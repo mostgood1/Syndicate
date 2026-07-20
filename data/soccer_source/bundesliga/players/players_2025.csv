@@ -1,0 +1,406 @@
+league,season,player_id,player_name,team,position,minutes,games,shots_per90,xg_per90,xa_per90,goals_per90,assists_per90,key_passes_per90,expected_minutes_share,is_goalkeeper,source
+bundesliga,2025,understat_647,Harry Kane,Bayern Munich,F M S,2385.0,31,4.4906,1.1162,0.2794,1.3585,0.1887,1.5094,0.8548,False,understat
+bundesliga,2025,understat_10804,Deniz Undav,VfB Stuttgart,F M S,2261.0,29,4.9359,0.7586,0.2223,0.7563,0.2388,1.5126,0.8663,False,understat
+bundesliga,2025,understat_3738,Serhou Guirassy,Borussia Dortmund,F S,2366.0,33,3.1953,0.7574,0.0734,0.6467,0.038,0.7608,0.7966,False,understat
+bundesliga,2025,understat_1236,Patrik Schick,Bayer Leverkusen,F M S,2005.0,28,3.2319,0.8718,0.1433,0.7182,0.1347,0.6284,0.7956,False,understat
+bundesliga,2025,understat_9948,Michael Olise,Bayern Munich,M S,2308.0,32,3.9775,0.4502,0.6646,0.5849,0.7409,3.0806,0.8014,False,understat
+bundesliga,2025,understat_10408,Luis Díaz,Bayern Munich,M S,2464.0,32,3.2143,0.5428,0.3697,0.5479,0.5114,2.3742,0.8556,False,understat
+bundesliga,2025,understat_956,Andrej Kramaric,Hoffenheim,F M S,2256.0,34,2.5931,0.5217,0.1807,0.5585,0.2394,1.3963,0.7373,False,understat
+bundesliga,2025,understat_7108,Jonathan Burkardt,Eintracht Frankfurt,F S,1351.0,22,2.7313,0.8738,0.0445,0.866,0.0666,0.5996,0.6823,False,understat
+bundesliga,2025,understat_7422,Christoph Baumgartner,RasenBallsport Leipzig,M S,2811.0,33,2.5934,0.577,0.1374,0.4162,0.2561,1.1846,0.9465,False,understat
+bundesliga,2025,understat_13013,Haris Tabakovic,Borussia M.Gladbach,F S,2424.0,32,2.4876,0.5324,0.0699,0.4827,0.0743,0.5941,0.8417,False,understat
+bundesliga,2025,understat_13911,Said El Mala,FC Cologne,F M S,1965.0,34,3.3893,0.5763,0.1917,0.5954,0.1832,0.916,0.6422,False,understat
+bundesliga,2025,understat_82,Nadiem Amiri,Mainz 05,F M S,2112.0,26,2.3011,0.4562,0.2795,0.5114,0.0852,2.7273,0.9026,False,understat
+bundesliga,2025,understat_6496,Ermedin Demirovic,VfB Stuttgart,F S,1507.0,25,2.4486,0.5174,0.1302,0.7167,0.1792,1.0153,0.6698,False,understat
+bundesliga,2025,understat_13561,Yan Diomande,RasenBallsport Leipzig,F M S,2507.0,33,1.9027,0.2883,0.3607,0.4308,0.2872,2.0463,0.8441,False,understat
+bundesliga,2025,understat_12953,Igor Matanovic,Freiburg,F S,1536.0,31,2.9883,0.5615,0.131,0.6445,0.1172,1.2891,0.5505,False,understat
+bundesliga,2025,understat_10113,Fisnik Asllani,Hoffenheim,F M S,2429.0,33,2.7048,0.3522,0.2001,0.3705,0.2594,1.2598,0.8178,False,understat
+bundesliga,2025,understat_10734,Jens Stage,Werder Bremen,M,2489.0,29,2.0611,0.2205,0.1257,0.3616,0.0723,0.9401,0.9536,False,understat
+bundesliga,2025,understat_8137,Maximilian Beier,Borussia Dortmund,D F M S,2069.0,32,2.175,0.3588,0.2156,0.3915,0.261,1.0875,0.7184,False,understat
+bundesliga,2025,understat_13852,Rômulo,RasenBallsport Leipzig,F M S,2246.0,30,2.5245,0.6386,0.1445,0.3606,0.1603,1.0018,0.8319,False,understat
+bundesliga,2025,understat_993,Serge Gnabry,Bayern Munich,F M S,1280.0,21,3.5156,0.4405,0.3622,0.5625,0.4219,1.5469,0.6772,False,understat
+bundesliga,2025,understat_8407,Tim Lemperle,Hoffenheim,F M S,2008.0,29,2.3755,0.4219,0.1154,0.3586,0.0896,1.1653,0.7693,False,understat
+bundesliga,2025,understat_10048,Nicolas Jackson,Bayern Munich,F M S,991.0,23,3.4511,0.7712,0.1898,0.7265,0.0908,1.5439,0.4787,False,understat
+bundesliga,2025,understat_11227,Dzenan Pejcinovic,Wolfsburg,F S,1445.0,30,3.1765,0.5164,0.1025,0.4983,0.0,0.7474,0.5352,False,understat
+bundesliga,2025,understat_11866,Álex Grimaldo,Bayer Leverkusen,D,2539.0,29,2.1623,0.2397,0.363,0.2836,0.2481,2.4458,0.9728,False,understat
+bundesliga,2025,understat_12954,Can Uzun,Eintracht Frankfurt,M S,1178.0,21,3.1324,0.3472,0.2011,0.6112,0.3056,1.4516,0.6233,False,understat
+bundesliga,2025,understat_13062,Mohammed Amoura,Wolfsburg,F M S,1949.0,30,2.7707,0.4598,0.1834,0.3694,0.1385,1.1083,0.7219,False,understat
+bundesliga,2025,understat_261,Julian Brandt,Borussia Dortmund,F M S,1601.0,29,2.1362,0.2869,0.2976,0.3935,0.2249,1.6864,0.6134,False,understat
+bundesliga,2025,understat_4340,Grischa Prömel,Hoffenheim,M S,1696.0,33,2.2288,0.2722,0.139,0.3715,0.1061,0.9021,0.571,False,understat
+bundesliga,2025,understat_5266,Vincenzo Grifo,Freiburg,M S,1733.0,33,1.558,0.2836,0.2798,0.3635,0.2077,2.0254,0.5835,False,understat
+bundesliga,2025,understat_6449,Chris Führich,VfB Stuttgart,F M S,1727.0,33,2.3451,0.2226,0.4079,0.3648,0.3648,2.5536,0.5815,False,understat
+bundesliga,2025,understat_8869,Ragnar Ache,FC Cologne,F S,1739.0,29,2.6912,0.5694,0.1538,0.3623,0.207,1.4491,0.6663,False,understat
+bundesliga,2025,understat_9718,Jamie Leweling,VfB Stuttgart,D M S,2385.0,32,1.8491,0.1548,0.2285,0.2642,0.3396,1.5472,0.8281,False,understat
+bundesliga,2025,understat_10732,Jakub Kaminski,FC Cologne,D F M,3031.0,34,1.841,0.2365,0.166,0.2079,0.0891,1.4847,0.9905,False,understat
+bundesliga,2025,understat_10772,Karim Adeyemi,Borussia Dortmund,F M S,1218.0,28,2.2906,0.3854,0.2555,0.5172,0.2956,1.1823,0.4833,False,understat
+bundesliga,2025,understat_11007,Fábio Vieira,Hamburger SV,F M S,2241.0,29,2.3695,0.1966,0.1863,0.2811,0.2008,1.5663,0.8586,False,understat
+bundesliga,2025,understat_171,Michael Gregoritsch,Augsburg,F S,926.0,17,2.8186,0.6041,0.1476,0.5832,0.1944,0.6803,0.6052,False,understat
+bundesliga,2025,understat_419,Maximilian Mittelstädt,VfB Stuttgart,D M S,2200.0,32,1.2682,0.2027,0.2258,0.2455,0.1636,1.5136,0.7639,False,understat
+bundesliga,2025,understat_5256,Oliver Burke,Union Berlin,F M S,1699.0,29,1.8011,0.3198,0.1213,0.3178,0.1059,1.2184,0.651,False,understat
+bundesliga,2025,understat_8056,Arnaud Kalimuendo Muinga,Eintracht Frankfurt,F M S,1431.0,19,1.8868,0.3069,0.1005,0.3774,0.0629,1.3836,0.8368,False,understat
+bundesliga,2025,understat_9860,Malik Tillman,Bayer Leverkusen,M S,1681.0,29,1.8203,0.2743,0.193,0.3212,0.0535,1.4456,0.6441,False,understat
+bundesliga,2025,understat_10288,Anton Kade,Augsburg,D F M S,1740.0,28,2.4828,0.3472,0.16,0.3103,0.0,1.2931,0.6905,False,understat
+bundesliga,2025,understat_11845,Phillip Tietz,"Augsburg,Mainz 05",F S,1811.0,29,2.5345,0.5764,0.0955,0.2982,0.0994,0.9442,0.6939,False,understat
+bundesliga,2025,understat_12038,Fabian Rieder,Augsburg,D F M S,2387.0,32,1.4328,0.1571,0.2027,0.2262,0.1131,1.659,0.8288,False,understat
+bundesliga,2025,understat_13323,Budu Zivzivadze,FC Heidenheim,F S,1148.0,20,2.1951,0.4563,0.0712,0.4704,0.0,0.5488,0.6378,False,understat
+bundesliga,2025,understat_13725,Luka Vuskovic,Hamburger SV,D S,2440.0,28,1.1434,0.1727,0.0209,0.2213,0.0,0.4057,0.9683,False,understat
+bundesliga,2025,understat_294,Gian-Luca Waldschmidt,FC Cologne,F M S,633.0,24,3.6967,0.8458,0.3746,0.7109,0.7109,1.9905,0.2931,False,understat
+bundesliga,2025,understat_335,Leon Goretzka,Bayern Munich,M S,2004.0,31,1.5719,0.2194,0.1054,0.2246,0.1347,0.9431,0.7183,False,understat
+bundesliga,2025,understat_1427,Kevin Diks,Borussia M.Gladbach,D S,2472.0,30,0.8374,0.1523,0.0256,0.182,0.0,0.2913,0.9156,False,understat
+bundesliga,2025,understat_3349,Ramy Bensebaini,Borussia Dortmund,D S,1524.0,21,1.0039,0.1924,0.0426,0.2953,0.1181,0.6496,0.8063,False,understat
+bundesliga,2025,understat_3455,Raphael Guerreiro,Bayern Munich,M S,779.0,18,1.3864,0.4077,0.2629,0.5777,0.2311,2.1951,0.4809,False,understat
+bundesliga,2025,understat_5251,Rani Khedira,Union Berlin,M,2854.0,32,0.7253,0.0716,0.073,0.1577,0.0315,0.5046,0.991,False,understat
+bundesliga,2025,understat_5752,Alexis Claude Maurice,Augsburg,F M S,2135.0,29,2.993,0.2672,0.1356,0.2108,0.1686,1.3489,0.818,False,understat
+bundesliga,2025,understat_7485,Nico Schlotterbeck,Borussia Dortmund,D,2520.0,28,1.1429,0.1358,0.0379,0.1786,0.0357,0.4286,1.0,False,understat
+bundesliga,2025,understat_7749,Rayan Philippe,Hamburger SV,F M S,1272.0,28,2.7594,0.3995,0.096,0.3538,0.0,1.0613,0.5048,False,understat
+bundesliga,2025,understat_7879,Marius Bülter,FC Cologne,F M S,1578.0,32,2.3954,0.227,0.2683,0.2852,0.2281,1.4829,0.5479,False,understat
+bundesliga,2025,understat_8317,Edmond Tapsoba,Bayer Leverkusen,D,2579.0,29,1.012,0.1479,0.0596,0.1745,0.1047,0.3839,0.9881,False,understat
+bundesliga,2025,understat_8791,Ritsu Doan,Eintracht Frankfurt,D F M S,2425.0,31,1.5216,0.1531,0.2419,0.1856,0.1856,1.4474,0.8692,False,understat
+bundesliga,2025,understat_8846,Paul Nebel,Mainz 05,M S,2087.0,30,1.38,0.2488,0.2304,0.2156,0.0862,1.7681,0.773,False,understat
+bundesliga,2025,understat_9689,Albert Sambi Lokonga,Hamburger SV,M S,1724.0,26,0.9919,0.0871,0.0719,0.261,0.0,1.3051,0.7368,False,understat
+bundesliga,2025,understat_10367,Tiago Tomás,VfB Stuttgart,F M S,996.0,27,3.1627,0.5,0.1138,0.4518,0.2711,0.994,0.4099,False,understat
+bundesliga,2025,understat_10585,Justin Njinmah,Werder Bremen,D F M S,1963.0,33,2.8426,0.3108,0.0568,0.2292,0.0,0.7794,0.6609,False,understat
+bundesliga,2025,understat_10725,Danilho Doekhi,Union Berlin,D,3060.0,34,1.3235,0.1435,0.0161,0.1471,0.0,0.2353,1.0,False,understat
+bundesliga,2025,understat_10860,Derry Scherhant,Freiburg,M S,1253.0,31,2.5858,0.2382,0.1411,0.3591,0.0718,1.5802,0.4491,False,understat
+bundesliga,2025,understat_11861,Stefan Schimmer,FC Heidenheim,F S,737.0,27,3.9077,0.7223,0.2016,0.6106,0.1221,1.4654,0.3033,False,understat
+bundesliga,2025,understat_12421,Andrej Ilic,Union Berlin,F M S,2238.0,32,2.8552,0.4469,0.1912,0.2011,0.3619,1.2064,0.7771,False,understat
+bundesliga,2025,understat_12983,Danel Sinani,St. Pauli,F M S,2080.0,30,2.1202,0.2487,0.1603,0.2163,0.1298,1.9471,0.7704,False,understat
+bundesliga,2025,understat_13102,Johan Manzambi,Freiburg,M S,2145.0,27,2.1399,0.1688,0.1501,0.2098,0.1678,0.7972,0.8827,False,understat
+bundesliga,2025,understat_13427,Bazoumana Touré,Hoffenheim,D F M S,2379.0,30,1.8159,0.1945,0.2735,0.1892,0.3405,1.6646,0.8811,False,understat
+bundesliga,2025,understat_13573,Lennart Karl,Bayern Munich,M S,1268.0,26,2.9811,0.5055,0.1981,0.3549,0.3549,1.6325,0.5419,False,understat
+bundesliga,2025,understat_13856,Christian Kofane,Bayer Leverkusen,F M S,1231.0,29,3.3631,0.5883,0.164,0.3656,0.2924,1.2429,0.4716,False,understat
+bundesliga,2025,understat_13857,Ernest Poku,Bayer Leverkusen,D M S,1471.0,29,1.6519,0.2281,0.1932,0.3059,0.3059,1.6519,0.5636,False,understat
+bundesliga,2025,understat_13866,Ilyas Ansah,Union Berlin,F M S,1960.0,33,1.5153,0.1757,0.0699,0.2296,0.0459,0.7806,0.6599,False,understat
+bundesliga,2025,understat_13925,Ransford Königsdörffer,Hamburger SV,F M S,2425.0,33,2.4124,0.3005,0.048,0.1856,0.0,0.7423,0.8165,False,understat
+bundesliga,2025,understat_5611,Martin Terrier,Bayer Leverkusen,F M S,667.0,18,2.2939,0.4319,0.1484,0.5397,0.1349,1.3493,0.4117,False,understat
+bundesliga,2025,understat_6415,Nikolas Nartey,VfB Stuttgart,F M S,1255.0,28,1.5777,0.3156,0.2405,0.2869,0.2151,1.7211,0.498,False,understat
+bundesliga,2025,understat_7267,Woo-Yeong Jeong,Union Berlin,F M S,1182.0,28,1.6751,0.2042,0.0325,0.3046,0.0761,0.4569,0.469,False,understat
+bundesliga,2025,understat_7376,Ozan Kabak,Hoffenheim,D S,1731.0,25,1.8198,0.2412,0.0233,0.208,0.0,0.4679,0.7693,False,understat
+bundesliga,2025,understat_8989,Ansgar Knauff,Eintracht Frankfurt,D F M S,1302.0,28,2.3502,0.2558,0.2011,0.2765,0.0691,1.1751,0.5167,False,understat
+bundesliga,2025,understat_9069,Romano Schmid,Werder Bremen,F M,3004.0,34,1.7077,0.2378,0.3079,0.1198,0.2397,2.6065,0.9817,False,understat
+bundesliga,2025,understat_9730,Patrick Wimmer,Wolfsburg,F M S,1678.0,25,1.2872,0.1951,0.1207,0.2145,0.1609,0.8582,0.7458,False,understat
+bundesliga,2025,understat_9783,Jae-Sung Lee,Mainz 05,F M S,2229.0,28,1.2113,0.1705,0.1343,0.1615,0.0808,0.8883,0.8845,False,understat
+bundesliga,2025,understat_11354,Yuito Suzuki,Freiburg,M S,1645.0,25,2.079,0.2286,0.1149,0.2188,0.1094,1.3678,0.7311,False,understat
+bundesliga,2025,understat_11856,Marvin Pieringer,FC Heidenheim,F M S,1689.0,27,1.7052,0.3096,0.1178,0.2131,0.0533,0.9059,0.6951,False,understat
+bundesliga,2025,understat_12941,Antonio Nusa,RasenBallsport Leipzig,F M S,2048.0,31,2.6807,0.2287,0.2087,0.1758,0.1318,1.4502,0.7341,False,understat
+bundesliga,2025,understat_13020,Bilal El Khannouss,VfB Stuttgart,F M S,1654.0,25,2.2854,0.1683,0.2871,0.2177,0.2721,2.3942,0.7351,False,understat
+bundesliga,2025,understat_13063,Konstantinos Koulierakis,Wolfsburg,D S,2476.0,29,0.9451,0.1292,0.0643,0.1454,0.0363,0.5089,0.9487,False,understat
+bundesliga,2025,understat_13122,Nathaniel Brown,Eintracht Frankfurt,D M S,2668.0,33,0.6072,0.0697,0.1073,0.1349,0.1349,1.1469,0.8983,False,understat
+bundesliga,2025,understat_13191,Assan Ouédraogo,RasenBallsport Leipzig,F M S,970.0,19,2.5052,0.2605,0.2793,0.3711,0.2784,1.299,0.5673,False,understat
+bundesliga,2025,understat_13860,Wouter Burger,Hoffenheim,M,2486.0,30,1.3033,0.1525,0.213,0.1448,0.181,1.8463,0.9207,False,understat
+bundesliga,2025,understat_13885,Andréas Hountondji,St. Pauli,F M S,1092.0,21,1.7308,0.4087,0.0582,0.3297,0.0,0.4945,0.5778,False,understat
+bundesliga,2025,understat_125,Maximilian Eggestein,Freiburg,M,3060.0,34,1.2941,0.0998,0.0416,0.0882,0.0294,0.5588,1.0,False,understat
+bundesliga,2025,understat_315,Matthias Ginter,Freiburg,D,2845.0,32,0.6011,0.0651,0.0667,0.0949,0.0949,0.4429,0.9878,False,understat
+bundesliga,2025,understat_604,Emre Can,Borussia Dortmund,D S,627.0,9,0.7177,0.3393,0.0,0.4306,0.0,0.0,0.7741,False,understat
+bundesliga,2025,understat_646,Christian Eriksen,Wolfsburg,M S,2446.0,31,1.3982,0.205,0.2908,0.1104,0.3312,2.2813,0.8767,False,understat
+bundesliga,2025,understat_1055,Aleix García,Bayer Leverkusen,M S,2708.0,33,0.997,0.0824,0.2016,0.0997,0.2326,1.6285,0.9118,False,understat
+bundesliga,2025,understat_5969,Jean-Luc Dompe,Hamburger SV,F M S,1132.0,20,1.9876,0.1733,0.3216,0.2385,0.0,2.6237,0.6289,False,understat
+bundesliga,2025,understat_6109,Konrad Laimer,Bayern Munich,D M S,1997.0,29,0.7661,0.1274,0.2249,0.1352,0.4056,1.9379,0.7651,False,understat
+bundesliga,2025,understat_6273,Robin Koch,Eintracht Frankfurt,D,2840.0,32,0.4754,0.0611,0.0228,0.0951,0.0317,0.3169,0.9861,False,understat
+bundesliga,2025,understat_6475,Lucas Höler,Freiburg,F M S,2070.0,33,1.4348,0.2281,0.0906,0.1304,0.0435,1.0435,0.697,False,understat
+bundesliga,2025,understat_6974,Mattias Svanberg,Wolfsburg,M S,814.0,24,2.3219,0.3319,0.0945,0.3317,0.1106,0.6634,0.3769,False,understat
+bundesliga,2025,understat_7783,Xaver Schlager,RasenBallsport Leipzig,M S,1844.0,26,1.0249,0.1053,0.1073,0.1464,0.0488,1.0249,0.788,False,understat
+bundesliga,2025,understat_7882,Sheraldo Becker,Mainz 05,F S,975.0,14,2.6769,0.4449,0.3269,0.2769,0.2769,1.5692,0.7738,False,understat
+bundesliga,2025,understat_8205,Jan Thielmann,FC Cologne,D F M S,1582.0,26,1.536,0.1167,0.0568,0.1707,0.0569,0.7965,0.6761,False,understat
+bundesliga,2025,understat_8418,Jamal Musiala,Bayern Munich,F M S,666.0,15,4.0541,0.6762,0.3704,0.4054,0.5405,2.2973,0.4933,False,understat
+bundesliga,2025,understat_9201,Eren Sami Dinkci,"FC Heidenheim,Freiburg",D F M S,1401.0,22,1.863,0.2645,0.0718,0.1927,0.0642,0.6424,0.7076,False,understat
+bundesliga,2025,understat_9326,Robert Glatzel,Hamburger SV,F S,594.0,19,2.4242,0.431,0.1309,0.4545,0.303,0.9091,0.3474,False,understat
+bundesliga,2025,understat_9724,David Raum,RasenBallsport Leipzig,D S,2570.0,30,0.8405,0.0841,0.3866,0.1051,0.2451,3.3619,0.9519,False,understat
+bundesliga,2025,understat_10187,Jarell Quansah,Bayer Leverkusen,D S,2303.0,28,0.7034,0.1394,0.0352,0.1172,0.0,0.4299,0.9139,False,understat
+bundesliga,2025,understat_10289,Tom Bischof,Bayern Munich,D M S,1282.0,26,2.1061,0.1391,0.2002,0.2106,0.2106,1.6849,0.5479,False,understat
+bundesliga,2025,understat_10830,Jean Négoce,Eintracht Frankfurt,F M S,1322.0,27,1.9743,0.1482,0.2735,0.2042,0.2723,2.1104,0.544,False,understat
+bundesliga,2025,understat_11310,Brajan Gruda,RasenBallsport Leipzig,F M S,760.0,13,2.4868,0.4181,0.3638,0.3553,0.3553,2.0132,0.6496,False,understat
+bundesliga,2025,understat_11484,Ibrahim Maza,Bayer Leverkusen,M S,1845.0,28,2.5854,0.2934,0.2142,0.1463,0.1951,1.3659,0.7321,False,understat
+bundesliga,2025,understat_11547,Aleksandar Pavlovic,Bayern Munich,M S,1451.0,24,0.6203,0.0961,0.1211,0.1861,0.062,1.3025,0.6718,False,understat
+bundesliga,2025,understat_11840,Jovan Milosevic,Werder Bremen,F S,476.0,13,2.2689,0.4386,0.0461,0.5672,0.1891,0.5672,0.4068,False,understat
+bundesliga,2025,understat_11865,Jan Schöppner,FC Heidenheim,M S,2286.0,31,0.9843,0.109,0.1172,0.1181,0.1181,0.5512,0.8194,False,understat
+bundesliga,2025,understat_12904,Samuel Mbangula,Werder Bremen,F M S,1160.0,26,1.319,0.1425,0.0805,0.2328,0.1552,1.0862,0.4957,False,understat
+bundesliga,2025,understat_12920,Leopold Querfeld,Union Berlin,D S,2701.0,31,0.9663,0.1297,0.0767,0.1,0.0,0.6997,0.9681,False,understat
+bundesliga,2025,understat_12924,Marco Grüll,Werder Bremen,F M S,2039.0,33,1.898,0.1865,0.1021,0.1324,0.0441,1.4566,0.6865,False,understat
+bundesliga,2025,understat_12928,Alexander Prass,Hoffenheim,D M S,1269.0,32,1.2766,0.1166,0.1537,0.2128,0.1418,1.2766,0.4406,False,understat
+bundesliga,2025,understat_12934,Shuto Machino,Borussia M.Gladbach,F M S,1046.0,32,2.1511,0.3284,0.0932,0.2581,0.086,1.2046,0.3632,False,understat
+bundesliga,2025,understat_13078,Chema Andres,VfB Stuttgart,M S,1299.0,25,1.0393,0.1369,0.0844,0.2079,0.0,1.0393,0.5773,False,understat
+bundesliga,2025,understat_13326,Abdoulie Ceesay,St. Pauli,S,282.0,20,3.5106,0.4928,0.1419,0.9574,0.0,0.9574,0.1567,False,understat
+bundesliga,2025,understat_13429,Julian Niehues,FC Heidenheim,M S,1416.0,24,1.1441,0.1334,0.0463,0.1907,0.0,0.4449,0.6556,False,understat
+bundesliga,2025,understat_13865,Robin Fellhauer,Augsburg,D M S,2829.0,34,0.9226,0.0825,0.0682,0.0954,0.0636,0.9862,0.9245,False,understat
+bundesliga,2025,understat_13919,Jens Castrop,Borussia M.Gladbach,D F M S,1613.0,26,1.6739,0.24,0.0784,0.1674,0.0558,1.0043,0.6893,False,understat
+bundesliga,2025,understat_13966,Martijn Kaars,St. Pauli,F S,1331.0,29,1.5552,0.2573,0.0906,0.2029,0.0676,0.6762,0.51,False,understat
+bundesliga,2025,understat_14023,Conrad Harder,RasenBallsport Leipzig,F S,886.0,29,4.2664,0.4753,0.2861,0.3047,0.3047,1.4221,0.3395,False,understat
+bundesliga,2025,understat_40,Stefan Bell,Mainz 05,D S,1044.0,18,1.0345,0.1586,0.1037,0.1724,0.0862,0.431,0.6444,False,understat
+bundesliga,2025,understat_106,Waldemar Anton,Borussia Dortmund,D,2880.0,32,0.5,0.0577,0.014,0.0625,0.0,0.25,1.0,False,understat
+bundesliga,2025,understat_183,Jonathan Tah,Bayern Munich,D S,2031.0,28,0.3545,0.0294,0.0261,0.0886,0.0443,0.2216,0.806,False,understat
+bundesliga,2025,understat_205,Mahmoud Dahoud,Eintracht Frankfurt,F M S,722.0,15,2.1191,0.0979,0.0403,0.2493,0.374,0.8726,0.5348,False,understat
+bundesliga,2025,understat_223,Joshua Kimmich,Bayern Munich,M S,2268.0,29,1.1111,0.0938,0.3004,0.0794,0.3175,2.2222,0.869,False,understat
+bundesliga,2025,understat_249,Danny da Costa,Mainz 05,D M S,2689.0,34,0.4686,0.0812,0.0947,0.0669,0.1004,0.5355,0.8788,False,understat
+bundesliga,2025,understat_269,Dominik Kohr,Mainz 05,D S,2366.0,29,0.6086,0.0716,0.0727,0.0761,0.0,0.3804,0.9065,False,understat
+bundesliga,2025,understat_320,Jonas Hofmann,Bayer Leverkusen,D M S,997.0,23,2.0762,0.1976,0.2487,0.1805,0.1805,1.4443,0.4816,False,understat
+bundesliga,2025,understat_1139,Silvan Widmer,Mainz 05,D M S,1855.0,27,0.9704,0.1329,0.0878,0.097,0.0485,0.3881,0.7634,False,understat
+bundesliga,2025,understat_3314,Franck Honorat,Borussia M.Gladbach,D F M S,2021.0,28,0.7571,0.0398,0.3269,0.0891,0.2672,2.004,0.802,False,understat
+bundesliga,2025,understat_5257,Willi Orban,RasenBallsport Leipzig,D,2952.0,33,0.6098,0.0958,0.0217,0.061,0.0,0.3354,0.9939,False,understat
+bundesliga,2025,understat_5263,Lukas Kübler,Freiburg,D S,1616.0,23,1.0582,0.1475,0.0775,0.1114,0.1114,0.6126,0.7807,False,understat
+bundesliga,2025,understat_5344,Hauke Wahl,St. Pauli,D S,2591.0,30,0.3474,0.0182,0.0221,0.0695,0.0347,0.2084,0.9596,False,understat
+bundesliga,2025,understat_6445,Elvis Rexhbecaj,Augsburg,D M S,1098.0,26,0.9016,0.0442,0.0579,0.1639,0.0,0.7377,0.4692,False,understat
+bundesliga,2025,understat_6638,Linton Maina,FC Cologne,D F M S,1007.0,24,1.7875,0.1152,0.2846,0.1787,0.0,1.5194,0.4662,False,understat
+bundesliga,2025,understat_6708,Bote Baku,RasenBallsport Leipzig,D S,2538.0,32,1.0638,0.1102,0.2056,0.0709,0.1064,1.3121,0.8812,False,understat
+bundesliga,2025,understat_7264,Han-Noah Massengo,Augsburg,M S,2455.0,33,0.7332,0.0635,0.06,0.0733,0.0367,0.6232,0.8266,False,understat
+bundesliga,2025,understat_7410,Andras Schafer,Union Berlin,M S,1420.0,28,1.7113,0.1127,0.0492,0.1268,0.0634,0.3803,0.5635,False,understat
+bundesliga,2025,understat_7743,Pereira Lage,St. Pauli,D F M S,2067.0,28,1.8723,0.1928,0.0898,0.0871,0.0871,1.045,0.8202,False,understat
+bundesliga,2025,understat_7877,Robert Andrich,Bayer Leverkusen,D M S,2550.0,32,0.4235,0.0286,0.019,0.0706,0.0,0.4235,0.8854,False,understat
+bundesliga,2025,understat_8778,Fabio Silva,Borussia Dortmund,F M S,784.0,28,2.6403,0.2417,0.3168,0.2296,0.6888,1.9515,0.3111,False,understat
+bundesliga,2025,understat_9053,Eric Martel,FC Cologne,D M S,2579.0,31,0.8026,0.0633,0.0718,0.0698,0.0698,0.4886,0.9244,False,understat
+bundesliga,2025,understat_9202,Felix Nmecha,Borussia Dortmund,M S,2208.0,29,1.3451,0.1371,0.0743,0.0815,0.1223,0.8152,0.846,False,understat
+bundesliga,2025,understat_9350,Armindo Sieb,Mainz 05,F S,497.0,22,3.2596,0.5191,0.1085,0.3622,0.0,1.4487,0.251,False,understat
+bundesliga,2025,understat_9356,Carney Chukwuemeka,Borussia Dortmund,F M S,869.0,28,1.8642,0.2534,0.0658,0.2071,0.0,1.1392,0.3448,False,understat
+bundesliga,2025,understat_9458,Josip Stanisic,Bayern Munich,D S,1842.0,26,0.342,0.0718,0.178,0.0977,0.1466,1.1726,0.7872,False,understat
+bundesliga,2025,understat_9674,Joe Scally,Borussia M.Gladbach,D M S,2615.0,32,0.5851,0.0929,0.0557,0.0688,0.1033,0.6195,0.908,False,understat
+bundesliga,2025,understat_9725,Angelo Stiller,VfB Stuttgart,M S,2752.0,34,0.556,0.1185,0.1983,0.0654,0.1635,1.766,0.8993,False,understat
+bundesliga,2025,understat_9745,Dimitris Giannoulis,Augsburg,D S,1957.0,27,0.4599,0.0447,0.1776,0.092,0.2299,1.5176,0.8053,False,understat
+bundesliga,2025,understat_9931,Lovro Majer,Wolfsburg,M S,1390.0,28,1.7482,0.2328,0.1898,0.1295,0.1942,1.3597,0.5516,False,understat
+bundesliga,2025,understat_9986,Kristijan Jakic,Augsburg,D M S,1655.0,26,0.9789,0.0783,0.074,0.1088,0.0544,0.7069,0.7073,False,understat
+bundesliga,2025,understat_10248,Arijon Ibrahimovic,FC Heidenheim,D F M S,2196.0,32,1.9262,0.2322,0.2774,0.082,0.1639,2.2951,0.7625,False,understat
+bundesliga,2025,understat_10497,Yannick Engelhardt,Borussia M.Gladbach,M S,2506.0,31,0.7542,0.0868,0.0387,0.0718,0.0718,0.5387,0.8982,False,understat
+bundesliga,2025,understat_10550,Tom Rothe,Union Berlin,D S,1018.0,21,1.6798,0.1415,0.0798,0.1768,0.0,0.9725,0.5386,False,understat
+bundesliga,2025,understat_10750,Rasmus Kristensen,Eintracht Frankfurt,D S,1555.0,22,0.8682,0.0652,0.0799,0.1158,0.0,0.463,0.7854,False,understat
+bundesliga,2025,understat_10792,Farès Chaïbi,Eintracht Frankfurt,D F M S,1822.0,28,1.7289,0.1741,0.2487,0.0988,0.4446,1.9759,0.723,False,understat
+bundesliga,2025,understat_10863,Aaron Zehnter,Wolfsburg,D M S,1467.0,20,0.6748,0.111,0.0647,0.1227,0.0,0.9816,0.815,False,understat
+bundesliga,2025,understat_10946,Yan Couto,Borussia Dortmund,D M S,989.0,19,0.819,0.0877,0.2593,0.182,0.182,1.547,0.5784,False,understat
+bundesliga,2025,understat_11604,Mert Kömür,Augsburg,F M S,1455.0,28,2.5361,0.2874,0.1711,0.1237,0.2474,1.299,0.5774,False,understat
+bundesliga,2025,understat_11853,Patrick Mainka,FC Heidenheim,D,3060.0,34,1.0882,0.0891,0.0521,0.0588,0.0588,0.2941,1.0,False,understat
+bundesliga,2025,understat_11911,Hugo Larsson,Eintracht Frankfurt,M S,1839.0,25,0.6362,0.0696,0.0581,0.0979,0.0979,0.9299,0.8173,False,understat
+bundesliga,2025,understat_11917,Mathias Honsak,FC Heidenheim,F M S,1263.0,27,2.209,0.2365,0.103,0.1425,0.0713,0.7838,0.5198,False,understat
+bundesliga,2025,understat_11982,Jan-Niklas Beste,Freiburg,M S,1721.0,28,1.2551,0.1829,0.1975,0.1046,0.1046,1.8826,0.6829,False,understat
+bundesliga,2025,understat_12418,Rodrigo Ribeiro,Augsburg,F S,629.0,14,3.7202,0.6624,0.0038,0.2862,0.0,0.1431,0.4992,False,understat
+bundesliga,2025,understat_12470,Max Moerstedt,Hoffenheim,F S,334.0,22,1.6168,0.3369,0.1813,0.5389,0.0,0.5389,0.1687,False,understat
+bundesliga,2025,understat_12915,Philipp Sander,Borussia M.Gladbach,D M S,2475.0,30,0.9091,0.0501,0.0296,0.0727,0.0,0.4,0.9167,False,understat
+bundesliga,2025,understat_12975,Eric Smith,St. Pauli,D M S,2313.0,27,0.4669,0.0317,0.0348,0.0778,0.0778,0.7004,0.9519,False,understat
+bundesliga,2025,understat_12987,Luca Kerber,FC Heidenheim,M S,670.0,18,1.209,0.205,0.0204,0.2687,0.0,0.2687,0.4136,False,understat
+bundesliga,2025,understat_12988,Sirlord Conteh,FC Heidenheim,F M S,585.0,15,1.5385,0.4896,0.0951,0.3077,0.1538,1.3846,0.4333,False,understat
+bundesliga,2025,understat_13101,Arthur Chaves,"Augsburg,Hoffenheim",D S,1062.0,15,0.4237,0.0887,0.0197,0.1695,0.0,0.339,0.7867,False,understat
+bundesliga,2025,understat_13424,Daniel Svensson,Borussia Dortmund,D M S,2454.0,33,0.4401,0.1075,0.1576,0.0733,0.0733,1.2836,0.8263,False,understat
+bundesliga,2025,understat_13850,Johan Bakayoko,RasenBallsport Leipzig,F M S,764.0,20,2.8272,0.2799,0.1538,0.2356,0.0,1.178,0.4244,False,understat
+bundesliga,2025,understat_13910,Ísak Bergmann Jóhannesson,FC Cologne,M S,1830.0,31,0.6885,0.0705,0.1186,0.0984,0.0984,1.623,0.6559,False,understat
+bundesliga,2025,understat_14024,Adam Daghim,Wolfsburg,F M S,1328.0,27,1.8298,0.2107,0.2084,0.1355,0.2033,1.2199,0.5465,False,understat
+bundesliga,2025,understat_14123,Wael Mohya,Borussia M.Gladbach,F M S,533.0,15,1.8574,0.1853,0.0334,0.3377,0.1689,0.6754,0.3948,False,understat
+bundesliga,2025,understat_14197,Ricky-Jade Jones,St. Pauli,F S,344.0,9,2.8779,0.7423,0.3689,0.5233,0.0,1.8314,0.4247,False,understat
+bundesliga,2025,understat_14331,Ayoube Amaimouni-Echghouyab,Eintracht Frankfurt,D F M S,551.0,17,1.9601,0.0918,0.1048,0.3267,0.49,0.98,0.3601,False,understat
+bundesliga,2025,understat_140,Yannick Gerhardt,Wolfsburg,D M S,1080.0,19,0.9167,0.096,0.0754,0.0833,0.0,0.6667,0.6316,False,understat
+bundesliga,2025,understat_153,Maximilian Arnold,Wolfsburg,M S,1837.0,25,0.6369,0.018,0.2081,0.049,0.196,1.4208,0.8164,False,understat
+bundesliga,2025,understat_435,Benjamin Henrichs,RasenBallsport Leipzig,D S,275.0,17,1.3091,0.0639,0.0544,0.3273,0.0,0.9818,0.1797,False,understat
+bundesliga,2025,understat_2253,Lucas Vázquez,Bayer Leverkusen,D S,483.0,12,0.7453,0.1704,0.4676,0.1863,0.3727,1.8634,0.4472,False,understat
+bundesliga,2025,understat_2611,Philipp Lienhart,Freiburg,D S,1296.0,20,0.5556,0.0659,0.01,0.0694,0.0,0.2778,0.72,False,understat
+bundesliga,2025,understat_2693,Marius Wolf,Augsburg,D F M S,1002.0,29,1.2575,0.154,0.3316,0.0898,0.0898,1.8862,0.3839,False,understat
+bundesliga,2025,understat_4312,Marnon Busch,FC Heidenheim,D M S,1901.0,29,0.5681,0.0377,0.1538,0.0473,0.2367,0.7575,0.7284,False,understat
+bundesliga,2025,understat_5225,Bakery Jatta,Hamburger SV,D M S,934.0,15,1.06,0.1491,0.0286,0.0964,0.0964,0.4818,0.6919,False,understat
+bundesliga,2025,understat_5231,Florian Kainz,FC Cologne,M S,245.0,15,2.9388,0.3416,0.1171,0.3673,0.3673,2.9388,0.1815,False,understat
+bundesliga,2025,understat_5243,Dayotchanculle Upamecano,Bayern Munich,D S,1805.0,24,0.3989,0.0414,0.0717,0.0499,0.0499,0.5485,0.8356,False,understat
+bundesliga,2025,understat_5248,Marcel Sabitzer,Borussia Dortmund,M S,1835.0,26,0.9809,0.0564,0.1099,0.049,0.0981,0.7357,0.7842,False,understat
+bundesliga,2025,understat_5250,Yussuf Poulsen,Hamburger SV,F S,286.0,15,2.2028,0.2175,0.0882,0.3147,0.0,0.6294,0.2119,False,understat
+bundesliga,2025,understat_5340,Marco Friedl,Werder Bremen,D S,2552.0,30,0.2821,0.0257,0.0103,0.0353,0.0,0.1763,0.9452,False,understat
+bundesliga,2025,understat_5347,Jonas Föhrenbach,FC Heidenheim,D M S,2333.0,27,0.2315,0.0245,0.0872,0.0386,0.0386,0.8487,0.9601,False,understat
+bundesliga,2025,understat_6351,Robin Hack,Borussia M.Gladbach,M S,311.0,8,3.1833,0.2247,0.2506,0.2894,0.0,3.4727,0.4319,False,understat
+bundesliga,2025,understat_6436,Stanley N&#039;Soki,Union Berlin,D S,837.0,13,0.3226,0.0143,0.0217,0.1075,0.2151,0.4301,0.7154,False,understat
+bundesliga,2025,understat_6626,Joshua Vagnoman,VfB Stuttgart,D M S,1589.0,27,1.0761,0.2015,0.1202,0.0566,0.1699,0.9062,0.6539,False,understat
+bundesliga,2025,understat_7058,Kevin Stöger,Borussia M.Gladbach,M S,1322.0,29,1.5658,0.1399,0.1396,0.0681,0.0681,1.8381,0.5065,False,understat
+bundesliga,2025,understat_7106,Philipp Mwene,Mainz 05,D M S,2081.0,29,0.4325,0.0879,0.0925,0.0432,0.0865,0.7785,0.7973,False,understat
+bundesliga,2025,understat_7345,Alphonso Davies,Bayern Munich,D S,521.0,13,0.691,0.0762,0.2249,0.1727,0.5182,1.5547,0.4453,False,understat
+bundesliga,2025,understat_7934,Andreas Skov Olsen,Wolfsburg,M S,365.0,8,1.726,0.0483,0.2204,0.2466,0.0,1.726,0.5069,False,understat
+bundesliga,2025,understat_7940,Denis Vavro,Wolfsburg,D S,1168.0,17,0.9247,0.1283,0.0137,0.0771,0.0,0.2312,0.7634,False,understat
+bundesliga,2025,understat_8191,Giovanni Reyna,Borussia M.Gladbach,M S,485.0,19,1.299,0.1238,0.2883,0.1856,0.0,2.2268,0.2836,False,understat
+bundesliga,2025,understat_8456,Nathan Tella,Bayer Leverkusen,D M S,890.0,17,2.427,0.2814,0.3865,0.1011,0.4045,2.0225,0.5817,False,understat
+bundesliga,2025,understat_8643,Chrislain Matsima,Augsburg,D S,1494.0,18,0.4217,0.034,0.0352,0.0602,0.0602,0.241,0.9222,False,understat
+bundesliga,2025,understat_8807,Silas Wamangituka,Mainz 05,F S,346.0,8,2.0809,0.6068,0.05,0.2601,0.0,0.7803,0.4806,False,understat
+bundesliga,2025,understat_8965,Vladimir Coufal,Hoffenheim,D M,3032.0,34,0.7718,0.0294,0.222,0.0297,0.2375,1.7216,0.9908,False,understat
+bundesliga,2025,understat_9233,Joakim Maehle,Wolfsburg,D M S,1226.0,16,1.0277,0.0497,0.1209,0.0734,0.1468,1.0277,0.8514,False,understat
+bundesliga,2025,understat_9511,Castello Lukeba,RasenBallsport Leipzig,D S,2176.0,26,0.3309,0.0368,0.0099,0.0414,0.0,0.2482,0.9299,False,understat
+bundesliga,2025,understat_9711,Patrick Osterhage,Freiburg,M S,1190.0,20,0.5294,0.0969,0.0252,0.0756,0.0,0.4538,0.6611,False,understat
+bundesliga,2025,understat_9715,Hiroki Ito,Bayern Munich,D S,918.0,16,0.9804,0.1467,0.1077,0.098,0.1961,0.5882,0.6375,False,understat
+bundesliga,2025,understat_9943,Moritz Jenz,Wolfsburg,D S,1795.0,22,0.2507,0.0333,0.0034,0.0501,0.0,0.1003,0.9066,False,understat
+bundesliga,2025,understat_9999,Arthur Theate,Eintracht Frankfurt,D,2147.0,24,0.6707,0.0597,0.0221,0.0419,0.0,0.4611,0.994,False,understat
+bundesliga,2025,understat_10394,Jonas Wind,Wolfsburg,F S,480.0,11,1.6875,0.2592,0.0492,0.1875,0.0,0.9375,0.4848,False,understat
+bundesliga,2025,understat_10926,Tim Skarke,Union Berlin,F M S,555.0,22,2.2703,0.147,0.2348,0.1622,0.1622,1.7838,0.2803,False,understat
+bundesliga,2025,understat_10986,Kim Min-Jae,Bayern Munich,D S,1621.0,25,0.2776,0.0403,0.0263,0.0555,0.0555,0.2221,0.7204,False,understat
+bundesliga,2025,understat_11314,Keke Maximilian Topp,Werder Bremen,F S,617.0,20,3.6467,0.2948,0.1274,0.1459,0.1459,1.3128,0.3428,False,understat
+bundesliga,2025,understat_11333,Josip Juranovic,Union Berlin,D S,309.0,11,1.165,0.2114,0.3597,0.2913,0.2913,3.4951,0.3121,False,understat
+bundesliga,2025,understat_11855,Adrian Beck,FC Heidenheim,M S,847.0,24,1.1688,0.1068,0.2691,0.1063,0.1063,1.9126,0.3921,False,understat
+bundesliga,2025,understat_11868,Arthur,Bayer Leverkusen,D S,1130.0,20,0.7965,0.0947,0.0956,0.0796,0.2389,1.1947,0.6278,False,understat
+bundesliga,2025,understat_11894,Max Finkgrafe,RasenBallsport Leipzig,D S,491.0,13,0.7332,0.0414,0.1136,0.1833,0.1833,2.1996,0.4197,False,understat
+bundesliga,2025,understat_11981,Benedict Hollerbach,Mainz 05,F M S,903.0,14,2.1927,0.2969,0.1876,0.0997,0.1993,0.3987,0.7167,False,understat
+bundesliga,2025,understat_12028,Olivier Deman,Werder Bremen,D S,1251.0,16,0.7194,0.0308,0.1064,0.0719,0.1439,1.223,0.8688,False,understat
+bundesliga,2025,understat_12053,Mikkel Kaufmann,FC Heidenheim,F S,519.0,16,1.9075,0.2385,0.2209,0.1734,0.1734,0.6936,0.3604,False,understat
+bundesliga,2025,understat_12069,Junior Adamu,Freiburg,F S,456.0,9,1.5789,0.3527,0.2458,0.1974,0.1974,0.9868,0.563,False,understat
+bundesliga,2025,understat_12430,Nnamdi Collins,Eintracht Frankfurt,D S,1490.0,23,0.1812,0.0414,0.0276,0.0604,0.1208,0.1812,0.7198,False,understat
+bundesliga,2025,understat_12880,Albert Grønbæk,Hamburger SV,D M S,500.0,7,1.44,0.0748,0.2588,0.18,0.36,1.44,0.7937,False,understat
+bundesliga,2025,understat_12918,Kaishu Sano,Mainz 05,M,3060.0,34,0.7059,0.0471,0.1064,0.0294,0.0588,0.7353,1.0,False,understat
+bundesliga,2025,understat_12922,Samuel Essende,Augsburg,F S,361.0,14,4.2382,0.3631,0.1066,0.2493,0.0,0.9972,0.2865,False,understat
+bundesliga,2025,understat_12952,Oscar Højlund,Eintracht Frankfurt,M S,1082.0,24,0.5823,0.0511,0.0887,0.0832,0.0832,0.5823,0.5009,False,understat
+bundesliga,2025,understat_12974,Karol Mets,St. Pauli,D S,1938.0,23,0.3251,0.0358,0.0078,0.0464,0.0,0.1858,0.9362,False,understat
+bundesliga,2025,understat_12976,Philipp Treu,Freiburg,D M S,2195.0,28,0.697,0.0603,0.0743,0.041,0.082,0.82,0.871,False,understat
+bundesliga,2025,understat_12981,Manolis Saliakas,St. Pauli,D M S,1118.0,17,1.288,0.044,0.0725,0.0805,0.2415,0.966,0.7307,False,understat
+bundesliga,2025,understat_12984,Adam Dzwigala,St. Pauli,D S,1303.0,19,0.2763,0.0107,0.0147,0.0691,0.0691,0.3454,0.762,False,understat
+bundesliga,2025,understat_12986,Léo Scienza,FC Heidenheim,M,180.0,2,2.0,0.0712,0.6612,0.5,0.0,1.5,1.0,False,understat
+bundesliga,2025,understat_13012,Robin Hranác,Hoffenheim,D S,2261.0,29,0.3184,0.0824,0.0051,0.0398,0.0,0.1194,0.8663,False,understat
+bundesliga,2025,understat_13093,Derrick Köhn,Union Berlin,D S,1887.0,29,1.3355,0.1133,0.1473,0.0477,0.0954,1.1924,0.723,False,understat
+bundesliga,2025,understat_13149,Noahkai Banks,Augsburg,D S,1746.0,23,0.4639,0.0634,0.0477,0.0515,0.0515,0.3608,0.8435,False,understat
+bundesliga,2025,understat_13291,Patrice Covic,Werder Bremen,M S,326.0,15,1.3804,0.3062,0.2597,0.2761,0.0,1.1043,0.2415,False,understat
+bundesliga,2025,understat_13325,James Sands,St. Pauli,M S,1957.0,24,0.7358,0.04,0.0444,0.046,0.0,0.4599,0.906,False,understat
+bundesliga,2025,understat_13414,Hennes Behrens,FC Heidenheim,D S,1321.0,16,0.6132,0.022,0.1874,0.0681,0.1363,1.2945,0.9174,False,understat
+bundesliga,2025,understat_13442,Tidiam Gomis,RasenBallsport Leipzig,F S,309.0,18,2.6214,0.178,0.1421,0.2913,0.0,0.8738,0.1907,False,understat
+bundesliga,2025,understat_13460,Aaron Anselmino,Borussia Dortmund,D S,368.0,6,0.2446,0.0133,0.0,0.2446,0.0,0.0,0.6815,False,understat
+bundesliga,2025,understat_13496,Karim Coulibaly,Werder Bremen,D S,2128.0,27,0.2538,0.0478,0.0082,0.0423,0.0,0.2961,0.8757,False,understat
+bundesliga,2025,understat_13883,Joel Chima Fujita,St. Pauli,F M S,2689.0,32,1.071,0.0471,0.1457,0.0335,0.1004,1.0041,0.9337,False,understat
+bundesliga,2025,understat_13884,Louis Oppie,St. Pauli,D M S,1606.0,23,0.8406,0.0647,0.0631,0.056,0.0,0.5604,0.7758,False,understat
+bundesliga,2025,understat_13923,Nicolás Capaldo,Hamburger SV,D M S,2029.0,26,0.9759,0.1193,0.0819,0.0444,0.1331,0.9759,0.8671,False,understat
+bundesliga,2025,understat_13973,Albian Hajdari,Hoffenheim,D S,2449.0,30,0.6982,0.0717,0.0542,0.0367,0.0735,0.3307,0.907,False,understat
+bundesliga,2025,understat_13974,Isaac Schmidt,Werder Bremen,D S,671.0,19,0.6706,0.0698,0.0692,0.1341,0.0,1.3413,0.3924,False,understat
+bundesliga,2025,understat_14025,Alessio Castro-Montes,FC Cologne,D M S,662.0,14,1.0876,0.1703,0.3171,0.136,0.4079,3.1269,0.5254,False,understat
+bundesliga,2025,understat_14036,Fabio Baldé,Hamburger SV,F M S,422.0,16,1.9194,0.2018,0.2646,0.2133,0.2133,1.0664,0.2931,False,understat
+bundesliga,2025,understat_14058,Cameron Puertas,Werder Bremen,F M S,1867.0,28,1.7836,0.107,0.1168,0.0482,0.0964,1.3498,0.7409,False,understat
+bundesliga,2025,understat_14126,Montrell Culbreath,Bayer Leverkusen,D S,756.0,12,0.9524,0.2406,0.0476,0.119,0.0,0.7143,0.7,False,understat
+bundesliga,2025,understat_14177,Livan Burcu,Union Berlin,F M S,621.0,18,2.3188,0.3132,0.0737,0.1449,0.1449,1.3043,0.3833,False,understat
+bundesliga,2025,understat_14187,Kacper Potulski,Mainz 05,D S,1061.0,15,1.1876,0.2222,0.0523,0.0848,0.0,0.1697,0.7859,False,understat
+bundesliga,2025,understat_14371,Kento Shiogai,Wolfsburg,M S,292.0,12,2.774,0.5799,0.1759,0.3082,0.0,0.6164,0.2704,False,understat
+bundesliga,2025,understat_14420,Luca Reggiani,Borussia Dortmund,D S,515.0,8,0.5243,0.0805,0.0071,0.1748,0.0,0.3495,0.7153,False,understat
+bundesliga,2025,understat_14421,Samuele Inácio,Borussia Dortmund,M S,371.0,7,2.1833,0.4868,0.2227,0.2426,0.0,1.9407,0.5889,False,understat
+bundesliga,2025,understat_14423,Philip Otele,Hamburger SV,F M S,504.0,9,1.25,0.1797,0.1717,0.1786,0.1786,1.6071,0.6222,False,understat
+bundesliga,2025,understat_14428,Hugo Bolin,Borussia M.Gladbach,M S,534.0,13,2.5281,0.1957,0.0855,0.1685,0.1685,1.3483,0.4564,False,understat
+bundesliga,2025,understat_14481,Salim Musah,Werder Bremen,F S,182.0,8,3.4615,0.2327,0.1251,0.4945,0.0,1.4835,0.2528,False,understat
+bundesliga,2025,understat_73,Oliver Baumann,Hoffenheim,GK,3060.0,34,0.0,0.0,0.001,0.0,0.0,0.0294,1.0,True,understat
+bundesliga,2025,understat_75,Niklas Süle,Borussia Dortmund,D S,487.0,11,0.3696,0.0062,0.0547,0.0,0.1848,0.3696,0.4919,False,understat
+bundesliga,2025,understat_126,Michael Zetterer,Eintracht Frankfurt,GK S,1976.0,22,0.0,0.0,0.0,0.0,0.0,0.0,0.998,True,understat
+bundesliga,2025,understat_129,Dominique Heintz,FC Cologne,D S,381.0,9,0.0,0.0,0.0178,0.0,0.0,0.2362,0.4704,False,understat
+bundesliga,2025,understat_212,Nico Elvedi,Borussia M.Gladbach,D,2968.0,33,0.2729,0.0116,0.0413,0.0,0.0606,0.3942,0.9993,False,understat
+bundesliga,2025,understat_217,Manuel Neuer,Bayern Munich,GK,1870.0,22,0.0,0.0,0.0,0.0,0.0,0.0,0.9444,True,understat
+bundesliga,2025,understat_239,Pascal Groß,Borussia Dortmund,M S,619.0,11,1.1632,0.1214,0.1949,0.0,0.1454,1.5994,0.6253,False,understat
+bundesliga,2025,understat_262,Leonardo Bittencourt,Werder Bremen,M S,588.0,17,1.0714,0.0329,0.1351,0.0,0.1531,0.7653,0.3843,False,understat
+bundesliga,2025,understat_418,Niklas Stark,Werder Bremen,D S,721.0,14,0.3745,0.0723,0.0,0.0,0.0,0.0,0.5722,False,understat
+bundesliga,2025,understat_422,Mario Götze,Eintracht Frankfurt,M S,880.0,21,0.5114,0.0444,0.2924,0.0,0.0,1.4318,0.4656,False,understat
+bundesliga,2025,understat_449,Robin Zentner,Mainz 05,GK,878.0,10,0.0,0.0,0.0,0.0,0.0,0.0,0.9756,True,understat
+bundesliga,2025,understat_2639,Alexander Nübel,VfB Stuttgart,GK,3060.0,34,0.0,0.0,0.0108,0.0,0.0294,0.1176,1.0,True,understat
+bundesliga,2025,understat_2665,Jeffrey Gouweleeuw,Augsburg,D S,857.0,11,0.5251,0.0249,0.0398,0.0,0.105,0.5251,0.8657,False,understat
+bundesliga,2025,understat_3347,Ellyes Skhiri,Eintracht Frankfurt,D M S,1439.0,25,0.5003,0.0478,0.0192,0.0,0.0,0.4378,0.6396,False,understat
+bundesliga,2025,understat_4243,Christian Günter,Freiburg,D S,1559.0,24,0.5196,0.0226,0.1289,0.0,0.1732,1.0969,0.7218,False,understat
+bundesliga,2025,understat_4250,Nicolas Höfler,Freiburg,M S,262.0,13,1.374,0.0384,0.0,0.0,0.0,0.0,0.2239,False,understat
+bundesliga,2025,understat_4271,Janik Haberer,Union Berlin,D M S,1662.0,28,0.5957,0.0334,0.0794,0.0,0.0542,1.1372,0.6595,False,understat
+bundesliga,2025,understat_4313,Janis Blaswich,Bayer Leverkusen,GK S,928.0,11,0.0,0.0,0.0095,0.0,0.0,0.194,0.9374,True,understat
+bundesliga,2025,understat_4376,Marvin Schwäbe,FC Cologne,GK,3060.0,34,0.0,0.0,0.0107,0.0,0.0,0.0294,1.0,True,understat
+bundesliga,2025,understat_5217,Anthony Jung,Freiburg,D S,502.0,12,0.1793,0.0066,0.0403,0.0,0.0,0.7171,0.4648,False,understat
+bundesliga,2025,understat_5238,Jordan Torunarigha,Hamburger SV,D S,1963.0,24,0.2292,0.0142,0.0065,0.0,0.0,0.0917,0.9088,False,understat
+bundesliga,2025,understat_5241,Péter Gulácsi,RasenBallsport Leipzig,GK,2008.0,23,0.0,0.0,0.0,0.0,0.0,0.0,0.97,True,understat
+bundesliga,2025,understat_5245,Bernardo,Hoffenheim,D S,2340.0,29,0.3846,0.0168,0.0136,0.0,0.0,0.3462,0.8966,False,understat
+bundesliga,2025,understat_5283,Daniel Heuer Fernandes,Hamburger SV,GK,2970.0,33,0.0303,0.0039,0.0,0.0,0.0,0.0,1.0,True,understat
+bundesliga,2025,understat_5288,Gregor Kobel,Borussia Dortmund,GK,3060.0,34,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+bundesliga,2025,understat_5329,Stefan Posch,Mainz 05,D,1399.0,16,0.6433,0.0258,0.0315,0.0,0.0,0.5147,0.9715,False,understat
+bundesliga,2025,understat_5684,Arnaud Nordin,Mainz 05,D F M S,468.0,13,2.5,0.1388,0.0271,0.0,0.0,0.3846,0.4,False,understat
+bundesliga,2025,understat_6103,Dan-Axel Zagadou,VfB Stuttgart,D,216.0,3,2.5,0.1232,0.0369,0.0,0.0,0.4167,0.8,False,understat
+bundesliga,2025,understat_6321,Moritz Nicolas,Borussia M.Gladbach,GK,3060.0,34,0.0,0.0,0.0102,0.0,0.0,0.0588,1.0,True,understat
+bundesliga,2025,understat_6380,Anthony Caci,Mainz 05,D M S,531.0,10,1.0169,0.0443,0.2921,0.0,0.0,1.8644,0.59,False,understat
+bundesliga,2025,understat_6403,Timo Hübers,FC Cologne,D,681.0,8,0.0,0.0,0.0,0.0,0.0,0.0,0.9458,False,understat
+bundesliga,2025,understat_6411,Niklas Dorsch,FC Heidenheim,M S,2293.0,32,0.5495,0.0222,0.0813,0.0,0.0392,0.942,0.7962,False,understat
+bundesliga,2025,understat_6596,Finn Dahmen,Augsburg,GK,3060.0,34,0.0294,0.0195,0.0087,0.0,0.0,0.1176,1.0,True,understat
+bundesliga,2025,understat_7047,Mark Flekken,Bayer Leverkusen,GK,2132.0,24,0.0,0.0,0.003,0.0,0.0,0.0422,0.987,True,understat
+bundesliga,2025,understat_7048,Frederik Rönnow,Union Berlin,GK,2640.0,30,0.0,0.0,0.0006,0.0,0.0,0.0341,0.9778,True,understat
+bundesliga,2025,understat_7065,Florian Neuhaus,Borussia M.Gladbach,F M S,945.0,17,2.0952,0.1326,0.0955,0.0,0.0952,0.8571,0.6176,False,understat
+bundesliga,2025,understat_7320,Amos Pieper,Werder Bremen,D,1510.0,19,0.4768,0.0231,0.0042,0.0,0.0,0.1192,0.883,False,understat
+bundesliga,2025,understat_7401,Keven Schlotterbeck,Augsburg,D S,2025.0,24,0.5333,0.0578,0.0457,0.0,0.0444,0.5333,0.9375,False,understat
+bundesliga,2025,understat_7511,Sacha Boey,Bayern Munich,D S,458.0,9,1.179,0.0771,0.036,0.0,0.0,0.786,0.5654,False,understat
+bundesliga,2025,understat_7809,Mads Pedersen,Augsburg,D S,182.0,7,1.4835,0.0816,0.0734,0.0,0.0,1.978,0.2889,False,understat
+bundesliga,2025,understat_7867,Robert Skov,Union Berlin,D,236.0,3,0.3814,0.0124,0.0305,0.0,0.0,0.3814,0.8741,False,understat
+bundesliga,2025,understat_7875,Christopher Trimmel,Union Berlin,D S,1904.0,29,0.2363,0.0035,0.2407,0.0,0.1418,2.458,0.7295,False,understat
+bundesliga,2025,understat_7937,Julian Chabot,VfB Stuttgart,D S,2307.0,27,0.7022,0.0631,0.0107,0.0,0.0,0.2731,0.9494,False,understat
+bundesliga,2025,understat_7997,Julian Ryerson,Borussia Dortmund,D S,2288.0,31,0.472,0.0427,0.4271,0.0,0.59,2.2421,0.8201,False,understat
+bundesliga,2025,understat_8017,Alex Kral,Union Berlin,M S,394.0,20,1.599,0.0819,0.0622,0.0,0.0,0.9137,0.2189,False,understat
+bundesliga,2025,understat_8092,Tom Krauß,FC Cologne,D M S,1779.0,26,0.4553,0.0197,0.064,0.0,0.1012,0.7589,0.7603,False,understat
+bundesliga,2025,understat_8206,Yannik Keitel,Augsburg,D M S,247.0,6,0.0,0.0,0.0,0.0,0.0,0.0,0.4574,False,understat
+bundesliga,2025,understat_8325,Exequiel Palacios,Bayer Leverkusen,M S,1079.0,18,0.8341,0.0366,0.1098,0.0,0.0834,1.0843,0.666,False,understat
+bundesliga,2025,understat_8401,Luca Netz,Borussia M.Gladbach,D S,937.0,15,0.1921,0.0037,0.2336,0.0,0.1921,0.9605,0.6941,False,understat
+bundesliga,2025,understat_8665,Loic Bade,Bayer Leverkusen,D S,1655.0,23,0.6526,0.068,0.0075,0.0,0.0,0.1088,0.7995,False,understat
+bundesliga,2025,understat_8804,Felix Agu,Werder Bremen,D M S,757.0,11,0.2378,0.0097,0.0532,0.0,0.0,0.8322,0.7646,False,understat
+bundesliga,2025,understat_8826,Rocco Reitz,Borussia M.Gladbach,M,2669.0,31,1.5849,0.0894,0.1346,0.0,0.1349,0.9442,0.9566,False,understat
+bundesliga,2025,understat_8854,Tim Siersleben,FC Heidenheim,D S,1085.0,15,0.4147,0.0522,0.0096,0.0,0.0,0.1659,0.8037,False,understat
+bundesliga,2025,understat_8878,Atakan Karazor,VfB Stuttgart,M S,1906.0,28,0.3305,0.05,0.0766,0.0,0.0472,0.6139,0.7563,False,understat
+bundesliga,2025,understat_8973,Lorenz Assignon,VfB Stuttgart,D S,1091.0,24,0.9899,0.0557,0.0868,0.0,0.0,0.8249,0.5051,False,understat
+bundesliga,2025,understat_9015,Cenk Özkacar,FC Cologne,D S,1786.0,25,0.5543,0.0554,0.0103,0.0,0.0,0.252,0.7938,False,understat
+bundesliga,2025,understat_9182,Sepe Elye Wahi,Eintracht Frankfurt,F S,309.0,10,2.0388,0.3008,0.1737,0.0,0.2913,1.165,0.3433,False,understat
+bundesliga,2025,understat_9491,Warmed Omari,Hamburger SV,D S,1606.0,20,0.1681,0.0039,0.0228,0.0,0.056,0.4483,0.8922,False,understat
+bundesliga,2025,understat_9537,William Mikelbrencis,Hamburger SV,D M S,1384.0,26,0.7803,0.0955,0.1832,0.0,0.2601,1.0405,0.5915,False,understat
+bundesliga,2025,understat_9629,El Chadaille Bitshiabu,RasenBallsport Leipzig,D S,661.0,11,0.2723,0.0176,0.0077,0.0,0.0,0.2723,0.6677,False,understat
+bundesliga,2025,understat_9692,Karl Hein,Werder Bremen,GK,180.0,2,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+bundesliga,2025,understat_9752,Jesper Lindstrom,Wolfsburg,M S,362.0,13,2.2376,0.2336,0.1975,0.0,0.0,0.9945,0.3094,False,understat
+bundesliga,2025,understat_9753,Diant Ramaj,FC Heidenheim,GK,2790.0,31,0.0,0.0,0.0098,0.0,0.0323,0.0323,1.0,True,understat
+bundesliga,2025,understat_9861,Jonas Urbig,Bayern Munich,GK S,1100.0,14,0.0,0.0,0.0084,0.0,0.0,0.0818,0.873,True,understat
+bundesliga,2025,understat_10071,Lennard Maloney,Mainz 05,D M S,444.0,21,1.0135,0.1117,0.0087,0.0,0.0,0.2027,0.2349,False,understat
+bundesliga,2025,understat_10160,Noah Atubolu,Freiburg,GK,3060.0,34,0.0,0.0,0.01,0.0,0.0,0.0882,1.0,True,understat
+bundesliga,2025,understat_10300,Jeanuël Belocian,"Bayer Leverkusen,Wolfsburg",D S,1543.0,22,0.2333,0.0247,0.0271,0.0,0.0583,0.2333,0.7793,False,understat
+bundesliga,2025,understat_10423,Lasse Rieß,Mainz 05,GK S,290.0,4,0.0,0.0,0.0,0.0,0.0,0.0,0.8056,True,understat
+bundesliga,2025,understat_10724,Diogo Leite,Union Berlin,D,1998.0,23,0.4505,0.0358,0.0208,0.0,0.0,0.4054,0.9652,False,understat
+bundesliga,2025,understat_10730,Muhammed Damar,Hoffenheim,F M S,243.0,15,4.4444,0.6539,0.3753,0.0,0.0,4.4444,0.18,False,understat
+bundesliga,2025,understat_10771,Ben Seghir,Bayer Leverkusen,M S,229.0,10,1.9651,0.0372,0.4743,0.0,0.0,1.9651,0.2544,False,understat
+bundesliga,2025,understat_10872,Vinicius Souza,Wolfsburg,M S,1794.0,24,0.4515,0.0367,0.0391,0.0,0.0,0.4013,0.8306,False,understat
+bundesliga,2025,understat_11031,Kilian Fischer,Wolfsburg,D S,801.0,11,0.2247,0.0098,0.0526,0.0,0.0,0.3371,0.8091,False,understat
+bundesliga,2025,understat_11062,Badredine Bouanani,VfB Stuttgart,F M S,451.0,14,3.1929,0.2144,0.1135,0.0,0.0,0.9978,0.3579,False,understat
+bundesliga,2025,understat_11073,Fabio Chiarodia,Borussia M.Gladbach,D S,669.0,15,0.5381,0.1302,0.0018,0.0,0.0,0.1345,0.4956,False,understat
+bundesliga,2025,understat_11074,Denis Huseinbasic,FC Cologne,M S,726.0,15,0.7438,0.0255,0.0356,0.0,0.0,0.4959,0.5378,False,understat
+bundesliga,2025,understat_11143,Nelson Weiper,Mainz 05,F S,486.0,24,2.4074,0.5144,0.0733,0.0,0.0,1.2963,0.225,False,understat
+bundesliga,2025,understat_11157,Sael Kumbedi,Wolfsburg,D M S,1825.0,24,0.2466,0.0229,0.1539,0.0,0.2466,0.8877,0.8449,False,understat
+bundesliga,2025,understat_11236,Aljoscha Kemlein,Union Berlin,M S,1984.0,30,0.7712,0.0635,0.0712,0.0,0.0907,0.6351,0.7348,False,understat
+bundesliga,2025,understat_11309,Andreas Hanche-Olsen,Mainz 05,D S,843.0,13,0.6406,0.0252,0.0757,0.0,0.1068,0.3203,0.7205,False,understat
+bundesliga,2025,understat_11411,Damion Downs,Hamburger SV,F S,534.0,12,1.1798,0.0829,0.1192,0.0,0.0,1.1798,0.4944,False,understat
+bundesliga,2025,understat_11699,Ameen Al Dakhil,VfB Stuttgart,D S,368.0,8,0.2446,0.0153,0.0199,0.0,0.0,0.4891,0.5111,False,understat
+bundesliga,2025,understat_11835,Senne Lynen,Werder Bremen,D M,2766.0,31,0.8134,0.0326,0.0403,0.0,0.0,0.4555,0.9914,False,understat
+bundesliga,2025,understat_11850,Cédric Zesiger,Augsburg,D S,1798.0,27,0.6007,0.0876,0.0278,0.0,0.0,0.4505,0.7399,False,understat
+bundesliga,2025,understat_11859,Omar Traoré,FC Heidenheim,D S,1506.0,26,0.5976,0.03,0.0871,0.0,0.1195,0.7769,0.6436,False,understat
+bundesliga,2025,understat_11864,Benedikt Gimber,FC Heidenheim,D S,1467.0,21,0.2454,0.0305,0.013,0.0,0.0,0.0613,0.7762,False,understat
+bundesliga,2025,understat_11867,Victor Boniface,Werder Bremen,F S,309.0,11,4.6602,0.2647,0.3068,0.0,0.5825,2.0388,0.3121,False,understat
+bundesliga,2025,understat_11871,Nicolas Seiwald,RasenBallsport Leipzig,D M S,2730.0,33,0.6593,0.0599,0.0596,0.0,0.0659,0.4945,0.9192,False,understat
+bundesliga,2025,understat_11975,Leonidas Stergiou,"FC Heidenheim,VfB Stuttgart",D S,194.0,6,0.4639,0.0215,0.0,0.0,0.0,0.0,0.3593,False,understat
+bundesliga,2025,understat_11991,Lukas Ullrich,Borussia M.Gladbach,D M S,1301.0,23,0.6918,0.0523,0.0627,0.0,0.0,0.9685,0.6285,False,understat
+bundesliga,2025,understat_12023,Thomas Keller,FC Heidenheim,D S,193.0,4,0.9326,0.0253,0.0,0.0,0.0,0.0,0.5361,False,understat
+bundesliga,2025,understat_12029,Daniel Batz,Mainz 05,GK,1890.0,21,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+bundesliga,2025,understat_12070,Jordy Makengo,Freiburg,D S,1160.0,20,0.0,0.0,0.0564,0.0,0.0776,0.3879,0.6444,False,understat
+bundesliga,2025,understat_12075,Kauã Santos,Eintracht Frankfurt,GK,1084.0,13,0.0,0.0,0.0,0.0,0.0,0.0,0.9265,True,understat
+bundesliga,2025,understat_12360,Julián Malatini,Werder Bremen,D S,508.0,11,0.3543,0.005,0.0275,0.0,0.0,0.3543,0.5131,False,understat
+bundesliga,2025,understat_12494,Frank Feller,FC Heidenheim,GK,270.0,3,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+bundesliga,2025,understat_12626,Max Rosenfelder,Freiburg,D S,476.0,12,0.1891,0.0033,0.0,0.0,0.0,0.0,0.4407,False,understat
+bundesliga,2025,understat_12761,Yukinari Sugawara,Werder Bremen,D S,2444.0,31,1.1047,0.0617,0.09,0.0,0.2209,0.7365,0.876,False,understat
+bundesliga,2025,understat_12775,Kosta Nedeljkovic,RasenBallsport Leipzig,D S,251.0,5,0.0,0.0,0.0,0.0,0.0,0.0,0.5578,False,understat
+bundesliga,2025,understat_12919,Nikolas Veratschnig,Mainz 05,D M S,614.0,21,0.5863,0.0217,0.1502,0.0,0.1466,0.5863,0.3249,False,understat
+bundesliga,2025,understat_12925,Mio Backhaus,Werder Bremen,GK,2880.0,32,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+bundesliga,2025,understat_12926,Bruno Ogbus,Freiburg,D S,1180.0,18,0.3814,0.06,0.0021,0.0,0.0,0.0763,0.7284,False,understat
+bundesliga,2025,understat_12927,Ramon Hendriks,VfB Stuttgart,D S,2011.0,31,0.2238,0.0095,0.0262,0.0,0.1343,0.2685,0.7208,False,understat
+bundesliga,2025,understat_12937,Nicolai Remberg,Hamburger SV,D M,2880.0,32,0.5312,0.0329,0.0673,0.0,0.0625,0.4062,1.0,False,understat
+bundesliga,2025,understat_12942,Maarten Vandevoordt,RasenBallsport Leipzig,GK S,1052.0,12,0.0,0.0,0.0,0.0,0.0,0.0,0.9741,True,understat
+bundesliga,2025,understat_12955,Aurèle Amenda,Eintracht Frankfurt,D S,1664.0,24,0.5409,0.0546,0.0182,0.0,0.0,0.3245,0.7704,False,understat
+bundesliga,2025,understat_12964,Kamil Grabara,Wolfsburg,GK,3060.0,34,0.0294,0.0011,0.0012,0.0,0.0,0.0882,1.0,True,understat
+bundesliga,2025,understat_12973,Nikola Vasilj,St. Pauli,GK,3060.0,34,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+bundesliga,2025,understat_12977,Lars Ritzka,St. Pauli,D M S,974.0,21,0.3696,0.0209,0.0809,0.0,0.0,0.5544,0.5153,False,understat
+bundesliga,2025,understat_12978,Jackson Irvine,St. Pauli,M S,1617.0,24,1.0575,0.0906,0.0506,0.0,0.0557,0.6122,0.7486,False,understat
+bundesliga,2025,understat_12979,Connor Metcalfe,St. Pauli,F M S,536.0,25,2.6866,0.124,0.1949,0.0,0.3358,1.5112,0.2382,False,understat
+bundesliga,2025,understat_12980,Elias Saad,Augsburg,F M S,518.0,10,1.0425,0.0646,0.1079,0.0,0.0,2.0849,0.5756,False,understat
+bundesliga,2025,understat_13185,Jahmai Simpson-Pusey,FC Cologne,D S,863.0,11,0.6257,0.0319,0.0104,0.0,0.0,0.2086,0.8717,False,understat
+bundesliga,2025,understat_13215,Axel Tape,Bayer Leverkusen,D S,214.0,6,1.2617,0.06,0.0,0.0,0.0,0.0,0.3963,False,understat
+bundesliga,2025,understat_13292,Carl Klaus,Union Berlin,GK S,330.0,4,0.0,0.0,0.0,0.0,0.0,0.0,0.9167,True,understat
+bundesliga,2025,understat_13425,Luca Jaquez,VfB Stuttgart,D S,893.0,14,0.4031,0.0154,0.0445,0.0,0.1008,0.5039,0.7087,False,understat
+bundesliga,2025,understat_13426,Finn Jeltsch,VfB Stuttgart,D S,1501.0,23,0.1799,0.0117,0.0061,0.0,0.06,0.2998,0.7251,False,understat
+bundesliga,2025,understat_13634,Jan Bürger,Wolfsburg,D S,247.0,7,0.7287,0.0219,0.0468,0.0,0.0,0.7287,0.3921,False,understat
+bundesliga,2025,understat_13714,Jenson Seelt,Wolfsburg,D S,681.0,9,0.2643,0.0142,0.0,0.0,0.0,0.0,0.8407,False,understat
+bundesliga,2025,understat_13851,Ezechiel Banzuzi,RasenBallsport Leipzig,M S,521.0,24,2.5912,0.2156,0.0611,0.0,0.1727,1.2092,0.2412,False,understat
+bundesliga,2025,understat_13861,Leon Avdullahu,Hoffenheim,M S,2860.0,33,0.4406,0.0165,0.0417,0.0,0.0315,0.6923,0.963,False,understat
+bundesliga,2025,understat_13864,Cyriaque Irié,Freiburg,M S,331.0,10,1.9033,0.1642,0.0353,0.0,0.0,1.0876,0.3678,False,understat
+bundesliga,2025,understat_13882,Arkadiusz Pyrka,St. Pauli,D M S,2596.0,31,0.6587,0.035,0.0771,0.0,0.0347,0.832,0.9305,False,understat
+bundesliga,2025,understat_13887,Jobe Bellingham,Borussia Dortmund,M S,1779.0,32,0.9612,0.0501,0.0391,0.0,0.0506,0.4553,0.6177,False,understat
+bundesliga,2025,understat_13907,Joël Schmied,FC Cologne,D S,1090.0,16,0.3303,0.0183,0.012,0.0,0.0,0.1651,0.7569,False,understat
+bundesliga,2025,understat_13908,Sebastian Sebulonsen,FC Cologne,D S,2519.0,31,1.1076,0.0532,0.0987,0.0,0.0,0.7503,0.9029,False,understat
+bundesliga,2025,understat_13909,Kristoffer Lund,FC Cologne,D M S,2319.0,33,0.7762,0.0245,0.0677,0.0,0.0776,0.7762,0.7808,False,understat
+bundesliga,2025,understat_13913,Rav van den Berg,FC Cologne,D S,1138.0,14,0.0791,0.0085,0.0392,0.0,0.0791,0.0791,0.9032,False,understat
+bundesliga,2025,understat_13920,Daniel Elfadli,Hamburger SV,D S,1257.0,21,0.2864,0.0433,0.0122,0.0,0.0,0.1432,0.6651,False,understat
+bundesliga,2025,understat_13921,Giorgi Gocholeishvili,Hamburger SV,D S,909.0,24,1.3861,0.0973,0.0632,0.0,0.099,0.8911,0.4208,False,understat
+bundesliga,2025,understat_13922,Miro Muheim,Hamburger SV,D M S,2443.0,29,0.8842,0.0505,0.1287,0.0,0.1474,1.4736,0.936,False,understat
+bundesliga,2025,understat_13926,Alexander Røssing-Lelesiit,Hamburger SV,F M S,319.0,11,0.5643,0.0251,0.205,0.0,0.2821,1.4107,0.3222,False,understat
+bundesliga,2025,understat_13928,Otto Stange,Hamburger SV,F S,275.0,10,2.9455,0.2164,0.034,0.0,0.0,0.3273,0.3056,False,understat
+bundesliga,2025,understat_13995,Sota Kawasaki,Mainz 05,D M S,295.0,10,0.3051,0.0139,0.0,0.0,0.0,0.0,0.3278,False,understat
+bundesliga,2025,understat_14008,Ezequiél Fernández,Bayer Leverkusen,M S,1009.0,20,0.9812,0.0477,0.0709,0.0,0.0892,0.7136,0.5606,False,understat
+bundesliga,2025,understat_14022,William Bøving,Mainz 05,M S,206.0,9,0.4369,0.0058,0.238,0.0,0.4369,1.7476,0.2543,False,understat
+bundesliga,2025,understat_14279,Kota Takai,Borussia M.Gladbach,D S,329.0,8,0.8207,0.1124,0.0091,0.0,0.0,0.5471,0.4569,False,understat
+bundesliga,2025,understat_14345,Tomoya Ando,St. Pauli,D S,1263.0,15,0.5701,0.0391,0.0923,0.0,0.0713,0.4276,0.9356,False,understat
+bundesliga,2025,understat_14390,Mathias Rasmussen,St. Pauli,M S,692.0,13,0.7803,0.1033,0.0343,0.0,0.0,0.6503,0.5915,False,understat
+bundesliga,2025,understat_14451,Christian Conteh,FC Heidenheim,F M S,398.0,9,0.6784,0.0302,0.3109,0.0,0.0,1.5829,0.4914,False,understat

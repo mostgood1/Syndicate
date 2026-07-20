@@ -1,0 +1,307 @@
+league,season,match_id,date,home_team,away_team,home_goals,away_goals,ht_home_goals,ht_away_goals,home_shots,away_shots,home_shots_on_target,away_shots_on_target,home_corners,away_corners,home_fouls,away_fouls,home_yellow_cards,away_yellow_cards,home_red_cards,away_red_cards,odds_home,odds_draw,odds_away,odds_over_2_5,odds_under_2_5
+eredivisie,2025,eredivisie_2025_0_for_sittard_go_ahead_eagles,08/08/2025,For Sittard,Go Ahead Eagles,2,2,1,1,36,6,8,2,8,5,10,9,2,2,0,1,2.66,3.44,2.5,1.71,2.05
+eredivisie,2025,eredivisie_2025_1_nijmegen_excelsior,09/08/2025,Nijmegen,Excelsior,5,0,1,0,15,9,10,6,7,2,14,14,1,1,0,0,1.75,3.73,4.39,1.76,1.98
+eredivisie,2025,eredivisie_2025_2_feyenoord_nac_breda,09/08/2025,Feyenoord,NAC Breda,2,0,1,0,20,7,4,0,3,4,10,13,1,1,0,0,1.16,7.56,13.94,1.39,2.82
+eredivisie,2025,eredivisie_2025_3_heerenveen_volendam,09/08/2025,Heerenveen,Volendam,1,1,1,0,18,5,6,3,9,2,8,9,1,1,0,0,1.57,4.03,5.4,1.68,2.08
+eredivisie,2025,eredivisie_2025_4_psv_eindhoven_sparta_rotterdam,09/08/2025,PSV Eindhoven,Sparta Rotterdam,6,1,3,0,22,8,12,4,8,5,8,2,1,1,0,0,1.18,6.99,12.69,1.37,2.88
+eredivisie,2025,eredivisie_2025_5_zwolle_twente,10/08/2025,Zwolle,Twente,1,0,1,0,7,16,2,4,2,4,14,15,4,1,0,0,3.73,3.57,1.92,1.72,2.03
+eredivisie,2025,eredivisie_2025_6_ajax_telstar,10/08/2025,Ajax,Telstar,2,0,1,0,15,18,7,5,8,10,9,12,0,0,0,0,1.15,7.78,15.16,1.33,3.15
+eredivisie,2025,eredivisie_2025_7_az_alkmaar_groningen,10/08/2025,AZ Alkmaar,Groningen,4,1,3,1,10,11,5,8,6,1,11,12,2,2,0,0,1.5,4.32,5.91,1.69,2.07
+eredivisie,2025,eredivisie_2025_8_utrecht_heracles,10/08/2025,Utrecht,Heracles,4,0,1,0,19,10,7,3,4,4,10,16,1,2,0,0,1.52,4.3,5.55,1.64,2.15
+eredivisie,2025,eredivisie_2025_9_telstar_zwolle,15/08/2025,Telstar,Zwolle,0,2,0,1,11,10,5,3,7,0,13,10,3,3,0,0,2.61,3.4,2.55,1.73,2.02
+eredivisie,2025,eredivisie_2025_10_excelsior_feyenoord,16/08/2025,Excelsior,Feyenoord,1,2,1,2,8,16,2,8,5,6,17,8,0,1,0,0,5.83,4.72,1.46,1.44,2.62
+eredivisie,2025,eredivisie_2025_11_heracles_nijmegen,16/08/2025,Heracles,Nijmegen,1,4,1,1,13,24,6,11,3,7,9,11,2,2,1,0,2.78,3.41,2.41,1.73,2.02
+eredivisie,2025,eredivisie_2025_12_groningen_heerenveen,16/08/2025,Groningen,Heerenveen,2,1,1,1,8,16,5,5,3,8,9,15,4,2,0,0,2.19,3.36,3.18,1.9,1.83
+eredivisie,2025,eredivisie_2025_13_go_ahead_eagles_ajax,17/08/2025,Go Ahead Eagles,Ajax,2,2,2,2,9,22,4,11,6,9,9,12,1,2,0,0,3.94,4.05,1.76,1.44,2.63
+eredivisie,2025,eredivisie_2025_14_sparta_rotterdam_utrecht,17/08/2025,Sparta Rotterdam,Utrecht,2,1,1,0,15,20,5,5,5,6,9,11,1,3,0,0,2.6,3.62,2.45,1.63,2.18
+eredivisie,2025,eredivisie_2025_15_twente_psv_eindhoven,17/08/2025,Twente,PSV Eindhoven,0,2,0,1,19,15,4,4,8,6,10,12,1,2,0,0,4.76,4.69,1.55,1.32,3.17
+eredivisie,2025,eredivisie_2025_16_volendam_az_alkmaar,17/08/2025,Volendam,AZ Alkmaar,2,2,1,1,8,19,3,3,3,4,10,10,1,3,0,0,4.87,4.51,1.56,1.43,2.65
+eredivisie,2025,eredivisie_2025_17_nac_breda_for_sittard,17/08/2025,NAC Breda,For Sittard,2,1,1,0,14,10,6,4,4,5,8,15,2,3,0,0,2.24,3.32,3.11,1.93,1.79
+eredivisie,2025,eredivisie_2025_18_go_ahead_eagles_sparta_rotterdam,23/08/2025,Go Ahead Eagles,Sparta Rotterdam,0,3,0,1,19,13,6,5,12,1,6,8,0,2,0,0,2.02,3.72,3.31,1.58,2.28
+eredivisie,2025,eredivisie_2025_19_psv_eindhoven_groningen,23/08/2025,PSV Eindhoven,Groningen,4,2,1,1,23,17,7,6,6,4,11,11,0,2,0,0,1.16,7.84,13.97,1.29,3.35
+eredivisie,2025,eredivisie_2025_20_telstar_volendam,23/08/2025,Telstar,Volendam,2,2,2,0,18,10,9,6,4,6,10,11,3,0,0,0,2.28,3.69,2.8,1.59,2.25
+eredivisie,2025,eredivisie_2025_21_heerenveen_twente,24/08/2025,Heerenveen,Twente,1,2,0,1,18,9,3,5,7,4,10,19,3,3,1,0,2.78,3.7,2.28,1.59,2.25
+eredivisie,2025,eredivisie_2025_22_nijmegen_nac_breda,24/08/2025,Nijmegen,NAC Breda,3,0,1,0,18,7,10,2,3,1,16,18,2,4,0,0,1.52,4.32,5.61,1.65,2.14
+eredivisie,2025,eredivisie_2025_23_utrecht_excelsior,24/08/2025,Utrecht,Excelsior,4,1,2,0,16,12,10,4,7,5,6,15,0,0,0,0,1.37,5.2,6.87,1.39,2.8
+eredivisie,2025,eredivisie_2025_24_ajax_heracles,24/08/2025,Ajax,Heracles,2,0,1,0,27,4,10,0,10,1,10,15,0,2,0,0,1.16,7.54,14.34,1.33,3.14
+eredivisie,2025,eredivisie_2025_25_groningen_heracles,29/08/2025,Groningen,Heracles,4,0,3,0,17,8,5,0,6,3,13,12,2,1,0,0,1.6,3.99,5.29,1.78,1.96
+eredivisie,2025,eredivisie_2025_26_volendam_ajax,30/08/2025,Volendam,Ajax,1,1,1,0,11,13,4,4,2,7,12,15,2,3,0,0,7.53,5.39,1.34,1.4,2.79
+eredivisie,2025,eredivisie_2025_27_heerenveen_go_ahead_eagles,30/08/2025,Heerenveen,Go Ahead Eagles,2,2,1,1,19,11,5,5,3,7,9,12,3,1,0,0,2.26,3.65,2.86,1.58,2.26
+eredivisie,2025,eredivisie_2025_28_psv_eindhoven_telstar,30/08/2025,PSV Eindhoven,Telstar,0,2,0,1,23,9,5,4,10,3,10,11,1,1,0,0,1.08,11.44,21.19,1.18,4.42
+eredivisie,2025,eredivisie_2025_29_excelsior_twente,30/08/2025,Excelsior,Twente,1,0,0,0,8,27,3,8,1,4,13,11,2,2,1,0,3.83,3.86,1.82,1.56,2.31
+eredivisie,2025,eredivisie_2025_30_for_sittard_nijmegen,31/08/2025,For Sittard,Nijmegen,3,2,2,1,10,14,5,5,3,4,16,8,4,1,0,0,3.08,3.65,2.14,1.66,2.13
+eredivisie,2025,eredivisie_2025_31_sparta_rotterdam_feyenoord,31/08/2025,Sparta Rotterdam,Feyenoord,0,4,0,1,7,24,2,11,1,9,5,9,1,2,1,0,3.66,3.97,1.84,1.52,2.42
+eredivisie,2025,eredivisie_2025_32_zwolle_utrecht,31/08/2025,Zwolle,Utrecht,0,2,0,2,6,14,2,7,3,2,13,10,2,1,0,0,3.03,3.58,2.18,1.68,2.09
+eredivisie,2025,eredivisie_2025_33_nac_breda_az_alkmaar,31/08/2025,NAC Breda,AZ Alkmaar,0,1,0,0,11,25,6,8,1,7,8,13,0,5,1,0,5.22,4.34,1.55,1.56,2.32
+eredivisie,2025,eredivisie_2025_34_ajax_zwolle,13/09/2025,Ajax,Zwolle,3,1,2,0,12,8,7,3,7,1,18,9,2,1,0,0,1.26,5.95,9.62,1.45,2.61
+eredivisie,2025,eredivisie_2025_35_go_ahead_eagles_volendam,13/09/2025,Go Ahead Eagles,Volendam,3,0,3,0,19,19,13,1,7,7,12,9,1,1,0,0,1.52,4.53,5.25,1.42,2.69
+eredivisie,2025,eredivisie_2025_36_nijmegen_psv_eindhoven,13/09/2025,Nijmegen,PSV Eindhoven,3,5,1,3,20,18,7,11,8,4,8,18,2,4,0,0,4.75,4.36,1.59,1.32,3.17
+eredivisie,2025,eredivisie_2025_37_feyenoord_heerenveen,13/09/2025,Feyenoord,Heerenveen,1,0,1,0,10,11,5,1,6,3,10,11,2,2,1,1,1.36,5.01,7.56,1.52,2.41
+eredivisie,2025,eredivisie_2025_38_twente_nac_breda,13/09/2025,Twente,NAC Breda,2,2,0,1,15,11,6,5,4,3,15,17,2,1,0,0,1.45,4.47,6.48,1.65,2.14
+eredivisie,2025,eredivisie_2025_39_excelsior_sparta_rotterdam,14/09/2025,Excelsior,Sparta Rotterdam,0,1,0,0,17,19,4,7,7,2,11,8,4,1,1,0,3.11,3.59,2.13,1.67,2.12
+eredivisie,2025,eredivisie_2025_40_heracles_az_alkmaar,14/09/2025,Heracles,AZ Alkmaar,1,2,1,1,19,25,6,8,6,9,11,11,1,5,0,0,5.74,4.36,1.51,1.59,2.26
+eredivisie,2025,eredivisie_2025_41_utrecht_groningen,14/09/2025,Utrecht,Groningen,0,1,0,0,14,13,3,6,3,4,9,16,0,4,0,0,1.75,3.8,4.16,1.66,2.13
+eredivisie,2025,eredivisie_2025_42_telstar_for_sittard,14/09/2025,Telstar,For Sittard,1,3,1,1,18,9,7,6,10,1,14,17,1,0,0,0,2.34,3.51,2.81,1.66,2.12
+eredivisie,2025,eredivisie_2025_43_feyenoord_for_sittard,17/09/2025,Feyenoord,For Sittard,2,0,1,0,19,5,5,0,13,0,11,9,0,1,0,0,1.28,5.7,9.23,1.45,2.6
+eredivisie,2025,eredivisie_2025_44_sparta_rotterdam_twente,19/09/2025,Sparta Rotterdam,Twente,1,5,1,1,7,23,2,11,1,6,7,6,0,1,0,0,2.85,3.48,2.33,1.67,2.11
+eredivisie,2025,eredivisie_2025_45_volendam_excelsior,20/09/2025,Volendam,Excelsior,1,2,1,1,14,15,7,6,5,3,11,19,3,2,0,0,2.3,3.68,2.78,1.52,2.4
+eredivisie,2025,eredivisie_2025_46_groningen_telstar,20/09/2025,Groningen,Telstar,2,0,1,0,16,7,6,3,7,2,9,10,1,2,0,0,1.78,3.67,4.37,1.82,1.91
+eredivisie,2025,eredivisie_2025_47_for_sittard_utrecht,20/09/2025,For Sittard,Utrecht,1,0,1,0,8,14,3,5,1,11,12,7,4,2,0,0,3.64,3.64,1.94,1.71,2.05
+eredivisie,2025,eredivisie_2025_48_nac_breda_heracles,20/09/2025,NAC Breda,Heracles,2,1,0,1,17,14,4,5,10,4,9,16,1,2,0,0,2.01,3.52,3.48,1.74,2.0
+eredivisie,2025,eredivisie_2025_49_zwolle_go_ahead_eagles,21/09/2025,Zwolle,Go Ahead Eagles,0,2,0,0,8,20,1,9,3,7,5,8,1,2,1,0,2.42,3.61,2.66,1.56,2.32
+eredivisie,2025,eredivisie_2025_50_heerenveen_nijmegen,21/09/2025,Heerenveen,Nijmegen,3,2,1,0,14,11,8,6,6,6,10,14,1,1,0,1,2.49,3.69,2.54,1.49,2.49
+eredivisie,2025,eredivisie_2025_51_psv_eindhoven_ajax,21/09/2025,PSV Eindhoven,Ajax,2,2,1,1,16,14,8,6,9,5,17,13,2,5,0,0,1.71,4.08,4.24,1.42,2.71
+eredivisie,2025,eredivisie_2025_52_az_alkmaar_feyenoord,21/09/2025,AZ Alkmaar,Feyenoord,3,3,1,1,9,19,5,3,4,11,9,10,4,5,0,1,2.33,3.52,2.82,1.69,2.07
+eredivisie,2025,eredivisie_2025_53_az_alkmaar_zwolle,24/09/2025,AZ Alkmaar,Zwolle,2,2,2,1,28,8,9,4,9,1,12,10,1,2,0,0,1.33,5.35,8.04,1.45,2.61
+eredivisie,2025,eredivisie_2025_54_twente_for_sittard,26/09/2025,Twente,For Sittard,3,2,1,0,18,8,10,4,4,5,14,13,1,2,0,0,1.42,4.68,6.82,1.58,2.26
+eredivisie,2025,eredivisie_2025_55_ajax_nac_breda,27/09/2025,Ajax,NAC Breda,2,1,1,1,12,17,7,7,2,7,11,14,2,4,0,1,1.26,6.15,9.25,1.34,3.07
+eredivisie,2025,eredivisie_2025_56_volendam_zwolle,27/09/2025,Volendam,Zwolle,2,1,1,1,15,14,3,2,3,5,11,12,2,3,0,0,2.66,3.56,2.44,1.61,2.22
+eredivisie,2025,eredivisie_2025_57_excelsior_psv_eindhoven,27/09/2025,Excelsior,PSV Eindhoven,1,2,1,1,18,18,5,8,3,2,8,5,0,0,0,0,9.66,6.5,1.24,1.28,3.49
+eredivisie,2025,eredivisie_2025_58_heracles_sparta_rotterdam,27/09/2025,Heracles,Sparta Rotterdam,3,0,1,0,12,18,5,5,5,4,12,11,2,4,0,0,3.0,3.67,2.17,1.59,2.24
+eredivisie,2025,eredivisie_2025_59_nijmegen_az_alkmaar,28/09/2025,Nijmegen,AZ Alkmaar,2,1,1,0,14,7,4,2,5,4,14,16,1,6,0,1,3.02,3.97,2.08,1.43,2.66
+eredivisie,2025,eredivisie_2025_60_groningen_feyenoord,28/09/2025,Groningen,Feyenoord,0,1,0,0,12,11,5,5,3,4,16,6,2,2,1,0,4.35,3.92,1.72,1.65,2.15
+eredivisie,2025,eredivisie_2025_61_utrecht_heerenveen,28/09/2025,Utrecht,Heerenveen,2,2,1,1,14,10,5,4,5,3,14,12,2,2,0,0,1.8,3.87,3.95,1.61,2.21
+eredivisie,2025,eredivisie_2025_62_telstar_go_ahead_eagles,28/09/2025,Telstar,Go Ahead Eagles,4,2,2,1,20,13,9,4,8,3,13,9,2,0,0,0,2.84,3.62,2.27,1.58,2.28
+eredivisie,2025,eredivisie_2025_63_nac_breda_groningen,03/10/2025,NAC Breda,Groningen,1,2,0,1,11,14,4,9,7,6,16,14,3,1,0,0,2.63,3.3,2.6,1.93,1.81
+eredivisie,2025,eredivisie_2025_64_sparta_rotterdam_ajax,04/10/2025,Sparta Rotterdam,Ajax,3,3,1,1,14,17,5,4,6,4,8,9,1,3,0,0,3.97,4.0,1.77,1.53,2.38
+eredivisie,2025,eredivisie_2025_65_for_sittard_volendam,04/10/2025,For Sittard,Volendam,1,0,1,0,16,8,3,1,7,4,14,13,1,2,0,0,1.83,3.83,3.87,1.63,2.18
+eredivisie,2025,eredivisie_2025_66_zwolle_psv_eindhoven,04/10/2025,Zwolle,PSV Eindhoven,0,4,0,2,4,19,0,9,4,8,7,8,0,3,1,0,6.95,5.18,1.38,1.39,2.83
+eredivisie,2025,eredivisie_2025_67_heerenveen_excelsior,04/10/2025,Heerenveen,Excelsior,2,1,0,1,19,9,4,2,7,3,6,17,1,3,0,0,1.6,4.28,4.9,1.51,2.43
+eredivisie,2025,eredivisie_2025_68_twente_heracles,05/10/2025,Twente,Heracles,2,1,0,1,21,7,9,2,4,3,5,8,0,2,1,0,1.32,5.5,8.13,1.42,2.69
+eredivisie,2025,eredivisie_2025_69_feyenoord_utrecht,05/10/2025,Feyenoord,Utrecht,3,2,1,0,22,10,10,4,12,3,7,10,1,0,0,0,1.46,4.56,6.26,1.59,2.25
+eredivisie,2025,eredivisie_2025_70_az_alkmaar_telstar,05/10/2025,AZ Alkmaar,Telstar,2,1,2,0,27,14,10,5,6,4,7,13,3,2,0,0,1.27,5.94,9.08,1.37,2.93
+eredivisie,2025,eredivisie_2025_71_go_ahead_eagles_nijmegen,05/10/2025,Go Ahead Eagles,Nijmegen,1,1,0,1,8,17,3,7,11,4,13,18,1,4,0,1,2.44,3.86,2.51,1.41,2.74
+eredivisie,2025,eredivisie_2025_72_nijmegen_twente,18/10/2025,Nijmegen,Twente,3,3,1,1,8,9,4,3,3,3,15,21,2,3,0,0,2.37,3.66,2.66,1.52,2.39
+eredivisie,2025,eredivisie_2025_73_psv_eindhoven_go_ahead_eagles,18/10/2025,PSV Eindhoven,Go Ahead Eagles,2,1,1,0,24,4,8,2,6,1,7,8,1,1,0,0,1.24,6.66,8.92,1.21,4.02
+eredivisie,2025,eredivisie_2025_74_utrecht_volendam,18/10/2025,Utrecht,Volendam,3,1,0,1,22,3,6,3,10,0,12,13,1,1,0,0,1.36,5.02,7.4,1.5,2.44
+eredivisie,2025,eredivisie_2025_75_ajax_az_alkmaar,18/10/2025,Ajax,AZ Alkmaar,0,2,0,2,17,13,6,3,5,4,13,19,4,2,0,0,1.97,3.76,3.39,1.55,2.32
+eredivisie,2025,eredivisie_2025_76_nac_breda_zwolle,18/10/2025,NAC Breda,Zwolle,2,2,2,1,19,11,6,3,3,2,11,14,0,3,0,0,2.06,3.56,3.28,1.72,2.02
+eredivisie,2025,eredivisie_2025_77_telstar_heerenveen,19/10/2025,Telstar,Heerenveen,2,3,1,2,18,15,6,7,6,11,9,12,1,2,0,0,2.71,3.56,2.39,1.65,2.14
+eredivisie,2025,eredivisie_2025_78_excelsior_for_sittard,19/10/2025,Excelsior,For Sittard,1,0,1,0,11,15,5,6,4,2,10,18,0,3,0,0,2.22,3.53,2.96,1.69,2.08
+eredivisie,2025,eredivisie_2025_79_groningen_sparta_rotterdam,19/10/2025,Groningen,Sparta Rotterdam,0,2,0,1,12,8,0,2,7,4,11,10,3,2,0,0,1.84,3.62,4.0,1.72,2.02
+eredivisie,2025,eredivisie_2025_80_heracles_feyenoord,19/10/2025,Heracles,Feyenoord,0,7,0,4,4,19,0,12,2,8,11,13,1,2,0,0,7.05,5.22,1.35,1.41,2.71
+eredivisie,2025,eredivisie_2025_81_heerenveen_nac_breda,24/10/2025,Heerenveen,NAC Breda,3,3,1,0,10,11,4,4,4,5,10,10,1,0,0,0,1.7,3.89,4.48,1.57,2.27
+eredivisie,2025,eredivisie_2025_82_for_sittard_groningen,25/10/2025,For Sittard,Groningen,1,2,0,1,9,16,3,10,7,7,14,9,3,1,0,0,2.78,3.24,2.49,1.97,1.76
+eredivisie,2025,eredivisie_2025_83_sparta_rotterdam_telstar,25/10/2025,Sparta Rotterdam,Telstar,1,0,1,0,14,14,6,3,6,7,9,14,3,2,0,0,1.83,3.91,3.78,1.5,2.44
+eredivisie,2025,eredivisie_2025_84_volendam_heracles,25/10/2025,Volendam,Heracles,3,0,1,0,13,11,7,2,5,5,6,13,0,3,0,1,2.11,3.74,3.07,1.61,2.22
+eredivisie,2025,eredivisie_2025_85_zwolle_nijmegen,25/10/2025,Zwolle,Nijmegen,2,2,1,1,10,11,6,3,3,4,11,12,0,1,0,0,3.17,3.74,2.06,1.5,2.44
+eredivisie,2025,eredivisie_2025_86_twente_ajax,26/10/2025,Twente,Ajax,2,3,1,0,21,9,5,6,6,1,14,13,0,2,0,0,2.29,3.54,2.86,1.59,2.24
+eredivisie,2025,eredivisie_2025_87_feyenoord_psv_eindhoven,26/10/2025,Feyenoord,PSV Eindhoven,2,3,0,1,12,11,6,6,3,5,7,13,0,1,0,0,2.4,3.82,2.57,1.4,2.75
+eredivisie,2025,eredivisie_2025_88_az_alkmaar_utrecht,26/10/2025,AZ Alkmaar,Utrecht,4,1,2,0,18,8,7,2,8,2,4,14,0,1,0,0,1.59,4.26,4.84,1.54,2.34
+eredivisie,2025,eredivisie_2025_89_go_ahead_eagles_excelsior,26/10/2025,Go Ahead Eagles,Excelsior,2,0,0,0,12,11,4,2,4,10,7,12,1,2,0,0,1.75,4.08,3.94,1.49,2.48
+eredivisie,2025,eredivisie_2025_90_psv_eindhoven_for_sittard,31/10/2025,PSV Eindhoven,For Sittard,5,2,3,0,21,10,6,4,7,4,8,12,0,4,0,0,1.15,8.11,14.13,1.26,3.53
+eredivisie,2025,eredivisie_2025_91_ajax_heerenveen,01/11/2025,Ajax,Heerenveen,1,1,1,0,9,17,2,7,5,4,6,16,0,2,0,0,1.53,4.52,5.12,1.42,2.68
+eredivisie,2025,eredivisie_2025_92_nac_breda_go_ahead_eagles,01/11/2025,NAC Breda,Go Ahead Eagles,1,0,0,0,8,7,2,2,2,2,10,8,4,2,0,0,2.32,3.59,2.78,1.6,2.22
+eredivisie,2025,eredivisie_2025_93_feyenoord_volendam,01/11/2025,Feyenoord,Volendam,3,1,2,0,37,9,9,1,10,1,4,8,0,0,0,0,1.1,9.64,18.63,1.23,3.87
+eredivisie,2025,eredivisie_2025_94_telstar_excelsior,01/11/2025,Telstar,Excelsior,2,2,2,1,17,21,8,8,3,5,8,15,0,2,0,0,2.21,3.58,2.98,1.61,2.2
+eredivisie,2025,eredivisie_2025_95_heracles_zwolle,02/11/2025,Heracles,Zwolle,8,2,4,1,23,7,11,4,4,2,16,11,0,3,0,1,2.38,3.38,2.82,1.74,2.0
+eredivisie,2025,eredivisie_2025_96_groningen_twente,02/11/2025,Groningen,Twente,1,1,0,0,18,10,7,4,7,3,7,12,2,4,0,0,2.76,3.35,2.42,1.81,1.91
+eredivisie,2025,eredivisie_2025_97_sparta_rotterdam_az_alkmaar,02/11/2025,Sparta Rotterdam,AZ Alkmaar,0,1,0,0,10,20,3,14,6,9,7,12,1,1,0,0,3.94,4.02,1.75,1.5,2.43
+eredivisie,2025,eredivisie_2025_98_utrecht_nijmegen,02/11/2025,Utrecht,Nijmegen,1,0,1,0,11,16,4,5,2,2,11,15,1,2,0,0,2.1,3.52,3.21,1.59,2.23
+eredivisie,2025,eredivisie_2025_99_twente_telstar,07/11/2025,Twente,Telstar,0,0,0,0,27,6,7,0,10,2,13,4,4,2,1,1,1.32,5.32,8.11,1.51,2.43
+eredivisie,2025,eredivisie_2025_100_excelsior_heracles,08/11/2025,Excelsior,Heracles,1,2,1,0,12,10,5,5,6,13,14,13,1,2,0,0,1.92,3.81,3.52,1.62,2.18
+eredivisie,2025,eredivisie_2025_101_volendam_nac_breda,08/11/2025,Volendam,NAC Breda,2,1,0,1,12,12,5,2,8,6,13,9,2,2,0,2,2.57,3.63,2.46,1.61,2.19
+eredivisie,2025,eredivisie_2025_102_for_sittard_heerenveen,08/11/2025,For Sittard,Heerenveen,2,0,0,0,10,18,5,8,4,5,14,12,2,1,0,0,2.93,3.61,2.22,1.63,2.17
+eredivisie,2025,eredivisie_2025_103_zwolle_sparta_rotterdam,08/11/2025,Zwolle,Sparta Rotterdam,1,0,1,0,11,14,3,1,3,6,9,15,2,4,0,1,2.49,3.49,2.61,1.63,2.16
+eredivisie,2025,eredivisie_2025_104_utrecht_ajax,09/11/2025,Utrecht,Ajax,2,1,1,0,16,10,6,4,6,4,15,10,1,0,0,0,2.7,3.54,2.4,1.6,2.23
+eredivisie,2025,eredivisie_2025_105_nijmegen_groningen,09/11/2025,Nijmegen,Groningen,2,0,0,0,13,10,5,4,9,3,6,13,1,1,0,0,1.94,3.65,3.57,1.66,2.12
+eredivisie,2025,eredivisie_2025_106_az_alkmaar_psv_eindhoven,09/11/2025,AZ Alkmaar,PSV Eindhoven,1,5,1,3,8,15,3,6,4,6,9,10,2,1,0,0,2.99,3.93,2.08,1.38,2.83
+eredivisie,2025,eredivisie_2025_107_go_ahead_eagles_feyenoord,09/11/2025,Go Ahead Eagles,Feyenoord,2,1,1,0,9,20,5,6,4,7,7,10,2,1,0,0,5.34,4.55,1.51,1.45,2.6
+eredivisie,2025,eredivisie_2025_108_nac_breda_psv_eindhoven,22/11/2025,NAC Breda,PSV Eindhoven,0,1,0,1,16,9,3,4,6,5,11,15,2,1,0,0,7.88,5.63,1.31,1.34,3.06
+eredivisie,2025,eredivisie_2025_109_ajax_excelsior,22/11/2025,Ajax,Excelsior,1,2,0,1,15,8,5,4,9,2,4,13,2,1,0,0,1.35,5.26,7.33,1.4,2.76
+eredivisie,2025,eredivisie_2025_110_volendam_twente,22/11/2025,Volendam,Twente,1,1,0,0,11,18,4,6,4,4,5,11,0,3,0,0,4.59,4.13,1.64,1.5,2.44
+eredivisie,2025,eredivisie_2025_111_heracles_go_ahead_eagles,22/11/2025,Heracles,Go Ahead Eagles,4,2,1,2,22,7,12,4,6,3,6,15,1,3,0,1,2.59,3.63,2.44,1.55,2.34
+eredivisie,2025,eredivisie_2025_112_sparta_rotterdam_for_sittard,22/11/2025,Sparta Rotterdam,For Sittard,1,1,1,0,13,12,4,7,7,5,9,11,1,1,0,0,1.86,3.67,3.84,1.67,2.1
+eredivisie,2025,eredivisie_2025_113_heerenveen_az_alkmaar,23/11/2025,Heerenveen,AZ Alkmaar,3,1,2,0,21,9,9,5,8,5,9,4,1,0,0,0,2.9,3.76,2.18,1.5,2.44
+eredivisie,2025,eredivisie_2025_114_feyenoord_nijmegen,23/11/2025,Feyenoord,Nijmegen,2,4,1,1,19,22,5,12,7,6,8,13,1,0,0,0,1.38,5.14,6.57,1.34,3.04
+eredivisie,2025,eredivisie_2025_115_telstar_utrecht,23/11/2025,Telstar,Utrecht,1,1,0,0,11,17,3,3,1,8,10,10,2,2,0,0,3.18,3.56,2.11,1.69,2.07
+eredivisie,2025,eredivisie_2025_116_groningen_zwolle,23/11/2025,Groningen,Zwolle,2,2,1,1,39,5,13,3,13,0,11,9,1,3,0,1,1.54,4.06,5.69,1.7,2.05
+eredivisie,2025,eredivisie_2025_117_zwolle_heerenveen,28/11/2025,Zwolle,Heerenveen,2,1,2,1,11,19,4,7,3,9,11,19,3,2,0,0,3.93,3.89,1.79,1.51,2.43
+eredivisie,2025,eredivisie_2025_118_excelsior_nac_breda,29/11/2025,Excelsior,NAC Breda,1,0,1,0,6,22,2,3,1,6,22,12,4,1,0,0,2.28,3.49,2.84,1.67,2.09
+eredivisie,2025,eredivisie_2025_119_for_sittard_heracles,29/11/2025,For Sittard,Heracles,1,1,1,0,23,6,5,3,11,3,19,22,3,5,0,0,2.09,3.56,3.24,1.65,2.12
+eredivisie,2025,eredivisie_2025_120_nijmegen_sparta_rotterdam,29/11/2025,Nijmegen,Sparta Rotterdam,3,1,2,0,19,13,7,5,7,6,9,13,2,4,0,0,1.61,4.29,4.63,1.46,2.58
+eredivisie,2025,eredivisie_2025_121_psv_eindhoven_volendam,30/11/2025,PSV Eindhoven,Volendam,3,0,2,0,19,11,8,2,5,2,12,4,0,0,0,0,1.09,10.63,18.5,1.15,5.0
+eredivisie,2025,eredivisie_2025_122_go_ahead_eagles_utrecht,30/11/2025,Go Ahead Eagles,Utrecht,2,2,0,1,11,17,6,8,4,3,9,12,2,2,0,0,2.77,3.55,2.33,1.6,2.22
+eredivisie,2025,eredivisie_2025_123_telstar_feyenoord,30/11/2025,Telstar,Feyenoord,1,2,0,1,12,11,2,7,3,5,8,8,0,3,0,0,6.53,4.94,1.4,1.42,2.68
+eredivisie,2025,eredivisie_2025_124_twente_az_alkmaar,30/11/2025,Twente,AZ Alkmaar,1,0,0,0,7,7,2,1,2,3,13,9,2,4,0,0,2.23,3.54,2.93,1.57,2.27
+eredivisie,2025,eredivisie_2025_125_ajax_groningen,02/12/2025,Ajax,Groningen,2,0,1,0,13,17,6,7,3,5,14,10,1,0,0,0,1.69,3.91,4.49,1.65,2.13
+eredivisie,2025,eredivisie_2025_126_excelsior_groningen,05/12/2025,Excelsior,Groningen,0,2,0,0,16,20,6,8,5,5,10,9,2,3,1,1,3.36,3.49,2.06,1.8,1.93
+eredivisie,2025,eredivisie_2025_127_heerenveen_psv_eindhoven,06/12/2025,Heerenveen,PSV Eindhoven,0,2,0,2,12,11,3,7,7,3,13,5,1,0,0,0,4.63,4.71,1.56,1.3,3.28
+eredivisie,2025,eredivisie_2025_128_for_sittard_ajax,06/12/2025,For Sittard,Ajax,1,3,1,1,26,13,7,4,4,4,13,9,3,4,1,1,4.18,3.84,1.76,1.62,2.18
+eredivisie,2025,eredivisie_2025_129_heracles_telstar,06/12/2025,Heracles,Telstar,1,1,0,0,15,11,6,2,6,6,15,12,3,2,0,0,2.19,3.62,2.98,1.62,2.19
+eredivisie,2025,eredivisie_2025_130_feyenoord_zwolle,06/12/2025,Feyenoord,Zwolle,6,1,4,0,25,7,12,4,8,4,17,12,1,1,0,0,1.16,7.72,13.72,1.28,3.43
+eredivisie,2025,eredivisie_2025_131_utrecht_twente,07/12/2025,Utrecht,Twente,1,1,0,0,12,21,4,6,6,8,8,8,1,2,0,0,2.44,3.45,2.71,1.73,2.01
+eredivisie,2025,eredivisie_2025_132_az_alkmaar_go_ahead_eagles,07/12/2025,AZ Alkmaar,Go Ahead Eagles,2,2,2,1,23,12,7,7,11,4,8,8,2,1,0,0,1.4,4.96,6.47,1.39,2.79
+eredivisie,2025,eredivisie_2025_133_volendam_nijmegen,07/12/2025,Volendam,Nijmegen,2,3,1,0,13,16,5,7,4,8,7,17,2,5,0,0,3.78,4.03,1.8,1.43,2.64
+eredivisie,2025,eredivisie_2025_134_sparta_rotterdam_nac_breda,07/12/2025,Sparta Rotterdam,NAC Breda,1,0,1,0,12,22,6,9,1,14,11,10,1,1,0,0,2.04,3.56,3.31,1.67,2.1
+eredivisie,2025,eredivisie_2025_135_telstar_nijmegen,13/12/2025,Telstar,Nijmegen,2,2,1,1,10,16,4,8,5,7,8,11,0,2,0,0,3.52,3.89,1.89,1.43,2.63
+eredivisie,2025,eredivisie_2025_136_groningen_volendam,13/12/2025,Groningen,Volendam,3,0,1,0,26,5,7,1,18,1,7,11,0,1,0,1,1.42,4.64,6.65,1.52,2.39
+eredivisie,2025,eredivisie_2025_137_psv_eindhoven_heracles,13/12/2025,PSV Eindhoven,Heracles,4,3,2,1,21,11,6,6,10,4,12,7,2,4,0,0,1.11,9.44,16.47,1.18,4.4
+eredivisie,2025,eredivisie_2025_138_zwolle_for_sittard,13/12/2025,Zwolle,For Sittard,1,0,1,0,8,11,3,3,2,12,17,13,3,3,0,0,2.34,3.53,2.8,1.66,2.11
+eredivisie,2025,eredivisie_2025_139_sparta_rotterdam_heerenveen,14/12/2025,Sparta Rotterdam,Heerenveen,0,3,0,1,11,20,3,5,5,10,10,15,1,2,0,0,2.9,3.65,2.21,1.53,2.36
+eredivisie,2025,eredivisie_2025_140_ajax_feyenoord,14/12/2025,Ajax,Feyenoord,2,0,1,0,15,18,7,1,3,12,12,12,2,1,0,0,2.97,3.74,2.14,1.51,2.42
+eredivisie,2025,eredivisie_2025_141_twente_go_ahead_eagles,14/12/2025,Twente,Go Ahead Eagles,2,0,2,0,23,6,7,2,3,6,7,9,0,3,0,0,1.39,4.79,6.89,1.45,2.57
+eredivisie,2025,eredivisie_2025_142_nac_breda_utrecht,14/12/2025,NAC Breda,Utrecht,1,1,1,1,16,11,3,6,6,5,10,12,2,2,0,0,2.66,3.4,2.49,1.8,1.92
+eredivisie,2025,eredivisie_2025_143_heracles_heerenveen,20/12/2025,Heracles,Heerenveen,0,3,0,0,8,15,2,8,4,4,12,9,1,1,0,0,3.2,3.7,2.06,1.54,2.34
+eredivisie,2025,eredivisie_2025_144_excelsior_zwolle,20/12/2025,Excelsior,Zwolle,2,1,1,0,13,9,4,3,3,1,13,7,1,1,0,0,2.09,3.63,3.16,1.59,2.25
+eredivisie,2025,eredivisie_2025_145_nijmegen_ajax,20/12/2025,Nijmegen,Ajax,2,2,1,2,15,19,6,8,1,7,8,8,3,3,1,0,2.27,3.79,2.72,1.44,2.62
+eredivisie,2025,eredivisie_2025_146_nac_breda_telstar,20/12/2025,NAC Breda,Telstar,0,1,0,0,11,11,2,4,8,3,11,16,2,3,0,0,1.83,3.76,3.86,1.67,2.1
+eredivisie,2025,eredivisie_2025_147_utrecht_psv_eindhoven,21/12/2025,Utrecht,PSV Eindhoven,1,2,1,0,17,14,3,8,2,12,7,14,3,5,0,1,4.33,4.14,1.68,1.46,2.56
+eredivisie,2025,eredivisie_2025_148_feyenoord_twente,21/12/2025,Feyenoord,Twente,1,1,0,1,10,29,4,11,7,12,15,11,2,0,1,0,1.68,4.01,4.48,1.54,2.33
+eredivisie,2025,eredivisie_2025_149_go_ahead_eagles_groningen,21/12/2025,Go Ahead Eagles,Groningen,1,1,1,0,8,14,3,3,1,8,10,13,2,1,0,0,3.14,3.47,2.15,1.68,2.07
+eredivisie,2025,eredivisie_2025_150_for_sittard_az_alkmaar,21/12/2025,For Sittard,AZ Alkmaar,4,3,2,2,15,21,6,9,5,8,18,11,3,0,0,0,3.89,3.83,1.81,1.56,2.29
+eredivisie,2025,eredivisie_2025_151_volendam_sparta_rotterdam,21/12/2025,Volendam,Sparta Rotterdam,0,1,0,0,12,23,5,10,6,8,14,6,3,2,0,0,2.74,3.59,2.34,1.56,2.29
+eredivisie,2025,eredivisie_2025_152_az_alkmaar_volendam,10/01/2026,AZ Alkmaar,Volendam,1,0,1,0,17,7,8,2,7,2,10,9,0,1,0,0,1.2,6.86,11.28,1.29,3.36
+eredivisie,2025,eredivisie_2025_153_twente_zwolle,10/01/2026,Twente,Zwolle,1,1,0,0,26,3,7,1,7,2,6,11,1,3,0,0,1.28,5.69,9.11,1.4,2.75
+eredivisie,2025,eredivisie_2025_154_psv_eindhoven_excelsior,10/01/2026,PSV Eindhoven,Excelsior,5,1,4,1,16,8,8,3,6,4,10,7,1,1,0,0,1.14,8.41,14.53,1.22,3.93
+eredivisie,2025,eredivisie_2025_155_groningen_nac_breda,10/01/2026,Groningen,NAC Breda,0,0,0,0,16,10,5,2,3,4,7,6,1,2,0,0,1.67,3.86,4.79,1.74,1.99
+eredivisie,2025,eredivisie_2025_156_heerenveen_feyenoord,11/01/2026,Heerenveen,Feyenoord,2,2,1,2,16,7,7,3,5,3,11,6,1,0,0,0,3.0,3.73,2.13,1.51,2.41
+eredivisie,2025,eredivisie_2025_157_go_ahead_eagles_for_sittard,11/01/2026,Go Ahead Eagles,For Sittard,2,2,1,1,23,12,8,5,9,1,10,9,0,1,0,0,2.12,3.65,3.11,1.63,2.16
+eredivisie,2025,eredivisie_2025_158_telstar_ajax,11/01/2026,Telstar,Ajax,2,3,0,2,7,16,3,10,8,3,6,6,1,1,1,0,3.76,3.86,1.84,1.54,2.34
+eredivisie,2025,eredivisie_2025_159_sparta_rotterdam_heracles,11/01/2026,Sparta Rotterdam,Heracles,2,0,1,0,22,6,9,2,9,5,6,16,1,3,0,0,1.81,3.78,3.93,1.56,2.3
+eredivisie,2025,eredivisie_2025_160_ajax_go_ahead_eagles,17/01/2026,Ajax,Go Ahead Eagles,2,2,2,0,18,10,6,6,1,5,11,16,2,4,0,0,1.46,4.66,5.93,1.38,2.85
+eredivisie,2025,eredivisie_2025_161_zwolle_az_alkmaar,17/01/2026,Zwolle,AZ Alkmaar,3,1,2,0,12,12,5,4,3,7,12,14,1,2,0,0,5.39,4.44,1.52,1.49,2.45
+eredivisie,2025,eredivisie_2025_162_excelsior_telstar,17/01/2026,Excelsior,Telstar,2,2,0,0,13,17,3,3,3,7,11,8,3,0,0,0,2.23,3.48,3.0,1.66,2.1
+eredivisie,2025,eredivisie_2025_163_for_sittard_psv_eindhoven,17/01/2026,For Sittard,PSV Eindhoven,1,2,1,1,6,18,1,8,4,14,10,11,1,1,0,0,7.04,5.25,1.35,1.38,2.84
+eredivisie,2025,eredivisie_2025_164_nac_breda_nijmegen,17/01/2026,NAC Breda,Nijmegen,3,4,1,2,14,11,5,8,2,3,13,15,2,1,0,0,2.97,3.59,2.2,1.58,2.26
+eredivisie,2025,eredivisie_2025_165_heerenveen_groningen,18/01/2026,Heerenveen,Groningen,0,2,0,0,16,12,4,6,3,6,11,13,1,2,0,0,2.21,3.38,3.11,1.69,2.06
+eredivisie,2025,eredivisie_2025_166_heracles_twente,18/01/2026,Heracles,Twente,0,2,0,1,11,18,2,6,4,2,12,14,2,4,0,1,4.88,4.17,1.6,1.57,2.27
+eredivisie,2025,eredivisie_2025_167_volendam_utrecht,18/01/2026,Volendam,Utrecht,2,1,2,0,7,16,3,5,1,6,14,14,3,3,0,0,4.08,3.7,1.8,1.73,2.01
+eredivisie,2025,eredivisie_2025_168_feyenoord_sparta_rotterdam,18/01/2026,Feyenoord,Sparta Rotterdam,3,4,0,1,22,13,12,5,9,0,6,11,1,3,0,0,1.4,4.81,6.69,1.42,2.67
+eredivisie,2025,eredivisie_2025_169_az_alkmaar_excelsior,21/01/2026,AZ Alkmaar,Excelsior,1,1,0,0,13,8,4,2,4,5,8,10,3,1,0,0,1.28,5.82,8.64,1.35,2.96
+eredivisie,2025,eredivisie_2025_170_ajax_volendam,24/01/2026,Ajax,Volendam,2,0,2,0,31,5,14,2,10,0,10,13,1,3,0,0,1.28,5.74,8.77,1.35,2.96
+eredivisie,2025,eredivisie_2025_171_nijmegen_zwolle,24/01/2026,Nijmegen,Zwolle,2,1,1,1,13,11,2,6,10,6,7,12,1,2,0,0,1.45,4.66,5.95,1.41,2.69
+eredivisie,2025,eredivisie_2025_172_psv_eindhoven_nac_breda,24/01/2026,PSV Eindhoven,NAC Breda,2,2,1,2,16,6,4,2,10,4,13,13,4,3,0,0,1.22,6.35,10.31,1.37,2.88
+eredivisie,2025,eredivisie_2025_173_twente_excelsior,24/01/2026,Twente,Excelsior,0,0,0,0,14,8,3,1,11,5,10,8,1,1,0,0,1.32,5.16,8.12,1.46,2.53
+eredivisie,2025,eredivisie_2025_174_telstar_az_alkmaar,25/01/2026,Telstar,AZ Alkmaar,0,1,0,0,10,12,3,4,5,1,13,16,1,2,0,0,4.14,3.92,1.74,1.53,2.36
+eredivisie,2025,eredivisie_2025_175_groningen_for_sittard,25/01/2026,Groningen,For Sittard,1,2,1,2,25,10,5,6,16,3,12,15,3,2,0,0,1.57,4.02,5.28,1.66,2.09
+eredivisie,2025,eredivisie_2025_176_feyenoord_heracles,25/01/2026,Feyenoord,Heracles,4,2,2,1,16,7,8,3,8,1,12,17,2,2,0,0,1.23,6.27,9.8,1.32,3.15
+eredivisie,2025,eredivisie_2025_177_utrecht_sparta_rotterdam,25/01/2026,Utrecht,Sparta Rotterdam,0,1,0,1,22,5,5,3,10,0,11,14,0,3,0,0,1.81,3.72,3.98,1.65,2.12
+eredivisie,2025,eredivisie_2025_178_nac_breda_twente,30/01/2026,NAC Breda,Twente,2,2,0,1,20,18,10,9,7,4,7,10,1,1,0,0,3.43,3.35,2.08,1.93,1.79
+eredivisie,2025,eredivisie_2025_179_az_alkmaar_nijmegen,31/01/2026,AZ Alkmaar,Nijmegen,1,3,1,2,11,19,2,8,3,3,15,16,1,2,0,0,1.78,4.04,3.82,1.42,2.67
+eredivisie,2025,eredivisie_2025_180_zwolle_telstar,31/01/2026,Zwolle,Telstar,4,1,1,0,16,14,9,8,6,9,11,16,0,0,0,0,2.31,3.53,2.82,1.62,2.18
+eredivisie,2025,eredivisie_2025_181_sparta_rotterdam_groningen,31/01/2026,Sparta Rotterdam,Groningen,2,0,0,0,9,8,5,2,3,6,8,16,1,5,0,0,2.64,3.37,2.53,1.74,1.99
+eredivisie,2025,eredivisie_2025_182_excelsior_ajax,01/02/2026,Excelsior,Ajax,2,2,0,2,11,9,5,3,4,1,12,5,1,0,0,0,4.05,3.89,1.77,1.54,2.34
+eredivisie,2025,eredivisie_2025_183_heracles_for_sittard,01/02/2026,Heracles,For Sittard,2,1,2,1,11,12,7,6,4,5,17,14,2,3,0,0,2.34,3.36,2.88,1.73,2.01
+eredivisie,2025,eredivisie_2025_184_psv_eindhoven_feyenoord,01/02/2026,PSV Eindhoven,Feyenoord,3,0,3,0,14,8,7,2,8,3,8,8,1,3,0,1,1.69,4.13,4.25,1.39,2.77
+eredivisie,2025,eredivisie_2025_185_heerenveen_utrecht,01/02/2026,Heerenveen,Utrecht,1,1,1,0,19,11,3,4,5,6,11,10,1,2,0,0,1.85,3.72,3.81,1.63,2.16
+eredivisie,2025,eredivisie_2025_186_volendam_go_ahead_eagles,01/02/2026,Volendam,Go Ahead Eagles,1,1,0,1,20,13,4,5,6,5,7,16,4,6,0,1,2.91,3.58,2.22,1.56,2.28
+eredivisie,2025,eredivisie_2025_187_nac_breda_excelsior,06/02/2026,NAC Breda,Excelsior,0,2,0,2,15,9,6,6,8,3,6,15,2,2,1,0,1.81,3.59,4.14,1.79,1.92
+eredivisie,2025,eredivisie_2025_188_nijmegen_heracles,07/02/2026,Nijmegen,Heracles,4,1,2,1,15,10,6,2,3,6,10,18,0,2,0,0,1.42,4.8,6.12,1.38,2.85
+eredivisie,2025,eredivisie_2025_189_zwolle_volendam,07/02/2026,Zwolle,Volendam,1,2,1,1,14,15,4,7,6,5,18,10,3,0,0,0,1.68,3.8,4.78,1.61,2.2
+eredivisie,2025,eredivisie_2025_190_twente_heerenveen,07/02/2026,Twente,Heerenveen,5,0,2,0,29,7,14,0,7,0,8,10,1,3,0,0,1.72,3.89,4.3,1.61,2.19
+eredivisie,2025,eredivisie_2025_191_for_sittard_sparta_rotterdam,07/02/2026,For Sittard,Sparta Rotterdam,2,2,1,0,11,16,3,5,3,13,13,10,3,1,0,0,2.79,3.32,2.43,1.73,2.01
+eredivisie,2025,eredivisie_2025_192_utrecht_feyenoord,08/02/2026,Utrecht,Feyenoord,0,1,0,1,6,10,5,4,2,7,12,14,3,4,1,0,3.1,3.59,2.13,1.64,2.14
+eredivisie,2025,eredivisie_2025_193_az_alkmaar_ajax,08/02/2026,AZ Alkmaar,Ajax,1,1,0,0,13,11,6,2,2,4,11,12,3,0,0,0,2.18,3.62,2.96,1.55,2.32
+eredivisie,2025,eredivisie_2025_194_go_ahead_eagles_telstar,08/02/2026,Go Ahead Eagles,Telstar,1,1,0,0,23,12,11,2,13,2,6,14,1,0,0,0,1.89,3.71,3.65,1.61,2.21
+eredivisie,2025,eredivisie_2025_195_groningen_psv_eindhoven,08/02/2026,Groningen,PSV Eindhoven,1,2,1,0,8,15,4,5,6,11,8,9,1,1,0,0,3.88,3.99,1.77,1.48,2.48
+eredivisie,2025,eredivisie_2025_196_go_ahead_eagles_heerenveen,11/02/2026,Go Ahead Eagles,Heerenveen,1,3,0,0,13,19,6,10,8,4,8,14,1,0,0,0,2.57,3.62,2.46,1.58,2.26
+eredivisie,2025,eredivisie_2025_197_nijmegen_utrecht,11/02/2026,Nijmegen,Utrecht,1,3,0,2,24,11,7,5,5,0,6,16,3,2,0,0,1.72,3.91,4.33,1.59,2.23
+eredivisie,2025,eredivisie_2025_198_volendam_psv_eindhoven,13/02/2026,Volendam,PSV Eindhoven,2,1,0,0,12,19,4,5,4,8,9,12,1,1,0,0,10.06,6.36,1.23,1.3,3.28
+eredivisie,2025,eredivisie_2025_199_heracles_nac_breda,14/02/2026,Heracles,NAC Breda,0,1,0,0,14,13,3,5,4,3,12,12,0,1,0,0,2.61,3.38,2.54,1.8,1.92
+eredivisie,2025,eredivisie_2025_200_excelsior_az_alkmaar,14/02/2026,Excelsior,AZ Alkmaar,1,2,1,0,11,16,2,7,7,5,7,6,1,2,0,0,3.39,3.71,1.97,1.61,2.2
+eredivisie,2025,eredivisie_2025_201_ajax_for_sittard,14/02/2026,Ajax,For Sittard,4,1,3,1,20,8,8,1,4,0,11,10,0,0,0,0,1.35,5.06,7.49,1.5,2.45
+eredivisie,2025,eredivisie_2025_202_groningen_utrecht,14/02/2026,Groningen,Utrecht,1,2,0,0,11,15,2,7,2,8,12,6,0,1,0,0,2.01,3.34,3.63,1.95,1.77
+eredivisie,2025,eredivisie_2025_203_feyenoord_go_ahead_eagles,15/02/2026,Feyenoord,Go Ahead Eagles,1,0,0,0,33,4,8,0,19,2,13,13,1,3,0,1,1.37,4.99,6.89,1.43,2.64
+eredivisie,2025,eredivisie_2025_204_heerenveen_zwolle,15/02/2026,Heerenveen,Zwolle,4,2,1,2,11,12,5,6,2,5,8,6,1,0,0,0,1.52,4.34,5.4,1.5,2.42
+eredivisie,2025,eredivisie_2025_205_telstar_twente,15/02/2026,Telstar,Twente,1,1,1,0,14,20,4,7,3,6,11,8,1,1,0,0,4.98,4.19,1.58,1.55,2.32
+eredivisie,2025,eredivisie_2025_206_sparta_rotterdam_nijmegen,17/02/2026,Sparta Rotterdam,Nijmegen,1,1,0,0,13,12,5,5,6,5,18,12,3,4,0,0,2.64,3.58,2.42,1.54,2.33
+eredivisie,2025,eredivisie_2025_207_for_sittard_excelsior,20/02/2026,For Sittard,Excelsior,2,1,1,0,16,10,6,4,5,3,7,15,1,1,0,0,2.21,3.46,3.04,1.75,1.98
+eredivisie,2025,eredivisie_2025_208_psv_eindhoven_heerenveen,21/02/2026,PSV Eindhoven,Heerenveen,3,1,1,1,29,14,7,4,9,3,12,5,2,1,0,0,1.36,5.36,6.89,1.31,3.25
+eredivisie,2025,eredivisie_2025_209_nac_breda_volendam,21/02/2026,NAC Breda,Volendam,1,0,0,0,17,8,3,1,6,3,13,13,1,3,0,0,1.54,4.12,5.57,1.68,2.08
+eredivisie,2025,eredivisie_2025_210_ajax_nijmegen,21/02/2026,Ajax,Nijmegen,1,1,1,0,9,18,4,9,6,7,7,16,1,1,0,0,1.75,4.12,3.94,1.43,2.67
+eredivisie,2025,eredivisie_2025_211_twente_groningen,22/02/2026,Twente,Groningen,2,1,1,1,6,11,4,3,4,4,8,6,0,2,0,0,1.53,4.16,5.65,1.65,2.12
+eredivisie,2025,eredivisie_2025_212_go_ahead_eagles_heracles,22/02/2026,Go Ahead Eagles,Heracles,4,0,1,0,12,9,6,2,4,5,7,13,1,3,0,0,1.71,3.91,4.39,1.62,2.18
+eredivisie,2025,eredivisie_2025_213_utrecht_zwolle,22/02/2026,Utrecht,Zwolle,1,1,1,0,24,9,3,4,6,4,11,17,1,0,0,1,1.62,3.97,4.99,1.72,2.02
+eredivisie,2025,eredivisie_2025_214_az_alkmaar_sparta_rotterdam,22/02/2026,AZ Alkmaar,Sparta Rotterdam,3,1,0,0,11,12,5,4,2,7,9,12,2,2,0,0,1.96,3.65,3.46,1.58,2.25
+eredivisie,2025,eredivisie_2025_215_feyenoord_telstar,22/02/2026,Feyenoord,Telstar,2,1,2,1,19,8,10,6,5,1,7,16,1,1,0,0,1.23,5.98,10.33,1.39,2.79
+eredivisie,2025,eredivisie_2025_216_telstar_nac_breda,27/02/2026,Telstar,NAC Breda,3,0,1,0,14,11,7,1,10,4,11,13,1,4,0,0,2.53,3.47,2.56,1.73,1.99
+eredivisie,2025,eredivisie_2025_217_heerenveen_sparta_rotterdam,28/02/2026,Heerenveen,Sparta Rotterdam,2,1,1,0,16,13,4,3,5,6,11,5,3,2,0,0,2.02,3.64,3.25,1.57,2.26
+eredivisie,2025,eredivisie_2025_218_heracles_psv_eindhoven,28/02/2026,Heracles,PSV Eindhoven,1,3,0,3,15,24,3,15,3,5,15,14,2,1,0,0,8.72,5.98,1.26,1.3,3.27
+eredivisie,2025,eredivisie_2025_219_nijmegen_for_sittard,28/02/2026,Nijmegen,For Sittard,2,3,1,1,15,13,4,9,10,5,10,13,1,2,0,0,1.41,4.86,6.17,1.39,2.78
+eredivisie,2025,eredivisie_2025_220_zwolle_ajax,01/03/2026,Zwolle,Ajax,0,0,0,0,9,6,2,2,12,3,12,8,3,2,0,0,3.97,3.94,1.76,1.5,2.46
+eredivisie,2025,eredivisie_2025_221_twente_feyenoord,01/03/2026,Twente,Feyenoord,2,0,1,0,19,8,8,2,4,2,13,8,0,0,0,0,2.24,3.57,2.86,1.57,2.26
+eredivisie,2025,eredivisie_2025_222_volendam_groningen,01/03/2026,Volendam,Groningen,3,2,1,1,12,28,4,9,2,10,8,13,2,2,0,0,3.61,3.6,1.92,1.66,2.11
+eredivisie,2025,eredivisie_2025_223_utrecht_az_alkmaar,01/03/2026,Utrecht,AZ Alkmaar,2,0,2,0,11,10,3,6,5,4,13,13,1,3,0,0,2.21,3.47,3.01,1.68,2.08
+eredivisie,2025,eredivisie_2025_224_excelsior_go_ahead_eagles,01/03/2026,Excelsior,Go Ahead Eagles,0,1,0,0,19,7,7,1,6,3,11,6,1,1,0,0,2.4,3.43,2.73,1.68,2.08
+eredivisie,2025,eredivisie_2025_225_heracles_utrecht,06/03/2026,Heracles,Utrecht,0,0,0,0,10,16,3,3,4,12,13,17,1,1,0,0,3.05,3.43,2.18,1.8,1.92
+eredivisie,2025,eredivisie_2025_226_groningen_ajax,07/03/2026,Groningen,Ajax,3,1,1,1,13,13,6,5,6,8,5,7,1,1,0,0,2.7,3.58,2.36,1.6,2.2
+eredivisie,2025,eredivisie_2025_227_psv_eindhoven_az_alkmaar,07/03/2026,PSV Eindhoven,AZ Alkmaar,2,1,1,1,19,13,8,5,5,6,7,4,2,1,0,0,1.31,5.58,7.52,1.3,3.28
+eredivisie,2025,eredivisie_2025_228_excelsior_heerenveen,07/03/2026,Excelsior,Heerenveen,1,2,0,1,21,10,5,5,6,8,4,7,1,1,0,0,2.76,3.62,2.29,1.61,2.2
+eredivisie,2025,eredivisie_2025_229_sparta_rotterdam_zwolle,08/03/2026,Sparta Rotterdam,Zwolle,1,1,0,0,20,15,7,6,6,3,7,10,3,1,0,0,1.66,4.04,4.42,1.53,2.36
+eredivisie,2025,eredivisie_2025_230_for_sittard_telstar,08/03/2026,For Sittard,Telstar,1,4,1,2,21,15,4,10,3,5,8,18,1,1,0,0,2.07,3.6,3.17,1.64,2.15
+eredivisie,2025,eredivisie_2025_231_go_ahead_eagles_twente,08/03/2026,Go Ahead Eagles,Twente,1,4,0,2,15,11,7,5,6,5,8,8,1,0,0,0,4.11,3.94,1.72,1.54,2.35
+eredivisie,2025,eredivisie_2025_232_nac_breda_feyenoord,08/03/2026,NAC Breda,Feyenoord,3,3,3,2,12,14,4,5,4,9,12,8,1,4,1,0,3.99,3.74,1.8,1.64,2.14
+eredivisie,2025,eredivisie_2025_233_nijmegen_volendam,08/03/2026,Nijmegen,Volendam,3,0,1,0,27,7,11,3,12,1,10,7,1,0,0,0,1.32,5.42,7.61,1.35,3.0
+eredivisie,2025,eredivisie_2025_234_zwolle_groningen,13/03/2026,Zwolle,Groningen,1,1,0,0,14,17,6,6,7,6,12,10,0,3,0,0,2.65,3.52,2.44,1.61,2.2
+eredivisie,2025,eredivisie_2025_235_volendam_for_sittard,14/03/2026,Volendam,For Sittard,1,2,0,2,16,13,5,4,4,4,11,13,1,2,0,0,2.28,3.63,2.76,1.58,2.24
+eredivisie,2025,eredivisie_2025_236_psv_eindhoven_nijmegen,14/03/2026,PSV Eindhoven,Nijmegen,2,3,1,2,12,17,6,6,7,7,8,12,0,3,0,0,1.42,5.02,5.77,1.26,3.53
+eredivisie,2025,eredivisie_2025_237_heerenveen_telstar,14/03/2026,Heerenveen,Telstar,3,0,1,0,12,20,9,6,5,4,12,9,4,1,0,0,1.69,4.09,4.23,1.47,2.52
+eredivisie,2025,eredivisie_2025_238_ajax_sparta_rotterdam,14/03/2026,Ajax,Sparta Rotterdam,4,0,2,0,22,8,10,1,5,3,8,17,0,2,0,0,1.59,4.24,4.81,1.49,2.49
+eredivisie,2025,eredivisie_2025_239_twente_utrecht,15/03/2026,Twente,Utrecht,0,2,0,1,16,10,4,8,4,5,7,10,1,3,0,0,1.53,4.15,5.42,1.64,2.14
+eredivisie,2025,eredivisie_2025_240_az_alkmaar_heracles,15/03/2026,AZ Alkmaar,Heracles,4,0,2,0,14,6,7,2,7,3,10,19,0,4,0,0,1.41,4.7,6.69,1.5,2.43
+eredivisie,2025,eredivisie_2025_241_feyenoord_excelsior,15/03/2026,Feyenoord,Excelsior,2,1,0,1,15,12,9,3,9,5,10,12,3,1,0,0,1.29,5.59,8.61,1.4,2.75
+eredivisie,2025,eredivisie_2025_242_go_ahead_eagles_nac_breda,15/03/2026,Go Ahead Eagles,NAC Breda,6,0,3,0,11,20,6,3,3,9,8,3,0,0,0,0,2.19,3.57,2.97,1.62,2.17
+eredivisie,2025,eredivisie_2025_243_heracles_excelsior,20/03/2026,Heracles,Excelsior,1,1,1,0,13,15,4,4,6,1,17,15,2,1,0,0,2.56,3.25,2.65,1.69,2.07
+eredivisie,2025,eredivisie_2025_244_for_sittard_twente,21/03/2026,For Sittard,Twente,1,2,1,0,11,9,5,2,7,6,6,15,2,0,0,0,5.03,4.24,1.56,1.51,2.4
+eredivisie,2025,eredivisie_2025_245_sparta_rotterdam_volendam,21/03/2026,Sparta Rotterdam,Volendam,2,0,2,0,16,8,9,3,3,7,15,9,2,1,0,0,1.49,4.42,5.65,1.5,2.46
+eredivisie,2025,eredivisie_2025_246_zwolle_nac_breda,21/03/2026,Zwolle,NAC Breda,2,1,2,0,8,20,2,6,2,5,20,14,2,1,0,0,2.19,3.55,2.97,1.62,2.18
+eredivisie,2025,eredivisie_2025_247_nijmegen_heerenveen,22/03/2026,Nijmegen,Heerenveen,2,2,1,2,22,11,10,5,6,2,6,11,0,0,0,0,1.68,4.22,4.11,1.38,2.86
+eredivisie,2025,eredivisie_2025_248_feyenoord_ajax,22/03/2026,Feyenoord,Ajax,1,1,0,0,14,5,5,2,5,1,12,16,1,3,0,0,2.01,3.79,3.17,1.48,2.5
+eredivisie,2025,eredivisie_2025_249_utrecht_go_ahead_eagles,22/03/2026,Utrecht,Go Ahead Eagles,2,0,2,0,22,11,10,6,2,5,9,7,2,1,0,0,1.71,3.71,4.52,1.64,2.14
+eredivisie,2025,eredivisie_2025_250_groningen_az_alkmaar,22/03/2026,Groningen,AZ Alkmaar,3,0,1,0,15,16,5,7,2,7,16,8,1,1,0,0,2.49,3.6,2.52,1.6,2.22
+eredivisie,2025,eredivisie_2025_251_telstar_psv_eindhoven,22/03/2026,Telstar,PSV Eindhoven,3,1,1,0,13,18,8,8,1,12,5,4,1,1,0,1,5.91,5.15,1.41,1.31,3.23
+eredivisie,2025,eredivisie_2025_252_psv_eindhoven_utrecht,04/04/2026,PSV Eindhoven,Utrecht,4,3,1,2,19,12,8,7,8,3,6,10,0,1,0,0,1.48,4.38,5.72,1.41,2.7
+eredivisie,2025,eredivisie_2025_253_az_alkmaar_for_sittard,04/04/2026,AZ Alkmaar,For Sittard,2,0,2,0,15,9,6,4,10,6,11,14,0,3,0,0,1.31,5.32,7.92,1.39,2.8
+eredivisie,2025,eredivisie_2025_254_telstar_groningen,04/04/2026,Telstar,Groningen,0,2,0,1,14,24,3,11,5,12,12,10,1,2,0,0,2.59,3.6,2.44,1.54,2.34
+eredivisie,2025,eredivisie_2025_255_ajax_twente,04/04/2026,Ajax,Twente,1,2,1,1,10,16,2,7,2,2,14,10,4,2,0,0,2.27,3.64,2.77,1.53,2.37
+eredivisie,2025,eredivisie_2025_256_excelsior_nijmegen,04/04/2026,Excelsior,Nijmegen,0,2,0,1,8,12,4,5,2,5,8,9,0,0,0,0,3.39,3.87,1.91,1.48,2.49
+eredivisie,2025,eredivisie_2025_257_go_ahead_eagles_zwolle,05/04/2026,Go Ahead Eagles,Zwolle,5,0,3,0,15,16,12,1,5,8,9,16,0,1,0,0,1.93,3.74,3.41,1.53,2.38
+eredivisie,2025,eredivisie_2025_258_heerenveen_heracles,05/04/2026,Heerenveen,Heracles,4,1,2,1,24,7,14,4,8,1,12,10,0,1,0,0,1.46,4.63,5.63,1.41,2.72
+eredivisie,2025,eredivisie_2025_259_volendam_feyenoord,05/04/2026,Volendam,Feyenoord,0,0,0,0,13,17,4,4,5,5,10,5,3,0,0,0,5.99,4.71,1.43,1.42,2.69
+eredivisie,2025,eredivisie_2025_260_nac_breda_sparta_rotterdam,05/04/2026,NAC Breda,Sparta Rotterdam,0,0,0,0,12,6,4,3,11,3,12,19,1,3,0,0,2.4,3.38,2.74,1.78,1.95
+eredivisie,2025,eredivisie_2025_261_twente_volendam,10/04/2026,Twente,Volendam,2,1,2,0,23,8,9,4,7,1,8,6,1,1,0,0,1.18,6.84,11.42,1.29,3.33
+eredivisie,2025,eredivisie_2025_262_utrecht_telstar,11/04/2026,Utrecht,Telstar,4,1,1,0,18,13,9,7,7,5,9,5,2,1,0,0,1.58,3.92,5.33,1.58,2.24
+eredivisie,2025,eredivisie_2025_263_sparta_rotterdam_psv_eindhoven,11/04/2026,Sparta Rotterdam,PSV Eindhoven,0,2,0,1,9,18,4,5,2,5,6,12,1,6,0,0,3.75,4.16,1.75,1.37,2.9
+eredivisie,2025,eredivisie_2025_264_groningen_go_ahead_eagles,11/04/2026,Groningen,Go Ahead Eagles,0,0,0,0,24,10,5,2,8,5,5,5,0,0,0,0,1.82,3.88,3.69,1.5,2.45
+eredivisie,2025,eredivisie_2025_265_heracles_ajax,11/04/2026,Heracles,Ajax,0,3,0,2,15,18,3,6,7,5,10,4,2,0,0,1,5.1,4.27,1.54,1.48,2.5
+eredivisie,2025,eredivisie_2025_266_for_sittard_nac_breda,12/04/2026,For Sittard,NAC Breda,1,1,0,0,10,14,2,7,5,8,11,12,2,1,0,0,2.52,3.48,2.54,1.66,2.12
+eredivisie,2025,eredivisie_2025_267_nijmegen_feyenoord,12/04/2026,Nijmegen,Feyenoord,1,1,0,1,15,13,4,5,4,1,17,14,3,4,0,0,2.16,3.84,2.84,1.37,2.88
+eredivisie,2025,eredivisie_2025_268_zwolle_excelsior,12/04/2026,Zwolle,Excelsior,2,2,1,1,15,16,5,3,5,2,10,13,0,1,0,0,2.11,3.65,3.04,1.59,2.24
+eredivisie,2025,eredivisie_2025_269_az_alkmaar_heerenveen,12/04/2026,AZ Alkmaar,Heerenveen,3,0,2,0,23,7,10,1,6,6,5,10,1,1,0,0,1.65,4.28,4.18,1.35,2.97
+eredivisie,2025,eredivisie_2025_270_telstar_sparta_rotterdam,22/04/2026,Telstar,Sparta Rotterdam,4,1,1,1,11,10,4,2,6,5,14,9,2,0,0,0,2.41,3.62,2.6,1.54,2.35
+eredivisie,2025,eredivisie_2025_271_go_ahead_eagles_az_alkmaar,23/04/2026,Go Ahead Eagles,AZ Alkmaar,0,0,0,0,15,23,4,4,5,10,9,13,2,1,0,0,2.93,3.74,2.14,1.47,2.53
+eredivisie,2025,eredivisie_2025_272_psv_eindhoven_zwolle,23/04/2026,PSV Eindhoven,Zwolle,6,1,1,0,17,6,11,4,4,4,10,4,1,1,0,0,1.19,7.09,10.75,1.21,4.02
+eredivisie,2025,eredivisie_2025_273_feyenoord_groningen,25/04/2026,Feyenoord,Groningen,3,1,2,0,10,10,4,2,3,3,10,15,0,2,0,0,1.6,4.22,4.63,1.48,2.49
+eredivisie,2025,eredivisie_2025_274_heerenveen_for_sittard,25/04/2026,Heerenveen,For Sittard,2,1,1,1,15,16,5,7,7,0,10,6,2,1,0,1,1.5,4.51,5.26,1.43,2.64
+eredivisie,2025,eredivisie_2025_275_nac_breda_ajax,25/04/2026,NAC Breda,Ajax,0,2,0,2,21,8,3,6,11,2,6,11,0,2,0,0,3.32,3.67,1.98,1.64,2.14
+eredivisie,2025,eredivisie_2025_276_twente_nijmegen,25/04/2026,Twente,Nijmegen,1,1,1,1,13,20,8,6,3,9,6,16,1,2,0,0,1.88,3.92,3.42,1.41,2.69
+eredivisie,2025,eredivisie_2025_277_excelsior_utrecht,26/04/2026,Excelsior,Utrecht,5,0,2,0,18,10,9,3,3,2,12,8,0,3,0,1,3.07,3.52,2.15,1.72,2.02
+eredivisie,2025,eredivisie_2025_278_heracles_volendam,26/04/2026,Heracles,Volendam,0,2,0,0,14,18,4,8,5,9,17,11,1,0,0,0,2.12,3.66,2.99,1.59,2.23
+eredivisie,2025,eredivisie_2025_279_utrecht_nac_breda,02/05/2026,Utrecht,NAC Breda,2,0,0,0,28,9,11,1,8,4,12,13,0,2,0,1,1.75,3.85,3.96,1.6,2.21
+eredivisie,2025,eredivisie_2025_280_groningen_excelsior,02/05/2026,Groningen,Excelsior,2,3,1,1,12,18,5,9,5,8,5,10,0,0,0,0,1.65,4.08,4.41,1.49,2.48
+eredivisie,2025,eredivisie_2025_281_ajax_psv_eindhoven,02/05/2026,Ajax,PSV Eindhoven,2,2,1,1,13,7,4,2,6,4,7,14,1,2,0,0,2.44,3.94,2.41,1.31,3.18
+eredivisie,2025,eredivisie_2025_282_nijmegen_telstar,02/05/2026,Nijmegen,Telstar,1,1,0,1,21,10,7,4,9,0,10,11,3,2,0,0,1.47,4.71,5.47,1.35,2.96
+eredivisie,2025,eredivisie_2025_283_volendam_heerenveen,03/05/2026,Volendam,Heerenveen,0,2,0,1,15,11,5,4,7,5,8,14,3,3,0,0,3.17,3.85,1.99,1.44,2.61
+eredivisie,2025,eredivisie_2025_284_for_sittard_feyenoord,03/05/2026,For Sittard,Feyenoord,1,2,0,0,7,19,3,7,1,8,16,13,2,3,1,0,5.56,4.57,1.47,1.48,2.51
+eredivisie,2025,eredivisie_2025_285_zwolle_heracles,03/05/2026,Zwolle,Heracles,1,0,1,0,9,14,5,3,3,3,18,18,2,4,0,1,1.44,4.68,5.81,1.43,2.63
+eredivisie,2025,eredivisie_2025_286_az_alkmaar_twente,03/05/2026,AZ Alkmaar,Twente,2,2,1,1,18,9,4,2,4,3,9,14,0,0,0,0,2.59,3.8,2.33,1.41,2.7
+eredivisie,2025,eredivisie_2025_287_sparta_rotterdam_go_ahead_eagles,03/05/2026,Sparta Rotterdam,Go Ahead Eagles,2,2,1,0,24,16,3,5,6,8,11,10,1,5,0,1,2.01,3.7,3.2,1.52,2.4
+eredivisie,2025,eredivisie_2025_288_ajax_utrecht,10/05/2026,Ajax,Utrecht,1,2,0,0,15,14,6,6,4,7,9,9,2,2,0,0,1.62,4.31,4.41,1.35,3.0
+eredivisie,2025,eredivisie_2025_289_excelsior_volendam,10/05/2026,Excelsior,Volendam,1,1,1,1,8,8,2,2,5,0,10,7,1,3,0,0,1.74,3.91,3.98,1.55,2.33
+eredivisie,2025,eredivisie_2025_290_feyenoord_az_alkmaar,10/05/2026,Feyenoord,AZ Alkmaar,1,1,0,1,10,13,5,3,7,3,10,9,1,0,0,0,1.79,4.01,3.7,1.38,2.84
+eredivisie,2025,eredivisie_2025_291_for_sittard_zwolle,10/05/2026,For Sittard,Zwolle,3,2,1,0,12,8,4,3,6,5,7,11,0,1,0,0,2.06,3.76,3.08,1.48,2.5
+eredivisie,2025,eredivisie_2025_292_go_ahead_eagles_psv_eindhoven,10/05/2026,Go Ahead Eagles,PSV Eindhoven,1,4,1,2,11,24,4,10,8,4,9,7,0,0,0,0,4.34,4.57,1.59,1.29,3.38
+eredivisie,2025,eredivisie_2025_293_groningen_nijmegen,10/05/2026,Groningen,Nijmegen,2,1,1,0,11,12,7,3,5,6,16,12,2,1,0,0,2.75,3.83,2.2,1.4,2.76
+eredivisie,2025,eredivisie_2025_294_nac_breda_heerenveen,10/05/2026,NAC Breda,Heerenveen,2,0,1,0,19,13,4,2,7,3,10,13,1,1,0,0,2.45,3.77,2.47,1.41,2.7
+eredivisie,2025,eredivisie_2025_295_telstar_heracles,10/05/2026,Telstar,Heracles,3,0,0,0,12,7,7,1,6,7,12,12,1,3,0,1,1.32,5.39,7.38,1.37,2.9
+eredivisie,2025,eredivisie_2025_296_twente_sparta_rotterdam,10/05/2026,Twente,Sparta Rotterdam,4,0,0,0,26,9,13,1,9,2,7,8,0,2,0,0,1.33,5.22,7.51,1.37,2.88
+eredivisie,2025,eredivisie_2025_297_az_alkmaar_nac_breda,17/05/2026,AZ Alkmaar,NAC Breda,3,3,2,0,16,17,10,11,7,6,11,6,1,1,0,0,1.34,5.17,7.19,1.35,2.99
+eredivisie,2025,eredivisie_2025_298_heerenveen_ajax,17/05/2026,Heerenveen,Ajax,0,0,0,0,16,23,6,6,10,6,9,8,0,3,0,0,2.93,4.08,2.03,1.31,3.2
+eredivisie,2025,eredivisie_2025_299_heracles_groningen,17/05/2026,Heracles,Groningen,1,2,1,1,11,16,2,5,9,5,8,5,1,1,0,0,4.63,4.43,1.57,1.37,2.89
+eredivisie,2025,eredivisie_2025_300_nijmegen_go_ahead_eagles,17/05/2026,Nijmegen,Go Ahead Eagles,2,1,2,0,37,3,12,1,13,4,12,8,1,2,0,0,1.35,5.25,6.98,1.3,3.29
+eredivisie,2025,eredivisie_2025_301_psv_eindhoven_twente,17/05/2026,PSV Eindhoven,Twente,5,1,2,1,13,18,7,6,11,9,7,5,1,1,0,0,2.04,4.06,2.91,1.3,3.28
+eredivisie,2025,eredivisie_2025_302_sparta_rotterdam_excelsior,17/05/2026,Sparta Rotterdam,Excelsior,2,3,0,1,17,16,5,4,5,2,11,15,4,0,0,0,2.02,3.9,3.04,1.43,2.66
+eredivisie,2025,eredivisie_2025_303_utrecht_for_sittard,17/05/2026,Utrecht,For Sittard,2,0,1,0,18,13,5,2,2,5,8,8,0,1,0,0,1.46,4.66,5.61,1.37,2.87
+eredivisie,2025,eredivisie_2025_304_volendam_telstar,17/05/2026,Volendam,Telstar,1,2,1,1,17,7,8,2,7,0,13,18,2,2,0,0,2.65,3.63,2.34,1.5,2.45
+eredivisie,2025,eredivisie_2025_305_zwolle_feyenoord,17/05/2026,Zwolle,Feyenoord,0,2,0,0,7,22,1,8,2,12,11,11,0,0,0,0,4.32,4.3,1.63,1.36,2.94

@@ -1,0 +1,307 @@
+league,season,match_id,date,home_team,away_team,home_goals,away_goals,ht_home_goals,ht_away_goals,home_shots,away_shots,home_shots_on_target,away_shots_on_target,home_corners,away_corners,home_fouls,away_fouls,home_yellow_cards,away_yellow_cards,home_red_cards,away_red_cards,odds_home,odds_draw,odds_away,odds_over_2_5,odds_under_2_5
+primeira_liga,2024,primeira_liga_2024_0_sp_lisbon_rio_ave,09/08/2024,Sp Lisbon,Rio Ave,3,1,2,0,23,3,6,1,6,1,9,14,2,2,0,0,1.16,7.79,15.44,1.44,2.74
+primeira_liga,2024,primeira_liga_2024_1_avs_nacional,10/08/2024,AVS,Nacional,1,1,0,1,17,6,3,2,4,2,8,13,1,1,0,0,2.26,3.28,3.21,2.09,1.74
+primeira_liga,2024,primeira_liga_2024_2_casa_pia_boavista,10/08/2024,Casa Pia,Boavista,0,1,0,0,15,5,4,2,3,1,12,6,2,1,0,0,1.93,3.47,3.98,2.08,1.74
+primeira_liga,2024,primeira_liga_2024_3_porto_gil_vicente,10/08/2024,Porto,Gil Vicente,3,0,1,0,16,3,7,2,6,2,18,10,0,3,0,1,1.18,7.17,14.72,1.52,2.5
+primeira_liga,2024,primeira_liga_2024_4_estoril_santa_clara,11/08/2024,Estoril,Santa Clara,1,4,1,1,4,9,2,8,1,3,11,20,6,3,0,0,2.18,3.22,3.47,2.38,1.57
+primeira_liga,2024,primeira_liga_2024_5_famalicao_benfica,11/08/2024,Famalicao,Benfica,2,0,1,0,9,10,5,1,0,7,8,13,3,4,0,0,6.54,4.68,1.44,1.58,2.36
+primeira_liga,2024,primeira_liga_2024_6_farense_moreirense,11/08/2024,Farense,Moreirense,1,2,0,1,10,10,5,6,5,4,14,11,0,4,0,1,2.92,3.22,2.47,2.16,1.69
+primeira_liga,2024,primeira_liga_2024_7_sp_braga_estrela,11/08/2024,Sp Braga,Estrela,1,1,0,0,13,6,5,4,13,4,14,9,3,5,0,0,1.38,5.04,7.45,1.54,2.42
+primeira_liga,2024,primeira_liga_2024_8_arouca_guimaraes,12/08/2024,Arouca,Guimaraes,0,1,0,1,8,11,0,4,6,5,13,11,7,2,1,0,2.85,3.4,2.42,1.89,1.91
+primeira_liga,2024,primeira_liga_2024_9_santa_clara_porto,16/08/2024,Santa Clara,Porto,0,2,0,2,5,8,2,6,2,2,19,12,2,3,1,0,5.93,4.24,1.53,1.91,1.9
+primeira_liga,2024,primeira_liga_2024_10_gil_vicente_avs,16/08/2024,Gil Vicente,AVS,4,2,2,2,16,10,6,5,2,3,6,12,1,4,0,1,2.28,3.3,3.19,2.05,1.77
+primeira_liga,2024,primeira_liga_2024_11_rio_ave_farense,17/08/2024,Rio Ave,Farense,1,0,1,0,9,14,3,4,7,14,8,16,0,1,0,0,2.01,3.42,3.75,1.99,1.82
+primeira_liga,2024,primeira_liga_2024_12_nacional_sp_lisbon,17/08/2024,Nacional,Sp Lisbon,1,6,1,2,12,20,6,10,4,3,9,10,1,1,0,0,10.74,6.03,1.25,1.57,2.37
+primeira_liga,2024,primeira_liga_2024_13_benfica_casa_pia,17/08/2024,Benfica,Casa Pia,3,0,0,0,26,5,7,1,12,2,6,14,0,1,0,0,1.18,7.44,13.53,1.42,2.79
+primeira_liga,2024,primeira_liga_2024_14_moreirense_arouca,18/08/2024,Moreirense,Arouca,3,1,2,1,14,15,6,3,7,5,14,12,1,2,0,0,2.34,3.25,3.1,2.06,1.76
+primeira_liga,2024,primeira_liga_2024_15_guimaraes_estoril,18/08/2024,Guimaraes,Estoril,1,0,1,0,14,3,5,1,9,3,15,17,2,1,0,0,1.58,4.03,5.68,1.89,1.91
+primeira_liga,2024,primeira_liga_2024_16_boavista_sp_braga,18/08/2024,Boavista,Sp Braga,0,1,0,1,7,12,1,3,3,8,8,9,3,1,0,0,5.2,4.16,1.6,1.74,2.09
+primeira_liga,2024,primeira_liga_2024_17_estrela_famalicao,19/08/2024,Estrela,Famalicao,0,3,0,1,8,11,2,8,2,4,10,10,3,1,0,0,2.48,3.22,2.91,2.18,1.67
+primeira_liga,2024,primeira_liga_2024_18_farense_sp_lisbon,23/08/2024,Farense,Sp Lisbon,0,5,0,2,4,28,1,8,1,5,18,5,4,1,0,0,12.84,7.49,1.19,1.37,3.03
+primeira_liga,2024,primeira_liga_2024_19_casa_pia_santa_clara,24/08/2024,Casa Pia,Santa Clara,0,2,0,0,10,7,3,4,7,1,14,21,4,4,1,0,2.74,3.26,2.58,2.05,1.76
+primeira_liga,2024,primeira_liga_2024_20_porto_rio_ave,24/08/2024,Porto,Rio Ave,2,0,2,0,23,0,12,0,9,3,14,15,0,2,0,1,1.23,6.01,12.26,1.72,2.11
+primeira_liga,2024,primeira_liga_2024_21_benfica_estrela,24/08/2024,Benfica,Estrela,1,0,1,0,16,5,9,0,12,2,19,12,4,3,0,0,1.18,7.23,14.79,1.49,2.54
+primeira_liga,2024,primeira_liga_2024_22_famalicao_boavista,24/08/2024,Famalicao,Boavista,1,0,1,0,10,5,4,2,7,3,18,16,1,3,0,0,1.56,3.94,5.96,2.0,1.81
+primeira_liga,2024,primeira_liga_2024_23_arouca_nacional,25/08/2024,Arouca,Nacional,1,0,1,0,10,11,4,1,9,2,17,11,2,6,0,0,2.07,3.45,3.46,1.89,1.91
+primeira_liga,2024,primeira_liga_2024_24_estoril_gil_vicente,25/08/2024,Estoril,Gil Vicente,0,0,0,0,12,10,2,4,8,1,19,6,4,1,0,0,2.6,3.24,2.72,2.03,1.77
+primeira_liga,2024,primeira_liga_2024_25_avs_guimaraes,25/08/2024,AVS,Guimaraes,1,0,0,0,9,13,2,5,3,6,15,13,3,3,0,0,3.84,3.48,1.93,1.92,1.87
+primeira_liga,2024,primeira_liga_2024_26_sp_braga_moreirense,25/08/2024,Sp Braga,Moreirense,3,1,1,0,19,12,7,5,6,1,11,7,0,2,0,0,1.56,4.11,5.59,1.85,1.95
+primeira_liga,2024,primeira_liga_2024_27_moreirense_benfica,30/08/2024,Moreirense,Benfica,1,1,0,0,8,12,6,4,0,8,17,7,3,5,0,0,7.19,4.52,1.44,1.84,1.96
+primeira_liga,2024,primeira_liga_2024_28_santa_clara_avs,31/08/2024,Santa Clara,AVS,2,1,1,1,15,9,6,2,3,2,12,9,1,2,0,0,1.83,3.49,4.43,2.09,1.74
+primeira_liga,2024,primeira_liga_2024_29_boavista_estoril,31/08/2024,Boavista,Estoril,0,0,0,0,19,7,5,1,8,3,12,19,2,5,0,0,2.32,3.11,3.27,2.37,1.58
+primeira_liga,2024,primeira_liga_2024_30_estrela_casa_pia,31/08/2024,Estrela,Casa Pia,0,1,0,0,14,15,4,6,2,7,9,22,1,1,0,0,2.29,3.2,3.24,2.37,1.58
+primeira_liga,2024,primeira_liga_2024_31_sp_lisbon_porto,31/08/2024,Sp Lisbon,Porto,2,0,0,0,11,8,4,2,2,3,14,18,1,5,0,0,1.78,3.76,4.37,1.71,2.14
+primeira_liga,2024,primeira_liga_2024_32_nacional_farense,01/09/2024,Nacional,Farense,2,0,1,0,17,14,4,2,4,4,19,16,3,3,0,0,2.22,3.42,3.18,1.89,1.91
+primeira_liga,2024,primeira_liga_2024_33_rio_ave_arouca,01/09/2024,Rio Ave,Arouca,1,0,1,0,11,13,3,3,8,8,16,19,1,3,0,0,2.32,3.28,3.11,2.04,1.77
+primeira_liga,2024,primeira_liga_2024_34_gil_vicente_sp_braga,01/09/2024,Gil Vicente,Sp Braga,0,0,0,0,10,8,5,2,4,5,8,18,4,1,0,0,4.49,3.85,1.74,1.75,2.07
+primeira_liga,2024,primeira_liga_2024_35_guimaraes_famalicao,01/09/2024,Guimaraes,Famalicao,2,1,1,1,8,8,4,4,5,7,18,12,5,3,0,0,1.97,3.38,3.92,2.17,1.68
+primeira_liga,2024,primeira_liga_2024_36_arouca_sp_lisbon,13/09/2024,Arouca,Sp Lisbon,0,3,0,1,6,21,2,6,2,8,14,11,3,0,0,0,12.11,6.7,1.21,1.45,2.72
+primeira_liga,2024,primeira_liga_2024_37_casa_pia_moreirense,14/09/2024,Casa Pia,Moreirense,3,1,0,1,16,12,4,2,4,5,23,10,5,2,0,0,2.71,3.01,2.81,2.52,1.51
+primeira_liga,2024,primeira_liga_2024_38_avs_rio_ave,14/09/2024,AVS,Rio Ave,1,0,0,0,11,17,3,3,4,11,13,12,4,2,0,0,2.61,3.19,2.75,2.12,1.7
+primeira_liga,2024,primeira_liga_2024_39_benfica_santa_clara,14/09/2024,Benfica,Santa Clara,4,1,2,1,15,6,7,2,5,1,14,7,1,3,0,0,1.24,6.16,11.38,1.65,2.24
+primeira_liga,2024,primeira_liga_2024_40_famalicao_gil_vicente,14/09/2024,Famalicao,Gil Vicente,1,1,1,0,13,8,4,3,8,1,11,16,1,0,0,0,1.87,3.44,4.31,2.17,1.68
+primeira_liga,2024,primeira_liga_2024_41_porto_farense,15/09/2024,Porto,Farense,2,1,0,0,23,12,11,5,11,0,7,19,2,3,0,0,1.13,8.41,18.5,1.45,2.68
+primeira_liga,2024,primeira_liga_2024_42_estoril_nacional,15/09/2024,Estoril,Nacional,1,0,1,0,11,15,3,3,3,4,22,14,2,1,0,1,2.3,3.34,3.07,2.09,1.74
+primeira_liga,2024,primeira_liga_2024_43_sp_braga_guimaraes,15/09/2024,Sp Braga,Guimaraes,0,2,0,0,5,10,2,4,6,4,20,17,3,3,1,0,1.99,3.47,3.75,2.07,1.75
+primeira_liga,2024,primeira_liga_2024_44_estrela_boavista,16/09/2024,Estrela,Boavista,2,2,1,2,20,12,3,4,9,2,8,17,3,4,0,0,1.92,3.29,4.3,2.36,1.58
+primeira_liga,2024,primeira_liga_2024_45_nacional_sp_braga,20/09/2024,Nacional,Sp Braga,0,3,0,0,12,15,2,5,6,6,12,17,3,3,0,0,5.04,3.98,1.65,1.65,2.24
+primeira_liga,2024,primeira_liga_2024_46_rio_ave_estoril,21/09/2024,Rio Ave,Estoril,2,2,1,0,15,8,7,3,7,4,16,9,2,2,0,0,1.94,3.31,4.2,2.41,1.56
+primeira_liga,2024,primeira_liga_2024_47_santa_clara_estrela,21/09/2024,Santa Clara,Estrela,1,0,0,0,8,11,4,4,3,8,17,18,2,3,0,0,1.77,3.57,4.73,2.13,1.71
+primeira_liga,2024,primeira_liga_2024_48_guimaraes_porto,21/09/2024,Guimaraes,Porto,0,3,0,0,6,12,1,4,5,6,7,18,4,4,0,0,3.5,3.17,2.19,2.22,1.66
+primeira_liga,2024,primeira_liga_2024_49_moreirense_famalicao,21/09/2024,Moreirense,Famalicao,0,0,0,0,8,6,3,1,4,3,24,15,5,3,0,0,2.52,3.1,2.95,2.38,1.58
+primeira_liga,2024,primeira_liga_2024_50_gil_vicente_casa_pia,22/09/2024,Gil Vicente,Casa Pia,1,1,1,0,15,8,4,4,9,2,7,24,2,5,0,0,2.1,3.18,3.74,2.37,1.57
+primeira_liga,2024,primeira_liga_2024_51_farense_arouca,22/09/2024,Farense,Arouca,0,1,0,1,16,11,2,2,10,6,22,16,1,4,0,0,2.64,3.34,2.63,1.92,1.89
+primeira_liga,2024,primeira_liga_2024_52_sp_lisbon_avs,22/09/2024,Sp Lisbon,AVS,3,0,2,0,22,3,9,0,9,1,11,12,0,3,0,0,1.07,11.72,25.98,1.31,3.32
+primeira_liga,2024,primeira_liga_2024_53_boavista_benfica,23/09/2024,Boavista,Benfica,0,3,0,2,7,16,3,9,4,5,9,9,2,0,0,0,11.49,5.81,1.25,1.69,2.15
+primeira_liga,2024,primeira_liga_2024_54_estoril_sp_lisbon,27/09/2024,Estoril,Sp Lisbon,0,3,0,2,5,22,2,5,1,14,13,8,2,0,0,0,14.79,7.74,1.17,1.4,2.87
+primeira_liga,2024,primeira_liga_2024_55_estrela_moreirense,28/09/2024,Estrela,Moreirense,2,1,2,0,4,13,2,2,2,7,27,18,3,3,0,1,2.96,3.1,2.51,2.34,1.59
+primeira_liga,2024,primeira_liga_2024_56_casa_pia_guimaraes,28/09/2024,Casa Pia,Guimaraes,1,1,1,0,9,19,4,7,7,9,13,9,2,0,0,0,3.97,3.23,2.02,2.39,1.57
+primeira_liga,2024,primeira_liga_2024_57_benfica_gil_vicente,28/09/2024,Benfica,Gil Vicente,5,1,2,1,18,10,6,4,11,2,10,6,1,2,0,0,1.19,7.17,13.37,1.47,2.62
+primeira_liga,2024,primeira_liga_2024_58_famalicao_nacional,29/09/2024,Famalicao,Nacional,0,0,0,0,16,11,5,4,8,4,13,22,1,4,0,0,1.61,3.83,5.59,1.98,1.83
+primeira_liga,2024,primeira_liga_2024_59_porto_arouca,29/09/2024,Porto,Arouca,4,0,0,0,26,4,7,0,8,2,17,7,2,3,0,1,1.19,6.84,14.55,1.52,2.46
+primeira_liga,2024,primeira_liga_2024_60_santa_clara_boavista,29/09/2024,Santa Clara,Boavista,1,0,1,0,15,4,5,2,3,0,11,9,4,3,0,0,1.6,3.79,5.91,2.2,1.66
+primeira_liga,2024,primeira_liga_2024_61_sp_braga_rio_ave,29/09/2024,Sp Braga,Rio Ave,4,0,2,0,18,13,8,4,4,5,13,11,0,2,0,0,1.4,4.74,7.44,1.71,2.1
+primeira_liga,2024,primeira_liga_2024_62_avs_farense,30/09/2024,AVS,Farense,0,0,0,0,12,9,1,3,6,3,14,11,4,3,0,0,1.9,3.63,3.94,1.92,1.88
+primeira_liga,2024,primeira_liga_2024_63_rio_ave_famalicao,04/10/2024,Rio Ave,Famalicao,1,1,0,0,15,8,6,3,11,7,17,13,4,3,0,0,2.96,2.98,2.62,2.62,1.49
+primeira_liga,2024,primeira_liga_2024_64_gil_vicente_estrela,05/10/2024,Gil Vicente,Estrela,3,0,2,0,6,11,5,2,0,8,14,15,2,1,0,0,1.88,3.48,4.23,2.08,1.75
+primeira_liga,2024,primeira_liga_2024_65_moreirense_santa_clara,05/10/2024,Moreirense,Santa Clara,1,0,0,0,11,12,2,3,1,7,10,14,0,0,0,0,2.53,3.06,2.98,2.46,1.54
+primeira_liga,2024,primeira_liga_2024_66_arouca_avs,05/10/2024,Arouca,AVS,1,1,1,0,10,16,2,2,5,7,9,12,3,2,0,0,2.11,3.37,3.5,2.16,1.69
+primeira_liga,2024,primeira_liga_2024_67_sp_lisbon_casa_pia,05/10/2024,Sp Lisbon,Casa Pia,2,0,1,0,22,5,6,3,5,3,9,12,1,2,0,0,1.12,9.04,19.17,1.4,2.89
+primeira_liga,2024,primeira_liga_2024_68_farense_estoril,06/10/2024,Farense,Estoril,1,0,0,0,15,7,2,2,5,4,18,11,4,3,0,0,2.24,3.32,3.22,2.02,1.79
+primeira_liga,2024,primeira_liga_2024_69_guimaraes_boavista,06/10/2024,Guimaraes,Boavista,2,2,1,0,12,8,4,5,6,5,18,16,4,5,0,0,1.43,4.4,7.66,1.92,1.89
+primeira_liga,2024,primeira_liga_2024_70_porto_sp_braga,06/10/2024,Porto,Sp Braga,2,1,1,0,6,17,3,3,1,5,14,9,2,2,0,0,1.59,4.16,5.32,1.66,2.22
+primeira_liga,2024,primeira_liga_2024_71_casa_pia_nacional,25/10/2024,Casa Pia,Nacional,1,0,1,0,14,19,5,6,7,7,17,12,3,3,0,0,2.13,3.22,3.63,2.31,1.61
+primeira_liga,2024,primeira_liga_2024_72_santa_clara_gil_vicente,25/10/2024,Santa Clara,Gil Vicente,2,1,2,1,15,10,3,1,6,4,16,17,2,4,0,0,2.13,3.0,3.96,2.83,1.43
+primeira_liga,2024,primeira_liga_2024_73_estoril_arouca,26/10/2024,Estoril,Arouca,4,1,2,1,12,13,5,4,6,9,19,14,4,2,0,0,2.99,3.15,2.46,2.27,1.63
+primeira_liga,2024,primeira_liga_2024_74_boavista_moreirense,26/10/2024,Boavista,Moreirense,0,2,0,1,10,17,3,8,4,3,17,14,1,3,0,0,3.38,3.11,2.27,2.45,1.54
+primeira_liga,2024,primeira_liga_2024_75_famalicao_sp_lisbon,26/10/2024,Famalicao,Sp Lisbon,0,3,0,0,6,33,1,13,4,8,7,10,1,1,0,0,8.69,4.96,1.35,1.78,2.03
+primeira_liga,2024,primeira_liga_2024_76_sp_braga_farense,27/10/2024,Sp Braga,Farense,2,0,1,0,18,4,6,2,10,3,12,12,1,2,0,0,1.31,5.45,8.58,1.57,2.35
+primeira_liga,2024,primeira_liga_2024_77_benfica_rio_ave,27/10/2024,Benfica,Rio Ave,5,0,3,0,29,4,14,0,8,2,12,10,1,1,0,0,1.17,7.32,14.59,1.46,2.64
+primeira_liga,2024,primeira_liga_2024_78_estrela_guimaraes,27/10/2024,Estrela,Guimaraes,2,2,1,1,7,10,2,3,3,4,17,17,2,3,0,0,4.51,3.42,1.83,2.26,1.63
+primeira_liga,2024,primeira_liga_2024_79_avs_porto,28/10/2024,AVS,Porto,0,5,0,4,5,12,1,7,2,3,8,11,2,1,0,0,10.0,5.36,1.29,1.77,2.04
+primeira_liga,2024,primeira_liga_2024_80_sp_lisbon_estrela,01/11/2024,Sp Lisbon,Estrela,5,1,3,1,20,9,8,5,12,2,13,15,0,0,0,0,1.08,11.16,26.6,1.3,3.4
+primeira_liga,2024,primeira_liga_2024_81_rio_ave_casa_pia,02/11/2024,Rio Ave,Casa Pia,2,2,2,2,13,10,5,2,3,2,14,19,3,3,0,0,2.19,3.22,3.43,2.25,1.64
+primeira_liga,2024,primeira_liga_2024_82_farense_benfica,02/11/2024,Farense,Benfica,1,2,1,1,9,18,4,7,3,8,10,5,1,0,0,0,12.24,6.79,1.2,1.41,2.84
+primeira_liga,2024,primeira_liga_2024_83_gil_vicente_boavista,02/11/2024,Gil Vicente,Boavista,1,2,0,0,17,13,2,5,7,2,14,11,3,2,0,0,1.67,3.72,5.32,2.12,1.72
+primeira_liga,2024,primeira_liga_2024_84_avs_famalicao,03/11/2024,AVS,Famalicao,2,3,2,2,13,18,6,6,4,0,18,11,4,1,0,0,3.06,3.03,2.47,2.52,1.52
+primeira_liga,2024,primeira_liga_2024_85_arouca_sp_braga,03/11/2024,Arouca,Sp Braga,1,2,0,1,13,16,3,3,12,4,10,15,3,2,0,0,4.36,3.87,1.75,1.73,2.1
+primeira_liga,2024,primeira_liga_2024_86_guimaraes_moreirense,03/11/2024,Guimaraes,Moreirense,1,0,0,0,10,9,4,2,9,4,17,16,0,1,0,0,1.72,3.48,5.23,2.36,1.58
+primeira_liga,2024,primeira_liga_2024_87_porto_estoril,03/11/2024,Porto,Estoril,4,0,2,0,16,12,9,5,9,5,7,9,0,2,0,0,1.14,7.97,17.51,1.44,2.71
+primeira_liga,2024,primeira_liga_2024_88_nacional_santa_clara,04/11/2024,Nacional,Santa Clara,2,0,2,0,8,22,4,6,2,6,15,14,4,7,0,0,3.27,3.16,2.28,2.37,1.58
+primeira_liga,2024,primeira_liga_2024_89_moreirense_gil_vicente,08/11/2024,Moreirense,Gil Vicente,3,2,0,1,12,11,8,5,3,4,19,22,2,5,0,0,2.34,3.0,3.4,2.52,1.52
+primeira_liga,2024,primeira_liga_2024_90_casa_pia_farense,09/11/2024,Casa Pia,Farense,1,1,1,1,13,8,2,3,4,2,13,16,4,3,0,0,1.98,3.3,4.0,2.24,1.64
+primeira_liga,2024,primeira_liga_2024_91_estoril_avs,09/11/2024,Estoril,AVS,0,0,0,0,9,11,2,2,10,6,13,14,2,0,0,0,2.28,3.14,3.33,2.3,1.61
+primeira_liga,2024,primeira_liga_2024_92_famalicao_arouca,09/11/2024,Famalicao,Arouca,0,0,0,0,6,9,2,1,4,8,19,13,5,3,0,0,1.92,3.35,4.21,2.3,1.61
+primeira_liga,2024,primeira_liga_2024_93_boavista_rio_ave,09/11/2024,Boavista,Rio Ave,0,2,0,1,24,5,4,1,7,2,10,17,5,3,1,1,2.73,3.12,2.67,2.31,1.61
+primeira_liga,2024,primeira_liga_2024_94_estrela_nacional,10/11/2024,Estrela,Nacional,2,0,0,0,17,15,3,4,10,4,10,12,1,1,0,0,2.22,3.28,3.26,2.13,1.71
+primeira_liga,2024,primeira_liga_2024_95_santa_clara_guimaraes,10/11/2024,Santa Clara,Guimaraes,1,0,0,0,21,5,7,2,9,4,17,19,5,6,0,0,2.89,3.01,2.61,2.56,1.49
+primeira_liga,2024,primeira_liga_2024_96_sp_braga_sp_lisbon,10/11/2024,Sp Braga,Sp Lisbon,2,4,2,0,3,13,2,6,0,5,20,13,5,4,0,0,5.25,4.22,1.58,1.59,2.34
+primeira_liga,2024,primeira_liga_2024_97_benfica_porto,10/11/2024,Benfica,Porto,4,1,1,1,16,8,7,3,2,2,10,13,2,6,0,0,2.09,3.42,3.44,1.96,1.84
+primeira_liga,2024,primeira_liga_2024_98_farense_estrela,29/11/2024,Farense,Estrela,1,0,1,0,11,13,2,3,3,6,20,19,4,2,0,0,2.21,3.2,3.44,2.3,1.61
+primeira_liga,2024,primeira_liga_2024_99_rio_ave_moreirense,30/11/2024,Rio Ave,Moreirense,3,2,1,0,12,11,4,2,2,4,15,17,3,3,0,0,2.92,3.05,2.58,2.37,1.58
+primeira_liga,2024,primeira_liga_2024_100_nacional_boavista,30/11/2024,Nacional,Boavista,0,0,0,0,22,9,8,2,4,7,14,15,1,2,0,0,1.94,3.42,4.0,2.15,1.69
+primeira_liga,2024,primeira_liga_2024_101_sp_lisbon_santa_clara,30/11/2024,Sp Lisbon,Santa Clara,0,1,0,1,21,4,4,3,8,2,9,18,2,8,0,0,1.16,7.43,16.32,1.62,2.25
+primeira_liga,2024,primeira_liga_2024_102_estoril_famalicao,01/12/2024,Estoril,Famalicao,2,1,2,1,12,7,4,1,5,7,19,18,2,4,0,0,3.3,3.18,2.24,2.4,1.56
+primeira_liga,2024,primeira_liga_2024_103_arouca_benfica,01/12/2024,Arouca,Benfica,0,2,0,1,12,14,5,8,5,6,15,10,2,3,0,0,10.21,5.93,1.26,1.53,2.45
+primeira_liga,2024,primeira_liga_2024_104_avs_sp_braga,01/12/2024,AVS,Sp Braga,0,1,0,0,6,20,1,8,2,9,12,16,3,1,2,0,5.37,3.97,1.6,1.85,1.95
+primeira_liga,2024,primeira_liga_2024_105_guimaraes_gil_vicente,02/12/2024,Guimaraes,Gil Vicente,4,0,1,0,19,3,5,0,9,2,19,10,1,2,0,0,1.68,3.73,5.0,2.04,1.77
+primeira_liga,2024,primeira_liga_2024_106_porto_casa_pia,02/12/2024,Porto,Casa Pia,2,0,0,0,17,10,9,3,8,6,14,13,3,0,0,0,1.2,6.62,13.19,1.52,2.46
+primeira_liga,2024,primeira_liga_2024_107_moreirense_sp_lisbon,05/12/2024,Moreirense,Sp Lisbon,2,1,2,1,8,16,4,2,4,6,17,15,3,1,0,0,8.44,5.02,1.34,1.74,2.07
+primeira_liga,2024,primeira_liga_2024_108_sp_braga_estoril,06/12/2024,Sp Braga,Estoril,2,2,1,0,16,11,7,3,3,2,18,21,3,5,0,0,1.22,6.35,13.45,1.63,2.26
+primeira_liga,2024,primeira_liga_2024_109_gil_vicente_nacional,07/12/2024,Gil Vicente,Nacional,2,1,1,0,17,19,4,6,6,7,13,17,3,4,0,0,2.03,3.4,3.7,2.07,1.75
+primeira_liga,2024,primeira_liga_2024_110_benfica_guimaraes,07/12/2024,Benfica,Guimaraes,1,0,1,0,8,10,1,2,6,9,9,13,3,1,0,0,1.31,5.38,9.43,1.65,2.24
+primeira_liga,2024,primeira_liga_2024_111_santa_clara_rio_ave,07/12/2024,Santa Clara,Rio Ave,1,0,1,0,10,4,4,2,6,2,18,17,2,4,0,0,1.82,3.43,4.63,2.18,1.67
+primeira_liga,2024,primeira_liga_2024_112_famalicao_porto,07/12/2024,Famalicao,Porto,1,1,1,0,4,16,2,4,3,5,13,19,2,3,0,0,6.57,4.36,1.48,1.92,1.88
+primeira_liga,2024,primeira_liga_2024_113_boavista_farense,08/12/2024,Boavista,Farense,1,1,0,0,13,11,4,6,5,4,7,17,3,4,1,1,2.42,3.16,3.02,2.3,1.61
+primeira_liga,2024,primeira_liga_2024_114_casa_pia_avs,08/12/2024,Casa Pia,AVS,1,1,1,0,11,7,5,3,6,3,13,14,0,4,0,0,1.83,3.37,4.59,2.25,1.63
+primeira_liga,2024,primeira_liga_2024_115_estrela_arouca,09/12/2024,Estrela,Arouca,2,1,0,1,10,10,2,4,2,7,13,19,4,2,0,0,2.54,3.19,2.83,2.18,1.67
+primeira_liga,2024,primeira_liga_2024_116_farense_gil_vicente,14/12/2024,Farense,Gil Vicente,0,1,0,0,15,7,2,2,7,1,13,15,3,2,0,1,2.81,3.02,2.66,2.33,1.59
+primeira_liga,2024,primeira_liga_2024_117_nacional_moreirense,14/12/2024,Nacional,Moreirense,1,0,0,0,12,4,5,1,10,2,14,16,0,3,0,0,2.8,3.1,2.62,2.26,1.62
+primeira_liga,2024,primeira_liga_2024_118_sp_lisbon_boavista,14/12/2024,Sp Lisbon,Boavista,3,2,1,1,20,8,7,2,10,1,16,11,3,3,0,0,1.08,11.3,22.96,1.23,3.88
+primeira_liga,2024,primeira_liga_2024_119_arouca_santa_clara,15/12/2024,Arouca,Santa Clara,1,0,0,0,12,5,3,1,7,2,17,18,2,2,0,0,3.19,3.08,2.34,2.37,1.56
+primeira_liga,2024,primeira_liga_2024_120_avs_benfica,15/12/2024,AVS,Benfica,1,1,0,1,18,13,7,4,0,3,8,13,2,2,0,0,15.35,7.19,1.16,1.5,2.48
+primeira_liga,2024,primeira_liga_2024_121_estoril_casa_pia,15/12/2024,Estoril,Casa Pia,0,2,0,0,14,10,5,4,5,4,14,16,4,3,0,0,2.62,3.12,2.76,2.25,1.62
+primeira_liga,2024,primeira_liga_2024_122_sp_braga_famalicao,16/12/2024,Sp Braga,Famalicao,3,3,0,1,21,10,8,8,10,3,12,14,0,1,0,0,1.48,4.26,6.44,1.84,1.94
+primeira_liga,2024,primeira_liga_2024_123_porto_estrela,16/12/2024,Porto,Estrela,2,0,1,0,12,3,4,0,11,4,17,19,0,3,0,1,1.13,8.13,18.96,1.45,2.64
+primeira_liga,2024,primeira_liga_2024_124_rio_ave_guimaraes,16/12/2024,Rio Ave,Guimaraes,2,2,2,0,5,16,4,5,0,2,9,13,2,1,0,0,3.67,3.29,2.06,2.2,1.65
+primeira_liga,2024,primeira_liga_2024_125_nacional_benfica,19/12/2024,Nacional,Benfica,0,2,0,0,5,16,1,7,4,11,12,9,2,4,0,0,10.6,6.32,1.24,1.43,2.76
+primeira_liga,2024,primeira_liga_2024_126_casa_pia_arouca,20/12/2024,Casa Pia,Arouca,3,1,2,0,10,9,6,4,3,4,9,12,2,3,0,0,2.35,2.99,3.34,2.47,1.53
+primeira_liga,2024,primeira_liga_2024_127_famalicao_farense,21/12/2024,Famalicao,Farense,1,2,0,1,11,7,1,5,7,4,5,19,3,6,0,0,1.79,3.43,4.72,2.2,1.65
+primeira_liga,2024,primeira_liga_2024_128_boavista_avs,21/12/2024,Boavista,AVS,0,0,0,0,15,7,4,1,5,1,9,14,1,2,0,0,2.27,3.14,3.28,2.31,1.59
+primeira_liga,2024,primeira_liga_2024_129_moreirense_porto,21/12/2024,Moreirense,Porto,0,3,0,1,7,12,1,7,2,4,17,12,3,4,0,0,6.68,4.18,1.48,2.03,1.77
+primeira_liga,2024,primeira_liga_2024_130_santa_clara_sp_braga,22/12/2024,Santa Clara,Sp Braga,0,2,0,0,12,12,6,5,2,2,14,15,3,5,1,0,3.14,3.18,2.3,2.22,1.64
+primeira_liga,2024,primeira_liga_2024_131_gil_vicente_sp_lisbon,22/12/2024,Gil Vicente,Sp Lisbon,0,0,0,0,3,14,1,7,3,8,12,11,3,1,0,0,7.66,5.1,1.35,1.51,2.45
+primeira_liga,2024,primeira_liga_2024_132_benfica_estoril,23/12/2024,Benfica,Estoril,3,0,1,0,15,10,6,2,4,1,11,13,1,1,0,0,1.09,10.02,21.76,1.31,3.24
+primeira_liga,2024,primeira_liga_2024_133_guimaraes_nacional,23/12/2024,Guimaraes,Nacional,2,2,1,1,16,8,3,2,7,1,15,11,1,1,0,0,1.53,4.04,6.05,1.92,1.86
+primeira_liga,2024,primeira_liga_2024_134_estrela_rio_ave,23/12/2024,Estrela,Rio Ave,1,0,1,0,8,19,4,6,5,6,17,16,4,3,0,0,2.36,3.24,3.0,2.1,1.71
+primeira_liga,2024,primeira_liga_2024_135_arouca_gil_vicente,27/12/2024,Arouca,Gil Vicente,1,1,0,0,10,7,5,3,5,7,21,11,0,1,0,0,2.34,3.06,3.26,2.38,1.57
+primeira_liga,2024,primeira_liga_2024_136_avs_estrela,28/12/2024,AVS,Estrela,1,1,0,1,12,16,6,5,7,6,13,12,2,2,0,0,2.45,3.08,3.01,2.29,1.6
+primeira_liga,2024,primeira_liga_2024_137_estoril_moreirense,28/12/2024,Estoril,Moreirense,2,2,2,1,15,8,7,5,6,2,17,14,2,2,0,0,3.16,3.03,2.4,2.48,1.51
+primeira_liga,2024,primeira_liga_2024_138_porto_boavista,28/12/2024,Porto,Boavista,4,0,1,0,13,4,7,1,4,1,12,15,4,2,0,0,1.11,8.79,19.86,1.41,2.76
+primeira_liga,2024,primeira_liga_2024_139_farense_guimaraes,29/12/2024,Farense,Guimaraes,2,2,1,0,6,27,2,12,6,9,12,15,2,3,0,0,4.18,3.51,1.84,2.07,1.73
+primeira_liga,2024,primeira_liga_2024_140_rio_ave_nacional,29/12/2024,Rio Ave,Nacional,2,1,1,1,20,13,7,2,11,6,10,14,0,1,0,0,2.17,3.21,3.41,2.08,1.73
+primeira_liga,2024,primeira_liga_2024_141_sp_braga_casa_pia,29/12/2024,Sp Braga,Casa Pia,1,2,1,1,16,8,6,4,10,2,9,14,2,3,0,0,1.39,4.56,7.59,1.79,2.0
+primeira_liga,2024,primeira_liga_2024_142_sp_lisbon_benfica,29/12/2024,Sp Lisbon,Benfica,1,0,1,0,12,14,6,2,4,8,13,14,2,3,0,0,2.5,3.57,2.59,1.66,2.16
+primeira_liga,2024,primeira_liga_2024_143_famalicao_santa_clara,30/12/2024,Famalicao,Santa Clara,1,2,0,1,18,7,5,3,5,4,11,13,3,3,0,0,2.68,2.9,2.87,2.68,1.43
+primeira_liga,2024,primeira_liga_2024_144_guimaraes_sp_lisbon,03/01/2025,Guimaraes,Sp Lisbon,4,4,1,2,15,9,5,5,6,2,12,14,4,5,0,0,3.78,3.48,1.96,1.93,1.85
+primeira_liga,2024,primeira_liga_2024_145_moreirense_avs,04/01/2025,Moreirense,AVS,1,1,1,1,11,17,5,2,3,9,13,18,3,5,0,0,1.84,3.31,4.55,2.45,1.52
+primeira_liga,2024,primeira_liga_2024_146_benfica_sp_braga,04/01/2025,Benfica,Sp Braga,1,2,0,2,21,6,5,2,8,2,8,11,4,3,0,0,1.42,4.69,6.67,1.57,2.35
+primeira_liga,2024,primeira_liga_2024_147_boavista_arouca,04/01/2025,Boavista,Arouca,1,3,0,1,14,14,2,5,3,3,8,18,5,7,1,0,2.76,3.18,2.58,2.27,1.61
+primeira_liga,2024,primeira_liga_2024_148_santa_clara_farense,05/01/2025,Santa Clara,Farense,0,0,0,0,17,2,6,1,13,2,16,15,3,4,0,1,1.67,3.45,5.57,2.35,1.56
+primeira_liga,2024,primeira_liga_2024_149_casa_pia_famalicao,05/01/2025,Casa Pia,Famalicao,1,1,1,1,6,19,3,14,5,7,11,6,3,3,1,0,2.37,3.02,3.17,2.51,1.5
+primeira_liga,2024,primeira_liga_2024_150_estrela_estoril,05/01/2025,Estrela,Estoril,2,4,0,3,8,14,4,8,3,3,20,18,2,1,0,0,2.29,2.99,3.35,2.28,1.59
+primeira_liga,2024,primeira_liga_2024_151_gil_vicente_rio_ave,06/01/2025,Gil Vicente,Rio Ave,1,1,1,0,13,14,4,4,4,4,8,13,2,3,0,0,2.15,3.17,3.47,2.15,1.67
+primeira_liga,2024,primeira_liga_2024_152_nacional_porto,12/01/2025,Nacional,Porto,2,0,2,0,7,13,4,3,1,10,8,11,3,6,0,0,8.62,5.03,1.34,1.73,2.09
+primeira_liga,2024,primeira_liga_2024_153_benfica_famalicao,17/01/2025,Benfica,Famalicao,4,0,2,0,21,1,12,0,7,2,13,8,3,0,0,0,1.23,6.22,11.37,1.54,2.41
+primeira_liga,2024,primeira_liga_2024_154_santa_clara_estoril,18/01/2025,Santa Clara,Estoril,2,3,1,2,15,8,5,3,7,1,14,16,2,2,0,0,1.71,3.49,5.12,2.39,1.55
+primeira_liga,2024,primeira_liga_2024_155_rio_ave_sp_lisbon,18/01/2025,Rio Ave,Sp Lisbon,0,3,0,2,2,29,0,13,0,8,16,11,1,1,0,0,9.24,5.69,1.28,1.51,2.47
+primeira_liga,2024,primeira_liga_2024_156_guimaraes_arouca,18/01/2025,Guimaraes,Arouca,2,2,2,0,17,19,7,6,9,5,13,9,1,3,0,0,1.57,3.96,5.71,1.94,1.84
+primeira_liga,2024,primeira_liga_2024_157_moreirense_farense,19/01/2025,Moreirense,Farense,0,0,0,0,14,5,4,0,6,3,16,14,2,4,0,0,1.91,3.24,4.27,2.51,1.5
+primeira_liga,2024,primeira_liga_2024_158_nacional_avs,19/01/2025,Nacional,AVS,3,1,3,1,17,13,7,3,4,6,12,14,2,4,0,0,2.07,3.23,3.66,2.25,1.62
+primeira_liga,2024,primeira_liga_2024_159_estrela_sp_braga,19/01/2025,Estrela,Sp Braga,0,1,0,0,7,13,3,5,1,8,21,9,3,1,0,0,4.76,3.82,1.68,1.83,1.95
+primeira_liga,2024,primeira_liga_2024_160_gil_vicente_porto,19/01/2025,Gil Vicente,Porto,3,1,1,0,8,18,3,3,4,6,10,18,3,6,0,1,7.93,4.51,1.39,1.94,1.84
+primeira_liga,2024,primeira_liga_2024_161_boavista_casa_pia,20/01/2025,Boavista,Casa Pia,2,3,1,2,10,9,5,6,2,3,13,14,3,2,1,0,3.22,3.09,2.31,2.37,1.55
+primeira_liga,2024,primeira_liga_2024_162_arouca_moreirense,24/01/2025,Arouca,Moreirense,1,0,0,0,16,7,5,1,10,2,18,11,3,0,0,0,2.37,3.08,3.19,2.53,1.51
+primeira_liga,2024,primeira_liga_2024_163_famalicao_estrela,25/01/2025,Famalicao,Estrela,0,0,0,0,10,4,2,1,5,2,14,15,1,3,0,0,1.87,3.39,4.28,2.25,1.62
+primeira_liga,2024,primeira_liga_2024_164_farense_rio_ave,25/01/2025,Farense,Rio Ave,1,2,0,1,15,9,5,2,9,2,16,10,5,4,0,0,2.55,3.01,2.94,2.41,1.54
+primeira_liga,2024,primeira_liga_2024_165_casa_pia_benfica,25/01/2025,Casa Pia,Benfica,3,1,1,1,8,19,3,7,2,9,12,10,2,0,0,0,7.96,4.85,1.37,1.72,2.11
+primeira_liga,2024,primeira_liga_2024_166_sp_lisbon_nacional,25/01/2025,Sp Lisbon,Nacional,2,0,1,0,15,3,5,1,6,2,12,16,1,1,0,0,1.13,8.71,15.83,1.36,2.95
+primeira_liga,2024,primeira_liga_2024_167_estoril_guimaraes,26/01/2025,Estoril,Guimaraes,1,0,0,0,13,7,5,2,2,5,17,20,3,3,0,0,4.2,3.58,1.82,2.01,1.79
+primeira_liga,2024,primeira_liga_2024_168_porto_santa_clara,26/01/2025,Porto,Santa Clara,1,1,0,1,21,2,7,1,7,2,12,23,0,0,0,0,1.46,4.12,7.29,2.12,1.71
+primeira_liga,2024,primeira_liga_2024_169_sp_braga_boavista,26/01/2025,Sp Braga,Boavista,3,0,2,0,15,9,5,3,11,3,12,7,2,0,0,1,1.21,6.33,12.43,1.54,2.39
+primeira_liga,2024,primeira_liga_2024_170_avs_gil_vicente,27/01/2025,AVS,Gil Vicente,1,0,0,0,8,10,1,0,1,8,17,10,3,1,0,0,2.88,3.09,2.54,2.34,1.57
+primeira_liga,2024,primeira_liga_2024_171_boavista_famalicao,31/01/2025,Boavista,Famalicao,0,2,0,1,4,20,1,4,2,7,12,16,3,1,0,0,3.52,3.03,2.23,2.54,1.51
+primeira_liga,2024,primeira_liga_2024_172_nacional_arouca,01/02/2025,Nacional,Arouca,1,2,1,2,19,11,4,6,3,3,15,20,5,1,0,1,2.52,3.16,2.84,2.2,1.65
+primeira_liga,2024,primeira_liga_2024_173_santa_clara_casa_pia,01/02/2025,Santa Clara,Casa Pia,2,1,0,1,16,5,6,2,5,2,10,10,2,2,0,0,2.11,3.04,3.8,2.66,1.44
+primeira_liga,2024,primeira_liga_2024_174_gil_vicente_estoril,01/02/2025,Gil Vicente,Estoril,1,2,1,1,9,19,6,6,3,3,12,14,0,1,1,0,2.14,3.18,3.55,2.21,1.65
+primeira_liga,2024,primeira_liga_2024_175_guimaraes_avs,01/02/2025,Guimaraes,AVS,2,0,0,0,14,4,8,1,8,2,14,20,1,5,0,1,1.36,4.74,8.32,1.89,1.9
+primeira_liga,2024,primeira_liga_2024_176_sp_lisbon_farense,02/02/2025,Sp Lisbon,Farense,3,1,2,1,21,6,7,2,9,1,12,8,1,0,0,0,1.12,8.53,18.26,1.41,2.75
+primeira_liga,2024,primeira_liga_2024_177_estrela_benfica,02/02/2025,Estrela,Benfica,2,3,1,3,7,14,3,8,0,7,14,17,3,2,0,0,9.72,5.68,1.27,1.58,2.32
+primeira_liga,2024,primeira_liga_2024_178_moreirense_sp_braga,03/02/2025,Moreirense,Sp Braga,1,2,1,0,10,13,6,5,1,9,18,11,2,1,0,0,3.95,3.46,1.92,2.04,1.76
+primeira_liga,2024,primeira_liga_2024_179_rio_ave_porto,03/02/2025,Rio Ave,Porto,2,2,1,0,9,23,3,8,3,5,18,8,1,3,1,0,6.98,4.58,1.42,1.75,2.04
+primeira_liga,2024,primeira_liga_2024_180_porto_sp_lisbon,07/02/2025,Porto,Sp Lisbon,1,1,0,1,17,13,2,3,6,3,16,14,3,4,0,2,2.87,3.06,2.6,2.21,1.66
+primeira_liga,2024,primeira_liga_2024_181_avs_santa_clara,08/02/2025,AVS,Santa Clara,1,2,0,0,9,8,3,4,2,3,11,15,0,0,0,0,4.24,3.17,1.96,2.61,1.47
+primeira_liga,2024,primeira_liga_2024_182_benfica_moreirense,08/02/2025,Benfica,Moreirense,3,2,3,1,11,8,6,4,6,6,14,10,0,1,0,0,1.19,6.91,13.71,1.57,2.35
+primeira_liga,2024,primeira_liga_2024_183_famalicao_guimaraes,08/02/2025,Famalicao,Guimaraes,0,0,0,0,8,7,2,2,4,11,16,19,3,2,0,0,3.13,3.03,2.41,2.38,1.57
+primeira_liga,2024,primeira_liga_2024_184_estoril_boavista,09/02/2025,Estoril,Boavista,2,1,1,0,13,9,5,5,5,3,25,12,2,1,0,0,1.54,3.98,6.12,2.08,1.74
+primeira_liga,2024,primeira_liga_2024_185_farense_nacional,09/02/2025,Farense,Nacional,0,2,0,0,21,11,6,4,12,3,16,15,1,4,1,1,2.31,3.2,3.13,2.23,1.65
+primeira_liga,2024,primeira_liga_2024_186_sp_braga_gil_vicente,09/02/2025,Sp Braga,Gil Vicente,2,0,1,0,14,6,6,4,4,2,18,9,0,0,0,1,1.55,4.12,5.7,1.88,1.92
+primeira_liga,2024,primeira_liga_2024_187_casa_pia_estrela,09/02/2025,Casa Pia,Estrela,1,0,1,0,15,13,4,3,5,2,17,16,4,4,0,0,1.83,3.38,4.47,2.32,1.59
+primeira_liga,2024,primeira_liga_2024_188_arouca_rio_ave,10/02/2025,Arouca,Rio Ave,1,1,0,0,16,12,4,4,6,3,20,10,0,1,0,0,1.96,3.34,3.9,2.1,1.71
+primeira_liga,2024,primeira_liga_2024_189_boavista_estrela,14/02/2025,Boavista,Estrela,0,1,0,1,14,9,1,6,7,4,23,17,2,2,0,0,2.55,2.94,3.1,2.58,1.5
+primeira_liga,2024,primeira_liga_2024_190_moreirense_casa_pia,15/02/2025,Moreirense,Casa Pia,3,2,3,0,10,15,5,4,4,5,17,16,0,0,0,0,2.33,3.03,3.33,2.54,1.5
+primeira_liga,2024,primeira_liga_2024_191_nacional_estoril,15/02/2025,Nacional,Estoril,2,2,1,1,18,7,6,4,7,3,15,14,3,3,0,0,2.24,3.24,3.29,2.15,1.69
+primeira_liga,2024,primeira_liga_2024_192_santa_clara_benfica,15/02/2025,Santa Clara,Benfica,0,1,0,0,10,17,3,6,2,5,21,17,6,3,1,0,5.09,3.7,1.68,2.23,1.65
+primeira_liga,2024,primeira_liga_2024_193_sp_lisbon_arouca,15/02/2025,Sp Lisbon,Arouca,2,2,1,2,21,15,8,7,9,9,6,13,3,3,1,0,1.25,5.96,10.55,1.57,2.39
+primeira_liga,2024,primeira_liga_2024_194_rio_ave_avs,16/02/2025,Rio Ave,AVS,1,1,0,1,16,11,3,3,2,4,14,19,0,0,0,0,2.15,3.26,3.43,2.27,1.62
+primeira_liga,2024,primeira_liga_2024_195_farense_porto,16/02/2025,Farense,Porto,0,1,0,0,8,11,2,2,2,4,15,10,4,2,1,0,7.65,4.53,1.4,1.9,1.91
+primeira_liga,2024,primeira_liga_2024_196_guimaraes_sp_braga,16/02/2025,Guimaraes,Sp Braga,0,0,0,0,16,6,3,3,7,4,11,15,5,3,0,0,2.47,3.4,2.76,2.04,1.78
+primeira_liga,2024,primeira_liga_2024_197_gil_vicente_famalicao,17/02/2025,Gil Vicente,Famalicao,0,2,0,1,14,20,2,6,5,11,11,19,2,2,0,0,2.53,2.97,3.02,2.53,1.5
+primeira_liga,2024,primeira_liga_2024_198_sp_braga_nacional,21/02/2025,Sp Braga,Nacional,1,0,1,0,20,8,7,3,7,6,14,14,1,2,0,0,1.57,4.05,5.81,1.73,2.1
+primeira_liga,2024,primeira_liga_2024_199_casa_pia_gil_vicente,22/02/2025,Casa Pia,Gil Vicente,1,0,0,0,10,4,1,0,2,5,14,10,1,2,0,0,2.22,3.13,3.44,2.44,1.55
+primeira_liga,2024,primeira_liga_2024_200_benfica_boavista,22/02/2025,Benfica,Boavista,3,0,1,0,31,6,14,2,13,2,10,7,0,3,0,1,1.1,9.82,22.36,1.33,3.24
+primeira_liga,2024,primeira_liga_2024_201_estoril_rio_ave,22/02/2025,Estoril,Rio Ave,2,1,0,0,11,9,4,4,0,4,14,9,2,1,0,0,2.04,3.4,3.64,2.01,1.81
+primeira_liga,2024,primeira_liga_2024_202_arouca_farense,23/02/2025,Arouca,Farense,2,2,0,1,12,17,6,7,4,9,16,16,2,3,0,0,1.89,3.4,4.21,2.18,1.67
+primeira_liga,2024,primeira_liga_2024_203_estrela_santa_clara,23/02/2025,Estrela,Santa Clara,0,0,0,0,10,4,2,1,5,2,13,19,3,1,0,0,3.57,3.13,2.16,2.75,1.43
+primeira_liga,2024,primeira_liga_2024_204_avs_sp_lisbon,23/02/2025,AVS,Sp Lisbon,2,2,0,2,11,9,4,3,4,5,22,13,5,5,0,1,8.89,5.17,1.32,1.7,2.14
+primeira_liga,2024,primeira_liga_2024_205_famalicao_moreirense,23/02/2025,Famalicao,Moreirense,2,0,0,0,17,8,4,6,3,1,19,17,3,3,0,0,2.17,3.1,3.59,2.49,1.52
+primeira_liga,2024,primeira_liga_2024_206_porto_guimaraes,24/02/2025,Porto,Guimaraes,1,1,0,0,13,11,2,5,6,7,20,16,2,2,0,0,1.67,3.73,5.13,2.06,1.75
+primeira_liga,2024,primeira_liga_2024_207_nacional_famalicao,01/03/2025,Nacional,Famalicao,2,1,1,0,15,15,5,3,1,6,18,12,3,4,0,0,2.55,3.09,2.91,2.21,1.66
+primeira_liga,2024,primeira_liga_2024_208_arouca_porto,01/03/2025,Arouca,Porto,0,2,0,1,6,9,2,2,4,2,13,12,2,2,0,0,4.93,3.77,1.69,1.95,1.85
+primeira_liga,2024,primeira_liga_2024_209_guimaraes_casa_pia,01/03/2025,Guimaraes,Casa Pia,1,0,0,0,18,10,6,2,7,2,9,18,3,1,0,0,1.76,3.54,4.7,2.17,1.68
+primeira_liga,2024,primeira_liga_2024_210_boavista_santa_clara,02/03/2025,Boavista,Santa Clara,1,0,0,0,12,11,5,1,9,5,10,19,4,3,0,0,4.25,3.18,1.96,2.58,1.48
+primeira_liga,2024,primeira_liga_2024_211_moreirense_estrela,02/03/2025,Moreirense,Estrela,1,1,0,0,11,7,2,1,4,1,20,13,2,4,0,0,1.93,3.06,4.63,2.47,1.53
+primeira_liga,2024,primeira_liga_2024_212_farense_avs,02/03/2025,Farense,AVS,0,1,0,0,17,6,4,3,7,1,24,12,2,2,0,0,2.29,3.05,3.36,2.53,1.51
+primeira_liga,2024,primeira_liga_2024_213_rio_ave_sp_braga,02/03/2025,Rio Ave,Sp Braga,2,1,1,1,13,14,7,7,2,5,9,13,2,5,0,0,4.07,3.78,1.82,1.82,1.99
+primeira_liga,2024,primeira_liga_2024_214_sp_lisbon_estoril,03/03/2025,Sp Lisbon,Estoril,3,1,2,0,13,8,6,2,6,6,10,10,1,1,0,1,1.19,7.03,12.53,1.43,2.72
+primeira_liga,2024,primeira_liga_2024_215_estrela_gil_vicente,07/03/2025,Estrela,Gil Vicente,1,1,0,0,8,10,3,2,7,7,22,10,5,2,0,0,2.67,2.97,2.88,2.49,1.53
+primeira_liga,2024,primeira_liga_2024_216_avs_arouca,08/03/2025,AVS,Arouca,0,1,0,0,9,20,1,8,1,7,15,17,1,1,0,0,3.08,3.11,2.42,2.26,1.64
+primeira_liga,2024,primeira_liga_2024_217_benfica_nacional,08/03/2025,Benfica,Nacional,3,0,2,0,18,12,12,3,5,3,11,11,0,3,0,0,1.2,6.66,12.49,1.46,2.64
+primeira_liga,2024,primeira_liga_2024_218_estoril_farense,08/03/2025,Estoril,Farense,2,2,0,0,13,14,4,4,4,7,17,18,2,1,0,0,2.1,3.22,3.66,2.22,1.65
+primeira_liga,2024,primeira_liga_2024_219_sp_braga_porto,08/03/2025,Sp Braga,Porto,1,0,1,0,7,7,4,3,7,3,16,14,2,4,1,0,3.29,3.33,2.19,1.97,1.83
+primeira_liga,2024,primeira_liga_2024_220_santa_clara_moreirense,09/03/2025,Santa Clara,Moreirense,1,1,0,0,13,9,5,3,4,3,15,11,1,2,0,0,2.02,3.09,4.11,2.67,1.45
+primeira_liga,2024,primeira_liga_2024_221_casa_pia_sp_lisbon,09/03/2025,Casa Pia,Sp Lisbon,1,3,1,2,10,17,3,6,4,4,9,10,4,3,0,0,6.26,4.27,1.49,1.79,2.02
+primeira_liga,2024,primeira_liga_2024_222_boavista_guimaraes,09/03/2025,Boavista,Guimaraes,1,2,1,0,7,19,4,8,2,7,17,16,2,1,0,0,5.52,3.67,1.64,2.22,1.65
+primeira_liga,2024,primeira_liga_2024_223_famalicao_rio_ave,10/03/2025,Famalicao,Rio Ave,1,0,1,0,16,13,7,4,5,1,22,13,1,2,0,0,1.97,3.04,4.45,2.13,1.7
+primeira_liga,2024,primeira_liga_2024_224_farense_sp_braga,15/03/2025,Farense,Sp Braga,0,1,0,0,11,10,3,4,12,4,19,14,2,1,0,0,4.37,3.38,1.87,2.21,1.65
+primeira_liga,2024,primeira_liga_2024_225_gil_vicente_santa_clara,15/03/2025,Gil Vicente,Santa Clara,0,1,0,1,12,3,2,1,5,0,12,21,2,2,0,0,3.01,2.95,2.57,2.83,1.41
+primeira_liga,2024,primeira_liga_2024_226_porto_avs,15/03/2025,Porto,AVS,2,0,1,0,20,8,10,2,4,3,19,8,3,4,0,1,1.23,6.02,12.06,1.65,2.21
+primeira_liga,2024,primeira_liga_2024_227_sp_lisbon_famalicao,15/03/2025,Sp Lisbon,Famalicao,3,1,1,1,18,9,9,3,11,4,10,13,4,1,1,0,1.3,5.18,10.08,1.65,2.2
+primeira_liga,2024,primeira_liga_2024_228_arouca_estoril,16/03/2025,Arouca,Estoril,1,1,1,0,3,12,1,3,3,4,14,14,0,1,0,0,1.98,3.4,3.79,2.04,1.76
+primeira_liga,2024,primeira_liga_2024_229_nacional_casa_pia,16/03/2025,Nacional,Casa Pia,3,1,1,0,14,10,6,3,2,5,11,13,2,1,0,0,2.41,3.24,2.94,2.21,1.66
+primeira_liga,2024,primeira_liga_2024_230_rio_ave_benfica,16/03/2025,Rio Ave,Benfica,2,3,0,1,7,20,2,8,3,11,16,12,3,1,1,0,7.77,5.15,1.35,1.56,2.38
+primeira_liga,2024,primeira_liga_2024_231_guimaraes_estrela,16/03/2025,Guimaraes,Estrela,2,0,1,0,12,9,6,0,8,2,15,17,1,2,0,0,1.45,4.13,7.72,2.06,1.75
+primeira_liga,2024,primeira_liga_2024_232_moreirense_boavista,16/03/2025,Moreirense,Boavista,1,0,1,0,21,9,3,4,6,3,14,16,4,6,0,1,1.78,3.38,4.88,2.38,1.57
+primeira_liga,2024,primeira_liga_2024_233_gil_vicente_benfica,28/03/2025,Gil Vicente,Benfica,0,3,0,1,7,18,2,7,5,2,9,16,4,2,0,0,7.83,4.74,1.38,1.8,2.0
+primeira_liga,2024,primeira_liga_2024_234_casa_pia_rio_ave,29/03/2025,Casa Pia,Rio Ave,2,1,1,1,11,12,3,5,7,4,19,12,5,1,0,0,2.08,3.32,3.62,2.12,1.71
+primeira_liga,2024,primeira_liga_2024_235_estrela_sp_lisbon,29/03/2025,Estrela,Sp Lisbon,0,3,0,0,7,13,0,7,3,2,18,18,7,1,2,0,8.67,5.08,1.33,1.72,2.08
+primeira_liga,2024,primeira_liga_2024_236_sp_braga_arouca,29/03/2025,Sp Braga,Arouca,2,1,2,0,14,8,5,1,7,1,12,9,2,2,0,0,1.7,3.76,4.77,1.87,1.91
+primeira_liga,2024,primeira_liga_2024_237_famalicao_avs,30/03/2025,Famalicao,AVS,4,1,0,0,16,6,4,1,4,2,15,21,2,2,0,0,1.78,3.44,4.72,2.26,1.61
+primeira_liga,2024,primeira_liga_2024_238_santa_clara_nacional,30/03/2025,Santa Clara,Nacional,1,0,1,0,13,9,5,4,3,4,23,16,3,3,0,1,1.93,3.18,4.37,2.53,1.49
+primeira_liga,2024,primeira_liga_2024_239_estoril_porto,30/03/2025,Estoril,Porto,1,2,1,1,3,14,2,6,1,6,19,13,4,2,0,0,6.12,4.07,1.53,1.96,1.82
+primeira_liga,2024,primeira_liga_2024_240_moreirense_guimaraes,30/03/2025,Moreirense,Guimaraes,2,2,1,1,11,11,3,3,2,3,11,15,2,2,0,0,3.54,3.09,2.17,2.52,1.5
+primeira_liga,2024,primeira_liga_2024_241_boavista_gil_vicente,01/04/2025,Boavista,Gil Vicente,1,3,0,0,7,14,3,9,3,3,21,13,1,3,1,1,3.75,3.2,2.09,2.37,1.58
+primeira_liga,2024,primeira_liga_2024_242_benfica_farense,02/04/2025,Benfica,Farense,3,2,2,1,13,12,7,6,5,4,13,13,1,1,0,0,1.11,8.58,20.82,1.45,2.68
+primeira_liga,2024,primeira_liga_2024_243_avs_estoril,04/04/2025,AVS,Estoril,0,3,0,2,9,14,2,8,4,3,13,18,3,1,0,0,2.94,3.11,2.52,2.29,1.61
+primeira_liga,2024,primeira_liga_2024_244_arouca_famalicao,05/04/2025,Arouca,Famalicao,1,2,0,1,15,6,8,4,3,7,17,16,3,5,0,0,2.47,3.22,2.88,2.12,1.7
+primeira_liga,2024,primeira_liga_2024_245_guimaraes_santa_clara,05/04/2025,Guimaraes,Santa Clara,2,0,1,0,9,15,3,5,7,6,11,16,1,2,0,0,1.99,3.13,4.16,2.67,1.45
+primeira_liga,2024,primeira_liga_2024_246_gil_vicente_moreirense,06/04/2025,Gil Vicente,Moreirense,0,1,0,0,12,8,4,3,7,0,15,14,3,4,0,0,2.52,3.04,2.96,2.51,1.5
+primeira_liga,2024,primeira_liga_2024_247_nacional_estrela,06/04/2025,Nacional,Estrela,0,1,0,0,19,12,4,3,7,5,15,14,1,2,0,0,2.09,3.18,3.72,2.35,1.57
+primeira_liga,2024,primeira_liga_2024_248_porto_benfica,06/04/2025,Porto,Benfica,1,4,0,2,14,14,3,5,2,6,17,11,3,1,0,0,2.88,3.27,2.45,1.99,1.8
+primeira_liga,2024,primeira_liga_2024_249_farense_casa_pia,07/04/2025,Farense,Casa Pia,0,0,0,0,11,2,5,0,13,3,18,21,4,2,0,0,2.59,3.11,2.81,2.41,1.54
+primeira_liga,2024,primeira_liga_2024_250_rio_ave_boavista,07/04/2025,Rio Ave,Boavista,0,2,0,1,17,6,2,4,9,2,15,12,3,2,0,0,1.87,3.41,4.28,2.09,1.71
+primeira_liga,2024,primeira_liga_2024_251_sp_lisbon_sp_braga,07/04/2025,Sp Lisbon,Sp Braga,1,1,1,0,15,9,7,3,4,0,11,21,3,5,0,1,1.52,4.22,5.87,1.72,2.09
+primeira_liga,2024,primeira_liga_2024_252_gil_vicente_guimaraes,11/04/2025,Gil Vicente,Guimaraes,0,1,0,0,7,7,1,1,1,5,12,18,1,6,0,0,4.12,3.16,2.0,2.39,1.57
+primeira_liga,2024,primeira_liga_2024_253_boavista_nacional,12/04/2025,Boavista,Nacional,0,1,0,1,21,15,8,5,7,7,16,12,3,4,1,0,2.76,3.11,2.63,2.18,1.66
+primeira_liga,2024,primeira_liga_2024_254_famalicao_estoril,12/04/2025,Famalicao,Estoril,3,0,0,0,9,6,4,2,3,8,20,22,3,4,0,0,2.02,3.32,3.74,2.15,1.68
+primeira_liga,2024,primeira_liga_2024_255_santa_clara_sp_lisbon,12/04/2025,Santa Clara,Sp Lisbon,0,1,0,0,10,7,1,4,3,3,18,11,4,2,1,1,5.72,3.74,1.61,2.14,1.69
+primeira_liga,2024,primeira_liga_2024_256_casa_pia_porto,12/04/2025,Casa Pia,Porto,0,1,0,1,5,10,2,3,4,3,12,16,2,2,0,0,5.15,3.67,1.67,2.12,1.7
+primeira_liga,2024,primeira_liga_2024_257_estrela_farense,13/04/2025,Estrela,Farense,0,1,0,0,13,10,3,5,7,3,22,11,1,0,0,0,2.72,3.03,2.72,2.56,1.48
+primeira_liga,2024,primeira_liga_2024_258_benfica_arouca,13/04/2025,Benfica,Arouca,2,2,0,0,26,8,8,5,11,5,6,12,1,3,0,0,1.15,7.51,15.9,1.4,2.81
+primeira_liga,2024,primeira_liga_2024_259_sp_braga_avs,13/04/2025,Sp Braga,AVS,4,1,3,1,18,4,8,2,7,3,13,8,2,2,0,0,1.36,4.75,8.18,1.78,2.02
+primeira_liga,2024,primeira_liga_2024_260_moreirense_rio_ave,13/04/2025,Moreirense,Rio Ave,0,2,0,0,8,10,1,4,2,2,13,26,4,5,1,0,1.97,3.23,4.06,2.21,1.64
+primeira_liga,2024,primeira_liga_2024_261_farense_boavista,18/04/2025,Farense,Boavista,0,1,0,0,12,6,4,2,4,4,8,15,0,5,0,0,1.83,3.42,4.5,2.16,1.67
+primeira_liga,2024,primeira_liga_2024_262_rio_ave_santa_clara,18/04/2025,Rio Ave,Santa Clara,1,1,1,0,8,17,3,5,6,4,15,14,2,2,0,0,2.84,3.06,2.6,2.42,1.54
+primeira_liga,2024,primeira_liga_2024_263_porto_famalicao,18/04/2025,Porto,Famalicao,2,1,1,0,8,12,6,4,4,5,17,13,2,3,1,0,1.46,4.36,6.55,1.88,1.91
+primeira_liga,2024,primeira_liga_2024_264_sp_lisbon_moreirense,18/04/2025,Sp Lisbon,Moreirense,3,1,2,0,20,6,10,2,4,2,8,17,2,3,0,0,1.23,5.8,12.08,1.62,2.25
+primeira_liga,2024,primeira_liga_2024_265_avs_casa_pia,19/04/2025,AVS,Casa Pia,1,1,1,0,10,6,3,4,3,4,14,11,7,2,0,0,2.94,3.12,2.49,2.36,1.56
+primeira_liga,2024,primeira_liga_2024_266_nacional_gil_vicente,19/04/2025,Nacional,Gil Vicente,0,3,0,1,22,8,7,4,9,0,8,12,0,3,1,0,2.37,3.12,3.11,2.24,1.63
+primeira_liga,2024,primeira_liga_2024_267_arouca_estrela,19/04/2025,Arouca,Estrela,1,0,0,0,19,8,6,4,4,4,17,16,4,4,0,0,1.95,3.31,4.0,2.14,1.69
+primeira_liga,2024,primeira_liga_2024_268_estoril_sp_braga,19/04/2025,Estoril,Sp Braga,0,2,0,2,6,5,3,3,1,2,11,15,1,0,0,0,3.78,3.41,1.97,2.0,1.8
+primeira_liga,2024,primeira_liga_2024_269_guimaraes_benfica,19/04/2025,Guimaraes,Benfica,0,3,0,1,17,8,6,7,7,3,10,12,2,4,0,0,5.39,3.94,1.6,1.87,1.93
+primeira_liga,2024,primeira_liga_2024_270_famalicao_sp_braga,25/04/2025,Famalicao,Sp Braga,1,1,1,0,9,13,4,3,6,9,16,15,1,4,0,0,3.26,3.29,2.24,2.21,1.66
+primeira_liga,2024,primeira_liga_2024_271_santa_clara_arouca,26/04/2025,Santa Clara,Arouca,2,0,2,0,9,15,4,5,3,5,14,14,4,5,0,1,1.92,3.24,4.18,2.32,1.58
+primeira_liga,2024,primeira_liga_2024_272_gil_vicente_farense,26/04/2025,Gil Vicente,Farense,1,0,0,0,14,8,3,2,4,1,16,12,1,3,0,0,2.31,3.12,3.25,2.3,1.6
+primeira_liga,2024,primeira_liga_2024_273_estrela_porto,26/04/2025,Estrela,Porto,2,0,1,0,11,12,5,3,5,11,17,14,5,3,0,0,6.27,4.05,1.52,2.01,1.8
+primeira_liga,2024,primeira_liga_2024_274_moreirense_nacional,27/04/2025,Moreirense,Nacional,1,1,0,0,8,18,3,4,2,5,10,13,1,0,0,0,2.2,3.03,3.59,2.19,1.65
+primeira_liga,2024,primeira_liga_2024_275_benfica_avs,27/04/2025,Benfica,AVS,6,0,4,0,23,10,11,3,10,4,11,12,1,3,0,0,1.08,10.47,24.48,1.28,3.48
+primeira_liga,2024,primeira_liga_2024_276_guimaraes_rio_ave,27/04/2025,Guimaraes,Rio Ave,3,0,3,0,25,10,6,5,9,1,16,7,1,2,0,0,1.53,4.1,5.73,1.82,1.96
+primeira_liga,2024,primeira_liga_2024_277_boavista_sp_lisbon,27/04/2025,Boavista,Sp Lisbon,0,5,0,2,6,23,0,12,3,5,14,14,3,4,0,0,12.4,6.26,1.21,1.54,2.38
+primeira_liga,2024,primeira_liga_2024_278_casa_pia_estoril,29/04/2025,Casa Pia,Estoril,1,3,1,1,8,11,4,4,4,4,12,14,2,1,1,1,2.04,3.27,3.68,2.17,1.65
+primeira_liga,2024,primeira_liga_2024_279_porto_moreirense,02/05/2025,Porto,Moreirense,3,1,1,1,15,5,4,4,9,2,14,12,3,3,0,0,1.32,5.21,9.19,1.71,2.12
+primeira_liga,2024,primeira_liga_2024_280_farense_famalicao,03/05/2025,Farense,Famalicao,2,1,1,1,14,9,6,4,4,10,22,19,7,3,0,1,2.55,3.2,2.78,2.21,1.65
+primeira_liga,2024,primeira_liga_2024_281_nacional_guimaraes,03/05/2025,Nacional,Guimaraes,1,2,0,1,16,11,1,4,6,3,15,13,2,3,0,0,4.11,3.58,1.85,1.96,1.84
+primeira_liga,2024,primeira_liga_2024_282_sp_braga_santa_clara,03/05/2025,Sp Braga,Santa Clara,1,1,0,1,17,5,4,3,8,0,15,15,0,6,0,0,1.73,3.45,5.1,2.4,1.54
+primeira_liga,2024,primeira_liga_2024_283_estoril_benfica,03/05/2025,Estoril,Benfica,1,2,0,2,10,10,2,3,2,4,15,13,2,2,0,0,12.63,7.42,1.18,1.37,2.91
+primeira_liga,2024,primeira_liga_2024_284_arouca_casa_pia,04/05/2025,Arouca,Casa Pia,0,0,0,0,15,4,3,1,5,0,14,14,2,6,1,2,2.05,3.33,3.64,2.11,1.7
+primeira_liga,2024,primeira_liga_2024_285_sp_lisbon_gil_vicente,04/05/2025,Sp Lisbon,Gil Vicente,2,1,0,1,16,1,3,1,9,2,13,11,3,3,0,0,1.12,8.01,20.69,1.46,2.58
+primeira_liga,2024,primeira_liga_2024_286_rio_ave_estrela,05/05/2025,Rio Ave,Estrela,2,0,0,0,19,8,6,3,5,3,17,16,4,6,0,0,2.36,3.27,3.01,2.06,1.75
+primeira_liga,2024,primeira_liga_2024_287_avs_boavista,05/05/2025,AVS,Boavista,1,2,0,0,13,14,5,3,4,5,21,12,4,2,0,0,2.09,3.32,3.51,2.15,1.67
+primeira_liga,2024,primeira_liga_2024_288_nacional_rio_ave,10/05/2025,Nacional,Rio Ave,3,3,0,3,12,13,5,7,4,5,11,12,1,4,0,0,1.96,3.51,3.7,1.89,1.89
+primeira_liga,2024,primeira_liga_2024_289_santa_clara_famalicao,10/05/2025,Santa Clara,Famalicao,2,1,1,0,16,12,5,4,3,6,23,14,7,2,1,1,2.17,3.14,3.52,2.49,1.5
+primeira_liga,2024,primeira_liga_2024_290_benfica_sp_lisbon,10/05/2025,Benfica,Sp Lisbon,1,1,0,1,14,7,1,4,6,2,24,14,4,2,0,0,2.15,3.4,3.28,1.68,2.15
+primeira_liga,2024,primeira_liga_2024_291_casa_pia_sp_braga,10/05/2025,Casa Pia,Sp Braga,2,1,1,1,5,21,3,6,2,7,19,13,0,0,0,0,5.64,3.85,1.59,2.01,1.79
+primeira_liga,2024,primeira_liga_2024_292_gil_vicente_arouca,10/05/2025,Gil Vicente,Arouca,1,1,0,0,15,8,5,4,4,1,17,15,1,3,0,0,2.38,3.21,3.03,2.13,1.69
+primeira_liga,2024,primeira_liga_2024_293_estrela_avs,11/05/2025,Estrela,AVS,0,1,0,0,11,18,3,2,1,6,9,11,0,3,0,0,1.91,3.41,4.02,2.16,1.66
+primeira_liga,2024,primeira_liga_2024_294_guimaraes_farense,11/05/2025,Guimaraes,Farense,1,2,0,1,21,7,4,3,16,3,15,7,4,4,0,0,1.57,3.97,5.75,1.94,1.84
+primeira_liga,2024,primeira_liga_2024_295_moreirense_estoril,11/05/2025,Moreirense,Estoril,2,2,1,0,9,7,5,5,2,7,20,16,4,4,0,0,2.4,3.27,2.94,2.06,1.74
+primeira_liga,2024,primeira_liga_2024_296_boavista_porto,11/05/2025,Boavista,Porto,1,2,1,2,9,16,4,7,0,4,13,19,4,2,1,1,7.51,4.78,1.38,1.75,2.05
+primeira_liga,2024,primeira_liga_2024_297_famalicao_casa_pia,16/05/2025,Famalicao,Casa Pia,2,1,1,0,18,5,4,1,13,4,14,15,2,6,0,0,1.94,3.51,3.86,1.87,1.93
+primeira_liga,2024,primeira_liga_2024_298_rio_ave_gil_vicente,16/05/2025,Rio Ave,Gil Vicente,1,1,1,1,6,11,3,3,6,7,11,8,1,0,0,0,2.72,3.27,2.58,1.85,1.96
+primeira_liga,2024,primeira_liga_2024_299_arouca_boavista,17/05/2025,Arouca,Boavista,4,1,3,1,14,21,7,5,2,11,16,16,1,2,0,0,2.0,3.51,3.57,1.88,1.91
+primeira_liga,2024,primeira_liga_2024_300_avs_moreirense,17/05/2025,AVS,Moreirense,0,3,0,2,8,19,3,11,2,4,24,10,7,3,1,0,1.98,3.32,3.88,2.17,1.67
+primeira_liga,2024,primeira_liga_2024_301_estoril_estrela,17/05/2025,Estoril,Estrela,4,0,4,0,10,11,6,3,4,4,18,13,2,2,0,0,2.54,3.31,2.71,1.98,1.82
+primeira_liga,2024,primeira_liga_2024_302_farense_santa_clara,17/05/2025,Farense,Santa Clara,1,2,1,1,12,16,2,5,3,6,13,20,2,5,0,0,2.73,3.03,2.73,2.48,1.51
+primeira_liga,2024,primeira_liga_2024_303_porto_nacional,17/05/2025,Porto,Nacional,3,0,1,0,10,11,4,5,2,8,11,15,1,7,0,1,1.29,5.46,9.6,1.56,2.38
+primeira_liga,2024,primeira_liga_2024_304_sp_braga_benfica,17/05/2025,Sp Braga,Benfica,1,1,1,0,17,13,7,2,6,6,15,8,4,2,1,0,4.86,4.14,1.62,1.63,2.23
+primeira_liga,2024,primeira_liga_2024_305_sp_lisbon_guimaraes,17/05/2025,Sp Lisbon,Guimaraes,2,0,0,0,18,2,7,0,7,1,14,17,3,4,0,0,1.24,5.85,10.97,1.56,2.38

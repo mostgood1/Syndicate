@@ -1,0 +1,381 @@
+league,season,match_id,date,home_team,away_team,home_goals,away_goals,ht_home_goals,ht_away_goals,home_shots,away_shots,home_shots_on_target,away_shots_on_target,home_corners,away_corners,home_fouls,away_fouls,home_yellow_cards,away_yellow_cards,home_red_cards,away_red_cards,odds_home,odds_draw,odds_away,odds_over_2_5,odds_under_2_5
+epl,2024,epl_2024_0_man_united_fulham,16/08/2024,Man United,Fulham,1,0,0,0,14,10,5,2,7,8,12,10,2,3,0,0,1.62,4.36,5.15,1.53,2.52
+epl,2024,epl_2024_1_ipswich_liverpool,17/08/2024,Ipswich,Liverpool,0,2,0,0,7,18,2,5,2,10,9,18,3,1,0,0,8.28,5.76,1.34,1.41,2.94
+epl,2024,epl_2024_2_arsenal_wolves,17/08/2024,Arsenal,Wolves,2,0,1,0,18,9,6,3,8,2,17,14,2,2,0,0,1.18,7.86,15.87,1.46,2.7
+epl,2024,epl_2024_3_everton_brighton,17/08/2024,Everton,Brighton,0,3,0,1,9,10,1,5,1,5,8,8,1,1,1,0,2.67,3.41,2.68,1.81,2.04
+epl,2024,epl_2024_4_newcastle_southampton,17/08/2024,Newcastle,Southampton,1,0,1,0,3,19,1,4,3,12,15,16,2,4,1,0,1.35,5.62,8.1,1.4,3.01
+epl,2024,epl_2024_5_nott'm_forest_bournemouth,17/08/2024,Nott'm Forest,Bournemouth,1,1,1,0,14,13,8,4,2,6,17,8,1,3,0,0,2.45,3.49,2.89,1.77,2.08
+epl,2024,epl_2024_6_west_ham_aston_villa,17/08/2024,West Ham,Aston Villa,1,2,1,1,14,15,3,3,5,3,18,11,1,2,0,0,2.44,3.69,2.79,1.57,2.43
+epl,2024,epl_2024_7_brentford_crystal_palace,18/08/2024,Brentford,Crystal Palace,2,1,1,0,9,14,5,6,4,7,6,15,1,5,0,0,2.46,3.44,2.9,1.81,2.03
+epl,2024,epl_2024_8_chelsea_man_city,18/08/2024,Chelsea,Man City,0,2,0,1,10,11,3,5,4,3,12,9,1,1,0,0,4.05,4.0,1.83,1.5,2.59
+epl,2024,epl_2024_9_leicester_tottenham,19/08/2024,Leicester,Tottenham,1,1,0,1,7,15,3,7,2,13,11,12,1,1,0,0,5.01,4.37,1.63,1.52,2.54
+epl,2024,epl_2024_10_brighton_man_united,24/08/2024,Brighton,Man United,2,1,1,0,14,11,5,4,4,4,9,13,1,2,0,0,2.5,3.72,2.69,1.58,2.42
+epl,2024,epl_2024_11_crystal_palace_west_ham,24/08/2024,Crystal Palace,West Ham,0,2,0,0,14,18,2,3,3,3,9,17,1,1,0,0,2.17,3.63,3.25,1.76,2.1
+epl,2024,epl_2024_12_fulham_leicester,24/08/2024,Fulham,Leicester,2,1,1,1,18,10,6,4,7,5,14,13,2,2,0,0,1.83,3.73,4.38,1.87,1.97
+epl,2024,epl_2024_13_man_city_ipswich,24/08/2024,Man City,Ipswich,4,1,3,1,14,1,5,1,10,1,4,15,2,3,0,0,1.09,12.17,26.97,1.29,3.54
+epl,2024,epl_2024_14_southampton_nott'm_forest,24/08/2024,Southampton,Nott'm Forest,0,1,0,0,5,23,1,8,4,10,14,14,3,3,0,0,2.57,3.32,2.84,1.97,1.87
+epl,2024,epl_2024_15_tottenham_everton,24/08/2024,Tottenham,Everton,4,0,2,0,13,10,7,1,12,5,11,15,0,0,0,0,1.44,4.95,6.75,1.51,2.55
+epl,2024,epl_2024_16_aston_villa_arsenal,24/08/2024,Aston Villa,Arsenal,0,2,0,0,11,9,3,4,4,1,8,15,1,3,0,0,4.41,3.92,1.78,1.73,2.13
+epl,2024,epl_2024_17_bournemouth_newcastle,25/08/2024,Bournemouth,Newcastle,1,1,1,0,16,14,4,5,8,9,19,8,2,2,0,0,2.99,3.8,2.25,1.56,2.44
+epl,2024,epl_2024_18_wolves_chelsea,25/08/2024,Wolves,Chelsea,2,6,2,2,12,14,4,8,5,5,13,13,2,3,0,0,4.37,4.0,1.77,1.64,2.29
+epl,2024,epl_2024_19_liverpool_brentford,25/08/2024,Liverpool,Brentford,2,0,1,0,19,8,8,2,9,4,10,7,2,3,0,0,1.25,6.78,10.37,1.35,3.2
+epl,2024,epl_2024_20_arsenal_brighton,31/08/2024,Arsenal,Brighton,1,1,1,0,11,22,7,4,3,7,12,7,3,2,1,0,1.35,5.66,8.11,1.53,2.52
+epl,2024,epl_2024_21_brentford_southampton,31/08/2024,Brentford,Southampton,3,1,1,0,20,18,7,6,2,8,10,7,2,1,0,0,1.77,3.97,4.46,1.73,2.15
+epl,2024,epl_2024_22_everton_bournemouth,31/08/2024,Everton,Bournemouth,2,3,0,0,18,17,8,7,8,4,6,1,2,1,0,0,2.78,3.4,2.59,1.87,1.95
+epl,2024,epl_2024_23_ipswich_fulham,31/08/2024,Ipswich,Fulham,1,1,1,1,11,9,4,4,8,6,15,15,2,3,0,0,3.1,3.5,2.31,1.82,2.03
+epl,2024,epl_2024_24_leicester_aston_villa,31/08/2024,Leicester,Aston Villa,1,2,0,1,9,10,3,5,1,4,13,21,4,5,0,0,4.62,4.02,1.74,1.69,2.21
+epl,2024,epl_2024_25_nott'm_forest_wolves,31/08/2024,Nott'm Forest,Wolves,1,1,1,1,16,11,5,3,7,3,15,18,3,4,0,0,2.03,3.66,3.65,1.83,2.02
+epl,2024,epl_2024_26_west_ham_man_city,31/08/2024,West Ham,Man City,1,3,1,2,10,23,2,8,3,11,10,3,3,2,0,0,7.57,5.49,1.38,1.46,2.73
+epl,2024,epl_2024_27_chelsea_crystal_palace,01/09/2024,Chelsea,Crystal Palace,1,1,1,0,13,9,7,3,4,5,9,13,4,2,0,0,1.63,4.4,5.01,1.52,2.56
+epl,2024,epl_2024_28_newcastle_tottenham,01/09/2024,Newcastle,Tottenham,2,1,1,0,9,20,3,6,7,12,16,13,4,4,0,0,2.51,3.97,2.56,1.38,3.07
+epl,2024,epl_2024_29_man_united_liverpool,01/09/2024,Man United,Liverpool,0,3,0,2,8,11,3,3,5,2,7,7,4,1,0,0,3.82,4.2,1.85,1.43,2.84
+epl,2024,epl_2024_30_southampton_man_united,14/09/2024,Southampton,Man United,0,3,0,2,6,20,4,10,0,7,11,14,1,4,1,0,4.56,4.04,1.74,1.61,2.36
+epl,2024,epl_2024_31_brighton_ipswich,14/09/2024,Brighton,Ipswich,0,0,0,0,21,6,6,1,9,2,14,16,4,3,0,0,1.38,5.16,7.89,1.56,2.46
+epl,2024,epl_2024_32_crystal_palace_leicester,14/09/2024,Crystal Palace,Leicester,2,2,0,1,20,9,4,4,5,2,11,15,0,3,0,0,1.63,4.14,5.38,1.76,2.1
+epl,2024,epl_2024_33_fulham_west_ham,14/09/2024,Fulham,West Ham,1,1,1,0,21,11,5,3,3,2,15,18,2,3,0,0,2.42,3.48,2.92,1.72,2.16
+epl,2024,epl_2024_34_liverpool_nott'm_forest,14/09/2024,Liverpool,Nott'm Forest,0,1,0,0,14,5,5,3,7,2,15,6,4,4,0,0,1.22,7.03,12.4,1.41,2.91
+epl,2024,epl_2024_35_man_city_brentford,14/09/2024,Man City,Brentford,2,1,2,1,18,8,7,5,12,3,9,3,3,1,0,0,1.17,8.2,14.79,1.35,3.22
+epl,2024,epl_2024_36_aston_villa_everton,14/09/2024,Aston Villa,Everton,3,2,1,2,17,6,8,2,6,2,10,12,1,4,0,0,1.51,4.48,6.34,1.67,2.23
+epl,2024,epl_2024_37_bournemouth_chelsea,14/09/2024,Bournemouth,Chelsea,0,1,0,0,19,10,7,3,6,3,16,9,6,8,0,0,3.33,3.96,2.05,1.45,2.76
+epl,2024,epl_2024_38_tottenham_arsenal,15/09/2024,Tottenham,Arsenal,0,1,0,0,15,7,5,4,7,6,13,10,5,3,0,0,2.99,3.59,2.33,1.58,2.41
+epl,2024,epl_2024_39_wolves_newcastle,15/09/2024,Wolves,Newcastle,1,2,1,0,12,14,5,6,4,7,17,6,3,3,0,0,3.36,3.69,2.11,1.56,2.47
+epl,2024,epl_2024_40_west_ham_chelsea,21/09/2024,West Ham,Chelsea,0,3,0,2,15,12,7,5,6,5,17,9,5,2,0,0,3.49,3.89,2.01,1.52,2.54
+epl,2024,epl_2024_41_aston_villa_wolves,21/09/2024,Aston Villa,Wolves,3,1,0,1,9,10,4,4,6,5,11,16,3,6,0,0,1.59,4.39,5.35,1.58,2.41
+epl,2024,epl_2024_42_fulham_newcastle,21/09/2024,Fulham,Newcastle,3,1,2,0,22,15,11,4,6,0,16,8,6,0,0,0,2.86,3.51,2.45,1.68,2.22
+epl,2024,epl_2024_43_leicester_everton,21/09/2024,Leicester,Everton,1,1,0,1,12,16,2,5,6,1,11,12,1,2,0,0,2.52,3.44,2.82,1.86,1.98
+epl,2024,epl_2024_44_liverpool_bournemouth,21/09/2024,Liverpool,Bournemouth,3,0,3,0,19,19,13,6,3,9,10,12,1,4,0,0,1.29,6.31,9.35,1.36,3.12
+epl,2024,epl_2024_45_southampton_ipswich,21/09/2024,Southampton,Ipswich,1,1,1,0,11,13,3,6,2,10,16,16,4,4,0,0,2.25,3.52,3.17,1.77,2.06
+epl,2024,epl_2024_46_tottenham_brentford,21/09/2024,Tottenham,Brentford,3,1,2,1,23,6,10,6,9,4,11,9,3,1,0,0,1.55,4.72,5.41,1.42,2.81
+epl,2024,epl_2024_47_crystal_palace_man_united,21/09/2024,Crystal Palace,Man United,0,0,0,0,9,15,4,6,4,11,7,12,3,1,0,0,2.85,3.72,2.36,1.6,2.39
+epl,2024,epl_2024_48_brighton_nott'm_forest,22/09/2024,Brighton,Nott'm Forest,2,2,2,1,14,4,3,3,9,1,12,11,3,4,0,1,1.86,3.83,4.21,1.83,2.02
+epl,2024,epl_2024_49_man_city_arsenal,22/09/2024,Man City,Arsenal,2,2,1,2,33,5,11,3,8,2,7,10,3,4,0,1,1.83,3.62,4.52,2.02,1.82
+epl,2024,epl_2024_50_newcastle_man_city,28/09/2024,Newcastle,Man City,1,1,0,1,11,16,4,6,5,6,14,10,4,4,0,0,5.09,4.47,1.61,1.49,2.64
+epl,2024,epl_2024_51_arsenal_leicester,28/09/2024,Arsenal,Leicester,4,2,2,0,36,5,16,3,17,0,11,6,2,4,0,0,1.18,7.82,15.12,1.49,2.55
+epl,2024,epl_2024_52_brentford_west_ham,28/09/2024,Brentford,West Ham,1,1,1,0,8,19,3,3,7,7,2,11,2,3,0,0,2.23,3.62,3.16,1.66,2.27
+epl,2024,epl_2024_53_chelsea_brighton,28/09/2024,Chelsea,Brighton,4,2,4,2,15,15,7,5,8,2,11,8,3,2,0,0,1.74,4.23,4.35,1.5,2.58
+epl,2024,epl_2024_54_everton_crystal_palace,28/09/2024,Everton,Crystal Palace,2,1,0,1,8,17,2,5,5,8,13,11,2,1,0,0,2.73,3.39,2.63,1.87,1.97
+epl,2024,epl_2024_55_nott'm_forest_fulham,28/09/2024,Nott'm Forest,Fulham,0,1,0,0,11,14,1,2,6,5,11,15,2,4,0,0,2.4,3.34,3.07,2.0,1.85
+epl,2024,epl_2024_56_wolves_liverpool,28/09/2024,Wolves,Liverpool,1,2,0,1,8,10,3,6,2,10,16,8,2,3,0,0,8.05,5.55,1.35,1.45,2.77
+epl,2024,epl_2024_57_ipswich_aston_villa,29/09/2024,Ipswich,Aston Villa,2,2,1,2,15,7,5,3,10,0,10,14,4,1,0,0,4.15,3.77,1.87,1.73,2.14
+epl,2024,epl_2024_58_man_united_tottenham,29/09/2024,Man United,Tottenham,0,3,0,1,11,24,2,10,5,3,16,14,5,3,1,0,2.36,3.89,2.77,1.42,2.87
+epl,2024,epl_2024_59_bournemouth_southampton,30/09/2024,Bournemouth,Southampton,3,1,3,0,14,9,6,3,7,4,19,12,2,5,0,0,1.65,4.29,4.91,1.49,2.6
+epl,2024,epl_2024_60_crystal_palace_liverpool,05/10/2024,Crystal Palace,Liverpool,0,1,0,1,9,16,5,4,3,8,7,15,4,2,0,0,6.36,4.65,1.49,1.59,2.4
+epl,2024,epl_2024_61_arsenal_southampton,05/10/2024,Arsenal,Southampton,3,1,0,0,29,8,6,2,13,1,10,9,0,3,0,0,1.14,9.2,18.63,1.36,3.13
+epl,2024,epl_2024_62_brentford_wolves,05/10/2024,Brentford,Wolves,5,3,4,2,19,17,12,6,10,3,9,10,2,3,0,0,2.09,3.64,3.47,1.78,2.08
+epl,2024,epl_2024_63_leicester_bournemouth,05/10/2024,Leicester,Bournemouth,1,0,1,0,6,17,2,2,0,9,12,14,4,1,0,0,3.24,3.66,2.17,1.69,2.21
+epl,2024,epl_2024_64_man_city_fulham,05/10/2024,Man City,Fulham,3,2,1,1,20,11,7,4,8,3,4,10,2,1,0,0,1.24,6.85,11.11,1.45,2.74
+epl,2024,epl_2024_65_west_ham_ipswich,05/10/2024,West Ham,Ipswich,4,1,2,1,23,9,13,2,5,5,12,6,0,1,0,0,1.8,3.96,4.25,1.69,2.21
+epl,2024,epl_2024_66_everton_newcastle,05/10/2024,Everton,Newcastle,0,0,0,0,8,14,2,3,0,10,12,8,1,2,0,0,3.15,3.62,2.23,1.69,2.21
+epl,2024,epl_2024_67_aston_villa_man_united,06/10/2024,Aston Villa,Man United,0,0,0,0,11,10,1,4,6,3,12,11,1,5,0,0,2.21,3.82,3.06,1.53,2.52
+epl,2024,epl_2024_68_chelsea_nott'm_forest,06/10/2024,Chelsea,Nott'm Forest,1,1,0,0,22,16,8,9,11,3,12,11,6,2,0,1,1.48,4.73,6.32,1.55,2.46
+epl,2024,epl_2024_69_brighton_tottenham,06/10/2024,Brighton,Tottenham,3,2,0,2,11,13,4,3,4,7,14,10,2,2,0,0,2.9,4.01,2.23,1.39,3.0
+epl,2024,epl_2024_70_tottenham_west_ham,19/10/2024,Tottenham,West Ham,4,1,1,1,22,11,7,4,13,5,10,15,1,3,0,1,1.5,4.91,5.73,1.37,3.08
+epl,2024,epl_2024_71_fulham_aston_villa,19/10/2024,Fulham,Aston Villa,1,3,1,1,10,14,4,5,6,11,8,11,3,3,1,1,2.44,3.5,2.89,1.73,2.14
+epl,2024,epl_2024_72_ipswich_everton,19/10/2024,Ipswich,Everton,0,2,0,2,13,11,2,8,5,8,12,10,1,1,0,0,2.4,3.42,3.01,1.83,2.01
+epl,2024,epl_2024_73_man_united_brentford,19/10/2024,Man United,Brentford,2,1,0,1,23,8,11,2,9,2,14,5,2,2,0,0,1.71,4.28,4.48,1.49,2.58
+epl,2024,epl_2024_74_newcastle_brighton,19/10/2024,Newcastle,Brighton,0,1,0,1,21,10,6,5,9,4,11,9,2,2,0,0,2.01,3.88,3.51,1.51,2.56
+epl,2024,epl_2024_75_southampton_leicester,19/10/2024,Southampton,Leicester,2,3,2,0,14,18,7,4,10,6,10,10,5,3,1,0,2.33,3.54,3.03,1.76,2.08
+epl,2024,epl_2024_76_bournemouth_arsenal,19/10/2024,Bournemouth,Arsenal,2,0,0,0,13,6,4,1,7,4,12,11,1,1,0,1,4.94,4.09,1.68,1.72,2.15
+epl,2024,epl_2024_77_wolves_man_city,20/10/2024,Wolves,Man City,1,2,1,1,3,22,2,7,1,18,8,5,4,1,0,0,8.88,5.85,1.31,1.45,2.75
+epl,2024,epl_2024_78_liverpool_chelsea,20/10/2024,Liverpool,Chelsea,2,1,1,0,9,12,5,2,1,6,12,13,4,3,0,0,1.63,4.39,4.89,1.4,2.93
+epl,2024,epl_2024_79_nott'm_forest_crystal_palace,21/10/2024,Nott'm Forest,Crystal Palace,1,0,0,0,20,20,6,7,6,6,9,12,2,3,0,0,2.36,3.31,3.11,2.14,1.73
+epl,2024,epl_2024_80_leicester_nott'm_forest,25/10/2024,Leicester,Nott'm Forest,1,3,1,1,11,20,1,5,6,7,16,9,5,2,0,0,3.09,3.32,2.41,2.06,1.79
+epl,2024,epl_2024_81_aston_villa_bournemouth,26/10/2024,Aston Villa,Bournemouth,1,1,0,0,18,11,8,3,9,7,12,14,7,6,0,0,1.86,3.97,3.97,1.6,2.39
+epl,2024,epl_2024_82_brentford_ipswich,26/10/2024,Brentford,Ipswich,4,3,2,2,20,11,9,5,5,5,7,10,0,1,0,1,1.67,4.27,4.86,1.65,2.28
+epl,2024,epl_2024_83_brighton_wolves,26/10/2024,Brighton,Wolves,2,2,1,0,19,14,6,7,9,6,12,10,3,3,0,0,1.64,4.32,4.94,1.56,2.43
+epl,2024,epl_2024_84_man_city_southampton,26/10/2024,Man City,Southampton,1,0,1,0,22,5,8,2,12,1,9,9,1,3,0,0,1.11,10.94,21.04,1.27,3.73
+epl,2024,epl_2024_85_everton_fulham,26/10/2024,Everton,Fulham,1,1,0,0,10,14,5,3,4,2,8,8,1,0,0,0,2.76,3.37,2.6,1.89,1.95
+epl,2024,epl_2024_86_chelsea_newcastle,27/10/2024,Chelsea,Newcastle,2,1,1,1,17,11,7,3,7,4,13,16,6,3,0,0,1.76,4.26,4.15,1.44,2.78
+epl,2024,epl_2024_87_crystal_palace_tottenham,27/10/2024,Crystal Palace,Tottenham,1,0,1,0,14,11,6,3,8,8,16,12,4,4,0,0,3.97,3.97,1.85,1.59,2.4
+epl,2024,epl_2024_88_west_ham_man_united,27/10/2024,West Ham,Man United,2,1,0,0,12,18,3,5,6,5,6,7,5,1,0,0,2.89,3.71,2.33,1.51,2.53
+epl,2024,epl_2024_89_arsenal_liverpool,27/10/2024,Arsenal,Liverpool,2,2,2,1,9,9,3,4,1,3,14,14,2,2,0,0,2.49,3.37,2.89,1.89,1.94
+epl,2024,epl_2024_90_newcastle_arsenal,02/11/2024,Newcastle,Arsenal,1,0,1,0,9,10,4,1,4,6,16,18,4,4,0,0,3.77,3.69,1.98,1.82,2.02
+epl,2024,epl_2024_91_bournemouth_man_city,02/11/2024,Bournemouth,Man City,2,1,1,0,12,18,6,4,3,10,11,6,2,1,0,0,5.32,4.44,1.59,1.57,2.42
+epl,2024,epl_2024_92_ipswich_leicester,02/11/2024,Ipswich,Leicester,1,1,0,0,14,20,2,6,4,6,11,10,4,2,1,0,2.27,3.61,3.09,1.71,2.18
+epl,2024,epl_2024_93_liverpool_brighton,02/11/2024,Liverpool,Brighton,2,1,0,1,16,13,8,5,10,7,10,18,1,1,0,0,1.39,5.4,7.12,1.39,2.99
+epl,2024,epl_2024_94_nott'm_forest_west_ham,02/11/2024,Nott'm Forest,West Ham,3,0,1,0,19,4,6,2,11,6,7,9,1,2,0,1,2.15,3.52,3.43,1.86,1.98
+epl,2024,epl_2024_95_southampton_everton,02/11/2024,Southampton,Everton,1,0,0,0,9,16,2,5,3,6,14,18,4,2,0,0,2.65,3.48,2.66,1.83,2.02
+epl,2024,epl_2024_96_wolves_crystal_palace,02/11/2024,Wolves,Crystal Palace,2,2,0,0,11,19,6,7,3,6,7,9,1,2,0,0,2.53,3.4,2.85,1.89,1.95
+epl,2024,epl_2024_97_tottenham_aston_villa,03/11/2024,Tottenham,Aston Villa,4,1,0,1,16,12,6,1,6,4,14,14,2,0,0,0,1.93,4.07,3.55,1.44,2.78
+epl,2024,epl_2024_98_man_united_chelsea,03/11/2024,Man United,Chelsea,1,1,0,0,11,12,4,3,4,8,19,14,6,2,0,0,2.58,3.78,2.56,1.44,2.79
+epl,2024,epl_2024_99_fulham_brentford,04/11/2024,Fulham,Brentford,2,1,0,1,26,5,12,2,11,3,3,10,2,1,0,0,2.03,3.73,3.52,1.67,2.23
+epl,2024,epl_2024_100_brentford_bournemouth,09/11/2024,Brentford,Bournemouth,3,2,1,1,12,15,6,3,6,4,8,16,2,4,0,0,2.53,3.59,2.72,1.6,2.39
+epl,2024,epl_2024_101_crystal_palace_fulham,09/11/2024,Crystal Palace,Fulham,0,2,0,1,13,17,5,7,1,8,10,11,1,1,1,0,2.7,3.48,2.61,1.93,1.91
+epl,2024,epl_2024_102_west_ham_everton,09/11/2024,West Ham,Everton,0,0,0,0,11,18,6,4,7,6,10,9,1,2,0,0,2.18,3.47,3.38,1.81,2.03
+epl,2024,epl_2024_103_wolves_southampton,09/11/2024,Wolves,Southampton,2,0,1,0,8,9,4,0,1,9,14,12,1,4,0,0,1.96,3.84,3.67,1.66,2.26
+epl,2024,epl_2024_104_brighton_man_city,09/11/2024,Brighton,Man City,2,1,0,1,10,15,4,6,0,4,12,10,3,3,0,0,4.34,4.17,1.75,1.53,2.5
+epl,2024,epl_2024_105_liverpool_aston_villa,09/11/2024,Liverpool,Aston Villa,2,0,1,0,14,12,5,2,2,9,11,15,0,3,0,0,1.42,5.26,6.7,1.43,2.83
+epl,2024,epl_2024_106_man_united_leicester,10/11/2024,Man United,Leicester,3,0,2,0,13,6,3,5,1,5,9,5,0,1,0,0,1.39,5.35,7.46,1.46,2.72
+epl,2024,epl_2024_107_nott'm_forest_newcastle,10/11/2024,Nott'm Forest,Newcastle,1,3,1,0,9,17,3,6,4,5,13,6,1,1,0,0,2.69,3.31,2.72,1.94,1.9
+epl,2024,epl_2024_108_tottenham_ipswich,10/11/2024,Tottenham,Ipswich,1,2,0,2,17,8,5,3,12,2,10,19,1,5,0,0,1.26,6.76,9.98,1.3,3.49
+epl,2024,epl_2024_109_chelsea_arsenal,10/11/2024,Chelsea,Arsenal,1,1,0,0,17,13,3,3,4,3,12,12,4,2,0,0,2.75,3.49,2.53,1.71,2.17
+epl,2024,epl_2024_110_leicester_chelsea,23/11/2024,Leicester,Chelsea,1,2,0,1,4,16,1,7,2,9,15,12,4,3,0,0,6.75,4.81,1.46,1.48,2.64
+epl,2024,epl_2024_111_arsenal_nott'm_forest,23/11/2024,Arsenal,Nott'm Forest,3,0,1,0,19,7,7,0,8,1,10,1,3,2,0,0,1.37,4.97,8.9,1.81,2.03
+epl,2024,epl_2024_112_aston_villa_crystal_palace,23/11/2024,Aston Villa,Crystal Palace,2,2,1,2,17,13,5,6,10,1,10,11,3,2,0,0,1.63,4.11,5.45,1.75,2.11
+epl,2024,epl_2024_113_bournemouth_brighton,23/11/2024,Bournemouth,Brighton,1,2,0,1,19,6,5,4,7,0,13,10,2,2,0,1,2.41,3.62,2.86,1.57,2.41
+epl,2024,epl_2024_114_everton_brentford,23/11/2024,Everton,Brentford,0,0,0,0,27,9,5,2,10,4,8,10,0,0,0,1,2.46,3.41,2.94,1.84,2.01
+epl,2024,epl_2024_115_fulham_wolves,23/11/2024,Fulham,Wolves,1,4,1,1,10,10,3,5,7,2,14,14,3,0,0,0,1.65,4.09,5.23,1.68,2.21
+epl,2024,epl_2024_116_man_city_tottenham,23/11/2024,Man City,Tottenham,0,4,0,2,23,9,5,7,9,3,19,9,4,2,0,0,1.49,5.01,5.92,1.31,3.46
+epl,2024,epl_2024_117_southampton_liverpool,24/11/2024,Southampton,Liverpool,2,3,1,1,7,27,5,11,3,10,11,9,3,4,0,0,10.4,5.96,1.28,1.44,2.8
+epl,2024,epl_2024_118_ipswich_man_united,24/11/2024,Ipswich,Man United,1,1,1,1,11,11,6,4,4,3,11,10,0,0,0,0,5.06,4.22,1.63,1.56,2.44
+epl,2024,epl_2024_119_newcastle_west_ham,25/11/2024,Newcastle,West Ham,0,2,0,1,18,15,2,6,8,3,11,8,1,0,0,0,1.5,4.57,6.21,1.55,2.45
+epl,2024,epl_2024_120_brighton_southampton,29/11/2024,Brighton,Southampton,1,1,1,0,22,10,5,2,7,6,20,16,2,4,0,0,1.39,5.29,7.57,1.43,2.84
+epl,2024,epl_2024_121_brentford_leicester,30/11/2024,Brentford,Leicester,4,1,3,1,13,7,6,3,5,4,9,10,1,1,0,0,1.66,4.24,4.87,1.58,2.41
+epl,2024,epl_2024_122_crystal_palace_newcastle,30/11/2024,Crystal Palace,Newcastle,1,1,0,0,16,1,4,0,8,9,12,11,3,3,0,0,3.04,3.56,2.3,1.79,2.08
+epl,2024,epl_2024_123_nott'm_forest_ipswich,30/11/2024,Nott'm Forest,Ipswich,1,0,0,0,12,7,5,3,8,7,5,16,1,3,0,0,1.75,3.82,4.79,1.89,1.94
+epl,2024,epl_2024_124_wolves_bournemouth,30/11/2024,Wolves,Bournemouth,2,4,1,3,10,12,3,8,3,4,13,11,4,1,0,0,2.81,3.61,2.44,1.65,2.27
+epl,2024,epl_2024_125_west_ham_arsenal,30/11/2024,West Ham,Arsenal,2,5,2,5,12,16,5,7,2,10,10,13,4,1,0,0,7.09,4.68,1.46,1.7,2.19
+epl,2024,epl_2024_126_chelsea_aston_villa,01/12/2024,Chelsea,Aston Villa,3,0,2,0,17,10,8,4,3,4,21,6,2,2,0,0,1.71,4.21,4.51,1.53,2.51
+epl,2024,epl_2024_127_man_united_everton,01/12/2024,Man United,Everton,4,0,2,0,11,8,5,2,2,2,12,12,2,3,0,0,1.54,4.33,6.08,1.75,2.11
+epl,2024,epl_2024_128_tottenham_fulham,01/12/2024,Tottenham,Fulham,1,1,0,0,8,14,3,6,7,11,4,14,0,1,0,1,1.72,4.35,4.24,1.42,2.84
+epl,2024,epl_2024_129_liverpool_man_city,01/12/2024,Liverpool,Man City,2,0,1,0,18,8,7,2,7,4,9,8,1,3,0,0,2.09,3.7,3.37,1.54,2.42
+epl,2024,epl_2024_130_ipswich_crystal_palace,03/12/2024,Ipswich,Crystal Palace,0,1,0,0,9,13,2,3,4,7,14,13,2,4,0,0,3.09,3.37,2.38,1.98,1.86
+epl,2024,epl_2024_131_leicester_west_ham,03/12/2024,Leicester,West Ham,3,1,1,0,8,31,6,10,3,9,9,7,2,2,0,0,2.9,3.44,2.47,1.79,2.06
+epl,2024,epl_2024_132_everton_wolves,04/12/2024,Everton,Wolves,4,0,2,0,13,6,4,2,3,4,10,8,2,0,0,0,2.14,3.46,3.51,1.98,1.86
+epl,2024,epl_2024_133_man_city_nott'm_forest,04/12/2024,Man City,Nott'm Forest,3,0,2,0,17,12,7,3,8,2,7,15,2,4,0,0,1.37,5.21,8.25,1.59,2.4
+epl,2024,epl_2024_134_newcastle_liverpool,04/12/2024,Newcastle,Liverpool,3,3,1,0,17,16,6,5,5,6,9,17,2,5,0,0,4.27,4.04,1.78,1.59,2.38
+epl,2024,epl_2024_135_southampton_chelsea,04/12/2024,Southampton,Chelsea,1,5,1,3,6,26,4,13,5,7,7,14,1,0,1,0,8.39,5.64,1.34,1.43,2.83
+epl,2024,epl_2024_136_arsenal_man_united,04/12/2024,Arsenal,Man United,2,0,0,0,14,5,6,2,13,0,12,8,1,3,0,0,1.46,4.73,6.92,1.63,2.31
+epl,2024,epl_2024_137_aston_villa_brentford,04/12/2024,Aston Villa,Brentford,3,1,3,0,20,9,10,1,10,5,11,15,2,2,0,0,1.8,4.01,4.24,1.57,2.42
+epl,2024,epl_2024_138_fulham_brighton,05/12/2024,Fulham,Brighton,3,1,1,0,6,13,2,3,5,6,7,8,2,2,0,0,2.33,3.65,2.92,1.62,2.33
+epl,2024,epl_2024_139_bournemouth_tottenham,05/12/2024,Bournemouth,Tottenham,1,0,1,0,21,12,8,4,5,9,15,8,2,2,0,0,2.65,3.92,2.42,1.41,2.9
+epl,2024,epl_2024_140_aston_villa_southampton,07/12/2024,Aston Villa,Southampton,1,0,1,0,18,4,5,0,14,1,18,15,1,3,0,0,1.37,5.41,7.78,1.44,2.81
+epl,2024,epl_2024_141_brentford_newcastle,07/12/2024,Brentford,Newcastle,4,2,2,2,11,16,8,3,3,4,10,7,3,0,0,0,2.86,3.74,2.36,1.57,2.45
+epl,2024,epl_2024_142_crystal_palace_man_city,07/12/2024,Crystal Palace,Man City,2,2,1,1,12,12,3,4,6,8,4,10,1,0,0,1,5.39,4.33,1.6,1.64,2.31
+epl,2024,epl_2024_143_man_united_nott'm_forest,07/12/2024,Man United,Nott'm Forest,2,3,1,1,17,11,7,3,5,3,10,13,0,2,0,0,1.67,4.05,5.12,1.79,2.05
+epl,2024,epl_2024_144_fulham_arsenal,08/12/2024,Fulham,Arsenal,1,1,1,0,2,12,2,4,0,6,10,9,4,2,0,0,5.4,4.24,1.61,1.78,2.06
+epl,2024,epl_2024_145_ipswich_bournemouth,08/12/2024,Ipswich,Bournemouth,1,2,1,0,18,22,5,6,6,13,9,13,2,1,0,0,3.57,3.73,2.02,1.72,2.16
+epl,2024,epl_2024_146_leicester_brighton,08/12/2024,Leicester,Brighton,2,2,0,1,10,16,3,7,5,5,9,10,1,2,0,0,4.48,4.02,1.75,1.59,2.39
+epl,2024,epl_2024_147_tottenham_chelsea,08/12/2024,Tottenham,Chelsea,3,4,2,1,13,17,5,8,5,10,17,11,2,2,0,0,3.21,4.04,2.07,1.35,3.26
+epl,2024,epl_2024_148_west_ham_wolves,09/12/2024,West Ham,Wolves,2,1,0,0,19,19,4,5,11,0,12,17,5,4,0,0,1.91,3.85,3.81,1.6,2.36
+epl,2024,epl_2024_149_arsenal_everton,14/12/2024,Arsenal,Everton,0,0,0,0,13,2,5,0,8,2,6,9,0,3,0,0,1.23,6.33,13.36,1.66,2.23
+epl,2024,epl_2024_150_liverpool_fulham,14/12/2024,Liverpool,Fulham,2,2,0,1,16,12,4,3,5,4,10,7,3,4,1,0,1.32,5.75,8.89,1.47,2.66
+epl,2024,epl_2024_151_newcastle_leicester,14/12/2024,Newcastle,Leicester,4,0,1,0,27,4,11,1,5,2,7,16,3,3,0,0,1.31,5.83,9.08,1.45,2.75
+epl,2024,epl_2024_152_wolves_ipswich,14/12/2024,Wolves,Ipswich,1,2,0,1,16,10,6,5,7,3,13,9,0,2,1,0,1.9,3.83,3.85,1.72,2.15
+epl,2024,epl_2024_153_nott'm_forest_aston_villa,14/12/2024,Nott'm Forest,Aston Villa,2,1,0,0,17,8,6,2,4,3,12,6,0,1,0,0,2.64,3.39,2.68,1.87,1.96
+epl,2024,epl_2024_154_brighton_crystal_palace,15/12/2024,Brighton,Crystal Palace,1,3,0,2,17,13,5,5,8,5,11,15,1,4,0,0,1.89,3.82,3.9,1.72,2.13
+epl,2024,epl_2024_155_man_city_man_united,15/12/2024,Man City,Man United,1,2,1,0,10,10,3,3,8,2,5,14,1,1,0,0,1.58,4.59,5.04,1.43,2.78
+epl,2024,epl_2024_156_chelsea_brentford,15/12/2024,Chelsea,Brentford,2,1,1,0,26,9,8,4,8,5,11,7,0,2,1,0,1.33,5.89,8.08,1.32,3.32
+epl,2024,epl_2024_157_southampton_tottenham,15/12/2024,Southampton,Tottenham,0,5,0,5,9,18,3,9,2,5,8,15,1,3,0,0,4.29,4.47,1.69,1.3,3.46
+epl,2024,epl_2024_158_bournemouth_west_ham,16/12/2024,Bournemouth,West Ham,1,1,0,0,29,16,9,3,12,6,6,11,0,2,0,0,1.71,4.19,4.43,1.51,2.54
+epl,2024,epl_2024_159_aston_villa_man_city,21/12/2024,Aston Villa,Man City,2,1,1,0,11,12,6,6,5,4,14,7,3,3,0,0,3.29,3.71,2.12,1.59,2.39
+epl,2024,epl_2024_160_brentford_nott'm_forest,21/12/2024,Brentford,Nott'm Forest,0,2,0,1,7,10,3,6,9,5,9,14,3,4,0,0,2.35,3.52,2.99,1.72,2.13
+epl,2024,epl_2024_161_ipswich_newcastle,21/12/2024,Ipswich,Newcastle,0,4,0,3,10,15,2,7,2,1,9,7,2,0,0,0,4.61,3.95,1.74,1.63,2.3
+epl,2024,epl_2024_162_west_ham_brighton,21/12/2024,West Ham,Brighton,1,1,0,0,11,12,4,6,8,4,14,20,2,2,0,0,2.8,3.75,2.38,1.51,2.56
+epl,2024,epl_2024_163_crystal_palace_arsenal,21/12/2024,Crystal Palace,Arsenal,1,5,1,3,15,14,6,6,3,3,9,8,2,2,0,0,6.08,4.11,1.57,1.83,2.01
+epl,2024,epl_2024_164_everton_chelsea,22/12/2024,Everton,Chelsea,0,0,0,0,5,12,4,5,2,5,20,12,4,1,0,0,5.18,4.13,1.63,1.66,2.25
+epl,2024,epl_2024_165_fulham_southampton,22/12/2024,Fulham,Southampton,0,0,0,0,16,5,5,1,6,5,8,15,1,3,0,0,1.42,4.96,7.21,1.54,2.46
+epl,2024,epl_2024_166_leicester_wolves,22/12/2024,Leicester,Wolves,0,3,0,3,9,8,5,4,6,1,15,16,2,0,0,0,2.55,3.56,2.69,1.66,2.24
+epl,2024,epl_2024_167_man_united_bournemouth,22/12/2024,Man United,Bournemouth,0,3,0,1,23,10,7,5,13,1,11,11,1,3,0,0,1.85,3.88,4.07,1.6,2.36
+epl,2024,epl_2024_168_tottenham_liverpool,22/12/2024,Tottenham,Liverpool,3,6,1,3,9,24,5,12,7,5,7,9,1,2,0,0,4.29,4.33,1.72,1.29,3.52
+epl,2024,epl_2024_169_man_city_everton,26/12/2024,Man City,Everton,1,1,1,1,24,8,5,3,8,5,5,10,1,4,0,0,1.34,5.46,8.59,1.55,2.44
+epl,2024,epl_2024_170_bournemouth_crystal_palace,26/12/2024,Bournemouth,Crystal Palace,0,0,0,0,18,10,4,4,5,2,13,12,2,2,0,0,1.9,3.77,3.87,1.72,2.13
+epl,2024,epl_2024_171_chelsea_fulham,26/12/2024,Chelsea,Fulham,1,2,1,0,12,14,8,7,3,1,13,13,1,3,0,0,1.47,4.88,6.15,1.45,2.72
+epl,2024,epl_2024_172_newcastle_aston_villa,26/12/2024,Newcastle,Aston Villa,3,0,1,0,22,4,8,1,9,6,15,10,2,1,0,1,1.93,3.91,3.66,1.61,2.34
+epl,2024,epl_2024_173_nott'm_forest_tottenham,26/12/2024,Nott'm Forest,Tottenham,1,0,1,0,10,13,3,4,2,7,12,13,3,2,0,1,2.35,3.74,2.82,1.48,2.64
+epl,2024,epl_2024_174_southampton_west_ham,26/12/2024,Southampton,West Ham,0,1,0,0,18,16,5,2,2,2,15,8,1,2,0,0,3.24,3.56,2.18,1.66,2.23
+epl,2024,epl_2024_175_wolves_man_united,26/12/2024,Wolves,Man United,2,0,0,0,7,11,4,4,4,4,12,12,2,2,0,1,3.8,3.7,1.94,1.67,2.22
+epl,2024,epl_2024_176_liverpool_leicester,26/12/2024,Liverpool,Leicester,3,1,1,1,19,4,7,1,14,1,17,5,3,2,0,0,1.08,12.4,25.35,1.19,4.41
+epl,2024,epl_2024_177_brighton_brentford,27/12/2024,Brighton,Brentford,0,0,0,0,24,8,7,3,5,3,6,12,0,2,0,0,1.64,4.44,4.89,1.44,2.78
+epl,2024,epl_2024_178_arsenal_ipswich,27/12/2024,Arsenal,Ipswich,1,0,1,0,13,3,5,0,5,1,7,12,1,1,0,0,1.16,8.37,17.31,1.39,2.99
+epl,2024,epl_2024_179_leicester_man_city,29/12/2024,Leicester,Man City,0,2,0,1,11,14,4,5,4,4,11,6,2,1,0,0,7.92,5.62,1.34,1.36,3.07
+epl,2024,epl_2024_180_crystal_palace_southampton,29/12/2024,Crystal Palace,Southampton,2,1,1,1,19,7,10,3,8,7,18,19,2,3,0,0,1.61,4.11,5.42,1.75,2.09
+epl,2024,epl_2024_181_everton_nott'm_forest,29/12/2024,Everton,Nott'm Forest,0,2,0,1,13,11,2,7,5,4,13,10,4,1,0,0,2.64,3.16,2.83,2.23,1.66
+epl,2024,epl_2024_182_fulham_bournemouth,29/12/2024,Fulham,Bournemouth,2,2,1,0,11,16,6,9,1,7,7,16,1,3,0,0,2.35,3.58,2.91,1.67,2.21
+epl,2024,epl_2024_183_tottenham_wolves,29/12/2024,Tottenham,Wolves,2,2,2,1,13,11,3,3,5,5,9,10,1,2,0,0,1.61,4.77,4.56,1.31,3.33
+epl,2024,epl_2024_184_west_ham_liverpool,29/12/2024,West Ham,Liverpool,0,5,0,3,7,22,0,13,3,6,7,10,0,0,0,0,7.04,5.21,1.4,1.39,2.92
+epl,2024,epl_2024_185_aston_villa_brighton,30/12/2024,Aston Villa,Brighton,2,2,1,1,20,13,4,4,12,3,9,14,2,3,0,0,1.94,3.86,3.61,1.59,2.36
+epl,2024,epl_2024_186_ipswich_chelsea,30/12/2024,Ipswich,Chelsea,2,0,1,0,9,20,6,5,4,7,9,5,4,4,0,0,6.87,5.02,1.41,1.43,2.75
+epl,2024,epl_2024_187_man_united_newcastle,30/12/2024,Man United,Newcastle,0,2,0,2,10,12,0,4,2,3,13,8,1,1,0,0,2.7,3.61,2.49,1.63,2.28
+epl,2024,epl_2024_188_brentford_arsenal,01/01/2025,Brentford,Arsenal,1,3,1,1,5,14,2,5,4,3,6,8,1,2,0,0,6.67,4.8,1.44,1.54,2.46
+epl,2024,epl_2024_189_tottenham_newcastle,04/01/2025,Tottenham,Newcastle,1,2,1,2,13,14,4,4,9,10,11,15,1,4,0,0,2.88,3.94,2.24,1.32,3.31
+epl,2024,epl_2024_190_aston_villa_leicester,04/01/2025,Aston Villa,Leicester,2,1,0,0,13,4,5,2,7,2,10,11,0,1,0,0,1.32,5.51,9.16,1.5,2.58
+epl,2024,epl_2024_191_bournemouth_everton,04/01/2025,Bournemouth,Everton,1,0,0,0,19,9,8,0,9,3,15,14,2,2,0,0,1.75,3.82,4.71,1.86,1.96
+epl,2024,epl_2024_192_crystal_palace_chelsea,04/01/2025,Crystal Palace,Chelsea,1,1,0,1,13,15,6,1,6,6,9,12,0,2,0,0,3.65,3.88,1.95,1.58,2.39
+epl,2024,epl_2024_193_man_city_west_ham,04/01/2025,Man City,West Ham,4,1,2,0,10,17,7,4,7,1,8,13,2,1,0,0,1.31,6.09,8.3,1.34,3.23
+epl,2024,epl_2024_194_southampton_brentford,04/01/2025,Southampton,Brentford,0,5,0,1,8,20,1,11,2,2,10,4,2,0,0,0,2.78,3.54,2.48,1.66,2.24
+epl,2024,epl_2024_195_brighton_arsenal,04/01/2025,Brighton,Arsenal,1,1,0,1,11,9,4,3,2,5,17,14,2,3,0,0,4.36,3.83,1.8,1.73,2.12
+epl,2024,epl_2024_196_fulham_ipswich,05/01/2025,Fulham,Ipswich,2,2,0,1,15,7,4,3,9,2,10,14,1,5,0,0,1.56,4.34,5.68,1.7,2.15
+epl,2024,epl_2024_197_liverpool_man_united,05/01/2025,Liverpool,Man United,2,2,0,0,19,13,6,4,6,9,10,13,2,4,0,0,1.29,6.05,9.49,1.41,2.86
+epl,2024,epl_2024_198_wolves_nott'm_forest,06/01/2025,Wolves,Nott'm Forest,0,3,0,2,13,11,6,3,5,3,10,8,1,2,0,0,3.22,3.22,2.33,2.04,1.78
+epl,2024,epl_2024_199_brentford_man_city,14/01/2025,Brentford,Man City,2,2,0,0,18,21,6,8,4,5,4,4,0,0,0,0,4.76,4.47,1.64,1.38,3.04
+epl,2024,epl_2024_200_chelsea_bournemouth,14/01/2025,Chelsea,Bournemouth,2,2,1,0,26,7,10,3,9,3,15,16,2,3,0,0,1.5,4.81,5.92,1.42,2.87
+epl,2024,epl_2024_201_west_ham_fulham,14/01/2025,West Ham,Fulham,3,2,2,0,4,21,3,5,0,3,9,18,3,3,0,0,2.97,3.43,2.41,1.83,2.01
+epl,2024,epl_2024_202_nott'm_forest_liverpool,14/01/2025,Nott'm Forest,Liverpool,1,1,1,0,6,23,3,7,0,9,7,10,2,1,0,0,5.14,4.16,1.64,1.63,2.3
+epl,2024,epl_2024_203_everton_aston_villa,15/01/2025,Everton,Aston Villa,0,1,0,0,10,11,3,3,8,5,17,10,2,1,0,0,3.2,3.24,2.35,2.06,1.78
+epl,2024,epl_2024_204_leicester_crystal_palace,15/01/2025,Leicester,Crystal Palace,0,2,0,0,21,9,4,4,4,3,7,6,0,0,0,0,3.88,3.73,1.92,1.74,2.11
+epl,2024,epl_2024_205_newcastle_wolves,15/01/2025,Newcastle,Wolves,3,0,1,0,17,13,5,7,4,2,10,13,0,2,0,0,1.35,5.54,8.08,1.42,2.82
+epl,2024,epl_2024_206_arsenal_tottenham,15/01/2025,Arsenal,Tottenham,2,1,2,1,14,10,4,2,10,4,16,9,3,1,0,0,1.4,5.29,6.86,1.43,2.8
+epl,2024,epl_2024_207_ipswich_brighton,16/01/2025,Ipswich,Brighton,0,2,0,0,5,11,3,5,1,9,13,14,2,2,0,0,3.8,3.73,1.94,1.71,2.15
+epl,2024,epl_2024_208_man_united_southampton,16/01/2025,Man United,Southampton,3,1,0,1,23,13,9,5,5,4,7,10,1,3,0,0,1.3,5.79,9.4,1.52,2.52
+epl,2024,epl_2024_209_newcastle_bournemouth,18/01/2025,Newcastle,Bournemouth,1,4,1,2,13,19,5,10,7,6,7,18,1,6,0,0,1.64,4.3,4.93,1.54,2.47
+epl,2024,epl_2024_210_brentford_liverpool,18/01/2025,Brentford,Liverpool,0,2,0,0,11,37,6,8,2,15,6,14,2,3,0,0,6.43,5.15,1.43,1.35,3.16
+epl,2024,epl_2024_211_leicester_fulham,18/01/2025,Leicester,Fulham,0,2,0,0,8,17,4,2,5,2,8,8,3,1,0,0,4.17,3.81,1.84,1.71,2.14
+epl,2024,epl_2024_212_west_ham_crystal_palace,18/01/2025,West Ham,Crystal Palace,0,2,0,0,7,12,0,7,2,4,13,10,1,0,1,0,2.62,3.41,2.69,1.79,2.04
+epl,2024,epl_2024_213_arsenal_aston_villa,18/01/2025,Arsenal,Aston Villa,2,2,1,0,18,8,6,4,10,1,10,18,2,3,0,0,1.51,4.35,6.45,1.82,2.01
+epl,2024,epl_2024_214_everton_tottenham,19/01/2025,Everton,Tottenham,3,2,3,0,12,11,6,6,3,8,14,14,2,1,0,0,2.91,3.51,2.41,1.69,2.19
+epl,2024,epl_2024_215_man_united_brighton,19/01/2025,Man United,Brighton,1,3,1,1,10,6,1,3,4,2,13,12,3,3,0,0,2.09,3.71,3.36,1.66,2.23
+epl,2024,epl_2024_216_nott'm_forest_southampton,19/01/2025,Nott'm Forest,Southampton,3,2,3,0,14,10,5,4,2,8,4,18,0,4,0,0,1.39,4.86,8.03,1.75,2.09
+epl,2024,epl_2024_217_ipswich_man_city,19/01/2025,Ipswich,Man City,0,6,0,3,8,17,4,9,4,7,4,7,0,1,0,0,7.72,5.36,1.36,1.44,2.74
+epl,2024,epl_2024_218_chelsea_wolves,20/01/2025,Chelsea,Wolves,3,1,1,1,19,9,7,4,3,6,8,14,4,2,0,0,1.37,5.51,7.3,1.37,3.06
+epl,2024,epl_2024_219_bournemouth_nott'm_forest,25/01/2025,Bournemouth,Nott'm Forest,5,0,1,0,16,18,10,4,3,9,9,12,2,3,0,0,2.09,3.64,3.42,1.82,2.02
+epl,2024,epl_2024_220_brighton_everton,25/01/2025,Brighton,Everton,0,1,0,1,16,3,1,1,9,1,8,11,3,4,0,0,1.67,3.86,5.39,1.9,1.93
+epl,2024,epl_2024_221_liverpool_ipswich,25/01/2025,Liverpool,Ipswich,4,1,3,0,16,3,6,3,3,4,10,11,0,2,0,0,1.1,11.04,20.87,1.25,3.82
+epl,2024,epl_2024_222_southampton_newcastle,25/01/2025,Southampton,Newcastle,1,3,1,2,12,17,5,9,3,8,10,5,1,0,0,0,6.82,5.09,1.42,1.44,2.75
+epl,2024,epl_2024_223_wolves_arsenal,25/01/2025,Wolves,Arsenal,0,1,0,0,9,9,4,3,1,5,20,10,0,1,1,1,6.85,4.65,1.46,1.72,2.14
+epl,2024,epl_2024_224_man_city_chelsea,25/01/2025,Man City,Chelsea,3,1,1,1,15,10,6,4,2,4,6,8,3,2,0,0,2.03,4.03,3.29,1.41,2.88
+epl,2024,epl_2024_225_crystal_palace_brentford,26/01/2025,Crystal Palace,Brentford,1,2,0,0,16,13,5,6,4,7,8,11,2,2,0,0,2.06,3.68,3.47,1.74,2.12
+epl,2024,epl_2024_226_tottenham_leicester,26/01/2025,Tottenham,Leicester,1,2,1,0,15,12,6,3,6,4,6,16,1,5,0,0,1.46,5.21,5.89,1.33,3.27
+epl,2024,epl_2024_227_aston_villa_west_ham,26/01/2025,Aston Villa,West Ham,1,1,1,0,14,14,4,4,4,3,13,16,2,3,0,0,1.55,4.39,5.81,1.67,2.21
+epl,2024,epl_2024_228_fulham_man_united,26/01/2025,Fulham,Man United,0,1,0,0,9,4,3,1,3,0,7,9,0,1,0,0,2.31,3.44,3.1,1.85,1.98
+epl,2024,epl_2024_229_nott'm_forest_brighton,01/02/2025,Nott'm Forest,Brighton,7,0,3,0,14,10,9,5,4,6,8,13,1,3,0,0,2.44,3.46,2.89,1.92,1.91
+epl,2024,epl_2024_230_bournemouth_liverpool,01/02/2025,Bournemouth,Liverpool,0,2,0,1,14,19,3,7,3,3,15,9,2,3,0,0,4.56,4.32,1.68,1.46,2.69
+epl,2024,epl_2024_231_everton_leicester,01/02/2025,Everton,Leicester,4,0,3,0,13,9,7,1,5,6,7,13,0,0,0,0,1.79,3.67,4.67,2.01,1.83
+epl,2024,epl_2024_232_ipswich_southampton,01/02/2025,Ipswich,Southampton,1,2,1,1,15,9,6,4,1,2,11,14,0,3,0,0,1.98,3.67,3.74,1.76,2.09
+epl,2024,epl_2024_233_newcastle_fulham,01/02/2025,Newcastle,Fulham,1,2,1,0,11,15,4,4,4,7,10,15,4,4,0,0,1.71,4.07,4.66,1.64,2.28
+epl,2024,epl_2024_234_wolves_aston_villa,01/02/2025,Wolves,Aston Villa,2,0,1,0,8,10,5,3,5,8,20,13,2,3,0,0,3.36,3.58,2.14,1.7,2.17
+epl,2024,epl_2024_235_brentford_tottenham,02/02/2025,Brentford,Tottenham,0,2,0,1,20,13,4,2,10,3,4,11,0,1,0,0,2.11,3.97,3.1,1.33,3.25
+epl,2024,epl_2024_236_man_united_crystal_palace,02/02/2025,Man United,Crystal Palace,0,2,0,0,17,11,2,3,11,0,12,13,3,1,0,0,2.04,3.48,3.71,1.83,1.99
+epl,2024,epl_2024_237_arsenal_man_city,02/02/2025,Arsenal,Man City,5,1,1,0,12,7,7,4,5,2,6,7,2,0,0,0,1.97,3.58,3.83,1.75,2.1
+epl,2024,epl_2024_238_chelsea_west_ham,03/02/2025,Chelsea,West Ham,2,1,0,1,22,14,3,5,4,3,11,10,3,1,0,0,1.36,5.54,7.58,1.38,2.99
+epl,2024,epl_2024_239_everton_liverpool,12/02/2025,Everton,Liverpool,2,2,1,1,10,6,3,4,2,3,9,20,2,2,1,1,7.36,4.71,1.44,1.71,2.18
+epl,2024,epl_2024_240_brighton_chelsea,14/02/2025,Brighton,Chelsea,3,0,2,0,13,8,5,0,2,9,12,15,1,2,0,0,2.85,3.6,2.43,1.58,2.42
+epl,2024,epl_2024_241_leicester_arsenal,15/02/2025,Leicester,Arsenal,0,2,0,0,6,11,2,5,3,7,9,10,2,1,0,0,9.45,5.29,1.34,1.71,2.17
+epl,2024,epl_2024_242_aston_villa_ipswich,15/02/2025,Aston Villa,Ipswich,1,1,0,0,25,4,6,3,16,1,7,11,0,3,0,1,1.41,4.96,7.45,1.58,2.41
+epl,2024,epl_2024_243_fulham_nott'm_forest,15/02/2025,Fulham,Nott'm Forest,2,1,1,1,24,8,10,2,8,4,13,8,0,0,0,0,2.22,3.35,3.39,2.1,1.76
+epl,2024,epl_2024_244_man_city_newcastle,15/02/2025,Man City,Newcastle,4,0,3,0,11,3,7,1,7,4,5,13,0,1,0,0,1.97,4.07,3.44,1.45,2.77
+epl,2024,epl_2024_245_southampton_bournemouth,15/02/2025,Southampton,Bournemouth,1,3,0,2,11,14,4,7,4,6,13,15,1,3,0,0,5.83,4.64,1.52,1.49,2.62
+epl,2024,epl_2024_246_west_ham_brentford,15/02/2025,West Ham,Brentford,0,1,0,1,13,14,3,5,9,2,10,13,1,1,0,0,2.41,3.64,2.82,1.6,2.37
+epl,2024,epl_2024_247_crystal_palace_everton,15/02/2025,Crystal Palace,Everton,1,2,0,1,17,11,6,6,6,2,9,12,0,1,0,0,1.81,3.45,4.94,2.23,1.67
+epl,2024,epl_2024_248_liverpool_wolves,16/02/2025,Liverpool,Wolves,2,1,2,0,10,16,3,4,4,3,15,13,2,2,0,0,1.19,7.85,12.84,1.37,3.12
+epl,2024,epl_2024_249_tottenham_man_united,16/02/2025,Tottenham,Man United,1,0,1,0,22,16,7,6,10,5,13,9,1,2,0,0,2.45,3.73,2.69,1.48,2.67
+epl,2024,epl_2024_250_aston_villa_liverpool,19/02/2025,Aston Villa,Liverpool,2,2,2,1,9,17,4,3,6,8,8,6,1,0,0,0,3.93,4.0,1.85,1.56,2.45
+epl,2024,epl_2024_251_leicester_brentford,21/02/2025,Leicester,Brentford,0,4,0,3,8,14,3,6,5,6,10,10,4,0,0,0,3.7,3.86,1.96,1.58,2.42
+epl,2024,epl_2024_252_everton_man_united,22/02/2025,Everton,Man United,2,2,2,0,9,9,8,3,7,9,12,9,4,1,0,0,2.55,3.2,2.96,2.19,1.7
+epl,2024,epl_2024_253_arsenal_west_ham,22/02/2025,Arsenal,West Ham,0,1,0,1,20,5,2,2,2,0,16,15,1,3,1,0,1.25,6.2,11.63,1.68,2.22
+epl,2024,epl_2024_254_bournemouth_wolves,22/02/2025,Bournemouth,Wolves,0,1,0,1,8,13,3,5,6,7,17,9,3,3,1,0,1.56,4.45,5.5,1.59,2.39
+epl,2024,epl_2024_255_fulham_crystal_palace,22/02/2025,Fulham,Crystal Palace,0,2,0,1,10,10,0,5,7,7,10,7,1,3,0,0,2.05,3.48,3.74,1.98,1.87
+epl,2024,epl_2024_256_ipswich_tottenham,22/02/2025,Ipswich,Tottenham,1,4,1,2,17,10,5,6,4,4,15,14,2,1,0,0,3.87,3.89,1.89,1.52,2.56
+epl,2024,epl_2024_257_southampton_brighton,22/02/2025,Southampton,Brighton,0,4,0,1,6,18,1,12,5,6,11,12,2,0,0,0,5.52,4.38,1.57,1.58,2.42
+epl,2024,epl_2024_258_aston_villa_chelsea,22/02/2025,Aston Villa,Chelsea,2,1,0,1,12,15,6,7,2,3,15,16,1,3,0,0,2.62,3.7,2.56,1.56,2.45
+epl,2024,epl_2024_259_newcastle_nott'm_forest,23/02/2025,Newcastle,Nott'm Forest,4,3,4,1,13,17,5,5,7,6,11,13,1,4,0,0,1.81,3.96,4.11,1.66,2.25
+epl,2024,epl_2024_260_man_city_liverpool,23/02/2025,Man City,Liverpool,0,2,0,2,16,8,5,4,7,5,3,10,0,0,0,0,2.9,3.86,2.26,1.41,2.89
+epl,2024,epl_2024_261_brighton_bournemouth,25/02/2025,Brighton,Bournemouth,2,1,1,0,11,19,4,5,1,9,12,14,2,1,0,0,2.06,3.81,3.43,1.62,2.35
+epl,2024,epl_2024_262_crystal_palace_aston_villa,25/02/2025,Crystal Palace,Aston Villa,4,1,1,0,19,6,6,2,3,8,19,10,3,1,0,0,2.55,3.38,2.83,1.9,1.95
+epl,2024,epl_2024_263_wolves_fulham,25/02/2025,Wolves,Fulham,1,2,1,1,18,11,5,5,7,5,8,15,1,3,0,0,2.71,3.34,2.69,2.01,1.84
+epl,2024,epl_2024_264_chelsea_southampton,25/02/2025,Chelsea,Southampton,4,0,3,0,19,7,10,2,4,2,6,9,1,2,0,0,1.17,8.55,14.69,1.28,3.72
+epl,2024,epl_2024_265_brentford_everton,26/02/2025,Brentford,Everton,1,1,1,0,12,14,3,4,2,5,3,6,2,1,0,0,2.02,3.68,3.59,1.85,1.99
+epl,2024,epl_2024_266_man_united_ipswich,26/02/2025,Man United,Ipswich,3,2,2,2,10,12,6,3,5,6,9,16,4,4,1,0,1.52,4.55,5.83,1.64,2.29
+epl,2024,epl_2024_267_nott'm_forest_arsenal,26/02/2025,Nott'm Forest,Arsenal,0,0,0,0,6,13,2,1,3,11,10,17,1,1,0,0,3.94,3.48,1.98,2.17,1.71
+epl,2024,epl_2024_268_tottenham_man_city,26/02/2025,Tottenham,Man City,0,1,0,1,11,12,6,5,8,3,12,15,3,0,0,0,3.22,4.09,2.04,1.34,3.29
+epl,2024,epl_2024_269_liverpool_newcastle,26/02/2025,Liverpool,Newcastle,2,0,1,0,12,3,3,0,4,2,12,11,0,1,0,0,1.52,4.77,5.64,1.44,2.79
+epl,2024,epl_2024_270_west_ham_leicester,27/02/2025,West Ham,Leicester,2,0,2,0,8,10,2,2,3,3,12,6,0,0,0,0,1.63,4.15,5.17,1.71,2.17
+epl,2024,epl_2024_271_nott'm_forest_man_city,08/03/2025,Nott'm Forest,Man City,1,0,0,0,9,14,4,3,3,2,9,7,3,2,0,0,3.88,3.89,1.89,1.57,2.42
+epl,2024,epl_2024_272_brighton_fulham,08/03/2025,Brighton,Fulham,2,1,1,1,9,6,4,1,3,7,6,12,0,2,0,0,1.99,3.62,3.77,1.75,2.11
+epl,2024,epl_2024_273_crystal_palace_ipswich,08/03/2025,Crystal Palace,Ipswich,1,0,0,0,19,15,4,8,5,4,8,7,4,3,0,0,1.48,4.55,6.74,1.75,2.07
+epl,2024,epl_2024_274_liverpool_southampton,08/03/2025,Liverpool,Southampton,3,1,0,1,28,6,7,4,6,4,10,9,2,1,0,0,1.12,9.97,19.5,1.27,3.77
+epl,2024,epl_2024_275_brentford_aston_villa,08/03/2025,Brentford,Aston Villa,0,1,0,0,13,12,3,4,6,5,10,5,2,2,0,0,2.26,3.8,2.95,1.52,2.54
+epl,2024,epl_2024_276_wolves_everton,08/03/2025,Wolves,Everton,1,1,1,1,11,12,3,4,5,5,11,16,2,2,0,0,2.63,3.14,2.87,2.27,1.64
+epl,2024,epl_2024_277_chelsea_leicester,09/03/2025,Chelsea,Leicester,1,0,0,0,20,3,7,3,12,2,12,13,1,0,0,0,1.2,7.67,12.34,1.35,3.22
+epl,2024,epl_2024_278_tottenham_bournemouth,09/03/2025,Tottenham,Bournemouth,2,2,0,1,12,17,4,8,3,6,15,16,3,3,0,0,2.71,3.88,2.4,1.39,3.02
+epl,2024,epl_2024_279_man_united_arsenal,09/03/2025,Man United,Arsenal,1,1,1,0,10,17,6,6,2,9,8,11,0,1,0,0,5.41,3.58,1.72,2.18,1.7
+epl,2024,epl_2024_280_west_ham_newcastle,10/03/2025,West Ham,Newcastle,0,1,0,0,9,9,2,3,3,4,7,15,0,1,0,0,3.21,3.57,2.19,1.69,2.18
+epl,2024,epl_2024_281_everton_west_ham,15/03/2025,Everton,West Ham,1,1,0,0,13,10,5,5,6,5,12,8,1,2,0,0,2.11,3.27,3.81,2.3,1.64
+epl,2024,epl_2024_282_ipswich_nott'm_forest,15/03/2025,Ipswich,Nott'm Forest,2,4,0,3,11,11,4,6,6,3,4,13,1,1,0,0,3.8,3.59,1.99,1.85,1.99
+epl,2024,epl_2024_283_man_city_brighton,15/03/2025,Man City,Brighton,2,2,2,1,11,15,3,3,4,5,10,10,2,5,0,0,1.66,4.45,4.63,1.47,2.68
+epl,2024,epl_2024_284_southampton_wolves,15/03/2025,Southampton,Wolves,1,2,0,1,10,5,3,3,5,1,12,13,0,0,0,0,3.63,3.51,2.06,1.81,2.03
+epl,2024,epl_2024_285_bournemouth_brentford,15/03/2025,Bournemouth,Brentford,1,2,1,1,17,10,5,4,4,3,13,7,3,0,0,0,1.76,4.16,4.25,1.48,2.66
+epl,2024,epl_2024_286_arsenal_chelsea,16/03/2025,Arsenal,Chelsea,1,0,1,0,12,8,4,2,5,4,10,13,3,3,0,0,1.81,3.74,4.44,1.88,1.94
+epl,2024,epl_2024_287_fulham_tottenham,16/03/2025,Fulham,Tottenham,2,0,0,0,13,12,4,4,6,5,13,10,0,0,0,0,2.01,3.84,3.48,1.57,2.42
+epl,2024,epl_2024_288_leicester_man_united,16/03/2025,Leicester,Man United,0,3,0,1,11,18,3,5,6,4,6,6,2,0,0,0,4.21,3.76,1.84,1.79,2.04
+epl,2024,epl_2024_289_arsenal_fulham,01/04/2025,Arsenal,Fulham,2,1,1,0,17,9,4,3,5,4,2,10,1,2,0,0,1.48,4.2,7.73,2.12,1.74
+epl,2024,epl_2024_290_wolves_west_ham,01/04/2025,Wolves,West Ham,1,0,1,0,9,10,2,1,1,2,16,12,4,2,0,0,2.57,3.2,2.92,2.18,1.7
+epl,2024,epl_2024_291_nott'm_forest_man_united,01/04/2025,Nott'm Forest,Man United,1,0,1,0,8,23,2,6,3,10,5,12,1,3,0,0,2.32,3.42,3.13,1.94,1.89
+epl,2024,epl_2024_292_bournemouth_ipswich,02/04/2025,Bournemouth,Ipswich,1,2,0,1,24,10,7,2,8,3,14,15,1,2,0,0,1.38,5.23,7.72,1.51,2.52
+epl,2024,epl_2024_293_brighton_aston_villa,02/04/2025,Brighton,Aston Villa,0,3,0,0,11,8,4,5,4,0,16,11,1,3,0,0,2.09,3.81,3.27,1.58,2.37
+epl,2024,epl_2024_294_man_city_leicester,02/04/2025,Man City,Leicester,2,0,2,0,18,2,5,0,5,0,11,8,1,4,0,0,1.2,7.61,12.4,1.38,2.99
+epl,2024,epl_2024_295_newcastle_brentford,02/04/2025,Newcastle,Brentford,2,1,1,0,21,12,4,3,4,5,12,12,1,1,0,0,1.73,4.31,4.21,1.46,2.68
+epl,2024,epl_2024_296_southampton_crystal_palace,02/04/2025,Southampton,Crystal Palace,1,1,1,0,8,9,2,3,2,2,14,9,2,1,0,0,5.5,4.01,1.62,1.78,2.03
+epl,2024,epl_2024_297_liverpool_everton,02/04/2025,Liverpool,Everton,1,0,0,0,17,5,3,0,11,5,7,11,2,2,0,0,1.36,5.02,8.78,1.76,2.06
+epl,2024,epl_2024_298_chelsea_tottenham,03/04/2025,Chelsea,Tottenham,1,0,0,0,11,8,5,2,4,6,7,16,5,5,0,0,1.64,4.5,4.57,1.39,2.92
+epl,2024,epl_2024_299_everton_arsenal,05/04/2025,Everton,Arsenal,1,1,0,1,5,14,2,5,3,8,17,13,3,1,0,0,5.15,3.44,1.78,2.36,1.59
+epl,2024,epl_2024_300_crystal_palace_brighton,05/04/2025,Crystal Palace,Brighton,2,1,1,1,8,11,3,5,2,4,12,13,0,1,2,1,2.43,3.46,2.87,1.78,2.04
+epl,2024,epl_2024_301_ipswich_wolves,05/04/2025,Ipswich,Wolves,1,2,1,0,6,22,2,7,4,8,12,16,2,2,0,0,2.74,3.28,2.65,2.07,1.75
+epl,2024,epl_2024_302_west_ham_bournemouth,05/04/2025,West Ham,Bournemouth,2,2,0,1,9,11,3,4,4,7,13,13,2,2,0,0,3.04,3.47,2.34,1.8,2.02
+epl,2024,epl_2024_303_aston_villa_nott'm_forest,05/04/2025,Aston Villa,Nott'm Forest,2,1,2,0,17,19,8,3,4,4,7,15,2,2,0,0,1.99,3.63,3.72,1.78,2.05
+epl,2024,epl_2024_304_brentford_chelsea,06/04/2025,Brentford,Chelsea,0,0,0,0,9,21,2,5,3,6,12,12,1,3,0,0,3.2,3.73,2.15,1.53,2.46
+epl,2024,epl_2024_305_fulham_liverpool,06/04/2025,Fulham,Liverpool,3,2,3,1,12,14,6,6,4,4,10,9,3,0,0,0,4.24,3.7,1.86,1.8,2.02
+epl,2024,epl_2024_306_tottenham_southampton,06/04/2025,Tottenham,Southampton,3,1,2,0,13,12,8,4,4,1,16,20,1,1,0,0,1.39,5.32,7.12,1.38,2.97
+epl,2024,epl_2024_307_man_united_man_city,06/04/2025,Man United,Man City,0,0,0,0,13,9,2,5,5,3,13,9,3,2,0,0,3.33,3.61,2.13,1.66,2.23
+epl,2024,epl_2024_308_leicester_newcastle,07/04/2025,Leicester,Newcastle,0,3,0,3,7,16,2,5,12,2,8,9,2,0,0,0,6.4,4.44,1.5,1.6,2.33
+epl,2024,epl_2024_309_man_city_crystal_palace,12/04/2025,Man City,Crystal Palace,5,2,2,2,21,8,9,3,1,4,10,16,2,3,0,0,1.5,4.7,5.95,1.53,2.48
+epl,2024,epl_2024_310_brighton_leicester,12/04/2025,Brighton,Leicester,2,2,1,1,21,15,7,6,3,6,9,11,2,5,0,0,1.27,5.89,10.98,1.61,2.33
+epl,2024,epl_2024_311_nott'm_forest_everton,12/04/2025,Nott'm Forest,Everton,0,1,0,0,10,13,5,5,1,7,9,13,0,3,0,0,2.11,3.33,3.67,2.22,1.67
+epl,2024,epl_2024_312_southampton_aston_villa,12/04/2025,Southampton,Aston Villa,0,3,0,0,7,25,2,10,2,14,11,4,3,1,0,0,5.65,4.42,1.55,1.59,2.37
+epl,2024,epl_2024_313_arsenal_brentford,12/04/2025,Arsenal,Brentford,1,1,0,0,14,3,3,2,13,5,7,9,1,3,0,0,1.61,4.16,5.35,1.77,2.06
+epl,2024,epl_2024_314_chelsea_ipswich,13/04/2025,Chelsea,Ipswich,2,2,0,2,34,13,9,4,15,4,11,7,2,2,0,0,1.25,6.57,9.7,1.43,2.77
+epl,2024,epl_2024_315_liverpool_west_ham,13/04/2025,Liverpool,West Ham,2,1,1,0,15,11,6,4,10,3,15,8,0,2,0,0,1.3,5.89,9.45,1.52,2.51
+epl,2024,epl_2024_316_wolves_tottenham,13/04/2025,Wolves,Tottenham,4,2,2,0,13,11,5,4,1,4,12,15,1,2,0,0,2.23,3.55,3.14,1.66,2.23
+epl,2024,epl_2024_317_newcastle_man_united,13/04/2025,Newcastle,Man United,4,1,1,1,13,9,6,5,7,2,7,9,0,2,0,0,1.65,4.21,4.73,1.64,2.27
+epl,2024,epl_2024_318_bournemouth_fulham,14/04/2025,Bournemouth,Fulham,1,0,1,0,12,12,3,7,6,9,11,10,3,2,0,0,2.15,3.58,3.3,1.74,2.1
+epl,2024,epl_2024_319_newcastle_crystal_palace,16/04/2025,Newcastle,Crystal Palace,5,0,4,0,14,11,7,4,5,4,9,15,2,3,0,0,1.71,3.96,4.75,1.69,2.18
+epl,2024,epl_2024_320_brentford_brighton,19/04/2025,Brentford,Brighton,4,2,1,1,16,12,8,3,4,8,7,11,3,3,0,1,2.5,3.61,2.7,1.59,2.37
+epl,2024,epl_2024_321_crystal_palace_bournemouth,19/04/2025,Crystal Palace,Bournemouth,0,0,0,0,5,15,0,4,5,4,13,10,3,4,1,0,2.54,3.54,2.69,1.78,2.04
+epl,2024,epl_2024_322_everton_man_city,19/04/2025,Everton,Man City,0,2,0,0,8,12,3,7,2,5,7,6,4,0,0,0,3.8,3.65,1.96,1.83,2.0
+epl,2024,epl_2024_323_west_ham_southampton,19/04/2025,West Ham,Southampton,1,1,0,0,12,15,4,4,2,5,14,13,2,1,0,0,1.49,4.49,6.44,1.68,2.19
+epl,2024,epl_2024_324_aston_villa_newcastle,19/04/2025,Aston Villa,Newcastle,4,1,1,1,23,10,9,3,7,7,9,12,1,3,0,0,2.36,3.63,2.85,1.63,2.28
+epl,2024,epl_2024_325_fulham_chelsea,20/04/2025,Fulham,Chelsea,1,2,1,0,6,13,1,8,6,4,13,9,1,3,0,0,2.82,3.52,2.43,1.81,2.01
+epl,2024,epl_2024_326_ipswich_arsenal,20/04/2025,Ipswich,Arsenal,0,4,0,2,4,24,0,7,0,12,10,7,0,0,1,0,7.83,4.81,1.4,1.72,2.13
+epl,2024,epl_2024_327_man_united_wolves,20/04/2025,Man United,Wolves,0,1,0,0,12,4,2,2,9,2,11,18,2,3,0,0,2.0,3.58,3.72,1.93,1.89
+epl,2024,epl_2024_328_leicester_liverpool,20/04/2025,Leicester,Liverpool,0,1,0,0,5,28,0,10,1,13,11,7,1,2,0,0,11.76,6.63,1.23,1.44,2.74
+epl,2024,epl_2024_329_tottenham_nott'm_forest,21/04/2025,Tottenham,Nott'm Forest,1,2,0,2,22,4,6,3,7,1,11,12,1,4,0,0,2.47,3.71,2.66,1.58,2.38
+epl,2024,epl_2024_330_man_city_aston_villa,22/04/2025,Man City,Aston Villa,2,1,1,1,14,7,6,3,10,2,9,10,3,3,0,0,1.85,4.06,3.93,1.51,2.56
+epl,2024,epl_2024_331_arsenal_crystal_palace,23/04/2025,Arsenal,Crystal Palace,2,2,2,1,12,15,6,4,3,6,4,6,1,1,0,0,1.41,4.66,8.13,1.87,1.95
+epl,2024,epl_2024_332_chelsea_everton,26/04/2025,Chelsea,Everton,1,0,1,0,10,6,7,3,10,2,11,11,0,0,0,0,1.58,4.08,5.91,1.85,1.97
+epl,2024,epl_2024_333_brighton_west_ham,26/04/2025,Brighton,West Ham,3,2,1,0,16,12,9,4,8,1,7,9,1,1,0,0,1.67,4.14,4.76,1.67,2.21
+epl,2024,epl_2024_334_newcastle_ipswich,26/04/2025,Newcastle,Ipswich,3,0,1,0,25,4,5,0,11,2,9,9,1,2,0,1,1.18,7.72,14.89,1.34,3.18
+epl,2024,epl_2024_335_southampton_fulham,26/04/2025,Southampton,Fulham,1,2,1,0,7,26,3,5,0,13,10,12,1,1,0,0,5.17,4.11,1.64,1.71,2.13
+epl,2024,epl_2024_336_wolves_leicester,26/04/2025,Wolves,Leicester,3,0,1,0,20,8,6,2,4,2,7,17,1,4,0,0,1.51,4.38,6.24,1.75,2.09
+epl,2024,epl_2024_337_bournemouth_man_united,27/04/2025,Bournemouth,Man United,1,1,1,0,8,25,1,6,5,10,11,12,4,2,1,0,1.67,4.13,4.77,1.68,2.2
+epl,2024,epl_2024_338_liverpool_tottenham,27/04/2025,Liverpool,Tottenham,5,1,3,1,25,8,8,3,8,2,16,9,2,1,0,0,1.25,6.57,9.98,1.31,3.38
+epl,2024,epl_2024_339_nott'm_forest_brentford,01/05/2025,Nott'm Forest,Brentford,0,2,0,1,14,11,5,3,4,5,10,12,3,5,0,0,2.17,3.55,3.27,1.79,2.04
+epl,2024,epl_2024_340_man_city_wolves,02/05/2025,Man City,Wolves,1,0,1,0,9,6,2,1,4,5,7,11,0,0,0,0,1.4,5.14,7.49,1.52,2.51
+epl,2024,epl_2024_341_aston_villa_fulham,03/05/2025,Aston Villa,Fulham,1,0,1,0,10,11,3,3,5,3,6,17,0,5,0,0,1.79,3.88,4.32,1.72,2.12
+epl,2024,epl_2024_342_everton_ipswich,03/05/2025,Everton,Ipswich,2,2,2,1,8,12,3,5,3,3,12,15,4,4,0,0,1.47,4.4,7.07,1.89,1.93
+epl,2024,epl_2024_343_leicester_southampton,03/05/2025,Leicester,Southampton,2,0,2,0,14,8,4,2,7,7,12,13,1,3,0,0,2.33,3.62,2.93,1.74,2.09
+epl,2024,epl_2024_344_arsenal_bournemouth,03/05/2025,Arsenal,Bournemouth,1,2,1,0,13,9,4,2,2,3,7,16,0,2,0,0,2.08,3.6,3.47,1.84,1.99
+epl,2024,epl_2024_345_brentford_man_united,04/05/2025,Brentford,Man United,4,3,2,1,12,14,6,5,7,4,8,10,0,2,0,0,1.67,4.14,4.74,1.67,2.21
+epl,2024,epl_2024_346_brighton_newcastle,04/05/2025,Brighton,Newcastle,1,1,1,0,5,13,2,5,1,4,15,10,2,1,0,0,2.86,3.77,2.31,1.55,2.47
+epl,2024,epl_2024_347_west_ham_tottenham,04/05/2025,West Ham,Tottenham,1,1,1,1,11,7,2,2,1,3,18,15,2,2,0,0,2.1,3.73,3.31,1.56,2.4
+epl,2024,epl_2024_348_chelsea_liverpool,04/05/2025,Chelsea,Liverpool,3,1,1,0,17,11,7,2,3,6,10,11,2,2,0,0,2.18,3.71,3.14,1.54,2.45
+epl,2024,epl_2024_349_crystal_palace_nott'm_forest,05/05/2025,Crystal Palace,Nott'm Forest,1,1,0,0,20,12,3,4,7,4,9,15,3,8,0,0,2.29,3.38,3.15,1.96,1.86
+epl,2024,epl_2024_350_fulham_everton,10/05/2025,Fulham,Everton,1,3,1,1,18,11,6,7,5,5,15,9,1,0,0,0,1.87,3.55,4.32,2.04,1.79
+epl,2024,epl_2024_351_ipswich_brentford,10/05/2025,Ipswich,Brentford,0,1,0,1,11,15,4,5,5,6,6,12,2,4,0,0,4.94,4.2,1.65,1.51,2.52
+epl,2024,epl_2024_352_southampton_man_city,10/05/2025,Southampton,Man City,0,0,0,0,2,26,0,5,1,15,9,8,2,0,0,0,13.37,7.58,1.19,1.33,3.22
+epl,2024,epl_2024_353_wolves_brighton,10/05/2025,Wolves,Brighton,0,2,0,1,10,7,3,2,7,4,8,12,1,1,0,0,2.73,3.47,2.54,1.73,2.12
+epl,2024,epl_2024_354_bournemouth_aston_villa,10/05/2025,Bournemouth,Aston Villa,0,1,0,1,10,6,4,3,10,0,19,12,4,3,0,1,2.45,3.68,2.71,1.61,2.33
+epl,2024,epl_2024_355_newcastle_chelsea,11/05/2025,Newcastle,Chelsea,2,0,1,0,15,10,6,3,2,8,9,13,4,2,0,1,2.13,3.76,3.18,1.55,2.43
+epl,2024,epl_2024_356_man_united_west_ham,11/05/2025,Man United,West Ham,0,2,0,1,20,9,5,4,8,5,3,13,0,1,0,0,1.92,3.72,3.83,1.76,2.07
+epl,2024,epl_2024_357_nott'm_forest_leicester,11/05/2025,Nott'm Forest,Leicester,2,2,1,1,15,10,4,6,4,4,11,11,3,3,0,0,1.33,5.34,8.83,1.66,2.22
+epl,2024,epl_2024_358_tottenham_crystal_palace,11/05/2025,Tottenham,Crystal Palace,0,2,0,1,8,23,1,10,4,8,12,10,1,1,0,0,2.65,3.68,2.5,1.53,2.46
+epl,2024,epl_2024_359_liverpool_arsenal,11/05/2025,Liverpool,Arsenal,2,2,2,0,14,15,5,7,3,1,13,10,1,1,0,1,2.06,3.54,3.57,1.71,2.14
+epl,2024,epl_2024_360_aston_villa_tottenham,16/05/2025,Aston Villa,Tottenham,2,0,0,0,18,3,7,1,9,1,5,12,1,2,0,0,1.32,5.95,8.45,1.37,3.06
+epl,2024,epl_2024_361_chelsea_man_united,16/05/2025,Chelsea,Man United,1,0,0,0,11,4,3,1,7,2,10,14,1,6,0,0,1.46,4.9,6.51,1.49,2.6
+epl,2024,epl_2024_362_everton_southampton,18/05/2025,Everton,Southampton,2,0,2,0,13,6,5,2,4,5,6,10,1,1,0,0,1.4,4.79,7.93,1.79,2.04
+epl,2024,epl_2024_363_west_ham_nott'm_forest,18/05/2025,West Ham,Nott'm Forest,1,2,0,1,16,10,5,5,8,7,14,7,6,3,0,0,2.8,3.4,2.53,1.94,1.89
+epl,2024,epl_2024_364_brentford_fulham,18/05/2025,Brentford,Fulham,2,3,2,1,11,16,6,7,5,3,12,8,4,4,0,0,1.93,3.9,3.64,1.61,2.32
+epl,2024,epl_2024_365_leicester_ipswich,18/05/2025,Leicester,Ipswich,2,0,1,0,9,20,3,2,2,2,15,12,1,0,0,0,2.33,3.59,2.94,1.74,2.11
+epl,2024,epl_2024_366_arsenal_newcastle,18/05/2025,Arsenal,Newcastle,1,0,0,0,12,14,4,5,10,7,9,9,3,3,0,0,2.01,3.59,3.7,1.77,2.06
+epl,2024,epl_2024_367_brighton_liverpool,19/05/2025,Brighton,Liverpool,3,2,1,2,25,18,12,5,3,3,9,8,1,0,0,0,2.63,3.82,2.46,1.45,2.7
+epl,2024,epl_2024_368_crystal_palace_wolves,20/05/2025,Crystal Palace,Wolves,4,2,2,1,14,12,10,3,0,10,14,8,1,2,0,0,2.27,3.32,3.26,1.99,1.83
+epl,2024,epl_2024_369_man_city_bournemouth,20/05/2025,Man City,Bournemouth,3,1,2,0,12,8,5,2,3,1,7,13,1,3,1,1,1.55,4.51,5.49,1.51,2.52
+epl,2024,epl_2024_370_bournemouth_leicester,25/05/2025,Bournemouth,Leicester,2,0,0,0,20,3,7,0,6,1,19,16,0,2,0,0,1.33,5.61,8.35,1.46,2.67
+epl,2024,epl_2024_371_fulham_man_city,25/05/2025,Fulham,Man City,0,2,0,1,13,20,3,5,1,6,11,5,0,0,0,0,5.15,4.28,1.61,1.51,2.52
+epl,2024,epl_2024_372_ipswich_west_ham,25/05/2025,Ipswich,West Ham,1,3,0,1,14,10,4,6,4,0,10,9,1,1,0,0,2.99,3.85,2.21,1.5,2.57
+epl,2024,epl_2024_373_liverpool_crystal_palace,25/05/2025,Liverpool,Crystal Palace,1,1,0,1,14,8,3,5,11,0,7,10,1,0,1,0,1.4,5.65,6.27,1.3,3.43
+epl,2024,epl_2024_374_man_united_aston_villa,25/05/2025,Man United,Aston Villa,2,0,0,0,25,6,10,1,4,3,10,10,2,2,0,1,4.37,4.16,1.73,1.6,2.35
+epl,2024,epl_2024_375_newcastle_everton,25/05/2025,Newcastle,Everton,0,1,0,0,17,14,6,6,12,3,12,9,1,4,0,0,1.32,5.6,8.77,1.5,2.55
+epl,2024,epl_2024_376_nott'm_forest_chelsea,25/05/2025,Nott'm Forest,Chelsea,0,1,0,0,10,6,2,2,7,4,10,11,2,2,0,0,3.09,3.72,2.2,1.67,2.21
+epl,2024,epl_2024_377_southampton_arsenal,25/05/2025,Southampton,Arsenal,1,2,0,1,7,23,2,8,5,8,7,8,0,0,0,0,9.45,5.83,1.29,1.47,2.64
+epl,2024,epl_2024_378_tottenham_brighton,25/05/2025,Tottenham,Brighton,1,4,1,0,4,23,2,8,2,11,13,8,3,1,0,0,4.23,4.43,1.71,1.32,3.34
+epl,2024,epl_2024_379_wolves_brentford,25/05/2025,Wolves,Brentford,1,1,0,1,18,13,6,7,8,3,7,9,2,1,0,0,2.71,3.76,2.43,1.5,2.55

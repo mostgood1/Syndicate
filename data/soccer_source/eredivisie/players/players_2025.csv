@@ -1,0 +1,460 @@
+league,player_id,player_name,team,position,is_goalkeeper,appearances,starts,minutes_played,shots_per90,xg_per90,xa_per90,shot_on_target_rate,expected_minutes_share,source
+eredivisie,155965,Mattijs Branderhorst,Fortuna Sittard,Goalkeeper,True,24,24,2160.0,0.0,0.0,0.0,,0.7059,espn_true_per90
+eredivisie,346817,Justin Hubner,Fortuna Sittard,Center Left Defender,False,25,15,1492.9,0.7234,0.1206,0.0603,0.3333,0.4879,espn_true_per90
+eredivisie,277375,Shawn Adewoye,Fortuna Sittard,Center Right Defender,False,28,24,2019.2,0.1783,0.0,0.0,0.5,0.6599,espn_true_per90
+eredivisie,305616,Jasper Dahlhaus,Fortuna Sittard,Left Back,False,26,25,2115.8,0.553,0.0,0.0425,0.2308,0.6915,espn_true_per90
+eredivisie,132666,Ivo Pinto,Fortuna Sittard,Right Back,False,28,24,2043.0,0.1762,0.0,0.2203,0.0,0.6677,espn_true_per90
+eredivisie,324486,Philip Brittijn,Fortuna Sittard,Attacking Midfielder,False,32,28,2405.7,0.5986,0.1496,0.0374,0.375,0.7862,espn_true_per90
+eredivisie,304738,Edouard Michut,Fortuna Sittard,Left Midfielder,False,20,17,1594.2,0.9597,0.0,0.0,0.1176,0.521,espn_true_per90
+eredivisie,345794,Ryan Fosso,Fortuna Sittard,Right Midfielder,False,17,17,1512.4,0.6546,0.0,0.0595,0.0909,0.4942,espn_true_per90
+eredivisie,156838,Paul Gladon,Fortuna Sittard,Forward,False,31,5,975.4,2.9527,0.4614,0.0923,0.3438,0.3187,espn_true_per90
+eredivisie,196353,Kristoffer Peterson,Fortuna Sittard,Attacking Midfielder Left,False,34,20,1688.1,2.6125,0.1599,0.1066,0.3061,0.5517,espn_true_per90
+eredivisie,223161,Dimitrios Limnios,Fortuna Sittard,Attacking Midfielder Right,False,34,28,2172.0,1.0359,0.0829,0.2486,0.44,0.7098,espn_true_per90
+eredivisie,250659,Iván Márquez,Fortuna Sittard,Substitute,False,32,28,2501.1,0.4678,0.036,0.0,0.2308,0.8174,espn_true_per90
+eredivisie,387950,Luka Tunjic,Fortuna Sittard,Substitute,False,16,3,384.6,2.1059,0.468,0.0,0.2222,0.1257,espn_true_per90
+eredivisie,384518,Tristan Schenkhuizen,Fortuna Sittard,Substitute,False,4,1,101.9,0.883,0.0,0.0,0.0,0.0333,espn_true_per90
+eredivisie,322717,Makan Aiko,Fortuna Sittard,Substitute,False,13,3,458.3,2.3565,0.3927,0.3927,0.25,0.1498,espn_true_per90
+eredivisie,255740,Jari De Busser,Go Ahead Eagles,Goalkeeper,True,34,34,3060.0,0.0,0.0,0.0,,1.0,espn_true_per90
+eredivisie,218424,Joris Kramer,Go Ahead Eagles,Center Left Defender,False,34,34,3015.0,0.4776,0.0299,0.0896,0.3125,0.9853,espn_true_per90
+eredivisie,153764,Gerrit Nauber,Go Ahead Eagles,Center Right Defender,False,9,9,798.8,0.7887,0.2253,0.0,0.5714,0.2611,espn_true_per90
+eredivisie,304868,Dean James,Go Ahead Eagles,Left Back,False,26,18,1619.5,0.389,0.0556,0.0556,0.5714,0.5292,espn_true_per90
+eredivisie,218529,Mats Deijl,Feyenoord Rotterdam,Right Back,False,33,32,2811.0,0.5443,0.032,0.1601,0.5882,0.9186,espn_true_per90
+eredivisie,313972,Victor Edvardsen,Go Ahead Eagles,Attacking Midfielder,False,26,22,1996.1,1.4428,0.1804,0.3156,0.4062,0.6523,espn_true_per90
+eredivisie,272716,Evert Linthorst,Go Ahead Eagles,Left Midfielder,False,29,16,1485.9,0.4846,0.0606,0.1211,0.5,0.4856,espn_true_per90
+eredivisie,307375,Calvin Twigt,Go Ahead Eagles,Right Midfielder,False,12,6,530.8,0.3391,0.0,0.0,0.5,0.1735,espn_true_per90
+eredivisie,338861,Milan Smit,Go Ahead Eagles,Forward,False,19,14,1362.2,1.7178,0.3964,0.1321,0.5,0.4452,espn_true_per90
+eredivisie,308091,Mathis Suray,Go Ahead Eagles,Attacking Midfielder Left,False,32,32,2595.7,2.1844,0.4161,0.0693,0.4921,0.8483,espn_true_per90
+eredivisie,285014,Richonell Margaret,Go Ahead Eagles,Attacking Midfielder Right,False,22,13,1028.0,1.4008,0.0875,0.1751,0.25,0.336,espn_true_per90
+eredivisie,312142,Julius Dirksen,Go Ahead Eagles,Substitute,False,18,14,1161.2,0.3875,0.155,0.0,0.4,0.3795,espn_true_per90
+eredivisie,258453,Melle Meulensteen,Go Ahead Eagles,Substitute,False,34,33,2828.9,1.3044,0.1909,0.0318,0.4634,0.9245,espn_true_per90
+eredivisie,406247,Yassir Rahmouni,Go Ahead Eagles,Substitute,False,20,7,779.9,0.3462,0.0,0.0,0.0,0.2549,espn_true_per90
+eredivisie,286808,Oscar Pettersson,Go Ahead Eagles,Substitute,False,5,1,157.5,2.2857,0.0,0.5714,0.5,0.0515,espn_true_per90
+eredivisie,195502,Finn Stokkers,Go Ahead Eagles,Substitute,False,19,0,276.3,4.2341,0.3257,0.0,0.1538,0.0903,espn_true_per90
+eredivisie,292223,Gonzalo Crettaz,NEC Nijmegen,Goalkeeper,True,31,31,2790.0,0.0,0.0,0.0,,0.9118,espn_true_per90
+eredivisie,239999,Philippe Sandler,NEC Nijmegen,Center Defender,False,25,23,1869.3,0.337,0.0481,0.1444,0.5714,0.6109,espn_true_per90
+eredivisie,217381,Calvin Verdonk,NEC Nijmegen,Center Left Defender,False,4,4,360.0,0.5,0.0,0.25,0.0,0.1176,espn_true_per90
+eredivisie,332960,Brayann Pereira,NEC Nijmegen,Center Right Defender,False,24,13,1165.2,0.4635,0.0,0.0772,0.1667,0.3808,espn_true_per90
+eredivisie,296510,Dirk Proper,NEC Nijmegen,Center Left Midfielder,False,22,8,1042.9,0.863,0.2589,0.0,0.4,0.3408,espn_true_per90
+eredivisie,341715,Kodai Sano,NEC Nijmegen,Center Right Midfielder,False,34,34,3060.0,1.0,0.0882,0.2059,0.2647,1.0,espn_true_per90
+eredivisie,337855,Basar Önal,NEC Nijmegen,Left Midfielder,False,29,25,2064.5,2.0925,0.3052,0.3052,0.4167,0.6747,espn_true_per90
+eredivisie,346896,Sami Ouaissa,NEC Nijmegen,Right Midfielder,False,32,32,2638.4,2.115,0.2047,0.2047,0.3548,0.8622,espn_true_per90
+eredivisie,238016,Koki Ogawa,NEC Nijmegen,Forward,False,26,17,1267.3,3.0539,0.5682,0.2131,0.4186,0.4141,espn_true_per90
+eredivisie,122954,Bryan Linssen,NEC Nijmegen,Center Left Forward,False,32,31,2239.1,2.8136,0.4421,0.2814,0.4571,0.7317,espn_true_per90
+eredivisie,116893,Tjaronn Chery,NEC Nijmegen,Center Right Forward,False,33,33,2754.3,3.4963,0.3268,0.1961,0.4206,0.9001,espn_true_per90
+eredivisie,200194,Vito van Crooij,Sparta Rotterdam,Substitute,False,18,11,1000.8,1.5287,0.0899,0.0899,0.4118,0.3271,espn_true_per90
+eredivisie,156836,Virgil Misidjan,NEC Nijmegen,Substitute,False,17,4,538.7,1.8377,0.1671,0.3341,0.3636,0.1761,espn_true_per90
+eredivisie,282682,Roberto González,NEC Nijmegen,Substitute,False,3,1,82.9,1.086,0.0,0.0,0.0,0.0271,espn_true_per90
+eredivisie,281525,Youssef El Kachati,NEC Nijmegen,Substitute,False,19,1,507.1,3.9043,0.5324,0.3549,0.3636,0.1657,espn_true_per90
+eredivisie,196688,Stijn van Gassel,Excelsior,Goalkeeper,True,32,32,2819.6,0.0,0.0,0.0319,,0.9214,espn_true_per90
+eredivisie,324740,Stan Hendrikx,Excelsior,Center Left Defender,False,10,5,528.1,0.6817,0.0,0.0,0.75,0.1726,espn_true_per90
+eredivisie,303840,Casper Widell,Excelsior,Center Right Defender,False,34,34,3053.8,0.5305,0.0295,0.0295,0.2222,0.998,espn_true_per90
+eredivisie,266190,Arthur Zagre,Excelsior,Left Back,False,30,27,2384.3,0.9814,0.151,0.0755,0.3462,0.7792,espn_true_per90
+eredivisie,265723,Ilias Bronkhorst,Excelsior,Right Back,False,33,26,2349.5,0.498,0.0766,0.0,0.3077,0.7678,espn_true_per90
+eredivisie,321341,Noah Naujoks,Excelsior,Attacking Midfielder,False,31,29,2326.5,2.4759,0.3869,0.0387,0.375,0.7603,espn_true_per90
+eredivisie,389278,Stjin Middendorp,Excelsior,Left Midfielder,False,6,2,197.8,0.4551,0.0,0.0,0.0,0.0646,espn_true_per90
+eredivisie,313971,Adam Carlén,Excelsior,Right Midfielder,False,25,12,1224.0,0.5883,0.0,0.0735,0.125,0.4,espn_true_per90
+eredivisie,157478,Mike van Duinen,Excelsior,Forward,False,28,5,713.8,2.2695,0.1261,0.2522,0.2222,0.2333,espn_true_per90
+eredivisie,332656,Gyan De Regt,Excelsior,Attacking Midfielder Left,False,34,31,2657.1,1.3887,0.1016,0.2371,0.3902,0.8683,espn_true_per90
+eredivisie,304484,Sanches Fernandes,Excelsior,Attacking Midfielder Right,False,33,30,2491.5,2.1674,0.2167,0.1084,0.3333,0.8142,espn_true_per90
+eredivisie,326258,Zach Booth,Excelsior,Substitute,False,3,1,105.4,0.8541,0.0,0.0,1.0,0.0344,espn_true_per90
+eredivisie,371574,Yoon Do-Yong,Excelsior,Substitute,False,6,0,100.8,4.4625,0.8925,0.0,0.4,0.033,espn_true_per90
+eredivisie,305597,Rick Meissen,Excelsior,Substitute,False,33,28,2511.9,0.43,0.0,0.1075,0.4167,0.8209,espn_true_per90
+eredivisie,388592,Jerolldino Bergraaf,Excelsior,Substitute,False,24,10,1048.6,1.6308,0.0,0.0,0.1579,0.3427,espn_true_per90
+eredivisie,182424,Timon Wellenreuther,Feyenoord Rotterdam,Goalkeeper,True,33,33,2970.0,0.0,0.0,0.0,,0.9706,espn_true_per90
+eredivisie,276279,Tsuyoshi Watanabe,Feyenoord Rotterdam,Center Left Defender,False,30,30,2636.5,0.7851,0.0683,0.0,0.4348,0.8616,espn_true_per90
+eredivisie,245857,Anel Ahmedhodzic,Feyenoord Rotterdam,Center Right Defender,False,26,26,2208.8,0.6112,0.0,0.0407,0.0667,0.7218,espn_true_per90
+eredivisie,238878,Jordan Lotomba,Feyenoord Rotterdam,Left Back,False,20,8,921.4,0.3907,0.0,0.0977,0.5,0.3011,espn_true_per90
+eredivisie,337084,Givairo Read,Feyenoord Rotterdam,Right Back,False,16,11,938.9,1.5337,0.0959,0.2876,0.1875,0.3068,espn_true_per90
+eredivisie,277106,Sem Steijn,Feyenoord Rotterdam,Attacking Midfielder,False,21,12,1105.0,3.0949,0.5701,0.1629,0.4474,0.3611,espn_true_per90
+eredivisie,319296,Luciano Valente,Feyenoord Rotterdam,Left Midfielder,False,32,30,2548.7,1.4478,0.0706,0.2472,0.3415,0.8329,espn_true_per90
+eredivisie,313354,Oussama Targhaline,Feyenoord Rotterdam,Right Midfielder,False,25,21,1908.8,0.4244,0.0943,0.1886,0.3333,0.6238,espn_true_per90
+eredivisie,274277,Ayase Ueda,Feyenoord Rotterdam,Forward,False,31,31,2527.1,3.6326,0.8904,0.0356,0.451,0.8258,espn_true_per90
+eredivisie,402344,Gaoussou Diarra,Feyenoord Rotterdam,Attacking Midfielder Left,False,6,2,206.0,3.0581,0.0,0.0,0.4286,0.0673,espn_true_per90
+eredivisie,341711,Anis Hadj Moussa,Feyenoord Rotterdam,Attacking Midfielder Right,False,30,30,2549.4,2.7183,0.3883,0.2118,0.4156,0.8331,espn_true_per90
+eredivisie,215172,Bart Nieuwkoop,Feyenoord Rotterdam,Substitute,False,17,5,545.3,0.8252,0.165,0.0,0.4,0.1782,espn_true_per90
+eredivisie,282230,Quinten Timber,Feyenoord Rotterdam,Substitute,False,17,14,1318.6,1.5698,0.1365,0.273,0.3478,0.4309,espn_true_per90
+eredivisie,355487,Leo Sauer,Feyenoord Rotterdam,Substitute,False,20,17,1416.8,2.0962,0.1906,0.127,0.4242,0.463,espn_true_per90
+eredivisie,306664,Casper Tengstedt,Feyenoord Rotterdam,Substitute,False,18,2,397.1,4.9861,0.6799,0.0,0.4091,0.1298,espn_true_per90
+eredivisie,328541,Jordan Bos,Feyenoord Rotterdam,Substitute,False,28,24,2055.4,1.6639,0.1751,0.3065,0.3684,0.6717,espn_true_per90
+eredivisie,275751,Daniel Bielica,NAC Breda,Goalkeeper,True,33,33,2970.0,0.0,0.0,0.0,,0.9706,espn_true_per90
+eredivisie,159244,Terence Kongolo,NAC Breda,Center Left Defender,False,5,1,182.0,0.0,0.0,0.0,,0.0595,espn_true_per90
+eredivisie,222274,Enes Mahmutovic,NAC Breda,Center Right Defender,False,15,7,735.1,1.2244,0.0,0.0,0.1,0.2402,espn_true_per90
+eredivisie,258967,Boy Kemper,NAC Breda,Left Back,False,32,32,2819.2,0.9577,0.1596,0.0958,0.4333,0.9213,espn_true_per90
+eredivisie,379184,Cherrion Valerius,NAC Breda,Right Back,False,28,20,1833.3,0.8346,0.0,0.0982,0.1176,0.5991,espn_true_per90
+eredivisie,272358,Kamal Sowah,NAC Breda,Attacking Midfielder,False,33,32,2786.0,1.163,0.0323,0.0323,0.25,0.9104,espn_true_per90
+eredivisie,312264,Maximilien Balard,NAC Breda,Left Midfielder,False,32,32,2730.4,0.5274,0.0,0.033,0.0625,0.8923,espn_true_per90
+eredivisie,268194,Boyd Lucassen,NAC Breda,Right Midfielder,False,20,13,1106.6,0.4066,0.0813,0.0,0.4,0.3617,espn_true_per90
+eredivisie,276819,Sydney van Hooijdonk,NAC Breda,Forward,False,18,15,1196.4,2.7834,0.3761,0.0,0.2703,0.391,espn_true_per90
+eredivisie,310137,Mohamed Nassoh,NAC Breda,Attacking Midfielder Left,False,28,20,1825.0,2.1205,0.2466,0.0493,0.3488,0.5964,espn_true_per90
+eredivisie,370623,Juho Talvitie,NAC Breda,Attacking Midfielder Right,False,27,15,1395.0,1.871,0.1935,0.129,0.3793,0.4559,espn_true_per90
+eredivisie,190996,Clint Leemans,NAC Breda,Substitute,False,31,15,1360.4,1.6539,0.0662,0.0,0.36,0.4446,espn_true_per90
+eredivisie,408772,Pepijn Reulen,NAC Breda,Substitute,False,16,2,308.1,1.7526,0.2921,0.0,0.5,0.1007,espn_true_per90
+eredivisie,379226,Raul Paula,NAC Breda,Substitute,False,21,7,708.1,2.9233,0.2542,0.2542,0.2609,0.2314,espn_true_per90
+eredivisie,345176,Dion Versluis,NAC Breda,Substitute,False,6,0,21.2,4.2533,0.0,0.0,0.0,0.0069,espn_true_per90
+eredivisie,190983,Andries Noppert,Heerenveen,Goalkeeper,True,4,4,360.0,0.0,0.0,0.0,,0.1143,espn_true_per90
+eredivisie,333779,Nikolai Hopland,Heerenveen,Center Left Defender,False,18,5,529.7,0.3398,0.1699,0.0,0.5,0.1682,espn_true_per90
+eredivisie,241526,Sam Kersten,Heerenveen,Center Right Defender,False,32,28,2442.0,0.3686,0.0369,0.0,0.3,0.7752,espn_true_per90
+eredivisie,323268,Hristiyan Petrov,Heerenveen,Left Back,False,21,3,513.1,0.3508,0.0,0.0,0.0,0.1629,espn_true_per90
+eredivisie,290209,Vasilios Zagaritis,Heerenveen,Right Back,False,35,34,2898.7,0.6831,0.0621,0.0931,0.2727,0.9202,espn_true_per90
+eredivisie,218528,Luuk Brouwers,Heerenveen,Left Midfielder,False,31,21,1955.5,1.6109,0.2301,0.1841,0.3143,0.6208,espn_true_per90
+eredivisie,159252,Joris van Overeem,Heerenveen,Right Midfielder,False,34,34,3021.7,0.4468,0.0596,0.2978,0.2667,0.9593,espn_true_per90
+eredivisie,253396,Dylan Vente,Heerenveen,Forward,False,31,24,2215.2,2.7627,0.325,0.1219,0.3971,0.7032,espn_true_per90
+eredivisie,301323,Maxence Rivera,Heerenveen,Attacking Midfielder Left,False,30,24,2054.4,3.1105,0.1752,0.1752,0.3944,0.6522,espn_true_per90
+eredivisie,308051,Jacob Trenskow,Heerenveen,Attacking Midfielder Right,False,34,33,2761.0,2.8685,0.4238,0.163,0.4545,0.8765,espn_true_per90
+eredivisie,326597,Václav Sejk,Heerenveen,Substitute,False,17,3,464.3,2.7139,0.5816,0.1939,0.4286,0.1474,espn_true_per90
+eredivisie,395480,Eser Gürbüz,Heerenveen,Substitute,False,16,1,300.4,3.5956,0.2996,0.0,0.5,0.0954,espn_true_per90
+eredivisie,378834,Marcus Linday,Heerenveen,Substitute,False,33,28,2383.5,0.6797,0.0378,0.0755,0.1111,0.7567,espn_true_per90
+eredivisie,324582,Kayne Van Oevelen,FC Volendam,Goalkeeper,True,32,32,2850.6,0.0316,0.0,0.0,0.0,0.9316,espn_true_per90
+eredivisie,144339,Mawouna Amevor,FC Volendam,Center Left Defender,False,32,32,2758.0,0.3916,0.0326,0.0326,0.1667,0.9013,espn_true_per90
+eredivisie,283026,Xavier Mbuyamba,FC Volendam,Center Right Defender,False,16,6,745.0,1.2081,0.1208,0.0,0.3,0.2435,espn_true_per90
+eredivisie,297297,Yannick Leliendal,FC Volendam,Left Back,False,32,31,2743.7,0.8201,0.0328,0.0328,0.32,0.8966,espn_true_per90
+eredivisie,306449,Deron Payne,FC Volendam,Right Back,False,15,11,930.8,0.2901,0.0,0.0,0.0,0.3042,espn_true_per90
+eredivisie,164393,Robert Mühren,FC Volendam,Attacking Midfielder,False,31,5,845.8,2.3409,0.6384,0.1064,0.5455,0.2764,espn_true_per90
+eredivisie,312141,Gibson Yah,FC Volendam,Left Midfielder,False,24,20,1658.2,0.597,0.0,0.1628,0.3636,0.5419,espn_true_per90
+eredivisie,240909,Alex Plat,FC Volendam,Right Midfielder,False,17,6,589.4,0.4581,0.0,0.0,0.3333,0.1926,espn_true_per90
+eredivisie,184150,Henk Veerman,FC Volendam,Forward,False,24,20,1693.7,2.338,0.2125,0.0531,0.3182,0.5535,espn_true_per90
+eredivisie,260446,Ozan Kökcü,FC Volendam,Attacking Midfielder Left,False,28,18,1575.6,1.0853,0.0571,0.1142,0.1579,0.5149,espn_true_per90
+eredivisie,312109,Aurelio Oehlers,FC Volendam,Attacking Midfielder Right,False,33,18,1537.7,1.0535,0.2341,0.0585,0.5556,0.5025,espn_true_per90
+eredivisie,177058,Brandley Kuwas,FC Volendam,Substitute,False,32,23,2019.7,1.7825,0.2228,0.1782,0.35,0.66,espn_true_per90
+eredivisie,125279,Aaron Meijers,FC Volendam,Substitute,False,12,5,498.6,0.5415,0.0,0.0,0.3333,0.163,espn_true_per90
+eredivisie,365390,Nordin Bukala,FC Volendam,Substitute,False,25,21,1747.6,0.618,0.103,0.0515,0.4167,0.5711,espn_true_per90
+eredivisie,408739,Robin Van Cruijsen,FC Volendam,Substitute,False,24,16,1351.9,1.0651,0.2663,0.1997,0.5625,0.4418,espn_true_per90
+eredivisie,277313,Matej Kovár,PSV Eindhoven,Goalkeeper,True,31,31,2790.0,0.0,0.0,0.0,,0.9118,espn_true_per90
+eredivisie,364814,Yarek Gasiorowski,PSV Eindhoven,Center Left Defender,False,28,25,2144.4,0.5456,0.1259,0.0839,0.6154,0.7008,espn_true_per90
+eredivisie,304478,Ryan Flamingo,PSV Eindhoven,Center Right Defender,False,33,15,1664.6,0.9732,0.1622,0.0541,0.3333,0.544,espn_true_per90
+eredivisie,259136,Mauro Júnior,PSV Eindhoven,Left Back,False,26,24,2083.7,0.9503,0.0432,0.3887,0.3636,0.6809,espn_true_per90
+eredivisie,266291,Sergiño Dest,PSV Eindhoven,Right Back,False,27,26,2202.4,0.5721,0.0409,0.2043,0.3571,0.7197,espn_true_per90
+eredivisie,239998,Jerdy Schouten,PSV Eindhoven,Center Midfielder,False,28,28,2377.3,0.7193,0.0379,0.0757,0.3158,0.7769,espn_true_per90
+eredivisie,240912,Joey Veerman,PSV Eindhoven,Left Midfielder,False,30,27,2367.7,1.2924,0.3041,0.5322,0.4118,0.7738,espn_true_per90
+eredivisie,304572,Ismael Saibari,PSV Eindhoven,Right Midfielder,False,27,26,2140.8,3.8256,0.6306,0.3363,0.4066,0.6996,espn_true_per90
+eredivisie,340252,Ruben Van Bommel,PSV Eindhoven,Left Forward,False,6,6,379.0,1.8997,0.7124,0.0,0.75,0.1239,espn_true_per90
+eredivisie,103485,Ivan Perisic,PSV Eindhoven,Right Forward,False,30,27,2212.1,2.197,0.2848,0.4882,0.3519,0.7229,espn_true_per90
+eredivisie,355957,Tygo Land,FC Groningen,Substitute,False,30,17,1604.7,0.673,0.1683,0.0561,0.4167,0.5094,espn_true_per90
+eredivisie,304592,Couhaib Driouech,PSV Eindhoven,Substitute,False,29,5,953.9,3.4911,0.3774,0.5661,0.3514,0.3117,espn_true_per90
+eredivisie,240965,Guus Til,PSV Eindhoven,Substitute,False,29,25,2243.4,2.4472,0.5617,0.1605,0.4426,0.7331,espn_true_per90
+eredivisie,301279,Kiliann Sildillia,PSV Eindhoven,Substitute,False,21,13,1266.0,1.0663,0.1422,0.2133,0.3333,0.4137,espn_true_per90
+eredivisie,325410,Esmir Bajraktarevic,PSV Eindhoven,Substitute,False,28,8,1067.3,3.0356,0.3373,0.3373,0.3889,0.3488,espn_true_per90
+eredivisie,207780,Joel Drommel,Sparta Rotterdam,Goalkeeper,True,34,34,3060.0,0.0294,0.0,0.0,0.0,1.0,espn_true_per90
+eredivisie,149301,Bruno Martins Indi,Sparta Rotterdam,Center Left Defender,False,27,26,2208.5,0.3668,0.0408,0.0,0.6667,0.7217,espn_true_per90
+eredivisie,388712,Marvin Young,Sparta Rotterdam,Center Right Defender,False,33,33,2970.0,0.303,0.0,0.0303,0.1,0.9706,espn_true_per90
+eredivisie,138746,Patrick van Aanholt,Sparta Rotterdam,Left Back,False,13,8,680.6,1.3224,0.1322,0.3967,0.3,0.2224,espn_true_per90
+eredivisie,262736,Saïd Bakari,Sparta Rotterdam,Right Back,False,13,4,398.6,0.0,0.0,0.0,,0.1303,espn_true_per90
+eredivisie,268460,Joshua Kitolano,Sparta Rotterdam,Center Left Midfielder,False,32,30,2628.8,0.9586,0.1712,0.0685,0.3929,0.8591,espn_true_per90
+eredivisie,142517,Jens Toornstra,Sparta Rotterdam,Center Right Midfielder,False,17,9,792.0,1.25,0.0,0.0,0.1818,0.2588,espn_true_per90
+eredivisie,223138,Tobias Lauritsen,Sparta Rotterdam,Center Left Forward,False,34,34,3041.9,2.1598,0.355,0.1479,0.3699,0.9941,espn_true_per90
+eredivisie,297252,Shunsuke Mito,Sparta Rotterdam,Center Right Forward,False,25,23,1869.1,2.5039,0.3371,0.1445,0.3462,0.6108,espn_true_per90
+eredivisie,218947,Pelle Clement,Sparta Rotterdam,Attacking Midfielder Left,False,26,18,1605.7,0.7287,0.1121,0.1682,0.3846,0.5247,espn_true_per90
+eredivisie,342952,Sayfallah Ltaief,Sparta Rotterdam,Attacking Midfielder Right,False,9,7,508.3,2.3018,0.1771,0.0,0.2308,0.1661,espn_true_per90
+eredivisie,356979,Nökkvi Thórisson,Telstar,Substitute,False,17,7,450.5,3.1965,0.1998,0.1998,0.5,0.1472,espn_true_per90
+eredivisie,389354,Ayoub Oufkir,AZ Alkmaar,Substitute,False,24,7,920.1,2.9343,0.0978,0.1956,0.4333,0.3007,espn_true_per90
+eredivisie,300260,Teo Quintero,Sparta Rotterdam,Substitute,False,31,27,2468.5,1.0209,0.0365,0.0365,0.2143,0.8067,espn_true_per90
+eredivisie,330425,Tom De Graaff,PEC Zwolle,Goalkeeper,True,31,31,2790.0,0.0,0.0,0.0,,0.9118,espn_true_per90
+eredivisie,320920,Anselmo Garcia MacNulty,PEC Zwolle,Center Left Defender,False,32,32,2844.3,0.4746,0.0633,0.0,0.3333,0.9295,espn_true_per90
+eredivisie,271210,Simon Graves,PEC Zwolle,Center Right Defender,False,32,30,2681.1,0.3021,0.0,0.0671,0.1111,0.8762,espn_true_per90
+eredivisie,224786,Sherel Floranus,PEC Zwolle,Left Back,False,32,32,2798.5,0.2251,0.0322,0.0965,0.4286,0.9146,espn_true_per90
+eredivisie,333618,Olivier Aertssen,PEC Zwolle,Right Back,False,28,19,1859.4,0.4356,0.0,0.0968,0.1111,0.6077,espn_true_per90
+eredivisie,272329,Thijs Oosting,PEC Zwolle,Attacking Midfielder,False,34,34,2641.7,1.7716,0.2044,0.1022,0.4808,0.8633,espn_true_per90
+eredivisie,227441,Jamiro Monteiro,PEC Zwolle,Left Midfielder,False,21,17,1273.0,1.414,0.1414,0.2121,0.15,0.416,espn_true_per90
+eredivisie,156146,Ryan Thomas,PEC Zwolle,Right Midfielder,False,27,27,2151.1,0.5857,0.0418,0.0418,0.1429,0.703,espn_true_per90
+eredivisie,241527,Koen Kostons,PEC Zwolle,Forward,False,34,34,2884.5,1.9033,0.3432,0.1872,0.459,0.9427,espn_true_per90
+eredivisie,271345,Kaj de Rooij,PEC Zwolle,Attacking Midfielder Left,False,32,23,2027.1,1.2432,0.2664,0.222,0.3214,0.6624,espn_true_per90
+eredivisie,286854,Dylan Mbayo,PEC Zwolle,Attacking Midfielder Right,False,14,5,520.8,0.3456,0.0,0.1728,0.5,0.1702,espn_true_per90
+eredivisie,386853,Gabriel Reiziger,PEC Zwolle,Substitute,False,12,1,197.8,1.8204,0.4551,0.0,0.25,0.0646,espn_true_per90
+eredivisie,333760,Damian Van Der Haar,PEC Zwolle,Substitute,False,3,0,18.2,0.0,0.0,0.0,,0.0059,espn_true_per90
+eredivisie,365026,Nick Fichtinger,PEC Zwolle,Substitute,False,20,5,759.6,0.8294,0.0,0.1185,0.2857,0.2482,espn_true_per90
+eredivisie,270806,Thomas Buitink,PEC Zwolle,Substitute,False,8,0,122.3,1.4713,0.0,0.0,0.5,0.04,espn_true_per90
+eredivisie,148868,Lars Unnerstall,FC Twente,Goalkeeper,True,31,31,2790.0,0.0,0.0,0.0,,0.9118,espn_true_per90
+eredivisie,169050,Robin Pröpper,FC Twente,Center Left Defender,False,28,20,1717.9,1.2049,0.0,0.0,0.2174,0.5614,espn_true_per90
+eredivisie,340691,Stav Lemkin,FC Twente,Center Right Defender,False,25,23,2039.9,0.3088,0.0,0.0441,0.0,0.6666,espn_true_per90
+eredivisie,359744,Mats Rots,FC Twente,Left Back,False,34,34,2950.4,1.1286,0.122,0.122,0.3243,0.9642,espn_true_per90
+eredivisie,277855,Bart van Rooij,FC Twente,Right Back,False,33,33,2925.2,1.1076,0.0923,0.1231,0.25,0.956,espn_true_per90
+eredivisie,214666,Arno Verschueren,FC Twente,Attacking Midfielder,False,30,3,568.7,2.3739,0.0,0.3165,0.4667,0.1858,espn_true_per90
+eredivisie,277315,Thomas van den Belt,FC Twente,Left Midfielder,False,32,27,2186.2,2.3053,0.2058,0.0412,0.3214,0.7145,espn_true_per90
+eredivisie,290517,Ramiz Zerrouki,FC Twente,Right Midfielder,False,32,32,2660.1,1.1165,0.1015,0.0338,0.2424,0.8693,espn_true_per90
+eredivisie,124932,Ricky van Wolfswinkel,FC Twente,Forward,False,31,18,1731.1,2.2356,0.4159,0.0,0.4651,0.5657,espn_true_per90
+eredivisie,265872,Taylor Booth,FC Twente,Attacking Midfielder Left,False,10,4,363.5,2.2284,0.0,0.0,0.2222,0.1188,espn_true_per90
+eredivisie,231832,Mitchell van Bergen,Sparta Rotterdam,Attacking Midfielder Right,False,30,30,2394.9,2.4427,0.1127,0.1503,0.3231,0.7826,espn_true_per90
+eredivisie,304905,Daan Rots,FC Twente,Substitute,False,33,28,2365.6,2.511,0.3424,0.1522,0.4545,0.7731,espn_true_per90
+eredivisie,297298,Naci Ünüvar,Heracles Almelo,Substitute,False,18,9,838.9,1.8238,0.2146,0.1073,0.2941,0.2741,espn_true_per90
+eredivisie,379839,Lucas Vennegoor Of Hesselink,FC Twente,Substitute,False,5,0,61.6,8.7677,0.0,0.0,0.0,0.0201,espn_true_per90
+eredivisie,311168,Kristian Hlynsson,FC Twente,Substitute,False,33,31,2560.7,3.0929,0.3515,0.1406,0.4091,0.8368,espn_true_per90
+eredivisie,310724,Max Bruns,FC Twente,Substitute,False,13,8,798.5,0.3381,0.1127,0.0,0.3333,0.2609,espn_true_per90
+eredivisie,289840,Vitezslav Jaros,Ajax Amsterdam,Goalkeeper,True,19,19,1710.0,0.0,0.0,0.0,,0.5278,espn_true_per90
+eredivisie,305590,Youri Baas,Ajax Amsterdam,Center Left Defender,False,33,33,2944.2,0.4585,0.1223,0.0306,0.4667,0.9087,espn_true_per90
+eredivisie,384127,Aaron Bouwman,Ajax Amsterdam,Center Right Defender,False,10,8,733.7,0.8586,0.1227,0.0,0.5714,0.2265,espn_true_per90
+eredivisie,241392,Owen Wijndal,Ajax Amsterdam,Left Back,False,19,15,1354.5,0.6644,0.0664,0.0,0.5,0.4181,espn_true_per90
+eredivisie,297292,Youri Regeer,Ajax Amsterdam,Right Back,False,27,22,1806.5,0.5979,0.0,0.0996,0.1667,0.5575,espn_true_per90
+eredivisie,168993,Davy Klaassen,Ajax Amsterdam,Center Midfielder,False,31,23,1957.6,1.3332,0.3678,0.0919,0.4483,0.6042,espn_true_per90
+eredivisie,282228,Kenneth Taylor,Ajax Amsterdam,Left Midfielder,False,15,14,1279.0,1.8295,0.1407,0.2815,0.4231,0.3948,espn_true_per90
+eredivisie,149577,Steven Berghuis,Ajax Amsterdam,Right Midfielder,False,21,16,1283.6,3.1552,0.2805,0.1402,0.3778,0.3962,espn_true_per90
+eredivisie,177042,Wout Weghorst,Ajax Amsterdam,Forward,False,29,21,1864.3,2.6551,0.3862,0.1931,0.3455,0.5754,espn_true_per90
+eredivisie,303906,Raúl Moro,Ajax Amsterdam,Left Forward,False,14,7,562.7,1.4395,0.0,0.1599,0.5556,0.1737,espn_true_per90
+eredivisie,353363,Mika Godts,Ajax Amsterdam,Substitute,False,34,32,2861.7,2.7047,0.5346,0.4088,0.4884,0.8832,espn_true_per90
+eredivisie,333312,Anton Gaaei,Ajax Amsterdam,Substitute,False,28,21,1972.1,1.3691,0.0456,0.1826,0.3,0.6087,espn_true_per90
+eredivisie,381074,Jorthy Mokio,Ajax Amsterdam,Substitute,False,28,15,1468.2,1.2873,0.1839,0.1226,0.3333,0.4532,espn_true_per90
+eredivisie,325609,Oscar Gloukh,Ajax Amsterdam,Substitute,False,29,16,1559.5,2.8279,0.3463,0.3463,0.449,0.4813,espn_true_per90
+eredivisie,79505,Ronald Koeman,Telstar,Goalkeeper,True,33,33,2958.6,0.0304,0.0304,0.0,1.0,0.9669,espn_true_per90
+eredivisie,304595,Guus Offerhaus,Telstar,Center Defender,False,33,33,2970.0,0.5455,0.0303,0.0909,0.1667,0.9706,espn_true_per90
+eredivisie,181345,Danny Bakker,Telstar,Center Left Defender,False,30,29,2635.7,1.0585,0.1366,0.0683,0.2581,0.8613,espn_true_per90
+eredivisie,308107,Dewon Koswal,Telstar,Center Right Defender,False,25,18,1635.6,0.1651,0.0,0.0,0.0,0.5345,espn_true_per90
+eredivisie,332709,Nils Rossen,Telstar,Center Left Midfielder,False,28,26,2331.0,0.3475,0.1158,0.0386,0.4444,0.7618,espn_true_per90
+eredivisie,306461,Tyrone Owusu,Telstar,Center Right Midfielder,False,22,20,1581.5,1.3658,0.1138,0.0569,0.4167,0.5168,espn_true_per90
+eredivisie,200158,Jeff Hardeveld,Telstar,Left Midfielder,False,34,34,2977.6,0.8161,0.1814,0.2116,0.4815,0.9731,espn_true_per90
+eredivisie,359132,Tyrese Noslin,Telstar,Right Midfielder,False,34,26,2299.6,1.5263,0.0783,0.1174,0.4359,0.7515,espn_true_per90
+eredivisie,324585,Milan Zonneveld,Sparta Rotterdam,Forward,False,31,9,1083.3,3.4892,0.4985,0.1662,0.4762,0.354,espn_true_per90
+eredivisie,306445,Patrick Brouwer,Telstar,Center Left Forward,False,30,28,2290.0,2.0044,0.2751,0.2358,0.4314,0.7484,espn_true_per90
+eredivisie,372971,Soufiane Hetli,Telstar,Center Right Forward,False,31,19,1617.3,2.9493,0.1669,0.0556,0.2642,0.5285,espn_true_per90
+eredivisie,375488,Sebastiaan Hagedoorn,Telstar,Substitute,False,8,0,80.6,8.9374,0.0,0.0,0.75,0.0263,espn_true_per90
+eredivisie,122946,Dion Malone,Telstar,Substitute,False,11,0,199.2,0.0,0.0,0.0,,0.0651,espn_true_per90
+eredivisie,375939,Adil Lechkar,Telstar,Substitute,False,16,1,268.1,0.6714,0.0,0.6714,0.5,0.0876,espn_true_per90
+eredivisie,207421,Dylan Mertens,Telstar,Substitute,False,20,4,478.7,1.5041,0.0,0.0,0.125,0.1564,espn_true_per90
+eredivisie,281027,Nigel Ogidi Nwankwo,Telstar,Substitute,False,4,0,63.1,1.4252,0.0,0.0,0.0,0.0206,espn_true_per90
+eredivisie,130177,Jeroen Zoet,AZ Alkmaar,Goalkeeper,True,11,10,918.5,0.0,0.0,0.098,,0.3002,espn_true_per90
+eredivisie,306510,Alexandre Penetra,AZ Alkmaar,Center Left Defender,False,33,33,2845.1,0.5061,0.0633,0.0316,0.125,0.9298,espn_true_per90
+eredivisie,329972,Wouter Goes,AZ Alkmaar,Center Right Defender,False,33,32,2748.3,0.1965,0.0327,0.0,0.6667,0.8981,espn_true_per90
+eredivisie,261596,Mees De Wit,AZ Alkmaar,Left Back,False,31,29,2482.3,0.7251,0.1088,0.1813,0.55,0.8112,espn_true_per90
+eredivisie,299530,Denso Kasius,AZ Alkmaar,Right Back,False,17,13,1220.5,1.8435,0.1475,0.1475,0.32,0.3989,espn_true_per90
+eredivisie,287279,Sven Mijnans,AZ Alkmaar,Attacking Midfielder,False,30,27,2350.5,3.2163,0.4212,0.2297,0.4286,0.7681,espn_true_per90
+eredivisie,353365,Kees Smit,AZ Alkmaar,Left Midfielder,False,26,23,2135.7,1.6014,0.1264,0.1264,0.2632,0.6979,espn_true_per90
+eredivisie,150199,Jordy Clasie,AZ Alkmaar,Right Midfielder,False,12,10,813.5,0.8851,0.1106,0.1106,0.375,0.2658,espn_true_per90
+eredivisie,279790,Troy Parrott,AZ Alkmaar,Forward,False,28,25,2203.2,3.5948,0.6536,0.1634,0.4886,0.72,espn_true_per90
+eredivisie,338775,Ro-Zangelo Daal,AZ Alkmaar,Attacking Midfielder Left,False,24,18,1353.1,1.6629,0.0665,0.0,0.36,0.4422,espn_true_per90
+eredivisie,266593,Ibrahim Sadiq,AZ Alkmaar,Substitute,False,20,5,629.3,3.0035,0.286,0.0,0.4762,0.2056,espn_true_per90
+eredivisie,309651,Isak Jensen,AZ Alkmaar,Substitute,False,33,23,2040.1,1.544,0.0882,0.1765,0.2571,0.6667,espn_true_per90
+eredivisie,379193,Mateo Chávez,AZ Alkmaar,Substitute,False,20,9,826.6,1.6332,0.1089,0.2178,0.3333,0.2701,espn_true_per90
+eredivisie,332465,Mexx Meerdink,AZ Alkmaar,Substitute,False,19,9,882.7,3.6704,0.5098,0.102,0.3611,0.2885,espn_true_per90
+eredivisie,269610,Peer Koopmeiners,AZ Alkmaar,Substitute,False,29,24,2135.6,1.3064,0.0843,0.0,0.2903,0.6979,espn_true_per90
+eredivisie,191304,Hidde Jurjus,FC Groningen,Goalkeeper,True,7,5,547.1,0.0,0.0,0.0,,0.1737,espn_true_per90
+eredivisie,179181,Marvin Peersman,FC Groningen,Center Left Defender,False,34,34,2888.3,0.6544,0.0935,0.0312,0.2857,0.9169,espn_true_per90
+eredivisie,319298,Thijmen Blokzijl,FC Groningen,Center Right Defender,False,35,35,3136.1,0.3157,0.0287,0.0287,0.0909,0.9956,espn_true_per90
+eredivisie,371412,Wouter Prins,FC Groningen,Left Back,False,22,4,503.6,0.5361,0.0,0.3574,0.0,0.1599,espn_true_per90
+eredivisie,261212,Marco Rente,FC Groningen,Right Back,False,30,29,2361.2,0.7623,0.1143,0.1525,0.4,0.7496,espn_true_per90
+eredivisie,351290,Thom Van Bergen,FC Groningen,Attacking Midfielder,False,35,35,3003.0,3.0569,0.2697,0.1199,0.3627,0.9533,espn_true_per90
+eredivisie,310482,Stije Resink,FC Groningen,Left Midfielder,False,24,24,2088.8,2.3698,0.2154,0.2154,0.2182,0.6631,espn_true_per90
+eredivisie,319297,Tika De Jonge,FC Groningen,Right Midfielder,False,29,26,2134.2,1.3495,0.1265,0.0422,0.2812,0.6775,espn_true_per90
+eredivisie,289883,Brynjólfur Willumsson,FC Groningen,Forward,False,28,12,1269.7,3.0479,0.4253,0.0,0.4651,0.4031,espn_true_per90
+eredivisie,385716,David Van Der Werff,FC Groningen,Attacking Midfielder Left,False,35,27,2122.9,2.3741,0.1272,0.0848,0.4286,0.6739,espn_true_per90
+eredivisie,324583,Younes Taha,FC Groningen,Attacking Midfielder Right,False,33,33,2685.7,3.217,0.1676,0.3016,0.4062,0.8526,espn_true_per90
+eredivisie,352987,Jorg Schreuders,FC Groningen,Substitute,False,35,33,2917.8,1.1104,0.0308,0.0617,0.5,0.9263,espn_true_per90
+eredivisie,308228,Noam Emeran,FC Groningen,Substitute,False,4,0,34.3,2.6262,0.0,0.0,0.0,0.0109,espn_true_per90
+eredivisie,375666,Tyrique Mercera,FC Groningen,Substitute,False,22,7,858.8,0.3144,0.0,0.1048,0.0,0.2726,espn_true_per90
+eredivisie,223162,Vasilios Barkas,FC Utrecht,Goalkeeper,True,35,35,3105.0,0.0,0.0,0.0,,0.9583,espn_true_per90
+eredivisie,131354,Nick Viergever,FC Utrecht,Center Left Defender,False,27,17,1789.5,0.4526,0.0,0.0,0.1111,0.5523,espn_true_per90
+eredivisie,158143,Mike van der Hoorn,FC Utrecht,Center Right Defender,False,31,28,2381.9,0.5668,0.1134,0.0,0.4,0.7352,espn_true_per90
+eredivisie,291730,Souffian El Karouani,FC Utrecht,Left Back,False,34,34,3014.2,1.4929,0.0896,0.3583,0.36,0.9303,espn_true_per90
+eredivisie,240351,Siebe Horemans,FC Utrecht,Right Back,False,29,20,1840.8,0.6845,0.0,0.0489,0.2143,0.5681,espn_true_per90
+eredivisie,263618,Victor Jensen,FC Utrecht,Attacking Midfielder,False,8,7,538.9,2.3379,0.835,0.0,0.5714,0.1663,espn_true_per90
+eredivisie,365021,Gjivai Zechiël,FC Utrecht,Left Midfielder,False,36,34,2986.0,1.9893,0.2713,0.211,0.4091,0.9216,espn_true_per90
+eredivisie,321347,Alonzo Engwanda,FC Utrecht,Right Midfielder,False,35,35,2965.5,0.2731,0.0,0.0303,0.1111,0.9153,espn_true_per90
+eredivisie,251979,David Min,FC Utrecht,Forward,False,23,7,887.8,2.433,0.4055,0.1014,0.2917,0.274,espn_true_per90
+eredivisie,305670,Yoann Cathline,FC Utrecht,Attacking Midfielder Left,False,28,23,2078.4,2.8146,0.1299,0.1732,0.2923,0.6415,espn_true_per90
+eredivisie,340665,Adrian Blake,FC Utrecht,Attacking Midfielder Right,False,25,10,1004.2,3.5849,0.1792,0.1792,0.375,0.3099,espn_true_per90
+eredivisie,83494,Miguel Rodríguez,FC Utrecht,Substitute,False,24,15,1347.0,3.0068,0.2005,0.0,0.3333,0.4157,espn_true_per90
+eredivisie,303790,Can Bozdogan,FC Utrecht,Substitute,False,18,4,416.5,2.8093,0.2161,0.0,0.4615,0.1285,espn_true_per90
+eredivisie,277870,Derry John Murkin,FC Utrecht,Substitute,False,9,4,350.5,0.5135,0.5135,0.7702,1.0,0.1082,espn_true_per90
+eredivisie,250528,Dani de Wit,FC Utrecht,Substitute,False,29,26,2328.7,1.314,0.2705,0.1159,0.4412,0.7187,espn_true_per90
+eredivisie,255662,Fabian De Keijzer,Heracles Almelo,Goalkeeper,True,8,8,720.0,0.0,0.0,0.0,,0.2353,espn_true_per90
+eredivisie,289548,Ivan Mesik,Heracles Almelo,Center Left Defender,False,30,30,2630.8,0.821,0.0684,0.0,0.2917,0.8597,espn_true_per90
+eredivisie,193763,Damon Mirani,Heracles Almelo,Center Right Defender,False,33,33,2930.0,0.4608,0.0922,0.0,0.3333,0.9575,espn_true_per90
+eredivisie,283835,Djevencio van der Kust,Heracles Almelo,Left Back,False,21,13,1207.0,0.2237,0.0,0.1491,0.0,0.3944,espn_true_per90
+eredivisie,306063,Jannes Wieckhoff,Heracles Almelo,Right Back,False,19,9,846.6,0.4252,0.0,0.0,0.0,0.2767,espn_true_per90
+eredivisie,340557,Tristan Van Gilst,Heracles Almelo,Attacking Midfielder,False,28,13,1261.1,1.4273,0.1427,0.0,0.35,0.4121,espn_true_per90
+eredivisie,336728,Sem Scheperman,Heracles Almelo,Left Midfielder,False,16,13,1122.9,1.2824,0.0801,0.0801,0.4375,0.367,espn_true_per90
+eredivisie,286352,Jan Zamburek,Heracles Almelo,Right Midfielder,False,26,21,1730.0,0.4162,0.0,0.052,0.125,0.5654,espn_true_per90
+eredivisie,268688,Jizz Hornkamp,AZ Alkmaar,Forward,False,22,16,1342.3,2.8832,0.6705,0.0671,0.5581,0.4387,espn_true_per90
+eredivisie,205952,Mario Engels,Heracles Almelo,Attacking Midfielder Left,False,24,11,1003.6,1.6142,0.0897,0.1794,0.4444,0.328,espn_true_per90
+eredivisie,300981,Bryan Limbombe,Heracles Almelo,Attacking Midfielder Right,False,22,16,1305.9,1.3095,0.0689,0.2068,0.3684,0.4268,espn_true_per90
+eredivisie,388225,Luka Kulenovic,Heracles Almelo,Substitute,False,29,16,1627.4,2.6545,0.2765,0.1659,0.25,0.5318,espn_true_per90
+eredivisie,324183,Yvandro Borges Sanches,Heracles Almelo,Substitute,False,11,5,515.0,1.0486,0.3495,0.0,0.6667,0.1683,espn_true_per90
+eredivisie,152154,Thomas Bruns,Heracles Almelo,Substitute,False,27,12,1157.7,1.3216,0.0777,0.0,0.1765,0.3783,espn_true_per90
+eredivisie,408620,Jadiel Pereira Da Gama,PEC Zwolle,Substitute,False,10,1,194.1,0.4637,0.0,0.0,0.0,0.0634,espn_true_per90
+eredivisie,399246,Nolan Martens,Excelsior,Right Back,False,9,6,478.4,0.1881,0.0,0.1881,0.0,0.1563,espn_true_per90
+eredivisie,280061,Hwang In-Beom,Feyenoord Rotterdam,Right Midfielder,False,17,12,980.6,1.4686,0.0918,0.2754,0.3125,0.3204,espn_true_per90
+eredivisie,344195,Jaden Slory,Go Ahead Eagles,Substitute,False,19,9,838.8,1.2876,0.0,0.1073,0.1667,0.2741,espn_true_per90
+eredivisie,240911,Gijs Smal,Feyenoord Rotterdam,Substitute,False,17,10,875.4,1.131,0.0,0.2056,0.1818,0.2861,espn_true_per90
+eredivisie,150207,Mike te Wierik,Heracles Almelo,Substitute,False,22,16,1381.0,0.4562,0.0652,0.0,0.1429,0.4513,espn_true_per90
+eredivisie,323052,Mimeirhel Benita,Heracles Almelo,Substitute,False,25,15,1448.6,0.3728,0.0,0.0621,0.6667,0.4734,espn_true_per90
+eredivisie,227289,Ajdin Hrustic,Heracles Almelo,Substitute,False,27,25,2222.6,1.4578,0.0405,0.243,0.3333,0.7263,espn_true_per90
+eredivisie,362959,Kento Shiogai,NEC Nijmegen,Substitute,False,12,1,365.8,3.4445,1.7223,0.0,0.5714,0.1195,espn_true_per90
+eredivisie,164264,Mats Seuntjens,FC Groningen,Substitute,False,17,0,202.8,4.4387,0.4439,0.0,0.4,0.0644,espn_true_per90
+eredivisie,364727,Oliver Braude,Heerenveen,Right Back,False,33,33,2906.8,0.6502,0.0,0.1238,0.1905,0.9228,espn_true_per90
+eredivisie,303769,Jakob Breum,Go Ahead Eagles,Attacking Midfielder,False,28,24,2039.8,1.456,0.2647,0.2206,0.6061,0.6666,espn_true_per90
+eredivisie,347026,Aske Adelgaard,Go Ahead Eagles,Substitute,False,27,16,1562.7,0.5759,0.0576,0.1152,0.4,0.5107,espn_true_per90
+eredivisie,303498,Oskar Siira Sivertsen,Go Ahead Eagles,Substitute,False,14,2,339.9,1.8534,0.0,0.2648,0.5714,0.1111,espn_true_per90
+eredivisie,238033,Kou Itakura,Ajax Amsterdam,Center Right Defender,False,19,16,1347.7,0.4675,0.0668,0.0,0.4286,0.4159,espn_true_per90
+eredivisie,305589,Kian Fitz-Jim,Ajax Amsterdam,Substitute,False,17,4,520.3,2.2489,0.173,0.0,0.3077,0.1606,espn_true_per90
+eredivisie,351281,Lucas Rosa,Ajax Amsterdam,Substitute,False,29,26,2324.8,0.6581,0.0,0.0,0.3529,0.7175,espn_true_per90
+eredivisie,295861,Oliver Edvardsen,Ajax Amsterdam,Substitute,False,18,6,637.1,0.565,0.0,0.1413,0.25,0.1966,espn_true_per90
+eredivisie,293644,Mathias Kjølø,FC Twente,Left Midfielder,False,19,3,524.5,0.858,0.0,0.0,0.6,0.1714,espn_true_per90
+eredivisie,304485,Julian Baas,Sparta Rotterdam,Substitute,False,23,14,1300.4,1.1766,0.0,0.0,0.2941,0.425,espn_true_per90
+eredivisie,340232,Miliano Jonathans,Excelsior,Substitute,False,16,3,497.9,2.7111,0.3615,0.1807,0.3333,0.1627,espn_true_per90
+eredivisie,291665,Davy van den Berg,FC Utrecht,Substitute,False,5,2,140.7,0.6398,0.6398,0.0,1.0,0.0434,espn_true_per90
+eredivisie,352177,Emirhan Demircan,FC Utrecht,Substitute,False,6,0,93.8,2.8794,0.0,0.0,0.0,0.0289,espn_true_per90
+eredivisie,368324,Nick Verschuren,FC Volendam,Substitute,False,31,30,2673.6,0.404,0.0,0.0337,0.25,0.8737,espn_true_per90
+eredivisie,310292,Joel Ideho,FC Volendam,Substitute,False,25,10,1135.2,1.8235,0.0793,0.0793,0.3043,0.371,espn_true_per90
+eredivisie,332466,Rome-Jayden Owusu-Oduro,AZ Alkmaar,Goalkeeper,True,23,23,2051.4,0.0,0.0,0.0439,,0.6704,espn_true_per90
+eredivisie,306400,Zico Buurmeester,PEC Zwolle,Substitute,False,23,15,1533.6,0.8803,0.1174,0.0,0.4,0.5012,espn_true_per90
+eredivisie,284716,Rio Hillen,NAC Breda,Center Left Defender,False,26,24,2003.7,0.8534,0.0,0.0449,0.3158,0.6548,espn_true_per90
+eredivisie,122289,Lewis Holtby,NAC Breda,Left Midfielder,False,30,25,1934.6,1.3957,0.0465,0.2326,0.1667,0.6322,espn_true_per90
+eredivisie,251691,Justin Lonwijk,Fortuna Sittard,Forward,False,15,12,903.7,1.4939,0.3984,0.0,0.3333,0.2953,espn_true_per90
+eredivisie,238445,Houboulang Mendes,Fortuna Sittard,Substitute,False,6,0,89.4,1.0066,0.0,0.0,0.0,0.0292,espn_true_per90
+eredivisie,284701,Mohamed Ihattaren,Fortuna Sittard,Substitute,False,28,23,1937.3,3.2055,0.2787,0.4646,0.4928,0.6331,espn_true_per90
+eredivisie,301456,Shurandy Sambo,Sparta Rotterdam,Right Back,False,25,18,1625.2,0.3323,0.0,0.0554,0.1667,0.5311,espn_true_per90
+eredivisie,245805,Dennis Man,PSV Eindhoven,Right Forward,False,25,20,1491.7,2.534,0.4223,0.4223,0.3571,0.4875,espn_true_per90
+eredivisie,384374,Joel Van Den Berg,PSV Eindhoven,Substitute,False,5,1,139.6,1.2892,0.0,0.0,0.5,0.0456,espn_true_per90
+eredivisie,289120,Ricardo Pepi,PSV Eindhoven,Substitute,False,26,16,1412.8,3.8858,1.0192,0.0637,0.5246,0.4617,espn_true_per90
+eredivisie,333399,Paul Wanner,PSV Eindhoven,Substitute,False,22,19,1639.1,1.812,0.1647,0.1647,0.4242,0.5357,espn_true_per90
+eredivisie,368818,Dies Janse,FC Groningen,Center Left Defender,False,32,31,2814.1,0.4477,0.064,0.064,0.3571,0.8934,espn_true_per90
+eredivisie,206463,Oskar Zawada,FC Groningen,Substitute,False,16,0,307.5,5.854,0.8781,0.0,0.3,0.0976,espn_true_per90
+eredivisie,330546,Jochem Ritmeester Van De Kamp,Telstar,Center Right Forward,False,28,23,2042.2,0.9696,0.3085,0.0441,0.5455,0.6674,espn_true_per90
+eredivisie,299929,Anthony Descotte,FC Volendam,Substitute,False,14,9,880.5,2.5554,0.4089,0.1022,0.64,0.2877,espn_true_per90
+eredivisie,380940,Precious Ugwu,FC Volendam,Substitute,False,29,24,2170.5,0.4976,0.0,0.0,0.1667,0.7093,espn_true_per90
+eredivisie,291972,Ringo Meerveld,Heerenveen,Attacking Midfielder Left,False,31,30,2524.7,1.9607,0.2139,0.1069,0.3455,0.8015,espn_true_per90
+eredivisie,379956,Sondre Ørjasaeter,FC Twente,Substitute,False,30,28,2140.2,2.6493,0.1262,0.2523,0.3175,0.6994,espn_true_per90
+eredivisie,188458,Bas Kuipers,FC Twente,Substitute,False,7,0,117.5,3.0646,0.0,0.0,0.5,0.0384,espn_true_per90
+eredivisie,315705,Matisse Didden,FC Utrecht,Center Left Defender,False,24,21,1887.8,0.5721,0.0953,0.0,0.4167,0.5827,espn_true_per90
+eredivisie,164171,Sébastien Haller,FC Utrecht,Substitute,False,23,10,1011.8,2.4906,0.089,0.2669,0.3571,0.3123,espn_true_per90
+eredivisie,343207,Irakli Yegoian,Excelsior,Attacking Midfielder,False,31,30,2673.9,1.8176,0.1683,0.0673,0.2593,0.8738,espn_true_per90
+eredivisie,305487,Szymon Wlodarczyk,Excelsior,Substitute,False,23,9,754.0,2.5065,0.3581,0.1194,0.4762,0.2464,espn_true_per90
+eredivisie,323050,Jayden Candelaria,NAC Breda,Substitute,False,8,1,158.9,1.1325,0.0,0.0,0.5,0.0519,espn_true_per90
+eredivisie,305552,Josip Sutalo,Ajax Amsterdam,Substitute,False,24,19,1798.3,0.1501,0.0,0.0,0.0,0.555,espn_true_per90
+eredivisie,227420,Etienne Vaessen,FC Groningen,Goalkeeper,True,30,30,2602.9,0.0,0.0,0.0346,,0.8263,espn_true_per90
+eredivisie,408838,Mark Hoekstra,FC Groningen,Substitute,False,4,0,34.6,0.0,0.0,0.0,,0.011,espn_true_per90
+eredivisie,397492,Rayane Bounida,Ajax Amsterdam,Substitute,False,22,9,829.4,4.015,0.1085,0.5426,0.2703,0.256,espn_true_per90
+eredivisie,308986,Thibo Baeten,Go Ahead Eagles,Substitute,False,20,5,774.0,1.7442,0.1163,0.2326,0.4667,0.2529,espn_true_per90
+eredivisie,245918,Armando Obispo,PSV Eindhoven,Substitute,False,17,9,808.7,1.2241,0.2226,0.0,0.5455,0.2643,espn_true_per90
+eredivisie,240916,Kay Tejan,Telstar,Substitute,False,28,6,797.4,2.9346,0.3386,0.1129,0.5385,0.2606,espn_true_per90
+eredivisie,366268,Marko Kerkez,Fortuna Sittard,Substitute,False,3,0,4.2,0.0,0.0,0.0,,0.0014,espn_true_per90
+eredivisie,278644,Mike Eerdhuijzen,FC Utrecht,Substitute,False,11,8,472.3,0.3811,0.0,0.0,0.5,0.1458,espn_true_per90
+eredivisie,337603,Mike Kleijn,Sparta Rotterdam,Substitute,False,11,4,442.2,0.2035,0.0,0.2035,1.0,0.1445,espn_true_per90
+eredivisie,332362,Gonçalo Borges,Feyenoord Rotterdam,Substitute,False,11,4,453.2,2.7802,0.3972,0.1986,0.2857,0.1481,espn_true_per90
+eredivisie,343202,Thijs Kraaijeveld,Feyenoord Rotterdam,Substitute,False,15,8,745.9,0.7239,0.0,0.0,0.0,0.2438,espn_true_per90
+eredivisie,283111,Leo Greiml,NAC Breda,Center Right Defender,False,14,14,1132.8,0.7945,0.0794,0.0,0.6,0.3702,espn_true_per90
+eredivisie,291194,Charles-Andreas Brym,NAC Breda,Substitute,False,24,17,1503.1,2.5747,0.1198,0.2395,0.3023,0.4912,espn_true_per90
+eredivisie,338959,Weslley Patati,AZ Alkmaar,Substitute,False,27,18,1448.6,2.8578,0.1243,0.1864,0.3478,0.4734,espn_true_per90
+eredivisie,382643,Matej Sin,AZ Alkmaar,Substitute,False,18,6,543.9,1.4894,0.1655,0.1655,0.3333,0.1777,espn_true_per90
+eredivisie,318386,Lequincio Zeefuik,Heracles Almelo,Substitute,False,23,12,1170.2,2.7688,0.1538,0.0,0.2778,0.3824,espn_true_per90
+eredivisie,326230,James McConnell,Ajax Amsterdam,Substitute,False,4,1,103.0,0.0,0.0,0.0,,0.0318,espn_true_per90
+eredivisie,310638,Shola Shoretire,PEC Zwolle,Substitute,False,24,19,1650.5,0.927,0.2726,0.0545,0.4706,0.5394,espn_true_per90
+eredivisie,388678,Jan Faberski,PEC Zwolle,Substitute,False,18,4,470.5,2.1041,0.0,0.3826,0.0909,0.1538,espn_true_per90
+eredivisie,306806,Ahmetcan Kaplan,NEC Nijmegen,Center Defender,False,25,23,2045.8,0.8799,0.044,0.0,0.4,0.6686,espn_true_per90
+eredivisie,335203,Deveron Fonville,NEC Nijmegen,Center Left Defender,False,29,13,1465.2,0.3071,0.0,0.1228,0.0,0.4788,espn_true_per90
+eredivisie,340685,Noé Lebreton,NEC Nijmegen,Substitute,False,22,15,1431.5,2.5149,0.3144,0.2515,0.425,0.4678,espn_true_per90
+eredivisie,276579,Darko Nejasmic,NEC Nijmegen,Substitute,False,29,26,2311.3,1.0514,0.1558,0.0389,0.4444,0.7553,espn_true_per90
+eredivisie,297296,Anass Salah-Eddine,PSV Eindhoven,,False,17,12,1092.1,0.6593,0.0,0.0,0.25,0.3569,espn_true_per90
+eredivisie,259143,Myron Boadu,PSV Eindhoven,,False,13,2,329.1,3.5557,0.8205,0.0,0.4615,0.1075,espn_true_per90
+eredivisie,271858,Kenzo Goudmijn,Go Ahead Eagles,Attacking Midfielder Right,False,16,11,761.4,1.4184,0.0,0.0,0.25,0.2488,espn_true_per90
+eredivisie,397547,Key-Shawn Wong-A-Soij,FC Volendam,Substitute,False,3,0,16.9,5.3223,0.0,0.0,0.0,0.0055,espn_true_per90
+eredivisie,355867,Kiano Dyer,FC Volendam,Substitute,False,3,0,26.5,0.0,0.0,0.0,,0.0087,espn_true_per90
+eredivisie,345579,Daouda Weidmann,FC Twente,Substitute,False,16,5,451.9,1.9917,0.0,0.1992,0.4,0.1477,espn_true_per90
+eredivisie,187956,Marko Pjaca,FC Twente,Substitute,False,27,7,920.8,2.4435,0.1955,0.0977,0.48,0.3009,espn_true_per90
+eredivisie,388327,Aymen Sliti,Feyenoord Rotterdam,Substitute,False,19,3,475.6,2.0814,0.1892,0.0,0.2727,0.1554,espn_true_per90
+eredivisie,358318,Bernt Klaverboer,Heerenveen,Goalkeeper,True,30,30,2700.0,0.0,0.0,0.0,,0.8571,espn_true_per90
+eredivisie,319067,Amourricho van Axel Dongen,Heerenveen,Substitute,False,7,1,112.0,4.8206,0.8034,0.0,0.3333,0.0356,espn_true_per90
+eredivisie,324484,Maas Willemsen,Heerenveen,Substitute,False,31,30,2646.2,0.6122,0.034,0.0,0.4444,0.8401,espn_true_per90
+eredivisie,385714,Chris-Kevin Nadje,Excelsior,Substitute,False,7,2,235.8,1.5267,0.0,0.0,0.0,0.0771,espn_true_per90
+eredivisie,372323,Stefan Mitrovic,Excelsior,Substitute,False,9,2,259.7,2.4262,0.0,0.0,0.2857,0.0849,espn_true_per90
+eredivisie,278383,Simon Janssen,Excelsior,Substitute,False,13,5,508.7,1.0616,0.0,0.1769,0.8333,0.1662,espn_true_per90
+eredivisie,295628,Tijs Velthuis,PEC Zwolle,Substitute,False,14,6,577.8,0.0,0.0,0.0,,0.1888,espn_true_per90
+eredivisie,277854,Lance Duijvestijn,Fortuna Sittard,Substitute,False,28,21,1948.0,2.1252,0.1386,0.0924,0.3478,0.6366,espn_true_per90
+eredivisie,69579,Jonathan de Guzmán,Sparta Rotterdam,Substitute,False,6,1,98.1,0.0,0.0,0.0,,0.032,espn_true_per90
+eredivisie,306433,Walid Ould-Chikh,Heracles Almelo,Substitute,False,24,17,1493.8,0.9037,0.0602,0.241,0.2667,0.4882,espn_true_per90
+eredivisie,352629,Neville Nwankwo,Telstar,Substitute,False,28,26,2160.7,0.4582,0.0,0.0417,0.1818,0.7061,espn_true_per90
+eredivisie,250529,Kaj Sierhuis,Fortuna Sittard,,False,30,25,1993.2,3.522,0.5418,0.0452,0.3974,0.6514,espn_true_per90
+eredivisie,408556,Moussa Gbemou,Fortuna Sittard,,False,3,0,33.0,0.0,0.0,0.0,,0.0108,espn_true_per90
+eredivisie,386880,Jan Plug,Feyenoord Rotterdam,Substitute,False,5,1,118.5,0.0,0.0,0.0,,0.0387,espn_true_per90
+eredivisie,334064,Lewis Schouten,Excelsior,Substitute,False,24,14,1358.0,0.7953,0.0663,0.0,0.4167,0.4438,espn_true_per90
+eredivisie,408545,Rojendro Oudsten,Telstar,Substitute,False,8,0,114.6,1.5703,0.0,0.0,0.5,0.0375,espn_true_per90
+eredivisie,325549,Zidane Iqbal,FC Utrecht,Left Midfielder,False,5,3,255.1,0.0,0.0,0.0,,0.0787,espn_true_per90
+eredivisie,221227,Fredrik Jensen,NAC Breda,Substitute,False,11,9,753.0,0.8367,0.0,0.1195,0.5714,0.2461,espn_true_per90
+eredivisie,289363,Alec Van Hoorenbeeck,Heracles Almelo,Center Left Defender,False,24,24,2155.5,0.7098,0.0835,0.0,0.2353,0.7044,espn_true_per90
+eredivisie,367664,Mats Egbring,Heerenveen,Substitute,False,8,1,165.2,0.545,0.0,0.545,0.0,0.0524,espn_true_per90
+eredivisie,223312,Thomas Ouwejan,NEC Nijmegen,Center Left Defender,False,6,6,442.6,1.0168,0.2034,0.4067,0.2,0.1446,espn_true_per90
+eredivisie,219284,Kasper Dolberg,Ajax Amsterdam,Forward,False,24,13,1193.1,2.0366,0.2263,0.2263,0.4444,0.3683,espn_true_per90
+eredivisie,336542,Tristan Gooijer,PEC Zwolle,Substitute,False,23,17,1370.5,0.9194,0.197,0.0,0.5,0.4479,espn_true_per90
+eredivisie,350346,David Voute,PEC Zwolle,Substitute,False,3,0,94.4,0.9533,0.0,0.0,0.0,0.0309,espn_true_per90
+eredivisie,386841,Don-Angelo Konadu,Ajax Amsterdam,Forward,False,9,2,179.3,3.5127,0.0,0.0,0.2857,0.0554,espn_true_per90
+eredivisie,346269,Dave Kwakman,FC Volendam,Substitute,False,16,9,829.2,1.1939,0.0,0.4342,0.1818,0.271,espn_true_per90
+eredivisie,324448,Rui Mendes,FC Groningen,Substitute,False,6,0,61.6,1.4606,0.0,0.0,1.0,0.0196,espn_true_per90
+eredivisie,205024,Cyle Larin,Feyenoord Rotterdam,Substitute,False,8,1,155.3,5.216,0.0,0.5796,0.3333,0.0507,espn_true_per90
+eredivisie,319262,Niklas Vesterlund,FC Utrecht,Attacking Midfielder Right,False,20,17,1432.0,0.6285,0.0628,0.1257,0.4,0.442,espn_true_per90
+eredivisie,386885,Noah Fernandez,PSV Eindhoven,Substitute,False,10,4,370.4,0.486,0.243,0.0,0.5,0.121,espn_true_per90
+eredivisie,399213,Ruud Nijstad,FC Twente,Substitute,False,21,18,1673.4,0.5916,0.0538,0.0538,0.4545,0.5469,espn_true_per90
+eredivisie,318531,Maxim Dekker,AZ Alkmaar,Substitute,False,6,2,191.7,0.4695,0.0,0.0,0.0,0.0626,espn_true_per90
+eredivisie,343924,Elijah Dijkstra,AZ Alkmaar,Substitute,False,20,13,1270.5,0.4959,0.0,0.0,0.1429,0.4152,espn_true_per90
+eredivisie,205654,Mohamed Hamdaoui,Telstar,Substitute,False,7,0,71.9,7.5094,0.0,0.0,0.0,0.0235,espn_true_per90
+eredivisie,218237,Eli Dasa,NEC Nijmegen,Substitute,False,22,21,1814.3,1.0417,0.0496,0.0,0.1905,0.5929,espn_true_per90
+eredivisie,224042,Sam Lammers,FC Twente,Substitute,False,25,17,1544.9,3.2041,0.3495,0.4078,0.4545,0.5049,espn_true_per90
+eredivisie,317400,Silvinho Esajas,FC Volendam,Substitute,False,3,1,72.4,2.4869,0.0,0.0,0.5,0.0237,espn_true_per90
+eredivisie,368817,Gerald Alders,Telstar,Substitute,False,10,7,551.8,0.1631,0.0,0.0,0.0,0.1803,espn_true_per90
+eredivisie,405673,Ayoni Santos,Sparta Rotterdam,Substitute,False,26,18,1564.7,1.2079,0.0575,0.0575,0.3333,0.5113,espn_true_per90
+eredivisie,336781,Timo Jansink,Heracles Almelo,Goalkeeper,True,15,15,1350.0,0.0,0.0,0.0,,0.4412,espn_true_per90
+eredivisie,83802,Remko Pasveer,Heracles Almelo,Goalkeeper,True,15,15,1350.0,0.0,0.0,0.0,,0.4412,espn_true_per90
+eredivisie,397194,Jelani Seedorf,Telstar,Substitute,False,13,0,175.3,4.1068,0.5133,0.0,0.625,0.0573,espn_true_per90
+eredivisie,357000,Moussa Soumano,NAC Breda,Substitute,False,16,9,793.4,4.764,0.5671,0.0,0.381,0.2593,espn_true_per90
+eredivisie,380174,Kasper Boogaard,AZ Alkmaar,Right Midfielder,False,11,8,710.6,0.7599,0.0,0.2533,0.1667,0.2322,espn_true_per90
+eredivisie,398766,Wassim Bouziane,AZ Alkmaar,Substitute,False,4,0,72.1,1.2479,0.0,1.2479,1.0,0.0236,espn_true_per90
+eredivisie,321080,Lennard Hartjes,Excelsior,Left Midfielder,False,21,21,1557.7,0.6356,0.0578,0.0,0.1818,0.509,espn_true_per90
+eredivisie,297295,Syb van Ottele,Fortuna Sittard,Substitute,False,15,9,899.2,0.6006,0.0,0.0,0.3333,0.2938,espn_true_per90
+eredivisie,138171,Denis Odoi,NAC Breda,Center Defender,False,19,17,1512.6,0.595,0.0,0.0,0.0,0.4943,espn_true_per90
+eredivisie,154521,Jetro Willems,NEC Nijmegen,Substitute,False,6,2,165.0,0.5456,0.0,0.0,0.0,0.0539,espn_true_per90
+eredivisie,318573,Giovanni van Zwam,Go Ahead Eagles,Center Right Defender,False,12,6,686.1,0.6559,0.0,0.0,0.2,0.2242,espn_true_per90
+eredivisie,415052,Shaqueel Van Persie,Feyenoord Rotterdam,Substitute,False,3,0,37.8,4.7606,4.7606,0.0,1.0,0.0124,espn_true_per90
+eredivisie,384372,Sean Steur,Ajax Amsterdam,Substitute,False,21,15,1229.3,1.3179,0.0732,0.0732,0.5,0.3794,espn_true_per90
+eredivisie,378250,Nils Eggens,FC Groningen,Substitute,False,3,0,15.9,5.6533,0.0,0.0,0.0,0.0051,espn_true_per90
+eredivisie,339952,Brahim Ghalidi,NAC Breda,Substitute,False,10,1,270.2,1.6657,0.0,0.0,0.0,0.0883,espn_true_per90
+eredivisie,210810,Samuel Bastien,Fortuna Sittard,Substitute,False,6,0,42.2,0.0,0.0,0.0,,0.0138,espn_true_per90
+eredivisie,415046,Lushendry Martes,Sparta Rotterdam,Substitute,False,13,12,937.7,0.5759,0.0,0.0,0.3333,0.3064,espn_true_per90
+eredivisie,333892,Seiya Maikuma,AZ Alkmaar,Substitute,False,7,1,145.0,0.0,0.0,0.0,,0.0474,espn_true_per90
+eredivisie,215159,Younes Namli,PEC Zwolle,Substitute,False,13,12,1054.3,2.4756,0.1707,0.3415,0.3448,0.3445,espn_true_per90
+eredivisie,372317,Nicolas Verkooijen,PSV Eindhoven,Substitute,False,3,0,11.4,0.0,0.0,0.0,,0.0037,espn_true_per90
+eredivisie,214178,Emil Hansson,Excelsior,Substitute,False,12,8,578.3,1.2451,0.1556,0.1556,0.625,0.189,espn_true_per90
+eredivisie,104030,André Ayew,NAC Breda,Substitute,False,17,8,883.8,2.5459,0.1018,0.0,0.32,0.2888,espn_true_per90
+eredivisie,303548,Luca Oyen,Heerenveen,Substitute,False,15,6,536.0,3.0221,0.1679,0.0,0.2778,0.1702,espn_true_per90
+eredivisie,319226,Lasse Nordas,Heerenveen,Substitute,False,17,10,879.3,4.2988,0.6141,0.1024,0.381,0.2791,espn_true_per90
+eredivisie,292393,Neraysho Kasanwirjo,Fortuna Sittard,Center Right Midfielder,False,16,14,1320.1,0.4772,0.0,0.1364,0.1429,0.4314,espn_true_per90
+eredivisie,179195,Alen Halilovic,Fortuna Sittard,Substitute,False,5,0,32.8,2.7414,0.0,2.7414,0.0,0.0107,espn_true_per90
+eredivisie,379191,Cedric Hatenboer,Telstar,Center Left Midfielder,False,15,15,1143.2,1.2596,0.0,0.2362,0.1875,0.3736,espn_true_per90
+eredivisie,312866,Erik Ahlstrand,Heracles Almelo,Right Midfielder,False,14,7,750.1,0.9599,0.0,0.12,0.25,0.2451,espn_true_per90
+eredivisie,355506,Oualid Agougil,FC Utrecht,Substitute,False,6,0,102.0,0.0,0.0,0.0,,0.0315,espn_true_per90
+eredivisie,399714,Tobias van den Elshout,Feyenoord Rotterdam,Substitute,False,11,4,363.2,2.478,0.0,0.2478,0.2,0.1187,espn_true_per90
+eredivisie,125136,Przemyslaw Tyton,FC Twente,Goalkeeper,True,3,3,270.0,0.0,0.0,0.0,,0.0882,espn_true_per90
+eredivisie,349089,Travis Hearnes,FC Groningen,Substitute,False,11,3,340.9,1.5842,0.0,0.0,0.3333,0.1082,espn_true_per90
+eredivisie,235503,Jesper Karlsson,FC Utrecht,Attacking Midfielder Left,False,18,7,682.7,2.9001,0.5273,0.1318,0.4091,0.2107,espn_true_per90
+eredivisie,364725,Alwande Roaldsöy,Sparta Rotterdam,Substitute,False,4,0,51.1,0.0,0.0,0.0,,0.0167,espn_true_per90
+eredivisie,239353,Odysseus Velanas,PEC Zwolle,Substitute,False,13,7,632.3,1.1388,0.2847,0.1423,0.75,0.2066,espn_true_per90
+eredivisie,325219,Sem van Duijn,Telstar,Substitute,False,14,12,1009.6,2.0503,0.4457,0.1783,0.3913,0.3299,espn_true_per90
+eredivisie,238004,Takehiro Tomiyasu,Ajax Amsterdam,Substitute,False,9,2,212.7,0.4232,0.0,0.4232,0.0,0.0656,espn_true_per90
+eredivisie,215524,Jerry St. Juste,Feyenoord Rotterdam,Center Right Defender,False,6,1,150.3,0.0,0.0,0.0,,0.0491,espn_true_per90
+eredivisie,287461,Jakub Moder,Feyenoord Rotterdam,Substitute,False,10,9,803.8,2.3514,0.112,0.112,0.3333,0.2627,espn_true_per90
+eredivisie,357698,Ángel Alarcón,FC Utrecht,Attacking Midfielder Right,False,14,13,965.7,3.0756,0.2796,0.2796,0.4545,0.298,espn_true_per90
+eredivisie,390471,Artem Stepanov,FC Utrecht,Substitute,False,15,13,937.4,2.9763,0.4801,0.096,0.3226,0.2893,espn_true_per90
+eredivisie,202224,Bilal Ould-Chikh,FC Volendam,Substitute,False,12,11,891.2,1.3128,0.0,0.101,0.3077,0.2913,espn_true_per90
+eredivisie,237839,Alfons Sampsted,Go Ahead Eagles,Right Back,False,12,12,873.9,0.206,0.0,0.206,0.5,0.2856,espn_true_per90
+eredivisie,334795,Salama,NAC Breda,Substitute,False,8,4,329.5,1.9119,0.0,0.2731,0.2857,0.1077,espn_true_per90
+eredivisie,308227,Isak Hansen-Aarøen,NEC Nijmegen,Substitute,False,3,0,16.0,0.0,0.0,0.0,,0.0052,espn_true_per90
+eredivisie,285471,Willum Thór Willumsson,NEC Nijmegen,Substitute,False,4,1,98.6,0.9124,0.0,0.0,1.0,0.0322,espn_true_per90
+eredivisie,140350,Bram Nuytinck,NEC Nijmegen,Substitute,False,7,3,253.5,0.3551,0.0,0.0,1.0,0.0828,espn_true_per90
+eredivisie,307371,Sava-Arangel Cestic,Heracles Almelo,Center Defender,False,7,3,358.3,1.256,0.0,0.0,0.4,0.1171,espn_true_per90
+eredivisie,385189,Benjamin Pauwels,FC Volendam,Substitute,False,8,5,396.1,3.8629,0.2272,0.0,0.3529,0.1294,espn_true_per90
+eredivisie,216287,Juninho Bacuna,FC Volendam,Substitute,False,13,8,709.0,2.2848,0.0,0.2539,0.1111,0.2317,espn_true_per90
+eredivisie,151900,Luuk Koopmans,Fortuna Sittard,Goalkeeper,True,10,10,900.0,0.0,0.0,0.0,,0.2941,espn_true_per90
+eredivisie,300592,Yassin Oukili,Fortuna Sittard,Substitute,False,13,3,472.4,1.7145,0.381,0.0,0.4444,0.1544,espn_true_per90
+eredivisie,320298,Casper Terho,Sparta Rotterdam,Substitute,False,9,0,231.9,3.4926,0.3881,0.3881,0.1111,0.0758,espn_true_per90
+eredivisie,293395,Stefan Ingi Sigurdarson,Go Ahead Eagles,Substitute,False,14,8,633.9,3.4076,0.426,0.0,0.5,0.2071,espn_true_per90
+eredivisie,289301,Sören Tengstedt,Go Ahead Eagles,Substitute,False,13,9,687.2,2.4882,0.5238,0.0,0.3684,0.2246,espn_true_per90
+eredivisie,417934,Ryan Metu,FC Groningen,Substitute,False,8,0,118.7,1.5163,0.0,0.0,0.5,0.0377,espn_true_per90
+eredivisie,361534,Eus Waayers,Go Ahead Eagles,Substitute,False,4,1,67.5,1.3339,0.0,1.3339,1.0,0.022,espn_true_per90
+eredivisie,272224,Danilo,NEC Nijmegen,Substitute,False,11,1,276.6,4.2307,0.3254,0.3254,0.3846,0.0904,espn_true_per90
+eredivisie,328547,Rhys Bozinovski,Heracles Almelo,Substitute,False,8,6,412.1,0.4368,0.0,0.0,0.0,0.1347,espn_true_per90
+eredivisie,407207,Nolhan Courtens,Heerenveen,Substitute,False,5,0,52.3,0.0,0.0,0.0,,0.0166,espn_true_per90
+eredivisie,238919,Maarten Paes,Ajax Amsterdam,Goalkeeper,True,13,13,1170.0,0.0,0.0,0.0,,0.3611,espn_true_per90
+eredivisie,340532,Billy Van Duijl,AZ Alkmaar,Center Left Defender,False,7,6,585.0,0.4615,0.1538,0.0,0.3333,0.1912,espn_true_per90
+eredivisie,156366,Raheem Sterling,Feyenoord Rotterdam,Substitute,False,8,5,419.8,1.7151,0.0,0.2144,0.375,0.1372,espn_true_per90
+eredivisie,376476,Maher Carrizo,Ajax Amsterdam,Substitute,False,6,0,66.3,8.1485,0.0,0.0,0.3333,0.0205,espn_true_per90
+eredivisie,137783,Jasper Cillessen,NEC Nijmegen,Goalkeeper,True,3,3,185.6,0.0,0.0,0.0,,0.0606,espn_true_per90
+eredivisie,376042,Owen Johnson,Fortuna Sittard,Substitute,False,4,0,15.1,0.0,0.0,0.0,,0.0049,espn_true_per90
+eredivisie,408790,Giannino Vianello,Sparta Rotterdam,Substitute,False,5,3,312.2,0.8648,0.0,0.0,0.0,0.102,espn_true_per90
+eredivisie,149904,Gernot Trauner,Feyenoord Rotterdam,Substitute,False,5,4,279.2,0.6446,0.0,0.0,0.5,0.0913,espn_true_per90
+eredivisie,408528,Bendegúz Kovács,AZ Alkmaar,Substitute,False,3,0,26.8,6.729,0.0,0.0,0.0,0.0087,espn_true_per90
+eredivisie,356490,Roy Steur,FC Volendam,Substitute,False,3,2,209.4,0.0,0.0,0.0,,0.0684,espn_true_per90

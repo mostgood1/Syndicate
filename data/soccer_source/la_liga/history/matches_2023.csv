@@ -1,0 +1,381 @@
+league,season,match_id,date,home_team,away_team,home_goals,away_goals,ht_home_goals,ht_away_goals,home_shots,away_shots,home_shots_on_target,away_shots_on_target,home_corners,away_corners,home_fouls,away_fouls,home_yellow_cards,away_yellow_cards,home_red_cards,away_red_cards,odds_home,odds_draw,odds_away,odds_over_2_5,odds_under_2_5
+la_liga,2023,la_liga_2023_0_almeria_vallecano,11/08/2023,Almeria,Vallecano,0,2,0,2,19,10,5,4,8,3,16,25,1,3,0,0,2.54,3.26,2.92,2.15,1.72
+la_liga,2023,la_liga_2023_1_sevilla_valencia,11/08/2023,Sevilla,Valencia,1,2,0,0,9,10,3,3,8,1,15,17,3,2,1,0,1.93,3.4,4.33,2.29,1.64
+la_liga,2023,la_liga_2023_2_sociedad_girona,12/08/2023,Sociedad,Girona,1,1,1,0,15,6,2,1,4,1,22,9,2,5,0,0,1.63,3.97,5.58,1.9,1.92
+la_liga,2023,la_liga_2023_3_las_palmas_mallorca,12/08/2023,Las Palmas,Mallorca,1,1,1,0,5,12,2,2,3,6,11,21,3,2,0,0,2.44,3.0,3.31,2.7,1.47
+la_liga,2023,la_liga_2023_4_ath_bilbao_real_madrid,12/08/2023,Ath Bilbao,Real Madrid,0,2,0,2,7,14,1,8,7,5,18,6,3,1,0,0,3.4,3.52,2.15,1.85,1.99
+la_liga,2023,la_liga_2023_5_celta_osasuna,13/08/2023,Celta,Osasuna,0,2,0,1,11,11,1,5,7,2,11,15,1,1,0,0,2.12,3.23,3.8,2.36,1.6
+la_liga,2023,la_liga_2023_6_villarreal_betis,13/08/2023,Villarreal,Betis,1,2,0,1,18,12,5,5,9,4,13,17,1,3,0,0,1.77,3.93,4.4,1.72,2.15
+la_liga,2023,la_liga_2023_7_getafe_barcelona,13/08/2023,Getafe,Barcelona,0,0,0,0,5,14,2,4,3,4,20,11,8,2,1,1,6.35,3.99,1.57,2.08,1.77
+la_liga,2023,la_liga_2023_8_cadiz_alaves,14/08/2023,Cadiz,Alaves,1,0,1,0,12,10,3,2,2,4,19,15,3,2,1,0,2.19,3.06,3.79,2.63,1.48
+la_liga,2023,la_liga_2023_9_ath_madrid_granada,14/08/2023,Ath Madrid,Granada,3,1,1,0,14,7,6,4,3,3,15,9,3,1,0,0,1.3,5.49,10.27,1.68,2.2
+la_liga,2023,la_liga_2023_10_mallorca_villarreal,18/08/2023,Mallorca,Villarreal,0,1,0,0,8,15,1,3,6,5,12,11,2,4,0,0,2.95,3.11,2.63,2.38,1.6
+la_liga,2023,la_liga_2023_11_valencia_las_palmas,18/08/2023,Valencia,Las Palmas,1,0,0,0,9,7,4,1,6,4,12,6,0,0,0,0,1.59,3.94,6.28,2.15,1.73
+la_liga,2023,la_liga_2023_12_sociedad_celta,19/08/2023,Sociedad,Celta,1,1,1,0,11,17,2,6,9,7,12,12,2,1,0,0,1.76,3.5,5.24,2.4,1.58
+la_liga,2023,la_liga_2023_13_almeria_real_madrid,19/08/2023,Almeria,Real Madrid,1,3,1,1,20,24,8,9,4,5,10,13,1,0,0,0,8.0,5.01,1.39,1.63,2.32
+la_liga,2023,la_liga_2023_14_osasuna_ath_bilbao,19/08/2023,Osasuna,Ath Bilbao,0,2,0,2,18,8,7,2,5,3,9,14,1,5,1,1,2.83,3.11,2.71,2.39,1.59
+la_liga,2023,la_liga_2023_15_girona_getafe,20/08/2023,Girona,Getafe,3,0,1,0,7,9,6,2,3,2,11,20,2,5,0,0,2.05,3.18,4.15,2.59,1.5
+la_liga,2023,la_liga_2023_16_barcelona_cadiz,20/08/2023,Barcelona,Cadiz,2,0,0,0,23,10,10,1,10,2,9,22,4,3,0,0,1.21,6.7,14.64,1.59,2.39
+la_liga,2023,la_liga_2023_17_betis_ath_madrid,20/08/2023,Betis,Ath Madrid,0,0,0,0,14,5,0,1,2,7,10,8,2,1,0,0,3.86,3.45,2.03,2.14,1.73
+la_liga,2023,la_liga_2023_18_alaves_sevilla,21/08/2023,Alaves,Sevilla,4,3,2,2,14,12,7,2,4,4,14,13,1,2,0,0,3.32,3.06,2.4,2.61,1.49
+la_liga,2023,la_liga_2023_19_granada_vallecano,21/08/2023,Granada,Vallecano,0,2,0,0,14,17,7,9,5,6,14,11,2,1,1,0,2.65,3.08,2.92,2.38,1.58
+la_liga,2023,la_liga_2023_20_las_palmas_sociedad,25/08/2023,Las Palmas,Sociedad,0,0,0,0,11,8,5,1,5,7,7,29,1,4,0,0,4.1,3.28,2.04,2.44,1.57
+la_liga,2023,la_liga_2023_21_celta_real_madrid,25/08/2023,Celta,Real Madrid,0,1,0,0,13,10,4,3,3,5,19,14,2,3,0,0,4.74,3.94,1.74,1.78,2.08
+la_liga,2023,la_liga_2023_22_cadiz_almeria,26/08/2023,Cadiz,Almeria,1,1,0,0,11,5,3,2,7,3,16,22,0,5,1,1,2.25,3.36,3.34,2.1,1.76
+la_liga,2023,la_liga_2023_23_granada_mallorca,26/08/2023,Granada,Mallorca,3,2,1,1,10,10,4,5,5,3,11,27,2,7,0,0,2.65,3.0,3.01,2.7,1.47
+la_liga,2023,la_liga_2023_24_sevilla_girona,26/08/2023,Sevilla,Girona,1,2,1,1,21,8,4,3,6,6,11,18,2,1,0,0,2.08,3.48,3.65,1.95,1.89
+la_liga,2023,la_liga_2023_25_villarreal_barcelona,27/08/2023,Villarreal,Barcelona,3,4,2,2,13,21,6,11,2,6,12,14,3,3,0,0,3.54,3.7,2.05,1.68,2.23
+la_liga,2023,la_liga_2023_26_valencia_osasuna,27/08/2023,Valencia,Osasuna,1,2,0,1,16,7,4,2,6,3,13,12,3,4,0,0,1.9,3.49,4.33,2.23,1.68
+la_liga,2023,la_liga_2023_27_ath_bilbao_betis,27/08/2023,Ath Bilbao,Betis,4,2,3,2,14,7,6,3,5,3,23,11,4,2,0,0,1.92,3.66,4.03,2.0,1.85
+la_liga,2023,la_liga_2023_28_getafe_alaves,28/08/2023,Getafe,Alaves,1,0,0,0,15,16,4,2,4,5,13,15,1,2,0,0,2.28,2.93,3.8,3.14,1.37
+la_liga,2023,la_liga_2023_29_vallecano_ath_madrid,28/08/2023,Vallecano,Ath Madrid,0,7,0,3,12,17,3,10,8,3,19,17,4,3,0,0,4.04,3.47,1.97,2.12,1.74
+la_liga,2023,la_liga_2023_30_cadiz_villarreal,01/09/2023,Cadiz,Villarreal,3,1,2,1,18,7,4,3,7,3,21,15,5,4,0,1,3.36,3.53,2.18,1.87,1.97
+la_liga,2023,la_liga_2023_31_almeria_celta,01/09/2023,Almeria,Celta,2,3,0,2,16,14,5,8,6,5,9,9,1,1,0,0,2.97,3.31,2.5,2.07,1.78
+la_liga,2023,la_liga_2023_32_sociedad_granada,02/09/2023,Sociedad,Granada,5,3,2,1,15,8,6,5,2,5,15,14,1,5,0,0,1.45,4.59,7.29,1.82,2.02
+la_liga,2023,la_liga_2023_33_real_madrid_getafe,02/09/2023,Real Madrid,Getafe,2,1,0,1,26,6,12,2,11,1,12,16,2,6,0,0,1.33,5.14,10.55,1.88,1.95
+la_liga,2023,la_liga_2023_34_alaves_valencia,02/09/2023,Alaves,Valencia,1,0,1,0,7,9,1,4,1,2,18,9,4,2,0,0,2.93,2.94,2.77,2.76,1.45
+la_liga,2023,la_liga_2023_35_betis_vallecano,02/09/2023,Betis,Vallecano,1,0,0,0,14,15,5,6,2,3,22,20,3,5,0,0,1.98,3.5,3.99,2.09,1.77
+la_liga,2023,la_liga_2023_36_girona_las_palmas,03/09/2023,Girona,Las Palmas,1,0,0,0,11,10,6,5,3,5,15,10,3,3,0,0,1.68,3.79,5.46,2.11,1.75
+la_liga,2023,la_liga_2023_37_mallorca_ath_bilbao,03/09/2023,Mallorca,Ath Bilbao,0,0,0,0,8,11,2,3,3,5,12,17,0,1,0,0,3.26,3.09,2.42,2.58,1.52
+la_liga,2023,la_liga_2023_38_osasuna_barcelona,03/09/2023,Osasuna,Barcelona,1,2,0,1,11,9,3,4,8,5,6,16,1,3,1,0,5.12,4.1,1.66,1.78,2.06
+la_liga,2023,la_liga_2023_39_vallecano_alaves,15/09/2023,Vallecano,Alaves,2,0,1,0,20,9,11,1,5,3,15,14,2,3,0,0,2.01,3.2,4.36,2.66,1.49
+la_liga,2023,la_liga_2023_40_ath_bilbao_cadiz,16/09/2023,Ath Bilbao,Cadiz,3,0,0,0,20,5,9,4,5,4,10,20,1,4,0,0,1.55,4.08,6.56,2.05,1.79
+la_liga,2023,la_liga_2023_41_valencia_ath_madrid,16/09/2023,Valencia,Ath Madrid,3,0,2,0,12,11,8,3,5,8,13,17,1,5,0,0,3.82,3.38,2.06,2.16,1.72
+la_liga,2023,la_liga_2023_42_celta_mallorca,16/09/2023,Celta,Mallorca,0,1,0,0,16,7,4,4,10,1,9,15,1,3,0,0,2.05,3.13,4.25,2.64,1.49
+la_liga,2023,la_liga_2023_43_barcelona_betis,16/09/2023,Barcelona,Betis,5,0,2,0,17,11,9,2,9,5,9,10,1,2,0,0,1.37,5.23,7.99,1.56,2.45
+la_liga,2023,la_liga_2023_44_getafe_osasuna,17/09/2023,Getafe,Osasuna,3,2,1,1,11,8,6,3,6,3,15,11,6,2,0,0,2.6,2.93,3.16,2.94,1.41
+la_liga,2023,la_liga_2023_45_villarreal_almeria,17/09/2023,Villarreal,Almeria,2,1,1,1,10,17,4,7,7,6,16,6,2,3,0,0,1.48,4.77,6.36,1.57,2.44
+la_liga,2023,la_liga_2023_46_sevilla_las_palmas,17/09/2023,Sevilla,Las Palmas,1,0,0,0,26,12,9,2,7,3,13,12,3,5,0,0,1.64,3.92,5.68,2.0,1.84
+la_liga,2023,la_liga_2023_47_real_madrid_sociedad,17/09/2023,Real Madrid,Sociedad,2,1,0,1,17,15,8,5,4,3,11,14,3,2,0,0,1.67,3.97,5.2,1.88,1.96
+la_liga,2023,la_liga_2023_48_granada_girona,18/09/2023,Granada,Girona,2,4,0,3,12,13,5,7,4,5,13,21,3,3,0,0,2.71,3.37,2.64,2.02,1.8
+la_liga,2023,la_liga_2023_49_alaves_ath_bilbao,22/09/2023,Alaves,Ath Bilbao,0,2,0,1,15,11,5,3,3,4,13,9,2,2,0,0,4.07,3.14,2.09,2.57,1.52
+la_liga,2023,la_liga_2023_50_girona_mallorca,23/09/2023,Girona,Mallorca,5,3,4,1,23,15,10,5,6,5,10,12,1,5,0,0,1.92,3.38,4.42,2.39,1.59
+la_liga,2023,la_liga_2023_51_osasuna_sevilla,23/09/2023,Osasuna,Sevilla,0,0,0,0,16,15,2,3,7,4,11,7,2,3,0,0,2.55,3.21,2.94,2.26,1.66
+la_liga,2023,la_liga_2023_52_barcelona_celta,23/09/2023,Barcelona,Celta,3,2,0,1,15,13,6,7,2,3,10,11,2,1,0,0,1.29,5.95,10.23,1.52,2.55
+la_liga,2023,la_liga_2023_53_almeria_valencia,23/09/2023,Almeria,Valencia,2,2,0,1,17,7,10,5,8,3,12,10,4,2,0,0,3.04,3.48,2.34,1.93,1.91
+la_liga,2023,la_liga_2023_54_sociedad_getafe,24/09/2023,Sociedad,Getafe,4,3,1,2,10,10,6,7,2,1,13,24,3,2,0,0,1.55,3.77,7.37,2.51,1.54
+la_liga,2023,la_liga_2023_55_vallecano_villarreal,24/09/2023,Vallecano,Villarreal,1,1,1,1,11,13,6,6,2,8,20,18,2,3,0,1,2.52,3.54,2.74,1.76,2.1
+la_liga,2023,la_liga_2023_56_betis_cadiz,24/09/2023,Betis,Cadiz,1,1,0,1,21,5,7,1,11,8,10,14,2,3,0,0,1.85,3.56,4.49,2.14,1.73
+la_liga,2023,la_liga_2023_57_las_palmas_granada,24/09/2023,Las Palmas,Granada,1,0,0,0,10,2,3,1,6,7,13,19,6,4,1,0,2.03,3.49,3.77,2.05,1.79
+la_liga,2023,la_liga_2023_58_ath_madrid_real_madrid,24/09/2023,Ath Madrid,Real Madrid,3,1,2,1,10,20,4,5,6,11,13,10,1,3,0,0,2.83,3.36,2.56,2.03,1.82
+la_liga,2023,la_liga_2023_59_sevilla_almeria,26/09/2023,Sevilla,Almeria,5,1,3,0,18,10,9,1,9,4,15,16,3,2,0,0,1.67,4.04,5.08,1.72,2.16
+la_liga,2023,la_liga_2023_60_mallorca_barcelona,26/09/2023,Mallorca,Barcelona,2,2,2,1,10,10,5,4,7,2,19,7,4,1,1,0,6.89,4.38,1.5,1.86,1.98
+la_liga,2023,la_liga_2023_61_ath_bilbao_getafe,27/09/2023,Ath Bilbao,Getafe,2,2,1,0,9,13,4,5,5,4,9,19,5,6,1,0,1.64,3.7,6.21,2.4,1.59
+la_liga,2023,la_liga_2023_62_real_madrid_las_palmas,27/09/2023,Real Madrid,Las Palmas,2,0,1,0,21,16,9,2,7,2,7,9,0,1,0,0,1.22,6.92,13.1,1.44,2.8
+la_liga,2023,la_liga_2023_63_villarreal_girona,27/09/2023,Villarreal,Girona,1,2,0,0,14,17,3,5,5,6,9,11,3,2,0,0,2.23,3.66,3.12,1.6,2.38
+la_liga,2023,la_liga_2023_64_cadiz_vallecano,27/09/2023,Cadiz,Vallecano,0,0,0,0,9,9,2,4,1,2,16,13,5,6,0,1,2.58,3.17,2.95,2.36,1.6
+la_liga,2023,la_liga_2023_65_valencia_sociedad,27/09/2023,Valencia,Sociedad,0,1,0,1,9,2,2,1,0,2,14,17,4,7,1,0,2.65,3.14,2.89,2.45,1.57
+la_liga,2023,la_liga_2023_66_celta_alaves,28/09/2023,Celta,Alaves,1,1,1,0,8,21,0,11,2,8,9,11,5,3,1,0,1.71,3.57,5.6,2.39,1.59
+la_liga,2023,la_liga_2023_67_granada_betis,28/09/2023,Granada,Betis,1,1,0,0,19,13,7,3,5,7,14,10,2,1,0,0,3.04,3.45,2.36,1.94,1.9
+la_liga,2023,la_liga_2023_68_osasuna_ath_madrid,28/09/2023,Osasuna,Ath Madrid,0,2,0,1,13,4,2,3,7,2,14,4,3,3,1,1,3.53,3.43,2.14,2.09,1.77
+la_liga,2023,la_liga_2023_69_barcelona_sevilla,29/09/2023,Barcelona,Sevilla,1,0,0,0,18,12,5,3,13,3,11,15,2,3,0,0,1.38,5.35,7.92,1.5,2.61
+la_liga,2023,la_liga_2023_70_getafe_villarreal,30/09/2023,Getafe,Villarreal,0,0,0,0,22,3,9,0,6,4,19,11,2,4,0,1,2.93,3.25,2.56,2.11,1.75
+la_liga,2023,la_liga_2023_71_vallecano_mallorca,30/09/2023,Vallecano,Mallorca,2,2,1,1,19,9,5,4,5,0,12,20,2,5,0,0,2.18,3.15,3.79,2.45,1.56
+la_liga,2023,la_liga_2023_72_girona_real_madrid,30/09/2023,Girona,Real Madrid,0,3,0,2,13,14,3,7,1,4,13,14,2,2,0,1,3.57,3.92,1.98,1.62,2.34
+la_liga,2023,la_liga_2023_73_sociedad_ath_bilbao,30/09/2023,Sociedad,Ath Bilbao,3,0,1,0,8,18,5,3,5,7,20,9,2,2,0,0,2.24,3.25,3.49,2.36,1.61
+la_liga,2023,la_liga_2023_74_almeria_granada,01/10/2023,Almeria,Granada,3,3,3,0,17,19,5,4,1,5,18,14,2,1,0,0,1.96,3.7,3.79,1.76,2.09
+la_liga,2023,la_liga_2023_75_alaves_osasuna,01/10/2023,Alaves,Osasuna,0,2,0,1,17,10,3,3,4,2,13,13,2,3,1,0,2.71,3.06,2.87,2.56,1.52
+la_liga,2023,la_liga_2023_76_ath_madrid_cadiz,01/10/2023,Ath Madrid,Cadiz,3,2,1,2,18,8,9,4,5,3,5,10,1,3,0,0,1.36,5.08,9.18,1.75,2.11
+la_liga,2023,la_liga_2023_77_betis_valencia,01/10/2023,Betis,Valencia,3,0,1,0,15,9,7,2,5,3,11,10,2,2,0,0,2.31,3.32,3.23,2.16,1.72
+la_liga,2023,la_liga_2023_78_las_palmas_celta,02/10/2023,Las Palmas,Celta,2,1,0,0,16,11,5,3,4,5,13,14,2,1,0,0,2.48,3.21,3.03,2.28,1.64
+la_liga,2023,la_liga_2023_79_ath_bilbao_almeria,06/10/2023,Ath Bilbao,Almeria,3,0,1,0,23,4,9,1,6,2,11,7,2,0,0,0,1.38,5.24,8.16,1.54,2.49
+la_liga,2023,la_liga_2023_80_cadiz_girona,07/10/2023,Cadiz,Girona,0,1,0,0,8,20,2,5,5,5,12,13,1,3,1,0,3.25,3.41,2.28,1.95,1.87
+la_liga,2023,la_liga_2023_81_real_madrid_osasuna,07/10/2023,Real Madrid,Osasuna,4,0,1,0,19,7,9,1,5,4,9,6,2,2,0,0,1.31,5.7,9.96,1.58,2.4
+la_liga,2023,la_liga_2023_82_mallorca_valencia,07/10/2023,Mallorca,Valencia,1,1,1,1,9,11,5,3,3,6,17,11,2,1,0,0,2.51,3.08,3.16,2.53,1.53
+la_liga,2023,la_liga_2023_83_sevilla_vallecano,07/10/2023,Sevilla,Vallecano,2,2,0,2,22,7,6,4,12,2,16,19,5,2,0,0,1.89,3.58,4.27,2.05,1.79
+la_liga,2023,la_liga_2023_84_villarreal_las_palmas,08/10/2023,Villarreal,Las Palmas,1,2,0,1,9,8,4,5,7,2,17,7,4,4,0,0,1.62,4.17,5.48,1.76,2.08
+la_liga,2023,la_liga_2023_85_ath_madrid_sociedad,08/10/2023,Ath Madrid,Sociedad,2,1,1,0,14,13,5,4,1,4,9,12,3,3,0,0,1.91,3.45,4.42,2.12,1.72
+la_liga,2023,la_liga_2023_86_alaves_betis,08/10/2023,Alaves,Betis,1,1,1,1,15,6,5,2,5,3,13,9,3,3,0,1,2.86,3.18,2.65,2.38,1.59
+la_liga,2023,la_liga_2023_87_celta_getafe,08/10/2023,Celta,Getafe,2,2,2,2,26,3,11,2,13,1,14,20,1,8,0,1,2.06,3.2,4.11,2.57,1.51
+la_liga,2023,la_liga_2023_88_granada_barcelona,08/10/2023,Granada,Barcelona,2,2,2,1,7,22,2,10,1,11,12,7,4,1,0,0,6.92,5.18,1.42,1.47,2.69
+la_liga,2023,la_liga_2023_89_osasuna_granada,20/10/2023,Osasuna,Granada,2,0,1,0,12,13,6,3,1,7,19,13,3,4,0,1,1.73,3.87,4.89,1.86,1.97
+la_liga,2023,la_liga_2023_90_sociedad_mallorca,21/10/2023,Sociedad,Mallorca,1,0,0,0,14,18,6,7,2,5,14,16,3,3,0,0,1.57,3.84,7.03,2.38,1.59
+la_liga,2023,la_liga_2023_91_getafe_betis,21/10/2023,Getafe,Betis,1,1,1,1,14,13,4,3,4,8,17,11,5,2,0,0,2.49,3.11,3.15,2.42,1.57
+la_liga,2023,la_liga_2023_92_sevilla_real_madrid,21/10/2023,Sevilla,Real Madrid,1,1,0,0,17,14,7,5,4,6,13,6,5,2,0,0,4.08,3.87,1.86,1.68,2.21
+la_liga,2023,la_liga_2023_93_celta_ath_madrid,21/10/2023,Celta,Ath Madrid,0,3,0,1,16,12,3,7,7,5,10,10,3,2,1,0,3.58,3.49,2.11,2.0,1.84
+la_liga,2023,la_liga_2023_94_las_palmas_vallecano,22/10/2023,Las Palmas,Vallecano,0,1,0,0,12,12,6,4,10,5,13,11,4,3,0,1,2.66,3.14,2.87,2.29,1.63
+la_liga,2023,la_liga_2023_95_girona_almeria,22/10/2023,Girona,Almeria,5,2,3,2,19,9,8,5,9,6,11,14,1,2,0,0,1.47,4.81,6.6,1.52,2.53
+la_liga,2023,la_liga_2023_96_villarreal_alaves,22/10/2023,Villarreal,Alaves,1,1,0,0,12,16,3,7,9,3,15,10,4,3,0,0,1.73,3.85,4.96,1.94,1.89
+la_liga,2023,la_liga_2023_97_barcelona_ath_bilbao,22/10/2023,Barcelona,Ath Bilbao,1,0,0,0,12,10,7,3,4,7,11,18,3,3,0,0,1.67,4.09,5.13,1.74,2.12
+la_liga,2023,la_liga_2023_98_valencia_cadiz,23/10/2023,Valencia,Cadiz,2,0,2,0,12,5,4,4,4,6,16,16,0,3,0,1,1.77,3.57,5.03,2.26,1.65
+la_liga,2023,la_liga_2023_99_girona_celta,27/10/2023,Girona,Celta,1,0,0,0,12,4,2,2,10,1,15,12,3,2,0,0,1.69,4.2,4.74,1.64,2.3
+la_liga,2023,la_liga_2023_100_almeria_las_palmas,28/10/2023,Almeria,Las Palmas,1,2,0,1,10,10,4,3,3,2,13,19,3,1,0,0,2.33,3.46,3.1,1.95,1.88
+la_liga,2023,la_liga_2023_101_barcelona_real_madrid,28/10/2023,Barcelona,Real Madrid,1,2,1,0,15,13,3,4,6,3,15,15,2,1,0,0,2.55,3.66,2.68,1.6,2.4
+la_liga,2023,la_liga_2023_102_mallorca_getafe,28/10/2023,Mallorca,Getafe,0,0,0,0,15,8,4,0,8,3,10,25,0,1,0,0,2.31,3.03,3.61,2.8,1.44
+la_liga,2023,la_liga_2023_103_cadiz_sevilla,28/10/2023,Cadiz,Sevilla,2,2,2,1,10,20,5,10,2,4,17,12,6,4,0,0,3.29,3.34,2.29,2.09,1.77
+la_liga,2023,la_liga_2023_104_betis_osasuna,29/10/2023,Betis,Osasuna,2,1,1,0,9,7,2,1,6,3,10,25,3,4,0,0,2.08,3.41,3.74,2.15,1.72
+la_liga,2023,la_liga_2023_105_vallecano_sociedad,29/10/2023,Vallecano,Sociedad,2,2,1,1,16,15,7,3,4,5,17,16,3,2,0,0,3.21,3.14,2.43,2.41,1.59
+la_liga,2023,la_liga_2023_106_ath_bilbao_valencia,29/10/2023,Ath Bilbao,Valencia,2,2,1,0,12,11,7,5,10,4,11,10,3,1,0,0,1.65,3.87,5.72,2.08,1.75
+la_liga,2023,la_liga_2023_107_ath_madrid_alaves,29/10/2023,Ath Madrid,Alaves,2,1,2,0,11,8,7,1,4,4,10,11,3,2,0,0,1.39,4.89,8.71,1.83,2.0
+la_liga,2023,la_liga_2023_108_granada_villarreal,30/10/2023,Granada,Villarreal,2,3,2,3,18,6,8,5,4,1,14,15,0,4,0,0,3.02,3.6,2.31,1.71,2.17
+la_liga,2023,la_liga_2023_109_las_palmas_ath_madrid,03/11/2023,Las Palmas,Ath Madrid,2,1,0,0,9,13,3,5,3,4,12,9,0,3,0,0,5.7,3.79,1.66,2.12,1.75
+la_liga,2023,la_liga_2023_110_osasuna_girona,04/11/2023,Osasuna,Girona,2,4,1,1,15,11,3,4,2,7,14,10,5,3,0,0,2.88,3.45,2.47,1.94,1.89
+la_liga,2023,la_liga_2023_111_betis_mallorca,04/11/2023,Betis,Mallorca,2,0,1,0,22,8,3,1,6,1,13,16,1,4,0,1,1.92,3.4,4.42,2.34,1.62
+la_liga,2023,la_liga_2023_112_celta_sevilla,04/11/2023,Celta,Sevilla,1,1,1,0,15,13,3,5,4,6,14,10,2,5,1,0,2.57,3.43,2.77,1.93,1.9
+la_liga,2023,la_liga_2023_113_sociedad_barcelona,04/11/2023,Sociedad,Barcelona,0,1,0,0,13,12,6,4,8,3,16,8,3,3,0,0,3.26,3.5,2.23,1.9,1.93
+la_liga,2023,la_liga_2023_114_alaves_almeria,05/11/2023,Alaves,Almeria,1,0,0,0,23,9,3,3,12,6,13,14,2,3,0,0,1.79,3.76,4.63,1.96,1.87
+la_liga,2023,la_liga_2023_115_valencia_granada,05/11/2023,Valencia,Granada,1,0,1,0,11,6,2,1,0,4,20,15,3,5,0,0,1.65,4.07,5.23,1.86,1.97
+la_liga,2023,la_liga_2023_116_villarreal_ath_bilbao,05/11/2023,Villarreal,Ath Bilbao,2,3,0,3,17,17,6,7,9,3,11,18,4,4,0,0,2.98,3.58,2.36,1.82,1.99
+la_liga,2023,la_liga_2023_117_real_madrid_vallecano,05/11/2023,Real Madrid,Vallecano,0,0,0,0,22,4,5,0,11,1,12,15,3,5,0,0,1.28,6.08,10.82,1.53,2.51
+la_liga,2023,la_liga_2023_118_getafe_cadiz,06/11/2023,Getafe,Cadiz,1,0,0,0,13,6,3,2,6,3,18,12,7,1,1,0,1.93,3.21,4.67,2.73,1.46
+la_liga,2023,la_liga_2023_119_ath_bilbao_celta,10/11/2023,Ath Bilbao,Celta,4,3,2,2,21,13,12,5,7,2,15,13,2,2,0,0,1.68,4.05,5.07,1.75,2.12
+la_liga,2023,la_liga_2023_120_vallecano_girona,11/11/2023,Vallecano,Girona,1,2,1,1,22,19,9,7,8,3,15,13,1,2,0,0,2.88,3.51,2.45,1.83,2.01
+la_liga,2023,la_liga_2023_121_almeria_sociedad,11/11/2023,Almeria,Sociedad,1,3,0,0,7,18,2,6,5,5,18,19,2,2,0,0,4.71,3.95,1.73,1.82,2.02
+la_liga,2023,la_liga_2023_122_granada_getafe,11/11/2023,Granada,Getafe,1,1,1,1,12,10,6,6,3,5,14,9,4,2,0,0,2.55,3.18,2.98,2.34,1.62
+la_liga,2023,la_liga_2023_123_osasuna_las_palmas,11/11/2023,Osasuna,Las Palmas,1,1,0,0,11,6,3,1,8,3,25,10,1,1,0,0,1.99,3.32,4.21,2.35,1.61
+la_liga,2023,la_liga_2023_124_real_madrid_valencia,11/11/2023,Real Madrid,Valencia,5,1,2,0,16,10,7,4,4,4,7,26,1,3,0,0,1.33,5.48,9.41,1.63,2.31
+la_liga,2023,la_liga_2023_125_barcelona_alaves,12/11/2023,Barcelona,Alaves,2,1,0,1,11,8,6,1,2,1,11,10,2,1,0,0,1.25,6.32,11.97,1.57,2.41
+la_liga,2023,la_liga_2023_126_sevilla_betis,12/11/2023,Sevilla,Betis,1,1,0,0,13,14,4,6,9,5,18,14,1,1,0,0,2.13,3.53,3.47,1.93,1.91
+la_liga,2023,la_liga_2023_127_ath_madrid_villarreal,12/11/2023,Ath Madrid,Villarreal,3,1,1,1,25,11,10,7,6,3,8,8,0,2,0,0,1.37,5.33,7.92,1.5,2.57
+la_liga,2023,la_liga_2023_128_alaves_granada,24/11/2023,Alaves,Granada,3,1,2,0,8,11,5,4,6,2,10,13,1,3,0,0,1.74,3.74,5.05,2.05,1.79
+la_liga,2023,la_liga_2023_129_vallecano_barcelona,25/11/2023,Vallecano,Barcelona,1,1,1,0,10,15,4,4,1,4,23,13,3,4,0,0,5.13,4.13,1.65,1.73,2.14
+la_liga,2023,la_liga_2023_130_valencia_celta,25/11/2023,Valencia,Celta,0,0,0,0,8,13,0,1,5,7,13,7,3,2,0,0,2.18,3.39,3.47,2.11,1.75
+la_liga,2023,la_liga_2023_131_getafe_almeria,25/11/2023,Getafe,Almeria,2,1,2,1,18,13,5,4,3,6,12,8,2,4,0,0,1.68,3.82,5.41,2.02,1.8
+la_liga,2023,la_liga_2023_132_ath_madrid_mallorca,25/11/2023,Ath Madrid,Mallorca,1,0,0,0,20,8,3,1,7,3,8,19,0,0,0,0,1.38,4.83,9.17,1.94,1.89
+la_liga,2023,la_liga_2023_133_villarreal_osasuna,26/11/2023,Villarreal,Osasuna,3,1,0,0,10,15,3,7,2,4,9,14,0,0,0,0,2.17,3.52,3.38,1.86,1.97
+la_liga,2023,la_liga_2023_134_sociedad_sevilla,26/11/2023,Sociedad,Sevilla,2,1,2,0,11,8,8,2,4,4,22,8,2,1,0,2,1.76,3.71,4.89,2.04,1.8
+la_liga,2023,la_liga_2023_135_cadiz_real_madrid,26/11/2023,Cadiz,Real Madrid,0,3,0,1,13,14,4,5,4,4,16,16,3,3,0,0,6.48,4.54,1.5,1.74,2.12
+la_liga,2023,la_liga_2023_136_betis_las_palmas,26/11/2023,Betis,Las Palmas,1,0,1,0,12,15,6,4,7,6,7,12,1,2,0,0,1.68,3.8,5.52,2.12,1.74
+la_liga,2023,la_liga_2023_137_girona_ath_bilbao,27/11/2023,Girona,Ath Bilbao,1,1,0,0,12,13,2,6,2,6,8,16,1,1,0,0,2.28,3.66,3.01,1.67,2.23
+la_liga,2023,la_liga_2023_138_mallorca_cadiz,29/11/2023,Mallorca,Cadiz,1,1,1,1,16,6,3,3,7,0,14,18,2,3,0,0,1.98,3.24,4.38,2.57,1.52
+la_liga,2023,la_liga_2023_139_las_palmas_getafe,01/12/2023,Las Palmas,Getafe,2,0,1,0,11,12,6,4,4,4,11,9,0,5,0,1,2.45,2.95,3.41,2.91,1.42
+la_liga,2023,la_liga_2023_140_girona_valencia,02/12/2023,Girona,Valencia,2,1,0,0,9,9,5,3,3,2,6,7,2,3,0,0,1.7,3.99,4.99,1.82,2.03
+la_liga,2023,la_liga_2023_141_ath_bilbao_vallecano,02/12/2023,Ath Bilbao,Vallecano,4,0,1,0,9,11,4,3,7,2,15,11,1,2,0,0,1.59,4.22,5.72,1.81,2.03
+la_liga,2023,la_liga_2023_142_real_madrid_granada,02/12/2023,Real Madrid,Granada,2,0,1,0,11,1,4,0,6,0,10,12,2,1,0,0,1.16,8.44,15.7,1.36,3.16
+la_liga,2023,la_liga_2023_143_osasuna_sociedad,02/12/2023,Osasuna,Sociedad,1,1,1,1,9,17,3,5,1,8,12,10,3,3,0,0,3.57,3.23,2.23,2.42,1.58
+la_liga,2023,la_liga_2023_144_mallorca_alaves,03/12/2023,Mallorca,Alaves,0,0,0,0,7,7,3,4,5,4,16,15,4,2,0,0,2.46,3.01,3.32,2.77,1.45
+la_liga,2023,la_liga_2023_145_almeria_betis,03/12/2023,Almeria,Betis,0,0,0,0,20,6,8,2,4,6,12,8,0,3,0,1,3.28,3.63,2.18,1.74,2.12
+la_liga,2023,la_liga_2023_146_sevilla_villarreal,03/12/2023,Sevilla,Villarreal,1,1,0,0,18,5,4,4,8,4,6,16,3,2,0,0,2.11,3.69,3.41,1.7,2.18
+la_liga,2023,la_liga_2023_147_barcelona_ath_madrid,03/12/2023,Barcelona,Ath Madrid,1,0,1,0,13,9,2,4,7,2,17,12,5,4,0,0,2.03,3.7,3.6,1.76,2.1
+la_liga,2023,la_liga_2023_148_celta_cadiz,04/12/2023,Celta,Cadiz,1,1,0,1,26,2,7,1,12,1,14,18,1,6,0,1,1.6,4.02,5.85,2.0,1.84
+la_liga,2023,la_liga_2023_149_getafe_valencia,08/12/2023,Getafe,Valencia,1,0,0,0,8,3,6,0,7,0,15,14,2,4,1,2,2.69,2.88,3.09,2.9,1.41
+la_liga,2023,la_liga_2023_150_alaves_las_palmas,09/12/2023,Alaves,Las Palmas,0,1,0,1,19,9,5,2,12,3,13,13,3,4,0,0,2.06,3.17,4.1,2.59,1.51
+la_liga,2023,la_liga_2023_151_betis_real_madrid,09/12/2023,Betis,Real Madrid,1,1,0,0,14,12,6,2,8,6,14,7,2,1,0,0,4.26,3.85,1.82,1.76,2.09
+la_liga,2023,la_liga_2023_152_villarreal_sociedad,09/12/2023,Villarreal,Sociedad,0,3,0,3,20,16,4,5,5,3,10,22,2,1,0,0,3.42,3.52,2.14,1.94,1.88
+la_liga,2023,la_liga_2023_153_mallorca_sevilla,09/12/2023,Mallorca,Sevilla,1,0,1,0,6,19,3,5,4,12,15,6,2,2,0,0,2.68,3.16,2.83,2.38,1.59
+la_liga,2023,la_liga_2023_154_ath_madrid_almeria,10/12/2023,Ath Madrid,Almeria,2,1,2,0,13,19,4,5,3,15,13,11,1,0,0,0,1.22,7.07,12.5,1.38,3.06
+la_liga,2023,la_liga_2023_155_cadiz_osasuna,10/12/2023,Cadiz,Osasuna,1,1,1,0,12,13,5,5,2,4,15,16,1,2,0,0,2.95,3.14,2.58,2.43,1.57
+la_liga,2023,la_liga_2023_156_barcelona_girona,10/12/2023,Barcelona,Girona,2,4,1,2,31,15,11,7,8,3,7,10,1,2,0,0,1.53,4.79,5.6,1.48,2.64
+la_liga,2023,la_liga_2023_157_granada_ath_bilbao,11/12/2023,Granada,Ath Bilbao,1,1,0,1,7,19,4,4,1,8,9,11,0,2,0,0,4.8,4.12,1.69,1.71,2.16
+la_liga,2023,la_liga_2023_158_vallecano_celta,11/12/2023,Vallecano,Celta,0,0,0,0,17,4,4,2,8,1,15,10,3,0,0,0,2.44,3.32,3.0,2.05,1.79
+la_liga,2023,la_liga_2023_159_osasuna_vallecano,15/12/2023,Osasuna,Vallecano,1,0,0,0,10,9,4,3,9,1,20,13,2,3,0,0,2.25,3.19,3.55,2.47,1.57
+la_liga,2023,la_liga_2023_160_celta_granada,16/12/2023,Celta,Granada,1,0,1,0,11,7,4,2,7,1,20,18,6,2,1,0,1.67,4.09,5.06,1.78,2.07
+la_liga,2023,la_liga_2023_161_ath_bilbao_ath_madrid,16/12/2023,Ath Bilbao,Ath Madrid,2,0,0,0,16,7,7,3,3,7,7,10,0,1,0,0,2.44,3.47,2.92,1.9,1.94
+la_liga,2023,la_liga_2023_162_sevilla_getafe,16/12/2023,Sevilla,Getafe,0,3,0,2,12,14,4,7,4,2,18,18,3,3,0,0,1.95,3.42,4.25,2.25,1.66
+la_liga,2023,la_liga_2023_163_valencia_barcelona,16/12/2023,Valencia,Barcelona,1,1,0,0,11,16,4,8,4,6,9,11,1,2,0,0,5.12,4.01,1.67,1.83,2.01
+la_liga,2023,la_liga_2023_164_almeria_mallorca,17/12/2023,Almeria,Mallorca,0,0,0,0,7,20,1,2,4,4,12,9,2,1,0,0,2.65,3.3,2.78,2.12,1.75
+la_liga,2023,la_liga_2023_165_sociedad_betis,17/12/2023,Sociedad,Betis,0,0,0,0,12,12,4,3,3,7,12,12,3,4,0,0,1.71,3.87,5.08,2.04,1.8
+la_liga,2023,la_liga_2023_166_las_palmas_cadiz,17/12/2023,Las Palmas,Cadiz,1,1,1,0,7,13,2,5,4,6,9,12,1,3,0,0,1.95,3.35,4.35,2.41,1.59
+la_liga,2023,la_liga_2023_167_real_madrid_villarreal,17/12/2023,Real Madrid,Villarreal,4,1,2,0,22,3,9,1,11,0,14,12,2,3,0,0,1.29,6.29,9.4,1.38,3.06
+la_liga,2023,la_liga_2023_168_girona_alaves,18/12/2023,Girona,Alaves,3,0,2,0,9,12,4,2,3,2,9,7,0,1,0,0,1.55,4.3,5.95,1.75,2.11
+la_liga,2023,la_liga_2023_169_vallecano_valencia,19/12/2023,Vallecano,Valencia,0,1,0,0,7,8,1,3,8,1,16,18,1,5,0,1,2.22,3.2,3.58,2.4,1.59
+la_liga,2023,la_liga_2023_170_ath_madrid_getafe,19/12/2023,Ath Madrid,Getafe,3,3,1,0,8,29,4,9,1,12,7,14,3,3,1,0,1.46,4.45,7.72,2.0,1.84
+la_liga,2023,la_liga_2023_171_granada_sevilla,19/12/2023,Granada,Sevilla,0,3,0,2,12,12,3,5,6,4,10,18,2,1,0,0,2.88,3.32,2.54,2.07,1.78
+la_liga,2023,la_liga_2023_172_barcelona_almeria,20/12/2023,Barcelona,Almeria,3,2,1,1,30,10,11,5,12,0,16,9,3,3,0,0,1.14,9.55,16.82,1.26,3.87
+la_liga,2023,la_liga_2023_173_ath_bilbao_las_palmas,20/12/2023,Ath Bilbao,Las Palmas,1,0,0,0,19,5,10,1,5,2,12,11,1,3,0,0,1.39,4.88,8.3,1.79,2.06
+la_liga,2023,la_liga_2023_174_villarreal_celta,20/12/2023,Villarreal,Celta,3,2,2,0,12,15,8,5,4,7,16,15,2,4,0,0,2.41,3.53,2.9,1.85,1.99
+la_liga,2023,la_liga_2023_175_betis_girona,21/12/2023,Betis,Girona,1,1,0,1,21,12,4,4,7,6,6,9,2,2,0,0,2.8,3.61,2.43,1.74,2.12
+la_liga,2023,la_liga_2023_176_cadiz_sociedad,21/12/2023,Cadiz,Sociedad,0,0,0,0,10,8,2,1,7,5,16,15,3,1,0,0,4.61,3.46,1.85,2.27,1.65
+la_liga,2023,la_liga_2023_177_alaves_real_madrid,21/12/2023,Alaves,Real Madrid,0,1,0,0,8,9,2,4,3,3,18,13,3,1,0,1,5.78,4.27,1.57,1.78,2.07
+la_liga,2023,la_liga_2023_178_mallorca_osasuna,21/12/2023,Mallorca,Osasuna,3,2,1,1,15,12,8,7,6,0,11,12,3,1,0,0,2.37,3.0,3.45,2.78,1.45
+la_liga,2023,la_liga_2023_179_ath_madrid_sevilla,23/12/2023,Ath Madrid,Sevilla,1,0,0,0,12,8,4,2,6,5,12,19,7,3,1,0,1.53,4.46,6.04,1.71,2.18
+la_liga,2023,la_liga_2023_180_getafe_vallecano,02/01/2024,Getafe,Vallecano,0,2,0,1,5,12,0,8,2,3,16,16,6,3,2,0,2.42,3.0,3.39,2.63,1.5
+la_liga,2023,la_liga_2023_181_sociedad_alaves,02/01/2024,Sociedad,Alaves,1,1,0,0,16,7,6,2,6,4,9,17,4,4,1,0,1.59,3.84,6.63,2.34,1.62
+la_liga,2023,la_liga_2023_182_valencia_villarreal,02/01/2024,Valencia,Villarreal,3,1,2,0,11,8,8,4,4,3,12,15,2,5,0,0,2.05,3.5,3.72,1.99,1.85
+la_liga,2023,la_liga_2023_183_granada_cadiz,03/01/2024,Granada,Cadiz,2,0,1,0,15,15,8,2,5,6,17,16,3,4,0,1,2.26,3.19,3.49,2.33,1.61
+la_liga,2023,la_liga_2023_184_celta_betis,03/01/2024,Celta,Betis,2,1,1,1,19,14,6,3,8,7,10,12,0,2,0,0,2.43,3.37,2.98,1.99,1.84
+la_liga,2023,la_liga_2023_185_real_madrid_mallorca,03/01/2024,Real Madrid,Mallorca,1,0,0,0,17,7,5,0,5,4,5,15,2,3,0,0,1.24,6.4,12.86,1.66,2.26
+la_liga,2023,la_liga_2023_186_girona_ath_madrid,03/01/2024,Girona,Ath Madrid,4,3,3,2,17,18,9,12,7,8,8,10,0,1,0,0,2.57,3.61,2.66,1.68,2.22
+la_liga,2023,la_liga_2023_187_osasuna_almeria,04/01/2024,Osasuna,Almeria,1,0,1,0,14,4,2,0,5,4,14,5,1,2,0,0,1.71,3.92,4.89,1.88,1.95
+la_liga,2023,la_liga_2023_188_sevilla_ath_bilbao,04/01/2024,Sevilla,Ath Bilbao,0,2,0,1,11,15,2,6,5,4,9,19,3,1,0,0,3.08,3.33,2.39,2.04,1.8
+la_liga,2023,la_liga_2023_189_las_palmas_barcelona,04/01/2024,Las Palmas,Barcelona,1,2,1,0,12,15,3,5,5,10,14,5,5,2,1,0,5.68,4.33,1.57,1.71,2.12
+la_liga,2023,la_liga_2023_190_sevilla_alaves,12/01/2024,Sevilla,Alaves,2,3,0,2,19,16,4,8,5,4,12,13,4,3,0,0,1.94,3.35,4.42,2.4,1.59
+la_liga,2023,la_liga_2023_191_las_palmas_villarreal,13/01/2024,Las Palmas,Villarreal,3,0,1,0,8,17,3,3,4,6,13,11,4,3,0,0,2.52,3.36,2.87,1.96,1.87
+la_liga,2023,la_liga_2023_192_mallorca_celta,13/01/2024,Mallorca,Celta,1,1,1,1,17,6,6,2,10,1,18,18,4,1,0,0,2.57,3.02,3.1,2.6,1.5
+la_liga,2023,la_liga_2023_193_ath_bilbao_sociedad,13/01/2024,Ath Bilbao,Sociedad,2,1,2,0,10,9,3,1,5,5,16,21,1,4,0,0,2.04,3.42,3.88,2.17,1.7
+la_liga,2023,la_liga_2023_194_betis_granada,13/01/2024,Betis,Granada,1,0,0,0,25,6,6,2,13,1,11,17,3,4,0,0,1.63,4.1,5.45,1.86,1.97
+la_liga,2023,la_liga_2023_195_almeria_girona,14/01/2024,Almeria,Girona,0,0,0,0,20,5,3,1,4,3,13,8,4,4,0,1,4.61,4.32,1.68,1.5,2.59
+la_liga,2023,la_liga_2023_196_cadiz_valencia,14/01/2024,Cadiz,Valencia,1,4,1,1,10,9,2,5,3,1,15,15,4,2,0,0,2.93,3.02,2.7,2.5,1.55
+la_liga,2023,la_liga_2023_197_alaves_cadiz,19/01/2024,Alaves,Cadiz,1,0,0,0,13,9,3,1,4,4,15,18,0,4,0,0,1.73,3.45,5.83,2.61,1.51
+la_liga,2023,la_liga_2023_198_vallecano_las_palmas,20/01/2024,Vallecano,Las Palmas,0,2,0,1,16,10,3,5,12,0,19,8,3,1,1,0,1.92,3.43,4.37,2.33,1.62
+la_liga,2023,la_liga_2023_199_villarreal_mallorca,20/01/2024,Villarreal,Mallorca,1,1,1,0,18,8,5,2,4,6,13,11,2,2,1,0,2.09,3.48,3.59,2.05,1.78
+la_liga,2023,la_liga_2023_200_valencia_ath_bilbao,20/01/2024,Valencia,Ath Bilbao,1,0,0,0,6,6,1,3,4,2,11,14,0,3,0,0,3.38,3.39,2.21,2.17,1.71
+la_liga,2023,la_liga_2023_201_celta_sociedad,20/01/2024,Celta,Sociedad,0,1,0,1,6,6,2,2,6,3,12,18,1,2,0,0,3.23,3.07,2.46,2.47,1.56
+la_liga,2023,la_liga_2023_202_osasuna_getafe,21/01/2024,Osasuna,Getafe,3,2,2,0,13,10,7,7,1,4,14,16,4,4,0,0,2.18,3.09,3.81,2.64,1.49
+la_liga,2023,la_liga_2023_203_real_madrid_almeria,21/01/2024,Real Madrid,Almeria,3,2,0,2,18,10,6,2,6,3,9,17,3,5,0,0,1.15,9.07,16.19,1.29,3.54
+la_liga,2023,la_liga_2023_204_betis_barcelona,21/01/2024,Betis,Barcelona,2,4,0,1,14,11,5,4,3,4,12,9,1,2,0,0,4.24,3.92,1.81,1.7,2.18
+la_liga,2023,la_liga_2023_205_girona_sevilla,21/01/2024,Girona,Sevilla,5,1,3,1,12,9,8,3,4,5,9,11,0,2,0,0,1.73,4.0,4.6,1.67,2.22
+la_liga,2023,la_liga_2023_206_granada_ath_madrid,22/01/2024,Granada,Ath Madrid,0,1,0,0,17,10,2,5,6,2,11,16,2,2,1,0,4.79,3.97,1.71,1.78,2.05
+la_liga,2023,la_liga_2023_207_almeria_alaves,26/01/2024,Almeria,Alaves,0,3,0,1,19,11,7,3,11,3,17,12,1,2,0,0,2.61,3.23,2.86,2.23,1.68
+la_liga,2023,la_liga_2023_208_sociedad_vallecano,27/01/2024,Sociedad,Vallecano,0,0,0,0,6,5,3,0,2,2,16,14,2,4,0,0,1.67,3.72,5.69,2.27,1.65
+la_liga,2023,la_liga_2023_209_las_palmas_real_madrid,27/01/2024,Las Palmas,Real Madrid,1,2,0,0,7,13,2,5,1,6,17,14,3,3,0,0,6.81,4.71,1.46,1.67,2.23
+la_liga,2023,la_liga_2023_210_barcelona_villarreal,27/01/2024,Barcelona,Villarreal,3,5,0,1,22,9,10,6,10,0,8,13,3,4,0,0,1.34,5.91,7.85,1.35,3.23
+la_liga,2023,la_liga_2023_211_mallorca_betis,27/01/2024,Mallorca,Betis,0,1,0,1,14,8,1,2,5,4,14,6,2,1,0,0,2.4,3.14,3.25,2.48,1.55
+la_liga,2023,la_liga_2023_212_celta_girona,28/01/2024,Celta,Girona,0,1,0,1,10,15,5,6,5,7,13,11,1,1,0,0,2.77,3.52,2.49,1.74,2.09
+la_liga,2023,la_liga_2023_213_cadiz_ath_bilbao,28/01/2024,Cadiz,Ath Bilbao,0,0,0,0,9,8,2,0,6,8,13,14,4,2,0,0,5.14,3.62,1.74,2.21,1.68
+la_liga,2023,la_liga_2023_214_sevilla_osasuna,28/01/2024,Sevilla,Osasuna,1,1,1,0,10,11,5,4,2,4,19,13,3,0,1,0,2.06,3.36,3.79,2.22,1.67
+la_liga,2023,la_liga_2023_215_ath_madrid_valencia,28/01/2024,Ath Madrid,Valencia,2,0,1,0,12,10,8,3,3,6,9,9,2,0,0,0,1.5,4.42,6.51,1.81,2.02
+la_liga,2023,la_liga_2023_216_getafe_granada,29/01/2024,Getafe,Granada,2,0,2,0,7,16,4,3,4,3,17,11,2,1,0,0,1.82,3.49,4.73,2.3,1.62
+la_liga,2023,la_liga_2023_217_barcelona_osasuna,31/01/2024,Barcelona,Osasuna,1,0,0,0,16,9,4,1,6,6,9,12,1,2,0,1,1.32,5.57,9.5,1.62,2.34
+la_liga,2023,la_liga_2023_218_ath_madrid_vallecano,31/01/2024,Ath Madrid,Vallecano,2,1,1,1,8,10,3,2,5,6,11,13,0,3,0,0,1.5,4.47,6.58,1.77,2.08
+la_liga,2023,la_liga_2023_219_getafe_real_madrid,01/02/2024,Getafe,Real Madrid,0,2,0,1,10,16,2,9,2,6,16,5,1,2,0,0,6.23,4.19,1.55,1.92,1.91
+la_liga,2023,la_liga_2023_220_ath_bilbao_mallorca,02/02/2024,Ath Bilbao,Mallorca,4,0,2,0,13,6,6,2,6,2,17,15,0,1,0,0,1.55,3.96,6.95,2.24,1.67
+la_liga,2023,la_liga_2023_221_valencia_almeria,03/02/2024,Valencia,Almeria,2,1,2,0,7,15,2,5,0,6,17,16,4,5,0,0,1.67,3.93,5.26,1.95,1.88
+la_liga,2023,la_liga_2023_222_granada_las_palmas,03/02/2024,Granada,Las Palmas,1,1,1,0,3,16,1,6,2,9,6,16,4,3,1,1,2.3,3.25,3.32,2.25,1.66
+la_liga,2023,la_liga_2023_223_alaves_barcelona,03/02/2024,Alaves,Barcelona,1,3,0,1,13,8,2,5,14,5,15,10,2,2,0,1,4.18,3.71,1.87,1.87,1.97
+la_liga,2023,la_liga_2023_224_girona_sociedad,03/02/2024,Girona,Sociedad,0,0,0,0,11,11,3,2,3,4,8,19,2,3,0,0,2.15,3.46,3.48,2.0,1.85
+la_liga,2023,la_liga_2023_225_villarreal_cadiz,04/02/2024,Villarreal,Cadiz,0,0,0,0,19,8,4,2,13,2,14,14,3,1,0,0,1.65,4.04,5.23,1.86,1.98
+la_liga,2023,la_liga_2023_226_osasuna_celta,04/02/2024,Osasuna,Celta,0,3,0,2,18,6,1,5,9,1,10,10,2,0,0,0,2.35,3.17,3.31,2.45,1.56
+la_liga,2023,la_liga_2023_227_betis_getafe,04/02/2024,Betis,Getafe,1,1,1,1,9,11,3,2,3,5,9,19,7,4,0,0,1.91,3.43,4.39,2.28,1.64
+la_liga,2023,la_liga_2023_228_real_madrid_ath_madrid,04/02/2024,Real Madrid,Ath Madrid,1,1,1,0,17,10,4,5,2,8,6,15,0,5,0,0,1.76,4.04,4.39,1.67,2.24
+la_liga,2023,la_liga_2023_229_vallecano_sevilla,05/02/2024,Vallecano,Sevilla,1,2,1,2,22,10,5,6,6,0,8,10,2,2,0,0,2.19,3.34,3.45,2.18,1.69
+la_liga,2023,la_liga_2023_230_cadiz_betis,09/02/2024,Cadiz,Betis,0,2,0,1,14,13,5,5,5,3,12,10,1,1,0,0,3.03,2.99,2.65,2.67,1.49
+la_liga,2023,la_liga_2023_231_alaves_villarreal,10/02/2024,Alaves,Villarreal,1,1,1,1,17,12,4,4,10,9,7,11,0,2,0,0,2.21,3.41,3.35,2.01,1.82
+la_liga,2023,la_liga_2023_232_sociedad_osasuna,10/02/2024,Sociedad,Osasuna,0,1,0,0,21,9,3,2,7,4,11,11,0,0,0,0,1.87,3.23,5.01,2.79,1.44
+la_liga,2023,la_liga_2023_233_real_madrid_girona,10/02/2024,Real Madrid,Girona,4,0,2,0,16,5,6,0,0,2,9,12,1,2,0,0,1.45,5.04,6.42,1.44,2.8
+la_liga,2023,la_liga_2023_234_las_palmas_valencia,10/02/2024,Las Palmas,Valencia,2,0,0,0,8,7,3,1,5,0,9,9,2,0,0,0,2.72,2.99,2.93,2.57,1.52
+la_liga,2023,la_liga_2023_235_getafe_celta,11/02/2024,Getafe,Celta,3,2,2,0,11,9,4,4,0,4,16,13,1,2,0,0,2.24,3.14,3.59,2.54,1.53
+la_liga,2023,la_liga_2023_236_mallorca_vallecano,11/02/2024,Mallorca,Vallecano,2,1,0,0,8,11,5,4,5,1,17,11,4,0,0,0,2.38,2.98,3.46,2.72,1.46
+la_liga,2023,la_liga_2023_237_sevilla_ath_madrid,11/02/2024,Sevilla,Ath Madrid,1,0,1,0,10,16,6,5,2,7,8,5,2,1,0,0,3.5,3.55,2.09,1.84,1.99
+la_liga,2023,la_liga_2023_238_barcelona_granada,11/02/2024,Barcelona,Granada,3,3,1,1,11,11,6,5,6,2,13,9,1,2,0,0,1.21,7.23,12.32,1.4,2.91
+la_liga,2023,la_liga_2023_239_almeria_ath_bilbao,12/02/2024,Almeria,Ath Bilbao,0,0,0,0,10,12,4,4,4,10,17,15,4,1,1,0,4.65,3.92,1.73,1.81,2.01
+la_liga,2023,la_liga_2023_240_villarreal_getafe,16/02/2024,Villarreal,Getafe,1,1,0,1,20,11,7,2,8,3,13,13,0,1,0,0,2.0,3.56,3.81,1.95,1.89
+la_liga,2023,la_liga_2023_241_ath_madrid_las_palmas,17/02/2024,Ath Madrid,Las Palmas,5,0,2,0,13,11,7,2,3,5,19,9,2,2,0,0,1.47,4.59,7.09,1.81,2.04
+la_liga,2023,la_liga_2023_242_osasuna_cadiz,17/02/2024,Osasuna,Cadiz,2,0,0,0,11,5,4,1,5,4,20,12,4,2,0,0,1.79,3.41,5.27,2.55,1.52
+la_liga,2023,la_liga_2023_243_celta_barcelona,17/02/2024,Celta,Barcelona,1,2,0,1,13,14,4,4,2,5,11,13,2,4,0,0,3.96,3.85,1.88,1.68,2.22
+la_liga,2023,la_liga_2023_244_valencia_sevilla,17/02/2024,Valencia,Sevilla,0,0,0,0,14,1,4,1,7,2,5,8,0,1,0,0,2.26,3.31,3.34,2.21,1.69
+la_liga,2023,la_liga_2023_245_vallecano_real_madrid,18/02/2024,Vallecano,Real Madrid,1,1,1,1,8,11,3,4,4,10,17,7,4,3,0,1,5.49,4.07,1.63,1.84,2.0
+la_liga,2023,la_liga_2023_246_granada_almeria,18/02/2024,Granada,Almeria,1,1,0,1,19,13,7,3,10,4,13,22,2,3,0,0,2.14,3.51,3.41,1.93,1.88
+la_liga,2023,la_liga_2023_247_mallorca_sociedad,18/02/2024,Mallorca,Sociedad,1,2,1,1,4,19,1,5,3,9,12,18,7,5,1,0,3.34,2.83,2.55,3.25,1.33
+la_liga,2023,la_liga_2023_248_betis_alaves,18/02/2024,Betis,Alaves,0,0,0,0,13,13,2,4,6,8,13,9,5,2,0,0,2.1,3.34,3.7,2.19,1.69
+la_liga,2023,la_liga_2023_249_ath_bilbao_girona,19/02/2024,Ath Bilbao,Girona,3,2,1,0,14,12,7,6,3,4,16,13,1,2,0,0,1.98,3.72,3.68,1.71,2.15
+la_liga,2023,la_liga_2023_250_sociedad_villarreal,23/02/2024,Sociedad,Villarreal,1,3,0,1,21,6,8,4,13,2,15,14,3,4,0,0,1.73,3.78,5.06,1.96,1.85
+la_liga,2023,la_liga_2023_251_barcelona_getafe,24/02/2024,Barcelona,Getafe,4,0,1,0,17,10,9,4,5,8,12,18,1,4,0,0,1.42,4.97,7.2,1.63,2.3
+la_liga,2023,la_liga_2023_252_alaves_mallorca,24/02/2024,Alaves,Mallorca,1,1,0,0,9,15,1,8,3,3,7,15,0,2,0,0,1.94,3.11,4.8,2.93,1.41
+la_liga,2023,la_liga_2023_253_almeria_ath_madrid,24/02/2024,Almeria,Ath Madrid,2,2,1,1,9,18,4,9,2,7,13,12,1,1,0,0,4.54,3.95,1.75,1.74,2.08
+la_liga,2023,la_liga_2023_254_cadiz_celta,25/02/2024,Cadiz,Celta,2,2,0,1,19,7,6,3,9,1,13,20,2,3,0,0,3.08,3.03,2.57,2.62,1.5
+la_liga,2023,la_liga_2023_255_betis_ath_bilbao,25/02/2024,Betis,Ath Bilbao,3,1,2,1,13,3,5,1,5,3,14,12,1,6,0,1,3.5,3.26,2.21,2.16,1.7
+la_liga,2023,la_liga_2023_256_las_palmas_osasuna,25/02/2024,Las Palmas,Osasuna,1,1,0,0,9,6,3,2,6,7,6,15,2,1,0,0,2.41,3.03,3.33,2.52,1.53
+la_liga,2023,la_liga_2023_257_real_madrid_sevilla,25/02/2024,Real Madrid,Sevilla,1,0,0,0,16,4,6,1,7,2,10,13,1,3,0,0,1.3,5.85,9.43,1.51,2.55
+la_liga,2023,la_liga_2023_258_girona_vallecano,26/02/2024,Girona,Vallecano,3,0,0,0,14,7,8,1,2,2,13,16,3,5,0,1,1.66,4.11,4.96,1.74,2.11
+la_liga,2023,la_liga_2023_259_celta_almeria,01/03/2024,Celta,Almeria,1,0,0,0,15,3,6,0,7,0,8,14,1,2,0,1,1.86,3.68,4.3,1.96,1.88
+la_liga,2023,la_liga_2023_260_sevilla_sociedad,02/03/2024,Sevilla,Sociedad,3,2,2,1,12,13,5,4,2,5,12,15,1,2,0,0,2.6,3.02,3.05,2.63,1.49
+la_liga,2023,la_liga_2023_261_vallecano_cadiz,02/03/2024,Vallecano,Cadiz,1,1,0,0,9,16,5,5,4,9,14,17,1,1,0,0,1.83,3.34,5.09,2.6,1.5
+la_liga,2023,la_liga_2023_262_getafe_las_palmas,02/03/2024,Getafe,Las Palmas,3,3,3,1,16,14,5,5,4,4,28,9,4,1,0,0,2.05,3.18,4.15,2.53,1.53
+la_liga,2023,la_liga_2023_263_valencia_real_madrid,02/03/2024,Valencia,Real Madrid,2,2,2,1,12,10,5,5,2,2,18,11,2,3,0,1,5.32,3.91,1.67,1.97,1.86
+la_liga,2023,la_liga_2023_264_villarreal_granada,03/03/2024,Villarreal,Granada,5,1,3,0,16,9,10,3,6,4,12,15,1,2,0,0,1.65,4.21,4.99,1.64,2.3
+la_liga,2023,la_liga_2023_265_ath_madrid_betis,03/03/2024,Ath Madrid,Betis,2,1,2,0,17,12,12,6,4,6,9,12,1,2,0,0,1.56,4.34,5.73,1.74,2.11
+la_liga,2023,la_liga_2023_266_mallorca_girona,03/03/2024,Mallorca,Girona,1,0,1,0,16,15,2,4,8,5,19,9,5,0,0,0,3.23,3.3,2.3,2.15,1.71
+la_liga,2023,la_liga_2023_267_ath_bilbao_barcelona,03/03/2024,Ath Bilbao,Barcelona,0,0,0,0,8,8,2,2,4,4,14,11,3,3,0,0,2.86,3.54,2.42,1.74,2.12
+la_liga,2023,la_liga_2023_268_osasuna_alaves,04/03/2024,Osasuna,Alaves,1,0,0,0,15,10,4,4,5,5,15,11,2,1,0,0,2.39,3.08,3.27,2.58,1.5
+la_liga,2023,la_liga_2023_269_barcelona_mallorca,08/03/2024,Barcelona,Mallorca,1,0,0,0,20,9,6,3,4,1,9,14,1,1,0,0,1.46,4.58,7.23,1.81,2.03
+la_liga,2023,la_liga_2023_270_valencia_getafe,09/03/2024,Valencia,Getafe,1,0,1,0,10,15,3,5,5,5,10,19,2,3,0,0,2.0,3.18,4.38,2.69,1.48
+la_liga,2023,la_liga_2023_271_cadiz_ath_madrid,09/03/2024,Cadiz,Ath Madrid,2,0,1,0,7,8,3,4,3,1,20,15,4,5,0,0,4.93,3.71,1.75,2.13,1.74
+la_liga,2023,la_liga_2023_272_granada_sociedad,09/03/2024,Granada,Sociedad,2,3,2,1,13,11,6,8,4,6,17,11,1,2,0,0,4.43,3.44,1.89,2.27,1.65
+la_liga,2023,la_liga_2023_273_girona_osasuna,09/03/2024,Girona,Osasuna,2,0,1,0,11,7,6,1,5,7,10,16,3,3,0,0,1.62,4.2,5.41,1.72,2.14
+la_liga,2023,la_liga_2023_274_alaves_vallecano,10/03/2024,Alaves,Vallecano,1,0,1,0,12,9,4,3,7,5,13,10,2,2,0,0,2.17,3.15,3.77,2.57,1.52
+la_liga,2023,la_liga_2023_275_las_palmas_ath_bilbao,10/03/2024,Las Palmas,Ath Bilbao,0,2,0,1,14,7,2,2,10,3,8,14,3,3,0,0,3.97,3.37,2.01,2.19,1.69
+la_liga,2023,la_liga_2023_276_real_madrid_celta,10/03/2024,Real Madrid,Celta,4,0,1,0,24,11,13,1,12,1,8,13,2,3,0,0,1.3,5.94,9.62,1.52,2.52
+la_liga,2023,la_liga_2023_277_betis_villarreal,10/03/2024,Betis,Villarreal,2,3,2,1,13,6,4,4,11,4,12,17,3,4,1,1,2.08,3.62,3.48,1.76,2.09
+la_liga,2023,la_liga_2023_278_almeria_sevilla,11/03/2024,Almeria,Sevilla,2,2,1,0,14,19,4,6,1,8,6,11,2,2,0,0,3.06,3.34,2.38,1.93,1.89
+la_liga,2023,la_liga_2023_279_sociedad_cadiz,15/03/2024,Sociedad,Cadiz,2,0,1,0,14,13,6,2,8,2,15,6,3,1,0,0,1.48,4.03,8.4,2.43,1.58
+la_liga,2023,la_liga_2023_280_mallorca_granada,16/03/2024,Mallorca,Granada,1,0,0,0,18,8,8,3,10,2,17,9,2,0,0,0,1.84,3.4,4.85,2.41,1.59
+la_liga,2023,la_liga_2023_281_osasuna_real_madrid,16/03/2024,Osasuna,Real Madrid,2,4,1,2,9,17,4,9,5,7,18,9,3,2,0,0,5.97,4.25,1.56,1.83,2.01
+la_liga,2023,la_liga_2023_282_getafe_girona,16/03/2024,Getafe,Girona,1,0,1,0,11,13,3,3,2,5,16,13,4,4,0,0,3.13,3.49,2.29,1.85,1.99
+la_liga,2023,la_liga_2023_283_ath_bilbao_alaves,16/03/2024,Ath Bilbao,Alaves,2,0,2,0,16,7,4,3,5,4,7,13,1,3,0,0,1.55,3.97,6.69,2.19,1.69
+la_liga,2023,la_liga_2023_284_sevilla_celta,17/03/2024,Sevilla,Celta,1,2,1,0,11,18,4,5,3,8,13,6,4,0,0,0,2.01,3.42,3.92,2.07,1.78
+la_liga,2023,la_liga_2023_285_las_palmas_almeria,17/03/2024,Las Palmas,Almeria,0,1,0,1,21,3,6,2,11,3,8,17,2,2,0,0,1.91,3.59,4.1,1.93,1.88
+la_liga,2023,la_liga_2023_286_villarreal_valencia,17/03/2024,Villarreal,Valencia,1,0,0,0,13,14,7,7,6,2,12,12,5,1,0,0,2.1,3.46,3.56,1.98,1.85
+la_liga,2023,la_liga_2023_287_vallecano_betis,17/03/2024,Vallecano,Betis,2,0,1,0,8,11,4,1,4,8,22,16,4,4,0,0,2.49,3.23,2.98,2.25,1.66
+la_liga,2023,la_liga_2023_288_ath_madrid_barcelona,17/03/2024,Ath Madrid,Barcelona,0,3,0,1,12,9,3,5,7,3,15,9,3,1,1,0,2.39,3.63,2.84,1.65,2.26
+la_liga,2023,la_liga_2023_289_cadiz_granada,29/03/2024,Cadiz,Granada,1,0,0,0,13,10,5,2,5,2,17,14,2,4,0,0,2.02,3.34,4.1,2.33,1.61
+la_liga,2023,la_liga_2023_290_getafe_sevilla,30/03/2024,Getafe,Sevilla,0,1,0,1,18,10,5,3,7,3,11,15,4,5,0,0,2.53,3.15,3.02,2.24,1.67
+la_liga,2023,la_liga_2023_291_almeria_osasuna,30/03/2024,Almeria,Osasuna,0,3,0,2,12,6,5,4,6,1,12,14,3,2,0,0,2.62,3.25,2.83,2.12,1.75
+la_liga,2023,la_liga_2023_292_valencia_mallorca,30/03/2024,Valencia,Mallorca,0,0,0,0,14,11,5,3,3,3,8,11,0,2,0,0,2.1,2.96,4.35,2.99,1.4
+la_liga,2023,la_liga_2023_293_barcelona_las_palmas,30/03/2024,Barcelona,Las Palmas,1,0,0,0,14,8,2,0,6,1,11,9,5,1,0,1,1.27,6.34,10.15,1.46,2.74
+la_liga,2023,la_liga_2023_294_celta_vallecano,31/03/2024,Celta,Vallecano,0,0,0,0,13,8,0,2,3,2,12,16,3,3,0,0,1.96,3.39,4.16,2.2,1.69
+la_liga,2023,la_liga_2023_295_girona_betis,31/03/2024,Girona,Betis,3,2,1,1,9,7,5,4,5,4,13,14,3,4,0,0,1.78,3.96,4.37,1.72,2.15
+la_liga,2023,la_liga_2023_296_alaves_sociedad,31/03/2024,Alaves,Sociedad,0,1,0,0,3,12,0,3,3,8,10,15,2,2,0,0,3.41,2.96,2.42,2.75,1.45
+la_liga,2023,la_liga_2023_297_real_madrid_ath_bilbao,31/03/2024,Real Madrid,Ath Bilbao,2,0,1,0,9,7,4,3,4,7,9,13,2,1,0,0,1.55,4.29,5.87,1.76,2.09
+la_liga,2023,la_liga_2023_298_villarreal_ath_madrid,01/04/2024,Villarreal,Ath Madrid,1,2,0,1,11,14,2,8,3,3,14,22,3,3,0,0,3.0,3.71,2.27,1.59,2.36
+la_liga,2023,la_liga_2023_299_granada_valencia,04/04/2024,Granada,Valencia,0,1,0,0,13,6,3,2,5,4,20,15,3,1,0,0,3.32,3.19,2.3,2.33,1.6
+la_liga,2023,la_liga_2023_300_betis_celta,12/04/2024,Betis,Celta,2,1,0,0,15,12,3,5,6,5,7,10,1,0,0,0,2.06,3.47,3.71,2.03,1.81
+la_liga,2023,la_liga_2023_301_ath_madrid_girona,13/04/2024,Ath Madrid,Girona,3,1,2,1,17,12,4,5,2,0,18,12,3,2,0,0,1.97,3.78,3.67,1.64,2.29
+la_liga,2023,la_liga_2023_302_vallecano_getafe,13/04/2024,Vallecano,Getafe,0,0,0,0,11,7,2,0,3,0,17,19,4,6,0,0,2.23,3.05,3.73,2.6,1.5
+la_liga,2023,la_liga_2023_303_mallorca_real_madrid,13/04/2024,Mallorca,Real Madrid,0,1,0,0,6,16,2,9,4,2,18,7,2,1,0,0,4.92,3.66,1.77,2.08,1.77
+la_liga,2023,la_liga_2023_304_cadiz_barcelona,13/04/2024,Cadiz,Barcelona,0,1,0,1,14,12,3,2,8,4,17,15,3,3,0,0,4.33,3.57,1.88,1.97,1.86
+la_liga,2023,la_liga_2023_305_las_palmas_sevilla,14/04/2024,Las Palmas,Sevilla,0,2,0,1,5,10,2,3,6,2,8,13,3,3,1,0,2.74,3.18,2.75,2.17,1.7
+la_liga,2023,la_liga_2023_306_granada_alaves,14/04/2024,Granada,Alaves,2,0,2,0,9,8,3,3,1,5,16,11,3,2,0,0,3.1,3.1,2.51,2.34,1.61
+la_liga,2023,la_liga_2023_307_ath_bilbao_villarreal,14/04/2024,Ath Bilbao,Villarreal,1,1,0,0,13,10,6,2,3,1,13,12,3,3,0,1,1.77,3.97,4.4,1.7,2.17
+la_liga,2023,la_liga_2023_308_sociedad_almeria,14/04/2024,Sociedad,Almeria,2,2,1,1,17,7,4,3,5,1,16,8,2,2,1,0,1.33,5.2,9.97,1.76,2.08
+la_liga,2023,la_liga_2023_309_osasuna_valencia,15/04/2024,Osasuna,Valencia,0,1,0,1,13,4,2,3,4,1,10,10,0,2,0,0,2.22,3.1,3.65,2.61,1.49
+la_liga,2023,la_liga_2023_310_ath_bilbao_granada,19/04/2024,Ath Bilbao,Granada,1,1,1,1,17,5,6,0,11,4,11,15,4,2,0,0,1.28,5.86,11.69,1.7,2.2
+la_liga,2023,la_liga_2023_311_celta_las_palmas,20/04/2024,Celta,Las Palmas,4,1,2,1,21,9,13,4,8,4,10,9,1,0,0,0,1.76,3.71,4.9,2.05,1.8
+la_liga,2023,la_liga_2023_312_vallecano_osasuna,20/04/2024,Vallecano,Osasuna,2,1,0,1,17,6,6,2,5,1,9,15,4,1,0,0,2.22,3.13,3.63,2.61,1.5
+la_liga,2023,la_liga_2023_313_valencia_betis,20/04/2024,Valencia,Betis,1,2,0,1,8,12,5,6,7,6,18,10,2,3,0,0,2.21,3.28,3.51,2.23,1.67
+la_liga,2023,la_liga_2023_314_girona_cadiz,20/04/2024,Girona,Cadiz,4,1,2,0,10,12,5,5,2,4,11,14,1,2,0,0,1.42,4.81,7.59,1.71,2.17
+la_liga,2023,la_liga_2023_315_getafe_sociedad,21/04/2024,Getafe,Sociedad,1,1,1,1,6,7,4,3,0,4,12,18,0,2,0,0,3.8,3.1,2.18,2.66,1.48
+la_liga,2023,la_liga_2023_316_almeria_villarreal,21/04/2024,Almeria,Villarreal,1,2,1,1,24,11,5,3,5,2,10,16,3,4,1,0,3.4,3.75,2.06,1.63,2.32
+la_liga,2023,la_liga_2023_317_alaves_ath_madrid,21/04/2024,Alaves,Ath Madrid,2,0,1,0,8,15,3,4,1,11,20,12,5,3,0,0,4.08,3.43,1.97,2.2,1.69
+la_liga,2023,la_liga_2023_318_real_madrid_barcelona,21/04/2024,Real Madrid,Barcelona,3,2,1,1,14,14,8,6,2,8,11,12,3,2,0,0,1.87,3.96,3.89,1.54,2.48
+la_liga,2023,la_liga_2023_319_sevilla_mallorca,22/04/2024,Sevilla,Mallorca,2,1,0,0,11,8,4,6,4,4,10,8,0,2,0,0,1.98,3.14,4.52,2.63,1.49
+la_liga,2023,la_liga_2023_320_sociedad_real_madrid,26/04/2024,Sociedad,Real Madrid,0,1,0,1,9,5,3,3,11,3,13,11,3,4,0,0,2.5,3.2,3.03,2.23,1.68
+la_liga,2023,la_liga_2023_321_las_palmas_girona,27/04/2024,Las Palmas,Girona,0,2,0,1,10,6,5,3,4,2,12,10,1,3,0,0,4.36,3.94,1.78,1.71,2.18
+la_liga,2023,la_liga_2023_322_almeria_getafe,27/04/2024,Almeria,Getafe,1,3,1,1,21,8,11,5,9,2,15,31,5,4,1,0,2.72,3.31,2.66,2.1,1.76
+la_liga,2023,la_liga_2023_323_alaves_celta,27/04/2024,Alaves,Celta,3,0,0,0,16,4,8,0,8,3,10,9,3,3,0,0,2.66,3.1,2.9,2.41,1.59
+la_liga,2023,la_liga_2023_324_ath_madrid_ath_bilbao,27/04/2024,Ath Madrid,Ath Bilbao,3,1,1,1,8,7,3,1,3,5,16,15,3,2,0,0,1.98,3.54,3.9,1.96,1.87
+la_liga,2023,la_liga_2023_325_cadiz_mallorca,28/04/2024,Cadiz,Mallorca,1,1,0,1,10,9,2,2,3,1,14,21,3,2,0,0,2.6,2.86,3.22,3.04,1.38
+la_liga,2023,la_liga_2023_326_granada_osasuna,28/04/2024,Granada,Osasuna,3,0,1,0,12,11,4,2,0,6,17,5,4,0,0,0,2.6,3.13,2.93,2.3,1.64
+la_liga,2023,la_liga_2023_327_villarreal_vallecano,28/04/2024,Villarreal,Vallecano,3,0,1,0,15,20,7,4,3,6,15,8,2,1,0,0,1.73,3.91,4.74,1.8,2.03
+la_liga,2023,la_liga_2023_328_betis_sevilla,28/04/2024,Betis,Sevilla,1,1,1,0,15,10,5,1,4,6,9,20,3,5,0,0,2.08,3.39,3.7,2.05,1.78
+la_liga,2023,la_liga_2023_329_barcelona_valencia,29/04/2024,Barcelona,Valencia,4,2,1,2,27,5,13,3,15,1,12,5,1,0,0,1,1.36,5.26,8.27,1.64,2.28
+la_liga,2023,la_liga_2023_330_getafe_ath_bilbao,03/05/2024,Getafe,Ath Bilbao,0,2,0,1,34,7,9,2,10,6,6,9,0,2,0,2,3.93,3.24,2.07,2.43,1.58
+la_liga,2023,la_liga_2023_331_sociedad_las_palmas,04/05/2024,Sociedad,Las Palmas,2,0,2,0,9,7,4,1,7,2,12,11,2,1,0,0,1.35,4.99,9.5,1.88,1.95
+la_liga,2023,la_liga_2023_332_real_madrid_cadiz,04/05/2024,Real Madrid,Cadiz,3,0,0,0,19,7,9,2,7,4,6,12,0,1,0,0,1.34,5.33,8.92,1.67,2.22
+la_liga,2023,la_liga_2023_333_girona_barcelona,04/05/2024,Girona,Barcelona,4,2,1,2,9,16,7,7,5,4,11,8,0,3,0,0,2.73,3.81,2.41,1.45,2.77
+la_liga,2023,la_liga_2023_334_mallorca_ath_madrid,04/05/2024,Mallorca,Ath Madrid,0,1,0,1,7,9,4,4,6,2,12,7,2,0,0,0,3.75,3.2,2.15,2.39,1.59
+la_liga,2023,la_liga_2023_335_osasuna_betis,05/05/2024,Osasuna,Betis,0,2,0,2,12,10,2,4,8,5,13,13,2,2,1,0,3.16,3.27,2.36,2.16,1.71
+la_liga,2023,la_liga_2023_336_celta_villarreal,05/05/2024,Celta,Villarreal,3,2,2,1,23,11,7,3,2,1,11,5,4,0,0,1,2.37,3.64,2.87,1.66,2.25
+la_liga,2023,la_liga_2023_337_valencia_alaves,05/05/2024,Valencia,Alaves,0,1,0,0,13,14,1,4,5,7,9,17,1,3,0,0,2.13,3.0,4.13,2.67,1.46
+la_liga,2023,la_liga_2023_338_sevilla_granada,05/05/2024,Sevilla,Granada,3,0,1,0,11,8,5,3,5,4,15,13,2,2,0,0,1.65,4.07,5.18,1.83,2.01
+la_liga,2023,la_liga_2023_339_vallecano_almeria,05/05/2024,Vallecano,Almeria,0,1,0,1,27,7,10,2,9,2,17,15,3,2,0,0,1.58,4.15,5.8,1.83,2.0
+la_liga,2023,la_liga_2023_340_alaves_girona,10/05/2024,Alaves,Girona,2,2,1,2,14,15,8,5,5,3,13,6,3,2,0,0,3.48,3.57,2.11,1.8,2.04
+la_liga,2023,la_liga_2023_341_mallorca_las_palmas,11/05/2024,Mallorca,Las Palmas,1,0,1,0,7,7,2,1,2,2,18,10,6,2,0,0,1.66,3.46,6.65,2.53,1.53
+la_liga,2023,la_liga_2023_342_villarreal_sevilla,11/05/2024,Villarreal,Sevilla,3,2,1,2,25,8,7,4,10,1,12,14,3,5,0,0,1.87,3.94,3.9,1.59,2.4
+la_liga,2023,la_liga_2023_343_granada_real_madrid,11/05/2024,Granada,Real Madrid,0,4,0,2,12,13,1,7,8,5,11,10,2,0,0,0,5.8,4.57,1.53,1.63,2.26
+la_liga,2023,la_liga_2023_344_ath_bilbao_osasuna,11/05/2024,Ath Bilbao,Osasuna,2,2,0,1,15,13,6,3,8,6,9,14,2,4,0,0,1.47,4.38,7.53,1.94,1.88
+la_liga,2023,la_liga_2023_345_cadiz_getafe,12/05/2024,Cadiz,Getafe,1,0,1,0,13,10,6,4,6,2,23,16,5,2,0,0,2.11,3.21,3.86,2.56,1.52
+la_liga,2023,la_liga_2023_346_ath_madrid_celta,12/05/2024,Ath Madrid,Celta,1,0,0,0,21,6,8,2,4,7,7,9,1,1,0,0,1.44,4.64,7.42,1.59,2.37
+la_liga,2023,la_liga_2023_347_valencia_vallecano,12/05/2024,Valencia,Vallecano,0,0,0,0,13,12,5,1,6,3,14,21,1,2,0,0,2.28,3.08,3.55,2.54,1.52
+la_liga,2023,la_liga_2023_348_betis_almeria,12/05/2024,Betis,Almeria,3,2,2,1,14,14,7,7,3,5,9,10,0,2,0,0,1.35,5.39,8.26,1.52,2.52
+la_liga,2023,la_liga_2023_349_barcelona_sociedad,13/05/2024,Barcelona,Sociedad,2,0,1,0,14,10,5,3,6,2,12,14,2,3,0,0,1.82,3.72,4.35,1.91,1.9
+la_liga,2023,la_liga_2023_350_osasuna_mallorca,14/05/2024,Osasuna,Mallorca,1,1,1,0,10,10,4,4,2,4,12,11,0,1,0,0,2.81,2.92,2.91,2.91,1.42
+la_liga,2023,la_liga_2023_351_real_madrid_alaves,14/05/2024,Real Madrid,Alaves,5,0,3,0,22,18,11,10,4,1,6,12,1,1,0,0,1.21,7.03,14.07,1.49,2.63
+la_liga,2023,la_liga_2023_352_girona_villarreal,14/05/2024,Girona,Villarreal,0,1,0,0,22,11,5,3,5,1,3,14,1,5,0,1,1.7,4.53,4.31,1.33,3.36
+la_liga,2023,la_liga_2023_353_sevilla_cadiz,15/05/2024,Sevilla,Cadiz,0,1,0,0,14,19,3,7,1,9,13,11,6,2,0,0,1.91,3.61,4.12,2.05,1.8
+la_liga,2023,la_liga_2023_354_vallecano_granada,15/05/2024,Vallecano,Granada,2,1,1,0,18,10,9,1,6,6,12,17,4,3,1,0,1.67,3.77,5.54,2.18,1.71
+la_liga,2023,la_liga_2023_355_celta_ath_bilbao,15/05/2024,Celta,Ath Bilbao,2,1,0,1,10,7,4,2,2,3,15,14,2,0,0,0,2.61,3.37,2.74,1.96,1.88
+la_liga,2023,la_liga_2023_356_getafe_ath_madrid,15/05/2024,Getafe,Ath Madrid,0,3,0,2,8,7,3,3,6,3,17,7,4,3,0,0,4.7,3.54,1.82,2.18,1.71
+la_liga,2023,la_liga_2023_357_las_palmas_betis,16/05/2024,Las Palmas,Betis,2,2,1,1,16,6,9,4,4,8,9,12,2,1,0,0,4.04,3.57,1.94,2.0,1.85
+la_liga,2023,la_liga_2023_358_almeria_barcelona,16/05/2024,Almeria,Barcelona,0,2,0,1,12,16,3,7,4,7,9,11,0,1,0,0,6.62,5.32,1.42,1.36,3.18
+la_liga,2023,la_liga_2023_359_sociedad_valencia,16/05/2024,Sociedad,Valencia,1,0,1,0,10,7,5,3,3,3,11,13,0,2,0,0,1.65,3.76,5.85,2.26,1.66
+la_liga,2023,la_liga_2023_360_alaves_getafe,18/05/2024,Alaves,Getafe,1,0,1,0,9,10,2,4,2,1,13,27,5,7,0,1,2.07,3.19,4.04,2.51,1.54
+la_liga,2023,la_liga_2023_361_ath_bilbao_sevilla,19/05/2024,Ath Bilbao,Sevilla,2,0,2,0,15,9,6,4,8,3,12,5,1,1,0,0,1.73,3.84,4.81,1.87,1.96
+la_liga,2023,la_liga_2023_362_ath_madrid_osasuna,19/05/2024,Ath Madrid,Osasuna,1,4,0,1,15,15,2,6,7,5,12,9,2,2,0,0,1.4,4.91,7.75,1.74,2.12
+la_liga,2023,la_liga_2023_363_barcelona_vallecano,19/05/2024,Barcelona,Vallecano,3,0,1,0,14,15,6,4,7,5,10,7,4,2,0,0,1.27,6.12,10.63,1.49,2.63
+la_liga,2023,la_liga_2023_364_betis_sociedad,19/05/2024,Betis,Sociedad,0,2,0,2,18,5,9,2,6,2,12,18,3,4,0,0,2.61,3.14,2.92,2.3,1.63
+la_liga,2023,la_liga_2023_365_cadiz_las_palmas,19/05/2024,Cadiz,Las Palmas,0,0,0,0,10,9,3,1,5,3,13,12,3,1,1,0,1.84,3.47,4.64,2.37,1.6
+la_liga,2023,la_liga_2023_366_granada_celta,19/05/2024,Granada,Celta,1,2,0,0,11,8,3,5,10,2,15,12,2,1,0,0,3.62,3.61,2.04,1.78,2.07
+la_liga,2023,la_liga_2023_367_mallorca_almeria,19/05/2024,Mallorca,Almeria,2,2,1,1,29,7,8,3,12,2,9,9,2,3,0,0,1.51,4.18,6.92,2.05,1.8
+la_liga,2023,la_liga_2023_368_valencia_girona,19/05/2024,Valencia,Girona,1,3,0,1,20,18,6,5,5,4,10,8,2,0,0,0,2.92,3.62,2.35,1.71,2.13
+la_liga,2023,la_liga_2023_369_villarreal_real_madrid,19/05/2024,Villarreal,Real Madrid,4,4,1,4,21,12,7,6,3,3,15,12,3,2,0,0,3.24,3.93,2.07,1.43,2.82
+la_liga,2023,la_liga_2023_370_girona_granada,24/05/2024,Girona,Granada,7,0,3,0,16,10,9,2,4,2,6,13,3,5,0,1,1.22,7.13,11.24,1.28,3.66
+la_liga,2023,la_liga_2023_371_osasuna_villarreal,25/05/2024,Osasuna,Villarreal,1,1,1,0,12,11,6,3,6,4,13,6,4,3,0,0,2.9,3.72,2.3,1.56,2.47
+la_liga,2023,la_liga_2023_372_sociedad_ath_madrid,25/05/2024,Sociedad,Ath Madrid,0,2,0,1,14,10,4,4,8,4,19,15,3,5,0,1,2.4,3.45,2.93,1.93,1.9
+la_liga,2023,la_liga_2023_373_almeria_cadiz,25/05/2024,Almeria,Cadiz,6,1,0,1,27,12,12,4,1,4,4,9,2,2,0,0,2.1,3.59,3.43,1.84,1.99
+la_liga,2023,la_liga_2023_374_vallecano_ath_bilbao,25/05/2024,Vallecano,Ath Bilbao,0,1,0,0,17,7,4,1,8,2,6,13,1,1,0,0,2.88,3.51,2.41,1.76,2.08
+la_liga,2023,la_liga_2023_375_real_madrid_betis,25/05/2024,Real Madrid,Betis,0,0,0,0,13,11,5,3,4,5,8,11,2,1,0,0,1.37,5.56,7.31,1.37,3.08
+la_liga,2023,la_liga_2023_376_getafe_mallorca,26/05/2024,Getafe,Mallorca,1,2,0,0,16,9,6,4,3,4,12,10,0,2,0,0,2.33,3.22,3.25,2.29,1.64
+la_liga,2023,la_liga_2023_377_celta_valencia,26/05/2024,Celta,Valencia,2,2,0,1,9,12,4,1,2,2,17,18,0,0,0,0,1.96,3.55,3.89,1.94,1.89
+la_liga,2023,la_liga_2023_378_las_palmas_alaves,26/05/2024,Las Palmas,Alaves,1,1,0,0,10,14,4,4,2,6,16,10,2,1,0,0,2.47,3.34,2.91,2.12,1.74
+la_liga,2023,la_liga_2023_379_sevilla_barcelona,26/05/2024,Sevilla,Barcelona,1,2,1,1,15,11,6,6,6,5,11,9,2,1,0,0,3.89,4.11,1.83,1.5,2.57

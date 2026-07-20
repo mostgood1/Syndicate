@@ -1,0 +1,226 @@
+{
+  "league": "mls",
+  "date": "2026-07-22",
+  "generated_at": "2026-07-20T19:34:04.533686+00:00",
+  "count": 1,
+  "games": {
+    "761659": {
+      "event_id": "761659",
+      "home_team": "CF Montr\u00e9al",
+      "away_team": "Toronto FC",
+      "half": 2,
+      "clock_remaining": 1800.0,
+      "score_home": 0,
+      "score_away": 0,
+      "home_red_cards": 0,
+      "away_red_cards": 0,
+      "home_shots_so_far": 9,
+      "away_shots_so_far": 5,
+      "home_shots_on_target_so_far": 1,
+      "away_shots_on_target_so_far": 0,
+      "home_corners_so_far": 4,
+      "away_corners_so_far": 2,
+      "projection": {
+        "simulations": 100,
+        "home_win_probability": 0.36,
+        "draw_probability": 0.47,
+        "away_win_probability": 0.17,
+        "projected_final_home_goals": 0.53,
+        "projected_final_away_goals": 0.29,
+        "projected_final_total": 0.82,
+        "over_2_5_probability": 0.04,
+        "both_teams_scored_probability": 0.08,
+        "projected_home_corners": 5.97,
+        "projected_away_corners": 3.38,
+        "projected_total_corners": 9.35,
+        "home_red_card_applied": false,
+        "away_red_card_applied": false
+      },
+      "goal_windows": {
+        "next_10_min": 0.22
+      },
+      "live_player_props": [
+        {
+          "player_id": "asa_7VqGLJn6Qv",
+          "player_name": "Hennadiy Synchuk",
+          "side": "home",
+          "shots_so_far": 0,
+          "projected_remainder_shots": 0.7019,
+          "projected_final_shots": 0.7019,
+          "shots_over_probabilities": {
+            "0.5": 0.5043,
+            "1.5": 0.1565,
+            "2.5": 0.0344,
+            "3.5": 0.0058,
+            "4.5": 0.0008
+          }
+        },
+        {
+          "player_id": "asa_9vQ22nALQK",
+          "player_name": "Daniel R\u00edos",
+          "side": "home",
+          "shots_so_far": 0,
+          "projected_remainder_shots": 0.4706,
+          "projected_final_shots": 0.4706,
+          "shots_over_probabilities": {
+            "0.5": 0.3754,
+            "1.5": 0.0814,
+            "2.5": 0.0123,
+            "3.5": 0.0014,
+            "4.5": 0.0001
+          }
+        },
+        {
+          "player_id": "asa_315VPKlXQ9",
+          "player_name": "Iv\u00e1n Jaime",
+          "side": "home",
+          "shots_so_far": 0,
+          "projected_remainder_shots": 0.4499,
+          "projected_final_shots": 0.4499,
+          "shots_over_probabilities": {
+            "0.5": 0.3623,
+            "1.5": 0.0754,
+            "2.5": 0.0109,
+            "3.5": 0.0012,
+            "4.5": 0.0001
+          }
+        },
+        {
+          "player_id": "asa_jYQJznrBQG",
+          "player_name": "Prince Owusu",
+          "side": "home",
+          "shots_so_far": 0,
+          "projected_remainder_shots": 0.3691,
+          "projected_final_shots": 0.3691,
+          "shots_over_probabilities": {
+            "0.5": 0.3086,
+            "1.5": 0.0535,
+            "2.5": 0.0064,
+            "3.5": 0.0006,
+            "4.5": 0.0
+          }
+        },
+        {
+          "player_id": "asa_7VqG08wXQv",
+          "player_name": "Wikelman Carmona",
+          "side": "home",
+          "shots_so_far": 0,
+          "projected_remainder_shots": 0.3569,
+          "projected_final_shots": 0.3569,
+          "shots_over_probabilities": {
+            "0.5": 0.3001,
+            "1.5": 0.0504,
+            "2.5": 0.0058,
+            "3.5": 0.0005,
+            "4.5": 0.0
+          }
+        },
+        {
+          "player_id": "asa_kRQawAyb5K",
+          "player_name": "Emilio Aristiz\u00e1bal",
+          "side": "away",
+          "shots_so_far": 0,
+          "projected_remainder_shots": 0.3481,
+          "projected_final_shots": 0.3481,
+          "shots_over_probabilities": {
+            "0.5": 0.294,
+            "1.5": 0.0482,
+            "2.5": 0.0054,
+            "3.5": 0.0005,
+            "4.5": 0.0
+          }
+        },
+        {
+          "player_id": "asa_xW5pr1oYQg",
+          "player_name": "Josh Sargent",
+          "side": "away",
+          "shots_so_far": 0,
+          "projected_remainder_shots": 0.3425,
+          "projected_final_shots": 0.3425,
+          "shots_over_probabilities": {
+            "0.5": 0.29,
+            "1.5": 0.0468,
+            "2.5": 0.0052,
+            "3.5": 0.0004,
+            "4.5": 0.0
+          }
+        },
+        {
+          "player_id": "asa_a35rKGpLqL",
+          "player_name": "D\u00e1niel Sall\u00f3i",
+          "side": "away",
+          "shots_so_far": 0,
+          "projected_remainder_shots": 0.3086,
+          "projected_final_shots": 0.3086,
+          "shots_over_probabilities": {
+            "0.5": 0.2655,
+            "1.5": 0.0389,
+            "2.5": 0.0039,
+            "3.5": 0.0003,
+            "4.5": 0.0
+          }
+        },
+        {
+          "player_id": "asa_wvq9eWbBqW",
+          "player_name": "Deandre Kerr",
+          "side": "away",
+          "shots_so_far": 0,
+          "projected_remainder_shots": 0.2877,
+          "projected_final_shots": 0.2877,
+          "shots_over_probabilities": {
+            "0.5": 0.25,
+            "1.5": 0.0342,
+            "2.5": 0.0032,
+            "3.5": 0.0002,
+            "4.5": 0.0
+          }
+        },
+        {
+          "player_id": "asa_2lqRj3Zxqr",
+          "player_name": "Olger Escobar",
+          "side": "home",
+          "shots_so_far": 0,
+          "projected_remainder_shots": 0.287,
+          "projected_final_shots": 0.287,
+          "shots_over_probabilities": {
+            "0.5": 0.2495,
+            "1.5": 0.0341,
+            "2.5": 0.0032,
+            "3.5": 0.0002,
+            "4.5": 0.0
+          }
+        },
+        {
+          "player_id": "asa_KPqj7Y0BQ6",
+          "player_name": "Matty Longstaff",
+          "side": "home",
+          "shots_so_far": 0,
+          "projected_remainder_shots": 0.2636,
+          "projected_final_shots": 0.2636,
+          "shots_over_probabilities": {
+            "0.5": 0.2318,
+            "1.5": 0.0292,
+            "2.5": 0.0025,
+            "3.5": 0.0002,
+            "4.5": 0.0
+          }
+        },
+        {
+          "player_id": "asa_0Oq624zdq6",
+          "player_name": "Noah Streit",
+          "side": "home",
+          "shots_so_far": 0,
+          "projected_remainder_shots": 0.2074,
+          "projected_final_shots": 0.2074,
+          "shots_over_probabilities": {
+            "0.5": 0.1873,
+            "1.5": 0.0187,
+            "2.5": 0.0013,
+            "3.5": 0.0001,
+            "4.5": 0.0
+          }
+        }
+      ]
+    }
+  }
+}

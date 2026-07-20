@@ -118,6 +118,10 @@ def _period_label(key: str) -> str:
         "f5": "First 5",
         "f7": "First 7",
         "full": "Full Game",
+        "h1": "1st Half",
+        "h2": "2nd Half",
+        "ht": "Halftime",
+        "ft": "Full Time",
     }
     return mapping.get(normalized, str(key or "Period").upper())
 

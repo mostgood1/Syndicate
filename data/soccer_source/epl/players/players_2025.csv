@@ -1,0 +1,441 @@
+league,season,player_id,player_name,team,position,minutes,games,shots_per90,xg_per90,xa_per90,goals_per90,assists_per90,key_passes_per90,expected_minutes_share,is_goalkeeper,source
+epl,2025,understat_8260,Erling Haaland,Manchester City,F S,2979.0,35,3.7764,0.8699,0.1664,0.8157,0.2417,0.7553,0.9457,False,understat
+epl,2025,understat_13222,Thiago,Brentford,F S,3292.0,38,2.2965,0.675,0.0943,0.6015,0.0273,0.6561,0.9626,False,understat
+epl,2025,understat_11363,Antoine Semenyo,"Bournemouth,Manchester City",F M,3220.0,37,2.3199,0.3588,0.1154,0.4752,0.1118,1.0621,0.967,False,understat
+epl,2025,understat_8865,Ollie Watkins,Aston Villa,F S,2908.0,37,2.5688,0.5827,0.0872,0.4952,0.0928,0.7118,0.8733,False,understat
+epl,2025,understat_6857,Morgan Gibbs-White,Nottingham Forest,F M S,3142.0,37,2.3775,0.3343,0.129,0.4297,0.1146,1.3749,0.9435,False,understat
+epl,2025,understat_8272,João Pedro,Chelsea,F M S,2698.0,35,2.4351,0.5245,0.1329,0.5004,0.1668,0.9674,0.8565,False,understat
+epl,2025,understat_5555,Dominic Calvert-Lewin,Leeds,F S,2732.0,35,2.4048,0.6151,0.0509,0.4612,0.0329,0.6589,0.8673,False,understat
+epl,2025,understat_7254,Viktor Gyokeres,Arsenal,F S,2255.0,36,2.1951,0.5536,0.1059,0.5588,0.0399,0.7982,0.696,False,understat
+epl,2025,understat_501,Danny Welbeck,Brighton,F S,2286.0,37,2.2047,0.5007,0.0891,0.5118,0.0394,0.7874,0.6865,False,understat
+epl,2025,understat_11504,Eli Junior Kroupi,Bournemouth,F M S,1708.0,33,2.74,0.4663,0.0957,0.685,0.0,1.1593,0.5751,False,understat
+epl,2025,understat_5735,Jean-Philippe Mateta,Crystal Palace,F S,2225.0,32,2.5483,0.6463,0.0505,0.4854,0.0,0.364,0.7726,False,understat
+epl,2025,understat_6026,Richarlison,Tottenham,F M S,1926.0,32,2.8505,0.461,0.1593,0.514,0.1869,0.8879,0.6687,False,understat
+epl,2025,understat_6552,Bryan Mbeumo,Manchester United,F M S,2676.0,33,2.4552,0.4476,0.1712,0.37,0.1009,1.5135,0.901,False,understat
+epl,2025,understat_8995,Hugo Ekitike,Liverpool,F S,1835.0,28,3.188,0.5852,0.1222,0.5395,0.1962,1.03,0.7282,False,understat
+epl,2025,understat_11974,Benjamin Sesko,Manchester United,F S,1636.0,30,3.3557,0.6879,0.0329,0.6051,0.055,0.4951,0.6059,False,understat
+epl,2025,understat_13729,Zian Flemming,Burnley,F S,1795.0,29,2.6072,0.4791,0.0343,0.5515,0.0,0.5014,0.6877,False,understat
+epl,2025,understat_5596,Harry Wilson,Fulham,M S,2751.0,36,2.5518,0.1884,0.1801,0.3272,0.229,1.2105,0.8491,False,understat
+epl,2025,understat_7080,Matheus Cunha,Manchester United,F M S,2506.0,33,3.2322,0.2541,0.1328,0.3591,0.0718,1.1852,0.8438,False,understat
+epl,2025,understat_8497,Cole Palmer,Chelsea,F M S,2007.0,26,2.87,0.46,0.0952,0.4484,0.0448,1.0762,0.8577,False,understat
+epl,2025,understat_11356,Enzo Fernández,Chelsea,M S,3149.0,36,2.0578,0.3406,0.2534,0.2858,0.1143,1.9435,0.9719,False,understat
+epl,2025,understat_12412,Morgan Rogers,Aston Villa,F M,3301.0,37,2.2902,0.1948,0.2038,0.2726,0.1636,1.3087,0.9913,False,understat
+epl,2025,understat_1228,Bruno Fernandes,Manchester United,M,3082.0,35,2.4822,0.3484,0.5185,0.2628,0.6132,4.0006,0.9784,False,understat
+epl,2025,understat_1776,Jarrod Bowen,West Ham,F M,3416.0,38,2.0814,0.218,0.2222,0.2371,0.2898,1.1593,0.9988,False,understat
+epl,2025,understat_2248,Casemiro,Manchester United,M S,2649.0,34,1.7667,0.2235,0.108,0.3058,0.068,1.2231,0.8657,False,understat
+epl,2025,understat_4105,Raúl Jiménez,Fulham,F S,2215.0,36,2.9661,0.4883,0.079,0.3657,0.1219,1.0158,0.6836,False,understat
+epl,2025,understat_5675,Ismaila Sarr,Crystal Palace,F M S,2181.0,28,1.9807,0.4763,0.0908,0.3714,0.0413,0.784,0.8655,False,understat
+epl,2025,understat_8327,Bruno Guimarães,Newcastle United,M S,2467.0,29,1.5322,0.2407,0.1412,0.3283,0.1824,1.6052,0.9452,False,understat
+epl,2025,understat_9983,Beto,Everton,F S,1552.0,37,2.4936,0.6349,0.0582,0.5219,0.058,0.6959,0.4661,False,understat
+epl,2025,understat_8117,Nick Woltemade,Newcastle United,F M S,1953.0,33,1.4747,0.3807,0.1337,0.3687,0.1382,1.0138,0.6576,False,understat
+epl,2025,understat_9156,Kevin Schade,Brentford,F M S,2781.0,35,1.8447,0.3829,0.1477,0.2589,0.0971,0.9385,0.8829,False,understat
+epl,2025,understat_9739,Kiernan Dewsbury-Hall,Everton,M S,2649.0,31,1.325,0.1471,0.2234,0.2718,0.1359,1.2231,0.9495,False,understat
+epl,2025,understat_10746,Jaidon Anthony,Burnley,F M S,2777.0,37,1.7825,0.1803,0.1418,0.2593,0.0648,1.1991,0.8339,False,understat
+epl,2025,understat_11966,Noah Okafor,Leeds,F M S,1592.0,28,1.9786,0.356,0.1277,0.4523,0.0565,1.0741,0.6317,False,understat
+epl,2025,understat_12916,Thierno Barry,Everton,F S,1921.0,38,1.7803,0.4287,0.047,0.3748,0.0,0.5622,0.5617,False,understat
+epl,2025,understat_468,Callum Wilson,West Ham,F M S,1229.0,32,2.7828,0.5567,0.0752,0.5126,0.0732,0.5858,0.4267,False,understat
+epl,2025,understat_1250,Mohamed Salah,Liverpool,F M S,2163.0,27,2.7878,0.3677,0.2675,0.2913,0.2913,2.0388,0.8901,False,understat
+epl,2025,understat_6055,Phil Foden,Manchester City,F M S,2083.0,33,2.3764,0.289,0.2639,0.3024,0.216,2.29,0.7013,False,understat
+epl,2025,understat_6681,Harvey Barnes,Newcastle United,F M S,1947.0,37,2.681,0.3721,0.1436,0.3236,0.0462,1.0632,0.5847,False,understat
+epl,2025,understat_7322,Bukayo Saka,Arsenal,F M S,2239.0,31,2.854,0.3498,0.3438,0.2814,0.201,2.4922,0.8025,False,understat
+epl,2025,understat_8706,Eberechi Eze,"Arsenal,Crystal Palace",F M S,1928.0,33,2.9409,0.2244,0.1229,0.3268,0.0934,0.7936,0.6492,False,understat
+epl,2025,understat_9556,William Osula,Newcastle United,F S,777.0,24,2.6641,0.5694,0.0517,0.8108,0.0,0.695,0.3597,False,understat
+epl,2025,understat_9662,Dango Ouattara,Brentford,F M S,2303.0,32,2.1884,0.3398,0.2291,0.2736,0.1172,1.0551,0.7997,False,understat
+epl,2025,understat_9789,Brian Brobbey,Sunderland,F S,1943.0,31,1.6675,0.3294,0.0699,0.3242,0.0463,0.6948,0.6964,False,understat
+epl,2025,understat_10741,Marcus Tavernier,Bournemouth,M S,2779.0,34,2.267,0.3044,0.1995,0.2267,0.1295,1.6841,0.9082,False,understat
+epl,2025,understat_11296,Cody Gakpo,Liverpool,F M S,2758.0,36,2.839,0.3206,0.2151,0.2284,0.1632,1.7295,0.8512,False,understat
+epl,2025,understat_833,Virgil van Dijk,Liverpool,D,3420.0,38,0.7895,0.1287,0.0086,0.1579,0.0,0.2895,1.0,False,understat
+epl,2025,understat_2203,Emiliano Buendía,Aston Villa,M S,1778.0,36,2.4803,0.1916,0.1836,0.3037,0.1012,1.5186,0.5488,False,understat
+epl,2025,understat_6544,Lukas Nmecha,Leeds,F S,1076.0,31,2.5093,0.6809,0.1409,0.5019,0.0836,0.9201,0.3857,False,understat
+epl,2025,understat_7148,Wilson Isidor,Sunderland,F S,1142.0,32,3.3888,0.4429,0.0,0.4729,0.0,0.0,0.3965,False,understat
+epl,2025,understat_7698,Leandro Trossard,Arsenal,F M S,2026.0,31,2.3544,0.3,0.2216,0.2665,0.2665,1.5992,0.7262,False,understat
+epl,2025,understat_8150,Anthony Gordon,Newcastle United,F M S,1888.0,26,2.2881,0.4174,0.1771,0.286,0.0953,1.2394,0.8068,False,understat
+epl,2025,understat_9307,Iliman Ndiaye,Everton,M,2805.0,32,1.3797,0.1971,0.143,0.1925,0.0963,0.9626,0.974,False,understat
+epl,2025,understat_9788,Dominik Szoboszlai,Liverpool,D F M,3236.0,36,1.9468,0.1314,0.2457,0.1669,0.1947,2.1693,0.9988,False,understat
+epl,2025,understat_10948,Valentín Castellanos,West Ham,F S,1430.0,18,3.1469,0.4481,0.047,0.3776,0.0,0.7552,0.8827,False,understat
+epl,2025,understat_12963,Evanilson,Bournemouth,F S,2810.0,36,2.306,0.3789,0.0983,0.1922,0.032,0.9609,0.8673,False,understat
+epl,2025,understat_13778,Igor Jesus,Nottingham Forest,F M S,2379.0,37,2.6482,0.2723,0.0863,0.227,0.1513,0.5675,0.7144,False,understat
+epl,2025,understat_6382,Pedro Neto,Chelsea,F M S,2667.0,34,1.5523,0.1738,0.2677,0.1687,0.2025,1.7885,0.8716,False,understat
+epl,2025,understat_7526,Martín Zubimendi,Arsenal,D M S,3040.0,38,0.7993,0.0872,0.0322,0.148,0.0296,0.5625,0.8889,False,understat
+epl,2025,understat_7723,John McGinn,Aston Villa,M S,2221.0,30,1.1346,0.1215,0.197,0.2026,0.1621,1.5804,0.8226,False,understat
+epl,2025,understat_8288,Tomas Soucek,West Ham,M S,2206.0,35,1.0199,0.2127,0.0335,0.204,0.0,0.4488,0.7003,False,understat
+epl,2025,understat_8397,Florian Wirtz,Liverpool,F M S,2426.0,33,1.892,0.2811,0.1997,0.1855,0.1113,2.2259,0.8168,False,understat
+epl,2025,understat_8651,Enzo Le Fée,Sunderland,F M S,2953.0,36,1.0972,0.1606,0.23,0.1524,0.1829,1.6153,0.9114,False,understat
+epl,2025,understat_8981,Jéremy Doku,Manchester City,F M S,1783.0,30,1.9686,0.2019,0.3813,0.2524,0.2524,2.9781,0.6604,False,understat
+epl,2025,understat_9492,Crysencio Summerville,West Ham,F M S,2509.0,31,1.937,0.2044,0.1161,0.1794,0.0717,1.0044,0.8993,False,understat
+epl,2025,understat_9910,Anton Stach,Leeds,M S,2394.0,29,2.0677,0.1098,0.224,0.188,0.1128,2.2932,0.9172,False,understat
+epl,2025,understat_10697,Ryan Gravenberch,Liverpool,M S,3008.0,36,1.137,0.0458,0.0709,0.1496,0.0898,0.8677,0.9284,False,understat
+epl,2025,understat_10715,João Palhinha,Tottenham,D M S,2180.0,33,1.3624,0.1407,0.0317,0.2064,0.0826,0.3303,0.734,False,understat
+epl,2025,understat_11592,Nico O&#039;Reilly,Manchester City,D M S,2646.0,34,1.3946,0.2288,0.1309,0.1701,0.102,0.7823,0.8647,False,understat
+epl,2025,understat_11965,Tijjani Reijnders,Manchester City,F M S,1642.0,28,2.6857,0.2665,0.1685,0.2741,0.1096,0.9866,0.6516,False,understat
+epl,2025,understat_13364,Diego Gómez,Brighton,F M S,2186.0,32,1.7292,0.2642,0.0861,0.2059,0.0412,0.8234,0.759,False,understat
+epl,2025,understat_14395,Rayan,Bournemouth,M S,1146.0,15,2.199,0.2096,0.2182,0.3927,0.1571,1.0995,0.8489,False,understat
+epl,2025,understat_500,Alex Iwobi,Fulham,M,2473.0,29,1.4193,0.0875,0.1321,0.1456,0.1092,1.5285,0.9475,False,understat
+epl,2025,understat_5304,Mikel Merino,Arsenal,F M S,1002.0,22,1.976,0.4687,0.2057,0.3593,0.2695,1.0778,0.5061,False,understat
+epl,2025,understat_5553,Declan Rice,Arsenal,D M S,3111.0,36,1.1572,0.1076,0.236,0.1157,0.1446,1.8226,0.9602,False,understat
+epl,2025,understat_7218,Cristian Romero,Tottenham,D S,1878.0,23,0.8147,0.0881,0.0871,0.1917,0.0479,0.5751,0.9072,False,understat
+epl,2025,understat_7365,Lucas Paquetá,West Ham,F M,1544.0,18,1.3407,0.1423,0.1756,0.2332,0.0583,1.3407,0.9531,False,understat
+epl,2025,understat_7814,Taiwo Awoniyi,Nottingham Forest,F S,441.0,17,3.0612,0.8871,0.2694,0.8163,0.2041,1.2245,0.2882,False,understat
+epl,2025,understat_8094,Mathis Cherki,Manchester City,F M S,1792.0,33,2.7623,0.2331,0.5416,0.2009,0.6027,3.0134,0.6034,False,understat
+epl,2025,understat_8378,Malick Thiaw,Newcastle United,D S,2968.0,35,0.8491,0.1788,0.0251,0.1213,0.0,0.1819,0.9422,False,understat
+epl,2025,understat_8859,Mikkel Damsgaard,Brentford,M S,2085.0,33,1.295,0.1284,0.2792,0.1727,0.1727,1.8129,0.702,False,understat
+epl,2025,understat_9154,Elliot Anderson,Nottingham Forest,M S,3329.0,38,1.1895,0.0931,0.1309,0.1081,0.1081,1.4869,0.9734,False,understat
+epl,2025,understat_9749,Donyell Malen,Aston Villa,F M S,600.0,21,3.9,0.7108,0.0554,0.6,0.15,1.05,0.3175,False,understat
+epl,2025,understat_9780,Mathys Tel,Tottenham,F M S,1324.0,31,2.3792,0.1921,0.2321,0.2719,0.068,1.9713,0.4746,False,understat
+epl,2025,understat_10050,Micky van de Ven,Tottenham,D,3049.0,35,0.4723,0.0724,0.0299,0.1181,0.0295,0.1476,0.9679,False,understat
+epl,2025,understat_10751,Brenden Aaronson,Leeds,F M S,2517.0,37,1.6448,0.2103,0.2025,0.143,0.1788,1.2157,0.7559,False,understat
+epl,2025,understat_11070,Jørgen Strand Larsen,"Crystal Palace,Wolverhampton Wanderers",F S,2353.0,36,1.683,0.2492,0.0263,0.153,0.0382,0.3825,0.7262,False,understat
+epl,2025,understat_11269,Jack Hinshelwood,Brighton,D M S,1773.0,27,1.8782,0.2417,0.1197,0.203,0.1523,0.8122,0.7296,False,understat
+epl,2025,understat_11944,Patrick Dorgu,Manchester United,D M S,1436.0,26,1.5669,0.1872,0.195,0.2507,0.2507,1.6922,0.6137,False,understat
+epl,2025,understat_12408,Daniel Muñoz,Crystal Palace,D,2417.0,29,0.9681,0.1172,0.1886,0.1489,0.1117,1.0054,0.9261,False,understat
+epl,2025,understat_13717,Chemsdine Talbi,Sunderland,F M S,1556.0,28,1.446,0.1344,0.0347,0.2314,0.0578,0.6941,0.6175,False,understat
+epl,2025,understat_592,Ross Barkley,Aston Villa,M S,818.0,21,1.9804,0.2105,0.2236,0.3301,0.11,1.1002,0.4328,False,understat
+epl,2025,understat_1653,Michael Keane,Everton,D S,2586.0,33,0.9049,0.1242,0.0045,0.1044,0.0348,0.0696,0.8707,False,understat
+epl,2025,understat_1679,Dominic Solanke,Tottenham,F S,989.0,15,1.82,0.3264,0.0544,0.273,0.0,0.546,0.7326,False,understat
+epl,2025,understat_4456,Chris Wood,Nottingham Forest,F S,913.0,15,2.2673,0.3317,0.0317,0.2957,0.0,0.4929,0.6763,False,understat
+epl,2025,understat_5232,Alexander Isak,Liverpool,F S,717.0,14,2.1339,0.4074,0.1062,0.3766,0.1255,0.251,0.569,False,understat
+epl,2025,understat_5543,Gabriel Jesus,Arsenal,F S,395.0,14,4.3291,0.906,0.0475,0.6835,0.0,0.6835,0.3135,False,understat
+epl,2025,understat_5613,Gabriel,Arsenal,D S,2748.0,32,0.8843,0.1523,0.0892,0.0983,0.131,0.2293,0.9542,False,understat
+epl,2025,understat_5659,Nordi Mukiele,Sunderland,D,2793.0,32,0.8378,0.0895,0.0887,0.0967,0.0967,0.7411,0.9698,False,understat
+epl,2025,understat_6063,Jacob Murphy,Newcastle United,D F M S,1630.0,33,2.319,0.1723,0.2642,0.1656,0.1104,1.2699,0.5488,False,understat
+epl,2025,understat_6456,Callum Hudson-Odoi,Nottingham Forest,M S,1857.0,30,1.454,0.1431,0.1907,0.1454,0.1939,2.1325,0.6878,False,understat
+epl,2025,understat_6615,Trevoh Chalobah,Chelsea,D S,2781.0,34,0.5178,0.0596,0.0204,0.0971,0.0,0.1618,0.9088,False,understat
+epl,2025,understat_6722,Konstantinos Mavropanos,West Ham,D S,2518.0,31,0.8221,0.0998,0.0175,0.1072,0.0,0.143,0.9025,False,understat
+epl,2025,understat_6837,Ryan Sessegnon,Fulham,D M S,1830.0,27,0.7869,0.1007,0.1096,0.1475,0.0492,0.6885,0.7531,False,understat
+epl,2025,understat_6937,Georginio Rutter,Brighton,F M S,1784.0,32,2.1188,0.148,0.232,0.1513,0.1513,1.2612,0.6194,False,understat
+epl,2025,understat_7166,Mathias Jensen,Brentford,M S,2258.0,36,1.1559,0.0633,0.2126,0.1196,0.0399,1.3153,0.6969,False,understat
+epl,2025,understat_7208,Samuel Chukwueze,Fulham,M S,1052.0,23,2.1388,0.1996,0.2426,0.2567,0.3422,2.0532,0.5082,False,understat
+epl,2025,understat_7230,Emile Smith-Rowe,Fulham,M S,1933.0,37,1.6762,0.1984,0.066,0.1397,0.0,0.8381,0.5805,False,understat
+epl,2025,understat_7498,Lyle Foster,Burnley,F M S,1375.0,26,1.3091,0.2351,0.075,0.1964,0.1309,0.6545,0.5876,False,understat
+epl,2025,understat_7603,Marc Guehi,"Crystal Palace,Manchester City",D,3150.0,35,0.9143,0.1342,0.0779,0.0857,0.0857,0.5143,1.0,False,understat
+epl,2025,understat_7768,Mason Mount,Manchester United,M S,1021.0,23,1.6748,0.1538,0.1213,0.2644,0.0,1.2341,0.4932,False,understat
+epl,2025,understat_8211,Amine Adli,Bournemouth,M S,1036.0,31,1.7375,0.3105,0.111,0.2606,0.0869,1.4768,0.3713,False,understat
+epl,2025,understat_8393,Omar Marmoush,Manchester City,F M S,693.0,21,3.8961,0.489,0.2762,0.3896,0.3896,1.5584,0.3667,False,understat
+epl,2025,understat_8864,Matthew Cash,Aston Villa,D S,3040.0,35,0.8882,0.0361,0.0952,0.0888,0.0888,0.9178,0.9651,False,understat
+epl,2025,understat_8875,Tolu Arokodare,Wolverhampton Wanderers,F S,1357.0,33,3.0508,0.4925,0.0769,0.199,0.0663,0.7296,0.4569,False,understat
+epl,2025,understat_9451,Chimuanya Ugochukwu,Burnley,M S,2407.0,35,0.8226,0.0981,0.0168,0.1122,0.0374,0.3739,0.7641,False,understat
+epl,2025,understat_9453,Moisés Caicedo,Chelsea,M S,2811.0,33,0.8645,0.049,0.0841,0.0961,0.032,0.5763,0.9465,False,understat
+epl,2025,understat_10806,Kaoru Mitoma,Brighton,F M S,1723.0,25,1.6715,0.2502,0.1851,0.1567,0.0522,1.567,0.7658,False,understat
+epl,2025,understat_10807,Jan Paul van Hecke,Brighton,D,3214.0,36,0.6441,0.094,0.0287,0.084,0.084,0.336,0.992,False,understat
+epl,2025,understat_10809,Keane Lewis-Potter,Brentford,D F M S,1949.0,36,1.4315,0.1485,0.1253,0.1385,0.1385,0.8774,0.6015,False,understat
+epl,2025,understat_10945,Santiago Bueno,Wolverhampton Wanderers,D S,2549.0,29,0.3531,0.0704,0.0319,0.1059,0.0353,0.3531,0.9766,False,understat
+epl,2025,understat_11385,Yasin Ayari,Brighton,M S,1918.0,29,1.9239,0.0994,0.0657,0.1408,0.1408,0.7039,0.7349,False,understat
+epl,2025,understat_11707,Jurriën Timber,Arsenal,D S,2475.0,30,0.9091,0.1466,0.0942,0.1091,0.1818,1.0182,0.9167,False,understat
+epl,2025,understat_12149,Alex Scott,Bournemouth,M S,2915.0,37,1.3585,0.1081,0.0893,0.0926,0.0309,0.8027,0.8754,False,understat
+epl,2025,understat_12756,Rodrigo Gomes,Wolverhampton Wanderers,D F M S,951.0,22,1.9874,0.2162,0.0143,0.2839,0.0,0.2839,0.4803,False,understat
+epl,2025,understat_12759,Yankuba Minteh,Brighton,M S,2410.0,34,1.5311,0.1775,0.2181,0.112,0.1494,1.6432,0.7876,False,understat
+epl,2025,understat_12948,Mateus Fernandes,West Ham,M S,3044.0,36,0.8279,0.0539,0.0986,0.0887,0.1183,1.094,0.9395,False,understat
+epl,2025,understat_13484,Mateus Mané,Wolverhampton Wanderers,M S,1784.0,27,2.0684,0.0995,0.1656,0.1513,0.0504,1.5135,0.7342,False,understat
+epl,2025,understat_87,Joelinton,Newcastle United,M S,1958.0,27,1.4709,0.1001,0.0856,0.0919,0.046,0.7814,0.8058,False,understat
+epl,2025,understat_668,Idrissa Gueye,Everton,M,2120.0,25,1.2311,0.0813,0.0719,0.0849,0.1274,0.5519,0.9422,False,understat
+epl,2025,understat_675,Jack Grealish,Everton,F M S,1645.0,20,1.4225,0.1688,0.2494,0.1094,0.3283,2.079,0.9139,False,understat
+epl,2025,understat_702,Tammy Abraham,Aston Villa,F S,253.0,12,3.2016,0.7287,0.046,0.7115,0.0,1.4229,0.2343,False,understat
+epl,2025,understat_1018,Josh Cullen,Burnley,M,1533.0,18,0.6458,0.0595,0.1067,0.1174,0.1174,0.7632,0.9463,False,understat
+epl,2025,understat_1433,Federico Chiesa,Liverpool,M S,247.0,26,5.83,0.607,0.5364,0.7287,0.3644,1.0931,0.1056,False,understat
+epl,2025,understat_1665,James Tarkowski,Everton,D,3330.0,37,0.5405,0.0775,0.0556,0.0541,0.0811,0.4865,1.0,False,understat
+epl,2025,understat_3635,Bernardo Silva,Manchester City,M S,2917.0,38,0.9256,0.0895,0.163,0.0617,0.1234,1.4501,0.8529,False,understat
+epl,2025,understat_4419,Adam Armstrong,Wolverhampton Wanderers,F M,1170.0,14,1.3846,0.216,0.1155,0.1538,0.1538,0.4615,0.9286,False,understat
+epl,2025,understat_5220,Kai Havertz,Arsenal,F M S,582.0,12,2.7835,0.757,0.2253,0.3093,0.4639,1.701,0.5389,False,understat
+epl,2025,understat_5722,Ibrahim Sangare,Nottingham Forest,M S,2111.0,28,0.6821,0.067,0.0618,0.0853,0.0853,0.5116,0.8377,False,understat
+epl,2025,understat_6377,Joe Rodon,Leeds,D S,2954.0,35,0.5484,0.0562,0.0141,0.0609,0.0,0.2742,0.9378,False,understat
+epl,2025,understat_6482,Eddie Nketiah,Crystal Palace,M S,396.0,12,3.4091,0.4416,0.2183,0.4545,0.0,1.5909,0.3667,False,understat
+epl,2025,understat_6835,Tom Cairney,Fulham,M S,747.0,24,2.0482,0.0979,0.083,0.241,0.0,1.3253,0.3458,False,understat
+epl,2025,understat_6963,Justin Kluivert,Bournemouth,M S,934.0,20,1.6381,0.221,0.2211,0.1927,0.0,2.1199,0.5189,False,understat
+epl,2025,understat_7078,Sean Longstaff,Leeds,M S,999.0,23,1.4414,0.1241,0.2494,0.1802,0.1802,2.2523,0.4826,False,understat
+epl,2025,understat_7352,Tyler Adams,Bournemouth,M S,1805.0,25,0.4986,0.0463,0.0613,0.0997,0.0997,0.349,0.8022,False,understat
+epl,2025,understat_7438,James Garner,Everton,D M,3417.0,38,1.1853,0.0547,0.1598,0.0527,0.1844,1.475,0.9991,False,understat
+epl,2025,understat_7753,James Justin,Leeds,D M S,1895.0,29,1.1398,0.1217,0.1222,0.095,0.0475,0.6174,0.7261,False,understat
+epl,2025,understat_8044,Joshua Zirkzee,Manchester United,F M S,573.0,24,3.9267,0.6042,0.191,0.3141,0.1571,1.7277,0.2653,False,understat
+epl,2025,understat_8067,Reece James,Chelsea,D M S,1927.0,29,1.0275,0.0574,0.1865,0.0934,0.1868,1.261,0.7383,False,understat
+epl,2025,understat_8127,Amad Diallo Traore,Manchester United,D M S,2341.0,32,2.076,0.2203,0.2171,0.0769,0.1153,1.5378,0.8128,False,understat
+epl,2025,understat_8204,Neco Williams,Nottingham Forest,D S,3203.0,37,1.2925,0.0526,0.1235,0.0562,0.0843,1.0116,0.9619,False,understat
+epl,2025,understat_8379,Alexis Mac Allister,Liverpool,M S,2683.0,37,1.7443,0.1366,0.0956,0.0671,0.1342,1.1405,0.8057,False,understat
+epl,2025,understat_8700,Xavi Simons,Tottenham,F M S,1768.0,28,2.138,0.1383,0.2367,0.1018,0.2545,1.7308,0.7016,False,understat
+epl,2025,understat_8845,Hee-Chan Hwang,Wolverhampton Wanderers,F M S,1469.0,26,1.1641,0.1631,0.1153,0.1225,0.1225,0.919,0.6278,False,understat
+epl,2025,understat_8941,Jacob Ramsey,Newcastle United,M S,1421.0,28,1.0134,0.0767,0.0992,0.1267,0.19,1.3934,0.5639,False,understat
+epl,2025,understat_8961,Rúben Dias,Manchester City,D S,2142.0,26,0.4202,0.0184,0.0178,0.084,0.0,0.2941,0.9154,False,understat
+epl,2025,understat_9017,Malo Gusto,Chelsea,D M S,2306.0,34,0.4683,0.0758,0.1485,0.0781,0.1171,1.0538,0.7536,False,understat
+epl,2025,understat_9021,Pape Sarr,Tottenham,M S,1347.0,26,1.1359,0.1368,0.1626,0.1336,0.2673,0.735,0.5756,False,understat
+epl,2025,understat_9024,Yeremi Pino,Crystal Palace,F M S,2134.0,34,1.8978,0.1844,0.3586,0.0843,0.0843,2.0244,0.6974,False,understat
+epl,2025,understat_9667,Amadou Onana,Aston Villa,M S,1793.0,25,0.9537,0.1392,0.0253,0.1004,0.0,0.3514,0.7969,False,understat
+epl,2025,understat_9767,Habib Diarra,Sunderland,M S,1414.0,20,1.6549,0.207,0.041,0.1273,0.1273,0.4455,0.7856,False,understat
+epl,2025,understat_9790,Josko Gvardiol,Manchester City,D S,1374.0,18,1.1135,0.1219,0.0287,0.131,0.131,0.262,0.8481,False,understat
+epl,2025,understat_9977,Loum Tchaouna,Burnley,F M S,1268.0,29,1.6325,0.0894,0.0851,0.142,0.071,0.9227,0.4858,False,understat
+epl,2025,understat_10184,Archie Gray,Tottenham,D M S,1497.0,24,0.6613,0.0955,0.0997,0.1202,0.1202,0.481,0.6931,False,understat
+epl,2025,understat_10744,Ryan Christie,Bournemouth,M S,942.0,26,2.3885,0.1711,0.1547,0.1911,0.0,1.051,0.4026,False,understat
+epl,2025,understat_10760,Brennan Johnson,"Crystal Palace,Tottenham",D F M S,1709.0,34,1.2112,0.1366,0.0675,0.1053,0.0527,1.0006,0.5585,False,understat
+epl,2025,understat_11357,Noni Madueke,Arsenal,F M S,1246.0,26,1.8058,0.1442,0.2897,0.1445,0.0722,1.5891,0.5325,False,understat
+epl,2025,understat_11709,Milos Kerkez,Liverpool,D S,2271.0,34,0.3567,0.0552,0.0739,0.0793,0.0396,1.0304,0.7422,False,understat
+epl,2025,understat_12027,Mohammed Kudus,Tottenham,F M,1577.0,19,1.4838,0.1348,0.1469,0.1141,0.2854,1.1985,0.9222,False,understat
+epl,2025,understat_12721,Ladislav Krejcí,Wolverhampton Wanderers,D M S,2385.0,28,0.7925,0.0651,0.0563,0.0755,0.0377,0.3396,0.9464,False,understat
+epl,2025,understat_12758,Mats Wieffer,Brighton,D S,1922.0,26,0.8429,0.0903,0.1343,0.0937,0.1405,0.8897,0.8214,False,understat
+epl,2025,understat_12905,Nicolò Savona,Nottingham Forest,D S,1036.0,14,0.4344,0.1073,0.0516,0.1737,0.0,0.5212,0.8222,False,understat
+epl,2025,understat_13692,Rio Ngumoha,Liverpool,M S,515.0,19,2.7961,0.2135,0.3716,0.3495,0.1748,2.7961,0.3012,False,understat
+epl,2025,understat_13711,Maxim De Cuyper,Brighton,D M S,1412.0,30,0.8286,0.111,0.2987,0.1275,0.1912,2.0397,0.523,False,understat
+epl,2025,understat_13713,Trai Hume,Sunderland,D M S,3041.0,38,1.0062,0.0801,0.0617,0.0592,0.0296,0.7991,0.8892,False,understat
+epl,2025,understat_13715,Dan Ballard,Sunderland,D S,2143.0,29,1.0499,0.1552,0.0664,0.084,0.0,0.588,0.8211,False,understat
+epl,2025,understat_13718,Eliezer Mayenda,Sunderland,F M S,740.0,20,1.5811,0.2446,0.0903,0.2432,0.0,0.4865,0.4111,False,understat
+epl,2025,understat_13775,Estêvão,Chelsea,F M S,854.0,22,2.9508,0.4083,0.2968,0.2108,0.2108,1.6862,0.4313,False,understat
+epl,2025,understat_13834,Ao Tanaka,Leeds,M S,1330.0,28,1.1504,0.1487,0.0919,0.1353,0.0,1.218,0.5278,False,understat
+epl,2025,understat_14118,Charalampos Kostoulas,Brighton,F S,309.0,21,6.1165,0.6574,0.3728,0.5825,0.2913,2.9126,0.1635,False,understat
+epl,2025,understat_204,Granit Xhaka,Sunderland,M S,2896.0,34,0.6526,0.0251,0.1151,0.0311,0.1865,1.0566,0.9464,False,understat
+epl,2025,understat_239,Pascal Groß,Brighton,M S,1635.0,19,0.9908,0.069,0.1813,0.055,0.1651,2.1468,0.9561,False,understat
+epl,2025,understat_489,James Milner,Brighton,M S,773.0,20,0.9314,0.114,0.0763,0.1164,0.1164,0.9314,0.4294,False,understat
+epl,2025,understat_605,Jordan Henderson,Brentford,M S,1935.0,32,0.2791,0.0256,0.1544,0.0465,0.1395,0.8837,0.6719,False,understat
+epl,2025,understat_695,Bertrand Traoré,Sunderland,F M S,675.0,12,1.6,0.0833,0.1318,0.1333,0.0,1.0667,0.625,False,understat
+epl,2025,understat_885,Kyle Walker-Peters,West Ham,D S,1365.0,23,0.3297,0.0783,0.0235,0.0659,0.0,0.3956,0.6594,False,understat
+epl,2025,understat_934,Axel Tuanzebe,Burnley,D,1209.0,14,0.1489,0.0416,0.0,0.0744,0.0,0.0,0.9595,False,understat
+epl,2025,understat_1006,Luke Shaw,Manchester United,D,3269.0,38,0.2753,0.0165,0.0411,0.0275,0.0275,0.413,0.9558,False,understat
+epl,2025,understat_1537,Sasa Lukic,Fulham,M S,1731.0,26,0.9359,0.1216,0.1125,0.052,0.104,1.4038,0.7397,False,understat
+epl,2025,understat_1687,Harry Maguire,Manchester United,D S,1666.0,23,0.7563,0.0636,0.0392,0.054,0.108,0.2161,0.8048,False,understat
+epl,2025,understat_1688,Andrew Robertson,Liverpool,D S,1160.0,24,0.7759,0.0813,0.1171,0.0776,0.0,1.5517,0.537,False,understat
+epl,2025,understat_2496,Rodri,Manchester City,M S,1500.0,21,1.02,0.0713,0.1366,0.06,0.0,1.56,0.7937,False,understat
+epl,2025,understat_2517,Martin Odegaard,Arsenal,M S,1347.0,24,1.4699,0.0815,0.3326,0.0668,0.4009,2.539,0.6236,False,understat
+epl,2025,understat_3203,Issa Diop,Fulham,D S,810.0,13,0.2222,0.0491,0.0,0.1111,0.0,0.0,0.6923,False,understat
+epl,2025,understat_5743,Randal Kolo Muani,Tottenham,F M S,1704.0,30,1.0563,0.1426,0.0976,0.0528,0.0528,1.0035,0.6311,False,understat
+epl,2025,understat_5786,Yoane Wissa,Newcastle United,F S,492.0,19,2.378,0.5924,0.031,0.1829,0.0,0.5488,0.2877,False,understat
+epl,2025,understat_5789,Boubacar Kamara,Aston Villa,M S,1434.0,18,0.4393,0.066,0.0458,0.0628,0.1883,0.9414,0.8852,False,understat
+epl,2025,understat_5973,Kenny Tete,Fulham,D S,1805.0,22,0.7978,0.0363,0.0473,0.0499,0.0,0.5485,0.9116,False,understat
+epl,2025,understat_6048,Lewis Dunk,Brighton,D S,2831.0,33,0.7312,0.0425,0.0173,0.0318,0.0,0.2225,0.9532,False,understat
+epl,2025,understat_6108,Rodrigo Bentancur,Tottenham,M S,1931.0,26,0.6059,0.0455,0.0409,0.0466,0.0466,0.4661,0.8252,False,understat
+epl,2025,understat_6122,Douglas Luiz,"Aston Villa,Nottingham Forest",M S,936.0,21,1.0577,0.0675,0.1753,0.0962,0.0,1.8269,0.4952,False,understat
+epl,2025,understat_6326,Ibrahima Konaté,Liverpool,D,3133.0,36,0.3447,0.0563,0.0208,0.0287,0.0,0.2298,0.967,False,understat
+epl,2025,understat_6369,Ethan Ampadu,Leeds,M,3130.0,35,0.7476,0.056,0.0338,0.0288,0.0288,0.5463,0.9937,False,understat
+epl,2025,understat_6665,Curtis Jones,Liverpool,D M S,1910.0,34,1.0366,0.1134,0.1335,0.0471,0.0942,1.0366,0.6242,False,understat
+epl,2025,understat_6807,Jaka Bijol,Leeds,D S,1895.0,25,0.7124,0.0341,0.0665,0.0475,0.095,0.3325,0.8422,False,understat
+epl,2025,understat_6820,David Brooks,Bournemouth,M S,1191.0,31,3.6272,0.4942,0.3171,0.0756,0.2267,1.8892,0.4269,False,understat
+epl,2025,understat_6888,William Saliba,Arsenal,D S,2609.0,31,0.1725,0.0544,0.0451,0.0345,0.0,0.345,0.9351,False,understat
+epl,2025,understat_6912,Pedro Porro,Tottenham,D M S,2815.0,34,1.0231,0.0449,0.1358,0.032,0.0639,1.6945,0.9199,False,understat
+epl,2025,understat_7134,Marc Cucurella,Chelsea,D M S,2714.0,34,0.6632,0.0625,0.1506,0.0332,0.1326,1.2933,0.8869,False,understat
+epl,2025,understat_7281,Diogo Dalot,Manchester United,D S,2614.0,34,0.8263,0.0756,0.1207,0.0344,0.1033,1.0329,0.8542,False,understat
+epl,2025,understat_7382,Dan Burn,Newcastle United,D S,2205.0,29,0.4082,0.0376,0.0167,0.0408,0.0816,0.2857,0.8448,False,understat
+epl,2025,understat_7752,Gabriel Martinelli,Arsenal,F M S,1025.0,30,2.5463,0.4704,0.2256,0.0878,0.3512,1.1415,0.3796,False,understat
+epl,2025,understat_7762,Jean-Ricner Bellegarde,Wolverhampton Wanderers,F M S,1268.0,26,1.4905,0.0617,0.0863,0.071,0.071,0.9227,0.5419,False,understat
+epl,2025,understat_7902,Matthijs de Ligt,Manchester United,D,1170.0,13,0.8462,0.1018,0.0329,0.0769,0.0,0.2308,1.0,False,understat
+epl,2025,understat_7908,Marshall Munetsi,Wolverhampton Wanderers,F M S,863.0,13,1.46,0.1918,0.0397,0.1043,0.1043,0.3129,0.7376,False,understat
+epl,2025,understat_8006,Evann Guessand,"Aston Villa,Crystal Palace",M S,920.0,21,1.0761,0.1814,0.1211,0.0978,0.1957,0.4891,0.4868,False,understat
+epl,2025,understat_8129,Riccardo Calafiori,Arsenal,D S,1755.0,26,1.641,0.1779,0.0333,0.0513,0.1026,0.4615,0.75,False,understat
+epl,2025,understat_8214,Tyrick Mitchell,Crystal Palace,D S,3258.0,38,0.5249,0.0548,0.0839,0.0276,0.0552,0.8011,0.9526,False,understat
+epl,2025,understat_8252,Nicolás Domínguez,Nottingham Forest,M S,1210.0,27,1.3388,0.0753,0.0952,0.0744,0.0744,0.8182,0.4979,False,understat
+epl,2025,understat_8384,Armando Broja,Burnley,F S,822.0,24,1.7518,0.2755,0.0668,0.1095,0.1095,0.5474,0.3806,False,understat
+epl,2025,understat_8430,Chris Richards,Crystal Palace,D S,2819.0,33,0.4789,0.0569,0.0156,0.0319,0.0,0.2873,0.9492,False,understat
+epl,2025,understat_8476,Jarrad Branthwaite,Everton,D S,682.0,10,0.7918,0.0409,0.0493,0.132,0.0,0.3959,0.7578,False,understat
+epl,2025,understat_8635,Sven Botman,Newcastle United,D S,1842.0,25,0.7329,0.0758,0.0725,0.0489,0.0,0.2932,0.8187,False,understat
+epl,2025,understat_8640,Adrien Truffert,Bournemouth,D,3391.0,38,0.4247,0.0528,0.117,0.0265,0.1327,0.8758,0.9915,False,understat
+epl,2025,understat_8662,Dan Ndoye,Nottingham Forest,F M S,1184.0,24,1.1402,0.0891,0.118,0.076,0.076,1.0642,0.5481,False,understat
+epl,2025,understat_8780,Joël Veltman,Brighton,D S,1025.0,24,0.3512,0.0934,0.0221,0.0878,0.0,0.3512,0.4745,False,understat
+epl,2025,understat_8853,Maxence Lacroix,Crystal Palace,D,3094.0,35,0.7272,0.0875,0.0374,0.0291,0.0582,0.2036,0.9822,False,understat
+epl,2025,understat_8868,Liam Delap,Chelsea,F S,1064.0,28,3.0451,0.4255,0.0143,0.0846,0.0,0.2538,0.4222,False,understat
+epl,2025,understat_8940,Antonee Robinson,Fulham,D S,1484.0,22,0.3639,0.0593,0.0661,0.0606,0.0,1.2736,0.7495,False,understat
+epl,2025,understat_8986,Omar Alderete,Sunderland,D S,2808.0,33,0.7692,0.0495,0.0195,0.0321,0.0321,0.2885,0.9455,False,understat
+epl,2025,understat_9040,Conor Gallagher,Tottenham,M S,1229.0,16,0.8055,0.1108,0.0626,0.0732,0.0732,0.952,0.8535,False,understat
+epl,2025,understat_9205,Jayden Bogle,Leeds,D M S,2822.0,34,0.5741,0.0603,0.1124,0.0319,0.0638,0.6697,0.9222,False,understat
+epl,2025,understat_9558,Hannibal Mejbri,Burnley,M S,1251.0,27,1.3669,0.0539,0.2042,0.0719,0.2878,1.5108,0.5148,False,understat
+epl,2025,understat_9680,Vitaly Janelt,Brentford,M S,1421.0,25,0.76,0.0475,0.2414,0.0633,0.2533,1.33,0.6316,False,understat
+epl,2025,understat_9733,Nathan Collins,Brentford,D S,2966.0,35,0.6069,0.0885,0.0737,0.0303,0.0607,0.2731,0.9416,False,understat
+epl,2025,understat_9802,Nico González,Manchester City,M S,1576.0,25,0.7995,0.0348,0.0507,0.0571,0.0,0.6282,0.7004,False,understat
+epl,2025,understat_9911,Piero Hincapié,Arsenal,D S,1786.0,25,0.1512,0.0208,0.1072,0.0504,0.1008,0.6551,0.7938,False,understat
+epl,2025,understat_10140,Hugo Bueno,Wolverhampton Wanderers,D M S,2351.0,35,0.6125,0.0343,0.141,0.0383,0.0766,1.4547,0.7463,False,understat
+epl,2025,understat_10216,Lewis Hall,Newcastle United,D S,2164.0,30,1.0397,0.0536,0.1054,0.0416,0.0416,1.0397,0.8015,False,understat
+epl,2025,understat_10348,Omari Hutchinson,Nottingham Forest,M S,1664.0,31,1.3522,0.1178,0.2667,0.0541,0.2704,1.7849,0.5964,False,understat
+epl,2025,understat_10552,Alejandro Garnacho,Chelsea,F M S,1285.0,24,2.3113,0.288,0.2955,0.07,0.2802,2.0311,0.5949,False,understat
+epl,2025,understat_10717,Rodrigo Muniz,Fulham,F S,1001.0,21,2.8771,0.4087,0.0864,0.0899,0.0899,0.7193,0.5296,False,understat
+epl,2025,understat_10770,Soungoutou Magassa,West Ham,M S,976.0,22,0.6455,0.0571,0.0688,0.0922,0.0,0.4611,0.4929,False,understat
+epl,2025,understat_11000,Matheus Nunes,Manchester City,D S,2865.0,34,0.2199,0.0212,0.0974,0.0314,0.1571,0.8796,0.9363,False,understat
+epl,2025,understat_11174,Kobbie Mainoo,Manchester United,M S,1623.0,28,0.7209,0.0287,0.066,0.0555,0.1109,1.22,0.644,False,understat
+epl,2025,understat_11281,Michael Kayode,Brentford,D,3281.0,37,0.2469,0.0321,0.0874,0.0274,0.0274,0.9052,0.9853,False,understat
+epl,2025,understat_11310,Brajan Gruda,Brighton,M S,716.0,18,2.0112,0.2228,0.1528,0.1257,0.1257,2.0112,0.442,False,understat
+epl,2025,understat_11331,Merlin Röhl,Everton,M S,650.0,16,1.5231,0.0774,0.05,0.1385,0.0,0.8308,0.4514,False,understat
+epl,2025,understat_11384,João Gomes,Wolverhampton Wanderers,M S,2845.0,35,0.5694,0.0394,0.0456,0.0316,0.0316,0.5062,0.9032,False,understat
+epl,2025,understat_11386,Lewis Miley,Newcastle United,D M S,1470.0,23,0.7347,0.0842,0.1421,0.0612,0.2449,0.9184,0.7101,False,understat
+epl,2025,understat_11710,Simon Adingra,Sunderland,F M S,665.0,14,0.812,0.0454,0.0991,0.1353,0.0,0.9474,0.5278,False,understat
+epl,2025,understat_11728,Calvin Bassey,Fulham,D S,2523.0,30,0.3924,0.0425,0.0154,0.0357,0.0,0.3567,0.9344,False,understat
+epl,2025,understat_11735,Sávio,Manchester City,M S,792.0,24,2.1591,0.3715,0.1058,0.1136,0.1136,1.0227,0.3667,False,understat
+epl,2025,understat_11772,Yehor Yarmolyuk,Brentford,M S,2679.0,37,0.5375,0.0462,0.0422,0.0336,0.0672,0.4703,0.8045,False,understat
+epl,2025,understat_11808,Andrey Santos,Chelsea,M S,1217.0,27,0.8135,0.189,0.0509,0.074,0.0,0.5916,0.5008,False,understat
+epl,2025,understat_12014,Jake O&#039;Brien,Everton,D S,3146.0,37,0.3719,0.0374,0.0207,0.0286,0.0286,0.4863,0.9447,False,understat
+epl,2025,understat_12123,Murillo,Nottingham Forest,D,2132.0,25,0.4644,0.0251,0.0126,0.0422,0.0,0.3377,0.9476,False,understat
+epl,2025,understat_12168,Alejandro Jiménez,Bournemouth,D M S,2354.0,31,0.8029,0.0463,0.0651,0.0382,0.0,0.5735,0.8437,False,understat
+epl,2025,understat_12409,Adam Wharton,Crystal Palace,M S,2596.0,34,1.1094,0.0399,0.2297,0.0347,0.1733,1.5254,0.8484,False,understat
+epl,2025,understat_12410,Joshua King,Fulham,F M S,1306.0,32,1.7917,0.2618,0.0716,0.0689,0.1378,1.0337,0.4535,False,understat
+epl,2025,understat_12535,Josh Acheampong,Chelsea,D S,657.0,17,0.5479,0.0919,0.0189,0.137,0.0,0.274,0.4294,False,understat
+epl,2025,understat_12912,Lucas Bergvall,Tottenham,M S,956.0,23,1.1297,0.135,0.0275,0.0941,0.2824,0.4707,0.4618,False,understat
+epl,2025,understat_13022,André,Wolverhampton Wanderers,M S,2763.0,35,0.4886,0.0168,0.0406,0.0326,0.0,0.5863,0.8771,False,understat
+epl,2025,understat_13038,Justin Devenny,Crystal Palace,D F M S,762.0,21,1.5354,0.2652,0.0393,0.1181,0.0,0.8268,0.4032,False,understat
+epl,2025,understat_13066,Ferdi Kadioglu,Brighton,D M S,3145.0,37,0.8013,0.0578,0.0642,0.0286,0.0,0.6296,0.9444,False,understat
+epl,2025,understat_13068,Morato,Nottingham Forest,D S,1333.0,21,0.3376,0.1273,0.0063,0.0675,0.0,0.135,0.7053,False,understat
+epl,2025,understat_13206,Matt O&#039;Riley,Brighton,M S,195.0,6,1.8462,0.526,0.069,0.4615,0.0,1.8462,0.3611,False,understat
+epl,2025,understat_13719,Chris Rigg,Sunderland,M S,780.0,18,1.3846,0.0923,0.1372,0.1154,0.1154,1.0385,0.4815,False,understat
+epl,2025,understat_13728,Josh Laurent,Burnley,D M S,1720.0,33,0.7849,0.0546,0.0385,0.0523,0.0,0.6279,0.5791,False,understat
+epl,2025,understat_13730,Marcus Edwards,Burnley,F M S,1054.0,23,1.9639,0.195,0.2174,0.0854,0.2562,1.7078,0.5092,False,understat
+epl,2025,understat_13741,Jhon Arias,Wolverhampton Wanderers,F M S,1140.0,23,1.2632,0.26,0.0708,0.0789,0.0,0.8684,0.5507,False,understat
+epl,2025,understat_14030,Kevin,Fulham,M S,1002.0,26,2.2455,0.1198,0.1114,0.0898,0.0898,1.2575,0.4282,False,understat
+epl,2025,understat_76,Fabian Schär,Newcastle United,D S,1096.0,16,1.396,0.0791,0.0134,0.0,0.0,0.3285,0.7611,False,understat
+epl,2025,understat_181,Bernd Leno,Fulham,GK,3420.0,38,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+epl,2025,understat_579,Nathan Aké,Manchester City,D S,681.0,18,0.9251,0.1449,0.094,0.0,0.0,0.793,0.4204,False,understat
+epl,2025,understat_586,John Stones,Manchester City,D S,445.0,9,0.0,0.0,0.0127,0.0,0.0,0.2022,0.5494,False,understat
+epl,2025,understat_603,Nathaniel Clyne,Crystal Palace,D S,613.0,10,0.4405,0.0397,0.099,0.0,0.1468,0.4405,0.6811,False,understat
+epl,2025,understat_638,Kyle Walker,Burnley,D M S,3101.0,36,0.1161,0.0027,0.0483,0.0,0.058,0.3773,0.9571,False,understat
+epl,2025,understat_652,Kieran Trippier,Newcastle United,D S,1606.0,21,0.1121,0.0054,0.102,0.0,0.056,1.5691,0.8497,False,understat
+epl,2025,understat_725,Ola Aina,Nottingham Forest,D,1595.0,18,0.6771,0.0231,0.0193,0.0,0.0,0.5078,0.9846,False,understat
+epl,2025,understat_741,Jordan Pickford,Everton,GK,3420.0,38,0.0,0.0,0.0061,0.0,0.0,0.0526,1.0,True,understat
+epl,2025,understat_780,Karl Darlow,Leeds,GK,1980.0,22,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+epl,2025,understat_825,Adam Smith,Bournemouth,D S,1079.0,22,0.0,0.0,0.0416,0.0,0.1668,0.5005,0.5449,False,understat
+epl,2025,understat_843,James Ward-Prowse,"Burnley,West Ham",M S,1082.0,18,0.4159,0.0151,0.2853,0.0,0.0832,1.9131,0.6679,False,understat
+epl,2025,understat_852,Freddie Woodman,Liverpool,GK S,210.0,3,0.0,0.0,0.0,0.0,0.0,0.0,0.7778,True,understat
+epl,2025,understat_900,Adama Traoré,"Fulham,West Ham",M S,326.0,24,1.9325,0.19,0.1145,0.0,0.0,0.8282,0.1509,False,understat
+epl,2025,understat_978,Sam Johnstone,Wolverhampton Wanderers,GK,1080.0,12,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+epl,2025,understat_987,Joseph Gomez,Liverpool,D S,577.0,21,0.6239,0.0311,0.1948,0.0,0.312,0.7799,0.3053,False,understat
+epl,2025,understat_1024,Tyrone Mings,Aston Villa,D S,1314.0,17,0.6164,0.1022,0.0486,0.0,0.0,0.3425,0.8588,False,understat
+epl,2025,understat_1116,Gianluigi Donnarumma,Manchester City,GK,3060.0,34,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+epl,2025,understat_1257,Alisson,Liverpool,GK,2340.0,26,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+epl,2025,understat_1789,Lewis Cook,Bournemouth,D M S,841.0,17,0.321,0.0064,0.0371,0.0,0.107,1.1772,0.5497,False,understat
+epl,2025,understat_1823,Lucas Digne,Aston Villa,D S,1857.0,31,0.6785,0.0341,0.1479,0.0,0.2908,1.2601,0.6656,False,understat
+epl,2025,understat_2182,Jefferson Lerma,Crystal Palace,D M S,1693.0,31,1.01,0.1174,0.0949,0.0,0.1063,0.6911,0.6068,False,understat
+epl,2025,understat_2310,Alphonse Areola,West Ham,GK,1800.0,20,0.0,0.0,0.0011,0.0,0.05,0.05,1.0,True,understat
+epl,2025,understat_2958,Oleksandr Zinchenko,Nottingham Forest,D S,347.0,5,1.0375,0.0199,0.1169,0.0,0.0,1.2968,0.7711,False,understat
+epl,2025,understat_3645,Olivier Boscagli,Brighton,D S,801.0,12,0.1124,0.0023,0.0166,0.0,0.1124,0.3371,0.7417,False,understat
+epl,2025,understat_4401,Emiliano Martinez,Aston Villa,GK,2837.0,32,0.0,0.0,0.0112,0.0,0.0317,0.0634,0.9851,True,understat
+epl,2025,understat_5221,Leon Bailey,Aston Villa,M S,437.0,13,1.6476,0.1457,0.23,0.0,0.2059,2.4714,0.3735,False,understat
+epl,2025,understat_5261,Kevin Danso,Tottenham,D S,1489.0,24,0.6649,0.0317,0.0096,0.0,0.0,0.1209,0.6894,False,understat
+epl,2025,understat_5355,Jacob Bruun Larsen,Burnley,F M S,1003.0,28,1.5254,0.1285,0.1237,0.0,0.0897,1.0768,0.398,False,understat
+epl,2025,understat_5552,Nick Pope,Newcastle United,GK,2422.0,27,0.0372,0.0049,0.0,0.0,0.0,0.0,0.9967,True,understat
+epl,2025,understat_5584,Aaron Wan-Bissaka,West Ham,D M S,2093.0,25,0.0,0.0,0.0614,0.0,0.086,0.774,0.9302,False,understat
+epl,2025,understat_5590,Tosin Adarabioyo,Chelsea,D S,791.0,16,0.2276,0.0082,0.0473,0.0,0.0,0.1138,0.5493,False,understat
+epl,2025,understat_5595,Daniel James,Leeds,D F S,538.0,19,2.342,0.1338,0.0819,0.0,0.0,1.5056,0.3146,False,understat
+epl,2025,understat_5598,Angel Gomes,Wolverhampton Wanderers,M S,475.0,12,1.1368,0.0366,0.0567,0.0,0.0,1.1368,0.4398,False,understat
+epl,2025,understat_5603,Aaron Ramsdale,Newcastle United,GK S,998.0,12,0.0,0.0,0.0064,0.0,0.0,0.0902,0.9241,True,understat
+epl,2025,understat_5609,Yves Bissouma,Tottenham,M S,619.0,11,0.727,0.0309,0.0,0.0,0.0,0.0,0.6253,False,understat
+epl,2025,understat_5956,Youri Tielemans,Aston Villa,M S,1861.0,25,1.1607,0.089,0.1442,0.0,0.1934,1.5476,0.8271,False,understat
+epl,2025,understat_6080,Victor Lindelöf,Aston Villa,D M S,938.0,17,0.2878,0.015,0.0574,0.0,0.0959,0.1919,0.6131,False,understat
+epl,2025,understat_6098,Niclas Füllkrug,West Ham,F S,416.0,8,1.9471,0.2127,0.0972,0.0,0.0,1.5144,0.5778,False,understat
+epl,2025,understat_6104,Will Hughes,Crystal Palace,M S,1567.0,31,0.9764,0.0736,0.1107,0.0,0.0,1.2061,0.5616,False,understat
+epl,2025,understat_6145,Daichi Kamada,Crystal Palace,M S,1924.0,28,0.8888,0.0696,0.121,0.0,0.0,0.9356,0.7635,False,understat
+epl,2025,understat_6157,Timothy Castagne,Fulham,D M S,1849.0,30,0.6814,0.0716,0.085,0.0,0.0,0.8761,0.6848,False,understat
+epl,2025,understat_6174,Nikola Milenkovic,Nottingham Forest,D S,3360.0,38,0.4018,0.0136,0.0072,0.0,0.0,0.0804,0.9825,False,understat
+epl,2025,understat_6221,Pau Torres,Aston Villa,D S,1679.0,21,0.4824,0.0848,0.0004,0.0,0.0,0.0536,0.8884,False,understat
+epl,2025,understat_6314,Joachim Andersen,Fulham,D,2882.0,33,0.4997,0.0518,0.0181,0.0,0.0312,0.1874,0.9704,False,understat
+epl,2025,understat_6345,Jadon Sancho,Aston Villa,M S,860.0,23,1.0465,0.0805,0.2147,0.0,0.2093,2.1977,0.4155,False,understat
+epl,2025,understat_6532,Martin Dubravka,Burnley,GK,3150.0,35,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+epl,2025,understat_6630,Joe Willock,Newcastle United,M S,979.0,24,1.5628,0.1274,0.1929,0.0,0.1839,1.287,0.4532,False,understat
+epl,2025,understat_6674,Rayan Ait Nouri,Manchester City,D M S,981.0,17,0.8257,0.0457,0.159,0.0,0.1835,1.1009,0.6412,False,understat
+epl,2025,understat_6756,Dwight McNeil,Everton,F M S,1184.0,22,1.8243,0.1112,0.1322,0.0,0.076,1.1402,0.598,False,understat
+epl,2025,understat_6816,Jean-Clair Todibo,West Ham,D S,1827.0,23,0.0985,0.0323,0.0187,0.0,0.0493,0.2463,0.8826,False,understat
+epl,2025,understat_6852,Matt Doherty,Wolverhampton Wanderers,D,822.0,11,0.3285,0.009,0.0189,0.0,0.0,0.3285,0.8303,False,understat
+epl,2025,understat_6885,Axel Disasi,West Ham,D,1258.0,14,0.3577,0.0773,0.0017,0.0,0.0,0.0715,0.9984,False,understat
+epl,2025,understat_6903,Matz Sels,Nottingham Forest,GK S,2672.0,31,0.0,0.0,0.0,0.0,0.0,0.0,0.9577,True,understat
+epl,2025,understat_6935,Naif Aguerd,West Ham,D,180.0,2,1.0,0.0443,0.0,0.0,0.0,0.0,1.0,False,understat
+epl,2025,understat_7240,Benoit Badiashile Mukinayi,Chelsea,D S,478.0,8,0.0,0.0,0.0,0.0,0.0,0.0,0.6639,False,understat
+epl,2025,understat_7268,Bafode Diakite,Bournemouth,D S,1276.0,18,0.0705,0.001,0.006,0.0,0.0,0.1411,0.7877,False,understat
+epl,2025,understat_7298,Ben White,Arsenal,D S,703.0,12,0.6401,0.0362,0.1994,0.0,0.128,1.0242,0.6509,False,understat
+epl,2025,understat_7332,Max Kilman,West Ham,D S,1552.0,21,0.4059,0.0677,0.012,0.0,0.0,0.232,0.8212,False,understat
+epl,2025,understat_7432,Reinildo,Sunderland,D S,1974.0,25,0.1824,0.0078,0.0135,0.0,0.0456,0.2736,0.8773,False,understat
+epl,2025,understat_7589,Wesley Fofana,Chelsea,D S,1745.0,25,0.4126,0.0279,0.034,0.0,0.0516,0.1547,0.7756,False,understat
+epl,2025,understat_7702,Dean Henderson,Crystal Palace,GK,3330.0,37,0.0,0.0,0.0004,0.0,0.0,0.027,1.0,True,understat
+epl,2025,understat_7726,Ezri Konsa Ngoyo,Aston Villa,D,3036.0,34,0.3261,0.0318,0.0178,0.0,0.0,0.1482,0.9922,False,understat
+epl,2025,understat_7791,Sebastiaan Bornauw,Leeds,D S,438.0,12,0.2055,0.0271,0.0,0.0,0.0,0.0,0.4056,False,understat
+epl,2025,understat_7904,Caoimhin Kelleher,Brentford,GK,3330.0,37,0.0,0.0,0.0029,0.0,0.0,0.0541,1.0,True,understat
+epl,2025,understat_7958,Sandro Tonali,Newcastle United,M S,2586.0,35,1.2877,0.0493,0.1309,0.0,0.0696,1.1137,0.821,False,understat
+epl,2025,understat_8000,Ilia Gruev,Leeds,M S,1310.0,23,0.4809,0.0504,0.1026,0.0,0.2061,0.7557,0.6329,False,understat
+epl,2025,understat_8285,Sander Berge,Fulham,M S,2935.0,35,0.4293,0.0413,0.0609,0.0,0.0307,0.644,0.9317,False,understat
+epl,2025,understat_8351,Ki-Jana Hoever,Wolverhampton Wanderers,D S,437.0,8,0.2059,0.0019,0.0698,0.0,0.0,1.0297,0.6069,False,understat
+epl,2025,understat_8401,Luca Netz,Nottingham Forest,D S,348.0,7,0.0,0.0,0.0254,0.0,0.0,0.5172,0.5524,False,understat
+epl,2025,understat_8489,Jorge Cuenca,Fulham,D S,949.0,15,0.0948,0.0048,0.0489,0.0,0.0,0.2845,0.703,False,understat
+epl,2025,understat_8537,Dennis Cirkin,Sunderland,D S,312.0,8,0.2885,0.0191,0.0,0.0,0.0,0.0,0.4333,False,understat
+epl,2025,understat_8717,Pascal Struijk,Leeds,D S,2940.0,34,0.949,0.0908,0.0335,0.0,0.0306,0.3673,0.9608,False,understat
+epl,2025,understat_8720,Jack Harrison,Leeds,F S,232.0,11,2.3276,0.1683,0.1311,0.0,0.0,0.3879,0.2343,False,understat
+epl,2025,understat_8786,Stefan Ortega Moreno,Nottingham Forest,GK,270.0,3,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+epl,2025,understat_8831,Iyenoma Destiny Udogie,Tottenham,D S,1342.0,20,0.2683,0.0147,0.0752,0.0,0.0671,0.8048,0.7456,False,understat
+epl,2025,understat_8858,Guglielmo Vicario,Tottenham,GK,2790.0,31,0.0,0.0,0.0023,0.0,0.0,0.0323,1.0,True,understat
+epl,2025,understat_8920,Dilane Bakwa,Nottingham Forest,M S,556.0,14,1.4568,0.1237,0.1969,0.0,0.3237,1.7806,0.4413,False,understat
+epl,2025,understat_8942,Aaron Hickey,Brentford,D M S,668.0,21,0.8084,0.0741,0.0814,0.0,0.0,0.1347,0.3534,False,understat
+epl,2025,understat_8969,Florentino Luís,Burnley,M S,2146.0,31,0.5452,0.0435,0.0225,0.0,0.0839,0.5452,0.7692,False,understat
+epl,2025,understat_9077,James Trafford,Manchester City,GK,360.0,4,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+epl,2025,understat_9098,Robert Sánchez,Chelsea,GK,3054.0,35,0.0,0.0,0.0261,0.0,0.0295,0.1473,0.9695,True,understat
+epl,2025,understat_9105,Radu Dragusin,Tottenham,D S,513.0,10,0.7018,0.0364,0.0,0.0,0.0,0.0,0.57,False,understat
+epl,2025,understat_9272,Filip Jorgensen,Chelsea,GK S,365.0,5,0.0,0.0,0.0,0.0,0.0,0.0,0.8111,True,understat
+epl,2025,understat_9328,Jeremie Frimpong,Liverpool,D M S,1027.0,21,0.8763,0.0451,0.2359,0.0,0.0876,1.3145,0.5434,False,understat
+epl,2025,understat_9487,Maxime Estève,Burnley,D,2946.0,34,0.3055,0.0138,0.0214,0.0,0.0,0.1833,0.9627,False,understat
+epl,2025,understat_9512,Valentino Livramento,Newcastle United,D S,1323.0,17,0.2041,0.0104,0.0419,0.0,0.068,0.6803,0.8647,False,understat
+epl,2025,understat_9524,Anthony Elanga,Newcastle United,F M S,1289.0,32,1.187,0.1015,0.1222,0.0,0.0698,1.0473,0.4476,False,understat
+epl,2025,understat_9554,Tim Iroegbunam,Everton,M S,1496.0,29,0.7219,0.0307,0.1112,0.0,0.1203,0.4813,0.5732,False,understat
+epl,2025,understat_9614,Marco Bizot,Aston Villa,GK S,583.0,7,0.0,0.0,0.0,0.0,0.0,0.0,0.9254,True,understat
+epl,2025,understat_9676,David Raya,Arsenal,GK,3330.0,37,0.0,0.0,0.004,0.0,0.0,0.0811,1.0,True,understat
+epl,2025,understat_9677,Kristoffer Ajer,Brentford,D S,1809.0,27,0.4975,0.0524,0.045,0.0,0.0498,0.2488,0.7444,False,understat
+epl,2025,understat_9678,Ethan Pinnock,Brentford,D,330.0,4,0.2727,0.0025,0.0,0.0,0.0,0.0,0.9167,False,understat
+epl,2025,understat_9679,Rico Henry,Brentford,D S,1315.0,25,0.3422,0.01,0.0216,0.0,0.0684,0.2738,0.5844,False,understat
+epl,2025,understat_9693,Giorgi Mamardashvili,Liverpool,GK,870.0,10,0.0,0.0,0.0,0.0,0.0,0.0,0.9667,True,understat
+epl,2025,understat_9740,José Sá,Wolverhampton Wanderers,GK,2070.0,23,0.0,0.0,0.0036,0.0,0.0,0.0435,1.0,True,understat
+epl,2025,understat_9944,Gabriel Gudmundsson,Leeds,D M S,2657.0,32,0.6097,0.0297,0.1051,0.0,0.0,0.7113,0.9226,False,understat
+epl,2025,understat_9958,Yerson Mosquera,Wolverhampton Wanderers,D S,2154.0,27,1.2535,0.1239,0.0503,0.0,0.0,0.4596,0.8864,False,understat
+epl,2025,understat_10004,Romeo Lavia,Chelsea,M S,366.0,12,0.7377,0.068,0.1021,0.0,0.0,0.2459,0.3389,False,understat
+epl,2025,understat_10024,Cristhian Mosquera,Arsenal,D S,976.0,20,0.0922,0.0079,0.0271,0.0,0.0,0.4611,0.5422,False,understat
+epl,2025,understat_10025,Lamare Bogarde,Aston Villa,D M S,1011.0,28,0.0,0.0,0.0037,0.0,0.0,0.178,0.4012,False,understat
+epl,2025,understat_10120,Conor Bradley,Liverpool,D S,962.0,15,0.5613,0.0206,0.1117,0.0,0.0936,0.3742,0.7126,False,understat
+epl,2025,understat_10126,James McAtee,Nottingham Forest,M S,263.0,14,1.3688,0.0684,0.2949,0.0,0.3422,2.0532,0.2087,False,understat
+epl,2025,understat_10169,Diego Coppola,Brighton,D S,192.0,5,0.0,0.0,0.0,0.0,0.0,0.0,0.4267,False,understat
+epl,2025,understat_10291,Vitalii Mykolenko,Everton,D,2963.0,33,0.2734,0.0084,0.0347,0.0,0.0304,0.6682,0.9976,False,understat
+epl,2025,understat_10292,Nathan Patterson,Everton,D S,241.0,7,0.3734,0.0636,0.0,0.0,0.0,0.0,0.3825,False,understat
+epl,2025,understat_10293,Toti,Wolverhampton Wanderers,D S,1437.0,19,0.3132,0.0595,0.0099,0.0,0.0,0.3758,0.8404,False,understat
+epl,2025,understat_10527,Carlos Baleba,Brighton,M S,1692.0,31,1.0638,0.0305,0.0432,0.0,0.0,0.4787,0.6065,False,understat
+epl,2025,understat_10542,Jamie Bynoe-Gittens,Chelsea,M S,455.0,16,1.978,0.1765,0.1935,0.0,0.3956,1.7802,0.316,False,understat
+epl,2025,understat_10564,Leny Yoro,Manchester United,D S,1736.0,32,0.4666,0.0647,0.0114,0.0,0.0,0.2074,0.6028,False,understat
+epl,2025,understat_10586,Tyler Dibling,Everton,M S,337.0,14,1.0682,0.0368,0.0569,0.0,0.0,1.0682,0.2675,False,understat
+epl,2025,understat_10696,Noussair Mazraoui,Manchester United,D S,990.0,20,0.4545,0.0179,0.019,0.0,0.0,0.5455,0.55,False,understat
+epl,2025,understat_10721,Sepp van den Berg,Brentford,D S,2758.0,32,0.7505,0.1088,0.0717,0.0,0.0653,0.2284,0.9576,False,understat
+epl,2025,understat_10747,James Hill,Bournemouth,D S,2100.0,29,0.5143,0.0407,0.0613,0.0,0.1286,0.5571,0.8046,False,understat
+epl,2025,understat_10756,Joe Worrall,Burnley,D S,478.0,11,0.1883,0.0072,0.0,0.0,0.0,0.0,0.4828,False,understat
+epl,2025,understat_10764,Djed Spence,Tottenham,D M S,2068.0,30,0.5658,0.0494,0.081,0.0,0.0,0.4352,0.7659,False,understat
+epl,2025,understat_10802,Lisandro Martínez,Manchester United,D S,1217.0,18,0.3698,0.0084,0.0343,0.0,0.0,0.3698,0.7512,False,understat
+epl,2025,understat_10805,Levi Colwill,Chelsea,D S,210.0,3,0.0,0.0,0.0,0.0,0.0,0.0,0.7778,False,understat
+epl,2025,understat_10822,Wilson Odobert,Tottenham,F M S,946.0,24,1.9979,0.2341,0.1857,0.0,0.1903,1.9027,0.438,False,understat
+epl,2025,understat_10847,Rico Lewis,Manchester City,D S,389.0,11,0.6941,0.0316,0.3597,0.0,0.2314,1.6195,0.3929,False,understat
+epl,2025,understat_10856,Emmanuel Agbadou,Wolverhampton Wanderers,D S,1093.0,14,0.8234,0.0368,0.0141,0.0,0.0,0.3294,0.8675,False,understat
+epl,2025,understat_10864,Marcos Senesi,Bournemouth,D,3298.0,37,0.4366,0.0505,0.1099,0.0,0.1364,0.6549,0.9904,False,understat
+epl,2025,understat_11003,Ryan Yates,Nottingham Forest,M S,550.0,22,1.4727,0.1104,0.0372,0.0,0.3273,0.8182,0.2778,False,understat
+epl,2025,understat_11155,Wilfried Gnonto,Leeds,F S,493.0,23,1.8256,0.0799,0.2277,0.0,0.1826,1.4604,0.2382,False,understat
+epl,2025,understat_11167,Chadi Riad,Crystal Palace,D S,562.0,9,0.6406,0.0448,0.0685,0.0,0.1601,0.1601,0.6938,False,understat
+epl,2025,understat_11243,Bashir Humphreys,Burnley,D S,1585.0,20,0.511,0.0299,0.0491,0.0,0.0,0.511,0.8806,False,understat
+epl,2025,understat_11297,Carlos Alcaraz,Everton,M S,681.0,20,2.6432,0.1333,0.1604,0.0,0.1322,1.1894,0.3783,False,understat
+epl,2025,understat_11361,Daniel Bentley,Wolverhampton Wanderers,GK,270.0,3,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+epl,2025,understat_11461,Romaine Mundle,Sunderland,M S,370.0,14,1.7027,0.1638,0.0042,0.0,0.0,0.2432,0.2937,False,understat
+epl,2025,understat_11633,Marc Guiu,"Chelsea,Sunderland",F S,250.0,10,4.68,0.9026,0.2731,0.0,0.36,1.08,0.2778,False,understat
+epl,2025,understat_11704,Hjalmar Ekdal,Burnley,D S,1545.0,19,0.3495,0.0354,0.0098,0.0,0.0,0.233,0.9035,False,understat
+epl,2025,understat_11711,Bart Verbruggen,Brighton,GK,3420.0,38,0.0,0.0,0.002,0.0,0.0,0.0263,1.0,True,understat
+epl,2025,understat_11763,Abduqodir Khusanov,Manchester City,D S,1421.0,21,0.4433,0.0426,0.0362,0.0,0.0,0.38,0.7519,False,understat
+epl,2025,understat_11766,Manuel Ugarte,Manchester United,M S,850.0,22,1.3765,0.0887,0.0136,0.0,0.0,0.3176,0.4293,False,understat
+epl,2025,understat_11807,Ian Maatsen,Aston Villa,D S,1587.0,30,1.1342,0.0737,0.1682,0.0,0.0567,1.4178,0.5878,False,understat
+epl,2025,understat_11824,Lucas Pires,Burnley,D S,1391.0,20,1.0352,0.0584,0.0983,0.0,0.0,1.294,0.7728,False,understat
+epl,2025,understat_11903,Oscar Bobb,"Fulham,Manchester City",F M S,1046.0,23,1.0325,0.123,0.1736,0.0,0.086,1.8929,0.5053,False,understat
+epl,2025,understat_12032,Djordje Petrovic,Bournemouth,GK,3420.0,38,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+epl,2025,understat_12054,Altay Bayindir,Manchester United,GK,540.0,6,0.0,0.0,0.049,0.0,0.0,0.1667,1.0,True,understat
+epl,2025,understat_12113,Jackson Tchatchoua,Wolverhampton Wanderers,D S,1822.0,31,0.1482,0.0052,0.1108,0.0,0.0494,1.0373,0.653,False,understat
+epl,2025,understat_12272,Myles Lewis-Skelly,Arsenal,D M S,666.0,20,0.2703,0.017,0.0241,0.0,0.0,0.5405,0.37,False,understat
+epl,2025,understat_12358,Oliver Scarles,West Ham,D S,665.0,13,0.406,0.0323,0.1321,0.0,0.0,0.6767,0.5684,False,understat
+epl,2025,understat_12369,Lucas Perri,Leeds,GK,1440.0,16,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+epl,2025,understat_12573,Tyrique George,"Chelsea,Everton",M S,328.0,15,2.7439,0.2274,0.3681,0.0,0.0,0.8232,0.243,False,understat
+epl,2025,understat_12757,Harrison Armstrong,Everton,M S,520.0,13,0.8654,0.076,0.021,0.0,0.0,0.6923,0.4444,False,understat
+epl,2025,understat_12910,Mads Hermansen,West Ham,GK,1620.0,18,0.0,0.0,0.0021,0.0,0.0556,0.1111,1.0,True,understat
+epl,2025,understat_13064,Lutsharel Geertruida,Sunderland,D M S,1659.0,28,0.5967,0.0454,0.042,0.0,0.0,0.434,0.6583,False,understat
+epl,2025,understat_13080,Ayden Heaven,Manchester United,D S,923.0,17,0.2925,0.021,0.0356,0.0,0.0975,0.195,0.6033,False,understat
+epl,2025,understat_13091,Jaydee Canvot,Crystal Palace,D S,1334.0,20,0.4723,0.1056,0.0056,0.0,0.0,0.2024,0.7411,False,understat
+epl,2025,understat_13156,Pedro Lima,Wolverhampton Wanderers,D S,254.0,9,1.4173,0.1771,0.0768,0.0,0.0,1.063,0.3136,False,understat
+epl,2025,understat_13200,Fernando López,Wolverhampton Wanderers,M S,211.0,9,2.1327,0.0931,0.2184,0.0,0.4265,1.2796,0.2605,False,understat
+epl,2025,understat_13348,Antonín Kinsky,Tottenham,GK,630.0,7,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+epl,2025,understat_13712,Robin Roefs,Sunderland,GK,3150.0,35,0.0,0.0,0.0202,0.0,0.0,0.1143,1.0,True,understat
+epl,2025,understat_13716,Noah Sadiki,Sunderland,M,2914.0,33,0.5868,0.05,0.0287,0.0,0.0309,0.5868,0.9811,False,understat
+epl,2025,understat_13723,El Hadji Malick Diouf,West Ham,D M S,2711.0,32,0.5976,0.0186,0.108,0.0,0.166,0.9627,0.9413,False,understat
+epl,2025,understat_13724,Freddie Potts,West Ham,M S,1152.0,22,0.2344,0.0166,0.0943,0.0,0.0781,0.625,0.5818,False,understat
+epl,2025,understat_13727,Quilindschy Hartman,Burnley,D,1843.0,21,0.4395,0.0184,0.1363,0.0,0.2442,0.9767,0.9751,False,understat
+epl,2025,understat_13731,Max Weiss,Burnley,GK,270.0,3,0.0,0.0,0.0536,0.0,0.0,0.3333,1.0,True,understat
+epl,2025,understat_13740,David Møller Wolfe,Wolverhampton Wanderers,D S,1059.0,22,0.255,0.007,0.1109,0.0,0.17,0.6799,0.5348,False,understat
+epl,2025,understat_13776,Jorrel Hato,Chelsea,D S,1131.0,22,0.3183,0.0269,0.0565,0.0,0.0,0.6366,0.5712,False,understat
+epl,2025,understat_13779,Jair,Nottingham Forest,D S,536.0,9,0.5037,0.0814,0.0132,0.0,0.0,0.1679,0.6617,False,understat
+epl,2025,understat_13835,Joël Piroe,Leeds,F S,216.0,16,5.8333,0.4515,0.0358,0.0,0.0,0.4167,0.15,False,understat
+epl,2025,understat_14017,John Victor,Nottingham Forest,GK,440.0,5,0.0,0.0,0.0,0.0,0.0,0.0,0.9778,True,understat
+epl,2025,understat_14027,Veljko Milosavljevic,Bournemouth,D S,363.0,7,0.2479,0.0886,0.0166,0.0,0.0,0.2479,0.5762,False,understat
+epl,2025,understat_14056,Senne Lammens,Manchester United,GK,2880.0,32,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+epl,2025,understat_14099,Luke O&#039;Nien,Sunderland,D S,556.0,12,0.6475,0.034,0.0172,0.0,0.1619,0.3237,0.5148,False,understat
+epl,2025,understat_14290,Pablo,West Ham,F M S,844.0,14,1.2796,0.1518,0.1379,0.0,0.1066,1.3863,0.6698,False,understat
+epl,2025,understat_14424,Nilson Angulo,Sunderland,M S,415.0,8,1.5181,0.1964,0.0115,0.0,0.0,0.6506,0.5764,False,understat
+epl,2025,understat_14425,Melker Ellborg,Sunderland,GK,270.0,3,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat

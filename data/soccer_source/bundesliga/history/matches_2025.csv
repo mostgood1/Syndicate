@@ -1,0 +1,307 @@
+league,season,match_id,date,home_team,away_team,home_goals,away_goals,ht_home_goals,ht_away_goals,home_shots,away_shots,home_shots_on_target,away_shots_on_target,home_corners,away_corners,home_fouls,away_fouls,home_yellow_cards,away_yellow_cards,home_red_cards,away_red_cards,odds_home,odds_draw,odds_away,odds_over_2_5,odds_under_2_5
+bundesliga,2025,bundesliga_2025_0_bayern_munich_rb_leipzig,22/08/2025,Bayern Munich,RB Leipzig,6,0,3,0,19,12,10,1,5,5,13,13,4,1,0,0,1.21,7.13,10.3,1.24,3.91
+bundesliga,2025,bundesliga_2025_1_ein_frankfurt_werder_bremen,23/08/2025,Ein Frankfurt,Werder Bremen,4,1,2,0,18,10,5,5,7,1,9,9,1,3,0,0,1.69,4.0,4.46,1.55,2.35
+bundesliga,2025,bundesliga_2025_2_freiburg_augsburg,23/08/2025,Freiburg,Augsburg,1,3,0,3,16,14,4,5,5,5,14,18,4,5,0,0,1.82,3.58,4.25,1.89,1.87
+bundesliga,2025,bundesliga_2025_3_heidenheim_wolfsburg,23/08/2025,Heidenheim,Wolfsburg,1,3,1,1,7,15,2,5,2,5,12,12,2,3,0,0,3.05,3.51,2.2,1.68,2.12
+bundesliga,2025,bundesliga_2025_4_leverkusen_hoffenheim,23/08/2025,Leverkusen,Hoffenheim,1,2,1,1,7,10,2,5,6,4,9,17,0,4,0,0,1.5,4.63,5.56,1.46,2.62
+bundesliga,2025,bundesliga_2025_5_union_berlin_stuttgart,23/08/2025,Union Berlin,Stuttgart,2,1,2,0,8,21,2,6,5,11,21,13,4,4,0,0,3.3,3.59,2.06,1.66,2.16
+bundesliga,2025,bundesliga_2025_6_st_pauli_dortmund,23/08/2025,St Pauli,Dortmund,3,3,0,1,11,8,7,7,5,2,13,12,2,3,0,1,4.52,3.85,1.71,1.75,2.02
+bundesliga,2025,bundesliga_2025_7_mainz_fc_koln,24/08/2025,Mainz,FC Koln,0,1,0,0,19,12,2,2,8,3,7,9,0,2,1,0,1.86,3.61,3.95,1.8,1.96
+bundesliga,2025,bundesliga_2025_8_m'gladbach_hamburg,24/08/2025,M'gladbach,Hamburg,0,0,0,0,17,7,4,2,7,6,10,10,2,1,0,0,1.82,3.92,3.78,1.5,2.47
+bundesliga,2025,bundesliga_2025_9_hamburg_st_pauli,29/08/2025,Hamburg,St Pauli,0,2,0,1,5,17,2,6,2,5,13,19,3,3,1,0,2.39,3.26,2.99,2.02,1.76
+bundesliga,2025,bundesliga_2025_10_hoffenheim_ein_frankfurt,30/08/2025,Hoffenheim,Ein Frankfurt,1,3,0,2,17,9,5,6,4,5,14,10,2,3,0,0,2.84,3.76,2.24,1.47,2.58
+bundesliga,2025,bundesliga_2025_11_rb_leipzig_heidenheim,30/08/2025,RB Leipzig,Heidenheim,2,0,0,0,19,5,5,3,4,3,7,13,2,5,0,0,1.42,4.83,6.48,1.5,2.5
+bundesliga,2025,bundesliga_2025_12_stuttgart_m'gladbach,30/08/2025,Stuttgart,M'gladbach,1,0,0,0,13,15,5,6,6,10,5,13,2,1,0,0,1.59,4.45,4.75,1.4,2.83
+bundesliga,2025,bundesliga_2025_13_werder_bremen_leverkusen,30/08/2025,Werder Bremen,Leverkusen,3,3,1,2,12,10,5,4,3,7,11,10,4,3,1,0,3.56,3.83,1.91,1.54,2.38
+bundesliga,2025,bundesliga_2025_14_augsburg_bayern_munich,30/08/2025,Augsburg,Bayern Munich,2,3,0,2,10,20,3,10,7,5,14,11,3,4,0,0,9.87,6.41,1.24,1.32,3.23
+bundesliga,2025,bundesliga_2025_15_wolfsburg_mainz,31/08/2025,Wolfsburg,Mainz,1,1,1,0,11,17,3,3,3,10,15,14,3,5,1,0,2.04,3.62,3.34,1.72,2.06
+bundesliga,2025,bundesliga_2025_16_dortmund_union_berlin,31/08/2025,Dortmund,Union Berlin,3,0,1,0,11,12,6,3,4,6,14,7,0,0,0,0,1.38,5.06,7.02,1.49,2.53
+bundesliga,2025,bundesliga_2025_17_fc_koln_freiburg,31/08/2025,FC Koln,Freiburg,4,1,1,0,18,12,6,2,3,5,12,9,2,1,0,0,2.5,3.26,2.74,1.97,1.79
+bundesliga,2025,bundesliga_2025_18_leverkusen_ein_frankfurt,12/09/2025,Leverkusen,Ein Frankfurt,3,1,2,0,18,13,8,2,4,8,10,9,5,3,2,0,2.1,3.8,3.11,1.44,2.72
+bundesliga,2025,bundesliga_2025_19_freiburg_stuttgart,13/09/2025,Freiburg,Stuttgart,3,1,0,1,14,7,6,2,7,1,8,13,1,1,1,0,2.84,3.59,2.29,1.58,2.29
+bundesliga,2025,bundesliga_2025_20_heidenheim_dortmund,13/09/2025,Heidenheim,Dortmund,0,2,0,2,6,17,1,8,5,4,5,9,2,3,1,0,5.16,4.39,1.55,1.49,2.55
+bundesliga,2025,bundesliga_2025_21_mainz_rb_leipzig,13/09/2025,Mainz,RB Leipzig,0,1,0,1,13,19,2,3,3,5,12,11,1,0,0,0,2.56,3.58,2.53,1.63,2.21
+bundesliga,2025,bundesliga_2025_22_union_berlin_hoffenheim,13/09/2025,Union Berlin,Hoffenheim,2,4,0,2,20,9,7,8,9,2,13,12,1,1,1,0,2.56,3.39,2.64,1.86,1.9
+bundesliga,2025,bundesliga_2025_23_wolfsburg_fc_koln,13/09/2025,Wolfsburg,FC Koln,3,3,1,1,14,14,6,8,7,4,15,11,2,3,0,0,1.96,3.56,3.66,1.78,1.98
+bundesliga,2025,bundesliga_2025_24_bayern_munich_hamburg,13/09/2025,Bayern Munich,Hamburg,5,0,4,0,22,9,12,2,5,3,11,14,2,2,0,0,1.06,11.91,26.44,1.2,4.25
+bundesliga,2025,bundesliga_2025_25_st_pauli_augsburg,14/09/2025,St Pauli,Augsburg,2,1,1,1,13,10,7,5,3,1,10,12,1,4,0,0,2.19,3.31,3.25,2.04,1.73
+bundesliga,2025,bundesliga_2025_26_m'gladbach_werder_bremen,14/09/2025,M'gladbach,Werder Bremen,0,4,0,2,19,12,3,7,9,4,12,9,1,0,0,0,1.92,3.92,3.46,1.48,2.55
+bundesliga,2025,bundesliga_2025_27_stuttgart_st_pauli,19/09/2025,Stuttgart,St Pauli,2,0,1,0,17,9,8,2,8,4,13,15,0,2,0,0,1.75,3.89,4.33,1.7,2.1
+bundesliga,2025,bundesliga_2025_28_augsburg_mainz,20/09/2025,Augsburg,Mainz,1,4,0,2,18,12,5,4,6,6,13,10,1,2,0,1,2.66,3.34,2.55,1.88,1.87
+bundesliga,2025,bundesliga_2025_29_hamburg_heidenheim,20/09/2025,Hamburg,Heidenheim,2,1,1,0,22,20,9,8,1,12,15,10,5,1,0,0,2.02,3.51,3.45,1.77,2.0
+bundesliga,2025,bundesliga_2025_30_hoffenheim_bayern_munich,20/09/2025,Hoffenheim,Bayern Munich,1,4,0,1,12,18,4,10,5,5,17,9,1,2,0,0,7.48,5.7,1.32,1.3,3.38
+bundesliga,2025,bundesliga_2025_31_werder_bremen_freiburg,20/09/2025,Werder Bremen,Freiburg,0,3,0,1,12,10,5,5,2,0,13,7,5,2,0,0,2.37,3.59,2.72,1.6,2.26
+bundesliga,2025,bundesliga_2025_32_rb_leipzig_fc_koln,20/09/2025,RB Leipzig,FC Koln,3,1,3,1,18,13,8,2,9,5,10,8,1,1,0,0,1.65,4.15,4.61,1.55,2.37
+bundesliga,2025,bundesliga_2025_33_ein_frankfurt_union_berlin,21/09/2025,Ein Frankfurt,Union Berlin,3,4,1,2,19,11,10,5,5,1,10,11,3,2,0,0,1.55,4.27,5.27,1.58,2.29
+bundesliga,2025,bundesliga_2025_34_leverkusen_m'gladbach,21/09/2025,Leverkusen,M'gladbach,1,1,0,0,13,13,9,7,3,4,12,15,5,5,0,0,1.55,4.52,5.01,1.43,2.7
+bundesliga,2025,bundesliga_2025_35_dortmund_wolfsburg,21/09/2025,Dortmund,Wolfsburg,1,0,1,0,12,10,4,1,9,3,10,9,1,0,0,0,1.47,4.72,5.78,1.44,2.67
+bundesliga,2025,bundesliga_2025_36_bayern_munich_werder_bremen,26/09/2025,Bayern Munich,Werder Bremen,4,0,2,0,26,9,13,3,7,6,9,4,2,0,0,0,1.09,10.97,20.23,1.17,4.79
+bundesliga,2025,bundesliga_2025_37_heidenheim_augsburg,27/09/2025,Heidenheim,Augsburg,2,1,0,0,11,8,5,2,3,2,16,20,1,6,0,0,2.69,3.46,2.46,1.74,2.03
+bundesliga,2025,bundesliga_2025_38_mainz_dortmund,27/09/2025,Mainz,Dortmund,0,2,0,2,8,10,2,4,7,5,12,14,2,1,1,0,3.14,3.74,2.08,1.57,2.33
+bundesliga,2025,bundesliga_2025_39_st_pauli_leverkusen,27/09/2025,St Pauli,Leverkusen,1,2,1,1,13,5,6,4,13,1,13,11,3,5,0,0,3.12,3.45,2.18,1.84,1.92
+bundesliga,2025,bundesliga_2025_40_wolfsburg_rb_leipzig,27/09/2025,Wolfsburg,RB Leipzig,0,1,0,1,22,20,4,6,6,11,7,9,2,2,0,0,2.54,3.65,2.5,1.51,2.47
+bundesliga,2025,bundesliga_2025_41_m'gladbach_ein_frankfurt,27/09/2025,M'gladbach,Ein Frankfurt,4,6,0,5,11,21,8,7,4,6,14,8,1,2,0,0,2.98,3.68,2.18,1.48,2.56
+bundesliga,2025,bundesliga_2025_42_freiburg_hoffenheim,28/09/2025,Freiburg,Hoffenheim,1,1,1,1,6,15,1,4,6,8,9,15,3,1,0,0,2.19,3.59,3.01,1.58,2.28
+bundesliga,2025,bundesliga_2025_43_fc_koln_stuttgart,28/09/2025,FC Koln,Stuttgart,1,2,1,1,14,15,6,5,8,8,12,12,2,2,0,0,2.78,3.64,2.29,1.53,2.41
+bundesliga,2025,bundesliga_2025_44_union_berlin_hamburg,28/09/2025,Union Berlin,Hamburg,0,0,0,0,11,16,2,6,5,3,18,17,2,2,0,1,1.97,3.53,3.61,1.78,1.97
+bundesliga,2025,bundesliga_2025_45_hoffenheim_fc_koln,03/10/2025,Hoffenheim,FC Koln,0,1,0,1,15,10,4,4,11,6,15,6,3,1,0,0,1.91,3.82,3.61,1.53,2.42
+bundesliga,2025,bundesliga_2025_46_augsburg_wolfsburg,04/10/2025,Augsburg,Wolfsburg,3,1,1,0,10,14,5,4,10,5,9,7,2,1,0,0,2.71,3.53,2.42,1.7,2.09
+bundesliga,2025,bundesliga_2025_47_dortmund_rb_leipzig,04/10/2025,Dortmund,RB Leipzig,1,1,1,1,15,13,3,3,7,7,13,14,1,3,0,0,1.68,4.36,4.14,1.36,3.03
+bundesliga,2025,bundesliga_2025_48_leverkusen_union_berlin,04/10/2025,Leverkusen,Union Berlin,2,0,1,0,20,10,3,3,4,4,11,13,1,3,0,0,1.68,3.91,4.65,1.75,2.02
+bundesliga,2025,bundesliga_2025_49_werder_bremen_st_pauli,04/10/2025,Werder Bremen,St Pauli,1,0,1,0,15,13,5,3,4,1,8,9,3,1,0,0,2.32,3.51,2.86,1.74,2.03
+bundesliga,2025,bundesliga_2025_50_ein_frankfurt_bayern_munich,04/10/2025,Ein Frankfurt,Bayern Munich,0,3,0,2,6,12,1,3,4,3,11,11,1,2,0,0,5.9,5.19,1.42,1.28,3.54
+bundesliga,2025,bundesliga_2025_51_stuttgart_heidenheim,05/10/2025,Stuttgart,Heidenheim,1,0,0,0,18,5,6,1,1,1,11,12,1,1,0,0,1.42,4.81,6.48,1.46,2.62
+bundesliga,2025,bundesliga_2025_52_hamburg_mainz,05/10/2025,Hamburg,Mainz,4,0,2,0,15,11,9,4,1,4,14,13,2,3,0,0,2.76,3.54,2.36,1.69,2.1
+bundesliga,2025,bundesliga_2025_53_m'gladbach_freiburg,05/10/2025,M'gladbach,Freiburg,0,0,0,0,9,12,5,1,4,1,15,7,3,1,0,0,2.27,3.53,2.92,1.7,2.1
+bundesliga,2025,bundesliga_2025_54_union_berlin_m'gladbach,17/10/2025,Union Berlin,M'gladbach,3,1,2,1,16,8,5,2,6,6,21,15,5,3,0,0,2.17,3.44,3.24,1.83,1.93
+bundesliga,2025,bundesliga_2025_55_fc_koln_augsburg,18/10/2025,FC Koln,Augsburg,1,1,0,0,9,10,2,4,5,2,10,17,2,2,0,0,1.98,3.79,3.39,1.57,2.31
+bundesliga,2025,bundesliga_2025_56_heidenheim_werder_bremen,18/10/2025,Heidenheim,Werder Bremen,2,2,0,0,31,11,11,4,12,2,9,11,1,3,0,0,2.84,3.53,2.32,1.66,2.16
+bundesliga,2025,bundesliga_2025_57_mainz_leverkusen,18/10/2025,Mainz,Leverkusen,3,4,1,3,12,20,4,8,2,3,20,12,4,4,0,0,2.78,3.4,2.39,1.74,2.02
+bundesliga,2025,bundesliga_2025_58_rb_leipzig_hamburg,18/10/2025,RB Leipzig,Hamburg,2,1,1,0,10,15,4,3,3,5,13,12,3,1,0,0,1.4,5.07,6.34,1.35,3.07
+bundesliga,2025,bundesliga_2025_59_wolfsburg_stuttgart,18/10/2025,Wolfsburg,Stuttgart,0,3,0,1,11,15,3,7,3,8,12,8,1,1,0,0,2.6,3.59,2.49,1.58,2.28
+bundesliga,2025,bundesliga_2025_60_bayern_munich_dortmund,18/10/2025,Bayern Munich,Dortmund,2,1,1,0,15,8,7,1,4,3,12,17,1,3,0,0,1.34,5.52,7.34,1.31,3.31
+bundesliga,2025,bundesliga_2025_61_freiburg_ein_frankfurt,19/10/2025,Freiburg,Ein Frankfurt,2,2,1,2,12,8,5,3,3,1,6,15,2,3,0,0,2.48,3.57,2.6,1.6,2.27
+bundesliga,2025,bundesliga_2025_62_st_pauli_hoffenheim,19/10/2025,St Pauli,Hoffenheim,0,3,0,0,10,14,2,5,9,7,10,17,1,3,0,0,2.41,3.45,2.78,1.77,1.99
+bundesliga,2025,bundesliga_2025_63_werder_bremen_union_berlin,24/10/2025,Werder Bremen,Union Berlin,1,0,0,0,16,12,3,2,5,6,6,13,4,0,0,0,2.24,3.52,3.03,1.68,2.13
+bundesliga,2025,bundesliga_2025_64_augsburg_rb_leipzig,25/10/2025,Augsburg,RB Leipzig,0,6,0,4,15,15,2,8,2,3,9,10,3,1,0,0,3.25,3.91,1.99,1.44,2.69
+bundesliga,2025,bundesliga_2025_65_ein_frankfurt_st_pauli,25/10/2025,Ein Frankfurt,St Pauli,2,0,1,0,10,9,6,1,1,3,11,6,0,1,0,0,1.68,4.06,4.43,1.56,2.35
+bundesliga,2025,bundesliga_2025_66_hamburg_wolfsburg,25/10/2025,Hamburg,Wolfsburg,0,1,0,1,27,6,6,2,11,1,8,18,1,5,0,0,2.32,3.58,2.81,1.61,2.26
+bundesliga,2025,bundesliga_2025_67_hoffenheim_heidenheim,25/10/2025,Hoffenheim,Heidenheim,3,1,2,0,14,12,7,3,7,5,14,13,1,1,0,0,1.57,4.38,5.03,1.48,2.56
+bundesliga,2025,bundesliga_2025_68_m'gladbach_bayern_munich,25/10/2025,M'gladbach,Bayern Munich,0,3,0,0,1,27,0,11,1,8,6,9,0,3,1,0,10.53,6.81,1.22,1.26,3.67
+bundesliga,2025,bundesliga_2025_69_dortmund_fc_koln,25/10/2025,Dortmund,FC Koln,1,0,0,0,27,5,9,0,17,2,10,8,2,2,0,0,1.42,4.97,6.36,1.4,2.8
+bundesliga,2025,bundesliga_2025_70_leverkusen_freiburg,26/10/2025,Leverkusen,Freiburg,2,0,1,0,19,10,4,3,2,3,9,8,1,2,0,1,1.77,3.82,4.17,1.72,2.06
+bundesliga,2025,bundesliga_2025_71_stuttgart_mainz,26/10/2025,Stuttgart,Mainz,2,1,1,1,19,13,8,2,7,5,11,12,4,3,0,0,1.73,3.99,4.22,1.57,2.33
+bundesliga,2025,bundesliga_2025_72_augsburg_dortmund,31/10/2025,Augsburg,Dortmund,0,1,0,1,9,5,1,1,4,3,14,16,4,1,0,0,5.03,4.34,1.58,1.48,2.57
+bundesliga,2025,bundesliga_2025_73_heidenheim_ein_frankfurt,01/11/2025,Heidenheim,Ein Frankfurt,1,1,1,0,9,16,4,3,2,8,7,11,0,2,0,0,3.48,3.96,1.91,1.47,2.59
+bundesliga,2025,bundesliga_2025_74_mainz_werder_bremen,01/11/2025,Mainz,Werder Bremen,1,1,1,0,10,5,5,3,2,0,19,11,1,3,0,0,1.99,3.77,3.37,1.55,2.37
+bundesliga,2025,bundesliga_2025_75_rb_leipzig_stuttgart,01/11/2025,RB Leipzig,Stuttgart,3,1,1,0,16,14,9,4,5,5,8,10,1,2,0,0,1.97,3.87,3.35,1.41,2.76
+bundesliga,2025,bundesliga_2025_76_st_pauli_m'gladbach,01/11/2025,St Pauli,M'gladbach,0,4,0,2,16,15,4,11,8,1,11,8,4,0,0,0,2.11,3.44,3.34,1.85,1.89
+bundesliga,2025,bundesliga_2025_77_union_berlin_freiburg,01/11/2025,Union Berlin,Freiburg,0,0,0,0,11,13,2,4,5,5,20,13,6,1,0,0,2.56,3.23,2.74,2.08,1.7
+bundesliga,2025,bundesliga_2025_78_bayern_munich_leverkusen,01/11/2025,Bayern Munich,Leverkusen,3,0,3,0,18,7,4,1,10,4,11,3,1,1,0,0,1.22,6.85,10.44,1.25,3.76
+bundesliga,2025,bundesliga_2025_79_fc_koln_hamburg,02/11/2025,FC Koln,Hamburg,4,1,1,0,23,11,10,5,2,3,8,18,1,6,0,2,2.1,3.64,3.19,1.62,2.23
+bundesliga,2025,bundesliga_2025_80_wolfsburg_hoffenheim,02/11/2025,Wolfsburg,Hoffenheim,2,3,1,1,12,10,6,4,2,2,10,17,0,2,0,0,2.76,3.68,2.31,1.53,2.39
+bundesliga,2025,bundesliga_2025_81_werder_bremen_wolfsburg,07/11/2025,Werder Bremen,Wolfsburg,2,1,0,1,20,7,7,4,13,3,13,8,2,0,0,0,2.18,3.64,3.07,1.55,2.39
+bundesliga,2025,bundesliga_2025_82_hamburg_dortmund,08/11/2025,Hamburg,Dortmund,1,1,0,0,9,17,3,1,2,6,14,8,1,1,0,0,4.45,4.21,1.66,1.47,2.57
+bundesliga,2025,bundesliga_2025_83_hoffenheim_rb_leipzig,08/11/2025,Hoffenheim,RB Leipzig,3,1,2,1,12,17,4,5,5,5,13,5,3,2,0,0,2.64,3.8,2.36,1.39,2.89
+bundesliga,2025,bundesliga_2025_84_leverkusen_heidenheim,08/11/2025,Leverkusen,Heidenheim,6,0,5,0,25,1,10,0,11,1,5,7,0,1,0,0,1.39,4.86,7.14,1.5,2.49
+bundesliga,2025,bundesliga_2025_85_union_berlin_bayern_munich,08/11/2025,Union Berlin,Bayern Munich,2,2,1,1,12,12,4,4,6,5,8,8,2,4,0,0,12.03,6.7,1.2,1.37,2.99
+bundesliga,2025,bundesliga_2025_86_m'gladbach_fc_koln,08/11/2025,M'gladbach,FC Koln,3,1,1,0,9,19,4,5,2,6,11,13,2,3,0,0,2.19,3.54,3.06,1.61,2.24
+bundesliga,2025,bundesliga_2025_87_freiburg_st_pauli,09/11/2025,Freiburg,St Pauli,2,1,1,0,8,7,4,2,9,3,8,12,2,2,0,0,1.82,3.51,4.32,1.97,1.78
+bundesliga,2025,bundesliga_2025_88_stuttgart_augsburg,09/11/2025,Stuttgart,Augsburg,3,2,2,2,17,17,6,6,4,4,13,10,2,3,0,0,1.5,4.49,5.63,1.53,2.41
+bundesliga,2025,bundesliga_2025_89_ein_frankfurt_mainz,09/11/2025,Ein Frankfurt,Mainz,1,0,0,0,14,3,4,0,4,3,8,14,0,5,0,0,1.84,3.93,3.73,1.53,2.41
+bundesliga,2025,bundesliga_2025_90_mainz_hoffenheim,21/11/2025,Mainz,Hoffenheim,1,1,0,1,17,19,3,5,7,4,13,13,3,2,1,0,2.48,3.56,2.65,1.6,2.27
+bundesliga,2025,bundesliga_2025_91_augsburg_hamburg,22/11/2025,Augsburg,Hamburg,1,0,0,0,13,15,6,6,4,3,13,10,2,3,1,0,2.3,3.51,2.89,1.68,2.11
+bundesliga,2025,bundesliga_2025_92_bayern_munich_freiburg,22/11/2025,Bayern Munich,Freiburg,6,2,2,2,22,8,8,2,3,5,9,7,1,0,0,0,1.17,7.25,13.25,1.34,3.12
+bundesliga,2025,bundesliga_2025_93_dortmund_stuttgart,22/11/2025,Dortmund,Stuttgart,3,3,2,0,14,16,6,6,2,4,12,10,1,1,0,0,1.74,4.03,4.11,1.51,2.47
+bundesliga,2025,bundesliga_2025_94_heidenheim_m'gladbach,22/11/2025,Heidenheim,M'gladbach,0,3,0,1,7,16,2,4,4,5,13,12,2,0,0,0,3.14,3.58,2.14,1.66,2.15
+bundesliga,2025,bundesliga_2025_95_wolfsburg_leverkusen,22/11/2025,Wolfsburg,Leverkusen,1,3,0,3,21,7,10,3,9,1,12,7,2,1,0,0,3.43,3.71,1.98,1.6,2.26
+bundesliga,2025,bundesliga_2025_96_fc_koln_ein_frankfurt,22/11/2025,FC Koln,Ein Frankfurt,3,4,1,2,11,11,5,7,3,3,6,5,0,0,0,0,2.91,3.77,2.19,1.5,2.49
+bundesliga,2025,bundesliga_2025_97_rb_leipzig_werder_bremen,23/11/2025,RB Leipzig,Werder Bremen,2,0,0,0,22,15,13,6,13,7,5,7,1,2,0,0,1.43,5.0,5.94,1.32,3.24
+bundesliga,2025,bundesliga_2025_98_st_pauli_union_berlin,23/11/2025,St Pauli,Union Berlin,0,1,0,1,12,8,3,3,8,2,10,8,1,1,0,0,2.43,3.21,2.91,2.1,1.69
+bundesliga,2025,bundesliga_2025_99_m'gladbach_rb_leipzig,28/11/2025,M'gladbach,RB Leipzig,0,0,0,0,8,20,1,4,5,6,9,9,0,3,0,0,2.84,3.8,2.24,1.42,2.72
+bundesliga,2025,bundesliga_2025_100_bayern_munich_st_pauli,29/11/2025,Bayern Munich,St Pauli,3,1,1,1,19,10,4,1,10,2,5,8,1,1,0,0,1.09,9.91,21.25,1.24,3.8
+bundesliga,2025,bundesliga_2025_101_hoffenheim_augsburg,29/11/2025,Hoffenheim,Augsburg,3,0,3,0,17,14,3,4,7,2,17,9,1,0,0,0,1.67,4.18,4.44,1.53,2.41
+bundesliga,2025,bundesliga_2025_102_union_berlin_heidenheim,29/11/2025,Union Berlin,Heidenheim,1,2,1,0,9,10,2,2,5,5,13,10,3,2,0,0,1.64,3.87,5.02,1.85,1.91
+bundesliga,2025,bundesliga_2025_103_werder_bremen_fc_koln,29/11/2025,Werder Bremen,FC Koln,1,1,1,0,17,10,4,2,4,0,11,11,2,4,1,0,2.21,3.74,2.89,1.52,2.44
+bundesliga,2025,bundesliga_2025_104_leverkusen_dortmund,29/11/2025,Leverkusen,Dortmund,1,2,0,1,14,7,4,4,10,3,7,9,3,4,0,0,2.47,3.62,2.59,1.56,2.35
+bundesliga,2025,bundesliga_2025_105_hamburg_stuttgart,30/11/2025,Hamburg,Stuttgart,2,1,1,0,9,14,2,3,4,6,16,12,2,4,1,0,3.02,3.68,2.15,1.53,2.42
+bundesliga,2025,bundesliga_2025_106_ein_frankfurt_wolfsburg,30/11/2025,Ein Frankfurt,Wolfsburg,1,1,0,0,15,10,3,3,14,1,7,9,1,4,0,0,1.7,4.17,4.22,1.46,2.61
+bundesliga,2025,bundesliga_2025_107_freiburg_mainz,30/11/2025,Freiburg,Mainz,4,0,2,0,23,1,10,1,6,2,9,12,0,2,0,1,1.91,3.43,3.95,1.95,1.8
+bundesliga,2025,bundesliga_2025_108_mainz_m'gladbach,05/12/2025,Mainz,M'gladbach,0,1,0,0,8,14,2,5,8,6,12,4,2,1,0,0,2.55,3.41,2.65,1.7,2.1
+bundesliga,2025,bundesliga_2025_109_augsburg_leverkusen,06/12/2025,Augsburg,Leverkusen,2,0,2,0,13,20,6,2,5,7,12,6,4,3,0,0,3.68,3.8,1.88,1.58,2.31
+bundesliga,2025,bundesliga_2025_110_fc_koln_st_pauli,06/12/2025,FC Koln,St Pauli,1,1,0,0,11,5,8,1,5,4,6,6,0,1,0,0,1.95,3.55,3.68,1.83,1.93
+bundesliga,2025,bundesliga_2025_111_heidenheim_freiburg,06/12/2025,Heidenheim,Freiburg,2,1,0,1,16,16,3,2,8,6,11,10,2,1,0,0,3.8,3.51,1.93,1.85,1.9
+bundesliga,2025,bundesliga_2025_112_stuttgart_bayern_munich,06/12/2025,Stuttgart,Bayern Munich,0,5,0,1,13,19,1,11,3,4,6,11,2,4,1,0,5.43,5.0,1.47,1.33,3.23
+bundesliga,2025,bundesliga_2025_113_wolfsburg_union_berlin,06/12/2025,Wolfsburg,Union Berlin,3,1,2,0,4,21,3,6,0,11,13,10,4,1,0,0,2.1,3.41,3.38,1.87,1.88
+bundesliga,2025,bundesliga_2025_114_rb_leipzig_ein_frankfurt,06/12/2025,RB Leipzig,Ein Frankfurt,6,0,2,0,16,8,7,2,4,0,9,17,1,2,0,0,1.73,4.13,4.06,1.42,2.73
+bundesliga,2025,bundesliga_2025_115_hamburg_werder_bremen,07/12/2025,Hamburg,Werder Bremen,3,2,0,1,12,10,6,3,5,3,8,13,1,6,0,0,2.25,3.53,2.96,1.65,2.16
+bundesliga,2025,bundesliga_2025_116_dortmund_hoffenheim,07/12/2025,Dortmund,Hoffenheim,2,0,1,0,8,11,4,3,7,5,7,9,0,2,0,0,1.58,4.41,4.84,1.47,2.6
+bundesliga,2025,bundesliga_2025_117_union_berlin_rb_leipzig,12/12/2025,Union Berlin,RB Leipzig,3,1,0,0,12,9,6,3,4,6,7,8,2,2,0,0,3.22,3.38,2.19,1.89,1.86
+bundesliga,2025,bundesliga_2025_118_ein_frankfurt_augsburg,13/12/2025,Ein Frankfurt,Augsburg,1,0,0,0,11,12,4,1,2,6,14,10,2,3,0,0,1.68,4.06,4.39,1.55,2.36
+bundesliga,2025,bundesliga_2025_119_hoffenheim_hamburg,13/12/2025,Hoffenheim,Hamburg,4,1,2,0,10,14,6,5,3,3,16,10,1,3,0,0,1.71,4.06,4.21,1.5,2.49
+bundesliga,2025,bundesliga_2025_120_m'gladbach_wolfsburg,13/12/2025,M'gladbach,Wolfsburg,1,3,1,3,14,11,4,6,6,3,6,8,0,1,0,0,1.96,3.75,3.47,1.56,2.33
+bundesliga,2025,bundesliga_2025_121_st_pauli_heidenheim,13/12/2025,St Pauli,Heidenheim,2,1,1,0,8,20,5,7,4,11,6,15,2,3,1,0,1.94,3.33,3.96,2.11,1.68
+bundesliga,2025,bundesliga_2025_122_leverkusen_fc_koln,13/12/2025,Leverkusen,FC Koln,2,0,0,0,17,6,6,4,8,3,8,6,2,1,0,0,1.53,4.44,5.28,1.49,2.53
+bundesliga,2025,bundesliga_2025_123_freiburg_dortmund,14/12/2025,Freiburg,Dortmund,1,1,0,1,21,9,6,4,6,0,11,10,3,2,0,1,3.25,3.44,2.12,1.8,1.94
+bundesliga,2025,bundesliga_2025_124_bayern_munich_mainz,14/12/2025,Bayern Munich,Mainz,2,2,1,1,24,5,11,2,7,0,7,8,2,2,0,0,1.09,10.18,19.25,1.21,4.11
+bundesliga,2025,bundesliga_2025_125_werder_bremen_stuttgart,14/12/2025,Werder Bremen,Stuttgart,0,4,0,2,9,24,3,12,0,9,11,6,2,0,1,0,2.88,3.71,2.21,1.52,2.44
+bundesliga,2025,bundesliga_2025_126_dortmund_m'gladbach,19/12/2025,Dortmund,M'gladbach,2,0,1,0,10,6,4,1,6,4,15,13,2,1,0,0,1.53,4.47,5.41,1.48,2.57
+bundesliga,2025,bundesliga_2025_127_augsburg_werder_bremen,20/12/2025,Augsburg,Werder Bremen,0,0,0,0,14,9,6,0,6,11,10,20,3,4,0,0,2.24,3.48,3.01,1.72,2.06
+bundesliga,2025,bundesliga_2025_128_fc_koln_union_berlin,20/12/2025,FC Koln,Union Berlin,0,1,0,0,13,11,2,3,3,6,9,18,2,5,1,0,2.32,3.28,3.02,1.93,1.83
+bundesliga,2025,bundesliga_2025_129_hamburg_ein_frankfurt,20/12/2025,Hamburg,Ein Frankfurt,1,1,1,1,9,9,3,3,5,5,8,12,0,0,0,0,2.62,3.48,2.51,1.65,2.17
+bundesliga,2025,bundesliga_2025_130_stuttgart_hoffenheim,20/12/2025,Stuttgart,Hoffenheim,0,0,0,0,10,4,3,1,4,2,10,17,3,2,0,0,1.99,3.84,3.29,1.46,2.62
+bundesliga,2025,bundesliga_2025_131_wolfsburg_freiburg,20/12/2025,Wolfsburg,Freiburg,3,4,1,1,13,15,6,8,2,6,16,8,1,1,0,0,2.47,3.43,2.7,1.77,1.99
+bundesliga,2025,bundesliga_2025_132_rb_leipzig_leverkusen,20/12/2025,RB Leipzig,Leverkusen,1,3,1,2,19,15,7,8,2,8,10,12,1,2,0,0,2.06,3.73,3.18,1.51,2.45
+bundesliga,2025,bundesliga_2025_133_mainz_st_pauli,21/12/2025,Mainz,St Pauli,0,0,0,0,13,5,1,1,9,5,5,9,1,1,0,0,1.92,3.34,4.02,2.1,1.68
+bundesliga,2025,bundesliga_2025_134_heidenheim_bayern_munich,21/12/2025,Heidenheim,Bayern Munich,0,4,0,2,8,23,1,11,0,6,8,6,0,0,0,0,15.28,8.61,1.13,1.23,3.99
+bundesliga,2025,bundesliga_2025_135_ein_frankfurt_dortmund,09/01/2026,Ein Frankfurt,Dortmund,3,3,1,1,12,16,6,6,2,5,14,6,3,3,0,0,3.47,3.67,1.99,1.6,2.27
+bundesliga,2025,bundesliga_2025_136_freiburg_hamburg,10/01/2026,Freiburg,Hamburg,2,1,0,0,20,10,7,5,0,3,13,11,3,5,0,1,1.76,3.6,4.49,1.79,1.97
+bundesliga,2025,bundesliga_2025_137_heidenheim_fc_koln,10/01/2026,Heidenheim,FC Koln,2,2,2,1,14,21,6,9,5,4,9,7,2,1,0,0,2.88,3.48,2.3,1.73,2.04
+bundesliga,2025,bundesliga_2025_138_union_berlin_mainz,10/01/2026,Union Berlin,Mainz,2,2,0,1,17,9,5,6,2,1,9,8,2,0,0,0,2.12,3.17,3.57,2.18,1.64
+bundesliga,2025,bundesliga_2025_139_leverkusen_stuttgart,10/01/2026,Leverkusen,Stuttgart,1,4,0,4,16,10,4,7,5,3,13,11,4,2,0,0,1.92,3.88,3.47,1.48,2.57
+bundesliga,2025,bundesliga_2025_140_m'gladbach_augsburg,11/01/2026,M'gladbach,Augsburg,4,0,3,0,12,17,7,2,2,2,16,9,0,1,0,0,1.87,3.63,3.88,1.77,1.99
+bundesliga,2025,bundesliga_2025_141_bayern_munich_wolfsburg,11/01/2026,Bayern Munich,Wolfsburg,8,1,2,1,16,8,10,3,6,2,7,6,0,1,0,0,1.1,10.11,18.06,1.18,4.54
+bundesliga,2025,bundesliga_2025_142_stuttgart_ein_frankfurt,13/01/2026,Stuttgart,Ein Frankfurt,3,2,2,1,20,12,11,5,10,2,8,15,2,2,0,0,1.72,4.11,4.2,1.46,2.62
+bundesliga,2025,bundesliga_2025_143_dortmund_werder_bremen,13/01/2026,Dortmund,Werder Bremen,3,0,1,0,18,6,8,3,3,3,14,8,2,0,0,0,1.37,5.18,7.28,1.44,2.68
+bundesliga,2025,bundesliga_2025_144_mainz_heidenheim,13/01/2026,Mainz,Heidenheim,2,1,1,0,13,15,6,4,4,1,11,10,2,2,0,0,1.75,3.74,4.47,1.73,2.05
+bundesliga,2025,bundesliga_2025_145_wolfsburg_st_pauli,14/01/2026,Wolfsburg,St Pauli,2,1,1,1,13,9,5,4,7,4,10,9,1,2,0,0,1.87,3.58,3.93,1.84,1.91
+bundesliga,2025,bundesliga_2025_146_fc_koln_bayern_munich,14/01/2026,FC Koln,Bayern Munich,1,3,1,1,8,19,3,8,4,6,3,4,0,0,0,0,9.9,6.86,1.22,1.24,3.82
+bundesliga,2025,bundesliga_2025_147_hoffenheim_m'gladbach,14/01/2026,Hoffenheim,M'gladbach,5,1,4,0,18,7,10,5,6,2,16,10,1,1,0,0,1.81,3.86,3.87,1.56,2.34
+bundesliga,2025,bundesliga_2025_148_rb_leipzig_freiburg,14/01/2026,RB Leipzig,Freiburg,2,0,0,0,21,3,7,1,7,2,12,16,0,4,0,0,1.72,3.93,4.3,1.57,2.33
+bundesliga,2025,bundesliga_2025_149_augsburg_union_berlin,15/01/2026,Augsburg,Union Berlin,1,1,1,0,9,16,5,3,3,3,9,18,1,0,0,1,2.55,3.13,2.81,2.21,1.62
+bundesliga,2025,bundesliga_2025_150_werder_bremen_ein_frankfurt,16/01/2026,Werder Bremen,Ein Frankfurt,3,3,1,1,13,8,4,4,4,1,8,15,1,4,0,0,2.65,3.5,2.49,1.63,2.22
+bundesliga,2025,bundesliga_2025_151_dortmund_st_pauli,17/01/2026,Dortmund,St Pauli,3,2,1,0,10,9,6,5,5,5,9,11,3,1,0,0,1.32,5.1,9.14,1.65,2.16
+bundesliga,2025,bundesliga_2025_152_fc_koln_mainz,17/01/2026,FC Koln,Mainz,2,1,0,1,20,11,6,7,9,5,6,10,4,4,0,0,2.15,3.53,3.14,1.71,2.07
+bundesliga,2025,bundesliga_2025_153_hamburg_m'gladbach,17/01/2026,Hamburg,M'gladbach,0,0,0,0,25,6,12,0,2,5,16,18,1,2,0,0,2.39,3.44,2.79,1.73,2.03
+bundesliga,2025,bundesliga_2025_154_hoffenheim_leverkusen,17/01/2026,Hoffenheim,Leverkusen,1,0,1,0,19,8,8,2,3,5,17,7,2,1,0,0,2.37,3.74,2.65,1.47,2.6
+bundesliga,2025,bundesliga_2025_155_wolfsburg_heidenheim,17/01/2026,Wolfsburg,Heidenheim,1,1,0,1,13,13,4,3,9,6,10,12,4,3,0,0,1.65,3.99,4.76,1.57,2.32
+bundesliga,2025,bundesliga_2025_156_rb_leipzig_bayern_munich,17/01/2026,RB Leipzig,Bayern Munich,1,5,1,0,17,19,4,12,5,9,7,6,1,0,0,0,4.9,4.69,1.54,1.3,3.32
+bundesliga,2025,bundesliga_2025_157_stuttgart_union_berlin,18/01/2026,Stuttgart,Union Berlin,1,1,0,0,13,20,4,3,3,8,6,11,1,1,0,0,1.64,3.86,4.98,1.79,1.95
+bundesliga,2025,bundesliga_2025_158_augsburg_freiburg,18/01/2026,Augsburg,Freiburg,2,2,0,0,13,12,5,5,9,6,11,14,3,2,0,0,2.83,3.29,2.44,1.9,1.85
+bundesliga,2025,bundesliga_2025_159_st_pauli_hamburg,23/01/2026,St Pauli,Hamburg,0,0,0,0,8,5,3,2,5,4,15,13,1,1,0,0,2.85,2.89,2.72,2.59,1.47
+bundesliga,2025,bundesliga_2025_160_bayern_munich_augsburg,24/01/2026,Bayern Munich,Augsburg,1,2,1,0,15,16,6,6,9,3,10,5,1,1,0,0,1.09,10.35,20.62,1.22,4.06
+bundesliga,2025,bundesliga_2025_161_ein_frankfurt_hoffenheim,24/01/2026,Ein Frankfurt,Hoffenheim,1,3,1,0,9,10,3,5,6,6,8,16,0,4,0,0,2.73,3.63,2.33,1.52,2.45
+bundesliga,2025,bundesliga_2025_162_heidenheim_rb_leipzig,24/01/2026,Heidenheim,RB Leipzig,0,3,0,0,7,11,2,8,4,0,10,9,1,0,0,0,5.08,4.31,1.56,1.48,2.56
+bundesliga,2025,bundesliga_2025_163_leverkusen_werder_bremen,24/01/2026,Leverkusen,Werder Bremen,1,0,1,0,13,17,4,3,5,5,6,9,2,3,0,0,1.59,4.23,4.93,1.48,2.58
+bundesliga,2025,bundesliga_2025_164_mainz_wolfsburg,24/01/2026,Mainz,Wolfsburg,3,1,0,1,20,7,9,2,15,1,8,11,3,2,0,0,2.31,3.42,2.91,1.74,2.04
+bundesliga,2025,bundesliga_2025_165_union_berlin_dortmund,24/01/2026,Union Berlin,Dortmund,0,3,0,1,10,15,3,5,7,2,10,16,0,1,0,0,3.57,3.4,2.03,1.91,1.84
+bundesliga,2025,bundesliga_2025_166_m'gladbach_stuttgart,25/01/2026,M'gladbach,Stuttgart,0,3,0,1,12,17,3,8,1,4,11,7,1,1,0,0,2.89,3.65,2.23,1.52,2.44
+bundesliga,2025,bundesliga_2025_167_freiburg_fc_koln,25/01/2026,Freiburg,FC Koln,2,1,2,1,13,19,5,4,5,5,5,9,1,2,0,0,1.9,3.59,3.78,1.78,1.99
+bundesliga,2025,bundesliga_2025_168_st_pauli_rb_leipzig,27/01/2026,St Pauli,RB Leipzig,1,1,0,0,7,12,2,5,4,3,6,8,0,1,0,0,4.49,3.47,1.81,2.05,1.74
+bundesliga,2025,bundesliga_2025_169_werder_bremen_hoffenheim,27/01/2026,Werder Bremen,Hoffenheim,0,2,0,1,26,12,3,3,6,7,7,10,2,2,0,1,3.49,3.61,2.0,1.65,2.19
+bundesliga,2025,bundesliga_2025_170_fc_koln_wolfsburg,30/01/2026,FC Koln,Wolfsburg,1,0,1,0,15,14,3,3,3,4,8,16,1,4,0,0,1.97,3.73,3.44,1.57,2.33
+bundesliga,2025,bundesliga_2025_171_augsburg_st_pauli,31/01/2026,Augsburg,St Pauli,2,1,1,1,12,17,6,5,5,5,15,13,3,1,0,0,1.97,3.22,4.02,2.21,1.62
+bundesliga,2025,bundesliga_2025_172_ein_frankfurt_leverkusen,31/01/2026,Ein Frankfurt,Leverkusen,1,3,0,2,11,11,4,4,8,3,11,10,3,1,1,0,2.92,3.67,2.21,1.52,2.43
+bundesliga,2025,bundesliga_2025_173_hoffenheim_union_berlin,31/01/2026,Hoffenheim,Union Berlin,3,1,2,0,9,16,4,3,3,10,11,18,2,2,0,0,1.78,3.69,4.3,1.79,1.96
+bundesliga,2025,bundesliga_2025_174_rb_leipzig_mainz,31/01/2026,RB Leipzig,Mainz,1,2,1,1,15,11,4,4,5,4,4,13,0,4,0,0,1.52,4.44,5.41,1.5,2.5
+bundesliga,2025,bundesliga_2025_175_werder_bremen_m'gladbach,31/01/2026,Werder Bremen,M'gladbach,1,1,0,0,18,7,6,2,7,3,10,14,0,1,0,0,2.35,3.49,2.79,1.66,2.15
+bundesliga,2025,bundesliga_2025_176_hamburg_bayern_munich,31/01/2026,Hamburg,Bayern Munich,2,2,1,1,14,13,4,7,3,9,12,16,6,4,0,0,8.81,6.15,1.26,1.3,3.41
+bundesliga,2025,bundesliga_2025_177_stuttgart_freiburg,01/02/2026,Stuttgart,Freiburg,1,0,0,0,18,11,7,2,6,2,14,14,3,1,0,0,1.67,3.99,4.53,1.6,2.27
+bundesliga,2025,bundesliga_2025_178_dortmund_heidenheim,01/02/2026,Dortmund,Heidenheim,3,2,1,1,19,12,5,3,12,3,11,11,2,2,0,0,1.22,6.22,11.13,1.42,2.76
+bundesliga,2025,bundesliga_2025_179_union_berlin_ein_frankfurt,06/02/2026,Union Berlin,Ein Frankfurt,1,1,0,0,11,3,3,1,5,2,9,11,4,3,0,1,2.04,3.46,3.52,1.87,1.88
+bundesliga,2025,bundesliga_2025_180_freiburg_werder_bremen,07/02/2026,Freiburg,Werder Bremen,1,0,1,0,7,17,2,5,4,8,9,12,0,1,1,0,1.79,3.7,4.17,1.74,2.03
+bundesliga,2025,bundesliga_2025_181_heidenheim_hamburg,07/02/2026,Heidenheim,Hamburg,0,2,0,1,20,14,4,5,10,8,6,11,0,2,0,0,2.78,3.41,2.41,1.77,1.99
+bundesliga,2025,bundesliga_2025_182_mainz_augsburg,07/02/2026,Mainz,Augsburg,2,0,1,0,10,14,6,6,6,4,12,10,2,2,0,0,2.04,3.51,3.41,1.8,1.95
+bundesliga,2025,bundesliga_2025_183_st_pauli_stuttgart,07/02/2026,St Pauli,Stuttgart,2,1,1,0,15,7,7,3,5,5,9,10,0,2,0,0,4.2,3.63,1.8,1.87,1.89
+bundesliga,2025,bundesliga_2025_184_wolfsburg_dortmund,07/02/2026,Wolfsburg,Dortmund,1,2,0,1,12,21,2,4,4,8,13,10,1,1,0,0,4.24,4.01,1.71,1.56,2.36
+bundesliga,2025,bundesliga_2025_185_m'gladbach_leverkusen,07/02/2026,M'gladbach,Leverkusen,1,1,1,1,9,10,6,2,2,2,7,11,2,3,0,0,3.41,3.67,1.99,1.6,2.26
+bundesliga,2025,bundesliga_2025_186_fc_koln_rb_leipzig,08/02/2026,FC Koln,RB Leipzig,1,2,0,1,10,19,3,4,4,3,7,13,1,4,0,0,3.14,3.81,2.05,1.46,2.62
+bundesliga,2025,bundesliga_2025_187_bayern_munich_hoffenheim,08/02/2026,Bayern Munich,Hoffenheim,5,1,3,1,27,9,14,4,8,3,11,9,2,2,0,1,1.26,6.34,8.44,1.23,3.92
+bundesliga,2025,bundesliga_2025_188_dortmund_mainz,13/02/2026,Dortmund,Mainz,4,0,3,0,14,10,8,5,7,2,10,5,3,2,0,0,1.52,4.35,5.52,1.52,2.45
+bundesliga,2025,bundesliga_2025_189_ein_frankfurt_m'gladbach,14/02/2026,Ein Frankfurt,M'gladbach,3,0,2,0,12,20,9,3,2,8,11,11,3,2,0,0,1.92,3.58,3.71,1.72,2.06
+bundesliga,2025,bundesliga_2025_190_hamburg_union_berlin,14/02/2026,Hamburg,Union Berlin,3,2,2,1,13,12,4,5,6,3,12,7,3,0,0,0,2.49,3.16,2.86,2.07,1.71
+bundesliga,2025,bundesliga_2025_191_hoffenheim_freiburg,14/02/2026,Hoffenheim,Freiburg,3,0,0,0,25,13,7,3,6,6,8,6,3,1,0,0,1.72,3.85,4.4,1.66,2.17
+bundesliga,2025,bundesliga_2025_192_leverkusen_st_pauli,14/02/2026,Leverkusen,St Pauli,4,0,2,0,12,11,7,1,8,3,7,11,0,1,0,0,1.45,4.21,6.77,1.82,1.94
+bundesliga,2025,bundesliga_2025_193_werder_bremen_bayern_munich,14/02/2026,Werder Bremen,Bayern Munich,0,3,0,2,14,11,3,8,2,4,10,6,3,1,0,0,8.06,5.79,1.29,1.31,3.34
+bundesliga,2025,bundesliga_2025_194_stuttgart_fc_koln,14/02/2026,Stuttgart,FC Koln,3,1,1,0,13,10,4,3,2,5,10,10,4,1,0,0,1.43,4.77,6.21,1.43,2.72
+bundesliga,2025,bundesliga_2025_195_augsburg_heidenheim,15/02/2026,Augsburg,Heidenheim,1,0,0,0,12,16,4,2,4,5,9,9,1,2,0,0,1.81,3.67,4.06,1.71,2.08
+bundesliga,2025,bundesliga_2025_196_rb_leipzig_wolfsburg,15/02/2026,RB Leipzig,Wolfsburg,2,2,0,0,20,10,10,3,6,2,6,10,1,2,0,0,1.44,4.81,6.03,1.38,2.93
+bundesliga,2025,bundesliga_2025_197_mainz_hamburg,20/02/2026,Mainz,Hamburg,1,1,1,0,17,14,3,5,7,2,16,13,3,2,0,0,2.05,3.45,3.5,1.76,2.0
+bundesliga,2025,bundesliga_2025_198_bayern_munich_ein_frankfurt,21/02/2026,Bayern Munich,Ein Frankfurt,3,2,2,0,24,9,11,3,8,2,9,10,0,3,0,0,1.14,8.63,14.22,1.19,4.41
+bundesliga,2025,bundesliga_2025_199_fc_koln_hoffenheim,21/02/2026,FC Koln,Hoffenheim,2,2,1,1,9,18,4,6,3,10,6,12,1,3,0,0,3.22,3.7,2.05,1.56,2.34
+bundesliga,2025,bundesliga_2025_200_union_berlin_leverkusen,21/02/2026,Union Berlin,Leverkusen,1,0,1,0,8,16,4,1,4,5,15,7,5,2,0,0,2.89,3.35,2.36,1.88,1.87
+bundesliga,2025,bundesliga_2025_201_wolfsburg_augsburg,21/02/2026,Wolfsburg,Augsburg,2,3,1,0,10,15,4,6,4,10,10,16,3,4,0,0,2.04,3.41,3.52,1.68,2.12
+bundesliga,2025,bundesliga_2025_202_rb_leipzig_dortmund,21/02/2026,RB Leipzig,Dortmund,2,2,2,0,13,11,3,5,6,2,11,17,3,4,0,0,2.14,3.88,2.92,1.43,2.69
+bundesliga,2025,bundesliga_2025_203_freiburg_m'gladbach,22/02/2026,Freiburg,M'gladbach,2,1,1,0,10,12,6,2,3,3,9,8,1,2,0,0,1.96,3.27,3.95,1.86,1.9
+bundesliga,2025,bundesliga_2025_204_st_pauli_werder_bremen,22/02/2026,St Pauli,Werder Bremen,2,1,0,0,5,13,4,4,1,5,6,10,2,6,0,0,2.7,3.08,2.67,2.27,1.6
+bundesliga,2025,bundesliga_2025_205_heidenheim_stuttgart,22/02/2026,Heidenheim,Stuttgart,3,3,2,2,10,12,6,8,3,4,13,7,1,2,0,0,4.4,4.06,1.68,1.53,2.43
+bundesliga,2025,bundesliga_2025_206_augsburg_fc_koln,27/02/2026,Augsburg,FC Koln,2,0,0,0,14,10,4,3,6,9,15,4,4,1,0,0,2.19,3.4,3.18,1.81,1.96
+bundesliga,2025,bundesliga_2025_207_hoffenheim_st_pauli,28/02/2026,Hoffenheim,St Pauli,0,1,0,1,20,11,11,3,10,3,13,7,1,2,0,0,1.47,4.33,6.29,1.73,2.04
+bundesliga,2025,bundesliga_2025_208_leverkusen_mainz,28/02/2026,Leverkusen,Mainz,1,1,0,0,12,8,5,4,6,2,9,13,1,2,0,0,1.67,3.97,4.54,1.64,2.19
+bundesliga,2025,bundesliga_2025_209_m'gladbach_union_berlin,28/02/2026,M'gladbach,Union Berlin,1,0,0,0,21,6,7,2,6,2,5,18,4,5,0,0,2.36,3.22,2.97,2.0,1.77
+bundesliga,2025,bundesliga_2025_210_werder_bremen_heidenheim,28/02/2026,Werder Bremen,Heidenheim,2,0,0,0,17,9,6,0,3,2,14,9,1,0,0,0,1.77,3.82,4.1,1.67,2.14
+bundesliga,2025,bundesliga_2025_211_dortmund_bayern_munich,28/02/2026,Dortmund,Bayern Munich,2,3,1,0,10,14,2,6,5,2,15,10,1,0,0,0,4.37,4.51,1.61,1.3,3.36
+bundesliga,2025,bundesliga_2025_212_stuttgart_wolfsburg,01/03/2026,Stuttgart,Wolfsburg,4,0,3,0,24,10,11,3,7,3,5,17,1,0,0,0,1.51,4.56,5.24,1.42,2.74
+bundesliga,2025,bundesliga_2025_213_ein_frankfurt_freiburg,01/03/2026,Ein Frankfurt,Freiburg,2,0,0,0,15,4,7,2,5,6,9,11,1,2,0,0,2.18,3.44,3.1,1.75,2.0
+bundesliga,2025,bundesliga_2025_214_hamburg_rb_leipzig,01/03/2026,Hamburg,RB Leipzig,1,2,1,1,7,13,3,5,4,9,8,12,3,2,0,0,3.12,3.67,2.09,1.56,2.35
+bundesliga,2025,bundesliga_2025_215_hamburg_leverkusen,04/03/2026,Hamburg,Leverkusen,0,1,0,0,10,14,3,4,2,7,12,11,0,2,0,0,3.35,3.57,2.03,1.7,2.09
+bundesliga,2025,bundesliga_2025_216_bayern_munich_m'gladbach,06/03/2026,Bayern Munich,M'gladbach,4,1,2,0,18,10,9,5,7,1,7,12,1,0,0,1,1.19,7.43,11.55,1.25,3.78
+bundesliga,2025,bundesliga_2025_217_freiburg_leverkusen,07/03/2026,Freiburg,Leverkusen,3,3,2,2,21,17,9,5,5,2,7,8,3,3,0,0,2.86,3.35,2.35,1.85,1.91
+bundesliga,2025,bundesliga_2025_218_heidenheim_hoffenheim,07/03/2026,Heidenheim,Hoffenheim,2,4,0,2,8,16,2,7,4,3,7,15,0,0,0,0,4.87,4.31,1.58,1.47,2.6
+bundesliga,2025,bundesliga_2025_219_mainz_stuttgart,07/03/2026,Mainz,Stuttgart,2,2,1,0,18,11,6,4,5,6,7,12,0,2,0,0,3.05,3.65,2.12,1.58,2.3
+bundesliga,2025,bundesliga_2025_220_rb_leipzig_augsburg,07/03/2026,RB Leipzig,Augsburg,2,1,0,1,17,16,8,5,6,8,8,9,0,2,0,0,1.41,4.88,6.35,1.43,2.72
+bundesliga,2025,bundesliga_2025_221_wolfsburg_hamburg,07/03/2026,Wolfsburg,Hamburg,1,2,1,1,14,10,4,7,7,3,18,6,3,3,1,0,2.3,3.52,2.82,1.67,2.13
+bundesliga,2025,bundesliga_2025_222_fc_koln_dortmund,07/03/2026,FC Koln,Dortmund,1,2,0,1,14,13,4,5,9,4,9,13,1,1,1,0,4.1,3.97,1.73,1.55,2.37
+bundesliga,2025,bundesliga_2025_223_st_pauli_ein_frankfurt,08/03/2026,St Pauli,Ein Frankfurt,0,0,0,0,11,8,2,2,6,5,13,8,2,1,0,0,2.64,3.3,2.56,1.96,1.79
+bundesliga,2025,bundesliga_2025_224_union_berlin_werder_bremen,08/03/2026,Union Berlin,Werder Bremen,1,4,1,2,9,15,2,5,1,3,5,13,1,3,1,0,2.2,3.3,3.2,1.97,1.77
+bundesliga,2025,bundesliga_2025_225_m'gladbach_st_pauli,13/03/2026,M'gladbach,St Pauli,2,0,1,0,10,8,4,1,2,2,9,7,1,2,0,0,1.9,3.31,4.22,2.21,1.63
+bundesliga,2025,bundesliga_2025_226_dortmund_augsburg,14/03/2026,Dortmund,Augsburg,2,0,1,0,16,7,5,3,12,2,7,7,0,0,0,0,1.4,4.88,6.75,1.51,2.46
+bundesliga,2025,bundesliga_2025_227_ein_frankfurt_heidenheim,14/03/2026,Ein Frankfurt,Heidenheim,1,0,0,0,12,3,4,1,5,4,5,9,3,2,1,0,1.52,4.38,5.44,1.54,2.36
+bundesliga,2025,bundesliga_2025_228_hoffenheim_wolfsburg,14/03/2026,Hoffenheim,Wolfsburg,1,1,0,0,21,4,6,2,16,4,10,10,0,3,0,0,1.44,4.78,6.04,1.42,2.73
+bundesliga,2025,bundesliga_2025_229_leverkusen_bayern_munich,14/03/2026,Leverkusen,Bayern Munich,1,1,1,0,21,11,7,5,4,1,12,13,3,4,0,2,4.98,4.59,1.53,1.36,3.02
+bundesliga,2025,bundesliga_2025_230_hamburg_fc_koln,14/03/2026,Hamburg,FC Koln,1,1,1,1,5,10,1,2,1,8,11,12,2,4,0,0,2.09,3.52,3.21,1.74,2.03
+bundesliga,2025,bundesliga_2025_231_werder_bremen_mainz,15/03/2026,Werder Bremen,Mainz,0,2,0,1,16,11,3,2,9,4,7,7,2,1,0,0,2.2,3.46,3.05,1.73,2.03
+bundesliga,2025,bundesliga_2025_232_freiburg_union_berlin,15/03/2026,Freiburg,Union Berlin,0,1,0,0,19,9,6,4,6,2,6,19,0,2,0,0,2.11,3.26,3.45,2.1,1.68
+bundesliga,2025,bundesliga_2025_233_stuttgart_rb_leipzig,15/03/2026,Stuttgart,RB Leipzig,1,0,0,0,13,9,4,4,5,6,5,16,1,2,0,0,2.26,3.85,2.69,1.36,3.02
+bundesliga,2025,bundesliga_2025_234_rb_leipzig_hoffenheim,20/03/2026,RB Leipzig,Hoffenheim,5,0,4,0,14,8,9,2,1,3,8,16,1,1,0,0,1.9,4.09,3.4,1.36,3.05
+bundesliga,2025,bundesliga_2025_235_bayern_munich_union_berlin,21/03/2026,Bayern Munich,Union Berlin,4,0,2,0,31,5,9,1,12,1,5,8,1,2,0,0,1.16,7.61,13.38,1.31,3.26
+bundesliga,2025,bundesliga_2025_236_fc_koln_m'gladbach,21/03/2026,FC Koln,M'gladbach,3,3,2,2,12,9,5,3,5,3,8,14,8,2,1,0,2.25,3.44,2.99,1.74,2.01
+bundesliga,2025,bundesliga_2025_237_heidenheim_leverkusen,21/03/2026,Heidenheim,Leverkusen,3,3,0,2,9,14,5,5,2,5,11,12,4,4,0,0,5.1,4.32,1.56,1.52,2.44
+bundesliga,2025,bundesliga_2025_238_wolfsburg_werder_bremen,21/03/2026,Wolfsburg,Werder Bremen,0,1,0,0,11,8,4,3,8,4,16,6,3,0,1,0,2.32,3.56,2.77,1.66,2.14
+bundesliga,2025,bundesliga_2025_239_dortmund_hamburg,21/03/2026,Dortmund,Hamburg,3,2,0,2,24,4,8,4,11,3,10,8,2,3,0,0,1.38,4.88,6.96,1.52,2.46
+bundesliga,2025,bundesliga_2025_240_mainz_ein_frankfurt,22/03/2026,Mainz,Ein Frankfurt,2,1,1,1,8,12,5,4,5,3,12,5,2,1,0,0,2.08,3.58,3.19,1.7,2.1
+bundesliga,2025,bundesliga_2025_241_st_pauli_freiburg,22/03/2026,St Pauli,Freiburg,1,2,1,0,12,15,5,6,3,2,9,6,1,1,0,0,2.66,3.05,2.7,2.23,1.61
+bundesliga,2025,bundesliga_2025_242_augsburg_stuttgart,22/03/2026,Augsburg,Stuttgart,2,5,0,3,13,13,7,8,2,5,11,14,1,3,0,0,3.36,3.75,1.97,1.56,2.34
+bundesliga,2025,bundesliga_2025_243_freiburg_bayern_munich,04/04/2026,Freiburg,Bayern Munich,2,3,0,0,13,21,4,9,5,8,9,13,3,3,0,0,6.66,5.26,1.37,1.36,3.03
+bundesliga,2025,bundesliga_2025_244_hamburg_augsburg,04/04/2026,Hamburg,Augsburg,1,1,0,1,18,18,4,3,9,2,12,12,2,3,1,0,2.22,3.41,3.07,1.78,1.98
+bundesliga,2025,bundesliga_2025_245_hoffenheim_mainz,04/04/2026,Hoffenheim,Mainz,1,2,1,1,16,9,5,5,7,3,11,5,4,1,0,0,1.67,4.05,4.41,1.53,2.42
+bundesliga,2025,bundesliga_2025_246_leverkusen_wolfsburg,04/04/2026,Leverkusen,Wolfsburg,6,3,2,3,25,11,11,5,12,2,8,11,1,3,0,0,1.39,4.93,6.73,1.44,2.69
+bundesliga,2025,bundesliga_2025_247_m'gladbach_heidenheim,04/04/2026,M'gladbach,Heidenheim,2,2,1,1,15,15,7,7,2,3,12,11,4,0,0,0,1.56,4.22,5.2,1.59,2.29
+bundesliga,2025,bundesliga_2025_248_werder_bremen_rb_leipzig,04/04/2026,Werder Bremen,RB Leipzig,1,2,0,1,13,7,5,2,1,0,13,14,2,1,0,0,3.42,3.85,1.93,1.48,2.58
+bundesliga,2025,bundesliga_2025_249_stuttgart_dortmund,04/04/2026,Stuttgart,Dortmund,0,2,0,0,13,5,3,3,5,2,10,12,2,4,0,0,2.28,3.86,2.68,1.42,2.75
+bundesliga,2025,bundesliga_2025_250_union_berlin_st_pauli,05/04/2026,Union Berlin,St Pauli,1,1,0,1,16,9,8,2,7,2,10,8,0,2,0,1,2.08,3.13,3.67,2.46,1.51
+bundesliga,2025,bundesliga_2025_251_ein_frankfurt_fc_koln,05/04/2026,Ein Frankfurt,FC Koln,2,2,0,0,20,14,7,9,8,0,10,7,1,2,0,0,2.01,3.55,3.4,1.7,2.09
+bundesliga,2025,bundesliga_2025_252_augsburg_hoffenheim,10/04/2026,Augsburg,Hoffenheim,2,2,2,2,17,13,8,4,4,4,6,18,5,3,0,0,3.32,3.75,2.01,1.55,2.38
+bundesliga,2025,bundesliga_2025_253_dortmund_leverkusen,11/04/2026,Dortmund,Leverkusen,0,1,0,1,14,11,1,4,5,5,5,6,3,0,0,0,1.95,3.8,3.42,1.51,2.46
+bundesliga,2025,bundesliga_2025_254_heidenheim_union_berlin,11/04/2026,Heidenheim,Union Berlin,3,1,2,0,7,10,3,3,3,5,7,13,0,2,0,0,2.93,3.5,2.25,1.84,1.91
+bundesliga,2025,bundesliga_2025_255_rb_leipzig_m'gladbach,11/04/2026,RB Leipzig,M'gladbach,1,0,0,0,24,15,11,3,11,4,9,6,4,1,0,0,1.49,4.58,5.57,1.43,2.7
+bundesliga,2025,bundesliga_2025_256_wolfsburg_ein_frankfurt,11/04/2026,Wolfsburg,Ein Frankfurt,1,2,0,2,22,10,7,4,7,7,9,8,2,1,0,0,2.48,3.58,2.57,1.56,2.33
+bundesliga,2025,bundesliga_2025_257_st_pauli_bayern_munich,11/04/2026,St Pauli,Bayern Munich,0,5,0,1,6,20,3,8,3,4,9,7,1,2,0,0,7.83,5.06,1.34,1.5,2.51
+bundesliga,2025,bundesliga_2025_258_fc_koln_werder_bremen,12/04/2026,FC Koln,Werder Bremen,3,1,1,0,25,6,8,2,8,5,16,7,3,2,0,1,2.18,3.45,3.08,1.7,2.09
+bundesliga,2025,bundesliga_2025_259_stuttgart_hamburg,12/04/2026,Stuttgart,Hamburg,4,0,2,0,23,9,11,5,8,2,10,14,2,1,0,0,1.39,4.88,6.75,1.44,2.7
+bundesliga,2025,bundesliga_2025_260_mainz_freiburg,12/04/2026,Mainz,Freiburg,0,1,0,0,10,8,3,3,6,4,10,13,1,3,0,0,2.23,3.14,3.3,1.85,1.9
+bundesliga,2025,bundesliga_2025_261_st_pauli_fc_koln,17/04/2026,St Pauli,FC Koln,1,1,0,0,14,10,6,1,8,5,6,2,4,1,0,0,2.82,3.24,2.49,2.0,1.78
+bundesliga,2025,bundesliga_2025_262_hoffenheim_dortmund,18/04/2026,Hoffenheim,Dortmund,2,1,1,0,13,8,4,3,4,3,14,11,2,3,0,0,2.53,3.8,2.42,1.47,2.58
+bundesliga,2025,bundesliga_2025_263_leverkusen_augsburg,18/04/2026,Leverkusen,Augsburg,1,2,1,1,35,11,10,5,11,4,5,8,2,1,0,0,1.4,4.86,6.64,1.44,2.68
+bundesliga,2025,bundesliga_2025_264_union_berlin_wolfsburg,18/04/2026,Union Berlin,Wolfsburg,1,2,0,1,25,5,7,4,11,4,13,15,1,1,0,0,2.14,3.46,3.18,1.84,1.91
+bundesliga,2025,bundesliga_2025_265_werder_bremen_hamburg,18/04/2026,Werder Bremen,Hamburg,3,1,1,1,18,11,10,3,7,3,14,14,4,3,0,1,1.97,3.55,3.55,1.7,2.09
+bundesliga,2025,bundesliga_2025_266_ein_frankfurt_rb_leipzig,18/04/2026,Ein Frankfurt,RB Leipzig,1,3,1,1,16,19,5,8,4,6,7,7,0,1,0,0,3.28,3.91,1.97,1.43,2.71
+bundesliga,2025,bundesliga_2025_267_freiburg_heidenheim,19/04/2026,Freiburg,Heidenheim,2,1,1,0,17,13,4,2,5,4,10,9,1,0,0,0,1.65,4.05,4.63,1.6,2.25
+bundesliga,2025,bundesliga_2025_268_bayern_munich_stuttgart,19/04/2026,Bayern Munich,Stuttgart,4,2,3,1,28,11,9,7,11,3,6,3,0,0,0,0,1.37,5.39,6.44,1.23,3.99
+bundesliga,2025,bundesliga_2025_269_m'gladbach_mainz,19/04/2026,M'gladbach,Mainz,1,1,1,0,9,17,4,7,0,6,12,8,5,2,0,0,2.39,3.4,2.79,1.84,1.91
+bundesliga,2025,bundesliga_2025_270_rb_leipzig_union_berlin,24/04/2026,RB Leipzig,Union Berlin,3,1,2,0,20,5,10,1,10,4,6,10,1,1,0,0,1.45,4.75,6.06,1.49,2.53
+bundesliga,2025,bundesliga_2025_271_augsburg_ein_frankfurt,25/04/2026,Augsburg,Ein Frankfurt,1,1,1,0,17,19,3,7,9,7,11,13,1,2,0,0,2.45,3.69,2.53,1.51,2.47
+bundesliga,2025,bundesliga_2025_272_fc_koln_leverkusen,25/04/2026,FC Koln,Leverkusen,1,2,0,1,25,8,10,3,2,5,11,5,1,2,0,0,3.72,3.9,1.83,1.51,2.46
+bundesliga,2025,bundesliga_2025_273_heidenheim_st_pauli,25/04/2026,Heidenheim,St Pauli,2,0,1,0,12,11,5,2,6,6,7,6,0,1,0,0,2.35,3.32,2.89,1.91,1.84
+bundesliga,2025,bundesliga_2025_274_mainz_bayern_munich,25/04/2026,Mainz,Bayern Munich,3,4,3,0,21,11,8,6,4,4,14,10,1,2,0,0,4.33,4.37,1.64,1.4,2.84
+bundesliga,2025,bundesliga_2025_275_wolfsburg_m'gladbach,25/04/2026,Wolfsburg,M'gladbach,0,0,0,0,12,10,4,2,8,5,11,5,1,3,0,1,2.2,3.59,2.95,1.6,2.25
+bundesliga,2025,bundesliga_2025_276_hamburg_hoffenheim,25/04/2026,Hamburg,Hoffenheim,1,2,1,2,12,15,4,6,4,9,11,18,2,4,0,0,3.88,3.96,1.77,1.49,2.53
+bundesliga,2025,bundesliga_2025_277_stuttgart_werder_bremen,26/04/2026,Stuttgart,Werder Bremen,1,1,0,1,20,9,4,3,14,2,8,10,0,1,0,0,1.5,4.46,5.46,1.41,2.76
+bundesliga,2025,bundesliga_2025_278_dortmund_freiburg,26/04/2026,Dortmund,Freiburg,4,0,3,0,17,7,5,4,5,0,19,10,1,0,0,0,1.35,4.98,7.51,1.5,2.51
+bundesliga,2025,bundesliga_2025_279_bayern_munich_heidenheim,02/05/2026,Bayern Munich,Heidenheim,3,3,1,2,23,12,7,5,13,5,6,7,3,2,0,0,1.22,6.75,9.61,1.24,3.86
+bundesliga,2025,bundesliga_2025_280_ein_frankfurt_hamburg,02/05/2026,Ein Frankfurt,Hamburg,1,2,0,0,8,9,5,4,9,4,13,5,6,1,1,0,1.7,4.05,4.26,1.52,2.45
+bundesliga,2025,bundesliga_2025_281_hoffenheim_stuttgart,02/05/2026,Hoffenheim,Stuttgart,3,3,2,1,22,14,9,5,4,5,18,9,3,1,0,1,2.27,3.98,2.63,1.34,3.1
+bundesliga,2025,bundesliga_2025_282_union_berlin_fc_koln,02/05/2026,Union Berlin,FC Koln,2,2,0,1,13,8,3,4,2,5,7,10,2,3,0,0,2.37,3.31,2.84,1.86,1.88
+bundesliga,2025,bundesliga_2025_283_werder_bremen_augsburg,02/05/2026,Werder Bremen,Augsburg,1,3,0,2,15,14,4,7,8,2,11,4,1,1,0,0,1.92,3.76,3.5,1.59,2.26
+bundesliga,2025,bundesliga_2025_284_leverkusen_rb_leipzig,02/05/2026,Leverkusen,RB Leipzig,4,1,2,0,23,14,8,5,7,3,7,12,1,3,0,0,2.1,3.98,2.9,1.36,3.02
+bundesliga,2025,bundesliga_2025_285_st_pauli_mainz,03/05/2026,St Pauli,Mainz,1,2,0,2,10,17,3,6,7,7,10,8,3,1,0,0,2.7,3.22,2.55,2.1,1.69
+bundesliga,2025,bundesliga_2025_286_m'gladbach_dortmund,03/05/2026,M'gladbach,Dortmund,1,0,0,0,12,6,4,1,1,1,14,17,3,1,0,0,3.59,3.79,1.89,1.56,2.34
+bundesliga,2025,bundesliga_2025_287_freiburg_wolfsburg,03/05/2026,Freiburg,Wolfsburg,1,1,0,0,11,13,3,4,1,7,5,11,1,1,0,0,2.43,3.51,2.67,1.65,2.16
+bundesliga,2025,bundesliga_2025_288_dortmund_ein_frankfurt,08/05/2026,Dortmund,Ein Frankfurt,3,2,2,1,13,9,8,4,6,2,14,8,3,0,0,0,1.64,4.38,4.43,1.37,2.98
+bundesliga,2025,bundesliga_2025_289_augsburg_m'gladbach,09/05/2026,Augsburg,M'gladbach,3,1,2,0,15,16,10,4,2,2,11,9,2,2,0,0,2.06,3.66,3.2,1.59,2.26
+bundesliga,2025,bundesliga_2025_290_hoffenheim_werder_bremen,09/05/2026,Hoffenheim,Werder Bremen,1,0,1,0,15,11,4,2,8,3,4,3,1,2,0,1,1.44,4.91,5.7,1.35,3.04
+bundesliga,2025,bundesliga_2025_291_rb_leipzig_st_pauli,09/05/2026,RB Leipzig,St Pauli,2,1,1,0,13,7,5,3,3,5,5,9,2,0,0,0,1.3,5.39,8.8,1.45,2.65
+bundesliga,2025,bundesliga_2025_292_stuttgart_leverkusen,09/05/2026,Stuttgart,Leverkusen,3,1,2,1,20,6,9,5,7,6,13,8,2,1,0,0,2.13,3.96,2.82,1.33,3.22
+bundesliga,2025,bundesliga_2025_293_wolfsburg_bayern_munich,09/05/2026,Wolfsburg,Bayern Munich,0,1,0,0,17,16,5,9,6,3,8,5,1,0,0,0,4.28,4.48,1.62,1.26,3.74
+bundesliga,2025,bundesliga_2025_294_hamburg_freiburg,10/05/2026,Hamburg,Freiburg,3,2,1,1,14,5,5,3,2,4,15,8,2,2,0,0,2.74,3.57,2.35,1.67,2.13
+bundesliga,2025,bundesliga_2025_295_fc_koln_heidenheim,10/05/2026,FC Koln,Heidenheim,1,3,1,2,18,11,7,5,6,4,9,8,2,2,0,0,1.88,3.93,3.48,1.43,2.68
+bundesliga,2025,bundesliga_2025_296_mainz_union_berlin,10/05/2026,Mainz,Union Berlin,1,3,0,1,14,16,3,9,7,8,11,10,2,1,0,0,1.74,3.81,4.24,1.69,2.1
+bundesliga,2025,bundesliga_2025_297_bayern_munich_fc_koln,16/05/2026,Bayern Munich,FC Koln,5,1,3,1,19,9,7,2,5,5,6,4,1,1,0,0,1.14,8.71,12.84,1.12,5.91
+bundesliga,2025,bundesliga_2025_298_ein_frankfurt_stuttgart,16/05/2026,Ein Frankfurt,Stuttgart,2,2,0,2,16,13,7,7,6,6,14,12,2,3,0,0,3.35,4.22,1.86,1.29,3.4
+bundesliga,2025,bundesliga_2025_299_freiburg_rb_leipzig,16/05/2026,Freiburg,RB Leipzig,4,1,2,1,11,14,5,6,1,2,13,7,0,1,0,0,2.65,3.88,2.28,1.41,2.75
+bundesliga,2025,bundesliga_2025_300_heidenheim_mainz,16/05/2026,Heidenheim,Mainz,0,2,0,2,15,15,5,9,6,3,8,12,1,1,0,0,1.88,4.14,3.35,1.42,2.71
+bundesliga,2025,bundesliga_2025_301_leverkusen_hamburg,16/05/2026,Leverkusen,Hamburg,1,1,0,0,26,19,9,6,8,3,8,11,1,2,0,0,1.25,6.29,8.83,1.28,3.48
+bundesliga,2025,bundesliga_2025_302_m'gladbach_hoffenheim,16/05/2026,M'gladbach,Hoffenheim,4,0,2,0,9,11,6,3,2,9,11,15,4,6,0,1,4.1,4.4,1.67,1.34,3.09
+bundesliga,2025,bundesliga_2025_303_st_pauli_wolfsburg,16/05/2026,St Pauli,Wolfsburg,1,3,0,1,11,19,2,10,8,9,6,9,2,3,0,0,2.78,3.63,2.28,1.65,2.16
+bundesliga,2025,bundesliga_2025_304_union_berlin_augsburg,16/05/2026,Union Berlin,Augsburg,4,0,2,0,17,11,9,1,4,9,6,7,3,1,0,0,2.57,3.77,2.39,1.49,2.53
+bundesliga,2025,bundesliga_2025_305_werder_bremen_dortmund,16/05/2026,Werder Bremen,Dortmund,0,2,0,0,9,17,3,9,4,5,8,5,0,0,0,0,3.3,3.97,1.93,1.39,2.9

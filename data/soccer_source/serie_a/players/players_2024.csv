@@ -1,0 +1,492 @@
+league,season,player_id,player_name,team,position,minutes,games,shots_per90,xg_per90,xa_per90,goals_per90,assists_per90,key_passes_per90,expected_minutes_share,is_goalkeeper,source
+serie_a,2024,understat_11898,Mateo Retegui,Atalanta,F S,2435.0,36,3.8439,0.8523,0.2018,0.924,0.2957,1.4045,0.7515,False,understat
+serie_a,2024,understat_1304,Moise Kean,Fiorentina,F S,2722.0,32,3.4717,0.7237,0.0768,0.6282,0.0992,0.6282,0.9451,False,understat
+serie_a,2024,understat_5556,Ademola Lookman,Atalanta,F M S,2295.0,31,3.2157,0.5415,0.3485,0.5882,0.1961,2.3529,0.8226,False,understat
+serie_a,2024,understat_6160,Riccardo Orsolini,Bologna,F M S,1914.0,30,3.5266,0.487,0.2188,0.7053,0.1881,1.4107,0.7089,False,understat
+serie_a,2024,understat_594,Romelu Lukaku,Napoli,F S,2913.0,36,1.9773,0.4107,0.1311,0.4325,0.309,1.0505,0.8991,False,understat
+serie_a,2024,understat_5992,Marcus Thuram,Inter,F S,2316.0,32,2.5259,0.4711,0.1766,0.544,0.1554,1.5155,0.8042,False,understat
+serie_a,2024,understat_5560,Scott McTominay,Napoli,M S,2938.0,34,2.3281,0.2713,0.0869,0.3676,0.1225,0.7965,0.9601,False,understat
+serie_a,2024,understat_7006,Lautaro Martínez,Inter,F,2605.0,31,3.524,0.5173,0.18,0.4146,0.1036,1.2783,0.9337,False,understat
+serie_a,2024,understat_11736,Artem Dovbyk,Roma,F S,2454.0,32,2.3105,0.5265,0.1071,0.4401,0.0733,0.9169,0.8521,False,understat
+serie_a,2024,understat_11936,Lorenzo Lucca,Udinese,F S,2369.0,33,2.5074,0.3515,0.0538,0.4559,0.038,0.5319,0.7976,False,understat
+serie_a,2024,understat_2662,Christian Pulisic,AC Milan,F M S,2518.0,34,2.0373,0.4173,0.2579,0.3932,0.3217,2.4662,0.8229,False,understat
+serie_a,2024,understat_12008,Nikola Krstovic,Lecce,F,3096.0,37,3.9826,0.3544,0.1038,0.3198,0.1453,0.8721,0.9297,False,understat
+serie_a,2024,understat_687,Pedro,Lazio,F M S,1057.0,30,3.3207,0.5444,0.1228,0.8515,0.0851,1.8732,0.3915,False,understat
+serie_a,2024,understat_4895,Andrea Pinamonti,Genoa,F S,2886.0,36,2.4636,0.2474,0.0574,0.3119,0.0312,0.4678,0.8907,False,understat
+serie_a,2024,understat_7084,Dusan Vlahovic,Juventus,F S,1793.0,29,3.865,0.7577,0.0876,0.502,0.2008,0.8031,0.687,False,understat
+serie_a,2024,understat_7375,Roberto Piccoli,Cagliari,F,3180.0,37,2.7453,0.507,0.0324,0.283,0.0283,0.3113,0.955,False,understat
+serie_a,2024,understat_10948,Valentín Castellanos,Lazio,F S,2407.0,29,4.0382,0.6032,0.1357,0.3739,0.1122,0.9722,0.9222,False,understat
+serie_a,2024,understat_11965,Tijjani Reijnders,AC Milan,M S,3136.0,37,2.2098,0.2315,0.1431,0.287,0.1148,1.3202,0.9417,False,understat
+serie_a,2024,understat_7224,Boulaye Dia,Lazio,F M S,2220.0,35,1.5811,0.2797,0.1869,0.3649,0.1216,1.0541,0.7048,False,understat
+serie_a,2024,understat_7700,Che Adams,Torino,F S,2650.0,36,2.1736,0.3231,0.0741,0.3057,0.1019,0.883,0.8179,False,understat
+serie_a,2024,understat_942,Florian Thauvin,Udinese,F M S,2010.0,25,2.4179,0.4181,0.2187,0.3582,0.1343,1.7015,0.8933,False,understat
+serie_a,2024,understat_1958,Mattia Zaccagni,Lazio,F M S,2750.0,34,1.5709,0.225,0.1707,0.2618,0.1964,1.8,0.8987,False,understat
+serie_a,2024,understat_5743,Randal Kolo Muani,Juventus,F M S,1175.0,16,1.9915,0.3682,0.109,0.6128,0.0766,1.3021,0.816,False,understat
+serie_a,2024,understat_7193,Rafael Leão,AC Milan,F M S,2329.0,34,2.5891,0.3351,0.2916,0.3091,0.3091,2.2413,0.7611,False,understat
+serie_a,2024,understat_7969,Sebastiano Esposito,Empoli,F M S,2370.0,33,2.3165,0.2369,0.0896,0.3038,0.0,1.3291,0.798,False,understat
+serie_a,2024,understat_8662,Dan Ndoye,Bologna,F M S,2166.0,30,2.1607,0.3555,0.1697,0.3324,0.1662,1.1634,0.8022,False,understat
+serie_a,2024,understat_12081,Assane Diao,Como,F M S,1268.0,15,1.9874,0.2496,0.0554,0.5678,0.071,0.5678,0.9393,False,understat
+serie_a,2024,understat_12528,Santiago Castro,Bologna,F S,2313.0,36,2.4514,0.3321,0.1219,0.3113,0.1556,1.1284,0.7139,False,understat
+serie_a,2024,understat_4918,Patrick Cutrone,Como,F S,2058.0,33,3.0175,0.3851,0.1262,0.3061,0.1749,0.8309,0.6929,False,understat
+serie_a,2024,understat_8297,Alexis Saelemaekers,"AC Milan,Roma",D F M S,1510.0,23,1.4901,0.1831,0.1788,0.4172,0.1788,1.5497,0.7295,False,understat
+serie_a,2024,understat_9840,Denzel Dumfries,Inter,D M S,1929.0,29,1.7263,0.286,0.1724,0.3266,0.0933,0.9798,0.7391,False,understat
+serie_a,2024,understat_10877,Charles De Ketelaere,Atalanta,F M S,2092.0,36,2.065,0.4068,0.2878,0.3011,0.3011,1.6778,0.6457,False,understat
+serie_a,2024,understat_11942,Kenan Yildiz,Juventus,F M S,2414.0,35,2.2742,0.1832,0.2111,0.261,0.1491,2.0878,0.7663,False,understat
+serie_a,2024,understat_1294,Paulo Dybala,Roma,F M S,1431.0,24,3.1447,0.4464,0.3916,0.3774,0.1887,2.5157,0.6625,False,understat
+serie_a,2024,understat_5222,Joel Pohjanpalo,Venezia,F S,1635.0,20,2.0917,0.4097,0.0959,0.3303,0.0,0.7706,0.9083,False,understat
+serie_a,2024,understat_6434,Franck Zambo,Napoli,M S,2862.0,35,1.3836,0.1592,0.0826,0.1887,0.1258,0.8176,0.9086,False,understat
+serie_a,2024,understat_7005,Jens Odgaard,Bologna,F M S,1987.0,29,2.2194,0.2406,0.1166,0.2718,0.0453,0.77,0.7613,False,understat
+serie_a,2024,understat_7500,Giacomo Raspadori,Napoli,F M S,1110.0,26,3.4054,0.4123,0.1776,0.4865,0.0811,2.3514,0.4744,False,understat
+serie_a,2024,understat_7944,Gabriel Strefezza,Como,F M S,2648.0,37,1.9373,0.1356,0.147,0.2039,0.136,1.9373,0.7952,False,understat
+serie_a,2024,understat_8163,Daniel Maldini,"Atalanta,Monza",F M S,1574.0,30,2.8018,0.3834,0.0971,0.3431,0.0,0.9149,0.583,False,understat
+serie_a,2024,understat_8478,Lorenzo Colombo,Empoli,F M S,2254.0,37,2.236,0.2591,0.1064,0.2396,0.0799,0.8385,0.6769,False,understat
+serie_a,2024,understat_9866,Nadir Zortea,Cagliari,D M S,2749.0,35,1.0477,0.096,0.1258,0.1964,0.0655,0.9494,0.8727,False,understat
+serie_a,2024,understat_10366,Albert Gudmundsson,Fiorentina,F M S,1284.0,24,1.8925,0.3397,0.1284,0.4206,0.0701,1.0514,0.5944,False,understat
+serie_a,2024,understat_11541,Nico Paz,Como,F M S,2704.0,35,3.6612,0.3316,0.1824,0.1997,0.2663,1.7973,0.8584,False,understat
+serie_a,2024,understat_12784,Ange-Yoan Bonny,Parma Calcio 1913,F S,2580.0,37,2.1977,0.3095,0.149,0.2093,0.1395,1.0465,0.7748,False,understat
+serie_a,2024,understat_12855,Casper Tengstedt,Verona,F M S,1552.0,25,2.2036,0.3231,0.073,0.3479,0.058,0.6959,0.6898,False,understat
+serie_a,2024,understat_189,Hakan Calhanoglu,Inter,M S,1999.0,29,2.071,0.1987,0.3172,0.2251,0.2701,2.2061,0.7659,False,understat
+serie_a,2024,understat_1804,Álvaro Morata,AC Milan,F M S,1110.0,16,2.1892,0.3906,0.0778,0.4054,0.0,0.5676,0.7708,False,understat
+serie_a,2024,understat_3856,Milan Djuric,"Monza,Parma Calcio 1913",F S,1522.0,27,1.6557,0.2412,0.0495,0.2957,0.0591,0.2957,0.6263,False,understat
+serie_a,2024,understat_4981,Davide Frattesi,Inter,M S,1194.0,28,2.1106,0.4007,0.0825,0.3769,0.0754,0.5276,0.4738,False,understat
+serie_a,2024,understat_6155,Robin Gosens,Fiorentina,D M S,2544.0,32,0.8137,0.0855,0.1039,0.1769,0.1769,0.9552,0.8833,False,understat
+serie_a,2024,understat_6276,Nikola Vlasic,Torino,F M S,2127.0,30,1.3117,0.1433,0.1118,0.2116,0.1693,1.354,0.7878,False,understat
+serie_a,2024,understat_6601,Timothy Weah,Juventus,D F M S,1636.0,30,1.1553,0.2052,0.1098,0.2751,0.11,1.0452,0.6059,False,understat
+serie_a,2024,understat_7453,Khvicha Kvaratskhelia,Napoli,F M S,1201.0,17,3.7469,0.3144,0.2777,0.3747,0.2248,2.0233,0.785,False,understat
+serie_a,2024,understat_9965,Matìas Soulè Malvano,Roma,D F M S,1807.0,27,2.0919,0.1841,0.3212,0.249,0.249,2.5401,0.7436,False,understat
+serie_a,2024,understat_10895,Dany Mota,Monza,F M S,2121.0,31,1.7822,0.2096,0.0832,0.2122,0.0849,0.8911,0.7602,False,understat
+serie_a,2024,understat_11900,Lucas Beltrán,Fiorentina,F M S,1965.0,33,1.3282,0.2771,0.1348,0.229,0.1832,1.3282,0.6616,False,understat
+serie_a,2024,understat_12857,Daniel Mosquera,Verona,F S,1334.0,35,3.8456,0.4836,0.1254,0.3373,0.0675,0.8096,0.4235,False,understat
+serie_a,2024,understat_13386,Jacob Ondrejka,Parma Calcio 1913,M S,408.0,12,3.0882,0.2985,0.2552,1.1029,0.0,1.7647,0.3778,False,understat
+serie_a,2024,understat_13453,Santiago Giménez,AC Milan,F S,665.0,14,3.1128,0.6036,0.2281,0.6767,0.2707,0.812,0.5278,False,understat
+serie_a,2024,understat_865,Marko Arnautovic,Inter,F S,531.0,18,2.3729,0.76,0.1694,0.678,0.339,1.1864,0.3278,False,understat
+serie_a,2024,understat_1168,Bryan Cristante,Roma,M S,2046.0,30,1.3196,0.1079,0.0757,0.176,0.088,0.7918,0.7578,False,understat
+serie_a,2024,understat_1178,Davide Zappacosta,Atalanta,D M S,2102.0,30,1.6698,0.1298,0.1254,0.1713,0.0856,0.9848,0.7785,False,understat
+serie_a,2024,understat_1324,Federico Dimarco,Inter,D M S,2214.0,33,2.2764,0.1692,0.2981,0.1626,0.2846,1.9512,0.7455,False,understat
+serie_a,2024,understat_1710,Marten de Roon,Atalanta,D M S,3060.0,36,0.4118,0.0372,0.0809,0.1176,0.1176,0.7353,0.9444,False,understat
+serie_a,2024,understat_2547,Theo Hernández,AC Milan,D S,2698.0,33,1.4678,0.1058,0.1783,0.1334,0.1001,1.6012,0.9084,False,understat
+serie_a,2024,understat_3821,Rolando Mandragora,Fiorentina,M S,1940.0,29,1.7629,0.1058,0.1821,0.1856,0.1392,1.4381,0.7433,False,understat
+serie_a,2024,understat_5954,Eldor Shomurodov,Roma,F M S,1082.0,27,2.4122,0.4702,0.1553,0.3327,0.3327,1.414,0.4453,False,understat
+serie_a,2024,understat_6176,Adam Marusic,Lazio,D M S,2336.0,35,0.8476,0.0842,0.0234,0.1541,0.0,0.5009,0.7416,False,understat
+serie_a,2024,understat_6692,Enrico Del Prato,Parma Calcio 1913,D M S,2944.0,34,0.3668,0.0601,0.0392,0.1223,0.0,0.4586,0.9621,False,understat
+serie_a,2024,understat_6762,Yacine Adli,Fiorentina,M S,1246.0,26,1.0112,0.0652,0.2517,0.2889,0.4334,1.6613,0.5325,False,understat
+serie_a,2024,understat_7265,Kephren Thuram,Juventus,M S,2331.0,35,1.39,0.1363,0.1808,0.1544,0.1931,0.9653,0.74,False,understat
+serie_a,2024,understat_7284,Marco Brescianini,Atalanta,M S,959.0,29,1.877,0.4127,0.1159,0.3754,0.1877,0.6569,0.3674,False,understat
+serie_a,2024,understat_7483,Hans Nicolussi Caviglia,Venezia,M S,2883.0,35,1.6545,0.0699,0.0878,0.1249,0.0624,0.9053,0.9152,False,understat
+serie_a,2024,understat_7912,Eljif Elmas,Torino,F M S,1032.0,13,1.657,0.12,0.0468,0.3488,0.0,0.8721,0.8821,False,understat
+serie_a,2024,understat_9029,Simon Sohm,Parma Calcio 1913,M S,3015.0,37,1.0149,0.1298,0.0785,0.1194,0.0,0.597,0.9054,False,understat
+serie_a,2024,understat_9303,Dennis Man,Parma Calcio 1913,F M S,1997.0,33,2.2083,0.3157,0.2094,0.1803,0.1803,2.028,0.6724,False,understat
+serie_a,2024,understat_10303,Jacopo Fazzini,Empoli,F M S,1403.0,20,1.6679,0.2369,0.0702,0.2566,0.0641,0.7698,0.7794,False,understat
+serie_a,2024,understat_10404,Éderson,Atalanta,M S,2898.0,37,1.2112,0.1347,0.1767,0.1242,0.0311,1.1491,0.8703,False,understat
+serie_a,2024,understat_11350,Amin Sarr,Verona,F S,1940.0,32,1.067,0.2224,0.0983,0.1856,0.0464,1.0206,0.6736,False,understat
+serie_a,2024,understat_11951,Gustav Isaksen,Lazio,F M S,2254.0,37,2.1961,0.2091,0.1231,0.1597,0.0799,1.4374,0.6769,False,understat
+serie_a,2024,understat_12362,Santiago Pierotti,Lecce,F M S,1963.0,36,1.4671,0.1954,0.1312,0.1834,0.0917,1.1462,0.6059,False,understat
+serie_a,2024,understat_557,Matteo Darmian,Inter,D S,1781.0,29,0.5559,0.1165,0.0706,0.1516,0.1011,0.758,0.6824,False,understat
+serie_a,2024,understat_702,Tammy Abraham,"AC Milan,Roma",F S,1174.0,29,2.1465,0.5936,0.191,0.23,0.3066,1.1499,0.4498,False,understat
+serie_a,2024,understat_1134,Mario Pasalic,Atalanta,M S,1973.0,34,2.0983,0.3213,0.1813,0.1368,0.1825,1.4597,0.6448,False,understat
+serie_a,2024,understat_1148,Duván Zapata,Torino,F,597.0,7,3.1658,0.4834,0.0878,0.4523,0.0,1.3568,0.9476,False,understat
+serie_a,2024,understat_1170,Gianluca Caprari,Monza,F M S,1644.0,34,1.5876,0.2115,0.1143,0.1642,0.1095,1.5876,0.5373,False,understat
+serie_a,2024,understat_1206,Danilo Cataldi,Fiorentina,M S,1762.0,25,0.664,0.0405,0.0303,0.1532,0.0,0.7151,0.7831,False,understat
+serie_a,2024,understat_1248,Leandro Paredes,Roma,M S,1370.0,22,1.708,0.1417,0.1092,0.1971,0.0657,1.3796,0.6919,False,understat
+serie_a,2024,understat_1252,Stephan El Shaarawy,Roma,D F M S,1075.0,31,2.3442,0.2485,0.1022,0.2512,0.3349,1.2558,0.3853,False,understat
+serie_a,2024,understat_1409,Nicolò Barella,Inter,M S,2485.0,33,1.5573,0.073,0.1735,0.1087,0.2173,1.992,0.8367,False,understat
+serie_a,2024,understat_1473,Matteo Politano,Napoli,D F M S,2881.0,37,1.7494,0.1139,0.1908,0.0937,0.125,1.7182,0.8652,False,understat
+serie_a,2024,understat_1541,Stefan de Vrij,Inter,D S,1719.0,26,0.6806,0.0977,0.003,0.1571,0.0,0.0524,0.7346,False,understat
+serie_a,2024,understat_4932,Pietro Pellegri,Empoli,F S,411.0,11,1.7518,0.1146,0.1336,0.6569,0.0,1.3139,0.4152,False,understat
+serie_a,2024,understat_5509,Hernani,Parma Calcio 1913,M S,1330.0,25,1.3534,0.1873,0.1412,0.203,0.203,1.6241,0.5911,False,understat
+serie_a,2024,understat_6196,Nicolas Viola,Cagliari,F M S,1293.0,27,2.1578,0.2118,0.2096,0.2088,0.0696,2.0186,0.5321,False,understat
+serie_a,2024,understat_6414,Yann Bisseck,Inter,D S,1646.0,27,1.1482,0.1342,0.0802,0.164,0.1094,0.3827,0.6774,False,understat
+serie_a,2024,understat_6978,Giovanni Di Lorenzo,Napoli,D,3330.0,37,0.5676,0.0961,0.1097,0.0811,0.0541,1.0,1.0,False,understat
+serie_a,2024,understat_7074,Nicolás González,Juventus,D F M S,1789.0,26,2.2638,0.2208,0.0666,0.1509,0.1006,0.9558,0.7645,False,understat
+serie_a,2024,understat_7208,Samuel Chukwueze,AC Milan,F M S,910.0,26,3.1648,0.276,0.3112,0.2967,0.1978,2.6703,0.3889,False,understat
+serie_a,2024,understat_8182,Lucas Da Cunha,Como,M S,2639.0,36,1.2618,0.0539,0.1568,0.1023,0.0682,1.8416,0.8145,False,understat
+serie_a,2024,understat_8856,Razvan Marin,Cagliari,M S,1374.0,33,1.5721,0.144,0.217,0.1965,0.131,2.1616,0.4626,False,understat
+serie_a,2024,understat_8895,Tete Morente,Lecce,F M S,2036.0,31,1.8124,0.1371,0.081,0.1326,0.0884,1.1051,0.7297,False,understat
+serie_a,2024,understat_9071,Matteo Cancellieri,Parma Calcio 1913,F M S,1453.0,27,1.3627,0.1554,0.0334,0.1858,0.0,0.6194,0.5979,False,understat
+serie_a,2024,understat_9964,Koni de Winter,Genoa,D S,2132.0,25,0.5488,0.1168,0.0114,0.1266,0.0,0.1266,0.9476,False,understat
+serie_a,2024,understat_9966,Fabio Miretti,Genoa,M S,1718.0,25,1.2573,0.1829,0.1173,0.1572,0.1572,1.1525,0.7636,False,understat
+serie_a,2024,understat_9969,Teun Koopmeiners,Juventus,F M S,1998.0,28,1.8919,0.2204,0.1154,0.1351,0.1351,1.6667,0.7929,False,understat
+serie_a,2024,understat_9985,Johan Vásquez,Genoa,D S,3036.0,36,1.0672,0.0723,0.0099,0.0889,0.0,0.2075,0.937,False,understat
+serie_a,2024,understat_9993,Jurgen Ekkelenkamp,Udinese,M S,1884.0,34,1.242,0.1497,0.0781,0.1433,0.0955,0.7643,0.6157,False,understat
+serie_a,2024,understat_10794,Thijs Dallinga,Bologna,F S,1124.0,31,2.4822,0.4433,0.0432,0.2402,0.1601,0.9609,0.4029,False,understat
+serie_a,2024,understat_10891,Carlos Augusto,Inter,D M S,1658.0,29,1.3028,0.1888,0.104,0.1628,0.1086,0.4885,0.6352,False,understat
+serie_a,2024,understat_10892,Samuele Birindelli,Monza,D M S,1497.0,21,0.9018,0.1135,0.1011,0.1804,0.0,1.0822,0.7921,False,understat
+serie_a,2024,understat_11278,Gvidas Gineitis,Torino,M S,1431.0,30,1.8239,0.1162,0.1366,0.1887,0.0629,1.3208,0.53,False,understat
+serie_a,2024,understat_11944,Patrick Dorgu,Lecce,D F M,1843.0,21,1.758,0.1546,0.0739,0.1465,0.0488,0.9278,0.9751,False,understat
+serie_a,2024,understat_11958,Gaetano Oristanio,Venezia,F M S,2353.0,37,1.683,0.2177,0.0891,0.1147,0.1147,1.2622,0.7066,False,understat
+serie_a,2024,understat_11964,Giovanni Fabbian,Bologna,M S,992.0,30,1.9052,0.2615,0.1373,0.2722,0.0907,0.9073,0.3674,False,understat
+serie_a,2024,understat_12872,Fisayo Dele-Bashiru,Lazio,M S,947.0,20,1.5206,0.1412,0.075,0.2851,0.095,0.8553,0.5261,False,understat
+serie_a,2024,understat_12904,Samuel Mbangula,Juventus,M S,687.0,23,1.179,0.0598,0.2298,0.393,0.393,1.9651,0.3319,False,understat
+serie_a,2024,understat_13052,Francisco Conceição,Juventus,F M S,1320.0,26,2.7273,0.2133,0.3004,0.2045,0.2045,1.9091,0.5641,False,understat
+serie_a,2024,understat_13061,Benjamín Domínguez,Bologna,F M S,1309.0,24,2.0626,0.1671,0.0503,0.2063,0.1375,0.6875,0.606,False,understat
+serie_a,2024,understat_13446,Mateo Pellegrino,Parma Calcio 1913,F S,742.0,13,2.6685,0.5918,0.0524,0.3639,0.1213,0.6065,0.6342,False,understat
+serie_a,2024,understat_307,Suat Serdar,Verona,M S,1380.0,22,1.9565,0.1055,0.0692,0.1304,0.0652,0.6522,0.697,False,understat
+serie_a,2024,understat_1040,Angelino,Roma,D M S,3182.0,38,0.6788,0.0403,0.1562,0.0566,0.0283,1.4142,0.9304,False,understat
+serie_a,2024,understat_1053,Keinan Davis,Udinese,F S,1049.0,23,2.4881,0.2634,0.2103,0.1716,0.0858,1.7159,0.5068,False,understat
+serie_a,2024,understat_1104,Leonardo Pavoletti,Cagliari,F S,377.0,26,4.2971,0.6605,0.3325,0.4775,0.0,2.1485,0.1611,False,understat
+serie_a,2024,understat_1106,Darko Lazovic,Verona,D M S,1467.0,27,1.227,0.1793,0.2221,0.1227,0.184,1.1656,0.6037,False,understat
+serie_a,2024,understat_1119,Alessio Romagnoli,Lazio,D S,2676.0,32,0.6726,0.1199,0.0236,0.0673,0.0,0.3363,0.9292,False,understat
+serie_a,2024,understat_1122,Manuel Locatelli,Juventus,M S,2852.0,36,0.7889,0.0545,0.0997,0.0631,0.0631,0.9151,0.8802,False,understat
+serie_a,2024,understat_1186,Andrea Belotti,Como,F S,584.0,18,2.9281,0.398,0.089,0.3082,0.0,1.0788,0.3605,False,understat
+serie_a,2024,understat_1210,Keita,Monza,F S,644.0,11,1.9565,0.2621,0.0292,0.2795,0.0,0.559,0.6505,False,understat
+serie_a,2024,understat_1386,Piotr Zielinski,Inter,M S,947.0,26,1.6156,0.2561,0.0587,0.1901,0.1901,1.2355,0.4047,False,understat
+serie_a,2024,understat_1423,Matías Vecino,Lazio,M S,843.0,20,1.7082,0.3311,0.3468,0.2135,0.3203,1.1744,0.4683,False,understat
+serie_a,2024,understat_1471,Lorenzo Pellegrini,Roma,M S,1648.0,25,2.2937,0.2964,0.1433,0.1092,0.0546,1.4745,0.7324,False,understat
+serie_a,2024,understat_1634,Alessandro Deiola,Cagliari,M S,1439.0,29,1.1258,0.0913,0.0486,0.1251,0.0625,0.3753,0.5513,False,understat
+serie_a,2024,understat_1725,Christian Kabasele,Udinese,D S,1164.0,16,1.1598,0.1748,0.0273,0.1546,0.0,0.4639,0.8083,False,understat
+serie_a,2024,understat_1809,Joaquín Correa,Inter,F M S,701.0,19,1.7974,0.3067,0.2084,0.2568,0.2568,1.2839,0.4099,False,understat
+serie_a,2024,understat_2217,Antonio Sanabria,Torino,F S,1321.0,26,1.2945,0.1754,0.0218,0.1363,0.0681,0.545,0.5645,False,understat
+serie_a,2024,understat_3278,Maxwel Cornet,Genoa,M S,240.0,7,1.875,0.3793,0.3994,0.75,0.375,1.875,0.381,False,understat
+serie_a,2024,understat_4920,Matteo Gabbia,AC Milan,D S,2159.0,26,0.5836,0.0651,0.0072,0.0834,0.0,0.0834,0.9226,False,understat
+serie_a,2024,understat_5360,Weston McKennie,Juventus,D F M S,2334.0,32,0.8483,0.1134,0.1795,0.0771,0.1542,1.2339,0.8104,False,understat
+serie_a,2024,understat_5661,Jonathan Ikone,"Como,Fiorentina",F M S,831.0,27,2.7076,0.3713,0.0538,0.2166,0.0,0.4332,0.342,False,understat
+serie_a,2024,understat_6159,Gianluca Mancini,Roma,D S,3152.0,37,0.6282,0.0846,0.0299,0.0571,0.0,0.4283,0.9465,False,understat
+serie_a,2024,understat_6228,Luka Jovic,AC Milan,F S,549.0,15,1.8033,0.3722,0.1877,0.3279,0.0,1.9672,0.4067,False,understat
+serie_a,2024,understat_6686,Nicolo Zaniolo,"Atalanta,Fiorentina",F M S,665.0,23,2.7068,0.2592,0.1686,0.2707,0.2707,1.6241,0.3213,False,understat
+serie_a,2024,understat_6718,Andrea Colpani,Fiorentina,M S,1469.0,25,2.2056,0.2055,0.0699,0.1225,0.0613,1.0415,0.6529,False,understat
+serie_a,2024,understat_6773,Samuel Gigot,Lazio,D S,692.0,15,0.5202,0.1762,0.0,0.2601,0.0,0.0,0.5126,False,understat
+serie_a,2024,understat_7328,Maxence Caqueret,Como,M S,1110.0,18,0.6486,0.0628,0.171,0.1622,0.2432,1.5405,0.6852,False,understat
+serie_a,2024,understat_7482,Kouadio Kone,Roma,M S,2597.0,34,1.1783,0.1025,0.0614,0.0693,0.0347,0.6585,0.8487,False,understat
+serie_a,2024,understat_7507,Gianluca Gaetano,Cagliari,M S,976.0,28,2.7664,0.427,0.2194,0.1844,0.3689,2.0287,0.3873,False,understat
+serie_a,2024,understat_7892,João Félix,AC Milan,M S,761.0,15,3.4297,0.34,0.1835,0.2365,0.0,1.1827,0.5637,False,understat
+serie_a,2024,understat_8034,Georgios Kyriakopoulos,Monza,D S,2865.0,34,0.8482,0.0323,0.1085,0.0628,0.1257,1.288,0.9363,False,understat
+serie_a,2024,understat_8341,Lazar Samardzic,Atalanta,M S,1119.0,31,2.6542,0.1549,0.2668,0.1609,0.0804,2.815,0.4011,False,understat
+serie_a,2024,understat_8383,Faustino Anjorin,Empoli,M S,1127.0,22,1.8367,0.063,0.1825,0.1597,0.2396,1.3576,0.5692,False,understat
+serie_a,2024,understat_8642,Strahinja Pavlovic,AC Milan,D S,1866.0,24,0.8199,0.1046,0.0625,0.0965,0.0482,0.2894,0.8639,False,understat
+serie_a,2024,understat_8857,Gabriele Zappa,Cagliari,D S,3070.0,37,0.3225,0.0231,0.1269,0.0586,0.0,0.8208,0.9219,False,understat
+serie_a,2024,understat_8912,Tommaso Pobega,Bologna,M S,1180.0,21,1.8305,0.191,0.1047,0.1525,0.1525,0.839,0.6243,False,understat
+serie_a,2024,understat_8913,Emmanuel Gyasi,Empoli,D M,3238.0,37,0.6115,0.1418,0.04,0.0556,0.0278,0.4725,0.9724,False,understat
+serie_a,2024,understat_9841,Andrea Cambiaso,Juventus,D F M S,2227.0,33,0.687,0.0376,0.1206,0.0808,0.1212,1.374,0.7498,False,understat
+serie_a,2024,understat_9854,Kristjan Asllani,Inter,M S,960.0,22,1.5,0.2137,0.1489,0.1875,0.1875,1.3125,0.4848,False,understat
+serie_a,2024,understat_9904,Gianluca Busio,Venezia,F M S,2537.0,33,1.2771,0.1013,0.0573,0.0709,0.0,0.9933,0.8542,False,understat
+serie_a,2024,understat_9924,Fabiano Parisi,Fiorentina,D M S,1107.0,26,0.7317,0.0355,0.0842,0.1626,0.0,0.3252,0.4731,False,understat
+serie_a,2024,understat_10090,Iker Bravo,Udinese,F M S,629.0,29,1.8601,0.1717,0.0748,0.2862,0.1431,1.0016,0.241,False,understat
+serie_a,2024,understat_10169,Diego Coppola,Verona,D S,2928.0,34,0.3074,0.0402,0.0029,0.0615,0.0,0.0922,0.9569,False,understat
+serie_a,2024,understat_10365,Morten Frendrup,Genoa,M,3115.0,35,0.8957,0.0488,0.0206,0.0578,0.0,0.4045,0.9889,False,understat
+serie_a,2024,understat_10380,Zito,Cagliari,F M S,1634.0,26,1.2668,0.1022,0.2094,0.1102,0.1102,0.9364,0.6983,False,understat
+serie_a,2024,understat_10385,Liberato Cacace,Empoli,D M S,2224.0,33,1.1736,0.1727,0.0816,0.0809,0.1619,1.0926,0.7488,False,understat
+serie_a,2024,understat_10878,Sandi Lovric,Udinese,M S,2370.0,36,1.8608,0.0972,0.1311,0.0759,0.1139,1.2152,0.7315,False,understat
+serie_a,2024,understat_10893,Christian Gytkjær,Venezia,F S,720.0,29,2.25,0.4289,0.0887,0.25,0.125,0.875,0.2759,False,understat
+serie_a,2024,understat_10902,Federico Baschirotto,Lecce,D,3420.0,38,0.5789,0.047,0.012,0.0526,0.0,0.1579,1.0,False,understat
+serie_a,2024,understat_10957,Mikael Ellertsson,Venezia,D M S,2503.0,36,0.7551,0.0497,0.0777,0.0719,0.0719,0.7191,0.7725,False,understat
+serie_a,2024,understat_10985,Sulemana,Atalanta,M S,282.0,9,1.5957,0.1854,0.0082,0.6383,0.0,0.3191,0.3481,False,understat
+serie_a,2024,understat_11027,Emanuele Valeri,Parma Calcio 1913,D M S,2883.0,35,0.8429,0.0501,0.175,0.0624,0.1873,1.1238,0.9152,False,understat
+serie_a,2024,understat_11380,Vitinha,Genoa,F M S,1346.0,25,2.2065,0.1188,0.2752,0.1337,0.2006,1.1367,0.5982,False,understat
+serie_a,2024,understat_11470,Niccolò Pisilli,Roma,M S,1198.0,28,2.0284,0.2304,0.0707,0.1503,0.0751,0.7513,0.4754,False,understat
+serie_a,2024,understat_11741,Saúl Coco,Torino,D,2851.0,32,0.6314,0.0614,0.0002,0.0631,0.0,0.0316,0.9899,False,understat
+serie_a,2024,understat_12006,Jesper Karlsson,"Bologna,Lecce",F M S,802.0,20,1.7955,0.2636,0.0905,0.2244,0.0,1.3466,0.4456,False,understat
+serie_a,2024,understat_12030,Tasos Douvikas,Como,F S,587.0,13,2.1465,0.4814,0.213,0.3066,0.3066,1.2266,0.5017,False,understat
+serie_a,2024,understat_12113,Jackson Tchatchoua,Verona,D M,3172.0,36,0.5107,0.0555,0.1013,0.0567,0.0851,0.9647,0.979,False,understat
+serie_a,2024,understat_12124,Alessandro Vogliacco,"Genoa,Parma Calcio 1913",D S,1499.0,22,0.3602,0.095,0.0075,0.1201,0.0,0.2402,0.7571,False,understat
+serie_a,2024,understat_12378,Tijjani Noslin,Lazio,F M S,830.0,30,2.0602,0.288,0.1734,0.2169,0.2169,1.3012,0.3074,False,understat
+serie_a,2024,understat_12785,Antoine Hainaut,Parma Calcio 1913,D M S,1184.0,25,0.4561,0.0649,0.0582,0.152,0.0,0.6841,0.5262,False,understat
+serie_a,2024,understat_12905,Nicolò Savona,Juventus,D S,1724.0,28,0.3132,0.0325,0.0842,0.1044,0.0522,0.8353,0.6841,False,understat
+serie_a,2024,understat_12993,David Neres,Napoli,F S,1268.0,28,2.0584,0.2125,0.2396,0.142,0.2839,1.8454,0.5032,False,understat
+serie_a,2024,understat_13448,Daniel Fila,Venezia,F S,495.0,10,1.4545,0.3496,0.0633,0.3636,0.0,1.0909,0.55,False,understat
+serie_a,2024,understat_317,Henrikh Mkhitaryan,Inter,M S,2441.0,32,0.848,0.0635,0.1212,0.0369,0.1475,1.0692,0.8476,False,understat
+serie_a,2024,understat_1096,Armando Izzo,Monza,D S,2455.0,30,0.22,0.0178,0.0373,0.0367,0.0367,0.4033,0.9093,False,understat
+serie_a,2024,understat_1102,Giovanni Simeone,Napoli,F S,349.0,30,3.3524,0.5844,0.2572,0.2579,0.2579,2.063,0.1293,False,understat
+serie_a,2024,understat_1120,Mattia De Sciglio,Empoli,D S,750.0,16,0.6,0.0959,0.0162,0.12,0.0,0.36,0.5208,False,understat
+serie_a,2024,understat_1161,Francesco Zampano,Venezia,D M S,1633.0,24,0.3858,0.0707,0.0654,0.0551,0.1102,0.6614,0.756,False,understat
+serie_a,2024,understat_1164,Cristiano Biraghi,"Fiorentina,Torino",D S,1585.0,23,0.8517,0.0361,0.1847,0.0568,0.0,1.7603,0.7657,False,understat
+serie_a,2024,understat_1193,Lorenzo De Silvestri,Bologna,D S,1074.0,18,0.7542,0.0911,0.0258,0.0838,0.0,0.419,0.663,False,understat
+serie_a,2024,understat_1204,Patric,Lazio,D S,593.0,10,0.3035,0.1331,0.0019,0.1518,0.0,0.1518,0.6589,False,understat
+serie_a,2024,understat_1226,Karol Linetty,Torino,M S,1548.0,28,0.9884,0.0495,0.0414,0.0581,0.0,0.5814,0.6143,False,understat
+serie_a,2024,understat_1241,Pedro Pereira,Monza,D S,2689.0,35,0.4351,0.0582,0.0749,0.0335,0.1004,0.4686,0.8537,False,understat
+serie_a,2024,understat_1264,Edoardo Goldaniga,Como,D S,2525.0,32,0.4277,0.0848,0.0106,0.0356,0.0,0.1782,0.8767,False,understat
+serie_a,2024,understat_1430,Milan Badelj,Genoa,M S,1525.0,23,0.7672,0.0565,0.0718,0.059,0.0,0.7082,0.7367,False,understat
+serie_a,2024,understat_1441,Adam Masina,Torino,D S,1911.0,28,0.3297,0.0411,0.0241,0.0471,0.0942,0.1884,0.7583,False,understat
+serie_a,2024,understat_1465,Stefano Sensi,Monza,M S,253.0,12,2.4901,0.318,0.1179,0.3557,0.0,1.0672,0.2343,False,understat
+serie_a,2024,understat_1477,Luca Mazzitelli,Como,M S,330.0,11,1.9091,0.0596,0.2309,0.2727,0.2727,1.6364,0.3333,False,understat
+serie_a,2024,understat_1488,Remo Freuler,Bologna,M,3230.0,37,0.4737,0.0417,0.0546,0.0279,0.0557,1.0031,0.97,False,understat
+serie_a,2024,understat_1500,Leonardo Spinazzola,Napoli,D F S,1531.0,27,0.7054,0.06,0.2411,0.0588,0.0588,1.5284,0.63,False,understat
+serie_a,2024,understat_1504,Alberto Grassi,Empoli,M S,2245.0,28,0.441,0.0467,0.0291,0.0401,0.0,0.2806,0.8909,False,understat
+serie_a,2024,understat_1639,Sebastiano Luperto,Cagliari,D,3240.0,36,0.5833,0.0687,0.0276,0.0278,0.0833,0.1944,1.0,False,understat
+serie_a,2024,understat_1852,Ante Rebic,Lecce,F M S,753.0,27,1.5538,0.2144,0.287,0.1195,0.0,2.1514,0.3099,False,understat
+serie_a,2024,understat_1927,Berat Gjimshiti,Atalanta,D S,2653.0,34,0.6785,0.1043,0.0587,0.0339,0.0678,0.3732,0.867,False,understat
+serie_a,2024,understat_3334,Lassana Coulibaly,Lecce,M S,2687.0,38,0.3015,0.0435,0.0351,0.0335,0.0,0.4019,0.7857,False,understat
+serie_a,2024,understat_3729,Hassane Kamara,Udinese,D M S,2020.0,30,0.7574,0.0333,0.145,0.0446,0.1782,1.1139,0.7481,False,understat
+serie_a,2024,understat_4733,José Luis Palomino,Cagliari,D S,1067.0,18,0.1687,0.025,0.005,0.0843,0.0,0.0843,0.6586,False,understat
+serie_a,2024,understat_4911,Alessio Zerbin,"Napoli,Venezia",D M S,1523.0,20,1.0046,0.1275,0.1398,0.0591,0.0591,1.4183,0.8461,False,understat
+serie_a,2024,understat_4939,Alessandro Bastoni,Inter,D S,2468.0,33,0.4741,0.0245,0.124,0.0365,0.1823,1.0211,0.831,False,understat
+serie_a,2024,understat_4951,Grigoris Kastanos,Verona,F M S,852.0,27,2.3239,0.1151,0.1669,0.1056,0.1056,1.2676,0.3506,False,understat
+serie_a,2024,understat_5025,Alessandro Buongiorno,Napoli,D,1931.0,22,0.3729,0.037,0.0293,0.0466,0.0,0.233,0.9753,False,understat
+serie_a,2024,understat_5240,Ondrej Duda,Verona,M S,2414.0,28,0.9321,0.0331,0.1282,0.0373,0.1118,1.193,0.9579,False,understat
+serie_a,2024,understat_5759,Matteo Guendouzi,Lazio,M,3281.0,37,0.7406,0.0427,0.0845,0.0274,0.0823,1.1795,0.9853,False,understat
+serie_a,2024,understat_6073,Guillermo Maripán,Torino,D S,2340.0,28,0.4615,0.0399,0.0499,0.0385,0.0385,0.1923,0.9286,False,understat
+serie_a,2024,understat_6360,Antoine Bernede,Verona,M S,591.0,14,0.6091,0.0333,0.071,0.1523,0.0,1.5228,0.469,False,understat
+serie_a,2024,understat_6521,Yerry Mina,Cagliari,D,2590.0,31,0.9035,0.0858,0.0196,0.0347,0.0,0.139,0.9283,False,understat
+serie_a,2024,understat_6618,Oumar Solet,Udinese,D,1676.0,19,0.6444,0.048,0.0653,0.0537,0.1074,0.9666,0.9801,False,understat
+serie_a,2024,understat_6672,Riccardo Sottil,"AC Milan,Fiorentina",M S,932.0,24,2.3176,0.1136,0.134,0.0966,0.0966,1.4485,0.4315,False,understat
+serie_a,2024,understat_6696,Luca Ranieri,Fiorentina,D S,3085.0,36,0.3209,0.0404,0.0517,0.0292,0.0875,0.4668,0.9522,False,understat
+serie_a,2024,understat_6706,Ndary Adopo,Cagliari,M S,2416.0,35,0.745,0.0422,0.0919,0.0373,0.0373,0.7078,0.767,False,understat
+serie_a,2024,understat_6807,Jaka Bijol,Udinese,D,2964.0,34,0.5769,0.065,0.0205,0.0304,0.0,0.3644,0.9686,False,understat
+serie_a,2024,understat_6945,Youssouf Fofana,AC Milan,M S,2516.0,35,1.2878,0.0406,0.1261,0.0358,0.2146,0.8585,0.7987,False,understat
+serie_a,2024,understat_7002,Giangiacomo Magnani,Verona,D S,1049.0,17,0.9438,0.1301,0.0042,0.0858,0.0,0.0858,0.6856,False,understat
+serie_a,2024,understat_7091,Christian Kouamé,"Empoli,Fiorentina",F M S,1100.0,26,2.0455,0.2748,0.2162,0.0818,0.0818,1.4727,0.4701,False,understat
+serie_a,2024,understat_7234,John Yeboah,Venezia,F M S,1198.0,33,2.2538,0.1902,0.2225,0.0751,0.0751,1.5025,0.4034,False,understat
+serie_a,2024,understat_7379,Nicolo Fagioli,"Fiorentina,Juventus",M S,1514.0,32,1.3078,0.0529,0.1796,0.0594,0.1189,1.605,0.5257,False,understat
+serie_a,2024,understat_7530,Samuele Ricci,Torino,M,2863.0,34,0.6916,0.0397,0.0212,0.0314,0.0314,0.4715,0.9356,False,understat
+serie_a,2024,understat_7576,Nicolò Cambiaghi,Bologna,F M S,581.0,18,2.1687,0.1128,0.3209,0.1549,0.4647,1.5491,0.3586,False,understat
+serie_a,2024,understat_7755,Domagoj Bradaric,Verona,D M S,1963.0,28,0.4126,0.0402,0.0897,0.0458,0.0,1.1462,0.779,False,understat
+serie_a,2024,understat_7924,Amir Rrahmani,Napoli,D,3410.0,38,0.739,0.0596,0.0409,0.0264,0.0792,0.2903,0.9971,False,understat
+serie_a,2024,understat_8313,Pierre Kalulu Kyatengwa,Juventus,D S,2330.0,29,0.2704,0.0328,0.0224,0.0386,0.0,0.4249,0.8927,False,understat
+serie_a,2024,understat_8470,Kike Pérez,Venezia,M S,1130.0,16,1.0354,0.1079,0.0834,0.0796,0.0,1.4336,0.7847,False,understat
+serie_a,2024,understat_8728,Oier Zarraga,Udinese,M S,881.0,22,0.6129,0.0293,0.033,0.1022,0.0,0.6129,0.4449,False,understat
+serie_a,2024,understat_8819,Mergim Vojvoda,"Como,Torino",D S,1836.0,28,0.4412,0.0334,0.1665,0.049,0.098,1.1765,0.7286,False,understat
+serie_a,2024,understat_8828,Ivan Ilic,Torino,M S,898.0,19,1.1024,0.1137,0.0963,0.1002,0.0,0.902,0.5251,False,understat
+serie_a,2024,understat_8838,Junior Messias,Genoa,F M S,832.0,17,1.9471,0.2813,0.0754,0.1082,0.1082,0.8654,0.5438,False,understat
+serie_a,2024,understat_8867,Adrián Bernabé,Parma Calcio 1913,M S,1464.0,21,1.6598,0.093,0.1015,0.0615,0.0615,1.4139,0.7746,False,understat
+serie_a,2024,understat_8967,Lautaro Valenti,Parma Calcio 1913,D S,1559.0,20,0.4041,0.0115,0.0085,0.0577,0.0,0.2309,0.8661,False,understat
+serie_a,2024,understat_9019,Lucas Martínez Quarta,Fiorentina,D S,341.0,8,0.7918,0.2399,0.003,0.2639,0.0,0.2639,0.4736,False,understat
+serie_a,2024,understat_9036,Nicola Zalewski,"Inter,Roma",D M S,963.0,23,0.9346,0.0402,0.2875,0.0935,0.0935,1.9626,0.4652,False,understat
+serie_a,2024,understat_9061,Pontus Almqvist,Parma Calcio 1913,D F M S,1085.0,29,2.1567,0.1711,0.1399,0.0829,0.0829,0.8295,0.4157,False,understat
+serie_a,2024,understat_9322,Alessandro Bianco,"Fiorentina,Monza",M S,2636.0,35,0.8877,0.0476,0.0503,0.0341,0.0,0.6146,0.8368,False,understat
+serie_a,2024,understat_9503,Kacper Urbanski,"Bologna,Monza",M S,737.0,15,1.0991,0.0847,0.1035,0.1221,0.0,1.5875,0.5459,False,understat
+serie_a,2024,understat_9518,Edoardo Bove,Fiorentina,M S,863.0,12,0.73,0.1317,0.1521,0.1043,0.2086,1.1472,0.7991,False,understat
+serie_a,2024,understat_9843,Caleb Ekuban,Genoa,F S,526.0,18,3.0798,0.5867,0.1469,0.1711,0.5133,1.3688,0.3247,False,understat
+serie_a,2024,understat_9855,Mattia Viti,Empoli,D,2580.0,30,0.3837,0.036,0.0077,0.0349,0.0,0.1744,0.9556,False,understat
+serie_a,2024,understat_9876,Alessandro Zanoli,Genoa,D M S,1716.0,31,0.5769,0.0343,0.0628,0.0524,0.0,0.9965,0.6151,False,understat
+serie_a,2024,understat_9887,Michael Svoboda,Venezia,D S,1311.0,16,0.2746,0.0137,0.0659,0.0686,0.0,0.3432,0.9104,False,understat
+serie_a,2024,understat_9951,Tommaso Baldanzi,Roma,M S,777.0,31,2.3166,0.2223,0.1519,0.1158,0.1158,1.1583,0.2785,False,understat
+serie_a,2024,understat_9952,Ridgeciano Haps,Venezia,D S,1369.0,25,0.9861,0.0979,0.0659,0.0657,0.0657,0.4602,0.6084,False,understat
+serie_a,2024,understat_9977,Loum Tchaouna,Lazio,F M S,624.0,24,3.3173,0.3727,0.099,0.1442,0.0,1.4423,0.2889,False,understat
+serie_a,2024,understat_9996,Abdou Harroui,Verona,F M S,452.0,10,2.9867,0.4881,0.208,0.1991,0.3982,0.7965,0.5022,False,understat
+serie_a,2024,understat_10073,Adam Obert,Cagliari,D M S,1072.0,21,0.7556,0.0853,0.0383,0.084,0.084,0.8396,0.5672,False,understat
+serie_a,2024,understat_10389,Fali Candé,Venezia,D,1530.0,17,0.2941,0.0485,0.0473,0.0588,0.0588,0.2353,1.0,False,understat
+serie_a,2024,understat_10433,Cesare Casadei,Torino,F M S,1030.0,15,1.2233,0.1092,0.0341,0.0874,0.0874,0.6117,0.763,False,understat
+serie_a,2024,understat_10497,Yannick Engelhardt,Como,D M S,1134.0,26,0.6349,0.0646,0.1177,0.0794,0.0794,0.9524,0.4846,False,understat
+serie_a,2024,understat_10577,Mario Gila,Lazio,D S,2740.0,32,0.4927,0.0315,0.0236,0.0328,0.0,0.4927,0.9514,False,understat
+serie_a,2024,understat_10740,Jordan Zemura,Udinese,D S,1401.0,23,0.8351,0.0697,0.114,0.0642,0.1285,0.7066,0.6768,False,understat
+serie_a,2024,understat_10854,Souleymane Isaak Touré,Udinese,D S,742.0,12,0.4852,0.0898,0.0035,0.1213,0.0,0.2426,0.687,False,understat
+serie_a,2024,understat_10894,Patrick Ciurria,Monza,D F M S,1101.0,21,0.8992,0.0422,0.1877,0.0817,0.0817,1.0627,0.5825,False,understat
+serie_a,2024,understat_10956,Emil Holm,Bologna,D S,1129.0,21,0.7972,0.0582,0.0804,0.0797,0.0797,0.7972,0.5974,False,understat
+serie_a,2024,understat_10993,Federico Gatti,Juventus,D S,2207.0,30,1.0195,0.1078,0.0116,0.0408,0.0,0.2447,0.8174,False,understat
+serie_a,2024,understat_11039,Lewis Ferguson,Bologna,M S,974.0,16,0.5544,0.0876,0.1431,0.0924,0.0924,1.2936,0.6764,False,understat
+serie_a,2024,understat_11279,Ali Dembélé,Torino,D S,369.0,15,1.2195,0.0923,0.0265,0.2439,0.0,0.7317,0.2733,False,understat
+serie_a,2024,understat_11752,Amir Richardson,Fiorentina,M S,1083.0,27,0.9141,0.09,0.0518,0.0831,0.0831,0.6648,0.4457,False,understat
+serie_a,2024,understat_11902,Pietro Comuzzo,Fiorentina,D S,2192.0,33,0.1642,0.0194,0.0149,0.0411,0.0,0.2464,0.738,False,understat
+serie_a,2024,understat_11945,Ylber Ramadani,Lecce,M S,1831.0,29,0.8356,0.0264,0.0438,0.0492,0.0492,0.7865,0.7015,False,understat
+serie_a,2024,understat_11966,Noah Okafor,"AC Milan,Napoli",F M S,435.0,15,2.6897,0.4614,0.1581,0.2069,0.0,1.4483,0.3222,False,understat
+serie_a,2024,understat_12040,Thomas Thiesson Kristensen,Udinese,D S,1747.0,24,0.2061,0.0488,0.0186,0.0515,0.0,0.2061,0.8088,False,understat
+serie_a,2024,understat_12084,Martín Payero,Udinese,M S,1391.0,25,2.0058,0.0886,0.0817,0.0647,0.0647,0.9705,0.6182,False,understat
+serie_a,2024,understat_12341,Lautaro Giannetti,Udinese,D S,892.0,15,0.2018,0.0078,0.0096,0.1009,0.0,0.2018,0.6607,False,understat
+serie_a,2024,understat_12342,Brenner,Udinese,F M S,389.0,9,1.6195,0.1145,0.12,0.2314,0.4627,1.1568,0.4802,False,understat
+serie_a,2024,understat_12365,Alieu Njie,Torino,S,361.0,16,2.2438,0.3079,0.1397,0.2493,0.0,0.9972,0.2507,False,understat
+serie_a,2024,understat_12776,Jeff Ekhator,Genoa,F M S,727.0,24,1.238,0.1643,0.1701,0.1238,0.1238,1.238,0.3366,False,understat
+serie_a,2024,understat_12777,Patrizio Masini,Genoa,M S,1528.0,26,0.4712,0.0256,0.015,0.0589,0.0,0.3534,0.653,False,understat
+serie_a,2024,understat_12780,Mehdi Taremi,Inter,F S,781.0,26,1.6133,0.3832,0.2108,0.1152,0.2305,1.7286,0.3338,False,understat
+serie_a,2024,understat_12788,Anas Haj Mohamed,Parma Calcio 1913,M S,450.0,15,1.4,0.2102,0.2537,0.2,0.4,1.8,0.3333,False,understat
+serie_a,2024,understat_12856,Dailon Livramento,Verona,F M S,922.0,29,1.269,0.2325,0.0989,0.0976,0.0976,0.7809,0.3533,False,understat
+serie_a,2024,understat_12873,Marin Sverko,Venezia,D S,1123.0,16,0.2404,0.0161,0.0305,0.0801,0.0,0.1603,0.7799,False,understat
+serie_a,2024,understat_12875,Magnus Kofod Andersen,Venezia,M S,692.0,14,1.0405,0.0299,0.0645,0.1301,0.1301,1.3006,0.5492,False,understat
+serie_a,2024,understat_12989,Jay Idzes,Venezia,D,3130.0,35,0.4601,0.0605,0.0444,0.0288,0.0,0.23,0.9937,False,understat
+serie_a,2024,understat_12997,Alieu Fadera,Como,D M S,1652.0,28,1.5254,0.0979,0.1828,0.0545,0.1634,1.253,0.6556,False,understat
+serie_a,2024,understat_13030,Gabriel Charpentier,Parma Calcio 1913,S,242.0,10,3.3471,0.3171,0.2338,0.3719,0.7438,2.2314,0.2689,False,understat
+serie_a,2024,understat_13031,Giovanni Leoni,Parma Calcio 1913,D S,1210.0,17,0.1488,0.0293,0.001,0.0744,0.0,0.0744,0.7908,False,understat
+serie_a,2024,understat_13444,Florinel Coman,Cagliari,M S,253.0,9,1.4229,0.0467,0.0048,0.3557,0.0,0.3557,0.3123,False,understat
+serie_a,2024,understat_3,Luca Caldirola,Monza,D S,865.0,14,0.4162,0.0351,0.009,0.0,0.0,0.2081,0.6865,False,understat
+serie_a,2024,understat_199,Yann Sommer,Inter,GK,2970.0,33,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+serie_a,2024,understat_342,Sead Kolasinac,Atalanta,D,1917.0,23,0.4695,0.039,0.1329,0.0,0.0939,0.7981,0.9261,False,understat
+serie_a,2024,understat_373,Mats Hummels,Roma,D S,925.0,14,0.7784,0.0599,0.0075,0.0,0.0,0.1946,0.7341,False,understat
+serie_a,2024,understat_498,Alexis Sánchez,Udinese,F S,435.0,13,1.4483,0.2547,0.021,0.0,0.0,0.6207,0.3718,False,understat
+serie_a,2024,understat_546,David de Gea,Fiorentina,GK,3150.0,35,0.0,0.0,0.0169,0.0,0.0286,0.0857,1.0,True,understat
+serie_a,2024,understat_608,Alberto Moreno,Como,D M S,1740.0,24,0.7241,0.0201,0.0837,0.0,0.0,0.9828,0.8056,False,understat
+serie_a,2024,understat_638,Kyle Walker,AC Milan,D S,658.0,11,0.2736,0.0048,0.0994,0.0,0.0,0.8207,0.6646,False,understat
+serie_a,2024,understat_688,Ruben Loftus-Cheek,AC Milan,M S,1022.0,19,0.7926,0.0645,0.1502,0.0,0.0,1.409,0.5977,False,understat
+serie_a,2024,understat_703,Fikayo Tomori,AC Milan,D S,1590.0,22,0.1132,0.007,0.03,0.0,0.0566,0.4528,0.803,False,understat
+serie_a,2024,understat_1089,Juan Cuadrado,Atalanta,D F M S,800.0,23,1.8,0.1657,0.2573,0.0,0.225,2.1375,0.3865,False,understat
+serie_a,2024,understat_1093,Mattia Perin,Juventus,GK,450.0,5,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+serie_a,2024,understat_1136,Gianluca Lapadula,Cagliari,F S,281.0,12,4.8043,0.4944,0.0202,0.0,0.0,0.9609,0.2602,False,understat
+serie_a,2024,understat_1158,Simone Scuffet,"Cagliari,Napoli",GK,1260.0,14,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+serie_a,2024,understat_1247,Juan Jesus,Napoli,D S,1076.0,15,0.2509,0.0217,0.0087,0.0,0.0836,0.0836,0.797,False,understat
+serie_a,2024,understat_1281,Giuseppe Pezzella,Empoli,D M S,2914.0,35,0.4633,0.0172,0.1743,0.0,0.0927,1.1119,0.9251,False,understat
+serie_a,2024,understat_1302,Emil Audero,Como,GK,720.0,8,0.125,0.0051,0.0,0.0,0.0,0.0,1.0,True,understat
+serie_a,2024,understat_1305,Lukasz Skorupski,Bologna,GK,2364.0,27,0.0,0.0,0.0,0.0,0.0,0.0,0.9728,True,understat
+serie_a,2024,understat_1320,Federico Barba,Como,D S,434.0,7,0.4147,0.1301,0.0,0.0,0.0,0.0,0.6889,False,understat
+serie_a,2024,understat_1374,José Reina,Como,GK,1034.0,12,0.0,0.0,0.0,0.0,0.0,0.0,0.9574,True,understat
+serie_a,2024,understat_1375,Elseid Hysaj,Lazio,D S,413.0,11,0.4358,0.0199,0.3267,0.0,0.6538,1.3075,0.4172,False,understat
+serie_a,2024,understat_1463,Francesco Acerbi,Inter,D S,1695.0,23,0.2655,0.0179,0.0369,0.0,0.0531,0.4248,0.8188,False,understat
+serie_a,2024,understat_1474,Alfred Duncan,Venezia,M S,965.0,16,1.399,0.0903,0.185,0.0,0.0,1.0259,0.6701,False,understat
+serie_a,2024,understat_1484,Rafael Toloi,Atalanta,D S,448.0,11,0.6027,0.0181,0.0512,0.0,0.0,0.6027,0.4525,False,understat
+serie_a,2024,understat_1493,Andrea Petagna,Monza,F S,319.0,13,1.1285,0.0702,0.0117,0.0,0.0,0.2821,0.2726,False,understat
+serie_a,2024,understat_1523,Danilo D&#039;Ambrosio,Monza,D S,1098.0,20,0.7377,0.0597,0.0441,0.0,0.082,0.4098,0.61,False,understat
+serie_a,2024,understat_1544,Federico Ravaglia,Bologna,GK S,1056.0,12,0.0,0.0,0.0038,0.0,0.0,0.0852,0.9778,True,understat
+serie_a,2024,understat_1574,Davide Calabria,"AC Milan,Bologna",D S,949.0,18,0.569,0.0597,0.1334,0.0,0.0948,1.3277,0.5858,False,understat
+serie_a,2024,understat_1830,Ionut Radu,Venezia,GK,1350.0,15,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+serie_a,2024,understat_1841,Pierluigi Gollini,Genoa,GK,630.0,7,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+serie_a,2024,understat_1873,Nicola Leali,Genoa,GK,2610.0,29,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+serie_a,2024,understat_1892,Alex Meret,Napoli,GK,3005.0,34,0.0,0.0,0.0,0.0,0.0,0.0,0.982,True,understat
+serie_a,2024,understat_1898,Stefano Sabelli,Genoa,D S,2072.0,34,0.2606,0.0059,0.0858,0.0,0.0869,0.7819,0.6771,False,understat
+serie_a,2024,understat_2053,Martin Erlic,Bologna,D S,326.0,8,1.6564,0.0658,0.0,0.0,0.0,0.0,0.4528,False,understat
+serie_a,2024,understat_2104,Sergi Roberto,Como,M S,692.0,13,0.7803,0.0664,0.07,0.0,0.1301,1.8208,0.5915,False,understat
+serie_a,2024,understat_2244,Danilo,Juventus,D S,573.0,12,0.1571,0.0091,0.1264,0.0,0.1571,0.4712,0.5306,False,understat
+serie_a,2024,understat_3209,Jean-Daniel Akpa-Akpro,Monza,D M S,979.0,14,0.3677,0.0395,0.0219,0.0,0.0,0.2758,0.777,False,understat
+serie_a,2024,understat_3253,Frederic Guilbert,Lecce,D M,2488.0,31,0.3979,0.0113,0.0655,0.0,0.0362,0.6511,0.8918,False,understat
+serie_a,2024,understat_3363,Benjamin Pavard,Inter,D S,1581.0,23,0.4554,0.0272,0.0465,0.0,0.0569,0.4554,0.7638,False,understat
+serie_a,2024,understat_3737,Mike Maignan,AC Milan,GK,3296.0,37,0.0,0.0,0.0143,0.0,0.0,0.1365,0.9898,True,understat
+serie_a,2024,understat_3978,Marco Faraoni,Verona,D M S,256.0,8,0.3516,0.1079,0.037,0.0,0.0,0.7031,0.3556,False,understat
+serie_a,2024,understat_4291,Marc-Oliver Kempf,Como,D M S,2622.0,31,0.6865,0.05,0.0537,0.0,0.0,0.3432,0.9398,False,understat
+serie_a,2024,understat_4968,Giorgio Altare,Venezia,D S,750.0,12,0.36,0.0101,0.0126,0.0,0.0,0.12,0.6944,False,understat
+serie_a,2024,understat_4970,Luca Pellegrini,Lazio,D S,1045.0,22,1.1196,0.0641,0.2478,0.0,0.3445,1.8086,0.5278,False,understat
+serie_a,2024,understat_4984,Wladimiro Falcone,Lecce,GK,3420.0,38,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+serie_a,2024,understat_5133,Aarón Martín,Genoa,D M S,3100.0,36,0.4645,0.0214,0.1677,0.0,0.2323,1.8871,0.9568,False,understat
+serie_a,2024,understat_5329,Stefan Posch,"Atalanta,Bologna",D S,1087.0,19,0.414,0.0572,0.0641,0.0,0.0,0.828,0.6357,False,understat
+serie_a,2024,understat_5610,Jean Butez,Como,GK S,1663.0,19,0.0,0.0,0.0017,0.0,0.0,0.0541,0.9725,True,understat
+serie_a,2024,understat_5700,Yann Karamoh,Torino,F M S,1031.0,29,2.1823,0.1524,0.0885,0.0,0.0873,0.7856,0.395,False,understat
+serie_a,2024,understat_5996,Adrien Tameze,Torino,D M S,647.0,20,0.9737,0.0413,0.1584,0.0,0.0,0.8346,0.3594,False,understat
+serie_a,2024,understat_6122,Douglas Luiz,Juventus,M S,491.0,19,1.4664,0.1259,0.212,0.0,0.0,2.5662,0.2871,False,understat
+serie_a,2024,understat_6125,Stanislav Lobotka,Napoli,M S,2678.0,32,0.2353,0.0085,0.0426,0.0,0.0336,0.5713,0.9299,False,understat
+serie_a,2024,understat_6132,Marco Silvestri,Empoli,GK,450.0,5,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+serie_a,2024,understat_6136,Mario Hermoso,Roma,D S,228.0,8,0.3947,0.0277,0.0,0.0,0.0,0.0,0.3167,False,understat
+serie_a,2024,understat_6161,Nicolas Haas,Empoli,M S,270.0,10,0.3333,0.0048,0.0632,0.0,0.0,1.0,0.3,False,understat
+serie_a,2024,understat_6167,Vanja Milinkovic-Savic,Torino,GK,3330.0,37,0.0,0.0,0.0032,0.0,0.0,0.0811,1.0,True,understat
+serie_a,2024,understat_6180,Manuel Lazzari,Lazio,D S,1408.0,25,0.3835,0.0083,0.1145,0.0,0.0639,1.2784,0.6258,False,understat
+serie_a,2024,understat_6212,Mattia Bani,Genoa,D S,1513.0,20,0.4759,0.089,0.007,0.0,0.0,0.119,0.8406,False,understat
+serie_a,2024,understat_6239,Junior Sambia,Empoli,D S,350.0,17,2.5714,0.1386,0.0599,0.0,0.0,1.2857,0.2288,False,understat
+serie_a,2024,understat_6352,Valentino Lazaro,Torino,D M S,2335.0,33,0.6167,0.0483,0.1347,0.0,0.2313,1.2719,0.7862,False,understat
+serie_a,2024,understat_6368,Mathías Olivera,Napoli,D S,2360.0,32,0.6102,0.0419,0.0693,0.0,0.0763,0.9534,0.8194,False,understat
+serie_a,2024,understat_6412,Raoul Bellanova,"Atalanta,Torino",D M S,2505.0,35,0.6826,0.0724,0.2214,0.0,0.3234,1.2575,0.7952,False,understat
+serie_a,2024,understat_6507,Semuel Pizzignacco,Monza,GK S,735.0,9,0.0,0.0,0.0,0.0,0.0,0.0,0.9074,True,understat
+serie_a,2024,understat_6517,Charalampos Lykogiannis,Bologna,D S,1056.0,17,0.5114,0.022,0.1714,0.0,0.3409,1.6193,0.6902,False,understat
+serie_a,2024,understat_6849,Rui Patrício,Atalanta,GK,270.0,3,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+serie_a,2024,understat_6872,Mehmet Zeki Çelik,Roma,D M S,2270.0,31,0.5154,0.0245,0.0738,0.0,0.0793,0.7533,0.8136,False,understat
+serie_a,2024,understat_6884,Remi Oudin,Lecce,M S,285.0,11,0.9474,0.0357,0.1224,0.0,0.0,1.8947,0.2879,False,understat
+serie_a,2024,understat_6960,Bremer,Juventus,D,540.0,6,0.5,0.0218,0.0,0.0,0.0,0.0,1.0,False,understat
+serie_a,2024,understat_6977,Pietro Terracciano,Fiorentina,GK,270.0,3,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+serie_a,2024,understat_6981,Ismael Bennacer,AC Milan,M S,308.0,6,0.8766,0.0136,0.0339,0.0,0.0,1.1688,0.5704,False,understat
+serie_a,2024,understat_6982,Ivan Provedel,Lazio,GK,2610.0,29,0.0,0.0,0.0084,0.0,0.0,0.1034,1.0,True,understat
+serie_a,2024,understat_7013,Matteo Pessina,Monza,M S,866.0,11,0.3118,0.0192,0.011,0.0,0.0,0.4157,0.8747,False,understat
+serie_a,2024,understat_7049,Evan Ndicka,Roma,D,3420.0,38,0.4737,0.0263,0.0287,0.0,0.0263,0.2105,1.0,False,understat
+serie_a,2024,understat_7075,Borna Sosa,Torino,D S,1195.0,19,0.3013,0.0161,0.0647,0.0,0.0,0.8285,0.6988,False,understat
+serie_a,2024,understat_7087,Elia Caprile,"Cagliari,Napoli",GK S,1945.0,22,0.0,0.0,0.0,0.0,0.0,0.0,0.9823,True,understat
+serie_a,2024,understat_7203,Drissa Camara,Parma Calcio 1913,F S,395.0,21,3.4177,0.2971,0.1833,0.0,0.0,1.1392,0.209,False,understat
+serie_a,2024,understat_7286,Juan Miranda,Bologna,D S,2271.0,31,0.8719,0.0287,0.2751,0.0,0.2378,2.2589,0.814,False,understat
+serie_a,2024,understat_7411,Nicolo Rovella,Lazio,M S,2747.0,33,0.9174,0.0525,0.0947,0.0,0.0983,0.9829,0.9249,False,understat
+serie_a,2024,understat_7412,Antonio Candela,Venezia,D S,1020.0,14,0.4412,0.0186,0.0708,0.0,0.0882,0.7941,0.8095,False,understat
+serie_a,2024,understat_7430,Emerson,AC Milan,D S,1392.0,17,0.6466,0.0224,0.0618,0.0,0.0,0.9698,0.9098,False,understat
+serie_a,2024,understat_7516,Nehuén Pérez,Udinese,D,180.0,2,0.0,0.0,0.0,0.0,0.0,0.0,1.0,False,understat
+serie_a,2024,understat_7628,Lameck Banda,Lecce,F M S,592.0,15,2.5845,0.2375,0.1486,0.0,0.152,1.6723,0.4385,False,understat
+serie_a,2024,understat_7742,Valentin Gendrey,Lecce,D,180.0,2,1.0,0.0829,0.0619,0.0,0.0,1.0,1.0,False,understat
+serie_a,2024,understat_7758,Cheikh Niasse,Verona,M S,760.0,11,0.3553,0.0204,0.0106,0.0,0.0,0.4737,0.7677,False,understat
+serie_a,2024,understat_7785,Kingsley Ehizibue,Udinese,D M S,2534.0,33,0.4972,0.0592,0.0823,0.0,0.0355,0.7814,0.8532,False,understat
+serie_a,2024,understat_7909,Gaetano Castrovilli,"Lazio,Monza",M S,725.0,21,0.9931,0.0803,0.115,0.0,0.0,1.1172,0.3836,False,understat
+serie_a,2024,understat_7923,Pawel Dawidowicz,Verona,D M S,1864.0,26,0.1931,0.0098,0.0,0.0,0.0,0.0,0.7966,False,understat
+serie_a,2024,understat_7925,Liam Henderson,Empoli,M S,2358.0,36,0.8397,0.0193,0.1579,0.0,0.1527,1.2214,0.7278,False,understat
+serie_a,2024,understat_7927,Sofyan Amrabat,Fiorentina,M,180.0,2,0.0,0.0,0.0251,0.0,0.0,1.0,1.0,False,understat
+serie_a,2024,understat_7938,Tommaso Augello,Cagliari,D M S,2724.0,38,0.2643,0.0067,0.1675,0.0,0.2313,1.3216,0.7965,False,understat
+serie_a,2024,understat_7939,Morten Thorsby,Genoa,F M S,1907.0,30,0.7079,0.1369,0.1123,0.0,0.0472,1.2271,0.7063,False,understat
+serie_a,2024,understat_7947,Ruslan Malinovskiy,Genoa,M S,372.0,9,2.1774,0.0578,0.3282,0.0,0.4839,1.6935,0.4593,False,understat
+serie_a,2024,understat_7955,Jesse Joronen,Venezia,GK S,703.0,8,0.0,0.0,0.0,0.0,0.0,0.0,0.9764,True,understat
+serie_a,2024,understat_7988,Billy Gilmour,Napoli,M S,1161.0,26,0.6977,0.0486,0.1166,0.0,0.0775,1.6279,0.4962,False,understat
+serie_a,2024,understat_8009,Antonino Gallo,Lecce,D,2624.0,31,0.3087,0.0117,0.1127,0.0,0.0686,1.4748,0.9405,False,understat
+serie_a,2024,understat_8030,Sebastian Walukiewicz,"Empoli,Torino",D S,1853.0,31,0.2914,0.0189,0.02,0.0,0.0,0.2428,0.6642,False,understat
+serie_a,2024,understat_8090,Lloyd Kelly,Juventus,D S,1018.0,12,0.6189,0.0545,0.0119,0.0,0.0,0.2652,0.9426,False,understat
+serie_a,2024,understat_8101,Stefano Turati,Monza,GK,2678.0,30,0.0,0.0,0.0,0.0,0.0,0.0,0.9919,True,understat
+serie_a,2024,understat_8232,Andrea Carboni,Monza,D M S,2209.0,26,0.3259,0.014,0.0062,0.0,0.0407,0.163,0.944,False,understat
+serie_a,2024,understat_8241,Balthazar Pierret,Lecce,M S,1741.0,30,0.3102,0.0072,0.0261,0.0,0.0,0.5169,0.6448,False,understat
+serie_a,2024,understat_8303,Marin Pongracic,Fiorentina,D S,1380.0,20,0.1957,0.0061,0.029,0.0,0.0,0.3261,0.7667,False,understat
+serie_a,2024,understat_8308,Filip Stankovic,Venezia,GK,1367.0,16,0.0,0.0,0.0,0.0,0.0,0.0,0.9493,True,understat
+serie_a,2024,understat_8321,Razvan Sava,Udinese,GK,1080.0,12,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+serie_a,2024,understat_8326,Maduka Okoye,Udinese,GK,2250.0,25,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+serie_a,2024,understat_8330,Jean Onana,Genoa,M S,291.0,9,0.3093,0.003,0.0254,0.0,0.0,0.6186,0.3593,False,understat
+serie_a,2024,understat_8372,Lucas Gourna Douath,Roma,M S,220.0,6,1.2273,0.0925,0.0381,0.0,0.0,0.8182,0.4074,False,understat
+serie_a,2024,understat_8378,Malick Thiaw,AC Milan,D S,1800.0,22,0.35,0.0223,0.0085,0.0,0.0,0.2,0.9091,False,understat
+serie_a,2024,understat_8380,Pablo Marí,"Fiorentina,Monza",D S,2731.0,32,0.2307,0.0107,0.0043,0.0,0.0,0.0989,0.9483,False,understat
+serie_a,2024,understat_8512,Filippo Terracciano,AC Milan,D M S,527.0,13,0.5123,0.0253,0.0146,0.0,0.0,0.3416,0.4504,False,understat
+serie_a,2024,understat_8569,Botond Balogh,Parma Calcio 1913,D S,2055.0,29,0.1314,0.022,0.0141,0.0,0.0438,0.0876,0.7874,False,understat
+serie_a,2024,understat_8626,Nikola Moro,Bologna,M S,1223.0,22,1.0303,0.0345,0.0977,0.0,0.1472,1.4718,0.6177,False,understat
+serie_a,2024,understat_8651,Enzo Le Fée,Roma,M S,317.0,6,1.1356,0.0539,0.0379,0.0,0.0,0.8517,0.587,False,understat
+serie_a,2024,understat_8663,Flavius Daniliuc,Verona,D S,990.0,18,0.2727,0.0116,0.0092,0.0,0.0,0.1818,0.6111,False,understat
+serie_a,2024,understat_8771,Yunus Musah,AC Milan,D F M S,1561.0,29,1.2684,0.15,0.1177,0.0,0.1153,1.3261,0.5981,False,understat
+serie_a,2024,understat_8829,Nicolò Casale,"Bologna,Lazio",D S,1036.0,17,0.4344,0.0239,0.0374,0.0,0.0869,0.2606,0.6771,False,understat
+serie_a,2024,understat_8871,Marco Carnesecchi,Atalanta,GK,3060.0,34,0.0,0.0,0.0088,0.0,0.0,0.0294,1.0,True,understat
+serie_a,2024,understat_8872,Matteo Ruggeri,Atalanta,D M S,1739.0,30,0.1553,0.0257,0.1328,0.0,0.1553,1.2421,0.6441,False,understat
+serie_a,2024,understat_8881,Lorenzo Montipò,Verona,GK,3240.0,36,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+serie_a,2024,understat_9010,Hamza Rafia,Lecce,M S,1083.0,18,0.831,0.0336,0.0934,0.0,0.0,1.3296,0.6685,False,understat
+serie_a,2024,understat_9052,Josep Martínez,Inter,GK,450.0,5,0.0,0.0,0.0129,0.0,0.0,0.2,1.0,True,understat
+serie_a,2024,understat_9057,Franco Ezequiel Carboni,Venezia,D M S,220.0,8,0.4091,0.0059,0.0381,0.0,0.0,0.8182,0.3056,False,understat
+serie_a,2024,understat_9065,Nahuel Estévez,Parma Calcio 1913,M S,658.0,14,0.6839,0.0132,0.0731,0.0,0.0,0.8207,0.5222,False,understat
+serie_a,2024,understat_9090,Ardian Ismajli,Empoli,D,2510.0,29,0.1793,0.0183,0.0011,0.0,0.0,0.0717,0.9617,False,understat
+serie_a,2024,understat_9107,Giorgio Scalvini,Atalanta,D S,284.0,6,1.2676,0.0272,0.0,0.0,0.0,0.0,0.5259,False,understat
+serie_a,2024,understat_9226,Mihai Valentin Mihaila,Parma Calcio 1913,F M S,1315.0,21,2.0532,0.1745,0.0936,0.0,0.2053,1.1635,0.6958,False,understat
+serie_a,2024,understat_9691,Nuno Tavares,Lazio,D S,1725.0,23,1.4609,0.0821,0.3364,0.0,0.4174,1.7739,0.8333,False,understat
+serie_a,2024,understat_9707,Silvère Ganvoula,Monza,F S,324.0,7,1.1111,0.1082,0.0388,0.0,0.0,0.2778,0.5143,False,understat
+serie_a,2024,understat_9714,Odilon Kossounou,Atalanta,D S,1126.0,18,0.4796,0.0871,0.0054,0.0,0.0,0.0799,0.6951,False,understat
+serie_a,2024,understat_9893,Youssef Maleh,Empoli,M S,1524.0,22,1.0039,0.0588,0.0532,0.0,0.0591,0.7087,0.7697,False,understat
+serie_a,2024,understat_9902,Pasquale Mazzocchi,Napoli,D S,691.0,20,0.3907,0.0429,0.0575,0.0,0.0,0.6512,0.3839,False,understat
+serie_a,2024,understat_10383,Michel Aebischer,Bologna,M S,729.0,14,1.2346,0.0536,0.0475,0.0,0.0,0.9877,0.5786,False,understat
+serie_a,2024,understat_10890,Michele Di Gregorio,Juventus,GK,2970.0,33,0.0,0.0,0.0093,0.0,0.0,0.0303,1.0,True,understat
+serie_a,2024,understat_10897,Samuele Vignato,Monza,M S,444.0,17,0.8108,0.0461,0.002,0.0,0.0,0.2027,0.2902,False,understat
+serie_a,2024,understat_10898,Warren Bondo,"AC Milan,Monza",M S,1797.0,24,0.7012,0.0212,0.0161,0.0,0.0,0.3005,0.8319,False,understat
+serie_a,2024,understat_10906,Thórir Helgason,Lecce,M S,1156.0,21,1.2457,0.1014,0.0752,0.0,0.3114,1.7128,0.6116,False,understat
+serie_a,2024,understat_10908,Medon Berisha,Lecce,M S,697.0,17,3.099,0.0858,0.0995,0.0,0.1291,1.4204,0.4556,False,understat
+serie_a,2024,understat_10935,Dodô,Fiorentina,D M,3126.0,35,0.7774,0.0405,0.1381,0.0,0.144,1.0653,0.9924,False,understat
+serie_a,2024,understat_10967,Mile Svilar,Roma,GK,3420.0,38,0.0263,0.0021,0.0,0.0,0.0,0.0,1.0,True,understat
+serie_a,2024,understat_11022,Simone Perilli,Verona,GK,180.0,2,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+serie_a,2024,understat_11038,Jhon Lucumí,Bologna,D S,2626.0,32,0.4113,0.0271,0.0188,0.0,0.0343,0.3085,0.9118,False,understat
+serie_a,2024,understat_11049,Reda Belahyane,"Lazio,Verona",M S,1849.0,28,0.292,0.0094,0.0583,0.0,0.0973,0.7788,0.7337,False,understat
+serie_a,2024,understat_11053,Isak Hien,Atalanta,D S,2336.0,30,0.3082,0.0367,0.003,0.0,0.0,0.0771,0.8652,False,understat
+serie_a,2024,understat_11054,Juan Cabal,Juventus,D S,464.0,7,0.9698,0.0253,0.0334,0.0,0.0,0.194,0.7365,False,understat
+serie_a,2024,understat_11289,Ola Solbakken,Empoli,F M S,750.0,21,0.48,0.0948,0.069,0.0,0.0,1.08,0.3968,False,understat
+serie_a,2024,understat_11299,Devis Vásquez,Empoli,GK,2880.0,32,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+serie_a,2024,understat_11378,Máximo Perrone,Como,M S,1866.0,26,0.4823,0.0456,0.0945,0.0,0.1447,1.4469,0.7974,False,understat
+serie_a,2024,understat_11383,Renato Veiga,Juventus,D S,1091.0,13,0.9899,0.0681,0.0033,0.0,0.0825,0.165,0.9325,False,understat
+serie_a,2024,understat_11498,Mirko Maric,"Monza,Venezia",F S,439.0,18,1.4351,0.2318,0.021,0.0,0.0,0.615,0.271,False,understat
+serie_a,2024,understat_11551,Marco Palestra,Atalanta,D S,213.0,9,0.0,0.0,0.1028,0.0,0.0,1.2676,0.263,False,understat
+serie_a,2024,understat_11768,Cher Ndour,Fiorentina,M S,397.0,9,0.9068,0.0341,0.0,0.0,0.0,0.0,0.4901,False,understat
+serie_a,2024,understat_11800,Arthur Atta,Udinese,M S,1223.0,27,1.9133,0.1136,0.1285,0.0,0.0736,1.3246,0.5033,False,understat
+serie_a,2024,understat_11876,Luca Marianucci,Empoli,D M S,1058.0,18,0.6805,0.0533,0.0131,0.0,0.0,0.2552,0.6531,False,understat
+serie_a,2024,understat_11877,Michael Folorunsho,"Fiorentina,Napoli",D M S,662.0,20,1.3595,0.0837,0.1025,0.0,0.0,0.4079,0.3678,False,understat
+serie_a,2024,understat_11946,Mohamed Kaba,Lecce,M S,422.0,15,0.8531,0.1381,0.0065,0.0,0.0,0.2133,0.3126,False,understat
+serie_a,2024,understat_11955,Alberto Dossena,Como,D S,1834.0,23,0.5889,0.0322,0.06,0.0,0.0981,0.2454,0.886,False,understat
+serie_a,2024,understat_11956,Paulo Azzi,Cagliari,D S,437.0,6,1.6476,0.1359,0.1648,0.0,0.0,1.0297,0.8093,False,understat
+serie_a,2024,understat_11957,Antoine Makoumbou,Cagliari,M S,2189.0,33,0.2878,0.0081,0.0372,0.0,0.1233,0.3289,0.737,False,understat
+serie_a,2024,understat_11959,Matteo Prati,Cagliari,M S,579.0,12,0.6218,0.0114,0.0781,0.0,0.0,0.9326,0.5361,False,understat
+serie_a,2024,understat_11961,Sam Beukema,Bologna,D S,3010.0,35,0.4485,0.0497,0.0355,0.0,0.0299,0.299,0.9556,False,understat
+serie_a,2024,understat_11968,Kevin Zeroli,"AC Milan,Monza",M S,404.0,9,1.3366,0.1109,0.1389,0.0,0.2228,0.4455,0.4988,False,understat
+serie_a,2024,understat_12012,Marcus Pedersen,Torino,D S,1349.0,29,0.5337,0.0559,0.0209,0.0,0.0,0.467,0.5169,False,understat
+serie_a,2024,understat_12043,Christos Mandas,Lazio,GK,810.0,9,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+serie_a,2024,understat_12078,Alan Matturro,Genoa,D S,888.0,13,0.4054,0.016,0.0236,0.0,0.0,0.3041,0.759,False,understat
+serie_a,2024,understat_12095,Tomás Suslov,Verona,F M S,2123.0,31,1.3566,0.0711,0.0864,0.0,0.0424,1.1446,0.7609,False,understat
+serie_a,2024,understat_12168,Alejandro Jiménez,AC Milan,D M S,1285.0,22,1.0506,0.0893,0.1183,0.0,0.07,0.8405,0.649,False,understat
+serie_a,2024,understat_12218,Francesco Camarda,AC Milan,F S,194.0,10,3.7113,0.2422,0.1305,0.0,0.0,2.3196,0.2156,False,understat
+serie_a,2024,understat_12310,Stefan Lekovic,Monza,D S,355.0,7,0.7606,0.0165,0.0,0.0,0.0,0.0,0.5635,False,understat
+serie_a,2024,understat_12340,Omari Forson,Monza,F S,198.0,9,2.2727,0.1946,0.1462,0.0,0.0,3.6364,0.2444,False,understat
+serie_a,2024,understat_12356,Saba Goglichidze,Empoli,D S,2560.0,33,0.2109,0.0092,0.0132,0.0,0.0352,0.1055,0.862,False,understat
+serie_a,2024,understat_12380,Dani Silva,Verona,M S,398.0,11,0.4523,0.0073,0.0334,0.0,0.0,0.6784,0.402,False,understat
+serie_a,2024,understat_12779,Honest Ahanor,Genoa,D M S,263.0,6,1.0266,0.239,0.0222,0.0,0.0,0.6844,0.487,False,understat
+serie_a,2024,understat_12781,Zion Suzuki,Parma Calcio 1913,GK,3319.0,37,0.0,0.0,0.0,0.0,0.0,0.0,0.9967,True,understat
+serie_a,2024,understat_12782,Woyo Coulibaly,Parma Calcio 1913,D S,1082.0,14,0.2495,0.0093,0.1085,0.0,0.0832,0.6654,0.8587,False,understat
+serie_a,2024,understat_12783,Alessandro Circati,Parma Calcio 1913,D,540.0,6,0.3333,0.0296,0.0036,0.0,0.0,0.1667,1.0,False,understat
+serie_a,2024,understat_12822,Álex Valle,Como,D S,1042.0,15,0.7774,0.0284,0.0448,0.0,0.0,0.9501,0.7719,False,understat
+serie_a,2024,understat_12853,Jesper Karlström,Udinese,M S,3201.0,37,0.3655,0.0287,0.0472,0.0,0.0843,0.5904,0.9613,False,understat
+serie_a,2024,understat_12854,Martin Frese,Verona,D M S,543.0,11,0.3315,0.0092,0.0438,0.0,0.0,0.8287,0.5485,False,understat
+serie_a,2024,understat_12858,Daniele Ghilardi,Verona,D S,2029.0,24,0.5323,0.0237,0.0084,0.0,0.0,0.2661,0.9394,False,understat
+serie_a,2024,understat_12867,Alen Sherri,Cagliari,GK,627.0,7,0.0,0.0,0.0033,0.0,0.0,0.1435,0.9952,True,understat
+serie_a,2024,understat_12868,Mattia Felici,Cagliari,M S,908.0,20,0.9912,0.1084,0.1214,0.0,0.2974,0.9912,0.5044,False,understat
+serie_a,2024,understat_12878,Issa Doumbia,Venezia,M S,922.0,24,1.6594,0.1527,0.0114,0.0,0.0,0.2928,0.4269,False,understat
+serie_a,2024,understat_12885,Kialonda Gaspar,Lecce,D,2148.0,24,0.6704,0.0322,0.0431,0.0,0.0419,0.2514,0.9944,False,understat
+serie_a,2024,understat_12906,Jonas Rouhi,Juventus,D S,206.0,5,0.0,0.0,0.0,0.0,0.0,0.0,0.4578,False,understat
+serie_a,2024,understat_12907,Marco Sala,"Como,Lecce",D S,325.0,10,0.0,0.0,0.1154,0.0,0.0,0.5538,0.3611,False,understat
+serie_a,2024,understat_12908,Matthias Braunöder,Como,M S,267.0,8,0.6742,0.0211,0.0,0.0,0.0,0.0,0.3708,False,understat
+serie_a,2024,understat_12958,Alessandro Marcandalli,"Genoa,Venezia",D S,407.0,10,0.4423,0.1252,0.0,0.0,0.0,0.0,0.4522,False,understat
+serie_a,2024,understat_12996,Alessio Iovine,Como,D S,373.0,10,0.2413,0.0037,0.0477,0.0,0.0,0.7239,0.4144,False,understat
+serie_a,2024,understat_13006,Joël Schingtienne,Venezia,D S,1124.0,16,0.0,0.0,0.0077,0.0,0.0,0.2402,0.7806,False,understat
+serie_a,2024,understat_13027,Gaby Jean,Lecce,D S,1384.0,19,0.065,0.0049,0.0037,0.0,0.0,0.065,0.8094,False,understat
+serie_a,2024,understat_13046,Lior Kasa,Genoa,M S,221.0,8,2.0362,0.3628,0.0155,0.0,0.0,0.8145,0.3069,False,understat
+serie_a,2024,understat_13050,Ignace Van der Brempt,Como,D S,1256.0,20,0.5016,0.0412,0.0306,0.0,0.0717,0.7166,0.6978,False,understat
+serie_a,2024,understat_13053,Saud Abdulhamid,Roma,D S,208.0,4,0.4327,0.0065,0.164,0.0,0.4327,0.8654,0.5778,False,understat
+serie_a,2024,understat_13095,Tomás Palacios,"Inter,Monza",D S,447.0,10,0.2013,0.009,0.0,0.0,0.0,0.0,0.4967,False,understat
+serie_a,2024,understat_13097,Mandela Keita,Parma Calcio 1913,M S,1852.0,30,0.243,0.0048,0.0587,0.0,0.0972,0.7775,0.6859,False,understat
+serie_a,2024,understat_13099,Rui Modesto,Udinese,D S,581.0,20,0.4647,0.0792,0.105,0.0,0.1549,2.1687,0.3228,False,understat
+serie_a,2024,understat_13136,Brooke Norton-Cuffy,Genoa,D F M S,726.0,14,0.6198,0.0271,0.014,0.0,0.0,0.2479,0.5762,False,understat
+serie_a,2024,understat_13172,Adrian Benedyczak,Parma Calcio 1913,M S,195.0,9,1.3846,0.0797,0.0176,0.0,0.0,0.9231,0.2407,False,understat
+serie_a,2024,understat_13313,Nicolás Valentini,Verona,D S,1139.0,14,0.6321,0.0215,0.0608,0.0,0.0,0.4741,0.904,False,understat
+serie_a,2024,understat_13354,Alberto Costa,Juventus,D S,342.0,9,1.8421,0.2699,0.0316,0.0,0.2632,0.5263,0.4222,False,understat
+serie_a,2024,understat_13389,Devyne Rensch,Roma,D S,458.0,14,0.5895,0.1225,0.15,0.0,0.1965,0.393,0.3635,False,understat
+serie_a,2024,understat_13395,Danilo Veiga,Lecce,D S,332.0,13,1.3554,0.1957,0.0892,0.0,0.0,1.6265,0.2838,False,understat
+serie_a,2024,understat_13400,Arvid Brorsson,Monza,D S,357.0,6,0.0,0.0,0.0,0.0,0.0,0.0,0.6611,False,understat
+serie_a,2024,understat_13443,Ivan Smolcic,Como,D S,627.0,9,1.0048,0.1118,0.0173,0.0,0.0,0.2871,0.7741,False,understat
+serie_a,2024,understat_13451,Konan N’Dri,Lecce,M S,285.0,11,2.8421,0.1507,0.0465,0.0,0.0,1.8947,0.2879,False,understat
+serie_a,2024,understat_13478,Sebastian Otoa,Genoa,D,183.0,3,0.0,0.0,0.0,0.0,0.0,0.0,0.6778,False,understat

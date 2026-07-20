@@ -1,0 +1,553 @@
+league,season,match_id,date,home_team,away_team,home_goals,away_goals,ht_home_goals,ht_away_goals,home_shots,away_shots,home_shots_on_target,away_shots_on_target,home_corners,away_corners,home_fouls,away_fouls,home_yellow_cards,away_yellow_cards,home_red_cards,away_red_cards,odds_home,odds_draw,odds_away,odds_over_2_5,odds_under_2_5
+championship,2023,championship_2023_0_sheffield_weds_southampton,04/08/2023,Sheffield Weds,Southampton,1,2,0,1,8,23,1,7,3,6,12,10,4,4,0,0,3.14,3.38,2.28,1.99,1.82
+championship,2023,championship_2023_1_blackburn_west_brom,05/08/2023,Blackburn,West Brom,2,1,2,0,12,14,3,4,6,5,11,11,4,3,0,0,2.78,3.21,2.62,2.17,1.68
+championship,2023,championship_2023_2_bristol_city_preston,05/08/2023,Bristol City,Preston,1,1,0,0,5,11,2,3,2,4,10,11,0,1,0,0,2.08,3.39,3.63,2.13,1.71
+championship,2023,championship_2023_3_middlesbrough_millwall,05/08/2023,Middlesbrough,Millwall,0,1,0,0,16,12,2,2,12,6,3,8,1,3,0,0,1.95,3.47,3.97,2.02,1.79
+championship,2023,championship_2023_4_norwich_hull,05/08/2023,Norwich,Hull,2,1,1,1,28,8,5,3,9,4,14,12,2,5,0,0,1.77,3.65,4.65,1.98,1.82
+championship,2023,championship_2023_5_plymouth_huddersfield,05/08/2023,Plymouth,Huddersfield,3,1,1,1,14,15,7,3,2,9,9,15,1,0,0,0,2.18,3.39,3.36,2.02,1.79
+championship,2023,championship_2023_6_stoke_rotherham,05/08/2023,Stoke,Rotherham,4,1,3,0,15,6,6,3,10,2,12,10,5,3,0,1,1.64,3.86,5.45,1.97,1.83
+championship,2023,championship_2023_7_swansea_birmingham,05/08/2023,Swansea,Birmingham,1,1,0,1,11,11,6,5,5,5,9,12,1,4,0,0,1.87,3.58,4.18,1.9,1.89
+championship,2023,championship_2023_8_watford_qpr,05/08/2023,Watford,QPR,4,0,4,0,23,4,12,1,8,2,8,15,1,2,0,0,1.89,3.58,4.09,1.96,1.84
+championship,2023,championship_2023_9_leicester_coventry,06/08/2023,Leicester,Coventry,2,1,0,0,20,20,7,6,6,8,11,13,3,2,0,0,1.55,4.19,5.87,1.79,2.02
+championship,2023,championship_2023_10_leeds_cardiff,06/08/2023,Leeds,Cardiff,2,2,0,2,25,7,6,2,10,0,8,10,2,1,0,0,1.42,4.71,7.25,1.69,2.15
+championship,2023,championship_2023_11_sunderland_ipswich,06/08/2023,Sunderland,Ipswich,1,2,0,1,20,13,4,5,11,4,10,13,1,3,1,0,2.45,3.34,2.88,1.93,1.86
+championship,2023,championship_2023_12_coventry_middlesbrough,12/08/2023,Coventry,Middlesbrough,3,0,1,0,12,14,5,2,7,7,5,8,1,1,0,0,2.41,3.36,2.92,1.94,1.86
+championship,2023,championship_2023_13_birmingham_leeds,12/08/2023,Birmingham,Leeds,1,0,0,0,10,7,2,1,7,4,13,10,1,2,0,0,3.21,3.55,2.16,1.8,2.0
+championship,2023,championship_2023_14_cardiff_qpr,12/08/2023,Cardiff,QPR,1,2,0,1,15,7,4,3,13,7,8,13,2,2,0,0,1.97,3.47,3.8,2.12,1.72
+championship,2023,championship_2023_15_huddersfield_leicester,12/08/2023,Huddersfield,Leicester,0,1,0,0,13,17,3,6,5,4,15,8,1,4,0,0,4.47,3.84,1.74,1.74,2.08
+championship,2023,championship_2023_16_hull_sheffield_weds,12/08/2023,Hull,Sheffield Weds,4,2,1,1,16,6,7,2,9,1,7,22,1,3,0,0,2.3,3.35,3.07,2.0,1.81
+championship,2023,championship_2023_17_ipswich_stoke,12/08/2023,Ipswich,Stoke,2,0,1,0,22,9,10,2,7,3,12,17,3,1,0,0,2.12,3.5,3.35,1.86,1.93
+championship,2023,championship_2023_18_millwall_bristol_city,12/08/2023,Millwall,Bristol City,0,1,0,0,10,13,2,1,1,5,13,11,1,3,0,0,1.88,3.53,4.17,2.1,1.73
+championship,2023,championship_2023_19_preston_sunderland,12/08/2023,Preston,Sunderland,2,1,1,1,11,13,2,4,5,12,17,8,3,1,0,0,2.7,3.36,2.57,1.92,1.87
+championship,2023,championship_2023_20_rotherham_blackburn,12/08/2023,Rotherham,Blackburn,2,2,1,0,9,21,3,6,5,9,9,8,3,1,1,0,2.92,3.37,2.4,1.98,1.82
+championship,2023,championship_2023_21_southampton_norwich,12/08/2023,Southampton,Norwich,4,4,2,3,31,15,11,6,13,4,12,13,7,4,0,0,1.84,3.69,4.13,1.87,1.92
+championship,2023,championship_2023_22_watford_plymouth,12/08/2023,Watford,Plymouth,0,0,0,0,20,13,3,5,12,3,16,10,0,2,0,0,1.74,3.82,4.59,1.82,1.98
+championship,2023,championship_2023_23_west_brom_swansea,12/08/2023,West Brom,Swansea,3,2,1,0,11,13,3,4,4,8,10,10,3,4,0,0,2.08,3.46,3.5,1.91,1.88
+championship,2023,championship_2023_24_leeds_west_brom,18/08/2023,Leeds,West Brom,1,1,0,0,16,4,4,2,4,3,10,9,4,5,0,0,2.11,3.46,3.44,1.92,1.87
+championship,2023,championship_2023_25_plymouth_southampton,19/08/2023,Plymouth,Southampton,1,2,0,0,15,19,2,9,5,10,11,15,2,4,0,0,3.75,3.78,1.91,1.71,2.13
+championship,2023,championship_2023_26_blackburn_hull,19/08/2023,Blackburn,Hull,1,2,0,0,14,19,3,5,2,8,12,7,1,3,1,0,1.91,3.63,3.93,1.85,1.95
+championship,2023,championship_2023_27_bristol_city_birmingham,19/08/2023,Bristol City,Birmingham,0,2,0,1,19,16,0,6,8,4,12,10,0,2,1,0,2.23,3.23,3.37,2.27,1.63
+championship,2023,championship_2023_28_leicester_cardiff,19/08/2023,Leicester,Cardiff,2,1,1,1,15,10,6,4,10,4,11,10,1,4,0,1,1.5,4.34,6.33,1.81,1.99
+championship,2023,championship_2023_29_middlesbrough_huddersfield,19/08/2023,Middlesbrough,Huddersfield,1,1,0,0,17,16,7,2,7,8,10,10,1,3,0,0,1.72,3.89,4.61,1.77,2.04
+championship,2023,championship_2023_30_qpr_ipswich,19/08/2023,QPR,Ipswich,0,1,0,0,10,16,4,3,5,4,15,10,4,1,0,0,4.13,3.53,1.89,2.02,1.79
+championship,2023,championship_2023_31_sheffield_weds_preston,19/08/2023,Sheffield Weds,Preston,0,1,0,0,8,5,3,2,0,4,14,16,1,1,0,0,2.54,3.16,2.89,2.25,1.64
+championship,2023,championship_2023_32_stoke_watford,19/08/2023,Stoke,Watford,1,0,0,0,13,10,2,3,7,2,21,10,4,1,0,0,2.23,3.38,3.23,2.0,1.8
+championship,2023,championship_2023_33_sunderland_rotherham,19/08/2023,Sunderland,Rotherham,2,1,1,1,11,4,4,1,5,0,11,10,2,1,0,0,1.65,3.98,5.03,1.79,2.02
+championship,2023,championship_2023_34_swansea_coventry,19/08/2023,Swansea,Coventry,1,1,1,1,7,11,3,2,3,8,12,10,2,1,0,0,2.39,3.41,2.92,1.9,1.88
+championship,2023,championship_2023_35_norwich_millwall,20/08/2023,Norwich,Millwall,3,1,1,0,20,10,5,2,6,3,3,13,2,1,0,0,2.05,3.46,3.57,1.99,1.81
+championship,2023,championship_2023_36_hull_bristol_city,25/08/2023,Hull,Bristol City,1,1,1,0,13,19,9,5,4,5,5,13,1,2,0,0,2.37,3.33,3.01,2.01,1.8
+championship,2023,championship_2023_37_birmingham_plymouth,26/08/2023,Birmingham,Plymouth,2,1,1,0,13,16,4,8,10,10,17,5,2,1,0,0,1.87,3.52,4.28,2.07,1.76
+championship,2023,championship_2023_38_cardiff_sheffield_weds,26/08/2023,Cardiff,Sheffield Weds,2,1,0,0,12,11,4,2,5,10,6,20,0,5,0,0,2.13,3.3,3.55,2.18,1.68
+championship,2023,championship_2023_39_coventry_sunderland,26/08/2023,Coventry,Sunderland,0,0,0,0,17,15,6,2,4,7,11,7,1,4,0,0,2.12,3.42,3.46,1.85,1.96
+championship,2023,championship_2023_40_huddersfield_norwich,26/08/2023,Huddersfield,Norwich,0,4,0,2,18,9,5,5,5,3,10,8,3,1,0,0,3.34,3.53,2.12,1.82,1.99
+championship,2023,championship_2023_41_ipswich_leeds,26/08/2023,Ipswich,Leeds,3,4,2,3,21,14,6,9,8,4,12,8,3,2,0,0,2.34,3.31,3.08,2.11,1.73
+championship,2023,championship_2023_42_millwall_stoke,26/08/2023,Millwall,Stoke,1,0,1,0,17,20,7,2,6,7,15,7,1,5,0,0,2.35,3.21,3.15,2.28,1.63
+championship,2023,championship_2023_43_preston_swansea,26/08/2023,Preston,Swansea,2,1,0,1,11,10,3,1,6,4,12,7,2,1,0,0,2.59,3.26,2.77,2.16,1.69
+championship,2023,championship_2023_44_rotherham_leicester,26/08/2023,Rotherham,Leicester,1,2,0,1,8,15,1,7,5,4,15,10,2,2,0,0,5.43,4.07,1.6,1.82,1.99
+championship,2023,championship_2023_45_southampton_qpr,26/08/2023,Southampton,QPR,2,1,1,1,7,11,3,5,4,3,8,14,4,2,0,0,1.36,5.09,8.24,1.63,2.28
+championship,2023,championship_2023_46_west_brom_middlesbrough,26/08/2023,West Brom,Middlesbrough,4,2,2,1,7,15,4,5,4,2,10,9,2,1,0,1,2.24,3.42,3.18,1.93,1.87
+championship,2023,championship_2023_47_watford_blackburn,27/08/2023,Watford,Blackburn,0,1,0,0,24,5,4,3,8,4,8,5,3,2,0,0,2.07,3.51,3.48,1.88,1.92
+championship,2023,championship_2023_48_birmingham_millwall,02/09/2023,Birmingham,Millwall,1,1,0,1,17,9,4,3,1,3,9,18,1,2,0,0,2.39,3.15,3.14,2.4,1.57
+championship,2023,championship_2023_49_sunderland_southampton,02/09/2023,Sunderland,Southampton,5,0,3,0,18,13,10,2,5,8,20,10,2,2,0,0,2.78,3.54,2.43,1.8,2.01
+championship,2023,championship_2023_50_swansea_bristol_city,02/09/2023,Swansea,Bristol City,1,2,1,0,12,16,4,4,4,8,13,17,3,2,0,0,2.11,3.52,3.38,1.94,1.86
+championship,2023,championship_2023_51_coventry_watford,02/09/2023,Coventry,Watford,3,3,1,1,16,14,7,5,9,6,10,16,3,3,0,0,2.14,3.49,3.33,1.92,1.87
+championship,2023,championship_2023_52_ipswich_cardiff,02/09/2023,Ipswich,Cardiff,3,2,0,1,19,13,7,5,6,3,7,14,4,3,0,0,1.64,4.07,5.01,1.75,2.08
+championship,2023,championship_2023_53_leeds_sheffield_weds,02/09/2023,Leeds,Sheffield Weds,0,0,0,0,16,10,4,5,5,3,8,9,1,2,0,0,1.44,4.71,6.84,1.69,2.16
+championship,2023,championship_2023_54_leicester_hull,02/09/2023,Leicester,Hull,0,1,0,1,21,7,1,4,8,3,16,12,3,5,0,0,1.53,4.44,5.7,1.62,2.29
+championship,2023,championship_2023_55_middlesbrough_qpr,02/09/2023,Middlesbrough,QPR,0,2,0,1,16,11,9,3,7,5,9,11,1,2,0,0,1.6,4.2,5.26,1.73,2.11
+championship,2023,championship_2023_56_plymouth_blackburn,02/09/2023,Plymouth,Blackburn,3,0,1,0,23,20,9,4,9,9,5,6,2,1,0,0,2.69,3.67,2.44,1.59,2.35
+championship,2023,championship_2023_57_rotherham_norwich,02/09/2023,Rotherham,Norwich,2,1,2,0,9,17,3,5,2,6,12,10,2,1,0,0,4.5,3.9,1.74,1.76,2.07
+championship,2023,championship_2023_58_stoke_preston,02/09/2023,Stoke,Preston,0,2,0,0,18,7,1,3,9,0,15,17,3,4,0,0,1.93,3.47,4.05,2.11,1.73
+championship,2023,championship_2023_59_west_brom_huddersfield,02/09/2023,West Brom,Huddersfield,1,2,0,1,10,14,5,4,4,9,9,9,1,1,0,0,1.69,3.91,4.83,1.87,1.93
+championship,2023,championship_2023_60_hull_coventry,15/09/2023,Hull,Coventry,1,1,0,1,18,8,4,2,9,3,7,21,2,5,0,0,2.8,3.4,2.49,1.87,1.94
+championship,2023,championship_2023_61_southampton_leicester,15/09/2023,Southampton,Leicester,1,4,1,3,19,15,8,8,9,3,11,12,2,4,1,0,2.47,3.52,2.77,1.73,2.11
+championship,2023,championship_2023_62_blackburn_middlesbrough,16/09/2023,Blackburn,Middlesbrough,2,1,1,0,15,21,8,6,5,9,11,10,1,2,0,0,2.51,3.52,2.69,1.73,2.11
+championship,2023,championship_2023_63_bristol_city_west_brom,16/09/2023,Bristol City,West Brom,0,0,0,0,14,14,3,0,7,7,10,5,2,2,0,0,2.42,3.37,2.9,1.96,1.85
+championship,2023,championship_2023_64_huddersfield_rotherham,16/09/2023,Huddersfield,Rotherham,2,0,1,0,15,7,5,3,2,5,10,17,1,1,0,0,1.88,3.56,4.14,1.97,1.84
+championship,2023,championship_2023_65_norwich_stoke,16/09/2023,Norwich,Stoke,1,0,1,0,13,13,5,2,5,3,7,14,2,2,0,0,1.89,3.7,3.92,1.8,2.01
+championship,2023,championship_2023_66_preston_plymouth,16/09/2023,Preston,Plymouth,2,1,2,0,9,18,5,7,4,14,14,11,3,1,0,0,1.98,3.57,3.69,1.88,1.93
+championship,2023,championship_2023_67_qpr_sunderland,16/09/2023,QPR,Sunderland,1,3,1,1,5,22,3,8,0,8,12,3,2,0,1,0,3.2,3.52,2.19,1.83,1.97
+championship,2023,championship_2023_68_sheffield_weds_ipswich,16/09/2023,Sheffield Weds,Ipswich,0,1,0,1,6,13,0,6,7,1,17,13,3,4,0,0,3.73,3.53,1.99,1.86,1.94
+championship,2023,championship_2023_69_watford_birmingham,16/09/2023,Watford,Birmingham,2,0,0,0,12,8,4,3,8,1,16,17,1,5,0,1,1.99,3.44,3.81,2.04,1.77
+championship,2023,championship_2023_70_cardiff_swansea,16/09/2023,Cardiff,Swansea,2,0,0,0,13,9,7,3,2,2,13,11,1,1,0,0,2.54,3.34,2.76,1.93,1.87
+championship,2023,championship_2023_71_millwall_leeds,17/09/2023,Millwall,Leeds,0,3,0,1,12,14,3,3,8,9,13,9,0,0,0,0,3.01,3.33,2.36,2.04,1.77
+championship,2023,championship_2023_72_bristol_city_plymouth,19/09/2023,Bristol City,Plymouth,4,1,3,1,17,6,6,2,7,1,9,13,3,0,0,0,1.77,3.96,4.25,1.62,2.3
+championship,2023,championship_2023_73_cardiff_coventry,19/09/2023,Cardiff,Coventry,3,2,1,1,8,7,3,3,3,5,7,8,2,3,0,0,2.67,3.31,2.64,2.01,1.81
+championship,2023,championship_2023_74_preston_birmingham,19/09/2023,Preston,Birmingham,2,1,0,0,10,16,3,4,5,2,11,13,2,1,0,0,2.35,3.15,3.25,2.33,1.61
+championship,2023,championship_2023_75_qpr_swansea,19/09/2023,QPR,Swansea,1,1,0,1,11,8,3,3,4,6,12,17,1,1,0,1,2.71,3.35,2.59,2.01,1.8
+championship,2023,championship_2023_76_southampton_ipswich,19/09/2023,Southampton,Ipswich,0,1,0,1,13,11,3,3,9,3,9,13,2,2,0,0,2.28,3.62,2.96,1.64,2.27
+championship,2023,championship_2023_77_sheffield_weds_middlesbrough,19/09/2023,Sheffield Weds,Middlesbrough,1,1,1,0,9,10,2,3,3,4,13,8,2,1,0,0,3.34,3.47,2.15,1.9,1.9
+championship,2023,championship_2023_78_blackburn_sunderland,20/09/2023,Blackburn,Sunderland,1,3,1,2,22,13,6,4,8,4,14,11,5,3,0,0,2.26,3.61,2.97,1.7,2.13
+championship,2023,championship_2023_79_huddersfield_stoke,20/09/2023,Huddersfield,Stoke,2,2,1,1,10,18,6,3,5,8,10,6,2,2,0,0,2.81,3.35,2.5,2.0,1.82
+championship,2023,championship_2023_80_hull_leeds,20/09/2023,Hull,Leeds,0,0,0,0,9,17,0,4,5,6,7,15,3,2,0,1,3.74,3.62,1.96,1.75,2.08
+championship,2023,championship_2023_81_millwall_rotherham,20/09/2023,Millwall,Rotherham,3,0,1,0,20,5,8,1,6,1,12,16,1,1,0,0,1.71,3.71,4.96,2.0,1.81
+championship,2023,championship_2023_82_watford_west_brom,20/09/2023,Watford,West Brom,2,2,2,2,12,7,4,5,3,2,8,9,2,1,0,0,2.17,3.41,3.34,2.0,1.82
+championship,2023,championship_2023_83_norwich_leicester,20/09/2023,Norwich,Leicester,0,2,0,1,15,10,2,3,10,1,14,15,3,4,0,0,2.64,3.57,2.53,1.69,2.17
+championship,2023,championship_2023_84_birmingham_qpr,22/09/2023,Birmingham,QPR,0,0,0,0,12,8,4,4,6,7,13,13,3,2,0,0,1.86,3.51,4.29,2.14,1.71
+championship,2023,championship_2023_85_ipswich_blackburn,23/09/2023,Ipswich,Blackburn,4,3,3,1,29,10,11,5,10,5,10,13,3,4,0,0,1.7,4.07,4.56,1.63,2.28
+championship,2023,championship_2023_86_leeds_watford,23/09/2023,Leeds,Watford,3,0,0,0,17,4,10,1,8,1,13,15,1,3,0,0,1.74,3.9,4.48,1.75,2.07
+championship,2023,championship_2023_87_leicester_bristol_city,23/09/2023,Leicester,Bristol City,1,0,0,0,19,6,7,1,9,0,11,10,1,2,0,0,1.72,3.97,4.53,1.74,2.09
+championship,2023,championship_2023_88_middlesbrough_southampton,23/09/2023,Middlesbrough,Southampton,2,1,1,1,14,15,5,5,5,7,16,7,3,0,0,0,2.46,3.54,2.73,1.7,2.15
+championship,2023,championship_2023_89_plymouth_norwich,23/09/2023,Plymouth,Norwich,6,2,4,0,16,11,10,6,3,6,9,6,1,0,0,0,3.33,3.77,2.05,1.62,2.31
+championship,2023,championship_2023_90_rotherham_preston,23/09/2023,Rotherham,Preston,1,1,1,1,3,14,1,6,2,10,7,6,3,2,0,0,3.26,3.27,2.27,2.23,1.66
+championship,2023,championship_2023_91_swansea_sheffield_weds,23/09/2023,Swansea,Sheffield Weds,3,0,1,0,12,10,4,1,2,5,12,16,2,2,0,0,1.95,3.5,3.9,2.0,1.82
+championship,2023,championship_2023_92_west_brom_millwall,23/09/2023,West Brom,Millwall,0,0,0,0,16,7,3,2,6,8,8,12,0,2,0,0,2.1,3.39,3.52,2.07,1.76
+championship,2023,championship_2023_93_stoke_hull,24/09/2023,Stoke,Hull,1,3,0,2,10,13,6,5,11,6,18,9,2,3,0,0,1.91,3.7,3.82,1.86,1.94
+championship,2023,championship_2023_94_sunderland_cardiff,24/09/2023,Sunderland,Cardiff,0,1,0,0,16,7,6,2,4,4,6,14,2,2,0,0,1.89,3.67,3.93,1.81,1.99
+championship,2023,championship_2023_95_coventry_huddersfield,25/09/2023,Coventry,Huddersfield,1,1,1,0,11,10,3,4,10,4,12,14,2,3,0,0,1.81,3.7,4.26,1.83,1.96
+championship,2023,championship_2023_96_sheffield_weds_sunderland,29/09/2023,Sheffield Weds,Sunderland,0,3,0,3,8,12,2,6,2,5,14,5,2,0,0,0,3.11,3.42,2.28,1.91,1.89
+championship,2023,championship_2023_97_southampton_leeds,30/09/2023,Southampton,Leeds,3,1,3,0,10,15,5,5,5,6,14,13,4,1,0,0,2.88,3.63,2.31,1.61,2.31
+championship,2023,championship_2023_98_bristol_city_stoke,30/09/2023,Bristol City,Stoke,2,3,2,1,13,6,5,4,11,3,9,13,1,1,0,0,2.34,3.33,3.06,2.01,1.8
+championship,2023,championship_2023_99_cardiff_rotherham,30/09/2023,Cardiff,Rotherham,2,0,0,0,12,7,5,0,6,5,4,11,2,0,0,0,1.7,3.83,4.92,1.89,1.91
+championship,2023,championship_2023_100_huddersfield_ipswich,30/09/2023,Huddersfield,Ipswich,1,1,0,0,12,20,6,6,5,6,10,11,3,3,0,0,3.72,3.77,1.92,1.69,2.15
+championship,2023,championship_2023_101_hull_plymouth,30/09/2023,Hull,Plymouth,1,1,1,1,21,11,5,5,12,4,9,10,2,2,0,0,1.9,3.82,3.77,1.62,2.29
+championship,2023,championship_2023_102_millwall_swansea,30/09/2023,Millwall,Swansea,0,3,0,1,22,7,5,5,6,0,18,10,2,2,0,0,2.08,3.36,3.61,2.11,1.72
+championship,2023,championship_2023_103_norwich_birmingham,30/09/2023,Norwich,Birmingham,2,0,0,0,16,12,4,2,4,4,9,10,1,1,0,0,1.9,3.61,4.01,1.9,1.9
+championship,2023,championship_2023_104_preston_west_brom,30/09/2023,Preston,West Brom,0,4,0,2,5,19,1,6,2,6,12,5,3,1,0,0,2.43,3.24,3.0,2.2,1.67
+championship,2023,championship_2023_105_qpr_coventry,30/09/2023,QPR,Coventry,1,3,0,0,12,15,3,6,4,5,11,14,4,2,0,0,3.1,3.34,2.32,1.96,1.84
+championship,2023,championship_2023_106_watford_middlesbrough,30/09/2023,Watford,Middlesbrough,2,3,1,2,17,9,4,3,9,3,10,15,2,0,0,0,2.4,3.42,2.91,1.91,1.89
+championship,2023,championship_2023_107_blackburn_leicester,01/10/2023,Blackburn,Leicester,1,4,1,2,15,11,4,4,5,6,8,14,2,3,0,0,3.33,3.77,2.05,1.56,2.42
+championship,2023,championship_2023_108_birmingham_huddersfield,03/10/2023,Birmingham,Huddersfield,4,1,2,0,12,17,6,6,3,5,14,13,3,1,0,0,2.25,3.31,3.27,2.07,1.75
+championship,2023,championship_2023_109_ipswich_hull,03/10/2023,Ipswich,Hull,3,0,2,0,14,13,6,6,6,5,16,11,0,0,0,0,1.72,4.0,4.53,1.64,2.25
+championship,2023,championship_2023_110_middlesbrough_cardiff,03/10/2023,Middlesbrough,Cardiff,2,0,0,0,11,6,6,3,8,2,10,10,1,3,0,0,1.87,3.74,3.97,1.81,2.0
+championship,2023,championship_2023_111_plymouth_millwall,03/10/2023,Plymouth,Millwall,0,2,0,0,22,9,6,3,8,1,5,14,2,6,0,0,2.45,3.53,2.78,1.75,2.07
+championship,2023,championship_2023_112_stoke_southampton,03/10/2023,Stoke,Southampton,0,1,0,1,15,9,2,4,8,6,17,2,4,1,0,0,2.68,3.43,2.58,1.8,2.01
+championship,2023,championship_2023_113_west_brom_sheffield_weds,03/10/2023,West Brom,Sheffield Weds,1,0,1,0,17,4,3,2,10,4,2,12,0,1,0,0,1.61,3.82,5.96,2.11,1.72
+championship,2023,championship_2023_114_coventry_blackburn,04/10/2023,Coventry,Blackburn,1,0,0,0,14,14,3,4,7,8,18,13,2,1,0,0,2.07,3.68,3.35,1.63,2.27
+championship,2023,championship_2023_115_leeds_qpr,04/10/2023,Leeds,QPR,1,0,1,0,16,5,3,2,8,0,9,12,0,2,0,1,1.34,5.17,8.65,1.6,2.34
+championship,2023,championship_2023_116_leicester_preston,04/10/2023,Leicester,Preston,3,0,0,0,9,6,4,1,4,4,3,8,0,2,0,0,1.48,4.34,6.91,1.83,1.97
+championship,2023,championship_2023_117_sunderland_watford,04/10/2023,Sunderland,Watford,2,0,1,0,9,11,4,4,5,2,9,19,1,5,0,1,1.94,3.62,3.84,1.79,2.0
+championship,2023,championship_2023_118_swansea_norwich,04/10/2023,Swansea,Norwich,2,1,1,1,23,14,7,5,8,7,12,12,4,2,0,0,2.83,3.43,2.44,1.81,2.0
+championship,2023,championship_2023_119_rotherham_bristol_city,04/10/2023,Rotherham,Bristol City,1,2,0,0,8,9,1,5,4,4,3,7,1,1,0,0,3.71,3.4,2.05,2.01,1.78
+championship,2023,championship_2023_120_birmingham_west_brom,06/10/2023,Birmingham,West Brom,3,1,2,1,11,10,3,3,6,8,16,6,2,1,0,0,2.81,3.15,2.64,2.29,1.62
+championship,2023,championship_2023_121_sunderland_middlesbrough,07/10/2023,Sunderland,Middlesbrough,0,4,0,0,9,19,3,7,4,8,14,13,3,2,1,0,2.36,3.49,2.9,1.76,2.06
+championship,2023,championship_2023_122_cardiff_watford,07/10/2023,Cardiff,Watford,1,1,1,0,8,8,2,1,2,1,9,10,0,2,0,0,2.47,3.25,2.92,2.05,1.76
+championship,2023,championship_2023_123_coventry_norwich,07/10/2023,Coventry,Norwich,1,1,0,1,21,6,3,2,8,0,11,13,1,1,0,0,2.51,3.34,2.79,1.87,1.92
+championship,2023,championship_2023_124_ipswich_preston,07/10/2023,Ipswich,Preston,4,2,3,1,16,8,10,2,7,0,10,11,0,3,0,0,1.62,3.96,5.42,1.82,1.97
+championship,2023,championship_2023_125_leeds_bristol_city,07/10/2023,Leeds,Bristol City,2,1,1,1,21,9,8,2,8,6,10,8,1,2,0,0,1.55,4.28,5.68,1.72,2.11
+championship,2023,championship_2023_126_leicester_stoke,07/10/2023,Leicester,Stoke,2,0,1,0,14,3,7,1,4,4,6,5,1,1,0,0,1.54,4.27,5.85,1.72,2.11
+championship,2023,championship_2023_127_millwall_hull,07/10/2023,Millwall,Hull,2,2,1,2,13,8,4,3,5,1,18,7,4,2,0,0,2.29,3.36,3.12,2.03,1.78
+championship,2023,championship_2023_128_plymouth_swansea,07/10/2023,Plymouth,Swansea,1,3,1,0,16,14,7,6,12,7,11,5,2,0,0,0,2.42,3.51,2.81,1.69,2.16
+championship,2023,championship_2023_129_qpr_blackburn,07/10/2023,QPR,Blackburn,0,4,0,2,21,17,6,7,10,7,13,10,2,2,0,0,2.89,3.51,2.36,1.76,2.06
+championship,2023,championship_2023_130_sheffield_weds_huddersfield,07/10/2023,Sheffield Weds,Huddersfield,0,0,0,0,6,7,1,0,5,4,16,13,1,1,0,0,2.59,3.3,2.73,2.02,1.79
+championship,2023,championship_2023_131_southampton_rotherham,07/10/2023,Southampton,Rotherham,1,1,1,0,22,4,10,2,12,4,8,13,2,6,0,0,1.34,5.25,8.66,1.59,2.35
+championship,2023,championship_2023_132_preston_millwall,21/10/2023,Preston,Millwall,1,1,1,1,7,7,2,4,5,2,13,15,4,1,0,0,2.41,3.14,3.12,2.34,1.6
+championship,2023,championship_2023_133_blackburn_cardiff,21/10/2023,Blackburn,Cardiff,1,0,0,0,9,11,1,2,4,6,8,8,2,1,0,0,2.04,3.66,3.43,1.69,2.16
+championship,2023,championship_2023_134_bristol_city_coventry,21/10/2023,Bristol City,Coventry,1,0,1,0,6,12,3,1,2,15,15,11,2,3,0,0,2.4,3.39,2.9,1.94,1.85
+championship,2023,championship_2023_135_huddersfield_qpr,21/10/2023,Huddersfield,QPR,2,1,2,1,6,14,4,2,2,9,9,12,2,2,0,0,1.95,3.53,3.88,1.96,1.84
+championship,2023,championship_2023_136_hull_southampton,21/10/2023,Hull,Southampton,1,2,1,1,13,18,3,5,7,9,13,14,4,3,0,0,2.88,3.51,2.37,1.73,2.09
+championship,2023,championship_2023_137_middlesbrough_birmingham,21/10/2023,Middlesbrough,Birmingham,1,0,0,0,17,5,10,3,12,0,9,17,3,3,0,0,1.79,3.74,4.43,1.88,1.92
+championship,2023,championship_2023_138_norwich_leeds,21/10/2023,Norwich,Leeds,2,3,2,0,14,19,4,8,7,7,11,13,2,3,0,0,3.03,3.57,2.26,1.72,2.12
+championship,2023,championship_2023_139_stoke_sunderland,21/10/2023,Stoke,Sunderland,2,1,1,1,11,18,4,7,6,2,17,9,5,4,0,0,2.44,3.47,2.78,1.78,2.03
+championship,2023,championship_2023_140_swansea_leicester,21/10/2023,Swansea,Leicester,1,3,1,1,11,18,4,7,3,3,10,5,2,3,0,0,4.33,3.89,1.77,1.74,2.08
+championship,2023,championship_2023_141_watford_sheffield_weds,21/10/2023,Watford,Sheffield Weds,1,0,0,0,12,10,3,2,4,5,15,6,2,1,0,0,1.69,3.69,5.11,2.06,1.75
+championship,2023,championship_2023_142_west_brom_plymouth,21/10/2023,West Brom,Plymouth,0,0,0,0,14,5,2,2,10,5,4,14,2,7,0,0,1.7,3.93,4.64,1.66,2.2
+championship,2023,championship_2023_143_huddersfield_cardiff,24/10/2023,Huddersfield,Cardiff,0,4,0,3,19,15,6,7,9,6,7,19,1,3,0,0,2.37,3.28,3.07,2.12,1.72
+championship,2023,championship_2023_144_millwall_blackburn,24/10/2023,Millwall,Blackburn,1,2,1,1,16,9,3,6,11,3,6,6,0,1,0,0,2.46,3.46,2.81,1.86,1.94
+championship,2023,championship_2023_145_norwich_middlesbrough,24/10/2023,Norwich,Middlesbrough,1,2,0,0,13,19,2,8,4,7,13,10,2,2,0,0,2.79,3.59,2.41,1.68,2.18
+championship,2023,championship_2023_146_swansea_watford,24/10/2023,Swansea,Watford,0,1,0,0,9,12,3,5,6,4,7,14,0,3,0,0,2.35,3.32,3.08,2.03,1.79
+championship,2023,championship_2023_147_leicester_sunderland,24/10/2023,Leicester,Sunderland,1,0,1,0,8,13,5,3,5,5,13,10,4,3,0,0,1.51,4.46,5.99,1.63,2.28
+championship,2023,championship_2023_148_west_brom_qpr,24/10/2023,West Brom,QPR,2,0,0,0,16,1,4,0,6,2,8,12,1,3,0,1,1.62,3.95,5.44,1.91,1.88
+championship,2023,championship_2023_149_birmingham_hull,25/10/2023,Birmingham,Hull,0,2,0,1,14,17,4,8,6,5,18,8,2,1,0,0,2.31,3.33,3.14,2.04,1.77
+championship,2023,championship_2023_150_bristol_city_ipswich,25/10/2023,Bristol City,Ipswich,0,1,0,1,11,19,4,6,5,2,11,15,0,4,0,0,3.44,3.61,2.06,1.73,2.11
+championship,2023,championship_2023_151_plymouth_sheffield_weds,25/10/2023,Plymouth,Sheffield Weds,3,0,2,0,13,13,6,2,1,7,10,8,2,1,0,0,2.04,3.54,3.57,1.81,2.0
+championship,2023,championship_2023_152_preston_southampton,25/10/2023,Preston,Southampton,2,2,0,1,12,13,5,5,7,2,16,13,3,2,0,0,3.41,3.5,2.11,1.81,2.0
+championship,2023,championship_2023_153_rotherham_coventry,25/10/2023,Rotherham,Coventry,2,0,0,0,20,23,7,7,6,16,4,6,2,1,0,0,3.98,3.54,1.92,1.94,1.86
+championship,2023,championship_2023_154_stoke_leeds,25/10/2023,Stoke,Leeds,1,0,0,0,12,16,4,3,5,3,16,11,1,3,0,0,3.7,3.65,1.97,1.78,2.04
+championship,2023,championship_2023_155_leeds_huddersfield,28/10/2023,Leeds,Huddersfield,4,1,4,0,20,5,5,2,4,2,7,11,0,4,0,0,1.35,5.12,8.46,1.61,2.32
+championship,2023,championship_2023_156_southampton_birmingham,28/10/2023,Southampton,Birmingham,3,1,2,0,11,10,5,2,4,4,8,12,0,4,0,0,1.6,4.11,5.44,1.78,2.03
+championship,2023,championship_2023_157_blackburn_swansea,28/10/2023,Blackburn,Swansea,0,1,0,1,20,16,6,4,6,5,15,7,5,3,0,0,2.0,3.78,3.47,1.61,2.31
+championship,2023,championship_2023_158_cardiff_bristol_city,28/10/2023,Cardiff,Bristol City,2,0,1,0,9,8,7,1,4,3,9,9,1,2,0,0,2.23,3.32,3.31,2.14,1.71
+championship,2023,championship_2023_159_hull_preston,28/10/2023,Hull,Preston,1,0,0,0,19,11,6,4,7,2,13,13,3,3,0,0,2.04,3.4,3.71,2.07,1.75
+championship,2023,championship_2023_160_ipswich_plymouth,28/10/2023,Ipswich,Plymouth,3,2,1,1,15,10,4,6,11,3,11,7,4,2,0,0,1.38,5.24,7.23,1.43,2.79
+championship,2023,championship_2023_161_middlesbrough_stoke,28/10/2023,Middlesbrough,Stoke,0,2,0,2,9,13,3,6,8,4,12,16,2,2,0,0,1.77,3.81,4.42,1.78,2.03
+championship,2023,championship_2023_162_qpr_leicester,28/10/2023,QPR,Leicester,1,2,1,1,9,16,3,5,1,8,13,7,1,2,1,0,8.01,4.99,1.37,1.64,2.24
+championship,2023,championship_2023_163_sunderland_norwich,28/10/2023,Sunderland,Norwich,3,1,2,1,17,9,8,2,7,1,12,17,4,4,0,0,2.07,3.65,3.37,1.7,2.15
+championship,2023,championship_2023_164_watford_millwall,28/10/2023,Watford,Millwall,2,2,1,1,19,11,6,4,7,2,13,13,3,3,0,0,2.07,3.3,3.74,2.21,1.67
+championship,2023,championship_2023_165_sheffield_weds_rotherham,29/10/2023,Sheffield Weds,Rotherham,2,0,2,0,14,6,5,0,4,3,9,16,2,3,0,0,1.89,3.39,4.32,2.32,1.61
+championship,2023,championship_2023_166_coventry_west_brom,30/10/2023,Coventry,West Brom,0,2,0,1,15,7,3,3,5,5,9,7,2,6,0,0,2.31,3.31,3.12,2.04,1.77
+championship,2023,championship_2023_167_leicester_leeds,03/11/2023,Leicester,Leeds,0,1,0,0,10,11,1,6,7,6,6,8,1,2,0,0,2.14,3.63,3.23,1.69,2.17
+championship,2023,championship_2023_168_birmingham_ipswich,04/11/2023,Birmingham,Ipswich,2,2,1,0,13,17,3,7,7,8,9,11,3,1,0,0,3.82,3.72,1.92,1.78,2.02
+championship,2023,championship_2023_169_bristol_city_sheffield_weds,04/11/2023,Bristol City,Sheffield Weds,1,0,0,0,17,6,7,2,8,7,10,14,3,1,0,1,2.11,3.32,3.6,2.16,1.69
+championship,2023,championship_2023_170_huddersfield_watford,04/11/2023,Huddersfield,Watford,0,0,0,0,5,9,2,3,1,3,6,20,0,2,0,0,3.11,3.34,2.31,2.07,1.75
+championship,2023,championship_2023_171_millwall_southampton,04/11/2023,Millwall,Southampton,0,1,0,0,7,16,1,8,5,12,10,10,2,2,0,0,3.43,3.56,2.08,1.86,1.94
+championship,2023,championship_2023_172_plymouth_middlesbrough,04/11/2023,Plymouth,Middlesbrough,3,3,2,1,10,20,5,11,8,6,15,15,2,3,0,0,3.7,3.87,1.91,1.57,2.39
+championship,2023,championship_2023_173_preston_coventry,04/11/2023,Preston,Coventry,3,2,2,1,16,18,7,8,6,8,14,15,2,2,0,0,2.79,3.22,2.62,2.18,1.68
+championship,2023,championship_2023_174_rotherham_qpr,04/11/2023,Rotherham,QPR,1,1,0,0,8,11,3,4,6,6,10,14,2,1,0,0,2.67,3.25,2.71,2.13,1.71
+championship,2023,championship_2023_175_stoke_cardiff,04/11/2023,Stoke,Cardiff,0,0,0,0,7,11,1,3,1,7,16,6,1,0,0,0,2.17,3.32,3.43,2.16,1.69
+championship,2023,championship_2023_176_swansea_sunderland,04/11/2023,Swansea,Sunderland,0,0,0,0,3,25,2,3,2,8,13,12,2,3,1,0,2.68,3.44,2.57,1.77,2.04
+championship,2023,championship_2023_177_west_brom_hull,04/11/2023,West Brom,Hull,3,1,1,1,10,9,5,4,1,2,10,12,1,1,0,0,2.09,3.37,3.62,2.1,1.74
+championship,2023,championship_2023_178_norwich_blackburn,05/11/2023,Norwich,Blackburn,1,3,0,2,21,10,8,4,8,2,11,4,3,2,0,1,2.13,3.76,3.14,1.53,2.49
+championship,2023,championship_2023_179_rotherham_ipswich,07/11/2023,Rotherham,Ipswich,2,2,1,1,8,13,3,3,6,8,12,10,1,1,0,0,6.65,4.53,1.46,1.72,2.11
+championship,2023,championship_2023_180_blackburn_preston,10/11/2023,Blackburn,Preston,1,2,0,1,22,9,5,4,7,2,9,13,0,1,0,0,1.96,3.6,3.77,1.81,1.99
+championship,2023,championship_2023_181_sunderland_birmingham,11/11/2023,Sunderland,Birmingham,3,1,1,1,22,16,6,7,10,5,5,13,2,2,0,0,1.74,3.81,4.63,1.82,1.98
+championship,2023,championship_2023_182_cardiff_norwich,11/11/2023,Cardiff,Norwich,2,3,2,1,13,20,6,8,2,9,10,6,2,2,0,0,2.02,3.63,3.54,1.81,1.97
+championship,2023,championship_2023_183_coventry_stoke,11/11/2023,Coventry,Stoke,0,0,0,0,13,6,2,2,4,4,14,16,1,1,0,0,2.31,3.36,3.12,2.01,1.8
+championship,2023,championship_2023_184_hull_huddersfield,11/11/2023,Hull,Huddersfield,1,0,0,0,20,2,5,1,9,1,10,10,2,3,0,0,1.75,3.72,4.75,1.92,1.88
+championship,2023,championship_2023_185_ipswich_swansea,11/11/2023,Ipswich,Swansea,3,2,2,1,22,7,9,4,6,2,15,9,2,1,0,1,1.59,4.28,5.32,1.62,2.31
+championship,2023,championship_2023_186_leeds_plymouth,11/11/2023,Leeds,Plymouth,2,1,2,0,14,9,6,3,7,6,10,10,1,4,0,0,1.26,6.33,10.17,1.37,3.04
+championship,2023,championship_2023_187_middlesbrough_leicester,11/11/2023,Middlesbrough,Leicester,1,0,0,0,9,12,6,4,3,4,18,15,4,3,0,0,2.93,3.56,2.32,1.73,2.1
+championship,2023,championship_2023_188_qpr_bristol_city,11/11/2023,QPR,Bristol City,0,0,0,0,7,7,0,2,5,2,12,16,2,2,0,0,2.75,3.26,2.63,2.09,1.74
+championship,2023,championship_2023_189_sheffield_weds_millwall,11/11/2023,Sheffield Weds,Millwall,0,4,0,2,12,13,2,6,8,4,13,8,2,2,0,0,2.64,3.07,2.87,2.42,1.55
+championship,2023,championship_2023_190_southampton_west_brom,11/11/2023,Southampton,West Brom,2,1,1,0,10,14,3,2,3,10,7,10,3,0,0,0,1.89,3.65,4.02,1.86,1.94
+championship,2023,championship_2023_191_watford_rotherham,11/11/2023,Watford,Rotherham,5,0,2,0,14,9,8,2,7,2,12,11,2,1,0,0,1.47,4.33,7.17,1.94,1.86
+championship,2023,championship_2023_192_rotherham_leeds,24/11/2023,Rotherham,Leeds,1,1,1,1,6,18,3,5,4,3,11,4,0,0,0,0,8.5,5.04,1.36,1.65,2.23
+championship,2023,championship_2023_193_birmingham_sheffield_weds,25/11/2023,Birmingham,Sheffield Weds,2,1,1,1,13,16,4,4,6,6,11,11,1,0,0,0,2.15,3.24,3.61,2.28,1.63
+championship,2023,championship_2023_194_bristol_city_middlesbrough,25/11/2023,Bristol City,Middlesbrough,3,2,2,0,10,12,8,4,3,8,8,12,2,2,0,0,3.5,3.43,2.1,1.99,1.83
+championship,2023,championship_2023_195_huddersfield_southampton,25/11/2023,Huddersfield,Southampton,1,1,0,1,10,16,2,4,2,7,5,11,4,1,0,0,4.66,3.9,1.72,1.8,2.02
+championship,2023,championship_2023_196_leicester_watford,25/11/2023,Leicester,Watford,2,0,0,0,23,9,8,1,6,2,5,14,2,5,0,1,1.57,4.05,5.86,1.87,1.91
+championship,2023,championship_2023_197_millwall_coventry,25/11/2023,Millwall,Coventry,0,3,0,1,20,11,5,9,4,3,12,10,2,1,0,0,2.67,3.21,2.72,2.14,1.71
+championship,2023,championship_2023_198_norwich_qpr,25/11/2023,Norwich,QPR,1,0,1,0,7,9,1,3,4,7,18,12,4,4,0,0,1.76,3.84,4.48,1.79,2.02
+championship,2023,championship_2023_199_plymouth_sunderland,25/11/2023,Plymouth,Sunderland,2,0,2,0,10,24,2,5,4,14,12,5,4,1,0,0,3.29,3.88,2.04,1.5,2.55
+championship,2023,championship_2023_200_preston_cardiff,25/11/2023,Preston,Cardiff,1,2,0,0,4,19,2,8,6,13,9,6,3,1,1,0,2.44,3.16,3.07,2.37,1.58
+championship,2023,championship_2023_201_stoke_blackburn,25/11/2023,Stoke,Blackburn,0,3,0,1,12,7,1,4,7,1,11,9,2,1,0,0,2.2,3.57,3.15,1.76,2.07
+championship,2023,championship_2023_202_swansea_hull,25/11/2023,Swansea,Hull,2,2,2,0,14,18,4,9,2,1,12,11,0,2,0,0,2.56,3.3,2.8,2.01,1.8
+championship,2023,championship_2023_203_west_brom_ipswich,25/11/2023,West Brom,Ipswich,2,0,1,0,10,6,4,0,4,5,5,12,1,2,0,0,2.62,3.48,2.61,1.86,1.95
+championship,2023,championship_2023_204_cardiff_west_brom,28/11/2023,Cardiff,West Brom,0,1,0,0,11,8,1,1,6,3,7,9,1,2,0,0,2.9,3.19,2.56,2.29,1.62
+championship,2023,championship_2023_205_coventry_plymouth,28/11/2023,Coventry,Plymouth,1,0,0,0,13,13,3,3,7,6,10,11,1,3,0,0,1.65,4.22,4.81,1.54,2.45
+championship,2023,championship_2023_206_hull_rotherham,28/11/2023,Hull,Rotherham,4,1,3,0,22,9,12,3,8,4,5,8,1,2,0,0,1.43,4.52,7.55,1.82,1.99
+championship,2023,championship_2023_207_middlesbrough_preston,28/11/2023,Middlesbrough,Preston,4,0,3,0,13,6,8,1,7,3,15,14,0,2,0,0,1.68,3.84,5.15,1.93,1.87
+championship,2023,championship_2023_208_qpr_stoke,28/11/2023,QPR,Stoke,4,2,1,1,19,12,9,4,13,7,13,11,2,5,0,1,3.17,3.25,2.34,2.21,1.67
+championship,2023,championship_2023_209_watford_norwich,28/11/2023,Watford,Norwich,3,2,2,2,21,12,9,5,7,5,14,12,1,4,0,0,2.14,3.53,3.32,1.83,1.98
+championship,2023,championship_2023_210_blackburn_birmingham,29/11/2023,Blackburn,Birmingham,4,2,0,0,11,26,6,6,8,9,12,6,4,2,0,0,1.81,3.84,4.17,1.63,2.28
+championship,2023,championship_2023_211_leeds_swansea,29/11/2023,Leeds,Swansea,3,1,2,1,18,10,8,2,6,5,12,11,0,1,0,0,1.36,5.2,8.2,1.56,2.41
+championship,2023,championship_2023_212_sheffield_weds_leicester,29/11/2023,Sheffield Weds,Leicester,1,1,0,1,14,12,7,3,5,4,10,7,2,1,0,0,5.45,4.17,1.59,1.78,2.03
+championship,2023,championship_2023_213_southampton_bristol_city,29/11/2023,Southampton,Bristol City,1,0,0,0,14,8,5,1,6,3,11,14,3,1,0,0,1.58,4.26,5.49,1.74,2.09
+championship,2023,championship_2023_214_sunderland_huddersfield,29/11/2023,Sunderland,Huddersfield,1,2,1,1,27,9,9,5,10,4,12,11,2,1,0,0,1.54,4.31,5.83,1.73,2.08
+championship,2023,championship_2023_215_ipswich_millwall,29/11/2023,Ipswich,Millwall,3,1,3,0,19,5,7,3,4,2,9,13,2,3,0,0,1.59,4.18,5.48,1.7,2.14
+championship,2023,championship_2023_216_preston_qpr,01/12/2023,Preston,QPR,0,2,0,0,7,8,1,5,6,4,11,11,1,1,0,0,2.22,3.19,3.47,2.3,1.62
+championship,2023,championship_2023_217_west_brom_leicester,02/12/2023,West Brom,Leicester,1,2,0,0,9,9,3,3,4,6,10,11,2,1,0,0,2.89,3.25,2.51,2.1,1.74
+championship,2023,championship_2023_218_birmingham_rotherham,02/12/2023,Birmingham,Rotherham,0,0,0,0,12,12,4,4,4,6,11,17,1,3,0,0,1.6,4.09,5.48,1.84,1.96
+championship,2023,championship_2023_219_hull_watford,02/12/2023,Hull,Watford,1,2,1,1,23,10,7,4,8,2,7,12,1,2,0,0,2.15,3.42,3.37,2.1,1.73
+championship,2023,championship_2023_220_ipswich_coventry,02/12/2023,Ipswich,Coventry,2,1,2,0,13,15,3,1,1,6,14,11,2,1,0,0,1.79,3.93,4.16,1.63,2.26
+championship,2023,championship_2023_221_leeds_middlesbrough,02/12/2023,Leeds,Middlesbrough,3,2,3,2,20,11,9,5,6,3,12,15,2,5,0,1,1.74,4.0,4.42,1.64,2.25
+championship,2023,championship_2023_222_millwall_sunderland,02/12/2023,Millwall,Sunderland,1,1,1,0,7,10,4,3,4,4,14,12,5,3,0,0,3.0,3.39,2.35,1.94,1.86
+championship,2023,championship_2023_223_plymouth_stoke,02/12/2023,Plymouth,Stoke,2,1,1,1,16,9,8,4,7,8,3,15,1,2,0,0,2.65,3.52,2.56,1.72,2.12
+championship,2023,championship_2023_224_sheffield_weds_blackburn,02/12/2023,Sheffield Weds,Blackburn,3,1,1,0,13,18,8,5,3,7,12,6,2,1,0,0,2.9,3.52,2.36,1.76,2.06
+championship,2023,championship_2023_225_southampton_cardiff,02/12/2023,Southampton,Cardiff,2,0,2,0,18,10,6,3,7,3,6,9,1,1,0,0,1.64,4.02,5.09,1.79,2.01
+championship,2023,championship_2023_226_swansea_huddersfield,02/12/2023,Swansea,Huddersfield,1,1,0,1,22,5,5,3,19,1,11,9,1,2,0,0,1.93,3.58,3.91,1.85,1.95
+championship,2023,championship_2023_227_bristol_city_norwich,03/12/2023,Bristol City,Norwich,1,2,1,0,15,12,6,3,6,6,5,7,1,1,0,0,2.29,3.42,3.05,1.8,2.01
+championship,2023,championship_2023_228_coventry_birmingham,08/12/2023,Coventry,Birmingham,2,0,1,0,16,13,8,6,6,7,11,19,0,5,0,0,1.72,3.83,4.67,1.77,2.04
+championship,2023,championship_2023_229_blackburn_leeds,09/12/2023,Blackburn,Leeds,0,2,0,1,12,8,2,4,13,3,11,7,3,2,0,0,4.13,4.12,1.76,1.48,2.6
+championship,2023,championship_2023_230_sunderland_west_brom,09/12/2023,Sunderland,West Brom,2,1,0,0,14,11,5,1,4,7,5,13,1,6,0,0,2.27,3.35,3.15,1.97,1.82
+championship,2023,championship_2023_231_cardiff_millwall,09/12/2023,Cardiff,Millwall,1,0,0,0,7,10,3,3,4,2,11,14,1,2,0,0,2.09,3.26,3.68,2.25,1.64
+championship,2023,championship_2023_232_huddersfield_bristol_city,09/12/2023,Huddersfield,Bristol City,1,1,1,0,6,15,2,4,2,9,8,10,1,1,0,0,3.08,3.13,2.43,2.34,1.6
+championship,2023,championship_2023_233_leicester_plymouth,09/12/2023,Leicester,Plymouth,4,0,1,0,13,15,7,5,5,8,6,10,0,3,0,0,1.27,5.99,9.7,1.41,2.83
+championship,2023,championship_2023_234_middlesbrough_ipswich,09/12/2023,Middlesbrough,Ipswich,0,2,0,1,7,9,1,3,5,3,15,14,1,3,0,0,2.33,3.64,2.86,1.66,2.22
+championship,2023,championship_2023_235_norwich_preston,09/12/2023,Norwich,Preston,0,0,0,0,18,6,4,1,10,1,8,10,0,2,0,0,1.91,3.61,3.96,1.88,1.92
+championship,2023,championship_2023_236_qpr_hull,09/12/2023,QPR,Hull,2,0,1,0,13,15,4,6,4,4,10,7,1,3,0,0,3.12,3.29,2.32,2.09,1.73
+championship,2023,championship_2023_237_rotherham_swansea,09/12/2023,Rotherham,Swansea,1,2,0,1,7,19,3,9,6,11,9,9,2,3,1,0,3.35,3.47,2.13,1.94,1.86
+championship,2023,championship_2023_238_stoke_sheffield_weds,09/12/2023,Stoke,Sheffield Weds,0,1,0,0,13,6,4,2,4,5,7,11,3,4,0,0,2.03,3.31,3.85,2.21,1.66
+championship,2023,championship_2023_239_watford_southampton,09/12/2023,Watford,Southampton,1,1,0,0,11,6,4,3,7,3,10,16,3,4,0,0,3.14,3.39,2.26,1.92,1.88
+championship,2023,championship_2023_240_blackburn_bristol_city,12/12/2023,Blackburn,Bristol City,2,1,1,0,13,11,3,5,3,4,6,7,4,1,0,0,1.96,3.7,3.7,1.75,2.08
+championship,2023,championship_2023_241_huddersfield_preston,12/12/2023,Huddersfield,Preston,1,3,0,2,7,11,3,3,2,6,12,10,0,2,0,0,2.67,3.06,2.86,2.48,1.53
+championship,2023,championship_2023_242_rotherham_west_brom,12/12/2023,Rotherham,West Brom,0,2,0,0,4,6,2,2,1,2,11,10,0,1,0,0,5.28,3.71,1.69,2.12,1.72
+championship,2023,championship_2023_243_stoke_swansea,12/12/2023,Stoke,Swansea,1,1,0,0,16,8,4,2,6,3,11,14,3,2,0,0,2.09,3.51,3.46,1.89,1.91
+championship,2023,championship_2023_244_watford_ipswich,12/12/2023,Watford,Ipswich,1,2,1,1,12,10,3,6,6,4,12,16,2,4,0,0,2.92,3.41,2.41,1.94,1.85
+championship,2023,championship_2023_245_sunderland_leeds,12/12/2023,Sunderland,Leeds,1,0,0,0,11,12,3,4,6,3,12,8,1,3,0,0,2.83,3.62,2.37,1.69,2.18
+championship,2023,championship_2023_246_cardiff_birmingham,13/12/2023,Cardiff,Birmingham,0,1,0,1,11,11,4,5,4,3,11,18,1,2,0,0,1.87,3.54,4.27,2.1,1.73
+championship,2023,championship_2023_247_coventry_southampton,13/12/2023,Coventry,Southampton,1,1,0,0,11,12,4,3,3,9,9,12,0,3,0,0,2.72,3.48,2.53,1.81,1.99
+championship,2023,championship_2023_248_leicester_millwall,13/12/2023,Leicester,Millwall,3,2,0,1,15,11,6,6,9,3,5,16,2,4,0,0,1.34,5.05,9.21,1.75,2.07
+championship,2023,championship_2023_249_norwich_sheffield_weds,13/12/2023,Norwich,Sheffield Weds,3,1,1,1,12,21,5,4,3,7,6,10,1,1,0,0,1.95,3.58,3.86,1.93,1.87
+championship,2023,championship_2023_250_qpr_plymouth,13/12/2023,QPR,Plymouth,0,0,0,0,29,12,10,2,6,1,14,8,2,3,0,1,2.01,3.66,3.57,1.77,2.05
+championship,2023,championship_2023_251_middlesbrough_hull,13/12/2023,Middlesbrough,Hull,1,2,1,0,16,8,8,4,6,4,9,5,0,1,0,0,1.86,3.77,4.01,1.81,1.99
+championship,2023,championship_2023_252_ipswich_norwich,16/12/2023,Ipswich,Norwich,2,2,1,1,18,11,5,3,6,3,11,8,2,0,0,0,1.58,4.29,5.44,1.53,2.48
+championship,2023,championship_2023_253_bristol_city_sunderland,16/12/2023,Bristol City,Sunderland,1,0,1,0,6,18,3,9,5,11,12,8,3,3,0,0,3.08,3.42,2.3,1.98,1.83
+championship,2023,championship_2023_254_hull_cardiff,16/12/2023,Hull,Cardiff,3,0,1,0,15,8,7,1,9,2,14,12,1,3,0,0,1.89,3.49,4.27,2.09,1.74
+championship,2023,championship_2023_255_leeds_coventry,16/12/2023,Leeds,Coventry,1,1,0,0,20,7,6,3,7,0,8,15,3,5,0,0,1.53,4.38,5.96,1.65,2.24
+championship,2023,championship_2023_256_millwall_huddersfield,16/12/2023,Millwall,Huddersfield,1,1,0,0,12,10,7,2,0,6,16,8,0,2,0,0,1.89,3.45,4.32,2.22,1.66
+championship,2023,championship_2023_257_plymouth_rotherham,16/12/2023,Plymouth,Rotherham,3,2,1,1,25,9,9,4,11,5,7,16,0,5,0,1,1.65,4.08,4.99,1.7,2.15
+championship,2023,championship_2023_258_preston_watford,16/12/2023,Preston,Watford,1,5,1,1,20,15,10,7,10,5,14,9,3,1,0,0,2.84,3.22,2.58,2.25,1.64
+championship,2023,championship_2023_259_sheffield_weds_qpr,16/12/2023,Sheffield Weds,QPR,2,1,0,1,8,5,3,2,8,3,12,13,5,4,0,0,2.34,3.2,3.22,2.32,1.6
+championship,2023,championship_2023_260_southampton_blackburn,16/12/2023,Southampton,Blackburn,4,0,1,0,22,4,11,4,15,1,9,11,3,2,0,1,1.68,4.1,4.73,1.53,2.46
+championship,2023,championship_2023_261_swansea_middlesbrough,16/12/2023,Swansea,Middlesbrough,1,2,0,1,10,9,3,4,4,4,14,14,2,3,0,0,3.16,3.64,2.17,1.71,2.13
+championship,2023,championship_2023_262_west_brom_stoke,17/12/2023,West Brom,Stoke,1,1,1,1,16,9,7,1,11,11,9,14,3,1,0,0,1.79,3.59,4.65,2.15,1.7
+championship,2023,championship_2023_263_birmingham_leicester,18/12/2023,Birmingham,Leicester,2,3,1,2,8,14,5,5,3,2,12,17,0,1,0,0,5.6,4.1,1.58,1.77,2.04
+championship,2023,championship_2023_264_bristol_city_hull,22/12/2023,Bristol City,Hull,3,2,1,2,21,16,5,4,7,6,9,11,2,3,0,0,2.73,3.23,2.65,2.15,1.7
+championship,2023,championship_2023_265_swansea_preston,22/12/2023,Swansea,Preston,2,1,0,0,10,9,4,4,4,3,10,8,4,2,0,0,2.1,3.41,3.53,2.06,1.76
+championship,2023,championship_2023_266_leeds_ipswich,23/12/2023,Leeds,Ipswich,4,0,3,0,9,2,4,0,5,0,10,15,1,4,0,0,1.81,4.01,3.97,1.6,2.32
+championship,2023,championship_2023_267_blackburn_watford,23/12/2023,Blackburn,Watford,1,2,1,0,11,18,5,6,7,5,12,8,2,3,0,0,2.28,3.56,2.99,1.71,2.14
+championship,2023,championship_2023_268_leicester_rotherham,23/12/2023,Leicester,Rotherham,3,0,0,0,24,2,11,0,10,0,5,4,1,1,0,0,1.15,8.02,18.17,1.47,2.65
+championship,2023,championship_2023_269_middlesbrough_west_brom,23/12/2023,Middlesbrough,West Brom,1,0,1,0,13,9,4,2,2,10,13,11,1,2,0,0,2.25,3.36,3.23,2.01,1.8
+championship,2023,championship_2023_270_norwich_huddersfield,23/12/2023,Norwich,Huddersfield,2,0,0,0,21,5,8,1,12,2,9,10,1,1,0,0,1.6,4.11,5.42,1.75,2.06
+championship,2023,championship_2023_271_plymouth_birmingham,23/12/2023,Plymouth,Birmingham,3,3,1,2,15,13,8,7,7,3,7,15,2,5,0,1,2.2,3.62,3.12,1.67,2.19
+championship,2023,championship_2023_272_qpr_southampton,23/12/2023,QPR,Southampton,0,1,0,1,12,13,2,4,7,5,8,12,1,3,0,1,4.67,3.76,1.75,1.86,1.94
+championship,2023,championship_2023_273_sheffield_weds_cardiff,23/12/2023,Sheffield Weds,Cardiff,1,2,1,0,18,7,5,3,10,3,10,12,3,2,0,0,2.14,3.28,3.55,2.29,1.62
+championship,2023,championship_2023_274_stoke_millwall,23/12/2023,Stoke,Millwall,0,0,0,0,19,2,3,1,7,1,11,16,1,3,0,0,2.11,3.4,3.51,2.13,1.72
+championship,2023,championship_2023_275_sunderland_coventry,23/12/2023,Sunderland,Coventry,0,3,0,1,21,10,6,5,7,7,11,11,3,2,0,0,2.06,3.57,3.49,1.83,1.97
+championship,2023,championship_2023_276_preston_leeds,26/12/2023,Preston,Leeds,2,1,0,0,13,11,4,2,5,6,22,12,5,1,0,1,5.59,4.15,1.58,1.79,2.03
+championship,2023,championship_2023_277_millwall_qpr,26/12/2023,Millwall,QPR,2,0,1,0,13,10,3,1,4,6,12,12,3,3,0,0,2.13,3.25,3.63,2.33,1.61
+championship,2023,championship_2023_278_cardiff_plymouth,26/12/2023,Cardiff,Plymouth,2,2,1,1,17,13,4,6,7,3,5,9,0,1,0,0,2.0,3.62,3.61,1.79,2.02
+championship,2023,championship_2023_279_coventry_sheffield_weds,26/12/2023,Coventry,Sheffield Weds,2,0,1,0,9,11,2,2,5,9,7,12,1,1,1,1,1.74,3.73,4.75,1.98,1.83
+championship,2023,championship_2023_280_huddersfield_blackburn,26/12/2023,Huddersfield,Blackburn,3,0,1,0,12,10,6,1,6,4,10,8,1,4,0,0,3.19,3.67,2.14,1.69,2.16
+championship,2023,championship_2023_281_hull_sunderland,26/12/2023,Hull,Sunderland,0,1,0,0,10,17,6,3,3,7,6,8,1,1,0,0,2.48,3.39,2.81,1.88,1.89
+championship,2023,championship_2023_282_rotherham_middlesbrough,26/12/2023,Rotherham,Middlesbrough,1,0,0,0,3,19,1,5,0,11,12,8,0,0,0,0,5.51,4.13,1.59,1.76,2.07
+championship,2023,championship_2023_283_southampton_swansea,26/12/2023,Southampton,Swansea,5,0,1,0,11,4,9,1,3,1,15,13,2,4,0,0,1.45,4.72,6.51,1.59,2.35
+championship,2023,championship_2023_284_watford_bristol_city,26/12/2023,Watford,Bristol City,1,4,0,2,13,15,5,5,6,6,10,4,1,0,0,0,1.96,3.42,4.01,2.11,1.73
+championship,2023,championship_2023_285_west_brom_norwich,26/12/2023,West Brom,Norwich,1,0,0,0,21,7,3,3,12,4,5,8,0,0,0,1,1.84,3.72,4.12,1.8,2.02
+championship,2023,championship_2023_286_birmingham_stoke,26/12/2023,Birmingham,Stoke,1,3,0,2,14,11,5,5,5,3,10,12,2,3,0,0,2.61,3.31,2.72,2.05,1.77
+championship,2023,championship_2023_287_ipswich_leicester,26/12/2023,Ipswich,Leicester,1,1,0,1,19,5,2,2,11,2,9,9,1,2,0,0,3.1,3.59,2.21,1.73,2.11
+championship,2023,championship_2023_288_southampton_plymouth,29/12/2023,Southampton,Plymouth,2,1,0,0,26,8,7,1,9,3,8,8,3,2,0,0,1.32,5.69,8.33,1.4,2.93
+championship,2023,championship_2023_289_birmingham_bristol_city,29/12/2023,Birmingham,Bristol City,0,0,0,0,5,8,1,0,1,6,11,6,0,0,0,0,2.78,3.29,2.59,2.03,1.79
+championship,2023,championship_2023_290_cardiff_leicester,29/12/2023,Cardiff,Leicester,0,2,0,1,10,9,2,4,5,2,11,7,1,0,0,0,5.65,3.95,1.61,1.94,1.86
+championship,2023,championship_2023_291_coventry_swansea,29/12/2023,Coventry,Swansea,2,2,1,1,21,12,5,4,12,4,14,11,1,4,0,0,1.78,3.87,4.34,1.76,2.07
+championship,2023,championship_2023_292_huddersfield_middlesbrough,29/12/2023,Huddersfield,Middlesbrough,1,2,0,0,16,9,5,5,7,2,11,11,0,2,0,0,4.4,3.75,1.79,1.92,1.88
+championship,2023,championship_2023_293_hull_blackburn,29/12/2023,Hull,Blackburn,3,2,2,2,21,10,9,4,4,4,15,12,3,3,0,1,1.86,3.92,3.87,1.62,2.3
+championship,2023,championship_2023_294_ipswich_qpr,29/12/2023,Ipswich,QPR,0,0,0,0,7,10,5,2,5,9,13,5,3,2,0,0,1.46,4.56,6.72,1.76,2.07
+championship,2023,championship_2023_295_millwall_norwich,29/12/2023,Millwall,Norwich,1,0,1,0,11,11,5,3,5,3,11,12,4,5,1,0,2.5,3.33,2.85,2.03,1.79
+championship,2023,championship_2023_296_preston_sheffield_weds,29/12/2023,Preston,Sheffield Weds,0,1,0,1,9,6,2,3,3,0,10,11,4,2,0,1,2.35,3.07,3.35,2.49,1.53
+championship,2023,championship_2023_297_rotherham_sunderland,29/12/2023,Rotherham,Sunderland,1,1,0,0,13,10,4,3,4,8,10,9,2,1,0,0,6.13,4.18,1.54,1.88,1.93
+championship,2023,championship_2023_298_watford_stoke,29/12/2023,Watford,Stoke,1,1,1,1,13,14,6,4,5,4,7,10,4,1,1,0,2.14,3.39,3.44,2.05,1.77
+championship,2023,championship_2023_299_west_brom_leeds,29/12/2023,West Brom,Leeds,1,0,1,0,13,15,3,1,11,8,8,10,1,1,0,0,3.25,3.32,2.26,2.1,1.74
+championship,2023,championship_2023_300_sunderland_preston,01/01/2024,Sunderland,Preston,2,0,2,0,7,12,4,3,2,3,6,12,0,1,0,0,1.59,4.06,5.56,1.86,1.93
+championship,2023,championship_2023_301_blackburn_rotherham,01/01/2024,Blackburn,Rotherham,2,2,1,1,18,13,9,4,5,5,5,11,0,1,0,0,1.49,4.61,6.02,1.58,2.38
+championship,2023,championship_2023_302_bristol_city_millwall,01/01/2024,Bristol City,Millwall,0,1,0,0,5,11,1,2,6,5,5,10,1,2,0,0,2.12,3.29,3.57,2.23,1.65
+championship,2023,championship_2023_303_leeds_birmingham,01/01/2024,Leeds,Birmingham,3,0,2,0,21,8,11,1,6,3,10,14,0,2,0,0,1.23,6.28,11.95,1.51,2.54
+championship,2023,championship_2023_304_leicester_huddersfield,01/01/2024,Leicester,Huddersfield,4,1,1,0,19,12,6,4,3,4,5,9,0,1,0,0,1.19,6.83,14.55,1.54,2.45
+championship,2023,championship_2023_305_middlesbrough_coventry,01/01/2024,Middlesbrough,Coventry,1,3,1,1,19,17,7,8,12,9,10,11,2,2,0,0,1.99,3.7,3.55,1.76,2.06
+championship,2023,championship_2023_306_norwich_southampton,01/01/2024,Norwich,Southampton,1,1,0,0,7,21,2,4,1,12,8,8,5,0,0,0,3.24,3.6,2.13,1.71,2.13
+championship,2023,championship_2023_307_plymouth_watford,01/01/2024,Plymouth,Watford,3,3,3,2,31,18,11,5,9,5,11,12,2,3,0,0,3.0,3.62,2.25,1.64,2.2
+championship,2023,championship_2023_308_qpr_cardiff,01/01/2024,QPR,Cardiff,1,2,0,1,8,10,3,5,1,6,12,20,2,5,0,0,2.32,3.16,3.28,2.38,1.58
+championship,2023,championship_2023_309_stoke_ipswich,01/01/2024,Stoke,Ipswich,0,0,0,0,8,13,4,2,8,5,7,15,1,2,1,0,2.87,3.44,2.4,1.87,1.93
+championship,2023,championship_2023_310_swansea_west_brom,01/01/2024,Swansea,West Brom,1,0,0,0,10,10,4,5,3,5,10,7,2,0,0,0,3.26,3.36,2.22,2.05,1.77
+championship,2023,championship_2023_311_sheffield_weds_hull,01/01/2024,Sheffield Weds,Hull,3,1,0,0,23,5,6,1,10,4,13,13,3,4,0,1,3.1,3.22,2.37,2.1,1.73
+championship,2023,championship_2023_312_hull_norwich,12/01/2024,Hull,Norwich,1,2,0,1,19,9,5,4,9,2,12,14,2,4,0,0,2.23,3.55,3.09,1.77,2.05
+championship,2023,championship_2023_313_coventry_leicester,13/01/2024,Coventry,Leicester,3,1,0,1,14,8,6,4,7,1,12,14,5,3,0,1,3.61,3.6,2.01,1.85,1.95
+championship,2023,championship_2023_314_birmingham_swansea,13/01/2024,Birmingham,Swansea,2,2,1,1,11,6,6,3,5,5,21,11,5,3,0,0,2.25,3.54,3.07,1.8,2.01
+championship,2023,championship_2023_315_cardiff_leeds,13/01/2024,Cardiff,Leeds,0,3,0,2,9,15,1,7,5,4,5,7,1,1,0,0,5.07,3.95,1.66,1.89,1.91
+championship,2023,championship_2023_316_huddersfield_plymouth,13/01/2024,Huddersfield,Plymouth,1,1,1,1,13,9,4,3,3,5,13,16,1,4,0,0,2.49,3.64,2.67,1.66,2.23
+championship,2023,championship_2023_317_millwall_middlesbrough,13/01/2024,Millwall,Middlesbrough,1,3,1,1,15,14,5,6,5,4,9,10,3,1,0,0,2.78,3.34,2.55,2.07,1.76
+championship,2023,championship_2023_318_preston_bristol_city,13/01/2024,Preston,Bristol City,2,0,0,0,12,15,7,6,8,6,13,7,1,2,0,0,2.63,3.15,2.83,2.41,1.56
+championship,2023,championship_2023_319_rotherham_stoke,13/01/2024,Rotherham,Stoke,0,1,0,1,3,4,0,3,3,6,11,13,2,3,0,0,3.96,3.56,1.93,1.98,1.83
+championship,2023,championship_2023_320_southampton_sheffield_weds,13/01/2024,Southampton,Sheffield Weds,4,0,1,0,15,6,7,4,14,3,9,12,3,3,0,0,1.41,4.77,7.57,1.74,2.09
+championship,2023,championship_2023_321_west_brom_blackburn,13/01/2024,West Brom,Blackburn,4,1,3,0,16,12,8,3,6,3,8,9,2,0,0,0,1.73,3.94,4.59,1.77,2.05
+championship,2023,championship_2023_322_ipswich_sunderland,13/01/2024,Ipswich,Sunderland,2,1,1,1,17,10,5,3,3,1,17,8,5,2,0,0,2.12,3.45,3.45,1.93,1.86
+championship,2023,championship_2023_323_qpr_watford,14/01/2024,QPR,Watford,1,2,0,0,16,9,7,2,8,4,17,13,3,3,0,0,2.98,3.27,2.43,2.14,1.71
+championship,2023,championship_2023_324_sunderland_hull,19/01/2024,Sunderland,Hull,0,1,0,0,15,2,3,2,12,1,12,17,2,7,0,0,1.84,3.6,4.31,1.92,1.88
+championship,2023,championship_2023_325_swansea_southampton,20/01/2024,Swansea,Southampton,1,3,1,3,15,21,6,10,3,8,10,12,2,2,0,0,4.74,4.09,1.67,1.64,2.25
+championship,2023,championship_2023_326_blackburn_huddersfield,20/01/2024,Blackburn,Huddersfield,1,1,1,1,16,8,4,3,7,3,10,4,1,2,0,0,1.76,3.96,4.3,1.61,2.31
+championship,2023,championship_2023_327_bristol_city_watford,20/01/2024,Bristol City,Watford,1,1,1,1,15,14,6,2,7,8,8,16,1,2,0,0,2.42,3.3,2.98,2.05,1.76
+championship,2023,championship_2023_328_middlesbrough_rotherham,20/01/2024,Middlesbrough,Rotherham,1,1,0,0,15,6,3,2,13,2,8,8,1,3,0,0,1.31,5.43,9.71,1.63,2.24
+championship,2023,championship_2023_329_norwich_west_brom,20/01/2024,Norwich,West Brom,2,0,1,0,13,15,6,3,2,6,9,10,1,2,0,0,2.79,3.39,2.5,1.93,1.87
+championship,2023,championship_2023_330_plymouth_cardiff,20/01/2024,Plymouth,Cardiff,3,1,1,1,15,6,5,3,5,5,9,7,4,2,0,0,2.23,3.53,3.11,1.76,2.05
+championship,2023,championship_2023_331_qpr_millwall,20/01/2024,QPR,Millwall,2,0,1,0,12,2,5,1,2,3,10,8,0,2,0,0,2.53,3.15,2.94,2.4,1.57
+championship,2023,championship_2023_332_sheffield_weds_coventry,20/01/2024,Sheffield Weds,Coventry,1,2,0,1,11,16,5,6,6,7,14,11,4,5,0,0,3.12,3.44,2.26,1.95,1.84
+championship,2023,championship_2023_333_stoke_birmingham,20/01/2024,Stoke,Birmingham,1,2,0,1,22,9,5,5,13,2,5,7,2,0,0,0,1.94,3.52,3.95,2.03,1.78
+championship,2023,championship_2023_334_leeds_preston,21/01/2024,Leeds,Preston,2,1,1,1,20,8,6,2,9,3,12,18,4,6,0,0,1.29,5.5,10.49,1.65,2.21
+championship,2023,championship_2023_335_leicester_ipswich,22/01/2024,Leicester,Ipswich,1,1,1,0,15,11,8,3,8,8,6,11,1,3,0,0,1.92,3.64,3.87,1.79,2.01
+championship,2023,championship_2023_336_leeds_norwich,24/01/2024,Leeds,Norwich,1,0,1,0,12,5,4,1,4,2,13,8,1,2,0,0,1.45,4.68,6.63,1.57,2.39
+championship,2023,championship_2023_337_millwall_preston,27/01/2024,Millwall,Preston,1,1,1,1,17,11,8,4,8,3,19,6,3,3,0,0,2.2,3.16,3.55,2.41,1.56
+championship,2023,championship_2023_338_sunderland_stoke,27/01/2024,Sunderland,Stoke,3,1,1,0,8,15,5,4,3,6,10,9,1,3,0,0,2.0,3.49,3.77,2.01,1.8
+championship,2023,championship_2023_339_qpr_huddersfield,28/01/2024,QPR,Huddersfield,1,1,0,0,7,13,4,3,4,10,15,16,4,3,0,0,2.06,3.27,3.82,2.32,1.61
+championship,2023,championship_2023_340_coventry_bristol_city,30/01/2024,Coventry,Bristol City,2,2,1,1,11,13,4,5,1,5,10,13,1,2,0,0,1.76,3.67,4.72,1.93,1.88
+championship,2023,championship_2023_341_leicester_swansea,30/01/2024,Leicester,Swansea,3,1,1,0,14,11,7,3,2,3,12,8,1,1,0,0,1.32,5.44,8.94,1.55,2.43
+championship,2023,championship_2023_342_sheffield_weds_watford,31/01/2024,Sheffield Weds,Watford,0,0,0,0,19,10,5,2,5,5,8,13,4,3,0,0,2.69,3.34,2.61,1.95,1.86
+championship,2023,championship_2023_343_bristol_city_leeds,02/02/2024,Bristol City,Leeds,0,1,0,0,7,14,1,6,2,4,10,10,1,0,0,0,4.85,3.73,1.74,2.0,1.82
+championship,2023,championship_2023_344_blackburn_qpr,03/02/2024,Blackburn,QPR,1,2,0,0,16,7,6,4,4,10,12,5,2,3,0,0,1.99,3.59,3.69,1.82,1.99
+championship,2023,championship_2023_345_huddersfield_sheffield_weds,03/02/2024,Huddersfield,Sheffield Weds,4,0,0,0,12,12,6,3,7,8,10,18,3,1,0,0,2.44,3.3,2.93,2.08,1.75
+championship,2023,championship_2023_346_hull_millwall,03/02/2024,Hull,Millwall,1,0,1,0,9,5,2,1,4,4,15,19,3,2,0,0,2.03,3.42,3.73,2.09,1.72
+championship,2023,championship_2023_347_norwich_coventry,03/02/2024,Norwich,Coventry,2,1,0,0,21,8,5,5,5,2,11,9,2,1,0,1,2.45,3.56,2.75,1.71,2.14
+championship,2023,championship_2023_348_preston_ipswich,03/02/2024,Preston,Ipswich,3,2,3,0,10,25,3,9,6,3,13,8,0,0,0,0,3.66,3.5,2.02,2.02,1.8
+championship,2023,championship_2023_349_rotherham_southampton,03/02/2024,Rotherham,Southampton,0,2,0,2,8,10,2,7,3,10,8,10,0,2,0,0,8.78,5.29,1.33,1.63,2.28
+championship,2023,championship_2023_350_stoke_leicester,03/02/2024,Stoke,Leicester,0,5,0,2,10,16,4,9,3,6,10,12,4,3,0,0,4.1,3.7,1.85,1.89,1.91
+championship,2023,championship_2023_351_swansea_plymouth,03/02/2024,Swansea,Plymouth,0,1,0,1,20,9,4,3,8,2,12,14,2,3,0,0,2.02,3.8,3.4,1.59,2.35
+championship,2023,championship_2023_352_watford_cardiff,03/02/2024,Watford,Cardiff,0,1,0,1,17,10,6,2,10,2,16,6,3,3,0,0,1.85,3.56,4.3,2.02,1.8
+championship,2023,championship_2023_353_west_brom_birmingham,03/02/2024,West Brom,Birmingham,1,0,0,0,10,13,2,5,4,8,12,16,2,3,0,0,1.71,3.83,4.8,1.96,1.85
+championship,2023,championship_2023_354_middlesbrough_sunderland,04/02/2024,Middlesbrough,Sunderland,1,1,0,0,15,13,2,5,1,6,17,10,3,3,0,0,2.07,3.54,3.46,1.83,1.99
+championship,2023,championship_2023_355_sheffield_weds_birmingham,09/02/2024,Sheffield Weds,Birmingham,2,0,1,0,13,25,3,4,1,7,14,10,3,1,0,0,2.3,3.35,3.12,2.0,1.81
+championship,2023,championship_2023_356_ipswich_west_brom,10/02/2024,Ipswich,West Brom,2,2,0,1,21,5,7,2,9,3,12,3,2,3,0,0,2.11,3.4,3.51,2.06,1.76
+championship,2023,championship_2023_357_blackburn_stoke,10/02/2024,Blackburn,Stoke,3,1,3,1,9,7,5,3,5,8,8,8,0,2,0,0,2.4,3.59,2.79,1.67,2.19
+championship,2023,championship_2023_358_cardiff_preston,10/02/2024,Cardiff,Preston,0,2,0,2,14,3,5,3,4,0,5,11,2,1,0,0,2.25,3.18,3.37,2.32,1.59
+championship,2023,championship_2023_359_hull_swansea,10/02/2024,Hull,Swansea,0,1,0,1,9,13,3,5,2,4,7,10,1,3,0,0,1.72,3.9,4.63,1.78,2.03
+championship,2023,championship_2023_360_leeds_rotherham,10/02/2024,Leeds,Rotherham,3,0,1,0,19,7,6,2,5,3,13,11,0,2,0,0,1.15,7.91,17.03,1.5,2.56
+championship,2023,championship_2023_361_middlesbrough_bristol_city,10/02/2024,Middlesbrough,Bristol City,1,2,0,2,16,12,6,7,7,1,11,11,1,0,0,0,1.72,3.78,4.79,1.94,1.86
+championship,2023,championship_2023_362_qpr_norwich,10/02/2024,QPR,Norwich,2,2,1,0,14,12,4,4,1,8,25,11,2,4,0,0,2.69,3.38,2.59,1.98,1.83
+championship,2023,championship_2023_363_southampton_huddersfield,10/02/2024,Southampton,Huddersfield,5,3,0,2,15,17,7,6,6,6,11,11,2,3,0,0,1.29,5.51,10.31,1.6,2.33
+championship,2023,championship_2023_364_sunderland_plymouth,10/02/2024,Sunderland,Plymouth,3,1,0,1,14,5,5,2,8,2,17,13,1,5,0,0,1.54,4.38,5.71,1.61,2.3
+championship,2023,championship_2023_365_watford_leicester,10/02/2024,Watford,Leicester,1,2,0,1,13,6,3,3,8,1,11,15,2,3,0,0,4.37,3.93,1.75,1.78,2.03
+championship,2023,championship_2023_366_coventry_millwall,11/02/2024,Coventry,Millwall,2,1,0,1,15,8,5,4,8,3,9,14,0,1,0,0,1.79,3.66,4.46,2.02,1.79
+championship,2023,championship_2023_367_birmingham_blackburn,13/02/2024,Birmingham,Blackburn,1,0,0,0,18,8,3,3,6,4,9,16,2,3,0,0,2.26,3.68,2.95,1.57,2.39
+championship,2023,championship_2023_368_leicester_sheffield_weds,13/02/2024,Leicester,Sheffield Weds,2,0,2,0,10,13,3,4,4,7,15,12,1,2,0,0,1.28,5.62,10.42,1.6,2.33
+championship,2023,championship_2023_369_norwich_watford,13/02/2024,Norwich,Watford,4,2,2,1,14,11,6,3,4,4,13,11,3,2,0,0,2.13,3.46,3.37,1.9,1.9
+championship,2023,championship_2023_370_rotherham_hull,13/02/2024,Rotherham,Hull,1,2,1,0,11,20,6,8,4,9,13,6,2,1,0,0,4.63,3.44,1.83,2.33,1.61
+championship,2023,championship_2023_371_swansea_leeds,13/02/2024,Swansea,Leeds,0,4,0,3,7,13,1,8,5,2,11,10,3,1,0,0,5.4,4.26,1.57,1.67,2.22
+championship,2023,championship_2023_372_bristol_city_southampton,13/02/2024,Bristol City,Southampton,3,1,0,0,14,16,4,4,6,5,8,13,2,2,0,0,4.4,3.68,1.8,1.9,1.88
+championship,2023,championship_2023_373_west_brom_cardiff,13/02/2024,West Brom,Cardiff,2,0,1,0,11,11,3,1,4,4,8,11,1,2,0,0,1.64,3.68,5.78,2.28,1.63
+championship,2023,championship_2023_374_huddersfield_sunderland,14/02/2024,Huddersfield,Sunderland,1,0,1,0,12,12,6,5,6,10,14,15,2,4,0,0,3.54,3.36,2.11,2.04,1.78
+championship,2023,championship_2023_375_plymouth_coventry,14/02/2024,Plymouth,Coventry,2,2,0,0,13,17,4,7,1,9,8,19,1,3,0,0,3.44,3.84,1.98,1.58,2.38
+championship,2023,championship_2023_376_preston_middlesbrough,14/02/2024,Preston,Middlesbrough,2,1,1,0,7,20,3,4,2,7,10,10,2,1,0,0,3.24,3.39,2.22,2.03,1.78
+championship,2023,championship_2023_377_stoke_qpr,14/02/2024,Stoke,QPR,1,0,1,0,14,10,5,1,5,7,12,11,0,1,0,0,2.09,3.34,3.61,2.15,1.7
+championship,2023,championship_2023_378_millwall_ipswich,14/02/2024,Millwall,Ipswich,0,4,0,3,14,8,4,4,9,5,12,13,3,1,0,0,3.54,3.41,2.09,2.07,1.76
+championship,2023,championship_2023_379_west_brom_southampton,16/02/2024,West Brom,Southampton,0,2,0,1,9,13,2,4,6,9,8,5,2,1,0,0,2.95,3.46,2.35,1.81,2.01
+championship,2023,championship_2023_380_plymouth_leeds,17/02/2024,Plymouth,Leeds,0,2,0,1,7,9,1,2,4,0,14,13,2,1,0,0,6.28,4.87,1.44,1.47,2.66
+championship,2023,championship_2023_381_birmingham_sunderland,17/02/2024,Birmingham,Sunderland,2,1,0,1,16,10,5,4,5,5,18,14,4,4,0,0,2.79,3.34,2.52,1.98,1.82
+championship,2023,championship_2023_382_bristol_city_qpr,17/02/2024,Bristol City,QPR,0,1,0,1,11,11,2,7,4,2,7,7,0,1,0,0,1.96,3.36,4.06,2.26,1.62
+championship,2023,championship_2023_383_huddersfield_hull,17/02/2024,Huddersfield,Hull,1,2,0,1,16,9,3,3,11,3,11,8,3,1,0,0,3.14,3.31,2.3,2.03,1.79
+championship,2023,championship_2023_384_leicester_middlesbrough,17/02/2024,Leicester,Middlesbrough,1,2,0,2,24,5,2,2,12,4,10,8,1,4,0,0,1.59,4.35,5.14,1.64,2.27
+championship,2023,championship_2023_385_millwall_sheffield_weds,17/02/2024,Millwall,Sheffield Weds,0,2,0,2,9,5,3,2,5,5,14,15,3,1,0,1,2.14,3.26,3.57,2.25,1.64
+championship,2023,championship_2023_386_norwich_cardiff,17/02/2024,Norwich,Cardiff,4,1,2,1,23,9,8,3,8,0,7,13,0,3,0,0,1.83,3.68,4.24,1.85,1.95
+championship,2023,championship_2023_387_preston_blackburn,17/02/2024,Preston,Blackburn,2,2,2,2,16,6,8,3,7,3,10,12,0,0,0,0,2.42,3.4,2.88,1.88,1.93
+championship,2023,championship_2023_388_rotherham_watford,17/02/2024,Rotherham,Watford,0,1,0,0,19,8,1,1,7,6,13,11,2,1,0,0,4.27,3.53,1.86,2.07,1.76
+championship,2023,championship_2023_389_stoke_coventry,17/02/2024,Stoke,Coventry,0,1,0,0,13,9,1,3,5,4,13,10,2,1,0,0,2.76,3.49,2.47,1.8,2.02
+championship,2023,championship_2023_390_swansea_ipswich,17/02/2024,Swansea,Ipswich,1,2,1,2,15,15,3,6,9,6,5,13,1,1,0,0,3.82,3.78,1.89,1.7,2.16
+championship,2023,championship_2023_391_cardiff_blackburn,20/02/2024,Cardiff,Blackburn,0,0,0,0,11,4,5,1,4,1,10,12,2,3,0,0,2.89,3.27,2.49,2.01,1.8
+championship,2023,championship_2023_392_ipswich_rotherham,20/02/2024,Ipswich,Rotherham,4,3,3,1,11,13,7,5,2,6,16,16,1,2,0,0,1.22,6.31,13.05,1.59,2.36
+championship,2023,championship_2023_393_plymouth_west_brom,20/02/2024,Plymouth,West Brom,0,3,0,0,4,17,0,7,2,7,9,8,1,0,0,0,3.54,3.54,2.04,1.89,1.92
+championship,2023,championship_2023_394_southampton_hull,20/02/2024,Southampton,Hull,1,2,0,2,15,17,3,5,4,2,9,13,1,2,0,0,1.54,4.46,5.56,1.53,2.47
+championship,2023,championship_2023_395_coventry_preston,23/02/2024,Coventry,Preston,0,3,0,3,10,10,4,3,6,6,9,19,1,3,0,0,1.76,3.67,4.66,1.96,1.85
+championship,2023,championship_2023_396_leeds_leicester,23/02/2024,Leeds,Leicester,3,1,0,1,15,16,4,5,2,5,15,11,5,2,0,0,2.12,3.51,3.39,1.78,2.04
+championship,2023,championship_2023_397_hull_west_brom,24/02/2024,Hull,West Brom,1,1,1,1,9,11,3,4,8,3,10,11,0,0,0,0,2.45,3.25,2.96,2.12,1.72
+championship,2023,championship_2023_398_blackburn_norwich,24/02/2024,Blackburn,Norwich,1,1,0,1,10,7,5,3,6,6,14,6,2,2,0,0,2.52,3.61,2.63,1.62,2.3
+championship,2023,championship_2023_399_cardiff_stoke,24/02/2024,Cardiff,Stoke,2,1,2,1,11,14,5,6,2,6,13,14,4,2,0,0,2.78,3.13,2.67,2.32,1.61
+championship,2023,championship_2023_400_ipswich_birmingham,24/02/2024,Ipswich,Birmingham,3,1,1,1,26,11,9,4,7,5,11,14,3,1,0,0,1.54,4.41,5.62,1.62,2.29
+championship,2023,championship_2023_401_middlesbrough_plymouth,24/02/2024,Middlesbrough,Plymouth,0,2,0,2,11,22,0,11,6,6,12,10,1,1,0,0,1.46,4.7,6.26,1.54,2.47
+championship,2023,championship_2023_402_qpr_rotherham,24/02/2024,QPR,Rotherham,2,1,0,1,18,14,9,4,9,0,9,17,4,1,0,0,1.66,3.64,5.6,2.2,1.68
+championship,2023,championship_2023_403_sheffield_weds_bristol_city,24/02/2024,Sheffield Weds,Bristol City,2,1,2,1,15,12,7,2,4,6,8,7,1,3,1,0,2.54,3.23,2.84,2.19,1.68
+championship,2023,championship_2023_404_southampton_millwall,24/02/2024,Southampton,Millwall,1,2,1,2,14,8,7,3,13,1,9,8,4,3,0,0,1.36,5.04,8.31,1.63,2.26
+championship,2023,championship_2023_405_sunderland_swansea,24/02/2024,Sunderland,Swansea,1,2,0,2,13,13,5,8,4,11,8,15,1,4,0,0,1.81,3.69,4.33,1.8,2.0
+championship,2023,championship_2023_406_watford_huddersfield,24/02/2024,Watford,Huddersfield,1,2,0,0,12,11,4,5,3,5,16,12,2,2,0,0,1.95,3.52,3.86,1.94,1.87
+championship,2023,championship_2023_407_west_brom_coventry,01/03/2024,West Brom,Coventry,2,1,2,0,7,17,2,3,4,4,10,12,2,1,0,0,2.12,3.32,3.58,2.06,1.77
+championship,2023,championship_2023_408_bristol_city_cardiff,02/03/2024,Bristol City,Cardiff,0,1,0,0,17,9,3,4,8,3,7,14,2,2,0,0,1.96,3.31,4.13,2.27,1.63
+championship,2023,championship_2023_409_huddersfield_leeds,02/03/2024,Huddersfield,Leeds,1,1,1,0,12,15,5,2,8,8,10,13,3,1,1,0,5.57,4.15,1.58,1.78,2.03
+championship,2023,championship_2023_410_birmingham_southampton,02/03/2024,Birmingham,Southampton,3,4,2,1,13,25,4,10,6,16,11,7,3,1,1,0,3.93,3.83,1.85,1.62,2.25
+championship,2023,championship_2023_411_leicester_qpr,02/03/2024,Leicester,QPR,1,2,0,1,18,3,5,2,9,0,7,11,2,3,0,0,1.35,5.09,8.7,1.69,2.17
+championship,2023,championship_2023_412_millwall_watford,02/03/2024,Millwall,Watford,1,0,1,0,6,12,2,3,4,3,12,14,3,1,0,0,2.4,3.27,3.01,2.13,1.71
+championship,2023,championship_2023_413_norwich_sunderland,02/03/2024,Norwich,Sunderland,1,0,0,0,16,12,4,4,5,2,13,11,2,3,0,0,1.93,3.64,3.82,1.81,2.0
+championship,2023,championship_2023_414_plymouth_ipswich,02/03/2024,Plymouth,Ipswich,0,2,0,0,9,14,2,6,5,7,11,22,1,3,0,0,4.39,4.15,1.71,1.51,2.53
+championship,2023,championship_2023_415_preston_hull,02/03/2024,Preston,Hull,0,0,0,0,16,15,4,4,8,8,12,6,1,1,0,0,2.82,3.27,2.54,2.04,1.78
+championship,2023,championship_2023_416_rotherham_sheffield_weds,02/03/2024,Rotherham,Sheffield Weds,0,1,0,0,7,17,1,4,2,10,16,14,1,2,0,0,3.42,3.25,2.2,2.19,1.67
+championship,2023,championship_2023_417_stoke_middlesbrough,02/03/2024,Stoke,Middlesbrough,2,0,1,0,11,10,5,3,6,3,16,5,3,1,0,0,2.68,3.39,2.59,1.9,1.9
+championship,2023,championship_2023_418_swansea_blackburn,02/03/2024,Swansea,Blackburn,2,1,2,0,7,10,4,5,6,6,10,12,1,2,0,0,2.22,3.53,3.12,1.72,2.1
+championship,2023,championship_2023_419_blackburn_millwall,05/03/2024,Blackburn,Millwall,1,1,0,0,11,3,3,1,4,2,10,11,0,1,0,0,2.23,3.25,3.37,2.18,1.68
+championship,2023,championship_2023_420_coventry_rotherham,05/03/2024,Coventry,Rotherham,5,0,4,0,16,7,6,1,4,5,10,19,0,1,0,0,1.29,5.49,10.34,1.67,2.21
+championship,2023,championship_2023_421_hull_birmingham,05/03/2024,Hull,Birmingham,1,1,1,0,22,8,5,3,10,2,7,8,1,3,0,0,1.73,3.94,4.56,1.67,2.21
+championship,2023,championship_2023_422_leeds_stoke,05/03/2024,Leeds,Stoke,1,0,1,0,15,13,7,6,8,2,7,13,1,1,0,1,1.33,5.31,8.85,1.55,2.43
+championship,2023,championship_2023_423_sheffield_weds_plymouth,05/03/2024,Sheffield Weds,Plymouth,1,0,0,0,18,13,3,3,8,2,12,13,1,2,0,0,1.95,3.54,3.88,1.93,1.87
+championship,2023,championship_2023_424_sunderland_leicester,05/03/2024,Sunderland,Leicester,0,1,0,1,17,10,6,6,6,5,12,19,1,3,0,0,3.9,3.67,1.91,1.84,1.96
+championship,2023,championship_2023_425_ipswich_bristol_city,05/03/2024,Ipswich,Bristol City,3,2,0,0,14,11,8,4,4,5,6,15,1,3,0,0,1.64,3.82,5.46,2.0,1.81
+championship,2023,championship_2023_426_cardiff_huddersfield,06/03/2024,Cardiff,Huddersfield,1,0,1,0,8,11,4,2,3,3,10,11,4,1,0,0,2.43,3.21,3.01,2.28,1.63
+championship,2023,championship_2023_427_middlesbrough_norwich,06/03/2024,Middlesbrough,Norwich,3,1,2,1,15,6,7,3,2,2,8,9,1,1,0,1,2.3,3.54,2.97,1.75,2.08
+championship,2023,championship_2023_428_watford_swansea,06/03/2024,Watford,Swansea,1,1,0,1,19,11,3,2,9,3,18,10,4,2,0,0,2.21,3.46,3.19,1.89,1.91
+championship,2023,championship_2023_429_qpr_west_brom,06/03/2024,QPR,West Brom,2,2,1,2,20,4,6,2,19,4,7,5,0,1,0,0,3.07,3.1,2.45,2.4,1.57
+championship,2023,championship_2023_430_sheffield_weds_leeds,08/03/2024,Sheffield Weds,Leeds,0,2,0,1,9,13,3,7,8,5,16,9,1,1,0,0,5.26,4.05,1.63,1.78,2.04
+championship,2023,championship_2023_431_cardiff_ipswich,09/03/2024,Cardiff,Ipswich,2,1,0,0,15,8,6,4,4,2,5,8,0,1,0,0,4.51,3.67,1.79,1.92,1.88
+championship,2023,championship_2023_432_blackburn_plymouth,09/03/2024,Blackburn,Plymouth,1,1,1,0,8,20,4,7,1,5,13,10,2,1,1,0,1.78,3.84,4.4,1.69,2.16
+championship,2023,championship_2023_433_hull_leicester,09/03/2024,Hull,Leicester,2,2,1,1,8,15,5,2,1,3,15,13,2,2,0,0,3.35,3.5,2.14,1.84,1.97
+championship,2023,championship_2023_434_millwall_birmingham,09/03/2024,Millwall,Birmingham,1,0,0,0,12,16,5,1,4,4,17,10,2,1,0,0,2.21,3.26,3.42,2.17,1.69
+championship,2023,championship_2023_435_norwich_rotherham,09/03/2024,Norwich,Rotherham,5,0,4,0,18,2,8,0,4,3,9,12,1,0,0,0,1.27,5.75,11.12,1.7,2.14
+championship,2023,championship_2023_436_preston_stoke,09/03/2024,Preston,Stoke,1,2,0,0,4,13,2,4,0,6,10,10,2,2,0,0,2.42,3.27,2.99,2.14,1.72
+championship,2023,championship_2023_437_qpr_middlesbrough,09/03/2024,QPR,Middlesbrough,0,2,0,0,10,7,2,4,10,3,11,7,2,5,0,0,2.37,3.42,2.95,1.98,1.83
+championship,2023,championship_2023_438_southampton_sunderland,09/03/2024,Southampton,Sunderland,4,2,2,0,21,13,10,5,6,2,13,15,2,3,0,0,1.45,4.62,6.72,1.58,2.38
+championship,2023,championship_2023_439_watford_coventry,09/03/2024,Watford,Coventry,1,2,1,1,19,8,5,3,5,4,12,12,1,5,0,0,2.87,3.46,2.4,1.82,2.0
+championship,2023,championship_2023_440_huddersfield_west_brom,10/03/2024,Huddersfield,West Brom,1,4,1,0,14,12,6,8,5,5,9,11,1,1,0,0,2.91,3.25,2.48,2.19,1.68
+championship,2023,championship_2023_441_bristol_city_swansea,10/03/2024,Bristol City,Swansea,1,0,0,0,5,8,2,0,3,6,14,4,2,1,0,0,2.36,3.31,3.05,2.04,1.78
+championship,2023,championship_2023_442_birmingham_middlesbrough,12/03/2024,Birmingham,Middlesbrough,0,1,0,1,9,12,0,3,3,4,9,6,0,2,0,0,2.87,3.52,2.38,1.75,2.04
+championship,2023,championship_2023_443_swansea_cardiff,16/03/2024,Swansea,Cardiff,2,0,1,0,20,11,5,2,10,5,12,11,2,1,0,0,2.03,3.36,3.84,2.09,1.74
+championship,2023,championship_2023_444_birmingham_watford,16/03/2024,Birmingham,Watford,0,1,0,1,27,14,5,4,7,6,11,12,0,3,0,0,2.43,3.37,2.9,1.87,1.93
+championship,2023,championship_2023_445_ipswich_sheffield_weds,16/03/2024,Ipswich,Sheffield Weds,6,0,3,0,20,9,10,1,10,4,12,8,1,2,0,0,1.53,4.32,6.0,1.71,2.13
+championship,2023,championship_2023_446_middlesbrough_blackburn,16/03/2024,Middlesbrough,Blackburn,0,0,0,0,16,12,3,3,8,5,10,9,3,3,0,0,1.86,3.7,4.14,1.75,2.08
+championship,2023,championship_2023_447_plymouth_preston,16/03/2024,Plymouth,Preston,0,1,0,1,9,9,0,4,6,5,11,22,2,2,0,0,2.52,3.33,2.82,1.93,1.88
+championship,2023,championship_2023_448_rotherham_huddersfield,16/03/2024,Rotherham,Huddersfield,0,0,0,0,7,18,1,5,1,6,13,12,2,2,0,1,4.1,3.45,1.93,2.08,1.74
+championship,2023,championship_2023_449_stoke_norwich,16/03/2024,Stoke,Norwich,0,3,0,2,10,16,1,7,7,6,12,7,1,0,0,0,2.56,3.36,2.74,1.91,1.85
+championship,2023,championship_2023_450_sunderland_qpr,16/03/2024,Sunderland,QPR,0,0,0,0,8,11,0,5,5,7,10,16,1,2,0,0,2.46,3.22,2.99,2.17,1.68
+championship,2023,championship_2023_451_west_brom_bristol_city,16/03/2024,West Brom,Bristol City,2,0,1,0,12,10,4,5,3,7,6,14,4,2,0,0,1.81,3.46,4.75,2.2,1.67
+championship,2023,championship_2023_452_leeds_millwall,17/03/2024,Leeds,Millwall,2,0,1,0,17,12,5,3,13,2,9,21,3,4,0,0,1.34,4.98,9.01,1.72,2.11
+championship,2023,championship_2023_453_bristol_city_leicester,29/03/2024,Bristol City,Leicester,1,0,0,0,16,11,6,3,5,6,12,13,2,0,0,0,4.92,3.86,1.7,1.9,1.9
+championship,2023,championship_2023_454_millwall_west_brom,29/03/2024,Millwall,West Brom,1,1,1,0,9,6,2,2,6,4,9,9,1,2,0,0,3.44,3.06,2.3,2.53,1.52
+championship,2023,championship_2023_455_cardiff_sunderland,29/03/2024,Cardiff,Sunderland,0,2,0,2,8,18,3,8,5,6,12,11,2,1,0,0,2.57,3.12,2.92,2.26,1.64
+championship,2023,championship_2023_456_huddersfield_coventry,29/03/2024,Huddersfield,Coventry,1,3,0,2,15,12,4,7,10,4,13,18,1,4,0,0,2.97,3.45,2.35,1.87,1.94
+championship,2023,championship_2023_457_hull_stoke,29/03/2024,Hull,Stoke,0,2,0,0,11,17,0,4,8,5,6,13,0,4,0,0,1.94,3.59,3.85,1.95,1.86
+championship,2023,championship_2023_458_norwich_plymouth,29/03/2024,Norwich,Plymouth,2,1,0,1,23,9,4,4,13,3,11,12,0,7,0,0,1.47,4.66,6.37,1.59,2.35
+championship,2023,championship_2023_459_preston_rotherham,29/03/2024,Preston,Rotherham,3,0,3,0,18,7,5,3,2,2,13,13,2,2,0,0,1.53,4.02,6.63,2.06,1.77
+championship,2023,championship_2023_460_qpr_birmingham,29/03/2024,QPR,Birmingham,2,1,0,0,18,13,6,3,6,2,11,12,2,2,0,0,2.06,3.42,3.64,2.09,1.74
+championship,2023,championship_2023_461_sheffield_weds_swansea,29/03/2024,Sheffield Weds,Swansea,1,1,1,0,14,8,4,4,3,4,10,8,1,1,0,0,2.46,3.39,2.85,1.83,1.98
+championship,2023,championship_2023_462_southampton_middlesbrough,29/03/2024,Southampton,Middlesbrough,1,1,1,0,13,8,5,3,8,5,5,14,2,4,0,0,1.57,4.49,5.14,1.48,2.62
+championship,2023,championship_2023_463_blackburn_ipswich,29/03/2024,Blackburn,Ipswich,0,1,0,1,8,11,3,3,9,2,13,13,2,3,0,0,3.71,3.75,1.94,1.67,2.2
+championship,2023,championship_2023_464_watford_leeds,29/03/2024,Watford,Leeds,2,2,2,1,9,12,5,8,8,5,15,5,0,0,0,0,5.75,4.3,1.55,1.69,2.17
+championship,2023,championship_2023_465_leicester_norwich,01/04/2024,Leicester,Norwich,3,1,1,1,18,6,6,2,9,2,13,8,1,1,0,0,1.65,4.17,4.83,1.63,2.24
+championship,2023,championship_2023_466_birmingham_preston,01/04/2024,Birmingham,Preston,1,0,0,0,11,4,4,1,0,0,7,9,1,1,0,0,2.36,3.36,3.01,2.07,1.75
+championship,2023,championship_2023_467_coventry_cardiff,01/04/2024,Coventry,Cardiff,1,2,1,1,14,10,2,4,6,3,7,9,1,2,0,0,1.53,4.28,6.0,1.78,2.03
+championship,2023,championship_2023_468_middlesbrough_sheffield_weds,01/04/2024,Middlesbrough,Sheffield Weds,2,0,1,0,23,6,5,2,11,5,7,11,1,4,0,0,1.8,3.76,4.32,1.82,1.99
+championship,2023,championship_2023_469_plymouth_bristol_city,01/04/2024,Plymouth,Bristol City,0,1,0,0,12,14,2,6,9,6,14,12,2,3,1,0,2.6,3.33,2.71,1.96,1.84
+championship,2023,championship_2023_470_rotherham_millwall,01/04/2024,Rotherham,Millwall,2,1,0,0,5,21,4,7,2,11,11,10,2,0,0,0,4.25,3.47,1.88,2.17,1.7
+championship,2023,championship_2023_471_stoke_huddersfield,01/04/2024,Stoke,Huddersfield,1,1,0,1,15,12,6,3,6,7,14,13,3,1,0,0,2.1,3.39,3.52,2.04,1.78
+championship,2023,championship_2023_472_sunderland_blackburn,01/04/2024,Sunderland,Blackburn,1,5,0,2,13,13,7,7,3,3,10,12,0,0,0,0,2.1,3.46,3.46,1.92,1.88
+championship,2023,championship_2023_473_swansea_qpr,01/04/2024,Swansea,QPR,0,1,0,0,15,10,4,4,7,4,9,10,0,0,0,0,2.48,3.31,2.86,2.07,1.75
+championship,2023,championship_2023_474_west_brom_watford,01/04/2024,West Brom,Watford,2,2,0,0,10,12,4,7,7,3,6,13,0,1,0,0,1.9,3.49,4.16,2.08,1.74
+championship,2023,championship_2023_475_ipswich_southampton,01/04/2024,Ipswich,Southampton,3,2,1,2,13,17,6,8,0,7,14,12,3,1,0,1,2.47,3.71,2.62,1.56,2.42
+championship,2023,championship_2023_476_leeds_hull,01/04/2024,Leeds,Hull,3,1,1,1,14,11,6,2,4,3,19,13,2,2,0,0,1.43,4.75,6.98,1.66,2.18
+championship,2023,championship_2023_477_rotherham_plymouth,05/04/2024,Rotherham,Plymouth,0,1,0,1,11,21,2,11,4,9,9,11,0,0,0,0,4.07,3.59,1.89,1.93,1.87
+championship,2023,championship_2023_478_norwich_ipswich,06/04/2024,Norwich,Ipswich,1,0,1,0,12,10,3,3,4,6,10,16,0,1,0,0,2.72,3.61,2.45,1.63,2.27
+championship,2023,championship_2023_479_blackburn_southampton,06/04/2024,Blackburn,Southampton,0,0,0,0,11,7,3,2,1,5,17,8,3,2,0,0,3.85,4.05,1.83,1.49,2.59
+championship,2023,championship_2023_480_cardiff_hull,06/04/2024,Cardiff,Hull,1,3,0,2,13,11,4,6,5,6,11,7,1,3,0,0,3.13,3.28,2.33,2.15,1.7
+championship,2023,championship_2023_481_coventry_leeds,06/04/2024,Coventry,Leeds,2,1,1,0,11,19,5,8,2,9,13,3,4,2,0,0,3.66,3.77,1.95,1.63,2.29
+championship,2023,championship_2023_482_huddersfield_millwall,06/04/2024,Huddersfield,Millwall,1,0,0,0,17,6,7,1,10,3,7,21,4,4,0,0,2.44,3.11,3.1,2.37,1.59
+championship,2023,championship_2023_483_leicester_birmingham,06/04/2024,Leicester,Birmingham,2,1,1,1,17,11,9,5,10,0,7,11,2,2,0,0,1.32,5.44,8.77,1.53,2.47
+championship,2023,championship_2023_484_middlesbrough_swansea,06/04/2024,Middlesbrough,Swansea,2,0,1,0,12,7,4,1,4,6,16,16,2,2,0,0,1.82,3.79,4.15,1.77,2.05
+championship,2023,championship_2023_485_qpr_sheffield_weds,06/04/2024,QPR,Sheffield Weds,0,2,0,0,16,7,1,4,5,2,13,10,3,3,0,0,1.97,3.34,4.07,2.16,1.69
+championship,2023,championship_2023_486_stoke_west_brom,06/04/2024,Stoke,West Brom,2,2,0,1,18,9,7,2,5,7,8,8,2,2,0,0,2.67,3.16,2.76,2.24,1.65
+championship,2023,championship_2023_487_sunderland_bristol_city,06/04/2024,Sunderland,Bristol City,0,0,0,0,20,8,7,2,4,4,12,10,1,1,0,0,2.41,3.15,3.12,2.27,1.63
+championship,2023,championship_2023_488_watford_preston,06/04/2024,Watford,Preston,0,0,0,0,11,9,2,1,7,5,6,13,2,1,0,0,2.09,3.4,3.58,2.09,1.74
+championship,2023,championship_2023_489_millwall_leicester,09/04/2024,Millwall,Leicester,1,0,0,0,6,11,4,3,3,9,11,6,3,1,0,0,5.15,3.73,1.69,1.97,1.84
+championship,2023,championship_2023_490_plymouth_qpr,09/04/2024,Plymouth,QPR,1,1,0,0,13,14,5,4,10,4,12,12,0,2,0,0,3.08,3.28,2.35,2.03,1.78
+championship,2023,championship_2023_491_preston_huddersfield,09/04/2024,Preston,Huddersfield,4,1,0,1,14,8,7,2,8,2,10,13,3,2,0,0,2.56,3.18,2.87,2.19,1.67
+championship,2023,championship_2023_492_sheffield_weds_norwich,09/04/2024,Sheffield Weds,Norwich,2,2,0,2,11,13,5,6,10,3,15,9,2,1,0,0,3.23,3.4,2.22,1.9,1.9
+championship,2023,championship_2023_493_southampton_coventry,09/04/2024,Southampton,Coventry,2,1,2,0,13,9,6,2,6,8,15,15,1,2,0,0,1.78,4.2,3.92,1.4,2.89
+championship,2023,championship_2023_494_leeds_sunderland,09/04/2024,Leeds,Sunderland,0,0,0,0,12,6,1,3,13,2,10,13,2,4,0,0,1.34,5.28,8.56,1.56,2.43
+championship,2023,championship_2023_495_birmingham_cardiff,10/04/2024,Birmingham,Cardiff,0,1,0,0,12,12,1,4,5,4,15,10,1,3,0,0,1.9,3.54,4.05,2.06,1.76
+championship,2023,championship_2023_496_bristol_city_blackburn,10/04/2024,Bristol City,Blackburn,5,0,2,0,15,9,7,4,6,8,7,15,0,2,0,0,2.49,3.21,2.92,2.12,1.71
+championship,2023,championship_2023_497_hull_middlesbrough,10/04/2024,Hull,Middlesbrough,2,2,2,1,18,13,7,6,9,3,8,7,3,0,0,0,2.4,3.48,2.84,1.79,2.02
+championship,2023,championship_2023_498_ipswich_watford,10/04/2024,Ipswich,Watford,0,0,0,0,15,10,4,3,3,4,13,16,2,1,0,0,1.46,4.61,6.51,1.59,2.34
+championship,2023,championship_2023_499_swansea_stoke,10/04/2024,Swansea,Stoke,3,0,1,0,12,10,4,1,2,6,15,16,3,3,0,0,2.43,3.23,3.02,1.99,1.81
+championship,2023,championship_2023_500_west_brom_rotherham,10/04/2024,West Brom,Rotherham,2,0,2,0,11,12,4,1,4,5,4,9,0,1,0,0,1.26,5.67,11.98,1.74,2.09
+championship,2023,championship_2023_501_plymouth_leicester,12/04/2024,Plymouth,Leicester,1,0,1,0,5,17,3,4,0,13,12,12,5,2,0,0,6.46,4.79,1.45,1.52,2.51
+championship,2023,championship_2023_502_leeds_blackburn,13/04/2024,Leeds,Blackburn,0,1,0,0,19,3,5,2,12,1,5,15,1,4,0,0,1.35,5.16,8.51,1.59,2.34
+championship,2023,championship_2023_503_birmingham_coventry,13/04/2024,Birmingham,Coventry,3,0,2,0,15,12,4,2,3,6,13,12,3,2,0,0,2.99,3.54,2.29,1.78,2.03
+championship,2023,championship_2023_504_bristol_city_huddersfield,13/04/2024,Bristol City,Huddersfield,1,1,0,0,9,13,3,4,12,4,7,18,1,6,0,0,2.32,3.24,3.19,2.2,1.67
+championship,2023,championship_2023_505_hull_qpr,13/04/2024,Hull,QPR,3,0,2,0,7,11,5,3,4,4,12,17,2,1,0,0,2.04,3.39,3.73,2.08,1.75
+championship,2023,championship_2023_506_ipswich_middlesbrough,13/04/2024,Ipswich,Middlesbrough,1,1,1,1,21,11,5,5,6,4,11,6,2,2,0,0,1.8,3.91,4.11,1.62,2.29
+championship,2023,championship_2023_507_millwall_cardiff,13/04/2024,Millwall,Cardiff,3,1,2,1,15,7,7,4,6,4,10,7,3,1,0,0,1.86,3.35,4.6,2.42,1.56
+championship,2023,championship_2023_508_preston_norwich,13/04/2024,Preston,Norwich,0,1,0,0,12,15,2,5,5,6,11,9,3,1,0,0,2.97,3.37,2.39,1.91,1.89
+championship,2023,championship_2023_509_sheffield_weds_stoke,13/04/2024,Sheffield Weds,Stoke,1,1,0,0,15,8,5,2,8,1,9,20,1,4,0,0,2.61,3.2,2.8,2.12,1.71
+championship,2023,championship_2023_510_southampton_watford,13/04/2024,Southampton,Watford,3,2,2,1,13,12,4,6,6,3,6,15,1,3,0,0,1.42,4.97,6.82,1.52,2.52
+championship,2023,championship_2023_511_swansea_rotherham,13/04/2024,Swansea,Rotherham,1,0,0,0,16,4,6,0,12,0,10,9,3,2,0,0,1.37,4.76,8.63,1.78,2.03
+championship,2023,championship_2023_512_west_brom_sunderland,13/04/2024,West Brom,Sunderland,0,1,0,1,8,9,3,3,1,5,15,12,3,3,1,0,1.81,3.6,4.43,2.07,1.75
+championship,2023,championship_2023_513_southampton_preston,16/04/2024,Southampton,Preston,3,0,3,0,23,1,6,1,5,0,7,12,0,2,0,0,1.35,5.18,8.35,1.55,2.43
+championship,2023,championship_2023_514_leicester_west_brom,20/04/2024,Leicester,West Brom,2,1,1,0,11,18,3,6,4,6,15,13,3,2,0,0,1.55,4.2,5.86,1.79,2.02
+championship,2023,championship_2023_515_cardiff_southampton,20/04/2024,Cardiff,Southampton,2,1,0,1,12,21,7,8,4,5,12,8,1,3,0,0,7.31,4.78,1.41,1.6,2.32
+championship,2023,championship_2023_516_huddersfield_swansea,20/04/2024,Huddersfield,Swansea,0,4,0,0,9,19,0,7,4,7,15,10,2,1,0,0,2.12,3.54,3.34,1.9,1.89
+championship,2023,championship_2023_517_norwich_bristol_city,20/04/2024,Norwich,Bristol City,1,1,0,0,10,13,3,5,8,5,13,9,1,2,0,0,1.66,3.98,4.94,1.88,1.92
+championship,2023,championship_2023_518_rotherham_birmingham,20/04/2024,Rotherham,Birmingham,0,0,0,0,11,6,4,2,7,6,16,11,4,2,0,0,5.56,3.98,1.6,1.94,1.86
+championship,2023,championship_2023_519_stoke_plymouth,20/04/2024,Stoke,Plymouth,3,0,2,0,23,8,4,1,7,3,14,11,3,4,0,0,1.84,3.41,4.62,1.91,1.89
+championship,2023,championship_2023_520_sunderland_millwall,20/04/2024,Sunderland,Millwall,0,1,0,0,13,4,3,1,11,4,11,9,3,2,0,0,2.2,3.24,3.42,2.21,1.67
+championship,2023,championship_2023_521_watford_hull,20/04/2024,Watford,Hull,0,0,0,0,17,13,2,6,1,5,19,13,4,4,0,0,2.86,3.45,2.4,1.82,1.98
+championship,2023,championship_2023_522_qpr_preston,20/04/2024,QPR,Preston,1,0,1,0,18,10,7,2,5,3,9,16,2,4,0,0,1.9,3.46,4.21,2.19,1.67
+championship,2023,championship_2023_523_blackburn_sheffield_weds,21/04/2024,Blackburn,Sheffield Weds,1,3,1,1,8,11,3,5,6,2,9,12,3,3,0,0,2.04,3.49,3.58,1.91,1.89
+championship,2023,championship_2023_524_middlesbrough_leeds,22/04/2024,Middlesbrough,Leeds,3,4,2,3,13,8,5,5,11,4,14,11,3,1,0,0,4.15,3.8,1.81,1.76,2.04
+championship,2023,championship_2023_525_leicester_southampton,23/04/2024,Leicester,Southampton,5,0,1,0,17,7,6,0,1,4,20,7,1,0,0,0,2.09,3.83,3.2,1.47,2.65
+championship,2023,championship_2023_526_coventry_hull,24/04/2024,Coventry,Hull,2,3,1,2,7,14,3,8,4,8,7,13,2,4,0,0,2.24,3.65,3.0,1.68,2.18
+championship,2023,championship_2023_527_qpr_leeds,26/04/2024,QPR,Leeds,4,0,2,0,11,15,5,5,7,8,9,14,1,2,0,0,5.34,4.28,1.59,1.68,2.19
+championship,2023,championship_2023_528_blackburn_coventry,27/04/2024,Blackburn,Coventry,0,0,0,0,30,6,8,1,10,2,10,9,0,1,0,1,2.17,3.61,3.16,1.63,2.26
+championship,2023,championship_2023_529_bristol_city_rotherham,27/04/2024,Bristol City,Rotherham,2,0,1,0,13,6,5,2,4,3,5,10,1,2,0,0,1.36,4.84,8.94,1.82,1.98
+championship,2023,championship_2023_530_cardiff_middlesbrough,27/04/2024,Cardiff,Middlesbrough,1,4,0,1,15,12,4,7,4,1,7,10,0,0,0,0,3.63,3.55,2.01,1.9,1.9
+championship,2023,championship_2023_531_huddersfield_birmingham,27/04/2024,Huddersfield,Birmingham,1,1,0,1,12,12,4,2,9,5,7,19,1,4,0,0,2.28,3.33,3.17,1.99,1.81
+championship,2023,championship_2023_532_millwall_plymouth,27/04/2024,Millwall,Plymouth,1,0,0,0,11,9,5,1,9,9,9,8,0,0,0,0,2.14,3.41,3.39,1.99,1.81
+championship,2023,championship_2023_533_norwich_swansea,27/04/2024,Norwich,Swansea,2,2,2,1,27,13,8,6,12,6,13,7,3,2,0,0,1.66,4.11,4.79,1.66,2.21
+championship,2023,championship_2023_534_sheffield_weds_west_brom,27/04/2024,Sheffield Weds,West Brom,3,0,1,0,13,22,7,8,6,12,7,6,3,1,0,0,2.93,3.26,2.45,2.12,1.71
+championship,2023,championship_2023_535_southampton_stoke,27/04/2024,Southampton,Stoke,0,1,0,1,14,15,3,8,8,7,4,14,2,1,0,0,1.77,4.27,3.95,1.51,2.52
+championship,2023,championship_2023_536_watford_sunderland,27/04/2024,Watford,Sunderland,1,0,0,0,10,11,3,6,3,3,11,9,2,1,0,0,2.35,3.25,3.13,2.04,1.76
+championship,2023,championship_2023_537_hull_ipswich,27/04/2024,Hull,Ipswich,3,3,1,2,14,21,7,11,6,8,13,14,1,3,0,0,3.2,3.62,2.14,1.72,2.12
+championship,2023,championship_2023_538_preston_leicester,29/04/2024,Preston,Leicester,0,3,0,1,5,19,1,11,1,5,9,7,4,0,0,0,6.49,4.55,1.45,1.7,2.09
+championship,2023,championship_2023_539_coventry_ipswich,30/04/2024,Coventry,Ipswich,1,2,0,1,13,14,3,9,7,6,10,13,1,1,0,0,4.35,4.12,1.72,1.5,2.53
+championship,2023,championship_2023_540_birmingham_norwich,04/05/2024,Birmingham,Norwich,1,0,0,0,12,5,3,2,6,3,10,8,2,0,0,0,2.36,3.69,2.78,1.72,2.09
+championship,2023,championship_2023_541_coventry_qpr,04/05/2024,Coventry,QPR,1,2,0,2,19,7,6,4,10,5,13,11,2,3,0,0,2.2,3.52,3.16,1.72,2.11
+championship,2023,championship_2023_542_ipswich_huddersfield,04/05/2024,Ipswich,Huddersfield,2,0,1,0,24,5,5,2,8,0,9,12,1,1,0,0,1.24,6.41,11.19,1.45,2.67
+championship,2023,championship_2023_543_leeds_southampton,04/05/2024,Leeds,Southampton,1,2,1,2,11,11,4,4,5,2,18,17,4,2,0,0,1.57,4.4,5.25,1.49,2.57
+championship,2023,championship_2023_544_leicester_blackburn,04/05/2024,Leicester,Blackburn,0,2,0,0,14,9,7,2,7,4,5,7,2,2,0,0,1.67,4.01,4.89,1.52,2.48
+championship,2023,championship_2023_545_middlesbrough_watford,04/05/2024,Middlesbrough,Watford,3,1,1,0,14,14,6,4,3,3,9,5,1,1,0,0,1.69,4.07,4.59,1.6,2.31
+championship,2023,championship_2023_546_plymouth_hull,04/05/2024,Plymouth,Hull,1,0,1,0,11,11,2,4,6,8,6,8,0,0,0,0,3.38,3.73,2.03,1.63,2.26
+championship,2023,championship_2023_547_rotherham_cardiff,04/05/2024,Rotherham,Cardiff,5,2,2,1,16,20,7,5,4,6,9,6,1,0,0,0,3.4,3.35,2.16,2.06,1.75
+championship,2023,championship_2023_548_stoke_bristol_city,04/05/2024,Stoke,Bristol City,4,0,3,0,20,7,7,2,5,6,11,5,0,0,0,0,2.05,3.52,3.51,1.87,1.92
+championship,2023,championship_2023_549_sunderland_sheffield_weds,04/05/2024,Sunderland,Sheffield Weds,0,2,0,2,18,12,3,2,6,5,4,19,1,1,0,0,2.73,3.25,2.62,2.03,1.77
+championship,2023,championship_2023_550_swansea_millwall,04/05/2024,Swansea,Millwall,0,1,0,0,9,12,2,4,4,5,3,9,0,2,1,1,2.04,3.5,3.57,1.91,1.88
+championship,2023,championship_2023_551_west_brom_preston,04/05/2024,West Brom,Preston,3,0,1,0,16,5,5,1,5,1,8,15,0,1,0,0,1.45,4.32,7.28,1.91,1.87

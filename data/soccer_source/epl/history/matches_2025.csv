@@ -1,0 +1,381 @@
+league,season,match_id,date,home_team,away_team,home_goals,away_goals,ht_home_goals,ht_away_goals,home_shots,away_shots,home_shots_on_target,away_shots_on_target,home_corners,away_corners,home_fouls,away_fouls,home_yellow_cards,away_yellow_cards,home_red_cards,away_red_cards,odds_home,odds_draw,odds_away,odds_over_2_5,odds_under_2_5
+epl,2025,epl_2025_0_liverpool_bournemouth,15/08/2025,Liverpool,Bournemouth,4,2,1,0,19,10,10,3,6,7,7,10,1,2,0,0,1.31,5.96,8.31,1.35,3.13
+epl,2025,epl_2025_1_aston_villa_newcastle,16/08/2025,Aston Villa,Newcastle,0,0,0,0,3,16,3,3,3,6,13,11,1,1,1,0,2.3,3.56,2.94,1.61,2.25
+epl,2025,epl_2025_2_brighton_fulham,16/08/2025,Brighton,Fulham,1,1,0,0,10,7,4,2,4,3,16,15,3,3,0,0,1.92,3.62,3.91,1.71,2.08
+epl,2025,epl_2025_3_sunderland_west_ham,16/08/2025,Sunderland,West Ham,3,0,0,0,10,12,5,4,5,7,8,10,0,1,0,0,3.17,3.38,2.26,1.88,1.88
+epl,2025,epl_2025_4_tottenham_burnley,16/08/2025,Tottenham,Burnley,3,0,1,0,16,14,6,4,6,5,14,8,0,0,0,0,1.37,4.8,8.3,1.66,2.16
+epl,2025,epl_2025_5_wolves_man_city,16/08/2025,Wolves,Man City,0,4,0,2,9,15,3,4,4,6,13,7,1,2,0,0,6.73,4.73,1.44,1.61,2.25
+epl,2025,epl_2025_6_chelsea_crystal_palace,17/08/2025,Chelsea,Crystal Palace,0,0,0,0,19,12,3,4,11,2,10,12,2,3,0,0,1.61,4.21,5.08,1.63,2.22
+epl,2025,epl_2025_7_nott'm_forest_brentford,17/08/2025,Nott'm Forest,Brentford,3,1,3,0,11,10,5,3,5,5,7,15,1,2,0,0,2.15,3.36,3.43,1.92,1.83
+epl,2025,epl_2025_8_man_united_arsenal,17/08/2025,Man United,Arsenal,0,1,0,1,22,9,7,3,3,4,10,19,1,4,0,0,3.57,3.56,2.01,1.8,1.97
+epl,2025,epl_2025_9_leeds_everton,18/08/2025,Leeds,Everton,1,0,0,0,21,7,3,1,7,2,6,8,0,2,0,0,2.39,3.29,2.96,2.07,1.72
+epl,2025,epl_2025_10_west_ham_chelsea,22/08/2025,West Ham,Chelsea,1,5,1,3,12,12,4,7,7,5,7,10,0,1,0,0,4.68,3.88,1.71,1.72,2.09
+epl,2025,epl_2025_11_man_city_tottenham,23/08/2025,Man City,Tottenham,0,2,0,2,10,12,4,5,7,2,7,12,1,4,0,0,1.48,4.7,6.08,1.46,2.62
+epl,2025,epl_2025_12_bournemouth_wolves,23/08/2025,Bournemouth,Wolves,1,0,1,0,14,6,4,1,8,3,13,16,2,4,0,1,1.79,3.88,4.24,1.72,2.06
+epl,2025,epl_2025_13_brentford_aston_villa,23/08/2025,Brentford,Aston Villa,1,0,1,0,9,17,2,2,2,9,11,9,1,2,0,0,3.11,3.53,2.21,1.77,2.0
+epl,2025,epl_2025_14_burnley_sunderland,23/08/2025,Burnley,Sunderland,2,0,0,0,7,9,2,1,4,3,9,5,0,1,0,0,2.25,3.16,3.42,2.26,1.6
+epl,2025,epl_2025_15_arsenal_leeds,23/08/2025,Arsenal,Leeds,5,0,2,0,18,3,5,1,2,2,8,11,0,2,0,0,1.27,5.93,10.61,1.55,2.38
+epl,2025,epl_2025_16_crystal_palace_nott'm_forest,24/08/2025,Crystal Palace,Nott'm Forest,1,1,1,0,8,9,4,1,1,3,11,11,3,3,0,0,2.35,3.26,3.07,2.05,1.73
+epl,2025,epl_2025_17_everton_brighton,24/08/2025,Everton,Brighton,2,0,1,0,11,13,3,4,2,2,7,15,4,3,0,0,3.08,3.3,2.32,2.01,1.76
+epl,2025,epl_2025_18_fulham_man_united,24/08/2025,Fulham,Man United,1,1,0,0,13,10,4,3,9,6,12,10,1,1,0,0,3.27,3.53,2.13,1.77,1.99
+epl,2025,epl_2025_19_newcastle_liverpool,25/08/2025,Newcastle,Liverpool,2,3,0,1,10,5,3,4,7,1,17,15,2,3,1,0,3.3,3.83,2.02,1.53,2.43
+epl,2025,epl_2025_20_chelsea_fulham,30/08/2025,Chelsea,Fulham,2,0,1,0,13,11,6,3,6,4,11,17,2,2,0,0,1.55,4.35,5.6,1.67,2.16
+epl,2025,epl_2025_21_man_united_burnley,30/08/2025,Man United,Burnley,3,2,1,0,26,6,6,3,7,1,9,9,1,5,0,0,1.35,5.15,8.28,1.65,2.17
+epl,2025,epl_2025_22_sunderland_brentford,30/08/2025,Sunderland,Brentford,2,1,0,0,12,7,3,4,3,4,11,12,3,2,0,0,2.92,3.27,2.46,2.04,1.73
+epl,2025,epl_2025_23_tottenham_bournemouth,30/08/2025,Tottenham,Bournemouth,0,1,0,1,5,20,1,6,0,8,17,13,2,4,0,0,1.73,4.06,4.29,1.54,2.38
+epl,2025,epl_2025_24_wolves_everton,30/08/2025,Wolves,Everton,2,3,1,2,12,10,4,4,2,2,15,10,0,1,0,0,2.66,3.19,2.74,2.17,1.65
+epl,2025,epl_2025_25_leeds_newcastle,30/08/2025,Leeds,Newcastle,0,0,0,0,10,8,1,2,5,5,10,15,1,1,0,0,3.37,3.49,2.12,1.76,2.01
+epl,2025,epl_2025_26_brighton_man_city,31/08/2025,Brighton,Man City,2,1,0,1,12,12,7,3,3,2,16,14,2,2,0,0,3.78,3.84,1.85,1.57,2.32
+epl,2025,epl_2025_27_nott'm_forest_west_ham,31/08/2025,Nott'm Forest,West Ham,0,3,0,0,11,12,3,8,9,7,14,6,0,0,0,0,1.69,3.74,5.03,1.94,1.82
+epl,2025,epl_2025_28_liverpool_arsenal,31/08/2025,Liverpool,Arsenal,1,0,0,0,9,11,3,1,3,8,7,10,2,2,0,0,2.2,3.49,3.17,1.73,2.06
+epl,2025,epl_2025_29_aston_villa_crystal_palace,31/08/2025,Aston Villa,Crystal Palace,0,3,0,1,13,6,4,4,10,1,7,14,2,3,0,0,1.88,3.56,4.07,1.95,1.81
+epl,2025,epl_2025_30_arsenal_nott'm_forest,13/09/2025,Arsenal,Nott'm Forest,3,0,1,0,16,5,5,1,8,4,8,11,1,1,0,0,1.38,4.85,8.16,1.69,2.11
+epl,2025,epl_2025_31_bournemouth_brighton,13/09/2025,Bournemouth,Brighton,2,1,1,0,13,6,5,2,4,4,16,10,4,4,0,0,2.38,3.5,2.87,1.67,2.14
+epl,2025,epl_2025_32_crystal_palace_sunderland,13/09/2025,Crystal Palace,Sunderland,0,0,0,0,14,6,6,0,5,3,10,8,1,1,0,0,1.66,3.76,5.42,2.08,1.71
+epl,2025,epl_2025_33_everton_aston_villa,13/09/2025,Everton,Aston Villa,0,0,0,0,20,7,2,1,10,3,17,15,3,3,0,0,2.44,3.27,2.95,2.02,1.76
+epl,2025,epl_2025_34_fulham_leeds,13/09/2025,Fulham,Leeds,1,0,0,0,5,10,3,3,3,3,20,15,1,2,0,0,1.96,3.51,3.89,1.98,1.78
+epl,2025,epl_2025_35_newcastle_wolves,13/09/2025,Newcastle,Wolves,1,0,1,0,16,8,4,3,10,4,10,17,1,4,0,0,1.43,4.62,7.45,1.74,2.04
+epl,2025,epl_2025_36_west_ham_tottenham,13/09/2025,West Ham,Tottenham,0,3,0,0,7,14,4,5,2,13,8,7,0,1,1,0,3.36,3.56,2.1,1.76,2.02
+epl,2025,epl_2025_37_brentford_chelsea,13/09/2025,Brentford,Chelsea,2,2,1,0,7,16,4,6,5,6,13,9,3,2,0,0,4.54,3.92,1.73,1.7,2.11
+epl,2025,epl_2025_38_burnley_liverpool,14/09/2025,Burnley,Liverpool,0,1,0,0,3,27,0,4,1,13,9,9,0,2,0,0,8.6,5.43,1.33,1.52,2.44
+epl,2025,epl_2025_39_man_city_man_united,14/09/2025,Man City,Man United,3,0,1,0,13,12,6,2,2,4,8,8,0,0,0,0,1.76,3.99,4.19,1.55,2.38
+epl,2025,epl_2025_40_liverpool_everton,20/09/2025,Liverpool,Everton,2,1,2,0,11,9,3,2,5,4,11,10,2,3,0,0,1.45,4.65,6.7,1.59,2.28
+epl,2025,epl_2025_41_brighton_tottenham,20/09/2025,Brighton,Tottenham,2,2,2,1,12,11,4,3,2,10,10,13,1,2,0,0,2.25,3.61,3.0,1.64,2.2
+epl,2025,epl_2025_42_burnley_nott'm_forest,20/09/2025,Burnley,Nott'm Forest,1,1,1,1,12,17,5,8,4,5,12,11,1,1,0,0,3.36,3.37,2.18,1.94,1.82
+epl,2025,epl_2025_43_west_ham_crystal_palace,20/09/2025,West Ham,Crystal Palace,1,2,0,1,8,18,3,3,8,8,15,5,3,3,0,0,2.98,3.36,2.37,1.98,1.79
+epl,2025,epl_2025_44_wolves_leeds,20/09/2025,Wolves,Leeds,1,3,1,3,16,6,6,4,4,0,11,9,1,1,0,0,2.67,3.16,2.74,2.22,1.62
+epl,2025,epl_2025_45_man_united_chelsea,20/09/2025,Man United,Chelsea,2,1,2,0,11,5,4,1,5,5,13,14,0,5,1,1,2.68,3.69,2.44,1.57,2.32
+epl,2025,epl_2025_46_fulham_brentford,20/09/2025,Fulham,Brentford,3,1,2,1,14,8,3,3,2,10,11,13,4,1,0,0,2.02,3.48,3.69,1.91,1.86
+epl,2025,epl_2025_47_bournemouth_newcastle,21/09/2025,Bournemouth,Newcastle,0,0,0,0,11,4,2,1,5,2,7,10,2,1,0,0,2.44,3.45,2.78,1.8,1.97
+epl,2025,epl_2025_48_sunderland_aston_villa,21/09/2025,Sunderland,Aston Villa,1,1,0,0,14,12,4,2,6,5,14,8,2,1,1,0,3.56,3.34,2.1,2.09,1.7
+epl,2025,epl_2025_49_arsenal_man_city,21/09/2025,Arsenal,Man City,1,1,0,1,12,5,3,3,11,2,11,10,1,2,0,0,1.9,3.7,3.85,1.77,2.0
+epl,2025,epl_2025_50_brentford_man_united,27/09/2025,Brentford,Man United,3,1,2,1,10,14,8,6,4,2,14,10,2,2,0,0,3.4,3.77,2.02,1.64,2.22
+epl,2025,epl_2025_51_chelsea_brighton,27/09/2025,Chelsea,Brighton,1,3,1,0,13,12,3,3,5,7,9,16,3,5,1,0,1.86,3.86,3.86,1.59,2.29
+epl,2025,epl_2025_52_crystal_palace_liverpool,27/09/2025,Crystal Palace,Liverpool,2,1,1,0,16,20,7,4,2,6,10,8,1,3,0,0,3.82,3.72,1.91,1.72,2.07
+epl,2025,epl_2025_53_leeds_bournemouth,27/09/2025,Leeds,Bournemouth,2,2,1,1,19,12,8,5,7,4,12,13,2,2,0,0,2.98,3.29,2.41,1.96,1.81
+epl,2025,epl_2025_54_man_city_burnley,27/09/2025,Man City,Burnley,5,1,1,1,21,9,8,2,10,2,5,7,1,3,0,0,1.17,7.48,15.54,1.43,2.74
+epl,2025,epl_2025_55_nott'm_forest_sunderland,27/09/2025,Nott'm Forest,Sunderland,0,1,0,1,22,11,6,3,7,4,11,6,4,2,0,0,1.77,3.67,4.64,1.97,1.8
+epl,2025,epl_2025_56_tottenham_wolves,27/09/2025,Tottenham,Wolves,1,1,0,0,10,9,3,3,10,9,9,11,3,2,0,0,1.47,4.57,6.38,1.68,2.14
+epl,2025,epl_2025_57_aston_villa_fulham,28/09/2025,Aston Villa,Fulham,3,1,1,1,9,11,4,4,2,8,10,13,1,4,0,0,2.29,3.19,3.3,2.11,1.69
+epl,2025,epl_2025_58_newcastle_arsenal,28/09/2025,Newcastle,Arsenal,1,2,1,0,8,20,3,7,7,12,8,9,2,1,0,0,3.51,3.32,2.12,2.08,1.71
+epl,2025,epl_2025_59_everton_west_ham,29/09/2025,Everton,West Ham,1,1,1,0,12,14,6,3,3,5,7,16,3,4,0,0,1.72,3.69,4.83,1.91,1.85
+epl,2025,epl_2025_60_bournemouth_fulham,03/10/2025,Bournemouth,Fulham,3,1,0,0,11,12,6,4,4,3,8,10,0,1,0,0,1.97,3.5,3.85,1.93,1.85
+epl,2025,epl_2025_61_leeds_tottenham,04/10/2025,Leeds,Tottenham,1,2,1,1,16,9,4,3,4,1,10,12,2,3,0,0,2.75,3.46,2.49,1.89,1.89
+epl,2025,epl_2025_62_arsenal_west_ham,04/10/2025,Arsenal,West Ham,2,0,1,0,21,4,5,0,8,3,14,14,0,2,0,0,1.19,6.83,15.25,1.52,2.47
+epl,2025,epl_2025_63_man_united_sunderland,04/10/2025,Man United,Sunderland,2,0,2,0,15,8,6,3,2,3,10,12,1,4,0,0,1.5,4.55,5.98,1.64,2.21
+epl,2025,epl_2025_64_chelsea_liverpool,04/10/2025,Chelsea,Liverpool,2,1,1,0,12,12,6,2,7,2,9,8,0,2,0,0,2.87,3.7,2.28,1.53,2.43
+epl,2025,epl_2025_65_aston_villa_burnley,05/10/2025,Aston Villa,Burnley,2,1,1,0,15,5,7,2,6,4,9,15,3,1,0,0,1.59,4.0,5.76,1.9,1.87
+epl,2025,epl_2025_66_everton_crystal_palace,05/10/2025,Everton,Crystal Palace,2,1,0,1,14,15,7,8,2,4,13,16,2,3,0,0,2.53,3.21,2.89,2.2,1.65
+epl,2025,epl_2025_67_newcastle_nott'm_forest,05/10/2025,Newcastle,Nott'm Forest,2,0,0,0,18,5,9,4,8,1,16,15,0,4,0,0,1.58,4.21,5.46,1.69,2.12
+epl,2025,epl_2025_68_wolves_brighton,05/10/2025,Wolves,Brighton,1,1,1,0,6,17,3,6,2,8,13,9,2,4,0,0,3.67,3.6,1.99,1.83,1.94
+epl,2025,epl_2025_69_brentford_man_city,05/10/2025,Brentford,Man City,0,1,0,1,6,10,1,4,3,2,10,6,3,2,0,0,4.73,4.27,1.64,1.56,2.35
+epl,2025,epl_2025_70_nott'm_forest_chelsea,18/10/2025,Nott'm Forest,Chelsea,0,3,0,0,12,17,2,6,5,2,13,16,2,2,0,1,3.75,3.74,1.93,1.68,2.13
+epl,2025,epl_2025_71_brighton_newcastle,18/10/2025,Brighton,Newcastle,2,1,1,0,13,16,5,3,8,4,9,9,0,1,0,0,2.61,3.48,2.62,1.84,1.92
+epl,2025,epl_2025_72_burnley_leeds,18/10/2025,Burnley,Leeds,2,0,1,0,4,19,3,4,1,5,10,7,2,1,0,0,3.3,3.25,2.26,2.2,1.64
+epl,2025,epl_2025_73_crystal_palace_bournemouth,18/10/2025,Crystal Palace,Bournemouth,3,3,0,2,20,8,7,5,6,5,8,16,1,4,0,0,2.25,3.35,3.22,1.92,1.85
+epl,2025,epl_2025_74_man_city_everton,18/10/2025,Man City,Everton,2,0,0,0,19,5,7,1,11,3,8,14,0,2,0,0,1.38,4.92,7.91,1.69,2.12
+epl,2025,epl_2025_75_sunderland_wolves,18/10/2025,Sunderland,Wolves,2,0,1,0,8,16,2,3,3,2,5,12,0,0,0,0,2.46,3.07,3.13,2.43,1.53
+epl,2025,epl_2025_76_fulham_arsenal,18/10/2025,Fulham,Arsenal,0,1,0,0,9,16,0,5,6,10,11,4,0,0,0,0,6.14,4.13,1.54,1.89,1.87
+epl,2025,epl_2025_77_tottenham_aston_villa,19/10/2025,Tottenham,Aston Villa,1,2,1,1,9,8,3,2,6,6,11,7,2,0,0,0,2.06,3.56,3.42,1.78,1.99
+epl,2025,epl_2025_78_liverpool_man_united,19/10/2025,Liverpool,Man United,1,2,0,1,19,12,6,4,9,4,8,14,0,2,0,0,1.6,4.4,4.89,1.43,2.71
+epl,2025,epl_2025_79_west_ham_brentford,20/10/2025,West Ham,Brentford,0,2,0,1,7,22,1,7,6,10,10,10,1,1,0,0,2.46,3.37,2.82,1.85,1.91
+epl,2025,epl_2025_80_leeds_west_ham,24/10/2025,Leeds,West Ham,2,1,2,0,13,9,5,3,3,4,12,11,3,3,0,0,1.81,3.57,4.59,2.04,1.76
+epl,2025,epl_2025_81_chelsea_sunderland,25/10/2025,Chelsea,Sunderland,1,2,1,1,16,10,7,4,9,1,15,13,1,1,0,0,1.37,4.99,8.31,1.69,2.12
+epl,2025,epl_2025_82_newcastle_fulham,25/10/2025,Newcastle,Fulham,2,1,1,0,18,12,7,5,4,3,11,18,0,2,0,0,1.62,3.97,5.44,1.85,1.92
+epl,2025,epl_2025_83_man_united_brighton,25/10/2025,Man United,Brighton,4,2,2,0,13,17,9,5,1,6,4,13,2,2,0,0,2.0,3.83,3.45,1.53,2.43
+epl,2025,epl_2025_84_brentford_liverpool,25/10/2025,Brentford,Liverpool,3,2,2,1,17,18,8,5,5,4,7,10,3,2,0,0,4.28,4.13,1.73,1.54,2.41
+epl,2025,epl_2025_85_arsenal_crystal_palace,26/10/2025,Arsenal,Crystal Palace,1,0,1,0,10,7,3,1,4,3,6,11,0,0,0,0,1.41,4.6,7.76,1.74,2.05
+epl,2025,epl_2025_86_aston_villa_man_city,26/10/2025,Aston Villa,Man City,1,0,1,0,9,18,3,4,5,6,8,16,1,4,0,0,4.08,3.8,1.83,1.73,2.07
+epl,2025,epl_2025_87_bournemouth_nott'm_forest,26/10/2025,Bournemouth,Nott'm Forest,2,0,2,0,13,8,5,4,6,4,17,7,3,1,0,0,1.79,3.79,4.29,1.84,1.92
+epl,2025,epl_2025_88_wolves_burnley,26/10/2025,Wolves,Burnley,2,3,2,2,15,11,7,7,5,3,12,7,1,0,0,0,1.97,3.3,4.06,2.22,1.63
+epl,2025,epl_2025_89_everton_tottenham,26/10/2025,Everton,Tottenham,0,3,0,2,12,7,2,4,9,8,9,8,2,0,0,0,2.35,3.38,2.99,1.91,1.85
+epl,2025,epl_2025_90_brighton_leeds,01/11/2025,Brighton,Leeds,3,0,1,0,14,5,7,2,4,7,10,7,0,1,0,0,1.85,3.74,4.11,1.79,1.97
+epl,2025,epl_2025_91_burnley_arsenal,01/11/2025,Burnley,Arsenal,0,2,0,2,3,12,0,8,1,6,10,13,2,1,0,0,10.97,5.65,1.28,1.73,2.05
+epl,2025,epl_2025_92_crystal_palace_brentford,01/11/2025,Crystal Palace,Brentford,2,0,1,0,9,6,2,2,6,5,7,11,0,3,0,0,1.92,3.65,3.85,1.74,2.04
+epl,2025,epl_2025_93_fulham_wolves,01/11/2025,Fulham,Wolves,3,0,1,0,19,5,6,2,10,1,13,14,1,3,0,1,1.84,3.46,4.51,2.17,1.66
+epl,2025,epl_2025_94_nott'm_forest_man_united,01/11/2025,Nott'm Forest,Man United,2,2,0,1,17,18,3,7,8,5,10,7,1,1,0,0,3.41,3.67,2.05,1.71,2.09
+epl,2025,epl_2025_95_tottenham_chelsea,01/11/2025,Tottenham,Chelsea,0,1,0,1,3,15,1,9,6,5,14,12,4,2,0,0,2.71,3.52,2.5,1.7,2.1
+epl,2025,epl_2025_96_liverpool_aston_villa,01/11/2025,Liverpool,Aston Villa,2,0,1,0,16,10,4,3,1,4,13,11,2,3,0,0,1.63,4.32,4.81,1.52,2.44
+epl,2025,epl_2025_97_west_ham_newcastle,02/11/2025,West Ham,Newcastle,3,1,2,1,15,12,9,4,7,6,5,10,1,2,0,0,4.99,4.08,1.64,1.74,2.04
+epl,2025,epl_2025_98_man_city_bournemouth,02/11/2025,Man City,Bournemouth,3,1,2,1,15,8,8,5,10,4,8,11,2,2,0,0,1.49,4.64,5.9,1.52,2.45
+epl,2025,epl_2025_99_sunderland_everton,03/11/2025,Sunderland,Everton,1,1,0,1,17,8,3,2,4,1,10,12,3,2,0,0,2.74,3.12,2.67,2.29,1.59
+epl,2025,epl_2025_100_tottenham_man_united,08/11/2025,Tottenham,Man United,2,2,0,1,10,5,4,2,5,3,10,8,5,1,0,0,2.65,3.58,2.52,1.64,2.23
+epl,2025,epl_2025_101_everton_fulham,08/11/2025,Everton,Fulham,2,0,1,0,14,8,5,4,7,5,11,14,2,2,0,0,2.2,3.28,3.4,2.17,1.66
+epl,2025,epl_2025_102_west_ham_burnley,08/11/2025,West Ham,Burnley,3,2,1,1,15,16,6,7,7,4,15,13,2,2,0,0,1.94,3.5,3.98,1.96,1.8
+epl,2025,epl_2025_103_sunderland_arsenal,08/11/2025,Sunderland,Arsenal,2,2,1,0,6,17,2,7,2,2,13,13,2,1,0,0,8.39,4.67,1.39,2.0,1.78
+epl,2025,epl_2025_104_chelsea_wolves,08/11/2025,Chelsea,Wolves,3,0,0,0,20,3,8,0,10,1,12,14,1,2,0,0,1.36,5.06,8.27,1.62,2.23
+epl,2025,epl_2025_105_aston_villa_bournemouth,09/11/2025,Aston Villa,Bournemouth,4,0,2,0,16,13,8,4,6,9,8,20,2,2,0,0,2.19,3.45,3.25,1.82,1.95
+epl,2025,epl_2025_106_brentford_newcastle,09/11/2025,Brentford,Newcastle,3,1,0,1,15,5,7,1,6,2,10,13,2,1,0,0,2.84,3.4,2.45,1.81,1.95
+epl,2025,epl_2025_107_crystal_palace_brighton,09/11/2025,Crystal Palace,Brighton,0,0,0,0,10,7,2,3,4,8,10,12,1,4,0,0,2.27,3.52,3.04,1.71,2.08
+epl,2025,epl_2025_108_nott'm_forest_leeds,09/11/2025,Nott'm Forest,Leeds,3,1,1,1,14,10,6,3,6,4,10,11,2,1,0,0,2.22,3.32,3.29,2.04,1.74
+epl,2025,epl_2025_109_man_city_liverpool,09/11/2025,Man City,Liverpool,3,0,2,0,14,7,6,1,7,7,14,15,2,4,0,0,1.88,3.92,3.72,1.48,2.58
+epl,2025,epl_2025_110_burnley_chelsea,22/11/2025,Burnley,Chelsea,0,2,0,1,8,15,2,5,1,9,13,8,2,3,0,0,6.56,4.45,1.48,1.76,2.01
+epl,2025,epl_2025_111_bournemouth_west_ham,22/11/2025,Bournemouth,West Ham,2,2,0,2,28,5,10,2,9,2,9,10,3,2,0,0,1.62,4.09,5.14,1.65,2.19
+epl,2025,epl_2025_112_brighton_brentford,22/11/2025,Brighton,Brentford,2,1,0,1,14,10,5,4,7,4,10,9,4,2,0,0,1.93,3.66,3.82,1.68,2.13
+epl,2025,epl_2025_113_fulham_sunderland,22/11/2025,Fulham,Sunderland,1,0,0,0,24,4,6,2,7,4,5,13,3,3,0,0,2.1,3.24,3.74,2.19,1.65
+epl,2025,epl_2025_114_liverpool_nott'm_forest,22/11/2025,Liverpool,Nott'm Forest,0,3,0,1,21,15,4,7,8,6,11,8,2,0,0,0,1.42,4.86,6.97,1.53,2.43
+epl,2025,epl_2025_115_wolves_crystal_palace,22/11/2025,Wolves,Crystal Palace,0,2,0,0,8,10,1,4,1,4,13,9,2,3,0,0,3.86,3.5,1.97,1.99,1.78
+epl,2025,epl_2025_116_newcastle_man_city,22/11/2025,Newcastle,Man City,2,1,0,0,9,17,5,4,5,9,13,8,1,3,0,0,3.54,3.75,1.98,1.68,2.13
+epl,2025,epl_2025_117_leeds_aston_villa,23/11/2025,Leeds,Aston Villa,1,2,1,0,14,14,5,3,3,3,18,16,5,1,0,0,3.04,3.25,2.37,2.12,1.69
+epl,2025,epl_2025_118_arsenal_tottenham,23/11/2025,Arsenal,Tottenham,4,1,2,0,17,3,8,2,4,1,11,15,1,3,0,0,1.39,4.66,8.03,1.77,2.0
+epl,2025,epl_2025_119_man_united_everton,24/11/2025,Man United,Everton,0,1,0,1,25,3,6,1,9,1,12,9,2,0,0,1,1.74,3.83,4.49,1.74,2.04
+epl,2025,epl_2025_120_brentford_burnley,29/11/2025,Brentford,Burnley,3,1,0,0,14,6,4,2,5,6,7,7,0,2,0,0,1.45,4.54,6.96,1.78,1.99
+epl,2025,epl_2025_121_man_city_leeds,29/11/2025,Man City,Leeds,3,2,2,0,18,9,9,4,8,1,17,11,4,1,0,0,1.23,6.42,11.78,1.52,2.46
+epl,2025,epl_2025_122_sunderland_bournemouth,29/11/2025,Sunderland,Bournemouth,3,2,1,2,12,18,6,6,6,3,14,13,5,5,0,1,3.04,3.3,2.35,1.96,1.81
+epl,2025,epl_2025_123_everton_newcastle,29/11/2025,Everton,Newcastle,1,4,0,3,10,13,2,8,8,7,4,6,0,0,0,0,2.79,3.31,2.55,1.96,1.8
+epl,2025,epl_2025_124_tottenham_fulham,29/11/2025,Tottenham,Fulham,1,2,0,2,14,7,2,3,8,2,11,7,3,2,0,0,2.18,3.39,3.33,1.87,1.9
+epl,2025,epl_2025_125_crystal_palace_man_united,30/11/2025,Crystal Palace,Man United,1,2,1,0,14,14,3,6,4,4,14,14,3,2,0,0,2.32,3.51,2.93,1.71,2.08
+epl,2025,epl_2025_126_aston_villa_wolves,30/11/2025,Aston Villa,Wolves,1,0,0,0,16,9,6,4,7,3,13,21,0,4,0,0,1.48,4.39,6.57,1.78,1.98
+epl,2025,epl_2025_127_nott'm_forest_brighton,30/11/2025,Nott'm Forest,Brighton,0,2,0,1,19,17,3,6,9,2,11,10,0,1,0,0,2.72,3.36,2.54,1.88,1.88
+epl,2025,epl_2025_128_west_ham_liverpool,30/11/2025,West Ham,Liverpool,0,2,0,0,7,9,0,5,7,2,12,14,1,0,1,0,4.28,4.06,1.74,1.51,2.47
+epl,2025,epl_2025_129_chelsea_arsenal,30/11/2025,Chelsea,Arsenal,1,1,0,0,11,8,4,4,3,3,12,13,1,6,1,0,3.33,3.35,2.18,1.92,1.84
+epl,2025,epl_2025_130_bournemouth_everton,02/12/2025,Bournemouth,Everton,0,1,0,0,5,13,2,3,1,6,14,14,3,3,0,0,2.2,3.29,3.38,1.92,1.86
+epl,2025,epl_2025_131_fulham_man_city,02/12/2025,Fulham,Man City,4,5,1,3,12,11,6,4,7,2,9,7,0,1,0,0,4.66,4.04,1.69,1.65,2.2
+epl,2025,epl_2025_132_newcastle_tottenham,02/12/2025,Newcastle,Tottenham,2,2,0,0,19,8,7,2,11,8,5,12,0,3,0,0,1.8,3.78,4.24,1.72,2.09
+epl,2025,epl_2025_133_arsenal_brentford,03/12/2025,Arsenal,Brentford,2,0,1,0,15,6,7,1,4,8,7,9,0,1,0,0,1.35,4.97,8.94,1.73,2.06
+epl,2025,epl_2025_134_brighton_aston_villa,03/12/2025,Brighton,Aston Villa,3,4,2,2,16,14,7,10,5,6,10,9,2,2,0,0,2.15,3.48,3.33,1.82,1.94
+epl,2025,epl_2025_135_burnley_crystal_palace,03/12/2025,Burnley,Crystal Palace,0,1,0,1,11,3,4,3,3,4,9,8,0,0,0,0,4.57,3.71,1.77,1.97,1.8
+epl,2025,epl_2025_136_wolves_nott'm_forest,03/12/2025,Wolves,Nott'm Forest,0,1,0,0,5,10,1,3,3,9,19,11,2,2,0,0,3.28,3.3,2.24,2.07,1.72
+epl,2025,epl_2025_137_leeds_chelsea,03/12/2025,Leeds,Chelsea,3,1,2,0,17,14,5,2,4,2,10,13,1,1,0,0,4.31,3.87,1.78,1.81,1.96
+epl,2025,epl_2025_138_liverpool_sunderland,03/12/2025,Liverpool,Sunderland,1,1,0,0,23,9,4,6,7,3,10,5,1,1,0,0,1.35,5.29,8.05,1.55,2.38
+epl,2025,epl_2025_139_man_united_west_ham,04/12/2025,Man United,West Ham,1,1,0,0,17,11,4,3,6,6,13,9,2,2,0,0,1.43,4.81,6.59,1.49,2.53
+epl,2025,epl_2025_140_aston_villa_arsenal,06/12/2025,Aston Villa,Arsenal,2,1,1,0,15,15,6,9,3,3,10,8,0,2,0,0,4.13,3.45,1.91,2.06,1.74
+epl,2025,epl_2025_141_bournemouth_chelsea,06/12/2025,Bournemouth,Chelsea,0,0,0,0,13,11,5,4,5,0,15,13,0,2,0,0,3.14,3.67,2.16,1.63,2.2
+epl,2025,epl_2025_142_everton_nott'm_forest,06/12/2025,Everton,Nott'm Forest,3,0,2,0,11,7,5,3,6,3,17,15,4,3,0,0,2.17,3.25,3.52,2.09,1.7
+epl,2025,epl_2025_143_man_city_sunderland,06/12/2025,Man City,Sunderland,3,0,2,0,18,8,6,1,6,5,9,10,1,0,0,1,1.24,6.22,11.38,1.48,2.57
+epl,2025,epl_2025_144_newcastle_burnley,06/12/2025,Newcastle,Burnley,2,1,2,0,17,9,7,3,9,9,9,11,2,2,0,1,1.28,5.72,10.39,1.58,2.29
+epl,2025,epl_2025_145_tottenham_brentford,06/12/2025,Tottenham,Brentford,2,0,2,0,15,4,7,1,7,6,8,9,3,4,0,0,2.31,3.44,3.03,1.8,1.97
+epl,2025,epl_2025_146_leeds_liverpool,06/12/2025,Leeds,Liverpool,3,3,0,0,12,16,5,7,5,4,14,14,3,3,0,0,3.95,3.9,1.84,1.64,2.2
+epl,2025,epl_2025_147_brighton_west_ham,07/12/2025,Brighton,West Ham,1,1,0,0,22,14,4,5,10,6,12,8,2,2,0,0,1.55,4.32,5.63,1.6,2.27
+epl,2025,epl_2025_148_fulham_crystal_palace,07/12/2025,Fulham,Crystal Palace,1,2,1,1,12,11,4,5,6,4,5,8,0,0,0,0,2.57,3.27,2.77,2.02,1.76
+epl,2025,epl_2025_149_wolves_man_united,08/12/2025,Wolves,Man United,1,4,1,1,8,27,2,10,1,9,17,12,3,2,0,0,4.22,3.9,1.77,1.67,2.14
+epl,2025,epl_2025_150_chelsea_everton,13/12/2025,Chelsea,Everton,2,0,2,0,17,11,5,2,4,7,13,11,1,0,0,0,1.66,3.9,5.09,1.84,1.91
+epl,2025,epl_2025_151_liverpool_brighton,13/12/2025,Liverpool,Brighton,2,0,1,0,18,14,4,1,2,2,8,15,1,2,0,0,1.67,4.17,4.62,1.5,2.48
+epl,2025,epl_2025_152_burnley_fulham,13/12/2025,Burnley,Fulham,2,3,1,2,16,6,8,4,10,4,8,8,1,2,0,0,3.93,3.48,1.95,2.04,1.74
+epl,2025,epl_2025_153_arsenal_wolves,13/12/2025,Arsenal,Wolves,2,1,0,0,16,3,2,2,8,0,7,15,0,4,0,0,1.12,8.62,22.31,1.51,2.48
+epl,2025,epl_2025_154_crystal_palace_man_city,14/12/2025,Crystal Palace,Man City,0,3,0,1,16,7,4,6,2,2,9,6,2,0,0,0,3.98,3.81,1.83,1.66,2.16
+epl,2025,epl_2025_155_nott'm_forest_tottenham,14/12/2025,Nott'm Forest,Tottenham,3,0,1,0,15,6,6,1,3,3,9,13,1,3,0,0,2.55,3.28,2.76,1.95,1.8
+epl,2025,epl_2025_156_sunderland_newcastle,14/12/2025,Sunderland,Newcastle,1,0,0,0,5,6,1,2,3,6,10,10,5,4,0,0,3.26,3.33,2.22,1.91,1.84
+epl,2025,epl_2025_157_west_ham_aston_villa,14/12/2025,West Ham,Aston Villa,2,3,2,1,10,7,3,4,5,3,18,13,1,2,0,0,3.63,3.51,2.0,1.78,1.97
+epl,2025,epl_2025_158_brentford_leeds,14/12/2025,Brentford,Leeds,1,1,0,0,7,18,2,4,0,3,8,9,0,0,0,0,1.94,3.54,3.85,1.86,1.89
+epl,2025,epl_2025_159_man_united_bournemouth,15/12/2025,Man United,Bournemouth,4,4,2,1,25,14,9,9,5,4,15,12,2,3,0,0,1.82,3.98,3.84,1.55,2.36
+epl,2025,epl_2025_160_newcastle_chelsea,20/12/2025,Newcastle,Chelsea,2,2,2,0,11,13,5,4,6,4,13,14,3,6,0,0,2.73,3.51,2.47,1.66,2.18
+epl,2025,epl_2025_161_bournemouth_burnley,20/12/2025,Bournemouth,Burnley,1,1,0,0,16,4,1,1,5,3,11,11,1,1,0,0,1.47,4.44,6.59,1.68,2.13
+epl,2025,epl_2025_162_brighton_sunderland,20/12/2025,Brighton,Sunderland,0,0,0,0,16,14,4,6,3,4,11,15,2,2,0,0,1.65,3.95,5.16,1.8,1.96
+epl,2025,epl_2025_163_man_city_west_ham,20/12/2025,Man City,West Ham,3,0,2,0,17,7,8,3,6,0,16,10,1,1,0,0,1.2,7.36,11.88,1.34,3.13
+epl,2025,epl_2025_164_wolves_brentford,20/12/2025,Wolves,Brentford,0,2,0,0,9,7,2,6,3,4,12,15,2,4,0,0,3.59,3.48,2.05,1.93,1.83
+epl,2025,epl_2025_165_tottenham_liverpool,20/12/2025,Tottenham,Liverpool,1,2,0,0,15,8,4,4,2,6,9,7,3,3,2,0,3.36,3.71,2.02,1.63,2.2
+epl,2025,epl_2025_166_everton_arsenal,20/12/2025,Everton,Arsenal,0,1,0,1,5,13,1,2,2,3,4,5,2,2,0,0,6.03,3.89,1.57,2.05,1.73
+epl,2025,epl_2025_167_leeds_crystal_palace,20/12/2025,Leeds,Crystal Palace,4,1,2,0,20,9,8,3,9,5,5,10,1,3,0,0,2.6,3.25,2.76,2.05,1.73
+epl,2025,epl_2025_168_aston_villa_man_united,21/12/2025,Aston Villa,Man United,2,1,1,1,12,15,4,6,5,5,11,14,1,2,0,0,2.1,3.64,3.26,1.63,2.21
+epl,2025,epl_2025_169_fulham_nott'm_forest,22/12/2025,Fulham,Nott'm Forest,1,0,1,0,11,12,1,2,1,5,5,9,5,4,0,0,2.42,3.27,2.93,1.99,1.76
+epl,2025,epl_2025_170_man_united_newcastle,26/12/2025,Man United,Newcastle,1,0,1,0,10,16,4,3,2,11,9,5,2,1,0,0,2.47,3.58,2.67,1.62,2.22
+epl,2025,epl_2025_171_nott'm_forest_man_city,27/12/2025,Nott'm Forest,Man City,1,2,0,0,7,16,2,5,5,5,5,13,1,2,0,0,5.21,4.24,1.59,1.62,2.23
+epl,2025,epl_2025_172_arsenal_brighton,27/12/2025,Arsenal,Brighton,2,1,1,0,24,8,6,3,7,2,7,13,2,3,0,0,1.41,4.73,7.34,1.64,2.2
+epl,2025,epl_2025_173_brentford_bournemouth,27/12/2025,Brentford,Bournemouth,4,1,2,0,15,20,7,10,2,15,9,8,2,2,0,0,2.25,3.57,2.98,1.69,2.11
+epl,2025,epl_2025_174_burnley_everton,27/12/2025,Burnley,Everton,0,0,0,0,16,15,0,6,6,5,8,8,0,2,0,0,4.03,3.33,1.96,2.16,1.66
+epl,2025,epl_2025_175_liverpool_wolves,27/12/2025,Liverpool,Wolves,2,1,2,0,14,9,4,4,6,4,5,13,0,1,0,0,1.24,6.31,11.25,1.46,2.62
+epl,2025,epl_2025_176_west_ham_fulham,27/12/2025,West Ham,Fulham,0,1,0,0,11,15,2,4,5,4,8,8,1,3,0,0,2.65,3.38,2.59,1.78,1.98
+epl,2025,epl_2025_177_chelsea_aston_villa,27/12/2025,Chelsea,Aston Villa,1,2,1,0,14,11,3,8,6,7,16,8,5,3,0,0,1.84,3.82,3.97,1.68,2.12
+epl,2025,epl_2025_178_sunderland_leeds,28/12/2025,Sunderland,Leeds,1,1,1,0,8,17,3,6,3,9,7,9,1,0,0,0,2.56,3.18,2.8,2.19,1.64
+epl,2025,epl_2025_179_crystal_palace_tottenham,28/12/2025,Crystal Palace,Tottenham,0,1,0,1,15,8,2,4,3,2,7,5,3,2,0,0,2.25,3.33,3.19,1.96,1.8
+epl,2025,epl_2025_180_burnley_newcastle,30/12/2025,Burnley,Newcastle,1,3,1,2,15,20,4,9,3,4,9,3,2,1,0,0,5.5,4.11,1.59,1.77,2.0
+epl,2025,epl_2025_181_chelsea_bournemouth,30/12/2025,Chelsea,Bournemouth,2,2,2,2,17,17,3,6,12,3,5,12,1,1,0,0,1.51,4.56,5.81,1.49,2.58
+epl,2025,epl_2025_182_nott'm_forest_everton,30/12/2025,Nott'm Forest,Everton,0,2,0,1,21,11,6,3,9,2,11,9,1,0,0,0,2.12,3.21,3.7,2.28,1.6
+epl,2025,epl_2025_183_west_ham_brighton,30/12/2025,West Ham,Brighton,2,2,2,1,10,16,4,6,5,5,11,18,3,5,0,0,3.41,3.67,2.04,1.65,2.19
+epl,2025,epl_2025_184_arsenal_aston_villa,30/12/2025,Arsenal,Aston Villa,4,1,0,0,22,11,7,3,3,3,18,9,2,3,0,0,1.43,4.68,7.02,1.67,2.17
+epl,2025,epl_2025_185_man_united_wolves,30/12/2025,Man United,Wolves,1,1,1,1,15,11,6,4,8,4,9,12,0,2,0,0,1.37,5.06,8.09,1.58,2.32
+epl,2025,epl_2025_186_crystal_palace_fulham,01/01/2026,Crystal Palace,Fulham,1,1,1,0,11,17,2,5,6,3,7,10,0,5,0,0,2.17,3.34,3.4,2.01,1.74
+epl,2025,epl_2025_187_liverpool_leeds,01/01/2026,Liverpool,Leeds,0,0,0,0,19,4,4,2,8,3,10,8,0,2,0,0,1.53,4.41,5.83,1.59,2.29
+epl,2025,epl_2025_188_brentford_tottenham,01/01/2026,Brentford,Tottenham,0,0,0,0,7,9,2,3,3,1,8,10,1,2,0,0,2.11,3.49,3.35,1.87,1.88
+epl,2025,epl_2025_189_sunderland_man_city,01/01/2026,Sunderland,Man City,0,0,0,0,10,14,4,4,3,5,9,6,1,1,0,0,7.81,4.82,1.39,1.62,2.22
+epl,2025,epl_2025_190_aston_villa_nott'm_forest,03/01/2026,Aston Villa,Nott'm Forest,3,1,1,0,11,10,4,5,4,4,10,20,1,2,0,0,1.76,3.74,4.54,1.8,1.97
+epl,2025,epl_2025_191_brighton_burnley,03/01/2026,Brighton,Burnley,2,0,1,0,15,5,4,3,4,4,7,17,0,4,0,0,1.49,4.35,6.56,1.7,2.1
+epl,2025,epl_2025_192_wolves_west_ham,03/01/2026,Wolves,West Ham,3,0,3,0,11,6,8,0,6,7,11,10,1,0,0,0,2.48,3.37,2.82,1.91,1.85
+epl,2025,epl_2025_193_bournemouth_arsenal,03/01/2026,Bournemouth,Arsenal,2,3,1,1,15,12,3,5,7,5,13,8,3,1,0,0,6.13,4.57,1.48,1.62,2.22
+epl,2025,epl_2025_194_leeds_man_united,04/01/2026,Leeds,Man United,1,1,0,0,11,15,3,2,6,4,9,9,0,1,0,0,2.68,3.44,2.56,1.8,1.96
+epl,2025,epl_2025_195_everton_brentford,04/01/2026,Everton,Brentford,2,4,0,1,14,11,6,7,4,5,9,8,0,2,0,0,2.36,3.19,3.1,2.19,1.64
+epl,2025,epl_2025_196_newcastle_crystal_palace,04/01/2026,Newcastle,Crystal Palace,2,0,0,0,12,11,7,1,8,6,5,12,1,3,0,0,1.67,3.92,4.89,1.75,2.02
+epl,2025,epl_2025_197_tottenham_sunderland,04/01/2026,Tottenham,Sunderland,1,1,1,0,13,10,5,3,3,5,10,6,2,3,0,0,1.8,3.65,4.37,2.0,1.77
+epl,2025,epl_2025_198_fulham_liverpool,04/01/2026,Fulham,Liverpool,2,2,1,0,8,10,2,2,3,8,11,4,1,1,0,0,3.74,3.68,1.92,1.77,2.0
+epl,2025,epl_2025_199_man_city_chelsea,04/01/2026,Man City,Chelsea,1,1,1,0,14,8,3,3,8,2,12,14,3,3,0,0,1.63,4.39,4.66,1.49,2.55
+epl,2025,epl_2025_200_west_ham_nott'm_forest,06/01/2026,West Ham,Nott'm Forest,1,2,1,0,14,13,3,5,6,5,15,9,3,0,0,0,3.1,3.33,2.3,1.91,1.86
+epl,2025,epl_2025_201_bournemouth_tottenham,07/01/2026,Bournemouth,Tottenham,3,2,2,1,11,16,3,4,3,7,19,10,3,3,0,0,2.11,3.62,3.27,1.69,2.11
+epl,2025,epl_2025_202_brentford_sunderland,07/01/2026,Brentford,Sunderland,3,0,1,0,18,11,6,3,7,4,13,13,2,1,0,0,1.83,3.56,4.36,1.98,1.79
+epl,2025,epl_2025_203_crystal_palace_aston_villa,07/01/2026,Crystal Palace,Aston Villa,0,0,0,0,11,15,5,3,3,5,8,3,2,0,0,0,3.08,3.36,2.31,1.9,1.86
+epl,2025,epl_2025_204_everton_wolves,07/01/2026,Everton,Wolves,1,1,1,0,13,13,2,4,2,7,13,15,1,3,2,0,1.76,3.55,4.85,2.05,1.73
+epl,2025,epl_2025_205_fulham_chelsea,07/01/2026,Fulham,Chelsea,2,1,0,0,16,14,5,6,2,11,11,6,3,3,0,1,3.38,3.59,2.07,1.77,2.0
+epl,2025,epl_2025_206_man_city_brighton,07/01/2026,Man City,Brighton,1,1,1,0,22,6,6,3,6,2,6,16,1,6,0,0,1.37,5.23,7.27,1.42,2.76
+epl,2025,epl_2025_207_burnley_man_united,07/01/2026,Burnley,Man United,2,2,1,0,7,30,1,10,2,6,9,8,2,0,0,0,4.68,3.95,1.7,1.71,2.08
+epl,2025,epl_2025_208_newcastle_leeds,07/01/2026,Newcastle,Leeds,4,3,1,2,18,14,8,6,8,4,11,10,3,2,0,0,1.67,3.87,5.02,1.79,1.98
+epl,2025,epl_2025_209_arsenal_liverpool,08/01/2026,Arsenal,Liverpool,0,0,0,0,9,8,4,0,3,0,10,9,2,2,0,0,1.6,4.11,5.25,1.71,2.07
+epl,2025,epl_2025_210_man_united_man_city,17/01/2026,Man United,Man City,2,0,0,0,11,7,7,1,1,6,13,8,2,3,0,0,3.55,3.87,1.94,1.48,2.56
+epl,2025,epl_2025_211_chelsea_brentford,17/01/2026,Chelsea,Brentford,2,0,1,0,6,15,2,5,3,9,7,10,3,2,0,0,1.69,3.97,4.75,1.63,2.21
+epl,2025,epl_2025_212_leeds_fulham,17/01/2026,Leeds,Fulham,1,0,0,0,14,8,5,1,7,3,6,11,1,5,0,0,2.17,3.33,3.41,2.05,1.74
+epl,2025,epl_2025_213_liverpool_burnley,17/01/2026,Liverpool,Burnley,1,1,1,0,32,7,11,1,9,1,8,10,1,2,0,0,1.22,6.4,12.44,1.54,2.39
+epl,2025,epl_2025_214_sunderland_crystal_palace,17/01/2026,Sunderland,Crystal Palace,2,1,1,1,13,6,7,2,3,4,8,15,3,3,0,0,2.69,3.15,2.74,2.2,1.64
+epl,2025,epl_2025_215_tottenham_west_ham,17/01/2026,Tottenham,West Ham,1,2,0,1,21,17,6,4,11,5,12,17,5,3,0,0,1.71,3.91,4.63,1.71,2.08
+epl,2025,epl_2025_216_nott'm_forest_arsenal,17/01/2026,Nott'm Forest,Arsenal,0,0,0,0,6,15,0,3,4,9,8,14,1,1,0,0,6.1,4.16,1.54,1.86,1.89
+epl,2025,epl_2025_217_wolves_newcastle,18/01/2026,Wolves,Newcastle,0,0,0,0,6,12,2,2,4,7,14,8,2,2,0,0,4.6,3.98,1.7,1.66,2.16
+epl,2025,epl_2025_218_aston_villa_everton,18/01/2026,Aston Villa,Everton,0,1,0,0,18,9,5,3,6,4,15,13,1,2,0,0,1.66,3.87,5.09,1.88,1.87
+epl,2025,epl_2025_219_brighton_bournemouth,19/01/2026,Brighton,Bournemouth,1,1,0,1,17,11,5,2,11,6,7,6,2,3,0,0,1.85,3.92,3.75,1.5,2.53
+epl,2025,epl_2025_220_west_ham_sunderland,24/01/2026,West Ham,Sunderland,3,1,3,0,13,7,5,2,3,3,9,16,2,4,0,0,2.51,3.24,2.85,2.08,1.71
+epl,2025,epl_2025_221_burnley_tottenham,24/01/2026,Burnley,Tottenham,2,2,1,1,9,18,4,11,1,3,8,9,1,0,0,0,3.64,3.39,2.05,1.99,1.77
+epl,2025,epl_2025_222_fulham_brighton,24/01/2026,Fulham,Brighton,2,1,0,1,12,13,4,5,6,6,10,6,1,1,0,0,2.54,3.42,2.71,1.76,2.01
+epl,2025,epl_2025_223_man_city_wolves,24/01/2026,Man City,Wolves,2,0,2,0,11,11,4,1,4,6,16,14,1,3,0,0,1.21,6.68,12.0,1.39,2.87
+epl,2025,epl_2025_224_bournemouth_liverpool,24/01/2026,Bournemouth,Liverpool,3,2,2,1,12,14,5,4,3,11,7,7,1,1,0,0,3.73,3.87,1.89,1.57,2.32
+epl,2025,epl_2025_225_brentford_nott'm_forest,25/01/2026,Brentford,Nott'm Forest,0,2,0,1,10,7,1,2,6,5,11,10,1,0,0,0,1.9,3.49,4.02,1.92,1.85
+epl,2025,epl_2025_226_crystal_palace_chelsea,25/01/2026,Crystal Palace,Chelsea,1,3,0,1,13,10,7,6,4,5,11,10,2,2,1,0,3.5,3.66,2.0,1.74,2.04
+epl,2025,epl_2025_227_newcastle_aston_villa,25/01/2026,Newcastle,Aston Villa,0,2,0,1,15,14,4,8,6,5,7,12,1,2,0,0,1.98,3.66,3.54,1.64,2.19
+epl,2025,epl_2025_228_arsenal_man_united,25/01/2026,Arsenal,Man United,2,3,1,1,15,10,4,3,9,2,11,9,2,0,0,0,1.55,4.08,5.89,1.69,2.1
+epl,2025,epl_2025_229_everton_leeds,26/01/2026,Everton,Leeds,1,1,0,1,10,14,3,4,4,4,9,13,0,3,0,0,2.48,3.15,2.92,2.19,1.64
+epl,2025,epl_2025_230_brighton_everton,31/01/2026,Brighton,Everton,1,1,0,0,11,7,2,4,5,2,13,14,1,2,0,0,1.86,3.6,4.13,1.83,1.93
+epl,2025,epl_2025_231_leeds_arsenal,31/01/2026,Leeds,Arsenal,0,4,0,2,3,14,1,8,4,12,10,7,1,1,0,0,6.16,4.1,1.54,1.92,1.85
+epl,2025,epl_2025_232_wolves_bournemouth,31/01/2026,Wolves,Bournemouth,0,2,0,1,17,9,7,4,5,6,11,15,3,3,0,0,2.95,3.5,2.31,1.73,2.06
+epl,2025,epl_2025_233_chelsea_west_ham,31/01/2026,Chelsea,West Ham,3,2,0,2,14,11,6,6,9,3,11,13,3,2,0,1,1.49,4.53,6.05,1.53,2.43
+epl,2025,epl_2025_234_liverpool_newcastle,31/01/2026,Liverpool,Newcastle,4,1,2,1,17,8,7,2,7,11,11,7,1,3,0,0,1.77,3.99,4.12,1.61,2.24
+epl,2025,epl_2025_235_aston_villa_brentford,01/02/2026,Aston Villa,Brentford,0,1,0,1,27,6,5,2,12,1,8,8,0,3,0,0,2.08,3.47,3.46,1.78,1.98
+epl,2025,epl_2025_236_man_united_fulham,01/02/2026,Man United,Fulham,3,2,1,0,13,14,6,6,3,7,6,9,2,1,0,0,1.58,4.32,5.2,1.65,2.17
+epl,2025,epl_2025_237_nott'm_forest_crystal_palace,01/02/2026,Nott'm Forest,Crystal Palace,1,1,1,1,9,14,1,3,5,7,4,12,1,3,0,0,1.95,3.48,3.88,1.97,1.78
+epl,2025,epl_2025_238_tottenham_man_city,01/02/2026,Tottenham,Man City,2,2,0,2,12,15,6,3,3,4,15,12,3,3,0,0,4.41,4.06,1.71,1.61,2.26
+epl,2025,epl_2025_239_sunderland_burnley,02/02/2026,Sunderland,Burnley,3,0,2,0,14,5,5,0,1,2,12,10,1,4,0,0,1.8,3.42,4.73,2.21,1.63
+epl,2025,epl_2025_240_leeds_nott'm_forest,06/02/2026,Leeds,Nott'm Forest,3,1,2,0,14,16,5,6,5,10,9,12,1,1,0,0,2.21,3.26,3.37,2.08,1.72
+epl,2025,epl_2025_241_man_united_tottenham,07/02/2026,Man United,Tottenham,2,0,1,0,23,7,10,1,7,0,12,11,1,2,0,1,1.57,4.54,4.97,1.46,2.65
+epl,2025,epl_2025_242_arsenal_sunderland,07/02/2026,Arsenal,Sunderland,3,0,1,0,16,5,5,3,5,2,11,8,1,2,0,0,1.21,6.23,14.08,1.69,2.11
+epl,2025,epl_2025_243_bournemouth_aston_villa,07/02/2026,Bournemouth,Aston Villa,1,1,0,1,20,7,9,4,11,4,4,11,1,1,0,0,2.68,3.6,2.46,1.66,2.16
+epl,2025,epl_2025_244_burnley_west_ham,07/02/2026,Burnley,West Ham,0,2,0,2,18,6,5,4,5,2,11,10,3,1,0,0,3.28,3.5,2.14,1.86,1.89
+epl,2025,epl_2025_245_fulham_everton,07/02/2026,Fulham,Everton,1,2,1,0,13,16,3,3,6,6,11,12,1,5,0,0,2.1,3.27,3.64,2.18,1.65
+epl,2025,epl_2025_246_wolves_chelsea,07/02/2026,Wolves,Chelsea,1,3,0,3,11,15,3,6,3,4,9,10,1,1,0,0,4.9,4.05,1.65,1.68,2.12
+epl,2025,epl_2025_247_newcastle_brentford,07/02/2026,Newcastle,Brentford,2,3,1,2,16,11,4,5,9,3,14,18,2,2,0,0,2.05,3.53,3.51,1.67,2.14
+epl,2025,epl_2025_248_brighton_crystal_palace,08/02/2026,Brighton,Crystal Palace,0,1,0,0,7,7,2,4,3,4,12,9,1,3,0,0,1.96,3.57,3.68,1.79,1.96
+epl,2025,epl_2025_249_liverpool_man_city,08/02/2026,Liverpool,Man City,1,2,0,0,15,17,4,7,5,4,13,16,2,4,1,0,2.34,3.68,2.76,1.56,2.36
+epl,2025,epl_2025_250_chelsea_leeds,10/02/2026,Chelsea,Leeds,2,2,1,0,19,4,4,2,4,1,9,13,4,4,0,0,1.55,4.28,5.66,1.61,2.24
+epl,2025,epl_2025_251_everton_bournemouth,10/02/2026,Everton,Bournemouth,1,2,1,0,16,11,6,4,7,2,14,15,1,3,1,0,2.41,3.35,2.91,1.82,1.93
+epl,2025,epl_2025_252_tottenham_newcastle,10/02/2026,Tottenham,Newcastle,1,2,0,1,16,21,2,5,2,12,15,11,3,2,0,0,3.18,3.48,2.2,1.7,2.11
+epl,2025,epl_2025_253_west_ham_man_united,10/02/2026,West Ham,Man United,1,1,0,0,7,9,3,3,5,3,10,4,1,1,0,0,4.36,4.23,1.7,1.47,2.6
+epl,2025,epl_2025_254_aston_villa_brighton,11/02/2026,Aston Villa,Brighton,1,0,0,0,15,9,1,3,7,5,9,15,2,3,0,0,1.92,3.67,3.79,1.75,2.02
+epl,2025,epl_2025_255_crystal_palace_burnley,11/02/2026,Crystal Palace,Burnley,2,3,2,3,21,8,3,3,8,2,11,8,2,1,0,0,1.55,3.98,6.18,1.91,1.83
+epl,2025,epl_2025_256_man_city_fulham,11/02/2026,Man City,Fulham,3,0,3,0,13,14,5,3,4,4,8,10,3,1,0,0,1.34,5.33,8.08,1.52,2.45
+epl,2025,epl_2025_257_nott'm_forest_wolves,11/02/2026,Nott'm Forest,Wolves,0,0,0,0,35,7,10,3,8,2,12,13,0,2,0,0,1.69,3.72,5.09,1.94,1.81
+epl,2025,epl_2025_258_sunderland_liverpool,11/02/2026,Sunderland,Liverpool,0,1,0,0,11,23,2,3,3,11,8,10,1,0,0,0,4.65,3.83,1.72,1.79,1.96
+epl,2025,epl_2025_259_brentford_arsenal,12/02/2026,Brentford,Arsenal,1,1,0,0,12,7,3,2,6,4,12,11,3,2,0,0,4.83,3.86,1.69,1.83,1.92
+epl,2025,epl_2025_260_wolves_arsenal,18/02/2026,Wolves,Arsenal,2,2,0,1,5,10,2,4,1,3,6,8,2,1,0,0,10.94,5.48,1.28,1.69,2.11
+epl,2025,epl_2025_261_aston_villa_leeds,21/02/2026,Aston Villa,Leeds,1,1,0,1,16,14,4,4,7,2,11,16,1,4,0,0,1.84,3.62,4.24,1.81,1.95
+epl,2025,epl_2025_262_brentford_brighton,21/02/2026,Brentford,Brighton,0,2,0,2,13,11,3,7,6,4,9,14,1,2,0,0,2.01,3.7,3.45,1.74,2.02
+epl,2025,epl_2025_263_chelsea_burnley,21/02/2026,Chelsea,Burnley,1,1,1,0,12,12,2,4,9,5,13,11,2,2,1,0,1.2,6.7,12.88,1.42,2.73
+epl,2025,epl_2025_264_west_ham_bournemouth,21/02/2026,West Ham,Bournemouth,0,0,0,0,20,10,3,5,9,5,10,11,1,1,0,0,2.41,3.65,2.71,1.54,2.38
+epl,2025,epl_2025_265_man_city_newcastle,21/02/2026,Man City,Newcastle,2,1,2,1,15,13,7,7,5,5,12,13,2,5,0,0,1.46,4.92,5.82,1.41,2.77
+epl,2025,epl_2025_266_crystal_palace_wolves,22/02/2026,Crystal Palace,Wolves,1,0,0,0,14,12,3,7,7,3,19,13,5,1,0,1,1.62,3.99,5.26,1.89,1.86
+epl,2025,epl_2025_267_nott'm_forest_liverpool,22/02/2026,Nott'm Forest,Liverpool,0,1,0,0,18,10,2,4,7,2,13,9,2,0,0,0,4.08,3.88,1.8,1.68,2.13
+epl,2025,epl_2025_268_sunderland_fulham,22/02/2026,Sunderland,Fulham,1,3,0,0,12,12,2,4,6,4,6,13,1,1,0,0,2.65,3.27,2.67,2.12,1.68
+epl,2025,epl_2025_269_tottenham_arsenal,22/02/2026,Tottenham,Arsenal,1,4,1,1,6,20,5,7,2,5,17,11,2,1,0,0,5.83,3.98,1.56,1.77,1.98
+epl,2025,epl_2025_270_everton_man_united,23/02/2026,Everton,Man United,0,1,0,0,12,11,4,3,10,1,12,7,2,3,0,0,3.57,3.73,1.94,1.68,2.12
+epl,2025,epl_2025_271_wolves_aston_villa,27/02/2026,Wolves,Aston Villa,2,0,0,0,9,14,2,5,0,5,13,19,3,3,0,0,4.17,3.64,1.84,1.84,1.93
+epl,2025,epl_2025_272_bournemouth_sunderland,28/02/2026,Bournemouth,Sunderland,1,1,0,1,21,8,5,4,7,3,15,12,4,2,0,0,1.77,3.8,4.34,1.77,2.02
+epl,2025,epl_2025_273_burnley_brentford,28/02/2026,Burnley,Brentford,3,4,1,3,12,16,3,7,4,8,9,9,2,2,0,0,4.58,3.81,1.73,1.81,1.94
+epl,2025,epl_2025_274_liverpool_west_ham,28/02/2026,Liverpool,West Ham,5,2,3,0,18,11,7,4,10,5,12,11,2,2,0,0,1.41,5.02,6.68,1.42,2.73
+epl,2025,epl_2025_275_newcastle_everton,28/02/2026,Newcastle,Everton,2,3,1,2,17,9,7,5,7,2,15,7,2,3,0,0,1.69,3.92,4.67,1.73,2.05
+epl,2025,epl_2025_276_leeds_man_city,28/02/2026,Leeds,Man City,0,1,0,1,14,14,2,5,5,3,10,8,0,3,0,0,5.0,4.25,1.6,1.61,2.24
+epl,2025,epl_2025_277_brighton_nott'm_forest,01/03/2026,Brighton,Nott'm Forest,2,1,2,1,14,13,7,4,4,4,12,13,3,1,0,0,2.05,3.54,3.42,1.79,1.97
+epl,2025,epl_2025_278_fulham_tottenham,01/03/2026,Fulham,Tottenham,2,1,2,0,18,13,4,1,5,8,11,14,3,3,0,0,2.08,3.57,3.3,1.72,2.07
+epl,2025,epl_2025_279_man_united_crystal_palace,01/03/2026,Man United,Crystal Palace,2,1,0,1,20,8,11,3,7,1,13,12,2,2,0,1,1.53,4.31,5.61,1.62,2.23
+epl,2025,epl_2025_280_arsenal_chelsea,01/03/2026,Arsenal,Chelsea,2,1,1,1,12,9,5,3,5,10,11,14,1,3,0,1,1.6,3.98,5.28,1.7,2.09
+epl,2025,epl_2025_281_bournemouth_brentford,03/03/2026,Bournemouth,Brentford,0,0,0,0,13,5,2,2,4,3,9,10,2,1,0,0,2.48,3.59,2.65,1.58,2.32
+epl,2025,epl_2025_282_everton_burnley,03/03/2026,Everton,Burnley,2,0,1,0,14,5,5,2,6,3,10,12,0,1,0,0,1.56,3.96,6.06,1.92,1.85
+epl,2025,epl_2025_283_leeds_sunderland,03/03/2026,Leeds,Sunderland,0,1,0,0,18,3,4,1,9,2,15,19,1,3,0,0,1.86,3.43,4.31,2.08,1.72
+epl,2025,epl_2025_284_wolves_liverpool,03/03/2026,Wolves,Liverpool,2,1,0,0,4,19,3,7,2,11,10,13,2,1,0,0,6.08,4.61,1.48,1.57,2.34
+epl,2025,epl_2025_285_aston_villa_chelsea,04/03/2026,Aston Villa,Chelsea,1,4,1,2,9,15,4,8,3,8,10,9,3,2,0,0,2.67,3.57,2.46,1.67,2.15
+epl,2025,epl_2025_286_brighton_arsenal,04/03/2026,Brighton,Arsenal,0,1,0,1,11,7,3,2,4,3,14,12,4,1,0,0,5.03,3.92,1.64,1.89,1.85
+epl,2025,epl_2025_287_fulham_west_ham,04/03/2026,Fulham,West Ham,0,1,0,0,13,9,5,3,7,5,14,12,2,4,0,0,2.03,3.56,3.52,1.72,2.06
+epl,2025,epl_2025_288_man_city_nott'm_forest,04/03/2026,Man City,Nott'm Forest,2,2,1,0,21,9,7,4,6,1,10,6,0,4,0,0,1.37,4.95,7.65,1.57,2.32
+epl,2025,epl_2025_289_newcastle_man_united,04/03/2026,Newcastle,Man United,2,1,1,1,12,14,5,5,2,4,15,16,2,3,1,0,2.56,3.66,2.53,1.52,2.44
+epl,2025,epl_2025_290_tottenham_crystal_palace,05/03/2026,Tottenham,Crystal Palace,1,3,1,3,12,9,4,4,6,3,14,14,3,2,0,0,2.34,3.32,2.97,1.78,1.97
+epl,2025,epl_2025_291_burnley_bournemouth,14/03/2026,Burnley,Bournemouth,0,0,0,0,15,22,2,3,5,8,11,5,1,0,0,0,4.02,3.83,1.82,1.68,2.1
+epl,2025,epl_2025_292_sunderland_brighton,14/03/2026,Sunderland,Brighton,0,1,0,0,14,12,4,4,7,3,7,12,1,2,0,0,3.26,3.27,2.23,2.04,1.73
+epl,2025,epl_2025_293_arsenal_everton,14/03/2026,Arsenal,Everton,2,0,0,0,25,9,7,3,8,3,11,12,0,0,0,0,1.37,4.56,8.83,1.9,1.84
+epl,2025,epl_2025_294_chelsea_newcastle,14/03/2026,Chelsea,Newcastle,0,1,0,1,22,7,3,5,8,1,9,10,2,2,0,0,1.79,4.12,3.86,1.47,2.58
+epl,2025,epl_2025_295_west_ham_man_city,14/03/2026,West Ham,Man City,1,1,1,1,1,24,1,6,1,15,14,5,2,2,0,0,4.43,4.15,1.69,1.52,2.45
+epl,2025,epl_2025_296_crystal_palace_leeds,15/03/2026,Crystal Palace,Leeds,0,0,0,0,12,10,0,3,8,3,12,11,2,1,0,1,2.49,3.24,2.85,2.03,1.73
+epl,2025,epl_2025_297_man_united_aston_villa,15/03/2026,Man United,Aston Villa,3,1,0,0,16,9,6,2,6,6,10,5,3,2,0,0,1.71,4.02,4.38,1.64,2.19
+epl,2025,epl_2025_298_nott'm_forest_fulham,15/03/2026,Nott'm Forest,Fulham,0,0,0,0,11,5,2,0,5,4,8,10,2,3,0,0,2.19,3.4,3.24,1.86,1.88
+epl,2025,epl_2025_299_liverpool_tottenham,15/03/2026,Liverpool,Tottenham,1,1,1,0,17,13,4,7,3,4,8,13,0,0,0,0,1.29,5.79,8.72,1.42,2.72
+epl,2025,epl_2025_300_brentford_wolves,16/03/2026,Brentford,Wolves,2,2,2,1,10,13,3,4,1,5,12,10,2,4,0,0,1.54,4.15,5.68,1.68,2.11
+epl,2025,epl_2025_301_bournemouth_man_united,20/03/2026,Bournemouth,Man United,2,2,0,0,16,14,5,5,6,8,10,9,2,2,0,1,3.22,3.76,2.07,1.53,2.44
+epl,2025,epl_2025_302_brighton_liverpool,21/03/2026,Brighton,Liverpool,2,1,1,1,16,12,7,5,4,8,11,11,5,5,0,0,3.02,3.55,2.22,1.68,2.12
+epl,2025,epl_2025_303_fulham_burnley,21/03/2026,Fulham,Burnley,3,1,0,0,22,9,6,5,6,6,6,9,2,2,0,1,1.53,4.09,6.22,1.76,1.98
+epl,2025,epl_2025_304_everton_chelsea,21/03/2026,Everton,Chelsea,3,0,1,0,10,12,9,4,3,9,6,7,0,2,0,0,3.38,3.5,2.08,1.78,1.98
+epl,2025,epl_2025_305_leeds_brentford,21/03/2026,Leeds,Brentford,0,0,0,0,14,6,4,2,6,2,6,9,2,0,0,0,2.46,3.42,2.77,1.84,1.9
+epl,2025,epl_2025_306_newcastle_sunderland,22/03/2026,Newcastle,Sunderland,1,2,1,0,16,17,4,7,9,5,8,19,1,6,0,0,1.65,3.89,5.04,1.83,1.91
+epl,2025,epl_2025_307_aston_villa_west_ham,22/03/2026,Aston Villa,West Ham,2,0,1,0,23,9,7,1,6,6,3,7,0,1,0,0,1.95,3.56,3.7,1.74,2.02
+epl,2025,epl_2025_308_tottenham_nott'm_forest,22/03/2026,Tottenham,Nott'm Forest,0,3,0,1,14,8,3,7,13,3,13,13,1,2,0,0,2.24,3.39,3.11,1.86,1.88
+epl,2025,epl_2025_309_west_ham_wolves,10/04/2026,West Ham,Wolves,4,0,1,0,18,14,7,3,5,2,11,7,2,2,0,0,1.78,3.74,4.34,1.79,1.98
+epl,2025,epl_2025_310_arsenal_bournemouth,11/04/2026,Arsenal,Bournemouth,1,2,1,1,15,8,3,3,10,1,12,18,1,3,0,0,1.43,4.55,7.06,1.62,2.24
+epl,2025,epl_2025_311_brentford_everton,11/04/2026,Brentford,Everton,2,2,1,1,17,14,4,7,2,3,6,7,0,2,0,0,2.13,3.31,3.45,1.95,1.8
+epl,2025,epl_2025_312_burnley_brighton,11/04/2026,Burnley,Brighton,0,2,0,1,10,13,5,6,8,2,7,11,2,1,0,0,4.48,3.93,1.72,1.71,2.08
+epl,2025,epl_2025_313_liverpool_fulham,11/04/2026,Liverpool,Fulham,2,0,2,0,18,19,5,4,6,9,10,4,0,0,0,0,1.62,4.18,4.83,1.53,2.42
+epl,2025,epl_2025_314_crystal_palace_newcastle,12/04/2026,Crystal Palace,Newcastle,2,1,0,1,11,7,5,3,2,4,17,12,0,3,0,0,3.07,3.5,2.22,1.71,2.07
+epl,2025,epl_2025_315_nott'm_forest_aston_villa,12/04/2026,Nott'm Forest,Aston Villa,1,1,1,1,15,12,4,5,7,3,15,10,2,2,0,0,2.61,3.33,2.65,1.91,1.84
+epl,2025,epl_2025_316_sunderland_tottenham,12/04/2026,Sunderland,Tottenham,1,0,0,0,13,11,2,7,2,6,14,15,3,3,0,0,2.62,3.34,2.63,1.92,1.83
+epl,2025,epl_2025_317_chelsea_man_city,12/04/2026,Chelsea,Man City,0,3,0,0,12,18,3,8,4,12,10,14,3,1,0,0,3.08,3.8,2.1,1.54,2.4
+epl,2025,epl_2025_318_man_united_leeds,13/04/2026,Man United,Leeds,1,2,0,2,20,15,9,6,11,4,12,15,3,2,1,0,1.59,4.07,5.3,1.68,2.11
+epl,2025,epl_2025_319_brentford_fulham,18/04/2026,Brentford,Fulham,0,0,0,0,13,11,4,0,9,3,8,13,0,1,0,0,2.09,3.63,3.26,1.73,2.04
+epl,2025,epl_2025_320_leeds_wolves,18/04/2026,Leeds,Wolves,3,0,2,0,17,7,6,2,5,6,9,17,2,1,0,0,1.6,3.93,5.5,1.86,1.89
+epl,2025,epl_2025_321_newcastle_bournemouth,18/04/2026,Newcastle,Bournemouth,1,2,0,1,12,12,3,3,2,3,11,12,2,4,0,0,1.96,3.81,3.48,1.47,2.58
+epl,2025,epl_2025_322_tottenham_brighton,18/04/2026,Tottenham,Brighton,2,2,1,1,13,10,6,3,7,5,14,14,3,1,0,0,2.68,3.65,2.41,1.66,2.16
+epl,2025,epl_2025_323_chelsea_man_united,18/04/2026,Chelsea,Man United,0,1,0,1,21,4,3,1,7,1,12,13,1,3,0,0,2.21,3.54,3.07,1.53,2.4
+epl,2025,epl_2025_324_aston_villa_sunderland,19/04/2026,Aston Villa,Sunderland,4,3,2,1,15,10,7,7,4,5,11,11,1,3,0,0,1.65,3.78,5.25,1.89,1.86
+epl,2025,epl_2025_325_everton_liverpool,19/04/2026,Everton,Liverpool,1,2,0,1,10,14,4,6,1,6,8,12,2,0,0,0,3.11,3.36,2.25,1.86,1.9
+epl,2025,epl_2025_326_nott'm_forest_burnley,19/04/2026,Nott'm Forest,Burnley,4,1,0,1,10,4,4,3,4,4,8,12,0,2,0,0,1.49,4.25,6.32,1.74,2.03
+epl,2025,epl_2025_327_man_city_arsenal,19/04/2026,Man City,Arsenal,2,1,1,1,15,9,5,3,8,5,5,12,2,2,0,0,1.82,3.6,4.25,1.92,1.82
+epl,2025,epl_2025_328_crystal_palace_west_ham,20/04/2026,Crystal Palace,West Ham,0,0,0,0,9,9,1,4,4,6,13,12,2,1,0,0,2.31,3.21,3.11,1.88,1.87
+epl,2025,epl_2025_329_brighton_chelsea,21/04/2026,Brighton,Chelsea,3,0,1,0,15,6,9,0,6,5,15,6,1,1,0,0,2.44,3.62,2.66,1.63,2.22
+epl,2025,epl_2025_330_bournemouth_leeds,22/04/2026,Bournemouth,Leeds,2,2,0,0,17,10,7,3,12,1,6,10,3,0,0,0,2.02,3.51,3.57,1.71,2.06
+epl,2025,epl_2025_331_burnley_man_city,22/04/2026,Burnley,Man City,0,1,0,1,9,28,1,9,3,11,10,12,0,0,0,0,16.53,8.3,1.14,1.32,3.22
+epl,2025,epl_2025_332_sunderland_nott'm_forest,24/04/2026,Sunderland,Nott'm Forest,0,5,0,4,14,10,4,6,3,6,13,15,2,5,0,0,2.67,3.18,2.66,2.13,1.69
+epl,2025,epl_2025_333_fulham_aston_villa,25/04/2026,Fulham,Aston Villa,1,0,1,0,13,10,6,1,2,5,14,12,2,2,0,0,2.67,3.5,2.47,1.72,2.07
+epl,2025,epl_2025_334_liverpool_crystal_palace,25/04/2026,Liverpool,Crystal Palace,3,1,2,0,9,14,3,7,5,8,10,10,1,3,0,0,1.44,4.76,6.31,1.55,2.36
+epl,2025,epl_2025_335_west_ham_everton,25/04/2026,West Ham,Everton,2,1,0,0,10,11,3,3,3,4,9,11,3,4,0,0,2.38,3.34,2.9,1.83,1.92
+epl,2025,epl_2025_336_wolves_tottenham,25/04/2026,Wolves,Tottenham,0,1,0,0,11,11,2,2,5,5,8,14,3,4,0,0,4.48,3.99,1.7,1.66,2.15
+epl,2025,epl_2025_337_arsenal_newcastle,25/04/2026,Arsenal,Newcastle,1,0,1,0,11,13,4,3,7,2,13,10,2,2,0,0,1.45,4.66,6.22,1.58,2.29
+epl,2025,epl_2025_338_man_united_brentford,27/04/2026,Man United,Brentford,2,1,2,0,11,12,6,4,7,8,6,9,2,4,0,0,1.84,3.82,3.84,1.55,2.35
+epl,2025,epl_2025_339_leeds_burnley,01/05/2026,Leeds,Burnley,3,1,1,0,18,9,8,3,5,0,12,11,4,3,0,0,1.34,5.09,8.57,1.65,2.18
+epl,2025,epl_2025_340_brentford_west_ham,02/05/2026,Brentford,West Ham,3,0,1,0,14,13,6,4,2,6,8,12,1,3,0,0,1.91,3.77,3.62,1.59,2.28
+epl,2025,epl_2025_341_newcastle_brighton,02/05/2026,Newcastle,Brighton,3,1,2,0,13,13,6,4,2,10,10,12,3,3,0,0,2.5,3.6,2.6,1.68,2.13
+epl,2025,epl_2025_342_wolves_sunderland,02/05/2026,Wolves,Sunderland,1,1,0,1,20,10,7,2,6,3,11,11,0,4,0,1,3.24,3.35,2.18,2.03,1.74
+epl,2025,epl_2025_343_arsenal_fulham,02/05/2026,Arsenal,Fulham,3,0,3,0,18,10,9,1,3,4,7,12,0,1,0,0,1.44,4.39,7.0,1.77,1.97
+epl,2025,epl_2025_344_bournemouth_crystal_palace,03/05/2026,Bournemouth,Crystal Palace,3,0,2,0,16,7,5,1,7,1,10,11,0,2,0,0,1.58,4.16,5.2,1.65,2.17
+epl,2025,epl_2025_345_man_united_liverpool,03/05/2026,Man United,Liverpool,3,2,2,0,18,13,6,5,3,2,12,11,2,2,0,0,2.29,3.73,2.76,1.47,2.58
+epl,2025,epl_2025_346_aston_villa_tottenham,03/05/2026,Aston Villa,Tottenham,1,2,0,2,5,10,1,5,5,5,12,12,2,5,0,0,2.1,3.59,3.21,1.68,2.11
+epl,2025,epl_2025_347_chelsea_nott'm_forest,04/05/2026,Chelsea,Nott'm Forest,1,3,0,2,21,6,5,4,10,1,12,10,3,1,0,0,1.68,3.93,4.65,1.67,2.14
+epl,2025,epl_2025_348_everton_man_city,04/05/2026,Everton,Man City,3,3,0,1,14,21,6,4,5,9,15,5,4,1,0,0,6.38,4.63,1.44,1.58,2.28
+epl,2025,epl_2025_349_liverpool_chelsea,09/05/2026,Liverpool,Chelsea,1,1,1,1,8,6,3,3,5,2,17,17,2,4,0,0,1.82,3.95,3.81,1.41,2.8
+epl,2025,epl_2025_350_brighton_wolves,09/05/2026,Brighton,Wolves,3,0,2,0,14,5,6,1,7,1,9,11,1,2,0,0,1.27,5.88,9.98,1.5,2.5
+epl,2025,epl_2025_351_fulham_bournemouth,09/05/2026,Fulham,Bournemouth,0,1,0,0,14,10,2,5,11,2,12,21,4,2,1,1,2.68,3.66,2.39,1.54,2.39
+epl,2025,epl_2025_352_sunderland_man_united,09/05/2026,Sunderland,Man United,0,0,0,0,15,11,4,1,7,8,12,12,0,3,0,0,3.93,3.7,1.86,1.72,2.05
+epl,2025,epl_2025_353_man_city_brentford,09/05/2026,Man City,Brentford,3,0,0,0,25,4,10,2,10,2,8,14,4,2,0,0,1.35,5.51,7.23,1.37,2.97
+epl,2025,epl_2025_354_burnley_aston_villa,10/05/2026,Burnley,Aston Villa,2,2,1,1,15,18,6,7,2,8,18,8,1,1,0,0,5.34,4.09,1.58,1.7,2.09
+epl,2025,epl_2025_355_crystal_palace_everton,10/05/2026,Crystal Palace,Everton,2,2,1,1,21,13,8,6,5,10,5,13,0,2,0,0,2.71,3.26,2.56,1.99,1.76
+epl,2025,epl_2025_356_nott'm_forest_newcastle,10/05/2026,Nott'm Forest,Newcastle,1,1,0,0,17,16,6,6,2,1,16,11,2,0,0,0,2.58,3.48,2.56,1.71,2.07
+epl,2025,epl_2025_357_west_ham_arsenal,10/05/2026,West Ham,Arsenal,0,1,0,0,9,15,3,4,4,3,14,12,3,4,0,0,5.29,4.09,1.58,1.65,2.17
+epl,2025,epl_2025_358_tottenham_leeds,11/05/2026,Tottenham,Leeds,1,1,0,0,16,11,3,4,14,2,12,7,3,1,0,0,1.82,3.82,3.92,1.7,2.09
+epl,2025,epl_2025_359_man_city_crystal_palace,13/05/2026,Man City,Crystal Palace,3,0,2,0,15,6,4,2,9,4,10,7,0,2,0,0,1.19,7.03,12.75,1.4,2.84
+epl,2025,epl_2025_360_aston_villa_liverpool,15/05/2026,Aston Villa,Liverpool,4,2,1,0,14,16,9,5,4,9,12,9,3,1,0,0,2.76,3.44,2.43,1.68,2.13
+epl,2025,epl_2025_361_man_united_nott'm_forest,17/05/2026,Man United,Nott'm Forest,3,2,1,0,29,11,8,4,7,6,11,5,2,1,0,0,1.58,4.23,4.94,1.57,2.32
+epl,2025,epl_2025_362_brentford_crystal_palace,17/05/2026,Brentford,Crystal Palace,2,2,1,1,14,16,3,5,9,4,7,5,1,3,0,0,1.71,4.09,4.17,1.65,2.18
+epl,2025,epl_2025_363_everton_sunderland,17/05/2026,Everton,Sunderland,1,3,1,0,10,7,4,3,3,2,14,9,3,0,0,0,1.81,3.63,4.18,1.88,1.86
+epl,2025,epl_2025_364_leeds_brighton,17/05/2026,Leeds,Brighton,1,0,0,0,7,19,1,8,7,8,9,7,1,0,0,0,3.09,3.57,2.14,1.65,2.16
+epl,2025,epl_2025_365_wolves_fulham,17/05/2026,Wolves,Fulham,1,1,1,1,11,13,3,5,3,6,20,8,1,0,0,0,3.68,3.78,1.87,1.68,2.11
+epl,2025,epl_2025_366_newcastle_west_ham,17/05/2026,Newcastle,West Ham,3,1,2,0,15,15,7,8,9,1,8,11,1,3,0,0,2.05,3.78,3.15,1.47,2.58
+epl,2025,epl_2025_367_arsenal_burnley,18/05/2026,Arsenal,Burnley,1,0,1,0,13,5,3,0,3,3,7,16,1,3,0,0,1.08,10.12,22.13,1.33,3.19
+epl,2025,epl_2025_368_bournemouth_man_city,19/05/2026,Bournemouth,Man City,1,1,1,0,10,14,2,5,7,6,16,7,4,2,0,0,4.42,4.27,1.66,1.42,2.8
+epl,2025,epl_2025_369_chelsea_tottenham,19/05/2026,Chelsea,Tottenham,2,1,1,0,9,9,4,3,3,4,11,18,4,3,0,0,1.9,3.64,3.76,1.69,2.12
+epl,2025,epl_2025_370_brighton_man_united,24/05/2026,Brighton,Man United,0,3,0,2,13,11,2,7,0,3,11,8,0,1,0,0,1.86,3.98,3.58,1.46,2.6
+epl,2025,epl_2025_371_burnley_wolves,24/05/2026,Burnley,Wolves,1,1,0,1,16,16,8,4,7,7,10,11,2,2,0,0,2.36,3.5,2.77,1.71,2.07
+epl,2025,epl_2025_372_crystal_palace_arsenal,24/05/2026,Crystal Palace,Arsenal,1,2,0,1,8,17,3,7,3,4,9,12,0,1,0,0,4.13,3.86,1.76,1.63,2.21
+epl,2025,epl_2025_373_fulham_newcastle,24/05/2026,Fulham,Newcastle,2,0,1,0,21,7,6,2,6,6,13,6,2,2,0,0,2.82,3.66,2.27,1.6,2.25
+epl,2025,epl_2025_374_liverpool_brentford,24/05/2026,Liverpool,Brentford,1,1,0,0,24,11,8,2,14,2,9,9,2,3,0,0,1.8,4.09,3.73,1.48,2.56
+epl,2025,epl_2025_375_man_city_aston_villa,24/05/2026,Man City,Aston Villa,1,2,1,0,16,12,3,5,9,4,8,4,1,0,0,0,1.28,5.93,8.39,1.29,3.38
+epl,2025,epl_2025_376_nott'm_forest_bournemouth,24/05/2026,Nott'm Forest,Bournemouth,1,1,1,0,15,17,5,4,6,3,11,7,1,1,0,0,3.19,3.72,2.05,1.56,2.34
+epl,2025,epl_2025_377_sunderland_chelsea,24/05/2026,Sunderland,Chelsea,2,1,1,0,20,10,2,1,7,7,15,18,3,2,0,0,3.47,3.59,1.99,1.73,2.04
+epl,2025,epl_2025_378_tottenham_everton,24/05/2026,Tottenham,Everton,1,0,1,0,21,8,6,3,6,2,15,12,5,3,0,1,1.89,3.63,3.78,1.73,2.03
+epl,2025,epl_2025_379_west_ham_leeds,24/05/2026,West Ham,Leeds,3,0,0,0,16,13,9,3,6,4,11,14,0,3,0,0,1.82,3.9,3.75,1.64,2.19

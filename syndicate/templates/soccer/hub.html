@@ -1,0 +1,30 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | Soccer{% endblock %}
+{% block page_title %}Soccer Hub{% endblock %}
+
+{% block content %}
+  {% with route_label='/soccer', title='Soccer now runs a full SoccerSim engine across multiple leagues', status='Active migration', body='Soccer now exposes SoccerSim-backed cards, a game drill-in, player-prop boards, a resumed-match live lens covering live corners/shots/goals/BTTS, and a stored-date daily archive, across ' ~ leagues|length ~ ' leagues.', action_href='/soccer/' ~ default_league ~ '/cards', action_label='Open ' ~ default_league|upper ~ ' cards' %}
+    {% include 'shared/_module_intro.html' %}
+  {% endwith %}
+
+  {% with eyebrow='Coverage', title='Leagues with stored SoccerSim dates', body='Leagues run through the same engine and UI surfaces; a league only appears here with real dates once scripts/build_soccer_artifacts.py has been run for it.', summary_stats=summary_stats %}
+    {% include 'shared/_content_panel.html' %}
+  {% endwith %}
+
+  <section class="cards-grid cards-grid--sports" aria-label="Soccer leagues">
+    {% for league in leagues %}
+      <article class="sport-card">
+        <div class="section-label">{{ league.name }}</div>
+        <h3>{{ league.latest_date or "No stored dates" }}</h3>
+        <p>{{ league.dates|length }} stored SoccerSim date(s) for {{ league.name }}.</p>
+        <div class="action-row">
+          <a class="cards-nav-pill" href="/soccer/{{ league.slug }}/cards{% if league.latest_date %}?date={{ league.latest_date }}{% endif %}">Cards</a>
+          <a class="cards-nav-pill" href="/soccer/{{ league.slug }}/props{% if league.latest_date %}?date={{ league.latest_date }}{% endif %}">Props</a>
+          <a class="cards-nav-pill" href="/soccer/{{ league.slug }}/live-lens{% if league.latest_date %}?date={{ league.latest_date }}{% endif %}">Live Lens</a>
+          <a class="cards-nav-pill" href="/soccer/{{ league.slug }}/archive{% if league.latest_date %}?date={{ league.latest_date }}{% endif %}">Daily Archive</a>
+        </div>
+      </article>
+    {% endfor %}
+  </section>
+{% endblock %}

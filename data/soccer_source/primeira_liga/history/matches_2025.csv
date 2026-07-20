@@ -1,0 +1,307 @@
+league,season,match_id,date,home_team,away_team,home_goals,away_goals,ht_home_goals,ht_away_goals,home_shots,away_shots,home_shots_on_target,away_shots_on_target,home_corners,away_corners,home_fouls,away_fouls,home_yellow_cards,away_yellow_cards,home_red_cards,away_red_cards,odds_home,odds_draw,odds_away,odds_over_2_5,odds_under_2_5
+primeira_liga,2025,primeira_liga_2025_0_casa_pia_sp_lisbon,08/08/2025,Casa Pia,Sp Lisbon,0,2,0,1,7,27,2,12,2,9,14,11,4,1,0,0,9.14,5.11,1.3,1.66,2.1
+primeira_liga,2025,primeira_liga_2025_1_nacional_gil_vicente,09/08/2025,Nacional,Gil Vicente,0,2,0,2,15,12,4,2,14,6,21,16,3,6,0,0,2.44,3.15,2.84,2.09,1.67
+primeira_liga,2025,primeira_liga_2025_2_arouca_avs,09/08/2025,Arouca,AVS,3,1,1,0,9,15,4,2,4,5,13,17,2,0,0,0,1.82,3.49,4.17,1.99,1.75
+primeira_liga,2025,primeira_liga_2025_3_famalicao_santa_clara,10/08/2025,Famalicao,Santa Clara,3,0,2,0,6,8,3,2,2,3,20,15,4,2,0,0,2.38,3.11,2.97,2.35,1.54
+primeira_liga,2025,primeira_liga_2025_4_moreirense_alverca,10/08/2025,Moreirense,Alverca,2,1,1,1,10,7,3,2,6,2,15,5,3,1,0,0,2.05,3.14,3.52,2.15,1.63
+primeira_liga,2025,primeira_liga_2025_5_sp_braga_tondela,10/08/2025,Sp Braga,Tondela,3,0,2,0,8,7,6,3,5,3,10,9,1,3,0,0,1.36,4.63,7.88,1.72,2.02
+primeira_liga,2025,primeira_liga_2025_6_estoril_estrela,11/08/2025,Estoril,Estrela,1,1,1,0,8,9,3,5,4,4,13,16,4,1,0,0,1.89,3.49,3.83,2.0,1.73
+primeira_liga,2025,primeira_liga_2025_7_porto_guimaraes,11/08/2025,Porto,Guimaraes,3,0,2,0,17,10,9,2,7,4,18,9,1,3,0,0,1.57,3.93,5.41,1.79,1.93
+primeira_liga,2025,primeira_liga_2025_8_avs_casa_pia,15/08/2025,AVS,Casa Pia,0,2,0,1,10,10,3,5,1,3,20,20,4,5,0,0,2.74,3.05,2.59,2.31,1.55
+primeira_liga,2025,primeira_liga_2025_9_tondela_famalicao,16/08/2025,Tondela,Famalicao,0,1,0,0,15,14,4,5,2,7,17,19,0,1,0,0,2.82,3.17,2.46,2.12,1.66
+primeira_liga,2025,primeira_liga_2025_10_guimaraes_estoril,16/08/2025,Guimaraes,Estoril,3,2,1,1,16,11,4,5,4,2,18,17,4,3,0,0,1.67,3.67,4.85,2.0,1.73
+primeira_liga,2025,primeira_liga_2025_11_estrela_benfica,16/08/2025,Estrela,Benfica,0,1,0,0,15,14,2,3,5,4,14,23,3,3,0,0,13.63,6.6,1.18,1.54,2.35
+primeira_liga,2025,primeira_liga_2025_12_rio_ave_nacional,17/08/2025,Rio Ave,Nacional,1,1,1,0,20,13,9,6,6,6,16,18,2,4,0,1,2.28,3.22,3.01,2.0,1.74
+primeira_liga,2025,primeira_liga_2025_13_alverca_sp_braga,17/08/2025,Alverca,Sp Braga,0,3,0,3,12,12,3,6,1,5,15,6,2,1,0,0,5.01,3.72,1.64,1.94,1.79
+primeira_liga,2025,primeira_liga_2025_14_santa_clara_moreirense,17/08/2025,Santa Clara,Moreirense,0,1,0,1,12,6,3,2,3,0,20,18,4,5,0,0,1.87,3.12,4.5,2.6,1.44
+primeira_liga,2025,primeira_liga_2025_15_sp_lisbon_arouca,17/08/2025,Sp Lisbon,Arouca,6,0,3,0,19,7,10,1,6,1,7,7,1,0,0,1,1.25,5.68,10.08,1.57,2.27
+primeira_liga,2025,primeira_liga_2025_16_gil_vicente_porto,18/08/2025,Gil Vicente,Porto,0,2,0,1,14,15,2,4,1,5,9,20,2,4,0,0,6.33,4.24,1.47,1.86,1.86
+primeira_liga,2025,primeira_liga_2025_17_moreirense_guimaraes,23/08/2025,Moreirense,Guimaraes,2,0,0,0,10,11,4,4,3,7,17,17,5,2,0,0,3.36,3.14,2.17,2.24,1.58
+primeira_liga,2025,primeira_liga_2025_18_nacional_sp_lisbon,23/08/2025,Nacional,Sp Lisbon,1,4,1,0,3,27,1,7,3,13,18,7,3,2,1,0,9.58,5.79,1.25,1.47,2.53
+primeira_liga,2025,primeira_liga_2025_19_arouca_rio_ave,23/08/2025,Arouca,Rio Ave,3,3,1,0,14,15,6,7,4,2,13,17,3,2,0,0,1.98,3.39,3.62,1.98,1.75
+primeira_liga,2025,primeira_liga_2025_20_benfica_tondela,23/08/2025,Benfica,Tondela,3,0,2,0,21,9,12,4,13,2,10,12,2,2,0,0,1.15,7.15,15.97,1.52,2.4
+primeira_liga,2025,primeira_liga_2025_21_famalicao_gil_vicente,24/08/2025,Famalicao,Gil Vicente,0,0,0,0,11,20,3,8,2,9,17,18,3,1,0,0,2.07,3.13,3.66,2.36,1.53
+primeira_liga,2025,primeira_liga_2025_22_porto_casa_pia,24/08/2025,Porto,Casa Pia,4,0,3,0,20,7,7,0,7,2,11,8,3,1,0,0,1.2,6.09,12.56,1.6,2.23
+primeira_liga,2025,primeira_liga_2025_23_sp_braga_avs,24/08/2025,Sp Braga,AVS,2,2,1,2,21,4,5,2,11,3,9,12,2,3,0,0,1.32,4.88,8.8,1.75,1.99
+primeira_liga,2025,primeira_liga_2025_24_estrela_alverca,25/08/2025,Estrela,Alverca,2,2,1,2,19,6,6,2,6,2,18,24,4,5,1,1,1.88,3.3,4.11,2.23,1.59
+primeira_liga,2025,primeira_liga_2025_25_gil_vicente_moreirense,29/08/2025,Gil Vicente,Moreirense,2,0,0,0,12,10,4,0,4,3,18,12,1,2,0,0,2.51,2.79,3.13,2.99,1.35
+primeira_liga,2025,primeira_liga_2025_26_casa_pia_nacional,30/08/2025,Casa Pia,Nacional,0,2,0,2,9,9,3,2,2,3,13,22,2,3,0,0,2.23,3.19,3.18,2.19,1.61
+primeira_liga,2025,primeira_liga_2025_27_avs_famalicao,30/08/2025,AVS,Famalicao,0,1,0,0,13,11,3,3,5,9,16,18,1,5,0,1,4.06,3.35,1.88,2.18,1.61
+primeira_liga,2025,primeira_liga_2025_28_guimaraes_arouca,30/08/2025,Guimaraes,Arouca,1,1,1,1,12,9,3,3,2,2,15,17,4,4,0,0,1.77,3.62,4.24,1.95,1.78
+primeira_liga,2025,primeira_liga_2025_29_sp_lisbon_porto,30/08/2025,Sp Lisbon,Porto,1,2,0,0,20,14,3,7,5,3,8,15,3,5,0,0,1.99,3.52,3.43,1.84,1.89
+primeira_liga,2025,primeira_liga_2025_30_tondela_estoril,31/08/2025,Tondela,Estoril,2,2,0,1,14,21,4,5,3,4,8,11,1,3,0,0,2.87,3.11,2.45,2.23,1.59
+primeira_liga,2025,primeira_liga_2025_31_alverca_benfica,31/08/2025,Alverca,Benfica,1,2,0,2,11,6,7,2,5,2,12,18,4,6,0,1,12.97,6.08,1.19,1.59,2.24
+primeira_liga,2025,primeira_liga_2025_32_rio_ave_sp_braga,31/08/2025,Rio Ave,Sp Braga,2,2,2,1,5,20,3,9,1,7,13,12,3,2,0,0,4.44,3.8,1.7,1.8,1.93
+primeira_liga,2025,primeira_liga_2025_33_santa_clara_estrela,31/08/2025,Santa Clara,Estrela,0,0,0,0,13,3,3,0,8,0,13,11,2,2,0,0,1.85,3.26,4.32,2.44,1.5
+primeira_liga,2025,primeira_liga_2025_34_estoril_santa_clara,06/09/2025,Estoril,Santa Clara,0,1,0,0,15,16,4,4,5,7,16,11,4,1,0,0,2.68,3.05,2.68,2.39,1.52
+primeira_liga,2025,primeira_liga_2025_35_alverca_tondela,12/09/2025,Alverca,Tondela,1,0,1,0,12,14,4,6,5,6,13,15,1,2,0,0,2.35,3.17,3.01,2.21,1.61
+primeira_liga,2025,primeira_liga_2025_36_benfica_santa_clara,12/09/2025,Benfica,Santa Clara,1,1,0,0,19,9,7,5,4,5,8,11,1,1,0,1,1.34,4.57,9.29,2.03,1.72
+primeira_liga,2025,primeira_liga_2025_37_estoril_avs,13/09/2025,Estoril,AVS,3,1,2,0,15,12,5,4,1,5,11,11,5,2,0,0,1.85,3.45,4.05,2.14,1.64
+primeira_liga,2025,primeira_liga_2025_38_moreirense_rio_ave,13/09/2025,Moreirense,Rio Ave,3,1,0,0,15,15,8,4,7,3,12,13,1,0,0,0,2.45,3.09,2.9,2.22,1.6
+primeira_liga,2025,primeira_liga_2025_39_porto_nacional,13/09/2025,Porto,Nacional,1,0,1,0,11,5,5,1,5,5,6,14,2,4,0,0,1.18,6.56,14.1,1.54,2.36
+primeira_liga,2025,primeira_liga_2025_40_famalicao_sp_lisbon,13/09/2025,Famalicao,Sp Lisbon,1,2,1,1,9,9,3,4,5,4,22,17,4,3,0,0,7.27,4.58,1.39,1.71,2.04
+primeira_liga,2025,primeira_liga_2025_41_estrela_guimaraes,14/09/2025,Estrela,Guimaraes,0,2,0,1,10,14,1,6,3,2,10,11,2,0,0,0,3.31,3.21,2.15,2.2,1.61
+primeira_liga,2025,primeira_liga_2025_42_arouca_casa_pia,14/09/2025,Arouca,Casa Pia,0,2,0,1,8,9,3,4,7,6,18,21,2,7,0,0,1.93,3.35,3.83,2.1,1.66
+primeira_liga,2025,primeira_liga_2025_43_sp_braga_gil_vicente,14/09/2025,Sp Braga,Gil Vicente,0,1,0,1,11,12,7,5,5,7,7,12,2,3,0,0,1.48,4.14,6.35,1.89,1.83
+primeira_liga,2025,primeira_liga_2025_44_rio_ave_porto,19/09/2025,Rio Ave,Porto,0,3,0,2,7,19,2,7,2,10,11,18,2,1,0,0,7.76,4.87,1.34,1.65,2.13
+primeira_liga,2025,primeira_liga_2025_45_nacional_arouca,20/09/2025,Nacional,Arouca,1,2,0,0,15,10,6,3,3,5,10,18,2,2,1,1,2.47,3.2,2.77,2.02,1.72
+primeira_liga,2025,primeira_liga_2025_46_santa_clara_alverca,20/09/2025,Santa Clara,Alverca,2,1,1,1,14,3,6,3,7,0,16,21,6,4,0,0,1.69,3.33,5.4,2.43,1.51
+primeira_liga,2025,primeira_liga_2025_47_avs_benfica,20/09/2025,AVS,Benfica,0,3,0,1,8,19,1,6,2,1,17,11,1,1,0,0,14.93,6.48,1.17,1.55,2.32
+primeira_liga,2025,primeira_liga_2025_48_guimaraes_sp_braga,20/09/2025,Guimaraes,Sp Braga,1,1,1,1,11,17,3,5,3,5,14,15,2,3,0,0,2.91,3.24,2.34,1.98,1.75
+primeira_liga,2025,primeira_liga_2025_49_tondela_estrela,21/09/2025,Tondela,Estrela,0,0,0,0,17,8,8,3,5,2,16,13,4,3,1,0,2.3,3.0,3.24,2.46,1.5
+primeira_liga,2025,primeira_liga_2025_50_gil_vicente_estoril,21/09/2025,Gil Vicente,Estoril,2,0,1,0,16,7,3,3,4,0,16,13,2,2,0,0,2.27,3.16,3.13,2.22,1.59
+primeira_liga,2025,primeira_liga_2025_51_casa_pia_famalicao,21/09/2025,Casa Pia,Famalicao,1,1,0,0,10,11,3,2,5,3,18,21,1,2,0,0,3.25,3.08,2.24,2.34,1.54
+primeira_liga,2025,primeira_liga_2025_52_sp_lisbon_moreirense,22/09/2025,Sp Lisbon,Moreirense,3,0,0,0,25,4,14,1,6,4,16,18,1,1,0,0,1.18,6.45,13.75,1.54,2.34
+primeira_liga,2025,primeira_liga_2025_53_benfica_rio_ave,23/09/2025,Benfica,Rio Ave,1,1,0,0,19,4,7,2,11,2,16,16,3,2,0,0,1.18,6.87,12.13,1.38,2.81
+primeira_liga,2025,primeira_liga_2025_54_benfica_gil_vicente,26/09/2025,Benfica,Gil Vicente,2,1,2,1,10,16,4,8,0,7,14,20,3,4,0,1,1.3,4.98,9.28,1.71,2.03
+primeira_liga,2025,primeira_liga_2025_55_moreirense_casa_pia,27/09/2025,Moreirense,Casa Pia,2,1,1,1,12,20,4,4,6,8,13,15,5,4,0,0,2.09,3.09,3.61,2.45,1.49
+primeira_liga,2025,primeira_liga_2025_56_santa_clara_tondela,27/09/2025,Santa Clara,Tondela,1,2,0,0,11,12,5,4,3,4,13,25,2,7,0,0,1.7,3.39,5.18,2.35,1.54
+primeira_liga,2025,primeira_liga_2025_57_estrela_avs,27/09/2025,Estrela,AVS,3,0,3,0,11,11,6,2,6,6,11,20,3,2,1,1,2.04,3.15,3.73,2.36,1.53
+primeira_liga,2025,primeira_liga_2025_58_estoril_sp_lisbon,27/09/2025,Estoril,Sp Lisbon,0,1,0,1,7,9,2,2,3,9,13,12,4,2,0,0,8.65,5.18,1.3,1.53,2.36
+primeira_liga,2025,primeira_liga_2025_59_alverca_guimaraes,28/09/2025,Alverca,Guimaraes,2,0,1,0,11,19,4,3,1,5,15,17,3,0,1,0,3.15,3.26,2.2,2.07,1.69
+primeira_liga,2025,primeira_liga_2025_60_sp_braga_nacional,28/09/2025,Sp Braga,Nacional,0,1,0,1,9,13,1,5,6,3,4,7,0,2,0,0,1.42,4.36,6.93,1.78,1.95
+primeira_liga,2025,primeira_liga_2025_61_famalicao_rio_ave,28/09/2025,Famalicao,Rio Ave,0,0,0,0,28,6,5,3,11,6,19,15,4,5,0,0,1.76,3.66,4.29,1.9,1.83
+primeira_liga,2025,primeira_liga_2025_62_arouca_porto,29/09/2025,Arouca,Porto,0,4,0,1,13,16,3,5,5,8,13,8,5,3,0,1,7.75,4.61,1.37,1.74,1.98
+primeira_liga,2025,primeira_liga_2025_63_casa_pia_estoril,03/10/2025,Casa Pia,Estoril,2,2,2,1,11,10,5,3,6,7,14,12,3,3,0,0,2.44,3.22,2.79,2.03,1.72
+primeira_liga,2025,primeira_liga_2025_64_gil_vicente_estrela,04/10/2025,Gil Vicente,Estrela,2,0,2,0,15,15,7,5,5,7,12,15,2,3,1,0,1.65,3.54,5.38,2.23,1.59
+primeira_liga,2025,primeira_liga_2025_65_nacional_moreirense,04/10/2025,Nacional,Moreirense,3,2,1,1,17,10,7,4,2,4,12,16,1,3,0,1,2.34,3.13,3.05,2.25,1.58
+primeira_liga,2025,primeira_liga_2025_66_avs_alverca,04/10/2025,AVS,Alverca,1,3,1,1,5,12,2,6,0,5,16,6,3,2,0,0,2.86,3.05,2.5,2.3,1.55
+primeira_liga,2025,primeira_liga_2025_67_guimaraes_santa_clara,04/10/2025,Guimaraes,Santa Clara,2,1,0,1,14,13,7,5,9,3,17,11,4,5,0,0,2.4,2.97,3.07,2.66,1.43
+primeira_liga,2025,primeira_liga_2025_68_arouca_famalicao,05/10/2025,Arouca,Famalicao,1,1,0,0,7,14,3,5,4,11,22,12,5,1,1,0,3.41,3.27,2.07,2.09,1.67
+primeira_liga,2025,primeira_liga_2025_69_rio_ave_tondela,05/10/2025,Rio Ave,Tondela,3,0,2,0,13,13,7,3,6,7,15,15,7,4,1,1,2.3,3.34,2.93,1.92,1.81
+primeira_liga,2025,primeira_liga_2025_70_sp_lisbon_sp_braga,05/10/2025,Sp Lisbon,Sp Braga,1,1,1,0,13,11,3,5,1,5,19,12,4,5,0,0,1.45,4.4,6.26,1.64,2.13
+primeira_liga,2025,primeira_liga_2025_71_porto_benfica,05/10/2025,Porto,Benfica,0,0,0,0,8,4,2,1,3,3,16,6,6,2,0,0,2.02,3.38,3.51,1.94,1.78
+primeira_liga,2025,primeira_liga_2025_72_alverca_gil_vicente,24/10/2025,Alverca,Gil Vicente,0,4,0,2,6,12,2,5,1,4,12,18,3,4,0,1,3.07,3.04,2.36,2.32,1.55
+primeira_liga,2025,primeira_liga_2025_73_santa_clara_avs,25/10/2025,Santa Clara,AVS,2,0,0,0,20,7,5,2,8,4,10,15,1,1,0,0,1.51,3.78,6.74,2.22,1.6
+primeira_liga,2025,primeira_liga_2025_74_benfica_arouca,25/10/2025,Benfica,Arouca,5,0,3,0,17,5,8,0,9,1,13,18,2,2,0,0,1.16,7.13,14.09,1.41,2.73
+primeira_liga,2025,primeira_liga_2025_75_estrela_rio_ave,25/10/2025,Estrela,Rio Ave,1,2,1,0,16,8,2,2,4,5,16,20,3,6,0,0,2.56,3.17,2.69,2.08,1.68
+primeira_liga,2025,primeira_liga_2025_76_estoril_nacional,26/10/2025,Estoril,Nacional,1,1,0,1,13,9,4,4,6,5,13,15,3,3,0,0,2.19,3.32,3.12,1.99,1.74
+primeira_liga,2025,primeira_liga_2025_77_famalicao_guimaraes,26/10/2025,Famalicao,Guimaraes,2,0,1,0,15,13,10,3,5,4,20,14,1,2,0,0,1.92,3.3,3.95,2.19,1.61
+primeira_liga,2025,primeira_liga_2025_78_tondela_sp_lisbon,26/10/2025,Tondela,Sp Lisbon,0,3,0,1,9,29,2,15,2,9,12,12,3,1,0,0,9.8,5.67,1.25,1.53,2.36
+primeira_liga,2025,primeira_liga_2025_79_sp_braga_casa_pia,26/10/2025,Sp Braga,Casa Pia,4,0,2,0,15,3,8,1,4,2,16,16,1,3,0,0,1.41,4.39,7.27,1.83,1.88
+primeira_liga,2025,primeira_liga_2025_80_moreirense_porto,27/10/2025,Moreirense,Porto,1,2,1,1,8,16,1,7,2,7,15,13,3,1,0,0,9.13,4.87,1.31,1.79,1.93
+primeira_liga,2025,primeira_liga_2025_81_sp_lisbon_alverca,31/10/2025,Sp Lisbon,Alverca,2,0,0,0,27,8,8,0,10,0,9,10,1,1,0,0,1.11,8.55,18.81,1.36,2.94
+primeira_liga,2025,primeira_liga_2025_82_nacional_famalicao,01/11/2025,Nacional,Famalicao,0,1,0,1,8,20,3,4,3,10,15,18,4,6,1,0,3.08,3.33,2.21,1.96,1.77
+primeira_liga,2025,primeira_liga_2025_83_casa_pia_estrela,01/11/2025,Casa Pia,Estrela,3,5,1,2,10,12,4,6,5,2,20,21,2,3,0,0,2.04,3.14,3.73,2.31,1.55
+primeira_liga,2025,primeira_liga_2025_84_rio_ave_estoril,01/11/2025,Rio Ave,Estoril,0,4,0,2,2,24,0,6,0,6,10,14,2,1,1,0,2.4,3.26,2.83,1.88,1.84
+primeira_liga,2025,primeira_liga_2025_85_guimaraes_benfica,01/11/2025,Guimaraes,Benfica,0,3,0,0,10,24,3,10,3,6,12,11,3,4,1,0,6.23,4.38,1.46,1.74,1.99
+primeira_liga,2025,primeira_liga_2025_86_avs_tondela,02/11/2025,AVS,Tondela,2,2,1,1,15,10,5,3,5,3,18,17,4,4,0,0,3.13,3.18,2.27,2.16,1.63
+primeira_liga,2025,primeira_liga_2025_87_arouca_moreirense,02/11/2025,Arouca,Moreirense,0,2,0,2,11,6,2,5,5,2,11,11,3,2,0,0,2.52,3.21,2.74,2.1,1.67
+primeira_liga,2025,primeira_liga_2025_88_porto_sp_braga,02/11/2025,Porto,Sp Braga,2,1,1,0,9,10,4,3,2,3,15,13,3,3,0,0,1.5,4.09,6.18,1.86,1.85
+primeira_liga,2025,primeira_liga_2025_89_gil_vicente_santa_clara,03/11/2025,Gil Vicente,Santa Clara,1,0,1,0,9,15,3,4,2,0,16,14,2,3,0,0,2.32,3.0,3.23,2.62,1.44
+primeira_liga,2025,primeira_liga_2025_90_estoril_arouca,07/11/2025,Estoril,Arouca,4,3,2,2,19,10,7,4,10,2,9,13,1,1,0,0,1.99,3.46,3.55,1.89,1.84
+primeira_liga,2025,primeira_liga_2025_91_alverca_rio_ave,08/11/2025,Alverca,Rio Ave,1,1,0,1,15,11,5,4,9,3,15,16,2,0,0,0,2.24,3.24,3.11,2.08,1.68
+primeira_liga,2025,primeira_liga_2025_92_tondela_guimaraes,08/11/2025,Tondela,Guimaraes,0,1,0,0,15,11,4,2,4,3,14,11,3,2,0,0,2.78,3.08,2.55,2.23,1.59
+primeira_liga,2025,primeira_liga_2025_93_santa_clara_sp_lisbon,08/11/2025,Santa Clara,Sp Lisbon,1,2,1,1,5,21,2,7,2,12,11,12,7,4,2,1,7.93,4.35,1.39,1.96,1.77
+primeira_liga,2025,primeira_liga_2025_94_avs_gil_vicente,09/11/2025,AVS,Gil Vicente,1,1,0,1,16,12,8,5,1,4,12,19,1,5,0,0,4.66,3.45,1.74,2.14,1.64
+primeira_liga,2025,primeira_liga_2025_95_estrela_nacional,09/11/2025,Estrela,Nacional,1,1,0,1,14,17,4,4,2,6,12,15,3,4,0,0,2.71,3.18,2.55,2.1,1.67
+primeira_liga,2025,primeira_liga_2025_96_famalicao_porto,09/11/2025,Famalicao,Porto,0,1,0,1,8,19,0,6,2,4,24,13,5,2,0,0,5.27,3.79,1.6,1.92,1.81
+primeira_liga,2025,primeira_liga_2025_97_benfica_casa_pia,09/11/2025,Benfica,Casa Pia,2,2,1,0,19,7,6,4,6,2,8,8,3,2,0,0,1.16,7.01,14.47,1.51,2.41
+primeira_liga,2025,primeira_liga_2025_98_sp_braga_moreirense,09/11/2025,Sp Braga,Moreirense,2,1,1,0,11,11,3,1,5,3,13,15,3,2,0,0,1.38,4.56,7.52,1.76,1.97
+primeira_liga,2025,primeira_liga_2025_99_guimaraes_avs,28/11/2025,Guimaraes,AVS,4,0,3,0,11,9,4,1,7,3,11,14,0,1,0,0,1.7,3.5,4.94,2.16,1.63
+primeira_liga,2025,primeira_liga_2025_100_casa_pia_alverca,29/11/2025,Casa Pia,Alverca,0,2,0,0,5,10,0,5,6,4,9,17,4,4,1,0,2.46,3.01,2.97,2.31,1.55
+primeira_liga,2025,primeira_liga_2025_101_moreirense_famalicao,29/11/2025,Moreirense,Famalicao,2,2,0,1,11,17,6,8,5,4,17,22,4,5,1,0,3.4,3.24,2.11,2.09,1.67
+primeira_liga,2025,primeira_liga_2025_102_nacional_benfica,29/11/2025,Nacional,Benfica,1,2,0,0,6,31,2,8,2,11,10,8,4,2,0,0,8.03,4.84,1.34,1.67,2.08
+primeira_liga,2025,primeira_liga_2025_103_gil_vicente_tondela,29/11/2025,Gil Vicente,Tondela,0,1,0,1,15,5,2,2,12,3,10,20,2,0,0,0,1.61,3.65,5.57,2.08,1.67
+primeira_liga,2025,primeira_liga_2025_104_rio_ave_santa_clara,30/11/2025,Rio Ave,Santa Clara,1,1,1,1,9,9,4,3,1,5,10,15,2,3,0,0,2.94,3.05,2.44,2.34,1.53
+primeira_liga,2025,primeira_liga_2025_105_sp_lisbon_estrela,30/11/2025,Sp Lisbon,Estrela,4,0,3,0,19,5,6,3,5,1,12,12,1,0,0,0,1.1,8.68,19.69,1.38,2.84
+primeira_liga,2025,primeira_liga_2025_106_porto_estoril,30/11/2025,Porto,Estoril,1,0,1,0,12,11,6,2,5,4,14,11,1,3,0,0,1.24,5.64,10.72,1.55,2.31
+primeira_liga,2025,primeira_liga_2025_107_arouca_sp_braga,01/12/2025,Arouca,Sp Braga,0,4,0,3,3,18,1,6,0,6,11,9,4,0,1,0,5.89,4.06,1.51,1.76,1.95
+primeira_liga,2025,primeira_liga_2025_108_benfica_sp_lisbon,05/12/2025,Benfica,Sp Lisbon,1,1,1,1,10,5,4,2,3,2,15,20,2,5,1,0,2.68,3.11,2.62,2.07,1.67
+primeira_liga,2025,primeira_liga_2025_109_santa_clara_casa_pia,06/12/2025,Santa Clara,Casa Pia,1,0,1,0,11,5,3,2,7,7,23,12,5,4,0,0,1.88,3.11,4.53,2.6,1.45
+primeira_liga,2025,primeira_liga_2025_110_avs_rio_ave,06/12/2025,AVS,Rio Ave,1,2,0,1,9,17,5,8,3,11,16,16,6,6,1,0,2.93,3.19,2.37,2.09,1.67
+primeira_liga,2025,primeira_liga_2025_111_famalicao_sp_braga,06/12/2025,Famalicao,Sp Braga,1,2,1,1,8,21,4,7,3,9,10,19,1,3,0,0,3.28,3.34,2.11,1.95,1.77
+primeira_liga,2025,primeira_liga_2025_112_estoril_moreirense,07/12/2025,Estoril,Moreirense,3,3,1,1,9,8,5,5,1,5,16,14,2,3,0,0,2.01,3.33,3.59,2.05,1.69
+primeira_liga,2025,primeira_liga_2025_113_alverca_nacional,07/12/2025,Alverca,Nacional,1,0,0,0,10,17,4,3,2,2,10,19,1,1,0,0,2.16,3.15,3.38,2.18,1.62
+primeira_liga,2025,primeira_liga_2025_114_estrela_arouca,07/12/2025,Estrela,Arouca,3,1,2,0,24,9,9,2,5,3,12,14,1,5,0,2,2.19,3.21,3.24,2.08,1.67
+primeira_liga,2025,primeira_liga_2025_115_tondela_porto,07/12/2025,Tondela,Porto,0,2,0,0,11,11,2,6,2,4,9,10,2,1,0,0,10.66,5.26,1.26,1.7,2.04
+primeira_liga,2025,primeira_liga_2025_116_guimaraes_gil_vicente,08/12/2025,Guimaraes,Gil Vicente,0,0,0,0,10,6,3,1,8,4,15,17,4,5,0,0,2.74,2.95,2.68,2.44,1.5
+primeira_liga,2025,primeira_liga_2025_117_casa_pia_gil_vicente,13/12/2025,Casa Pia,Gil Vicente,1,1,0,1,3,11,1,2,1,8,19,8,3,1,0,0,3.6,3.01,2.13,2.51,1.47
+primeira_liga,2025,primeira_liga_2025_118_rio_ave_guimaraes,13/12/2025,Rio Ave,Guimaraes,0,1,0,1,8,16,2,3,6,6,15,15,4,4,1,0,2.67,3.23,2.55,2.02,1.71
+primeira_liga,2025,primeira_liga_2025_119_sp_lisbon_avs,13/12/2025,Sp Lisbon,AVS,6,0,3,0,24,7,14,3,8,1,11,9,1,2,0,0,1.07,9.83,23.38,1.31,3.19
+primeira_liga,2025,primeira_liga_2025_120_famalicao_estoril,14/12/2025,Famalicao,Estoril,4,0,2,0,20,10,12,4,4,9,10,18,3,1,0,0,1.8,3.58,4.13,1.8,1.91
+primeira_liga,2025,primeira_liga_2025_121_moreirense_benfica,14/12/2025,Moreirense,Benfica,0,4,0,1,10,10,2,5,4,4,19,15,2,0,0,0,8.64,4.62,1.34,1.8,1.91
+primeira_liga,2025,primeira_liga_2025_122_arouca_alverca,14/12/2025,Arouca,Alverca,1,0,0,0,18,5,4,1,8,5,15,11,1,4,0,1,2.79,3.17,2.48,2.16,1.62
+primeira_liga,2025,primeira_liga_2025_123_nacional_tondela,15/12/2025,Nacional,Tondela,3,1,0,0,8,21,4,5,3,10,11,17,5,6,1,1,2.27,3.15,3.11,2.09,1.67
+primeira_liga,2025,primeira_liga_2025_124_sp_braga_santa_clara,15/12/2025,Sp Braga,Santa Clara,1,0,1,0,6,5,3,2,5,1,10,15,1,3,0,0,1.49,3.88,6.74,2.16,1.63
+primeira_liga,2025,primeira_liga_2025_125_porto_estrela,15/12/2025,Porto,Estrela,3,1,1,0,20,6,6,1,4,0,13,17,1,5,0,0,1.18,6.24,14.34,1.59,2.22
+primeira_liga,2025,primeira_liga_2025_126_estoril_sp_braga,19/12/2025,Estoril,Sp Braga,1,0,1,0,13,12,7,5,9,5,12,8,5,2,0,0,5.34,3.92,1.57,1.8,1.91
+primeira_liga,2025,primeira_liga_2025_127_gil_vicente_rio_ave,20/12/2025,Gil Vicente,Rio Ave,2,2,1,1,23,3,5,2,10,1,16,16,3,5,0,1,1.71,3.53,4.8,2.07,1.67
+primeira_liga,2025,primeira_liga_2025_128_estrela_moreirense,20/12/2025,Estrela,Moreirense,0,0,0,0,13,16,3,7,3,7,15,19,2,1,0,0,2.4,3.11,2.94,2.17,1.61
+primeira_liga,2025,primeira_liga_2025_129_avs_nacional,21/12/2025,AVS,Nacional,2,2,2,0,16,19,3,6,9,2,10,11,1,0,1,0,3.11,3.19,2.25,2.17,1.62
+primeira_liga,2025,primeira_liga_2025_130_tondela_casa_pia,21/12/2025,Tondela,Casa Pia,1,2,0,0,11,12,4,5,6,4,10,16,2,3,0,0,2.16,3.15,3.38,2.21,1.6
+primeira_liga,2025,primeira_liga_2025_131_santa_clara_arouca,21/12/2025,Santa Clara,Arouca,0,0,0,0,9,8,5,2,2,4,15,14,2,2,0,0,1.79,3.29,4.64,2.3,1.55
+primeira_liga,2025,primeira_liga_2025_132_alverca_porto,22/12/2025,Alverca,Porto,0,3,0,1,8,14,5,6,4,1,8,12,1,1,0,0,8.72,4.6,1.34,1.89,1.82
+primeira_liga,2025,primeira_liga_2025_133_benfica_famalicao,22/12/2025,Benfica,Famalicao,1,0,1,0,9,4,6,2,5,2,11,21,0,1,0,0,1.33,4.74,8.55,1.73,2.0
+primeira_liga,2025,primeira_liga_2025_134_guimaraes_sp_lisbon,23/12/2025,Guimaraes,Sp Lisbon,1,4,0,2,17,16,5,7,2,5,21,14,3,5,1,0,7.34,4.41,1.39,1.82,1.88
+primeira_liga,2025,primeira_liga_2025_135_famalicao_estrela,27/12/2025,Famalicao,Estrela,2,3,2,2,22,6,5,4,9,4,18,16,3,5,0,0,1.56,3.81,5.61,1.9,1.8
+primeira_liga,2025,primeira_liga_2025_136_estoril_alverca,27/12/2025,Estoril,Alverca,4,1,2,0,9,12,4,7,3,7,12,11,2,3,0,0,2.17,3.3,3.21,2.02,1.71
+primeira_liga,2025,primeira_liga_2025_137_arouca_gil_vicente,28/12/2025,Arouca,Gil Vicente,2,2,2,1,9,17,5,5,4,8,13,5,5,2,0,0,3.87,3.25,1.95,2.15,1.63
+primeira_liga,2025,primeira_liga_2025_138_casa_pia_guimaraes,28/12/2025,Casa Pia,Guimaraes,0,0,0,0,5,13,2,2,2,3,23,11,4,2,0,0,3.19,3.01,2.3,2.39,1.5
+primeira_liga,2025,primeira_liga_2025_139_sp_braga_benfica,28/12/2025,Sp Braga,Benfica,2,2,2,1,11,14,3,6,1,5,14,9,4,2,1,0,3.35,3.24,2.12,2.04,1.7
+primeira_liga,2025,primeira_liga_2025_140_sp_lisbon_rio_ave,28/12/2025,Sp Lisbon,Rio Ave,4,0,1,0,23,5,12,0,8,1,13,6,1,1,0,0,1.14,7.56,14.63,1.39,2.78
+primeira_liga,2025,primeira_liga_2025_141_porto_avs,29/12/2025,Porto,AVS,2,0,0,0,18,7,4,1,7,0,8,7,1,1,0,0,1.12,7.87,17.82,1.42,2.69
+primeira_liga,2025,primeira_liga_2025_142_gil_vicente_sp_lisbon,02/01/2026,Gil Vicente,Sp Lisbon,1,1,0,1,19,14,9,4,8,7,17,14,4,4,0,1,7.03,4.25,1.43,1.84,1.86
+primeira_liga,2025,primeira_liga_2025_143_guimaraes_nacional,02/01/2026,Guimaraes,Nacional,2,1,0,0,9,14,4,4,2,3,20,18,1,3,0,0,1.85,3.38,4.17,2.09,1.67
+primeira_liga,2025,primeira_liga_2025_144_tondela_arouca,03/01/2026,Tondela,Arouca,3,1,2,1,5,11,3,4,2,9,12,7,3,1,0,0,2.11,3.25,3.37,2.0,1.72
+primeira_liga,2025,primeira_liga_2025_145_benfica_estoril,03/01/2026,Benfica,Estoril,3,1,2,1,20,9,3,4,7,3,12,15,0,2,0,0,1.22,5.89,11.31,1.49,2.44
+primeira_liga,2025,primeira_liga_2025_146_estrela_sp_braga,03/01/2026,Estrela,Sp Braga,3,3,1,1,11,10,4,6,5,7,14,8,2,1,0,0,6.55,4.13,1.47,1.83,1.87
+primeira_liga,2025,primeira_liga_2025_147_avs_moreirense,03/01/2026,AVS,Moreirense,0,2,0,1,9,12,4,5,2,4,23,11,5,3,0,0,3.29,3.12,2.2,2.28,1.56
+primeira_liga,2025,primeira_liga_2025_148_rio_ave_casa_pia,04/01/2026,Rio Ave,Casa Pia,3,1,0,0,12,15,8,5,9,4,10,23,0,1,0,0,2.29,3.1,3.14,2.32,1.55
+primeira_liga,2025,primeira_liga_2025_149_santa_clara_porto,04/01/2026,Santa Clara,Porto,0,1,0,0,12,8,0,5,2,7,20,22,2,4,0,0,7.43,3.91,1.45,2.21,1.59
+primeira_liga,2025,primeira_liga_2025_150_alverca_famalicao,04/01/2026,Alverca,Famalicao,1,0,0,0,10,14,4,2,3,4,14,22,2,2,0,0,3.6,3.25,2.02,2.09,1.67
+primeira_liga,2025,primeira_liga_2025_151_nacional_santa_clara,11/01/2026,Nacional,Santa Clara,3,3,2,2,13,22,5,6,2,8,14,11,4,4,0,0,2.75,2.95,2.65,2.48,1.48
+primeira_liga,2025,primeira_liga_2025_152_moreirense_tondela,11/01/2026,Moreirense,Tondela,1,0,0,0,7,8,2,2,4,2,7,13,1,1,0,0,2.09,3.21,3.49,2.12,1.64
+primeira_liga,2025,primeira_liga_2025_153_sp_lisbon_casa_pia,16/01/2026,Sp Lisbon,Casa Pia,3,0,2,0,16,6,4,1,4,6,12,12,0,2,0,1,1.19,6.44,12.88,1.53,2.34
+primeira_liga,2025,primeira_liga_2025_154_gil_vicente_nacional,17/01/2026,Gil Vicente,Nacional,2,1,1,1,16,13,4,4,7,5,7,18,1,2,0,0,1.62,3.68,5.3,2.0,1.73
+primeira_liga,2025,primeira_liga_2025_155_alverca_moreirense,17/01/2026,Alverca,Moreirense,2,1,0,0,15,10,3,4,4,0,16,6,3,1,0,0,2.65,2.93,2.78,2.48,1.48
+primeira_liga,2025,primeira_liga_2025_156_avs_arouca,17/01/2026,AVS,Arouca,0,1,0,1,12,18,3,3,2,3,11,12,3,6,1,0,2.83,3.16,2.45,2.17,1.62
+primeira_liga,2025,primeira_liga_2025_157_rio_ave_benfica,17/01/2026,Rio Ave,Benfica,0,2,0,2,7,24,1,8,3,11,12,8,1,2,0,0,9.32,5.04,1.3,1.65,2.12
+primeira_liga,2025,primeira_liga_2025_158_santa_clara_famalicao,18/01/2026,Santa Clara,Famalicao,0,1,0,0,15,7,1,3,9,2,17,18,1,1,0,0,2.96,2.93,2.5,2.41,1.51
+primeira_liga,2025,primeira_liga_2025_159_tondela_sp_braga,18/01/2026,Tondela,Sp Braga,0,1,0,0,7,11,2,4,1,5,19,14,3,3,0,1,5.69,3.67,1.58,2.06,1.69
+primeira_liga,2025,primeira_liga_2025_160_guimaraes_porto,18/01/2026,Guimaraes,Porto,0,1,0,0,20,12,3,3,6,1,19,15,4,2,1,0,7.07,4.04,1.45,2.01,1.72
+primeira_liga,2025,primeira_liga_2025_161_estrela_estoril,19/01/2026,Estrela,Estoril,0,5,0,1,6,11,2,6,1,4,16,12,2,2,1,0,2.76,3.27,2.44,1.85,1.85
+primeira_liga,2025,primeira_liga_2025_162_casa_pia_avs,23/01/2026,Casa Pia,AVS,3,3,1,0,9,27,4,7,2,11,15,13,3,5,0,0,2.0,3.16,3.83,2.26,1.57
+primeira_liga,2025,primeira_liga_2025_163_moreirense_santa_clara,24/01/2026,Moreirense,Santa Clara,1,0,0,0,3,9,1,1,5,5,13,22,2,2,0,0,2.71,2.87,2.76,2.65,1.43
+primeira_liga,2025,primeira_liga_2025_164_arouca_sp_lisbon,24/01/2026,Arouca,Sp Lisbon,1,2,0,1,11,15,5,4,4,7,11,12,3,4,1,1,10.87,5.7,1.23,1.54,2.34
+primeira_liga,2025,primeira_liga_2025_165_estoril_guimaraes,24/01/2026,Estoril,Guimaraes,4,2,1,2,16,13,6,4,4,2,9,19,2,3,0,0,2.43,3.17,2.81,2.0,1.73
+primeira_liga,2025,primeira_liga_2025_166_nacional_rio_ave,25/01/2026,Nacional,Rio Ave,4,0,1,0,14,11,5,6,5,5,18,6,3,0,0,0,2.2,3.25,3.15,1.93,1.79
+primeira_liga,2025,primeira_liga_2025_167_benfica_estrela,25/01/2026,Benfica,Estrela,4,0,1,0,15,4,8,1,6,1,10,24,3,4,0,0,1.12,7.72,18.86,1.48,2.49
+primeira_liga,2025,primeira_liga_2025_168_famalicao_tondela,25/01/2026,Famalicao,Tondela,3,0,1,0,9,2,4,0,3,4,9,20,0,1,0,0,1.59,3.7,5.58,2.01,1.72
+primeira_liga,2025,primeira_liga_2025_169_sp_braga_alverca,25/01/2026,Sp Braga,Alverca,5,0,4,0,17,3,7,0,7,0,9,11,2,2,0,0,1.38,4.48,7.53,1.79,1.93
+primeira_liga,2025,primeira_liga_2025_170_porto_gil_vicente,26/01/2026,Porto,Gil Vicente,3,0,1,0,14,11,6,5,11,3,13,8,2,3,0,1,1.37,4.38,8.24,1.95,1.77
+primeira_liga,2025,primeira_liga_2025_171_guimaraes_moreirense,30/01/2026,Guimaraes,Moreirense,1,0,0,0,14,10,2,5,5,5,19,12,2,5,0,0,1.84,3.27,4.35,2.23,1.58
+primeira_liga,2025,primeira_liga_2025_172_santa_clara_estoril,31/01/2026,Santa Clara,Estoril,2,4,0,2,14,11,4,6,6,5,16,11,7,3,0,0,2.2,3.08,3.3,2.23,1.59
+primeira_liga,2025,primeira_liga_2025_173_rio_ave_arouca,31/01/2026,Rio Ave,Arouca,0,3,0,1,8,18,0,7,5,5,11,15,2,1,0,0,2.46,3.15,2.8,1.97,1.76
+primeira_liga,2025,primeira_liga_2025_174_alverca_estrela,31/01/2026,Alverca,Estrela,1,1,0,0,8,5,4,2,9,2,17,17,1,2,0,0,2.09,3.11,3.54,2.27,1.57
+primeira_liga,2025,primeira_liga_2025_175_gil_vicente_famalicao,01/02/2026,Gil Vicente,Famalicao,5,0,1,0,17,4,9,0,3,1,19,10,1,1,0,1,2.64,3.06,2.69,2.21,1.6
+primeira_liga,2025,primeira_liga_2025_176_sp_lisbon_nacional,01/02/2026,Sp Lisbon,Nacional,2,1,0,0,16,6,7,4,11,0,12,15,0,3,0,0,1.13,7.87,16.71,1.37,2.87
+primeira_liga,2025,primeira_liga_2025_177_tondela_benfica,01/02/2026,Tondela,Benfica,0,0,0,0,7,23,1,9,1,13,19,5,5,0,0,0,12.59,5.69,1.21,1.68,2.08
+primeira_liga,2025,primeira_liga_2025_178_avs_sp_braga,02/02/2026,AVS,Sp Braga,0,4,0,2,8,10,3,8,1,4,3,6,0,1,0,0,8.08,4.56,1.36,1.8,1.91
+primeira_liga,2025,primeira_liga_2025_179_casa_pia_porto,02/02/2026,Casa Pia,Porto,2,1,2,0,6,15,3,6,0,10,14,14,3,2,0,1,10.75,5.04,1.27,1.79,1.92
+primeira_liga,2025,primeira_liga_2025_180_estrela_santa_clara,07/02/2026,Estrela,Santa Clara,1,0,0,0,12,17,4,5,3,6,15,9,4,1,0,0,3.33,2.9,2.29,2.7,1.41
+primeira_liga,2025,primeira_liga_2025_181_moreirense_gil_vicente,07/02/2026,Moreirense,Gil Vicente,1,2,0,1,3,15,1,4,3,6,18,15,3,1,1,0,3.29,2.97,2.27,2.47,1.49
+primeira_liga,2025,primeira_liga_2025_182_estoril_tondela,07/02/2026,Estoril,Tondela,2,2,2,2,15,6,6,5,5,4,8,8,1,0,0,0,1.68,3.76,4.6,1.75,1.98
+primeira_liga,2025,primeira_liga_2025_183_arouca_guimaraes,07/02/2026,Arouca,Guimaraes,3,2,1,2,10,14,6,6,1,6,19,15,1,4,0,0,2.83,3.19,2.42,2.09,1.67
+primeira_liga,2025,primeira_liga_2025_184_nacional_casa_pia,08/02/2026,Nacional,Casa Pia,0,0,0,0,21,9,4,3,12,1,15,11,2,3,0,0,2.06,3.18,3.57,2.1,1.66
+primeira_liga,2025,primeira_liga_2025_185_sp_braga_rio_ave,08/02/2026,Sp Braga,Rio Ave,3,0,1,0,15,7,7,2,9,1,14,8,1,1,0,0,1.23,5.77,10.56,1.52,2.36
+primeira_liga,2025,primeira_liga_2025_186_benfica_alverca,08/02/2026,Benfica,Alverca,2,1,1,1,29,6,10,2,9,1,11,18,3,2,0,0,1.17,6.23,15.65,1.61,2.18
+primeira_liga,2025,primeira_liga_2025_187_famalicao_avs,09/02/2026,Famalicao,AVS,3,1,0,0,14,7,6,1,7,2,9,14,3,2,0,0,1.37,4.49,7.68,1.75,1.96
+primeira_liga,2025,primeira_liga_2025_188_porto_sp_lisbon,09/02/2026,Porto,Sp Lisbon,1,1,0,0,8,11,1,3,1,8,14,12,3,5,0,0,2.24,3.03,3.27,2.18,1.61
+primeira_liga,2025,primeira_liga_2025_189_santa_clara_benfica,13/02/2026,Santa Clara,Benfica,1,2,0,2,9,11,2,3,1,7,23,5,6,2,1,0,6.47,3.77,1.51,2.13,1.64
+primeira_liga,2025,primeira_liga_2025_190_tondela_alverca,13/02/2026,Tondela,Alverca,1,1,0,1,18,10,4,4,11,5,14,10,5,5,0,1,2.46,3.04,2.9,2.3,1.55
+primeira_liga,2025,primeira_liga_2025_191_casa_pia_arouca,14/02/2026,Casa Pia,Arouca,3,2,3,2,11,8,4,4,2,3,21,8,5,2,0,0,2.64,3.1,2.65,2.15,1.63
+primeira_liga,2025,primeira_liga_2025_192_guimaraes_estrela,14/02/2026,Guimaraes,Estrela,2,1,0,1,20,7,6,4,9,2,13,18,3,2,0,0,1.68,3.5,5.02,2.15,1.63
+primeira_liga,2025,primeira_liga_2025_193_gil_vicente_sp_braga,14/02/2026,Gil Vicente,Sp Braga,2,1,0,1,15,11,5,2,5,6,7,18,2,1,0,0,3.51,3.21,2.06,2.16,1.63
+primeira_liga,2025,primeira_liga_2025_194_nacional_porto,15/02/2026,Nacional,Porto,0,1,0,0,9,8,2,5,5,8,13,11,4,0,0,0,8.79,4.8,1.32,1.74,1.98
+primeira_liga,2025,primeira_liga_2025_195_avs_estoril,15/02/2026,AVS,Estoril,3,0,0,0,15,12,3,2,9,9,9,10,2,2,0,0,4.06,3.67,1.78,1.72,2.01
+primeira_liga,2025,primeira_liga_2025_196_sp_lisbon_famalicao,15/02/2026,Sp Lisbon,Famalicao,1,0,0,0,22,2,5,1,14,1,17,19,3,2,0,0,1.3,5.03,8.8,1.61,2.18
+primeira_liga,2025,primeira_liga_2025_197_rio_ave_moreirense,16/02/2026,Rio Ave,Moreirense,1,2,1,1,18,6,6,3,7,1,17,24,1,3,0,0,2.85,3.1,2.46,2.16,1.62
+primeira_liga,2025,primeira_liga_2025_198_estrela_tondela,20/02/2026,Estrela,Tondela,0,2,0,1,15,11,3,5,5,3,12,17,2,3,1,0,2.55,3.05,2.79,2.24,1.58
+primeira_liga,2025,primeira_liga_2025_199_alverca_santa_clara,21/02/2026,Alverca,Santa Clara,1,1,1,0,7,16,1,3,5,2,16,14,2,2,0,0,2.85,2.88,2.62,2.62,1.43
+primeira_liga,2025,primeira_liga_2025_200_arouca_nacional,21/02/2026,Arouca,Nacional,3,0,0,0,10,15,7,5,4,1,13,13,5,3,1,1,2.3,3.29,2.94,1.86,1.84
+primeira_liga,2025,primeira_liga_2025_201_benfica_avs,21/02/2026,Benfica,AVS,3,0,3,0,22,3,9,0,10,1,7,14,0,0,0,0,1.08,9.3,22.63,1.33,3.05
+primeira_liga,2025,primeira_liga_2025_202_moreirense_sp_lisbon,21/02/2026,Moreirense,Sp Lisbon,0,3,0,0,6,15,2,8,1,8,12,14,1,1,0,0,9.63,5.21,1.28,1.62,2.16
+primeira_liga,2025,primeira_liga_2025_203_sp_braga_guimaraes,21/02/2026,Sp Braga,Guimaraes,3,2,2,1,7,9,7,4,0,2,17,10,2,3,0,0,1.56,3.89,5.46,1.84,1.86
+primeira_liga,2025,primeira_liga_2025_204_estoril_gil_vicente,22/02/2026,Estoril,Gil Vicente,3,1,1,1,10,12,7,4,1,4,13,8,0,0,0,0,2.69,3.27,2.48,1.91,1.81
+primeira_liga,2025,primeira_liga_2025_205_porto_rio_ave,22/02/2026,Porto,Rio Ave,1,0,1,0,16,6,3,1,10,1,14,16,2,3,0,0,1.11,8.15,19.15,1.45,2.59
+primeira_liga,2025,primeira_liga_2025_206_famalicao_casa_pia,23/02/2026,Famalicao,Casa Pia,2,0,1,0,24,7,7,1,7,7,17,17,3,2,0,0,1.63,3.65,5.18,1.96,1.76
+primeira_liga,2025,primeira_liga_2025_207_porto_arouca,27/02/2026,Porto,Arouca,3,1,1,0,20,7,7,1,5,1,11,14,0,2,0,0,1.21,5.77,12.23,1.69,2.06
+primeira_liga,2025,primeira_liga_2025_208_sp_lisbon_estoril,27/02/2026,Sp Lisbon,Estoril,3,0,2,0,14,8,7,3,4,1,9,16,2,3,0,0,1.17,7.15,11.65,1.29,3.37
+primeira_liga,2025,primeira_liga_2025_209_avs_estrela,28/02/2026,AVS,Estrela,0,0,0,0,11,16,3,6,7,9,17,9,2,1,0,0,2.63,3.09,2.64,2.15,1.63
+primeira_liga,2025,primeira_liga_2025_210_nacional_sp_braga,28/02/2026,Nacional,Sp Braga,1,2,0,1,14,20,5,8,3,6,15,15,2,3,0,0,5.47,4.0,1.54,1.75,1.98
+primeira_liga,2025,primeira_liga_2025_211_guimaraes_alverca,28/02/2026,Guimaraes,Alverca,1,1,0,0,15,11,6,5,0,11,16,5,1,2,0,0,1.75,3.46,4.5,2.02,1.72
+primeira_liga,2025,primeira_liga_2025_212_tondela_santa_clara,01/03/2026,Tondela,Santa Clara,2,2,1,1,11,17,4,3,4,7,15,15,3,2,0,0,3.16,2.96,2.35,2.49,1.47
+primeira_liga,2025,primeira_liga_2025_213_casa_pia_moreirense,01/03/2026,Casa Pia,Moreirense,1,1,1,0,7,12,2,6,1,7,22,12,2,3,0,0,2.65,2.95,2.74,2.42,1.5
+primeira_liga,2025,primeira_liga_2025_214_rio_ave_famalicao,01/03/2026,Rio Ave,Famalicao,0,0,0,0,16,10,4,4,5,5,19,15,4,2,0,0,3.93,3.48,1.86,1.87,1.83
+primeira_liga,2025,primeira_liga_2025_215_gil_vicente_benfica,02/03/2026,Gil Vicente,Benfica,1,2,0,1,13,11,5,3,5,3,16,12,2,3,0,0,5.66,3.69,1.56,2.0,1.73
+primeira_liga,2025,primeira_liga_2025_216_famalicao_arouca,06/03/2026,Famalicao,Arouca,1,0,0,0,13,10,6,4,5,1,12,16,1,1,0,0,1.75,3.55,4.37,1.88,1.82
+primeira_liga,2025,primeira_liga_2025_217_alverca_avs,07/03/2026,Alverca,AVS,0,0,0,0,17,12,2,2,8,0,7,13,1,3,0,0,1.7,3.56,4.68,1.96,1.77
+primeira_liga,2025,primeira_liga_2025_218_moreirense_nacional,07/03/2026,Moreirense,Nacional,1,1,1,0,7,20,2,7,4,7,13,13,4,2,0,0,2.31,3.19,2.97,2.09,1.66
+primeira_liga,2025,primeira_liga_2025_219_sp_braga_sp_lisbon,07/03/2026,Sp Braga,Sp Lisbon,2,2,1,2,10,14,3,5,6,5,17,13,3,3,0,0,3.3,3.33,2.08,1.92,1.8
+primeira_liga,2025,primeira_liga_2025_220_estoril_casa_pia,07/03/2026,Estoril,Casa Pia,0,0,0,0,9,9,1,2,4,5,10,12,2,2,0,0,1.69,3.77,4.43,1.72,2.01
+primeira_liga,2025,primeira_liga_2025_221_estrela_gil_vicente,08/03/2026,Estrela,Gil Vicente,2,2,0,1,9,19,5,6,0,8,16,17,1,2,0,0,4.25,3.31,1.83,2.16,1.62
+primeira_liga,2025,primeira_liga_2025_222_benfica_porto,08/03/2026,Benfica,Porto,2,2,0,2,20,14,6,6,8,2,11,17,2,6,0,0,2.13,3.18,3.34,2.15,1.63
+primeira_liga,2025,primeira_liga_2025_223_santa_clara_guimaraes,08/03/2026,Santa Clara,Guimaraes,2,0,2,0,6,14,4,6,2,4,26,15,3,2,0,0,2.57,2.98,2.77,2.39,1.51
+primeira_liga,2025,primeira_liga_2025_224_tondela_rio_ave,09/03/2026,Tondela,Rio Ave,0,1,0,0,6,9,2,2,3,2,15,14,0,5,0,0,2.06,3.27,3.44,1.98,1.73
+primeira_liga,2025,primeira_liga_2025_225_guimaraes_famalicao,14/03/2026,Guimaraes,Famalicao,1,2,1,1,12,13,6,3,3,11,22,13,1,1,0,0,2.37,3.22,2.84,2.06,1.69
+primeira_liga,2025,primeira_liga_2025_226_gil_vicente_alverca,14/03/2026,Gil Vicente,Alverca,2,2,1,0,10,17,6,6,3,7,15,8,3,1,0,0,1.65,3.6,5.05,2.01,1.72
+primeira_liga,2025,primeira_liga_2025_227_arouca_benfica,14/03/2026,Arouca,Benfica,1,2,1,0,12,22,6,5,2,15,17,11,5,5,1,1,10.23,5.49,1.25,1.57,2.25
+primeira_liga,2025,primeira_liga_2025_228_avs_santa_clara,15/03/2026,AVS,Santa Clara,0,1,0,0,10,12,2,3,4,6,16,10,2,1,1,0,4.34,3.27,1.83,2.24,1.57
+primeira_liga,2025,primeira_liga_2025_229_nacional_estoril,15/03/2026,Nacional,Estoril,0,1,0,1,16,11,4,2,5,4,16,13,5,3,0,0,2.39,3.47,2.66,1.66,2.09
+primeira_liga,2025,primeira_liga_2025_230_rio_ave_estrela,15/03/2026,Rio Ave,Estrela,2,1,1,0,18,11,6,3,10,4,16,12,4,2,0,0,2.26,3.31,2.98,1.98,1.75
+primeira_liga,2025,primeira_liga_2025_231_porto_moreirense,15/03/2026,Porto,Moreirense,3,0,2,0,17,3,9,2,4,1,14,15,1,1,0,0,1.17,6.0,15.54,1.69,2.06
+primeira_liga,2025,primeira_liga_2025_232_estrela_casa_pia,20/03/2026,Estrela,Casa Pia,4,0,3,0,23,8,8,2,6,1,18,20,3,2,0,0,2.38,3.09,2.98,2.19,1.61
+primeira_liga,2025,primeira_liga_2025_233_famalicao_nacional,21/03/2026,Famalicao,Nacional,1,0,0,0,14,10,4,6,7,6,13,18,3,3,0,0,1.67,3.72,4.59,1.79,1.93
+primeira_liga,2025,primeira_liga_2025_234_moreirense_arouca,21/03/2026,Moreirense,Arouca,0,1,0,0,7,14,2,2,3,7,11,12,1,2,0,0,2.36,3.19,2.92,2.09,1.67
+primeira_liga,2025,primeira_liga_2025_235_benfica_guimaraes,21/03/2026,Benfica,Guimaraes,3,0,1,0,12,16,4,2,4,8,15,15,0,1,0,0,1.28,5.22,9.35,1.57,2.27
+primeira_liga,2025,primeira_liga_2025_236_santa_clara_gil_vicente,21/03/2026,Santa Clara,Gil Vicente,1,0,0,0,7,8,2,0,6,6,15,17,1,2,0,0,2.65,2.95,2.73,2.53,1.47
+primeira_liga,2025,primeira_liga_2025_237_tondela_avs,21/03/2026,Tondela,AVS,0,0,0,0,14,9,3,2,7,6,12,15,0,2,0,0,1.87,3.35,4.03,2.03,1.71
+primeira_liga,2025,primeira_liga_2025_238_estoril_rio_ave,22/03/2026,Estoril,Rio Ave,1,2,1,0,13,13,4,8,11,7,16,11,2,3,0,0,1.71,3.79,4.27,1.65,2.12
+primeira_liga,2025,primeira_liga_2025_239_alverca_sp_lisbon,22/03/2026,Alverca,Sp Lisbon,1,4,0,1,12,15,4,9,3,1,13,9,1,2,0,0,9.46,5.17,1.27,1.56,2.26
+primeira_liga,2025,primeira_liga_2025_240_sp_braga_porto,22/03/2026,Sp Braga,Porto,1,2,0,0,6,12,1,3,3,5,12,15,4,5,0,0,3.25,3.12,2.19,2.25,1.57
+primeira_liga,2025,primeira_liga_2025_241_gil_vicente_avs,03/04/2026,Gil Vicente,AVS,3,0,2,0,16,11,6,3,3,1,8,15,2,1,0,0,1.33,4.62,8.66,1.78,1.96
+primeira_liga,2025,primeira_liga_2025_242_guimaraes_tondela,03/04/2026,Guimaraes,Tondela,5,0,2,0,12,3,5,1,3,1,14,17,1,1,0,0,1.79,3.4,4.32,2.09,1.67
+primeira_liga,2025,primeira_liga_2025_243_sp_lisbon_santa_clara,03/04/2026,Sp Lisbon,Santa Clara,4,2,3,1,22,7,8,4,9,5,12,22,4,4,0,0,1.29,5.0,9.58,1.75,1.99
+primeira_liga,2025,primeira_liga_2025_244_nacional_estrela,04/04/2026,Nacional,Estrela,2,0,1,0,16,11,4,2,5,6,14,8,4,3,0,0,2.05,3.37,3.34,1.86,1.85
+primeira_liga,2025,primeira_liga_2025_245_moreirense_sp_braga,04/04/2026,Moreirense,Sp Braga,0,1,0,1,12,10,2,7,4,9,9,14,0,3,0,0,5.98,3.85,1.52,1.9,1.81
+primeira_liga,2025,primeira_liga_2025_246_rio_ave_alverca,04/04/2026,Rio Ave,Alverca,1,2,0,2,18,14,5,6,8,4,7,6,2,1,0,0,2.45,3.29,2.68,1.97,1.76
+primeira_liga,2025,primeira_liga_2025_247_porto_famalicao,04/04/2026,Porto,Famalicao,2,2,1,0,8,11,3,6,4,3,20,14,5,4,0,0,1.36,4.41,8.3,1.9,1.81
+primeira_liga,2025,primeira_liga_2025_248_arouca_estoril,06/04/2026,Arouca,Estoril,3,2,2,2,12,12,4,3,3,3,13,18,3,2,0,0,2.42,3.44,2.61,1.72,2.02
+primeira_liga,2025,primeira_liga_2025_249_casa_pia_benfica,06/04/2026,Casa Pia,Benfica,1,1,0,0,8,18,2,3,3,12,19,10,1,0,0,0,11.81,5.9,1.2,1.51,2.42
+primeira_liga,2025,primeira_liga_2025_250_famalicao_moreirense,10/04/2026,Famalicao,Moreirense,1,1,0,1,18,2,7,1,13,0,15,15,5,6,0,0,1.46,4.05,6.72,1.94,1.79
+primeira_liga,2025,primeira_liga_2025_251_avs_guimaraes,11/04/2026,AVS,Guimaraes,1,1,1,1,17,14,4,6,5,4,16,9,5,1,0,0,4.79,3.65,1.66,1.88,1.83
+primeira_liga,2025,primeira_liga_2025_252_santa_clara_rio_ave,11/04/2026,Santa Clara,Rio Ave,0,2,0,0,13,4,4,3,3,3,18,12,2,3,0,0,1.77,3.34,4.56,2.24,1.59
+primeira_liga,2025,primeira_liga_2025_253_estrela_sp_lisbon,11/04/2026,Estrela,Sp Lisbon,0,1,0,0,9,10,3,2,4,13,14,16,3,1,0,0,11.08,6.04,1.21,1.44,2.62
+primeira_liga,2025,primeira_liga_2025_254_alverca_casa_pia,12/04/2026,Alverca,Casa Pia,3,1,0,1,11,15,5,5,9,11,10,15,0,0,0,0,1.98,3.22,3.74,2.13,1.65
+primeira_liga,2025,primeira_liga_2025_255_benfica_nacional,12/04/2026,Benfica,Nacional,2,0,2,0,24,7,8,4,15,1,13,18,1,5,0,0,1.13,7.56,14.75,1.32,3.13
+primeira_liga,2025,primeira_liga_2025_256_sp_braga_arouca,12/04/2026,Sp Braga,Arouca,1,0,0,0,6,9,2,1,6,5,9,12,2,2,1,0,1.37,4.59,7.19,1.64,2.15
+primeira_liga,2025,primeira_liga_2025_257_estoril_porto,12/04/2026,Estoril,Porto,1,3,0,2,8,20,3,5,1,8,13,15,3,1,0,0,6.28,4.31,1.45,1.66,2.11
+primeira_liga,2025,primeira_liga_2025_258_tondela_gil_vicente,13/04/2026,Tondela,Gil Vicente,2,2,1,1,10,14,5,6,5,5,15,11,6,2,0,0,3.79,3.2,1.95,2.22,1.59
+primeira_liga,2025,primeira_liga_2025_259_rio_ave_avs,17/04/2026,Rio Ave,AVS,2,2,1,1,20,13,8,7,4,9,9,11,1,2,0,0,1.69,3.68,4.61,1.88,1.85
+primeira_liga,2025,primeira_liga_2025_260_nacional_alverca,18/04/2026,Nacional,Alverca,1,0,0,0,10,8,6,4,4,8,15,15,2,1,0,0,2.17,3.36,3.08,1.83,1.89
+primeira_liga,2025,primeira_liga_2025_261_casa_pia_santa_clara,18/04/2026,Casa Pia,Santa Clara,0,0,0,0,10,5,3,2,4,6,20,12,3,2,0,0,3.57,3.04,2.11,2.42,1.51
+primeira_liga,2025,primeira_liga_2025_262_gil_vicente_guimaraes,18/04/2026,Gil Vicente,Guimaraes,0,1,0,0,12,11,6,3,10,3,11,16,2,2,0,0,2.11,3.22,3.34,2.06,1.69
+primeira_liga,2025,primeira_liga_2025_263_arouca_estrela,19/04/2026,Arouca,Estrela,1,0,0,0,11,15,3,3,4,3,15,11,5,1,0,0,2.03,3.23,3.54,1.89,1.83
+primeira_liga,2025,primeira_liga_2025_264_sp_lisbon_benfica,19/04/2026,Sp Lisbon,Benfica,1,2,0,1,19,14,6,5,3,8,13,8,2,1,0,0,2.1,3.5,3.11,1.7,2.05
+primeira_liga,2025,primeira_liga_2025_265_porto_tondela,19/04/2026,Porto,Tondela,2,0,0,0,22,5,8,3,8,3,12,11,4,6,0,0,1.17,6.09,15.35,1.62,2.17
+primeira_liga,2025,primeira_liga_2025_266_sp_braga_famalicao,19/04/2026,Sp Braga,Famalicao,2,2,1,1,10,6,4,3,5,2,10,11,2,5,0,0,1.78,3.51,4.2,1.9,1.82
+primeira_liga,2025,primeira_liga_2025_267_moreirense_estoril,20/04/2026,Moreirense,Estoril,1,0,1,0,11,4,4,1,5,1,14,12,0,2,0,0,2.92,3.29,2.27,1.88,1.84
+primeira_liga,2025,primeira_liga_2025_268_casa_pia_sp_braga,23/04/2026,Casa Pia,Sp Braga,0,1,0,1,7,8,1,2,4,5,9,9,2,3,0,0,5.69,3.92,1.53,1.89,1.82
+primeira_liga,2025,primeira_liga_2025_269_alverca_arouca,24/04/2026,Alverca,Arouca,2,1,1,0,7,14,3,3,6,3,8,12,0,5,0,0,2.19,3.28,3.12,1.89,1.83
+primeira_liga,2025,primeira_liga_2025_270_tondela_nacional,25/04/2026,Tondela,Nacional,0,2,0,2,22,17,5,6,8,7,16,15,2,1,0,0,2.7,3.29,2.43,1.9,1.81
+primeira_liga,2025,primeira_liga_2025_271_benfica_moreirense,25/04/2026,Benfica,Moreirense,4,1,2,1,18,8,8,4,9,2,13,14,2,2,0,0,1.13,7.63,15.6,1.43,2.63
+primeira_liga,2025,primeira_liga_2025_272_guimaraes_rio_ave,25/04/2026,Guimaraes,Rio Ave,2,0,0,0,11,5,3,4,3,5,7,13,4,4,0,0,1.8,3.42,4.18,1.81,1.9
+primeira_liga,2025,primeira_liga_2025_273_estoril_famalicao,26/04/2026,Estoril,Famalicao,0,1,0,0,9,6,2,6,9,4,19,11,0,2,0,0,2.97,3.46,2.18,1.68,2.06
+primeira_liga,2025,primeira_liga_2025_274_estrela_porto,26/04/2026,Estrela,Porto,1,2,0,2,11,11,3,4,0,6,15,15,3,3,0,0,9.03,4.74,1.31,1.78,1.94
+primeira_liga,2025,primeira_liga_2025_275_santa_clara_sp_braga,26/04/2026,Santa Clara,Sp Braga,2,1,0,1,14,3,3,2,4,1,15,11,4,4,0,0,3.35,3.14,2.13,2.23,1.58
+primeira_liga,2025,primeira_liga_2025_276_avs_sp_lisbon,26/04/2026,AVS,Sp Lisbon,1,1,0,0,11,20,4,8,0,9,15,8,3,1,0,0,16.78,8.82,1.1,1.29,3.28
+primeira_liga,2025,primeira_liga_2025_277_gil_vicente_casa_pia,27/04/2026,Gil Vicente,Casa Pia,2,1,1,1,12,7,4,2,4,3,15,18,5,3,0,0,1.54,3.75,5.72,1.96,1.75
+primeira_liga,2025,primeira_liga_2025_278_sp_lisbon_tondela,29/04/2026,Sp Lisbon,Tondela,2,2,0,0,16,9,5,2,5,5,16,8,2,3,0,0,1.12,7.89,15.63,1.33,3.05
+primeira_liga,2025,primeira_liga_2025_279_arouca_santa_clara,02/05/2026,Arouca,Santa Clara,2,2,1,1,9,12,5,4,5,6,15,8,3,3,1,0,2.81,3.05,2.5,2.31,1.55
+primeira_liga,2025,primeira_liga_2025_280_moreirense_estrela,02/05/2026,Moreirense,Estrela,3,2,1,2,14,10,5,3,1,4,18,18,4,4,0,0,2.43,3.15,2.8,2.17,1.63
+primeira_liga,2025,primeira_liga_2025_281_nacional_avs,02/05/2026,Nacional,AVS,1,2,1,1,24,19,6,3,8,6,8,14,4,2,1,0,1.44,4.37,6.2,1.63,2.17
+primeira_liga,2025,primeira_liga_2025_282_famalicao_benfica,02/05/2026,Famalicao,Benfica,2,2,0,2,15,8,5,3,6,4,20,14,2,2,0,1,5.2,4.01,1.55,1.69,2.05
+primeira_liga,2025,primeira_liga_2025_283_porto_alverca,02/05/2026,Porto,Alverca,1,0,1,0,12,10,3,4,5,4,21,19,1,4,0,0,1.19,6.18,12.91,1.53,2.35
+primeira_liga,2025,primeira_liga_2025_284_casa_pia_tondela,03/05/2026,Casa Pia,Tondela,0,1,0,0,4,9,3,5,7,2,22,19,8,3,2,0,2.26,3.15,3.07,2.15,1.63
+primeira_liga,2025,primeira_liga_2025_285_sp_braga_estoril,03/05/2026,Sp Braga,Estoril,1,1,1,0,10,10,3,4,5,4,15,10,3,3,0,0,1.69,3.86,4.33,1.61,2.19
+primeira_liga,2025,primeira_liga_2025_286_rio_ave_gil_vicente,03/05/2026,Rio Ave,Gil Vicente,0,0,0,0,18,13,2,2,9,7,9,12,1,2,0,0,3.61,3.42,1.94,1.92,1.8
+primeira_liga,2025,primeira_liga_2025_287_sp_lisbon_guimaraes,04/05/2026,Sp Lisbon,Guimaraes,5,1,3,0,14,13,10,5,1,7,7,13,0,3,0,0,1.25,5.64,9.45,1.45,2.58
+primeira_liga,2025,primeira_liga_2025_288_avs_porto,10/05/2026,AVS,Porto,3,1,1,0,9,20,5,4,3,7,7,9,2,2,0,1,11.83,6.26,1.19,1.49,2.45
+primeira_liga,2025,primeira_liga_2025_289_alverca_estoril,10/05/2026,Alverca,Estoril,1,1,1,0,8,11,1,3,4,4,20,15,3,2,0,0,2.36,3.44,2.69,1.69,2.05
+primeira_liga,2025,primeira_liga_2025_290_benfica_sp_braga,11/05/2026,Benfica,Sp Braga,2,2,0,0,24,5,8,2,8,2,6,11,1,4,0,0,1.4,4.45,6.61,1.62,2.15
+primeira_liga,2025,primeira_liga_2025_291_estrela_famalicao,11/05/2026,Estrela,Famalicao,0,0,0,0,4,15,1,4,3,10,16,9,3,1,0,0,3.51,3.42,1.96,1.83,1.88
+primeira_liga,2025,primeira_liga_2025_292_gil_vicente_arouca,11/05/2026,Gil Vicente,Arouca,1,3,0,0,15,13,5,6,6,2,13,17,2,1,0,0,1.69,3.67,4.55,1.8,1.91
+primeira_liga,2025,primeira_liga_2025_293_guimaraes_casa_pia,11/05/2026,Guimaraes,Casa Pia,0,1,0,0,15,11,2,5,6,4,11,16,2,1,0,0,1.72,3.67,4.3,1.85,1.86
+primeira_liga,2025,primeira_liga_2025_294_rio_ave_sp_lisbon,11/05/2026,Rio Ave,Sp Lisbon,1,4,1,2,12,16,3,5,5,6,9,7,5,2,2,0,9.64,5.89,1.23,1.38,2.84
+primeira_liga,2025,primeira_liga_2025_295_santa_clara_nacional,11/05/2026,Santa Clara,Nacional,2,0,1,0,12,12,2,1,4,6,10,16,1,2,0,0,2.04,3.26,3.44,2.0,1.73
+primeira_liga,2025,primeira_liga_2025_296_tondela_moreirense,11/05/2026,Tondela,Moreirense,2,0,1,0,14,10,3,2,1,8,14,9,1,3,0,1,1.91,3.38,3.75,2.01,1.72
+primeira_liga,2025,primeira_liga_2025_297_moreirense_avs,16/05/2026,Moreirense,AVS,0,0,0,0,13,8,4,0,5,3,10,12,2,3,0,0,1.76,3.62,4.16,1.82,1.89
+primeira_liga,2025,primeira_liga_2025_298_porto_santa_clara,16/05/2026,Porto,Santa Clara,1,0,0,0,14,11,6,0,8,5,11,9,0,0,0,0,1.31,4.81,8.82,1.74,1.98
+primeira_liga,2025,primeira_liga_2025_299_arouca_tondela,16/05/2026,Arouca,Tondela,3,1,1,0,16,11,4,2,5,6,12,12,3,1,0,0,3.0,3.46,2.15,1.79,1.92
+primeira_liga,2025,primeira_liga_2025_300_casa_pia_rio_ave,16/05/2026,Casa Pia,Rio Ave,1,1,1,0,20,6,5,3,9,0,17,14,1,0,0,0,1.65,3.82,4.6,1.76,1.96
+primeira_liga,2025,primeira_liga_2025_301_nacional_guimaraes,16/05/2026,Nacional,Guimaraes,2,0,0,0,5,13,3,4,2,6,17,13,4,3,0,0,1.95,3.46,3.5,1.71,2.02
+primeira_liga,2025,primeira_liga_2025_302_sp_braga_estrela,16/05/2026,Sp Braga,Estrela,2,2,1,1,14,6,4,4,7,1,13,9,1,5,0,1,1.61,3.86,4.84,1.76,1.96
+primeira_liga,2025,primeira_liga_2025_303_estoril_benfica,16/05/2026,Estoril,Benfica,1,3,0,3,16,19,6,8,2,9,9,12,3,2,0,0,7.81,5.31,1.31,1.37,2.87
+primeira_liga,2025,primeira_liga_2025_304_famalicao_alverca,16/05/2026,Famalicao,Alverca,1,0,0,0,11,7,2,1,6,5,9,8,1,2,0,0,1.59,3.93,4.92,1.65,2.11
+primeira_liga,2025,primeira_liga_2025_305_sp_lisbon_gil_vicente,16/05/2026,Sp Lisbon,Gil Vicente,3,0,2,0,15,10,5,1,6,1,13,14,0,1,0,0,1.23,5.78,10.07,1.46,2.55

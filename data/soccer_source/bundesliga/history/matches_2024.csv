@@ -1,0 +1,307 @@
+league,season,match_id,date,home_team,away_team,home_goals,away_goals,ht_home_goals,ht_away_goals,home_shots,away_shots,home_shots_on_target,away_shots_on_target,home_corners,away_corners,home_fouls,away_fouls,home_yellow_cards,away_yellow_cards,home_red_cards,away_red_cards,odds_home,odds_draw,odds_away,odds_over_2_5,odds_under_2_5
+bundesliga,2024,bundesliga_2024_0_m'gladbach_leverkusen,23/08/2024,M'gladbach,Leverkusen,2,3,0.0,2.0,14.0,25.0,7.0,9.0,2.0,4.0,11.0,7.0,1.0,0.0,0.0,0.0,5.16,4.53,1.58,1.47,2.68
+bundesliga,2024,bundesliga_2024_1_augsburg_werder_bremen,24/08/2024,Augsburg,Werder Bremen,2,2,2.0,1.0,10.0,12.0,3.0,6.0,4.0,2.0,11.0,10.0,3.0,1.0,0.0,0.0,2.28,3.56,3.07,1.72,2.15
+bundesliga,2024,bundesliga_2024_2_freiburg_stuttgart,24/08/2024,Freiburg,Stuttgart,3,1,1.0,1.0,15.0,9.0,4.0,2.0,6.0,3.0,7.0,10.0,2.0,1.0,0.0,0.0,3.5,3.7,2.06,1.7,2.18
+bundesliga,2024,bundesliga_2024_3_hoffenheim_holstein_kiel,24/08/2024,Hoffenheim,Holstein Kiel,3,2,2.0,0.0,20.0,15.0,8.0,6.0,8.0,6.0,8.0,14.0,2.0,3.0,0.0,1.0,1.65,4.33,4.85,1.53,2.49
+bundesliga,2024,bundesliga_2024_4_mainz_union_berlin,24/08/2024,Mainz,Union Berlin,1,1,0.0,0.0,15.0,15.0,3.0,4.0,8.0,9.0,9.0,15.0,1.0,3.0,0.0,0.0,2.05,3.3,4.01,2.23,1.68
+bundesliga,2024,bundesliga_2024_5_rb_leipzig_bochum,24/08/2024,RB Leipzig,Bochum,1,0,0.0,0.0,12.0,10.0,3.0,4.0,9.0,3.0,9.0,17.0,1.0,3.0,1.0,0.0,1.25,6.58,10.53,1.36,3.14
+bundesliga,2024,bundesliga_2024_6_dortmund_ein_frankfurt,24/08/2024,Dortmund,Ein Frankfurt,2,0,0.0,0.0,17.0,7.0,5.0,2.0,7.0,7.0,6.0,3.0,0.0,1.0,0.0,0.0,1.71,4.31,4.39,1.47,2.68
+bundesliga,2024,bundesliga_2024_7_wolfsburg_bayern_munich,25/08/2024,Wolfsburg,Bayern Munich,2,3,0.0,1.0,11.0,14.0,2.0,8.0,1.0,7.0,13.0,11.0,2.0,3.0,0.0,0.0,6.32,4.93,1.46,1.44,2.76
+bundesliga,2024,bundesliga_2024_8_st_pauli_heidenheim,25/08/2024,St Pauli,Heidenheim,0,2,0.0,0.0,11.0,6.0,3.0,3.0,4.0,2.0,10.0,15.0,2.0,3.0,0.0,0.0,2.12,3.5,3.46,1.85,1.98
+bundesliga,2024,bundesliga_2024_9_union_berlin_st_pauli,30/08/2024,Union Berlin,St Pauli,1,0,1.0,0.0,10.0,8.0,5.0,2.0,5.0,4.0,10.0,11.0,3.0,1.0,0.0,0.0,1.94,3.5,4.15,1.99,1.86
+bundesliga,2024,bundesliga_2024_10_bochum_m'gladbach,31/08/2024,Bochum,M'gladbach,0,2,0.0,0.0,16.0,15.0,4.0,6.0,3.0,4.0,9.0,10.0,1.0,0.0,0.0,0.0,2.62,3.69,2.56,1.6,2.38
+bundesliga,2024,bundesliga_2024_11_ein_frankfurt_hoffenheim,31/08/2024,Ein Frankfurt,Hoffenheim,3,1,2.0,0.0,17.0,10.0,7.0,3.0,1.0,4.0,10.0,10.0,0.0,3.0,0.0,0.0,1.81,4.1,4.01,1.46,2.71
+bundesliga,2024,bundesliga_2024_12_holstein_kiel_wolfsburg,31/08/2024,Holstein Kiel,Wolfsburg,0,2,0.0,2.0,12.0,12.0,5.0,4.0,1.0,7.0,17.0,14.0,4.0,7.0,0.0,0.0,3.2,3.69,2.18,1.7,2.18
+bundesliga,2024,bundesliga_2024_13_stuttgart_mainz,31/08/2024,Stuttgart,Mainz,3,3,2.0,1.0,28.0,9.0,13.0,7.0,11.0,2.0,6.0,12.0,4.0,2.0,0.0,0.0,1.65,4.24,5.02,1.62,2.32
+bundesliga,2024,bundesliga_2024_14_werder_bremen_dortmund,31/08/2024,Werder Bremen,Dortmund,0,0,0.0,0.0,5.0,9.0,1.0,4.0,5.0,6.0,11.0,16.0,2.0,7.0,0.0,1.0,3.94,4.12,1.82,1.44,2.77
+bundesliga,2024,bundesliga_2024_15_leverkusen_rb_leipzig,31/08/2024,Leverkusen,RB Leipzig,2,3,2.0,1.0,27.0,10.0,10.0,4.0,18.0,2.0,7.0,8.0,3.0,1.0,0.0,0.0,1.8,4.14,4.05,1.48,2.65
+bundesliga,2024,bundesliga_2024_16_heidenheim_augsburg,01/09/2024,Heidenheim,Augsburg,4,0,2.0,0.0,17.0,15.0,9.0,1.0,5.0,6.0,15.0,11.0,0.0,3.0,0.0,0.0,2.4,3.49,2.94,1.77,2.09
+bundesliga,2024,bundesliga_2024_17_bayern_munich_freiburg,01/09/2024,Bayern Munich,Freiburg,2,0,1.0,0.0,11.0,8.0,4.0,4.0,2.0,4.0,13.0,12.0,1.0,0.0,0.0,0.0,1.21,7.74,11.63,1.24,3.96
+bundesliga,2024,bundesliga_2024_18_dortmund_heidenheim,13/09/2024,Dortmund,Heidenheim,4,2,3.0,1.0,13.0,11.0,7.0,4.0,8.0,1.0,13.0,18.0,2.0,2.0,0.0,0.0,1.39,5.26,7.6,1.5,2.62
+bundesliga,2024,bundesliga_2024_19_freiburg_bochum,14/09/2024,Freiburg,Bochum,2,1,0.0,1.0,27.0,13.0,9.0,2.0,5.0,6.0,5.0,16.0,0.0,3.0,0.0,0.0,1.71,4.06,4.72,1.66,2.27
+bundesliga,2024,bundesliga_2024_20_hoffenheim_leverkusen,14/09/2024,Hoffenheim,Leverkusen,1,4,1.0,2.0,14.0,20.0,5.0,8.0,4.0,12.0,9.0,10.0,2.0,2.0,0.0,0.0,5.78,4.94,1.5,1.31,3.41
+bundesliga,2024,bundesliga_2024_21_m'gladbach_stuttgart,14/09/2024,M'gladbach,Stuttgart,1,3,1.0,1.0,15.0,12.0,7.0,7.0,6.0,2.0,14.0,12.0,2.0,2.0,0.0,0.0,2.81,3.94,2.31,1.44,2.78
+bundesliga,2024,bundesliga_2024_22_rb_leipzig_union_berlin,14/09/2024,RB Leipzig,Union Berlin,0,0,0.0,0.0,16.0,11.0,3.0,3.0,6.0,5.0,9.0,19.0,2.0,3.0,0.0,0.0,1.48,4.68,6.68,1.68,2.22
+bundesliga,2024,bundesliga_2024_23_wolfsburg_ein_frankfurt,14/09/2024,Wolfsburg,Ein Frankfurt,1,2,0.0,1.0,17.0,15.0,4.0,7.0,5.0,4.0,7.0,18.0,1.0,2.0,0.0,0.0,2.69,3.53,2.58,1.73,2.09
+bundesliga,2024,bundesliga_2024_24_holstein_kiel_bayern_munich,14/09/2024,Holstein Kiel,Bayern Munich,1,6,0.0,4.0,5.0,23.0,1.0,13.0,2.0,10.0,12.0,11.0,0.0,1.0,0.0,0.0,11.32,7.34,1.23,1.27,3.81
+bundesliga,2024,bundesliga_2024_25_augsburg_st_pauli,15/09/2024,Augsburg,St Pauli,3,1,0.0,0.0,18.0,12.0,10.0,3.0,7.0,7.0,12.0,10.0,4.0,3.0,0.0,0.0,2.09,3.62,3.47,1.76,2.11
+bundesliga,2024,bundesliga_2024_26_mainz_werder_bremen,15/09/2024,Mainz,Werder Bremen,1,2,1.0,1.0,11.0,11.0,5.0,5.0,10.0,4.0,12.0,7.0,3.0,1.0,0.0,1.0,2.04,3.66,3.57,1.75,2.09
+bundesliga,2024,bundesliga_2024_27_augsburg_mainz,20/09/2024,Augsburg,Mainz,2,3,1.0,2.0,30.0,5.0,9.0,3.0,14.0,1.0,7.0,12.0,3.0,5.0,1.0,1.0,2.42,3.54,2.9,1.68,2.22
+bundesliga,2024,bundesliga_2024_28_bochum_holstein_kiel,21/09/2024,Bochum,Holstein Kiel,2,2,2.0,1.0,14.0,13.0,3.0,4.0,2.0,5.0,20.0,9.0,4.0,1.0,0.0,0.0,1.98,3.73,3.68,1.61,2.36
+bundesliga,2024,bundesliga_2024_29_heidenheim_freiburg,21/09/2024,Heidenheim,Freiburg,0,3,0.0,0.0,7.0,14.0,2.0,5.0,3.0,9.0,6.0,7.0,1.0,1.0,0.0,0.0,2.72,3.46,2.59,1.72,2.15
+bundesliga,2024,bundesliga_2024_30_union_berlin_hoffenheim,21/09/2024,Union Berlin,Hoffenheim,2,1,2.0,0.0,12.0,6.0,2.0,3.0,5.0,5.0,17.0,18.0,3.0,3.0,0.0,0.0,2.03,3.68,3.58,1.74,2.13
+bundesliga,2024,bundesliga_2024_31_werder_bremen_bayern_munich,21/09/2024,Werder Bremen,Bayern Munich,0,5,0.0,2.0,0.0,25.0,0.0,7.0,1.0,4.0,4.0,13.0,0.0,3.0,0.0,0.0,7.74,5.57,1.36,1.36,3.11
+bundesliga,2024,bundesliga_2024_32_ein_frankfurt_m'gladbach,21/09/2024,Ein Frankfurt,M'gladbach,2,0,1.0,0.0,14.0,22.0,4.0,7.0,8.0,5.0,10.0,12.0,1.0,1.0,0.0,0.0,1.78,4.13,4.18,1.49,2.6
+bundesliga,2024,bundesliga_2024_33_leverkusen_wolfsburg,22/09/2024,Leverkusen,Wolfsburg,4,3,2.0,3.0,20.0,8.0,7.0,4.0,6.0,2.0,6.0,14.0,4.0,5.0,0.0,1.0,1.3,5.83,9.28,1.46,2.69
+bundesliga,2024,bundesliga_2024_34_stuttgart_dortmund,22/09/2024,Stuttgart,Dortmund,5,1,2.0,0.0,16.0,6.0,9.0,3.0,6.0,4.0,10.0,6.0,1.0,3.0,0.0,0.0,2.31,3.82,2.86,1.43,2.79
+bundesliga,2024,bundesliga_2024_35_st_pauli_rb_leipzig,22/09/2024,St Pauli,RB Leipzig,0,0,0.0,0.0,15.0,10.0,4.0,5.0,3.0,1.0,6.0,9.0,2.0,1.0,0.0,0.0,5.11,4.15,1.64,1.66,2.23
+bundesliga,2024,bundesliga_2024_36_dortmund_bochum,27/09/2024,Dortmund,Bochum,4,2,1.0,2.0,23.0,10.0,8.0,6.0,11.0,0.0,12.0,9.0,2.0,0.0,0.0,0.0,1.24,6.99,10.74,1.29,3.57
+bundesliga,2024,bundesliga_2024_37_freiburg_st_pauli,28/09/2024,Freiburg,St Pauli,0,3,0.0,2.0,6.0,10.0,2.0,4.0,4.0,2.0,7.0,18.0,3.0,3.0,0.0,0.0,1.63,4.08,5.44,1.82,2.03
+bundesliga,2024,bundesliga_2024_38_mainz_heidenheim,28/09/2024,Mainz,Heidenheim,0,2,0.0,1.0,7.0,14.0,2.0,7.0,7.0,6.0,10.0,10.0,4.0,4.0,1.0,1.0,1.85,3.8,4.2,1.74,2.13
+bundesliga,2024,bundesliga_2024_39_m'gladbach_union_berlin,28/09/2024,M'gladbach,Union Berlin,1,0,0.0,0.0,8.0,9.0,3.0,3.0,2.0,4.0,10.0,12.0,3.0,1.0,0.0,0.0,2.12,3.54,3.47,1.8,2.05
+bundesliga,2024,bundesliga_2024_40_rb_leipzig_augsburg,28/09/2024,RB Leipzig,Augsburg,4,0,2.0,0.0,14.0,7.0,7.0,1.0,8.0,5.0,9.0,13.0,1.0,2.0,0.0,0.0,1.42,5.22,6.88,1.43,2.8
+bundesliga,2024,bundesliga_2024_41_wolfsburg_stuttgart,28/09/2024,Wolfsburg,Stuttgart,2,2,1.0,1.0,5.0,17.0,2.0,5.0,1.0,3.0,20.0,10.0,5.0,2.0,0.0,1.0,3.22,3.89,2.1,1.5,2.58
+bundesliga,2024,bundesliga_2024_42_bayern_munich_leverkusen,28/09/2024,Bayern Munich,Leverkusen,1,1,1.0,1.0,18.0,3.0,3.0,3.0,6.0,1.0,11.0,15.0,1.0,3.0,0.0,0.0,1.73,4.41,4.22,1.31,3.42
+bundesliga,2024,bundesliga_2024_43_holstein_kiel_ein_frankfurt,29/09/2024,Holstein Kiel,Ein Frankfurt,2,4,1.0,1.0,10.0,18.0,5.0,10.0,4.0,9.0,12.0,13.0,1.0,3.0,0.0,0.0,4.41,4.24,1.72,1.5,2.57
+bundesliga,2024,bundesliga_2024_44_hoffenheim_werder_bremen,29/09/2024,Hoffenheim,Werder Bremen,3,4,3.0,3.0,10.0,18.0,5.0,10.0,2.0,6.0,12.0,19.0,3.0,3.0,1.0,0.0,2.36,3.8,2.8,1.45,2.74
+bundesliga,2024,bundesliga_2024_45_augsburg_m'gladbach,04/10/2024,Augsburg,M'gladbach,2,1,1.0,0.0,13.0,11.0,5.0,5.0,6.0,5.0,13.0,15.0,2.0,4.0,0.0,0.0,2.43,3.75,2.75,1.5,2.59
+bundesliga,2024,bundesliga_2024_46_bochum_wolfsburg,05/10/2024,Bochum,Wolfsburg,1,3,0.0,2.0,17.0,15.0,5.0,5.0,7.0,6.0,11.0,12.0,1.0,2.0,0.0,0.0,3.03,3.75,2.24,1.61,2.35
+bundesliga,2024,bundesliga_2024_47_leverkusen_holstein_kiel,05/10/2024,Leverkusen,Holstein Kiel,2,2,2.0,1.0,24.0,8.0,7.0,4.0,12.0,3.0,5.0,9.0,2.0,2.0,0.0,0.0,1.09,12.54,25.37,1.21,4.32
+bundesliga,2024,bundesliga_2024_48_union_berlin_dortmund,05/10/2024,Union Berlin,Dortmund,2,1,2.0,0.0,13.0,9.0,5.0,5.0,3.0,3.0,15.0,17.0,4.0,4.0,0.0,0.0,3.37,3.53,2.16,1.77,2.07
+bundesliga,2024,bundesliga_2024_49_werder_bremen_freiburg,05/10/2024,Werder Bremen,Freiburg,0,1,0.0,0.0,11.0,13.0,3.0,3.0,7.0,5.0,7.0,9.0,1.0,2.0,0.0,0.0,2.61,3.63,2.61,1.67,2.24
+bundesliga,2024,bundesliga_2024_50_st_pauli_mainz,05/10/2024,St Pauli,Mainz,0,3,0.0,2.0,17.0,8.0,4.0,4.0,2.0,2.0,12.0,16.0,0.0,3.0,0.0,0.0,2.44,3.42,2.93,1.87,1.97
+bundesliga,2024,bundesliga_2024_51_heidenheim_rb_leipzig,06/10/2024,Heidenheim,RB Leipzig,0,1,0.0,0.0,15.0,12.0,4.0,2.0,3.0,2.0,12.0,13.0,2.0,2.0,0.0,0.0,4.64,4.23,1.69,1.57,2.42
+bundesliga,2024,bundesliga_2024_52_ein_frankfurt_bayern_munich,06/10/2024,Ein Frankfurt,Bayern Munich,3,3,2.0,2.0,5.0,22.0,4.0,13.0,0.0,11.0,10.0,6.0,1.0,1.0,0.0,0.0,5.51,4.85,1.52,1.35,3.13
+bundesliga,2024,bundesliga_2024_53_stuttgart_hoffenheim,06/10/2024,Stuttgart,Hoffenheim,1,1,0.0,1.0,18.0,7.0,7.0,5.0,10.0,5.0,10.0,7.0,1.0,4.0,0.0,0.0,1.31,6.32,8.07,1.23,4.05
+bundesliga,2024,bundesliga_2024_54_dortmund_st_pauli,18/10/2024,Dortmund,St Pauli,2,1,1.0,0.0,20.0,10.0,7.0,3.0,7.0,1.0,8.0,7.0,2.0,1.0,0.0,0.0,1.31,5.72,9.79,1.49,2.61
+bundesliga,2024,bundesliga_2024_55_freiburg_augsburg,19/10/2024,Freiburg,Augsburg,3,1,3.0,0.0,15.0,9.0,6.0,3.0,5.0,4.0,11.0,7.0,1.0,1.0,0.0,0.0,1.74,3.91,4.75,1.7,2.18
+bundesliga,2024,bundesliga_2024_56_hoffenheim_bochum,19/10/2024,Hoffenheim,Bochum,3,1,1.0,0.0,12.0,13.0,7.0,4.0,4.0,2.0,10.0,12.0,1.0,1.0,0.0,0.0,1.7,4.44,4.38,1.4,2.96
+bundesliga,2024,bundesliga_2024_57_leverkusen_ein_frankfurt,19/10/2024,Leverkusen,Ein Frankfurt,2,1,1.0,1.0,27.0,9.0,9.0,2.0,8.0,3.0,9.0,5.0,2.0,1.0,0.0,0.0,1.45,5.04,6.32,1.38,3.06
+bundesliga,2024,bundesliga_2024_58_mainz_rb_leipzig,19/10/2024,Mainz,RB Leipzig,0,2,0.0,2.0,16.0,11.0,2.0,5.0,5.0,3.0,12.0,15.0,1.0,3.0,0.0,0.0,4.04,3.83,1.88,1.66,2.26
+bundesliga,2024,bundesliga_2024_59_m'gladbach_heidenheim,19/10/2024,M'gladbach,Heidenheim,3,2,1.0,1.0,20.0,19.0,10.0,6.0,6.0,3.0,15.0,9.0,3.0,3.0,0.0,0.0,1.85,3.8,4.21,1.64,2.29
+bundesliga,2024,bundesliga_2024_60_bayern_munich_stuttgart,19/10/2024,Bayern Munich,Stuttgart,4,0,0.0,0.0,22.0,4.0,10.0,1.0,7.0,3.0,6.0,10.0,0.0,2.0,0.0,0.0,1.35,5.77,7.7,1.31,3.42
+bundesliga,2024,bundesliga_2024_61_holstein_kiel_union_berlin,20/10/2024,Holstein Kiel,Union Berlin,0,2,0.0,1.0,12.0,14.0,5.0,4.0,7.0,3.0,8.0,11.0,2.0,1.0,0.0,0.0,3.44,3.42,2.16,1.96,1.87
+bundesliga,2024,bundesliga_2024_62_wolfsburg_werder_bremen,20/10/2024,Wolfsburg,Werder Bremen,2,4,1.0,1.0,14.0,15.0,6.0,7.0,4.0,4.0,15.0,9.0,1.0,1.0,1.0,0.0,2.07,3.66,3.44,1.7,2.18
+bundesliga,2024,bundesliga_2024_63_mainz_m'gladbach,25/10/2024,Mainz,M'gladbach,1,1,0.0,0.0,23.0,9.0,6.0,5.0,2.0,4.0,16.0,16.0,3.0,2.0,0.0,0.0,2.35,3.76,2.86,1.56,2.43
+bundesliga,2024,bundesliga_2024_64_augsburg_dortmund,26/10/2024,Augsburg,Dortmund,2,1,1.0,1.0,12.0,11.0,4.0,4.0,3.0,5.0,13.0,10.0,3.0,3.0,0.0,1.0,3.73,3.96,1.91,1.52,2.55
+bundesliga,2024,bundesliga_2024_65_rb_leipzig_freiburg,26/10/2024,RB Leipzig,Freiburg,3,1,0.0,1.0,12.0,15.0,9.0,5.0,3.0,3.0,9.0,7.0,3.0,2.0,0.0,0.0,1.73,4.12,4.52,1.67,2.24
+bundesliga,2024,bundesliga_2024_66_st_pauli_wolfsburg,26/10/2024,St Pauli,Wolfsburg,0,0,0.0,0.0,14.0,10.0,5.0,4.0,7.0,6.0,9.0,12.0,0.0,3.0,0.0,0.0,2.61,3.46,2.68,1.83,2.01
+bundesliga,2024,bundesliga_2024_67_stuttgart_holstein_kiel,26/10/2024,Stuttgart,Holstein Kiel,2,1,1.0,0.0,16.0,9.0,6.0,3.0,9.0,5.0,6.0,17.0,3.0,6.0,1.0,1.0,1.23,7.14,10.95,1.3,3.48
+bundesliga,2024,bundesliga_2024_68_werder_bremen_leverkusen,26/10/2024,Werder Bremen,Leverkusen,2,2,0.0,1.0,13.0,15.0,8.0,6.0,3.0,5.0,9.0,11.0,1.0,1.0,0.0,0.0,5.64,4.9,1.51,1.4,2.92
+bundesliga,2024,bundesliga_2024_69_bochum_bayern_munich,27/10/2024,Bochum,Bayern Munich,0,5,0.0,2.0,6.0,17.0,2.0,9.0,2.0,5.0,15.0,6.0,1.0,1.0,0.0,0.0,14.44,9.35,1.15,1.23,4.08
+bundesliga,2024,bundesliga_2024_70_union_berlin_ein_frankfurt,27/10/2024,Union Berlin,Ein Frankfurt,1,1,0.0,1.0,13.0,17.0,4.0,5.0,4.0,5.0,13.0,7.0,5.0,3.0,0.0,1.0,2.58,3.37,2.76,1.9,1.9
+bundesliga,2024,bundesliga_2024_71_heidenheim_hoffenheim,27/10/2024,Heidenheim,Hoffenheim,0,0,0.0,0.0,17.0,12.0,3.0,4.0,7.0,3.0,12.0,16.0,1.0,2.0,0.0,0.0,2.29,3.65,2.98,1.53,2.52
+bundesliga,2024,bundesliga_2024_72_leverkusen_stuttgart,01/11/2024,Leverkusen,Stuttgart,0,0,0.0,0.0,19.0,4.0,5.0,1.0,10.0,2.0,13.0,14.0,3.0,4.0,0.0,0.0,1.56,4.8,5.16,1.36,3.15
+bundesliga,2024,bundesliga_2024_73_bayern_munich_union_berlin,02/11/2024,Bayern Munich,Union Berlin,3,0,2.0,0.0,16.0,8.0,7.0,1.0,7.0,4.0,2.0,9.0,0.0,2.0,0.0,0.0,1.17,7.97,15.38,1.42,2.84
+bundesliga,2024,bundesliga_2024_74_ein_frankfurt_bochum,02/11/2024,Ein Frankfurt,Bochum,7,2,4.0,1.0,18.0,11.0,9.0,8.0,5.0,2.0,6.0,15.0,1.0,2.0,0.0,0.0,1.33,5.88,8.06,1.38,3.05
+bundesliga,2024,bundesliga_2024_75_hoffenheim_st_pauli,02/11/2024,Hoffenheim,St Pauli,0,2,0.0,1.0,12.0,7.0,6.0,3.0,7.0,2.0,10.0,10.0,0.0,2.0,0.0,0.0,1.88,3.91,3.9,1.62,2.34
+bundesliga,2024,bundesliga_2024_76_holstein_kiel_heidenheim,02/11/2024,Holstein Kiel,Heidenheim,1,0,1.0,0.0,11.0,17.0,6.0,4.0,5.0,6.0,16.0,14.0,4.0,5.0,0.0,0.0,2.79,3.49,2.51,1.76,2.11
+bundesliga,2024,bundesliga_2024_77_wolfsburg_augsburg,02/11/2024,Wolfsburg,Augsburg,1,1,0.0,1.0,18.0,3.0,6.0,1.0,8.0,1.0,7.0,14.0,1.0,3.0,0.0,0.0,2.01,3.83,3.53,1.64,2.31
+bundesliga,2024,bundesliga_2024_78_dortmund_rb_leipzig,02/11/2024,Dortmund,RB Leipzig,2,1,1.0,1.0,19.0,7.0,7.0,3.0,4.0,0.0,11.0,12.0,3.0,4.0,0.0,0.0,2.25,3.77,3.03,1.47,2.68
+bundesliga,2024,bundesliga_2024_79_freiburg_mainz,03/11/2024,Freiburg,Mainz,0,0,0.0,0.0,10.0,9.0,2.0,2.0,8.0,4.0,9.0,12.0,1.0,2.0,0.0,0.0,1.7,3.95,4.84,1.72,2.14
+bundesliga,2024,bundesliga_2024_80_m'gladbach_werder_bremen,03/11/2024,M'gladbach,Werder Bremen,4,1,3.0,0.0,16.0,15.0,8.0,5.0,7.0,7.0,12.0,10.0,1.0,4.0,0.0,1.0,2.1,3.87,3.18,1.48,2.65
+bundesliga,2024,bundesliga_2024_81_union_berlin_freiburg,08/11/2024,Union Berlin,Freiburg,0,0,0.0,0.0,12.0,14.0,6.0,4.0,4.0,1.0,11.0,8.0,2.0,0.0,0.0,0.0,2.52,3.18,3.04,2.41,1.59
+bundesliga,2024,bundesliga_2024_82_bochum_leverkusen,09/11/2024,Bochum,Leverkusen,1,1,0.0,1.0,15.0,11.0,3.0,3.0,6.0,4.0,10.0,9.0,0.0,1.0,0.0,0.0,10.15,6.68,1.26,1.29,3.54
+bundesliga,2024,bundesliga_2024_83_mainz_dortmund,09/11/2024,Mainz,Dortmund,3,1,2.0,1.0,13.0,2.0,9.0,1.0,8.0,0.0,17.0,5.0,3.0,1.0,0.0,1.0,3.46,3.74,2.06,1.59,2.4
+bundesliga,2024,bundesliga_2024_84_st_pauli_bayern_munich,09/11/2024,St Pauli,Bayern Munich,0,1,0.0,1.0,3.0,13.0,0.0,6.0,5.0,10.0,10.0,7.0,2.0,2.0,0.0,0.0,11.42,6.92,1.23,1.38,3.03
+bundesliga,2024,bundesliga_2024_85_werder_bremen_holstein_kiel,09/11/2024,Werder Bremen,Holstein Kiel,2,1,1.0,0.0,16.0,12.0,5.0,5.0,6.0,3.0,10.0,19.0,3.0,2.0,0.0,0.0,1.64,4.3,4.93,1.52,2.55
+bundesliga,2024,bundesliga_2024_86_rb_leipzig_m'gladbach,09/11/2024,RB Leipzig,M'gladbach,0,0,0.0,0.0,11.0,14.0,4.0,4.0,8.0,4.0,14.0,7.0,2.0,2.0,0.0,0.0,1.59,4.59,5.08,1.41,2.92
+bundesliga,2024,bundesliga_2024_87_augsburg_hoffenheim,10/11/2024,Augsburg,Hoffenheim,0,0,0.0,0.0,16.0,11.0,4.0,2.0,10.0,6.0,16.0,7.0,2.0,3.0,0.0,0.0,2.1,3.79,3.25,1.55,2.45
+bundesliga,2024,bundesliga_2024_88_stuttgart_ein_frankfurt,10/11/2024,Stuttgart,Ein Frankfurt,2,3,0.0,1.0,22.0,8.0,11.0,5.0,8.0,3.0,10.0,15.0,2.0,3.0,0.0,0.0,1.91,4.04,3.65,1.45,2.72
+bundesliga,2024,bundesliga_2024_89_heidenheim_wolfsburg,10/11/2024,Heidenheim,Wolfsburg,1,3,0.0,2.0,19.0,13.0,4.0,6.0,5.0,5.0,9.0,23.0,1.0,6.0,0.0,0.0,2.83,3.33,2.54,1.92,1.91
+bundesliga,2024,bundesliga_2024_90_bayern_munich_augsburg,22/11/2024,Bayern Munich,Augsburg,3,0,0.0,0.0,33.0,2.0,14.0,1.0,8.0,0.0,9.0,9.0,0.0,2.0,0.0,1.0,1.12,10.21,19.53,1.28,3.67
+bundesliga,2024,bundesliga_2024_91_dortmund_freiburg,23/11/2024,Dortmund,Freiburg,4,0,2.0,0.0,19.0,7.0,7.0,3.0,7.0,0.0,11.0,4.0,1.0,2.0,0.0,2.0,1.68,4.2,4.73,1.59,2.4
+bundesliga,2024,bundesliga_2024_92_hoffenheim_rb_leipzig,23/11/2024,Hoffenheim,RB Leipzig,4,3,1.0,2.0,20.0,14.0,7.0,6.0,4.0,3.0,14.0,12.0,2.0,1.0,0.0,0.0,3.39,3.66,2.1,1.55,2.45
+bundesliga,2024,bundesliga_2024_93_leverkusen_heidenheim,23/11/2024,Leverkusen,Heidenheim,5,2,2.0,2.0,20.0,6.0,10.0,3.0,6.0,0.0,8.0,11.0,0.0,0.0,0.0,0.0,1.19,7.63,13.79,1.41,2.92
+bundesliga,2024,bundesliga_2024_94_stuttgart_bochum,23/11/2024,Stuttgart,Bochum,2,0,0.0,0.0,15.0,9.0,5.0,2.0,7.0,4.0,7.0,16.0,2.0,3.0,0.0,0.0,1.31,6.11,8.33,1.34,3.27
+bundesliga,2024,bundesliga_2024_95_wolfsburg_union_berlin,23/11/2024,Wolfsburg,Union Berlin,1,0,0.0,0.0,10.0,11.0,5.0,4.0,8.0,5.0,7.0,15.0,1.0,2.0,0.0,0.0,2.32,3.3,3.24,2.15,1.72
+bundesliga,2024,bundesliga_2024_96_ein_frankfurt_werder_bremen,23/11/2024,Ein Frankfurt,Werder Bremen,1,0,1.0,0.0,15.0,8.0,5.0,1.0,5.0,6.0,15.0,9.0,2.0,2.0,0.0,0.0,1.71,4.25,4.46,1.5,2.59
+bundesliga,2024,bundesliga_2024_97_holstein_kiel_mainz,24/11/2024,Holstein Kiel,Mainz,0,3,0.0,2.0,7.0,18.0,2.0,7.0,2.0,6.0,11.0,7.0,1.0,0.0,0.0,0.0,3.07,3.49,2.3,1.78,2.06
+bundesliga,2024,bundesliga_2024_98_m'gladbach_st_pauli,24/11/2024,M'gladbach,St Pauli,2,0,2.0,0.0,15.0,15.0,4.0,3.0,5.0,4.0,7.0,8.0,1.0,0.0,0.0,0.0,1.81,3.77,4.34,1.79,2.05
+bundesliga,2024,bundesliga_2024_99_st_pauli_holstein_kiel,29/11/2024,St Pauli,Holstein Kiel,3,1,1.0,0.0,11.0,10.0,4.0,3.0,4.0,4.0,10.0,11.0,2.0,5.0,0.0,0.0,1.71,3.79,5.11,1.92,1.91
+bundesliga,2024,bundesliga_2024_100_augsburg_bochum,30/11/2024,Augsburg,Bochum,1,0,1.0,0.0,16.0,7.0,4.0,1.0,6.0,1.0,8.0,22.0,3.0,3.0,0.0,0.0,1.73,3.96,4.69,1.72,2.15
+bundesliga,2024,bundesliga_2024_101_freiburg_m'gladbach,30/11/2024,Freiburg,M'gladbach,3,1,1.0,0.0,17.0,15.0,7.0,4.0,4.0,6.0,5.0,14.0,1.0,1.0,0.0,0.0,2.0,3.75,3.59,1.68,2.23
+bundesliga,2024,bundesliga_2024_102_rb_leipzig_wolfsburg,30/11/2024,RB Leipzig,Wolfsburg,1,5,0.0,3.0,9.0,13.0,4.0,8.0,7.0,3.0,11.0,6.0,2.0,1.0,0.0,0.0,1.69,4.12,4.75,1.61,2.35
+bundesliga,2024,bundesliga_2024_103_union_berlin_leverkusen,30/11/2024,Union Berlin,Leverkusen,1,2,1.0,1.0,8.0,8.0,2.0,3.0,1.0,3.0,18.0,11.0,4.0,2.0,0.0,0.0,4.65,3.83,1.76,1.86,1.98
+bundesliga,2024,bundesliga_2024_104_werder_bremen_stuttgart,30/11/2024,Werder Bremen,Stuttgart,2,2,1.0,1.0,20.0,10.0,6.0,4.0,11.0,2.0,8.0,13.0,1.0,1.0,0.0,0.0,3.0,3.75,2.25,1.53,2.5
+bundesliga,2024,bundesliga_2024_105_dortmund_bayern_munich,30/11/2024,Dortmund,Bayern Munich,1,1,1.0,0.0,7.0,14.0,2.0,5.0,2.0,3.0,11.0,7.0,2.0,2.0,0.0,0.0,4.54,4.32,1.69,1.39,2.99
+bundesliga,2024,bundesliga_2024_106_mainz_hoffenheim,01/12/2024,Mainz,Hoffenheim,2,0,2.0,0.0,18.0,10.0,8.0,2.0,8.0,3.0,13.0,12.0,1.0,3.0,0.0,0.0,2.08,3.61,3.45,1.66,2.26
+bundesliga,2024,bundesliga_2024_107_heidenheim_ein_frankfurt,01/12/2024,Heidenheim,Ein Frankfurt,0,4,0.0,1.0,8.0,14.0,1.0,8.0,6.0,5.0,7.0,9.0,0.0,2.0,0.0,0.0,3.73,3.69,1.97,1.76,2.09
+bundesliga,2024,bundesliga_2024_108_stuttgart_union_berlin,06/12/2024,Stuttgart,Union Berlin,3,2,0.0,1.0,7.0,14.0,5.0,3.0,1.0,6.0,14.0,19.0,1.0,6.0,0.0,0.0,1.83,3.58,4.64,2.08,1.77
+bundesliga,2024,bundesliga_2024_109_bayern_munich_heidenheim,07/12/2024,Bayern Munich,Heidenheim,4,2,1.0,0.0,21.0,2.0,10.0,2.0,8.0,0.0,4.0,5.0,1.0,0.0,0.0,0.0,1.09,12.51,23.3,1.28,3.73
+bundesliga,2024,bundesliga_2024_110_bochum_werder_bremen,07/12/2024,Bochum,Werder Bremen,0,1,0.0,0.0,12.0,9.0,2.0,1.0,9.0,5.0,12.0,10.0,1.0,1.0,0.0,0.0,3.14,3.62,2.23,1.62,2.34
+bundesliga,2024,bundesliga_2024_111_ein_frankfurt_augsburg,07/12/2024,Ein Frankfurt,Augsburg,2,2,0.0,0.0,16.0,8.0,4.0,3.0,4.0,0.0,17.0,9.0,2.0,2.0,0.0,0.0,1.55,4.36,5.89,1.6,2.36
+bundesliga,2024,bundesliga_2024_112_holstein_kiel_rb_leipzig,07/12/2024,Holstein Kiel,RB Leipzig,0,2,0.0,1.0,17.0,9.0,5.0,5.0,6.0,1.0,11.0,13.0,4.0,3.0,0.0,0.0,5.36,4.37,1.59,1.5,2.58
+bundesliga,2024,bundesliga_2024_113_leverkusen_st_pauli,07/12/2024,Leverkusen,St Pauli,2,1,2.0,0.0,6.0,12.0,2.0,4.0,7.0,4.0,8.0,10.0,1.0,3.0,0.0,0.0,1.24,6.57,11.8,1.51,2.59
+bundesliga,2024,bundesliga_2024_114_m'gladbach_dortmund,07/12/2024,M'gladbach,Dortmund,1,1,0.0,0.0,9.0,16.0,3.0,3.0,7.0,4.0,16.0,11.0,3.0,2.0,1.0,0.0,3.23,3.89,2.1,1.46,2.74
+bundesliga,2024,bundesliga_2024_115_wolfsburg_mainz,08/12/2024,Wolfsburg,Mainz,4,3,1.0,2.0,10.0,12.0,5.0,5.0,3.0,5.0,10.0,15.0,3.0,4.0,0.0,0.0,2.15,3.42,3.46,1.82,2.02
+bundesliga,2024,bundesliga_2024_116_hoffenheim_freiburg,08/12/2024,Hoffenheim,Freiburg,1,1,0.0,0.0,15.0,11.0,5.0,4.0,6.0,1.0,10.0,5.0,1.0,1.0,0.0,0.0,2.71,3.47,2.54,1.7,2.18
+bundesliga,2024,bundesliga_2024_117_freiburg_wolfsburg,13/12/2024,Freiburg,Wolfsburg,3,2,1.0,0.0,18.0,20.0,9.0,5.0,5.0,6.0,11.0,3.0,4.0,1.0,0.0,0.0,2.22,3.41,3.3,1.9,1.92
+bundesliga,2024,bundesliga_2024_118_augsburg_leverkusen,14/12/2024,Augsburg,Leverkusen,0,2,0.0,2.0,8.0,14.0,4.0,3.0,4.0,9.0,12.0,5.0,3.0,0.0,0.0,0.0,5.47,4.2,1.59,1.66,2.25
+bundesliga,2024,bundesliga_2024_119_mainz_bayern_munich,14/12/2024,Mainz,Bayern Munich,2,1,1.0,0.0,8.0,13.0,4.0,1.0,3.0,2.0,21.0,12.0,3.0,2.0,0.0,0.0,6.54,4.69,1.47,1.52,2.52
+bundesliga,2024,bundesliga_2024_120_m'gladbach_holstein_kiel,14/12/2024,M'gladbach,Holstein Kiel,4,1,3.0,1.0,15.0,11.0,6.0,3.0,5.0,2.0,10.0,14.0,1.0,1.0,0.0,0.0,1.44,4.89,6.63,1.48,2.64
+bundesliga,2024,bundesliga_2024_121_union_berlin_bochum,14/12/2024,Union Berlin,Bochum,0,2,,,,,,,,,,,,,,,1.59,3.94,6.09,2.01,1.83
+bundesliga,2024,bundesliga_2024_122_st_pauli_werder_bremen,14/12/2024,St Pauli,Werder Bremen,0,2,0.0,1.0,15.0,8.0,4.0,4.0,4.0,5.0,10.0,9.0,2.0,3.0,0.0,0.0,2.64,3.4,2.66,1.92,1.9
+bundesliga,2024,bundesliga_2024_123_heidenheim_stuttgart,15/12/2024,Heidenheim,Stuttgart,1,3,1.0,2.0,9.0,18.0,2.0,7.0,9.0,6.0,25.0,13.0,4.0,3.0,0.0,0.0,4.09,3.89,1.82,1.71,2.16
+bundesliga,2024,bundesliga_2024_124_dortmund_hoffenheim,15/12/2024,Dortmund,Hoffenheim,1,1,0.0,0.0,6.0,12.0,2.0,1.0,3.0,9.0,9.0,10.0,5.0,2.0,0.0,0.0,1.44,5.01,6.34,1.4,2.93
+bundesliga,2024,bundesliga_2024_125_rb_leipzig_ein_frankfurt,15/12/2024,RB Leipzig,Ein Frankfurt,2,1,1.0,1.0,19.0,16.0,9.0,3.0,6.0,7.0,15.0,10.0,1.0,3.0,0.0,0.0,2.1,3.86,3.18,1.53,2.48
+bundesliga,2024,bundesliga_2024_126_bayern_munich_rb_leipzig,20/12/2024,Bayern Munich,RB Leipzig,5,1,3.0,1.0,22.0,4.0,9.0,1.0,8.0,1.0,9.0,10.0,5.0,2.0,0.0,0.0,1.22,7.04,11.46,1.28,3.59
+bundesliga,2024,bundesliga_2024_127_ein_frankfurt_mainz,21/12/2024,Ein Frankfurt,Mainz,1,3,0.0,2.0,34.0,9.0,9.0,3.0,17.0,2.0,10.0,10.0,1.0,1.0,0.0,1.0,1.84,3.95,3.97,1.66,2.24
+bundesliga,2024,bundesliga_2024_128_hoffenheim_m'gladbach,21/12/2024,Hoffenheim,M'gladbach,1,2,0.0,1.0,18.0,5.0,8.0,3.0,8.0,4.0,14.0,6.0,0.0,0.0,0.0,0.0,2.35,3.69,2.85,1.58,2.39
+bundesliga,2024,bundesliga_2024_129_holstein_kiel_augsburg,21/12/2024,Holstein Kiel,Augsburg,5,1,4.0,1.0,8.0,17.0,6.0,4.0,3.0,8.0,11.0,13.0,0.0,4.0,0.0,0.0,3.05,3.31,2.4,1.92,1.89
+bundesliga,2024,bundesliga_2024_130_stuttgart_st_pauli,21/12/2024,Stuttgart,St Pauli,0,1,0.0,1.0,25.0,11.0,5.0,5.0,9.0,1.0,10.0,11.0,2.0,2.0,0.0,0.0,1.47,4.64,6.51,1.66,2.24
+bundesliga,2024,bundesliga_2024_131_werder_bremen_union_berlin,21/12/2024,Werder Bremen,Union Berlin,4,1,3.0,1.0,11.0,16.0,6.0,4.0,4.0,9.0,9.0,12.0,2.0,2.0,0.0,0.0,2.1,3.37,3.64,2.03,1.8
+bundesliga,2024,bundesliga_2024_132_leverkusen_freiburg,21/12/2024,Leverkusen,Freiburg,5,1,1.0,0.0,20.0,8.0,12.0,2.0,4.0,2.0,8.0,9.0,1.0,2.0,0.0,0.0,1.38,5.03,8.04,1.6,2.35
+bundesliga,2024,bundesliga_2024_133_bochum_heidenheim,22/12/2024,Bochum,Heidenheim,2,0,2.0,0.0,14.0,10.0,4.0,2.0,5.0,2.0,18.0,15.0,2.0,7.0,0.0,0.0,2.32,3.52,2.98,1.74,2.11
+bundesliga,2024,bundesliga_2024_134_wolfsburg_dortmund,22/12/2024,Wolfsburg,Dortmund,1,3,0.0,3.0,14.0,12.0,5.0,4.0,10.0,4.0,8.0,8.0,3.0,2.0,0.0,1.0,3.05,3.67,2.23,1.59,2.36
+bundesliga,2024,bundesliga_2024_135_dortmund_leverkusen,10/01/2025,Dortmund,Leverkusen,2,3,1.0,3.0,12.0,7.0,5.0,5.0,6.0,1.0,8.0,6.0,1.0,2.0,0.0,0.0,2.82,3.55,2.43,1.59,2.37
+bundesliga,2024,bundesliga_2024_136_freiburg_holstein_kiel,11/01/2025,Freiburg,Holstein Kiel,3,2,2.0,0.0,14.0,14.0,5.0,7.0,7.0,1.0,9.0,12.0,2.0,3.0,0.0,0.0,1.39,4.98,7.58,1.57,2.4
+bundesliga,2024,bundesliga_2024_137_heidenheim_union_berlin,11/01/2025,Heidenheim,Union Berlin,2,0,1.0,0.0,16.0,10.0,9.0,6.0,5.0,4.0,8.0,10.0,0.0,1.0,0.0,1.0,3.17,3.26,2.34,2.04,1.79
+bundesliga,2024,bundesliga_2024_138_hoffenheim_wolfsburg,11/01/2025,Hoffenheim,Wolfsburg,0,1,0.0,1.0,15.0,12.0,2.0,3.0,4.0,8.0,15.0,14.0,1.0,2.0,0.0,0.0,2.43,3.45,2.87,1.61,2.33
+bundesliga,2024,bundesliga_2024_139_mainz_bochum,11/01/2025,Mainz,Bochum,2,0,1.0,0.0,10.0,11.0,5.0,2.0,5.0,6.0,6.0,16.0,0.0,2.0,0.0,0.0,1.56,4.28,5.76,1.72,2.12
+bundesliga,2024,bundesliga_2024_140_st_pauli_ein_frankfurt,11/01/2025,St Pauli,Ein Frankfurt,0,1,0.0,1.0,18.0,14.0,4.0,6.0,3.0,3.0,8.0,7.0,0.0,3.0,0.0,0.0,3.57,3.47,2.08,1.81,2.01
+bundesliga,2024,bundesliga_2024_141_m'gladbach_bayern_munich,11/01/2025,M'gladbach,Bayern Munich,0,1,0.0,0.0,5.0,23.0,0.0,10.0,4.0,10.0,10.0,7.0,3.0,1.0,0.0,0.0,6.8,5.23,1.4,1.34,3.22
+bundesliga,2024,bundesliga_2024_142_rb_leipzig_werder_bremen,12/01/2025,RB Leipzig,Werder Bremen,4,2,2.0,1.0,18.0,7.0,7.0,2.0,4.0,1.0,7.0,12.0,1.0,1.0,0.0,0.0,1.75,4.11,4.22,1.51,2.51
+bundesliga,2024,bundesliga_2024_143_augsburg_stuttgart,12/01/2025,Augsburg,Stuttgart,0,1,0.0,0.0,8.0,13.0,2.0,5.0,3.0,9.0,11.0,14.0,5.0,1.0,0.0,0.0,3.61,3.65,1.99,1.71,2.14
+bundesliga,2024,bundesliga_2024_144_holstein_kiel_dortmund,14/01/2025,Holstein Kiel,Dortmund,4,2,3.0,0.0,11.0,16.0,7.0,4.0,1.0,9.0,13.0,11.0,2.0,2.0,1.0,0.0,5.41,4.64,1.55,1.44,2.77
+bundesliga,2024,bundesliga_2024_145_ein_frankfurt_freiburg,14/01/2025,Ein Frankfurt,Freiburg,4,1,1.0,1.0,23.0,7.0,8.0,5.0,8.0,1.0,8.0,11.0,1.0,1.0,0.0,0.0,1.71,4.12,4.53,1.57,2.42
+bundesliga,2024,bundesliga_2024_146_leverkusen_mainz,14/01/2025,Leverkusen,Mainz,1,0,0.0,0.0,20.0,7.0,9.0,4.0,8.0,4.0,4.0,14.0,2.0,3.0,0.0,0.0,1.37,5.12,8.38,1.62,2.31
+bundesliga,2024,bundesliga_2024_147_wolfsburg_m'gladbach,14/01/2025,Wolfsburg,M'gladbach,5,1,1.0,0.0,16.0,9.0,5.0,5.0,4.0,7.0,10.0,7.0,1.0,0.0,0.0,0.0,1.96,3.8,3.69,1.59,2.36
+bundesliga,2024,bundesliga_2024_148_bochum_st_pauli,15/01/2025,Bochum,St Pauli,1,0,0.0,0.0,13.0,12.0,5.0,1.0,6.0,7.0,7.0,15.0,1.0,3.0,0.0,1.0,2.59,3.27,2.81,2.04,1.78
+bundesliga,2024,bundesliga_2024_149_bayern_munich_hoffenheim,15/01/2025,Bayern Munich,Hoffenheim,5,0,3.0,0.0,25.0,5.0,10.0,2.0,13.0,1.0,8.0,10.0,1.0,1.0,0.0,0.0,1.12,10.12,18.51,1.23,4.01
+bundesliga,2024,bundesliga_2024_150_stuttgart_rb_leipzig,15/01/2025,Stuttgart,RB Leipzig,2,1,0.0,1.0,14.0,6.0,6.0,3.0,5.0,0.0,10.0,19.0,2.0,7.0,0.0,2.0,2.01,3.78,3.47,1.44,2.71
+bundesliga,2024,bundesliga_2024_151_union_berlin_augsburg,15/01/2025,Union Berlin,Augsburg,0,2,0.0,2.0,13.0,11.0,2.0,5.0,7.0,4.0,15.0,9.0,1.0,2.0,0.0,0.0,1.84,3.51,4.55,2.11,1.74
+bundesliga,2024,bundesliga_2024_152_werder_bremen_heidenheim,15/01/2025,Werder Bremen,Heidenheim,3,3,1.0,1.0,12.0,14.0,5.0,5.0,4.0,2.0,10.0,15.0,5.0,3.0,0.0,0.0,1.63,4.26,4.92,1.59,2.37
+bundesliga,2024,bundesliga_2024_153_ein_frankfurt_dortmund,17/01/2025,Ein Frankfurt,Dortmund,2,0,1.0,0.0,13.0,12.0,5.0,3.0,5.0,7.0,8.0,6.0,0.0,2.0,0.0,0.0,2.56,3.59,2.65,1.56,2.41
+bundesliga,2024,bundesliga_2024_154_bayern_munich_wolfsburg,18/01/2025,Bayern Munich,Wolfsburg,3,2,2.0,1.0,25.0,7.0,10.0,3.0,6.0,2.0,10.0,9.0,2.0,3.0,0.0,0.0,1.17,8.34,14.42,1.27,3.62
+bundesliga,2024,bundesliga_2024_155_bochum_rb_leipzig,18/01/2025,Bochum,RB Leipzig,3,3,0.0,3.0,14.0,11.0,3.0,3.0,6.0,3.0,14.0,7.0,4.0,0.0,0.0,0.0,3.63,3.7,1.99,1.73,2.12
+bundesliga,2024,bundesliga_2024_156_heidenheim_st_pauli,18/01/2025,Heidenheim,St Pauli,0,2,0.0,1.0,8.0,7.0,1.0,4.0,4.0,4.0,11.0,17.0,1.0,2.0,0.0,0.0,2.42,3.47,2.87,1.93,1.89
+bundesliga,2024,bundesliga_2024_157_holstein_kiel_hoffenheim,18/01/2025,Holstein Kiel,Hoffenheim,1,3,0.0,2.0,12.0,11.0,3.0,6.0,4.0,3.0,13.0,14.0,2.0,1.0,0.0,0.0,2.9,3.6,2.35,1.64,2.26
+bundesliga,2024,bundesliga_2024_158_stuttgart_freiburg,18/01/2025,Stuttgart,Freiburg,4,0,3.0,0.0,12.0,4.0,7.0,0.0,4.0,1.0,8.0,12.0,5.0,3.0,0.0,0.0,1.66,4.33,4.71,1.52,2.5
+bundesliga,2024,bundesliga_2024_159_leverkusen_m'gladbach,18/01/2025,Leverkusen,M'gladbach,3,1,1.0,0.0,10.0,7.0,5.0,4.0,7.0,6.0,12.0,10.0,0.0,2.0,0.0,0.0,1.27,6.22,10.05,1.39,2.92
+bundesliga,2024,bundesliga_2024_160_union_berlin_mainz,19/01/2025,Union Berlin,Mainz,2,1,2.0,1.0,12.0,9.0,4.0,1.0,2.0,2.0,12.0,10.0,2.0,2.0,0.0,0.0,2.58,3.18,2.88,2.11,1.73
+bundesliga,2024,bundesliga_2024_161_werder_bremen_augsburg,19/01/2025,Werder Bremen,Augsburg,0,2,0.0,2.0,20.0,9.0,2.0,4.0,6.0,2.0,8.0,14.0,1.0,2.0,0.0,0.0,1.86,3.72,4.09,1.85,1.97
+bundesliga,2024,bundesliga_2024_162_wolfsburg_holstein_kiel,24/01/2025,Wolfsburg,Holstein Kiel,2,2,0.0,1.0,22.0,5.0,5.0,2.0,10.0,3.0,9.0,10.0,2.0,4.0,0.0,0.0,1.43,4.96,6.99,1.53,2.48
+bundesliga,2024,bundesliga_2024_163_augsburg_heidenheim,25/01/2025,Augsburg,Heidenheim,2,1,1.0,0.0,11.0,11.0,7.0,6.0,6.0,4.0,8.0,9.0,1.0,0.0,0.0,0.0,1.9,3.62,4.05,1.9,1.92
+bundesliga,2024,bundesliga_2024_164_dortmund_werder_bremen,25/01/2025,Dortmund,Werder Bremen,2,2,1.0,0.0,8.0,13.0,4.0,4.0,5.0,5.0,11.0,15.0,1.0,4.0,1.0,0.0,1.62,4.39,4.9,1.5,2.57
+bundesliga,2024,bundesliga_2024_165_freiburg_bayern_munich,25/01/2025,Freiburg,Bayern Munich,1,2,0.0,1.0,7.0,7.0,2.0,3.0,2.0,4.0,15.0,9.0,4.0,2.0,0.0,0.0,8.55,5.6,1.32,1.42,2.82
+bundesliga,2024,bundesliga_2024_166_mainz_stuttgart,25/01/2025,Mainz,Stuttgart,2,0,1.0,0.0,11.0,10.0,4.0,5.0,9.0,2.0,12.0,8.0,4.0,3.0,0.0,0.0,2.84,3.5,2.44,1.75,2.1
+bundesliga,2024,bundesliga_2024_167_rb_leipzig_leverkusen,25/01/2025,RB Leipzig,Leverkusen,2,2,1.0,2.0,8.0,13.0,4.0,7.0,7.0,3.0,12.0,6.0,0.0,0.0,0.0,0.0,3.7,3.95,1.91,1.53,2.48
+bundesliga,2024,bundesliga_2024_168_m'gladbach_bochum,25/01/2025,M'gladbach,Bochum,3,0,1.0,0.0,16.0,10.0,6.0,4.0,8.0,7.0,6.0,15.0,1.0,3.0,0.0,0.0,1.72,4.08,4.49,1.61,2.34
+bundesliga,2024,bundesliga_2024_169_hoffenheim_ein_frankfurt,26/01/2025,Hoffenheim,Ein Frankfurt,2,2,0.0,1.0,24.0,12.0,8.0,7.0,9.0,3.0,16.0,8.0,3.0,0.0,0.0,0.0,3.08,3.59,2.24,1.66,2.23
+bundesliga,2024,bundesliga_2024_170_st_pauli_union_berlin,26/01/2025,St Pauli,Union Berlin,3,0,1.0,0.0,16.0,14.0,5.0,2.0,5.0,7.0,6.0,15.0,0.0,3.0,0.0,0.0,2.5,3.14,3.01,2.27,1.64
+bundesliga,2024,bundesliga_2024_171_werder_bremen_mainz,31/01/2025,Werder Bremen,Mainz,1,0,1.0,0.0,12.0,13.0,5.0,2.0,3.0,8.0,14.0,13.0,8.0,4.0,3.0,0.0,2.31,3.4,3.13,1.86,1.98
+bundesliga,2024,bundesliga_2024_172_bayern_munich_holstein_kiel,01/02/2025,Bayern Munich,Holstein Kiel,4,3,2.0,0.0,29.0,10.0,12.0,6.0,12.0,1.0,7.0,10.0,1.0,1.0,0.0,0.0,1.05,16.44,38.04,1.13,5.31
+bundesliga,2024,bundesliga_2024_173_bochum_freiburg,01/02/2025,Bochum,Freiburg,0,1,0.0,1.0,22.0,13.0,4.0,5.0,9.0,7.0,15.0,10.0,3.0,2.0,0.0,0.0,2.81,3.38,2.51,1.79,2.03
+bundesliga,2024,bundesliga_2024_174_heidenheim_dortmund,01/02/2025,Heidenheim,Dortmund,1,2,0.0,1.0,11.0,16.0,5.0,5.0,4.0,5.0,11.0,9.0,0.0,0.0,0.0,0.0,4.3,4.01,1.76,1.56,2.4
+bundesliga,2024,bundesliga_2024_175_st_pauli_augsburg,01/02/2025,St Pauli,Augsburg,1,1,1.0,0.0,5.0,2.0,1.0,1.0,3.0,1.0,16.0,18.0,1.0,3.0,0.0,0.0,2.35,3.2,3.23,2.22,1.66
+bundesliga,2024,bundesliga_2024_176_stuttgart_m'gladbach,01/02/2025,Stuttgart,M'gladbach,1,2,0.0,1.0,10.0,12.0,3.0,6.0,2.0,0.0,11.0,11.0,2.0,2.0,0.0,0.0,1.57,4.62,5.05,1.41,2.84
+bundesliga,2024,bundesliga_2024_177_union_berlin_rb_leipzig,01/02/2025,Union Berlin,RB Leipzig,0,0,0.0,0.0,21.0,6.0,6.0,2.0,4.0,5.0,5.0,12.0,3.0,2.0,0.0,0.0,3.12,3.49,2.26,1.76,2.08
+bundesliga,2024,bundesliga_2024_178_ein_frankfurt_wolfsburg,02/02/2025,Ein Frankfurt,Wolfsburg,1,1,0.0,0.0,16.0,11.0,4.0,2.0,9.0,1.0,8.0,8.0,1.0,3.0,0.0,0.0,1.96,3.82,3.59,1.52,2.5
+bundesliga,2024,bundesliga_2024_179_leverkusen_hoffenheim,02/02/2025,Leverkusen,Hoffenheim,3,1,2.0,0.0,9.0,16.0,5.0,7.0,3.0,3.0,14.0,7.0,4.0,3.0,1.0,0.0,1.23,6.86,10.7,1.36,3.07
+bundesliga,2024,bundesliga_2024_180_bayern_munich_werder_bremen,07/02/2025,Bayern Munich,Werder Bremen,3,0,0.0,0.0,21.0,2.0,12.0,0.0,5.0,2.0,9.0,8.0,1.0,3.0,0.0,0.0,1.1,11.87,21.03,1.19,4.49
+bundesliga,2024,bundesliga_2024_181_dortmund_stuttgart,08/02/2025,Dortmund,Stuttgart,1,2,0.0,0.0,16.0,4.0,5.0,2.0,9.0,4.0,13.0,14.0,5.0,2.0,1.0,0.0,1.89,3.92,3.84,1.5,2.6
+bundesliga,2024,bundesliga_2024_182_freiburg_heidenheim,08/02/2025,Freiburg,Heidenheim,1,0,1.0,0.0,9.0,11.0,3.0,5.0,6.0,3.0,11.0,8.0,3.0,1.0,0.0,0.0,1.73,3.93,4.65,1.75,2.1
+bundesliga,2024,bundesliga_2024_183_hoffenheim_union_berlin,08/02/2025,Hoffenheim,Union Berlin,0,4,0.0,1.0,16.0,22.0,4.0,7.0,8.0,4.0,9.0,16.0,2.0,1.0,0.0,0.0,2.22,3.57,3.18,1.82,2.03
+bundesliga,2024,bundesliga_2024_184_mainz_augsburg,08/02/2025,Mainz,Augsburg,0,0,0.0,0.0,9.0,9.0,5.0,2.0,1.0,3.0,12.0,9.0,3.0,3.0,0.0,0.0,1.77,3.66,4.78,2.03,1.81
+bundesliga,2024,bundesliga_2024_185_wolfsburg_leverkusen,08/02/2025,Wolfsburg,Leverkusen,0,0,0.0,0.0,13.0,15.0,8.0,1.0,3.0,9.0,7.0,8.0,2.0,3.0,0.0,0.0,4.21,3.83,1.83,1.66,2.25
+bundesliga,2024,bundesliga_2024_186_m'gladbach_ein_frankfurt,08/02/2025,M'gladbach,Ein Frankfurt,1,1,1.0,1.0,8.0,15.0,3.0,7.0,6.0,1.0,10.0,9.0,3.0,3.0,0.0,0.0,2.59,3.64,2.59,1.54,2.48
+bundesliga,2024,bundesliga_2024_187_holstein_kiel_bochum,09/02/2025,Holstein Kiel,Bochum,2,2,1.0,2.0,10.0,21.0,3.0,6.0,3.0,5.0,11.0,17.0,2.0,2.0,0.0,0.0,2.29,3.54,3.04,1.68,2.21
+bundesliga,2024,bundesliga_2024_188_rb_leipzig_st_pauli,09/02/2025,RB Leipzig,St Pauli,2,0,2.0,0.0,11.0,7.0,6.0,4.0,5.0,4.0,12.0,8.0,2.0,2.0,1.0,0.0,1.57,4.31,5.56,1.71,2.16
+bundesliga,2024,bundesliga_2024_189_augsburg_rb_leipzig,14/02/2025,Augsburg,RB Leipzig,0,0,0.0,0.0,11.0,14.0,2.0,4.0,8.0,9.0,12.0,12.0,2.0,1.0,0.0,0.0,2.97,3.39,2.43,1.89,1.96
+bundesliga,2024,bundesliga_2024_190_bochum_dortmund,15/02/2025,Bochum,Dortmund,2,0,2.0,0.0,18.0,17.0,9.0,2.0,2.0,8.0,12.0,4.0,1.0,0.0,0.0,0.0,4.83,4.21,1.66,1.59,2.4
+bundesliga,2024,bundesliga_2024_191_st_pauli_freiburg,15/02/2025,St Pauli,Freiburg,0,1,0.0,0.0,5.0,6.0,1.0,4.0,2.0,6.0,10.0,10.0,1.0,0.0,0.0,0.0,2.56,3.21,2.92,2.21,1.68
+bundesliga,2024,bundesliga_2024_192_stuttgart_wolfsburg,15/02/2025,Stuttgart,Wolfsburg,1,2,0.0,0.0,10.0,7.0,4.0,3.0,7.0,5.0,10.0,15.0,3.0,4.0,0.0,0.0,1.75,4.19,4.25,1.52,2.53
+bundesliga,2024,bundesliga_2024_193_union_berlin_m'gladbach,15/02/2025,Union Berlin,M'gladbach,1,2,0.0,2.0,18.0,9.0,3.0,5.0,4.0,5.0,9.0,8.0,0.0,1.0,0.0,0.0,2.27,3.54,3.11,1.77,2.09
+bundesliga,2024,bundesliga_2024_194_leverkusen_bayern_munich,15/02/2025,Leverkusen,Bayern Munich,0,0,0.0,0.0,15.0,2.0,3.0,0.0,6.0,0.0,16.0,13.0,2.0,3.0,0.0,0.0,3.01,3.66,2.26,1.65,2.26
+bundesliga,2024,bundesliga_2024_195_werder_bremen_hoffenheim,16/02/2025,Werder Bremen,Hoffenheim,1,3,1.0,2.0,14.0,16.0,1.0,7.0,6.0,4.0,14.0,12.0,2.0,3.0,0.0,0.0,1.89,3.96,3.74,1.51,2.55
+bundesliga,2024,bundesliga_2024_196_ein_frankfurt_holstein_kiel,16/02/2025,Ein Frankfurt,Holstein Kiel,3,1,2.0,0.0,20.0,10.0,9.0,4.0,4.0,6.0,16.0,10.0,2.0,0.0,0.0,0.0,1.33,5.69,8.17,1.39,3.01
+bundesliga,2024,bundesliga_2024_197_heidenheim_mainz,16/02/2025,Heidenheim,Mainz,0,2,0.0,1.0,12.0,6.0,3.0,5.0,8.0,4.0,9.0,16.0,1.0,3.0,0.0,0.0,3.56,3.51,2.07,1.9,1.93
+bundesliga,2024,bundesliga_2024_198_freiburg_werder_bremen,21/02/2025,Freiburg,Werder Bremen,5,0,2.0,0.0,13.0,9.0,8.0,3.0,3.0,7.0,14.0,8.0,3.0,0.0,0.0,0.0,2.06,3.48,3.74,1.93,1.91
+bundesliga,2024,bundesliga_2024_199_holstein_kiel_leverkusen,22/02/2025,Holstein Kiel,Leverkusen,0,2,0.0,2.0,4.0,18.0,3.0,8.0,5.0,11.0,11.0,10.0,4.0,1.0,0.0,0.0,10.53,6.57,1.25,1.4,2.95
+bundesliga,2024,bundesliga_2024_200_mainz_st_pauli,22/02/2025,Mainz,St Pauli,2,0,0.0,0.0,10.0,12.0,5.0,0.0,6.0,5.0,9.0,10.0,3.0,3.0,0.0,0.0,1.8,3.57,4.73,2.15,1.72
+bundesliga,2024,bundesliga_2024_201_m'gladbach_augsburg,22/02/2025,M'gladbach,Augsburg,0,3,0.0,0.0,8.0,17.0,5.0,4.0,2.0,4.0,10.0,9.0,3.0,2.0,1.0,0.0,1.84,3.79,4.19,1.72,2.15
+bundesliga,2024,bundesliga_2024_202_wolfsburg_bochum,22/02/2025,Wolfsburg,Bochum,1,1,0.0,0.0,13.0,11.0,6.0,5.0,3.0,5.0,8.0,15.0,2.0,3.0,0.0,0.0,1.55,4.42,5.7,1.62,2.32
+bundesliga,2024,bundesliga_2024_203_dortmund_union_berlin,22/02/2025,Dortmund,Union Berlin,6,0,2.0,0.0,24.0,6.0,8.0,1.0,5.0,3.0,10.0,11.0,2.0,2.0,0.0,0.0,1.55,4.46,5.59,1.61,2.35
+bundesliga,2024,bundesliga_2024_204_rb_leipzig_heidenheim,23/02/2025,RB Leipzig,Heidenheim,2,2,1.0,2.0,17.0,4.0,6.0,2.0,7.0,4.0,15.0,15.0,3.0,3.0,0.0,0.0,1.35,5.37,7.98,1.48,2.64
+bundesliga,2024,bundesliga_2024_205_bayern_munich_ein_frankfurt,23/02/2025,Bayern Munich,Ein Frankfurt,4,0,1.0,0.0,19.0,7.0,12.0,2.0,4.0,1.0,8.0,7.0,1.0,1.0,0.0,0.0,1.3,6.33,8.27,1.33,3.3
+bundesliga,2024,bundesliga_2024_206_hoffenheim_stuttgart,23/02/2025,Hoffenheim,Stuttgart,1,1,0.0,1.0,9.0,14.0,2.0,7.0,4.0,8.0,8.0,10.0,0.0,0.0,0.0,0.0,3.5,3.92,1.96,1.48,2.63
+bundesliga,2024,bundesliga_2024_207_stuttgart_bayern_munich,28/02/2025,Stuttgart,Bayern Munich,1,3,1.0,1.0,12.0,17.0,3.0,8.0,4.0,6.0,12.0,13.0,5.0,3.0,0.0,0.0,4.85,4.29,1.67,1.54,2.49
+bundesliga,2024,bundesliga_2024_208_bochum_hoffenheim,01/03/2025,Bochum,Hoffenheim,0,1,0.0,0.0,12.0,10.0,3.0,2.0,8.0,5.0,16.0,17.0,0.0,1.0,0.0,0.0,2.43,3.57,2.83,1.63,2.3
+bundesliga,2024,bundesliga_2024_209_heidenheim_m'gladbach,01/03/2025,Heidenheim,M'gladbach,0,3,0.0,2.0,20.0,13.0,5.0,5.0,6.0,2.0,9.0,15.0,2.0,3.0,0.0,0.0,3.02,3.59,2.29,1.64,2.28
+bundesliga,2024,bundesliga_2024_210_rb_leipzig_mainz,01/03/2025,RB Leipzig,Mainz,1,2,1.0,0.0,13.0,15.0,4.0,3.0,7.0,1.0,8.0,15.0,1.0,1.0,0.0,0.0,1.99,3.7,3.64,1.8,2.03
+bundesliga,2024,bundesliga_2024_211_st_pauli_dortmund,01/03/2025,St Pauli,Dortmund,0,2,0.0,0.0,7.0,14.0,1.0,3.0,7.0,1.0,11.0,13.0,1.0,2.0,0.0,0.0,4.12,3.73,1.87,1.8,2.04
+bundesliga,2024,bundesliga_2024_212_werder_bremen_wolfsburg,01/03/2025,Werder Bremen,Wolfsburg,1,2,0.0,1.0,15.0,9.0,7.0,3.0,8.0,2.0,13.0,9.0,2.0,0.0,0.0,0.0,2.65,3.53,2.59,1.68,2.2
+bundesliga,2024,bundesliga_2024_213_ein_frankfurt_leverkusen,01/03/2025,Ein Frankfurt,Leverkusen,1,4,1.0,3.0,7.0,20.0,3.0,9.0,2.0,6.0,9.0,7.0,1.0,1.0,0.0,0.0,4.58,3.92,1.74,1.68,2.21
+bundesliga,2024,bundesliga_2024_214_union_berlin_holstein_kiel,02/03/2025,Union Berlin,Holstein Kiel,0,1,0.0,1.0,14.0,10.0,3.0,3.0,11.0,3.0,16.0,12.0,4.0,0.0,0.0,0.0,1.6,4.23,5.3,1.7,2.18
+bundesliga,2024,bundesliga_2024_215_augsburg_freiburg,02/03/2025,Augsburg,Freiburg,0,0,0.0,0.0,13.0,7.0,5.0,3.0,5.0,2.0,13.0,9.0,1.0,1.0,0.0,0.0,2.65,3.15,2.82,2.25,1.66
+bundesliga,2024,bundesliga_2024_216_m'gladbach_mainz,07/03/2025,M'gladbach,Mainz,1,3,0.0,1.0,12.0,16.0,4.0,8.0,4.0,3.0,6.0,6.0,0.0,1.0,0.0,0.0,2.6,3.41,2.7,1.79,2.05
+bundesliga,2024,bundesliga_2024_217_bayern_munich_bochum,08/03/2025,Bayern Munich,Bochum,2,3,2.0,1.0,14.0,8.0,5.0,5.0,9.0,3.0,7.0,14.0,0.0,6.0,1.0,0.0,1.11,10.81,18.52,1.28,3.67
+bundesliga,2024,bundesliga_2024_218_dortmund_augsburg,08/03/2025,Dortmund,Augsburg,0,1,0.0,1.0,14.0,6.0,1.0,1.0,12.0,3.0,6.0,12.0,1.0,4.0,0.0,0.0,1.53,4.39,6.02,1.71,2.13
+bundesliga,2024,bundesliga_2024_219_holstein_kiel_stuttgart,08/03/2025,Holstein Kiel,Stuttgart,2,2,1.0,1.0,17.0,5.0,5.0,2.0,3.0,1.0,8.0,9.0,1.0,2.0,1.0,0.0,5.78,4.64,1.52,1.5,2.61
+bundesliga,2024,bundesliga_2024_220_leverkusen_werder_bremen,08/03/2025,Leverkusen,Werder Bremen,0,2,0.0,1.0,18.0,11.0,4.0,7.0,10.0,3.0,12.0,10.0,4.0,4.0,0.0,0.0,1.26,6.22,10.53,1.52,2.53
+bundesliga,2024,bundesliga_2024_221_wolfsburg_st_pauli,08/03/2025,Wolfsburg,St Pauli,1,1,0.0,1.0,16.0,14.0,4.0,4.0,6.0,6.0,11.0,13.0,1.0,0.0,0.0,0.0,1.76,3.72,4.79,1.87,1.96
+bundesliga,2024,bundesliga_2024_222_freiburg_rb_leipzig,08/03/2025,Freiburg,RB Leipzig,0,0,0.0,0.0,10.0,18.0,2.0,3.0,2.0,6.0,6.0,11.0,0.0,3.0,0.0,0.0,2.6,3.32,2.75,1.8,2.03
+bundesliga,2024,bundesliga_2024_223_ein_frankfurt_union_berlin,09/03/2025,Ein Frankfurt,Union Berlin,1,2,1.0,0.0,14.0,11.0,3.0,3.0,1.0,5.0,10.0,8.0,3.0,0.0,0.0,0.0,1.74,4.04,4.45,1.67,2.22
+bundesliga,2024,bundesliga_2024_224_hoffenheim_heidenheim,09/03/2025,Hoffenheim,Heidenheim,1,1,1.0,0.0,16.0,23.0,3.0,5.0,6.0,4.0,9.0,11.0,2.0,3.0,0.0,0.0,1.77,3.98,4.31,1.65,2.24
+bundesliga,2024,bundesliga_2024_225_st_pauli_hoffenheim,14/03/2025,St Pauli,Hoffenheim,1,0,0.0,0.0,10.0,4.0,5.0,0.0,11.0,2.0,6.0,8.0,0.0,1.0,0.0,0.0,2.3,3.28,3.3,2.1,1.76
+bundesliga,2024,bundesliga_2024_226_augsburg_wolfsburg,15/03/2025,Augsburg,Wolfsburg,1,0,0.0,0.0,9.0,13.0,2.0,2.0,1.0,4.0,7.0,9.0,1.0,2.0,0.0,0.0,2.6,3.29,2.81,2.05,1.78
+bundesliga,2024,bundesliga_2024_227_mainz_freiburg,15/03/2025,Mainz,Freiburg,2,2,1.0,0.0,9.0,24.0,4.0,8.0,1.0,4.0,7.0,7.0,1.0,2.0,1.0,0.0,2.01,3.42,3.91,2.1,1.75
+bundesliga,2024,bundesliga_2024_228_union_berlin_bayern_munich,15/03/2025,Union Berlin,Bayern Munich,1,1,0.0,0.0,7.0,18.0,3.0,4.0,2.0,14.0,13.0,8.0,1.0,2.0,0.0,0.0,8.5,5.27,1.35,1.59,2.38
+bundesliga,2024,bundesliga_2024_229_werder_bremen_m'gladbach,15/03/2025,Werder Bremen,M'gladbach,2,4,2.0,2.0,23.0,13.0,2.0,7.0,4.0,1.0,10.0,7.0,1.0,2.0,0.0,1.0,2.4,3.61,2.83,1.59,2.37
+bundesliga,2024,bundesliga_2024_230_rb_leipzig_dortmund,15/03/2025,RB Leipzig,Dortmund,2,0,1.0,0.0,15.0,25.0,5.0,9.0,3.0,12.0,14.0,10.0,3.0,3.0,0.0,0.0,2.41,3.63,2.82,1.59,2.4
+bundesliga,2024,bundesliga_2024_231_bochum_ein_frankfurt,16/03/2025,Bochum,Ein Frankfurt,1,3,0.0,2.0,17.0,18.0,7.0,7.0,8.0,3.0,7.0,9.0,4.0,1.0,0.0,0.0,3.09,3.6,2.24,1.69,2.17
+bundesliga,2024,bundesliga_2024_232_heidenheim_holstein_kiel,16/03/2025,Heidenheim,Holstein Kiel,3,1,1.0,0.0,14.0,16.0,5.0,4.0,3.0,5.0,15.0,13.0,1.0,3.0,0.0,0.0,2.02,3.59,3.64,1.8,2.03
+bundesliga,2024,bundesliga_2024_233_stuttgart_leverkusen,16/03/2025,Stuttgart,Leverkusen,3,4,1.0,0.0,11.0,16.0,6.0,4.0,1.0,10.0,13.0,14.0,3.0,2.0,0.0,0.0,3.03,3.54,2.29,1.67,2.23
+bundesliga,2024,bundesliga_2024_234_leverkusen_bochum,28/03/2025,Leverkusen,Bochum,3,1,1.0,1.0,14.0,8.0,5.0,3.0,3.0,2.0,6.0,12.0,0.0,1.0,0.0,0.0,1.23,6.58,12.03,1.44,2.71
+bundesliga,2024,bundesliga_2024_235_bayern_munich_st_pauli,29/03/2025,Bayern Munich,St Pauli,3,2,1.0,1.0,19.0,10.0,9.0,4.0,5.0,4.0,13.0,4.0,3.0,0.0,0.0,0.0,1.14,8.67,17.25,1.43,2.75
+bundesliga,2024,bundesliga_2024_236_hoffenheim_augsburg,29/03/2025,Hoffenheim,Augsburg,1,1,0.0,0.0,13.0,11.0,4.0,4.0,2.0,2.0,14.0,12.0,1.0,2.0,0.0,0.0,2.4,3.3,3.05,2.08,1.76
+bundesliga,2024,bundesliga_2024_237_holstein_kiel_werder_bremen,29/03/2025,Holstein Kiel,Werder Bremen,0,3,0.0,1.0,11.0,14.0,0.0,7.0,3.0,4.0,13.0,8.0,4.0,1.0,0.0,0.0,3.32,3.8,2.07,1.61,2.33
+bundesliga,2024,bundesliga_2024_238_m'gladbach_rb_leipzig,29/03/2025,M'gladbach,RB Leipzig,1,0,0.0,0.0,16.0,19.0,3.0,3.0,5.0,8.0,5.0,9.0,2.0,2.0,0.0,0.0,2.9,3.57,2.37,1.52,2.5
+bundesliga,2024,bundesliga_2024_239_wolfsburg_heidenheim,29/03/2025,Wolfsburg,Heidenheim,0,1,0.0,1.0,11.0,11.0,2.0,4.0,4.0,5.0,8.0,10.0,2.0,4.0,0.0,0.0,1.66,4.02,5.04,1.73,2.11
+bundesliga,2024,bundesliga_2024_240_ein_frankfurt_stuttgart,29/03/2025,Ein Frankfurt,Stuttgart,1,0,0.0,0.0,19.0,8.0,6.0,2.0,6.0,10.0,9.0,6.0,1.0,3.0,0.0,1.0,2.52,3.65,2.63,1.51,2.52
+bundesliga,2024,bundesliga_2024_241_freiburg_union_berlin,30/03/2025,Freiburg,Union Berlin,1,2,1.0,1.0,9.0,10.0,3.0,6.0,3.0,3.0,8.0,11.0,3.0,4.0,0.0,0.0,2.0,3.43,3.89,2.1,1.74
+bundesliga,2024,bundesliga_2024_242_dortmund_mainz,30/03/2025,Dortmund,Mainz,3,1,2.0,0.0,18.0,12.0,7.0,3.0,6.0,4.0,10.0,8.0,2.0,0.0,0.0,0.0,1.66,4.1,4.86,1.67,2.2
+bundesliga,2024,bundesliga_2024_243_augsburg_bayern_munich,04/04/2025,Augsburg,Bayern Munich,1,3,1.0,1.0,6.0,19.0,3.0,7.0,2.0,4.0,8.0,8.0,4.0,0.0,1.0,0.0,7.41,4.85,1.42,1.61,2.32
+bundesliga,2024,bundesliga_2024_244_bochum_stuttgart,05/04/2025,Bochum,Stuttgart,0,4,0.0,2.0,11.0,14.0,2.0,6.0,2.0,4.0,17.0,13.0,1.0,1.0,0.0,0.0,3.13,3.71,2.16,1.56,2.37
+bundesliga,2024,bundesliga_2024_245_freiburg_dortmund,05/04/2025,Freiburg,Dortmund,1,4,0.0,1.0,12.0,18.0,3.0,7.0,3.0,4.0,8.0,6.0,1.0,0.0,0.0,0.0,3.07,3.53,2.27,1.77,2.05
+bundesliga,2024,bundesliga_2024_246_heidenheim_leverkusen,05/04/2025,Heidenheim,Leverkusen,0,1,0.0,0.0,10.0,6.0,2.0,2.0,4.0,0.0,14.0,10.0,1.0,0.0,0.0,0.0,6.78,4.7,1.44,1.62,2.28
+bundesliga,2024,bundesliga_2024_247_mainz_holstein_kiel,05/04/2025,Mainz,Holstein Kiel,1,1,0.0,1.0,13.0,10.0,3.0,5.0,4.0,4.0,12.0,8.0,4.0,4.0,0.0,0.0,1.44,4.72,6.92,1.62,2.28
+bundesliga,2024,bundesliga_2024_248_rb_leipzig_hoffenheim,05/04/2025,RB Leipzig,Hoffenheim,3,1,2.0,1.0,16.0,9.0,5.0,5.0,8.0,2.0,10.0,12.0,0.0,3.0,0.0,1.0,1.54,4.53,5.57,1.52,2.48
+bundesliga,2024,bundesliga_2024_249_werder_bremen_ein_frankfurt,05/04/2025,Werder Bremen,Ein Frankfurt,2,0,1.0,0.0,12.0,9.0,4.0,0.0,5.0,6.0,8.0,15.0,3.0,3.0,0.0,0.0,2.64,3.67,2.51,1.53,2.44
+bundesliga,2024,bundesliga_2024_250_st_pauli_m'gladbach,06/04/2025,St Pauli,M'gladbach,1,1,0.0,1.0,26.0,5.0,9.0,3.0,11.0,2.0,6.0,13.0,0.0,2.0,0.0,0.0,2.49,3.4,2.8,1.84,1.97
+bundesliga,2024,bundesliga_2024_251_union_berlin_wolfsburg,06/04/2025,Union Berlin,Wolfsburg,1,0,0.0,0.0,13.0,12.0,3.0,3.0,6.0,4.0,13.0,14.0,0.0,1.0,0.0,0.0,2.45,3.31,2.92,2.01,1.81
+bundesliga,2024,bundesliga_2024_252_wolfsburg_rb_leipzig,11/04/2025,Wolfsburg,RB Leipzig,2,3,0.0,2.0,17.0,16.0,6.0,5.0,8.0,5.0,14.0,13.0,2.0,3.0,0.0,0.0,2.9,3.7,2.32,1.57,2.41
+bundesliga,2024,bundesliga_2024_253_bochum_augsburg,12/04/2025,Bochum,Augsburg,1,2,0.0,1.0,25.0,12.0,9.0,5.0,7.0,6.0,14.0,9.0,2.0,1.0,0.0,1.0,2.46,3.34,2.9,1.99,1.84
+bundesliga,2024,bundesliga_2024_254_hoffenheim_mainz,12/04/2025,Hoffenheim,Mainz,2,0,2.0,0.0,8.0,14.0,5.0,1.0,4.0,7.0,18.0,11.0,4.0,2.0,0.0,1.0,2.66,3.46,2.59,1.74,2.1
+bundesliga,2024,bundesliga_2024_255_holstein_kiel_st_pauli,12/04/2025,Holstein Kiel,St Pauli,1,2,1.0,1.0,6.0,14.0,2.0,6.0,3.0,3.0,15.0,11.0,3.0,4.0,0.0,0.0,3.16,3.37,2.29,1.95,1.87
+bundesliga,2024,bundesliga_2024_256_leverkusen_union_berlin,12/04/2025,Leverkusen,Union Berlin,0,0,0.0,0.0,16.0,7.0,3.0,3.0,7.0,3.0,10.0,13.0,2.0,1.0,0.0,0.0,1.33,5.32,8.99,1.61,2.31
+bundesliga,2024,bundesliga_2024_257_m'gladbach_freiburg,12/04/2025,M'gladbach,Freiburg,1,2,1.0,1.0,10.0,19.0,1.0,7.0,4.0,6.0,4.0,11.0,0.0,1.0,0.0,0.0,2.18,3.65,3.15,1.66,2.23
+bundesliga,2024,bundesliga_2024_258_bayern_munich_dortmund,12/04/2025,Bayern Munich,Dortmund,2,2,0.0,0.0,28.0,11.0,11.0,3.0,6.0,5.0,8.0,5.0,0.0,0.0,0.0,0.0,1.43,5.2,6.4,1.38,2.99
+bundesliga,2024,bundesliga_2024_259_stuttgart_werder_bremen,13/04/2025,Stuttgart,Werder Bremen,1,2,1.0,1.0,12.0,14.0,4.0,5.0,3.0,4.0,12.0,13.0,3.0,2.0,1.0,0.0,1.64,4.45,4.57,1.44,2.7
+bundesliga,2024,bundesliga_2024_260_ein_frankfurt_heidenheim,13/04/2025,Ein Frankfurt,Heidenheim,3,0,2.0,0.0,19.0,14.0,8.0,3.0,5.0,3.0,6.0,7.0,1.0,1.0,0.0,0.0,1.72,4.08,4.41,1.65,2.23
+bundesliga,2024,bundesliga_2024_261_freiburg_hoffenheim,19/04/2025,Freiburg,Hoffenheim,3,2,2.0,2.0,12.0,19.0,6.0,6.0,2.0,6.0,14.0,13.0,3.0,2.0,0.0,0.0,1.94,3.72,3.76,1.74,2.1
+bundesliga,2024,bundesliga_2024_262_heidenheim_bayern_munich,19/04/2025,Heidenheim,Bayern Munich,0,4,0.0,3.0,4.0,18.0,1.0,11.0,4.0,4.0,8.0,11.0,3.0,1.0,0.0,0.0,9.41,6.18,1.28,1.38,2.98
+bundesliga,2024,bundesliga_2024_263_mainz_wolfsburg,19/04/2025,Mainz,Wolfsburg,2,2,2.0,1.0,18.0,16.0,7.0,4.0,7.0,5.0,15.0,8.0,2.0,3.0,0.0,0.0,2.02,3.65,3.53,1.79,2.02
+bundesliga,2024,bundesliga_2024_264_rb_leipzig_holstein_kiel,19/04/2025,RB Leipzig,Holstein Kiel,1,1,0.0,1.0,10.0,13.0,4.0,3.0,9.0,7.0,5.0,9.0,1.0,2.0,0.0,0.0,1.31,5.89,8.51,1.39,2.9
+bundesliga,2024,bundesliga_2024_265_werder_bremen_bochum,19/04/2025,Werder Bremen,Bochum,1,0,0.0,0.0,14.0,12.0,4.0,1.0,2.0,7.0,9.0,20.0,3.0,3.0,0.0,1.0,1.73,4.11,4.35,1.56,2.43
+bundesliga,2024,bundesliga_2024_266_union_berlin_stuttgart,19/04/2025,Union Berlin,Stuttgart,4,4,4.0,4.0,12.0,13.0,5.0,6.0,3.0,5.0,8.0,9.0,0.0,2.0,0.0,0.0,2.83,3.4,2.48,1.78,2.05
+bundesliga,2024,bundesliga_2024_267_augsburg_ein_frankfurt,20/04/2025,Augsburg,Ein Frankfurt,0,0,0.0,0.0,13.0,8.0,2.0,5.0,3.0,9.0,6.0,8.0,2.0,1.0,0.0,0.0,2.58,3.36,2.72,1.88,1.93
+bundesliga,2024,bundesliga_2024_268_dortmund_m'gladbach,20/04/2025,Dortmund,M'gladbach,3,2,3.0,1.0,14.0,6.0,6.0,3.0,6.0,2.0,13.0,10.0,1.0,2.0,0.0,0.0,1.41,5.25,6.6,1.36,3.07
+bundesliga,2024,bundesliga_2024_269_st_pauli_leverkusen,20/04/2025,St Pauli,Leverkusen,1,1,0.0,1.0,10.0,6.0,5.0,4.0,4.0,4.0,12.0,12.0,1.0,4.0,0.0,0.0,5.15,3.85,1.67,1.97,1.84
+bundesliga,2024,bundesliga_2024_270_stuttgart_heidenheim,25/04/2025,Stuttgart,Heidenheim,0,1,0.0,0.0,19.0,6.0,3.0,2.0,6.0,5.0,14.0,16.0,0.0,4.0,0.0,0.0,1.49,4.9,5.87,1.45,2.7
+bundesliga,2024,bundesliga_2024_271_bayern_munich_mainz,26/04/2025,Bayern Munich,Mainz,3,0,2.0,0.0,14.0,8.0,6.0,3.0,4.0,4.0,13.0,17.0,2.0,2.0,0.0,0.0,1.22,7.12,11.36,1.32,3.29
+bundesliga,2024,bundesliga_2024_272_hoffenheim_dortmund,26/04/2025,Hoffenheim,Dortmund,2,3,0.0,1.0,11.0,16.0,3.0,8.0,2.0,5.0,17.0,9.0,5.0,1.0,0.0,0.0,4.15,4.3,1.73,1.42,2.78
+bundesliga,2024,bundesliga_2024_273_holstein_kiel_m'gladbach,26/04/2025,Holstein Kiel,M'gladbach,4,3,2.0,0.0,22.0,16.0,11.0,7.0,7.0,8.0,13.0,11.0,2.0,1.0,0.0,0.0,3.06,3.86,2.15,1.47,2.62
+bundesliga,2024,bundesliga_2024_274_leverkusen_augsburg,26/04/2025,Leverkusen,Augsburg,2,0,2.0,0.0,14.0,11.0,5.0,2.0,3.0,7.0,10.0,10.0,0.0,1.0,0.0,0.0,1.36,5.01,8.72,1.76,2.08
+bundesliga,2024,bundesliga_2024_275_wolfsburg_freiburg,26/04/2025,Wolfsburg,Freiburg,0,1,0.0,0.0,8.0,15.0,1.0,2.0,3.0,2.0,6.0,9.0,3.0,1.0,1.0,0.0,2.4,3.56,2.84,1.73,2.11
+bundesliga,2024,bundesliga_2024_276_ein_frankfurt_rb_leipzig,26/04/2025,Ein Frankfurt,RB Leipzig,4,0,1.0,0.0,9.0,7.0,6.0,3.0,8.0,4.0,10.0,13.0,1.0,2.0,0.0,1.0,2.16,3.84,3.03,1.48,2.59
+bundesliga,2024,bundesliga_2024_277_bochum_union_berlin,27/04/2025,Bochum,Union Berlin,1,1,0.0,1.0,10.0,5.0,4.0,1.0,10.0,4.0,11.0,9.0,3.0,2.0,0.0,0.0,2.3,3.49,3.04,1.82,2.01
+bundesliga,2024,bundesliga_2024_278_werder_bremen_st_pauli,27/04/2025,Werder Bremen,St Pauli,0,0,0.0,0.0,11.0,10.0,2.0,4.0,1.0,3.0,9.0,16.0,2.0,3.0,0.0,1.0,1.9,3.68,3.93,1.83,1.99
+bundesliga,2024,bundesliga_2024_279_heidenheim_bochum,02/05/2025,Heidenheim,Bochum,0,0,0.0,0.0,11.0,14.0,3.0,3.0,6.0,4.0,8.0,14.0,0.0,1.0,0.0,0.0,2.29,3.54,3.06,1.68,2.2
+bundesliga,2024,bundesliga_2024_280_m'gladbach_hoffenheim,03/05/2025,M'gladbach,Hoffenheim,4,4,2.0,1.0,12.0,26.0,7.0,8.0,4.0,7.0,6.0,8.0,0.0,0.0,0.0,0.0,2.1,3.95,3.11,1.44,2.71
+bundesliga,2024,bundesliga_2024_281_rb_leipzig_bayern_munich,03/05/2025,RB Leipzig,Bayern Munich,3,3,2.0,0.0,8.0,20.0,6.0,6.0,2.0,7.0,9.0,6.0,3.0,1.0,0.0,0.0,4.49,4.57,1.64,1.34,3.17
+bundesliga,2024,bundesliga_2024_282_st_pauli_stuttgart,03/05/2025,St Pauli,Stuttgart,0,1,0.0,0.0,6.0,21.0,1.0,8.0,4.0,4.0,17.0,12.0,6.0,3.0,2.0,0.0,2.67,3.47,2.57,1.83,2.0
+bundesliga,2024,bundesliga_2024_283_union_berlin_werder_bremen,03/05/2025,Union Berlin,Werder Bremen,2,2,1.0,2.0,17.0,13.0,7.0,6.0,5.0,5.0,9.0,8.0,2.0,3.0,0.0,0.0,2.72,3.42,2.56,1.86,1.96
+bundesliga,2024,bundesliga_2024_284_dortmund_wolfsburg,03/05/2025,Dortmund,Wolfsburg,4,0,1.0,0.0,11.0,11.0,5.0,2.0,4.0,3.0,13.0,6.0,0.0,1.0,0.0,0.0,1.32,5.97,7.96,1.31,3.35
+bundesliga,2024,bundesliga_2024_285_augsburg_holstein_kiel,04/05/2025,Augsburg,Holstein Kiel,1,3,0.0,2.0,27.0,7.0,10.0,5.0,12.0,0.0,4.0,20.0,0.0,2.0,0.0,0.0,1.84,3.76,4.14,1.81,2.01
+bundesliga,2024,bundesliga_2024_286_freiburg_leverkusen,04/05/2025,Freiburg,Leverkusen,2,2,1.0,0.0,8.0,5.0,4.0,2.0,4.0,1.0,10.0,16.0,1.0,2.0,0.0,0.0,3.08,3.51,2.27,1.75,2.09
+bundesliga,2024,bundesliga_2024_287_mainz_ein_frankfurt,04/05/2025,Mainz,Ein Frankfurt,1,1,0.0,1.0,12.0,8.0,3.0,2.0,8.0,1.0,10.0,10.0,1.0,0.0,0.0,0.0,2.38,3.64,2.82,1.62,2.31
+bundesliga,2024,bundesliga_2024_288_wolfsburg_hoffenheim,09/05/2025,Wolfsburg,Hoffenheim,2,2,1.0,1.0,14.0,17.0,5.0,7.0,5.0,6.0,11.0,10.0,0.0,2.0,0.0,0.0,2.29,3.7,2.94,1.5,2.57
+bundesliga,2024,bundesliga_2024_289_bochum_mainz,10/05/2025,Bochum,Mainz,1,4,0.0,1.0,11.0,22.0,6.0,8.0,6.0,6.0,9.0,6.0,3.0,0.0,0.0,0.0,2.95,3.68,2.27,1.64,2.26
+bundesliga,2024,bundesliga_2024_290_holstein_kiel_freiburg,10/05/2025,Holstein Kiel,Freiburg,1,2,1.0,1.0,15.0,9.0,3.0,4.0,2.0,5.0,9.0,13.0,1.0,0.0,0.0,0.0,3.21,3.8,2.09,1.52,2.48
+bundesliga,2024,bundesliga_2024_291_union_berlin_heidenheim,10/05/2025,Union Berlin,Heidenheim,0,3,0.0,1.0,10.0,8.0,1.0,4.0,1.0,2.0,14.0,7.0,2.0,0.0,0.0,0.0,2.19,3.47,3.28,1.91,1.9
+bundesliga,2024,bundesliga_2024_292_werder_bremen_rb_leipzig,10/05/2025,Werder Bremen,RB Leipzig,0,0,0.0,0.0,21.0,16.0,6.0,4.0,11.0,4.0,6.0,13.0,1.0,3.0,0.0,0.0,2.36,3.68,2.82,1.52,2.48
+bundesliga,2024,bundesliga_2024_293_bayern_munich_m'gladbach,10/05/2025,Bayern Munich,M'gladbach,2,0,1.0,0.0,24.0,16.0,9.0,6.0,4.0,9.0,3.0,8.0,1.0,1.0,0.0,0.0,1.16,9.49,12.4,1.16,4.8
+bundesliga,2024,bundesliga_2024_294_leverkusen_dortmund,11/05/2025,Leverkusen,Dortmund,2,4,1.0,2.0,19.0,9.0,10.0,5.0,12.0,0.0,7.0,8.0,0.0,2.0,0.0,0.0,2.65,3.94,2.39,1.47,2.64
+bundesliga,2024,bundesliga_2024_295_ein_frankfurt_st_pauli,11/05/2025,Ein Frankfurt,St Pauli,2,2,1.0,2.0,13.0,5.0,5.0,2.0,3.0,1.0,11.0,12.0,2.0,2.0,0.0,0.0,1.52,4.49,5.96,1.7,2.14
+bundesliga,2024,bundesliga_2024_296_stuttgart_augsburg,11/05/2025,Stuttgart,Augsburg,4,0,1.0,0.0,29.0,7.0,11.0,0.0,11.0,2.0,9.0,7.0,1.0,1.0,0.0,1.0,1.55,4.46,5.47,1.52,2.47
+bundesliga,2024,bundesliga_2024_297_augsburg_union_berlin,17/05/2025,Augsburg,Union Berlin,1,2,1.0,0.0,19.0,6.0,4.0,4.0,4.0,0.0,6.0,5.0,0.0,0.0,0.0,0.0,2.08,3.47,3.52,1.63,2.26
+bundesliga,2024,bundesliga_2024_298_dortmund_holstein_kiel,17/05/2025,Dortmund,Holstein Kiel,3,0,1.0,0.0,19.0,4.0,6.0,2.0,7.0,1.0,12.0,6.0,3.0,1.0,0.0,1.0,1.08,12.72,21.58,1.13,5.4
+bundesliga,2024,bundesliga_2024_299_freiburg_ein_frankfurt,17/05/2025,Freiburg,Ein Frankfurt,1,3,1.0,1.0,8.0,11.0,1.0,6.0,4.0,7.0,13.0,16.0,2.0,4.0,0.0,0.0,2.37,3.72,2.76,1.52,2.46
+bundesliga,2024,bundesliga_2024_300_heidenheim_werder_bremen,17/05/2025,Heidenheim,Werder Bremen,1,4,0.0,2.0,21.0,13.0,8.0,7.0,6.0,4.0,11.0,11.0,2.0,2.0,0.0,0.0,2.3,3.87,2.78,1.94,1.87
+bundesliga,2024,bundesliga_2024_301_hoffenheim_bayern_munich,17/05/2025,Hoffenheim,Bayern Munich,0,4,0.0,1.0,6.0,14.0,2.0,5.0,1.0,4.0,9.0,7.0,0.0,0.0,0.0,0.0,5.11,5.23,1.5,1.25,3.76
+bundesliga,2024,bundesliga_2024_302_mainz_leverkusen,17/05/2025,Mainz,Leverkusen,2,2,1.0,0.0,20.0,7.0,6.0,4.0,7.0,3.0,14.0,13.0,2.0,6.0,0.0,0.0,2.18,3.94,2.94,1.44,2.73
+bundesliga,2024,bundesliga_2024_303_m'gladbach_wolfsburg,17/05/2025,M'gladbach,Wolfsburg,0,1,0.0,0.0,16.0,17.0,3.0,6.0,7.0,10.0,6.0,4.0,0.0,0.0,0.0,0.0,2.19,4.23,2.79,1.29,3.44
+bundesliga,2024,bundesliga_2024_304_rb_leipzig_stuttgart,17/05/2025,RB Leipzig,Stuttgart,2,3,2.0,1.0,8.0,15.0,5.0,7.0,5.0,8.0,9.0,9.0,1.0,0.0,0.0,0.0,1.99,4.24,3.19,1.32,3.31
+bundesliga,2024,bundesliga_2024_305_st_pauli_bochum,17/05/2025,St Pauli,Bochum,0,2,0.0,1.0,10.0,9.0,2.0,6.0,7.0,4.0,3.0,11.0,0.0,0.0,0.0,0.0,1.67,4.2,4.68,1.58,2.36

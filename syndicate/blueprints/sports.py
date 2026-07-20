@@ -13,7 +13,7 @@ def _sport_map() -> dict[str, dict[str, str]]:
 
 @sports_bp.get("/<sport_slug>")
 def sport_hub(sport_slug: str):
-    if sport_slug in {"mlb", "nba", "nhl", "nfl", "wnba", "ncaaf", "ncaab"}:
+    if sport_slug in {"mlb", "nba", "nhl", "nfl", "wnba", "ncaaf", "ncaab", "soccer"}:
         abort(404)
     sport = _sport_map().get(sport_slug)
     if sport is None:

@@ -1,0 +1,490 @@
+league,season,player_id,player_name,team,position,minutes,games,shots_per90,xg_per90,xa_per90,goals_per90,assists_per90,key_passes_per90,expected_minutes_share,is_goalkeeper,source
+la_liga,2024,understat_3423,Kylian Mbappe-Lottin,Real Madrid,F,2938.0,34,4.9319,0.9231,0.2878,0.9496,0.0919,1.5623,0.9601,False,understat
+la_liga,2024,understat_227,Robert Lewandowski,Barcelona,F S,2716.0,34,3.8108,0.9747,0.082,0.8947,0.0663,0.5965,0.8876,False,understat
+la_liga,2024,understat_1235,Ante Budimir,Osasuna,F S,3008.0,38,2.9621,0.6184,0.0562,0.6283,0.1197,0.4787,0.8795,False,understat
+la_liga,2024,understat_6531,Alexander Sørloth,Atletico Madrid,F S,1525.0,35,4.6623,1.2072,0.077,1.1803,0.118,0.7672,0.4841,False,understat
+la_liga,2024,understat_770,Ayoze Pérez,Villarreal,F S,1987.0,30,3.3971,0.6897,0.1417,0.8606,0.0906,1.4494,0.7359,False,understat
+la_liga,2024,understat_8026,Raphinha,Barcelona,F M S,2862.0,36,3.5849,0.6058,0.4254,0.566,0.3145,2.8616,0.8833,False,understat
+la_liga,2024,understat_10846,Julián Álvarez,Atletico Madrid,F M S,2543.0,37,2.5482,0.5011,0.2286,0.6017,0.1416,1.451,0.7637,False,understat
+la_liga,2024,understat_7779,Oihan Sancet,Athletic Club,F M S,1645.0,29,2.7356,0.5722,0.1016,0.8207,0.0547,1.1489,0.6303,False,understat
+la_liga,2024,understat_5074,Kike García,Alaves,F S,2571.0,35,2.2054,0.375,0.0267,0.4551,0.0,0.4551,0.8162,False,understat
+la_liga,2024,understat_6933,Javi Puado,Espanyol,F M,3023.0,35,2.1138,0.3556,0.0884,0.3573,0.1191,0.655,0.9597,False,understat
+la_liga,2024,understat_1709,Cristhian Stuani,Girona,F S,998.0,32,3.0661,0.7858,0.0387,0.992,0.1804,0.6313,0.3465,False,understat
+la_liga,2024,understat_2543,Borja Iglesias,Celta Vigo,F S,1968.0,37,2.1037,0.5283,0.1453,0.503,0.1372,0.8232,0.591,False,understat
+la_liga,2024,understat_5706,Dodi Lukebakio,Sevilla,F M S,3117.0,38,2.7141,0.2669,0.1557,0.3176,0.0577,1.5592,0.9114,False,understat
+la_liga,2024,understat_6637,Hugo Duro,Valencia,F S,2180.0,31,1.9817,0.4528,0.0599,0.4541,0.0826,0.5367,0.7814,False,understat
+la_liga,2024,understat_7008,Vinícius Júnior,Real Madrid,F M S,2267.0,30,3.2157,0.5072,0.343,0.4367,0.3176,2.3026,0.8396,False,understat
+la_liga,2024,understat_12916,Thierno Barry,Villarreal,F S,2322.0,35,2.8295,0.5837,0.1421,0.4264,0.155,0.9302,0.7371,False,understat
+la_liga,2024,understat_2290,Iago Aspas,Celta Vigo,F M S,1751.0,30,2.6728,0.4251,0.2479,0.514,0.257,1.9532,0.6485,False,understat
+la_liga,2024,understat_3264,Mauro Arambarri,Getafe,F M S,2670.0,35,1.8876,0.3196,0.0219,0.3371,0.0,0.6067,0.8476,False,understat
+la_liga,2024,understat_6441,Ferrán Torres,Barcelona,F M S,1093.0,27,3.9524,0.7973,0.2928,0.8234,0.4941,1.5645,0.4498,False,understat
+la_liga,2024,understat_8292,Dani Olmo,Barcelona,M S,1221.0,25,3.0958,0.4893,0.2839,0.7371,0.2948,1.9902,0.5427,False,understat
+la_liga,2024,understat_8778,Fabio Silva,Las Palmas,F M S,1902.0,24,2.3186,0.439,0.1177,0.4732,0.142,0.7571,0.8806,False,understat
+la_liga,2024,understat_2234,Mikel Oyarzabal,Real Sociedad,F M S,2291.0,35,1.6892,0.4045,0.114,0.3536,0.1179,0.5893,0.7273,False,understat
+la_liga,2024,understat_2255,Isco,Real Betis,M S,1565.0,22,2.5304,0.508,0.2906,0.5176,0.4601,3.508,0.7904,False,understat
+la_liga,2024,understat_2537,Sandro Ramírez,Las Palmas,F M S,2086.0,31,2.2435,0.1855,0.1509,0.3883,0.1294,1.2081,0.7477,False,understat
+la_liga,2024,understat_8824,Jude Bellingham,Real Madrid,M S,2510.0,31,2.2231,0.4692,0.1544,0.3227,0.2869,1.5418,0.8996,False,understat
+la_liga,2024,understat_11527,Lamine Yamal,Barcelona,F M S,2879.0,35,4.5016,0.3624,0.4522,0.2813,0.4064,2.0007,0.914,False,understat
+la_liga,2024,understat_2270,Antoine Griezmann,Atletico Madrid,F M S,2514.0,38,1.79,0.3012,0.2906,0.2864,0.2506,1.7184,0.7351,False,understat
+la_liga,2024,understat_5199,Raba,Leganes,F M S,1925.0,29,2.0571,0.3371,0.2865,0.374,0.2805,2.1506,0.7375,False,understat
+la_liga,2024,understat_5681,Giovani Lo Celso,Real Betis,M S,1437.0,25,2.1294,0.296,0.2926,0.501,0.1879,2.6931,0.6387,False,understat
+la_liga,2024,understat_9694,Diego López,Valencia,D F M S,2839.0,38,1.3949,0.2196,0.1896,0.2536,0.1585,1.1729,0.8301,False,understat
+la_liga,2024,understat_7020,Gorka Guruzeta,Athletic Club,F M S,1856.0,36,2.861,0.3292,0.0704,0.3394,0.097,0.7274,0.5728,False,understat
+la_liga,2024,understat_8417,Álex Baena,Villarreal,F M S,2639.0,32,2.3873,0.2454,0.4301,0.2387,0.3069,3.2399,0.9163,False,understat
+la_liga,2024,understat_9002,Vedat Muriqi,Mallorca,F S,2081.0,29,2.3354,0.4751,0.1168,0.3027,0.0865,1.1677,0.7973,False,understat
+la_liga,2024,understat_11340,Cyle Larin,Mallorca,F S,1781.0,32,1.9708,0.3661,0.0799,0.3537,0.1011,0.4043,0.6184,False,understat
+la_liga,2024,understat_2399,Iñaki Williams,Athletic Club,F M S,2659.0,35,2.1324,0.3439,0.2975,0.2031,0.2708,1.4554,0.8441,False,understat
+la_liga,2024,understat_5091,Alex Berenguer,Athletic Club,F M S,2381.0,36,1.9656,0.2827,0.2285,0.2268,0.2646,1.8144,0.7349,False,understat
+la_liga,2024,understat_6241,Federico Valverde,Real Madrid,D M S,3035.0,36,1.6903,0.0745,0.1307,0.1779,0.1186,1.1565,0.9367,False,understat
+la_liga,2024,understat_8015,Rodrygo,Real Madrid,F M S,1965.0,30,2.4733,0.2164,0.1834,0.2748,0.229,2.1985,0.7278,False,understat
+la_liga,2024,understat_8107,Jorge De Frutos,Rayo Vallecano,F M S,2573.0,36,1.8189,0.2451,0.1446,0.2099,0.1049,1.0843,0.7941,False,understat
+la_liga,2024,understat_11822,Fermín López,Barcelona,M S,1224.0,28,3.0147,0.3497,0.3465,0.4412,0.3676,2.1324,0.4857,False,understat
+la_liga,2024,understat_12160,Alberto Moleiro,Las Palmas,F M S,2765.0,35,2.2134,0.1871,0.1197,0.1953,0.0325,1.3345,0.8778,False,understat
+la_liga,2024,understat_13350,Roberto Fernández,Espanyol,F S,1537.0,19,1.2297,0.19,0.0523,0.3513,0.0,0.4684,0.8988,False,understat
+la_liga,2024,understat_1450,Umar Sadiq,"Real Sociedad,Valencia",F S,1040.0,23,2.1635,0.388,0.0771,0.4327,0.0,0.6058,0.5024,False,understat
+la_liga,2024,understat_2122,Joan Jordán,Alaves,M S,1397.0,25,1.0952,0.2756,0.1398,0.3221,0.1288,1.9327,0.6209,False,understat
+la_liga,2024,understat_2183,Rubén García,Osasuna,F M S,2481.0,36,0.9794,0.1023,0.1839,0.1814,0.1814,1.7775,0.7657,False,understat
+la_liga,2024,understat_2252,Borja Mayoral,Getafe,F S,1064.0,24,1.6917,0.3465,0.1113,0.4229,0.0846,0.6767,0.4926,False,understat
+la_liga,2024,understat_2433,Mamadou Sylla,Real Valladolid,F M S,1569.0,29,1.262,0.2853,0.0553,0.2868,0.0574,0.7457,0.6011,False,understat
+la_liga,2024,understat_6759,Juan Cruz,Leganes,D F M S,2292.0,34,1.2958,0.1081,0.1629,0.1963,0.1571,0.9817,0.749,False,understat
+la_liga,2024,understat_6954,Juan Camilo Hernández,Real Betis,F S,1172.0,15,3.302,0.3664,0.1238,0.384,0.0768,1.0751,0.8681,False,understat
+la_liga,2024,understat_8001,Takefusa Kubo,Real Sociedad,F M S,2392.0,36,1.6179,0.159,0.2066,0.1881,0.0,1.6931,0.7383,False,understat
+la_liga,2024,understat_8424,Aimar Oroz,Osasuna,F M S,3027.0,37,1.4569,0.1339,0.1214,0.1487,0.1189,1.1596,0.909,False,understat
+la_liga,2024,understat_9211,Nico Williams,Athletic Club,M S,1994.0,29,2.4824,0.2075,0.1883,0.2257,0.2257,1.8054,0.764,False,understat
+la_liga,2024,understat_9241,Alfon,Celta Vigo,F M S,1382.0,26,2.9305,0.3191,0.2085,0.3256,0.1302,1.563,0.5906,False,understat
+la_liga,2024,understat_11094,Antony,Real Betis,M S,1372.0,17,2.8207,0.1825,0.3071,0.328,0.1312,2.4271,0.8967,False,understat
+la_liga,2024,understat_12294,Carlos Vicente,Alaves,D F M S,3114.0,37,1.0694,0.0907,0.1857,0.1445,0.1445,1.7919,0.9351,False,understat
+la_liga,2024,understat_2106,Munir,Leganes,F M S,844.0,25,2.2393,0.1526,0.0761,0.4265,0.0,0.8531,0.3751,False,understat
+la_liga,2024,understat_2275,Ángel Correa,Atletico Madrid,F S,721.0,31,4.2441,0.6736,0.2601,0.4993,0.1248,1.7476,0.2584,False,understat
+la_liga,2024,understat_6168,Leandro Cabrera,Espanyol,D S,2878.0,33,0.5942,0.0503,0.029,0.1251,0.0625,0.2814,0.969,False,understat
+la_liga,2024,understat_6400,Antonio Martínez,Alaves,F S,965.0,28,4.1036,0.3561,0.0634,0.3731,0.0,1.1192,0.3829,False,understat
+la_liga,2024,understat_6421,Brahim Diaz,Real Madrid,F M S,1368.0,31,1.8421,0.4172,0.2171,0.2632,0.1316,1.5132,0.4903,False,understat
+la_liga,2024,understat_6766,Dani Vivian,Athletic Club,D S,2590.0,32,0.6602,0.0799,0.0234,0.139,0.0,0.3475,0.8993,False,understat
+la_liga,2024,understat_7070,Santiago Comesaña,Villarreal,M S,2597.0,35,1.3516,0.166,0.1019,0.1386,0.0693,0.9704,0.8244,False,understat
+la_liga,2024,understat_7071,Álvaro García,Rayo Vallecano,F M S,2581.0,36,2.4758,0.2628,0.2003,0.1395,0.1744,1.7086,0.7966,False,understat
+la_liga,2024,understat_7350,Yangel Herrera,Girona,M S,2293.0,29,1.5307,0.1894,0.0945,0.157,0.1177,0.628,0.8785,False,understat
+la_liga,2024,understat_7549,Abel Ruiz,Girona,F S,1383.0,23,1.4967,0.3189,0.0286,0.2603,0.0,0.5206,0.6681,False,understat
+la_liga,2024,understat_7841,Dani Rodríguez,Mallorca,F M S,2207.0,37,1.2642,0.1389,0.1703,0.1631,0.2855,1.3457,0.6628,False,understat
+la_liga,2024,understat_7870,Luis Rioja,"Alaves,Valencia",D M S,2898.0,37,0.9317,0.1228,0.1391,0.1242,0.0932,1.087,0.8703,False,understat
+la_liga,2024,understat_8042,Raul García,Osasuna,F S,673.0,32,3.477,0.4457,0.0917,0.5349,0.0,0.4012,0.2337,False,understat
+la_liga,2024,understat_8066,Arnaut Danjuma Groeneveld,"Girona,Villarreal",F M S,1562.0,28,2.0743,0.2545,0.1313,0.2305,0.0,1.3828,0.6198,False,understat
+la_liga,2024,understat_8409,Juanlu Sanchez,Sevilla,D F M S,1740.0,32,0.6724,0.1509,0.1403,0.2069,0.2069,1.2931,0.6042,False,understat
+la_liga,2024,understat_8584,Raul Moro,Real Valladolid,F M S,2352.0,33,1.7219,0.1729,0.2137,0.1531,0.1913,1.6837,0.7919,False,understat
+la_liga,2024,understat_8696,Pape Alassane Gueye,Villarreal,F M S,2246.0,34,2.1638,0.1559,0.0619,0.1603,0.0,0.6411,0.734,False,understat
+la_liga,2024,understat_8935,Pedri,Barcelona,M S,2941.0,37,0.7344,0.0768,0.2389,0.1224,0.153,2.1421,0.8832,False,understat
+la_liga,2024,understat_9011,Óscar Mingueza,Celta Vigo,D M S,2761.0,34,1.0757,0.0706,0.1852,0.1304,0.1956,1.0757,0.9023,False,understat
+la_liga,2024,understat_9024,Yeremi Pino,Villarreal,M S,1984.0,34,1.3155,0.1806,0.2626,0.1815,0.3175,1.7692,0.6484,False,understat
+la_liga,2024,understat_9812,Isi Palazón,Rayo Vallecano,F M S,2166.0,35,2.5346,0.2234,0.1874,0.1662,0.1662,1.9529,0.6876,False,understat
+la_liga,2024,understat_9815,Pathé Ciss,Rayo Vallecano,D M S,2166.0,33,0.8726,0.1064,0.06,0.1662,0.0416,0.7064,0.7293,False,understat
+la_liga,2024,understat_10078,Hugo Álvarez,Celta Vigo,D M S,1572.0,26,1.4313,0.154,0.0915,0.229,0.1718,1.0305,0.6718,False,understat
+la_liga,2024,understat_10870,Williot Swedberg,Celta Vigo,F M S,1329.0,32,2.167,0.3668,0.1592,0.2709,0.3386,1.0835,0.4615,False,understat
+la_liga,2024,understat_10947,Ramón Terrats,"Getafe,Villarreal",F M S,1356.0,26,1.3938,0.1934,0.2169,0.2655,0.0664,1.1283,0.5795,False,understat
+la_liga,2024,understat_11154,Pablo Durán,Celta Vigo,F M S,1393.0,27,1.6798,0.2,0.2052,0.2584,0.2584,1.163,0.5733,False,understat
+la_liga,2024,understat_12302,Vitor Roque,Real Betis,F S,1252.0,22,2.9473,0.4361,0.1258,0.2875,0.0,0.8626,0.6323,False,understat
+la_liga,2024,understat_12305,Isaac Romero,Sevilla,F M S,2200.0,31,2.2091,0.3345,0.106,0.1636,0.0818,0.8182,0.7885,False,understat
+la_liga,2024,understat_12726,Christantus Uche,Getafe,F M S,2542.0,33,1.7703,0.1254,0.1514,0.1416,0.2124,1.0268,0.8559,False,understat
+la_liga,2024,understat_1145,Rodrigo de Paul,Atletico Madrid,M S,2137.0,34,0.8002,0.0618,0.2498,0.1263,0.2106,1.7688,0.6984,False,understat
+la_liga,2024,understat_1621,Marcos Alonso,Celta Vigo,D S,2660.0,31,1.1504,0.1402,0.0627,0.1015,0.0,0.7105,0.9534,False,understat
+la_liga,2024,understat_1736,Oliver McBurnie,Las Palmas,F S,1835.0,34,1.5695,0.2961,0.1692,0.1471,0.2943,1.1281,0.5997,False,understat
+la_liga,2024,understat_2120,Gerard Moreno,Villarreal,F S,698.0,17,3.3524,0.5035,0.4978,0.3868,0.2579,2.192,0.4562,False,understat
+la_liga,2024,understat_2378,Daniel Parejo,Villarreal,M S,2279.0,36,0.5529,0.1044,0.0504,0.1185,0.1185,0.9083,0.7034,False,understat
+la_liga,2024,understat_4091,Unai López,Rayo Vallecano,M S,1740.0,32,1.3448,0.0808,0.0469,0.1552,0.0517,0.9828,0.6042,False,understat
+la_liga,2024,understat_4175,Pere Milla,Espanyol,M S,402.0,20,2.4627,0.3508,0.0876,0.6716,0.0,1.1194,0.2233,False,understat
+la_liga,2024,understat_5137,Álex Muñoz,Las Palmas,D S,1443.0,21,0.5613,0.0718,0.0331,0.1871,0.0,0.4366,0.7635,False,understat
+la_liga,2024,understat_5179,Jon Guridi,Alaves,F M S,2149.0,33,1.0051,0.1818,0.0478,0.1256,0.0419,0.712,0.7236,False,understat
+la_liga,2024,understat_5656,Nicolas Pepe,Villarreal,F M S,1483.0,28,2.3668,0.3206,0.3341,0.1821,0.3641,2.0027,0.5885,False,understat
+la_liga,2024,understat_6227,Brais Méndez,Real Sociedad,F M S,1552.0,27,1.6237,0.2349,0.1317,0.174,0.116,1.3338,0.6387,False,understat
+la_liga,2024,understat_6324,Marash Kumbulla,Espanyol,D S,2981.0,35,0.4831,0.0814,0.0087,0.0906,0.0,0.0302,0.9463,False,understat
+la_liga,2024,understat_7050,Lucas Torró,Osasuna,M,2983.0,35,0.9051,0.0807,0.0296,0.0905,0.0,0.3017,0.947,False,understat
+la_liga,2024,understat_7338,Bryan Gil Salvatierra,Girona,D F M S,1769.0,25,1.628,0.1198,0.1489,0.1526,0.1526,1.1193,0.7862,False,understat
+la_liga,2024,understat_7528,Sergio Camello,Rayo Vallecano,F S,1150.0,23,2.5043,0.3083,0.1807,0.2348,0.1565,1.487,0.5556,False,understat
+la_liga,2024,understat_7609,Carles Pérez,Getafe,M S,1438.0,27,2.128,0.2161,0.076,0.1878,0.0,1.0014,0.5918,False,understat
+la_liga,2024,understat_7838,Martin Valjent,Mallorca,D,2773.0,31,0.3895,0.0323,0.004,0.0974,0.0,0.1298,0.9939,False,understat
+la_liga,2024,understat_8948,Aitor Paredes,Athletic Club,D S,1828.0,23,0.2954,0.1227,0.0028,0.1477,0.0,0.0985,0.8831,False,understat
+la_liga,2024,understat_9040,Conor Gallagher,Atletico Madrid,M S,1637.0,32,1.2645,0.165,0.0721,0.1649,0.1649,0.6597,0.5684,False,understat
+la_liga,2024,understat_9813,Randy Nteka,Rayo Vallecano,F S,1151.0,24,1.2511,0.2608,0.0598,0.2346,0.0,0.7037,0.5329,False,understat
+la_liga,2024,understat_10209,Jofre Carreras,Espanyol,D M S,2217.0,37,1.6238,0.1297,0.1013,0.1218,0.1218,0.9743,0.6658,False,understat
+la_liga,2024,understat_10322,Javier Guerra,Valencia,F M S,2642.0,36,1.6011,0.0787,0.1178,0.1022,0.1022,0.7835,0.8154,False,understat
+la_liga,2024,understat_10334,Kike Salas,Sevilla,D S,2238.0,31,0.9249,0.0875,0.0302,0.1206,0.0804,0.2413,0.8022,False,understat
+la_liga,2024,understat_10399,Juan Latasa,Real Valladolid,F S,1376.0,28,2.6163,0.2976,0.0377,0.1962,0.0,0.7849,0.546,False,understat
+la_liga,2024,understat_10943,Samuel Lino,Atletico Madrid,D F M S,1580.0,31,2.5633,0.3465,0.198,0.1709,0.2278,1.2532,0.5663,False,understat
+la_liga,2024,understat_11025,Pablo Torre,Barcelona,M S,302.0,10,1.7881,0.0881,0.279,0.894,0.298,2.3841,0.3356,False,understat
+la_liga,2024,understat_11379,Selim Amallah,Real Valladolid,F M S,1405.0,24,1.4733,0.1678,0.0849,0.1922,0.0641,0.8327,0.6505,False,understat
+la_liga,2024,understat_12030,Tasos Douvikas,Celta Vigo,F S,690.0,20,2.2174,0.6658,0.03,0.3913,0.1304,0.3913,0.3833,False,understat
+la_liga,2024,understat_12180,Javier Rodríguez,Celta Vigo,D S,2490.0,36,0.4337,0.0981,0.0412,0.1084,0.0723,0.4699,0.7685,False,understat
+la_liga,2024,understat_12190,Arda Güler,Real Madrid,F M S,1252.0,28,2.8035,0.2875,0.4435,0.2157,0.2875,2.8035,0.4968,False,understat
+la_liga,2024,understat_12323,Johnny Cardoso,Real Betis,M S,2147.0,28,0.7965,0.112,0.0308,0.1258,0.0419,0.3773,0.852,False,understat
+la_liga,2024,understat_12792,Seydouba Cissé,Leganes,M S,2494.0,34,0.8661,0.0826,0.0318,0.1083,0.0361,0.6135,0.815,False,understat
+la_liga,2024,understat_12794,Diego García,Leganes,F M S,1171.0,28,2.2289,0.3383,0.0196,0.2306,0.0,0.4611,0.4647,False,understat
+la_liga,2024,understat_12863,Pedro Díaz,Rayo Vallecano,M S,1199.0,26,2.3269,0.2031,0.1713,0.2252,0.0,1.9516,0.5124,False,understat
+la_liga,2024,understat_13005,Yáser Asprilla,Girona,F M S,1392.0,27,2.4569,0.1281,0.1978,0.194,0.0647,1.5517,0.5728,False,understat
+la_liga,2024,understat_13048,Orri Óskarsson,Real Sociedad,F S,929.0,23,1.8407,0.5439,0.0168,0.2906,0.0,0.4844,0.4488,False,understat
+la_liga,2024,understat_323,Adnan Januzaj,Las Palmas,F M S,563.0,18,2.5577,0.1585,0.1867,0.3197,0.1599,2.5577,0.3475,False,understat
+la_liga,2024,understat_2163,Diego Llorente,Real Betis,D S,2521.0,30,0.3927,0.0659,0.0132,0.0714,0.0,0.2142,0.9337,False,understat
+la_liga,2024,understat_2250,Luka Modric,Real Madrid,M S,1774.0,35,1.1161,0.082,0.4007,0.1015,0.3044,3.3484,0.5632,False,understat
+la_liga,2024,understat_2306,Cédric Bakambu,Real Betis,F S,661.0,25,3.2678,0.5118,0.115,0.2723,0.2723,1.0893,0.2938,False,understat
+la_liga,2024,understat_2335,Pablo Fornals,Real Betis,M S,1876.0,26,1.1034,0.0932,0.1472,0.0959,0.0,1.7271,0.8017,False,understat
+la_liga,2024,understat_2453,Marc Bartra,Real Betis,D S,2101.0,25,0.7711,0.0589,0.0061,0.0857,0.0428,0.1713,0.9338,False,understat
+la_liga,2024,understat_2518,Marcos Llorente,Atletico Madrid,D M S,2515.0,33,0.5726,0.0244,0.1358,0.0716,0.1431,1.002,0.8468,False,understat
+la_liga,2024,understat_2551,Pepelu,Valencia,M S,1691.0,34,0.7451,0.1039,0.1368,0.1064,0.0532,1.6499,0.5526,False,understat
+la_liga,2024,understat_2584,Raíllo,Mallorca,D,3211.0,36,0.981,0.0784,0.0529,0.0561,0.0,0.3644,0.991,False,understat
+la_liga,2024,understat_2621,Sergi Darder,Mallorca,M S,2811.0,38,1.1526,0.0604,0.1588,0.064,0.1921,1.7289,0.8219,False,understat
+la_liga,2024,understat_2624,Djibril Sow,Sevilla,M S,2095.0,30,0.9451,0.1151,0.0867,0.0859,0.043,0.9021,0.7759,False,understat
+la_liga,2024,understat_4169,Iván Sánchez,Real Valladolid,F M S,1365.0,32,0.989,0.0439,0.1908,0.1319,0.0659,1.5165,0.474,False,understat
+la_liga,2024,understat_5050,Clement Lenglet,Atletico Madrid,D,1987.0,23,0.4529,0.0995,0.0432,0.0906,0.0453,0.2265,0.9599,False,understat
+la_liga,2024,understat_5073,Florian Lejeune,Rayo Vallecano,D,3329.0,37,1.568,0.0969,0.0523,0.0541,0.0811,0.4055,0.9997,False,understat
+la_liga,2024,understat_5086,Marc Roca,Real Betis,M S,912.0,14,1.1842,0.1093,0.1478,0.1974,0.1974,1.1842,0.7238,False,understat
+la_liga,2024,understat_5666,Mouctar Diakhaby,Valencia,D S,641.0,13,1.5445,0.1851,0.0029,0.2808,0.0,0.1404,0.5479,False,understat
+la_liga,2024,understat_6087,Takuma Asano,Mallorca,F M S,1071.0,21,2.3529,0.2485,0.0782,0.1681,0.084,0.5042,0.5667,False,understat
+la_liga,2024,understat_6433,Jules Koundé,Barcelona,D S,2606.0,32,0.6216,0.0948,0.1428,0.0691,0.1036,1.1051,0.9049,False,understat
+la_liga,2024,understat_6500,Romain Perraud,Real Betis,D S,2005.0,28,0.8978,0.0268,0.0871,0.0898,0.0898,0.7182,0.7956,False,understat
+la_liga,2024,understat_6656,Sergio Gómez,Real Sociedad,D F M S,2745.0,37,0.5902,0.0616,0.2737,0.0656,0.1639,1.8361,0.8243,False,understat
+la_liga,2024,understat_6918,Anuar Mohamed,Real Valladolid,D F M S,1748.0,26,0.5664,0.1163,0.061,0.103,0.0,0.4119,0.747,False,understat
+la_liga,2024,understat_6931,Fran Beltrán,Celta Vigo,M S,2443.0,34,0.8473,0.033,0.0777,0.0737,0.0368,0.5526,0.7984,False,understat
+la_liga,2024,understat_6955,Ezequiel Ávila,Real Betis,F M S,642.0,19,2.8037,0.2564,0.1889,0.2804,0.0,2.243,0.3754,False,understat
+la_liga,2024,understat_7245,Javi Sánchez,Real Valladolid,D,2050.0,25,0.4829,0.0229,0.0212,0.0878,0.0,0.2634,0.9111,False,understat
+la_liga,2024,understat_7246,Valery Fernández,Mallorca,M S,260.0,18,1.0385,0.403,0.0088,0.6923,0.0,0.3462,0.1605,False,understat
+la_liga,2024,understat_7515,Andrei Ratiu,Rayo Vallecano,D M S,3066.0,35,0.91,0.0627,0.1639,0.0587,0.0881,1.0568,0.9733,False,understat
+la_liga,2024,understat_7526,Martín Zubimendi,Real Sociedad,M S,2966.0,36,0.7283,0.119,0.0368,0.0607,0.0303,0.5765,0.9154,False,understat
+la_liga,2024,understat_7781,Frenkie de Jong,Barcelona,M S,1105.0,26,0.4072,0.0834,0.1876,0.1629,0.1629,1.7104,0.4722,False,understat
+la_liga,2024,understat_7810,Ruben Vargas,Sevilla,F M S,693.0,11,2.2078,0.3617,0.1343,0.2597,0.1299,1.6883,0.7,False,understat
+la_liga,2024,understat_7882,Sheraldo Becker,Real Sociedad,F M S,996.0,22,1.988,0.1702,0.1615,0.1807,0.0904,0.7229,0.503,False,understat
+la_liga,2024,understat_8014,Abdón Prats,Mallorca,F M S,400.0,24,3.15,0.6175,0.029,0.45,0.0,0.675,0.1852,False,understat
+la_liga,2024,understat_8045,Eric Garcia,Barcelona,D M S,1532.0,29,0.8225,0.1383,0.0595,0.1175,0.1762,0.4112,0.587,False,understat
+la_liga,2024,understat_8200,Logan Costa,Villarreal,D S,2596.0,32,0.416,0.0345,0.0113,0.0693,0.0347,0.1387,0.9014,False,understat
+la_liga,2024,understat_8422,Javi Hernández,Leganes,D M S,2401.0,31,0.6372,0.0425,0.0579,0.075,0.0375,0.6372,0.8606,False,understat
+la_liga,2024,understat_8470,Kike Pérez,Real Valladolid,M S,1225.0,19,1.4694,0.1643,0.1016,0.1469,0.0,1.249,0.7164,False,understat
+la_liga,2024,understat_8694,Chidera Ejuke,Sevilla,F M S,917.0,25,1.9629,0.0936,0.1566,0.1963,0.0981,2.0611,0.4076,False,understat
+la_liga,2024,understat_8774,Dani Gómez,Valencia,F S,504.0,14,2.3214,0.4815,0.0058,0.3571,0.0,0.1786,0.4,False,understat
+la_liga,2024,understat_8821,Donny van de Beek,Girona,M S,1435.0,26,1.1289,0.0872,0.2009,0.1254,0.1254,1.1289,0.6132,False,understat
+la_liga,2024,understat_9796,Giuliano Simeone,Atletico Madrid,F M S,1988.0,33,0.996,0.1359,0.3253,0.0905,0.2716,1.0865,0.6694,False,understat
+la_liga,2024,understat_10095,Abdessamad Ezzalzouli,Real Betis,M S,2038.0,32,2.738,0.4233,0.1064,0.0883,0.0883,1.1482,0.7076,False,understat
+la_liga,2024,understat_10101,Carlos Martín,Alaves,F M S,1367.0,26,1.7118,0.1633,0.1704,0.1317,0.1317,0.7901,0.5842,False,understat
+la_liga,2024,understat_10107,César Tárrega,Valencia,D,3029.0,34,0.5943,0.0677,0.0032,0.0594,0.0,0.0891,0.9899,False,understat
+la_liga,2024,understat_10364,Nahuel Tenaglia,Alaves,D S,2930.0,34,0.8294,0.0842,0.0593,0.0614,0.0307,0.5836,0.9575,False,understat
+la_liga,2024,understat_10949,Arnau Martinez,Girona,D M S,2631.0,32,0.6499,0.0884,0.0658,0.0684,0.0684,0.6157,0.9135,False,understat
+la_liga,2024,understat_10953,Pau Victor,Barcelona,F S,273.0,21,4.6154,0.9782,0.2891,0.6593,0.3297,2.6374,0.1444,False,understat
+la_liga,2024,understat_11105,Abdul Mumin,Rayo Vallecano,D,2020.0,24,0.4455,0.0338,0.0087,0.0891,0.0446,0.0446,0.9352,False,understat
+la_liga,2024,understat_11186,Alvaro Rodríguez,Getafe,F S,831.0,22,2.7076,0.1413,0.0691,0.2166,0.0,0.5415,0.4197,False,understat
+la_liga,2024,understat_11322,Viktor Tsygankov,Girona,F M S,1947.0,27,1.6179,0.1367,0.1921,0.0924,0.2311,1.5254,0.8012,False,understat
+la_liga,2024,understat_11402,Carlos Romero,Espanyol,D M S,2566.0,34,1.0171,0.0871,0.0738,0.0701,0.0351,1.0171,0.8386,False,understat
+la_liga,2024,understat_12263,Mikel Jauregizar,Athletic Club,M S,2244.0,34,0.8422,0.0418,0.0641,0.0802,0.0401,0.9626,0.7333,False,understat
+la_liga,2024,understat_12721,Ladislav Krejcí,Girona,D S,2436.0,28,0.665,0.0621,0.0122,0.0739,0.0,0.2956,0.9667,False,understat
+la_liga,2024,understat_12738,Manu Fuster,Las Palmas,F M S,958.0,28,1.691,0.07,0.1304,0.1879,0.0939,2.6305,0.3802,False,understat
+la_liga,2024,understat_12790,Abel Bretones,Osasuna,D M S,2061.0,35,0.524,0.0198,0.0483,0.0873,0.0,0.6987,0.6543,False,understat
+la_liga,2024,understat_12791,Sergio González,Leganes,D S,2966.0,36,0.3945,0.0594,0.0175,0.0607,0.0,0.1214,0.9154,False,understat
+la_liga,2024,understat_12893,Enzo Boyomo,"Osasuna,Real Valladolid",D S,3254.0,37,0.3872,0.0537,0.0283,0.0553,0.0,0.1106,0.9772,False,understat
+la_liga,2024,understat_12896,Chuki,Real Valladolid,F M S,720.0,18,2.0,0.3264,0.1755,0.25,0.0,1.0,0.4444,False,understat
+la_liga,2024,understat_12995,Bojan Miovski,Girona,F S,898.0,17,1.4031,0.2682,0.0172,0.2004,0.1002,0.4009,0.5869,False,understat
+la_liga,2024,understat_13059,Jesús Rodriguez,Real Betis,M S,1143.0,21,1.811,0.1973,0.028,0.1575,0.0,0.7087,0.6048,False,understat
+la_liga,2024,understat_13200,Fernando López,Celta Vigo,F M S,654.0,17,2.7523,0.3633,0.2996,0.2752,0.0,1.9266,0.4275,False,understat
+la_liga,2024,understat_13267,Arkaitz Mariezkurrena,Real Sociedad,F S,219.0,9,4.1096,0.4662,0.2108,0.8219,0.0,0.8219,0.2704,False,understat
+la_liga,2024,understat_13561,Yan Diomande,Leganes,D M S,544.0,10,1.8199,0.2099,0.1352,0.3309,0.1654,2.3162,0.6044,False,understat
+la_liga,2024,understat_451,Matija Nastasic,Leganes,D S,2118.0,26,0.085,0.0061,0.0038,0.0425,0.0,0.085,0.9051,False,understat
+la_liga,2024,understat_565,Nyom,Getafe,D M S,877.0,20,0.9236,0.0554,0.0376,0.1026,0.2052,0.5131,0.4872,False,understat
+la_liga,2024,understat_616,Jesús Navas,Sevilla,D F M S,410.0,15,0.6585,0.1368,0.1056,0.2195,0.0,2.1951,0.3037,False,understat
+la_liga,2024,understat_681,César Azpilicueta,Atletico Madrid,D S,881.0,14,0.5108,0.0186,0.009,0.1022,0.0,0.3065,0.6992,False,understat
+la_liga,2024,understat_1857,David López,Girona,D S,2429.0,29,0.4446,0.0377,0.0288,0.0371,0.0371,0.1482,0.9307,False,understat
+la_liga,2024,understat_2166,Adrián Embarba,Rayo Vallecano,F M S,1603.0,35,2.0774,0.1277,0.1408,0.0561,0.0561,1.179,0.5089,False,understat
+la_liga,2024,understat_2253,Lucas Vázquez,Real Madrid,D S,2218.0,32,0.6087,0.076,0.2146,0.0406,0.2029,1.3796,0.7701,False,understat
+la_liga,2024,understat_2260,Daniel Carvajal,Real Madrid,D S,613.0,8,0.4405,0.1616,0.0186,0.1468,0.0,0.7341,0.8514,False,understat
+la_liga,2024,understat_2266,Saúl Ñíguez,Sevilla,M S,1556.0,24,2.4293,0.2114,0.1221,0.0578,0.347,1.2725,0.7204,False,understat
+la_liga,2024,understat_2269,Koke,Atletico Madrid,M S,1915.0,32,0.517,0.0704,0.0627,0.047,0.047,0.752,0.6649,False,understat
+la_liga,2024,understat_2308,Denis Suárez,Villarreal,M S,583.0,21,1.5437,0.1773,0.2615,0.1544,0.1544,2.1612,0.3085,False,understat
+la_liga,2024,understat_2456,Omar Mascarell,Mallorca,M S,1994.0,32,0.4062,0.0386,0.0037,0.0451,0.0,0.0903,0.6924,False,understat
+la_liga,2024,understat_2519,Tejero,Espanyol,D F M S,1227.0,28,1.2469,0.0491,0.2442,0.0733,0.2934,2.3472,0.4869,False,understat
+la_liga,2024,understat_2589,Rafa Mir,Valencia,F M S,716.0,20,3.3939,0.3192,0.1176,0.1257,0.2514,0.5028,0.3978,False,understat
+la_liga,2024,understat_3208,Óscar Trejo,Rayo Vallecano,M S,475.0,19,0.9474,0.0998,0.1375,0.1895,0.0,1.7053,0.2778,False,understat
+la_liga,2024,understat_4168,Javi Muñoz,Las Palmas,D M S,2592.0,35,0.8681,0.0707,0.0804,0.0347,0.1042,1.0069,0.8229,False,understat
+la_liga,2024,understat_5037,Darko Brasanac,Leganes,M S,1606.0,30,0.6725,0.1151,0.0181,0.056,0.1121,0.5044,0.5948,False,understat
+la_liga,2024,understat_5062,Yeray Álvarez,Athletic Club,D S,1784.0,21,0.454,0.0308,0.024,0.0504,0.0,0.2018,0.9439,False,understat
+la_liga,2024,understat_5173,Asier Villalibre,Alaves,F S,298.0,16,2.7181,0.5305,0.2854,0.302,0.302,0.302,0.2069,False,understat
+la_liga,2024,understat_5615,Valentin Rosier,Leganes,D M S,2583.0,32,0.453,0.0356,0.0388,0.0348,0.0697,0.4181,0.8969,False,understat
+la_liga,2024,understat_5724,Irvin Cardona,Espanyol,F M S,577.0,16,1.5598,0.1378,0.1349,0.156,0.156,1.4038,0.4007,False,understat
+la_liga,2024,understat_6118,Portu,Girona,F M S,728.0,27,0.989,0.2171,0.202,0.1236,0.2473,1.7308,0.2996,False,understat
+la_liga,2024,understat_6242,Johan Mojica,Mallorca,D S,2747.0,36,0.557,0.0252,0.1475,0.0328,0.0655,1.3105,0.8478,False,understat
+la_liga,2024,understat_6306,Juan Foyth,Villarreal,D S,1515.0,19,1.0099,0.1344,0.0236,0.0594,0.0,0.4158,0.886,False,understat
+la_liga,2024,understat_6427,Aitor Ruibal,Real Betis,D F M S,1287.0,29,1.1189,0.089,0.1856,0.0699,0.2098,1.3986,0.4931,False,understat
+la_liga,2024,understat_6570,Óscar Rodríguez,Leganes,M S,1290.0,29,2.3023,0.1836,0.1971,0.0698,0.2791,1.3256,0.4943,False,understat
+la_liga,2024,understat_6916,Fernando Calero,Espanyol,D S,675.0,21,0.2667,0.0756,0.0071,0.1333,0.0,0.4,0.3571,False,understat
+la_liga,2024,understat_6924,Miguel De la Fuente,Leganes,F M S,1708.0,34,1.8443,0.3052,0.0598,0.0527,0.1581,0.3689,0.5582,False,understat
+la_liga,2024,understat_7174,Adrià Pedrosa,Sevilla,D M S,2323.0,31,0.9298,0.0335,0.0666,0.0387,0.0387,0.7749,0.8326,False,understat
+la_liga,2024,understat_7276,Robin Le Normand,Atletico Madrid,D S,2140.0,27,0.4206,0.0587,0.0286,0.0421,0.0,0.1262,0.8807,False,understat
+la_liga,2024,understat_7308,Ander Barrenetxea,Real Sociedad,F M S,1271.0,30,1.7703,0.1397,0.1732,0.0708,0.2124,1.133,0.4707,False,understat
+la_liga,2024,understat_7359,Eduardo Camavinga,Real Madrid,D M S,1079.0,19,0.6673,0.0743,0.0763,0.0834,0.1668,0.9175,0.631,False,understat
+la_liga,2024,understat_7529,Iván Martín,Girona,M S,2054.0,32,0.482,0.0627,0.0827,0.0438,0.0438,0.964,0.7132,False,understat
+la_liga,2024,understat_7604,Alejandro Catena,Osasuna,D,3086.0,35,0.5833,0.087,0.0733,0.0292,0.0875,0.2916,0.9797,False,understat
+la_liga,2024,understat_7605,Manuel Sánchez,Alaves,D S,2651.0,33,0.4074,0.0546,0.0402,0.0339,0.0,0.5432,0.8926,False,understat
+la_liga,2024,understat_7655,Carl Starfelt,Celta Vigo,D S,2273.0,28,0.198,0.0196,0.0072,0.0396,0.0,0.2376,0.902,False,understat
+la_liga,2024,understat_7825,Iker Losada,"Celta Vigo,Real Betis",F M S,670.0,22,1.0746,0.2304,0.1283,0.1343,0.0,1.4776,0.3384,False,understat
+la_liga,2024,understat_7828,Jorge Sáenz,Leganes,D S,1694.0,23,0.425,0.0966,0.0077,0.0531,0.0,0.1063,0.8184,False,understat
+la_liga,2024,understat_7829,Eder Militão,Real Madrid,D S,938.0,12,0.9595,0.0668,0.0479,0.0959,0.0959,0.5757,0.8685,False,understat
+la_liga,2024,understat_7860,Domingos Duarte,Getafe,D S,1865.0,22,0.1448,0.0233,0.0021,0.0483,0.0,0.0965,0.9419,False,understat
+la_liga,2024,understat_7888,Nemanja Gudelj,Sevilla,D M S,2495.0,31,0.8297,0.0546,0.0233,0.0361,0.0361,0.505,0.8943,False,understat
+la_liga,2024,understat_8091,Ronald Araújo,Barcelona,D S,771.0,12,0.4669,0.1362,0.0568,0.1167,0.1167,0.4669,0.7139,False,understat
+la_liga,2024,understat_8165,Lucien Agoume,Sevilla,M S,2113.0,35,0.4259,0.0277,0.1015,0.0426,0.1278,1.1074,0.6708,False,understat
+la_liga,2024,understat_8513,Miguel Gutiérrez,Girona,D M,2477.0,29,1.0174,0.068,0.1474,0.0363,0.1817,1.4897,0.949,False,understat
+la_liga,2024,understat_8665,Loic Bade,Sevilla,D S,2682.0,32,0.4362,0.0276,0.0122,0.0336,0.0336,0.1342,0.9313,False,understat
+la_liga,2024,understat_8689,Yvan Neyou,Leganes,M S,2344.0,30,0.6143,0.0176,0.0272,0.0384,0.0384,0.4991,0.8681,False,understat
+la_liga,2024,understat_8710,Renato Tapia,Leganes,D M S,2442.0,34,0.516,0.0232,0.0098,0.0369,0.0,0.258,0.798,False,understat
+la_liga,2024,understat_8725,Luis Milla,Getafe,M S,2887.0,33,0.9976,0.0578,0.1326,0.0312,0.1247,2.1822,0.9721,False,understat
+la_liga,2024,understat_8765,Roberto Navarro,Mallorca,M S,1302.0,23,1.2442,0.1959,0.1301,0.0691,0.0,0.8986,0.629,False,understat
+la_liga,2024,understat_8933,Marcos de Sousa,Real Valladolid,F S,1213.0,22,1.6323,0.237,0.1047,0.0742,0.1484,0.6678,0.6126,False,understat
+la_liga,2024,understat_8986,Omar Alderete,Getafe,D M,2999.0,34,1.1404,0.0643,0.0275,0.03,0.0,0.3301,0.9801,False,understat
+la_liga,2024,understat_9243,Ilaix Moriba,Celta Vigo,M S,2115.0,33,1.4468,0.0912,0.0985,0.0426,0.0426,0.8511,0.7121,False,understat
+la_liga,2024,understat_9466,Jon Ander Olasagasti,Real Sociedad,M S,821.0,22,1.4251,0.134,0.1164,0.1096,0.1096,0.6577,0.4146,False,understat
+la_liga,2024,understat_9505,Beñat Prados,Athletic Club,M S,1736.0,30,0.8295,0.0473,0.0565,0.0518,0.0,0.5184,0.643,False,understat
+la_liga,2024,understat_9765,Enric Franquesa,Leganes,D M S,612.0,12,0.5882,0.0577,0.0084,0.1471,0.0,0.2941,0.5667,False,understat
+la_liga,2024,understat_9804,Gavi,Barcelona,F M S,1079.0,26,0.9175,0.0884,0.1379,0.0834,0.0834,1.1677,0.4611,False,understat
+la_liga,2024,understat_10024,Cristhian Mosquera,Valencia,D,3322.0,37,0.1355,0.0095,0.0,0.0271,0.0,0.0,0.9976,False,understat
+la_liga,2024,understat_10121,Ilias Akhomach,Villarreal,M S,604.0,11,2.5331,0.0905,0.1868,0.149,0.0,1.3411,0.6101,False,understat
+la_liga,2024,understat_10143,Bryan Zaragoza,Osasuna,F M S,1887.0,27,2.0032,0.1558,0.2084,0.0477,0.2862,1.7647,0.7765,False,understat
+la_liga,2024,understat_10494,Pablo Barrios Rivas,Atletico Madrid,M S,2347.0,31,1.1121,0.0526,0.1124,0.0383,0.1534,0.997,0.8412,False,understat
+la_liga,2024,understat_10723,Stefan Bajcetic,Las Palmas,D M S,986.0,14,0.4564,0.0148,0.0199,0.0913,0.0,0.6389,0.7825,False,understat
+la_liga,2024,understat_10857,Pablo Ibáñez,Osasuna,M S,1286.0,28,1.3997,0.099,0.085,0.07,0.07,0.4199,0.5103,False,understat
+la_liga,2024,understat_10858,Jorge Herrando,Osasuna,D S,1362.0,18,0.859,0.1142,0.0,0.0661,0.0,0.0,0.8407,False,understat
+la_liga,2024,understat_11140,Enzo Barrenechea,Valencia,M S,2245.0,30,0.6414,0.0507,0.0333,0.0401,0.0802,0.6013,0.8315,False,understat
+la_liga,2024,understat_11151,Marc Casadó,Barcelona,M S,1640.0,23,0.7683,0.05,0.0897,0.0549,0.1646,0.4939,0.7923,False,understat
+la_liga,2024,understat_11185,Pablo Marín,Real Sociedad,M S,1224.0,23,1.5441,0.1615,0.0864,0.0735,0.1471,1.0294,0.5913,False,understat
+la_liga,2024,understat_11531,Unai Gómez,Athletic Club,D F M S,1267.0,32,1.3496,0.1978,0.0721,0.071,0.2131,0.7103,0.4399,False,understat
+la_liga,2024,understat_11744,Sergi Cardona,Villarreal,D S,2974.0,35,0.6052,0.1034,0.1826,0.0303,0.2118,1.3618,0.9441,False,understat
+la_liga,2024,understat_11826,Carlos Benavídez,Alaves,M S,456.0,18,0.9868,0.0403,0.1269,0.1974,0.1974,0.5921,0.2815,False,understat
+la_liga,2024,understat_11890,Natan,Real Betis,D S,2163.0,31,0.3745,0.0206,0.0529,0.0416,0.0416,0.208,0.7753,False,understat
+la_liga,2024,understat_11989,Walid Cheddira,Espanyol,F S,587.0,22,1.9932,0.2173,0.1593,0.1533,0.1533,0.9199,0.2965,False,understat
+la_liga,2024,understat_12039,Bertug Yildirim,Getafe,F S,1101.0,22,1.5531,0.213,0.0934,0.0817,0.0,0.7357,0.5561,False,understat
+la_liga,2024,understat_12046,Jhon Solis,Girona,M S,491.0,19,0.7332,0.1275,0.0095,0.1833,0.0,0.3666,0.2871,False,understat
+la_liga,2024,understat_12081,Assane Diao,Real Betis,F S,259.0,10,2.4324,0.4025,0.6123,0.3475,0.695,2.7799,0.2878,False,understat
+la_liga,2024,understat_12105,Alejo Véliz,Espanyol,F S,1115.0,27,1.5336,0.1888,0.0056,0.0807,0.0,0.1614,0.4588,False,understat
+la_liga,2024,understat_12182,Jon Aramburu,Real Sociedad,D S,2466.0,35,0.4015,0.0166,0.0329,0.0365,0.0365,0.5474,0.7829,False,understat
+la_liga,2024,understat_12322,Tajon Buchanan,Villarreal,M S,403.0,13,1.5633,0.2182,0.172,0.2233,0.4467,1.1166,0.3444,False,understat
+la_liga,2024,understat_12426,Stanis Idumbo Muzambo,Sevilla,M S,255.0,14,1.4118,0.1351,0.213,0.3529,0.3529,2.1176,0.2024,False,understat
+la_liga,2024,understat_12436,Jacobo Ramón,Real Madrid,D S,201.0,3,0.8955,0.2187,0.0314,0.4478,0.0,0.4478,0.7444,False,understat
+la_liga,2024,understat_12716,Tomás Conechny,Alaves,F M S,837.0,22,2.3656,0.3738,0.0372,0.1075,0.0,0.7527,0.4227,False,understat
+la_liga,2024,understat_12722,Gabriel Misehouy,Girona,F S,235.0,9,2.2979,0.2886,0.0703,0.383,0.0,1.5319,0.2901,False,understat
+la_liga,2024,understat_12742,Peque,Sevilla,F M S,1144.0,26,1.4948,0.1532,0.1056,0.0787,0.0787,0.9441,0.4889,False,understat
+la_liga,2024,understat_12821,Gerard Martín,Barcelona,D S,1018.0,28,0.6189,0.0569,0.1146,0.0884,0.2652,1.0609,0.404,False,understat
+la_liga,2024,understat_12862,Luka Sucic,Real Sociedad,F M S,1804.0,29,2.1452,0.1827,0.171,0.0499,0.0499,1.2472,0.6912,False,understat
+la_liga,2024,understat_12884,Endrick,Real Madrid,F S,324.0,22,6.6667,0.8134,0.1845,0.2778,0.0,1.3889,0.1636,False,understat
+la_liga,2024,understat_13001,Álvaro Djaló,Athletic Club,F M S,637.0,17,2.1193,0.1276,0.154,0.1413,0.0,0.5651,0.4163,False,understat
+la_liga,2024,understat_13036,Pau Cabanes De La Torre,"Alaves,Villarreal",M S,311.0,16,1.7363,0.1755,0.179,0.2894,0.0,1.4469,0.216,False,understat
+la_liga,2024,understat_13047,Coba da Costa,Getafe,M S,1003.0,19,2.0638,0.1284,0.1459,0.0897,0.0897,0.8076,0.5865,False,understat
+la_liga,2024,understat_13094,Dário Essugo,Las Palmas,M S,1985.0,27,1.0428,0.0293,0.0196,0.0453,0.0,0.5894,0.8169,False,understat
+la_liga,2024,understat_13198,Ramón Martínez,Sevilla,D S,252.0,5,1.4286,0.1851,0.0241,0.3571,0.0,0.3571,0.56,False,understat
+la_liga,2024,understat_13294,García Pascual,Sevilla,F S,372.0,7,2.6613,0.238,0.007,0.2419,0.0,0.4839,0.5905,False,understat
+la_liga,2024,understat_13417,Maroan Sannadi,Athletic Club,F S,743.0,16,2.3015,0.394,0.146,0.1211,0.1211,0.8479,0.516,False,understat
+la_liga,2024,understat_116,Florian Grillitsch,Real Valladolid,M S,627.0,13,0.5742,0.0324,0.0928,0.0,0.0,1.1483,0.5359,False,understat
+la_liga,2024,understat_200,Andreas Christensen,Barcelona,D S,239.0,5,0.3766,0.0125,0.0151,0.0,0.0,0.3766,0.5311,False,understat
+la_liga,2024,understat_250,Ørjan Nyland,Sevilla,GK,2676.0,30,0.0,0.0,0.0122,0.0,0.0,0.1345,0.9911,True,understat
+la_liga,2024,understat_308,Ricardo Rodríguez,Real Betis,D S,1282.0,18,0.351,0.0166,0.0244,0.0,0.0702,0.4914,0.7914,False,understat
+la_liga,2024,understat_391,David Alaba,Real Madrid,D S,312.0,7,0.0,0.0,0.0156,0.0,0.0,0.2885,0.4952,False,understat
+la_liga,2024,understat_414,Juan Bernat,"Getafe,Villarreal",D M S,892.0,24,0.6054,0.0693,0.1105,0.0,0.2018,1.009,0.413,False,understat
+la_liga,2024,understat_492,Héctor Bellerín,Real Betis,D S,569.0,9,0.1582,0.0175,0.2883,0.0,0.3163,1.2654,0.7025,False,understat
+la_liga,2024,understat_527,Adrián,Real Betis,GK,1710.0,19,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+la_liga,2024,understat_548,Daley Blind,Girona,D S,2774.0,34,0.3244,0.0137,0.0717,0.0,0.0649,0.6164,0.9065,False,understat
+la_liga,2024,understat_552,Ander Herrera,Athletic Club,M S,254.0,8,2.8346,0.6891,0.0381,0.0,0.0,0.7087,0.3528,False,understat
+la_liga,2024,understat_620,Kelechi Iheanacho,Sevilla,F S,401.0,9,2.02,0.2284,0.048,0.0,0.0,1.1222,0.4951,False,understat
+la_liga,2024,understat_680,Thibaut Courtois,Real Madrid,GK,2700.0,30,0.0,0.0,0.0057,0.0,0.0,0.0333,1.0,True,understat
+la_liga,2024,understat_842,Oriol Romeu,Girona,M S,1357.0,25,0.3316,0.0134,0.0365,0.0,0.0,0.5306,0.6031,False,understat
+la_liga,2024,understat_897,Juanmi,"Getafe,Real Betis",F M S,914.0,24,1.8709,0.3631,0.0822,0.0,0.0,0.7877,0.4231,False,understat
+la_liga,2024,understat_973,Paulo Gazzaniga,Girona,GK,3198.0,36,0.0,0.0,0.0,0.0,0.0,0.0,0.987,True,understat
+la_liga,2024,understat_1003,Pablo Maffeo,Mallorca,D M S,2385.0,30,0.2642,0.013,0.1661,0.0,0.0755,1.0943,0.8833,False,understat
+la_liga,2024,understat_1078,Sergi Canos,Valencia,M S,326.0,17,3.0368,0.1244,0.0542,0.0,0.2761,1.1043,0.2131,False,understat
+la_liga,2024,understat_1109,Lucas Ocampos,Sevilla,F M,180.0,2,2.0,0.0791,0.1581,0.0,0.5,1.5,1.0,False,understat
+la_liga,2024,understat_1129,Suso,Sevilla,F M S,572.0,16,2.5175,0.0996,0.3432,0.0,0.3147,3.4615,0.3972,False,understat
+la_liga,2024,understat_1244,Wojciech Szczesny,Barcelona,GK,1350.0,15,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+la_liga,2024,understat_1588,Raúl Albiol,Villarreal,D S,1186.0,15,0.1518,0.0086,0.0,0.0,0.0,0.0,0.8785,False,understat
+la_liga,2024,understat_1719,Javier Manquillo,Celta Vigo,D S,533.0,10,0.0,0.0,0.0,0.0,0.0,0.0,0.5922,False,understat
+la_liga,2024,understat_1739,Eric Bailly,Villarreal,D S,632.0,12,0.5696,0.0342,0.0,0.0,0.0,0.0,0.5852,False,understat
+la_liga,2024,understat_1822,Antonio Rüdiger,Real Madrid,D S,2291.0,29,0.9428,0.0712,0.0222,0.0,0.0,0.275,0.8778,False,understat
+la_liga,2024,understat_2090,Marc-André ter Stegen,Barcelona,GK,677.0,8,0.0,0.0,0.0,0.0,0.0,0.0,0.9403,True,understat
+la_liga,2024,understat_2190,Vicente Guaita,Celta Vigo,GK,3060.0,34,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+la_liga,2024,understat_2198,Moi Gómez,Osasuna,F M S,730.0,26,0.7397,0.0427,0.1103,0.0,0.0,1.3562,0.312,False,understat
+la_liga,2024,understat_2228,Aritz Elustondo,Real Sociedad,D S,1452.0,22,0.2479,0.0318,0.0135,0.0,0.0,0.2479,0.7333,False,understat
+la_liga,2024,understat_2229,Yuri,Athletic Club,D S,2027.0,30,0.7104,0.0264,0.0857,0.0,0.0888,0.7992,0.7507,False,understat
+la_liga,2024,understat_2261,Jan Oblak,Atletico Madrid,GK,3240.0,36,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+la_liga,2024,understat_2278,Giménez,Atletico Madrid,D S,1984.0,27,0.2268,0.0211,0.0165,0.0,0.0454,0.0907,0.8165,False,understat
+la_liga,2024,understat_2282,Sergi Gómez,Espanyol,D S,648.0,12,0.2778,0.0234,0.0,0.0,0.0,0.0,0.6,False,understat
+la_liga,2024,understat_2403,Íñigo Lekue,Athletic Club,D S,757.0,16,0.2378,0.0166,0.0683,0.0,0.0,0.9511,0.5257,False,understat
+la_liga,2024,understat_2415,David Soria,Getafe,GK,3420.0,38,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+la_liga,2024,understat_2417,Igor Zubeldia,Real Sociedad,D S,2283.0,28,0.4731,0.0359,0.0115,0.0,0.0,0.1577,0.906,False,understat
+la_liga,2024,understat_2446,Dani Ceballos,Real Madrid,M S,1235.0,23,0.5101,0.0223,0.1414,0.0,0.0,1.6032,0.5966,False,understat
+la_liga,2024,understat_2452,De Marcos,Athletic Club,D S,1554.0,26,0.4633,0.0671,0.1654,0.0,0.2317,1.1004,0.6641,False,understat
+la_liga,2024,understat_2479,Toni Lato,Mallorca,D S,615.0,14,0.0,0.0,0.0465,0.0,0.0,0.878,0.4881,False,understat
+la_liga,2024,understat_2484,Iñigo Martínez,Barcelona,D,2505.0,28,0.4671,0.0185,0.0808,0.0,0.1437,0.5749,0.994,False,understat
+la_liga,2024,understat_2505,José Gayá,Valencia,D S,1839.0,23,0.5873,0.0651,0.1657,0.0,0.0489,1.1746,0.8884,False,understat
+la_liga,2024,understat_2509,Dimitri Foulquier,Valencia,D S,2293.0,32,0.471,0.0241,0.0611,0.0,0.0392,0.3925,0.7962,False,understat
+la_liga,2024,understat_2521,Alfonso,Villarreal,D M S,443.0,12,1.0158,0.0767,0.2693,0.0,0.4063,1.8284,0.4102,False,understat
+la_liga,2024,understat_2532,Amath Diedhiou,Real Valladolid,D F M S,366.0,13,1.2295,0.0771,0.1473,0.0,0.2459,1.4754,0.3128,False,understat
+la_liga,2024,understat_2555,Remiro,Real Sociedad,GK,3240.0,36,0.0,0.0,0.0006,0.0,0.0,0.0278,1.0,True,understat
+la_liga,2024,understat_2609,Gerard Gumbau,Rayo Vallecano,M S,824.0,22,1.5291,0.1408,0.1304,0.0,0.1092,1.8568,0.4162,False,understat
+la_liga,2024,understat_2619,Stole Dimitrievski,Valencia,GK,360.0,4,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+la_liga,2024,understat_3059,Axel Witsel,Atletico Madrid,D S,845.0,14,0.1065,0.0065,0.0897,0.0,0.1065,0.213,0.6706,False,understat
+la_liga,2024,understat_3239,Hamari Traore,Real Sociedad,D S,725.0,11,0.1241,0.0409,0.0193,0.0,0.1241,0.3724,0.7323,False,understat
+la_liga,2024,understat_3399,Youssouf Sabaly,Real Betis,D S,1612.0,22,0.2792,0.013,0.0322,0.0,0.0558,0.6141,0.8141,False,understat
+la_liga,2024,understat_3667,Nabil Fekir,Real Betis,M,180.0,2,3.5,0.2772,0.3591,0.0,0.5,3.0,1.0,False,understat
+la_liga,2024,understat_3749,Jonathan Bamba,Celta Vigo,D F M S,823.0,12,1.4216,0.0718,0.2046,0.0,0.1094,1.3123,0.762,False,understat
+la_liga,2024,understat_4034,José Campaña,Las Palmas,M S,1208.0,25,0.3725,0.0102,0.0662,0.0,0.2235,0.9685,0.5369,False,understat
+la_liga,2024,understat_4226,Darwin Machís,Real Valladolid,F M S,621.0,18,2.029,0.1647,0.157,0.0,0.1449,1.1594,0.3833,False,understat
+la_liga,2024,understat_5033,Iván Villar,Celta Vigo,GK,360.0,4,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+la_liga,2024,understat_5041,Benito Ramírez,Las Palmas,D M S,431.0,19,2.0882,0.0654,0.1893,0.0,0.0,2.7146,0.252,False,understat
+la_liga,2024,understat_5043,Kiko Femenía,Villarreal,D S,2242.0,28,0.1204,0.0129,0.0855,0.0,0.0401,0.6423,0.8897,False,understat
+la_liga,2024,understat_5057,Jasper Cillessen,Las Palmas,GK,2339.0,27,0.0,0.0,0.0,0.0,0.0,0.0,0.9626,True,understat
+la_liga,2024,understat_5058,Carles Aleñá,"Alaves,Getafe",M S,1568.0,24,1.148,0.0715,0.1187,0.0,0.1148,1.3202,0.7259,False,understat
+la_liga,2024,understat_5065,Diego Rico,Getafe,D S,2822.0,33,0.5103,0.0106,0.1049,0.0,0.0957,1.1481,0.9502,False,understat
+la_liga,2024,understat_5075,Rubén Peña,Osasuna,D F M S,737.0,25,1.2212,0.1053,0.0625,0.0,0.0,1.5875,0.3276,False,understat
+la_liga,2024,understat_5077,Mikel Vesga,Athletic Club,M S,977.0,25,0.5527,0.1144,0.0954,0.0,0.0,1.1054,0.4342,False,understat
+la_liga,2024,understat_5081,Edu Expósito,Espanyol,F M S,1044.0,19,1.5517,0.1025,0.3167,0.0,0.1724,2.4138,0.6105,False,understat
+la_liga,2024,understat_5109,Rui Silva,Real Betis,GK,1350.0,15,0.0,0.0,0.0056,0.0,0.0,0.1333,1.0,True,understat
+la_liga,2024,understat_5140,Kike Barja,Osasuna,F M S,296.0,15,1.2162,0.0534,0.4491,0.0,0.3041,3.0405,0.2193,False,understat
+la_liga,2024,understat_5185,Unai Simón,Athletic Club,GK,1890.0,21,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+la_liga,2024,understat_5191,Álvaro Fernández,Sevilla,GK S,744.0,9,0.0,0.0,0.0062,0.0,0.0,0.121,0.9185,True,understat
+la_liga,2024,understat_5212,Sergi Guardiola,Rayo Vallecano,F S,321.0,16,3.0841,0.6485,0.0479,0.0,0.0,1.4019,0.2229,False,understat
+la_liga,2024,understat_5672,Iván Balliu,Rayo Vallecano,D S,1167.0,25,0.0771,0.0016,0.0264,0.0,0.0,0.4627,0.5187,False,understat
+la_liga,2024,understat_5947,Mihailo Ristic,Celta Vigo,D S,436.0,10,0.4128,0.0091,0.0295,0.0,0.2064,0.8257,0.4844,False,understat
+la_liga,2024,understat_6075,Antonio Sivera,Alaves,GK,2817.0,32,0.0,0.0,0.0011,0.0,0.0,0.0319,0.9781,True,understat
+la_liga,2024,understat_6121,Juanpe,Girona,D S,720.0,12,0.25,0.0114,0.0221,0.0,0.0,0.375,0.6667,False,understat
+la_liga,2024,understat_6126,Ander Guevara,Alaves,M S,1969.0,33,0.5485,0.0442,0.0308,0.0,0.0457,0.5485,0.663,False,understat
+la_liga,2024,understat_6144,Sébastien Haller,Leganes,F S,404.0,8,0.8911,0.0798,0.0301,0.0,0.0,0.2228,0.5611,False,understat
+la_liga,2024,understat_6149,Unai Núñez,Athletic Club,D S,643.0,10,0.14,0.0692,0.0036,0.0,0.0,0.14,0.7144,False,understat
+la_liga,2024,understat_6151,Djené Dakonam,Getafe,D M,2566.0,31,0.2104,0.0081,0.0202,0.0,0.0,0.3157,0.9197,False,understat
+la_liga,2024,understat_6224,Marko Dmitrovic,Leganes,GK,2880.0,32,0.0,0.0,0.0032,0.0,0.0,0.0312,1.0,True,understat
+la_liga,2024,understat_6233,Ferland Mendy,Real Madrid,D S,1019.0,14,0.0,0.0,0.0567,0.0,0.0883,0.265,0.8087,False,understat
+la_liga,2024,understat_6257,Juan Soriano,Leganes,GK,540.0,6,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+la_liga,2024,understat_6325,Andoni Gorosabel,Athletic Club,D S,1508.0,20,0.1194,0.017,0.1415,0.0,0.1194,0.8952,0.8378,False,understat
+la_liga,2024,understat_6501,Andy Pelmard,Las Palmas,D S,202.0,4,0.4455,0.0077,0.0346,0.0,0.0,0.4455,0.5611,False,understat
+la_liga,2024,understat_6560,Aurelien Tchouameni,Real Madrid,D M S,2697.0,32,0.634,0.0607,0.0239,0.0,0.0,0.1669,0.9365,False,understat
+la_liga,2024,understat_6592,Manuel Morlanes,Mallorca,M S,1335.0,23,0.7416,0.0306,0.0305,0.0,0.0,0.6742,0.6449,False,understat
+la_liga,2024,understat_6643,Francisco Vieites,Real Betis,GK,360.0,4,0.25,0.0066,0.0,0.0,0.0,0.0,1.0,True,understat
+la_liga,2024,understat_6712,Enzo Loiodice,Las Palmas,M S,661.0,17,0.9531,0.0295,0.0228,0.0,0.0,0.6808,0.432,False,understat
+la_liga,2024,understat_6926,William Carvalho,Real Betis,M S,457.0,14,0.7877,0.0442,0.0581,0.0,0.0,1.1816,0.3627,False,understat
+la_liga,2024,understat_6935,Naif Aguerd,Real Sociedad,D,1772.0,21,0.7619,0.1092,0.018,0.0,0.0,0.254,0.9376,False,understat
+la_liga,2024,understat_6942,Arthur,Girona,M S,943.0,15,0.5726,0.0258,0.017,0.0,0.0,0.4772,0.6985,False,understat
+la_liga,2024,understat_7009,Jaime Mata,Las Palmas,F M S,571.0,30,2.6795,0.3869,0.0169,0.0,0.0,0.4729,0.2115,False,understat
+la_liga,2024,understat_7095,Juan Musso,Atletico Madrid,GK,180.0,2,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+la_liga,2024,understat_7186,Juan Berrocal,Getafe,D S,1061.0,19,0.3393,0.0475,0.0008,0.0,0.0,0.0848,0.6205,False,understat
+la_liga,2024,understat_7194,Andriy Lunin,Real Madrid,GK,630.0,7,0.0,0.0,0.1311,0.0,0.1429,0.1429,1.0,True,understat
+la_liga,2024,understat_7195,Roberto López,Leganes,M S,374.0,13,1.6845,0.1458,0.2139,0.0,0.2406,2.4064,0.3197,False,understat
+la_liga,2024,understat_7287,Iñaki Peña,Barcelona,GK S,1393.0,16,0.0,0.0,0.0,0.0,0.0,0.0,0.9674,True,understat
+la_liga,2024,understat_7306,Aihen Muñoz,Real Sociedad,D S,1098.0,21,0.4918,0.013,0.0107,0.0,0.0,0.2459,0.581,False,understat
+la_liga,2024,understat_7385,Javi Galán,Atletico Madrid,D S,1806.0,25,0.4485,0.0122,0.1657,0.0,0.0997,0.6977,0.8027,False,understat
+la_liga,2024,understat_7412,Antonio Candela,Real Valladolid,D,935.0,12,0.0963,0.0048,0.0379,0.0,0.0,0.5775,0.8657,False,understat
+la_liga,2024,understat_7424,Alex Sola,Getafe,M S,1077.0,19,1.1699,0.0854,0.0952,0.0,0.0836,0.7521,0.6298,False,understat
+la_liga,2024,understat_7432,Reinildo,Atletico Madrid,D S,916.0,19,0.0983,0.0051,0.018,0.0,0.0,0.1965,0.5357,False,understat
+la_liga,2024,understat_7613,Moussa Diarra,Alaves,D S,1855.0,26,0.0485,0.0012,0.0083,0.0,0.0,0.1941,0.7927,False,understat
+la_liga,2024,understat_7826,Joseph Aidoo,"Celta Vigo,Real Valladolid",D S,589.0,9,0.1528,0.0054,0.0,0.0,0.0,0.0,0.7272,False,understat
+la_liga,2024,understat_7835,Aritz Arambarri,Leganes,D,180.0,2,0.5,0.0209,0.0,0.0,0.0,0.0,1.0,False,understat
+la_liga,2024,understat_7845,Aleksander Sedlar,Alaves,D S,599.0,9,0.1503,0.0027,0.0,0.0,0.0,0.0,0.7395,False,understat
+la_liga,2024,understat_7856,Aridane Hernández,Rayo Vallecano,D S,1026.0,14,0.7018,0.0999,0.0044,0.0,0.0,0.1754,0.8143,False,understat
+la_liga,2024,understat_7857,Jon Moncayola,Osasuna,M S,2144.0,32,0.8815,0.0665,0.138,0.0,0.0,1.4272,0.7444,False,understat
+la_liga,2024,understat_7859,Sergio Herrera,Osasuna,GK,3330.0,37,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+la_liga,2024,understat_7916,Pol Lozano,Espanyol,M S,2015.0,30,0.3573,0.0072,0.0448,0.0,0.0447,0.804,0.7463,False,understat
+la_liga,2024,understat_7967,Anssumane Fati,Barcelona,M S,228.0,6,4.7368,0.4349,0.0489,0.0,0.0,1.5789,0.4222,False,understat
+la_liga,2024,understat_7981,Nianzou Kouassi,Sevilla,D,524.0,6,0.3435,0.0299,0.0,0.0,0.0,0.0,0.9704,False,understat
+la_liga,2024,understat_8002,Rodrigo Riquelme,Atletico Madrid,D M S,493.0,16,2.5558,0.2624,0.1874,0.0,0.1826,2.7383,0.3424,False,understat
+la_liga,2024,understat_8017,Alex Kral,Espanyol,F M S,2699.0,37,0.7003,0.0658,0.0706,0.0,0.0333,0.4335,0.8105,False,understat
+la_liga,2024,understat_8058,Thierry Correia,Valencia,D S,782.0,11,0.8056,0.0657,0.0342,0.0,0.0,0.5754,0.7899,False,understat
+la_liga,2024,understat_8070,Mateu Morey,Mallorca,D S,734.0,16,0.3678,0.0541,0.0302,0.0,0.0,0.4905,0.5097,False,understat
+la_liga,2024,understat_8108,Daniel Cárdenas,Rayo Vallecano,GK,540.0,6,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+la_liga,2024,understat_8122,Sergio Carreira,Celta Vigo,D M S,1658.0,23,0.7057,0.0518,0.1471,0.0,0.2171,0.8142,0.801,False,understat
+la_liga,2024,understat_8334,Hugo Guillamón,Valencia,M S,346.0,12,0.5202,0.0148,0.0104,0.0,0.0,0.5202,0.3204,False,understat
+la_liga,2024,understat_8413,Javier López,Real Sociedad,D S,1934.0,29,0.2327,0.0066,0.0404,0.0,0.0,0.2327,0.741,False,understat
+la_liga,2024,understat_8423,Jon Pacheco Dozagarat,Real Sociedad,D S,849.0,14,0.106,0.0099,0.0065,0.0,0.0,0.106,0.6738,False,understat
+la_liga,2024,understat_8429,Luka Romero,Alaves,F M S,201.0,6,0.8955,0.3451,0.1193,0.0,0.0,1.791,0.3722,False,understat
+la_liga,2024,understat_8733,Alfonso Espino,Rayo Vallecano,D S,835.0,16,1.0778,0.0762,0.0709,0.0,0.1078,0.5389,0.5799,False,understat
+la_liga,2024,understat_8744,Juan Cruz,Osasuna,D S,1509.0,25,0.2386,0.0071,0.0016,0.0,0.0,0.0596,0.6707,False,understat
+la_liga,2024,understat_8762,Luis Pérez,Real Valladolid,D M S,2548.0,30,0.1766,0.0054,0.0922,0.0,0.0,0.989,0.9437,False,understat
+la_liga,2024,understat_8861,Urko Gonzalez,"Espanyol,Real Sociedad",M S,1441.0,18,0.2498,0.0423,0.0545,0.0,0.1249,0.6246,0.8895,False,understat
+la_liga,2024,understat_8863,Marvin Park,Las Palmas,D F M S,1008.0,23,0.4464,0.0202,0.1139,0.0,0.0,0.5357,0.487,False,understat
+la_liga,2024,understat_8963,Nahuel Molina,Atletico Madrid,D S,1565.0,30,0.5176,0.0574,0.1112,0.0,0.1725,0.7476,0.5796,False,understat
+la_liga,2024,understat_9015,Cenk Özkacar,Real Valladolid,D S,750.0,11,0.24,0.0138,0.0032,0.0,0.0,0.12,0.7576,False,understat
+la_liga,2024,understat_9198,Unai Marrero,Real Sociedad,GK,180.0,2,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+la_liga,2024,understat_9217,Jesús Vázquez,Valencia,D S,907.0,19,0.4961,0.027,0.0531,0.0,0.0,0.2977,0.5304,False,understat
+la_liga,2024,understat_9218,Juan Iglesias,Getafe,D M S,2888.0,37,0.6544,0.0444,0.0631,0.0,0.0312,0.5921,0.8673,False,understat
+la_liga,2024,understat_9280,Antonio Blanco,Alaves,M S,2755.0,35,0.8167,0.0231,0.0568,0.0,0.0327,0.4574,0.8746,False,understat
+la_liga,2024,understat_9293,Hugo Novoa Ramos,Alaves,D M S,217.0,5,0.4147,0.2474,0.048,0.0,0.0,0.8295,0.4822,False,understat
+la_liga,2024,understat_9297,Abdelkabir Abqar,Alaves,D,2489.0,29,0.4339,0.031,0.0086,0.0,0.0362,0.2893,0.9536,False,understat
+la_liga,2024,understat_9465,Beñat Turrientes,Real Sociedad,M S,933.0,21,0.6752,0.0329,0.0361,0.0,0.0,0.2894,0.4937,False,understat
+la_liga,2024,understat_9519,Carlos Domínguez,Celta Vigo,D S,1178.0,19,0.2292,0.0144,0.0044,0.0,0.0,0.1528,0.6889,False,understat
+la_liga,2024,understat_9520,Hugo Sotelo,Celta Vigo,M S,1268.0,24,0.2839,0.0146,0.1033,0.0,0.0,1.2776,0.587,False,understat
+la_liga,2024,understat_9689,Albert Sambi Lokonga,Sevilla,M S,1482.0,22,0.7895,0.0467,0.0852,0.0,0.1215,1.1538,0.7485,False,understat
+la_liga,2024,understat_9692,Karl Hein,Real Valladolid,GK,2790.0,31,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+la_liga,2024,understat_9693,Giorgi Mamardashvili,Valencia,GK,3060.0,34,0.0,0.0,0.002,0.0,0.0,0.0588,1.0,True,understat
+la_liga,2024,understat_9698,Diego Conde,Villarreal,GK,1965.0,22,0.0,0.0,0.0185,0.0,0.0458,0.0916,0.9924,True,understat
+la_liga,2024,understat_9744,Justin Smith,Espanyol,M S,209.0,5,0.0,0.0,0.0121,0.0,0.0,0.4306,0.4644,False,understat
+la_liga,2024,understat_9754,Brian Oliván,Espanyol,D S,1020.0,17,0.5294,0.0365,0.0829,0.0,0.0882,1.3235,0.6667,False,understat
+la_liga,2024,understat_9755,Inigo Ruiz de Galarreta,Athletic Club,M S,1502.0,26,0.6591,0.0222,0.2079,0.0,0.2397,1.6778,0.6419,False,understat
+la_liga,2024,understat_9756,Dominik Greif,Mallorca,GK,2790.0,31,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+la_liga,2024,understat_9768,Jesús Areso,Osasuna,D S,3111.0,36,0.2314,0.0165,0.0999,0.0,0.0868,0.8679,0.9602,False,understat
+la_liga,2024,understat_9773,Joan García,Espanyol,GK,3420.0,38,0.0263,0.0019,0.0,0.0,0.0,0.0,1.0,True,understat
+la_liga,2024,understat_9778,Henrique,Real Valladolid,D S,354.0,5,0.2542,0.0127,0.0081,0.0,0.0,0.5085,0.7867,False,understat
+la_liga,2024,understat_9794,Franco Cervi,Celta Vigo,D F M S,266.0,7,0.0,0.0,0.2004,0.0,0.0,1.6917,0.4222,False,understat
+la_liga,2024,understat_9805,Álex Balde,Barcelona,D S,2303.0,32,0.469,0.0214,0.1429,0.0,0.1563,1.0161,0.7997,False,understat
+la_liga,2024,understat_9809,José Ángel Carmona,Sevilla,D,2993.0,35,0.5713,0.0179,0.0587,0.0,0.0,0.5713,0.9502,False,understat
+la_liga,2024,understat_9810,Fran García,Real Madrid,D S,2180.0,31,0.578,0.0505,0.0915,0.0,0.0826,0.9908,0.7814,False,understat
+la_liga,2024,understat_9811,Óscar Valentín,Rayo Vallecano,M S,1804.0,34,0.2494,0.0373,0.0405,0.0,0.0,0.6486,0.5895,False,understat
+la_liga,2024,understat_9824,Julen Agirrezabala,Athletic Club,GK,1212.0,14,0.0,0.0,0.0,0.0,0.0,0.0,0.9619,True,understat
+la_liga,2024,understat_9839,Leo Román,Mallorca,GK,630.0,7,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+la_liga,2024,understat_9970,Antonio Sánchez,Mallorca,D F M S,1353.0,33,1.1308,0.0858,0.028,0.0,0.0,0.3326,0.4556,False,understat
+la_liga,2024,understat_10010,Jesús Owono,Alaves,GK S,482.0,6,0.0,0.0,0.0,0.0,0.0,0.0,0.8926,True,understat
+la_liga,2024,understat_10188,Peter,Getafe,M S,433.0,17,2.4942,0.2472,0.0255,0.0,0.0,0.8314,0.283,False,understat
+la_liga,2024,understat_10224,Mika Mármol,Las Palmas,D M S,2398.0,30,0.3753,0.0171,0.0586,0.0,0.0375,0.6005,0.8881,False,understat
+la_liga,2024,understat_10382,Eray Cömert,Real Valladolid,D M S,1800.0,25,0.45,0.0603,0.0,0.0,0.0,0.0,0.8,False,understat
+la_liga,2024,understat_10561,Jesús Santiago,Getafe,M S,333.0,19,0.2703,0.0061,0.0,0.0,0.0,0.0,0.1947,False,understat
+la_liga,2024,understat_10614,Damián Rodríguez,Celta Vigo,M S,934.0,17,0.3854,0.0123,0.0738,0.0,0.0,1.6381,0.6105,False,understat
+la_liga,2024,understat_10757,Scott McKenna,Las Palmas,D S,2468.0,29,0.3647,0.0434,0.009,0.0,0.0,0.1459,0.9456,False,understat
+la_liga,2024,understat_10875,Omar El Hilali,Espanyol,D,3173.0,36,0.0567,0.0009,0.0343,0.0,0.0567,0.2269,0.9793,False,understat
+la_liga,2024,understat_10884,Álvaro Aguado,Espanyol,M S,421.0,16,2.1378,0.1031,0.1603,0.0,0.2138,0.8551,0.2924,False,understat
+la_liga,2024,understat_10888,David Torres,Real Valladolid,D S,1384.0,18,0.1951,0.0139,0.0007,0.0,0.0,0.065,0.8543,False,understat
+la_liga,2024,understat_10944,Fran Pérez,Valencia,M S,497.0,26,1.0865,0.0517,0.3526,0.0,0.0,1.2676,0.2124,False,understat
+la_liga,2024,understat_10974,Samú Costa,Mallorca,M S,2667.0,32,1.0124,0.0699,0.059,0.0,0.0675,0.4724,0.926,False,understat
+la_liga,2024,understat_10982,Copete,Mallorca,D S,1511.0,25,0.3574,0.0329,0.0,0.0,0.0,0.0,0.6716,False,understat
+la_liga,2024,understat_10999,Marcão,Sevilla,D S,547.0,12,0.0,0.0,0.0,0.0,0.0,0.0,0.5065,False,understat
+la_liga,2024,understat_11057,André Almeida,Valencia,F M S,2019.0,34,0.8024,0.0641,0.1641,0.0,0.1783,1.9168,0.6598,False,understat
+la_liga,2024,understat_11087,Pep Chavarría,Rayo Vallecano,D M S,2574.0,34,0.3846,0.0438,0.0598,0.0,0.035,0.8392,0.8412,False,understat
+la_liga,2024,understat_11147,Lucas Rosa,Real Valladolid,D,1890.0,21,0.381,0.041,0.096,0.0,0.0476,0.5714,1.0,False,understat
+la_liga,2024,understat_11349,Mario Martín,Real Valladolid,M S,1740.0,30,1.3966,0.0865,0.0714,0.0,0.0517,0.6207,0.6444,False,understat
+la_liga,2024,understat_11358,José Gragera,Espanyol,M S,580.0,10,0.3103,0.0063,0.0032,0.0,0.0,0.1552,0.6444,False,understat
+la_liga,2024,understat_11395,Iker Muñoz,Osasuna,M S,554.0,23,1.787,0.0848,0.1574,0.0,0.1625,0.9747,0.2676,False,understat
+la_liga,2024,understat_11742,Álex Suárez,Las Palmas,D,2498.0,30,0.2162,0.0117,0.0067,0.0,0.0,0.1081,0.9252,False,understat
+la_liga,2024,understat_11743,Kirian Rodríguez,Las Palmas,M,1792.0,21,1.0547,0.085,0.0838,0.0,0.1507,0.8036,0.9481,False,understat
+la_liga,2024,understat_11747,Juan Herzog,Las Palmas,D S,1321.0,19,0.6813,0.04,0.0,0.0,0.0,0.0,0.7725,False,understat
+la_liga,2024,understat_11825,Abderrahmane Rebbach,Alaves,F M S,381.0,8,1.4173,0.0775,0.0651,0.0,0.0,1.4173,0.5292,False,understat
+la_liga,2024,understat_11829,André Ferreira,Real Valladolid,GK,540.0,6,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+la_liga,2024,understat_11834,Adrià Alti,Leganes,D M S,1645.0,22,0.383,0.0137,0.032,0.0,0.0,0.6018,0.8308,False,understat
+la_liga,2024,understat_11953,Sergi Altimira,Real Betis,M S,1985.0,32,0.9521,0.0744,0.0804,0.0,0.0453,0.9975,0.6892,False,understat
+la_liga,2024,understat_12005,Pau Cubarsí,Barcelona,D S,2631.0,35,0.2737,0.032,0.0525,0.0,0.1026,0.3079,0.8352,False,understat
+la_liga,2024,understat_12139,Yarek Gasiorowski,Valencia,D S,944.0,15,0.286,0.098,0.0155,0.0,0.0,0.286,0.6993,False,understat
+la_liga,2024,understat_12154,Nabil Aberdin,Getafe,M S,270.0,7,0.6667,0.011,0.0037,0.0,0.0,0.3333,0.4286,False,understat
+la_liga,2024,understat_12171,Hector Fort,Barcelona,D S,552.0,17,0.9783,0.0439,0.2122,0.0,0.0,1.4674,0.3608,False,understat
+la_liga,2024,understat_12227,Álex Padilla,Athletic Club,GK S,315.0,5,0.0,0.0,0.0,0.0,0.0,0.0,0.7,True,understat
+la_liga,2024,understat_12275,Willy Kambwala,Villarreal,D S,1097.0,19,0.3282,0.0186,0.0059,0.0,0.0,0.082,0.6415,False,understat
+la_liga,2024,understat_12298,Augusto Batalla,Rayo Vallecano,GK,2880.0,32,0.0,0.0,0.0008,0.0,0.0,0.0312,1.0,True,understat
+la_liga,2024,understat_12300,Jaílson,Celta Vigo,D S,600.0,13,0.6,0.0213,0.0014,0.0,0.0,0.15,0.5128,False,understat
+la_liga,2024,understat_12353,Jon Martín,Real Sociedad,D S,884.0,13,0.9163,0.0511,0.016,0.0,0.1018,0.4072,0.7556,False,understat
+la_liga,2024,understat_12371,Adam Aznou,Real Valladolid,D M S,884.0,13,0.4072,0.0275,0.0543,0.0,0.0,0.6109,0.7556,False,understat
+la_liga,2024,understat_12498,Valentín Barco,Sevilla,D S,279.0,7,2.2581,0.092,0.1376,0.0,0.0,1.9355,0.4429,False,understat
+la_liga,2024,understat_12642,Yoel Lago,Celta Vigo,D S,589.0,8,0.0,0.0,0.0051,0.0,0.1528,0.1528,0.8181,False,understat
+la_liga,2024,understat_12717,Stoichkov,Alaves,F M S,675.0,16,2.4,0.1593,0.1373,0.0,0.1333,0.9333,0.4688,False,understat
+la_liga,2024,understat_12718,Adrián Pica,Alaves,D S,489.0,9,0.7362,0.1105,0.0115,0.0,0.0,0.184,0.6037,False,understat
+la_liga,2024,understat_12723,Alejandro Francés,Girona,D S,1188.0,18,0.4545,0.0121,0.0253,0.0,0.0,0.2273,0.7333,False,understat
+la_liga,2024,understat_12724,Adama Boiro,Athletic Club,D M S,1120.0,18,0.4018,0.0311,0.0332,0.0,0.0,0.4018,0.6914,False,understat
+la_liga,2024,understat_12737,Viti Rozada,Las Palmas,D S,2005.0,29,0.1347,0.003,0.0638,0.0,0.0898,0.5387,0.7682,False,understat
+la_liga,2024,understat_12740,Dinko Horkas,Las Palmas,GK S,1081.0,13,0.0,0.0,0.0,0.0,0.0,0.0,0.9239,True,understat
+la_liga,2024,understat_12793,Julián Chicco,Leganes,D M S,273.0,14,0.989,0.1297,0.1633,0.0,0.3297,0.6593,0.2167,False,understat
+la_liga,2024,understat_12820,Marc Bernal,Barcelona,M,256.0,3,0.7031,0.0197,0.0039,0.0,0.0,0.3516,0.9481,False,understat
+la_liga,2024,understat_12883,Marc Domenech,Mallorca,F M S,297.0,10,2.4242,0.2252,0.0654,0.0,0.0,1.5152,0.33,False,understat
+la_liga,2024,understat_12894,Stanko Juric,Real Valladolid,M S,1757.0,26,0.4098,0.0199,0.027,0.0,0.0,0.2049,0.7509,False,understat
+la_liga,2024,understat_12895,Víctor Meseguer,Real Valladolid,M S,376.0,14,1.4362,0.1035,0.006,0.0,0.0,0.2394,0.2984,False,understat
+la_liga,2024,understat_12901,Antoniu Roca,Espanyol,M S,1023.0,26,0.8798,0.0929,0.106,0.0,0.088,0.6158,0.4372,False,understat
+la_liga,2024,understat_12903,Rafael Bauza,Espanyol,M S,183.0,5,1.4754,0.0412,0.0,0.0,0.0,0.0,0.4067,False,understat
+la_liga,2024,understat_12914,Pau Navarro,Villarreal,D S,902.0,17,0.0998,0.0016,0.0014,0.0,0.0,0.0998,0.5895,False,understat
+la_liga,2024,understat_12917,Luiz Júnior,Villarreal,GK S,1455.0,17,0.0,0.0,0.0,0.0,0.0,0.0,0.951,True,understat
+la_liga,2024,understat_13003,Santiago Mouriño,Alaves,D S,1827.0,25,0.6404,0.0498,0.0467,0.0,0.0493,0.3448,0.812,False,understat
+la_liga,2024,understat_13100,Juma Bah,Real Valladolid,D S,862.0,12,0.3132,0.0189,0.0019,0.0,0.0,0.1044,0.7981,False,understat
+la_liga,2024,understat_13123,Peio Canales,Athletic Club,M S,247.0,8,1.0931,0.0718,0.1781,0.0,0.0,2.1862,0.3431,False,understat
+la_liga,2024,understat_13201,Raúl,Real Madrid,D S,1675.0,23,0.1612,0.004,0.0408,0.0,0.0537,0.3761,0.8092,False,understat
+la_liga,2024,understat_13319,Facundo Garcés,Alaves,D S,670.0,10,0.6716,0.0153,0.1019,0.0,0.0,0.403,0.7444,False,understat
+la_liga,2024,understat_13374,Ángel Ortiz,Real Betis,D S,352.0,5,0.5114,0.0141,0.0942,0.0,0.2557,0.767,0.7822,False,understat
+la_liga,2024,understat_13404,Tamás Nikitscher,Real Valladolid,D M S,853.0,13,0.1055,0.002,0.0032,0.0,0.0,0.211,0.7291,False,understat
+la_liga,2024,understat_13420,Vladyslav Krapyvtsov,Girona,GK,180.0,2,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+la_liga,2024,understat_13436,Iván Jaime,Valencia,M S,277.0,9,2.5993,0.1414,0.1254,0.0,0.0,1.2996,0.342,False,understat

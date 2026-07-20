@@ -1,0 +1,572 @@
+league,season,player_id,player_name,team,position,minutes,games,shots_per90,xg_per90,xa_per90,goals_per90,assists_per90,key_passes_per90,expected_minutes_share,is_goalkeeper,source
+mls,2026,asa_0Oq624oPq6,Kalani Kossa-Rienzi,Seattle Sounders FC,FB,962.0,,1.0291,0.1174,0.116,0.0936,0.0,0.9356,0.6789,False,asa
+mls,2026,asa_0Oq624zdq6,Noah Streit,CF Montréal,W,590.0,,1.2203,0.2004,0.0713,0.0,0.0,1.2203,0.3814,False,asa
+mls,2026,asa_0Oq6320dQ6,Kai Trewin,New York City FC,DM,1402.0,,0.5136,0.0303,0.039,0.0,0.0,0.321,0.9224,False,asa
+mls,2026,asa_0Oq633dAQ6,Griffin Yow,New England Revolution,W,739.0,,1.4614,0.1375,0.1076,0.1218,0.0,0.8525,0.5161,False,asa
+mls,2026,asa_0Oq63P32Q6,Nkosi Tafari,Los Angeles FC,CB,1390.0,,0.4532,0.0454,0.0583,0.0,0.0647,0.1942,0.9803,False,asa
+mls,2026,asa_0Oq63YndQ6,Onni Valakari,San Diego FC,CM,1407.0,,1.0874,0.1919,0.1123,0.1919,0.1919,0.7676,0.9637,False,asa
+mls,2026,asa_0Oq6712Q6D,Ashley Westwood,Charlotte FC,DM,1349.0,,0.467,0.0542,0.1655,0.0667,0.0667,1.1342,0.8881,False,asa
+mls,2026,asa_0Oq6ENn256,Danny Musovski,Seattle Sounders FC,ST,664.0,,2.1687,0.5384,0.0756,0.1355,0.0,0.6777,0.4686,False,asa
+mls,2026,asa_0Oq6L8EgM6,Ayoub Jabbari,FC Cincinnati,ST,459.0,,1.3725,0.1692,0.1895,0.1961,0.3922,1.1765,0.3348,False,asa
+mls,2026,asa_0Oq6LeJ7M6,Philip Quinton,Real Salt Lake,CB,873.0,,0.2062,0.0134,0.0054,0.0,0.1031,0.2062,0.6046,False,asa
+mls,2026,asa_0Oq6LgZgM6,Justin Ellis,Orlando City SC,ST,585.0,,1.3846,0.2588,0.1622,0.1538,0.3077,1.5385,0.3836,False,asa
+mls,2026,asa_0Oq6LpK2M6,Wayne Frederick,Colorado Rapids,DM,1088.0,,0.6618,0.115,0.0268,0.1654,0.0827,0.2482,0.7056,False,asa
+mls,2026,asa_0Oq6lyNdM6,Wil Trapp,Minnesota United FC,DM,917.0,,0.0,0.0,0.0356,0.0,0.0,0.5889,0.5997,False,asa
+mls,2026,asa_0Oq6wjlzQ6,Jack Skahan,San Jose Earthquakes,W,556.0,,1.295,0.2897,0.1775,0.3237,0.3237,0.9712,0.3692,False,asa
+mls,2026,asa_0Oq6wmbrQ6,Kye Rowles,D.C. United,CB,1431.0,,0.3774,0.0573,0.078,0.0629,0.0,0.2516,0.9353,False,asa
+mls,2026,asa_0x5g213RM7,Sergio Reguilón,Inter Miami CF,FB,410.0,,0.6585,0.043,0.2243,0.2195,0.0,1.0976,0.2837,False,asa
+mls,2026,asa_0x5g2BmPM7,Enea Mihaj,Atlanta United FC,CB,1299.0,,0.4157,0.0248,0.0,0.0,0.0,0.0,0.8485,False,asa
+mls,2026,asa_0x5g2EKLM7,Indiana Vassilev,Philadelphia Union,W,1042.0,,0.9501,0.128,0.0891,0.0864,0.0,0.9501,0.6762,False,asa
+mls,2026,asa_0x5g2RXXM7,Stijn Spierings,Real Salt Lake,CM,830.0,,0.8675,0.0435,0.1255,0.1084,0.1084,0.9759,0.5748,False,asa
+mls,2026,asa_0x5g2Z8ZM7,Kristijan Kahlina,Charlotte FC,GK,1519.0,,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,asa
+mls,2026,asa_0x5g2mYrM7,Michael Collodi,FC Dallas,GK,1332.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.8994,True,asa
+mls,2026,asa_0x5g2pW7M7,Shaq Moore,FC Dallas,FB,1481.0,,0.2431,0.0211,0.0293,0.0,0.0608,0.2431,1.0,False,asa
+mls,2026,asa_0x5g2xoXM7,Raheem Edwards,Toronto FC,FB,838.0,,0.3222,0.0112,0.0384,0.0,0.0,0.4296,0.5393,False,asa
+mls,2026,asa_0x5gJWwjM7,Dawid Bugaj,CF Montréal,FB,911.0,,1.0867,0.0541,0.0157,0.0,0.0,0.2964,0.5889,False,asa
+mls,2026,asa_0x5gJY2rM7,Bruno Caicedo,Vancouver Whitecaps FC,W,355.0,,6.338,0.6874,0.2175,0.507,0.507,0.507,0.2657,False,asa
+mls,2026,asa_0x5gJg07M7,Malachi Jones,New York City FC,W,245.0,,3.3061,0.4228,0.0084,0.0,0.0,0.3673,0.1612,False,asa
+mls,2026,asa_0x5gLEbRq7,Louis Munteanu,D.C. United,ST,737.0,,3.9077,0.4596,0.0221,0.6106,0.0,0.4885,0.4817,False,asa
+mls,2026,asa_0x5gLj27q7,Sekou Bangoura,Columbus Crew,CM,554.0,,0.8123,0.1381,0.0045,0.1625,0.0,0.1625,0.3593,False,asa
+mls,2026,asa_0x5gLm2bq7,Jackson Hopkins,D.C. United,CM,1179.0,,1.5267,0.2558,0.1462,0.1527,0.0763,1.0687,0.7706,False,asa
+mls,2026,asa_0x5gP3gXq7,Matt Miazga,FC Cincinnati,CB,646.0,,0.5573,0.0762,0.013,0.0,0.1393,0.1393,0.4712,False,asa
+mls,2026,asa_0x5gPv8mq7,Duane Holmes,Houston Dynamo FC,FB,561.0,,0.6417,0.0556,0.0441,0.0,0.0,0.6417,0.4027,False,asa
+mls,2026,asa_0x5gWWz757,Herman Johansson,FC Dallas,FB,1124.0,,0.1601,0.01,0.204,0.0,0.1601,1.2811,0.7589,False,asa
+mls,2026,asa_0x5gWlZb57,Samuel Gidi,FC Cincinnati,CM,1201.0,,0.0749,0.0052,0.0473,0.0,0.0,0.5246,0.876,False,asa
+mls,2026,asa_0x5gk2PL57,Ezekiel Alladoh,Philadelphia Union,ST,639.0,,1.1268,0.162,0.0743,0.0,0.1408,0.9859,0.4147,False,asa
+mls,2026,asa_2lqR72mAQr,Kenji Cabrera,Vancouver Whitecaps FC,W,382.0,,0.4712,0.0116,0.1581,0.0,0.4712,1.4136,0.2859,False,asa
+mls,2026,asa_2lqR7V9AQr,Georgi Minoungou,Colorado Rapids,W,841.0,,1.0702,0.1415,0.142,0.0,0.214,0.9631,0.5454,False,asa
+mls,2026,asa_2lqR7YEaQr,Jackson Travis,Colorado Rapids,FB,892.0,,0.2018,0.0112,0.0449,0.0,0.1009,0.4036,0.5785,False,asa
+mls,2026,asa_2lqR7wZaQr,Max Arfsten,Columbus Crew,FB,1436.0,,1.1908,0.1891,0.1913,0.2507,0.2507,1.3788,0.9313,False,asa
+mls,2026,asa_2lqRJVwJqr,Morrison Agyemang,Charlotte FC,CB,1369.0,,0.6574,0.1232,0.0027,0.1315,0.0,0.0657,0.9013,False,asa
+mls,2026,asa_2lqRR4Rxqr,Lewis Morgan,San Diego FC,W,415.0,,1.7349,0.2044,0.184,0.0,0.4337,0.8675,0.2842,False,asa
+mls,2026,asa_2lqRRZy2qr,Ilie Sánchez,Austin FC,DM,817.0,,0.7711,0.084,0.0,0.0,0.0,0.0,0.5333,False,asa
+mls,2026,asa_2lqRj3Zxqr,Olger Escobar,CF Montréal,AM,373.0,,1.689,0.0803,0.1548,0.0,0.0,1.2064,0.2411,False,asa
+mls,2026,asa_2lqRj90Jqr,Jackson Gilman,Toronto FC,CB,289.0,,1.2457,0.0886,0.1082,0.0,0.0,0.3114,0.186,False,asa
+mls,2026,asa_2lqRjDAAqr,Ian Fray,Inter Miami CF,FB,752.0,,0.7181,0.1871,0.088,0.1197,0.1197,0.5984,0.5204,False,asa
+mls,2026,asa_2lqRjL12qr,Brandan Craig,CF Montréal,CB,339.0,,1.0619,0.0651,0.0,0.0,0.0,0.0,0.2191,False,asa
+mls,2026,asa_2lqRjYLWqr,Zane Monlouis,Toronto FC,CB,1017.0,,0.531,0.0195,0.0023,0.0,0.0,0.0885,0.6544,False,asa
+mls,2026,asa_2lqRk1raQr,Kamal Miller,Portland Timbers FC,CB,753.0,,0.1195,0.0634,0.0092,0.1195,0.0,0.1195,0.4864,False,asa
+mls,2026,asa_2lqRk3NWQr,Kyle Duncan,Minnesota United FC,FB,932.0,,0.4828,0.1153,0.0495,0.0966,0.0,0.8691,0.6095,False,asa
+mls,2026,asa_2lqRk3lnQr,Keaton Parks,New York City FC,DM,918.0,,0.8824,0.1669,0.0603,0.1961,0.0,0.7843,0.6039,False,asa
+mls,2026,asa_2lqRkOwnQr,Ryan Porteous,Los Angeles FC,CB,1291.0,,0.6274,0.0818,0.0202,0.0,0.0,0.3486,0.9104,False,asa
+mls,2026,asa_2lqRkWG0Qr,Rafael Santos,St. Louis City SC,FB,1012.0,,1.1561,0.0708,0.1159,0.0889,0.0889,1.2451,0.6662,False,asa
+mls,2026,asa_2lqRkYZnQr,Bryan Acosta,Nashville SC,DM,552.0,,0.6522,0.0748,0.051,0.3261,0.163,0.6522,0.3622,False,asa
+mls,2026,asa_2lqRkZXDQr,Cristian Espinoza,Nashville SC,W,1087.0,,1.3247,0.1338,0.2967,0.2484,0.4968,2.5667,0.7133,False,asa
+mls,2026,asa_2lqRkbN4Qr,Paul Rothrock,Seattle Sounders FC,W,1117.0,,1.3697,0.1402,0.1554,0.3223,0.0806,1.128,0.7883,False,asa
+mls,2026,asa_2lqRked4Qr,Eduard Löwen,St. Louis City SC,CM,399.0,,2.9323,0.3648,0.1463,0.4511,0.2256,1.3534,0.2627,False,asa
+mls,2026,asa_2lqRknk2Qr,Yeimar Gómez Andrade,Seattle Sounders FC,CB,198.0,,1.8182,0.1518,0.0,0.0,0.0,0.0,0.1397,False,asa
+mls,2026,asa_2vQ14xl0qr,Dylan Chambost,Columbus Crew,CM,852.0,,0.7394,0.0311,0.1649,0.0,0.1056,1.7958,0.5525,False,asa
+mls,2026,asa_2vQ1LYxbqr,Paul Arriola,Seattle Sounders FC,W,314.0,,1.4331,0.307,0.1294,0.0,0.0,0.8599,0.2216,False,asa
+mls,2026,asa_2vQ1NBY8Mr,Joaquín Pereyra,Minnesota United FC,W,1437.0,,1.691,0.1315,0.3012,0.0626,0.2505,1.7537,0.9398,False,asa
+mls,2026,asa_2vQ1NPw4Mr,Emmanuel Sabbi,Vancouver Whitecaps FC,W,682.0,,2.7713,0.4996,0.2179,0.2639,0.2639,1.1877,0.5105,False,asa
+mls,2026,asa_2vQ1R1wOMr,Taylor Calheira,Sporting Kansas City,ST,321.0,,2.243,0.3027,0.0,0.0,0.0,0.0,0.2156,False,asa
+mls,2026,asa_2vQ1dZ8Kqr,Lukas Engel,Real Salt Lake,CB,747.0,,0.7229,0.0472,0.0052,0.0,0.0,0.1205,0.5173,False,asa
+mls,2026,asa_2vQ1dr8bqr,Andrei Chirila,FC Cincinnati,CB,478.0,,0.5649,0.0146,0.016,0.1883,0.0,0.1883,0.3487,False,asa
+mls,2026,asa_315V60b59x,Tim Ream,Charlotte FC,CB,1059.0,,0.085,0.0039,0.0188,0.0,0.085,0.085,0.6972,False,asa
+mls,2026,asa_315V7AgEq9,Peyton Miller,New England Revolution,FB,826.0,,2.1792,0.2802,0.0509,0.3269,0.0,0.5448,0.5768,False,asa
+mls,2026,asa_315V7V1Yq9,Leonardo Barroso,Chicago Fire FC,FB,611.0,,0.7365,0.0307,0.0669,0.0,0.0,0.5892,0.4243,False,asa
+mls,2026,asa_315V7Z2Vq9,Dor Turgeman,New England Revolution,ST,1301.0,,2.0061,0.1971,0.059,0.1384,0.2075,0.4842,0.9085,False,asa
+mls,2026,asa_315V7bLYq9,Reid Roberts,San Jose Earthquakes,CB,1426.0,,0.2525,0.0257,0.0019,0.0631,0.0,0.1262,0.9469,False,asa
+mls,2026,asa_315V7ox6q9,Alexis Manyoma,Colorado Rapids,W,304.0,,1.1842,0.062,0.1304,0.2961,0.0,0.2961,0.1971,False,asa
+mls,2026,asa_315VPKlXQ9,Iván Jaime,CF Montréal,W,918.0,,2.6471,0.2689,0.0925,0.098,0.098,1.4706,0.5934,False,asa
+mls,2026,asa_315VPPBEQ9,Tayvon Gray,New York City FC,FB,1333.0,,0.6077,0.0541,0.0952,0.0675,0.0675,0.6752,0.877,False,asa
+mls,2026,asa_315VPR6vQ9,Petar Musa,FC Dallas,ST,1176.0,,3.8265,0.7681,0.1485,0.9184,0.1531,1.148,0.7941,False,asa
+mls,2026,asa_315VPVXbQ9,Ibrahim Aliyu,Houston Dynamo FC,W,333.0,,1.6216,0.0963,0.0567,0.2703,0.0,0.8108,0.2391,False,asa
+mls,2026,asa_315VPZmnQ9,Aziel Jackson,Vancouver Whitecaps FC,AM,581.0,,2.4785,0.1428,0.0271,0.1549,0.1549,0.4647,0.4349,False,asa
+mls,2026,asa_315VX4PEQ9,Luca De La Torre,Charlotte FC,CM,480.0,,0.9375,0.0578,0.0553,0.0,0.1875,0.75,0.316,False,asa
+mls,2026,asa_315VXO8XQ9,Tomas Totland,St. Louis City SC,FB,678.0,,0.531,0.0844,0.0965,0.1327,0.0,1.0619,0.4463,False,asa
+mls,2026,asa_315VXyJXQ9,Andrew Gutman,Chicago Fire FC,FB,888.0,,1.0135,0.1083,0.1719,0.1014,0.2027,0.9122,0.6167,False,asa
+mls,2026,asa_4JMARyP65K,Arnau Farnós,New York City FC,W,187.0,,0.9626,0.1,0.2442,0.0,0.0,0.9626,0.123,False,asa
+mls,2026,asa_4JMAaRwPMK,Héctor Herrera,Houston Dynamo FC,DM,652.0,,0.9663,0.1057,0.0876,0.138,0.0,2.2086,0.4681,False,asa
+mls,2026,asa_4JMAk3z9qK,Thomas Gillier,CF Montréal,GK,1547.0,,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,asa
+mls,2026,asa_4JMAk7nkqK,Devin Padelford,Minnesota United FC,FB,578.0,,0.4671,0.0725,0.1416,0.0,0.1557,0.3114,0.378,False,asa
+mls,2026,asa_4JMAkkK1qK,Preston Judd,San Jose Earthquakes,ST,1319.0,,3.4117,0.5848,0.0899,0.7506,0.1365,0.2729,0.8758,False,asa
+mls,2026,asa_4JMAnx65Kg,Thomas Müller,Vancouver Whitecaps FC,AM,964.0,,2.0539,0.2828,0.3699,0.3734,0.1867,2.334,0.7216,False,asa
+mls,2026,asa_4JMAoJgYqK,Cade Cowell,New York Red Bulls,W,957.0,,2.4451,0.2049,0.3442,0.094,0.2821,1.6928,0.6292,False,asa
+mls,2026,asa_4JMAoR9lqK,Osaze Urhoghide,FC Dallas,CB,1223.0,,0.5887,0.0747,0.0278,0.0736,0.0736,0.1472,0.8258,False,asa
+mls,2026,asa_4JMAolz1qK,Dani Pereira,CF Montréal,DM,442.0,,0.6109,0.0193,0.1099,0.0,0.2036,0.8145,0.2857,False,asa
+mls,2026,asa_4JMAormOqK,David Da Costa,Portland Timbers FC,AM,1119.0,,0.9651,0.085,0.2036,0.0804,0.4021,1.5282,0.7229,False,asa
+mls,2026,asa_4wM42Belqj,Mark Delgado,Los Angeles FC,CM,1233.0,,0.6569,0.0565,0.1258,0.146,0.146,1.3139,0.8695,False,asa
+mls,2026,asa_4wM46RpqjB,Emil Forsberg,New York Red Bulls,AM,1185.0,,1.9747,0.1941,0.2719,0.0759,0.2278,1.8228,0.7791,False,asa
+mls,2026,asa_4wM4EmLl5j,Daniel Pinter,Inter Miami CF,W,265.0,,1.3585,0.1248,0.1207,0.0,0.0,1.0189,0.1834,False,asa
+mls,2026,asa_4wM4J0KNqj,Peglow,D.C. United,W,1425.0,,1.5789,0.1395,0.2445,0.0632,0.1895,1.7684,0.9314,False,asa
+mls,2026,asa_4wM4J8bNqj,Owen Wolff,Austin FC,W,221.0,,0.0,0.0,0.0659,0.0,0.0,0.4072,0.1443,False,asa
+mls,2026,asa_4wM4JZezqj,Dagur Dan Thórhallsson,CF Montréal,FB,707.0,,0.8911,0.0551,0.0979,0.1273,0.0,0.8911,0.457,False,asa
+mls,2026,asa_4wM4Jgkgqj,Matías Galarza,Atlanta United FC,CM,735.0,,2.2041,0.1596,0.0695,0.0,0.0,1.102,0.4801,False,asa
+mls,2026,asa_4wM4JmKAqj,Santiago Moreno,FC Dallas,W,567.0,,1.4286,0.3055,0.2285,0.3175,0.1587,2.0635,0.3828,False,asa
+mls,2026,asa_4wM4JrbBqj,Pavel Bucha,FC Cincinnati,CM,1371.0,,0.7877,0.0765,0.1026,0.1313,0.2626,0.7877,1.0,False,asa
+mls,2026,asa_4wM4Jwdzqj,Jahkeele Marshall-Rutty,New York Red Bulls,FB,1249.0,,0.7926,0.0386,0.0199,0.0,0.0,0.5044,0.8212,False,asa
+mls,2026,asa_4wM4JxWpqj,Jonathan Sirois,FC Dallas,GK,206.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.1391,True,asa
+mls,2026,asa_4wM4JxwBqj,Daniel Munie,San Jose Earthquakes,CB,1429.0,,0.5668,0.1377,0.0308,0.1889,0.0,0.2519,0.9489,False,asa
+mls,2026,asa_4wM4aNJN5j,Yevhen Cheberko,Columbus Crew,CB,182.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.118,False,asa
+mls,2026,asa_4wM4aomy5j,Reggie Cannon,Colorado Rapids,FB,354.0,,0.2542,0.0067,0.0214,0.0,0.0,0.5085,0.2296,False,asa
+mls,2026,asa_7VqG008YQv,Stephen Eustáquio,Los Angeles FC,DM,672.0,,0.8036,0.0244,0.0062,0.1339,0.1339,0.2679,0.4739,False,asa
+mls,2026,asa_7VqG07YAQv,Yohei Takaoka,Vancouver Whitecaps FC,GK,1297.0,,0.0,0.0,0.0039,0.0,0.0694,0.0694,0.9708,True,asa
+mls,2026,asa_7VqG08vjQv,David Ayala,Inter Miami CF,DM,312.0,,0.2885,0.0093,0.0217,0.0,0.0,0.5769,0.2159,False,asa
+mls,2026,asa_7VqG08wXQv,Wikelman Carmona,CF Montréal,W,900.0,,2.1,0.2351,0.2842,0.4,0.2,2.5,0.5818,False,asa
+mls,2026,asa_7VqG0GzzQv,Alexander Aravena,Portland Timbers FC,W,535.0,,2.3551,0.2405,0.0617,0.1682,0.0,0.6729,0.3456,False,asa
+mls,2026,asa_7VqG0ZGYQv,Diego Luna,Real Salt Lake,W,678.0,,2.1239,0.2626,0.4286,0.531,0.1327,3.5841,0.4695,False,asa
+mls,2026,asa_7VqG0jDzQv,Maren Haile-Selassie,Chicago Fire FC,W,1184.0,,1.7483,0.2017,0.2237,0.228,0.152,1.4443,0.8222,False,asa
+mls,2026,asa_7VqG3Vmjqv,Patrick Yazbek,Nashville SC,CM,743.0,,0.969,0.1108,0.0887,0.1211,0.2423,0.7268,0.4875,False,asa
+mls,2026,asa_7VqG3dLjqv,Artem Smoliakov,Los Angeles FC,FB,205.0,,0.878,0.0742,0.0153,0.0,0.0,0.439,0.1446,False,asa
+mls,2026,asa_7VqG3l0xqv,Pedro Soma,San Diego FC,DM,458.0,,0.5895,0.0247,0.2023,0.1965,0.393,0.5895,0.3137,False,asa
+mls,2026,asa_7VqGLJn6Qv,Hennadiy Synchuk,CF Montréal,W,523.0,,4.13,0.5931,0.1221,0.1721,0.0,1.0325,0.3381,False,asa
+mls,2026,asa_7VqGj3RA5v,Samuel Piette,CF Montréal,CM,621.0,,0.1449,0.0027,0.0605,0.0,0.0,1.1594,0.4014,False,asa
+mls,2026,asa_7VqGjBpz5v,Jared Stroud,D.C. United,W,404.0,,1.5594,0.1358,0.1594,0.2228,0.0,1.1139,0.2641,False,asa
+mls,2026,asa_7VqGjEpj5v,Germán Berterame,Inter Miami CF,ST,1311.0,,2.0595,0.5458,0.1516,0.4805,0.1373,0.8924,0.9073,False,asa
+mls,2026,asa_7VqGjRDY5v,Diadie Samassékou,Houston Dynamo FC,CM,707.0,,0.2546,0.0099,0.0435,0.0,0.0,0.5092,0.5075,False,asa
+mls,2026,asa_7VqGmYJAMv,André Gomes,Columbus Crew,CM,739.0,,0.8525,0.0474,0.0148,0.0,0.0,0.4871,0.4792,False,asa
+mls,2026,asa_7VqGmob3Mv,Andre Blake,Philadelphia Union,GK,1435.0,,0.0,0.0,0.0049,0.0,0.0,0.0627,0.9312,True,asa
+mls,2026,asa_7vQ73orEQD,DeAndre Yedlin,Real Salt Lake,FB,752.0,,0.2394,0.0148,0.0933,0.0,0.1197,0.5984,0.5208,False,asa
+mls,2026,asa_7vQ7BmAzqD,Hassani Dotson,Seattle Sounders FC,DM,741.0,,0.6073,0.0172,0.085,0.1215,0.0,0.6073,0.5229,False,asa
+mls,2026,asa_7vQ7J8JYqD,Joseph Paintsil,LA Galaxy,W,1031.0,,1.9205,0.4223,0.1647,0.2619,0.1746,0.7856,0.7553,False,asa
+mls,2026,asa_7vQ7eNPO5D,Mohammed Sofo,New York Red Bulls,W,330.0,,2.1818,0.3238,0.0316,0.2727,0.0,0.2727,0.217,False,asa
+mls,2026,asa_7vQ7ew0z5D,Rodolfo Aloko,Charlotte FC,W,279.0,,2.2581,0.2367,0.0129,0.0,0.0,0.3226,0.1837,False,asa
+mls,2026,asa_7vQ7rA7YqD,Will Sands,New England Revolution,FB,1346.0,,0.6018,0.0451,0.0216,0.0669,0.0,0.4681,0.9399,False,asa
+mls,2026,asa_7vQ7rKGYqD,Andrew Thomas,Seattle Sounders FC,GK,1417.0,,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,asa
+mls,2026,asa_7vQ7rVvGqD,Kevin O'Toole,New York City FC,FB,1014.0,,0.355,0.0687,0.0322,0.0,0.0,0.2663,0.6671,False,asa
+mls,2026,asa_7vQ7wYXeQD,Nico Cavallo,New York City FC,FB,506.0,,0.0,0.0,0.0714,0.0,0.0,0.1779,0.3329,False,asa
+mls,2026,asa_7vQ7x6aOMD,Jeevan Badwal,Vancouver Whitecaps FC,DM,999.0,,0.7207,0.227,0.1835,0.0,0.0,0.7207,0.7478,False,asa
+mls,2026,asa_7vQ7xGkYMD,Oscar Verhoeven,San Diego FC,FB,1035.0,,0.1739,0.0192,0.057,0.0,0.0,0.6087,0.7089,False,asa
+mls,2026,asa_7vQ7xNzdMD,Frankie Westfield,Philadelphia Union,FB,1003.0,,1.1665,0.0579,0.1956,0.0,0.1795,1.346,0.6509,False,asa
+mls,2026,asa_7vQ7xWmYMD,Édier Ocampo,Vancouver Whitecaps FC,FB,1228.0,,0.7329,0.0257,0.1258,0.0733,0.0,1.3192,0.9192,False,asa
+mls,2026,asa_7vQ7xpBzMD,Taha Habroune,Columbus Crew,CM,1038.0,,0.6069,0.0967,0.2221,0.0867,0.1734,1.8208,0.6732,False,asa
+mls,2026,asa_9Yqd4X9qvJ,James Rodríguez,Minnesota United FC,AM,220.0,,3.6818,0.1367,1.0928,0.0,0.8182,5.7273,0.1439,False,asa
+mls,2026,asa_9YqdWjPm5v,Luis Otávio,Orlando City SC,DM,490.0,,0.7347,0.1045,0.0041,0.1837,0.0,0.1837,0.3213,False,asa
+mls,2026,asa_9YqdY2mRQv,Mathieu Choinière,Los Angeles FC,CM,949.0,,0.9484,0.0341,0.0417,0.1897,0.0,0.7587,0.6693,False,asa
+mls,2026,asa_9YqdoXJL5v,Woobens Pacius,Nashville SC,ST,301.0,,1.794,0.156,0.162,0.0,0.0,0.598,0.1975,False,asa
+mls,2026,asa_9Yqdwg885v,Gilberto Flores,FC Cincinnati,CB,352.0,,0.2557,0.0036,0.0,0.0,0.0,0.0,0.2567,False,asa
+mls,2026,asa_9Yqdwlrj5v,Marco Pašalić,Orlando City SC,W,737.0,,1.4654,0.1202,0.0708,0.2442,0.0,0.6106,0.4833,False,asa
+mls,2026,asa_9vQ229oLQK,Erik Thommy,LA Galaxy,CM,511.0,,3.1703,0.2026,0.1454,0.1761,0.0,1.2329,0.3744,False,asa
+mls,2026,asa_9vQ22BR7QK,Jesús Ferreira,Seattle Sounders FC,ST,1014.0,,1.7751,0.2827,0.2781,0.1775,0.2663,2.574,0.7156,False,asa
+mls,2026,asa_9vQ22jRLQK,Daniel Lovitz,Nashville SC,FB,1323.0,,0.4082,0.0466,0.0485,0.0,0.0,0.4082,0.8681,False,asa
+mls,2026,asa_9vQ22nALQK,Daniel Ríos,CF Montréal,ST,455.0,,2.7692,0.3787,0.0487,0.3956,0.0,0.7912,0.2941,False,asa
+mls,2026,asa_9vQ22pVaQK,Matt Polster,New England Revolution,DM,591.0,,0.4569,0.0199,0.0,0.0,0.0,0.0,0.4127,False,asa
+mls,2026,asa_9vQ248BL5K,Idan Toklomati,Charlotte FC,ST,1247.0,,1.2269,0.3664,0.0881,0.3609,0.0,0.7939,0.8209,False,asa
+mls,2026,asa_9vQ24Gkx5K,Agustín Ojeda,New York City FC,W,1306.0,,1.4472,0.1999,0.1201,0.2067,0.2067,1.1026,0.8592,False,asa
+mls,2026,asa_9vQ2NW1oQK,Diego Borges,Sporting Kansas City,CB,232.0,,0.3879,0.0089,0.0,0.0,0.0,0.0,0.1558,False,asa
+mls,2026,asa_9vQ2Z3doQK,Louicius Don Deedson,FC Dallas,FB,303.0,,1.7822,0.2256,0.154,0.297,0.0,0.5941,0.2046,False,asa
+mls,2026,asa_9vQ2ZNGLQK,Ben Bender,Philadelphia Union,CM,514.0,,1.0506,0.0448,0.1211,0.1751,0.0,1.5759,0.3335,False,asa
+mls,2026,asa_9vQ2ZjbmQK,Jayden Nelson,Austin FC,W,494.0,,1.2753,0.166,0.1154,0.3644,0.0,0.9109,0.3225,False,asa
+mls,2026,asa_9vQ2ZlkaQK,Matthew Edwards,Atlanta United FC,FB,390.0,,0.2308,0.0045,0.0966,0.0,0.2308,1.1538,0.2547,False,asa
+mls,2026,asa_9vQ2ZoR7QK,Andrés Herrera,Columbus Crew,FB,971.0,,1.1123,0.1006,0.0847,0.0,0.0927,0.5561,0.6297,False,asa
+mls,2026,asa_9vQ2d66e5K,Stian Gregersen,Atlanta United FC,CB,825.0,,0.2182,0.0137,0.0199,0.0,0.0,0.2182,0.5389,False,asa
+mls,2026,asa_9z5k71be5A,Dave Romney,San Jose Earthquakes,CB,511.0,,0.7045,0.049,0.0,0.1761,0.0,0.0,0.3393,False,asa
+mls,2026,asa_9z5k76Yd5A,Alexandros Katranis,Real Salt Lake,FB,383.0,,0.705,0.0409,0.1198,0.0,0.0,0.705,0.2652,False,asa
+mls,2026,asa_9z5kGga5A3,Sean Johnson,D.C. United,GK,1530.0,,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,asa
+mls,2026,asa_9z5karAKQA,Nick Hagglund,FC Cincinnati,CB,982.0,,0.9165,0.0647,0.009,0.0916,0.0,0.0916,0.7163,False,asa
+mls,2026,asa_9z5kb8dJMA,Raul Gustavo,New York City FC,CB,1074.0,,0.5866,0.0457,0.0023,0.0,0.0,0.0838,0.7066,False,asa
+mls,2026,asa_9z5kbnmdMA,Lasse Berg Johnsen,Sporting Kansas City,CM,1123.0,,0.4809,0.0348,0.0867,0.0801,0.0,0.7213,0.7542,False,asa
+mls,2026,asa_BLMv1GlQxe,Albert Rusnák,Seattle Sounders FC,AM,1033.0,,1.9167,0.2816,0.2168,0.2614,0.3485,2.4395,0.729,False,asa
+mls,2026,asa_BLMv64wlMx,Duran Michael Ferree,San Diego FC,GK,1230.0,,0.0732,0.0013,0.0,0.0,0.0,0.0,0.8425,True,asa
+mls,2026,asa_BLMv6ZyRMx,Niko Tsakiris,San Jose Earthquakes,DM,1023.0,,1.9355,0.2936,0.3181,0.176,0.3519,2.9032,0.6793,False,asa
+mls,2026,asa_BLMv6j1AMx,Djé D'Avilla,Chicago Fire FC,DM,1011.0,,0.5341,0.0274,0.01,0.0,0.0,0.2671,0.7021,False,asa
+mls,2026,asa_BLMv7DLA5x,Darren Yapi,Colorado Rapids,ST,913.0,,1.6758,0.2693,0.1599,0.2957,0.1972,0.9858,0.5921,False,asa
+mls,2026,asa_BLMv7oaB5x,Djibril Diani,Charlotte FC,DM,727.0,,0.7428,0.1249,0.07,0.0,0.1238,0.4952,0.4786,False,asa
+mls,2026,asa_BLMva87Qxe,Roman Bürki,St. Louis City SC,GK,1316.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.8664,True,asa
+mls,2026,asa_BLMvkAAR5x,Danley Jean Jacques,Philadelphia Union,CM,1312.0,,0.9604,0.1047,0.0504,0.1372,0.0,0.4802,0.8514,False,asa
+mls,2026,asa_BLMvzyGjMx,Emmanuel Latte Lath,Atlanta United FC,ST,1025.0,,2.1073,0.3588,0.0571,0.1756,0.0878,0.3512,0.6695,False,asa
+mls,2026,asa_EGMP1vxy5a,Kristoffer Velde,Portland Timbers FC,W,1393.0,,2.2613,0.2043,0.1324,0.2584,0.0646,1.486,0.8999,False,asa
+mls,2026,asa_EGMP4WVMaY,Hugo Lloris,Los Angeles FC,GK,1316.0,,0.0,0.0,0.0027,0.0,0.0,0.0684,0.9281,True,asa
+mls,2026,asa_EGMPR64xqa,Noah Cobb,Colorado Rapids,CB,370.0,,0.2432,0.0194,0.0315,0.0,0.0,0.2432,0.2399,False,asa
+mls,2026,asa_EGMPREorqa,Luca Moisa,Real Salt Lake,CM,193.0,,0.4663,0.0173,0.0364,0.0,0.0,0.9326,0.1337,False,asa
+mls,2026,asa_EGMPRgDAqa,Brayan Ceballos,New England Revolution,CB,712.0,,0.3792,0.0775,0.0335,0.2528,0.0,0.2528,0.4972,False,asa
+mls,2026,asa_EGMPRpB0qa,Luca Langoni,New England Revolution,W,888.0,,1.8243,0.1803,0.1605,0.3041,0.6081,1.4189,0.6201,False,asa
+mls,2026,asa_EGMPRw86qa,Matthew Dos Santos,New York Red Bulls,FB,1019.0,,0.4416,0.0277,0.1166,0.0,0.0,0.9715,0.67,False,asa
+mls,2026,asa_EGMPZZa3qa,Peter Kingston,Seattle Sounders FC,FB,324.0,,1.6667,0.1159,0.0421,0.0,0.0,0.5556,0.2287,False,asa
+mls,2026,asa_EGMPZlYrqa,Jansen Miller,Sporting Kansas City,CB,581.0,,0.1549,0.0097,0.0,0.0,0.0,0.0,0.3902,False,asa
+mls,2026,asa_EGMPlOjkMa,Felipe Mora,Portland Timbers FC,ST,445.0,,1.2135,0.1838,0.0318,0.2022,0.0,0.4045,0.2875,False,asa
+mls,2026,asa_KAqB9DZX5b,Richie Laryea,Toronto FC,FB,1038.0,,0.3468,0.0747,0.0385,0.1734,0.0867,0.4335,0.668,False,asa
+mls,2026,asa_KAqB9KxB5b,Brian Anunga,FC Cincinnati,CM,455.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.3319,False,asa
+mls,2026,asa_KAqB9bKv5b,Joel Waterman,Chicago Fire FC,CB,757.0,,0.1189,0.0063,0.0417,0.0,0.0,0.4756,0.5257,False,asa
+mls,2026,asa_KAqBNEB7qb,Kieran Sargeant,San Diego FC,FB,492.0,,0.3659,0.0099,0.0843,0.0,0.1829,0.7317,0.337,False,asa
+mls,2026,asa_KAqBNL8mqb,Nathan Harriel,Philadelphia Union,FB,1541.0,,0.9345,0.1132,0.0309,0.0584,0.0584,0.292,1.0,False,asa
+mls,2026,asa_KAqBNbaWqb,Efrain Morales,CF Montréal,CB,1016.0,,0.6201,0.0779,0.0801,0.0,0.0886,0.4429,0.6568,False,asa
+mls,2026,asa_KAqBNdyZqb,Kelvin Yeboah,Minnesota United FC,ST,1321.0,,2.3164,0.667,0.046,0.545,0.0,0.4088,0.864,False,asa
+mls,2026,asa_KAqBNnYXqb,Malte Amundsen,Columbus Crew,CB,1087.0,,0.3312,0.0341,0.0455,0.0,0.0,0.3312,0.7049,False,asa
+mls,2026,asa_KAqBNnrVqb,Jesús Bueno,Philadelphia Union,CM,541.0,,1.6636,0.0982,0.0399,0.1664,0.0,0.3327,0.3511,False,asa
+mls,2026,asa_KAqBNr8Jqb,Kosi Thompson,Colorado Rapids,FB,781.0,,0.2305,0.0077,0.0211,0.2305,0.0,0.4609,0.5065,False,asa
+mls,2026,asa_KAqBgD4Qbg,Jonathan Bond,Houston Dynamo FC,GK,1393.0,,0.0,0.0,0.0066,0.0,0.0,0.0646,1.0,True,asa
+mls,2026,asa_KAqBjB97qb,Ethan Horvath,New York Red Bulls,GK,1521.0,,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,asa
+mls,2026,asa_KAqBjWZBqb,Jonathan Osorio,Toronto FC,CM,1457.0,,0.3706,0.0362,0.0683,0.0,0.1853,0.6795,0.9376,False,asa
+mls,2026,asa_KAqBjgDAqb,Ramiro,FC Dallas,DM,1094.0,,0.6581,0.0295,0.0644,0.0,0.0823,0.4936,0.7387,False,asa
+mls,2026,asa_KAqBk0bZQb,Jude Terry,Los Angeles FC,DM,195.0,,0.9231,0.0248,0.0186,0.4615,0.0,0.4615,0.1375,False,asa
+mls,2026,asa_KAqBk1yAQb,Alex Bonetig,Portland Timbers FC,CB,734.0,,0.1226,0.0291,0.0,0.1226,0.0,0.0,0.4742,False,asa
+mls,2026,asa_KAqBkLmZQb,Morgan Guilavogui,Real Salt Lake,AM,948.0,,2.8481,0.3795,0.2053,0.0949,0.2848,1.2342,0.6565,False,asa
+mls,2026,asa_KAqBlEZMbg,Maya Yoshida,LA Galaxy,CB,649.0,,0.9707,0.1529,0.0,0.1387,0.0,0.0,0.4755,False,asa
+mls,2026,asa_KAqBvrrVqb,Kenji Mboma Dem,FC Cincinnati,ST,736.0,,2.2011,0.3048,0.0416,0.4891,0.1223,0.6114,0.5368,False,asa
+mls,2026,asa_KAqBvvRmqb,Shakur Mohammed,Nashville SC,W,197.0,,1.3706,0.3569,0.0115,0.9137,0.0,0.4569,0.1293,False,asa
+mls,2026,asa_KAqBxEWMbg,Wilfried Zaha,Charlotte FC,W,1301.0,,1.937,0.2729,0.1925,0.2075,0.0692,1.3144,0.8565,False,asa
+mls,2026,asa_KPqj71NyQ6,Sam Surridge,Nashville SC,ST,627.0,,2.7273,0.7829,0.0133,1.2919,0.0,0.1435,0.4114,False,asa
+mls,2026,asa_KPqj7K72Q6,Cedric Teuchert,St. Louis City SC,ST,348.0,,3.3621,0.3113,0.377,0.0,0.2586,2.5862,0.2291,False,asa
+mls,2026,asa_KPqj7Y0BQ6,Matty Longstaff,CF Montréal,CM,1381.0,,1.3034,0.1139,0.1406,0.1303,0.1955,1.1079,0.8927,False,asa
+mls,2026,asa_KPqj7daPQ6,DeJuan Jones,San Jose Earthquakes,FB,383.0,,0.235,0.0476,0.0523,0.0,0.0,0.705,0.2543,False,asa
+mls,2026,asa_KPqj7jxPQ6,Wessam Abou Ali,Columbus Crew,ST,637.0,,2.8257,0.4642,0.0234,0.7064,0.1413,0.5651,0.4131,False,asa
+mls,2026,asa_KPqjBBNBq6,Jefferson Díaz,Minnesota United FC,CB,1298.0,,1.0401,0.1309,0.0525,0.0,0.0693,0.416,0.8489,False,asa
+mls,2026,asa_KPqjK4w4Q6,Noah Allen,Inter Miami CF,CB,861.0,,0.0,0.0,0.0241,0.0,0.1045,0.3136,0.5958,False,asa
+mls,2026,asa_KPqjKRARQ6,Tomás Chancalay,Minnesota United FC,W,1253.0,,2.4421,0.1688,0.2628,0.0718,0.2155,1.1492,0.8195,False,asa
+mls,2026,asa_KPqjKbg2Q6,Paxten Aaronson,Colorado Rapids,AM,1311.0,,1.8535,0.1501,0.2304,0.2746,0.2059,1.5789,0.8502,False,asa
+mls,2026,asa_KPqjKkPNQ6,Brandon Bye,Portland Timbers FC,FB,1455.0,,0.6804,0.0461,0.1235,0.0,0.1237,0.7423,0.9399,False,asa
+mls,2026,asa_KPqjonZyQ6,Maxime Crépeau,Orlando City SC,GK,1361.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.8925,True,asa
+mls,2026,asa_KPqjwXzYQ6,Adri Mehmeti,New York Red Bulls,DM,1369.0,,0.3944,0.0602,0.1305,0.0657,0.1315,0.7889,0.9001,False,asa
+mls,2026,asa_KPqjwdw8Q6,Alonso Coello,Toronto FC,DM,1291.0,,0.4183,0.023,0.1763,0.0,0.2091,2.2308,0.8308,False,asa
+mls,2026,asa_KPqjzJ2q6v,Maxi Moralez,New York City FC,AM,1236.0,,0.9466,0.166,0.2298,0.0728,0.4369,1.966,0.8132,False,asa
+mls,2026,asa_KXMe3y6vq6,Brooklyn Raines,New England Revolution,DM,1283.0,,0.1403,0.0125,0.008,0.0,0.0,0.2806,0.8959,False,asa
+mls,2026,asa_KXMe4l1Q64,Alejandro Bedoya,Philadelphia Union,CM,254.0,,1.4173,0.139,0.3695,0.0,0.7087,2.126,0.1648,False,asa
+mls,2026,asa_KXMe87ZPQ6,Ralph Priso,Vancouver Whitecaps FC,DM,528.0,,0.1705,0.1278,0.2139,0.1705,0.0,0.6818,0.3952,False,asa
+mls,2026,asa_KXMe8JD2Q6,Pedro Amador,Atlanta United FC,FB,297.0,,0.9091,0.0265,0.2727,0.0,0.0,1.5152,0.194,False,asa
+mls,2026,asa_KXMe8Y2vQ6,Justin Che,New York Red Bulls,FB,630.0,,0.4286,0.0566,0.0854,0.0,0.0,0.4286,0.4142,False,asa
+mls,2026,asa_KXMe8ejPQ6,Jeremy Rafanello,Philadelphia Union,CM,240.0,,1.125,0.021,0.221,0.0,0.0,1.875,0.1557,False,asa
+mls,2026,asa_KXMeggl2q6,Duncan McGuire,Orlando City SC,ST,559.0,,1.61,0.2791,0.0643,0.322,0.0,0.805,0.3666,False,asa
+mls,2026,asa_KXMek9R2q6,Ondrej Lingr,Houston Dynamo FC,W,470.0,,1.3404,0.1398,0.0374,0.0,0.1915,1.1489,0.3374,False,asa
+mls,2026,asa_KXMekX42q6,Dejan Joveljic,Sporting Kansas City,ST,1489.0,,1.6924,0.3039,0.0947,0.4231,0.0604,0.6044,1.0,False,asa
+mls,2026,asa_N6MmKBXeqE,Christian Cappis,FC Dallas,CM,954.0,,0.6604,0.0428,0.1644,0.0,0.0943,1.0377,0.6442,False,asa
+mls,2026,asa_N6MmKdJPqE,Jack Maher,Nashville SC,CB,485.0,,0.5567,0.0208,0.0053,0.0,0.0,0.1856,0.3182,False,asa
+mls,2026,asa_N6MmWLNPqE,Matthew Corcoran,Nashville SC,CM,900.0,,0.6,0.0212,0.0166,0.0,0.0,0.4,0.5906,False,asa
+mls,2026,asa_N6MmeAowME,Amahl Pellegrino,San Diego FC,W,729.0,,1.6049,0.242,0.1974,0.2469,0.1235,1.358,0.4993,False,asa
+mls,2026,asa_N6MmeE3wME,Hannes Wolf,New York City FC,W,1116.0,,1.7742,0.2391,0.1297,0.4032,0.0806,0.9677,0.7342,False,asa
+mls,2026,asa_N6MmeEN0ME,Nico Hansen,Colorado Rapids,GK,605.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.3923,True,asa
+mls,2026,asa_N6MmeZ4WME,Connor Ronan,Colorado Rapids,DM,229.0,,0.786,0.0198,0.1653,0.0,0.0,1.9651,0.1485,False,asa
+mls,2026,asa_N6Mmo4vLqE,Maxwell Woledzi,Nashville SC,CB,1438.0,,0.2503,0.0196,0.0016,0.0626,0.0,0.0626,0.9436,False,asa
+mls,2026,asa_N6Mmo9EPqE,Nathan Ordaz,Los Angeles FC,ST,570.0,,1.2632,0.2805,0.0202,0.3158,0.0,0.3158,0.402,False,asa
+mls,2026,asa_NPqxAP6gQ9,Archie Goodwin,Charlotte FC,ST,253.0,,3.2016,0.7686,0.0,1.0672,0.0,0.0,0.1666,False,asa
+mls,2026,asa_NPqxeGOZQ9,Daniel,San Jose Earthquakes,GK,1506.0,,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,asa
+mls,2026,asa_NPqxen8gQ9,Adrián Marín,Orlando City SC,CB,1056.0,,0.0852,0.0037,0.0509,0.0,0.2557,0.5966,0.6925,False,asa
+mls,2026,asa_NPqxoNPx59,Osvald Søe,San Diego FC,CB,477.0,,0.1887,0.0038,0.0,0.0,0.0,0.0,0.3267,False,asa
+mls,2026,asa_NPqxx91gq9,Ajani Fortune,Atlanta United FC,CM,536.0,,1.6791,0.1073,0.1057,0.3358,0.0,1.1754,0.3501,False,asa
+mls,2026,asa_NPqxxLDkq9,Andrew Privett,Charlotte FC,CB,643.0,,0.2799,0.0196,0.0432,0.0,0.0,0.2799,0.4233,False,asa
+mls,2026,asa_NPqxxjAmq9,Elijah Wynder,LA Galaxy,CM,922.0,,0.5857,0.1237,0.0259,0.0,0.0,0.5857,0.6755,False,asa
+mls,2026,asa_NWMWL3nL5l,Mathías Laborda,Vancouver Whitecaps FC,CB,1263.0,,0.9976,0.1746,0.0701,0.2138,0.0713,0.2138,0.9454,False,asa
+mls,2026,asa_NWMWLO7N5l,Sam Junqua,Real Salt Lake,FB,761.0,,0.2365,0.0085,0.0358,0.0,0.0,0.3548,0.527,False,asa
+mls,2026,asa_NWMWVR6jQl,Brendan Hines-Ike,Austin FC,CB,1054.0,,0.5977,0.0751,0.0032,0.0854,0.0,0.0854,0.688,False,asa
+mls,2026,asa_NWMWgLbEMl,Kevin Kelsy,Portland Timbers FC,ST,919.0,,2.7421,0.4678,0.1117,0.6855,0.0979,1.3711,0.5937,False,asa
+mls,2026,asa_NWMWlEAD5l,Edwin Cerrillo,LA Galaxy,DM,1327.0,,0.4748,0.0198,0.0301,0.0,0.0,0.6104,0.9722,False,asa
+mls,2026,asa_NWMWlWle5l,Brian White,Vancouver Whitecaps FC,ST,1335.0,,3.573,0.8353,0.0711,0.6742,0.0674,0.7416,0.9993,False,asa
+mls,2026,asa_NWMWlX6K5l,Andrés Perea,New York City FC,DM,245.0,,1.4694,0.1368,0.0152,0.3673,0.0,0.3673,0.1612,False,asa
+mls,2026,asa_NWMWlYdY5l,Facundo Mura,Inter Miami CF,FB,818.0,,0.3301,0.0246,0.1034,0.0,0.0,0.6601,0.5661,False,asa
+mls,2026,asa_NWMWlaDZ5l,Kobe Franklin,Toronto FC,FB,960.0,,0.6562,0.0566,0.0631,0.1875,0.1875,0.5625,0.6178,False,asa
+mls,2026,asa_NWMWoG7LMl,Iago,Orlando City SC,CB,1153.0,,0.7025,0.0504,0.0283,0.0,0.0,0.1561,0.7561,False,asa
+mls,2026,asa_NWMWoN6KMl,Ilay Feingold,New England Revolution,FB,758.0,,0.7124,0.0425,0.0897,0.1187,0.0,0.8311,0.5293,False,asa
+mls,2026,asa_Oa5wAaRjQ1,Talles Magno,New York City FC,W,231.0,,3.8961,0.5575,0.0268,0.7792,0.0,0.3896,0.152,False,asa
+mls,2026,asa_Oa5wAe74Q1,Cheick Tidiane Sabaly,Vancouver Whitecaps FC,W,514.0,,2.2763,0.4467,0.3079,0.3502,0.1751,1.9261,0.3847,False,asa
+mls,2026,asa_Oa5wV0XXM1,Benjamín Kuscevic,Toronto FC,CB,542.0,,0.8303,0.0347,0.0,0.0,0.0,0.0,0.3488,False,asa
+mls,2026,asa_Oa5wV17gM1,Martín Ojeda,Orlando City SC,AM,1506.0,,2.9283,0.4646,0.1411,0.6574,0.0,1.3745,0.9875,False,asa
+mls,2026,asa_Oa5wVYvWM1,Ezequiel Ponce,Houston Dynamo FC,ST,984.0,,1.4634,0.2372,0.0695,0.0,0.0,0.5488,0.7064,False,asa
+mls,2026,asa_Oa5wVzeWM1,José Cifuentes,Toronto FC,CM,894.0,,1.1074,0.0966,0.1077,0.1007,0.1007,0.8054,0.5753,False,asa
+mls,2026,asa_Oa5wY8RXQ1,Hany Mukhtar,Nashville SC,ST,1324.0,,2.923,0.3748,0.168,0.4079,0.2039,1.3595,0.8688,False,asa
+mls,2026,asa_Oa5wYLD9Q1,Robin Jansson,Orlando City SC,CB,858.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.5626,False,asa
+mls,2026,asa_Oa5wd4DXq1,Ran Binyamin,FC Dallas,W,538.0,,0.8364,0.0945,0.0667,0.0,0.3346,1.0037,0.3633,False,asa
+mls,2026,asa_Oa5wdxN9q1,Nolan Norris,FC Dallas,CB,1027.0,,0.1753,0.0218,0.0055,0.0876,0.0,0.1753,0.6935,False,asa
+mls,2026,asa_OlMlBKG4qL,Ahmed Qasem,Nashville SC,W,885.0,,1.2203,0.065,0.0482,0.1017,0.1017,0.4068,0.5807,False,asa
+mls,2026,asa_OlMlBalgqL,Juan José Mina,New York Red Bulls,FB,209.0,,2.1531,0.1462,0.0098,0.0,0.0,0.4306,0.1374,False,asa
+mls,2026,asa_OlMlBn1yqL,Warren Madrigal,Nashville SC,ST,884.0,,2.4434,0.3223,0.0942,0.509,0.1018,0.8145,0.5801,False,asa
+mls,2026,asa_OlMleNXN5L,Justin Reynolds,Sporting Kansas City,FB,364.0,,0.4945,0.0851,0.097,0.0,0.2473,1.2363,0.2445,False,asa
+mls,2026,asa_OlMleWzR5L,Rafael Navarro,Colorado Rapids,ST,1523.0,,2.4819,0.5682,0.0743,0.4728,0.1182,0.8864,0.9877,False,asa
+mls,2026,asa_OlMlegLA5L,Mauricio Cuevas,LA Galaxy,FB,821.0,,0.5481,0.0226,0.1321,0.0,0.0,1.3155,0.6015,False,asa
+mls,2026,asa_OlMlezzg5L,Lukas MacNaughton,St. Louis City SC,CB,666.0,,0.6757,0.0546,0.0571,0.0,0.1351,0.5405,0.4384,False,asa
+mls,2026,asa_OlMlkNP0QL,Kwaku Agyabeng,Sporting Kansas City,FB,375.0,,0.0,0.0,0.0442,0.0,0.0,0.48,0.2518,False,asa
+mls,2026,asa_OlMlnxlDqL,Tristan Blackmon,Vancouver Whitecaps FC,CB,1336.0,,0.6063,0.0851,0.0027,0.0674,0.0,0.0674,1.0,False,asa
+mls,2026,asa_OlMlonPQLz,Marco Reus,LA Galaxy,AM,1239.0,,1.5254,0.3179,0.3684,0.2906,0.3632,2.615,0.9077,False,asa
+mls,2026,asa_Pk5L6BzZQO,Micael,Inter Miami CF,CB,1445.0,,0.436,0.0524,0.0096,0.0623,0.0,0.0623,1.0,False,asa
+mls,2026,asa_Pk5LZEgGQO,Nikola Markovic,D.C. United,CM,402.0,,0.8955,0.0216,0.0178,0.0,0.2239,0.4478,0.2627,False,asa
+mls,2026,asa_Pk5Le0VDqO,Ryan Raposo,Los Angeles FC,FB,365.0,,1.726,0.2303,0.1733,0.0,0.0,1.4795,0.2574,False,asa
+mls,2026,asa_Pk5Le6BPqO,Antino Lopez,Seattle Sounders FC,CB,618.0,,0.2913,0.0073,0.0059,0.0,0.0,0.2913,0.4361,False,asa
+mls,2026,asa_Pk5LeDgmqO,Mateusz Bogusz,Houston Dynamo FC,W,1334.0,,2.8336,0.1997,0.1277,0.1349,0.0675,0.8771,0.9576,False,asa
+mls,2026,asa_Pk5LgPOmMO,Ethan Bartlow,Sporting Kansas City,CB,893.0,,0.3024,0.02,0.0204,0.0,0.0,0.2016,0.5997,False,asa
+mls,2026,asa_Pk5LggA7MO,Oleksandr Svatok,Austin FC,CB,1392.0,,0.2586,0.0197,0.0251,0.0,0.0,0.2586,0.9086,False,asa
+mls,2026,asa_Pk5Lggy7MO,Myrto Uzuni,Austin FC,ST,1257.0,,2.4344,0.3713,0.0275,0.358,0.0,0.358,0.8205,False,asa
+mls,2026,asa_Vj58BnDLQ8,Matt Turner,New England Revolution,GK,1432.0,,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,asa
+mls,2026,asa_Vj58WEKLM8,Jayden Reid,Sporting Kansas City,FB,1034.0,,0.5222,0.0226,0.0253,0.0,0.0,0.2611,0.6944,False,asa
+mls,2026,asa_Vj58aBe8q8,Fallou Fall,St. Louis City SC,CB,260.0,,1.0385,0.1325,0.0219,0.3462,0.0,0.3462,0.1712,False,asa
+mls,2026,asa_Vj58lAnw58,Cooper Sanchez,Atlanta United FC,CM,1115.0,,0.8072,0.0686,0.0559,0.0,0.0807,0.6457,0.7283,False,asa
+mls,2026,asa_Vj58lXp258,Nicolás Romero,Minnesota United FC,CB,712.0,,0.5056,0.0375,0.0075,0.0,0.0,0.2528,0.4657,False,asa
+mls,2026,asa_Vj58lrom58,Rafael Mosquera,New York Red Bulls,W,378.0,,1.4286,0.0607,0.1993,0.0,0.0,1.9048,0.2485,False,asa
+mls,2026,asa_Vj58w7RmM8,Alex Roldan,Seattle Sounders FC,FB,842.0,,0.5344,0.0167,0.0586,0.0,0.0,0.5344,0.5942,False,asa
+mls,2026,asa_XVqKG1XWq0,Simon Becher,St. Louis City SC,ST,1252.0,,2.4441,0.3848,0.1753,0.0719,0.2875,1.0064,0.8242,False,asa
+mls,2026,asa_XVqKLXRaQ0,Tiago,Orlando City SC,ST,677.0,,1.3294,0.1748,0.0447,0.1329,0.1329,0.3988,0.4439,False,asa
+mls,2026,asa_XVqKWAZBq0,Brandon Servania,D.C. United,CM,1325.0,,0.9509,0.0355,0.0377,0.0,0.0,0.5434,0.866,False,asa
+mls,2026,asa_XVqKWX8Bq0,Steven Alzate,Atlanta United FC,CM,434.0,,0.6221,0.0376,0.0669,0.0,0.0,1.0369,0.2835,False,asa
+mls,2026,asa_XVqKbElN50,Sergi Solans,Real Salt Lake,ST,976.0,,2.9508,0.638,0.1649,0.5533,0.2766,1.1988,0.6759,False,asa
+mls,2026,asa_XVqKbEmN50,Geiner Martínez,Philadelphia Union,CB,528.0,,0.5114,0.119,0.0063,0.0,0.0,0.1705,0.3426,False,asa
+mls,2026,asa_XVqKbj3B50,Mbekezeli Mbokazi,Chicago Fire FC,CB,1195.0,,0.5272,0.0511,0.029,0.0,0.0,0.0753,0.8299,False,asa
+mls,2026,asa_XVqKeBkKM0,Jacob Shaffelburg,Los Angeles FC,W,329.0,,1.3678,0.107,0.4399,0.0,0.5471,2.462,0.232,False,asa
+mls,2026,asa_XVqKeEmBM0,Facundo Torres,Austin FC,W,1406.0,,1.4723,0.1626,0.1466,0.064,0.256,2.2404,0.9178,False,asa
+mls,2026,asa_XVqKeYLNM0,Josh Atencio,Colorado Rapids,DM,874.0,,0.3089,0.016,0.0266,0.103,0.0,0.4119,0.5668,False,asa
+mls,2026,asa_Xj5Y60Kxqb,Miki Yamane,LA Galaxy,FB,892.0,,0.3027,0.0544,0.1952,0.0,0.1009,1.3117,0.6535,False,asa
+mls,2026,asa_Xj5Y68Olqb,Dániel Gazdag,Columbus Crew,AM,621.0,,1.3043,0.1764,0.0088,0.1449,0.0,0.4348,0.4027,False,asa
+mls,2026,asa_Xj5Y6KKaqb,Anders Dreyer,San Diego FC,W,1460.0,,2.8973,0.4411,0.2206,0.3699,0.4315,2.3425,1.0,False,asa
+mls,2026,asa_Xj5Y6kWaqb,Timothy Tillman,Los Angeles FC,CM,1006.0,,0.7157,0.098,0.197,0.0895,0.1789,1.3419,0.7094,False,asa
+mls,2026,asa_Xj5Y6zYAqb,Edvard Tagseth,Nashville SC,CM,832.0,,0.2163,0.0132,0.0669,0.1082,0.0,0.4327,0.5459,False,asa
+mls,2026,asa_Xj5Y9XmX5b,Beau Leroux,San Jose Earthquakes,CM,1181.0,,1.7528,0.2072,0.125,0.1524,0.1524,0.7621,0.7842,False,asa
+mls,2026,asa_Xj5Y9zw05b,Dylan Nealis,New York Red Bulls,FB,1182.0,,0.2284,0.016,0.0068,0.0,0.0,0.1523,0.7771,False,asa
+mls,2026,asa_Xj5YLGKxMb,Christopher McVey,San Diego FC,CB,1192.0,,0.453,0.053,0.0144,0.0755,0.0,0.2265,0.8164,False,asa
+mls,2026,asa_Xj5YyNjE5b,Yannick Bright,Inter Miami CF,DM,1074.0,,0.3352,0.0336,0.0756,0.0,0.0,0.7542,0.7433,False,asa
+mls,2026,asa_Xj5YyZOw5b,Olwethu Makhanya,Philadelphia Union,CB,1324.0,,0.4079,0.0285,0.0278,0.0,0.0,0.3399,0.8592,False,asa
+mls,2026,asa_a35rB7Do5L,Luke Brennan,Atlanta United FC,W,315.0,,1.7143,0.3586,0.1372,0.0,0.0,0.5714,0.2057,False,asa
+mls,2026,asa_a35rBOLG5L,Omar Valencia,New York Red Bulls,FB,346.0,,0.5202,0.0137,0.0149,0.0,0.0,0.5202,0.2275,False,asa
+mls,2026,asa_a35rBoxG5L,Bryan Ramirez,FC Cincinnati,FB,1267.0,,0.7814,0.0331,0.0777,0.0,0.1421,1.2786,0.9241,False,asa
+mls,2026,asa_a35rKA2AqL,Mauricio Pineda,Chicago Fire FC,CB,521.0,,0.691,0.0189,0.0291,0.0,0.0,0.5182,0.3618,False,asa
+mls,2026,asa_a35rKGpLqL,Dániel Sallói,Toronto FC,W,1482.0,,1.8219,0.229,0.0981,0.2429,0.1822,0.8502,0.9537,False,asa
+mls,2026,asa_a35rKYrAqL,Aaron Herrera,D.C. United,FB,433.0,,1.6628,0.206,0.0958,0.0,0.0,0.8314,0.283,False,asa
+mls,2026,asa_a35rlyZ4QL,Diego Chará,Portland Timbers FC,DM,726.0,,0.124,0.0017,0.0854,0.0,0.0,0.6198,0.469,False,asa
+mls,2026,asa_a35ry7P2ML,João Klauss,LA Galaxy,ST,606.0,,2.9703,0.6423,0.117,0.7426,0.0,0.8911,0.444,False,asa
+mls,2026,asa_a35ryXm2ML,Novak Mićović,LA Galaxy,GK,510.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.3736,True,asa
+mls,2026,asa_a35rymlLML,Drake Callender,Minnesota United FC,GK,1529.0,,0.0,0.0,0.0167,0.0,0.0,0.1177,1.0,True,asa
+mls,2026,asa_aDQ0LoylQE,Griffin Dorsey,Orlando City SC,FB,1073.0,,1.0065,0.1608,0.0595,0.1678,0.0839,0.671,0.7036,False,asa
+mls,2026,asa_aDQ0NJKG5E,Victor Olatunji,Real Salt Lake,ST,331.0,,2.4471,0.6835,0.0,0.2719,0.0,0.0,0.2292,False,asa
+mls,2026,asa_aDQ0Njb35E,Malik Henry,Toronto FC,W,606.0,,0.7426,0.1174,0.0728,0.0,0.0,0.4455,0.39,False,asa
+mls,2026,asa_aDQ0PGv3QE,Alex Mighten,San Diego FC,W,421.0,,0.6413,0.0495,0.1561,0.0,0.4276,1.4964,0.2884,False,asa
+mls,2026,asa_aDQ0PJpPQE,Tai Baribo,D.C. United,ST,1029.0,,2.0991,0.5992,0.0291,0.6997,0.0,0.6122,0.6725,False,asa
+mls,2026,asa_aDQ0PZY3QE,Pep Biel,Charlotte FC,AM,1441.0,,2.186,0.2681,0.2675,0.4372,0.2498,1.499,0.9487,False,asa
+mls,2026,asa_aDQ0PjypQE,Timo Baumgartl,St. Louis City SC,CB,1519.0,,0.1185,0.0255,0.0,0.0592,0.0,0.0,1.0,False,asa
+mls,2026,asa_aDQ0PkRRQE,Eduard Atuesta,Orlando City SC,DM,765.0,,0.4706,0.0647,0.0556,0.0,0.0,0.5882,0.5016,False,asa
+mls,2026,asa_aDQ0PnvBQE,Djordje Mihailovic,Toronto FC,AM,465.0,,1.3548,0.1329,0.1869,0.1935,0.3871,2.3226,0.2992,False,asa
+mls,2026,asa_aDQ0aG9pME,Aleksey Miranchuk,Atlanta United FC,AM,1248.0,,1.9471,0.2729,0.1942,0.3606,0.1442,1.875,0.8152,False,asa
+mls,2026,asa_aDQ0aNE3ME,Michael Boxall,Minnesota United FC,CB,451.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.295,False,asa
+mls,2026,asa_aDQ0aVkWME,Jamal Thiaré,Columbus Crew,ST,211.0,,0.4265,0.0917,0.1026,0.0,0.0,1.2796,0.1368,False,asa
+mls,2026,asa_aDQ0aVwlME,Rob Holding,Colorado Rapids,CB,1088.0,,0.3309,0.0543,0.0201,0.0,0.0,0.2482,0.7056,False,asa
+mls,2026,asa_aDQ0lp9pQE,David Vazquez,San Diego FC,CM,824.0,,1.7476,0.2585,0.1028,0.3277,0.0,0.6553,0.5644,False,asa
+mls,2026,asa_aDQ0lryRQE,Mihail Gherasimencov,Vancouver Whitecaps FC,FB,256.0,,0.3516,0.0112,0.0,0.0,0.0,0.0,0.1916,False,asa
+mls,2026,asa_e7Mz0EpXqr,Kaick,FC Dallas,CM,1263.0,,0.9264,0.1247,0.0996,0.0713,0.0713,0.7126,0.8528,False,asa
+mls,2026,asa_e7Mz913GQr,Aaron Long,Los Angeles FC,CB,378.0,,0.2381,0.0695,0.0097,0.0,0.0,0.2381,0.2666,False,asa
+mls,2026,asa_e7Mz9NpeQr,Harry Toffolo,Charlotte FC,FB,885.0,,0.4068,0.0114,0.0778,0.0,0.2034,0.8136,0.5826,False,asa
+mls,2026,asa_e7Mz9PWjQr,Keegan Rosenberry,Colorado Rapids,FB,507.0,,0.5325,0.0462,0.2073,0.1775,0.0,1.0651,0.3288,False,asa
+mls,2026,asa_e7Mz9eaOQr,Rodrigo de Paul,Inter Miami CF,CM,1345.0,,1.6059,0.1209,0.3294,0.2677,0.2677,2.0743,0.9308,False,asa
+mls,2026,asa_e7MzJPvGMr,Julián Aude,LA Galaxy,FB,616.0,,0.0,0.0,0.0101,0.0,0.0,0.2922,0.4513,False,asa
+mls,2026,asa_e7MzJV2GMr,Nicolás Fernández,New York City FC,ST,1459.0,,2.5908,0.3592,0.1932,0.6169,0.1234,1.3571,0.9599,False,asa
+mls,2026,asa_e7MzZ63OMr,Bernard Kamungo,FC Dallas,FB,581.0,,0.7745,0.0496,0.0555,0.0,0.0,0.9294,0.3923,False,asa
+mls,2026,asa_e7MzZpaXMr,Josh Bauer,Nashville SC,FB,409.0,,0.4401,0.0299,0.0058,0.0,0.0,0.22,0.2684,False,asa
+mls,2026,asa_e7MzzmEeMr,Manu Duah,San Diego FC,CB,1361.0,,0.1984,0.0124,0.0264,0.0,0.0,0.1323,0.9322,False,asa
+mls,2026,asa_eV5D0G2Z5K,Alvas Powell,FC Cincinnati,FB,209.0,,0.0,0.0,0.0366,0.0,0.4306,0.8612,0.1524,False,asa
+mls,2026,asa_eV5D21BAQK,Wyatt Meyer,Sporting Kansas City,CB,976.0,,0.0922,0.0074,0.0,0.0,0.0,0.0,0.6555,False,asa
+mls,2026,asa_eV5D2NgaQK,Philippe Ndinga Ossibadjouo,Philadelphia Union,FB,272.0,,0.9926,0.0555,0.0334,0.0,0.0,0.6618,0.1765,False,asa
+mls,2026,asa_eV5D2RJAQK,Noel Caliskan,Real Salt Lake,CM,1363.0,,0.6603,0.0303,0.066,0.0,0.1321,0.9905,0.9439,False,asa
+mls,2026,asa_eV5DB6nQKn,Eric Maxim Choupo-Moting,New York Red Bulls,ST,245.0,,1.4694,0.3653,0.0104,0.7347,0.0,0.3673,0.1611,False,asa
+mls,2026,asa_eV5DL18a5K,Jakob Glesnes,LA Galaxy,CB,963.0,,0.2804,0.0083,0.0,0.0,0.0,0.0,0.7055,False,asa
+mls,2026,asa_eV5DL1xR5K,Sean Zawadzki,Columbus Crew,CB,1542.0,,0.2918,0.0123,0.0033,0.0,0.0,0.0584,1.0,False,asa
+mls,2026,asa_eV5DL9aZ5K,Luca Petrasso,CF Montréal,FB,1333.0,,0.3376,0.0127,0.0989,0.0,0.0,0.9452,0.8617,False,asa
+mls,2026,asa_eV5DLWdm5K,Ronald Hernández,Atlanta United FC,FB,202.0,,0.0,0.0,0.0254,0.0,0.0,0.8911,0.1319,False,asa
+mls,2026,asa_eV5DLnOY5K,Jeisson Palacios,Nashville SC,CB,1125.0,,0.56,0.0628,0.0097,0.08,0.0,0.16,0.7382,False,asa
+mls,2026,asa_eV5Dz67ZQK,Jovan Lukić,Philadelphia Union,CM,1174.0,,0.6133,0.0354,0.0618,0.0,0.0767,1.1499,0.7618,False,asa
+mls,2026,asa_eV5DzXvnQK,Brayan Vera,CF Montréal,CB,1247.0,,0.8661,0.0503,0.0083,0.0,0.0,0.1443,0.8061,False,asa
+mls,2026,asa_eV5Dzm8EQK,Kenny Nielsen,Los Angeles FC,CB,192.0,,0.0,0.0,0.068,0.0,0.0,0.4688,0.1354,False,asa
+mls,2026,asa_eV5Dzr7EQK,CJ Fodrey,Austin FC,ST,312.0,,1.1538,0.0832,0.0177,0.0,0.0,0.2885,0.2037,False,asa
+mls,2026,asa_eVq3alzDMW,Mikkel Desler,Austin FC,FB,631.0,,0.7132,0.0379,0.038,0.1426,0.0,0.5705,0.4119,False,asa
+mls,2026,asa_eVq3jBAv5W,Jeremy Ebobisse,Los Angeles FC,ST,213.0,,1.2676,0.3109,0.0,0.0,0.0,0.0,0.1502,False,asa
+mls,2026,asa_eVq3jBjj5W,Tom Barlow,FC Cincinnati,ST,668.0,,1.7515,0.426,0.0462,0.6737,0.0,0.4042,0.4872,False,asa
+mls,2026,asa_eVq3jDBG5W,Gustav Berggren,New York Red Bulls,CM,367.0,,1.9619,0.1755,0.1262,0.0,0.2452,1.2262,0.2413,False,asa
+mls,2026,asa_eVq3jJYw5W,Jonathan González,San Jose Earthquakes,DM,215.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.1428,False,asa
+mls,2026,asa_eVq3jx6G5W,Andrés Cubas,Vancouver Whitecaps FC,DM,971.0,,0.4634,0.0174,0.0273,0.0,0.0927,0.5561,0.7268,False,asa
+mls,2026,asa_eVq3jyYV5W,Justen Glad,Real Salt Lake,CB,1208.0,,0.298,0.0282,0.0084,0.0,0.0745,0.149,0.8366,False,asa
+mls,2026,asa_eVq3r1eD5W,Ronald Donkor,New York Red Bulls,CM,1316.0,,0.6839,0.1099,0.1939,0.0684,0.2736,1.4362,0.8652,False,asa
+mls,2026,asa_eVq3rBnV5W,Mateo Silvetti,Inter Miami CF,W,691.0,,2.6049,0.2002,0.3328,0.3907,0.3907,1.4327,0.4782,False,asa
+mls,2026,asa_eVq3rXzD5W,Ender Echenique,FC Cincinnati,FB,878.0,,1.4351,0.1219,0.2756,0.1025,0.41,2.1526,0.6404,False,asa
+mls,2026,asa_eVq3rkkw5W,Tomás Avilés,CF Montréal,CB,253.0,,0.3557,0.0203,0.0,0.0,0.0,0.0,0.1635,False,asa
+mls,2026,asa_eVq3x2B6QW,Dante Polvara,St. Louis City SC,CB,1418.0,,0.5078,0.0514,0.0378,0.0,0.0,0.2539,0.9335,False,asa
+mls,2026,asa_eVq3xWKgQW,José Caicedo,Portland Timbers FC,DM,603.0,,0.7463,0.0265,0.0187,0.0,0.0,0.597,0.3895,False,asa
+mls,2026,asa_eVq3xk1VQW,Sebastian Berhalter,Vancouver Whitecaps FC,CM,1262.0,,2.4247,0.2231,0.3338,0.4279,0.2853,2.4247,0.9446,False,asa
+mls,2026,asa_eVq3y6KGMW,David Martínez,Los Angeles FC,W,916.0,,2.5546,0.3068,0.1312,0.4913,0.0,1.2773,0.646,False,asa
+mls,2026,asa_eVq3yPAGMW,Morris Duggan,Minnesota United FC,CB,1529.0,,0.5886,0.0819,0.0046,0.0589,0.0,0.1177,1.0,False,asa
+mls,2026,asa_eVq3yR3yMW,Owen Gene,Minnesota United FC,CM,787.0,,0.3431,0.0082,0.0576,0.0,0.0,0.6861,0.5147,False,asa
+mls,2026,asa_gOMn6eOBMw,Timo Werner,San Jose Earthquakes,W,505.0,,2.495,0.557,0.5165,0.7129,0.5347,2.6733,0.3353,False,asa
+mls,2026,asa_gOMn6n8XMw,Christian Ramírez,Austin FC,ST,777.0,,1.7375,0.3459,0.0619,0.4633,0.1158,0.8108,0.5072,False,asa
+mls,2026,asa_gOMnR96lMw,Alex Muyl,Nashville SC,W,676.0,,0.5325,0.0761,0.0793,0.0,0.1331,0.5325,0.4436,False,asa
+mls,2026,asa_gOMnRE8BMw,Marcel Hartel,St. Louis City SC,AM,1311.0,,3.2265,0.3501,0.2227,0.2746,0.0686,2.3341,0.8631,False,asa
+mls,2026,asa_gOMnRnO8Mw,Thomas Hasal,Los Angeles FC,GK,227.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.1601,True,asa
+mls,2026,asa_gOMnRzymMw,James Pantemis,Portland Timbers FC,GK,1548.0,,0.0,0.0,0.0052,0.0,0.0,0.0581,1.0,True,asa
+mls,2026,asa_gOMnYVweQw,Gonzalo Lujan,Inter Miami CF,CB,976.0,,0.3689,0.0315,0.0311,0.0922,0.0,0.3689,0.6754,False,asa
+mls,2026,asa_gOMnl3y6qw,Jeong Sang-Bin,St. Louis City SC,W,413.0,,1.3075,0.3623,0.0463,0.4358,0.2179,1.0896,0.2719,False,asa
+mls,2026,asa_gOMnl6zBqw,Osaze De Rosario,Seattle Sounders FC,ST,467.0,,2.1199,0.3249,0.0093,0.3854,0.0,0.3854,0.3296,False,asa
+mls,2026,asa_gOMnlA96qw,Chris Brady,Chicago Fire FC,GK,1440.0,,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,asa
+mls,2026,asa_gOMnlGZmqw,Mohamed Farsi,Columbus Crew,FB,241.0,,1.1203,0.0446,0.3028,0.0,0.7469,0.7469,0.1563,False,asa
+mls,2026,asa_gOMnlKNeqw,Liel Abada,Charlotte FC,W,424.0,,2.1226,0.2246,0.2085,0.0,0.2123,1.2736,0.2791,False,asa
+mls,2026,asa_gOMnlWY8qw,Jaziel Orozco,St. Louis City SC,CB,800.0,,0.225,0.0361,0.0625,0.0,0.0,0.5625,0.5267,False,asa
+mls,2026,asa_gOMnlp9eqw,Matti Peltola,D.C. United,CM,1485.0,,0.7879,0.0258,0.0516,0.0606,0.0,0.8485,0.9706,False,asa
+mls,2026,asa_gjMN6gkKMK,Felipe Andrade,Houston Dynamo FC,FB,1121.0,,0.6423,0.0322,0.0027,0.0803,0.0,0.0803,0.8047,False,asa
+mls,2026,asa_gjMN6r64MK,Lucas Bartlett,D.C. United,CB,1522.0,,0.887,0.1303,0.0344,0.1183,0.0,0.2957,0.9948,False,asa
+mls,2026,asa_gjMN7Xz05K,Gage Guerra,Portland Timbers FC,ST,327.0,,1.6514,0.2705,0.0829,0.2752,0.0,0.2752,0.2112,False,asa
+mls,2026,asa_gjMNRGojMK,Guilherme,Houston Dynamo FC,W,1302.0,,2.6267,0.2603,0.1955,0.553,0.2765,2.1429,0.9347,False,asa
+mls,2026,asa_gjMNRZE3MK,Stefan Cleveland,Sporting Kansas City,GK,600.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.403,True,asa
+mls,2026,asa_gjMNRxjvMK,Maximiliano Falcón,Inter Miami CF,CB,924.0,,0.3896,0.0632,0.0151,0.0,0.0,0.0974,0.6394,False,asa
+mls,2026,asa_gjMNeXBpQK,Roman Celentano,FC Cincinnati,GK,1349.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.984,True,asa
+mls,2026,asa_gjMNjJbkMK,Jacob Bartlett,Sporting Kansas City,DM,920.0,,0.0978,0.0291,0.0217,0.0978,0.0,0.4891,0.6179,False,asa
+mls,2026,asa_gjMNjxPBMK,Ian Pilcher,San Diego FC,CB,226.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.1548,False,asa
+mls,2026,asa_gjMNv7PpMK,Aníbal Godoy,San Diego FC,CM,891.0,,0.101,0.0029,0.0761,0.0,0.101,0.303,0.6103,False,asa
+mls,2026,asa_gjMNvV70MK,Ben Lundt,St. Louis City SC,GK,203.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.1336,True,asa
+mls,2026,asa_gjMNvrO4MK,Steven Moreira,Columbus Crew,CB,1267.0,,0.6393,0.0307,0.0613,0.0,0.0,0.6393,0.8217,False,asa
+mls,2026,asa_gpMOL01y5z,Lucas Sanabria,LA Galaxy,DM,1107.0,,1.3821,0.1958,0.1133,0.1626,0.0813,0.5691,0.811,False,asa
+mls,2026,asa_gpMOLX225z,Joaquín Valiente,FC Dallas,AM,963.0,,1.028,0.0811,0.1799,0.0,0.1869,1.6822,0.6502,False,asa
+mls,2026,asa_gpMOa2rRqz,Besard Šabović,Austin FC,CM,457.0,,0.3939,0.0147,0.0064,0.0,0.0,0.1969,0.2983,False,asa
+mls,2026,asa_gpMOa67Eqz,Ronaldo Vieira,San Jose Earthquakes,DM,1166.0,,1.3122,0.1007,0.0545,0.0,0.0,0.5403,0.7742,False,asa
+mls,2026,asa_gpMOa6DOqz,Agustín Bouzat,Houston Dynamo FC,CM,702.0,,1.4103,0.0639,0.043,0.0,0.0,0.5128,0.5039,False,asa
+mls,2026,asa_gpMOa6zrqz,Derrick Etienne Jr.,Toronto FC,W,815.0,,1.3252,0.2445,0.0722,0.2209,0.0,0.8834,0.5245,False,asa
+mls,2026,asa_gpMOaaB2qz,Manu García,Sporting Kansas City,CM,1223.0,,0.4415,0.024,0.2646,0.0736,0.2944,2.0605,0.8214,False,asa
+mls,2026,asa_gpMOalwDqz,Ian Harkes,San Jose Earthquakes,CM,612.0,,1.1765,0.1613,0.0692,0.0,0.0,0.4412,0.4064,False,asa
+mls,2026,asa_gpMOe7GOqz,Emiro Garcés,LA Galaxy,CB,824.0,,0.1092,0.0021,0.0797,0.0,0.1092,0.3277,0.6037,False,asa
+mls,2026,asa_gpMOeEnOqz,Zavier Gozo,Real Salt Lake,W,1408.0,,3.0043,0.229,0.2097,0.3835,0.2557,1.2784,0.9751,False,asa
+mls,2026,asa_gpMOeEzyqz,Tomás Jacob,Atlanta United FC,FB,1245.0,,0.3614,0.0247,0.0961,0.0723,0.0,0.7229,0.8132,False,asa
+mls,2026,asa_gpMOeGdrqz,Antony,Portland Timbers FC,W,1129.0,,2.1523,0.205,0.0813,0.1594,0.0,1.0363,0.7293,False,asa
+mls,2026,asa_gpMOoO8rMz,John Pulskamp,Sporting Kansas City,GK,913.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.6132,True,asa
+mls,2026,asa_gpMOoOjEMz,Justin Haak,LA Galaxy,CB,1337.0,,0.4712,0.0433,0.0128,0.0,0.0673,0.2693,0.9795,False,asa
+mls,2026,asa_gpMOoZ47Mz,Jorge Ruvalcaba,New York Red Bulls,W,1251.0,,2.7338,0.3457,0.0591,0.5036,0.0,1.0072,0.8225,False,asa
+mls,2026,asa_gpMOogB1Mz,Telasco Segovia,Inter Miami CF,W,1275.0,,1.2,0.2029,0.1155,0.1412,0.3529,1.1294,0.8824,False,asa
+mls,2026,asa_gpMOov07Mz,Nectarios Triantis,Minnesota United FC,CM,1281.0,,1.1944,0.0632,0.1063,0.0703,0.0703,0.6323,0.8378,False,asa
+mls,2026,asa_gpMOoypDMz,Zach Booth,Real Salt Lake,FB,366.0,,0.7377,0.0514,0.0401,0.2459,0.0,0.4918,0.2535,False,asa
+mls,2026,asa_jYQJ14KyqG,Philip Zinckernagel,Chicago Fire FC,W,1258.0,,3.5056,0.4689,0.2395,0.3577,0.4293,1.8601,0.8736,False,asa
+mls,2026,asa_jYQJ1PaVqG,Antônio Carlos,Houston Dynamo FC,CB,1171.0,,0.4611,0.051,0.0119,0.0,0.0,0.1537,0.8406,False,asa
+mls,2026,asa_jYQJB7wVQG,Cole Bassett,Portland Timbers FC,DM,1005.0,,1.5224,0.1976,0.0891,0.2687,0.1791,0.9851,0.6492,False,asa
+mls,2026,asa_jYQJBvJGQG,Jon Bell,Austin FC,CB,851.0,,0.5288,0.0798,0.0344,0.2115,0.0,0.423,0.5555,False,asa
+mls,2026,asa_jYQJYXpPqG,Tyrese Spicer,Orlando City SC,FB,511.0,,2.4658,0.3155,0.1999,0.3523,0.1761,1.2329,0.3351,False,asa
+mls,2026,asa_jYQJa30DqG,Joseph Rosales,Austin FC,FB,1404.0,,1.0256,0.0427,0.0681,0.0641,0.0641,0.641,0.9164,False,asa
+mls,2026,asa_jYQJa3GEqG,Japhet Sery Larsen,Philadelphia Union,CB,816.0,,0.2206,0.0095,0.0365,0.1103,0.0,0.2206,0.5295,False,asa
+mls,2026,asa_jYQJaaBdqG,Jack McGlynn,Houston Dynamo FC,CM,850.0,,1.1647,0.0341,0.2403,0.2118,0.3176,2.6471,0.6102,False,asa
+mls,2026,asa_jYQJagNWqG,Brian Schwake,Nashville SC,GK,1524.0,,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,asa
+mls,2026,asa_jYQJal6kqG,Miguel Navarro,Colorado Rapids,FB,761.0,,0.2365,0.014,0.1176,0.0,0.1183,0.3548,0.4935,False,asa
+mls,2026,asa_jYQJamlEqG,Bongokuhle Hlongwane,Minnesota United FC,W,471.0,,0.9554,0.1125,0.1195,0.0,0.0,1.1465,0.308,False,asa
+mls,2026,asa_jYQJanvVqG,Daniel Edelman,St. Louis City SC,CM,1289.0,,0.5586,0.0331,0.2064,0.0698,0.1396,0.9775,0.8486,False,asa
+mls,2026,asa_jYQJg6lWMG,Augustin Anello,Philadelphia Union,W,434.0,,2.9032,0.355,0.1181,0.2074,0.2074,1.2442,0.2816,False,asa
+mls,2026,asa_jYQJgEJdMG,Cavan Sullivan,Philadelphia Union,W,660.0,,1.9091,0.1716,0.2195,0.1364,0.1364,1.5,0.4283,False,asa
+mls,2026,asa_jYQJgRABMG,Ethan Kohler,New England Revolution,CB,924.0,,0.2922,0.0434,0.0,0.0,0.0,0.0,0.6453,False,asa
+mls,2026,asa_jYQJgokGMG,Lazar Stefanovic,Toronto FC,CB,252.0,,0.7143,0.0733,0.0385,0.0,0.0,0.3571,0.1622,False,asa
+mls,2026,asa_jYQJgrOWMG,Luca Bombino,San Diego FC,FB,1029.0,,0.6122,0.0309,0.0651,0.0875,0.0875,0.4373,0.7048,False,asa
+mls,2026,asa_jYQJz0RGQG,CJ dos Santos,San Diego FC,GK,203.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.139,True,asa
+mls,2026,asa_jYQJzApVQG,Silvan Hefti,D.C. United,FB,1358.0,,0.1988,0.009,0.1398,0.0,0.1325,0.729,0.8876,False,asa
+mls,2026,asa_jYQJzWGyQG,Miles Robinson,FC Cincinnati,CB,678.0,,0.3982,0.0742,0.0,0.0,0.0,0.0,0.4945,False,asa
+mls,2026,asa_jYQJznnkQG,Chris Durkin,St. Louis City SC,CM,1245.0,,0.8675,0.0849,0.0282,0.1446,0.0,0.4337,0.8196,False,asa
+mls,2026,asa_jYQJznrBQG,Prince Owusu,CF Montréal,ST,1224.0,,2.0588,0.4832,0.2911,0.6618,0.4412,1.25,0.7912,False,asa
+mls,2026,asa_jYQJzpAkQG,Brandt Bronico,Charlotte FC,DM,580.0,,0.1552,0.0064,0.0792,0.0,0.0,0.6207,0.3818,False,asa
+mls,2026,asa_jYQJzwXkQG,Jeppe Tverskov,San Diego FC,DM,955.0,,0.377,0.0861,0.1213,0.0,0.0942,0.9424,0.6541,False,asa
+mls,2026,asa_kRQa2AvjMK,Evander,FC Cincinnati,AM,1290.0,,3.4884,0.4663,0.383,0.6279,0.4186,2.6512,0.9409,False,asa
+mls,2026,asa_kRQa2L2LMK,Evan Louro,FC Cincinnati,GK,212.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.1546,True,asa
+mls,2026,asa_kRQa2LebMK,Dayne St. Clair,Inter Miami CF,GK,1445.0,,0.0,0.0,0.0018,0.0,0.0,0.0623,1.0,True,asa
+mls,2026,asa_kRQa2j0LMK,Kyle Smith,FC Cincinnati,FB,757.0,,0.4756,0.094,0.0099,0.1189,0.0,0.1189,0.5522,False,asa
+mls,2026,asa_kRQaPd61qK,Agustín Resch,Houston Dynamo FC,CB,911.0,,0.0988,0.0049,0.0136,0.0,0.0,0.0988,0.654,False,asa
+mls,2026,asa_kRQabvYbMK,Walker Zimmerman,Toronto FC,CB,1026.0,,0.8772,0.053,0.0,0.0877,0.0,0.0,0.6602,False,asa
+mls,2026,asa_kRQaodJm5K,Keisuke Kurokawa,D.C. United,FB,1507.0,,0.2986,0.0362,0.0947,0.0,0.1792,0.7764,0.985,False,asa
+mls,2026,asa_kRQaonbo5K,Patrick Schulte,Columbus Crew,GK,1542.0,,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,asa
+mls,2026,asa_kRQaopnY5K,David Schnegg,Charlotte FC,FB,598.0,,0.602,0.0316,0.0866,0.1505,0.1505,0.903,0.3937,False,asa
+mls,2026,asa_kRQaovVo5K,Gabriel Pec,LA Galaxy,W,1365.0,,3.956,0.4415,0.2321,0.3297,0.2637,1.3846,1.0,False,asa
+mls,2026,asa_kRQawAyb5K,Emilio Aristizábal,Toronto FC,ST,551.0,,2.6134,0.2883,0.1414,0.49,0.0,0.6534,0.3546,False,asa
+mls,2026,asa_kRQawobY5K,Aiden Hezarkhani,Real Salt Lake,W,640.0,,1.6875,0.0918,0.0665,0.2812,0.0,0.8438,0.4432,False,asa
+mls,2026,asa_kRQay0LQKZ,Andy Najar,Nashville SC,FB,870.0,,0.3103,0.0563,0.1453,0.0,0.3103,1.2414,0.5709,False,asa
+mls,2026,asa_ljqE2EwAQx,Mamadou Fofana,New England Revolution,CB,1329.0,,0.0677,0.0194,0.0353,0.0677,0.0,0.3386,0.9281,False,asa
+mls,2026,asa_ljqE2ekNQx,Žan Kolmanič,Austin FC,FB,320.0,,0.0,0.0,0.0588,0.0,0.0,0.8438,0.2089,False,asa
+mls,2026,asa_ljqE2keVQx,JT Marcinkowski,LA Galaxy,GK,1124.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.8234,True,asa
+mls,2026,asa_ljqE2vBzQx,John Nelson,LA Galaxy,FB,999.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.7319,False,asa
+mls,2026,asa_ljqE9kzoqx,Dieng Mamadou,Minnesota United FC,ST,290.0,,2.7931,0.4108,0.0478,0.0,0.0,0.6207,0.1897,False,asa
+mls,2026,asa_ljqEJ8KkQx,Ian James,Sporting Kansas City,CB,873.0,,0.3093,0.0217,0.0279,0.0,0.0,0.4124,0.5863,False,asa
+mls,2026,asa_ljqEJEozQx,Harbor Miller,LA Galaxy,W,661.0,,1.2254,0.1127,0.1572,0.0,0.0,1.3616,0.4842,False,asa
+mls,2026,asa_ljqEJEvzQx,Snyder Brunell,Seattle Sounders FC,DM,922.0,,1.3666,0.0932,0.1222,0.0,0.0976,0.6833,0.6507,False,asa
+mls,2026,asa_ljqEJWxzQx,Dominik Marczuk,Real Salt Lake,W,240.0,,1.125,0.0536,0.0088,0.0,0.0,0.375,0.1662,False,asa
+mls,2026,asa_ljqEJonzQx,Bruno Damiani,Philadelphia Union,ST,1226.0,,2.2023,0.2593,0.0369,0.0734,0.0,0.8075,0.7956,False,asa
+mls,2026,asa_ljqEJzLkQx,Nolan Miller,Orlando City SC,CB,370.0,,0.2432,0.0217,0.0,0.0,0.0,0.0,0.2426,False,asa
+mls,2026,asa_ljqEL4wo5x,Gerardo Valenzuela,FC Cincinnati,AM,867.0,,1.3495,0.135,0.1372,0.1038,0.0,1.2457,0.6324,False,asa
+mls,2026,asa_ljqELGYo5x,William Reilly,Atlanta United FC,DM,336.0,,0.0,0.0,0.0239,0.0,0.0,0.5357,0.2195,False,asa
+mls,2026,asa_ljqELmRk5x,Victor Loturi,CF Montréal,DM,1368.0,,0.3947,0.036,0.0208,0.0658,0.0658,0.4605,0.8843,False,asa
+mls,2026,asa_ljqELmeo5x,Ousseni Bouda,San Jose Earthquakes,W,1324.0,,1.4955,0.2768,0.1515,0.3399,0.068,0.9517,0.8792,False,asa
+mls,2026,asa_ljqEjLaEQx,Diego Fagundez,New England Revolution,W,251.0,,0.3586,0.012,0.1348,0.0,0.0,1.0757,0.1753,False,asa
+mls,2026,asa_ljqEjOpzQx,Zack Steffen,Colorado Rapids,GK,937.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.6077,True,asa
+mls,2026,asa_ljqEjV8oQx,Nathan Byrne,Charlotte FC,FB,1401.0,,0.1927,0.0197,0.0058,0.0,0.0,0.1285,0.9223,False,asa
+mls,2026,asa_odMX70VAQY,Calvin Harris,Sporting Kansas City,W,1194.0,,2.1859,0.3192,0.1602,0.1508,0.2261,0.6784,0.8019,False,asa
+mls,2026,asa_odMX84koMY,Son Heung-Min,Los Angeles FC,ST,1245.0,,3.253,0.3546,0.2946,0.0723,0.5783,2.1687,0.878,False,asa
+mls,2026,asa_odMX8xmrMY,Sebastien Ibeagha,FC Dallas,CB,1106.0,,0.3255,0.0463,0.0055,0.0,0.0,0.0814,0.7468,False,asa
+mls,2026,asa_odMXE2rG5Y,Puso Dithejane,Chicago Fire FC,W,219.0,,3.2877,0.1525,0.0533,0.0,0.0,1.6438,0.1521,False,asa
+mls,2026,asa_odMXEANx5Y,Tahir Reid-Brown,Orlando City SC,CB,289.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.1895,False,asa
+mls,2026,asa_odMXGB1xQY,Nicolás Dubersarsky,Austin FC,CM,742.0,,0.1213,0.0019,0.0179,0.0,0.0,0.3639,0.4843,False,asa
+mls,2026,asa_odMXGL8JQY,Logan Farrington,FC Dallas,ST,873.0,,2.7835,0.3915,0.2099,0.6186,0.2062,0.7216,0.5895,False,asa
+mls,2026,asa_odMXR6GGqY,Jonathan Dean,Chicago Fire FC,FB,870.0,,0.0,0.0,0.0746,0.0,0.0,0.8276,0.6042,False,asa
+mls,2026,asa_odMXRoXoqY,Matt Freese,New York City FC,GK,1520.0,,0.0592,0.0026,0.0,0.0,0.0,0.0,1.0,True,asa
+mls,2026,asa_odMXRxV2qY,Dénis Bouanga,Los Angeles FC,W,1418.0,,3.11,0.4832,0.2889,0.4443,0.1269,1.7137,1.0,False,asa
+mls,2026,asa_odMXrvAqYL,Erik Sviatchenko,Houston Dynamo FC,CB,666.0,,0.4054,0.0325,0.0635,0.1351,0.0,0.4054,0.4781,False,asa
+mls,2026,asa_p6qb4pwM0G,Rafael Cabral,Real Salt Lake,GK,1444.0,,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,asa
+mls,2026,asa_p6qbOD1bQ0,Eddie Segura,Los Angeles FC,CB,1340.0,,0.0672,0.0053,0.0456,0.0,0.0,0.4701,0.945,False,asa
+mls,2026,asa_p6qbON3aQ0,Franco Negri,Houston Dynamo FC,FB,324.0,,0.5556,0.0109,0.0676,0.0,0.0,0.2778,0.2326,False,asa
+mls,2026,asa_p6qbONo3Q0,Aiden O'Neill,New York City FC,DM,991.0,,0.4541,0.0191,0.0319,0.0,0.0908,0.2725,0.652,False,asa
+mls,2026,asa_p6qbOeRXQ0,Jordan Morris,Seattle Sounders FC,W,648.0,,1.9444,0.3802,0.2392,0.1389,0.1389,1.1111,0.4573,False,asa
+mls,2026,asa_p6qbOn3DQ0,Jonathan Bamba,Chicago Fire FC,W,740.0,,2.1892,0.3234,0.2073,0.2432,0.2432,1.0946,0.5139,False,asa
+mls,2026,asa_p6qbOnb8Q0,Saba Lobjanidze,Atlanta United FC,W,710.0,,3.0423,0.2769,0.1806,0.2535,0.0,1.6479,0.4637,False,asa
+mls,2026,asa_p6qbOpVDQ0,Lucas Halter,Houston Dynamo FC,CB,282.0,,0.9574,0.1279,0.0348,0.0,0.0,0.3191,0.2024,False,asa
+mls,2026,asa_p6qbeEd350,Brad Stuver,Austin FC,GK,1532.0,,0.0,0.0,0.0015,0.0,0.0,0.0587,1.0,True,asa
+mls,2026,asa_p6qbeZ1p50,Robin Lod,Chicago Fire FC,W,951.0,,1.1356,0.2811,0.1101,0.2839,0.0,1.4196,0.6604,False,asa
+mls,2026,asa_p6qbekPD50,Tyler Boyd,Los Angeles FC,W,560.0,,2.25,0.1335,0.2237,0.1607,0.1607,1.125,0.3949,False,asa
+mls,2026,asa_p6qbgGEpQ0,Kerwin Vargas,Charlotte FC,W,899.0,,1.7019,0.2204,0.0725,0.2002,0.3003,0.901,0.5918,False,asa
+mls,2026,asa_p6qborPBQ0,Javier Otero,Orlando City SC,GK,189.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.1239,True,asa
+mls,2026,asa_raMyA6KRMd,Jon Gallagher,Austin FC,FB,1349.0,,0.5337,0.0379,0.1305,0.0,0.0667,0.8006,0.8805,False,asa
+mls,2026,asa_raMyAExNMd,Nick Fernandez,San Jose Earthquakes,AM,397.0,,2.0403,0.1576,0.1252,0.2267,0.4534,1.5869,0.2636,False,asa
+mls,2026,asa_raMyAGEBMd,Fafa Picault,Atlanta United FC,W,239.0,,1.1297,0.3826,0.0892,0.3766,0.3766,1.5063,0.1561,False,asa
+mls,2026,asa_raMyAWZAMd,Kévin Denkey,FC Cincinnati,ST,1319.0,,2.2517,0.6256,0.0894,0.6141,0.1365,0.887,0.9621,False,asa
+mls,2026,asa_raMyAZR2Md,Cristian Roldan,Seattle Sounders FC,DM,1080.0,,1.3333,0.0798,0.0584,0.25,0.0,0.5,0.7622,False,asa
+mls,2026,asa_raMyAywlMd,Miguel Almirón,Atlanta United FC,AM,840.0,,2.3571,0.239,0.1944,0.0,0.3214,1.5,0.5487,False,asa
+mls,2026,asa_raMyZX9N5d,Anton Salétros,Chicago Fire FC,CM,1198.0,,0.7513,0.0322,0.1177,0.0,0.0,1.4274,0.8319,False,asa
+mls,2026,asa_raMyeRERMd,Tate Johnson,Vancouver Whitecaps FC,FB,1093.0,,0.1647,0.0026,0.1094,0.0,0.0,1.2351,0.8181,False,asa
+mls,2026,asa_raMyedmkMd,Griffin Dillon,Real Salt Lake,CM,374.0,,0.9626,0.0621,0.1232,0.0,0.0,1.4439,0.259,False,asa
+mls,2026,asa_raMyekYkMd,Miguel Perez,St. Louis City SC,CM,300.0,,1.5,0.1102,0.4076,0.0,0.0,1.5,0.1975,False,asa
+mls,2026,asa_raMyoLlNqd,Lucas Herrington,Colorado Rapids,CB,1542.0,,0.1751,0.0339,0.0525,0.0584,0.0584,0.1751,1.0,False,asa
+mls,2026,asa_raMyr4Ne5d,David Brekalo,Orlando City SC,CB,938.0,,0.4797,0.0483,0.0,0.0,0.0,0.0,0.6151,False,asa
+mls,2026,asa_raMyrEDR5d,Patrickson Delgado,FC Dallas,CM,561.0,,2.246,0.2027,0.0644,0.3209,0.0,0.8021,0.3788,False,asa
+mls,2026,asa_raMyrrNJ5d,Bode Hidalgo,CF Montréal,FB,296.0,,0.3041,0.0034,0.0,0.0,0.0,0.0,0.1913,False,asa
+mls,2026,asa_raMyyJaAMd,Paul Marie,San Jose Earthquakes,FB,300.0,,0.6,0.1323,0.6019,0.0,1.2,2.4,0.1992,False,asa
+mls,2026,asa_vzqo70PBqa,Amar Sejdić,Columbus Crew,CM,228.0,,1.1842,0.0562,0.0362,0.0,0.0,0.7895,0.1479,False,asa
+mls,2026,asa_vzqo7EpLqa,Anthony Markanich,Minnesota United FC,FB,1328.0,,1.2199,0.2237,0.118,0.2711,0.0678,0.9488,0.8685,False,asa
+mls,2026,asa_vzqo7XWpqa,Jackson Ragen,Seattle Sounders FC,CB,1295.0,,0.834,0.0675,0.021,0.0,0.0,0.2085,0.9139,False,asa
+mls,2026,asa_vzqo7jLvqa,Nouhou,Seattle Sounders FC,FB,1386.0,,0.1948,0.0122,0.0652,0.0,0.0649,0.4545,0.9781,False,asa
+mls,2026,asa_vzqo7joZqa,Teenage Hadebe,FC Cincinnati,CB,325.0,,0.5538,0.0862,0.1106,0.0,0.0,0.5538,0.2371,False,asa
+mls,2026,asa_vzqo7mXJqa,Iván Angulo,Orlando City SC,W,1466.0,,0.5525,0.0911,0.1962,0.0,0.2456,1.1664,0.9613,False,asa
+mls,2026,asa_vzqo7o4kqa,Milan Iloski,Philadelphia Union,ST,1329.0,,3.4537,0.4391,0.1302,0.474,0.0677,1.693,0.8624,False,asa
+mls,2026,asa_vzqo7zWLqa,Hugo Cuypers,Chicago Fire FC,ST,1135.0,,3.1718,0.835,0.0714,1.0308,0.0,0.7137,0.7882,False,asa
+mls,2026,asa_vzqo7zdZqa,Oliver Larraz,Vancouver Whitecaps FC,DM,242.0,,0.7438,0.0251,0.1528,0.0,0.0,1.4876,0.1811,False,asa
+mls,2026,asa_vzqoG6aLqa,Juan Manuel Sanabria,Real Salt Lake,FB,1037.0,,1.0415,0.0509,0.1421,0.0,0.3472,1.3886,0.7181,False,asa
+mls,2026,asa_vzqoJ3pj5a,Julian Hall,New York Red Bulls,ST,1418.0,,1.7137,0.4837,0.0986,0.5712,0.1904,0.5712,0.9323,False,asa
+mls,2026,asa_vzqod7xBQa,Shapi Suleymanov,Sporting Kansas City,W,817.0,,1.7625,0.1467,0.067,0.1102,0.1102,0.661,0.5487,False,asa
+mls,2026,asa_vzqodKdZQa,Capita,Sporting Kansas City,W,659.0,,1.6388,0.1991,0.0635,0.2731,0.0,0.2731,0.4426,False,asa
+mls,2026,asa_vzqodVa7Qa,Hamzat Ojediran,Colorado Rapids,DM,1066.0,,1.0131,0.0287,0.0105,0.0844,0.0,0.2533,0.6913,False,asa
+mls,2026,asa_vzqodXdjQa,Jamar Ricketts,San Jose Earthquakes,FB,945.0,,0.5714,0.0945,0.2309,0.0,0.1905,1.0476,0.6275,False,asa
+mls,2026,asa_vzqoddvZQa,Dante Sealy,Colorado Rapids,W,870.0,,1.9655,0.1867,0.1281,0.0,0.2069,0.931,0.5642,False,asa
+mls,2026,asa_vzqodkKBQa,Zorhan Bassong,Sporting Kansas City,FB,347.0,,1.8156,0.1053,0.0601,0.0,0.0,1.2968,0.233,False,asa
+mls,2026,asa_vzqorrRk5a,Carles Gil,New England Revolution,AM,1412.0,,1.466,0.2876,0.173,0.3187,0.1912,2.2309,0.986,False,asa
+mls,2026,asa_vzqowm7qap,Lionel Messi,Inter Miami CF,ST,1420.0,,5.3239,0.71,0.4623,0.7606,0.4437,2.3451,0.9827,False,asa
+mls,2026,asa_wvq9XO7B5W,Colin Guske,Orlando City SC,CM,322.0,,0.2795,0.0048,0.0098,0.0,0.0,0.2795,0.2111,False,asa
+mls,2026,asa_wvq9Xdlw5W,Tadeo Allende,Inter Miami CF,W,493.0,,1.643,0.2998,0.032,0.0,0.0,0.9128,0.3412,False,asa
+mls,2026,asa_wvq9Xp1B5W,Gabriel Pirani,D.C. United,AM,507.0,,0.8876,0.0616,0.0443,0.0,0.0,0.8876,0.3314,False,asa
+mls,2026,asa_wvq9XwJ35W,Luka Gavran,Toronto FC,GK,1554.0,,0.1158,0.0194,0.0,0.0579,0.0,0.0,1.0,True,asa
+mls,2026,asa_wvq9eLBwqW,Alhassan Yusuf,New England Revolution,CM,1221.0,,0.5897,0.0597,0.0705,0.1474,0.0,0.6634,0.8527,False,asa
+mls,2026,asa_wvq9eWbBqW,Deandre Kerr,Toronto FC,ST,375.0,,2.16,0.2184,0.0722,0.0,0.0,0.72,0.2413,False,asa
+mls,2026,asa_wvq9eXy3qW,Sam Sarver,FC Dallas,FB,275.0,,1.9636,0.5679,0.0513,0.9818,0.0,0.3273,0.1857,False,asa
+mls,2026,asa_wvq9eY8YqW,Robert Voloder,New York Red Bulls,CB,793.0,,0.3405,0.0456,0.0024,0.0,0.0,0.1135,0.5214,False,asa
+mls,2026,asa_wvq9eZdYqW,Benji Kikanović,San Jose Earthquakes,FB,1131.0,,0.3979,0.0264,0.0802,0.0,0.0,0.9549,0.751,False,asa
+mls,2026,asa_wvq9ebLaqW,Reed Baker-Whiting,Nashville SC,FB,473.0,,0.1903,0.0558,0.0351,0.0,0.0,0.3805,0.3104,False,asa
+mls,2026,asa_wvq9ed47qW,Brendan McSorley,St. Louis City SC,W,245.0,,3.3061,0.6594,0.0542,0.3673,0.0,1.102,0.1613,False,asa
+mls,2026,asa_wvq9edxmqW,Ian Smith,Portland Timbers FC,FB,406.0,,0.8867,0.1083,0.0543,0.0,0.0,0.4433,0.2623,False,asa
+mls,2026,asa_wvq9ena3qW,Jack Jasinski,San Jose Earthquakes,FB,436.0,,1.0321,0.1476,0.0153,0.2064,0.0,0.2064,0.2895,False,asa
+mls,2026,asa_wvq9g7AaMW,Tim Parker,New York Red Bulls,CB,481.0,,0.1871,0.002,0.0,0.0,0.0,0.0,0.3162,False,asa
+mls,2026,asa_wvq9gPmNMW,Jack Elliott,Chicago Fire FC,CB,1157.0,,0.7001,0.0537,0.0463,0.0,0.0778,0.2334,0.8035,False,asa
+mls,2026,asa_wvq9go6aMW,Diego Rossi,Columbus Crew,W,1410.0,,2.4894,0.2948,0.0636,0.383,0.0638,0.8936,0.9144,False,asa
+mls,2026,asa_wvq9gxBmMW,Joao Ortíz,Portland Timbers FC,DM,511.0,,0.8806,0.0294,0.0253,0.0,0.1761,0.5284,0.3301,False,asa
+mls,2026,asa_wvq9gzx1MW,Sergi Palencia,Los Angeles FC,FB,679.0,,0.3976,0.0556,0.0252,0.1325,0.0,0.5302,0.4788,False,asa
+mls,2026,asa_wvq9jYdBQW,Stephen Afrifa,Sporting Kansas City,W,320.0,,1.6875,0.0921,0.0575,0.2812,0.2812,0.8438,0.2149,False,asa
+mls,2026,asa_wvq9pAjl5W,Ryan Hollingshead,Los Angeles FC,FB,803.0,,0.6725,0.1851,0.0564,0.1121,0.0,0.8966,0.5663,False,asa
+mls,2026,asa_xW5p7L4KMg,Elías Baez,Atlanta United FC,FB,1268.0,,0.9227,0.0479,0.053,0.0,0.142,0.6388,0.8282,False,asa
+mls,2026,asa_xW5pr1oYQg,Josh Sargent,Toronto FC,ST,735.0,,2.5714,0.4984,0.1089,0.3673,0.1224,0.4898,0.473,False,asa
+mls,2026,asa_xW5prK4BQg,Ariel Lassiter,Portland Timbers FC,FB,312.0,,2.0192,0.2024,0.1311,0.5769,0.2885,1.1538,0.2016,False,asa
+mls,2026,asa_xW5prbllQg,Artur,Houston Dynamo FC,DM,499.0,,0.5411,0.0122,0.0247,0.0,0.1804,0.3607,0.3582,False,asa
+mls,2026,asa_xW5pro36Qg,Sergio Córdova,St. Louis City SC,ST,563.0,,1.119,0.14,0.0061,0.1599,0.0,0.3197,0.3706,False,asa
+mls,2026,asa_xW5pw3PYMg,Conrad Wallem,St. Louis City SC,FB,1203.0,,0.8978,0.0726,0.0621,0.0,0.0,0.8978,0.792,False,asa
+mls,2026,asa_xW5pw8KGMg,Lawrence Ennali,Houston Dynamo FC,W,1229.0,,0.8055,0.0844,0.0433,0.2197,0.1465,0.8788,0.8823,False,asa
+mls,2026,asa_xW5pwEwGMg,Finn Surman,Portland Timbers FC,CB,1496.0,,0.2406,0.0317,0.011,0.0,0.0602,0.2406,0.9664,False,asa
+mls,2026,asa_xW5pxANJ5g,Marcus Ingvartsen,San Diego FC,ST,1243.0,,2.6066,0.4886,0.0744,0.7965,0.1448,0.7241,0.8514,False,asa
+mls,2026,asa_xW5pxRGB5g,Thiago Martins,New York City FC,CB,1406.0,,0.128,0.0144,0.0121,0.0,0.0,0.064,0.925,False,asa
+mls,2026,asa_xW5pyAVYqg,Stas Kornzeniowski,Philadelphia Union,ST,185.0,,3.4054,0.383,0.0357,0.0,0.4865,0.4865,0.1201,False,asa
+mls,2026,asa_xW5pygjdqg,Jalen Neal,CF Montréal,CB,548.0,,0.1642,0.0025,0.0,0.0,0.0,0.0,0.3542,False,asa
+mls,2026,asa_xW5pykn0qg,Juan Berrocal,Atlanta United FC,CB,821.0,,0.6577,0.0596,0.0051,0.0,0.0,0.2192,0.5363,False,asa
+mls,2026,asa_xW5pynPBqg,Guilherme Biro,Austin FC,FB,951.0,,0.9464,0.0623,0.0666,0.0946,0.0946,0.2839,0.6208,False,asa
+mls,2026,asa_xW5pynj0qg,Matheus Nascimento,LA Galaxy,ST,193.0,,3.2642,0.6878,0.1925,0.4663,0.0,0.9326,0.1414,False,asa
+mls,2026,asa_xW5pyrwKqg,Obinna Nwobodo,FC Cincinnati,CM,454.0,,0.9912,0.0677,0.0,0.0,0.0,0.0,0.3311,False,asa
+mls,2026,asa_xW5pyyaJqg,Braian Ojeda,Orlando City SC,DM,1525.0,,0.6492,0.0209,0.065,0.0,0.059,0.5311,1.0,False,asa
+mls,2026,asa_zeQZ7DJzMK,Tristan Muyumba,Atlanta United FC,DM,1258.0,,0.787,0.0486,0.0618,0.0715,0.0,0.8585,0.8217,False,asa
+mls,2026,asa_zeQZJ7YgQK,Rudy Camacho,Columbus Crew,CB,1452.0,,0.3719,0.0392,0.0176,0.0,0.0,0.124,0.9416,False,asa
+mls,2026,asa_zeQZJYDZQK,Lucas Hoyos,Atlanta United FC,GK,1531.0,,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,asa
+mls,2026,asa_zeQZKbYMKw,Luis Suárez,Inter Miami CF,ST,707.0,,2.9279,0.6289,0.243,0.7638,0.1273,1.6549,0.4893,False,asa
+mls,2026,asa_zeQZX96N5K,Jimer Fory,Portland Timbers FC,FB,1321.0,,0.2044,0.0089,0.0339,0.0,0.0681,0.2725,0.8534,False,asa
+mls,2026,asa_zeQZXXm15K,Jake Davis,Sporting Kansas City,FB,1190.0,,0.4538,0.0151,0.0894,0.0,0.0756,0.4538,0.7992,False,asa
+mls,2026,asa_zeQZe4aYqK,Zakaria Taifi,Orlando City SC,FB,390.0,,1.1538,0.0629,0.1661,0.0,0.2308,0.4615,0.2557,False,asa
+mls,2026,asa_zeQZeWKjqK,Hugo Picard,Columbus Crew,W,876.0,,1.7466,0.2294,0.1119,0.2055,0.2055,1.0274,0.5681,False,asa

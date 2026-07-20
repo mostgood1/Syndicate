@@ -1,0 +1,427 @@
+league,player_id,player_name,team,position,is_goalkeeper,appearances,starts,minutes_played,shots_per90,xg_per90,xa_per90,shot_on_target_rate,expected_minutes_share,source
+belgian_pro_league,252523,Ortwin De Wolf,KV Mechelen,Goalkeeper,True,7,6,585.0,0.0,0.0,0.0,,0.1667,espn_true_per90
+belgian_pro_league,328300,Redouane Halhal,KV Mechelen,Center Defender,False,32,31,2759.0,0.3914,0.0326,0.0652,0.3333,0.786,espn_true_per90
+belgian_pro_league,297827,José Marsà,KV Mechelen,Center Left Defender,False,32,27,2503.0,0.5394,0.036,0.0719,0.2,0.7131,espn_true_per90
+belgian_pro_league,157133,Rob Schoofs,Union St.-Gilloise,Center Left Midfielder,False,35,19,1907.0,1.935,0.1888,0.236,0.2683,0.5433,espn_true_per90
+belgian_pro_league,273992,Fredrik Hammar,KV Mechelen,Center Right Midfielder,False,37,37,3276.0,0.7692,0.0275,0.0275,0.2143,0.9333,espn_true_per90
+belgian_pro_league,357005,Bilal Bafdili,KV Mechelen,Attacking Midfielder,False,18,11,839.0,1.18,0.1073,0.3218,0.3636,0.239,espn_true_per90
+belgian_pro_league,403413,Moncef Zekri,KV Mechelen,Left Midfielder,False,15,10,767.0,0.8214,0.0,0.0,0.5714,0.2185,espn_true_per90
+belgian_pro_league,206569,Patrick Pflücke,Royal Charleroi SC,Right Midfielder,False,40,32,2559.0,2.1454,0.1407,0.2814,0.3443,0.7291,espn_true_per90
+belgian_pro_league,226416,Kerim Mrabti,KV Mechelen,Center Left Forward,False,32,27,2227.0,1.1316,0.2021,0.0808,0.3571,0.6345,espn_true_per90
+belgian_pro_league,259357,Lion Lauberbach,KV Mechelen,Center Right Forward,False,21,20,1811.0,2.3357,0.2485,0.0497,0.5106,0.516,espn_true_per90
+belgian_pro_league,261209,Mory Konaté,KV Mechelen,Substitute,False,30,23,2002.0,0.5844,0.0899,0.045,0.3846,0.5704,espn_true_per90
+belgian_pro_league,408133,Ian Struyf,KV Mechelen,Substitute,False,11,6,427.0,0.2108,0.0,0.0,0.0,0.1217,espn_true_per90
+belgian_pro_league,387507,Halil Özdemir,KV Mechelen,Substitute,False,6,1,149.0,0.604,0.0,0.0,0.0,0.0425,espn_true_per90
+belgian_pro_league,282238,Ryan Teague,KV Mechelen,Substitute,False,4,0,18.0,0.0,0.0,0.0,,0.0051,espn_true_per90
+belgian_pro_league,202101,Nordin Jackers,Club Brugge,Goalkeeper,True,21,20,1801.0,0.0,0.0,0.0,,0.5131,espn_true_per90
+belgian_pro_league,191222,Brandon Mechele,Club Brugge,Center Right Defender,False,38,38,3345.0,0.8341,0.1076,0.0538,0.3871,0.953,espn_true_per90
+belgian_pro_league,363068,Joaquin Seys,Club Brugge,Left Back,False,38,34,2888.0,0.4986,0.0623,0.1558,0.25,0.8228,espn_true_per90
+belgian_pro_league,351301,Jorne Spileers,Club Brugge,Right Back,False,22,12,1136.0,0.2377,0.0,0.0792,0.0,0.3236,espn_true_per90
+belgian_pro_league,320882,Raphael Onyedika,Club Brugge,Center Midfielder,False,29,21,1908.0,1.3208,0.0472,0.0,0.3929,0.5436,espn_true_per90
+belgian_pro_league,193849,Hans Vanaken,Club Brugge,Left Midfielder,False,38,37,3276.0,1.5659,0.1923,0.0824,0.3684,0.9333,espn_true_per90
+belgian_pro_league,261363,Ludovit Reis,Club Brugge,Right Midfielder,False,6,2,220.0,1.6364,0.0,0.0,0.5,0.0627,espn_true_per90
+belgian_pro_league,360422,Romeo Vermant,Club Brugge,Forward,False,34,12,1235.0,3.3522,0.583,0.0729,0.413,0.3519,espn_true_per90
+belgian_pro_league,303793,Christos Tzolis,Club Brugge,Left Forward,False,35,33,2982.0,3.5614,0.5131,0.6942,0.3644,0.8496,espn_true_per90
+belgian_pro_league,255261,Hugo Vetlesen,Club Brugge,Right Forward,False,24,14,1244.0,2.6045,0.3617,0.4341,0.3889,0.3544,espn_true_per90
+belgian_pro_league,304618,Bjorn Meijer,Club Brugge,Substitute,False,26,9,991.0,1.1806,0.0908,0.0908,0.3077,0.2823,espn_true_per90
+belgian_pro_league,288481,Michal Skoras,KAA Gent,Substitute,False,33,31,2654.0,1.3904,0.0678,0.2374,0.2439,0.7372,espn_true_per90
+belgian_pro_league,240109,Aleksandar Stankovic,Club Brugge,Substitute,False,39,34,3076.0,2.1651,0.1756,0.0585,0.3378,0.8764,espn_true_per90
+belgian_pro_league,78836,Carlos Forbs,Club Brugge,Substitute,False,36,34,2775.0,1.8486,0.2595,0.2595,0.3684,0.7906,espn_true_per90
+belgian_pro_league,335201,Nicolo Tresoldi,Club Brugge,Substitute,False,39,29,2492.0,3.6477,0.6862,0.1806,0.3861,0.71,espn_true_per90
+belgian_pro_league,306840,Andreas Jungdal,KVC Westerlo,Goalkeeper,True,39,39,3510.0,0.0,0.0,0.0,,1.0,espn_true_per90
+belgian_pro_league,122282,Roman Neustädter,KVC Westerlo,Center Left Defender,False,17,16,1302.0,0.3456,0.0,0.0,0.2,0.3709,espn_true_per90
+belgian_pro_league,299391,Emin Bayram,KVC Westerlo,Center Right Defender,False,37,37,3232.0,1.1139,0.1114,0.0278,0.3,0.9208,espn_true_per90
+belgian_pro_league,323129,Tuur Rommens,KVC Westerlo,Left Back,False,14,13,1133.0,0.556,0.0,0.0794,0.2857,0.3228,espn_true_per90
+belgian_pro_league,250758,Bryan Reynolds,KVC Westerlo,Right Back,False,38,38,3404.0,0.5552,0.0529,0.0793,0.381,0.9698,espn_true_per90
+belgian_pro_league,320563,Issai Sakamoto,KVC Westerlo,Attacking Midfielder,False,37,37,2960.0,2.0068,0.1824,0.1216,0.3182,0.8433,espn_true_per90
+belgian_pro_league,301330,Thomas Van Den Keybus,KVC Westerlo,Left Midfielder,False,31,9,1030.0,2.534,0.0874,0.0,0.2759,0.2934,espn_true_per90
+belgian_pro_league,241110,Dogucan Haspolat,KVC Westerlo,Right Midfielder,False,37,37,3305.0,1.2526,0.0272,0.1089,0.2174,0.9416,espn_true_per90
+belgian_pro_league,328393,Josimar Alcócer,KVC Westerlo,Attacking Midfielder Left,False,34,32,2645.0,1.7353,0.1021,0.1021,0.4706,0.7536,espn_true_per90
+belgian_pro_league,286757,Griffin Yow,KVC Westerlo,Attacking Midfielder Right,False,15,8,654.0,3.3028,0.4128,0.0,0.2917,0.1863,espn_true_per90
+belgian_pro_league,184824,Serhiy Sydorchuk,KVC Westerlo,Substitute,False,15,2,288.0,0.3125,0.0,0.0,0.0,0.0821,espn_true_per90
+belgian_pro_league,364582,Nacho Ferri,KVC Westerlo,Substitute,False,35,34,2890.0,3.1453,0.3426,0.0623,0.4158,0.8234,espn_true_per90
+belgian_pro_league,328463,Adedire Mebude,KVC Westerlo,Substitute,False,13,1,379.0,3.3245,0.4749,0.0,0.2857,0.108,espn_true_per90
+belgian_pro_league,359360,Arthur Piedfort,KVC Westerlo,Substitute,False,36,35,2993.0,0.6916,0.0902,0.0601,0.3043,0.8527,espn_true_per90
+belgian_pro_league,276721,Brent Gabriel,Zulte-Waregem,Goalkeeper,True,35,35,3150.0,0.0,0.0,0.0286,,1.0,espn_true_per90
+belgian_pro_league,200892,Laurent Lemoine,Zulte-Waregem,Center Left Defender,False,21,18,1581.0,0.1708,0.0569,0.0,0.3333,0.5019,espn_true_per90
+belgian_pro_league,298857,Anton Tanghe,Zulte-Waregem,Center Right Defender,False,20,19,1576.0,0.2284,0.1713,0.0,0.75,0.5003,espn_true_per90
+belgian_pro_league,406198,Yannick Cappelle,Zulte-Waregem,Left Back,False,29,21,1927.0,0.3736,0.0467,0.0467,0.125,0.6117,espn_true_per90
+belgian_pro_league,275348,Benoit Nyssen,Zulte-Waregem,Right Back,False,27,19,1655.0,0.8157,0.1088,0.1088,0.3333,0.5254,espn_true_per90
+belgian_pro_league,406195,Jeppe Erenbjerg,Zulte-Waregem,Attacking Midfielder,False,34,31,2686.0,2.9151,0.4356,0.1005,0.3678,0.8527,espn_true_per90
+belgian_pro_league,379959,Thomas Claes,Zulte-Waregem,Left Midfielder,False,33,31,2710.0,1.6605,0.0664,0.0332,0.32,0.8603,espn_true_per90
+belgian_pro_league,343114,Tochukwu Nnadi,Zulte-Waregem,Right Midfielder,False,17,16,1328.0,0.1355,0.0,0.0678,0.0,0.4216,espn_true_per90
+belgian_pro_league,99191,Jelle Vossen,Zulte-Waregem,Forward,False,16,3,358.0,3.0168,0.2514,0.0,0.25,0.1137,espn_true_per90
+belgian_pro_league,406203,Joseph Opoku,Zulte-Waregem,Attacking Midfielder Left,False,32,29,2369.0,2.3934,0.3799,0.2279,0.381,0.7521,espn_true_per90
+belgian_pro_league,385479,Wilguens Paugain,Zulte-Waregem,Substitute,False,23,15,1277.0,0.4229,0.0705,0.0,0.1667,0.4054,espn_true_per90
+belgian_pro_league,275730,Serxho Ujka,Zulte-Waregem,Substitute,False,14,6,585.0,1.6923,0.1538,0.3077,0.1818,0.1857,espn_true_per90
+belgian_pro_league,386239,Tobias Hedl,Zulte-Waregem,Substitute,False,10,4,328.0,1.0976,0.2744,0.0,0.75,0.1041,espn_true_per90
+belgian_pro_league,305923,Stavros Gavriel,Zulte-Waregem,Substitute,False,21,7,606.0,3.7129,0.1485,0.1485,0.28,0.1924,espn_true_per90
+belgian_pro_league,319371,Matthieu Epolo,Standard Liege,Goalkeeper,True,28,28,2520.0,0.0357,0.0,0.0,0.0,0.7179,espn_true_per90
+belgian_pro_league,286170,Josué Homawoo,Standard Liege,Center Left Defender,False,29,25,2093.0,0.258,0.0,0.043,0.0,0.5963,espn_true_per90
+belgian_pro_league,312386,Daan Dierckx,Standard Liege,Center Right Defender,False,19,15,1231.0,0.9504,0.0,0.0,0.3077,0.3507,espn_true_per90
+belgian_pro_league,319112,Alexandro Calut,Standard Liege,Left Back,False,8,3,324.0,0.0,0.0,0.0,,0.0923,espn_true_per90
+belgian_pro_league,256211,Marlon Fossey,Standard Liege,Right Back,False,19,19,1379.0,0.5874,0.0653,0.1305,0.4444,0.3929,espn_true_per90
+belgian_pro_league,272489,Dennis Dargahi,Standard Liege,Attacking Midfielder,False,34,22,1913.0,1.4584,0.2352,0.0,0.3226,0.545,espn_true_per90
+belgian_pro_league,283824,Ibrahim Karamoko,Standard Liege,Left Midfielder,False,30,25,2162.0,0.9158,0.0416,0.0,0.3182,0.616,espn_true_per90
+belgian_pro_league,195565,Marco Ilaimaharitra,Standard Liege,Right Midfielder,False,30,28,2355.0,0.4586,0.0764,0.0,0.4167,0.6709,espn_true_per90
+belgian_pro_league,231728,Thomas Henry,Standard Liege,Forward,False,20,16,1275.0,1.0588,0.1412,0.1412,0.3333,0.3632,espn_true_per90
+belgian_pro_league,305692,Rafiki Said,Standard Liege,Attacking Midfielder Left,False,36,34,2742.0,2.8884,0.2626,0.1313,0.3636,0.7812,espn_true_per90
+belgian_pro_league,275821,Tobias Mohr,Standard Liege,Attacking Midfielder Right,False,37,25,2203.0,0.9805,0.0817,0.0817,0.1667,0.6276,espn_true_per90
+belgian_pro_league,321346,Nayel Mehssatou Sepúlveda,Standard Liege,Substitute,False,28,10,1009.0,0.892,0.0,0.0892,0.5,0.2875,espn_true_per90
+belgian_pro_league,360869,Hakim Sahabo,Standard Liege,Substitute,False,13,4,501.0,0.7186,0.0,0.0,0.25,0.1427,espn_true_per90
+belgian_pro_league,207390,Michael Verrips,Dender,Goalkeeper,True,9,9,810.0,0.0,0.0,0.0,,0.2571,espn_true_per90
+belgian_pro_league,365345,Luc de Fougerolles,Dender,Center Defender,False,27,18,1655.0,0.2719,0.0,0.0544,0.0,0.5254,espn_true_per90
+belgian_pro_league,251089,Joederik Pupe,Sint-Truidense,Center Left Defender,False,11,9,701.0,0.5136,0.1284,0.0,0.5,0.1997,espn_true_per90
+belgian_pro_league,309152,Luc Marijnissen,Dender,Center Right Defender,False,34,34,2969.0,0.485,0.0303,0.0,0.375,0.9425,espn_true_per90
+belgian_pro_league,315454,Noah Mbamba,Dender,Center Left Midfielder,False,32,32,2637.0,0.8532,0.0683,0.0683,0.36,0.8371,espn_true_per90
+belgian_pro_league,310967,Malcolm Viltard,Dender,Center Right Midfielder,False,33,31,2479.0,0.4357,0.0363,0.0363,0.3333,0.787,espn_true_per90
+belgian_pro_league,328759,Fabio Ferraro,Dender,Left Midfielder,False,28,28,2441.0,1.0324,0.0369,0.1106,0.4286,0.7749,espn_true_per90
+belgian_pro_league,362266,Benjamin Fredrick,Dender,Right Midfielder,False,13,10,848.0,0.6368,0.0,0.0,0.1667,0.2692,espn_true_per90
+belgian_pro_league,269252,Aurelien Scheidler,Royal Charleroi SC,Forward,False,39,36,3176.0,1.927,0.255,0.1134,0.3824,0.9048,espn_true_per90
+belgian_pro_league,256770,Nathan Rodes,Dender,Center Left Forward,False,32,21,1893.0,0.9033,0.0,0.0,0.2105,0.601,espn_true_per90
+belgian_pro_league,346739,Roman Kvet,Dender,Center Right Forward,False,31,29,2476.0,1.3086,0.1817,0.0,0.3056,0.786,espn_true_per90
+belgian_pro_league,268178,Kobe Cools,Dender,Substitute,False,18,14,1236.0,0.801,0.0,0.0,0.5455,0.3924,espn_true_per90
+belgian_pro_league,304839,Bruny Nsimba,Dender,Substitute,False,27,22,1806.0,2.7907,0.4485,0.1993,0.3929,0.5733,espn_true_per90
+belgian_pro_league,317401,Dion Moise Sahi,Dender,Substitute,False,5,0,78.0,1.1538,0.0,0.0,0.0,0.0248,espn_true_per90
+belgian_pro_league,406340,Nail Moutha-Sebtaoui,Dender,Substitute,False,14,1,254.0,0.7087,0.0,0.0,0.5,0.0806,espn_true_per90
+belgian_pro_league,276605,David Hrncar,Dender,Substitute,False,17,8,739.0,1.9486,0.2436,0.0,0.5,0.2346,espn_true_per90
+belgian_pro_league,178363,Davy Roef,KAA Gent,Goalkeeper,True,40,40,3600.0,0.0,0.0,0.0,,1.0,espn_true_per90
+belgian_pro_league,337021,Samuel Junior Kotto,KAA Gent,Center Left Defender,False,7,5,399.0,0.4511,0.0,0.0,0.0,0.1108,espn_true_per90
+belgian_pro_league,214439,Leo Da Silva Lopes,KAA Gent,Center Right Defender,False,36,25,2332.0,0.6561,0.0386,0.0386,0.1176,0.6478,espn_true_per90
+belgian_pro_league,310801,Tiago Araújo,KAA Gent,Left Back,False,34,31,2693.0,0.7018,0.0334,0.1337,0.1905,0.7481,espn_true_per90
+belgian_pro_league,308143,Matisse Samoise,KAA Gent,Right Back,False,17,15,1284.0,0.5607,0.1402,0.1402,0.5,0.3567,espn_true_per90
+belgian_pro_league,304028,Atsuki Ito,KAA Gent,Center Left Midfielder,False,29,25,2087.7,1.5088,0.1724,0.1293,0.3714,0.5799,espn_true_per90
+belgian_pro_league,313240,Mathias Delorge-Knieper,KAA Gent,Center Right Midfielder,False,19,18,1321.0,0.6132,0.0,0.2044,0.4444,0.3669,espn_true_per90
+belgian_pro_league,370753,Franck Surdez,KAA Gent,Right Midfielder,False,14,4,363.0,2.7273,0.2479,0.0,0.3636,0.1008,espn_true_per90
+belgian_pro_league,241689,Wilfried Kanga,KAA Gent,Center Left Forward,False,35,32,2752.7,2.9099,0.3597,0.1308,0.4045,0.7646,espn_true_per90
+belgian_pro_league,399631,Bi Goore,KAA Gent,Center Right Forward,False,33,14,1384.0,3.4465,0.3251,0.2601,0.283,0.3844,espn_true_per90
+belgian_pro_league,228431,Dante Vanzeir,Cercle Brugge KSV,Substitute,False,19,9,888.0,2.2297,0.2027,0.2027,0.4545,0.2819,espn_true_per90
+belgian_pro_league,325338,Momodou Sonko,KAA Gent,Substitute,False,27,6,790.3,2.2777,0.0,0.2278,0.1,0.2195,espn_true_per90
+belgian_pro_league,403618,Mohammed El Adfaoui,KAA Gent,Substitute,False,3,0,61.0,0.0,0.0,1.4754,,0.0169,espn_true_per90
+belgian_pro_league,356927,Aime Omgba,KAA Gent,Substitute,False,19,2,389.0,0.9254,0.0,0.0,0.25,0.1081,espn_true_per90
+belgian_pro_league,216831,Marcos Peano,RAAL La Louvière,Goalkeeper,True,33,33,2970.0,0.0,0.0,0.0,,0.9429,espn_true_per90
+belgian_pro_league,406196,Maxence Maisonneuve,RAAL La Louvière,Center Defender,False,30,23,2203.0,0.9396,0.0,0.0409,0.2174,0.6994,espn_true_per90
+belgian_pro_league,333236,Djibril Lamego,RAAL La Louvière,Center Left Defender,False,29,28,2463.0,0.1462,0.0,0.0,0.0,0.7819,espn_true_per90
+belgian_pro_league,318572,Wagane Faye,RAAL La Louvière,Center Right Defender,False,26,25,2214.0,0.6504,0.122,0.0407,0.3125,0.7029,espn_true_per90
+belgian_pro_league,291742,Sami Lahssaini,RAAL La Louvière,Center Left Midfielder,False,31,30,2680.0,0.403,0.0336,0.0336,0.1667,0.8508,espn_true_per90
+belgian_pro_league,324133,Samuel Gueulette,RAAL La Louvière,Center Right Midfielder,False,28,11,1179.0,0.6107,0.0,0.0,0.25,0.3743,espn_true_per90
+belgian_pro_league,308315,Jordi Liongola,RAAL La Louvière,Left Midfielder,False,30,29,2528.0,0.9612,0.0712,0.2136,0.2222,0.8025,espn_true_per90
+belgian_pro_league,376145,Darío Benavides,RAAL La Louvière,Right Midfielder,False,19,11,905.0,0.6961,0.0,0.0994,0.1429,0.2873,espn_true_per90
+belgian_pro_league,382451,Mohamed Guindo,RAAL La Louvière,Forward,False,13,6,527.0,2.5617,0.0,0.0,0.2,0.1673,espn_true_per90
+belgian_pro_league,291668,Sekou Sidibe,RAAL La Louvière,Center Left Forward,False,4,1,117.0,1.5385,0.0,0.0,0.5,0.0371,espn_true_per90
+belgian_pro_league,406193,Max Pau,RAAL La Louvière,Center Right Forward,False,13,7,608.0,1.0362,0.148,0.0,0.1429,0.193,espn_true_per90
+belgian_pro_league,356493,Théo Épailly,RAAL La Louvière,Substitute,False,3,0,41.0,0.0,0.0,0.0,,0.013,espn_true_per90
+belgian_pro_league,406199,Joël Ito,RAAL La Louvière,Substitute,False,32,27,2331.0,0.8494,0.0386,0.0386,0.3182,0.74,espn_true_per90
+belgian_pro_league,313112,Oucasse Mendy,RAAL La Louvière,Substitute,False,16,12,921.0,0.5863,0.0977,0.0,0.3333,0.2924,espn_true_per90
+belgian_pro_league,346792,Nolan Gillot,RAAL La Louvière,Substitute,False,21,13,1281.0,2.1077,0.1405,0.281,0.3,0.4067,espn_true_per90
+belgian_pro_league,276177,Tobias Lawal,Racing Genk,Goalkeeper,True,18,18,1620.0,0.0,0.0,0.0,,0.45,espn_true_per90
+belgian_pro_league,346609,Matte Smets,Racing Genk,Center Left Defender,False,38,38,3420.0,0.3947,0.0,0.0263,0.0,0.95,espn_true_per90
+belgian_pro_league,265996,Mujaid Sadick,Racing Genk,Center Right Defender,False,35,33,2923.0,0.2155,0.0616,0.0,0.4286,0.8119,espn_true_per90
+belgian_pro_league,204329,Joris Kayembe,Racing Genk,Left Back,False,27,22,2015.0,0.536,0.0,0.0447,0.0833,0.5597,espn_true_per90
+belgian_pro_league,325024,Zakaria El Ouahdi,Racing Genk,Right Back,False,33,33,2922.0,2.0637,0.2464,0.1232,0.3433,0.8117,espn_true_per90
+belgian_pro_league,357801,Konstantinos Karetsas,Racing Genk,Attacking Midfielder,False,33,26,2172.0,2.6934,0.0,0.3729,0.3846,0.6033,espn_true_per90
+belgian_pro_league,223337,Bryan Heynen,Racing Genk,Left Midfielder,False,39,39,3483.0,1.2403,0.1034,0.0258,0.2292,0.9675,espn_true_per90
+belgian_pro_league,345959,Nikolas Sattlberger,Racing Genk,Right Midfielder,False,24,11,979.0,0.7354,0.0,0.0919,0.25,0.2719,espn_true_per90
+belgian_pro_league,302434,Oh Hyeon-Gyu,Racing Genk,Forward,False,19,12,1040.0,3.9808,0.4327,0.2596,0.4783,0.2889,espn_true_per90
+belgian_pro_league,366071,Noah Adedeji-Sternberg,Racing Genk,Attacking Midfielder Left,False,24,11,958.0,2.0668,0.0939,0.0939,0.1818,0.2661,espn_true_per90
+belgian_pro_league,312807,Jarne Steuckers,Racing Genk,Attacking Midfielder Right,False,29,15,1399.9,1.6073,0.0,0.3858,0.2,0.3889,espn_true_per90
+belgian_pro_league,366066,Ibrahima Bangoura,Racing Genk,Substitute,False,27,18,1475.0,0.4881,0.0,0.0,0.375,0.4097,espn_true_per90
+belgian_pro_league,315600,Yaimar Medina,Racing Genk,Substitute,False,27,18,1534.0,1.5841,0.0,0.176,0.4074,0.4261,espn_true_per90
+belgian_pro_league,240519,Daan Heymans,Racing Genk,Substitute,False,30,28,2340.3,2.3458,0.3846,0.1538,0.4098,0.6501,espn_true_per90
+belgian_pro_league,305372,Tolu Arokodare,Racing Genk,Substitute,False,3,0,60.0,7.5,1.5,0.0,0.4,0.0167,espn_true_per90
+belgian_pro_league,288476,Yira Sor,Racing Genk,Substitute,False,27,10,1082.1,2.8278,0.3327,0.0832,0.4706,0.3006,espn_true_per90
+belgian_pro_league,301425,Senne Lammens,Antwerp,Goalkeeper,True,3,3,270.0,0.0,0.0,0.0,,0.0769,espn_true_per90
+belgian_pro_league,382742,Rosen Bozhinov,Antwerp,Center Defender,False,15,14,1189.0,0.3785,0.0757,0.0,0.6,0.3387,espn_true_per90
+belgian_pro_league,365949,Andreas Verstraeten,Antwerp,Center Left Defender,False,15,8,831.0,0.0,0.0,0.1083,,0.2368,espn_true_per90
+belgian_pro_league,314184,Zeno Van Den Bosch,Antwerp,Center Right Defender,False,34,34,2982.0,0.3924,0.0,0.0302,0.4615,0.8496,espn_true_per90
+belgian_pro_league,271729,Daam Foulon,Antwerp,Left Back,False,32,28,2199.0,0.5321,0.0,0.1637,0.3077,0.6265,espn_true_per90
+belgian_pro_league,298354,Thibo Somers,Antwerp,Right Back,False,31,28,2344.0,1.3439,0.1536,0.0768,0.4571,0.6678,espn_true_per90
+belgian_pro_league,173150,Dennis Praet,Antwerp,Center Midfielder,False,30,28,2442.0,0.5897,0.0,0.0,0.1875,0.6957,espn_true_per90
+belgian_pro_league,349122,Mahamadou Doumbia,Antwerp,Center Left Midfielder,False,5,5,439.0,2.0501,0.41,0.205,0.3,0.1251,espn_true_per90
+belgian_pro_league,304204,Michel-Ange Balikwisha,Antwerp,Center Right Midfielder,False,3,3,257.0,1.0506,0.3502,0.0,0.6667,0.0732,espn_true_per90
+belgian_pro_league,188402,Vincent Janssen,Antwerp,Center Left Forward,False,34,34,2999.0,2.6409,0.2701,0.2101,0.3182,0.8544,espn_true_per90
+belgian_pro_league,199663,Gyrano Kerk,Antwerp,Center Right Forward,False,26,23,2022.0,2.1365,0.1335,0.178,0.3125,0.5761,espn_true_per90
+belgian_pro_league,401026,David Gabriel Jesus,Antwerp,Substitute,False,7,0,99.0,0.9091,0.0,0.0,0.0,0.0282,espn_true_per90
+belgian_pro_league,349711,Mauricio Benitez,Antwerp,Substitute,False,26,17,1490.0,1.4497,0.1812,0.0,0.25,0.4245,espn_true_per90
+belgian_pro_league,390670,Semm Renders,Antwerp,Substitute,False,12,5,622.0,0.2894,0.0,0.0,0.0,0.1772,espn_true_per90
+belgian_pro_league,286946,Maxime Delanghe,Cercle Brugge KSV,Goalkeeper,True,17,16,1501.0,0.0,0.0,0.0,,0.4765,espn_true_per90
+belgian_pro_league,310407,Edgaras Utkus,Cercle Brugge KSV,Center Left Defender,False,18,16,1361.0,0.8597,0.1323,0.0,0.3077,0.4321,espn_true_per90
+belgian_pro_league,335909,Christiaan Ravych,Cercle Brugge KSV,Center Right Defender,False,26,24,2153.0,0.3344,0.0,0.0,0.25,0.6835,espn_true_per90
+belgian_pro_league,316559,Názinho,Cercle Brugge KSV,Left Back,False,29,27,2464.0,0.9497,0.1096,0.2557,0.3077,0.7822,espn_true_per90
+belgian_pro_league,311004,Ibrahim Diakité,Cercle Brugge KSV,Right Back,False,18,10,855.0,0.5263,0.0,0.1053,0.2,0.2714,espn_true_per90
+belgian_pro_league,177363,Hannes Van Der Bruggen,Cercle Brugge KSV,Center Left Midfielder,False,31,31,2498.0,1.0088,0.0,0.036,0.1429,0.793,espn_true_per90
+belgian_pro_league,406339,Makaya Diaby,Cercle Brugge KSV,Center Right Midfielder,False,25,9,919.0,1.7628,0.1959,0.0979,0.3889,0.2917,espn_true_per90
+belgian_pro_league,183074,Pieter Gerkens,Cercle Brugge KSV,Left Midfielder,False,34,30,2747.0,1.3105,0.1966,0.0328,0.4,0.8721,espn_true_per90
+belgian_pro_league,334129,Lawrence Agyekum,Cercle Brugge KSV,Right Midfielder,False,28,24,1797.0,1.2521,0.0,0.1002,0.24,0.5705,espn_true_per90
+belgian_pro_league,319422,Alan Minda,Cercle Brugge KSV,Center Left Forward,False,16,10,881.0,2.4518,0.3065,0.2043,0.4167,0.2797,espn_true_per90
+belgian_pro_league,346520,Steve Ngoura,Cercle Brugge KSV,Center Right Forward,False,33,25,2025.0,3.0667,0.3111,0.1778,0.3333,0.6429,espn_true_per90
+belgian_pro_league,321828,Nils De Wilde,Cercle Brugge KSV,Substitute,False,10,0,89.0,2.0225,0.0,0.0,0.5,0.0283,espn_true_per90
+belgian_pro_league,345645,Edan Diop,Cercle Brugge KSV,Substitute,False,32,31,2589.0,1.8424,0.2433,0.1043,0.4151,0.8219,espn_true_per90
+belgian_pro_league,384108,Emmanuel Kakou,Cercle Brugge KSV,Substitute,False,24,19,1733.0,1.0906,0.1039,0.0519,0.2381,0.5502,espn_true_per90
+belgian_pro_league,290547,Gary Magnée,Cercle Brugge KSV,Substitute,False,33,30,2801.0,0.9639,0.1285,0.2249,0.3333,0.8892,espn_true_per90
+belgian_pro_league,361440,Erick,Cercle Brugge KSV,Substitute,False,15,1,294.0,0.9184,0.0,0.3061,0.0,0.0933,espn_true_per90
+belgian_pro_league,152749,Colin Coosemans,Anderlecht,Goalkeeper,True,37,37,3330.0,0.0,0.0,0.0,,0.9487,espn_true_per90
+belgian_pro_league,291360,Marco Kana,Anderlecht,Center Left Defender,False,26,25,2043.0,0.3965,0.0,0.0,0.2222,0.5821,espn_true_per90
+belgian_pro_league,319468,Lucas Hey,Anderlecht,Center Right Defender,False,31,26,2422.0,0.2601,0.0,0.0,0.0,0.69,espn_true_per90
+belgian_pro_league,349838,N'Diaye Moussa,Anderlecht,Left Back,False,17,9,970.0,0.9278,0.0,0.0,0.1,0.2764,espn_true_per90
+belgian_pro_league,395942,Ali Maamar,Anderlecht,Right Back,False,24,13,1317.0,0.8884,0.0,0.2733,0.0,0.3752,espn_true_per90
+belgian_pro_league,158066,Thorgan Hazard,Anderlecht,Attacking Midfielder,False,35,30,2634.0,2.426,0.3759,0.2392,0.4085,0.7504,espn_true_per90
+belgian_pro_league,287172,Enric Llansana,Anderlecht,Left Midfielder,False,28,18,1619.0,0.8894,0.0,0.0556,0.0625,0.4613,espn_true_per90
+belgian_pro_league,386884,Nathan De Cat,Anderlecht,Right Midfielder,False,35,33,2671.0,0.9772,0.0674,0.1011,0.2069,0.761,espn_true_per90
+belgian_pro_league,285032,Luis Vázquez,Anderlecht,Forward,False,13,7,608.0,2.3684,0.2961,0.0,0.5625,0.1732,espn_true_per90
+belgian_pro_league,318090,Nilson Angulo,Anderlecht,Attacking Midfielder Left,False,21,21,1825.0,1.5288,0.2466,0.1973,0.4516,0.5199,espn_true_per90
+belgian_pro_league,283658,Yari Verschaeren,Anderlecht,Attacking Midfielder Right,False,27,12,1382.0,1.563,0.0651,0.1954,0.25,0.3937,espn_true_per90
+belgian_pro_league,192475,Ludwig Augustinsson,Anderlecht,Substitute,False,26,23,1984.0,0.7712,0.0,0.0907,0.1176,0.5652,espn_true_per90
+belgian_pro_league,277376,Adriano Bertaccini,Anderlecht,Substitute,False,32,17,1548.0,3.5465,0.3488,0.0581,0.4098,0.441,espn_true_per90
+belgian_pro_league,365988,Tristan Degreef,Anderlecht,Substitute,False,33,20,1806.0,1.8439,0.1495,0.0997,0.3514,0.5145,espn_true_per90
+belgian_pro_league,370492,Ilay Camara,Anderlecht,Substitute,False,25,17,1310.0,1.0305,0.1374,0.0687,0.4667,0.3732,espn_true_per90
+belgian_pro_league,311163,Nathan Saliba,Anderlecht,Substitute,False,33,28,2299.0,2.2706,0.0783,0.0391,0.2414,0.655,espn_true_per90
+belgian_pro_league,316278,Vic Chambaere,Union St.-Gilloise,Goalkeeper,True,8,7,675.0,0.0,0.0,0.0,,0.1923,espn_true_per90
+belgian_pro_league,310140,Fedde Leysen,Union St.-Gilloise,Center Defender,False,26,19,1781.0,0.5559,0.0505,0.0505,0.3636,0.5074,espn_true_per90
+belgian_pro_league,241066,Ross Sykes,Union St.-Gilloise,Center Left Defender,False,32,28,2623.0,1.9215,0.1716,0.0,0.4464,0.7473,espn_true_per90
+belgian_pro_league,234337,Kevin Mac Allister,Union St.-Gilloise,Center Right Defender,False,33,33,2840.0,0.6655,0.0317,0.0317,0.2381,0.8091,espn_true_per90
+belgian_pro_league,298901,Adem Zorgane,Union St.-Gilloise,Center Left Midfielder,False,36,34,2959.0,0.8516,0.1217,0.1521,0.4286,0.843,espn_true_per90
+belgian_pro_league,276260,Charles Vanhoutte,Union St.-Gilloise,Center Right Midfielder,False,4,4,360.0,0.25,0.0,0.25,0.0,0.1026,espn_true_per90
+belgian_pro_league,290809,Anouar Ait El Hadj,Union St.-Gilloise,Attacking Midfielder,False,37,33,2567.0,1.4725,0.0701,0.1753,0.3095,0.7313,espn_true_per90
+belgian_pro_league,256687,Ousseynou Niang,Union St.-Gilloise,Left Midfielder,False,26,17,1520.0,1.3026,0.1184,0.1184,0.2727,0.433,espn_true_per90
+belgian_pro_league,332648,Anan Khalaili,Union St.-Gilloise,Right Midfielder,False,37,36,3070.0,1.0847,0.0879,0.1466,0.3243,0.8746,espn_true_per90
+belgian_pro_league,281316,Kevin Rodríguez,Union St.-Gilloise,Center Left Forward,False,30,21,1781.0,3.79,0.5053,0.1011,0.4,0.5074,espn_true_per90
+belgian_pro_league,344857,Raul Florucz,Union St.-Gilloise,Center Right Forward,False,23,15,1169.0,3.3875,0.4619,0.231,0.3182,0.333,espn_true_per90
+belgian_pro_league,399471,Marc Giger,Union St.-Gilloise,Substitute,False,16,5,475.0,2.8421,0.5684,0.1895,0.5333,0.1353,espn_true_per90
+belgian_pro_league,236136,Alessio Castro-Montes,Union St.-Gilloise,Substitute,False,4,1,82.0,1.0976,0.0,0.0,0.0,0.0234,espn_true_per90
+belgian_pro_league,178056,Sofiane Boufal,Union St.-Gilloise,Substitute,False,8,0,169.0,4.2604,0.0,0.5325,0.25,0.0481,espn_true_per90
+belgian_pro_league,277374,Tobe Leysen,Oud-Heverlee Leuven,Goalkeeper,True,31,31,2769.0,0.0,0.0,0.0,,0.7889,espn_true_per90
+belgian_pro_league,238018,Takuma Ominami,Oud-Heverlee Leuven,Center Left Defender,False,21,17,1616.0,0.5012,0.0,0.0557,0.1111,0.4604,espn_true_per90
+belgian_pro_league,279287,Ewoud Pletinckx,Oud-Heverlee Leuven,Center Right Defender,False,39,39,3448.0,0.8875,0.0783,0.0,0.3529,0.9823,espn_true_per90
+belgian_pro_league,312886,Takahiro Akimoto,Oud-Heverlee Leuven,Left Back,False,30,29,2620.0,0.6527,0.0,0.0,0.2632,0.7464,espn_true_per90
+belgian_pro_league,282276,Óscar Gil,Oud-Heverlee Leuven,Right Back,False,32,28,2235.0,0.8859,0.0805,0.0403,0.4545,0.6368,espn_true_per90
+belgian_pro_league,250728,Youssef Maziz,Oud-Heverlee Leuven,Attacking Midfielder,False,35,24,2069.0,2.088,0.087,0.174,0.2292,0.5895,espn_true_per90
+belgian_pro_league,178857,Birger Verstraete,Oud-Heverlee Leuven,Left Midfielder,False,25,17,1622.0,0.2219,0.0,0.0,0.0,0.4621,espn_true_per90
+belgian_pro_league,180547,Siebe Schrijvers,Oud-Heverlee Leuven,Right Midfielder,False,29,24,2032.0,1.2844,0.1329,0.1772,0.1379,0.5789,espn_true_per90
+belgian_pro_league,352320,Jovan Mijatovic,Oud-Heverlee Leuven,Forward,False,13,7,704.0,1.9176,0.0,0.0,0.2667,0.2006,espn_true_per90
+belgian_pro_league,243453,Thibaud Verlinden,Oud-Heverlee Leuven,Attacking Midfielder Left,False,25,16,1401.0,1.2848,0.1285,0.1927,0.5,0.3991,espn_true_per90
+belgian_pro_league,276727,William Balikwisha,Oud-Heverlee Leuven,Attacking Midfielder Right,False,10,2,210.0,2.1429,0.0,0.0,0.4,0.0598,espn_true_per90
+belgian_pro_league,225526,Thibault Vlietinck,Oud-Heverlee Leuven,Substitute,False,9,4,332.0,0.5422,0.0,0.0,0.5,0.0946,espn_true_per90
+belgian_pro_league,320298,Casper Terho,Oud-Heverlee Leuven,Substitute,False,11,6,524.0,2.9198,0.0,0.0,0.4118,0.1493,espn_true_per90
+belgian_pro_league,345151,Nachon Nsingi,RAAL La Louvière,Substitute,False,15,2,298.0,2.4161,0.302,0.0,0.375,0.0946,espn_true_per90
+belgian_pro_league,214655,Mathieu Maertens,Oud-Heverlee Leuven,Substitute,False,34,11,1207.0,3.7283,0.0,0.2237,0.3,0.3439,espn_true_per90
+belgian_pro_league,364234,Abdoul Traoré,Oud-Heverlee Leuven,Substitute,False,24,10,876.0,3.3904,0.2055,0.1027,0.2424,0.2496,espn_true_per90
+belgian_pro_league,345149,Martin Delavalée,Royal Charleroi SC,Goalkeeper,True,20,20,1800.0,0.0,0.0,0.0,,0.5128,espn_true_per90
+belgian_pro_league,388157,Massamba Sow,Royal Charleroi SC,Center Left Defender,False,3,1,147.0,0.0,0.0,0.0,,0.0419,espn_true_per90
+belgian_pro_league,286806,Aiham Ousou,Royal Charleroi SC,Center Right Defender,False,38,38,3305.0,0.8714,0.0545,0.0272,0.3125,0.9416,espn_true_per90
+belgian_pro_league,291160,Mardochee Nzita,Royal Charleroi SC,Left Back,False,38,34,3008.0,0.359,0.0,0.0598,0.25,0.857,espn_true_per90
+belgian_pro_league,291712,Jeremy Petris,Royal Charleroi SC,Right Back,False,4,4,348.0,0.0,0.0,0.0,,0.0991,espn_true_per90
+belgian_pro_league,301704,Antoine Colassin,Royal Charleroi SC,Attacking Midfielder,False,29,6,612.0,3.3824,0.2941,0.1471,0.3043,0.1744,espn_true_per90
+belgian_pro_league,312550,Etienne Camara,Royal Charleroi SC,Left Midfielder,False,37,37,2955.0,0.5787,0.0609,0.0914,0.3158,0.8419,espn_true_per90
+belgian_pro_league,341720,Yassine Titraoui,Royal Charleroi SC,Right Midfielder,False,34,32,2844.0,1.5823,0.1582,0.0316,0.38,0.8103,espn_true_per90
+belgian_pro_league,216303,Isaac Mbenza,Royal Charleroi SC,Attacking Midfielder Left,False,3,1,97.0,1.8557,0.0,0.0,0.5,0.0276,espn_true_per90
+belgian_pro_league,257055,Parfait Guiagon,Royal Charleroi SC,Substitute,False,32,28,2484.0,2.8986,0.3261,0.1812,0.275,0.7077,espn_true_per90
+belgian_pro_league,359500,Jakob Romsaas,Royal Charleroi SC,Substitute,False,36,16,1712.0,2.0502,0.1051,0.1577,0.359,0.4877,espn_true_per90
+belgian_pro_league,207878,Cheick Keita,Royal Charleroi SC,Substitute,False,39,38,3350.0,0.403,0.0806,0.0,0.2667,0.9544,espn_true_per90
+belgian_pro_league,327161,Leo Brian Kokubo,Sint-Truidense,Goalkeeper,True,37,37,3330.0,0.0,0.0,0.0,,0.9487,espn_true_per90
+belgian_pro_league,222063,Visar Musliu,Sint-Truidense,Center Left Defender,False,29,27,2429.0,0.5928,0.0,0.0,0.1875,0.692,espn_true_per90
+belgian_pro_league,336732,Rein Van Helden,Antwerp,Center Right Defender,False,28,24,2031.0,0.5318,0.0886,0.0,0.3333,0.5786,espn_true_per90
+belgian_pro_league,297569,Taiga Hata,Sint-Truidense,Left Back,False,31,27,2354.0,0.1912,0.0382,0.0765,0.4,0.6707,espn_true_per90
+belgian_pro_league,306031,Louis Patris,Union St.-Gilloise,Right Back,False,33,13,1346.0,0.8692,0.0,0.1337,0.4615,0.3835,espn_true_per90
+belgian_pro_league,236070,Ryotaro Ito,Sint-Truidense,Attacking Midfielder,False,34,33,2750.0,2.3564,0.2945,0.1636,0.3611,0.7835,espn_true_per90
+belgian_pro_league,241304,Abdoulage Sissako,Sint-Truidense,Left Midfielder,False,39,38,3260.0,0.8006,0.0552,0.0828,0.1379,0.9288,espn_true_per90
+belgian_pro_league,347980,Rihito Yamamoto,Sint-Truidense,Right Midfielder,False,37,37,3214.0,1.4281,0.14,0.168,0.3137,0.9157,espn_true_per90
+belgian_pro_league,359913,Andrés Ferrari,Sint-Truidense,Forward,False,19,9,802.0,3.2544,0.3367,0.1122,0.2759,0.2285,espn_true_per90
+belgian_pro_league,330042,Ilias Sebaoui,Sint-Truidense,Attacking Midfielder Left,False,39,39,3184.0,2.5722,0.1413,0.1413,0.2967,0.9071,espn_true_per90
+belgian_pro_league,363541,Robert-Jan Vanwesemael,Sint-Truidense,Attacking Midfielder Right,False,36,36,3000.0,0.99,0.03,0.03,0.2424,0.8547,espn_true_per90
+belgian_pro_league,366547,Alouis Diriken,Sint-Truidense,Substitute,False,7,0,62.0,2.9032,0.0,0.0,0.5,0.0177,espn_true_per90
+belgian_pro_league,202728,Shogo Taniguchi,Sint-Truidense,Substitute,False,37,32,2941.0,0.4284,0.0306,0.0306,0.1429,0.8379,espn_true_per90
+belgian_pro_league,406299,Ryan Merlen,Sint-Truidense,Substitute,False,32,7,935.0,2.3102,0.2888,0.1925,0.2083,0.2664,espn_true_per90
+belgian_pro_league,406998,Kaito Matsuzawa,Sint-Truidense,Substitute,False,32,3,688.0,3.0087,0.2616,0.2616,0.3478,0.196,espn_true_per90
+belgian_pro_league,346208,Keisuke Goto,Sint-Truidense,Substitute,False,38,32,2886.0,1.9335,0.343,0.2183,0.4032,0.8222,espn_true_per90
+belgian_pro_league,407613,Krzysztof Koton,Dender,Substitute,False,12,2,343.0,1.5743,0.0,0.0,0.5,0.1089,espn_true_per90
+belgian_pro_league,310023,Hugo Siquet,Club Brugge,Right Back,False,31,13,1283.0,1.1224,0.0,0.1403,0.125,0.3655,espn_true_per90
+belgian_pro_league,312758,Cisse Sandra,Club Brugge,Attacking Midfielder Right,False,16,6,588.0,2.2959,0.1531,0.1531,0.2667,0.1675,espn_true_per90
+belgian_pro_league,351373,Kyriani Sabbe,Club Brugge,Substitute,False,27,20,1653.0,0.98,0.1633,0.1633,0.5,0.4709,espn_true_per90
+belgian_pro_league,396639,Krys Kouassi,Cercle Brugge KSV,Substitute,False,12,0,114.0,2.3684,0.0,0.0,0.0,0.0362,espn_true_per90
+belgian_pro_league,375875,Antonio Cordero,KVC Westerlo,Substitute,False,7,0,86.0,4.186,0.0,0.0,0.25,0.0245,espn_true_per90
+belgian_pro_league,379483,Amando Lapage,KVC Westerlo,Substitute,False,16,14,1266.0,0.5687,0.0,0.0,0.25,0.3607,espn_true_per90
+belgian_pro_league,343979,Kyan Vaesen,Oud-Heverlee Leuven,Substitute,False,31,7,780.0,2.4231,0.1154,0.1154,0.381,0.2222,espn_true_per90
+belgian_pro_league,330584,Bill Antonio,KV Mechelen,,False,33,7,1159.0,1.1648,0.0777,0.0777,0.2667,0.3302,espn_true_per90
+belgian_pro_league,199230,Benito Raman,KV Mechelen,,False,29,10,1050.0,2.4,0.2571,0.2571,0.3571,0.2991,espn_true_per90
+belgian_pro_league,263628,Tommy St. Jago,KV Mechelen,,False,28,25,2282.0,0.2366,0.0,0.0394,0.0,0.6501,espn_true_per90
+belgian_pro_league,240517,Siebe van der Heyden,KAA Gent,Center Left Defender,False,36,34,3045.0,0.7389,0.0591,0.0296,0.32,0.8458,espn_true_per90
+belgian_pro_league,305459,Maksim Paskotši,KAA Gent,Center Right Defender,False,22,22,1813.0,0.7446,0.1986,0.0496,0.4,0.5036,espn_true_per90
+belgian_pro_league,326642,Omri Gandelman,KAA Gent,Substitute,False,18,16,1428.0,1.7647,0.4412,0.063,0.3929,0.3967,espn_true_per90
+belgian_pro_league,181403,Christian Burgess,Union St.-Gilloise,Center Defender,False,34,34,3057.0,0.5594,0.0589,0.0883,0.3684,0.8709,espn_true_per90
+belgian_pro_league,396001,Cristian Makaté,RAAL La Louvière,Substitute,False,7,0,141.0,1.9149,0.0,0.0,0.6667,0.0448,espn_true_per90
+belgian_pro_league,173141,Mathias Rasmussen,Union St.-Gilloise,Substitute,False,16,7,707.0,1.273,0.2546,0.1273,0.3,0.2014,espn_true_per90
+belgian_pro_league,290810,Thierry Lutonda,RAAL La Louvière,Left Back,False,26,22,1730.0,1.0405,0.052,0.052,0.25,0.5492,espn_true_per90
+belgian_pro_league,332396,Yllan Okou,RAAL La Louvière,Substitute,False,33,30,2710.0,0.3653,0.0332,0.0,0.2727,0.8603,espn_true_per90
+belgian_pro_league,332143,Owen Maes,RAAL La Louvière,Substitute,False,22,14,1275.0,1.2,0.0,0.0706,0.2941,0.4048,espn_true_per90
+belgian_pro_league,276270,Antoine Bernier,Royal Charleroi SC,Attacking Midfielder Right,False,37,31,2359.0,1.5261,0.2289,0.0763,0.375,0.6721,espn_true_per90
+belgian_pro_league,363133,Yassine Khalifi,Royal Charleroi SC,Substitute,False,20,4,612.0,0.4412,0.0,0.1471,0.0,0.1744,espn_true_per90
+belgian_pro_league,219284,Kasper Dolberg,Anderlecht,Center Right Forward,False,3,1,122.0,5.1639,0.7377,0.0,0.5714,0.0348,espn_true_per90
+belgian_pro_league,312187,Mario Stroeykens,Anderlecht,Substitute,False,22,7,795.0,1.6981,0.1132,0.0,0.2,0.2265,espn_true_per90
+belgian_pro_league,328743,Lukas Willen,Zulte-Waregem,Center Left Defender,False,20,16,1439.0,0.2502,0.0,0.0625,0.0,0.4568,espn_true_per90
+belgian_pro_league,365728,Enrique Lofolomo,Zulte-Waregem,Substitute,False,22,14,1309.0,0.6188,0.0,0.1375,0.3333,0.4156,espn_true_per90
+belgian_pro_league,183094,Casper Nielsen,Standard Liege,Right Midfielder,False,26,23,1878.0,1.5335,0.2396,0.0958,0.3438,0.535,espn_true_per90
+belgian_pro_league,356177,Léandre Kuavita,Standard Liege,Substitute,False,12,1,302.0,1.1921,0.0,0.0,0.5,0.086,espn_true_per90
+belgian_pro_league,343978,Ibe Hautekiet,Standard Liege,Substitute,False,36,32,2947.0,0.5192,0.0611,0.0,0.2941,0.8396,espn_true_per90
+belgian_pro_league,287514,Timothé Nkada,Standard Liege,Substitute,False,30,11,1240.0,1.8145,0.2903,0.0726,0.4,0.3533,espn_true_per90
+belgian_pro_league,282482,Ken Nkuba Tshiend,Racing Genk,Substitute,False,13,5,508.0,1.9488,0.1772,0.0,0.5455,0.1411,espn_true_per90
+belgian_pro_league,346679,Adrian Palacios,Racing Genk,Substitute,False,11,3,301.3,1.1947,0.0,0.2987,0.0,0.0837,espn_true_per90
+belgian_pro_league,378866,Yuto Tsunashima,Antwerp,Center Right Defender,False,34,32,2726.0,0.3962,0.033,0.0,0.3333,0.7766,espn_true_per90
+belgian_pro_league,390494,Farouck Adekami,Antwerp,Substitute,False,21,12,1140.0,2.7632,0.1579,0.1579,0.4571,0.3248,espn_true_per90
+belgian_pro_league,372206,Mukhammadali Urinboev,Antwerp,Substitute,False,5,0,127.0,2.126,0.0,0.0,0.0,0.0362,espn_true_per90
+belgian_pro_league,323045,Roggerio Nyakossi,Oud-Heverlee Leuven,Center Defender,False,27,26,2241.0,0.5221,0.1606,0.0,0.3846,0.6385,espn_true_per90
+belgian_pro_league,300983,Wouter George,Oud-Heverlee Leuven,Substitute,False,24,12,1179.0,0.8397,0.0763,0.0763,0.2727,0.3359,espn_true_per90
+belgian_pro_league,169214,Patrik Hrosovský,Racing Genk,Substitute,False,16,10,1005.0,2.1493,0.0896,0.0896,0.3333,0.2792,espn_true_per90
+belgian_pro_league,219350,Junya Ito,Racing Genk,Substitute,False,28,22,1786.0,1.8141,0.3024,0.252,0.4444,0.4961,espn_true_per90
+belgian_pro_league,366835,Shandre Campbell,Club Brugge,Substitute,False,11,0,94.0,4.7872,0.9574,0.0,0.2,0.0268,espn_true_per90
+belgian_pro_league,311270,Nacho Miras,KV Mechelen,Goalkeeper,True,33,33,2925.0,0.0,0.0,0.0,,0.8333,espn_true_per90
+belgian_pro_league,360232,Thérence Koudou,KV Mechelen,Right Midfielder,False,36,36,3032.0,0.7421,0.1484,0.0594,0.32,0.8638,espn_true_per90
+belgian_pro_league,350454,Gora Diouf,KV Mechelen,Substitute,False,18,9,925.0,0.5838,0.0973,0.0973,0.1667,0.2635,espn_true_per90
+belgian_pro_league,379297,Tibe De Vlieger,KAA Gent,Substitute,False,24,17,1566.0,0.8621,0.0575,0.0,0.0667,0.435,espn_true_per90
+belgian_pro_league,299294,Abdelkahar Kadri,KAA Gent,Substitute,False,33,22,2076.3,1.1704,0.0867,0.2167,0.3333,0.5767,espn_true_per90
+belgian_pro_league,246244,Kjell Scherpen,Union St.-Gilloise,Goalkeeper,True,32,32,2835.0,0.0,0.0,0.0,,0.8077,espn_true_per90
+belgian_pro_league,318522,Promise David,Union St.-Gilloise,Substitute,False,23,16,1437.0,4.1336,0.5637,0.0626,0.3636,0.4094,espn_true_per90
+belgian_pro_league,344595,Mohammed Fuseini,Union St.-Gilloise,Substitute,False,21,4,581.0,2.4785,0.1549,0.0,0.3125,0.1655,espn_true_per90
+belgian_pro_league,191225,Boli Bolingoli-Mbombo,Standard Liege,,False,3,1,115.0,0.0,0.0,0.0,,0.0328,espn_true_per90
+belgian_pro_league,260808,Ragnar Oratmangoen,Dender,Substitute,False,16,3,502.0,1.4343,0.1793,0.0,0.5,0.1594,espn_true_per90
+belgian_pro_league,251523,Bryan Goncalves,Dender,Substitute,False,26,24,2113.0,0.4259,0.0426,0.0852,0.4,0.6708,espn_true_per90
+belgian_pro_league,265969,César Huerta,Anderlecht,Substitute,False,11,8,545.0,2.6422,0.1651,0.0,0.375,0.1553,espn_true_per90
+belgian_pro_league,399247,Youssef Hamdaoui,Antwerp,,False,21,5,583.0,2.9331,0.1544,0.1544,0.2105,0.1661,espn_true_per90
+belgian_pro_league,390645,Oluwaseun Adewumi,Cercle Brugge KSV,Substitute,False,31,16,1564.0,3.2225,0.2877,0.0,0.4286,0.4965,espn_true_per90
+belgian_pro_league,386076,Alama Bayo,Cercle Brugge KSV,Substitute,False,4,0,11.0,0.0,0.0,0.0,,0.0035,espn_true_per90
+belgian_pro_league,274853,Seiji Kimura,KVC Westerlo,Substitute,False,21,20,1839.0,0.783,0.0489,0.0,0.125,0.5239,espn_true_per90
+belgian_pro_league,353362,Adnane Abid,Standard Liege,Attacking Midfielder Right,False,33,25,2060.0,0.9175,0.0874,0.2184,0.4762,0.5869,espn_true_per90
+belgian_pro_league,403318,René Muteba,Standard Liege,Substitute,False,6,0,143.0,1.2587,0.0,0.0,0.0,0.0407,espn_true_per90
+belgian_pro_league,240376,Mohamed El Hankouri,Standard Liege,Substitute,False,15,6,633.0,0.8531,0.0,0.0,0.3333,0.1803,espn_true_per90
+belgian_pro_league,384986,Valy Konaté,Cercle Brugge KSV,Substitute,False,13,9,823.0,0.3281,0.0,0.0,0.3333,0.2613,espn_true_per90
+belgian_pro_league,320948,Anosike Ementa,Zulte-Waregem,Substitute,False,32,29,2616.0,1.4106,0.1376,0.2752,0.439,0.8305,espn_true_per90
+belgian_pro_league,263282,Boubakar Kiki Kouyate,Antwerp,,False,24,13,1180.0,0.7627,0.0763,0.0,0.3,0.3362,espn_true_per90
+belgian_pro_league,127880,Yannick Thoelen,Antwerp,Goalkeeper,True,7,5,495.0,0.0,0.0,0.0,,0.141,espn_true_per90
+belgian_pro_league,212769,Glenn Bijl,Antwerp,Center Right Midfielder,False,11,8,645.0,0.1395,0.0,0.0,0.0,0.1838,espn_true_per90
+belgian_pro_league,347037,Marwan Al-Sahafi,Antwerp,Center Left Forward,False,24,15,1323.0,1.2925,0.068,0.0,0.2632,0.3769,espn_true_per90
+belgian_pro_league,396561,Jerry Afriyie,RAAL La Louvière,Substitute,False,31,29,2498.0,1.8375,0.1801,0.036,0.4118,0.793,espn_true_per90
+belgian_pro_league,292152,Jordan Attah Kadiri,Dender,,False,13,1,260.0,3.8077,0.3462,0.0,0.2727,0.0825,espn_true_per90
+belgian_pro_league,194352,Noe Dussenne,Oud-Heverlee Leuven,Center Defender,False,23,22,1877.0,0.8631,0.0479,0.0,0.2222,0.5348,espn_true_per90
+belgian_pro_league,266722,Allahyar Sayyad,KVC Westerlo,Substitute,False,29,27,2221.0,1.9451,0.2837,0.1216,0.3125,0.6328,espn_true_per90
+belgian_pro_league,255739,Mathias Fixelles,KVC Westerlo,Substitute,False,4,0,25.0,0.0,0.0,0.0,,0.0071,espn_true_per90
+belgian_pro_league,321999,Kevin Guiton,Royal Charleroi SC,Substitute,False,30,25,2118.0,1.4873,0.1275,0.17,0.3143,0.6034,espn_true_per90
+belgian_pro_league,318597,Jules Gaudin,Royal Charleroi SC,Substitute,False,19,6,632.0,0.9968,0.0,0.0,0.1429,0.1801,espn_true_per90
+belgian_pro_league,345150,Desmond Acquah,Dender,Substitute,False,11,2,235.0,2.6809,0.0,0.383,0.1429,0.0746,espn_true_per90
+belgian_pro_league,359025,Hatim Essaoubi,KAA Gent,Center Right Defender,False,10,2,193.0,0.0,0.0,0.0,,0.0536,espn_true_per90
+belgian_pro_league,329449,Lynnt Audoor,Club Brugge,Substitute,False,6,3,194.0,0.0,0.0,0.4639,,0.0553,espn_true_per90
+belgian_pro_league,394418,Kaye Furo,Club Brugge,Substitute,False,5,0,84.0,4.2857,1.0714,0.0,0.5,0.0239,espn_true_per90
+belgian_pro_league,362875,Mamadou Diakhon,Club Brugge,Substitute,False,23,8,795.0,1.9245,0.0,0.7925,0.1765,0.2265,espn_true_per90
+belgian_pro_league,341446,Lukasz Lakomy,Oud-Heverlee Leuven,Center Right Midfielder,False,32,25,2119.0,1.3591,0.1274,0.1274,0.375,0.6037,espn_true_per90
+belgian_pro_league,364191,Chukwubuikem Ikwuemesi,Oud-Heverlee Leuven,Substitute,False,34,20,1819.0,2.276,0.1979,0.0,0.413,0.5182,espn_true_per90
+belgian_pro_league,384411,Davis Opoku,Oud-Heverlee Leuven,Substitute,False,21,5,813.0,0.4428,0.0,0.2214,0.25,0.2316,espn_true_per90
+belgian_pro_league,291538,Henry Lawrence,Standard Liege,Left Back,False,30,27,2433.0,0.4069,0.074,0.0,0.2727,0.6932,espn_true_per90
+belgian_pro_league,291359,Killian Sardella,Anderlecht,Substitute,False,32,22,2036.0,1.0167,0.0,0.0442,0.2609,0.5801,espn_true_per90
+belgian_pro_league,401002,Robin Mirisola,Racing Genk,Forward,False,30,13,1266.2,2.5588,0.3554,0.1422,0.3611,0.3517,espn_true_per90
+belgian_pro_league,366842,Josué Ndenge,Racing Genk,Substitute,False,16,12,1166.8,0.3085,0.0,0.0,0.0,0.3241,espn_true_per90
+belgian_pro_league,259548,Jakob Kiilerich,Zulte-Waregem,Center Left Defender,False,29,25,2291.0,0.3536,0.0,0.0,0.2222,0.7273,espn_true_per90
+belgian_pro_league,314178,Mathis Servais,KV Mechelen,Center Left Midfielder,False,32,32,2798.0,1.3188,0.0643,0.1287,0.2683,0.7972,espn_true_per90
+belgian_pro_league,309156,Myron van Brederode,KV Mechelen,Substitute,False,34,32,2841.0,1.2988,0.2851,0.1584,0.4146,0.8094,espn_true_per90
+belgian_pro_league,291677,Marley Aké,Zulte-Waregem,Substitute,False,30,16,1746.0,2.4742,0.4124,0.0,0.3542,0.5543,espn_true_per90
+belgian_pro_league,324015,Henok Teklab,Oud-Heverlee Leuven,Substitute,False,25,21,1638.0,1.2637,0.1648,0.0,0.3478,0.4667,espn_true_per90
+belgian_pro_league,319420,Mohamed Berte,Dender,,False,28,8,950.0,1.9895,0.1895,0.0,0.4286,0.3016,espn_true_per90
+belgian_pro_league,385284,Kamiel Van De Perre,Union St.-Gilloise,Substitute,False,29,24,2128.0,0.4652,0.0,0.1269,0.0,0.6063,espn_true_per90
+belgian_pro_league,336589,Joel Ordóñez,Club Brugge,Substitute,False,32,29,2578.0,0.4888,0.0698,0.0,0.2143,0.7345,espn_true_per90
+belgian_pro_league,133319,Mahamadou Diawara,Antwerp,Center Left Midfielder,False,8,6,401.0,0.4489,0.0,0.0,0.5,0.1142,espn_true_per90
+belgian_pro_league,318782,Isaac Babadi,Antwerp,Center Right Midfielder,False,17,3,472.0,2.2881,0.0,0.0,0.5,0.1345,espn_true_per90
+belgian_pro_league,241032,Jean-Kévin Duverne,KAA Gent,Substitute,False,22,12,1153.0,0.3122,0.0781,0.0781,0.75,0.3203,espn_true_per90
+belgian_pro_league,329483,Oumar Diakité,Cercle Brugge KSV,,False,24,15,1399.0,2.4446,0.4503,0.0,0.4474,0.4441,espn_true_per90
+belgian_pro_league,304930,Filip Szymczak,Royal Charleroi SC,Substitute,False,19,0,277.0,3.2491,0.0,0.0,0.3,0.0789,espn_true_per90
+belgian_pro_league,333320,Lewin Blum,Royal Charleroi SC,Substitute,False,32,17,1776.0,0.4054,0.0,0.0507,0.25,0.506,espn_true_per90
+belgian_pro_league,324177,Mehdi Boukamir,Royal Charleroi SC,Substitute,False,16,1,288.0,0.0,0.0,0.0,,0.0821,espn_true_per90
+belgian_pro_league,372078,Ibrahim Kanate,Anderlecht,Substitute,False,18,0,332.0,3.253,0.5422,0.0,0.4167,0.0946,espn_true_per90
+belgian_pro_league,315675,Jusef Erabi,Racing Genk,Substitute,False,15,4,457.0,2.7571,0.1969,0.0,0.4286,0.1269,espn_true_per90
+belgian_pro_league,257897,Arbnor Muja,Sint-Truidense,Substitute,False,26,22,1856.0,2.0851,0.2909,0.097,0.3721,0.5288,espn_true_per90
+belgian_pro_league,238113,Simen Jukleröd,Sint-Truidense,Substitute,False,22,7,854.0,0.8431,0.1054,0.4215,0.375,0.2433,espn_true_per90
+belgian_pro_league,322590,Junior Sambu Mansoni,Dender,Substitute,False,29,23,2014.0,0.4916,0.0,0.1787,0.1818,0.6394,espn_true_per90
+belgian_pro_league,252205,Sory Kaba,Oud-Heverlee Leuven,Center Left Forward,False,30,16,1595.0,2.3135,0.3386,0.1129,0.2927,0.4544,espn_true_per90
+belgian_pro_league,388196,Pape Fall,RAAL La Louvière,Substitute,False,27,18,1772.0,3.149,0.5587,0.0508,0.371,0.5625,espn_true_per90
+belgian_pro_league,356949,Emran Soglo,Zulte-Waregem,Substitute,False,18,11,1037.0,1.3886,0.0,0.2604,0.125,0.3292,espn_true_per90
+belgian_pro_league,369978,Mihajlo Cvetkovic,Anderlecht,Substitute,False,29,19,1625.0,2.2708,0.4985,0.1108,0.5122,0.463,espn_true_per90
+belgian_pro_league,43199,Christopher Scott,Antwerp,,False,31,26,2199.0,1.7599,0.2456,0.0819,0.3953,0.6265,espn_true_per90
+belgian_pro_league,238183,Gustaf Nilsson,Club Brugge,Substitute,False,7,0,39.0,6.9231,0.0,0.0,0.3333,0.0111,espn_true_per90
+belgian_pro_league,303903,Isaias Del Pupo,Sint-Truidense,Substitute,False,4,0,22.0,0.0,0.0,0.0,,0.0063,espn_true_per90
+belgian_pro_league,336718,Mihajlo Ilic,Anderlecht,Substitute,False,10,8,768.0,0.4688,0.0,0.0,0.25,0.2188,espn_true_per90
+belgian_pro_league,391053,Eliot Bujupi,KVC Westerlo,Substitute,False,5,0,8.0,22.5,0.0,0.0,0.5,0.0023,espn_true_per90
+belgian_pro_league,238771,Hendrik van Crombrugge,Racing Genk,Goalkeeper,True,11,11,990.0,0.0,0.0,0.0,,0.275,espn_true_per90
+belgian_pro_league,250143,Warleson,Cercle Brugge KSV,Substitute,False,19,18,1556.0,0.0,0.0,0.0,,0.494,espn_true_per90
+belgian_pro_league,381685,Amine Boukamir,Royal Charleroi SC,Right Midfielder,False,6,5,359.0,0.0,0.0,0.0,,0.1023,espn_true_per90
+belgian_pro_league,297237,Taishi Nozawa,Antwerp,Goalkeeper,True,30,30,2655.0,0.0,0.0,0.0,,0.7564,espn_true_per90
+belgian_pro_league,284369,Guillaume Dietsch,Dender,Goalkeeper,True,14,13,1194.0,0.0,0.0,0.0,,0.379,espn_true_per90
+belgian_pro_league,304607,David Tosevski,Dender,Substitute,False,25,19,1491.0,2.3541,0.2414,0.0,0.3077,0.4733,espn_true_per90
+belgian_pro_league,185286,Abdoul Ouattara,Cercle Brugge KSV,Substitute,False,3,1,119.0,0.0,0.0,0.0,,0.0378,espn_true_per90
+belgian_pro_league,332317,Dikeni-Rafid Salifou,KV Mechelen,Substitute,False,18,11,995.0,0.2714,0.0,0.0,0.6667,0.2835,espn_true_per90
+belgian_pro_league,240551,Wolke Janssens,Sint-Truidense,Substitute,False,7,0,40.0,0.0,0.0,0.0,,0.0114,espn_true_per90
+belgian_pro_league,303328,Anthony Valencia,Antwerp,Substitute,False,23,12,1326.0,1.9683,0.2715,0.1357,0.4138,0.3778,espn_true_per90
+belgian_pro_league,307140,Max Dean,KAA Gent,Substitute,False,23,11,1178.0,3.82,0.5348,0.0764,0.42,0.3272,espn_true_per90
+belgian_pro_league,408314,Lucas Mbamba-Muanda,KVC Westerlo,Right Back,False,14,9,764.0,0.9424,0.0,0.0,0.25,0.2177,espn_true_per90
+belgian_pro_league,329916,Heriberto De Jesus,Cercle Brugge KSV,,False,8,1,155.0,1.7419,0.0,0.0,0.3333,0.0492,espn_true_per90
+belgian_pro_league,188055,Alireza Jahanbakhsh,Dender,Substitute,False,21,9,900.0,2.0,0.1,0.1,0.35,0.2857,espn_true_per90
+belgian_pro_league,323997,Mohamed Koné,Royal Charleroi SC,Goalkeeper,True,19,19,1710.0,0.0,0.0,0.0,,0.4872,espn_true_per90
+belgian_pro_league,288917,Alexis Beka Beka,RAAL La Louvière,Substitute,False,7,2,166.0,4.3373,0.5422,0.0,0.25,0.0527,espn_true_per90
+belgian_pro_league,397467,Steeven Assengue,Standard Liege,Substitute,False,6,0,115.0,0.0,0.0,0.0,,0.0328,espn_true_per90
+belgian_pro_league,414540,Matties Volckaert,KAA Gent,Right Back,False,26,25,2231.0,0.5244,0.0,0.0,0.0769,0.6197,espn_true_per90
+belgian_pro_league,260389,Hassane Bandé,KV Mechelen,Substitute,False,7,0,65.0,0.0,0.0,0.0,,0.0185,espn_true_per90
+belgian_pro_league,359880,Gerard Vandeplas,Antwerp,Substitute,False,19,5,533.0,1.8574,0.0,0.0,0.5455,0.1519,espn_true_per90
+belgian_pro_league,99829,Simon Mignolet,Club Brugge,Goalkeeper,True,11,11,933.0,0.0,0.0,0.0,,0.2658,espn_true_per90
+belgian_pro_league,305931,Dani van den Heuvel,Club Brugge,Substitute,False,10,8,764.0,0.0,0.0,0.0,,0.2177,espn_true_per90
+belgian_pro_league,410554,Xander Dierckx,Antwerp,Substitute,False,19,16,1362.0,0.5947,0.0661,0.0,0.2222,0.388,espn_true_per90
+belgian_pro_league,346146,Massimo Decoene,KV Mechelen,Substitute,False,8,2,236.0,0.7627,0.0,0.0,1.0,0.0672,espn_true_per90
+belgian_pro_league,346213,Yasin Ozcan,Anderlecht,Substitute,False,4,1,132.0,1.3636,0.0,0.0,0.0,0.0376,espn_true_per90
+belgian_pro_league,207287,Lucas Pirard,Standard Liege,Goalkeeper,True,11,11,990.0,0.0,0.0,0.0,,0.2821,espn_true_per90
+belgian_pro_league,330077,Guilherme Smith,Union St.-Gilloise,Substitute,False,22,18,1541.0,1.2265,0.2336,0.1168,0.3333,0.439,espn_true_per90
+belgian_pro_league,314183,Ivan Pavlic,Union St.-Gilloise,Substitute,False,9,0,66.0,1.3636,0.0,0.0,0.0,0.0188,espn_true_per90
+belgian_pro_league,406206,Benoit De Jaegere,Zulte-Waregem,Substitute,False,17,10,926.0,0.1944,0.0,0.0,0.0,0.294,espn_true_per90
+belgian_pro_league,384888,Maksim Kireev,KV Mechelen,Substitute,False,13,3,288.0,1.5625,0.0,0.0,0.2,0.0821,espn_true_per90
+belgian_pro_league,398907,Keano Van Rafelghem,KV Mechelen,Substitute,False,16,5,518.0,1.7375,0.5212,0.0,0.4,0.1476,espn_true_per90
+belgian_pro_league,313950,Fernand Gouré,KVC Westerlo,Substitute,False,13,1,162.0,1.6667,0.0,0.0,0.3333,0.0462,espn_true_per90
+belgian_pro_league,364138,Aaron Bibout,Racing Genk,Substitute,False,21,13,1165.8,3.7828,0.4632,0.0,0.3469,0.3238,espn_true_per90
+belgian_pro_league,417499,Naoufal Bohamdi-Kamoni,KVC Westerlo,Substitute,False,11,0,105.0,0.8571,0.0,0.8571,0.0,0.0299,espn_true_per90
+belgian_pro_league,411026,Shunsuke Saito,KVC Westerlo,Substitute,False,17,10,856.0,1.8925,0.1051,0.1051,0.1111,0.2439,espn_true_per90
+belgian_pro_league,345526,Mateo Biondic,Union St.-Gilloise,Substitute,False,15,9,757.0,3.21,0.4756,0.2378,0.5556,0.2157,espn_true_per90
+belgian_pro_league,271701,Hong Hyun-Seok,KAA Gent,Attacking Midfielder,False,19,13,868.7,0.6216,0.1036,0.0,0.6667,0.2413,espn_true_per90
+belgian_pro_league,190293,Gauthier Gallon,Dender,Goalkeeper,True,13,13,1146.0,0.0,0.0,0.0,,0.3638,espn_true_per90
+belgian_pro_league,319386,Gustav Julius Mortensen,Standard Liege,Substitute,False,20,19,1736.0,0.3629,0.0,0.0,0.1429,0.4946,espn_true_per90
+belgian_pro_league,232231,Teddy Teuma,Standard Liege,Substitute,False,9,3,371.0,1.4555,0.0,0.2426,0.5,0.1057,espn_true_per90
+belgian_pro_league,397592,Bernard Nguene,Standard Liege,Substitute,False,14,1,299.0,2.408,0.301,0.0,0.625,0.0852,espn_true_per90
+belgian_pro_league,190262,David Bates,Standard Liege,Substitute,False,18,15,1380.0,0.6522,0.0652,0.0,0.4,0.3932,espn_true_per90
+belgian_pro_league,362670,Oumar Diouf,Sint-Truidense,Substitute,False,16,0,188.0,5.7447,1.4362,0.0,0.5,0.0536,espn_true_per90
+belgian_pro_league,276334,Loïc Mbe Soh,Sint-Truidense,Substitute,False,14,9,913.0,0.4929,0.1972,0.0,0.4,0.2601,espn_true_per90
+belgian_pro_league,334024,Besfort Zeneli,Union St.-Gilloise,Substitute,False,15,8,765.0,1.8824,0.3529,0.7059,0.5,0.2179,espn_true_per90
+belgian_pro_league,288490,Danylo Sikan,Anderlecht,Forward,False,9,6,413.0,3.0508,0.4358,0.2179,0.7143,0.1177,espn_true_per90
+belgian_pro_league,394413,Dylan Ourega,KVC Westerlo,Left Back,False,8,3,413.0,0.6538,0.2179,0.2179,0.3333,0.1177,espn_true_per90
+belgian_pro_league,356912,Geoffrey Kondo,Cercle Brugge KSV,Center Left Defender,False,10,10,900.0,0.9,0.1,0.1,0.2222,0.2857,espn_true_per90
+belgian_pro_league,213535,Moussa Diarra,Anderlecht,Left Back,False,12,12,970.0,0.4639,0.0,0.0,0.2,0.2764,espn_true_per90
+belgian_pro_league,399644,Bouke Boersma,KV Mechelen,Forward,False,17,15,1326.0,1.5611,0.2036,0.2036,0.4783,0.3778,espn_true_per90
+belgian_pro_league,401308,Afonso Patrão,KVC Westerlo,Substitute,False,11,1,222.0,3.2432,0.4054,0.0,0.5,0.0632,espn_true_per90
+belgian_pro_league,418166,Bo De Kerf,Dender,Substitute,False,8,5,458.0,0.786,0.0,0.0,0.0,0.1454,espn_true_per90
+belgian_pro_league,256966,Daiki Hashioka,KAA Gent,Substitute,False,17,16,1386.0,0.4545,0.0,0.0,0.1429,0.385,espn_true_per90
+belgian_pro_league,214457,Maxence Prevot,Oud-Heverlee Leuven,Substitute,False,9,8,741.0,0.0,0.0,0.0,,0.2111,espn_true_per90
+belgian_pro_league,390696,Coba da Costa,Anderlecht,Attacking Midfielder Right,False,5,2,145.0,1.2414,0.0,0.0,0.5,0.0413,espn_true_per90
+belgian_pro_league,256839,Majeed Ashimeru,RAAL La Louvière,Substitute,False,9,6,414.0,1.5217,0.0,0.0,0.0,0.1314,espn_true_per90
+belgian_pro_league,398443,Yoann Cisse,Royal Charleroi SC,Substitute,False,5,0,24.0,7.5,0.0,0.0,0.5,0.0068,espn_true_per90
+belgian_pro_league,361591,Moctar Diop,KAA Gent,Substitute,False,3,0,30.0,3.0,0.0,0.0,0.0,0.0083,espn_true_per90
+belgian_pro_league,372031,Charles Herrmann,Cercle Brugge KSV,Substitute,False,4,0,71.0,2.5352,0.0,0.0,0.0,0.0225,espn_true_per90
+belgian_pro_league,365842,Clinton Nsiala-Makengo,KVC Westerlo,Left Back,False,4,4,265.0,0.0,0.0,0.0,,0.0755,espn_true_per90
+belgian_pro_league,328744,Dirk Asare,Zulte-Waregem,Substitute,False,11,9,818.0,0.8802,0.0,0.0,0.5,0.2597,espn_true_per90
+belgian_pro_league,249777,Malick Mbaye,Zulte-Waregem,Substitute,False,6,0,61.0,4.4262,1.4754,0.0,0.6667,0.0194,espn_true_per90
+belgian_pro_league,418988,Ibrahima Cisse,KAA Gent,Substitute,False,12,1,270.4,2.9961,0.3329,0.0,0.2222,0.0751,espn_true_per90
+belgian_pro_league,286758,Bryang Kayo,Oud-Heverlee Leuven,Substitute,False,5,1,95.0,0.0,0.0,0.0,,0.0271,espn_true_per90
+belgian_pro_league,409831,Amine Daali,Dender,Substitute,False,5,0,106.0,1.6981,0.0,0.0,1.0,0.0337,espn_true_per90
+belgian_pro_league,376388,Eran Tuypens,Antwerp,Substitute,False,8,4,305.0,0.2951,0.0,0.0,0.0,0.0869,espn_true_per90
+belgian_pro_league,284373,Bryan Soumaré,RAAL La Louvière,Substitute,False,7,3,314.0,1.1465,0.0,0.0,0.75,0.0997,espn_true_per90
+belgian_pro_league,141623,Mats Rits,Anderlecht,Substitute,False,3,0,88.0,1.0227,0.0,0.0,0.0,0.0251,espn_true_per90
+belgian_pro_league,387927,Lucca Kiaba Mounganga,Racing Genk,Goalkeeper,True,11,11,990.0,0.0,0.0,0.0,,0.275,espn_true_per90
+belgian_pro_league,410539,Joshua-Williame Nga Kana,Anderlecht,Substitute,False,3,0,33.0,5.4545,0.0,0.0,0.0,0.0094,espn_true_per90
+belgian_pro_league,341710,Ayumu Yokoyama,Racing Genk,Substitute,False,9,3,387.0,3.2558,0.2326,0.0,0.5,0.1075,espn_true_per90
+belgian_pro_league,389282,Massiré Sylla,Union St.-Gilloise,Substitute,False,3,1,90.0,0.0,0.0,0.0,,0.0256,espn_true_per90
+belgian_pro_league,417984,Shion Shinkawa,Sint-Truidense,Substitute,False,4,1,79.0,2.2785,0.0,0.0,0.0,0.0225,espn_true_per90
+belgian_pro_league,383224,Mathys Angély,Anderlecht,Substitute,False,4,3,279.0,0.3226,0.0,0.0,0.0,0.0795,espn_true_per90
+belgian_pro_league,144337,Geoffrey Hairemans,Antwerp,Substitute,False,4,1,105.0,1.7143,0.0,0.0,0.0,0.0299,espn_true_per90
+belgian_pro_league,403786,August De Wannemacker,Racing Genk,Substitute,False,4,0,39.0,2.3077,0.0,0.0,1.0,0.0108,espn_true_per90
+belgian_pro_league,404690,Reda Laalaoui,KVC Westerlo,Substitute,False,3,0,38.0,4.7368,0.0,0.0,0.5,0.0108,espn_true_per90
+belgian_pro_league,317076,Enis Destan,KVC Westerlo,Substitute,False,3,1,96.0,2.8125,0.0,0.0,0.3333,0.0274,espn_true_per90

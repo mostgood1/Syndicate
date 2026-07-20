@@ -1,0 +1,431 @@
+league,season,player_id,player_name,team,position,minutes,games,shots_per90,xg_per90,xa_per90,goals_per90,assists_per90,key_passes_per90,expected_minutes_share,is_goalkeeper,source
+ligue_1,2024,understat_7490,Mason Greenwood,Marseille,F M S,2851.0,34,3.7881,0.6087,0.2155,0.6945,0.1578,1.4837,0.9317,False,understat
+ligue_1,2024,understat_3226,Ousmane Dembélé,Paris Saint Germain,F M S,1747.0,29,4.9971,0.9549,0.4534,1.0819,0.3606,3.1425,0.6693,False,understat
+ligue_1,2024,understat_8056,Arnaud Kalimuendo Muinga,Rennes,F M S,2630.0,33,2.6008,0.6153,0.0986,0.5817,0.1027,0.6502,0.8855,False,understat
+ligue_1,2024,understat_8636,Jonathan Christian David,Lille,F S,2535.0,32,2.5917,0.6907,0.167,0.568,0.1775,1.2781,0.8802,False,understat
+ligue_1,2024,understat_3277,Alexandre Lacazette,Lyon,F S,2092.0,30,2.5382,0.7746,0.1628,0.6453,0.086,1.1185,0.7748,False,understat
+ligue_1,2024,understat_10016,Bradley Barcola,Paris Saint Germain,F M S,2223.0,34,2.996,0.6212,0.4022,0.5668,0.4049,2.0243,0.7265,False,understat
+ligue_1,2024,understat_11817,Emanuel Emegha,Strasbourg,F M,2331.0,27,2.3552,0.6805,0.0772,0.5405,0.1158,0.695,0.9593,False,understat
+ligue_1,2024,understat_6401,Amine Gouiri,"Marseille,Rennes",F M S,2122.0,33,3.4354,0.4534,0.1934,0.5514,0.2121,1.442,0.7145,False,understat
+ligue_1,2024,understat_6905,Ludovic Ajorque,Brest,F S,2533.0,31,1.9187,0.4474,0.1089,0.4619,0.0711,1.2436,0.9079,False,understat
+ligue_1,2024,understat_10349,Mika Biereth,Monaco,F,1255.0,16,3.012,0.8753,0.3438,0.9323,0.1434,1.5777,0.8715,False,understat
+ligue_1,2024,understat_8006,Evann Guessand,Nice,F M S,2609.0,33,2.1043,0.3376,0.2145,0.414,0.276,1.1039,0.8785,False,understat
+ligue_1,2024,understat_13057,Lucas Stassin,Saint-Etienne,F S,1916.0,28,2.0668,0.395,0.1808,0.5637,0.1879,0.8455,0.7603,False,understat
+ligue_1,2024,understat_3746,Gaetan Laborde,Nice,F S,1845.0,28,3.6098,0.6107,0.249,0.5366,0.1951,1.3171,0.7321,False,understat
+ligue_1,2024,understat_8187,Georges Mikautadze,Lyon,F M S,1397.0,34,3.6077,0.7384,0.3428,0.7087,0.3865,1.4173,0.4565,False,understat
+ligue_1,2024,understat_11755,Keito Nakamura,Reims,F M S,2702.0,32,2.8312,0.3075,0.1075,0.3664,0.0666,0.7994,0.9382,False,understat
+ligue_1,2024,understat_3285,Gaetan Perrin,Auxerre,F M S,2750.0,34,1.9309,0.2022,0.2787,0.3273,0.36,2.3891,0.8987,False,understat
+ligue_1,2024,understat_3674,Abdoulaye Touré,Le Havre,M S,2347.0,28,1.8023,0.3598,0.0224,0.3835,0.0383,0.2684,0.9313,False,understat
+ligue_1,2024,understat_6986,Hamed Junior Traore,Auxerre,F M,2154.0,26,2.883,0.3196,0.1217,0.4178,0.0836,1.1281,0.9205,False,understat
+ligue_1,2024,understat_11767,Gonçalo Ramos,Paris Saint Germain,F S,1047.0,22,4.7278,1.3982,0.2873,0.8596,0.2579,1.2894,0.5288,False,understat
+ligue_1,2024,understat_11808,Andrey Santos,Strasbourg,M,2861.0,32,1.4156,0.2037,0.1045,0.3146,0.0944,0.8494,0.9934,False,understat
+ligue_1,2024,understat_3291,Adrien Rabiot,Marseille,M S,2476.0,29,1.7811,0.2648,0.1438,0.3271,0.1817,1.0541,0.9487,False,understat
+ligue_1,2024,understat_7652,Zuriko Davitashvili,Saint-Etienne,F M S,2815.0,33,2.238,0.2568,0.1812,0.2877,0.2558,1.6625,0.9478,False,understat
+ligue_1,2024,understat_9490,Matthis Abline,Nantes,F M S,2823.0,34,2.3273,0.3018,0.134,0.2869,0.0638,0.8289,0.9225,False,understat
+ligue_1,2024,understat_12850,Esteban Lepaul,Angers,F S,1638.0,28,2.2527,0.4025,0.0632,0.4945,0.0,0.3846,0.65,False,understat
+ligue_1,2024,understat_7169,Moses Simon,Nantes,F M S,2661.0,32,1.4882,0.2335,0.2953,0.2706,0.3382,1.9278,0.924,False,understat
+ligue_1,2024,understat_8094,Mathis Cherki,Lyon,F M S,2050.0,30,1.9756,0.2336,0.5192,0.3512,0.4829,3.2927,0.7593,False,understat
+ligue_1,2024,understat_12104,Neil El Aynaoui,Lens,M S,1596.0,24,1.0714,0.2662,0.116,0.4511,0.0564,1.3534,0.7389,False,understat
+ligue_1,2024,understat_3603,Corentin Tolisso,Lyon,M S,2343.0,32,1.959,0.2176,0.1539,0.2689,0.1536,1.1908,0.8135,False,understat
+ligue_1,2024,understat_8980,Luis Henrique,Marseille,D M S,2646.0,33,1.0204,0.1841,0.1842,0.2381,0.2381,1.8027,0.8909,False,understat
+ligue_1,2024,understat_10796,Zakaria Aboukhlal,Toulouse,F M S,1935.0,26,2.9302,0.5565,0.0788,0.3256,0.093,0.6047,0.8269,False,understat
+ligue_1,2024,understat_465,Joshua King,Toulouse,F M S,1685.0,28,2.6706,0.4142,0.0925,0.3205,0.1602,0.908,0.6687,False,understat
+ligue_1,2024,understat_3475,Ludovic Blas,Rennes,F M S,2332.0,29,2.1998,0.2154,0.2176,0.2316,0.3087,1.8139,0.8935,False,understat
+ligue_1,2024,understat_3721,Romain Del Castillo,Brest,F M S,1246.0,26,1.5169,0.3114,0.3203,0.4334,0.2889,2.6726,0.5325,False,understat
+ligue_1,2024,understat_5356,Breel Embolo,Monaco,F M S,1853.0,29,2.4285,0.6012,0.2857,0.2914,0.1943,1.5057,0.71,False,understat
+ligue_1,2024,understat_6147,Denis Zakaria,Monaco,M S,2156.0,26,1.2941,0.1855,0.0663,0.2505,0.167,0.6679,0.9214,False,understat
+ligue_1,2024,understat_6846,Sofiane Diop,Nice,F M S,1018.0,28,1.945,0.4903,0.2752,0.5305,0.3536,2.1218,0.404,False,understat
+ligue_1,2024,understat_7313,Lee Kang-In,Paris Saint Germain,F M S,1670.0,30,2.2096,0.2323,0.367,0.3234,0.3234,3.018,0.6185,False,understat
+ligue_1,2024,understat_8239,Takumi Minamino,Monaco,M S,2269.0,31,2.2212,0.387,0.2679,0.238,0.119,1.5866,0.8133,False,understat
+ligue_1,2024,understat_8920,Dilane Bakwa,Strasbourg,D F M S,2544.0,30,1.8396,0.1716,0.2734,0.2123,0.283,1.6981,0.9422,False,understat
+ligue_1,2024,understat_9018,M&#039;Bala Nzola,Lens,F S,1470.0,21,2.8776,0.6075,0.0744,0.3673,0.0612,1.2245,0.7778,False,understat
+ligue_1,2024,understat_10431,Désiré Doué,Paris Saint Germain,F M S,1725.0,31,2.8696,0.3187,0.5215,0.313,0.313,2.8696,0.6183,False,understat
+ligue_1,2024,understat_10771,Ben Seghir,Monaco,M S,1759.0,33,3.1723,0.3304,0.2465,0.307,0.1535,1.6373,0.5923,False,understat
+ligue_1,2024,understat_10812,Jubal,Auxerre,D,2647.0,30,1.02,0.1835,0.0314,0.204,0.0,0.204,0.9804,False,understat
+ligue_1,2024,understat_10923,Himad Abdelli,Angers,F M,2866.0,32,1.1933,0.2113,0.1227,0.1884,0.0314,1.2247,0.9951,False,understat
+ligue_1,2024,understat_11046,Abdallah Sima,Brest,F M S,1229.0,27,2.7828,0.5636,0.1245,0.4394,0.1465,0.952,0.5058,False,understat
+ligue_1,2024,understat_12970,Sebastian Nanasi,Strasbourg,F M S,2166.0,31,1.205,0.253,0.2513,0.2493,0.1662,1.5789,0.7763,False,understat
+ligue_1,2024,understat_5311,Vincent Sierro,Toulouse,M S,2433.0,29,1.1837,0.1575,0.1582,0.185,0.037,1.1837,0.9322,False,understat
+ligue_1,2024,understat_5724,Irvin Cardona,Saint-Etienne,F M S,1102.0,15,1.9601,0.4105,0.1737,0.4083,0.245,1.5517,0.8163,False,understat
+ligue_1,2024,understat_6452,Mahdi Camara,Brest,M S,2691.0,34,1.6388,0.162,0.092,0.1672,0.1003,0.8696,0.8794,False,understat
+ligue_1,2024,understat_6874,Yann Gboho,Toulouse,F M S,2363.0,31,1.9044,0.2056,0.1705,0.1904,0.1523,1.1426,0.847,False,understat
+ligue_1,2024,understat_8777,Vitinha,Paris Saint Germain,M S,2020.0,29,1.203,0.1653,0.1247,0.2228,0.0446,1.203,0.7739,False,understat
+ligue_1,2024,understat_10058,Maghnes Akliouche,Monaco,M S,2419.0,32,2.2695,0.3081,0.3162,0.186,0.3721,1.7487,0.8399,False,understat
+ligue_1,2024,understat_10193,Frank Magri,Toulouse,F M S,1512.0,31,2.619,0.367,0.1024,0.2976,0.0595,0.5357,0.5419,False,understat
+ligue_1,2024,understat_10815,Lassine Sinayoko,Auxerre,F M S,2305.0,34,2.3818,0.2782,0.212,0.1952,0.3124,1.4447,0.7533,False,understat
+ligue_1,2024,understat_10831,Mostafa Mohamed,Nantes,F S,1216.0,30,3.1826,0.4886,0.0339,0.3701,0.0,0.5181,0.4504,False,understat
+ligue_1,2024,understat_11757,Hákon Haraldsson,Lille,F M S,1791.0,25,1.7588,0.2197,0.1902,0.2513,0.1508,1.7588,0.796,False,understat
+ligue_1,2024,understat_11792,Issa Soumaré,Le Havre,F M S,1908.0,29,2.0283,0.1982,0.1279,0.2358,0.1887,1.3208,0.731,False,understat
+ligue_1,2024,understat_12336,Malick Fofana,Lyon,F M S,1574.0,29,1.7726,0.2509,0.169,0.2859,0.2287,1.3723,0.6031,False,understat
+ligue_1,2024,understat_13070,Ali Abdi,Nice,D S,1410.0,25,1.8511,0.3125,0.151,0.3191,0.1277,1.2766,0.6267,False,understat
+ligue_1,2024,understat_713,André Ayew,Le Havre,F S,1452.0,27,1.3636,0.2956,0.0114,0.2479,0.062,0.4959,0.5975,False,understat
+ligue_1,2024,understat_2447,Fabián,Paris Saint Germain,M S,1911.0,30,2.0251,0.2176,0.2316,0.1884,0.2355,1.6954,0.7078,False,understat
+ligue_1,2024,understat_2674,Thilo Kehrer,Monaco,D,2386.0,27,0.4526,0.0489,0.0075,0.1509,0.0,0.1886,0.9819,False,understat
+ligue_1,2024,understat_3621,Neal Maupay,Marseille,F S,1054.0,22,1.6224,0.4005,0.1952,0.3416,0.3416,1.1101,0.5323,False,understat
+ligue_1,2024,understat_5197,Achraf Hakimi,Paris Saint Germain,D S,2078.0,25,1.3859,0.1802,0.3233,0.1732,0.2599,2.2089,0.9236,False,understat
+ligue_1,2024,understat_5684,Arnaud Nordin,Montpellier,F M S,1187.0,16,2.123,0.3296,0.0913,0.3033,0.0758,1.1373,0.8243,False,understat
+ligue_1,2024,understat_7268,Bafode Diakite,Lille,D,2770.0,31,0.5199,0.0901,0.004,0.13,0.0325,0.0975,0.9928,False,understat
+ligue_1,2024,understat_7453,Khvicha Kvaratskhelia,Paris Saint Germain,F S,926.0,14,3.3045,0.3857,0.4628,0.3888,0.2916,2.4298,0.7349,False,understat
+ligue_1,2024,understat_7908,Marshall Munetsi,Reims,M,1697.0,19,1.6971,0.3073,0.0839,0.2121,0.1061,1.0077,0.9924,False,understat
+ligue_1,2024,understat_9633,Przemyslaw Frankowski,Lens,D M S,1399.0,18,1.0293,0.1582,0.2008,0.2573,0.1287,1.2866,0.8636,False,understat
+ligue_1,2024,understat_9690,Folarin Balogun,Monaco,F S,622.0,13,4.4855,0.7464,0.1635,0.5788,0.0,0.8682,0.5316,False,understat
+ligue_1,2024,understat_9767,Habib Diarra,Strasbourg,D F M S,2366.0,30,1.027,0.1365,0.2171,0.1522,0.1902,1.027,0.8763,False,understat
+ligue_1,2024,understat_10057,Felix Lemarechal,Strasbourg,F M S,1803.0,27,1.2479,0.2034,0.1376,0.1997,0.1498,1.4476,0.742,False,understat
+ligue_1,2024,understat_10328,Edon Zhegrova,Lille,F M,1007.0,12,2.0556,0.1909,0.2178,0.3575,0.0894,1.43,0.9324,False,understat
+ligue_1,2024,understat_10799,Ado Onaiwu,Auxerre,F M S,894.0,31,2.3154,0.4148,0.1248,0.4027,0.1007,1.0067,0.3204,False,understat
+ligue_1,2024,understat_10920,Junya Ito,Reims,F M S,2721.0,33,1.0584,0.2002,0.2779,0.1323,0.0992,2.7784,0.9162,False,understat
+ligue_1,2024,understat_11753,Oumar Diakité,Reims,F S,1696.0,26,1.4328,0.3252,0.0922,0.2123,0.0531,0.5837,0.7248,False,understat
+ligue_1,2024,understat_11773,Douglas Augusto,Nantes,M,2336.0,28,1.387,0.1642,0.0658,0.1541,0.0771,0.5394,0.927,False,understat
+ligue_1,2024,understat_11789,Josué Casimir,Le Havre,D F M S,2024.0,27,1.2006,0.165,0.1539,0.1779,0.1779,1.1561,0.8329,False,understat
+ligue_1,2024,understat_12389,Shavy Babicka,Toulouse,M S,1147.0,30,1.5693,0.2731,0.1872,0.3139,0.1569,1.0201,0.4248,False,understat
+ligue_1,2024,understat_13051,Matias Fernandez-Pardo,Lille,F M S,1060.0,22,1.9528,0.2668,0.2214,0.3396,0.1698,1.3585,0.5354,False,understat
+ligue_1,2024,understat_13335,Goduine Koyalipou,Lens,F M S,909.0,15,4.1584,0.6462,0.0932,0.396,0.0,0.8911,0.6733,False,understat
+ligue_1,2024,understat_1790,Chuba Akpom,Lille,F S,633.0,14,2.8436,0.631,0.1274,0.4265,0.1422,0.7109,0.5024,False,understat
+ligue_1,2024,understat_2897,Aleksandr Golovin,Monaco,M S,1158.0,19,1.8653,0.1713,0.188,0.2332,0.0,1.8653,0.6772,False,understat
+ligue_1,2024,understat_3549,Adrien Thomasson,Lens,M S,2640.0,33,1.4318,0.2175,0.2048,0.1023,0.2386,1.875,0.8889,False,understat
+ligue_1,2024,understat_3673,Valentin Rongier,Marseille,D M S,1565.0,25,0.8051,0.0555,0.0965,0.1725,0.0575,0.6326,0.6956,False,understat
+ligue_1,2024,understat_3696,Morgan Sanson,Nice,M S,241.0,6,3.361,0.5887,0.0126,1.1203,0.0,0.3734,0.4463,False,understat
+ligue_1,2024,understat_3799,Wesley Said,Lens,F M S,910.0,24,1.6813,0.2921,0.0935,0.2967,0.0,0.7912,0.4213,False,understat
+ligue_1,2024,understat_5975,Kenny Lala,Brest,D S,2686.0,30,0.4021,0.0983,0.1308,0.1005,0.067,1.4073,0.9948,False,understat
+ligue_1,2024,understat_5988,Ibrahima Niane,Angers,F S,907.0,24,2.9768,0.7674,0.1087,0.2977,0.0992,0.8931,0.4199,False,understat
+ligue_1,2024,understat_6420,Romain Faivre,Brest,F M S,901.0,20,1.8979,0.2708,0.2215,0.2997,0.1998,0.9989,0.5006,False,understat
+ligue_1,2024,understat_8310,Mitchel Bakker,Lille,D F M S,1144.0,24,1.8094,0.2492,0.2104,0.236,0.1573,1.8094,0.5296,False,understat
+ligue_1,2024,understat_8685,Mohamed Ali-Cho,Nice,F M S,1667.0,27,1.9976,0.2317,0.24,0.162,0.216,1.6197,0.686,False,understat
+ligue_1,2024,understat_8697,Jonathan Clauss,Nice,D S,2337.0,28,1.0013,0.1059,0.3216,0.1155,0.3081,2.0796,0.9274,False,understat
+ligue_1,2024,understat_8703,Sinaly Diomande,Auxerre,D S,1945.0,23,0.4165,0.0626,0.0184,0.1388,0.0925,0.1851,0.9396,False,understat
+ligue_1,2024,understat_8813,Tanguy Coulibaly,Montpellier,F M S,1502.0,25,1.7976,0.297,0.0898,0.1798,0.0,1.0786,0.6676,False,understat
+ligue_1,2024,understat_8973,Lorenz Assignon,Rennes,D M S,2378.0,32,0.8326,0.1099,0.1487,0.1135,0.1514,1.0976,0.8257,False,understat
+ligue_1,2024,understat_9182,Sepe Elye Wahi,Marseille,F S,585.0,13,2.6154,0.8322,0.0616,0.4615,0.1538,0.9231,0.5,False,understat
+ligue_1,2024,understat_9220,Charlie Cresswell,Toulouse,D S,2601.0,31,1.1073,0.1431,0.0455,0.1038,0.0346,0.173,0.9323,False,understat
+ligue_1,2024,understat_9345,Ahmadou Bamba Dieng,Angers,F S,495.0,18,2.7273,0.5117,0.0048,0.5455,0.0,0.1818,0.3056,False,understat
+ligue_1,2024,understat_9655,Pablo Rosario,Nice,D M S,1775.0,29,0.862,0.223,0.0293,0.1521,0.0507,0.7606,0.6801,False,understat
+ligue_1,2024,understat_10100,Kamory Doumbia,Brest,M S,1317.0,30,1.5034,0.2563,0.1539,0.205,0.1367,1.7768,0.4878,False,understat
+ligue_1,2024,understat_10172,Jonathan Rowe,Marseille,F M S,745.0,28,4.349,0.4882,0.5134,0.3624,0.3624,2.0537,0.2956,False,understat
+ligue_1,2024,understat_10701,Nicolás Tagliafico,Lyon,D S,1918.0,24,1.3139,0.1391,0.0316,0.1408,0.0469,0.2346,0.888,False,understat
+ligue_1,2024,understat_11062,Badredine Bouanani,Nice,F M S,1083.0,26,2.5762,0.2352,0.232,0.2493,0.2493,1.7452,0.4628,False,understat
+ligue_1,2024,understat_11339,Youssouf Ndayishimiye,Nice,D M S,1937.0,23,0.5111,0.0747,0.0077,0.1394,0.0,0.2323,0.9357,False,understat
+ligue_1,2024,understat_11782,Mousa Al Tamari,"Montpellier,Rennes",F M S,1696.0,26,2.1757,0.2806,0.2105,0.1592,0.0531,1.1675,0.7248,False,understat
+ligue_1,2024,understat_11783,Akor Adams,Montpellier,F S,1079.0,15,2.1687,0.4194,0.0649,0.2502,0.0834,0.9175,0.7993,False,understat
+ligue_1,2024,understat_11788,Arouna Sangante,Le Havre,D,1268.0,16,0.4968,0.0692,0.0045,0.2129,0.0,0.2129,0.8806,False,understat
+ligue_1,2024,understat_12045,Aron Dønnum,Toulouse,D M S,2714.0,32,1.028,0.0848,0.1646,0.0995,0.0663,1.4591,0.9424,False,understat
+ligue_1,2024,understat_12060,Ernest Nuamah,Lyon,F M S,1038.0,23,2.4277,0.1835,0.1699,0.2601,0.0867,1.5607,0.5014,False,understat
+ligue_1,2024,understat_12734,João Neves,Paris Saint Germain,D M S,1875.0,29,1.344,0.185,0.2457,0.144,0.384,1.584,0.7184,False,understat
+ligue_1,2024,understat_12801,Osame Sahraoui,Lille,M S,1251.0,30,1.6547,0.2011,0.2497,0.2158,0.2158,2.0863,0.4633,False,understat
+ligue_1,2024,understat_12804,George Ilenikhena,Monaco,F S,672.0,23,2.8125,0.6446,0.1816,0.4018,0.2679,1.0714,0.3246,False,understat
+ligue_1,2024,understat_12810,Ibrahim Sissoko,Saint-Etienne,F S,808.0,20,2.4505,0.4493,0.0946,0.3342,0.1114,0.7797,0.4489,False,understat
+ligue_1,2024,understat_12812,Augustine Boakye,Saint-Etienne,F M S,741.0,17,2.915,0.275,0.137,0.3644,0.0,1.5789,0.4843,False,understat
+ligue_1,2024,understat_12971,Andrés Gómez,Rennes,M S,318.0,17,2.5472,0.4265,0.0547,0.8491,0.0,1.4151,0.2078,False,understat
+ligue_1,2024,understat_13368,Koka,Le Havre,F S,863.0,16,2.0857,0.5152,0.1026,0.3129,0.1043,0.5214,0.5993,False,understat
+ligue_1,2024,understat_343,Pierre-Emile Højbjerg,Marseille,D M,2670.0,30,1.0787,0.1048,0.1176,0.0674,0.1348,1.4157,0.9889,False,understat
+ligue_1,2024,understat_399,Ulisses García,Marseille,D S,918.0,20,0.7843,0.1172,0.1196,0.1961,0.1961,0.7843,0.51,False,understat
+ligue_1,2024,understat_677,Jordan Veretout,Lyon,M S,1581.0,27,1.1954,0.1593,0.0771,0.1139,0.0,0.797,0.6506,False,understat
+ligue_1,2024,understat_2117,Marco Asensio,Paris Saint Germain,F M S,634.0,12,3.6909,0.9304,0.4272,0.2839,0.5678,2.4132,0.587,False,understat
+ligue_1,2024,understat_2594,Sergio Akieme,Reims,D S,2548.0,30,0.9184,0.0422,0.099,0.0706,0.106,0.8124,0.9437,False,understat
+ligue_1,2024,understat_3297,Marquinhos,Paris Saint Germain,D S,1718.0,22,0.4191,0.0777,0.0502,0.1048,0.0,0.4715,0.8677,False,understat
+ligue_1,2024,understat_3701,Gautier Lloris,Le Havre,D,2771.0,31,0.3573,0.0546,0.0295,0.065,0.0325,0.1624,0.9932,False,understat
+ligue_1,2024,understat_4811,Jean Eudes Aholou,Angers,M,2024.0,26,1.2006,0.0947,0.0413,0.0889,0.0,0.4447,0.865,False,understat
+ligue_1,2024,understat_5619,Pierre Lees-Melou,Brest,M S,1516.0,20,1.3061,0.0792,0.1322,0.1187,0.1187,1.128,0.8422,False,understat
+ligue_1,2024,understat_5680,Thomas Meunier,Lille,D S,1897.0,30,1.3284,0.1188,0.0307,0.0949,0.0,0.6168,0.7026,False,understat
+ligue_1,2024,understat_5717,Amine Harit,Marseille,M S,529.0,13,1.3611,0.1718,0.4867,0.3403,0.6805,3.2325,0.4521,False,understat
+ligue_1,2024,understat_5743,Randal Kolo Muani,Paris Saint Germain,F S,338.0,10,4.2604,1.1611,0.2748,0.5325,0.2663,1.3314,0.3756,False,understat
+ligue_1,2024,understat_6863,Téji Savanier,Montpellier,M S,2382.0,31,1.7758,0.1579,0.3042,0.0756,0.1889,2.6448,0.8538,False,understat
+ligue_1,2024,understat_7064,Farid El Melali,Angers,F M S,1935.0,32,2.1395,0.1629,0.1715,0.093,0.1395,1.1628,0.6719,False,understat
+ligue_1,2024,understat_7743,Pereira Lage,Brest,F M S,1576.0,29,2.0558,0.1818,0.2725,0.1142,0.3997,1.2563,0.6038,False,understat
+ligue_1,2024,understat_7747,Mama Baldé,"Brest,Lyon",F M S,1177.0,29,2.294,0.2594,0.1806,0.1529,0.2294,1.2234,0.451,False,understat
+ligue_1,2024,understat_7773,Zinedine Ferhat,Angers,M S,799.0,24,1.3517,0.0821,0.3489,0.2253,0.0,1.9149,0.3699,False,understat
+ligue_1,2024,understat_7960,Florian Aye,Auxerre,F S,547.0,26,1.9744,0.3609,0.0132,0.3291,0.0,0.4936,0.2338,False,understat
+ligue_1,2024,understat_8050,Hichem Boudaoui,Nice,M S,2450.0,29,1.4327,0.1421,0.1011,0.0735,0.1102,0.8082,0.9387,False,understat
+ligue_1,2024,understat_8103,Modibo Sagnan,Montpellier,D S,2155.0,27,0.4594,0.0233,0.0599,0.0835,0.0,0.3341,0.8868,False,understat
+ligue_1,2024,understat_8190,Melvin Bard,Nice,D S,1953.0,24,1.0599,0.1176,0.1132,0.0922,0.0461,0.7373,0.9042,False,understat
+ligue_1,2024,understat_8640,Adrien Truffert,Rennes,D M S,2764.0,33,0.7489,0.0648,0.1109,0.0651,0.0651,1.2699,0.9306,False,understat
+ligue_1,2024,understat_9133,Youssoufa Moukoko,Nice,F S,194.0,11,2.7835,0.9066,0.2521,0.9278,0.4639,2.3196,0.196,False,understat
+ligue_1,2024,understat_9621,Florian Tardieu,Saint-Etienne,M S,1245.0,24,1.1566,0.0583,0.0837,0.1446,0.2892,1.5181,0.5764,False,understat
+ligue_1,2024,understat_9646,Mohamed Bayo,Lille,F S,334.0,12,2.6946,0.5388,0.169,0.5389,0.2695,1.0778,0.3093,False,understat
+ligue_1,2024,understat_9944,Gabriel Gudmundsson,Lille,D S,1796.0,30,0.902,0.0543,0.1106,0.1002,0.0,0.8018,0.6652,False,understat
+ligue_1,2024,understat_9961,Nuno Mendes,Paris Saint Germain,D S,1681.0,24,1.1243,0.0937,0.3498,0.1071,0.1606,1.6062,0.7782,False,understat
+ligue_1,2024,understat_10702,Johann Lepenant,Nantes,M S,2064.0,29,0.8721,0.085,0.0604,0.0872,0.0436,0.3924,0.7908,False,understat
+ligue_1,2024,understat_11065,Remy Labeau Lascary,Lens,F M S,626.0,14,2.0128,0.4322,0.1657,0.2875,0.1438,0.8626,0.4968,False,understat
+ligue_1,2024,understat_11613,Mamadou Diakhon,Reims,F M S,782.0,28,2.0716,0.1618,0.1002,0.2302,0.1151,1.4962,0.3103,False,understat
+ligue_1,2024,understat_11618,Samuel Amo-Ameyaw,Strasbourg,D M S,306.0,9,2.6471,0.2989,0.1168,0.5882,0.0,1.1765,0.3778,False,understat
+ligue_1,2024,understat_11703,Anass Zaroury,Lens,D F M S,1411.0,28,2.2325,0.1206,0.2268,0.1276,0.1276,2.2325,0.5599,False,understat
+ligue_1,2024,understat_11795,Yassine Kechta,Le Havre,F M S,2163.0,31,1.165,0.0947,0.0488,0.0832,0.0,0.6241,0.7753,False,understat
+ligue_1,2024,understat_11799,Lamine Camara,Monaco,M S,2104.0,29,1.0694,0.096,0.2081,0.0856,0.2994,1.9249,0.8061,False,understat
+ligue_1,2024,understat_11978,Diego Moreira,Strasbourg,D F M S,2586.0,32,0.9049,0.0841,0.2695,0.0696,0.2436,1.0441,0.8979,False,understat
+ligue_1,2024,understat_12159,Mahamadou Nagida,Rennes,D S,413.0,13,1.3075,0.4265,0.0499,0.4358,0.0,0.6538,0.353,False,understat
+ligue_1,2024,understat_12345,Senny Mayulu,Paris Saint Germain,D M S,787.0,20,2.859,0.3622,0.292,0.2287,0.2287,1.3723,0.4372,False,understat
+ligue_1,2024,understat_12367,Gift Orban,Lyon,F S,180.0,3,2.0,0.7302,0.0118,1.0,0.0,0.5,0.6667,False,understat
+ligue_1,2024,understat_12825,Theo Bair,Auxerre,F S,912.0,29,2.5658,0.3135,0.1059,0.1974,0.0987,0.9868,0.3494,False,understat
+ligue_1,2024,understat_12844,Bahereba Guirassy,Nantes,M S,303.0,19,2.0792,0.2381,0.0205,0.5941,0.0,0.5941,0.1772,False,understat
+ligue_1,2024,understat_12846,Louis Leroux,Nantes,D M S,802.0,16,1.01,0.2141,0.1485,0.2244,0.1122,1.2344,0.5569,False,understat
+ligue_1,2024,understat_12880,Albert Grønbæk,Rennes,F M S,816.0,16,2.4265,0.2265,0.1059,0.2206,0.1103,2.0956,0.5667,False,understat
+ligue_1,2024,understat_13069,Ismaël Koné,"Marseille,Rennes",M S,803.0,21,1.1208,0.0493,0.2055,0.2242,0.1121,1.0087,0.4249,False,understat
+ligue_1,2024,understat_13210,Mohamed Meïté,Rennes,F S,525.0,12,2.5714,0.4647,0.0716,0.3429,0.0,0.8571,0.4861,False,understat
+ligue_1,2024,understat_497,Francis Coquelin,Nantes,M S,227.0,6,2.7753,0.4173,0.3469,0.3965,0.3965,1.5859,0.4204,False,understat
+ligue_1,2024,understat_734,Wahbi Khazri,Montpellier,F M S,1084.0,30,2.9889,0.1379,0.1677,0.083,0.083,1.4114,0.4015,False,understat
+ligue_1,2024,understat_914,Nabil Bentaleb,Lille,M S,306.0,10,1.4706,0.2085,0.0036,0.2941,0.0,0.2941,0.34,False,understat
+ligue_1,2024,understat_1144,Seko Fofana,Rennes,M S,845.0,16,2.5562,0.2467,0.1143,0.1065,0.1065,1.3846,0.5868,False,understat
+ligue_1,2024,understat_1461,Pol Lirola,Marseille,D S,670.0,19,0.806,0.1125,0.0987,0.1343,0.2687,1.0746,0.3918,False,understat
+ligue_1,2024,understat_1750,Ainsley Maitland-Niles,Lyon,D M S,1943.0,32,1.019,0.115,0.2074,0.0463,0.1853,1.297,0.6747,False,understat
+ligue_1,2024,understat_2854,Daler Kuzyaev,Le Havre,M S,553.0,12,0.651,0.0371,0.0648,0.1627,0.0,0.3255,0.512,False,understat
+ligue_1,2024,understat_3346,Jonas Martin,Brest,M S,480.0,17,0.5625,0.1607,0.0699,0.1875,0.0,0.5625,0.3137,False,understat
+ligue_1,2024,understat_3348,Florian Sotoca,Lens,D F M S,1805.0,31,2.3435,0.2339,0.0695,0.0499,0.0499,0.8975,0.647,False,understat
+ligue_1,2024,understat_3370,Issiaga Sylla,Montpellier,D M S,1165.0,19,0.8498,0.1384,0.0387,0.0773,0.0,0.5408,0.6813,False,understat
+ligue_1,2024,understat_3390,Rémy Cabella,Lille,F M S,1006.0,23,2.6839,0.3059,0.2201,0.0895,0.1789,2.326,0.486,False,understat
+ligue_1,2024,understat_3544,Jeremie Boga,Nice,F M S,1059.0,21,2.5496,0.3002,0.1957,0.085,0.085,2.0397,0.5603,False,understat
+ligue_1,2024,understat_3585,Said Benrahma,Lyon,F M S,757.0,13,2.0211,0.2457,0.2723,0.1189,0.3567,1.7834,0.647,False,understat
+ligue_1,2024,understat_3682,Jordan Siebatcheu,Reims,F S,403.0,7,2.4566,0.2378,0.0456,0.2233,0.0,0.67,0.6397,False,understat
+ligue_1,2024,understat_3785,Kelvin Adou,Nantes,D S,2159.0,30,0.2918,0.0262,0.0372,0.0417,0.0,0.5419,0.7996,False,understat
+ligue_1,2024,understat_3786,Mathieu Cafaro,Saint-Etienne,F M S,729.0,15,2.8395,0.2837,0.1565,0.1235,0.0,1.6049,0.54,False,understat
+ligue_1,2024,understat_5598,Angel Gomes,Lille,M S,750.0,14,1.08,0.2071,0.205,0.12,0.12,1.68,0.5952,False,understat
+ligue_1,2024,understat_5742,Hugo Magnetti,Brest,M S,2352.0,32,0.727,0.0331,0.0204,0.0383,0.0,0.2296,0.8167,False,understat
+ligue_1,2024,understat_5753,Mickael Nade,Saint-Etienne,D S,2306.0,26,0.1951,0.0361,0.0385,0.039,0.0781,0.2732,0.9855,False,understat
+ligue_1,2024,understat_5962,Tanguy NDombele Alvaro,Nice,M S,1153.0,18,0.8586,0.1766,0.1724,0.0781,0.1561,1.405,0.7117,False,understat
+ligue_1,2024,understat_6006,Ruben Aguilar,Lens,D M S,1143.0,16,0.8661,0.1292,0.1857,0.0787,0.1575,0.8661,0.7937,False,understat
+ligue_1,2024,understat_6007,Nicolas Cozza,Nantes,D S,2045.0,27,0.7042,0.0771,0.0357,0.044,0.0,0.3081,0.8416,False,understat
+ligue_1,2024,understat_6019,Angelo Fulgini,Lens,D F M S,1034.0,23,2.2631,0.2077,0.2312,0.087,0.087,2.3501,0.4995,False,understat
+ligue_1,2024,understat_6333,Elisha Owusu,Auxerre,M,2384.0,28,0.2643,0.0172,0.0348,0.0378,0.1133,0.5285,0.946,False,understat
+ligue_1,2024,understat_6923,Mohammed Salisu,Monaco,D S,1016.0,15,0.7087,0.0985,0.0072,0.0886,0.0,0.2657,0.7526,False,understat
+ligue_1,2024,understat_7007,Duje Caleta-Car,Lyon,D S,1589.0,19,0.623,0.077,0.0097,0.0566,0.0,0.1133,0.9292,False,understat
+ligue_1,2024,understat_7472,Wilfried Stephane Singo,Monaco,D S,2081.0,27,0.7352,0.0646,0.0711,0.0432,0.0865,0.3027,0.8564,False,understat
+ligue_1,2024,understat_7540,Theo Sainte Luce,Montpellier,D M S,1030.0,16,0.699,0.1554,0.1027,0.0874,0.0,0.699,0.7153,False,understat
+ligue_1,2024,understat_7736,Brendan Chardonnet,Brest,D,2422.0,27,0.5202,0.0514,0.0512,0.0372,0.0,0.2973,0.9967,False,understat
+ligue_1,2024,understat_7739,Joris Chotard,Montpellier,M S,1908.0,26,0.8962,0.0713,0.0181,0.0472,0.0,0.3302,0.8154,False,understat
+ligue_1,2024,understat_8351,Ki-Jana Hoever,Auxerre,D S,2170.0,30,0.4147,0.0249,0.1212,0.0415,0.0829,0.9954,0.8037,False,understat
+ligue_1,2024,understat_8677,Lilian Brassier,"Marseille,Rennes",D S,2016.0,26,0.8482,0.0682,0.0219,0.0446,0.0446,0.3125,0.8615,False,understat
+ligue_1,2024,understat_8691,Saidou Sow,"Nantes,Strasbourg",D S,1823.0,21,0.4443,0.0697,0.038,0.0494,0.0494,0.1975,0.9646,False,understat
+ligue_1,2024,understat_8701,Timothee Pembele,Le Havre,D M S,1099.0,20,0.6551,0.0973,0.008,0.0819,0.0,0.2457,0.6106,False,understat
+ligue_1,2024,understat_8702,Tinotenda Kadewere,Nantes,M S,514.0,12,1.4008,0.322,0.1795,0.1751,0.3502,1.4008,0.4759,False,understat
+ligue_1,2024,understat_8970,Sékou Mara,Strasbourg,F M S,727.0,25,2.3521,0.2645,0.1377,0.1238,0.1238,0.619,0.3231,False,understat
+ligue_1,2024,understat_9031,Jota,Rennes,M S,308.0,9,1.1688,0.3588,0.1055,0.2922,0.0,1.461,0.3802,False,understat
+ligue_1,2024,understat_9399,Quentin Merlin,Marseille,D M S,1627.0,27,1.4382,0.1384,0.1746,0.0553,0.1659,1.3829,0.6695,False,understat
+ligue_1,2024,understat_9447,Niakhate Ndiaye,Brest,D S,1703.0,22,0.5813,0.0357,0.0007,0.0528,0.0,0.0528,0.8601,False,understat
+ligue_1,2024,understat_9523,Andy Diouf,Lens,F M S,2262.0,34,1.5915,0.1306,0.1304,0.0398,0.0796,1.3528,0.7392,False,understat
+ligue_1,2024,understat_9632,Deiver Machado,Lens,D M S,1793.0,27,1.1043,0.11,0.1468,0.0502,0.2008,1.0039,0.7379,False,understat
+ligue_1,2024,understat_9645,Jim Allevinah,Angers,F M S,1814.0,28,1.7365,0.201,0.1539,0.0496,0.1488,0.7442,0.7198,False,understat
+ligue_1,2024,understat_9673,Bilal Nadir,Marseille,M S,370.0,15,1.9459,0.116,0.1004,0.2432,0.0,1.7027,0.2741,False,understat
+ligue_1,2024,understat_9885,Tanner Tessmann,Lyon,M S,1218.0,25,1.33,0.0883,0.0543,0.0739,0.0,0.5172,0.5413,False,understat
+ligue_1,2024,understat_9978,Azor Matusiwa,Rennes,M S,2079.0,29,0.4762,0.0605,0.1073,0.0433,0.1299,0.7359,0.7966,False,understat
+ligue_1,2024,understat_10237,Leo Østigard,Rennes,D S,1231.0,16,0.4387,0.0651,0.0104,0.0731,0.0,0.1462,0.8549,False,understat
+ligue_1,2024,understat_10271,Vanderson,Monaco,D S,2086.0,29,0.906,0.1126,0.1255,0.0431,0.1294,0.9923,0.7992,False,understat
+ligue_1,2024,understat_10284,Pierre Ekwah,Saint-Etienne,D M,2592.0,29,0.8681,0.0257,0.0408,0.0347,0.0,0.5556,0.9931,False,understat
+ligue_1,2024,understat_10390,Ismaël Doukouré,Strasbourg,D M,2658.0,31,0.1354,0.0224,0.0426,0.0339,0.0339,0.3047,0.9527,False,understat
+ligue_1,2024,understat_10485,Guemissongui Ouattara,Strasbourg,D F M S,442.0,17,1.0181,0.1146,0.0827,0.2036,0.2036,0.6109,0.2889,False,understat
+ligue_1,2024,understat_10517,Yassin Belkhdim,Angers,M S,1529.0,29,0.5298,0.048,0.0304,0.0589,0.0589,0.2943,0.5858,False,understat
+ligue_1,2024,understat_10581,Junior Mwanga,"Le Havre,Strasbourg",M S,1249.0,19,1.1529,0.0987,0.1201,0.0721,0.1441,0.6485,0.7304,False,understat
+ligue_1,2024,understat_10786,Warren Zaïre-Emery,Paris Saint Germain,D M S,2055.0,29,0.7445,0.0945,0.0901,0.0438,0.0876,0.7883,0.7874,False,understat
+ligue_1,2024,understat_10810,Alexsandro Ribeiro,Lille,D,2700.0,30,0.7,0.0401,0.0233,0.0333,0.0333,0.3,1.0,False,understat
+ligue_1,2024,understat_10868,Guela Doué,Strasbourg,D S,2713.0,32,0.5971,0.0328,0.0315,0.0332,0.0663,0.3649,0.942,False,understat
+ligue_1,2024,understat_10922,Rayan Raveloson,Auxerre,D M S,705.0,13,2.0426,0.127,0.0152,0.1277,0.0,0.383,0.6026,False,understat
+ligue_1,2024,understat_11066,Yaya Fofana,Reims,F M S,646.0,12,1.8111,0.1172,0.2406,0.1393,0.1393,0.9752,0.5981,False,understat
+ligue_1,2024,understat_11291,Warren Kamanzi,Toulouse,D S,1010.0,24,0.6238,0.1712,0.0888,0.0891,0.0891,1.0693,0.4676,False,understat
+ligue_1,2024,understat_11318,Abner,Lyon,D S,1094.0,19,0.5759,0.0828,0.0901,0.0823,0.0823,0.9049,0.6398,False,understat
+ligue_1,2024,understat_11371,Ibrahim Salah,Brest,F M S,349.0,12,3.3524,0.2097,0.2195,0.2579,0.2579,1.5473,0.3231,False,understat
+ligue_1,2024,understat_11389,Valentin Atangana Edoa,Reims,D M S,2909.0,34,0.99,0.0727,0.0238,0.0309,0.0,0.3403,0.9507,False,understat
+ligue_1,2024,understat_11515,Tom Louchet,Nice,D M S,734.0,22,1.4714,0.0747,0.1898,0.1226,0.0,1.8392,0.3707,False,understat
+ligue_1,2024,understat_11751,Joseph Okumu,Reims,D S,1714.0,22,0.6301,0.0633,0.0054,0.0525,0.0,0.21,0.8657,False,understat
+ligue_1,2024,understat_11754,Teddy Teuma,Reims,M S,753.0,17,1.6733,0.2031,0.1415,0.1195,0.0,1.5538,0.4922,False,understat
+ligue_1,2024,understat_11777,Cristian Cásseres Jr.,Toulouse,M S,2739.0,32,0.5586,0.0324,0.1046,0.0329,0.0986,0.92,0.951,False,understat
+ligue_1,2024,understat_11784,Lucas Mincarelli Davin,Montpellier,D S,716.0,10,0.8799,0.0764,0.0947,0.1257,0.0,0.5028,0.7956,False,understat
+ligue_1,2024,understat_11790,Rassoul Ndiaye,Le Havre,M S,1027.0,27,1.5774,0.135,0.064,0.0876,0.0,0.8763,0.4226,False,understat
+ligue_1,2024,understat_11816,Abakar Sylla,Strasbourg,D S,944.0,21,0.4767,0.0602,0.0055,0.0953,0.0,0.0953,0.4995,False,understat
+ligue_1,2024,understat_12111,Amir Murillo,Marseille,D S,2425.0,30,0.4825,0.0661,0.134,0.0371,0.1113,0.8907,0.8981,False,understat
+ligue_1,2024,understat_12151,Gabriel Osho,Auxerre,D,1667.0,20,0.3779,0.0537,0.0055,0.054,0.0,0.054,0.9261,False,understat
+ligue_1,2024,understat_12192,Othmane Maamma,Montpellier,M S,326.0,12,2.7607,0.2682,0.1894,0.2761,0.2761,0.8282,0.3019,False,understat
+ligue_1,2024,understat_12335,Steve Ngoura,Le Havre,F S,265.0,8,3.3962,0.4995,0.1507,0.3396,0.0,0.6792,0.3681,False,understat
+ligue_1,2024,understat_12343,Jhoanner Chávez,Lens,D M S,606.0,10,0.7426,0.0705,0.1253,0.1485,0.0,1.1881,0.6733,False,understat
+ligue_1,2024,understat_12346,Beraldo,Paris Saint Germain,D S,2014.0,25,0.5362,0.0472,0.0261,0.0447,0.0,0.4022,0.8951,False,understat
+ligue_1,2024,understat_12400,Rabby Nzingoula,Montpellier,M S,1712.0,27,0.9988,0.0824,0.0533,0.0526,0.0526,0.4206,0.7045,False,understat
+ligue_1,2024,understat_12451,Djaoui Cissé,Rennes,M,1146.0,14,1.178,0.0285,0.0295,0.0785,0.0,0.4712,0.9095,False,understat
+ligue_1,2024,understat_12733,Ibrahim Mbaye,Paris Saint Germain,F S,331.0,9,3.2628,0.7065,0.2249,0.2719,0.2719,0.8157,0.4086,False,understat
+ligue_1,2024,understat_12806,Dylan Batubinsika,Saint-Etienne,D S,2006.0,25,0.3141,0.0305,0.0127,0.0449,0.0,0.1795,0.8916,False,understat
+ligue_1,2024,understat_12842,Mark McKenzie,Toulouse,D S,2504.0,30,0.2875,0.0644,0.0168,0.0359,0.0359,0.1438,0.9274,False,understat
+ligue_1,2024,understat_12843,Sorba Thomas,Nantes,D F M S,1323.0,25,0.6122,0.1267,0.2922,0.068,0.2041,2.517,0.588,False,understat
+ligue_1,2024,understat_12848,Florent Hanin,Angers,D S,2705.0,33,0.366,0.0336,0.08,0.0333,0.0665,0.8318,0.9108,False,understat
+ligue_1,2024,understat_12851,Emmanuel Biumla,Angers,D S,1334.0,17,0.2699,0.065,0.0025,0.0675,0.0,0.0675,0.8719,False,understat
+ligue_1,2024,understat_12950,Jordan Teze,Monaco,D S,574.0,16,0.784,0.2514,0.2629,0.1568,0.0,2.0383,0.3986,False,understat
+ligue_1,2024,understat_12961,Hamzat Ojediran,Lens,M S,376.0,17,2.3936,0.2227,0.0837,0.2394,0.0,0.4787,0.2458,False,understat
+ligue_1,2024,understat_13058,Benjamin Bouchouari,Saint-Etienne,M S,1794.0,25,0.8027,0.0312,0.0504,0.0502,0.0,0.8027,0.7973,False,understat
+ligue_1,2024,understat_13358,Thiago Almada,Lyon,M S,934.0,16,2.2163,0.1917,0.232,0.0964,0.3854,2.1199,0.6486,False,understat
+ligue_1,2024,understat_13398,Jeremy Agbonifo,Lens,F S,277.0,8,1.9495,0.3918,0.0672,0.3249,0.0,0.9747,0.3847,False,understat
+ligue_1,2024,understat_13423,Al Musrati,Monaco,M S,373.0,10,2.6542,0.087,0.146,0.2413,0.2413,1.2064,0.4144,False,understat
+ligue_1,2024,understat_148,Dante,Nice,D S,1958.0,25,0.4137,0.0163,0.013,0.0,0.0,0.1839,0.8702,False,understat
+ligue_1,2024,understat_697,Nemanja Matic,Lyon,M S,2084.0,29,0.0864,0.0029,0.0612,0.0,0.0432,0.7342,0.7985,False,understat
+ligue_1,2024,understat_943,Massadio Haidara,Brest,D S,1707.0,22,0.5272,0.0161,0.021,0.0,0.0,0.4218,0.8621,False,understat
+ligue_1,2024,understat_961,Jordan Amavi,Brest,D S,780.0,11,0.9231,0.0342,0.0202,0.0,0.0,0.6923,0.7879,False,understat
+ligue_1,2024,understat_1022,Pedro Chirivella,Nantes,M S,2404.0,30,0.2995,0.0115,0.0845,0.0,0.0749,0.7113,0.8904,False,understat
+ligue_1,2024,understat_1116,Gianluigi Donnarumma,Paris Saint Germain,GK,2091.0,24,0.0,0.0,0.0,0.0,0.0,0.0,0.9681,True,understat
+ligue_1,2024,understat_1223,Milan Skriniar,Paris Saint Germain,D S,380.0,5,0.7105,0.0256,0.0335,0.0,0.0,0.2368,0.8444,False,understat
+ligue_1,2024,understat_1326,Assane Diousse,Auxerre,M S,646.0,17,0.418,0.0069,0.0166,0.0,0.0,0.2786,0.4222,False,understat
+ligue_1,2024,understat_1377,Nikola Maksimovic,Montpellier,D,592.0,7,0.152,0.0069,0.0078,0.0,0.0,0.3041,0.9397,False,understat
+ligue_1,2024,understat_1516,Geoffrey Kondogbia,Marseille,D M S,2026.0,25,0.3554,0.031,0.0072,0.0,0.0,0.2221,0.9004,False,understat
+ligue_1,2024,understat_1670,Steve Mandanda,Rennes,GK S,1490.0,18,0.0,0.0,0.009,0.0,0.0,0.1208,0.9198,True,understat
+ligue_1,2024,understat_1673,Edimilson Fernandes,Brest,D M S,1111.0,19,0.8101,0.0258,0.0597,0.0,0.081,0.6481,0.6497,False,understat
+ligue_1,2024,understat_1785,Nampalys Mendy,Lens,M S,592.0,10,0.4561,0.0231,0.0252,0.0,0.152,0.152,0.6578,False,understat
+ligue_1,2024,understat_2225,Gerónimo Rulli,Marseille,GK,3060.0,34,0.0,0.0,0.0024,0.0,0.0,0.0588,1.0,True,understat
+ligue_1,2024,understat_2276,Lucas Hernández,Paris Saint Germain,D S,869.0,16,0.3107,0.0089,0.0041,0.0,0.0,0.1036,0.6035,False,understat
+ligue_1,2024,understat_2383,André Gomes,Lille,M S,1301.0,20,0.761,0.0332,0.0608,0.0,0.0,0.6918,0.7228,False,understat
+ligue_1,2024,understat_2385,Mat Ryan,Lens,GK,1260.0,14,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+ligue_1,2024,understat_3201,Alban Lafont,Nantes,GK,1080.0,12,0.0,0.0,0.0037,0.0,0.0,0.1667,1.0,True,understat
+ligue_1,2024,understat_3223,Benjamin André,Lille,M,2697.0,30,0.5339,0.0458,0.0877,0.0,0.1001,0.6674,0.9989,False,understat
+ligue_1,2024,understat_3237,Aissa Mandi,Lille,D S,1768.0,24,0.3054,0.0169,0.0347,0.0,0.0,0.2545,0.8185,False,understat
+ligue_1,2024,understat_3269,Anthony Lopes,Nantes,GK,1563.0,18,0.0,0.0,0.0,0.0,0.0,0.0,0.9648,True,understat
+ligue_1,2024,understat_3275,Jordan Ferri,Montpellier,M S,1804.0,25,0.6486,0.0188,0.0558,0.0,0.0998,0.6486,0.8018,False,understat
+ligue_1,2024,understat_3283,Mathieu Gorgelin,Le Havre,GK,1440.0,16,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+ligue_1,2024,understat_3357,Djibril Sidibe,Toulouse,D S,2117.0,28,0.2126,0.0128,0.1196,0.0,0.1275,0.7227,0.8401,False,understat
+ligue_1,2024,understat_3415,Birama Touré,Montpellier,D M S,283.0,8,0.9541,0.0248,0.034,0.0,0.0,0.9541,0.3931,False,understat
+ligue_1,2024,understat_3451,Benjamin Lecomte,Montpellier,GK,2700.0,30,0.0,0.0,0.0046,0.0,0.0,0.1333,1.0,True,understat
+ligue_1,2024,understat_3479,Marcus Coco,Nantes,D S,960.0,20,0.1875,0.0039,0.1513,0.0,0.0938,0.9375,0.5333,False,understat
+ligue_1,2024,understat_3495,Pierrick Capelle,Angers,M S,450.0,16,1.2,0.0394,0.2084,0.0,0.0,0.8,0.3125,False,understat
+ligue_1,2024,understat_3521,Dennis Appiah,Saint-Etienne,D S,2108.0,29,0.2135,0.0097,0.0786,0.0,0.0427,0.5977,0.8077,False,understat
+ligue_1,2024,understat_3530,Andy Delort,Montpellier,F S,638.0,9,2.3981,0.2857,0.1303,0.0,0.0,0.9875,0.7877,False,understat
+ligue_1,2024,understat_3591,Dimitry Bertaud,Montpellier,GK,360.0,4,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+ligue_1,2024,understat_3670,Nicolas Pallois,Nantes,D S,2028.0,26,0.1331,0.0165,0.0219,0.0,0.0888,0.1331,0.8667,False,understat
+ligue_1,2024,understat_4748,Brice Samba,"Lens,Rennes",GK,2880.0,32,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+ligue_1,2024,understat_4764,Jean-Philippe Gbamin,Nantes,M S,198.0,14,0.9091,0.2588,0.0,0.0,0.0,0.0,0.1571,False,understat
+ligue_1,2024,understat_4886,Cédric Hountondji,Angers,D,270.0,3,0.0,0.0,0.0,0.0,0.0,0.0,1.0,False,understat
+ligue_1,2024,understat_4937,Miha Zajc,Toulouse,M S,198.0,19,2.7273,0.1665,0.0468,0.0,0.0,1.3636,0.1158,False,understat
+ligue_1,2024,understat_4941,Hans Hateboer,Rennes,D S,1666.0,26,0.4322,0.02,0.0869,0.0,0.0,0.7563,0.712,False,understat
+ligue_1,2024,understat_5177,Caio Henrique,Monaco,D S,1942.0,27,0.1854,0.0096,0.2491,0.0,0.2781,1.622,0.7992,False,understat
+ligue_1,2024,understat_5261,Kevin Danso,Lens,D,1080.0,12,0.8333,0.0378,0.0619,0.0,0.0,0.4167,1.0,False,understat
+ligue_1,2024,understat_5352,Niklas Schmidt,Toulouse,M S,180.0,9,1.5,0.0469,0.3572,0.0,0.5,2.5,0.2222,False,understat
+ligue_1,2024,understat_5480,Matvey Safonov,Paris Saint Germain,GK S,879.0,10,0.0,0.0,0.0,0.0,0.0,0.0,0.9767,True,understat
+ligue_1,2024,understat_5624,Yunis Abdelhamid,Saint-Etienne,D S,1033.0,16,0.1742,0.0491,0.0136,0.0,0.0,0.1742,0.7174,False,understat
+ligue_1,2024,understat_5648,Malang Sarr,Lens,D S,1378.0,21,0.3919,0.015,0.0239,0.0,0.0,0.2612,0.7291,False,understat
+ligue_1,2024,understat_5654,Baptiste Santamaria,"Nice,Rennes",M S,1411.0,23,1.2757,0.0542,0.0983,0.0,0.0638,0.9568,0.6816,False,understat
+ligue_1,2024,understat_5677,Florent Mollet,Nantes,M S,243.0,9,2.2222,0.0965,0.0973,0.0,0.0,2.2222,0.3,False,understat
+ligue_1,2024,understat_5690,Karl-Johan Johnsson,Strasbourg,GK,270.0,3,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+ligue_1,2024,understat_5732,Abdoulaye Bamba,Angers,D S,1504.0,19,0.0598,0.0033,0.0122,0.0,0.0,0.359,0.8795,False,understat
+ligue_1,2024,understat_5756,Carlens Arcus,Angers,D S,2077.0,28,0.13,0.0022,0.0732,0.0,0.0433,0.78,0.8242,False,understat
+ligue_1,2024,understat_5801,Christopher Operi,Le Havre,D M,1170.0,13,0.5385,0.0207,0.2974,0.0,0.1538,1.8462,1.0,False,understat
+ligue_1,2024,understat_5803,Fode Toure,Le Havre,D S,607.0,10,0.0,0.0,0.0133,0.0,0.0,0.1483,0.6744,False,understat
+ligue_1,2024,understat_5976,Yoann Salmier,Le Havre,D S,797.0,13,0.5646,0.1626,0.0355,0.0,0.0,0.2258,0.6812,False,understat
+ligue_1,2024,understat_5989,Moussa Niakhate,Lyon,D S,2721.0,31,0.0662,0.0021,0.0311,0.0,0.0,0.2315,0.9753,False,understat
+ligue_1,2024,understat_6015,Kouakou Herve Koffi,Lens,GK,450.0,5,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+ligue_1,2024,understat_6238,Ignatius Ganago,Nantes,M S,209.0,11,3.0144,0.1639,0.0884,0.0,0.0,2.1531,0.2111,False,understat
+ligue_1,2024,understat_6709,Yehvann Diouf,Reims,GK,3060.0,34,0.0294,0.0016,0.0,0.0,0.0,0.0,1.0,True,understat
+ligue_1,2024,understat_6737,Maxime Bernauer,Saint-Etienne,D S,759.0,11,0.2372,0.0049,0.0048,0.0,0.0,0.1186,0.7667,False,understat
+ligue_1,2024,understat_6895,Jordan Lefort,Angers,D,3060.0,34,0.2353,0.015,0.0404,0.0,0.0294,0.2941,1.0,False,understat
+ligue_1,2024,understat_6981,Ismael Bennacer,Marseille,M S,655.0,12,0.4122,0.0111,0.2355,0.0,0.2748,1.7863,0.6065,False,understat
+ligue_1,2024,understat_7206,Jonathan Gradit,Lens,D S,2129.0,25,0.6764,0.0236,0.0307,0.0,0.0,0.4227,0.9462,False,understat
+ligue_1,2024,understat_7264,Han-Noah Massengo,Auxerre,M S,1048.0,17,0.5153,0.0311,0.0542,0.0,0.0,0.2576,0.685,False,understat
+ligue_1,2024,understat_7328,Maxence Caqueret,Lyon,M S,566.0,9,1.1131,0.1272,0.124,0.0,0.0,1.5901,0.6988,False,understat
+ligue_1,2024,understat_7486,Leonardo Balerdi,Marseille,D,2278.0,27,0.5926,0.0569,0.0197,0.0,0.0,0.3161,0.9374,False,understat
+ligue_1,2024,understat_7574,Leo Petrot,Saint-Etienne,D S,2649.0,31,0.2378,0.0225,0.0643,0.0,0.1019,0.5436,0.9495,False,understat
+ligue_1,2024,understat_7728,Gautier Larsonneur,Saint-Etienne,GK,3060.0,34,0.0,0.0,0.0008,0.0,0.0,0.0294,1.0,True,understat
+ligue_1,2024,understat_7730,Jean-Charles Castelletto,Nantes,D M,2628.0,30,0.6164,0.0607,0.0015,0.0,0.0,0.0685,0.9733,False,understat
+ligue_1,2024,understat_7732,Haris Belkebla,Angers,M S,1792.0,22,0.1507,0.0052,0.014,0.0,0.0502,0.2009,0.9051,False,understat
+ligue_1,2024,understat_7735,Donovan Léon,Auxerre,GK,2880.0,32,0.0,0.0,0.0127,0.0,0.0625,0.0938,1.0,True,understat
+ligue_1,2024,understat_7763,Fabien Centonze,Nantes,D S,251.0,7,0.0,0.0,0.0502,0.0,0.0,1.0757,0.3984,False,understat
+ligue_1,2024,understat_7772,Marcin Bulka,Nice,GK,3060.0,34,0.0,0.0,0.003,0.0,0.0,0.0294,1.0,True,understat
+ligue_1,2024,understat_7913,Lamine Fomba,Saint-Etienne,M S,214.0,7,0.4206,0.0079,0.1225,0.0,0.0,0.4206,0.3397,False,understat
+ligue_1,2024,understat_8049,Jean-Kevin Duverne,Nantes,D S,549.0,9,0.6557,0.0377,0.0155,0.0,0.0,0.1639,0.6778,False,understat
+ligue_1,2024,understat_8146,Ismail Jakobs,Monaco,D,180.0,2,0.0,0.0,0.1963,0.0,0.0,2.0,1.0,False,understat
+ligue_1,2024,understat_8175,Zinédine Ould Khaled,Angers,M S,330.0,10,0.2727,0.0154,0.0,0.0,0.0,0.0,0.3667,False,understat
+ligue_1,2024,understat_8314,Yvann Maçon,Saint-Etienne,D S,813.0,12,1.107,0.0315,0.027,0.0,0.0,0.6642,0.7528,False,understat
+ligue_1,2024,understat_8638,Lucas Chevalier,Lille,GK,3060.0,34,0.0,0.0,0.0143,0.0,0.0,0.0882,1.0,True,understat
+ligue_1,2024,understat_8641,Radoslaw Majecki,Monaco,GK,1350.0,15,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+ligue_1,2024,understat_8647,Thibault De Smet,Reims,D S,181.0,5,0.4972,0.0543,0.0,0.0,0.0,0.0,0.4022,False,understat
+ligue_1,2024,understat_8664,Facundo Medina,Lens,D M,2558.0,29,0.9851,0.0703,0.0763,0.0,0.0352,0.8092,0.9801,False,understat
+ligue_1,2024,understat_8687,Kiki Kouyate,Montpellier,D S,754.0,11,0.9549,0.0529,0.0846,0.0,0.0,0.1194,0.7616,False,understat
+ligue_1,2024,understat_8746,Aïmen Moueffek,Saint-Etienne,M S,1028.0,22,0.8755,0.0907,0.1342,0.0,0.0875,0.8755,0.5192,False,understat
+ligue_1,2024,understat_8759,David Pereira Da Costa,Lens,M S,337.0,11,2.4036,0.2008,0.1122,0.0,0.0,1.6024,0.3404,False,understat
+ligue_1,2024,understat_8785,Cédric Kipré,Reims,D S,2195.0,28,0.369,0.014,0.0386,0.0,0.041,0.41,0.871,False,understat
+ligue_1,2024,understat_9092,Marvin Senaya,Strasbourg,D S,193.0,10,0.4663,0.0119,0.0532,0.0,0.0,0.9326,0.2144,False,understat
+ligue_1,2024,understat_9170,John Finn,Reims,M S,525.0,13,1.3714,0.026,0.0014,0.0,0.0,0.1714,0.4487,False,understat
+ligue_1,2024,understat_9279,Krépin Diatta,Monaco,D M S,452.0,19,0.3982,0.0379,0.1522,0.0,0.0,0.7965,0.2643,False,understat
+ligue_1,2024,understat_9317,Oussama Targhaline,Le Havre,M S,997.0,14,0.4514,0.0142,0.0579,0.0,0.0,0.6319,0.7913,False,understat
+ligue_1,2024,understat_9514,Antoine Mendy,Nice,D S,805.0,18,1.0062,0.1001,0.0089,0.0,0.0,0.2236,0.4969,False,understat
+ligue_1,2024,understat_9614,Marco Bizot,Brest,GK,2880.0,32,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+ligue_1,2024,understat_9616,Grégoire Coudert,Brest,GK,180.0,2,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+ligue_1,2024,understat_9631,Christopher Wooh,Rennes,D S,1457.0,20,0.6177,0.0651,0.0062,0.0,0.0,0.1235,0.8094,False,understat
+ligue_1,2024,understat_9638,Arthur Desmas,Le Havre,GK,1620.0,18,0.0,0.0,0.0023,0.0,0.0,0.0556,1.0,True,understat
+ligue_1,2024,understat_9652,Alidu Seidu,Rennes,D S,809.0,11,0.3337,0.0109,0.0341,0.0,0.0,0.5562,0.8172,False,understat
+ligue_1,2024,understat_9699,Bamo Meïté,"Marseille,Montpellier",D S,458.0,10,0.1965,0.0089,0.0,0.0,0.0,0.0,0.5089,False,understat
+ligue_1,2024,understat_9807,Gideon Mensah,Auxerre,D S,2292.0,29,0.1571,0.0052,0.0758,0.0,0.0393,0.8246,0.8782,False,understat
+ligue_1,2024,understat_9833,Andrew Omobamidele,Strasbourg,D S,526.0,10,0.0,0.0,0.0,0.0,0.0,0.0,0.5844,False,understat
+ligue_1,2024,understat_10243,Jacques Ekomie,Angers,D M S,673.0,18,0.1337,0.0028,0.0,0.0,0.0,0.0,0.4154,False,understat
+ligue_1,2024,understat_10295,Louis Mouton,Saint-Etienne,M S,1047.0,24,1.6332,0.1292,0.1248,0.0,0.086,1.3754,0.4847,False,understat
+ligue_1,2024,understat_10373,Falaye Sacko,Montpellier,D S,1240.0,16,0.0,0.0,0.0172,0.0,0.0726,0.6532,0.8611,False,understat
+ligue_1,2024,understat_10375,Enzo Tchato Mbiayi,Montpellier,D M S,1897.0,27,0.1898,0.0071,0.0671,0.0,0.0,0.6642,0.7807,False,understat
+ligue_1,2024,understat_10467,Soumaila Coulibaly,Brest,D S,435.0,7,0.8276,0.0475,0.0106,0.0,0.0,0.2069,0.6905,False,understat
+ligue_1,2024,understat_10626,Mory Gbane,Reims,D M,1130.0,13,0.3982,0.0144,0.027,0.0,0.0796,0.5575,0.9658,False,understat
+ligue_1,2024,understat_10770,Soungoutou Magassa,Monaco,M S,1008.0,21,0.7143,0.0288,0.0697,0.0,0.0893,0.625,0.5333,False,understat
+ligue_1,2024,understat_10788,Rasmus Nicolaisen,Toulouse,D,626.0,7,0.7188,0.1007,0.0506,0.0,0.1438,0.2875,0.9937,False,understat
+ligue_1,2024,understat_10789,Anthony Rouault,Rennes,D,979.0,11,0.6435,0.0393,0.0011,0.0,0.0,0.0919,0.9889,False,understat
+ligue_1,2024,understat_10795,Denis Genreau,Toulouse,M S,214.0,8,2.5234,0.1279,0.1693,0.0,0.0,2.1028,0.2972,False,understat
+ligue_1,2024,understat_10800,Kjetil Haug,Toulouse,GK S,498.0,6,0.0,0.0,0.0,0.0,0.0,0.0,0.9222,True,understat
+ligue_1,2024,understat_10811,Ismaily,Lille,D S,911.0,16,0.9879,0.138,0.1501,0.0,0.0988,0.494,0.6326,False,understat
+ligue_1,2024,understat_10817,Paul Joly,Auxerre,D S,991.0,26,0.9082,0.0568,0.1689,0.0,0.0908,1.4531,0.4235,False,understat
+ligue_1,2024,understat_10818,Kévin Danois,Auxerre,M S,1466.0,22,0.9823,0.0611,0.143,0.0,0.0,1.5348,0.7404,False,understat
+ligue_1,2024,understat_10819,Khalil Fayad,Montpellier,F M S,1019.0,20,1.5015,0.0921,0.0242,0.0,0.0,0.6183,0.5661,False,understat
+ligue_1,2024,understat_10827,Amine Salama,Reims,F S,337.0,17,2.4036,0.2778,0.1097,0.0,0.0,1.3353,0.2203,False,understat
+ligue_1,2024,understat_10829,Yahia Fofana,Angers,GK,2970.0,33,0.0,0.0,0.0029,0.0,0.0,0.0303,1.0,True,understat
+ligue_1,2024,understat_10856,Emmanuel Agbadou,Reims,D,1260.0,14,1.0714,0.036,0.0404,0.0,0.0,0.5714,1.0,False,understat
+ligue_1,2024,understat_11016,Ousmane Camara,Angers,D,255.0,3,0.3529,0.0089,0.0082,0.0,0.0,0.3529,0.9444,False,understat
+ligue_1,2024,understat_11131,Christian Mawissa Elebi,Monaco,D S,1510.0,22,0.0596,0.0136,0.0018,0.0,0.0,0.0596,0.7626,False,understat
+ligue_1,2024,understat_11157,Sael Kumbedi,Lyon,D S,971.0,14,0.3708,0.0454,0.0296,0.0,0.0,0.4634,0.7706,False,understat
+ligue_1,2024,understat_11250,Théo De Percin,Auxerre,GK,180.0,2,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+ligue_1,2024,understat_11253,Mamadou Sarr,Strasbourg,D,2376.0,27,0.1894,0.0415,0.024,0.0,0.0379,0.1894,0.9778,False,understat
+ligue_1,2024,understat_11254,Ilyes Housni,Le Havre,F S,222.0,12,2.027,0.1086,0.1956,0.0,0.0,0.8108,0.2056,False,understat
+ligue_1,2024,understat_11259,Julien Le Cardinal,Brest,D S,1375.0,16,0.6545,0.0377,0.0139,0.0,0.0655,0.3273,0.9549,False,understat
+ligue_1,2024,understat_11271,Nathan Zeze,Nantes,D S,1522.0,18,0.3548,0.0198,0.0006,0.0,0.0,0.0591,0.9395,False,understat
+ligue_1,2024,understat_11294,Lilian Raolisoa,Angers,D M S,1303.0,29,0.967,0.0497,0.1534,0.0,0.2072,1.0361,0.4992,False,understat
+ligue_1,2024,understat_11311,Aurélio Buta,Reims,D S,2013.0,27,0.3577,0.013,0.0695,0.0,0.0447,0.4471,0.8284,False,understat
+ligue_1,2024,understat_11343,Gabriel Suazo,Toulouse,D S,2171.0,30,0.2902,0.0385,0.1916,0.0,0.2487,1.6997,0.8041,False,understat
+ligue_1,2024,understat_11545,Jérémy Jacquet,Rennes,D,933.0,11,0.7717,0.0462,0.0596,0.0,0.0965,0.3859,0.9424,False,understat
+ligue_1,2024,understat_11756,Tiago Santos,Lille,D S,406.0,7,1.7734,0.1609,0.2014,0.0,0.0,1.1084,0.6444,False,understat
+ligue_1,2024,understat_11763,Abduqodir Khusanov,Lens,D S,978.0,13,0.4601,0.0197,0.0277,0.0,0.0,0.184,0.8359,False,understat
+ligue_1,2024,understat_11776,Guillaume Restes,Toulouse,GK,2545.0,29,0.0,0.0,0.0019,0.0,0.0354,0.0354,0.9751,True,understat
+ligue_1,2024,understat_11781,Philipp Köhn,Monaco,GK,1710.0,19,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+ligue_1,2024,understat_11786,Becir Omeragic,Montpellier,D M S,1813.0,22,0.3475,0.0278,0.0113,0.0,0.0,0.1489,0.9157,False,understat
+ligue_1,2024,understat_11787,Loïc Négo,Le Havre,D M S,2473.0,31,0.4367,0.0179,0.0245,0.0,0.0,0.4367,0.8864,False,understat
+ligue_1,2024,understat_11794,Antoine Joujou,Le Havre,F M S,923.0,26,1.0726,0.0798,0.3396,0.0,0.195,1.4626,0.3944,False,understat
+ligue_1,2024,understat_11796,Étienne Youté,Le Havre,D M S,2315.0,28,0.5443,0.0793,0.0052,0.0,0.0,0.1166,0.9187,False,understat
+ligue_1,2024,understat_11819,Clinton Mata,Lyon,D S,2366.0,29,0.1902,0.0087,0.0639,0.0,0.1522,0.4184,0.9065,False,understat
+ligue_1,2024,understat_11906,Emmanuel Sabbi,Le Havre,F M S,649.0,15,2.0801,0.3523,0.0433,0.0,0.0,0.5547,0.4807,False,understat
+ligue_1,2024,understat_11910,William Pacho,Paris Saint Germain,D S,2127.0,28,0.2539,0.0189,0.0185,0.0,0.0423,0.1269,0.844,False,understat
+ligue_1,2024,understat_12032,Djordje Petrovic,Strasbourg,GK,2790.0,31,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+ligue_1,2024,understat_12066,Ethan Mbappé,Lille,M S,194.0,10,5.1031,0.541,0.7503,0.0,0.0,2.7835,0.2156,False,understat
+ligue_1,2024,understat_12143,Mahamadou Diawara,"Le Havre,Lyon",M S,576.0,17,1.0938,0.0418,0.0448,0.0,0.1562,1.0938,0.3765,False,understat
+ligue_1,2024,understat_12162,Ayyoub Bouaddi,Lille,M S,1112.0,24,0.2428,0.0118,0.0773,0.0,0.0809,0.4047,0.5148,False,understat
+ligue_1,2024,understat_12163,Amadou Koné,Reims,M S,1317.0,24,0.9567,0.0436,0.0282,0.0,0.0,0.5467,0.6097,False,understat
+ligue_1,2024,understat_12186,Kassoum Ouattara,Monaco,D S,380.0,12,0.4737,0.0292,0.4049,0.0,0.2368,1.4211,0.3519,False,understat
+ligue_1,2024,understat_12258,Luc Zogbe,Brest,D S,616.0,13,1.1688,0.0406,0.0141,0.0,0.0,0.5844,0.5265,False,understat
+ligue_1,2024,understat_12317,Nhoa Sangui,Reims,D M S,1080.0,26,0.25,0.0092,0.0465,0.0,0.1667,0.4167,0.4615,False,understat
+ligue_1,2024,understat_12369,Lucas Perri,Lyon,GK,2970.0,33,0.0,0.0,0.0004,0.0,0.0,0.0303,1.0,True,understat
+ligue_1,2024,understat_12391,Tom Pouilly,Lens,D S,252.0,10,1.4286,0.2286,0.2006,0.0,0.0,1.0714,0.28,False,understat
+ligue_1,2024,understat_12402,Yoram Zague,Paris Saint Germain,D S,183.0,4,0.4918,0.0243,0.0561,0.0,0.0,0.9836,0.5083,False,understat
+ligue_1,2024,understat_12411,Junior Ndiaye,Montpellier,F S,410.0,15,1.0976,0.1801,0.0708,0.0,0.0,1.0976,0.3037,False,understat
+ligue_1,2024,understat_12498,Valentín Barco,Strasbourg,D M,1181.0,14,0.6859,0.0318,0.0755,0.0,0.1524,0.6097,0.9373,False,understat
+ligue_1,2024,understat_12530,Mikayil Faye,Rennes,D S,701.0,11,0.7703,0.0274,0.0034,0.0,0.0,0.1284,0.7081,False,understat
+ligue_1,2024,understat_12598,Rafik Messali,Toulouse,D S,449.0,13,0.8018,0.0532,0.2637,0.0,0.2004,2.2049,0.3838,False,understat
+ligue_1,2024,understat_12732,Yanis Zouaoui,Le Havre,D M S,964.0,17,0.4668,0.0122,0.2635,0.0,0.1867,2.6141,0.6301,False,understat
+ligue_1,2024,understat_12769,Derek Cornelius,Marseille,D S,1439.0,21,0.5629,0.0782,0.0076,0.0,0.0,0.2502,0.7614,False,understat
+ligue_1,2024,understat_12800,Ngal&#039;ayel Mukau,Lille,M S,1224.0,22,0.8088,0.0464,0.0441,0.0,0.0735,0.8824,0.6182,False,understat
+ligue_1,2024,understat_12808,Mathis Amougou,Saint-Etienne,M S,840.0,17,0.75,0.0455,0.0385,0.0,0.0,0.75,0.549,False,understat
+ligue_1,2024,understat_12809,Ben Old,Saint-Etienne,F M S,503.0,13,1.9682,0.191,0.1223,0.0,0.0,1.4314,0.4299,False,understat
+ligue_1,2024,understat_12824,Clément Akpa,Auxerre,D S,2507.0,31,0.2154,0.0077,0.0248,0.0,0.0359,0.2872,0.8986,False,understat
+ligue_1,2024,understat_12836,Stefan Dzodic,Montpellier,D S,232.0,7,1.1638,0.0378,0.0,0.0,0.0,0.0,0.3683,False,understat
+ligue_1,2024,understat_12837,Caleb Wiley,Strasbourg,D M S,266.0,6,0.3383,0.0295,0.1407,0.0,0.3383,0.6767,0.4926,False,understat
+ligue_1,2024,understat_12847,Sidiki Chérif,Angers,F S,316.0,7,1.4241,0.1905,0.0562,0.0,0.0,0.5696,0.5016,False,understat
+ligue_1,2024,understat_12879,Glen Kamara,Rennes,M S,669.0,13,0.1345,0.0095,0.0461,0.0,0.1345,0.8072,0.5718,False,understat
+ligue_1,2024,understat_12882,Jordan James,Rennes,M S,1195.0,23,1.2803,0.058,0.12,0.0,0.0753,1.7322,0.5773,False,understat
+ligue_1,2024,understat_12959,Ibrahima Wadji,Saint-Etienne,F S,310.0,10,3.4839,0.4199,0.0025,0.0,0.0,0.2903,0.3444,False,understat
+ligue_1,2024,understat_12969,Moïse Bombito,Nice,D S,2197.0,27,0.3277,0.0273,0.004,0.0,0.0,0.0819,0.9041,False,understat
+ligue_1,2024,understat_13025,Pierre Cornud,Saint-Etienne,D S,568.0,11,0.0,0.0,0.0631,0.0,0.0,0.4754,0.5737,False,understat
+ligue_1,2024,understat_13033,Ümit Akdag,Toulouse,D S,514.0,9,0.3502,0.0134,0.0096,0.0,0.0,0.3502,0.6346,False,understat
+ligue_1,2024,understat_13042,Mohamed Abdelmonem,Nice,D S,857.0,12,0.0,0.0,0.0,0.0,0.0,0.0,0.7935,False,understat
+ligue_1,2024,understat_13089,Patrik Carlgren,Nantes,GK S,417.0,5,0.0,0.0,0.0,0.0,0.0,0.0,0.9267,True,understat
+ligue_1,2024,understat_13091,Jaydee Canvot,Toulouse,D M S,1102.0,18,0.4083,0.0197,0.036,0.0,0.0,0.3267,0.6802,False,understat
+ligue_1,2024,understat_13100,Juma Bah,Lens,D S,684.0,10,0.2632,0.0137,0.0162,0.0,0.0,0.2632,0.76,False,understat
+ligue_1,2024,understat_13158,Marius Courcoul,Angers,M S,296.0,8,0.9122,0.0182,0.0127,0.0,0.0,0.3041,0.4111,False,understat
+ligue_1,2024,understat_13174,Yael Mouanga,Montpellier,D S,941.0,14,0.0956,0.0346,0.027,0.0,0.0,0.1913,0.7468,False,understat
+ligue_1,2024,understat_13215,Axel Tape,Paris Saint Germain,D,180.0,2,0.5,0.0139,0.0158,0.0,0.0,0.5,1.0,False,understat
+ligue_1,2024,understat_13311,Djylian N&#039;Guessan,Saint-Etienne,F S,181.0,8,1.4917,0.2188,0.1523,0.0,0.0,0.9945,0.2514,False,understat
+ligue_1,2024,understat_13312,Hafiz Ibrahim,Reims,F S,360.0,11,1.75,0.1506,0.1078,0.0,0.25,1.0,0.3636,False,understat
+ligue_1,2024,understat_13384,Hiroki Sekine,Reims,D S,866.0,15,0.5196,0.0155,0.0246,0.0,0.0,0.3118,0.6415,False,understat
+ligue_1,2024,understat_13397,Nicolas Pays,Montpellier,F M S,433.0,9,2.2864,0.2068,0.0651,0.0,0.0,0.6236,0.5346,False,understat
+ligue_1,2024,understat_13407,Fredrik Oppegård,Auxerre,D S,261.0,9,1.0345,0.0353,0.0426,0.0,0.0,0.6897,0.3222,False,understat
+ligue_1,2024,understat_13435,Kazeem Olaigbe,Rennes,F M S,288.0,10,1.875,0.0726,0.7433,0.0,0.625,4.6875,0.32,False,understat
+ligue_1,2024,understat_13456,Amar Dedic,Marseille,D S,289.0,10,1.8685,0.2228,0.2667,0.0,0.3114,1.2457,0.3211,False,understat
+ligue_1,2024,understat_13525,Wilfried Ndollo Bille,Montpellier,D S,390.0,8,0.0,0.0,0.0067,0.0,0.0,0.2308,0.5417,False,understat

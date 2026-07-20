@@ -1,0 +1,553 @@
+league,season,match_id,date,home_team,away_team,home_goals,away_goals,ht_home_goals,ht_away_goals,home_shots,away_shots,home_shots_on_target,away_shots_on_target,home_corners,away_corners,home_fouls,away_fouls,home_yellow_cards,away_yellow_cards,home_red_cards,away_red_cards,odds_home,odds_draw,odds_away,odds_over_2_5,odds_under_2_5
+championship,2024,championship_2024_0_blackburn_derby,09/08/2024,Blackburn,Derby,4,2,1,0,11,12,7,4,1,9,9,10,1,3,0,0,2.28,3.36,3.17,1.99,1.82
+championship,2024,championship_2024_1_preston_sheffield_united,09/08/2024,Preston,Sheffield United,0,2,0,1,12,11,2,3,3,6,11,14,1,0,0,0,3.16,3.35,2.3,1.98,1.83
+championship,2024,championship_2024_2_cardiff_sunderland,10/08/2024,Cardiff,Sunderland,0,2,0,1,12,11,4,4,4,4,10,8,0,2,0,0,2.9,3.18,2.54,2.25,1.63
+championship,2024,championship_2024_3_hull_bristol_city,10/08/2024,Hull,Bristol City,1,1,0,0,11,15,5,3,2,8,10,13,0,2,0,0,2.63,3.27,2.73,2.08,1.74
+championship,2024,championship_2024_4_leeds_portsmouth,10/08/2024,Leeds,Portsmouth,3,3,1,2,22,5,10,4,12,0,19,21,2,4,0,0,1.37,5.01,7.81,1.59,2.32
+championship,2024,championship_2024_5_middlesbrough_swansea,10/08/2024,Middlesbrough,Swansea,1,0,1,0,18,5,4,0,6,9,14,12,1,4,0,0,1.83,3.77,4.16,1.74,2.09
+championship,2024,championship_2024_6_millwall_watford,10/08/2024,Millwall,Watford,2,3,0,1,16,10,4,5,5,5,11,15,2,3,0,0,2.34,3.2,3.19,2.3,1.61
+championship,2024,championship_2024_7_oxford_norwich,10/08/2024,Oxford,Norwich,2,0,1,0,12,10,4,2,5,5,4,14,1,3,0,0,3.04,3.49,2.28,1.86,1.94
+championship,2024,championship_2024_8_qpr_west_brom,10/08/2024,QPR,West Brom,1,3,1,1,11,7,6,4,12,3,7,7,1,0,0,0,2.55,3.18,2.88,2.24,1.64
+championship,2024,championship_2024_9_stoke_coventry,10/08/2024,Stoke,Coventry,1,0,0,0,11,8,2,1,9,7,7,9,2,1,0,0,2.47,3.51,2.75,1.8,2.01
+championship,2024,championship_2024_10_sheffield_weds_plymouth,11/08/2024,Sheffield Weds,Plymouth,4,0,1,0,31,5,11,1,15,1,15,14,1,1,0,0,1.84,3.58,4.27,1.96,1.84
+championship,2024,championship_2024_11_luton_burnley,12/08/2024,Luton,Burnley,1,4,0,2,10,11,3,6,5,4,11,17,2,3,0,0,2.4,3.39,2.9,1.85,1.94
+championship,2024,championship_2024_12_coventry_oxford,16/08/2024,Coventry,Oxford,3,2,2,1,26,7,10,2,14,1,9,7,0,2,0,0,1.69,3.98,4.72,1.71,2.13
+championship,2024,championship_2024_13_derby_middlesbrough,17/08/2024,Derby,Middlesbrough,1,0,1,0,3,20,2,4,3,8,13,5,3,1,0,0,3.45,3.55,2.07,1.83,1.98
+championship,2024,championship_2024_14_portsmouth_luton,17/08/2024,Portsmouth,Luton,0,0,0,0,15,9,6,4,5,4,11,12,3,2,0,1,3.0,3.55,2.28,1.76,2.06
+championship,2024,championship_2024_15_west_brom_leeds,17/08/2024,West Brom,Leeds,0,0,0,0,8,8,1,1,5,4,14,11,2,2,0,0,3.39,3.45,2.13,2.0,1.81
+championship,2024,championship_2024_16_bristol_city_millwall,17/08/2024,Bristol City,Millwall,4,3,2,0,11,15,6,4,5,4,11,12,1,2,0,0,2.02,3.26,3.96,2.36,1.58
+championship,2024,championship_2024_17_burnley_cardiff,17/08/2024,Burnley,Cardiff,5,0,2,0,9,11,4,4,2,5,19,6,2,1,0,0,1.47,4.44,6.69,1.75,2.08
+championship,2024,championship_2024_18_norwich_blackburn,17/08/2024,Norwich,Blackburn,2,2,0,1,14,7,4,3,6,5,12,12,2,3,0,0,2.06,3.54,3.48,1.79,2.02
+championship,2024,championship_2024_19_plymouth_hull,17/08/2024,Plymouth,Hull,1,1,0,0,16,14,7,2,6,3,13,16,3,1,0,0,2.83,3.65,2.35,1.67,2.19
+championship,2024,championship_2024_20_sheffield_united_qpr,17/08/2024,Sheffield United,QPR,2,2,2,0,14,14,3,3,4,9,15,9,2,2,0,1,1.79,3.72,4.39,1.89,1.92
+championship,2024,championship_2024_21_swansea_preston,17/08/2024,Swansea,Preston,3,0,1,0,12,5,6,2,5,3,11,21,1,3,0,0,1.97,3.42,3.92,2.11,1.72
+championship,2024,championship_2024_22_watford_stoke,17/08/2024,Watford,Stoke,3,0,0,0,24,7,8,3,2,4,12,15,2,2,0,0,2.63,3.28,2.71,2.05,1.77
+championship,2024,championship_2024_23_sunderland_sheffield_weds,18/08/2024,Sunderland,Sheffield Weds,4,0,3,0,15,9,6,3,5,8,9,10,0,3,0,0,2.15,3.46,3.33,1.93,1.87
+championship,2024,championship_2024_24_sheffield_weds_leeds,23/08/2024,Sheffield Weds,Leeds,0,2,0,1,8,13,2,5,3,2,14,10,2,3,0,0,3.96,3.52,1.93,1.87,1.93
+championship,2024,championship_2024_25_bristol_city_coventry,24/08/2024,Bristol City,Coventry,1,1,1,0,12,8,7,1,8,2,8,16,2,4,0,0,2.47,3.41,2.8,1.87,1.94
+championship,2024,championship_2024_26_hull_millwall,24/08/2024,Hull,Millwall,0,0,0,0,14,13,4,5,5,7,11,15,2,2,0,0,2.18,3.35,3.35,2.04,1.77
+championship,2024,championship_2024_27_qpr_plymouth,24/08/2024,QPR,Plymouth,1,1,1,1,30,6,10,1,11,1,10,14,2,3,0,2,1.7,3.88,4.76,1.81,2.01
+championship,2024,championship_2024_28_blackburn_oxford,24/08/2024,Blackburn,Oxford,2,1,1,1,18,13,4,3,7,5,14,8,2,1,0,0,1.77,3.83,4.29,1.74,2.08
+championship,2024,championship_2024_29_middlesbrough_portsmouth,24/08/2024,Middlesbrough,Portsmouth,2,2,1,2,29,7,7,3,15,2,10,15,0,5,0,0,1.47,4.45,6.62,1.7,2.14
+championship,2024,championship_2024_30_norwich_sheffield_united,24/08/2024,Norwich,Sheffield United,1,1,1,1,7,12,5,4,1,5,14,7,5,2,0,0,2.74,3.47,2.47,1.75,2.06
+championship,2024,championship_2024_31_preston_luton,24/08/2024,Preston,Luton,1,0,1,0,6,17,2,4,2,13,16,10,6,1,0,0,3.18,3.48,2.21,1.94,1.87
+championship,2024,championship_2024_32_stoke_west_brom,24/08/2024,Stoke,West Brom,1,2,1,2,7,8,2,5,2,5,12,11,2,3,0,0,2.55,3.18,2.84,2.24,1.64
+championship,2024,championship_2024_33_sunderland_burnley,24/08/2024,Sunderland,Burnley,1,0,1,0,14,4,3,1,3,1,13,19,2,3,1,0,2.99,3.41,2.33,1.9,1.9
+championship,2024,championship_2024_34_watford_derby,24/08/2024,Watford,Derby,2,1,1,1,12,8,3,3,4,2,10,11,2,3,0,0,1.87,3.61,4.03,1.86,1.93
+championship,2024,championship_2024_35_swansea_cardiff,25/08/2024,Swansea,Cardiff,1,1,1,0,9,7,4,3,2,5,14,14,2,2,0,0,1.97,3.58,3.71,1.88,1.92
+championship,2024,championship_2024_36_luton_qpr,30/08/2024,Luton,QPR,1,2,1,0,11,11,5,4,4,5,13,10,3,2,0,0,1.97,3.61,3.73,1.77,2.05
+championship,2024,championship_2024_37_burnley_blackburn,31/08/2024,Burnley,Blackburn,1,1,1,1,15,10,3,3,9,0,15,19,4,5,0,1,1.93,3.67,3.81,1.79,2.02
+championship,2024,championship_2024_38_cardiff_middlesbrough,31/08/2024,Cardiff,Middlesbrough,0,2,0,0,12,10,3,5,4,6,13,10,2,1,0,0,3.94,3.71,1.89,1.88,1.93
+championship,2024,championship_2024_39_coventry_norwich,31/08/2024,Coventry,Norwich,0,1,0,0,14,9,5,1,6,3,11,10,4,3,0,0,1.89,3.78,3.85,1.71,2.14
+championship,2024,championship_2024_40_derby_bristol_city,31/08/2024,Derby,Bristol City,3,0,1,0,19,13,7,5,6,9,15,11,1,0,0,0,2.94,3.28,2.45,2.02,1.79
+championship,2024,championship_2024_41_leeds_hull,31/08/2024,Leeds,Hull,2,0,0,0,16,9,5,2,8,7,12,15,2,1,0,0,1.33,5.3,9.01,1.61,2.32
+championship,2024,championship_2024_42_millwall_sheffield_weds,31/08/2024,Millwall,Sheffield Weds,3,0,0,0,18,4,4,1,6,6,16,13,2,1,0,0,2.42,3.32,2.95,2.11,1.72
+championship,2024,championship_2024_43_oxford_preston,31/08/2024,Oxford,Preston,3,1,1,1,10,10,5,4,2,5,8,21,2,2,0,1,2.44,3.37,2.88,1.99,1.82
+championship,2024,championship_2024_44_plymouth_stoke,31/08/2024,Plymouth,Stoke,0,1,0,0,15,15,7,7,10,4,14,17,1,3,0,0,3.17,3.62,2.17,1.7,2.16
+championship,2024,championship_2024_45_portsmouth_sunderland,31/08/2024,Portsmouth,Sunderland,1,3,0,1,6,11,2,4,5,5,14,14,3,1,0,0,3.48,3.53,2.07,1.97,1.84
+championship,2024,championship_2024_46_west_brom_swansea,31/08/2024,West Brom,Swansea,1,0,1,0,18,6,5,2,6,7,8,11,4,1,0,0,1.85,3.63,4.24,1.96,1.85
+championship,2024,championship_2024_47_sheffield_united_watford,01/09/2024,Sheffield United,Watford,1,0,1,0,18,7,7,1,8,5,15,12,5,3,0,0,1.78,3.85,4.3,1.81,1.99
+championship,2024,championship_2024_48_hull_sheffield_united,13/09/2024,Hull,Sheffield United,0,2,0,1,10,9,2,4,16,3,6,10,1,4,0,0,3.36,3.44,2.15,1.87,1.93
+championship,2024,championship_2024_49_leeds_burnley,14/09/2024,Leeds,Burnley,0,1,0,1,17,7,4,3,9,3,8,13,3,4,0,1,1.72,3.86,4.7,1.84,1.97
+championship,2024,championship_2024_50_millwall_luton,14/09/2024,Millwall,Luton,0,1,0,1,11,10,3,6,6,4,8,20,2,3,0,0,2.64,3.33,2.67,2.05,1.77
+championship,2024,championship_2024_51_oxford_stoke,14/09/2024,Oxford,Stoke,1,0,0,0,14,9,8,1,4,6,5,6,0,1,0,0,3.14,3.38,2.27,1.96,1.85
+championship,2024,championship_2024_52_blackburn_bristol_city,14/09/2024,Blackburn,Bristol City,3,0,1,0,9,8,3,2,6,6,13,15,0,4,0,0,2.14,3.48,3.34,1.91,1.9
+championship,2024,championship_2024_53_derby_cardiff,14/09/2024,Derby,Cardiff,1,0,1,0,12,9,3,3,7,6,12,10,2,3,0,0,2.35,3.3,3.07,2.08,1.75
+championship,2024,championship_2024_54_middlesbrough_preston,14/09/2024,Middlesbrough,Preston,1,1,1,1,16,6,6,2,9,2,6,21,0,5,0,0,1.46,4.53,6.77,1.73,2.1
+championship,2024,championship_2024_55_plymouth_sunderland,14/09/2024,Plymouth,Sunderland,3,2,0,1,13,17,6,7,3,5,14,12,4,4,0,0,4.31,3.74,1.8,1.73,2.1
+championship,2024,championship_2024_56_sheffield_weds_qpr,14/09/2024,Sheffield Weds,QPR,1,1,0,0,13,13,2,4,11,4,6,7,0,3,0,0,2.3,3.33,3.14,2.03,1.78
+championship,2024,championship_2024_57_swansea_norwich,14/09/2024,Swansea,Norwich,1,0,1,0,9,13,4,3,4,5,14,14,2,3,0,0,2.33,3.45,2.97,1.86,1.94
+championship,2024,championship_2024_58_watford_coventry,14/09/2024,Watford,Coventry,1,1,0,1,18,17,6,5,6,10,9,10,2,2,0,0,2.6,3.44,2.64,1.8,2.02
+championship,2024,championship_2024_59_portsmouth_west_brom,15/09/2024,Portsmouth,West Brom,0,3,0,1,14,19,0,7,10,4,18,6,5,2,0,0,4.02,3.57,1.91,1.95,1.85
+championship,2024,championship_2024_60_stoke_hull,20/09/2024,Stoke,Hull,1,3,1,0,14,13,2,3,2,5,12,10,3,2,0,0,2.1,3.47,3.46,1.91,1.9
+championship,2024,championship_2024_61_norwich_watford,21/09/2024,Norwich,Watford,4,1,2,1,19,11,8,3,3,5,6,8,2,1,0,0,2.17,3.51,3.25,1.9,1.9
+championship,2024,championship_2024_62_qpr_millwall,21/09/2024,QPR,Millwall,1,1,1,1,7,16,2,5,5,10,9,12,2,1,0,0,2.32,3.27,3.15,2.2,1.67
+championship,2024,championship_2024_63_sunderland_middlesbrough,21/09/2024,Sunderland,Middlesbrough,1,0,1,0,9,11,2,1,3,5,8,15,3,2,0,0,2.46,3.43,2.82,1.88,1.93
+championship,2024,championship_2024_64_bristol_city_oxford,21/09/2024,Bristol City,Oxford,2,1,0,1,19,7,6,2,5,1,16,14,1,4,0,0,1.78,3.66,4.57,1.92,1.89
+championship,2024,championship_2024_65_burnley_portsmouth,21/09/2024,Burnley,Portsmouth,2,1,0,1,18,5,4,2,4,2,15,4,2,2,0,0,1.48,4.42,6.65,1.74,2.09
+championship,2024,championship_2024_66_cardiff_leeds,21/09/2024,Cardiff,Leeds,0,2,0,1,3,15,2,7,0,4,10,14,2,2,1,0,5.13,4.01,1.64,1.9,1.9
+championship,2024,championship_2024_67_coventry_swansea,21/09/2024,Coventry,Swansea,1,2,1,2,20,11,7,4,6,3,12,5,2,3,0,0,1.73,3.9,4.51,1.71,2.13
+championship,2024,championship_2024_68_luton_sheffield_weds,21/09/2024,Luton,Sheffield Weds,2,1,0,0,15,12,3,6,8,5,9,14,1,1,0,1,1.91,3.58,3.96,1.84,1.97
+championship,2024,championship_2024_69_sheffield_united_derby,21/09/2024,Sheffield United,Derby,1,0,0,0,18,3,5,0,11,2,11,13,3,2,0,0,1.58,4.26,5.4,1.79,2.03
+championship,2024,championship_2024_70_west_brom_plymouth,21/09/2024,West Brom,Plymouth,1,0,0,0,17,17,4,4,5,2,9,9,3,2,0,0,1.39,4.95,7.56,1.55,2.42
+championship,2024,championship_2024_71_preston_blackburn,22/09/2024,Preston,Blackburn,0,0,0,0,7,6,5,3,4,4,10,16,4,4,1,1,2.75,3.27,2.58,2.04,1.78
+championship,2024,championship_2024_72_plymouth_luton,27/09/2024,Plymouth,Luton,3,1,1,0,19,16,6,2,3,15,4,13,1,4,0,0,3.81,3.85,1.89,1.59,2.36
+championship,2024,championship_2024_73_blackburn_qpr,28/09/2024,Blackburn,QPR,2,0,0,0,19,6,12,1,8,2,16,11,3,2,0,1,2.04,3.52,3.57,1.92,1.88
+championship,2024,championship_2024_74_derby_norwich,28/09/2024,Derby,Norwich,2,3,0,1,16,10,5,5,9,5,13,7,3,2,0,0,2.73,3.44,2.52,1.94,1.86
+championship,2024,championship_2024_75_sheffield_weds_west_brom,28/09/2024,Sheffield Weds,West Brom,3,2,2,0,12,12,5,3,5,4,11,14,5,3,0,0,3.05,3.33,2.35,2.07,1.75
+championship,2024,championship_2024_76_hull_cardiff,28/09/2024,Hull,Cardiff,4,1,2,1,18,16,9,5,7,5,9,12,3,4,0,0,1.89,3.76,3.84,1.91,1.89
+championship,2024,championship_2024_77_leeds_coventry,28/09/2024,Leeds,Coventry,3,0,1,0,13,7,8,2,7,3,16,15,1,1,0,0,1.56,4.32,5.4,1.65,2.23
+championship,2024,championship_2024_78_middlesbrough_stoke,28/09/2024,Middlesbrough,Stoke,2,0,1,0,26,7,9,1,7,2,10,17,4,7,0,0,1.62,4.1,5.14,1.72,2.11
+championship,2024,championship_2024_79_millwall_preston,28/09/2024,Millwall,Preston,3,1,2,0,14,11,6,4,3,8,16,10,2,2,1,0,1.92,3.34,4.26,2.39,1.57
+championship,2024,championship_2024_80_oxford_burnley,28/09/2024,Oxford,Burnley,0,0,0,0,3,14,1,1,2,6,8,13,1,2,0,0,3.55,3.54,2.04,1.9,1.9
+championship,2024,championship_2024_81_portsmouth_sheffield_united,28/09/2024,Portsmouth,Sheffield United,0,0,0,0,9,12,2,4,15,9,12,19,2,2,0,0,4.01,3.75,1.86,1.81,2.0
+championship,2024,championship_2024_82_watford_sunderland,28/09/2024,Watford,Sunderland,2,1,1,0,13,17,5,5,4,6,11,11,2,1,0,0,2.85,3.42,2.42,1.97,1.83
+championship,2024,championship_2024_83_swansea_bristol_city,29/09/2024,Swansea,Bristol City,1,1,1,0,7,15,2,6,3,8,10,15,1,3,0,0,2.33,3.51,2.92,1.88,1.92
+championship,2024,championship_2024_84_burnley_plymouth,01/10/2024,Burnley,Plymouth,1,0,1,0,11,7,3,0,7,1,14,8,1,0,0,0,1.43,4.86,6.74,1.56,2.4
+championship,2024,championship_2024_85_cardiff_millwall,01/10/2024,Cardiff,Millwall,1,0,1,0,10,11,5,5,5,6,14,12,1,3,0,0,3.16,3.08,2.43,2.57,1.51
+championship,2024,championship_2024_86_coventry_blackburn,01/10/2024,Coventry,Blackburn,3,0,1,0,18,10,8,3,5,1,12,12,1,3,0,0,2.11,3.43,3.48,1.83,1.98
+championship,2024,championship_2024_87_luton_oxford,01/10/2024,Luton,Oxford,2,2,2,1,12,19,4,8,5,6,13,12,3,3,1,0,1.69,3.93,4.86,1.86,1.95
+championship,2024,championship_2024_88_norwich_leeds,01/10/2024,Norwich,Leeds,1,1,1,0,7,14,1,3,9,6,12,18,2,4,0,0,3.67,3.53,2.01,1.87,1.94
+championship,2024,championship_2024_89_qpr_hull,01/10/2024,QPR,Hull,1,3,1,2,21,15,7,6,5,6,12,11,1,3,0,0,2.46,3.38,2.86,1.91,1.89
+championship,2024,championship_2024_90_sunderland_derby,01/10/2024,Sunderland,Derby,2,0,1,0,9,13,3,5,1,8,7,19,2,2,0,0,1.69,3.81,5.03,2.0,1.81
+championship,2024,championship_2024_91_west_brom_middlesbrough,01/10/2024,West Brom,Middlesbrough,0,1,0,0,11,15,1,4,5,4,7,6,2,1,0,0,2.46,3.38,2.85,1.88,1.92
+championship,2024,championship_2024_92_preston_watford,02/10/2024,Preston,Watford,3,0,0,0,15,10,6,6,7,5,12,12,2,0,0,0,2.53,3.29,2.81,2.03,1.78
+championship,2024,championship_2024_93_sheffield_united_swansea,02/10/2024,Sheffield United,Swansea,1,0,1,0,15,7,3,1,5,5,13,9,3,2,0,0,1.77,3.78,4.45,1.82,1.99
+championship,2024,championship_2024_94_stoke_portsmouth,02/10/2024,Stoke,Portsmouth,6,1,3,1,20,9,8,2,3,5,9,13,2,1,0,0,1.84,3.7,4.16,1.83,1.98
+championship,2024,championship_2024_95_bristol_city_sheffield_weds,02/10/2024,Bristol City,Sheffield Weds,0,0,0,0,10,8,2,1,6,5,10,12,2,1,0,0,2.18,3.51,3.22,1.93,1.88
+championship,2024,championship_2024_96_sunderland_leeds,04/10/2024,Sunderland,Leeds,2,2,1,1,14,15,4,4,8,1,11,16,3,3,0,0,2.96,3.28,2.44,2.12,1.72
+championship,2024,championship_2024_97_burnley_preston,05/10/2024,Burnley,Preston,0,0,0,0,9,9,1,2,2,3,10,12,3,4,0,0,1.67,3.77,5.24,2.02,1.8
+championship,2024,championship_2024_98_norwich_hull,05/10/2024,Norwich,Hull,4,0,2,0,19,16,9,5,4,7,11,14,3,4,0,0,2.0,3.73,3.51,1.67,2.18
+championship,2024,championship_2024_99_portsmouth_oxford,05/10/2024,Portsmouth,Oxford,1,1,0,0,21,13,8,3,11,4,11,10,0,1,0,0,2.45,3.36,2.87,1.92,1.88
+championship,2024,championship_2024_100_coventry_sheffield_weds,05/10/2024,Coventry,Sheffield Weds,1,2,1,1,13,13,2,5,6,6,12,17,4,3,0,0,1.87,3.71,4.01,1.74,2.09
+championship,2024,championship_2024_101_derby_qpr,05/10/2024,Derby,QPR,2,0,0,0,10,11,5,3,6,9,12,10,1,1,0,0,2.24,3.36,3.2,2.05,1.77
+championship,2024,championship_2024_102_plymouth_blackburn,05/10/2024,Plymouth,Blackburn,2,1,1,0,17,7,7,4,5,5,8,16,4,3,0,0,3.18,3.66,2.14,1.66,2.21
+championship,2024,championship_2024_103_sheffield_united_luton,05/10/2024,Sheffield United,Luton,2,0,1,0,15,8,7,2,5,6,10,8,2,1,0,0,1.92,3.64,3.88,1.87,1.93
+championship,2024,championship_2024_104_swansea_stoke,05/10/2024,Swansea,Stoke,0,0,0,0,19,10,5,4,5,9,8,14,0,4,0,0,2.22,3.44,3.19,1.92,1.88
+championship,2024,championship_2024_105_watford_middlesbrough,05/10/2024,Watford,Middlesbrough,2,1,0,0,9,11,4,5,7,5,15,11,3,1,0,0,3.55,3.71,1.99,1.66,2.22
+championship,2024,championship_2024_106_west_brom_millwall,05/10/2024,West Brom,Millwall,0,0,0,0,13,6,3,4,5,2,8,15,2,3,0,0,1.96,3.33,4.09,2.31,1.61
+championship,2024,championship_2024_107_bristol_city_cardiff,06/10/2024,Bristol City,Cardiff,1,1,0,0,16,15,2,2,4,6,8,12,2,1,0,0,1.76,3.74,4.52,1.97,1.84
+championship,2024,championship_2024_108_leeds_sheffield_united,18/10/2024,Leeds,Sheffield United,2,0,0,0,13,5,4,0,7,3,10,10,1,2,0,0,1.9,3.53,4.11,2.05,1.77
+championship,2024,championship_2024_109_cardiff_plymouth,19/10/2024,Cardiff,Plymouth,5,0,2,0,25,6,11,2,9,1,15,10,3,1,0,1,2.05,3.54,3.53,1.81,2.01
+championship,2024,championship_2024_110_luton_watford,19/10/2024,Luton,Watford,3,0,1,0,13,9,5,1,11,4,22,20,3,2,0,0,2.02,3.56,3.61,1.7,2.11
+championship,2024,championship_2024_111_oxford_west_brom,19/10/2024,Oxford,West Brom,1,1,0,1,12,14,3,3,5,8,16,10,3,1,0,0,3.84,3.48,1.98,2.01,1.77
+championship,2024,championship_2024_112_preston_coventry,19/10/2024,Preston,Coventry,1,0,0,0,18,12,3,1,9,9,12,12,4,0,0,0,2.8,3.32,2.53,1.94,1.84
+championship,2024,championship_2024_113_blackburn_swansea,19/10/2024,Blackburn,Swansea,1,0,1,0,8,14,3,2,3,8,15,5,1,2,0,0,2.1,3.48,3.47,1.9,1.9
+championship,2024,championship_2024_114_middlesbrough_bristol_city,19/10/2024,Middlesbrough,Bristol City,0,2,0,2,20,9,2,3,7,0,13,10,5,3,0,0,1.72,3.92,4.62,1.77,2.04
+championship,2024,championship_2024_115_millwall_derby,19/10/2024,Millwall,Derby,1,1,0,0,16,5,6,1,9,5,12,14,2,0,0,0,2.03,3.32,3.84,2.28,1.62
+championship,2024,championship_2024_116_qpr_portsmouth,19/10/2024,QPR,Portsmouth,1,2,1,1,15,11,8,3,3,5,11,11,1,3,0,0,1.87,3.65,4.1,1.89,1.91
+championship,2024,championship_2024_117_sheffield_weds_burnley,19/10/2024,Sheffield Weds,Burnley,0,2,0,1,13,14,3,6,10,3,10,11,1,2,0,0,2.77,3.2,2.63,2.15,1.69
+championship,2024,championship_2024_118_stoke_norwich,19/10/2024,Stoke,Norwich,1,1,1,1,14,12,5,4,8,7,7,9,0,1,0,0,2.57,3.47,2.65,1.79,1.99
+championship,2024,championship_2024_119_hull_sunderland,20/10/2024,Hull,Sunderland,0,1,0,0,8,10,0,2,4,4,12,8,1,1,0,0,2.83,3.51,2.39,1.77,2.05
+championship,2024,championship_2024_120_cardiff_portsmouth,22/10/2024,Cardiff,Portsmouth,2,0,2,0,24,8,10,2,12,5,9,13,2,2,0,0,1.92,3.58,3.97,1.93,1.87
+championship,2024,championship_2024_121_leeds_watford,22/10/2024,Leeds,Watford,2,1,2,0,24,9,7,3,10,4,7,11,2,1,0,0,1.33,5.29,8.97,1.6,2.31
+championship,2024,championship_2024_122_oxford_derby,22/10/2024,Oxford,Derby,1,1,1,0,11,17,3,4,1,6,8,8,1,5,0,0,2.58,3.25,2.8,2.12,1.72
+championship,2024,championship_2024_123_preston_norwich,22/10/2024,Preston,Norwich,2,2,2,1,8,9,2,3,5,2,12,15,2,3,0,0,2.68,3.26,2.69,2.01,1.8
+championship,2024,championship_2024_124_sheffield_weds_swansea,22/10/2024,Sheffield Weds,Swansea,0,0,0,0,8,9,0,1,9,6,8,5,0,4,0,0,2.16,3.38,3.41,2.02,1.79
+championship,2024,championship_2024_125_stoke_bristol_city,22/10/2024,Stoke,Bristol City,2,2,2,0,10,28,6,10,6,13,10,5,3,1,0,0,2.41,3.35,2.94,1.97,1.84
+championship,2024,championship_2024_126_qpr_coventry,22/10/2024,QPR,Coventry,1,1,0,1,16,8,5,3,7,3,7,13,2,1,0,0,2.93,3.38,2.41,1.84,1.97
+championship,2024,championship_2024_127_blackburn_west_brom,23/10/2024,Blackburn,West Brom,0,0,0,0,8,9,2,4,4,4,10,7,2,0,0,0,2.79,3.27,2.57,2.09,1.74
+championship,2024,championship_2024_128_hull_burnley,23/10/2024,Hull,Burnley,1,1,1,0,11,11,2,5,4,8,4,15,0,1,0,0,2.74,3.29,2.6,2.07,1.76
+championship,2024,championship_2024_129_luton_sunderland,23/10/2024,Luton,Sunderland,1,2,0,0,19,9,4,5,10,3,14,12,2,4,0,0,2.57,3.33,2.73,1.96,1.84
+championship,2024,championship_2024_130_millwall_plymouth,23/10/2024,Millwall,Plymouth,1,0,1,0,13,9,6,2,6,2,12,11,5,1,0,0,1.62,4.04,5.28,1.8,2.0
+championship,2024,championship_2024_131_middlesbrough_sheffield_united,23/10/2024,Middlesbrough,Sheffield United,1,0,0,0,18,9,6,5,8,6,7,4,0,1,0,0,2.06,3.56,3.48,1.91,1.89
+championship,2024,championship_2024_132_portsmouth_sheffield_weds,25/10/2024,Portsmouth,Sheffield Weds,1,2,1,0,9,9,2,3,7,7,10,14,1,3,0,0,3.4,3.41,2.15,1.98,1.83
+championship,2024,championship_2024_133_bristol_city_leeds,26/10/2024,Bristol City,Leeds,0,0,0,0,4,17,0,5,7,6,11,10,1,3,0,0,4.04,3.63,1.88,1.89,1.91
+championship,2024,championship_2024_134_coventry_luton,26/10/2024,Coventry,Luton,3,2,0,2,26,9,10,5,11,5,9,16,2,3,0,1,2.22,3.47,3.19,1.81,2.0
+championship,2024,championship_2024_135_watford_blackburn,26/10/2024,Watford,Blackburn,1,0,0,0,10,12,1,2,6,3,9,17,5,4,0,0,2.47,3.41,2.81,1.82,2.0
+championship,2024,championship_2024_136_burnley_qpr,26/10/2024,Burnley,QPR,0,0,0,0,22,2,4,0,16,1,7,10,0,1,0,0,1.69,3.72,5.13,2.06,1.76
+championship,2024,championship_2024_137_derby_hull,26/10/2024,Derby,Hull,1,1,0,0,14,11,3,5,5,3,10,11,1,4,0,0,2.34,3.42,3.01,1.87,1.93
+championship,2024,championship_2024_138_plymouth_preston,26/10/2024,Plymouth,Preston,3,3,0,2,12,16,6,8,2,1,12,16,0,3,0,0,2.7,3.42,2.54,1.9,1.9
+championship,2024,championship_2024_139_sheffield_united_stoke,26/10/2024,Sheffield United,Stoke,2,0,1,0,19,7,6,3,5,3,12,14,4,2,0,0,1.78,3.72,4.51,1.9,1.89
+championship,2024,championship_2024_140_sunderland_oxford,26/10/2024,Sunderland,Oxford,2,0,1,0,13,5,6,2,8,2,9,8,2,2,0,0,1.56,4.22,5.63,1.78,2.04
+championship,2024,championship_2024_141_swansea_millwall,26/10/2024,Swansea,Millwall,0,1,0,0,17,6,5,2,10,6,13,14,1,4,0,0,2.48,3.23,2.92,2.24,1.64
+championship,2024,championship_2024_142_west_brom_cardiff,26/10/2024,West Brom,Cardiff,0,0,0,0,19,5,4,0,12,1,9,18,4,3,0,0,1.67,3.88,5.08,2.0,1.8
+championship,2024,championship_2024_143_norwich_middlesbrough,27/10/2024,Norwich,Middlesbrough,3,3,1,3,9,14,3,8,3,2,15,7,2,3,1,0,2.79,3.5,2.42,1.7,2.15
+championship,2024,championship_2024_144_luton_west_brom,01/11/2024,Luton,West Brom,1,1,0,1,13,10,5,3,6,3,10,13,1,2,0,0,2.79,3.28,2.56,2.0,1.81
+championship,2024,championship_2024_145_blackburn_sheffield_united,02/11/2024,Blackburn,Sheffield United,0,2,0,1,9,20,0,9,5,8,11,14,1,2,0,0,2.81,3.17,2.61,2.17,1.69
+championship,2024,championship_2024_146_oxford_swansea,02/11/2024,Oxford,Swansea,1,2,0,1,9,16,2,5,1,8,15,8,1,1,0,0,2.77,3.18,2.64,2.15,1.7
+championship,2024,championship_2024_147_stoke_derby,02/11/2024,Stoke,Derby,2,1,1,0,13,9,4,3,9,4,10,14,2,3,0,0,2.22,3.38,3.25,1.99,1.82
+championship,2024,championship_2024_148_cardiff_norwich,02/11/2024,Cardiff,Norwich,2,1,0,0,11,16,5,6,4,4,11,15,3,2,0,0,2.58,3.54,2.6,1.76,2.06
+championship,2024,championship_2024_149_hull_portsmouth,02/11/2024,Hull,Portsmouth,1,1,1,0,10,9,3,5,5,3,12,7,1,4,0,0,1.68,4.08,4.74,1.66,2.22
+championship,2024,championship_2024_150_leeds_plymouth,02/11/2024,Leeds,Plymouth,3,0,3,0,23,0,7,0,9,0,11,15,0,0,0,0,1.18,7.43,13.74,1.42,2.82
+championship,2024,championship_2024_151_middlesbrough_coventry,02/11/2024,Middlesbrough,Coventry,0,3,0,1,9,10,1,4,6,8,4,12,1,3,1,0,1.72,4.02,4.5,1.67,2.2
+championship,2024,championship_2024_152_preston_bristol_city,02/11/2024,Preston,Bristol City,1,3,0,1,14,5,2,3,4,1,11,20,4,3,0,0,2.51,3.18,2.92,2.19,1.67
+championship,2024,championship_2024_153_qpr_sunderland,02/11/2024,QPR,Sunderland,0,0,0,0,17,8,3,1,6,6,12,10,1,2,0,1,3.62,3.37,2.08,2.16,1.69
+championship,2024,championship_2024_154_sheffield_weds_watford,02/11/2024,Sheffield Weds,Watford,2,6,1,1,14,16,6,8,6,2,14,16,3,3,0,0,1.96,3.55,3.81,1.93,1.87
+championship,2024,championship_2024_155_millwall_burnley,03/11/2024,Millwall,Burnley,1,0,0,0,12,8,3,0,2,3,17,12,2,2,0,0,2.77,2.99,2.76,2.67,1.46
+championship,2024,championship_2024_156_bristol_city_sheffield_united,05/11/2024,Bristol City,Sheffield United,1,2,0,0,12,11,2,4,2,5,8,12,0,2,1,0,3.04,3.27,2.39,2.08,1.75
+championship,2024,championship_2024_157_oxford_hull,05/11/2024,Oxford,Hull,1,0,0,0,4,12,2,2,2,6,8,10,2,1,0,0,2.95,3.39,2.39,1.93,1.87
+championship,2024,championship_2024_158_qpr_middlesbrough,05/11/2024,QPR,Middlesbrough,1,4,0,2,7,12,5,8,8,5,8,11,0,2,0,0,3.66,3.57,2.0,1.87,1.93
+championship,2024,championship_2024_159_sheffield_weds_norwich,05/11/2024,Sheffield Weds,Norwich,2,0,2,0,12,5,5,3,2,5,6,16,0,0,0,0,2.22,3.33,3.31,2.0,1.81
+championship,2024,championship_2024_160_plymouth_portsmouth,05/11/2024,Plymouth,Portsmouth,1,0,0,0,10,14,4,4,5,6,8,21,4,2,0,0,2.26,3.54,3.05,1.73,2.11
+championship,2024,championship_2024_161_swansea_watford,05/11/2024,Swansea,Watford,1,0,1,0,12,7,3,0,6,8,9,10,3,2,0,0,1.99,3.54,3.75,1.83,1.98
+championship,2024,championship_2024_162_blackburn_stoke,06/11/2024,Blackburn,Stoke,0,2,0,0,25,15,8,7,9,4,8,8,1,2,0,0,2.02,3.54,3.6,1.87,1.93
+championship,2024,championship_2024_163_coventry_derby,06/11/2024,Coventry,Derby,1,2,0,1,11,3,3,1,9,6,5,11,0,2,0,0,1.78,3.7,4.41,1.88,1.92
+championship,2024,championship_2024_164_millwall_leeds,06/11/2024,Millwall,Leeds,1,0,1,0,6,14,3,4,2,12,11,14,2,1,0,0,4.16,3.36,1.94,2.32,1.61
+championship,2024,championship_2024_165_luton_cardiff,06/11/2024,Luton,Cardiff,1,0,0,0,8,10,3,3,6,6,12,13,2,1,0,0,1.89,3.65,3.95,1.81,1.99
+championship,2024,championship_2024_166_preston_sunderland,06/11/2024,Preston,Sunderland,0,0,0,0,14,10,2,2,4,4,20,11,2,1,0,0,3.17,3.2,2.35,2.2,1.67
+championship,2024,championship_2024_167_west_brom_burnley,07/11/2024,West Brom,Burnley,0,0,0,0,11,12,1,4,2,8,6,20,3,3,0,0,2.29,3.18,3.28,2.4,1.57
+championship,2024,championship_2024_168_watford_oxford,08/11/2024,Watford,Oxford,1,0,0,0,16,10,8,3,11,4,12,8,5,2,0,0,1.7,3.82,4.92,1.9,1.9
+championship,2024,championship_2024_169_cardiff_blackburn,09/11/2024,Cardiff,Blackburn,1,3,0,1,20,10,8,7,12,1,11,6,0,3,0,0,2.32,3.45,3.01,1.93,1.88
+championship,2024,championship_2024_170_middlesbrough_luton,09/11/2024,Middlesbrough,Luton,5,1,2,0,11,5,6,3,1,1,6,15,1,4,0,0,1.76,3.9,4.38,1.71,2.12
+championship,2024,championship_2024_171_stoke_millwall,09/11/2024,Stoke,Millwall,1,1,0,1,8,7,3,1,9,2,13,8,2,2,0,0,2.59,3.16,2.85,2.28,1.63
+championship,2024,championship_2024_172_derby_plymouth,09/11/2024,Derby,Plymouth,1,1,1,1,20,5,4,2,8,3,7,11,1,4,0,0,1.66,4.0,4.97,1.78,2.03
+championship,2024,championship_2024_173_leeds_qpr,09/11/2024,Leeds,QPR,2,0,1,0,21,5,6,0,7,1,12,13,1,2,0,0,1.25,5.81,11.72,1.66,2.18
+championship,2024,championship_2024_174_norwich_bristol_city,09/11/2024,Norwich,Bristol City,0,2,0,1,9,9,3,2,3,3,16,8,2,0,0,0,2.3,3.47,3.01,1.8,2.01
+championship,2024,championship_2024_175_portsmouth_preston,09/11/2024,Portsmouth,Preston,3,1,2,0,18,6,6,1,11,5,12,13,1,0,0,0,2.87,3.31,2.47,2.08,1.75
+championship,2024,championship_2024_176_sunderland_coventry,09/11/2024,Sunderland,Coventry,2,2,2,0,9,8,5,3,2,7,10,16,3,4,0,0,2.19,3.33,3.37,1.94,1.86
+championship,2024,championship_2024_177_sheffield_united_sheffield_weds,10/11/2024,Sheffield United,Sheffield Weds,1,0,0,0,8,10,1,0,5,6,15,22,1,3,0,0,1.89,3.52,4.08,2.06,1.76
+championship,2024,championship_2024_178_hull_west_brom,10/11/2024,Hull,West Brom,1,2,1,2,13,5,3,3,4,3,16,10,1,2,0,0,2.72,3.26,2.64,2.07,1.74
+championship,2024,championship_2024_179_burnley_swansea,10/11/2024,Burnley,Swansea,1,0,0,0,2,9,7,4,5,1,13,12,1,3,0,0,1.93,3.43,4.06,2.23,1.65
+championship,2024,championship_2024_180_plymouth_watford,22/11/2024,Plymouth,Watford,2,2,1,2,10,12,3,5,2,8,5,13,2,1,0,0,3.09,3.47,2.26,1.73,2.11
+championship,2024,championship_2024_181_bristol_city_burnley,23/11/2024,Bristol City,Burnley,0,1,0,1,7,14,2,5,8,3,9,15,3,4,0,0,2.75,3.11,2.7,2.32,1.61
+championship,2024,championship_2024_182_coventry_sheffield_united,23/11/2024,Coventry,Sheffield United,2,2,1,2,20,7,6,2,12,2,13,6,4,2,0,1,2.56,3.29,2.77,2.03,1.78
+championship,2024,championship_2024_183_sheffield_weds_cardiff,23/11/2024,Sheffield Weds,Cardiff,1,1,1,1,16,9,3,4,6,2,8,13,0,1,0,0,2.01,3.46,3.75,1.97,1.83
+championship,2024,championship_2024_184_luton_hull,23/11/2024,Luton,Hull,1,0,1,0,7,14,2,2,10,4,10,10,2,1,0,0,2.01,3.54,3.62,1.88,1.9
+championship,2024,championship_2024_185_millwall_sunderland,23/11/2024,Millwall,Sunderland,1,1,0,1,11,9,5,6,10,2,14,16,1,2,0,0,2.34,3.16,3.21,2.4,1.57
+championship,2024,championship_2024_186_oxford_middlesbrough,23/11/2024,Oxford,Middlesbrough,2,6,1,3,11,16,7,12,6,9,9,8,1,3,0,0,5.25,4.09,1.61,1.82,1.98
+championship,2024,championship_2024_187_preston_derby,23/11/2024,Preston,Derby,1,1,1,1,11,5,3,1,7,3,8,12,2,2,0,0,2.21,3.27,3.36,2.18,1.68
+championship,2024,championship_2024_188_qpr_stoke,23/11/2024,QPR,Stoke,1,1,0,1,23,9,5,5,10,4,9,10,3,2,0,0,2.59,3.31,2.72,1.97,1.83
+championship,2024,championship_2024_189_west_brom_norwich,23/11/2024,West Brom,Norwich,2,2,2,2,22,11,6,5,11,2,4,12,1,2,0,0,1.86,3.56,4.21,2.01,1.8
+championship,2024,championship_2024_190_swansea_leeds,24/11/2024,Swansea,Leeds,3,4,2,1,10,13,5,4,1,2,11,11,1,2,0,0,4.39,3.56,1.81,2.08,1.74
+championship,2024,championship_2024_191_burnley_coventry,26/11/2024,Burnley,Coventry,2,0,0,0,12,3,3,1,6,2,10,7,0,1,0,0,2.22,3.26,3.36,2.26,1.64
+championship,2024,championship_2024_192_hull_sheffield_weds,26/11/2024,Hull,Sheffield Weds,0,2,0,1,9,16,3,4,4,6,12,9,1,2,0,0,2.36,3.3,3.05,2.06,1.76
+championship,2024,championship_2024_193_norwich_plymouth,26/11/2024,Norwich,Plymouth,6,1,2,1,19,13,10,4,8,4,11,5,0,1,0,0,1.46,4.67,6.48,1.58,2.35
+championship,2024,championship_2024_194_sheffield_united_oxford,26/11/2024,Sheffield United,Oxford,3,0,2,0,14,9,8,3,7,7,8,7,1,1,0,0,1.42,4.45,8.12,1.94,1.86
+championship,2024,championship_2024_195_stoke_preston,26/11/2024,Stoke,Preston,0,0,0,0,12,8,1,3,8,10,7,10,1,1,0,0,2.06,3.42,3.61,2.07,1.75
+championship,2024,championship_2024_196_watford_bristol_city,26/11/2024,Watford,Bristol City,1,0,0,0,7,14,1,5,3,6,15,11,2,2,0,0,2.24,3.38,3.22,1.99,1.82
+championship,2024,championship_2024_197_sunderland_west_brom,26/11/2024,Sunderland,West Brom,0,0,0,0,18,2,2,0,13,2,9,7,0,0,0,0,2.36,3.24,3.1,2.21,1.66
+championship,2024,championship_2024_198_cardiff_qpr,27/11/2024,Cardiff,QPR,0,2,0,1,24,10,7,5,14,4,12,5,0,1,0,0,1.97,3.5,3.85,2.04,1.77
+championship,2024,championship_2024_199_leeds_luton,27/11/2024,Leeds,Luton,3,0,2,0,20,7,11,4,9,1,9,12,1,2,0,0,1.41,4.59,7.69,1.79,2.01
+championship,2024,championship_2024_200_middlesbrough_blackburn,27/11/2024,Middlesbrough,Blackburn,0,1,0,0,10,7,2,2,5,3,7,7,1,0,0,0,1.53,4.32,5.89,1.71,2.13
+championship,2024,championship_2024_201_derby_swansea,27/11/2024,Derby,Swansea,1,2,0,2,18,3,7,2,6,2,16,14,3,1,0,0,2.47,3.25,2.92,2.18,1.67
+championship,2024,championship_2024_202_sheffield_united_sunderland,29/11/2024,Sheffield United,Sunderland,1,0,0,0,14,16,4,2,8,8,12,8,4,2,1,1,2.03,3.27,3.93,2.35,1.59
+championship,2024,championship_2024_203_middlesbrough_hull,30/11/2024,Middlesbrough,Hull,3,1,2,0,21,10,9,3,7,6,9,10,1,2,0,0,1.5,4.49,5.96,1.61,2.3
+championship,2024,championship_2024_204_oxford_millwall,30/11/2024,Oxford,Millwall,1,1,0,1,8,11,3,3,2,11,10,14,0,4,0,0,3.5,3.3,2.15,2.34,1.6
+championship,2024,championship_2024_205_watford_qpr,30/11/2024,Watford,QPR,0,0,0,0,17,16,6,1,7,5,17,14,2,3,0,0,1.87,3.64,4.07,1.92,1.88
+championship,2024,championship_2024_206_blackburn_leeds,30/11/2024,Blackburn,Leeds,1,0,1,0,11,13,2,5,3,9,9,12,2,2,0,0,4.26,3.64,1.83,1.97,1.83
+championship,2024,championship_2024_207_bristol_city_plymouth,30/11/2024,Bristol City,Plymouth,4,0,0,0,25,4,12,2,5,2,7,16,1,3,0,0,1.49,4.43,6.27,1.69,2.17
+championship,2024,championship_2024_208_coventry_cardiff,30/11/2024,Coventry,Cardiff,2,2,1,1,11,10,6,4,5,1,10,15,1,5,0,0,1.71,3.92,4.64,1.84,1.96
+championship,2024,championship_2024_209_norwich_luton,30/11/2024,Norwich,Luton,4,2,2,1,16,12,6,3,6,5,9,12,1,2,0,0,2.06,3.61,3.42,1.81,2.0
+championship,2024,championship_2024_210_preston_west_brom,30/11/2024,Preston,West Brom,1,1,0,1,13,8,6,3,7,4,12,10,2,1,0,0,2.96,3.22,2.46,2.3,1.61
+championship,2024,championship_2024_211_stoke_burnley,30/11/2024,Stoke,Burnley,0,2,0,0,14,16,5,4,6,4,10,5,2,0,0,0,3.1,3.29,2.33,2.19,1.67
+championship,2024,championship_2024_212_swansea_portsmouth,30/11/2024,Swansea,Portsmouth,2,2,1,2,22,6,6,4,9,1,8,11,2,4,0,0,1.7,3.9,4.73,1.85,1.96
+championship,2024,championship_2024_213_derby_sheffield_weds,01/12/2024,Derby,Sheffield Weds,1,2,1,0,13,10,4,2,7,5,20,7,5,1,0,0,2.43,3.19,3.0,2.21,1.66
+championship,2024,championship_2024_214_burnley_middlesbrough,06/12/2024,Burnley,Middlesbrough,1,1,1,1,15,10,4,5,11,3,12,10,1,0,0,0,2.48,3.23,2.95,2.07,1.76
+championship,2024,championship_2024_215_leeds_derby,07/12/2024,Leeds,Derby,2,0,2,0,18,3,6,1,10,2,6,10,0,1,0,0,1.35,4.91,9.36,1.87,1.94
+championship,2024,championship_2024_216_sheffield_weds_preston,07/12/2024,Sheffield Weds,Preston,1,1,0,1,13,14,4,7,6,3,16,9,4,2,0,0,1.95,3.36,4.13,2.22,1.66
+championship,2024,championship_2024_217_sunderland_stoke,07/12/2024,Sunderland,Stoke,2,1,1,1,25,11,10,3,9,4,5,9,0,0,0,0,1.78,3.66,4.62,1.96,1.85
+championship,2024,championship_2024_218_hull_blackburn,07/12/2024,Hull,Blackburn,0,1,0,1,14,5,6,1,9,2,10,14,2,4,0,0,2.53,3.37,2.77,2.0,1.8
+championship,2024,championship_2024_219_luton_swansea,07/12/2024,Luton,Swansea,1,1,1,0,8,20,2,10,5,8,16,10,0,0,0,0,2.26,3.33,3.23,2.01,1.8
+championship,2024,championship_2024_220_millwall_coventry,07/12/2024,Millwall,Coventry,0,1,0,0,9,14,0,3,7,8,11,11,2,1,0,0,2.56,3.06,2.98,2.38,1.58
+championship,2024,championship_2024_221_portsmouth_bristol_city,07/12/2024,Portsmouth,Bristol City,3,0,1,0,13,11,8,2,6,7,14,12,3,3,0,0,3.19,3.4,2.25,1.92,1.88
+championship,2024,championship_2024_222_qpr_norwich,07/12/2024,QPR,Norwich,3,0,2,0,9,5,5,1,2,10,8,12,5,2,0,0,2.99,3.38,2.37,1.92,1.88
+championship,2024,championship_2024_223_west_brom_sheffield_united,08/12/2024,West Brom,Sheffield United,2,2,1,2,11,12,4,5,6,5,8,13,2,4,0,0,2.46,3.19,2.95,2.24,1.64
+championship,2024,championship_2024_224_burnley_derby,10/12/2024,Burnley,Derby,0,0,0,0,14,6,4,1,6,2,8,15,1,1,0,0,1.7,3.45,5.49,2.52,1.51
+championship,2024,championship_2024_225_luton_stoke,10/12/2024,Luton,Stoke,2,1,1,1,18,15,8,4,10,4,7,16,1,2,0,0,2.07,3.43,3.53,1.88,1.92
+championship,2024,championship_2024_226_plymouth_swansea,10/12/2024,Plymouth,Swansea,1,2,0,1,14,10,2,2,6,3,10,20,0,3,0,0,4.45,3.89,1.74,1.73,2.1
+championship,2024,championship_2024_227_portsmouth_norwich,10/12/2024,Portsmouth,Norwich,0,0,0,0,15,5,1,4,8,3,14,21,3,5,0,0,3.23,3.42,2.19,1.89,1.9
+championship,2024,championship_2024_228_sheffield_weds_blackburn,10/12/2024,Sheffield Weds,Blackburn,0,1,0,0,16,8,4,3,8,3,8,12,0,2,0,0,2.3,3.24,3.2,2.17,1.68
+championship,2024,championship_2024_229_sunderland_bristol_city,10/12/2024,Sunderland,Bristol City,1,1,0,0,21,7,5,2,8,4,10,12,2,5,0,0,1.89,3.43,4.23,2.13,1.71
+championship,2024,championship_2024_230_leeds_middlesbrough,10/12/2024,Leeds,Middlesbrough,3,1,1,0,17,6,5,2,7,4,11,17,1,2,0,0,1.76,3.67,4.62,1.88,1.91
+championship,2024,championship_2024_231_cardiff_preston,11/12/2024,Cardiff,Preston,0,2,0,0,13,14,4,4,7,2,11,16,2,5,0,0,2.3,3.18,3.24,2.22,1.65
+championship,2024,championship_2024_232_hull_watford,11/12/2024,Hull,Watford,1,1,0,0,13,12,4,2,6,2,15,7,2,3,0,0,2.27,3.43,3.06,1.88,1.91
+championship,2024,championship_2024_233_millwall_sheffield_united,11/12/2024,Millwall,Sheffield United,0,1,0,1,11,9,3,1,7,3,10,9,0,2,0,0,2.84,3.05,2.63,2.5,1.51
+championship,2024,championship_2024_234_qpr_oxford,11/12/2024,QPR,Oxford,2,0,0,0,11,4,4,1,0,4,11,20,2,2,0,0,2.01,3.41,3.74,2.11,1.72
+championship,2024,championship_2024_235_west_brom_coventry,11/12/2024,West Brom,Coventry,2,0,1,0,10,16,2,4,9,9,5,7,1,1,0,0,2.3,3.29,3.08,2.07,1.74
+championship,2024,championship_2024_236_derby_portsmouth,13/12/2024,Derby,Portsmouth,4,0,3,0,17,3,7,0,5,3,8,6,0,1,0,0,2.1,3.19,3.74,2.27,1.63
+championship,2024,championship_2024_237_bristol_city_qpr,14/12/2024,Bristol City,QPR,1,1,0,0,17,5,5,2,10,3,5,9,1,2,0,0,1.89,3.49,4.12,2.1,1.72
+championship,2024,championship_2024_238_coventry_hull,14/12/2024,Coventry,Hull,2,1,0,1,18,10,7,4,10,2,16,11,3,3,0,0,1.75,3.81,4.52,1.79,2.02
+championship,2024,championship_2024_239_preston_leeds,14/12/2024,Preston,Leeds,1,1,1,0,5,18,2,4,2,8,16,7,3,1,0,0,5.18,3.74,1.67,2.09,1.73
+championship,2024,championship_2024_240_blackburn_luton,14/12/2024,Blackburn,Luton,2,0,2,0,12,10,6,4,4,4,14,11,3,2,0,1,2.18,3.36,3.29,2.03,1.77
+championship,2024,championship_2024_241_middlesbrough_millwall,14/12/2024,Middlesbrough,Millwall,1,0,1,0,11,12,2,4,3,4,14,10,2,2,0,0,1.69,3.68,5.03,2.09,1.73
+championship,2024,championship_2024_242_oxford_sheffield_weds,14/12/2024,Oxford,Sheffield Weds,1,3,1,1,11,15,5,9,7,11,9,11,0,1,0,0,3.29,3.19,2.26,2.13,1.7
+championship,2024,championship_2024_243_sheffield_united_plymouth,14/12/2024,Sheffield United,Plymouth,2,0,1,0,10,12,3,4,2,3,10,13,0,2,0,0,1.24,5.95,11.59,1.58,2.35
+championship,2024,championship_2024_244_stoke_cardiff,14/12/2024,Stoke,Cardiff,2,2,1,1,14,19,5,4,4,4,10,10,4,1,0,0,2.22,3.42,3.17,1.88,1.91
+championship,2024,championship_2024_245_swansea_sunderland,14/12/2024,Swansea,Sunderland,2,3,2,1,10,13,4,5,2,4,12,14,1,4,0,0,2.65,3.17,2.71,2.15,1.69
+championship,2024,championship_2024_246_watford_west_brom,15/12/2024,Watford,West Brom,2,1,1,0,14,15,7,6,4,5,9,7,2,3,0,0,2.79,3.21,2.56,2.06,1.75
+championship,2024,championship_2024_247_norwich_burnley,15/12/2024,Norwich,Burnley,1,2,1,0,12,10,6,5,6,5,14,13,3,1,0,0,2.85,3.2,2.52,2.13,1.7
+championship,2024,championship_2024_248_luton_derby,20/12/2024,Luton,Derby,2,1,0,0,18,10,5,3,7,4,12,14,1,3,0,0,2.2,3.16,3.5,2.29,1.61
+championship,2024,championship_2024_249_hull_swansea,21/12/2024,Hull,Swansea,2,1,1,1,12,8,5,2,3,5,12,11,2,2,0,0,2.51,3.37,2.75,1.95,1.84
+championship,2024,championship_2024_250_portsmouth_coventry,21/12/2024,Portsmouth,Coventry,4,1,2,1,12,7,7,3,10,2,14,14,1,0,0,0,3.73,3.68,1.93,1.79,2.0
+championship,2024,championship_2024_251_sheffield_weds_stoke,21/12/2024,Sheffield Weds,Stoke,2,0,0,0,6,15,4,4,6,6,12,12,2,2,1,0,1.94,3.48,3.9,1.95,1.84
+championship,2024,championship_2024_252_burnley_watford,21/12/2024,Burnley,Watford,2,1,1,0,15,9,5,2,7,3,12,16,3,1,0,0,1.71,3.67,4.97,2.06,1.75
+championship,2024,championship_2024_253_cardiff_sheffield_united,21/12/2024,Cardiff,Sheffield United,0,2,0,0,8,12,2,5,3,6,13,11,3,1,0,0,3.57,3.41,2.06,2.06,1.75
+championship,2024,championship_2024_254_leeds_oxford,21/12/2024,Leeds,Oxford,4,0,1,0,23,6,9,0,5,0,7,7,0,1,0,0,1.14,7.67,18.95,1.52,2.44
+championship,2024,championship_2024_255_millwall_blackburn,21/12/2024,Millwall,Blackburn,1,0,0,0,17,6,4,1,6,4,12,15,0,2,0,0,2.3,3.2,3.21,2.35,1.57
+championship,2024,championship_2024_256_plymouth_middlesbrough,21/12/2024,Plymouth,Middlesbrough,3,3,1,0,12,17,5,6,3,6,8,8,2,2,0,0,6.08,4.61,1.47,1.55,2.39
+championship,2024,championship_2024_257_qpr_preston,21/12/2024,QPR,Preston,2,1,0,1,16,2,4,2,5,1,10,16,1,0,0,1,2.53,3.09,2.92,2.45,1.53
+championship,2024,championship_2024_258_sunderland_norwich,21/12/2024,Sunderland,Norwich,2,1,0,1,7,7,4,4,4,2,15,14,5,3,0,1,1.85,3.58,4.17,1.88,1.91
+championship,2024,championship_2024_259_west_brom_bristol_city,22/12/2024,West Brom,Bristol City,2,0,2,0,17,8,4,2,6,1,8,17,2,3,0,0,2.1,3.32,3.5,2.12,1.7
+championship,2024,championship_2024_260_blackburn_sunderland,26/12/2024,Blackburn,Sunderland,2,2,1,0,12,13,3,4,5,4,11,14,2,3,0,0,2.8,3.2,2.53,2.16,1.68
+championship,2024,championship_2024_261_bristol_city_luton,26/12/2024,Bristol City,Luton,1,0,0,0,10,7,3,2,5,4,9,9,2,1,0,0,2.25,3.32,3.14,2.02,1.78
+championship,2024,championship_2024_262_coventry_plymouth,26/12/2024,Coventry,Plymouth,4,0,4,0,19,5,9,1,4,4,7,11,0,1,0,1,1.31,5.46,8.41,1.47,2.58
+championship,2024,championship_2024_263_middlesbrough_sheffield_weds,26/12/2024,Middlesbrough,Sheffield Weds,3,3,3,0,7,15,4,5,1,9,11,12,0,2,1,0,1.64,4.01,4.9,1.74,2.07
+championship,2024,championship_2024_264_norwich_millwall,26/12/2024,Norwich,Millwall,2,1,2,0,9,8,4,2,4,2,8,11,2,1,0,0,2.17,3.25,3.4,2.16,1.67
+championship,2024,championship_2024_265_oxford_cardiff,26/12/2024,Oxford,Cardiff,3,2,1,0,13,8,5,3,3,0,14,7,1,1,0,0,2.86,3.21,2.49,2.1,1.71
+championship,2024,championship_2024_266_preston_hull,26/12/2024,Preston,Hull,1,0,0,0,8,10,2,4,2,2,10,13,3,1,0,0,2.24,3.29,3.19,2.08,1.73
+championship,2024,championship_2024_267_sheffield_united_burnley,26/12/2024,Sheffield United,Burnley,0,2,0,1,9,8,3,4,6,5,10,14,3,1,0,0,2.41,3.11,3.04,2.38,1.56
+championship,2024,championship_2024_268_swansea_qpr,26/12/2024,Swansea,QPR,3,0,3,0,10,4,8,0,3,3,13,8,2,3,0,0,1.85,3.45,4.29,2.11,1.71
+championship,2024,championship_2024_269_watford_portsmouth,26/12/2024,Watford,Portsmouth,2,1,0,1,13,5,6,1,11,5,12,13,1,6,1,0,1.83,3.65,4.1,1.82,1.97
+championship,2024,championship_2024_270_derby_west_brom,26/12/2024,Derby,West Brom,2,1,1,0,13,14,4,3,5,3,13,8,1,1,0,0,2.69,3.12,2.69,2.35,1.57
+championship,2024,championship_2024_271_stoke_leeds,26/12/2024,Stoke,Leeds,0,2,0,1,3,20,2,5,1,7,8,8,4,0,0,0,6.04,4.17,1.52,1.85,1.94
+championship,2024,championship_2024_272_norwich_qpr,29/12/2024,Norwich,QPR,1,1,0,1,19,4,4,0,4,4,15,18,1,4,0,0,1.77,3.75,4.34,1.84,1.94
+championship,2024,championship_2024_273_preston_sheffield_weds,29/12/2024,Preston,Sheffield Weds,3,1,1,0,14,18,7,3,3,6,15,18,0,2,0,0,2.46,3.09,2.99,2.28,1.6
+championship,2024,championship_2024_274_sheffield_united_west_brom,29/12/2024,Sheffield United,West Brom,1,1,1,1,14,10,2,6,2,2,12,11,3,2,0,0,1.99,3.27,3.93,2.21,1.64
+championship,2024,championship_2024_275_blackburn_hull,29/12/2024,Blackburn,Hull,0,1,0,0,14,8,2,3,8,3,12,16,3,0,0,0,2.02,3.38,3.66,2.06,1.74
+championship,2024,championship_2024_276_bristol_city_portsmouth,29/12/2024,Bristol City,Portsmouth,3,0,3,0,20,5,7,2,10,4,11,10,1,1,0,0,1.7,3.79,4.69,1.89,1.88
+championship,2024,championship_2024_277_coventry_millwall,29/12/2024,Coventry,Millwall,0,0,0,0,6,10,1,2,5,5,13,15,0,1,0,0,1.82,3.49,4.4,2.22,1.63
+championship,2024,championship_2024_278_oxford_plymouth,29/12/2024,Oxford,Plymouth,2,0,1,0,14,11,5,2,9,6,9,15,0,2,0,0,1.86,3.6,4.0,1.82,1.96
+championship,2024,championship_2024_279_stoke_sunderland,29/12/2024,Stoke,Sunderland,1,0,0,0,11,22,4,7,4,12,17,11,5,2,0,0,3.1,3.39,2.24,2.01,1.78
+championship,2024,championship_2024_280_swansea_luton,29/12/2024,Swansea,Luton,2,1,1,1,12,4,9,1,8,1,14,17,1,2,0,1,2.21,3.41,3.15,1.99,1.79
+championship,2024,championship_2024_281_watford_cardiff,29/12/2024,Watford,Cardiff,1,2,1,2,9,9,1,3,4,2,15,12,2,3,0,0,1.98,3.51,3.63,1.86,1.91
+championship,2024,championship_2024_282_derby_leeds,29/12/2024,Derby,Leeds,0,1,0,0,4,17,1,6,2,9,14,9,1,1,0,0,5.49,3.93,1.6,2.05,1.74
+championship,2024,championship_2024_283_middlesbrough_burnley,29/12/2024,Middlesbrough,Burnley,0,0,0,0,8,8,3,1,1,4,10,12,1,3,0,0,2.29,3.32,3.06,2.08,1.72
+championship,2024,championship_2024_284_plymouth_bristol_city,01/01/2025,Plymouth,Bristol City,2,2,0,1,15,14,7,6,1,6,12,12,1,0,0,0,3.98,3.71,1.84,1.76,2.02
+championship,2024,championship_2024_285_qpr_watford,01/01/2025,QPR,Watford,3,1,2,0,9,12,5,3,2,6,16,18,4,4,0,0,2.56,3.31,2.71,2.02,1.76
+championship,2024,championship_2024_286_millwall_oxford,01/01/2025,Millwall,Oxford,0,1,0,0,15,8,4,2,3,4,15,11,0,1,0,0,1.68,3.62,5.13,2.26,1.61
+championship,2024,championship_2024_287_burnley_stoke,01/01/2025,Burnley,Stoke,0,0,0,0,18,14,2,3,6,2,8,16,1,4,1,0,1.53,3.9,6.41,2.17,1.66
+championship,2024,championship_2024_288_cardiff_coventry,01/01/2025,Cardiff,Coventry,1,1,1,0,12,17,2,7,6,9,8,9,2,0,1,0,2.93,3.43,2.31,1.85,1.92
+championship,2024,championship_2024_289_leeds_blackburn,01/01/2025,Leeds,Blackburn,1,1,0,0,12,4,4,2,8,3,9,15,2,4,0,0,1.36,4.7,8.46,1.86,1.9
+championship,2024,championship_2024_290_luton_norwich,01/01/2025,Luton,Norwich,0,1,0,0,14,10,3,2,9,5,11,9,1,1,0,0,2.46,3.38,2.76,1.87,1.89
+championship,2024,championship_2024_291_portsmouth_swansea,01/01/2025,Portsmouth,Swansea,4,0,2,0,14,12,6,3,6,6,12,5,1,0,0,0,2.86,3.39,2.38,1.91,1.86
+championship,2024,championship_2024_292_sheffield_weds_derby,01/01/2025,Sheffield Weds,Derby,4,2,1,0,13,17,8,8,4,11,8,8,1,2,0,0,2.0,3.39,3.69,2.08,1.72
+championship,2024,championship_2024_293_west_brom_preston,01/01/2025,West Brom,Preston,3,1,3,0,12,10,7,5,3,5,12,14,1,4,0,0,1.83,3.41,4.45,2.3,1.59
+championship,2024,championship_2024_294_hull_middlesbrough,01/01/2025,Hull,Middlesbrough,0,1,0,0,7,17,0,6,3,7,14,6,2,1,0,0,3.25,3.49,2.12,1.84,1.93
+championship,2024,championship_2024_295_sunderland_sheffield_united,01/01/2025,Sunderland,Sheffield United,2,1,2,1,14,16,6,3,4,10,13,7,4,1,0,0,2.3,3.25,3.1,2.2,1.64
+championship,2024,championship_2024_296_blackburn_burnley,04/01/2025,Blackburn,Burnley,0,1,0,0,11,4,1,2,10,0,16,18,2,2,0,0,3.36,3.18,2.23,2.38,1.56
+championship,2024,championship_2024_297_stoke_plymouth,04/01/2025,Stoke,Plymouth,0,0,0,0,18,2,3,1,6,3,13,11,1,2,0,0,1.65,4.14,4.7,1.64,2.22
+championship,2024,championship_2024_298_swansea_west_brom,04/01/2025,Swansea,West Brom,1,1,0,0,11,16,2,4,5,6,6,8,2,4,0,0,2.53,3.28,2.77,2.08,1.73
+championship,2024,championship_2024_299_bristol_city_derby,04/01/2025,Bristol City,Derby,1,0,1,0,11,9,2,3,6,7,7,12,3,1,0,0,1.93,3.3,4.16,2.29,1.6
+championship,2024,championship_2024_300_hull_leeds,04/01/2025,Hull,Leeds,3,3,1,0,15,17,6,9,5,7,14,9,0,1,0,0,5.73,4.07,1.56,1.88,1.89
+championship,2024,championship_2024_301_middlesbrough_cardiff,04/01/2025,Middlesbrough,Cardiff,1,1,1,1,9,8,3,2,4,4,9,15,2,3,0,0,1.57,4.16,5.37,1.7,2.12
+championship,2024,championship_2024_302_norwich_coventry,04/01/2025,Norwich,Coventry,2,1,0,1,24,6,9,2,9,1,9,16,1,2,0,0,2.39,3.45,2.83,1.81,1.98
+championship,2024,championship_2024_303_preston_oxford,04/01/2025,Preston,Oxford,1,1,0,1,19,5,5,3,4,2,12,13,3,3,0,0,1.83,3.47,4.38,2.19,1.65
+championship,2024,championship_2024_304_sheffield_weds_millwall,04/01/2025,Sheffield Weds,Millwall,2,2,1,0,14,14,2,6,4,2,16,17,1,3,0,0,2.15,3.19,3.53,2.46,1.52
+championship,2024,championship_2024_305_watford_sheffield_united,04/01/2025,Watford,Sheffield United,1,2,1,1,7,7,4,6,4,0,9,8,2,1,0,0,2.83,3.33,2.44,2.03,1.76
+championship,2024,championship_2024_306_sunderland_portsmouth,05/01/2025,Sunderland,Portsmouth,1,0,1,0,24,6,8,1,7,3,9,10,1,2,0,1,1.47,4.36,6.48,1.76,2.01
+championship,2024,championship_2024_307_qpr_luton,06/01/2025,QPR,Luton,2,1,1,1,15,18,6,4,3,4,10,9,1,1,0,0,2.46,3.18,2.92,2.21,1.64
+championship,2024,championship_2024_308_cardiff_watford,14/01/2025,Cardiff,Watford,1,1,0,0,12,4,4,2,7,3,8,14,1,2,0,0,2.27,3.25,3.23,2.06,1.75
+championship,2024,championship_2024_309_plymouth_oxford,14/01/2025,Plymouth,Oxford,1,1,0,1,11,8,2,3,6,3,8,10,1,1,0,0,2.34,3.29,3.05,2.01,1.79
+championship,2024,championship_2024_310_blackburn_portsmouth,15/01/2025,Blackburn,Portsmouth,3,0,0,0,13,11,6,2,5,6,15,19,1,3,0,0,1.74,3.69,4.65,1.92,1.86
+championship,2024,championship_2024_311_burnley_sunderland,17/01/2025,Burnley,Sunderland,0,0,0,0,9,14,4,3,5,4,9,9,3,2,0,0,2.22,3.09,3.53,2.6,1.47
+championship,2024,championship_2024_312_cardiff_swansea,18/01/2025,Cardiff,Swansea,3,0,0,0,11,6,6,2,3,6,14,11,1,4,0,0,2.61,3.24,2.71,2.1,1.71
+championship,2024,championship_2024_313_millwall_hull,18/01/2025,Millwall,Hull,0,1,0,0,12,7,1,2,1,3,13,16,1,1,0,0,2.09,3.17,3.81,2.47,1.52
+championship,2024,championship_2024_314_plymouth_qpr,18/01/2025,Plymouth,QPR,0,1,0,0,4,15,1,7,8,6,9,9,1,3,0,0,2.96,3.27,2.41,2.03,1.76
+championship,2024,championship_2024_315_coventry_bristol_city,18/01/2025,Coventry,Bristol City,1,0,0,0,16,10,4,2,3,5,3,11,0,0,0,0,2.11,3.41,3.4,1.93,1.85
+championship,2024,championship_2024_316_derby_watford,18/01/2025,Derby,Watford,0,2,0,1,15,15,3,5,4,8,11,11,1,3,0,0,2.24,3.3,3.21,2.09,1.72
+championship,2024,championship_2024_317_luton_preston,18/01/2025,Luton,Preston,0,0,0,0,9,2,4,0,3,1,13,21,3,2,0,0,2.19,3.21,3.41,2.17,1.67
+championship,2024,championship_2024_318_oxford_blackburn,18/01/2025,Oxford,Blackburn,1,0,0,0,17,14,7,4,4,3,12,10,1,3,0,0,3.09,3.24,2.34,2.18,1.66
+championship,2024,championship_2024_319_portsmouth_middlesbrough,18/01/2025,Portsmouth,Middlesbrough,2,1,0,1,13,12,5,5,7,5,11,9,1,2,0,0,4.08,3.82,1.8,1.68,2.15
+championship,2024,championship_2024_320_sheffield_united_norwich,18/01/2025,Sheffield United,Norwich,2,0,1,0,22,11,6,0,7,6,9,12,1,2,0,0,2.11,3.37,3.47,2.05,1.75
+championship,2024,championship_2024_321_west_brom_stoke,18/01/2025,West Brom,Stoke,1,1,0,1,23,5,4,2,12,0,6,11,2,0,0,0,1.76,3.67,4.56,1.98,1.81
+championship,2024,championship_2024_322_leeds_sheffield_weds,19/01/2025,Leeds,Sheffield Weds,3,0,1,0,16,6,5,3,9,6,11,13,1,2,0,0,1.35,4.87,8.35,1.76,2.03
+championship,2024,championship_2024_323_blackburn_coventry,21/01/2025,Blackburn,Coventry,0,2,0,1,14,9,7,4,4,4,11,15,0,1,0,0,2.61,3.21,2.77,2.11,1.72
+championship,2024,championship_2024_324_derby_sunderland,21/01/2025,Derby,Sunderland,0,1,0,1,9,8,3,3,8,4,9,12,1,1,0,0,3.53,3.31,2.12,2.22,1.65
+championship,2024,championship_2024_325_hull_qpr,21/01/2025,Hull,QPR,1,2,0,0,12,8,3,4,4,3,14,13,3,1,0,0,2.14,3.3,3.53,2.15,1.69
+championship,2024,championship_2024_326_middlesbrough_west_brom,21/01/2025,Middlesbrough,West Brom,2,0,1,0,14,14,4,1,5,5,13,7,1,0,0,0,2.0,3.47,3.74,1.97,1.83
+championship,2024,championship_2024_327_oxford_luton,21/01/2025,Oxford,Luton,3,2,1,2,12,8,5,3,6,5,11,17,3,3,0,0,2.96,3.14,2.5,2.29,1.61
+championship,2024,championship_2024_328_swansea_sheffield_united,21/01/2025,Swansea,Sheffield United,1,2,1,0,8,14,5,3,1,2,11,20,3,4,1,0,2.85,3.24,2.53,2.11,1.72
+championship,2024,championship_2024_329_watford_preston,21/01/2025,Watford,Preston,1,2,0,1,10,15,4,8,4,2,8,14,0,2,0,0,2.12,3.34,3.49,2.14,1.69
+championship,2024,championship_2024_330_millwall_cardiff,21/01/2025,Millwall,Cardiff,2,2,2,1,7,13,3,5,4,2,10,11,0,0,0,0,2.2,2.95,3.8,2.83,1.42
+championship,2024,championship_2024_331_leeds_norwich,22/01/2025,Leeds,Norwich,2,0,1,0,14,3,7,0,9,4,11,11,4,2,0,0,1.38,4.75,8.06,1.7,2.11
+championship,2024,championship_2024_332_portsmouth_stoke,22/01/2025,Portsmouth,Stoke,3,1,2,1,17,8,7,2,7,1,12,9,2,5,0,0,2.41,3.3,2.92,1.94,1.85
+championship,2024,championship_2024_333_sheffield_weds_bristol_city,22/01/2025,Sheffield Weds,Bristol City,2,2,1,0,16,13,5,3,7,4,12,8,2,2,0,0,2.45,3.24,2.91,2.09,1.72
+championship,2024,championship_2024_334_plymouth_burnley,22/01/2025,Plymouth,Burnley,0,5,0,5,4,17,1,9,1,5,14,9,1,0,0,0,5.42,3.77,1.64,2.07,1.73
+championship,2024,championship_2024_335_sheffield_united_hull,24/01/2025,Sheffield United,Hull,0,3,0,1,16,8,2,5,11,1,8,15,0,2,0,0,1.74,3.66,4.77,2.03,1.78
+championship,2024,championship_2024_336_luton_millwall,25/01/2025,Luton,Millwall,0,1,0,0,12,13,2,6,7,5,11,19,2,4,0,0,2.22,3.08,3.5,2.61,1.47
+championship,2024,championship_2024_337_norwich_swansea,25/01/2025,Norwich,Swansea,5,1,1,0,18,12,8,3,7,8,10,9,2,1,0,0,2.13,3.35,3.45,1.92,1.87
+championship,2024,championship_2024_338_stoke_oxford,25/01/2025,Stoke,Oxford,0,0,0,0,7,13,4,4,5,5,14,10,3,4,0,0,2.0,3.4,3.75,2.04,1.76
+championship,2024,championship_2024_339_bristol_city_blackburn,25/01/2025,Bristol City,Blackburn,2,1,1,1,16,10,5,3,1,7,8,19,1,4,0,0,1.99,3.34,3.88,2.22,1.64
+championship,2024,championship_2024_340_cardiff_derby,25/01/2025,Cardiff,Derby,2,1,0,0,17,9,9,6,5,10,12,11,2,1,0,0,2.19,3.1,3.54,2.45,1.53
+championship,2024,championship_2024_341_coventry_watford,25/01/2025,Coventry,Watford,2,1,1,0,14,12,2,3,5,3,10,12,3,4,0,0,1.74,3.78,4.51,1.82,1.98
+championship,2024,championship_2024_342_preston_middlesbrough,25/01/2025,Preston,Middlesbrough,2,1,1,0,10,16,4,6,6,4,11,6,3,1,0,0,3.16,3.27,2.28,2.09,1.72
+championship,2024,championship_2024_343_qpr_sheffield_weds,25/01/2025,QPR,Sheffield Weds,0,2,0,0,13,15,2,5,12,6,10,16,2,1,0,0,2.48,3.19,2.91,2.12,1.7
+championship,2024,championship_2024_344_sunderland_plymouth,25/01/2025,Sunderland,Plymouth,2,2,0,0,12,7,5,3,7,2,7,21,1,4,0,0,1.24,5.99,10.84,1.54,2.38
+championship,2024,championship_2024_345_west_brom_portsmouth,25/01/2025,West Brom,Portsmouth,5,1,4,0,18,14,11,4,7,5,5,14,0,3,0,0,1.65,3.75,5.32,1.96,1.83
+championship,2024,championship_2024_346_burnley_leeds,27/01/2025,Burnley,Leeds,0,0,0,0,4,8,0,1,1,5,9,11,0,3,0,0,3.21,3.12,2.33,2.48,1.51
+championship,2024,championship_2024_347_portsmouth_millwall,28/01/2025,Portsmouth,Millwall,0,1,0,1,15,7,3,1,7,3,9,15,0,2,0,0,2.51,3.01,3.07,2.58,1.49
+championship,2024,championship_2024_348_blackburn_preston,31/01/2025,Blackburn,Preston,2,1,1,0,13,11,2,2,7,4,13,6,1,1,0,0,2.18,3.14,3.55,2.39,1.56
+championship,2024,championship_2024_349_oxford_bristol_city,01/02/2025,Oxford,Bristol City,1,1,0,0,20,7,4,2,5,3,9,14,4,2,0,2,3.24,3.17,2.3,2.23,1.64
+championship,2024,championship_2024_350_plymouth_west_brom,01/02/2025,Plymouth,West Brom,2,1,0,0,8,11,4,4,2,5,10,4,0,1,0,0,4.84,3.85,1.69,1.86,1.93
+championship,2024,championship_2024_351_watford_norwich,01/02/2025,Watford,Norwich,0,1,0,1,9,16,1,5,4,6,14,8,3,0,1,0,2.62,3.35,2.64,1.88,1.91
+championship,2024,championship_2024_352_derby_sheffield_united,01/02/2025,Derby,Sheffield United,0,1,0,0,10,6,2,3,2,2,10,12,1,1,0,0,3.46,3.21,2.17,2.21,1.65
+championship,2024,championship_2024_353_hull_stoke,01/02/2025,Hull,Stoke,1,2,1,1,22,11,8,5,8,4,10,11,1,1,0,0,1.91,3.48,3.99,2.0,1.8
+championship,2024,championship_2024_354_leeds_cardiff,01/02/2025,Leeds,Cardiff,7,0,2,0,29,2,12,2,14,1,10,17,0,2,0,0,1.27,5.49,10.56,1.72,2.1
+championship,2024,championship_2024_355_millwall_qpr,01/02/2025,Millwall,QPR,2,1,2,1,7,13,4,5,2,11,10,12,1,2,0,0,2.25,3.01,3.51,2.63,1.46
+championship,2024,championship_2024_356_portsmouth_burnley,01/02/2025,Portsmouth,Burnley,0,0,0,0,18,14,3,6,3,3,10,9,3,1,0,0,4.77,3.47,1.78,2.15,1.69
+championship,2024,championship_2024_357_sheffield_weds_luton,01/02/2025,Sheffield Weds,Luton,1,1,0,1,17,8,4,1,9,5,11,12,1,1,0,0,2.09,3.3,3.6,2.12,1.7
+championship,2024,championship_2024_358_swansea_coventry,01/02/2025,Swansea,Coventry,0,2,0,2,6,16,1,5,8,2,13,11,2,0,0,0,2.54,3.32,2.73,1.96,1.83
+championship,2024,championship_2024_359_middlesbrough_sunderland,03/02/2025,Middlesbrough,Sunderland,2,3,1,1,12,12,4,9,1,5,11,15,2,3,0,0,2.31,3.37,3.03,1.91,1.88
+championship,2024,championship_2024_360_burnley_oxford,04/02/2025,Burnley,Oxford,1,0,1,0,15,7,7,0,12,3,10,11,2,2,0,0,1.49,3.95,7.39,2.24,1.64
+championship,2024,championship_2024_361_qpr_blackburn,04/02/2025,QPR,Blackburn,2,1,1,0,17,10,6,4,11,2,9,11,0,0,0,0,2.62,3.09,2.84,2.31,1.61
+championship,2024,championship_2024_362_coventry_leeds,05/02/2025,Coventry,Leeds,0,2,0,2,9,20,4,8,3,8,11,10,2,1,0,0,4.02,3.61,1.87,1.91,1.89
+championship,2024,championship_2024_363_sunderland_watford,08/02/2025,Sunderland,Watford,2,2,1,1,14,11,7,5,7,3,12,20,5,1,0,0,1.5,4.34,6.26,1.79,2.01
+championship,2024,championship_2024_364_west_brom_sheffield_weds,08/02/2025,West Brom,Sheffield Weds,2,1,0,0,15,15,5,4,12,2,8,8,2,3,1,0,2.16,3.45,3.28,2.04,1.77
+championship,2024,championship_2024_365_norwich_derby,08/02/2025,Norwich,Derby,1,1,0,0,8,6,3,2,2,4,8,7,2,2,0,0,1.7,3.82,4.85,1.97,1.84
+championship,2024,championship_2024_366_sheffield_united_portsmouth,08/02/2025,Sheffield United,Portsmouth,2,1,1,1,11,16,3,5,5,5,17,10,4,1,0,0,1.5,4.29,6.34,1.85,1.95
+championship,2024,championship_2024_367_bristol_city_swansea,09/02/2025,Bristol City,Swansea,0,1,0,0,19,9,3,5,11,3,9,8,0,0,0,0,1.84,3.51,4.28,2.09,1.73
+championship,2024,championship_2024_368_coventry_qpr,11/02/2025,Coventry,QPR,1,0,0,0,10,12,6,3,10,9,10,8,3,2,0,0,1.87,3.56,4.21,1.98,1.83
+championship,2024,championship_2024_369_derby_oxford,11/02/2025,Derby,Oxford,0,0,0,0,14,6,4,1,3,4,11,4,1,0,0,0,2.24,3.05,3.57,2.66,1.47
+championship,2024,championship_2024_370_portsmouth_cardiff,11/02/2025,Portsmouth,Cardiff,2,1,2,1,19,12,8,6,10,4,9,9,2,2,0,0,2.29,3.14,3.35,2.3,1.62
+championship,2024,championship_2024_371_watford_leeds,11/02/2025,Watford,Leeds,0,4,0,3,6,20,2,7,7,7,12,6,0,0,0,0,9.3,5.0,1.34,1.75,2.09
+championship,2024,championship_2024_372_norwich_preston,11/02/2025,Norwich,Preston,0,1,0,1,11,8,1,1,8,3,14,11,1,3,0,0,1.79,3.52,4.7,2.17,1.69
+championship,2024,championship_2024_373_bristol_city_stoke,12/02/2025,Bristol City,Stoke,2,0,1,0,10,5,6,0,2,1,12,9,2,2,0,0,1.73,3.71,4.78,1.97,1.83
+championship,2024,championship_2024_374_burnley_hull,12/02/2025,Burnley,Hull,2,0,2,0,16,9,5,3,9,3,5,11,0,1,0,0,1.69,3.54,5.45,2.35,1.59
+championship,2024,championship_2024_375_plymouth_millwall,12/02/2025,Plymouth,Millwall,5,1,2,0,13,13,7,6,2,6,19,10,1,0,0,0,3.45,3.11,2.24,2.47,1.53
+championship,2024,championship_2024_376_sunderland_luton,12/02/2025,Sunderland,Luton,2,0,1,0,13,4,3,1,6,1,6,9,0,2,0,0,1.68,3.8,5.05,1.97,1.83
+championship,2024,championship_2024_377_swansea_sheffield_weds,12/02/2025,Swansea,Sheffield Weds,0,1,0,0,4,10,1,5,1,7,10,12,0,2,0,0,2.55,3.32,2.74,2.05,1.76
+championship,2024,championship_2024_378_sheffield_united_middlesbrough,12/02/2025,Sheffield United,Middlesbrough,3,1,1,1,18,10,9,4,10,4,11,11,2,3,0,0,2.25,3.44,3.1,1.9,1.91
+championship,2024,championship_2024_379_west_brom_blackburn,12/02/2025,West Brom,Blackburn,0,2,0,0,13,6,3,4,11,1,7,11,0,1,0,0,1.84,3.55,4.33,2.02,1.8
+championship,2024,championship_2024_380_qpr_derby,14/02/2025,QPR,Derby,4,0,2,0,12,7,5,1,2,3,9,14,0,2,0,0,2.08,3.14,3.97,2.65,1.48
+championship,2024,championship_2024_381_cardiff_bristol_city,15/02/2025,Cardiff,Bristol City,1,1,0,0,13,11,6,4,4,5,12,9,2,2,0,0,2.83,3.27,2.53,2.16,1.69
+championship,2024,championship_2024_382_oxford_portsmouth,15/02/2025,Oxford,Portsmouth,0,2,0,0,10,13,1,4,4,5,8,12,0,2,0,0,2.38,3.2,3.11,2.22,1.67
+championship,2024,championship_2024_383_preston_burnley,15/02/2025,Preston,Burnley,0,0,0,0,5,11,1,2,2,6,18,13,2,3,0,0,3.86,3.08,2.13,2.78,1.43
+championship,2024,championship_2024_384_blackburn_plymouth,15/02/2025,Blackburn,Plymouth,2,0,0,0,17,7,7,3,6,3,6,17,0,2,0,0,1.67,3.8,5.11,1.95,1.85
+championship,2024,championship_2024_385_hull_norwich,15/02/2025,Hull,Norwich,1,1,1,0,12,15,4,3,5,3,14,13,1,2,0,0,2.62,3.33,2.66,1.95,1.86
+championship,2024,championship_2024_386_luton_sheffield_united,15/02/2025,Luton,Sheffield United,0,1,0,0,14,12,5,4,5,3,12,10,1,3,0,0,3.39,3.3,2.18,2.22,1.66
+championship,2024,championship_2024_387_middlesbrough_watford,15/02/2025,Middlesbrough,Watford,0,1,0,1,13,14,5,6,8,5,7,7,2,2,0,0,1.6,4.23,5.17,1.62,2.29
+championship,2024,championship_2024_388_millwall_west_brom,15/02/2025,Millwall,West Brom,1,1,1,1,11,7,6,3,5,2,15,15,1,2,0,0,2.7,3.05,2.8,2.46,1.54
+championship,2024,championship_2024_389_sheffield_weds_coventry,15/02/2025,Sheffield Weds,Coventry,1,2,0,1,22,9,8,4,10,1,11,9,0,1,0,0,2.46,3.4,2.81,1.95,1.86
+championship,2024,championship_2024_390_stoke_swansea,15/02/2025,Stoke,Swansea,3,1,0,0,8,7,5,2,1,6,19,8,3,1,0,0,2.51,3.23,2.88,2.05,1.77
+championship,2024,championship_2024_391_leeds_sunderland,17/02/2025,Leeds,Sunderland,2,1,0,1,21,6,4,6,10,0,11,11,3,6,0,0,1.54,4.07,5.93,1.89,1.9
+championship,2024,championship_2024_392_preston_millwall,18/02/2025,Preston,Millwall,1,1,0,1,16,9,4,3,7,4,10,16,0,4,0,0,2.48,2.87,3.32,3.06,1.37
+championship,2024,championship_2024_393_luton_plymouth,19/02/2025,Luton,Plymouth,1,1,0,0,17,3,2,1,10,2,7,18,0,2,0,0,1.74,3.6,4.85,2.03,1.79
+championship,2024,championship_2024_394_bristol_city_middlesbrough,21/02/2025,Bristol City,Middlesbrough,2,1,0,1,21,11,7,4,4,1,10,13,0,2,0,0,2.34,3.46,2.96,1.91,1.91
+championship,2024,championship_2024_395_burnley_sheffield_weds,21/02/2025,Burnley,Sheffield Weds,4,0,1,0,7,11,4,2,4,9,10,16,3,4,0,0,1.82,3.35,4.87,2.39,1.58
+championship,2024,championship_2024_396_derby_millwall,22/02/2025,Derby,Millwall,0,1,0,0,9,11,0,4,4,4,10,8,2,0,0,0,2.48,2.9,3.27,2.93,1.38
+championship,2024,championship_2024_397_plymouth_cardiff,22/02/2025,Plymouth,Cardiff,1,1,0,1,14,11,1,3,0,6,13,13,4,3,0,1,2.72,3.37,2.56,1.99,1.83
+championship,2024,championship_2024_398_sunderland_hull,22/02/2025,Sunderland,Hull,0,1,0,1,17,8,2,4,5,3,6,15,0,3,0,0,1.64,3.85,5.42,2.0,1.82
+championship,2024,championship_2024_399_coventry_preston,22/02/2025,Coventry,Preston,2,1,2,0,17,7,9,3,10,3,10,10,0,1,0,0,1.8,3.54,4.58,2.12,1.72
+championship,2024,championship_2024_400_norwich_stoke,22/02/2025,Norwich,Stoke,4,2,1,1,16,7,7,4,4,4,5,8,0,1,0,0,1.66,3.9,5.01,1.88,1.93
+championship,2024,championship_2024_401_portsmouth_qpr,22/02/2025,Portsmouth,QPR,2,1,0,0,7,9,3,4,5,1,16,11,3,2,0,0,2.44,3.31,2.9,2.04,1.78
+championship,2024,championship_2024_402_swansea_blackburn,22/02/2025,Swansea,Blackburn,3,0,2,0,14,6,5,2,5,7,7,15,0,2,0,0,2.56,3.23,2.79,2.17,1.68
+championship,2024,championship_2024_403_west_brom_oxford,22/02/2025,West Brom,Oxford,2,0,1,0,22,5,5,0,13,2,8,10,2,3,0,0,1.69,3.63,5.29,2.16,1.69
+championship,2024,championship_2024_404_watford_luton,23/02/2025,Watford,Luton,2,0,2,0,10,10,5,2,4,6,13,17,2,2,0,0,2.39,3.26,2.99,2.16,1.69
+championship,2024,championship_2024_405_sheffield_united_leeds,24/02/2025,Sheffield United,Leeds,1,3,1,0,10,18,4,8,3,5,9,7,1,1,0,0,3.99,3.6,1.88,2.03,1.78
+championship,2024,championship_2024_406_cardiff_hull,25/02/2025,Cardiff,Hull,1,0,0,0,8,4,4,1,5,3,12,9,2,2,0,0,2.68,3.25,2.69,2.11,1.74
+championship,2024,championship_2024_407_stoke_middlesbrough,25/02/2025,Stoke,Middlesbrough,1,3,1,1,12,16,3,6,5,1,10,6,2,2,0,0,3.0,3.41,2.35,1.9,1.91
+championship,2024,championship_2024_408_sheffield_weds_sunderland,28/02/2025,Sheffield Weds,Sunderland,1,2,0,1,9,11,4,4,5,9,10,13,1,1,0,0,2.75,3.26,2.61,2.11,1.74
+championship,2024,championship_2024_409_blackburn_norwich,01/03/2025,Blackburn,Norwich,1,1,0,0,10,11,1,3,5,2,15,11,0,1,1,0,2.55,3.28,2.78,2.03,1.79
+championship,2024,championship_2024_410_leeds_west_brom,01/03/2025,Leeds,West Brom,1,1,1,1,15,7,2,3,10,3,13,11,0,0,0,0,1.34,4.92,9.04,1.77,2.05
+championship,2024,championship_2024_411_oxford_coventry,01/03/2025,Oxford,Coventry,2,3,0,1,10,18,4,6,3,11,14,10,3,3,0,0,3.53,3.38,2.1,2.01,1.81
+championship,2024,championship_2024_412_luton_portsmouth,01/03/2025,Luton,Portsmouth,1,0,1,0,10,7,2,1,2,7,10,14,2,4,0,0,2.18,3.34,3.35,2.02,1.79
+championship,2024,championship_2024_413_middlesbrough_derby,01/03/2025,Middlesbrough,Derby,1,0,0,0,18,5,6,1,5,3,9,13,1,2,0,0,1.66,3.93,5.0,1.88,1.93
+championship,2024,championship_2024_414_qpr_sheffield_united,01/03/2025,QPR,Sheffield United,1,2,0,1,16,8,4,2,6,2,15,14,3,3,0,0,3.0,3.24,2.41,2.13,1.71
+championship,2024,championship_2024_415_stoke_watford,01/03/2025,Stoke,Watford,0,0,0,0,8,8,2,1,4,5,15,12,1,2,0,0,2.44,3.36,2.88,1.94,1.87
+championship,2024,championship_2024_416_cardiff_burnley,04/03/2025,Cardiff,Burnley,1,2,1,2,9,12,2,5,5,6,9,7,0,3,0,0,4.37,3.3,1.92,2.56,1.51
+championship,2024,championship_2024_417_hull_plymouth,04/03/2025,Hull,Plymouth,2,0,0,0,11,3,5,0,7,4,11,12,1,3,0,0,1.65,3.77,5.51,2.03,1.78
+championship,2024,championship_2024_418_millwall_bristol_city,04/03/2025,Millwall,Bristol City,0,2,0,0,13,11,1,5,4,6,5,11,0,0,0,0,2.81,2.93,2.81,2.85,1.43
+championship,2024,championship_2024_419_preston_swansea,04/03/2025,Preston,Swansea,0,0,0,0,20,8,5,1,6,1,12,7,0,0,0,0,2.4,3.15,3.15,2.3,1.62
+championship,2024,championship_2024_420_norwich_oxford,07/03/2025,Norwich,Oxford,1,1,1,1,15,3,6,2,12,1,7,11,0,2,0,0,1.58,4.04,5.64,1.89,1.92
+championship,2024,championship_2024_421_coventry_stoke,08/03/2025,Coventry,Stoke,3,2,2,0,13,11,3,4,7,5,8,8,1,3,0,0,1.54,4.23,5.88,1.8,2.01
+championship,2024,championship_2024_422_watford_millwall,08/03/2025,Watford,Millwall,1,2,1,0,14,11,5,4,11,4,7,7,0,1,0,0,2.38,3.08,3.22,2.47,1.51
+championship,2024,championship_2024_423_bristol_city_hull,08/03/2025,Bristol City,Hull,1,1,0,1,26,5,10,1,14,1,9,5,1,3,0,1,1.93,3.44,4.04,2.15,1.69
+championship,2024,championship_2024_424_burnley_luton,08/03/2025,Burnley,Luton,4,0,2,0,16,3,3,2,6,4,5,18,3,2,0,1,1.62,3.66,6.03,2.36,1.59
+championship,2024,championship_2024_425_derby_blackburn,08/03/2025,Derby,Blackburn,2,1,2,1,9,13,2,4,2,4,15,16,3,3,0,0,2.74,3.08,2.74,2.4,1.57
+championship,2024,championship_2024_426_plymouth_sheffield_weds,08/03/2025,Plymouth,Sheffield Weds,0,3,0,2,4,7,2,3,2,2,16,14,3,5,0,0,3.62,3.52,2.02,1.98,1.82
+championship,2024,championship_2024_427_sheffield_united_preston,08/03/2025,Sheffield United,Preston,1,0,0,0,11,8,4,3,8,3,13,14,1,4,0,0,1.65,3.79,5.43,2.12,1.72
+championship,2024,championship_2024_428_sunderland_cardiff,08/03/2025,Sunderland,Cardiff,2,1,1,1,19,6,4,2,4,3,10,16,1,2,0,0,1.51,4.27,6.3,1.9,1.9
+championship,2024,championship_2024_429_swansea_middlesbrough,08/03/2025,Swansea,Middlesbrough,1,0,1,0,13,9,4,1,5,6,16,12,1,1,0,0,2.82,3.43,2.45,1.88,1.93
+championship,2024,championship_2024_430_west_brom_qpr,08/03/2025,West Brom,QPR,1,0,1,0,2,10,1,1,3,4,13,14,4,4,1,0,1.74,3.59,4.93,2.11,1.72
+championship,2024,championship_2024_431_portsmouth_leeds,09/03/2025,Portsmouth,Leeds,1,0,0,0,13,13,3,4,7,6,9,9,2,0,0,0,7.5,4.73,1.4,1.74,2.09
+championship,2024,championship_2024_432_burnley_west_brom,11/03/2025,Burnley,West Brom,1,1,1,1,8,7,2,3,6,2,10,17,0,2,1,0,1.95,3.18,4.37,2.57,1.5
+championship,2024,championship_2024_433_cardiff_luton,11/03/2025,Cardiff,Luton,1,2,0,0,12,9,4,4,4,3,10,9,1,1,0,0,2.36,3.17,3.18,2.29,1.63
+championship,2024,championship_2024_434_derby_coventry,11/03/2025,Derby,Coventry,2,0,1,0,6,13,2,4,4,8,6,8,2,1,0,0,3.35,3.23,2.24,2.4,1.57
+championship,2024,championship_2024_435_middlesbrough_qpr,11/03/2025,Middlesbrough,QPR,2,1,1,0,16,9,5,5,4,4,9,10,0,0,0,0,1.9,3.46,4.21,1.99,1.83
+championship,2024,championship_2024_436_norwich_sheffield_weds,11/03/2025,Norwich,Sheffield Weds,2,3,2,0,10,15,3,5,9,3,14,10,0,4,0,0,2.23,3.36,3.25,1.88,1.93
+championship,2024,championship_2024_437_sunderland_preston,11/03/2025,Sunderland,Preston,1,1,0,0,20,15,2,2,7,2,10,11,1,3,0,0,1.66,3.66,5.67,2.33,1.61
+championship,2024,championship_2024_438_sheffield_united_bristol_city,11/03/2025,Sheffield United,Bristol City,1,1,0,0,13,23,5,4,5,4,8,9,1,3,0,0,2.03,3.33,3.81,2.15,1.7
+championship,2024,championship_2024_439_hull_oxford,12/03/2025,Hull,Oxford,2,1,0,0,14,12,2,3,4,6,13,7,2,1,1,0,1.72,3.63,4.95,2.13,1.71
+championship,2024,championship_2024_440_leeds_millwall,12/03/2025,Leeds,Millwall,2,0,1,0,18,4,2,0,4,3,7,12,0,0,0,0,1.29,5.09,10.8,1.93,1.88
+championship,2024,championship_2024_441_portsmouth_plymouth,12/03/2025,Portsmouth,Plymouth,1,2,0,1,16,6,3,3,7,0,13,15,2,1,0,1,1.69,3.74,5.04,1.91,1.9
+championship,2024,championship_2024_442_watford_swansea,12/03/2025,Watford,Swansea,1,0,1,0,9,12,2,3,1,6,16,3,3,2,0,0,2.32,3.24,3.12,2.14,1.7
+championship,2024,championship_2024_443_stoke_blackburn,12/03/2025,Stoke,Blackburn,1,0,1,0,8,10,3,2,3,4,16,14,2,2,0,0,2.64,3.2,2.72,2.11,1.72
+championship,2024,championship_2024_444_bristol_city_norwich,14/03/2025,Bristol City,Norwich,2,1,2,0,13,20,5,6,5,3,11,10,4,1,0,0,2.08,3.44,3.57,1.93,1.87
+championship,2024,championship_2024_445_millwall_stoke,15/03/2025,Millwall,Stoke,1,0,0,0,11,5,4,1,7,5,8,13,2,5,0,0,2.16,3.12,3.66,2.55,1.5
+championship,2024,championship_2024_446_qpr_leeds,15/03/2025,QPR,Leeds,2,2,2,1,8,10,4,3,1,8,17,12,3,2,1,0,6.42,4.16,1.51,1.96,1.84
+championship,2024,championship_2024_447_blackburn_cardiff,15/03/2025,Blackburn,Cardiff,1,2,1,1,8,10,2,4,3,1,14,11,0,1,0,0,2.02,3.35,3.79,2.16,1.69
+championship,2024,championship_2024_448_coventry_sunderland,15/03/2025,Coventry,Sunderland,3,0,2,0,21,6,5,1,6,1,9,11,1,2,0,0,2.6,3.26,2.73,2.01,1.8
+championship,2024,championship_2024_449_luton_middlesbrough,15/03/2025,Luton,Middlesbrough,0,0,0,0,19,7,5,0,9,3,18,12,2,3,0,0,2.61,3.41,2.63,1.92,1.88
+championship,2024,championship_2024_450_oxford_watford,15/03/2025,Oxford,Watford,1,0,0,0,8,16,3,4,4,5,11,8,1,1,0,1,2.83,3.12,2.61,2.22,1.65
+championship,2024,championship_2024_451_plymouth_derby,15/03/2025,Plymouth,Derby,2,3,1,2,11,9,3,5,7,3,4,13,0,3,0,0,2.9,3.04,2.6,2.48,1.53
+championship,2024,championship_2024_452_preston_portsmouth,15/03/2025,Preston,Portsmouth,2,1,0,0,14,9,6,2,6,5,13,14,1,1,1,0,2.18,3.24,3.45,2.19,1.67
+championship,2024,championship_2024_453_swansea_burnley,15/03/2025,Swansea,Burnley,0,2,0,2,5,12,1,5,4,4,12,12,1,0,0,0,3.76,3.19,2.09,2.51,1.51
+championship,2024,championship_2024_454_west_brom_hull,15/03/2025,West Brom,Hull,1,1,0,0,16,7,3,4,6,5,6,14,1,5,0,0,1.91,3.39,4.19,2.12,1.71
+championship,2024,championship_2024_455_sheffield_weds_sheffield_united,16/03/2025,Sheffield Weds,Sheffield United,0,1,0,0,14,9,3,2,7,2,18,8,3,3,0,0,2.52,3.2,2.86,2.14,1.7
+championship,2024,championship_2024_456_sheffield_united_coventry,28/03/2025,Sheffield United,Coventry,3,1,2,0,16,11,6,4,8,2,11,9,1,2,0,0,2.07,3.37,3.56,2.01,1.79
+championship,2024,championship_2024_457_hull_luton,29/03/2025,Hull,Luton,0,1,0,0,14,8,3,2,10,4,10,10,0,0,0,0,2.2,3.23,3.4,2.26,1.63
+championship,2024,championship_2024_458_watford_plymouth,29/03/2025,Watford,Plymouth,0,0,0,0,17,7,1,1,14,5,11,11,1,3,0,0,1.59,3.87,5.77,1.97,1.83
+championship,2024,championship_2024_459_burnley_bristol_city,29/03/2025,Burnley,Bristol City,1,0,1,0,14,4,3,1,7,2,11,9,0,0,0,0,1.74,3.5,5.01,2.33,1.59
+championship,2024,championship_2024_460_cardiff_sheffield_weds,29/03/2025,Cardiff,Sheffield Weds,1,1,1,0,14,9,5,2,9,1,12,10,2,1,0,0,2.91,3.26,2.45,2.1,1.73
+championship,2024,championship_2024_461_leeds_swansea,29/03/2025,Leeds,Swansea,2,2,1,0,15,9,7,6,5,4,13,16,3,4,0,0,1.23,5.96,12.52,1.71,2.11
+championship,2024,championship_2024_462_middlesbrough_oxford,29/03/2025,Middlesbrough,Oxford,2,1,0,1,24,9,4,3,11,5,5,11,0,2,0,0,1.6,4.04,5.4,1.84,1.96
+championship,2024,championship_2024_463_norwich_west_brom,29/03/2025,Norwich,West Brom,1,0,0,0,9,16,3,7,3,6,15,12,1,0,0,0,2.23,3.31,3.26,2.0,1.81
+championship,2024,championship_2024_464_portsmouth_blackburn,29/03/2025,Portsmouth,Blackburn,1,0,1,0,3,9,2,3,2,5,13,13,4,2,0,0,2.27,3.27,3.22,2.14,1.7
+championship,2024,championship_2024_465_stoke_qpr,29/03/2025,Stoke,QPR,3,1,2,0,11,9,6,3,3,2,10,9,1,3,0,0,2.27,3.19,3.29,2.21,1.66
+championship,2024,championship_2024_466_sunderland_millwall,29/03/2025,Sunderland,Millwall,1,0,1,0,13,5,6,2,6,1,14,13,4,3,0,0,1.63,3.69,5.75,2.28,1.62
+championship,2024,championship_2024_467_derby_preston,02/04/2025,Derby,Preston,2,0,0,0,7,5,2,1,4,3,11,10,1,2,0,0,2.29,2.99,3.46,2.72,1.43
+championship,2024,championship_2024_468_blackburn_middlesbrough,04/04/2025,Blackburn,Middlesbrough,0,2,0,2,7,12,2,3,4,3,15,10,2,0,0,0,2.82,3.37,2.46,1.94,1.86
+championship,2024,championship_2024_469_coventry_burnley,05/04/2025,Coventry,Burnley,1,2,1,1,14,13,4,6,1,5,14,18,2,4,0,0,3.07,3.15,2.4,2.24,1.63
+championship,2024,championship_2024_470_luton_leeds,05/04/2025,Luton,Leeds,1,1,1,1,8,8,3,5,0,5,15,13,1,2,0,0,5.53,4.03,1.58,1.98,1.82
+championship,2024,championship_2024_471_west_brom_sunderland,05/04/2025,West Brom,Sunderland,0,1,0,1,21,7,3,3,6,6,15,14,2,3,0,0,2.45,3.25,2.89,2.13,1.7
+championship,2024,championship_2024_472_bristol_city_watford,05/04/2025,Bristol City,Watford,2,1,2,0,7,8,4,3,2,2,11,9,1,1,0,0,1.81,3.57,4.35,2.0,1.8
+championship,2024,championship_2024_473_millwall_portsmouth,05/04/2025,Millwall,Portsmouth,2,1,0,0,14,6,3,3,11,4,20,13,0,4,0,0,2.33,3.03,3.31,2.6,1.47
+championship,2024,championship_2024_474_oxford_sheffield_united,05/04/2025,Oxford,Sheffield United,1,0,1,0,9,15,3,4,2,10,6,8,2,3,0,0,4.39,3.45,1.84,2.12,1.71
+championship,2024,championship_2024_475_plymouth_norwich,05/04/2025,Plymouth,Norwich,2,1,2,0,8,9,4,4,2,5,11,9,0,0,0,0,4.27,3.66,1.81,1.89,1.9
+championship,2024,championship_2024_476_preston_stoke,05/04/2025,Preston,Stoke,1,1,1,0,6,15,2,5,1,9,9,15,4,3,0,0,2.39,3.11,3.12,2.3,1.6
+championship,2024,championship_2024_477_qpr_cardiff,05/04/2025,QPR,Cardiff,0,0,0,0,11,13,4,2,7,4,13,10,1,1,0,0,2.23,3.2,3.33,2.24,1.63
+championship,2024,championship_2024_478_sheffield_weds_hull,05/04/2025,Sheffield Weds,Hull,0,1,0,0,15,8,4,2,5,3,14,13,2,1,0,0,2.0,3.39,3.79,2.1,1.72
+championship,2024,championship_2024_479_swansea_derby,05/04/2025,Swansea,Derby,1,0,0,0,3,12,1,2,4,3,7,12,0,2,0,0,2.05,3.19,3.86,2.38,1.56
+championship,2024,championship_2024_480_blackburn_sheffield_weds,08/04/2025,Blackburn,Sheffield Weds,2,2,0,2,11,9,5,3,8,4,10,11,3,4,0,0,2.62,3.2,2.74,2.29,1.61
+championship,2024,championship_2024_481_bristol_city_west_brom,08/04/2025,Bristol City,West Brom,2,1,0,0,12,13,7,5,4,5,8,14,1,1,0,1,2.43,3.33,2.89,2.1,1.73
+championship,2024,championship_2024_482_derby_burnley,08/04/2025,Derby,Burnley,0,0,0,0,9,8,1,2,8,4,14,8,2,0,0,0,4.62,3.2,1.89,2.77,1.42
+championship,2024,championship_2024_483_norwich_sunderland,08/04/2025,Norwich,Sunderland,0,0,0,0,11,7,4,3,4,4,13,14,2,4,0,0,2.43,3.46,2.8,1.86,1.93
+championship,2024,championship_2024_484_preston_cardiff,08/04/2025,Preston,Cardiff,2,2,1,0,14,14,4,6,4,6,13,12,0,2,0,0,2.55,3.25,2.8,2.16,1.7
+championship,2024,championship_2024_485_sheffield_united_millwall,08/04/2025,Sheffield United,Millwall,0,1,0,1,25,7,5,2,11,4,5,18,0,1,0,0,1.64,3.66,5.66,2.27,1.63
+championship,2024,championship_2024_486_stoke_luton,08/04/2025,Stoke,Luton,1,1,0,0,10,15,4,3,4,6,12,13,2,2,0,0,2.44,3.15,3.01,2.36,1.58
+championship,2024,championship_2024_487_watford_hull,08/04/2025,Watford,Hull,1,0,0,0,9,16,2,5,7,3,7,6,3,0,0,0,2.4,3.23,3.02,2.19,1.67
+championship,2024,championship_2024_488_middlesbrough_leeds,08/04/2025,Middlesbrough,Leeds,0,1,0,1,17,5,2,3,4,4,11,11,1,1,0,0,4.58,3.81,1.73,1.84,1.96
+championship,2024,championship_2024_489_oxford_qpr,09/04/2025,Oxford,QPR,1,3,0,2,12,11,5,6,7,7,14,11,1,3,0,0,2.54,3.15,2.83,2.31,1.6
+championship,2024,championship_2024_490_swansea_plymouth,09/04/2025,Swansea,Plymouth,3,0,3,0,18,6,8,3,3,1,11,12,0,2,0,0,1.63,3.83,5.24,2.01,1.8
+championship,2024,championship_2024_491_coventry_portsmouth,09/04/2025,Coventry,Portsmouth,1,0,0,0,16,10,3,1,5,4,9,8,1,3,0,0,1.65,3.92,4.9,1.83,1.97
+championship,2024,championship_2024_492_burnley_norwich,11/04/2025,Burnley,Norwich,2,1,2,0,8,12,2,2,5,5,14,14,2,2,0,0,1.6,3.83,5.83,2.04,1.78
+championship,2024,championship_2024_493_leeds_preston,12/04/2025,Leeds,Preston,2,1,2,1,20,3,5,2,6,5,4,7,2,1,0,0,1.23,6.07,12.29,1.66,2.2
+championship,2024,championship_2024_494_plymouth_sheffield_united,12/04/2025,Plymouth,Sheffield United,2,1,0,1,8,8,3,3,3,9,9,12,1,1,0,0,5.4,4.0,1.6,1.9,1.91
+championship,2024,championship_2024_495_cardiff_stoke,12/04/2025,Cardiff,Stoke,0,1,0,0,16,12,3,5,3,3,13,11,1,3,0,0,2.28,3.28,3.13,2.15,1.69
+championship,2024,championship_2024_496_luton_blackburn,12/04/2025,Luton,Blackburn,0,1,0,0,18,4,3,2,9,2,7,13,1,3,0,1,1.88,3.43,4.21,2.2,1.66
+championship,2024,championship_2024_497_millwall_middlesbrough,12/04/2025,Millwall,Middlesbrough,1,0,0,0,13,11,4,4,2,4,21,10,1,0,0,0,2.84,3.29,2.46,2.11,1.71
+championship,2024,championship_2024_498_portsmouth_derby,12/04/2025,Portsmouth,Derby,2,2,0,0,15,10,5,4,6,3,13,18,5,4,0,0,2.35,3.01,3.29,2.53,1.5
+championship,2024,championship_2024_499_qpr_bristol_city,12/04/2025,QPR,Bristol City,1,1,1,1,13,5,4,1,3,6,10,12,2,1,0,0,3.11,3.27,2.3,2.22,1.64
+championship,2024,championship_2024_500_sheffield_weds_oxford,12/04/2025,Sheffield Weds,Oxford,0,1,0,0,15,13,2,5,4,5,6,12,1,2,0,0,1.63,3.83,5.36,1.98,1.82
+championship,2024,championship_2024_501_sunderland_swansea,12/04/2025,Sunderland,Swansea,0,1,0,0,12,9,3,2,4,1,13,16,2,3,0,0,1.71,3.62,4.93,2.06,1.75
+championship,2024,championship_2024_502_west_brom_watford,12/04/2025,West Brom,Watford,2,1,1,0,10,15,5,3,3,6,10,12,4,2,0,0,1.74,3.64,4.72,2.05,1.76
+championship,2024,championship_2024_503_hull_coventry,14/04/2025,Hull,Coventry,1,1,0,0,9,14,3,8,7,7,12,9,0,1,0,0,2.54,3.24,2.76,2.01,1.78
+championship,2024,championship_2024_504_derby_luton,18/04/2025,Derby,Luton,0,1,0,1,14,8,5,1,9,4,9,13,2,2,0,0,2.55,2.99,2.97,2.73,1.44
+championship,2024,championship_2024_505_blackburn_millwall,18/04/2025,Blackburn,Millwall,4,1,2,1,17,12,6,6,8,6,8,20,0,1,0,0,2.32,3.12,3.23,2.54,1.5
+championship,2024,championship_2024_506_bristol_city_sunderland,18/04/2025,Bristol City,Sunderland,2,1,0,1,27,4,7,2,5,2,5,9,1,3,0,1,2.32,3.33,3.03,2.08,1.73
+championship,2024,championship_2024_507_coventry_west_brom,18/04/2025,Coventry,West Brom,2,0,1,0,10,7,4,0,5,5,17,13,3,0,0,1,2.2,3.44,3.16,1.94,1.85
+championship,2024,championship_2024_508_middlesbrough_plymouth,18/04/2025,Middlesbrough,Plymouth,2,1,1,1,22,19,8,5,12,1,8,12,0,2,0,1,1.37,5.08,7.37,1.54,2.4
+championship,2024,championship_2024_509_norwich_portsmouth,18/04/2025,Norwich,Portsmouth,3,5,1,3,11,22,6,10,6,5,12,11,1,3,0,0,1.8,3.73,4.2,1.8,2.01
+championship,2024,championship_2024_510_preston_qpr,18/04/2025,Preston,QPR,1,2,1,0,9,14,2,5,4,4,11,13,1,2,0,0,2.3,3.06,3.34,2.42,1.54
+championship,2024,championship_2024_511_stoke_sheffield_weds,18/04/2025,Stoke,Sheffield Weds,2,0,1,0,10,9,3,1,2,4,16,14,2,2,0,0,2.27,3.4,3.07,2.03,1.77
+championship,2024,championship_2024_512_swansea_hull,18/04/2025,Swansea,Hull,1,0,0,0,20,11,3,3,4,7,15,15,2,2,0,1,2.37,3.23,3.02,2.2,1.66
+championship,2024,championship_2024_513_watford_burnley,18/04/2025,Watford,Burnley,1,2,1,1,11,16,5,7,4,1,17,4,3,4,2,0,4.68,3.44,1.8,2.3,1.6
+championship,2024,championship_2024_514_sheffield_united_cardiff,18/04/2025,Sheffield United,Cardiff,2,0,1,0,15,11,5,3,7,1,9,8,1,1,0,0,1.58,3.98,5.58,1.92,1.87
+championship,2024,championship_2024_515_oxford_leeds,18/04/2025,Oxford,Leeds,0,1,0,1,9,11,2,4,2,5,16,6,4,2,0,0,8.5,4.86,1.35,1.8,2.0
+championship,2024,championship_2024_516_cardiff_oxford,21/04/2025,Cardiff,Oxford,1,1,0,0,12,2,3,1,4,0,14,17,1,3,0,0,1.89,3.36,4.27,2.22,1.64
+championship,2024,championship_2024_517_hull_preston,21/04/2025,Hull,Preston,2,1,0,1,16,16,6,2,9,6,7,8,0,3,0,0,1.97,3.29,4.02,2.26,1.62
+championship,2024,championship_2024_518_leeds_stoke,21/04/2025,Leeds,Stoke,6,0,5,0,18,5,11,1,5,1,7,9,1,0,0,0,1.25,5.73,11.57,1.68,2.14
+championship,2024,championship_2024_519_luton_bristol_city,21/04/2025,Luton,Bristol City,3,1,0,0,16,11,7,4,3,4,11,12,0,3,0,0,2.49,3.22,2.86,2.15,1.69
+championship,2024,championship_2024_520_millwall_norwich,21/04/2025,Millwall,Norwich,3,1,2,1,16,4,5,1,5,4,10,9,1,3,0,0,2.21,3.25,3.31,2.17,1.67
+championship,2024,championship_2024_521_plymouth_coventry,21/04/2025,Plymouth,Coventry,3,1,2,1,10,11,5,3,3,4,9,8,1,1,0,0,4.42,3.91,1.73,1.76,2.06
+championship,2024,championship_2024_522_portsmouth_watford,21/04/2025,Portsmouth,Watford,1,0,1,0,19,10,10,3,6,3,13,12,4,2,0,1,2.05,3.44,3.52,2.06,1.75
+championship,2024,championship_2024_523_qpr_swansea,21/04/2025,QPR,Swansea,1,2,0,1,6,10,2,2,5,3,19,17,1,1,0,0,2.49,3.19,2.89,2.26,1.62
+championship,2024,championship_2024_524_sheffield_weds_middlesbrough,21/04/2025,Sheffield Weds,Middlesbrough,2,1,0,1,25,17,11,6,5,6,15,9,3,4,0,0,3.15,3.51,2.18,1.91,1.89
+championship,2024,championship_2024_525_sunderland_blackburn,21/04/2025,Sunderland,Blackburn,0,1,0,1,16,2,2,1,10,2,7,15,1,2,0,0,1.74,3.63,4.69,2.09,1.73
+championship,2024,championship_2024_526_west_brom_derby,21/04/2025,West Brom,Derby,1,3,0,2,13,5,2,4,4,3,10,12,1,2,0,0,1.93,3.33,4.11,2.37,1.57
+championship,2024,championship_2024_527_burnley_sheffield_united,21/04/2025,Burnley,Sheffield United,2,1,2,1,10,15,4,4,3,4,11,14,1,3,0,0,1.93,3.3,4.15,2.48,1.52
+championship,2024,championship_2024_528_stoke_sheffield_united,25/04/2025,Stoke,Sheffield United,0,2,0,1,10,13,3,5,8,3,16,11,3,2,0,0,2.44,3.27,2.93,2.14,1.7
+championship,2024,championship_2024_529_luton_coventry,26/04/2025,Luton,Coventry,1,0,0,0,23,3,8,0,18,2,9,16,2,5,1,1,2.47,3.3,2.86,1.99,1.82
+championship,2024,championship_2024_530_qpr_burnley,26/04/2025,QPR,Burnley,0,5,0,3,9,16,2,10,2,6,13,11,4,2,0,0,3.9,3.45,1.95,2.22,1.65
+championship,2024,championship_2024_531_blackburn_watford,26/04/2025,Blackburn,Watford,2,1,0,0,10,9,4,2,4,6,12,14,5,5,0,0,1.73,3.64,4.81,1.97,1.82
+championship,2024,championship_2024_532_cardiff_west_brom,26/04/2025,Cardiff,West Brom,0,0,0,0,18,17,5,5,9,5,16,10,1,0,0,0,2.26,3.24,3.22,2.11,1.71
+championship,2024,championship_2024_533_hull_derby,26/04/2025,Hull,Derby,0,1,0,0,15,6,2,2,5,3,11,15,1,2,0,0,2.4,3.05,3.16,2.59,1.49
+championship,2024,championship_2024_534_middlesbrough_norwich,26/04/2025,Middlesbrough,Norwich,0,0,0,0,16,10,5,4,10,3,12,15,1,2,0,0,1.54,4.45,5.32,1.51,2.47
+championship,2024,championship_2024_535_millwall_swansea,26/04/2025,Millwall,Swansea,1,0,1,0,16,12,4,4,4,7,11,9,1,1,0,0,2.25,3.16,3.33,2.34,1.57
+championship,2024,championship_2024_536_oxford_sunderland,26/04/2025,Oxford,Sunderland,2,0,1,0,17,10,4,0,3,6,15,10,3,1,0,0,3.13,3.19,2.34,2.17,1.67
+championship,2024,championship_2024_537_preston_plymouth,26/04/2025,Preston,Plymouth,1,2,0,1,20,5,7,3,9,2,9,14,3,2,0,0,1.77,3.65,4.49,1.98,1.83
+championship,2024,championship_2024_538_sheffield_weds_portsmouth,26/04/2025,Sheffield Weds,Portsmouth,1,1,1,1,18,2,5,1,5,4,14,7,1,2,0,0,2.04,3.61,3.4,1.84,1.96
+championship,2024,championship_2024_539_leeds_bristol_city,28/04/2025,Leeds,Bristol City,4,0,1,0,23,3,12,1,11,1,6,4,1,0,0,0,1.59,4.02,5.42,1.82,1.98
+championship,2024,championship_2024_540_bristol_city_preston,03/05/2025,Bristol City,Preston,2,2,0,1,18,18,2,5,7,3,7,9,2,4,0,0,1.77,3.69,4.5,1.97,1.84
+championship,2024,championship_2024_541_burnley_millwall,03/05/2025,Burnley,Millwall,3,1,1,1,19,12,9,4,7,4,5,16,1,0,0,0,1.61,3.87,5.65,2.05,1.76
+championship,2024,championship_2024_542_coventry_middlesbrough,03/05/2025,Coventry,Middlesbrough,2,0,1,0,17,21,4,6,5,5,12,6,3,1,0,0,2.08,3.76,3.2,1.58,2.36
+championship,2024,championship_2024_543_derby_stoke,03/05/2025,Derby,Stoke,0,0,0,0,12,4,4,1,5,4,10,9,2,1,0,0,2.07,2.86,4.42,2.51,1.51
+championship,2024,championship_2024_544_norwich_cardiff,03/05/2025,Norwich,Cardiff,4,2,3,0,22,19,8,6,6,9,13,9,3,2,0,1,1.61,4.43,4.7,1.56,2.36
+championship,2024,championship_2024_545_plymouth_leeds,03/05/2025,Plymouth,Leeds,1,2,1,0,6,25,0,4,1,7,16,8,2,2,0,0,10.75,6.15,1.24,1.48,2.58
+championship,2024,championship_2024_546_portsmouth_hull,03/05/2025,Portsmouth,Hull,1,1,0,1,11,11,2,4,5,5,7,18,0,2,0,0,2.89,3.56,2.31,1.93,1.88
+championship,2024,championship_2024_547_sheffield_united_blackburn,03/05/2025,Sheffield United,Blackburn,1,1,0,0,18,7,5,2,8,4,16,11,2,0,0,0,2.26,3.43,3.07,2.0,1.81
+championship,2024,championship_2024_548_sunderland_qpr,03/05/2025,Sunderland,QPR,0,1,0,1,11,5,5,1,11,1,13,11,2,3,0,0,1.59,4.0,5.55,1.89,1.91
+championship,2024,championship_2024_549_swansea_oxford,03/05/2025,Swansea,Oxford,3,3,1,1,12,10,5,7,5,4,8,10,0,2,0,0,1.66,3.97,4.92,1.93,1.87
+championship,2024,championship_2024_550_watford_sheffield_weds,03/05/2025,Watford,Sheffield Weds,1,1,1,1,18,7,5,2,8,2,15,12,0,1,0,0,2.78,3.55,2.4,1.64,2.23
+championship,2024,championship_2024_551_west_brom_luton,03/05/2025,West Brom,Luton,5,3,3,1,19,12,5,4,6,4,9,22,2,2,0,0,2.99,3.39,2.33,2.03,1.79

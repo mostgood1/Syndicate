@@ -1,0 +1,381 @@
+league,season,match_id,date,home_team,away_team,home_goals,away_goals,ht_home_goals,ht_away_goals,home_shots,away_shots,home_shots_on_target,away_shots_on_target,home_corners,away_corners,home_fouls,away_fouls,home_yellow_cards,away_yellow_cards,home_red_cards,away_red_cards,odds_home,odds_draw,odds_away,odds_over_2_5,odds_under_2_5
+la_liga,2024,la_liga_2024_0_ath_bilbao_getafe,15/08/2024,Ath Bilbao,Getafe,1,1,1,0,7,9,4,2,5,6,15,12,4,1,0,0,1.51,4.04,7.61,2.24,1.67
+la_liga,2024,la_liga_2024_1_betis_girona,15/08/2024,Betis,Girona,1,1,1,0,19,13,4,2,4,4,11,7,2,0,0,0,2.4,3.38,3.02,1.93,1.9
+la_liga,2024,la_liga_2024_2_celta_alaves,16/08/2024,Celta,Alaves,2,1,0,1,6,10,4,2,3,3,8,23,3,2,0,0,2.03,3.32,4.02,2.25,1.67
+la_liga,2024,la_liga_2024_3_las_palmas_sevilla,16/08/2024,Las Palmas,Sevilla,2,2,1,1,13,16,5,5,6,3,12,13,0,0,0,0,2.83,3.21,2.65,2.18,1.71
+la_liga,2024,la_liga_2024_4_osasuna_leganes,17/08/2024,Osasuna,Leganes,1,1,0,1,16,10,5,4,6,4,14,12,3,2,0,0,1.88,3.44,4.48,2.34,1.62
+la_liga,2024,la_liga_2024_5_valencia_barcelona,17/08/2024,Valencia,Barcelona,1,2,1,1,6,18,1,8,3,8,11,13,2,3,0,0,4.76,3.87,1.74,1.82,2.02
+la_liga,2024,la_liga_2024_6_sociedad_vallecano,18/08/2024,Sociedad,Vallecano,1,2,0,0,11,12,5,5,10,5,14,21,2,4,0,0,1.59,3.74,6.63,2.34,1.61
+la_liga,2024,la_liga_2024_7_mallorca_real_madrid,18/08/2024,Mallorca,Real Madrid,1,1,0,1,12,13,5,4,8,7,11,6,1,0,0,1,7.33,4.34,1.47,1.92,1.91
+la_liga,2024,la_liga_2024_8_valladolid_espanol,19/08/2024,Valladolid,Espanol,1,0,1,0,12,10,3,2,3,2,15,8,2,2,0,0,2.36,3.1,3.34,2.33,1.61
+la_liga,2024,la_liga_2024_9_villarreal_ath_madrid,19/08/2024,Villarreal,Ath Madrid,2,2,2,2,8,10,3,5,2,3,6,10,1,3,0,0,3.33,3.67,2.12,1.7,2.19
+la_liga,2024,la_liga_2024_10_celta_valencia,23/08/2024,Celta,Valencia,3,1,2,1,7,13,5,5,4,7,9,11,3,0,0,0,2.12,3.35,3.65,2.14,1.73
+la_liga,2024,la_liga_2024_11_sevilla_villarreal,23/08/2024,Sevilla,Villarreal,1,2,1,1,15,6,9,5,7,2,15,7,3,5,0,0,2.4,3.55,2.88,1.74,2.12
+la_liga,2024,la_liga_2024_12_osasuna_mallorca,24/08/2024,Osasuna,Mallorca,1,0,0,0,15,11,5,2,5,4,10,8,2,1,0,0,2.47,3.01,3.22,2.68,1.47
+la_liga,2024,la_liga_2024_13_barcelona_ath_bilbao,24/08/2024,Barcelona,Ath Bilbao,2,1,1,1,13,9,5,2,5,6,11,16,4,5,0,0,1.64,4.18,5.05,1.71,2.16
+la_liga,2024,la_liga_2024_14_espanol_sociedad,24/08/2024,Espanol,Sociedad,0,1,0,0,13,8,3,4,7,4,14,18,2,2,0,0,4.0,3.13,2.1,2.64,1.48
+la_liga,2024,la_liga_2024_15_getafe_vallecano,24/08/2024,Getafe,Vallecano,0,0,0,0,12,3,0,1,3,2,16,18,1,2,0,0,2.5,2.93,3.27,2.77,1.45
+la_liga,2024,la_liga_2024_16_real_madrid_valladolid,25/08/2024,Real Madrid,Valladolid,3,0,0,0,17,8,9,2,5,5,10,15,1,1,0,0,1.17,7.96,15.17,1.39,2.96
+la_liga,2024,la_liga_2024_17_leganes_las_palmas,25/08/2024,Leganes,Las Palmas,2,1,0,0,10,10,5,5,3,7,11,10,1,1,0,0,2.29,2.99,3.64,2.69,1.46
+la_liga,2024,la_liga_2024_18_alaves_betis,25/08/2024,Alaves,Betis,0,0,0,0,3,13,1,3,3,8,16,13,1,4,1,0,2.4,3.12,3.21,2.39,1.59
+la_liga,2024,la_liga_2024_19_ath_madrid_girona,25/08/2024,Ath Madrid,Girona,3,0,1,0,11,13,6,5,1,9,11,10,1,3,0,0,1.6,4.27,5.31,1.63,2.31
+la_liga,2024,la_liga_2024_20_villarreal_celta,26/08/2024,Villarreal,Celta,4,3,1,2,22,18,9,8,7,4,8,6,4,3,0,0,1.96,3.56,3.82,1.93,1.88
+la_liga,2024,la_liga_2024_21_mallorca_sevilla,27/08/2024,Mallorca,Sevilla,0,0,0,0,12,16,4,7,5,9,15,10,0,1,0,1,2.41,3.11,3.26,2.52,1.53
+la_liga,2024,la_liga_2024_22_vallecano_barcelona,27/08/2024,Vallecano,Barcelona,1,2,1,0,8,22,4,5,6,6,17,11,3,1,0,0,5.33,3.95,1.66,1.88,1.95
+la_liga,2024,la_liga_2024_23_ath_bilbao_valencia,28/08/2024,Ath Bilbao,Valencia,1,0,1,0,13,2,4,0,5,3,14,9,1,3,0,0,1.62,3.89,5.91,2.15,1.73
+la_liga,2024,la_liga_2024_24_valladolid_leganes,28/08/2024,Valladolid,Leganes,0,0,0,0,12,8,2,1,4,4,13,19,1,5,0,0,2.32,3.01,3.58,2.65,1.49
+la_liga,2024,la_liga_2024_25_ath_madrid_espanol,28/08/2024,Ath Madrid,Espanol,0,0,0,0,24,8,7,1,9,3,6,9,0,2,0,0,1.3,5.42,11.24,1.8,2.02
+la_liga,2024,la_liga_2024_26_sociedad_alaves,28/08/2024,Sociedad,Alaves,1,2,1,1,8,12,1,5,8,6,16,12,4,4,1,0,1.71,3.57,5.64,2.48,1.55
+la_liga,2024,la_liga_2024_27_girona_osasuna,29/08/2024,Girona,Osasuna,4,0,1,0,10,1,5,0,5,0,10,9,0,0,0,0,1.73,3.94,4.53,1.77,2.06
+la_liga,2024,la_liga_2024_28_las_palmas_real_madrid,29/08/2024,Las Palmas,Real Madrid,1,1,1,0,7,25,3,8,2,6,16,13,0,2,0,0,8.01,5.09,1.38,1.56,2.42
+la_liga,2024,la_liga_2024_29_barcelona_valladolid,31/08/2024,Barcelona,Valladolid,7,0,3,0,23,5,10,2,10,1,6,12,0,3,0,0,1.25,6.45,11.72,1.46,2.72
+la_liga,2024,la_liga_2024_30_ath_bilbao_ath_madrid,31/08/2024,Ath Bilbao,Ath Madrid,0,1,0,0,8,9,1,2,2,2,13,9,3,1,0,0,3.01,3.34,2.43,2.06,1.78
+la_liga,2024,la_liga_2024_31_espanol_vallecano,31/08/2024,Espanol,Vallecano,2,1,1,1,10,17,5,5,3,7,14,16,3,2,0,0,2.78,3.03,2.84,2.66,1.49
+la_liga,2024,la_liga_2024_32_leganes_mallorca,31/08/2024,Leganes,Mallorca,0,1,0,1,4,12,2,3,1,3,11,17,1,3,0,0,2.56,2.9,3.27,2.79,1.44
+la_liga,2024,la_liga_2024_33_valencia_villarreal,31/08/2024,Valencia,Villarreal,1,1,1,1,22,9,6,3,14,3,15,11,3,5,0,1,2.84,3.45,2.49,1.84,1.99
+la_liga,2024,la_liga_2024_34_alaves_las_palmas,01/09/2024,Alaves,Las Palmas,2,0,1,0,15,12,5,7,6,5,13,9,3,0,0,0,1.96,3.35,4.25,2.34,1.62
+la_liga,2024,la_liga_2024_35_osasuna_celta,01/09/2024,Osasuna,Celta,3,2,2,1,10,12,4,3,6,3,19,10,2,0,0,1,2.46,3.31,2.99,2.1,1.76
+la_liga,2024,la_liga_2024_36_sevilla_girona,01/09/2024,Sevilla,Girona,0,2,0,1,16,11,5,4,7,5,6,14,3,2,0,0,2.37,3.73,2.82,1.68,2.22
+la_liga,2024,la_liga_2024_37_getafe_sociedad,01/09/2024,Getafe,Sociedad,0,0,0,0,16,1,1,0,4,1,14,16,1,1,0,0,3.52,2.87,2.43,2.98,1.4
+la_liga,2024,la_liga_2024_38_real_madrid_betis,01/09/2024,Real Madrid,Betis,2,0,0,0,20,12,8,2,7,3,8,16,2,0,0,0,1.29,5.91,10.17,1.53,2.49
+la_liga,2024,la_liga_2024_39_betis_leganes,13/09/2024,Betis,Leganes,2,0,0,0,14,3,5,0,11,1,11,18,1,2,0,0,1.65,3.72,6.06,2.33,1.62
+la_liga,2024,la_liga_2024_40_mallorca_villarreal,14/09/2024,Mallorca,Villarreal,1,2,0,1,10,21,5,4,7,6,11,10,3,3,1,0,2.5,3.27,2.96,2.11,1.75
+la_liga,2024,la_liga_2024_41_espanol_alaves,14/09/2024,Espanol,Alaves,3,2,1,1,9,19,4,6,0,5,17,14,2,3,0,0,2.72,3.07,2.87,2.59,1.51
+la_liga,2024,la_liga_2024_42_sevilla_getafe,14/09/2024,Sevilla,Getafe,1,0,1,0,10,15,4,4,3,4,19,15,3,4,1,0,2.24,3.09,3.66,2.62,1.5
+la_liga,2024,la_liga_2024_43_sociedad_real_madrid,14/09/2024,Sociedad,Real Madrid,0,2,0,0,11,16,2,7,6,6,12,9,4,1,0,0,5.07,3.87,1.7,1.96,1.87
+la_liga,2024,la_liga_2024_44_celta_valladolid,15/09/2024,Celta,Valladolid,3,1,2,0,14,6,7,1,5,3,14,15,3,5,0,1,1.68,3.97,5.06,1.82,2.01
+la_liga,2024,la_liga_2024_45_girona_barcelona,15/09/2024,Girona,Barcelona,1,4,0,2,9,20,4,9,1,6,13,4,3,2,0,1,4.05,3.97,1.84,1.52,2.53
+la_liga,2024,la_liga_2024_46_las_palmas_ath_bilbao,15/09/2024,Las Palmas,Ath Bilbao,2,3,0,2,15,9,6,4,9,3,8,12,1,2,0,1,3.8,3.43,2.04,2.1,1.76
+la_liga,2024,la_liga_2024_47_ath_madrid_valencia,15/09/2024,Ath Madrid,Valencia,3,0,1,0,14,5,5,1,7,3,10,8,1,2,0,0,1.35,4.98,9.83,1.89,1.94
+la_liga,2024,la_liga_2024_48_vallecano_osasuna,16/09/2024,Vallecano,Osasuna,3,1,0,1,17,5,6,2,7,4,12,15,3,2,0,0,2.1,3.17,3.95,2.57,1.51
+la_liga,2024,la_liga_2024_49_mallorca_sociedad,17/09/2024,Mallorca,Sociedad,1,0,1,0,10,13,4,4,5,5,5,10,1,1,0,0,2.88,2.81,2.93,3.04,1.38
+la_liga,2024,la_liga_2024_50_betis_getafe,18/09/2024,Betis,Getafe,2,1,0,0,18,15,8,5,8,4,10,20,3,5,0,0,1.98,3.08,4.64,2.89,1.42
+la_liga,2024,la_liga_2024_51_leganes_ath_bilbao,19/09/2024,Leganes,Ath Bilbao,0,2,0,0,14,10,3,4,4,7,12,11,3,0,0,0,4.03,3.17,2.07,2.5,1.54
+la_liga,2024,la_liga_2024_52_alaves_sevilla,20/09/2024,Alaves,Sevilla,2,1,1,0,10,8,4,2,3,5,11,16,1,4,0,0,2.18,3.26,3.63,2.23,1.68
+la_liga,2024,la_liga_2024_53_valladolid_sociedad,21/09/2024,Valladolid,Sociedad,0,0,0,0,15,14,2,4,5,7,15,12,4,4,0,0,3.79,3.07,2.19,2.57,1.52
+la_liga,2024,la_liga_2024_54_osasuna_las_palmas,21/09/2024,Osasuna,Las Palmas,2,1,1,1,13,11,2,4,2,4,14,11,2,5,0,0,1.92,3.44,4.33,2.21,1.69
+la_liga,2024,la_liga_2024_55_valencia_girona,21/09/2024,Valencia,Girona,2,0,0,0,7,8,2,3,5,4,13,10,3,2,0,0,2.89,3.35,2.51,2.03,1.81
+la_liga,2024,la_liga_2024_56_real_madrid_espanol,21/09/2024,Real Madrid,Espanol,4,1,0,0,31,10,14,2,9,4,7,5,4,3,0,0,1.16,8.07,16.79,1.4,2.94
+la_liga,2024,la_liga_2024_57_getafe_leganes,22/09/2024,Getafe,Leganes,1,1,0,0,12,6,3,3,6,2,16,17,3,2,0,0,2.05,2.88,4.77,3.24,1.34
+la_liga,2024,la_liga_2024_58_ath_bilbao_celta,22/09/2024,Ath Bilbao,Celta,3,1,2,1,10,11,7,4,3,6,16,11,3,2,0,0,1.71,3.96,4.83,1.76,2.09
+la_liga,2024,la_liga_2024_59_villarreal_barcelona,22/09/2024,Villarreal,Barcelona,1,5,1,2,13,17,4,10,7,3,12,12,6,1,0,0,3.74,4.09,1.87,1.4,2.94
+la_liga,2024,la_liga_2024_60_vallecano_ath_madrid,22/09/2024,Vallecano,Ath Madrid,1,1,1,0,15,10,3,5,3,4,9,12,0,0,0,0,4.79,3.52,1.81,2.22,1.68
+la_liga,2024,la_liga_2024_61_betis_mallorca,23/09/2024,Betis,Mallorca,1,2,1,1,14,6,6,6,6,3,12,12,3,2,0,0,1.89,3.29,4.73,2.51,1.53
+la_liga,2024,la_liga_2024_62_sevilla_valladolid,24/09/2024,Sevilla,Valladolid,2,1,1,0,22,8,5,2,6,4,14,12,5,4,1,0,1.68,3.83,5.45,2.0,1.84
+la_liga,2024,la_liga_2024_63_valencia_osasuna,24/09/2024,Valencia,Osasuna,0,0,0,0,10,9,2,2,10,5,6,11,2,3,0,0,2.08,3.16,4.08,2.63,1.5
+la_liga,2024,la_liga_2024_64_real_madrid_alaves,24/09/2024,Real Madrid,Alaves,3,2,2,0,10,12,4,3,4,4,7,10,4,0,0,0,1.19,7.37,16.0,1.48,2.63
+la_liga,2024,la_liga_2024_65_girona_vallecano,25/09/2024,Girona,Vallecano,0,0,0,0,11,2,0,0,4,3,8,16,3,4,0,0,1.76,3.81,4.66,1.95,1.88
+la_liga,2024,la_liga_2024_66_barcelona_getafe,25/09/2024,Barcelona,Getafe,1,0,1,0,16,7,4,1,7,5,4,14,1,1,0,0,1.23,6.47,12.83,1.59,2.41
+la_liga,2024,la_liga_2024_67_espanol_villarreal,26/09/2024,Espanol,Villarreal,1,2,1,1,11,15,2,4,4,1,12,14,5,3,0,0,3.38,3.46,2.18,1.84,2.0
+la_liga,2024,la_liga_2024_68_las_palmas_betis,26/09/2024,Las Palmas,Betis,1,1,1,1,8,14,2,5,1,4,21,10,4,2,0,0,3.09,3.25,2.41,2.18,1.69
+la_liga,2024,la_liga_2024_69_celta_ath_madrid,26/09/2024,Celta,Ath Madrid,0,1,0,0,9,7,4,2,2,3,10,7,2,2,0,0,3.82,3.74,1.94,1.73,2.14
+la_liga,2024,la_liga_2024_70_valladolid_mallorca,27/09/2024,Valladolid,Mallorca,1,2,0,0,11,14,1,6,7,4,15,9,3,2,0,0,3.03,2.9,2.72,2.9,1.41
+la_liga,2024,la_liga_2024_71_getafe_alaves,28/09/2024,Getafe,Alaves,2,0,1,0,14,9,8,1,2,2,17,24,3,6,0,0,2.63,2.8,3.27,3.09,1.36
+la_liga,2024,la_liga_2024_72_vallecano_leganes,28/09/2024,Vallecano,Leganes,1,1,1,0,15,13,6,3,5,5,12,7,2,1,0,0,1.94,3.14,4.79,2.84,1.42
+la_liga,2024,la_liga_2024_73_sociedad_valencia,28/09/2024,Sociedad,Valencia,3,0,1,0,11,9,6,4,6,4,7,12,0,0,0,0,1.91,3.29,4.62,2.68,1.48
+la_liga,2024,la_liga_2024_74_osasuna_barcelona,28/09/2024,Osasuna,Barcelona,4,2,2,0,11,12,6,5,5,8,13,3,2,2,0,0,6.38,4.76,1.47,1.53,2.5
+la_liga,2024,la_liga_2024_75_celta_girona,29/09/2024,Celta,Girona,1,1,0,1,12,9,2,4,4,4,9,14,1,0,0,0,2.16,3.65,3.26,1.67,2.25
+la_liga,2024,la_liga_2024_76_ath_bilbao_sevilla,29/09/2024,Ath Bilbao,Sevilla,1,1,1,0,13,13,3,4,4,7,6,7,0,3,1,0,1.72,3.83,4.9,2.0,1.84
+la_liga,2024,la_liga_2024_77_betis_espanol,29/09/2024,Betis,Espanol,1,0,0,0,20,8,12,1,8,4,14,20,2,4,0,0,1.67,3.77,5.58,2.07,1.78
+la_liga,2024,la_liga_2024_78_ath_madrid_real_madrid,29/09/2024,Ath Madrid,Real Madrid,1,1,0,0,12,12,4,4,5,5,11,11,3,1,1,0,2.79,3.44,2.52,1.79,2.06
+la_liga,2024,la_liga_2024_79_villarreal_las_palmas,30/09/2024,Villarreal,Las Palmas,3,1,1,0,17,7,7,3,3,2,14,10,0,3,0,0,1.48,4.71,6.37,1.54,2.46
+la_liga,2024,la_liga_2024_80_leganes_valencia,04/10/2024,Leganes,Valencia,0,0,0,0,8,6,0,1,1,2,15,14,2,2,0,0,3.0,2.82,2.83,3.01,1.39
+la_liga,2024,la_liga_2024_81_espanol_mallorca,05/10/2024,Espanol,Mallorca,2,1,1,0,8,11,3,4,4,6,14,19,1,5,0,0,3.2,2.92,2.58,2.71,1.46
+la_liga,2024,la_liga_2024_82_getafe_osasuna,05/10/2024,Getafe,Osasuna,1,1,1,0,11,6,3,2,4,2,17,10,2,4,0,0,2.23,2.95,3.87,3.03,1.38
+la_liga,2024,la_liga_2024_83_las_palmas_celta,05/10/2024,Las Palmas,Celta,0,1,0,1,24,8,5,1,11,2,9,13,3,8,0,2,3.12,3.58,2.26,1.76,2.1
+la_liga,2024,la_liga_2024_84_valladolid_vallecano,05/10/2024,Valladolid,Vallecano,1,2,0,0,13,17,5,3,5,13,13,18,4,2,0,0,3.13,3.01,2.56,2.58,1.51
+la_liga,2024,la_liga_2024_85_real_madrid_villarreal,05/10/2024,Real Madrid,Villarreal,2,0,1,0,11,10,2,1,2,5,7,11,0,1,0,0,1.27,6.6,9.69,1.31,3.42
+la_liga,2024,la_liga_2024_86_girona_ath_bilbao,06/10/2024,Girona,Ath Bilbao,2,1,1,1,14,13,6,4,6,1,12,13,4,3,0,1,2.42,3.27,3.1,2.01,1.83
+la_liga,2024,la_liga_2024_87_alaves_barcelona,06/10/2024,Alaves,Barcelona,0,3,0,3,11,14,2,8,11,3,13,8,2,2,0,0,5.5,4.4,1.57,1.64,2.29
+la_liga,2024,la_liga_2024_88_sevilla_betis,06/10/2024,Sevilla,Betis,1,0,0,0,14,11,5,3,4,1,15,15,6,3,1,0,2.52,3.21,2.97,2.16,1.71
+la_liga,2024,la_liga_2024_89_sociedad_ath_madrid,06/10/2024,Sociedad,Ath Madrid,1,1,0,1,16,4,8,1,5,1,10,9,0,2,0,0,3.31,3.16,2.35,2.42,1.57
+la_liga,2024,la_liga_2024_90_alaves_valladolid,18/10/2024,Alaves,Valladolid,2,3,1,1,10,12,4,4,5,6,15,14,6,2,1,0,1.65,3.82,5.82,2.15,1.72
+la_liga,2024,la_liga_2024_91_ath_bilbao_espanol,19/10/2024,Ath Bilbao,Espanol,4,1,3,0,10,5,6,2,5,5,15,22,2,3,0,0,1.46,4.32,7.98,1.93,1.9
+la_liga,2024,la_liga_2024_92_osasuna_betis,19/10/2024,Osasuna,Betis,1,2,0,1,19,11,6,7,10,2,12,8,2,1,0,1,2.58,3.3,2.83,2.14,1.73
+la_liga,2024,la_liga_2024_93_girona_sociedad,19/10/2024,Girona,Sociedad,0,1,0,1,8,14,3,4,6,6,10,12,2,1,0,0,2.51,3.29,2.93,2.23,1.67
+la_liga,2024,la_liga_2024_94_celta_real_madrid,19/10/2024,Celta,Real Madrid,1,2,0,1,13,10,5,3,6,2,16,13,2,1,0,0,5.24,4.37,1.61,1.62,2.33
+la_liga,2024,la_liga_2024_95_mallorca_vallecano,20/10/2024,Mallorca,Vallecano,1,0,0,0,19,10,5,2,9,2,9,13,1,1,0,0,2.1,3.07,4.08,2.79,1.44
+la_liga,2024,la_liga_2024_96_ath_madrid_leganes,20/10/2024,Ath Madrid,Leganes,3,1,0,1,24,5,9,2,8,2,14,8,5,1,0,0,1.33,4.96,10.5,1.99,1.84
+la_liga,2024,la_liga_2024_97_villarreal_getafe,20/10/2024,Villarreal,Getafe,1,1,1,0,10,21,4,4,5,5,18,21,4,3,0,0,1.73,3.77,4.9,2.04,1.79
+la_liga,2024,la_liga_2024_98_barcelona_sevilla,20/10/2024,Barcelona,Sevilla,5,1,3,0,21,7,9,1,5,5,6,14,1,2,0,0,1.31,5.81,8.96,1.43,2.72
+la_liga,2024,la_liga_2024_99_valencia_las_palmas,21/10/2024,Valencia,Las Palmas,2,3,1,1,14,11,7,6,11,2,12,12,4,9,1,0,1.65,3.71,5.85,2.28,1.64
+la_liga,2024,la_liga_2024_100_espanol_sevilla,25/10/2024,Espanol,Sevilla,0,2,0,2,16,6,1,3,13,2,14,9,2,0,0,0,3.17,3.21,2.42,2.26,1.66
+la_liga,2024,la_liga_2024_101_valladolid_villarreal,26/10/2024,Valladolid,Villarreal,1,2,0,1,7,21,3,9,4,6,16,13,4,3,0,0,3.61,3.68,2.02,1.72,2.16
+la_liga,2024,la_liga_2024_102_vallecano_alaves,26/10/2024,Vallecano,Alaves,1,0,0,0,16,15,4,7,6,2,8,14,2,4,1,0,2.26,3.09,3.6,2.49,1.55
+la_liga,2024,la_liga_2024_103_las_palmas_girona,26/10/2024,Las Palmas,Girona,1,0,1,0,12,8,3,3,3,5,12,14,4,5,0,1,2.87,3.42,2.49,1.96,1.87
+la_liga,2024,la_liga_2024_104_real_madrid_barcelona,26/10/2024,Real Madrid,Barcelona,0,4,0,0,9,15,4,7,10,3,15,17,2,5,0,0,2.04,4.04,3.29,1.41,2.92
+la_liga,2024,la_liga_2024_105_leganes_celta,27/10/2024,Leganes,Celta,3,0,0,0,7,18,4,5,4,2,15,17,2,2,0,0,3.28,3.18,2.36,2.34,1.61
+la_liga,2024,la_liga_2024_106_getafe_valencia,27/10/2024,Getafe,Valencia,1,1,0,1,15,2,4,1,8,2,20,20,3,7,0,0,2.19,2.93,4.02,3.07,1.37
+la_liga,2024,la_liga_2024_107_betis_ath_madrid,27/10/2024,Betis,Ath Madrid,1,0,1,0,24,10,3,3,3,10,8,4,3,2,0,0,3.19,3.22,2.37,2.26,1.64
+la_liga,2024,la_liga_2024_108_sociedad_osasuna,27/10/2024,Sociedad,Osasuna,0,2,0,2,19,10,9,4,14,4,7,14,3,4,0,0,1.79,3.63,4.69,2.25,1.66
+la_liga,2024,la_liga_2024_109_mallorca_ath_bilbao,28/10/2024,Mallorca,Ath Bilbao,0,0,0,0,4,20,1,1,1,14,9,12,5,1,1,0,3.0,2.98,2.64,2.57,1.52
+la_liga,2024,la_liga_2024_110_alaves_mallorca,01/11/2024,Alaves,Mallorca,1,0,0,0,13,7,3,2,7,2,19,12,3,2,0,0,2.38,2.97,3.5,2.65,1.47
+la_liga,2024,la_liga_2024_111_osasuna_valladolid,02/11/2024,Osasuna,Valladolid,1,0,1,0,20,7,4,4,7,2,21,12,1,5,0,0,1.63,3.79,6.02,2.15,1.73
+la_liga,2024,la_liga_2024_112_girona_leganes,02/11/2024,Girona,Leganes,4,3,2,2,15,8,6,5,6,1,17,15,2,4,0,0,1.71,3.64,5.43,2.23,1.67
+la_liga,2024,la_liga_2024_113_ath_madrid_las_palmas,03/11/2024,Ath Madrid,Las Palmas,2,0,1,0,15,1,3,1,9,1,13,13,1,1,0,0,1.27,5.92,11.1,1.63,2.27
+la_liga,2024,la_liga_2024_114_barcelona_espanol,03/11/2024,Barcelona,Espanol,3,1,3,0,14,10,9,3,9,5,13,14,0,3,0,0,1.12,10.76,17.94,1.19,4.44
+la_liga,2024,la_liga_2024_115_sevilla_sociedad,03/11/2024,Sevilla,Sociedad,0,2,0,1,8,9,0,3,5,9,6,17,2,1,0,0,2.94,3.05,2.64,2.48,1.53
+la_liga,2024,la_liga_2024_116_ath_bilbao_betis,03/11/2024,Ath Bilbao,Betis,1,1,0,0,17,7,8,4,6,2,9,8,0,0,0,0,1.93,3.5,4.09,2.11,1.75
+la_liga,2024,la_liga_2024_117_celta_getafe,04/11/2024,Celta,Getafe,1,0,1,0,10,10,3,2,0,2,12,11,1,4,0,1,1.96,3.27,4.36,2.46,1.55
+la_liga,2024,la_liga_2024_118_vallecano_las_palmas,08/11/2024,Vallecano,Las Palmas,1,3,0,1,35,11,7,3,12,4,9,13,1,3,0,0,1.88,3.43,4.56,2.26,1.66
+la_liga,2024,la_liga_2024_119_real_madrid_osasuna,09/11/2024,Real Madrid,Osasuna,4,0,2,0,18,2,8,0,11,3,9,16,0,2,0,0,1.19,7.32,13.91,1.46,2.68
+la_liga,2024,la_liga_2024_120_villarreal_alaves,09/11/2024,Villarreal,Alaves,3,0,1,0,13,9,3,3,7,2,17,21,1,3,0,0,1.63,4.14,5.27,1.73,2.12
+la_liga,2024,la_liga_2024_121_leganes_sevilla,09/11/2024,Leganes,Sevilla,1,0,0,0,8,13,4,2,0,6,7,10,2,1,0,1,2.92,3.06,2.66,2.51,1.54
+la_liga,2024,la_liga_2024_122_betis_celta,10/11/2024,Betis,Celta,2,2,1,1,19,3,6,2,2,0,12,8,3,0,0,0,2.0,3.54,3.77,1.84,1.99
+la_liga,2024,la_liga_2024_123_mallorca_ath_madrid,10/11/2024,Mallorca,Ath Madrid,0,1,0,0,12,9,6,2,7,2,10,16,1,3,0,0,3.74,3.02,2.24,2.64,1.47
+la_liga,2024,la_liga_2024_124_getafe_girona,10/11/2024,Getafe,Girona,0,1,0,1,8,3,0,2,5,2,25,16,3,3,0,0,2.46,3.1,3.15,2.62,1.5
+la_liga,2024,la_liga_2024_125_valladolid_ath_bilbao,10/11/2024,Valladolid,Ath Bilbao,1,1,0,0,6,17,3,1,5,5,12,12,4,4,0,0,4.53,3.42,1.87,2.22,1.68
+la_liga,2024,la_liga_2024_126_sociedad_barcelona,10/11/2024,Sociedad,Barcelona,1,0,1,0,14,11,6,0,7,6,17,6,3,1,0,0,4.75,4.1,1.68,1.62,2.31
+la_liga,2024,la_liga_2024_127_getafe_valladolid,22/11/2024,Getafe,Valladolid,2,0,0,0,12,6,5,3,3,2,15,15,3,2,0,0,1.67,3.44,6.48,2.75,1.45
+la_liga,2024,la_liga_2024_128_valencia_betis,23/11/2024,Valencia,Betis,4,2,1,1,11,7,5,3,2,4,10,16,4,2,0,0,2.97,3.06,2.63,2.48,1.55
+la_liga,2024,la_liga_2024_129_ath_madrid_alaves,23/11/2024,Ath Madrid,Alaves,2,1,0,1,11,4,8,1,5,0,18,19,3,3,0,0,1.36,4.86,9.9,2.0,1.84
+la_liga,2024,la_liga_2024_130_girona_espanol,23/11/2024,Girona,Espanol,4,1,4,0,12,9,5,1,6,3,4,19,0,3,0,0,1.67,3.91,5.3,1.93,1.9
+la_liga,2024,la_liga_2024_131_las_palmas_mallorca,23/11/2024,Las Palmas,Mallorca,2,3,0,0,14,10,3,3,4,3,10,18,4,2,0,1,2.96,2.94,2.72,2.58,1.52
+la_liga,2024,la_liga_2024_132_celta_barcelona,23/11/2024,Celta,Barcelona,2,2,0,1,15,9,8,4,5,1,13,9,5,5,0,1,4.58,4.44,1.67,1.46,2.71
+la_liga,2024,la_liga_2024_133_osasuna_villarreal,24/11/2024,Osasuna,Villarreal,2,2,2,0,4,17,3,7,0,8,12,13,6,5,0,0,2.59,3.45,2.7,1.81,2.02
+la_liga,2024,la_liga_2024_134_sevilla_vallecano,24/11/2024,Sevilla,Vallecano,1,0,1,0,11,9,3,1,8,3,14,14,2,5,0,1,2.32,3.23,3.28,2.39,1.59
+la_liga,2024,la_liga_2024_135_leganes_real_madrid,24/11/2024,Leganes,Real Madrid,0,3,0,1,4,16,0,9,2,4,17,11,2,0,0,0,8.26,4.66,1.4,1.83,2.0
+la_liga,2024,la_liga_2024_136_ath_bilbao_sociedad,24/11/2024,Ath Bilbao,Sociedad,1,0,1,0,12,6,4,1,4,4,18,9,3,4,0,0,2.25,3.04,3.65,2.55,1.52
+la_liga,2024,la_liga_2024_137_mallorca_valencia,29/11/2024,Mallorca,Valencia,2,1,1,1,9,7,3,1,3,6,9,14,0,0,0,0,2.04,2.94,4.67,3.03,1.38
+la_liga,2024,la_liga_2024_138_barcelona_las_palmas,30/11/2024,Barcelona,Las Palmas,1,2,0,0,27,5,8,3,7,0,7,11,0,0,0,0,1.16,8.92,14.85,1.23,4.09
+la_liga,2024,la_liga_2024_139_alaves_leganes,30/11/2024,Alaves,Leganes,1,1,0,0,18,6,7,3,13,8,15,15,1,4,0,0,1.83,3.27,5.19,2.73,1.46
+la_liga,2024,la_liga_2024_140_espanol_celta,30/11/2024,Espanol,Celta,3,1,1,0,9,16,5,2,2,5,13,7,2,2,0,0,3.31,3.33,2.26,2.02,1.82
+la_liga,2024,la_liga_2024_141_valladolid_ath_madrid,30/11/2024,Valladolid,Ath Madrid,0,5,0,3,9,13,1,9,3,5,6,11,1,2,0,0,6.33,4.07,1.56,2.03,1.81
+la_liga,2024,la_liga_2024_142_villarreal_girona,01/12/2024,Villarreal,Girona,2,2,1,0,13,13,4,6,1,5,8,13,2,6,0,0,1.86,3.84,4.0,1.66,2.21
+la_liga,2024,la_liga_2024_143_real_madrid_getafe,01/12/2024,Real Madrid,Getafe,2,0,2,0,13,8,4,3,5,3,7,26,2,6,0,0,1.36,4.75,9.5,1.99,1.84
+la_liga,2024,la_liga_2024_144_vallecano_ath_bilbao,01/12/2024,Vallecano,Ath Bilbao,1,2,1,0,7,12,4,7,1,7,14,8,3,0,0,0,2.84,3.08,2.69,2.42,1.57
+la_liga,2024,la_liga_2024_145_sociedad_betis,01/12/2024,Sociedad,Betis,2,0,2,0,2,7,1,2,0,4,28,10,3,2,0,0,1.79,3.58,4.78,2.23,1.67
+la_liga,2024,la_liga_2024_146_sevilla_osasuna,02/12/2024,Sevilla,Osasuna,1,1,0,0,12,7,5,3,5,1,11,15,1,1,0,0,2.14,3.36,3.52,2.16,1.71
+la_liga,2024,la_liga_2024_147_mallorca_barcelona,03/12/2024,Mallorca,Barcelona,1,5,1,1,6,20,1,9,2,5,13,13,4,3,0,0,6.11,4.38,1.53,1.72,2.14
+la_liga,2024,la_liga_2024_148_ath_bilbao_real_madrid,04/12/2024,Ath Bilbao,Real Madrid,2,1,0,0,9,10,3,5,5,2,21,9,3,3,0,0,3.14,3.5,2.28,1.84,2.0
+la_liga,2024,la_liga_2024_149_celta_mallorca,06/12/2024,Celta,Mallorca,2,0,1,0,12,9,5,4,3,3,9,12,1,0,0,1,1.89,3.36,4.62,2.41,1.59
+la_liga,2024,la_liga_2024_150_las_palmas_valladolid,07/12/2024,Las Palmas,Valladolid,2,1,1,1,11,9,5,2,3,3,17,13,4,3,0,0,1.8,3.65,4.64,2.02,1.82
+la_liga,2024,la_liga_2024_151_betis_barcelona,07/12/2024,Betis,Barcelona,2,2,0,1,12,9,6,3,6,4,15,14,1,2,0,0,5.11,4.5,1.6,1.5,2.6
+la_liga,2024,la_liga_2024_152_valencia_vallecano,07/12/2024,Valencia,Vallecano,0,1,0,1,14,6,6,1,9,4,5,12,2,2,0,0,2.25,2.98,3.81,2.75,1.46
+la_liga,2024,la_liga_2024_153_girona_real_madrid,07/12/2024,Girona,Real Madrid,0,3,0,1,10,10,4,7,6,3,6,7,3,2,0,0,4.56,4.01,1.73,1.62,2.31
+la_liga,2024,la_liga_2024_154_leganes_sociedad,08/12/2024,Leganes,Sociedad,0,3,0,1,11,15,2,5,5,3,12,15,2,2,0,0,4.61,3.15,1.94,2.78,1.45
+la_liga,2024,la_liga_2024_155_ath_bilbao_villarreal,08/12/2024,Ath Bilbao,Villarreal,2,0,1,0,12,11,4,1,3,3,15,10,2,1,0,0,1.96,3.7,3.72,1.82,2.01
+la_liga,2024,la_liga_2024_156_osasuna_alaves,08/12/2024,Osasuna,Alaves,2,2,0,1,16,6,8,3,8,3,13,14,4,3,0,0,2.08,3.35,3.72,2.32,1.62
+la_liga,2024,la_liga_2024_157_ath_madrid_sevilla,08/12/2024,Ath Madrid,Sevilla,4,3,1,2,14,4,9,3,5,3,11,8,4,3,0,0,1.38,4.84,8.57,1.82,2.01
+la_liga,2024,la_liga_2024_158_getafe_espanol,09/12/2024,Getafe,Espanol,1,0,1,0,15,9,6,1,3,3,14,15,3,6,0,0,1.8,3.17,5.61,2.93,1.41
+la_liga,2024,la_liga_2024_159_valladolid_valencia,13/12/2024,Valladolid,Valencia,1,0,1,0,2,14,1,2,1,7,10,10,4,3,1,0,3.23,3.05,2.44,2.54,1.52
+la_liga,2024,la_liga_2024_160_espanol_osasuna,14/12/2024,Espanol,Osasuna,0,0,0,0,9,6,3,0,5,4,13,13,3,1,0,0,2.82,3.14,2.66,2.29,1.63
+la_liga,2024,la_liga_2024_161_mallorca_girona,14/12/2024,Mallorca,Girona,2,1,1,1,8,13,2,1,2,4,10,14,5,2,1,0,2.36,3.05,3.37,2.42,1.57
+la_liga,2024,la_liga_2024_162_sevilla_celta,14/12/2024,Sevilla,Celta,1,0,0,0,8,10,3,2,3,4,12,9,7,3,0,0,2.27,3.31,3.28,2.01,1.83
+la_liga,2024,la_liga_2024_163_vallecano_real_madrid,14/12/2024,Vallecano,Real Madrid,3,3,2,2,14,13,5,6,4,3,18,8,4,2,0,0,5.79,4.01,1.6,1.84,1.99
+la_liga,2024,la_liga_2024_164_ath_madrid_getafe,15/12/2024,Ath Madrid,Getafe,1,0,0,0,11,7,3,1,8,3,13,15,3,1,0,0,1.4,4.3,9.61,2.29,1.62
+la_liga,2024,la_liga_2024_165_alaves_ath_bilbao,15/12/2024,Alaves,Ath Bilbao,1,1,0,1,6,9,3,2,2,4,14,17,2,2,0,0,3.66,3.15,2.17,2.47,1.54
+la_liga,2024,la_liga_2024_166_sociedad_las_palmas,15/12/2024,Sociedad,Las Palmas,0,0,0,0,15,9,4,3,8,6,17,12,2,3,0,0,1.42,4.31,8.55,2.15,1.71
+la_liga,2024,la_liga_2024_167_villarreal_betis,15/12/2024,Villarreal,Betis,1,2,0,1,17,10,4,4,5,5,19,10,5,2,0,1,1.79,3.89,4.3,1.66,2.23
+la_liga,2024,la_liga_2024_168_barcelona_leganes,15/12/2024,Barcelona,Leganes,0,1,0,1,20,6,4,4,8,2,5,13,0,2,0,0,1.13,8.85,18.38,1.31,3.33
+la_liga,2024,la_liga_2024_169_espanol_valencia,18/12/2024,Espanol,Valencia,1,1,1,0,10,14,3,4,4,7,13,11,1,0,0,0,2.65,2.95,3.02,2.57,1.5
+la_liga,2024,la_liga_2024_170_villarreal_vallecano,18/12/2024,Villarreal,Vallecano,1,1,1,1,14,18,5,3,7,7,10,15,4,3,1,0,1.83,3.65,4.4,1.86,1.97
+la_liga,2024,la_liga_2024_171_girona_valladolid,20/12/2024,Girona,Valladolid,3,0,2,0,23,1,7,1,9,1,13,7,3,1,0,0,1.39,4.83,8.26,1.77,2.06
+la_liga,2024,la_liga_2024_172_getafe_mallorca,21/12/2024,Getafe,Mallorca,0,1,0,0,18,9,5,2,3,0,19,13,4,3,0,0,2.31,2.76,3.93,3.46,1.3
+la_liga,2024,la_liga_2024_173_celta_sociedad,21/12/2024,Celta,Sociedad,2,0,2,0,11,7,7,1,5,7,19,13,3,5,0,0,2.92,3.11,2.6,2.37,1.59
+la_liga,2024,la_liga_2024_174_osasuna_ath_bilbao,21/12/2024,Osasuna,Ath Bilbao,1,2,1,1,6,13,3,8,4,4,10,13,0,1,0,0,3.76,3.2,2.12,2.33,1.6
+la_liga,2024,la_liga_2024_175_barcelona_ath_madrid,21/12/2024,Barcelona,Ath Madrid,1,2,1,0,19,5,7,4,11,3,11,8,0,3,0,0,1.89,3.88,3.85,1.58,2.38
+la_liga,2024,la_liga_2024_176_valencia_alaves,22/12/2024,Valencia,Alaves,2,2,0,1,8,11,3,3,5,4,20,15,2,1,0,0,2.28,3.04,3.52,2.63,1.48
+la_liga,2024,la_liga_2024_177_real_madrid_sevilla,22/12/2024,Real Madrid,Sevilla,4,2,3,1,16,10,8,5,6,6,5,14,1,2,0,0,1.34,5.53,8.21,1.51,2.52
+la_liga,2024,la_liga_2024_178_las_palmas_espanol,22/12/2024,Las Palmas,Espanol,1,0,0,0,10,9,4,2,2,2,9,16,4,2,0,0,1.84,3.54,4.45,2.09,1.74
+la_liga,2024,la_liga_2024_179_leganes_villarreal,22/12/2024,Leganes,Villarreal,2,5,2,2,5,18,3,9,1,5,17,15,1,2,2,0,4.1,3.47,1.94,1.99,1.83
+la_liga,2024,la_liga_2024_180_betis_vallecano,22/12/2024,Betis,Vallecano,1,1,1,0,14,10,5,4,5,5,9,14,0,4,0,0,1.8,3.54,4.69,2.22,1.67
+la_liga,2024,la_liga_2024_181_valencia_real_madrid,03/01/2025,Valencia,Real Madrid,1,2,1,0,8,17,5,5,2,5,16,9,2,3,0,1,7.11,4.67,1.44,1.65,2.23
+la_liga,2024,la_liga_2024_182_vallecano_celta,10/01/2025,Vallecano,Celta,2,1,1,1,8,23,5,7,3,3,18,9,2,3,0,1,2.81,3.07,2.74,2.22,1.66
+la_liga,2024,la_liga_2024_183_alaves_girona,11/01/2025,Alaves,Girona,0,1,0,0,11,3,2,1,6,3,16,11,1,4,0,0,2.77,3.13,2.7,2.18,1.68
+la_liga,2024,la_liga_2024_184_valladolid_betis,11/01/2025,Valladolid,Betis,1,0,0,0,12,14,1,3,1,8,21,10,2,4,0,0,4.48,3.47,1.85,2.12,1.72
+la_liga,2024,la_liga_2024_185_espanol_leganes,11/01/2025,Espanol,Leganes,1,1,1,1,15,14,5,6,8,4,15,19,2,2,0,1,2.09,3.03,4.07,2.76,1.44
+la_liga,2024,la_liga_2024_186_sevilla_valencia,11/01/2025,Sevilla,Valencia,1,1,0,0,15,5,5,1,10,1,16,8,1,2,0,0,2.0,3.42,3.85,2.28,1.63
+la_liga,2024,la_liga_2024_187_las_palmas_getafe,12/01/2025,Las Palmas,Getafe,1,2,0,0,15,12,7,3,4,5,14,17,2,3,0,0,2.49,2.93,3.24,2.67,1.46
+la_liga,2024,la_liga_2024_188_ath_madrid_osasuna,12/01/2025,Ath Madrid,Osasuna,1,0,0,0,9,6,5,1,4,0,8,14,2,0,0,0,1.31,5.3,10.29,1.78,2.04
+la_liga,2024,la_liga_2024_189_sociedad_villarreal,13/01/2025,Sociedad,Villarreal,1,0,0,0,6,15,3,5,3,7,17,6,4,2,0,0,1.94,3.48,4.0,2.02,1.8
+la_liga,2024,la_liga_2024_190_espanol_valladolid,17/01/2025,Espanol,Valladolid,2,1,1,0,12,11,4,4,1,7,13,16,2,2,0,0,1.81,3.36,5.12,2.32,1.62
+la_liga,2024,la_liga_2024_191_girona_sevilla,18/01/2025,Girona,Sevilla,1,2,1,0,7,14,4,6,7,4,6,15,0,4,0,0,1.94,3.55,3.96,1.96,1.85
+la_liga,2024,la_liga_2024_192_leganes_ath_madrid,18/01/2025,Leganes,Ath Madrid,1,0,0,0,9,19,3,4,2,9,16,6,1,3,0,0,7.03,4.15,1.5,2.09,1.74
+la_liga,2024,la_liga_2024_193_betis_alaves,18/01/2025,Betis,Alaves,1,3,1,1,7,9,2,5,2,3,12,24,4,5,1,0,1.75,3.68,4.81,2.13,1.72
+la_liga,2024,la_liga_2024_194_getafe_barcelona,18/01/2025,Getafe,Barcelona,1,1,1,1,10,21,4,5,2,10,9,9,3,2,0,0,6.51,4.35,1.5,1.76,2.06
+la_liga,2024,la_liga_2024_195_celta_ath_bilbao,19/01/2025,Celta,Ath Bilbao,1,2,0,0,3,14,1,6,3,4,14,6,0,0,0,0,2.83,3.14,2.64,2.31,1.61
+la_liga,2024,la_liga_2024_196_real_madrid_las_palmas,19/01/2025,Real Madrid,Las Palmas,4,1,3,1,26,6,13,2,8,2,11,13,0,1,0,1,1.15,8.44,16.41,1.3,3.39
+la_liga,2024,la_liga_2024_197_osasuna_vallecano,19/01/2025,Osasuna,Vallecano,1,1,0,1,12,8,3,3,6,3,9,13,3,2,0,0,2.18,3.11,3.68,2.5,1.53
+la_liga,2024,la_liga_2024_198_valencia_sociedad,19/01/2025,Valencia,Sociedad,1,0,1,0,7,9,2,3,4,7,10,12,3,4,0,0,3.1,3.05,2.51,2.82,1.41
+la_liga,2024,la_liga_2024_199_villarreal_mallorca,20/01/2025,Villarreal,Mallorca,4,0,4,0,14,9,7,2,6,5,9,12,1,3,0,0,1.73,3.68,5.04,2.04,1.77
+la_liga,2024,la_liga_2024_200_las_palmas_osasuna,24/01/2025,Las Palmas,Osasuna,1,1,0,0,16,16,7,4,4,2,14,17,7,8,1,0,2.52,3.13,3.04,2.19,1.68
+la_liga,2024,la_liga_2024_201_mallorca_betis,25/01/2025,Mallorca,Betis,0,1,0,0,16,8,3,3,4,4,12,18,2,2,1,0,2.3,3.05,3.48,2.53,1.52
+la_liga,2024,la_liga_2024_202_ath_madrid_villarreal,25/01/2025,Ath Madrid,Villarreal,1,1,0,1,20,11,8,1,5,6,10,14,4,2,0,0,1.7,4.09,4.61,1.63,2.28
+la_liga,2024,la_liga_2024_203_sevilla_espanol,25/01/2025,Sevilla,Espanol,1,1,0,1,25,6,4,1,5,1,13,14,1,4,0,0,1.71,3.75,5.06,2.16,1.7
+la_liga,2024,la_liga_2024_204_valladolid_real_madrid,25/01/2025,Valladolid,Real Madrid,0,3,0,1,6,20,2,4,1,7,11,12,3,3,1,0,10.64,6.31,1.25,1.43,2.77
+la_liga,2024,la_liga_2024_205_vallecano_girona,26/01/2025,Vallecano,Girona,2,1,0,0,17,12,7,5,4,1,19,9,3,1,0,0,2.72,3.06,2.82,2.2,1.68
+la_liga,2024,la_liga_2024_206_sociedad_getafe,26/01/2025,Sociedad,Getafe,0,3,0,0,13,13,4,4,5,2,11,15,3,6,0,0,1.76,3.21,5.81,3.06,1.37
+la_liga,2024,la_liga_2024_207_ath_bilbao_leganes,26/01/2025,Ath Bilbao,Leganes,0,0,0,0,29,5,3,2,16,1,10,8,1,1,0,0,1.38,4.67,9.14,2.05,1.77
+la_liga,2024,la_liga_2024_208_barcelona_valencia,26/01/2025,Barcelona,Valencia,7,1,5,0,22,7,11,2,14,4,10,12,0,1,0,0,1.2,7.06,12.73,1.39,2.91
+la_liga,2024,la_liga_2024_209_alaves_celta,27/01/2025,Alaves,Celta,1,1,1,0,3,5,1,2,3,4,15,14,2,3,0,0,2.66,3.1,2.85,2.2,1.67
+la_liga,2024,la_liga_2024_210_leganes_vallecano,31/01/2025,Leganes,Vallecano,0,1,0,0,5,19,1,3,2,9,7,19,2,4,1,0,3.23,2.99,2.48,2.51,1.53
+la_liga,2024,la_liga_2024_211_getafe_sevilla,01/02/2025,Getafe,Sevilla,0,0,0,0,7,13,1,1,6,5,15,12,4,6,0,0,2.49,2.92,3.3,2.81,1.42
+la_liga,2024,la_liga_2024_212_villarreal_valladolid,01/02/2025,Villarreal,Valladolid,5,1,1,0,22,8,8,2,3,6,9,14,1,2,0,0,1.23,6.59,11.97,1.45,2.69
+la_liga,2024,la_liga_2024_213_ath_madrid_mallorca,01/02/2025,Ath Madrid,Mallorca,2,0,1,0,17,10,5,1,10,4,9,14,2,3,0,0,1.41,4.34,8.9,2.22,1.66
+la_liga,2024,la_liga_2024_214_espanol_real_madrid,01/02/2025,Espanol,Real Madrid,1,0,0,0,5,21,2,7,1,8,14,3,2,0,0,0,9.57,5.49,1.31,1.59,2.36
+la_liga,2024,la_liga_2024_215_barcelona_alaves,02/02/2025,Barcelona,Alaves,1,0,0,0,11,3,4,0,5,2,8,20,5,2,0,0,1.19,7.52,13.89,1.35,3.1
+la_liga,2024,la_liga_2024_216_valencia_celta,02/02/2025,Valencia,Celta,2,1,1,0,8,3,5,2,5,2,9,17,1,2,0,0,2.37,3.13,3.24,2.28,1.63
+la_liga,2024,la_liga_2024_217_osasuna_sociedad,02/02/2025,Osasuna,Sociedad,2,1,1,0,11,13,4,3,3,5,10,8,3,3,0,0,3.02,2.97,2.6,2.65,1.46
+la_liga,2024,la_liga_2024_218_betis_ath_bilbao,02/02/2025,Betis,Ath Bilbao,2,2,2,1,10,12,6,4,3,7,10,20,3,1,0,0,2.98,3.26,2.46,2.22,1.66
+la_liga,2024,la_liga_2024_219_girona_las_palmas,03/02/2025,Girona,Las Palmas,2,1,1,0,12,10,4,2,11,3,12,12,2,2,0,0,1.62,4.1,5.29,1.81,2.01
+la_liga,2024,la_liga_2024_220_vallecano_valladolid,07/02/2025,Vallecano,Valladolid,1,0,0,0,20,8,6,3,4,2,11,15,2,2,0,0,1.49,4.25,7.3,2.05,1.79
+la_liga,2024,la_liga_2024_221_celta_betis,08/02/2025,Celta,Betis,3,2,0,2,14,12,6,5,4,7,11,11,3,5,0,0,2.31,3.35,3.16,2.1,1.75
+la_liga,2024,la_liga_2024_222_ath_bilbao_girona,08/02/2025,Ath Bilbao,Girona,3,0,2,0,23,3,8,1,11,2,7,12,0,4,0,0,1.67,3.84,5.29,2.09,1.76
+la_liga,2024,la_liga_2024_223_las_palmas_villarreal,08/02/2025,Las Palmas,Villarreal,1,2,0,0,20,9,4,4,6,5,12,12,6,3,0,0,4.51,4.04,1.73,1.64,2.28
+la_liga,2024,la_liga_2024_224_real_madrid_ath_madrid,08/02/2025,Real Madrid,Ath Madrid,1,1,0,1,23,10,9,1,6,1,14,13,1,3,0,0,1.88,3.68,4.13,1.79,2.04
+la_liga,2024,la_liga_2024_225_alaves_getafe,09/02/2025,Alaves,Getafe,0,1,0,1,12,4,4,3,8,3,16,16,2,6,0,0,2.32,2.9,3.63,3.04,1.37
+la_liga,2024,la_liga_2024_226_valencia_leganes,09/02/2025,Valencia,Leganes,2,0,2,0,18,12,4,4,9,3,14,9,1,1,0,0,1.74,3.43,5.39,2.53,1.52
+la_liga,2024,la_liga_2024_227_sociedad_espanol,09/02/2025,Sociedad,Espanol,2,1,1,0,13,4,3,1,6,0,11,17,1,2,0,0,1.59,3.81,6.29,2.25,1.65
+la_liga,2024,la_liga_2024_228_sevilla_barcelona,09/02/2025,Sevilla,Barcelona,1,4,1,1,8,10,4,6,5,6,14,6,5,2,0,1,5.47,4.63,1.54,1.45,2.69
+la_liga,2024,la_liga_2024_229_mallorca_osasuna,10/02/2025,Mallorca,Osasuna,1,1,0,0,10,19,2,4,7,11,7,11,1,4,0,0,2.02,3.15,4.22,2.76,1.44
+la_liga,2024,la_liga_2024_230_girona_getafe,14/02/2025,Girona,Getafe,1,2,0,1,14,10,4,6,3,3,11,23,2,3,1,0,1.98,3.22,4.44,2.61,1.51
+la_liga,2024,la_liga_2024_231_leganes_alaves,15/02/2025,Leganes,Alaves,3,3,2,1,8,16,3,7,3,2,18,15,4,5,1,0,3.19,2.92,2.57,2.78,1.44
+la_liga,2024,la_liga_2024_232_osasuna_real_madrid,15/02/2025,Osasuna,Real Madrid,1,1,0,1,11,17,4,6,6,2,16,7,3,1,0,1,5.58,4.32,1.57,1.62,2.31
+la_liga,2024,la_liga_2024_233_ath_madrid_celta,15/02/2025,Ath Madrid,Celta,1,1,0,0,9,11,3,4,2,7,8,18,3,5,1,0,1.42,4.64,7.71,1.82,2.02
+la_liga,2024,la_liga_2024_234_villarreal_valencia,15/02/2025,Villarreal,Valencia,1,1,1,0,13,12,4,3,4,5,6,17,0,5,0,0,1.53,4.43,5.96,1.7,2.18
+la_liga,2024,la_liga_2024_235_espanol_ath_bilbao,16/02/2025,Espanol,Ath Bilbao,1,1,0,0,12,14,4,4,2,7,12,8,1,1,0,0,5.22,3.52,1.75,2.35,1.61
+la_liga,2024,la_liga_2024_236_valladolid_sevilla,16/02/2025,Valladolid,Sevilla,0,4,0,2,7,11,2,6,3,2,11,10,4,2,0,0,4.01,3.38,1.99,2.19,1.69
+la_liga,2024,la_liga_2024_237_mallorca_las_palmas,16/02/2025,Mallorca,Las Palmas,3,1,3,0,14,9,5,4,3,5,7,13,1,4,0,0,1.73,3.53,5.29,2.43,1.57
+la_liga,2024,la_liga_2024_238_betis_sociedad,16/02/2025,Betis,Sociedad,3,0,0,0,24,5,8,1,5,5,9,15,0,2,0,2,2.54,3.1,3.0,2.41,1.58
+la_liga,2024,la_liga_2024_239_barcelona_vallecano,17/02/2025,Barcelona,Vallecano,1,0,1,0,14,9,5,4,4,5,11,9,2,3,0,0,1.2,7.43,12.37,1.31,3.43
+la_liga,2024,la_liga_2024_240_celta_osasuna,21/02/2025,Celta,Osasuna,1,0,0,0,12,18,5,1,5,4,11,13,1,0,0,0,1.7,3.8,5.2,1.96,1.89
+la_liga,2024,la_liga_2024_241_alaves_espanol,22/02/2025,Alaves,Espanol,0,1,0,0,15,9,5,2,7,0,13,17,2,2,0,0,1.8,3.38,5.22,2.62,1.5
+la_liga,2024,la_liga_2024_242_vallecano_villarreal,22/02/2025,Vallecano,Villarreal,0,1,0,0,10,10,5,5,3,5,15,12,1,4,1,0,2.98,3.42,2.39,1.79,2.04
+la_liga,2024,la_liga_2024_243_valencia_ath_madrid,22/02/2025,Valencia,Ath Madrid,0,3,0,2,18,11,2,3,7,0,18,16,1,3,0,0,4.35,3.42,1.91,2.22,1.68
+la_liga,2024,la_liga_2024_244_las_palmas_barcelona,22/02/2025,Las Palmas,Barcelona,0,2,0,0,10,15,2,5,5,3,13,4,1,1,0,0,10.33,6.79,1.24,1.3,3.5
+la_liga,2024,la_liga_2024_245_ath_bilbao_valladolid,23/02/2025,Ath Bilbao,Valladolid,7,1,4,0,29,5,16,3,4,4,10,5,2,3,0,1,1.16,7.34,18.55,1.63,2.3
+la_liga,2024,la_liga_2024_246_real_madrid_girona,23/02/2025,Real Madrid,Girona,2,0,1,0,22,6,5,2,11,5,1,7,0,2,0,0,1.28,6.26,9.32,1.38,2.97
+la_liga,2024,la_liga_2024_247_getafe_betis,23/02/2025,Getafe,Betis,1,2,0,1,10,13,4,6,2,5,17,20,3,0,1,1,2.61,3.06,2.95,2.63,1.49
+la_liga,2024,la_liga_2024_248_sociedad_leganes,23/02/2025,Sociedad,Leganes,3,0,1,0,12,8,5,2,3,3,13,13,3,3,0,0,1.55,3.79,7.03,2.45,1.56
+la_liga,2024,la_liga_2024_249_sevilla_mallorca,24/02/2025,Sevilla,Mallorca,1,1,1,0,19,13,4,2,4,4,11,12,1,3,0,0,2.09,3.17,3.93,2.57,1.51
+la_liga,2024,la_liga_2024_250_valladolid_las_palmas,28/02/2025,Valladolid,Las Palmas,1,1,0,1,23,4,7,3,13,4,11,8,2,1,0,1,3.14,3.21,2.43,2.22,1.68
+la_liga,2024,la_liga_2024_251_girona_celta,01/03/2025,Girona,Celta,2,2,1,1,9,10,6,6,4,2,8,17,0,0,0,0,2.17,3.51,3.31,1.85,1.99
+la_liga,2024,la_liga_2024_252_vallecano_sevilla,01/03/2025,Vallecano,Sevilla,1,1,0,0,20,10,8,5,6,6,14,9,1,0,0,0,2.3,3.23,3.31,2.23,1.67
+la_liga,2024,la_liga_2024_253_betis_real_madrid,01/03/2025,Betis,Real Madrid,2,1,1,1,18,9,3,2,9,2,17,12,3,4,0,0,4.41,4.07,1.74,1.52,2.52
+la_liga,2024,la_liga_2024_254_ath_madrid_ath_bilbao,01/03/2025,Ath Madrid,Ath Bilbao,1,0,0,0,12,15,4,3,6,2,7,8,2,3,0,0,2.04,3.44,3.78,2.17,1.7
+la_liga,2024,la_liga_2024_255_leganes_getafe,02/03/2025,Leganes,Getafe,1,0,0,0,5,9,1,0,2,6,15,15,1,1,0,0,3.21,2.74,2.67,3.21,1.34
+la_liga,2024,la_liga_2024_256_barcelona_sociedad,02/03/2025,Barcelona,Sociedad,4,0,2,0,33,0,10,0,12,0,15,6,0,0,0,1,1.26,5.97,11.44,1.56,2.42
+la_liga,2024,la_liga_2024_257_mallorca_alaves,02/03/2025,Mallorca,Alaves,1,1,1,0,15,19,4,7,3,9,20,14,0,2,0,0,2.27,3.05,3.57,2.87,1.41
+la_liga,2024,la_liga_2024_258_osasuna_valencia,02/03/2025,Osasuna,Valencia,3,3,3,2,12,12,5,5,3,3,10,7,2,1,0,0,2.31,3.16,3.32,2.37,1.6
+la_liga,2024,la_liga_2024_259_celta_leganes,08/03/2025,Celta,Leganes,2,1,2,1,7,12,4,6,2,5,10,9,3,2,0,0,1.56,4.04,6.37,2.04,1.8
+la_liga,2024,la_liga_2024_260_alaves_villarreal,08/03/2025,Alaves,Villarreal,1,0,1,0,5,24,3,2,1,6,11,13,3,1,2,0,3.07,3.32,2.4,2.05,1.79
+la_liga,2024,la_liga_2024_261_valencia_valladolid,08/03/2025,Valencia,Valladolid,2,1,1,1,17,11,4,4,5,4,11,10,1,3,0,0,1.39,4.5,9.27,2.12,1.73
+la_liga,2024,la_liga_2024_262_getafe_ath_madrid,09/03/2025,Getafe,Ath Madrid,2,1,0,0,11,4,3,2,4,4,10,14,6,2,0,1,4.48,3.1,1.98,2.72,1.45
+la_liga,2024,la_liga_2024_263_real_madrid_vallecano,09/03/2025,Real Madrid,Vallecano,2,1,2,1,10,20,5,6,4,6,12,17,3,1,0,0,1.28,5.97,10.23,1.54,2.47
+la_liga,2024,la_liga_2024_264_ath_bilbao_mallorca,09/03/2025,Ath Bilbao,Mallorca,1,1,0,0,8,9,2,2,3,3,6,13,1,3,0,0,1.63,3.73,6.01,2.18,1.69
+la_liga,2024,la_liga_2024_265_betis_las_palmas,09/03/2025,Betis,Las Palmas,1,0,0,0,14,8,6,1,11,1,12,14,2,8,0,1,1.45,4.61,7.02,1.73,2.13
+la_liga,2024,la_liga_2024_266_sociedad_sevilla,09/03/2025,Sociedad,Sevilla,0,1,0,0,7,9,2,4,6,3,14,12,2,1,0,0,2.2,3.15,3.59,2.4,1.58
+la_liga,2024,la_liga_2024_267_espanol_girona,10/03/2025,Espanol,Girona,1,1,0,0,7,18,4,4,4,9,11,13,3,3,0,0,3.13,3.22,2.39,2.21,1.67
+la_liga,2024,la_liga_2024_268_las_palmas_alaves,14/03/2025,Las Palmas,Alaves,2,2,0,1,14,9,7,3,4,5,10,22,5,5,0,0,2.91,3.02,2.7,2.45,1.54
+la_liga,2024,la_liga_2024_269_valladolid_celta,15/03/2025,Valladolid,Celta,0,1,0,0,5,10,2,1,3,4,9,15,3,3,0,0,5.07,3.88,1.69,1.93,1.89
+la_liga,2024,la_liga_2024_270_mallorca_espanol,15/03/2025,Mallorca,Espanol,2,1,0,0,20,2,7,0,6,2,10,12,0,2,0,0,1.82,3.37,4.91,2.54,1.53
+la_liga,2024,la_liga_2024_271_villarreal_real_madrid,15/03/2025,Villarreal,Real Madrid,1,2,1,2,23,9,10,5,11,4,17,3,2,1,0,0,3.05,3.9,2.16,1.47,2.66
+la_liga,2024,la_liga_2024_272_girona_valencia,15/03/2025,Girona,Valencia,1,1,0,0,14,12,4,2,9,4,12,5,2,1,0,0,1.98,3.53,3.87,2.05,1.78
+la_liga,2024,la_liga_2024_273_leganes_betis,16/03/2025,Leganes,Betis,2,3,2,0,10,21,4,6,3,7,16,5,2,1,0,0,3.77,3.33,2.06,2.22,1.67
+la_liga,2024,la_liga_2024_274_sevilla_ath_bilbao,16/03/2025,Sevilla,Ath Bilbao,0,1,0,0,11,9,4,4,4,6,13,12,4,2,0,0,2.96,3.15,2.54,2.35,1.6
+la_liga,2024,la_liga_2024_275_osasuna_getafe,16/03/2025,Osasuna,Getafe,1,2,1,0,12,7,4,4,3,2,19,15,2,3,0,1,2.32,2.94,3.6,3.02,1.38
+la_liga,2024,la_liga_2024_276_vallecano_sociedad,16/03/2025,Vallecano,Sociedad,2,2,0,1,10,8,5,4,4,4,16,9,3,2,0,0,2.49,3.08,3.12,2.67,1.47
+la_liga,2024,la_liga_2024_277_ath_madrid_barcelona,16/03/2025,Ath Madrid,Barcelona,2,4,1,0,7,13,2,6,6,6,10,11,1,3,0,0,3.03,3.64,2.25,1.57,2.4
+la_liga,2024,la_liga_2024_278_barcelona_osasuna,27/03/2025,Barcelona,Osasuna,3,0,2,0,19,4,5,0,8,4,7,14,1,3,0,0,1.28,6.34,8.82,1.33,3.25
+la_liga,2024,la_liga_2024_279_sociedad_valladolid,29/03/2025,Sociedad,Valladolid,2,1,1,0,12,12,2,5,3,6,20,10,2,3,0,0,1.34,4.81,10.49,2.05,1.78
+la_liga,2024,la_liga_2024_280_espanol_ath_madrid,29/03/2025,Espanol,Ath Madrid,1,1,0,1,8,13,1,2,4,3,12,14,2,1,0,0,5.87,3.81,1.62,2.19,1.68
+la_liga,2024,la_liga_2024_281_alaves_vallecano,29/03/2025,Alaves,Vallecano,0,2,0,1,12,11,4,5,8,5,14,12,3,5,0,0,2.19,2.99,3.89,2.73,1.45
+la_liga,2024,la_liga_2024_282_real_madrid_leganes,29/03/2025,Real Madrid,Leganes,3,2,1,2,24,10,10,4,8,3,9,13,1,4,0,0,1.15,8.37,17.3,1.35,3.1
+la_liga,2024,la_liga_2024_283_getafe_villarreal,30/03/2025,Getafe,Villarreal,1,2,1,2,11,9,4,3,3,1,16,21,1,4,0,0,3.28,3.14,2.35,2.36,1.59
+la_liga,2024,la_liga_2024_284_barcelona_girona,30/03/2025,Barcelona,Girona,4,1,1,0,21,4,9,2,10,2,8,11,0,1,0,0,1.24,6.72,10.69,1.31,3.34
+la_liga,2024,la_liga_2024_285_ath_bilbao_osasuna,30/03/2025,Ath Bilbao,Osasuna,0,0,0,0,11,5,5,2,3,4,12,12,1,1,0,0,1.46,4.33,7.33,1.95,1.86
+la_liga,2024,la_liga_2024_286_valencia_mallorca,30/03/2025,Valencia,Mallorca,1,0,0,0,8,8,2,2,4,5,16,15,5,5,0,0,2.17,3.15,3.69,2.58,1.5
+la_liga,2024,la_liga_2024_287_betis_sevilla,30/03/2025,Betis,Sevilla,2,1,2,1,11,6,3,2,2,2,10,22,4,4,0,0,1.89,3.52,4.26,2.03,1.81
+la_liga,2024,la_liga_2024_288_celta_las_palmas,31/03/2025,Celta,Las Palmas,1,1,1,0,19,4,7,2,4,2,17,5,3,0,0,0,1.57,4.17,5.64,1.78,2.04
+la_liga,2024,la_liga_2024_289_vallecano_espanol,04/04/2025,Vallecano,Espanol,0,4,0,2,16,15,5,7,8,4,8,10,2,2,0,0,1.69,3.55,5.88,2.45,1.55
+la_liga,2024,la_liga_2024_290_girona_alaves,05/04/2025,Girona,Alaves,0,1,0,0,11,14,6,3,1,5,9,16,1,4,0,0,2.08,3.36,3.69,2.13,1.71
+la_liga,2024,la_liga_2024_291_real_madrid_valencia,05/04/2025,Real Madrid,Valencia,1,2,0,1,21,10,9,2,9,4,10,13,0,4,0,0,1.3,5.68,9.44,1.51,2.52
+la_liga,2024,la_liga_2024_292_mallorca_celta,05/04/2025,Mallorca,Celta,1,2,1,0,7,10,2,4,4,2,9,11,3,0,0,0,2.68,3.09,2.85,2.34,1.59
+la_liga,2024,la_liga_2024_293_barcelona_betis,05/04/2025,Barcelona,Betis,1,1,1,1,13,6,5,2,9,3,16,12,2,1,0,0,1.37,5.5,7.35,1.35,3.08
+la_liga,2024,la_liga_2024_294_las_palmas_sociedad,06/04/2025,Las Palmas,Sociedad,1,3,0,1,13,13,5,8,5,4,7,10,0,2,0,0,3.18,3.18,2.38,2.39,1.57
+la_liga,2024,la_liga_2024_295_sevilla_ath_madrid,06/04/2025,Sevilla,Ath Madrid,1,2,1,1,11,13,6,5,7,7,14,12,1,4,0,0,3.41,3.29,2.21,2.24,1.65
+la_liga,2024,la_liga_2024_296_valladolid_getafe,06/04/2025,Valladolid,Getafe,0,4,0,3,5,16,0,9,3,4,11,17,3,1,1,0,4.62,3.18,1.93,2.76,1.43
+la_liga,2024,la_liga_2024_297_villarreal_ath_bilbao,06/04/2025,Villarreal,Ath Bilbao,0,0,0,0,12,11,4,2,6,5,9,13,0,1,1,0,2.22,3.38,3.28,1.87,1.95
+la_liga,2024,la_liga_2024_298_leganes_osasuna,07/04/2025,Leganes,Osasuna,1,1,0,0,13,14,7,6,4,8,18,14,3,3,0,0,2.71,3.1,2.79,2.3,1.61
+la_liga,2024,la_liga_2024_299_valencia_sevilla,11/04/2025,Valencia,Sevilla,1,0,1,0,8,12,6,5,3,3,10,18,3,2,0,0,2.34,3.12,3.36,2.31,1.63
+la_liga,2024,la_liga_2024_300_sociedad_mallorca,12/04/2025,Sociedad,Mallorca,0,2,0,1,15,7,4,3,8,2,11,12,3,1,0,0,1.76,3.37,5.38,2.55,1.51
+la_liga,2024,la_liga_2024_301_getafe_las_palmas,12/04/2025,Getafe,Las Palmas,1,3,1,0,11,10,6,5,3,2,14,15,0,2,1,0,1.78,3.44,5.1,2.45,1.55
+la_liga,2024,la_liga_2024_302_celta_espanol,12/04/2025,Celta,Espanol,0,2,0,1,16,5,6,3,13,5,14,10,2,2,0,0,1.64,3.81,5.69,2.01,1.82
+la_liga,2024,la_liga_2024_303_leganes_barcelona,12/04/2025,Leganes,Barcelona,0,1,0,0,6,12,1,3,4,8,10,4,2,1,0,0,8.41,5.94,1.31,1.43,2.74
+la_liga,2024,la_liga_2024_304_osasuna_girona,13/04/2025,Osasuna,Girona,2,1,1,0,13,18,6,8,4,4,17,15,2,0,0,0,2.46,3.2,3.02,2.1,1.74
+la_liga,2024,la_liga_2024_305_alaves_real_madrid,13/04/2025,Alaves,Real Madrid,0,1,0,1,13,11,6,4,4,4,21,12,4,4,1,1,5.23,4.13,1.62,1.71,2.14
+la_liga,2024,la_liga_2024_306_betis_villarreal,13/04/2025,Betis,Villarreal,1,2,1,1,24,8,5,2,5,5,4,13,0,4,0,0,2.32,3.52,2.98,1.72,2.12
+la_liga,2024,la_liga_2024_307_ath_bilbao_vallecano,13/04/2025,Ath Bilbao,Vallecano,3,1,0,1,13,11,4,3,7,1,12,7,4,3,0,0,1.76,3.44,5.16,2.32,1.61
+la_liga,2024,la_liga_2024_308_ath_madrid_valladolid,14/04/2025,Ath Madrid,Valladolid,4,2,2,1,24,6,9,3,5,1,11,8,1,1,0,0,1.13,8.56,19.92,1.46,2.65
+la_liga,2024,la_liga_2024_309_espanol_getafe,18/04/2025,Espanol,Getafe,1,0,1,0,9,9,3,4,6,8,12,15,0,2,0,1,2.8,2.74,3.05,2.94,1.39
+la_liga,2024,la_liga_2024_310_vallecano_valencia,19/04/2025,Vallecano,Valencia,1,1,1,0,11,10,4,3,5,2,18,13,3,1,0,0,2.29,3.13,3.37,2.37,1.58
+la_liga,2024,la_liga_2024_311_barcelona_celta,19/04/2025,Barcelona,Celta,4,3,1,1,18,11,6,8,4,1,10,13,2,2,0,0,1.3,6.1,8.61,1.33,3.21
+la_liga,2024,la_liga_2024_312_mallorca_leganes,19/04/2025,Mallorca,Leganes,0,0,0,0,11,15,1,1,4,4,17,15,2,1,0,0,1.88,3.15,4.93,2.54,1.51
+la_liga,2024,la_liga_2024_313_las_palmas_ath_madrid,19/04/2025,Las Palmas,Ath Madrid,1,0,0,0,8,7,2,2,4,4,13,13,3,1,0,0,5.79,4.2,1.56,1.8,2.02
+la_liga,2024,la_liga_2024_314_valladolid_osasuna,20/04/2025,Valladolid,Osasuna,2,3,0,2,12,11,5,6,5,2,12,17,2,0,0,0,4.5,3.49,1.84,2.05,1.77
+la_liga,2024,la_liga_2024_315_villarreal_sociedad,20/04/2025,Villarreal,Sociedad,2,2,1,1,20,4,5,4,10,4,12,12,5,1,0,0,1.7,3.85,4.94,1.93,1.88
+la_liga,2024,la_liga_2024_316_sevilla_alaves,20/04/2025,Sevilla,Alaves,1,1,1,1,10,11,2,3,3,6,10,11,2,2,0,0,2.07,3.07,4.14,2.67,1.46
+la_liga,2024,la_liga_2024_317_real_madrid_ath_bilbao,20/04/2025,Real Madrid,Ath Bilbao,1,0,0,0,22,3,7,1,14,1,7,15,1,2,0,0,1.67,3.94,5.04,1.71,2.13
+la_liga,2024,la_liga_2024_318_girona_betis,21/04/2025,Girona,Betis,1,3,0,3,11,17,5,9,8,9,13,11,3,2,0,0,2.83,3.39,2.49,1.99,1.82
+la_liga,2024,la_liga_2024_319_valencia_espanol,22/04/2025,Valencia,Espanol,1,1,0,1,16,8,7,3,6,4,7,7,2,1,0,0,1.98,3.34,4.13,2.18,1.69
+la_liga,2024,la_liga_2024_320_barcelona_mallorca,22/04/2025,Barcelona,Mallorca,1,0,0,0,40,4,13,0,13,2,10,7,0,1,0,0,1.23,6.61,12.07,1.48,2.63
+la_liga,2024,la_liga_2024_321_ath_bilbao_las_palmas,23/04/2025,Ath Bilbao,Las Palmas,1,0,1,0,13,10,4,2,3,3,13,9,1,3,0,0,1.36,5.0,8.48,1.75,2.09
+la_liga,2024,la_liga_2024_322_celta_villarreal,23/04/2025,Celta,Villarreal,3,0,1,0,21,4,9,1,6,3,16,10,2,1,0,1,2.52,3.41,2.77,1.68,2.18
+la_liga,2024,la_liga_2024_323_alaves_sociedad,23/04/2025,Alaves,Sociedad,1,0,0,0,10,6,1,0,6,6,17,17,4,5,0,0,2.37,3.04,3.32,2.62,1.48
+la_liga,2024,la_liga_2024_324_getafe_real_madrid,23/04/2025,Getafe,Real Madrid,0,1,0,1,20,14,6,7,4,4,15,7,3,1,0,0,4.7,3.64,1.77,2.0,1.82
+la_liga,2024,la_liga_2024_325_leganes_girona,24/04/2025,Leganes,Girona,1,1,0,0,7,8,1,3,4,5,16,18,4,2,1,0,2.76,3.05,2.77,2.25,1.64
+la_liga,2024,la_liga_2024_326_osasuna_sevilla,24/04/2025,Osasuna,Sevilla,1,0,1,0,9,12,2,3,4,4,14,13,4,2,0,1,2.49,3.03,3.15,2.31,1.61
+la_liga,2024,la_liga_2024_327_ath_madrid_vallecano,24/04/2025,Ath Madrid,Vallecano,3,0,2,0,10,12,5,5,6,3,8,15,0,2,0,0,1.55,4.03,6.28,2.02,1.81
+la_liga,2024,la_liga_2024_328_betis_valladolid,24/04/2025,Betis,Valladolid,5,1,1,1,16,10,6,5,4,4,7,7,1,0,0,0,1.19,7.04,14.88,1.46,2.64
+la_liga,2024,la_liga_2024_329_villarreal_espanol,27/04/2025,Villarreal,Espanol,1,0,0,0,14,12,5,1,8,6,19,11,4,0,0,0,1.44,4.85,6.28,1.72,2.11
+la_liga,2024,la_liga_2024_330_vallecano_getafe,02/05/2025,Vallecano,Getafe,1,0,1,0,13,12,8,1,7,3,12,13,3,2,0,1,2.42,2.98,3.38,2.66,1.47
+la_liga,2024,la_liga_2024_331_alaves_ath_madrid,03/05/2025,Alaves,Ath Madrid,0,0,0,0,8,9,2,2,3,5,18,13,3,2,0,0,3.76,3.15,2.14,2.52,1.52
+la_liga,2024,la_liga_2024_332_villarreal_osasuna,03/05/2025,Villarreal,Osasuna,4,2,3,0,15,11,5,4,2,8,10,18,4,1,0,0,1.54,4.4,5.77,1.63,2.27
+la_liga,2024,la_liga_2024_333_las_palmas_valencia,03/05/2025,Las Palmas,Valencia,2,3,1,1,15,10,3,5,9,5,12,6,1,1,0,0,2.59,3.34,2.73,2.02,1.8
+la_liga,2024,la_liga_2024_334_valladolid_barcelona,03/05/2025,Valladolid,Barcelona,1,2,1,0,5,24,4,7,4,8,12,15,3,2,0,0,14.72,8.53,1.15,1.23,4.02
+la_liga,2024,la_liga_2024_335_real_madrid_celta,04/05/2025,Real Madrid,Celta,3,2,2,0,17,14,6,7,4,6,5,11,2,1,0,0,1.36,5.64,7.26,1.34,3.16
+la_liga,2024,la_liga_2024_336_sevilla_leganes,04/05/2025,Sevilla,Leganes,2,2,1,1,25,9,7,3,8,2,17,12,4,5,0,0,1.79,3.41,4.99,2.53,1.52
+la_liga,2024,la_liga_2024_337_espanol_betis,04/05/2025,Espanol,Betis,1,2,1,0,11,20,5,10,3,7,16,10,2,0,0,0,3.37,2.98,2.39,2.24,1.65
+la_liga,2024,la_liga_2024_338_sociedad_ath_bilbao,04/05/2025,Sociedad,Ath Bilbao,0,0,0,0,12,3,3,1,7,3,18,13,1,2,0,0,2.47,3.14,3.04,2.55,1.51
+la_liga,2024,la_liga_2024_339_girona_mallorca,05/05/2025,Girona,Mallorca,1,0,1,0,13,9,6,1,5,2,11,14,0,2,0,0,2.02,3.2,4.07,2.41,1.56
+la_liga,2024,la_liga_2024_340_las_palmas_vallecano,09/05/2025,Las Palmas,Vallecano,0,1,0,0,11,16,2,5,8,8,8,9,2,3,0,0,2.47,3.29,2.98,2.05,1.78
+la_liga,2024,la_liga_2024_341_valencia_getafe,10/05/2025,Valencia,Getafe,3,0,3,0,10,10,6,3,2,6,17,20,3,5,0,0,2.05,3.12,4.13,2.59,1.49
+la_liga,2024,la_liga_2024_342_celta_sevilla,10/05/2025,Celta,Sevilla,3,2,1,1,8,19,4,10,3,6,11,16,0,2,1,0,1.83,3.66,4.34,2.01,1.81
+la_liga,2024,la_liga_2024_343_girona_villarreal,10/05/2025,Girona,Villarreal,0,1,0,0,7,14,0,5,5,3,13,10,2,3,0,0,3.12,3.72,2.16,1.59,2.35
+la_liga,2024,la_liga_2024_344_mallorca_valladolid,10/05/2025,Mallorca,Valladolid,2,1,1,1,12,16,4,7,5,10,16,12,2,1,0,0,1.34,5.0,9.97,1.96,1.85
+la_liga,2024,la_liga_2024_345_ath_madrid_sociedad,10/05/2025,Ath Madrid,Sociedad,4,0,4,0,13,6,7,1,3,3,7,12,0,1,0,0,1.68,3.83,5.18,2.04,1.79
+la_liga,2024,la_liga_2024_346_leganes_espanol,11/05/2025,Leganes,Espanol,3,2,2,0,13,12,5,6,3,8,14,18,2,2,0,0,2.41,3.07,3.22,2.54,1.51
+la_liga,2024,la_liga_2024_347_barcelona_real_madrid,11/05/2025,Barcelona,Real Madrid,4,3,4,2,23,9,9,5,10,2,17,15,4,3,0,0,1.97,4.08,3.34,1.32,3.28
+la_liga,2024,la_liga_2024_348_ath_bilbao_alaves,11/05/2025,Ath Bilbao,Alaves,1,0,0,0,11,4,3,1,9,2,17,12,1,1,0,0,1.88,3.24,4.68,2.57,1.5
+la_liga,2024,la_liga_2024_349_betis_osasuna,11/05/2025,Betis,Osasuna,1,1,0,0,10,16,5,5,6,7,8,12,3,2,0,0,1.64,3.98,5.24,1.83,2.0
+la_liga,2024,la_liga_2024_350_valladolid_girona,13/05/2025,Valladolid,Girona,0,1,0,0,11,13,4,5,6,4,5,19,0,0,0,0,4.59,3.88,1.75,1.81,2.02
+la_liga,2024,la_liga_2024_351_sociedad_celta,13/05/2025,Sociedad,Celta,0,1,0,1,15,6,5,2,14,1,18,11,3,1,0,0,2.37,3.32,3.12,2.03,1.81
+la_liga,2024,la_liga_2024_352_sevilla_las_palmas,13/05/2025,Sevilla,Las Palmas,1,0,0,0,10,14,3,3,4,2,22,15,6,6,0,0,1.69,3.73,5.37,2.01,1.83
+la_liga,2024,la_liga_2024_353_alaves_valencia,14/05/2025,Alaves,Valencia,1,0,0,0,11,10,5,3,9,4,16,10,4,3,0,0,2.16,3.17,3.69,2.38,1.58
+la_liga,2024,la_liga_2024_354_villarreal_leganes,14/05/2025,Villarreal,Leganes,3,0,3,0,17,23,7,6,3,6,5,11,1,1,0,0,1.34,5.26,8.73,1.57,2.39
+la_liga,2024,la_liga_2024_355_real_madrid_mallorca,14/05/2025,Real Madrid,Mallorca,2,1,0,1,39,4,13,2,26,0,6,15,0,3,0,0,1.38,5.06,7.87,1.59,2.36
+la_liga,2024,la_liga_2024_356_vallecano_betis,15/05/2025,Vallecano,Betis,2,2,2,0,20,10,6,3,10,7,8,18,1,3,0,0,3.05,3.13,2.48,2.04,1.79
+la_liga,2024,la_liga_2024_357_osasuna_ath_madrid,15/05/2025,Osasuna,Ath Madrid,2,0,1,0,9,9,3,5,3,5,12,11,1,1,0,0,3.74,3.3,2.08,2.12,1.73
+la_liga,2024,la_liga_2024_358_espanol_barcelona,15/05/2025,Espanol,Barcelona,0,2,0,0,9,12,1,4,3,3,8,10,2,2,1,0,9.34,5.76,1.3,1.42,2.81
+la_liga,2024,la_liga_2024_359_getafe_ath_bilbao,15/05/2025,Getafe,Ath Bilbao,0,2,0,0,11,9,1,2,2,5,10,7,1,0,0,0,3.4,2.65,2.64,2.89,1.4
+la_liga,2024,la_liga_2024_360_ath_madrid_betis,18/05/2025,Ath Madrid,Betis,4,1,2,0,20,12,11,7,7,4,12,9,1,1,0,0,1.95,3.72,3.69,1.76,2.08
+la_liga,2024,la_liga_2024_361_barcelona_villarreal,18/05/2025,Barcelona,Villarreal,2,3,2,1,24,7,9,3,11,3,14,9,2,0,0,0,1.85,4.15,3.7,1.35,3.15
+la_liga,2024,la_liga_2024_362_celta_vallecano,18/05/2025,Celta,Vallecano,1,2,1,2,24,7,7,2,9,2,10,17,2,3,0,0,1.78,3.91,4.32,1.74,2.1
+la_liga,2024,la_liga_2024_363_las_palmas_leganes,18/05/2025,Las Palmas,Leganes,0,1,0,1,12,11,3,4,9,2,15,12,2,2,0,0,2.9,3.45,2.39,1.83,1.98
+la_liga,2024,la_liga_2024_364_mallorca_getafe,18/05/2025,Mallorca,Getafe,1,2,0,0,7,10,1,4,3,4,14,9,2,2,0,0,2.01,3.2,4.16,2.67,1.46
+la_liga,2024,la_liga_2024_365_osasuna_espanol,18/05/2025,Osasuna,Espanol,2,0,1,0,16,16,3,6,8,6,11,5,1,1,0,0,1.83,3.48,4.59,2.09,1.75
+la_liga,2024,la_liga_2024_366_sevilla_real_madrid,18/05/2025,Sevilla,Real Madrid,0,2,0,0,6,16,1,6,1,7,7,9,0,1,2,0,4.13,3.99,1.78,1.52,2.48
+la_liga,2024,la_liga_2024_367_sociedad_girona,18/05/2025,Sociedad,Girona,3,2,2,1,15,9,9,5,9,2,10,9,1,3,0,0,2.13,3.08,3.88,2.11,1.73
+la_liga,2024,la_liga_2024_368_valencia_ath_bilbao,18/05/2025,Valencia,Ath Bilbao,0,1,0,0,6,10,2,4,5,3,10,16,3,1,0,0,2.24,2.99,3.73,2.34,1.6
+la_liga,2024,la_liga_2024_369_valladolid_alaves,18/05/2025,Valladolid,Alaves,0,1,0,1,7,14,1,4,5,9,12,24,0,2,0,0,5.73,3.84,1.62,2.0,1.82
+la_liga,2024,la_liga_2024_370_betis_valencia,23/05/2025,Betis,Valencia,1,1,1,0,14,9,4,2,3,2,8,12,1,2,0,0,1.96,3.78,3.66,1.62,2.31
+la_liga,2024,la_liga_2024_371_real_madrid_sociedad,24/05/2025,Real Madrid,Sociedad,2,0,1,0,16,9,8,1,11,4,5,7,0,0,0,0,1.42,5.04,6.72,1.44,2.74
+la_liga,2024,la_liga_2024_372_espanol_las_palmas,24/05/2025,Espanol,Las Palmas,2,0,0,0,8,10,3,4,3,6,12,11,3,2,0,0,1.38,4.88,8.3,1.82,2.01
+la_liga,2024,la_liga_2024_373_leganes_valladolid,24/05/2025,Leganes,Valladolid,3,0,3,0,16,6,6,2,3,4,11,16,0,1,0,0,1.32,5.42,9.4,1.68,2.2
+la_liga,2024,la_liga_2024_374_alaves_osasuna,24/05/2025,Alaves,Osasuna,1,1,0,0,14,19,5,5,5,9,15,6,2,2,0,0,3.2,3.2,2.36,2.35,1.6
+la_liga,2024,la_liga_2024_375_getafe_celta,24/05/2025,Getafe,Celta,1,2,1,1,6,15,1,8,2,6,13,10,3,4,1,0,4.22,3.65,1.86,2.07,1.76
+la_liga,2024,la_liga_2024_376_vallecano_mallorca,24/05/2025,Vallecano,Mallorca,0,0,0,0,27,9,8,2,11,2,9,14,2,2,0,0,1.53,4.1,6.46,2.14,1.71
+la_liga,2024,la_liga_2024_377_girona_ath_madrid,25/05/2025,Girona,Ath Madrid,0,4,0,0,2,19,1,11,1,8,13,11,0,1,0,0,3.71,3.75,1.95,1.61,2.32
+la_liga,2024,la_liga_2024_378_villarreal_sevilla,25/05/2025,Villarreal,Sevilla,4,2,3,1,12,17,7,6,3,5,8,14,0,1,0,0,1.46,4.89,6.15,1.5,2.55
+la_liga,2024,la_liga_2024_379_ath_bilbao_barcelona,25/05/2025,Ath Bilbao,Barcelona,0,3,0,2,10,13,1,4,2,6,21,10,1,0,0,0,3.22,3.75,2.11,1.52,2.49

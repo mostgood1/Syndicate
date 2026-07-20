@@ -1,0 +1,307 @@
+league,season,match_id,date,home_team,away_team,home_goals,away_goals,ht_home_goals,ht_away_goals,home_shots,away_shots,home_shots_on_target,away_shots_on_target,home_corners,away_corners,home_fouls,away_fouls,home_yellow_cards,away_yellow_cards,home_red_cards,away_red_cards,odds_home,odds_draw,odds_away,odds_over_2_5,odds_under_2_5
+bundesliga,2023,bundesliga_2023_0_werder_bremen_bayern_munich,18/08/2023,Werder Bremen,Bayern Munich,0,4,0,1,6,25,1,10,0,6,16,11,2,1,0,0,8.5,6.09,1.32,1.33,3.34
+bundesliga,2023,bundesliga_2023_1_augsburg_m'gladbach,19/08/2023,Augsburg,M'gladbach,4,4,3,3,20,9,8,6,8,7,9,14,1,2,0,0,2.72,3.69,2.47,1.61,2.34
+bundesliga,2023,bundesliga_2023_2_hoffenheim_freiburg,19/08/2023,Hoffenheim,Freiburg,1,2,0,2,24,17,5,8,4,2,9,9,0,1,0,0,2.35,3.63,2.94,1.66,2.24
+bundesliga,2023,bundesliga_2023_3_leverkusen_rb_leipzig,19/08/2023,Leverkusen,RB Leipzig,3,2,2,1,11,13,7,6,4,5,13,10,1,2,0,0,2.47,3.62,2.78,1.68,2.2
+bundesliga,2023,bundesliga_2023_4_stuttgart_bochum,19/08/2023,Stuttgart,Bochum,5,0,2,0,19,4,9,1,7,0,5,12,1,1,0,0,1.69,4.17,4.69,1.64,2.29
+bundesliga,2023,bundesliga_2023_5_wolfsburg_heidenheim,19/08/2023,Wolfsburg,Heidenheim,2,0,2,0,18,13,8,1,1,7,10,9,3,0,0,0,1.62,4.31,5.19,1.61,2.34
+bundesliga,2023,bundesliga_2023_6_dortmund_fc_koln,19/08/2023,Dortmund,FC Koln,1,0,0,0,12,11,2,4,6,3,13,11,1,0,0,0,1.4,5.21,7.24,1.43,2.83
+bundesliga,2023,bundesliga_2023_7_union_berlin_mainz,20/08/2023,Union Berlin,Mainz,4,1,2,0,12,9,7,3,3,1,15,16,1,5,0,0,2.01,3.45,3.92,2.1,1.75
+bundesliga,2023,bundesliga_2023_8_ein_frankfurt_darmstadt,20/08/2023,Ein Frankfurt,Darmstadt,1,0,1,0,10,11,4,2,7,3,9,14,2,3,0,0,1.39,5.12,7.82,1.67,2.23
+bundesliga,2023,bundesliga_2023_9_rb_leipzig_stuttgart,25/08/2023,RB Leipzig,Stuttgart,5,1,0,1,20,8,11,3,4,4,12,10,1,1,0,0,1.51,4.71,6.09,1.54,2.49
+bundesliga,2023,bundesliga_2023_10_bochum_dortmund,26/08/2023,Bochum,Dortmund,1,1,1,0,17,13,6,3,5,4,21,7,2,1,0,0,6.72,5.29,1.42,1.36,3.17
+bundesliga,2023,bundesliga_2023_11_darmstadt_union_berlin,26/08/2023,Darmstadt,Union Berlin,1,4,1,3,18,12,6,6,3,5,15,12,2,2,0,1,3.88,3.44,2.03,2.08,1.77
+bundesliga,2023,bundesliga_2023_12_fc_koln_wolfsburg,26/08/2023,FC Koln,Wolfsburg,1,2,0,0,14,9,2,6,6,1,6,10,1,5,0,0,2.36,3.56,2.98,1.75,2.09
+bundesliga,2023,bundesliga_2023_13_freiburg_werder_bremen,26/08/2023,Freiburg,Werder Bremen,1,0,0,0,23,16,6,2,5,5,9,8,2,2,0,0,1.71,4.06,4.75,1.68,2.22
+bundesliga,2023,bundesliga_2023_14_heidenheim_hoffenheim,26/08/2023,Heidenheim,Hoffenheim,2,3,1,0,19,16,9,6,10,6,13,9,1,5,0,0,2.98,3.73,2.3,1.67,2.25
+bundesliga,2023,bundesliga_2023_15_m'gladbach_leverkusen,26/08/2023,M'gladbach,Leverkusen,0,3,0,2,13,24,2,10,5,8,7,8,2,3,0,0,3.68,4.1,1.91,1.49,2.63
+bundesliga,2023,bundesliga_2023_16_mainz_ein_frankfurt,27/08/2023,Mainz,Ein Frankfurt,1,1,1,0,13,8,7,2,5,4,23,12,3,4,0,1,2.43,3.63,2.83,1.71,2.17
+bundesliga,2023,bundesliga_2023_17_bayern_munich_augsburg,27/08/2023,Bayern Munich,Augsburg,3,1,2,0,19,11,6,2,10,4,13,8,1,2,0,0,1.08,12.99,24.71,1.19,4.78
+bundesliga,2023,bundesliga_2023_18_dortmund_heidenheim,01/09/2023,Dortmund,Heidenheim,2,2,2,0,20,15,9,6,3,6,9,22,3,3,0,0,1.25,6.82,10.4,1.33,3.34
+bundesliga,2023,bundesliga_2023_19_augsburg_bochum,02/09/2023,Augsburg,Bochum,2,2,1,1,11,22,3,9,3,5,15,13,2,2,0,0,2.03,3.7,3.56,1.73,2.14
+bundesliga,2023,bundesliga_2023_20_hoffenheim_wolfsburg,02/09/2023,Hoffenheim,Wolfsburg,3,1,1,1,11,14,5,7,3,3,12,15,2,2,0,0,2.47,3.77,2.67,1.53,2.51
+bundesliga,2023,bundesliga_2023_21_leverkusen_darmstadt,02/09/2023,Leverkusen,Darmstadt,5,1,1,1,24,5,13,1,4,2,8,11,3,2,0,0,1.2,7.3,13.64,1.41,2.9
+bundesliga,2023,bundesliga_2023_22_stuttgart_freiburg,02/09/2023,Stuttgart,Freiburg,5,0,3,0,13,11,6,5,2,4,9,10,1,1,0,0,2.18,3.68,3.2,1.72,2.15
+bundesliga,2023,bundesliga_2023_23_werder_bremen_mainz,02/09/2023,Werder Bremen,Mainz,4,0,1,0,12,12,6,3,1,7,18,14,2,2,0,0,2.7,3.57,2.55,1.74,2.12
+bundesliga,2023,bundesliga_2023_24_m'gladbach_bayern_munich,02/09/2023,M'gladbach,Bayern Munich,1,2,1,0,8,25,3,9,1,15,5,20,0,2,0,0,8.28,6.34,1.31,1.24,4.09
+bundesliga,2023,bundesliga_2023_25_ein_frankfurt_fc_koln,03/09/2023,Ein Frankfurt,FC Koln,1,1,0,1,12,6,4,2,8,1,10,10,1,3,0,0,2.13,3.49,3.49,1.94,1.89
+bundesliga,2023,bundesliga_2023_26_union_berlin_rb_leipzig,03/09/2023,Union Berlin,RB Leipzig,0,3,0,0,4,15,1,8,3,7,16,9,3,1,1,0,3.22,3.45,2.26,1.94,1.89
+bundesliga,2023,bundesliga_2023_27_bayern_munich_leverkusen,15/09/2023,Bayern Munich,Leverkusen,2,2,1,1,15,12,9,5,7,4,6,6,0,3,0,0,1.62,4.66,4.76,1.37,3.09
+bundesliga,2023,bundesliga_2023_28_fc_koln_hoffenheim,16/09/2023,FC Koln,Hoffenheim,1,3,0,2,17,17,7,5,13,4,15,14,4,4,1,0,2.22,3.78,3.05,1.61,2.35
+bundesliga,2023,bundesliga_2023_29_freiburg_dortmund,16/09/2023,Freiburg,Dortmund,2,4,2,1,14,14,4,6,6,8,12,16,2,3,1,0,3.16,3.84,2.15,1.51,2.58
+bundesliga,2023,bundesliga_2023_30_mainz_stuttgart,16/09/2023,Mainz,Stuttgart,1,3,0,0,15,16,3,6,6,4,12,9,1,2,0,0,2.55,3.65,2.66,1.69,2.2
+bundesliga,2023,bundesliga_2023_31_rb_leipzig_augsburg,16/09/2023,RB Leipzig,Augsburg,3,0,3,0,9,16,6,4,1,6,16,12,0,0,0,0,1.23,6.98,11.49,1.37,3.1
+bundesliga,2023,bundesliga_2023_32_wolfsburg_union_berlin,16/09/2023,Wolfsburg,Union Berlin,2,1,2,1,8,17,3,5,3,7,6,8,1,0,0,0,2.26,3.47,3.22,1.94,1.9
+bundesliga,2023,bundesliga_2023_33_bochum_ein_frankfurt,16/09/2023,Bochum,Ein Frankfurt,1,1,0,0,24,8,10,6,8,2,13,14,3,2,0,0,2.93,3.63,2.35,1.72,2.15
+bundesliga,2023,bundesliga_2023_34_heidenheim_werder_bremen,17/09/2023,Heidenheim,Werder Bremen,4,2,2,0,19,11,4,4,10,1,21,9,1,1,0,0,2.35,3.79,2.83,1.64,2.29
+bundesliga,2023,bundesliga_2023_35_darmstadt_m'gladbach,17/09/2023,Darmstadt,M'gladbach,3,3,3,0,15,21,8,10,6,6,12,8,1,1,1,0,2.96,3.61,2.34,1.78,2.06
+bundesliga,2023,bundesliga_2023_36_stuttgart_darmstadt,22/09/2023,Stuttgart,Darmstadt,3,1,2,1,18,3,11,0,5,4,7,12,1,6,0,0,1.38,5.14,7.89,1.56,2.47
+bundesliga,2023,bundesliga_2023_37_augsburg_mainz,23/09/2023,Augsburg,Mainz,2,1,2,1,6,13,3,3,3,4,16,14,2,3,1,0,2.59,3.63,2.62,1.68,2.22
+bundesliga,2023,bundesliga_2023_38_bayern_munich_bochum,23/09/2023,Bayern Munich,Bochum,7,0,4,0,26,4,16,1,8,1,8,10,0,1,0,0,1.1,11.34,20.92,1.21,4.41
+bundesliga,2023,bundesliga_2023_39_dortmund_wolfsburg,23/09/2023,Dortmund,Wolfsburg,1,0,0,0,18,8,4,2,5,3,9,14,0,1,0,0,1.69,4.39,4.46,1.43,2.86
+bundesliga,2023,bundesliga_2023_40_m'gladbach_rb_leipzig,23/09/2023,M'gladbach,RB Leipzig,0,1,0,0,13,8,1,4,11,6,14,7,1,1,0,0,5.07,4.69,1.58,1.4,2.96
+bundesliga,2023,bundesliga_2023_41_union_berlin_hoffenheim,23/09/2023,Union Berlin,Hoffenheim,0,2,0,2,22,11,6,4,11,6,11,13,1,3,0,0,2.12,3.67,3.36,1.79,2.05
+bundesliga,2023,bundesliga_2023_42_werder_bremen_fc_koln,23/09/2023,Werder Bremen,FC Koln,2,1,1,1,17,13,6,5,9,8,18,16,2,1,0,0,2.54,3.62,2.68,1.71,2.17
+bundesliga,2023,bundesliga_2023_43_leverkusen_heidenheim,24/09/2023,Leverkusen,Heidenheim,4,1,1,0,20,1,10,1,7,2,9,10,1,1,0,0,1.23,6.98,11.42,1.34,3.3
+bundesliga,2023,bundesliga_2023_44_ein_frankfurt_freiburg,24/09/2023,Ein Frankfurt,Freiburg,0,0,0,0,13,9,5,2,7,3,12,5,4,2,0,0,2.09,3.63,3.44,1.83,2.0
+bundesliga,2023,bundesliga_2023_45_hoffenheim_dortmund,29/09/2023,Hoffenheim,Dortmund,1,3,1,2,15,6,5,5,4,3,14,16,3,4,0,1,3.11,4.13,2.11,1.38,3.04
+bundesliga,2023,bundesliga_2023_46_bochum_m'gladbach,30/09/2023,Bochum,M'gladbach,1,3,0,3,23,25,5,9,5,10,12,12,2,3,0,0,2.33,3.79,2.88,1.56,2.44
+bundesliga,2023,bundesliga_2023_47_fc_koln_stuttgart,30/09/2023,FC Koln,Stuttgart,0,2,0,0,14,18,5,4,8,4,16,8,2,1,0,0,2.85,3.65,2.42,1.69,2.2
+bundesliga,2023,bundesliga_2023_48_heidenheim_union_berlin,30/09/2023,Heidenheim,Union Berlin,1,0,0,0,9,19,4,8,5,7,11,14,1,2,0,0,3.07,3.65,2.27,1.78,2.07
+bundesliga,2023,bundesliga_2023_49_mainz_leverkusen,30/09/2023,Mainz,Leverkusen,0,3,0,1,10,6,3,3,3,1,13,11,4,1,0,0,5.65,4.64,1.54,1.54,2.48
+bundesliga,2023,bundesliga_2023_50_wolfsburg_ein_frankfurt,30/09/2023,Wolfsburg,Ein Frankfurt,2,0,1,0,19,7,7,3,7,4,11,18,1,6,0,1,2.11,3.55,3.51,1.92,1.91
+bundesliga,2023,bundesliga_2023_51_rb_leipzig_bayern_munich,30/09/2023,RB Leipzig,Bayern Munich,2,2,2,0,7,11,2,5,5,1,10,11,2,5,0,0,3.56,4.21,1.93,1.4,2.96
+bundesliga,2023,bundesliga_2023_52_darmstadt_werder_bremen,01/10/2023,Darmstadt,Werder Bremen,4,2,2,0,14,10,5,7,2,4,19,19,3,2,0,0,2.8,3.7,2.42,1.68,2.22
+bundesliga,2023,bundesliga_2023_53_freiburg_augsburg,01/10/2023,Freiburg,Augsburg,2,0,1,0,7,13,3,4,2,3,13,17,2,2,0,0,1.72,4.13,4.59,1.65,2.26
+bundesliga,2023,bundesliga_2023_54_m'gladbach_mainz,06/10/2023,M'gladbach,Mainz,2,2,1,1,20,13,9,7,10,3,9,9,3,1,0,0,2.06,3.87,3.42,1.58,2.42
+bundesliga,2023,bundesliga_2023_55_augsburg_darmstadt,07/10/2023,Augsburg,Darmstadt,1,2,0,0,17,17,3,5,4,4,13,12,4,2,0,0,1.9,3.87,3.95,1.69,2.21
+bundesliga,2023,bundesliga_2023_56_dortmund_union_berlin,07/10/2023,Dortmund,Union Berlin,4,2,1,2,12,12,7,6,4,6,7,15,1,1,0,0,1.61,4.38,5.31,1.63,2.31
+bundesliga,2023,bundesliga_2023_57_rb_leipzig_bochum,07/10/2023,RB Leipzig,Bochum,0,0,0,0,18,9,5,2,9,1,10,13,2,4,0,0,1.24,6.81,11.15,1.35,3.21
+bundesliga,2023,bundesliga_2023_58_stuttgart_wolfsburg,07/10/2023,Stuttgart,Wolfsburg,3,1,0,1,13,12,7,5,5,6,13,14,1,3,0,0,2.0,3.76,3.64,1.67,2.23
+bundesliga,2023,bundesliga_2023_59_werder_bremen_hoffenheim,07/10/2023,Werder Bremen,Hoffenheim,2,3,1,2,13,11,3,4,4,4,15,6,5,4,0,0,2.75,3.9,2.38,1.46,2.71
+bundesliga,2023,bundesliga_2023_60_leverkusen_fc_koln,08/10/2023,Leverkusen,FC Koln,3,0,2,0,21,7,10,3,11,4,9,7,3,0,0,0,1.34,5.58,8.69,1.48,2.65
+bundesliga,2023,bundesliga_2023_61_bayern_munich_freiburg,08/10/2023,Bayern Munich,Freiburg,3,0,2,0,21,2,5,0,7,1,7,8,1,0,0,0,1.16,8.73,15.05,1.28,3.69
+bundesliga,2023,bundesliga_2023_62_ein_frankfurt_heidenheim,08/10/2023,Ein Frankfurt,Heidenheim,2,0,1,0,12,7,6,2,3,6,14,10,2,3,0,0,1.73,4.07,4.63,1.7,2.17
+bundesliga,2023,bundesliga_2023_63_dortmund_werder_bremen,20/10/2023,Dortmund,Werder Bremen,1,0,0,0,22,6,5,1,10,4,5,10,1,5,0,0,1.3,6.52,8.74,1.27,3.76
+bundesliga,2023,bundesliga_2023_64_darmstadt_rb_leipzig,21/10/2023,Darmstadt,RB Leipzig,1,3,1,2,16,10,3,7,6,0,16,12,6,3,0,0,6.54,4.92,1.46,1.51,2.54
+bundesliga,2023,bundesliga_2023_65_freiburg_bochum,21/10/2023,Freiburg,Bochum,2,1,2,1,15,13,5,5,5,2,11,16,3,4,0,0,1.73,3.98,4.69,1.71,2.16
+bundesliga,2023,bundesliga_2023_66_hoffenheim_ein_frankfurt,21/10/2023,Hoffenheim,Ein Frankfurt,1,3,1,3,14,13,5,5,6,3,7,7,3,0,0,0,2.12,3.67,3.37,1.69,2.21
+bundesliga,2023,bundesliga_2023_67_union_berlin_stuttgart,21/10/2023,Union Berlin,Stuttgart,0,3,0,1,10,10,2,5,4,2,12,12,2,1,0,0,2.54,3.54,2.75,1.8,2.04
+bundesliga,2023,bundesliga_2023_68_wolfsburg_leverkusen,21/10/2023,Wolfsburg,Leverkusen,1,2,1,1,18,13,7,6,4,3,15,14,3,5,0,0,4.47,4.12,1.75,1.55,2.48
+bundesliga,2023,bundesliga_2023_69_mainz_bayern_munich,21/10/2023,Mainz,Bayern Munich,1,3,1,2,14,12,3,5,2,7,12,10,3,2,0,0,9.77,6.53,1.28,1.29,3.58
+bundesliga,2023,bundesliga_2023_70_fc_koln_m'gladbach,22/10/2023,FC Koln,M'gladbach,3,1,1,0,21,5,8,2,8,3,13,10,0,2,0,1,2.38,3.72,2.86,1.59,2.39
+bundesliga,2023,bundesliga_2023_71_heidenheim_augsburg,22/10/2023,Heidenheim,Augsburg,2,5,2,3,16,9,5,6,6,5,11,11,3,2,0,0,2.4,3.62,2.87,1.71,2.17
+bundesliga,2023,bundesliga_2023_72_bochum_mainz,27/10/2023,Bochum,Mainz,2,2,1,0,10,10,4,4,5,4,14,21,3,3,0,0,2.72,3.54,2.56,1.75,2.11
+bundesliga,2023,bundesliga_2023_73_augsburg_wolfsburg,28/10/2023,Augsburg,Wolfsburg,3,2,1,2,9,13,5,6,5,5,19,14,6,4,1,0,2.87,3.63,2.4,1.71,2.16
+bundesliga,2023,bundesliga_2023_74_bayern_munich_darmstadt,28/10/2023,Bayern Munich,Darmstadt,8,0,0,0,28,10,16,4,7,1,15,13,1,2,1,2,1.07,14.36,28.45,1.17,4.98
+bundesliga,2023,bundesliga_2023_75_m'gladbach_heidenheim,28/10/2023,M'gladbach,Heidenheim,2,1,1,1,11,8,6,3,6,4,5,18,0,3,0,0,1.8,4.17,4.09,1.48,2.66
+bundesliga,2023,bundesliga_2023_76_stuttgart_hoffenheim,28/10/2023,Stuttgart,Hoffenheim,2,3,0,2,23,7,10,5,6,0,13,11,2,1,0,0,1.86,4.14,3.82,1.49,2.63
+bundesliga,2023,bundesliga_2023_77_werder_bremen_union_berlin,28/10/2023,Werder Bremen,Union Berlin,2,0,1,0,9,7,3,2,3,3,12,14,1,4,0,1,2.68,3.54,2.61,1.81,2.03
+bundesliga,2023,bundesliga_2023_78_rb_leipzig_fc_koln,28/10/2023,RB Leipzig,FC Koln,6,0,4,0,24,6,13,1,11,1,8,13,2,4,0,1,1.44,4.97,7.1,1.57,2.42
+bundesliga,2023,bundesliga_2023_79_ein_frankfurt_dortmund,29/10/2023,Ein Frankfurt,Dortmund,3,3,2,1,11,14,7,4,0,4,11,10,3,2,0,0,3.24,3.69,2.17,1.65,2.26
+bundesliga,2023,bundesliga_2023_80_leverkusen_freiburg,29/10/2023,Leverkusen,Freiburg,2,1,1,0,19,10,4,4,11,4,9,10,0,2,0,0,1.29,6.01,10.41,1.48,2.65
+bundesliga,2023,bundesliga_2023_81_darmstadt_bochum,03/11/2023,Darmstadt,Bochum,1,2,1,1,15,9,4,4,11,2,7,16,2,5,1,0,2.38,3.62,2.91,1.67,2.24
+bundesliga,2023,bundesliga_2023_82_fc_koln_augsburg,04/11/2023,FC Koln,Augsburg,1,1,1,1,28,18,12,3,10,2,10,10,1,4,0,0,2.35,3.72,2.89,1.63,2.33
+bundesliga,2023,bundesliga_2023_83_freiburg_m'gladbach,04/11/2023,Freiburg,M'gladbach,3,3,1,3,15,10,8,5,8,2,7,10,2,2,0,0,2.1,3.85,3.28,1.59,2.38
+bundesliga,2023,bundesliga_2023_84_hoffenheim_leverkusen,04/11/2023,Hoffenheim,Leverkusen,2,3,0,2,12,10,7,4,4,3,6,10,3,2,0,0,4.85,4.82,1.59,1.32,3.35
+bundesliga,2023,bundesliga_2023_85_mainz_rb_leipzig,04/11/2023,Mainz,RB Leipzig,2,0,0,0,10,10,3,2,2,7,13,9,3,1,0,0,5.23,4.44,1.6,1.59,2.38
+bundesliga,2023,bundesliga_2023_86_union_berlin_ein_frankfurt,04/11/2023,Union Berlin,Ein Frankfurt,0,3,0,2,10,4,3,3,9,1,13,8,0,1,0,0,2.56,3.25,2.92,2.04,1.8
+bundesliga,2023,bundesliga_2023_87_dortmund_bayern_munich,04/11/2023,Dortmund,Bayern Munich,0,4,0,2,15,14,1,8,3,2,14,6,3,2,0,0,3.81,4.39,1.82,1.34,3.32
+bundesliga,2023,bundesliga_2023_88_wolfsburg_werder_bremen,05/11/2023,Wolfsburg,Werder Bremen,2,2,1,1,15,13,5,4,5,2,14,17,4,1,1,0,1.73,4.3,4.32,1.45,2.72
+bundesliga,2023,bundesliga_2023_89_heidenheim_stuttgart,05/11/2023,Heidenheim,Stuttgart,2,0,0,0,19,14,2,2,9,6,7,13,2,2,0,0,4.6,4.38,1.68,1.48,2.65
+bundesliga,2023,bundesliga_2023_90_m'gladbach_wolfsburg,10/11/2023,M'gladbach,Wolfsburg,4,0,2,0,16,12,8,4,8,5,7,12,1,3,0,0,2.38,3.76,2.82,1.53,2.54
+bundesliga,2023,bundesliga_2023_91_augsburg_hoffenheim,11/11/2023,Augsburg,Hoffenheim,1,1,0,1,11,12,6,6,3,5,9,11,1,2,0,0,2.6,3.8,2.53,1.47,2.69
+bundesliga,2023,bundesliga_2023_92_bayern_munich_heidenheim,11/11/2023,Bayern Munich,Heidenheim,4,2,2,0,18,7,8,2,7,2,8,8,1,0,0,0,1.06,15.98,30.37,1.16,5.07
+bundesliga,2023,bundesliga_2023_93_darmstadt_mainz,11/11/2023,Darmstadt,Mainz,0,0,0,0,9,9,3,0,0,5,20,15,3,3,0,0,2.99,3.67,2.31,1.66,2.22
+bundesliga,2023,bundesliga_2023_94_stuttgart_dortmund,11/11/2023,Stuttgart,Dortmund,2,1,1,1,22,5,10,1,6,1,13,16,2,3,0,0,2.59,3.79,2.56,1.47,2.7
+bundesliga,2023,bundesliga_2023_95_bochum_fc_koln,11/11/2023,Bochum,FC Koln,1,1,1,0,25,10,9,6,3,3,14,19,4,1,0,0,2.45,3.62,2.82,1.69,2.2
+bundesliga,2023,bundesliga_2023_96_leverkusen_union_berlin,12/11/2023,Leverkusen,Union Berlin,4,0,1,0,19,2,10,2,10,1,8,5,0,1,0,0,1.28,6.03,10.54,1.57,2.41
+bundesliga,2023,bundesliga_2023_97_werder_bremen_ein_frankfurt,12/11/2023,Werder Bremen,Ein Frankfurt,2,2,1,0,14,14,5,3,3,7,3,10,1,3,0,0,3.0,3.58,2.34,1.72,2.15
+bundesliga,2023,bundesliga_2023_98_rb_leipzig_freiburg,12/11/2023,RB Leipzig,Freiburg,3,1,1,1,15,9,6,3,7,3,10,12,2,0,0,0,1.45,4.88,6.67,1.56,2.45
+bundesliga,2023,bundesliga_2023_99_fc_koln_bayern_munich,24/11/2023,FC Koln,Bayern Munich,0,1,0,1,6,19,2,5,3,12,6,4,0,1,0,0,10.51,6.77,1.26,1.33,3.32
+bundesliga,2023,bundesliga_2023_100_dortmund_m'gladbach,25/11/2023,Dortmund,M'gladbach,4,2,3,2,20,10,13,3,5,4,11,11,1,2,0,0,1.48,5.23,5.77,1.31,3.4
+bundesliga,2023,bundesliga_2023_101_freiburg_darmstadt,25/11/2023,Freiburg,Darmstadt,1,1,1,1,16,7,3,1,11,2,15,15,2,0,0,0,1.58,4.37,5.6,1.66,2.27
+bundesliga,2023,bundesliga_2023_102_union_berlin_augsburg,25/11/2023,Union Berlin,Augsburg,1,1,0,1,16,11,6,2,3,4,10,15,2,2,0,0,2.01,3.63,3.76,1.93,1.9
+bundesliga,2023,bundesliga_2023_103_werder_bremen_leverkusen,25/11/2023,Werder Bremen,Leverkusen,0,3,0,2,2,13,1,4,1,6,15,4,3,1,0,0,6.24,5.13,1.46,1.38,3.04
+bundesliga,2023,bundesliga_2023_104_wolfsburg_rb_leipzig,25/11/2023,Wolfsburg,RB Leipzig,2,1,1,0,10,26,4,10,1,12,18,11,4,2,0,0,3.77,3.94,1.92,1.6,2.36
+bundesliga,2023,bundesliga_2023_105_ein_frankfurt_stuttgart,25/11/2023,Ein Frankfurt,Stuttgart,1,2,1,2,14,11,1,5,4,2,14,8,0,1,0,0,2.62,3.67,2.6,1.7,2.19
+bundesliga,2023,bundesliga_2023_106_heidenheim_bochum,26/11/2023,Heidenheim,Bochum,0,0,0,0,9,9,3,2,6,5,14,7,4,3,0,0,2.22,3.76,3.07,1.63,2.31
+bundesliga,2023,bundesliga_2023_107_hoffenheim_mainz,26/11/2023,Hoffenheim,Mainz,1,1,0,1,15,15,6,6,4,5,9,14,4,4,0,0,1.85,4.04,3.94,1.6,2.39
+bundesliga,2023,bundesliga_2023_108_darmstadt_fc_koln,01/12/2023,Darmstadt,FC Koln,0,1,0,0,11,11,1,6,1,6,12,12,1,3,0,0,2.68,3.51,2.63,1.79,2.06
+bundesliga,2023,bundesliga_2023_109_bochum_wolfsburg,02/12/2023,Bochum,Wolfsburg,3,1,2,1,19,15,9,6,6,6,14,13,6,2,0,0,2.66,3.65,2.58,1.66,2.26
+bundesliga,2023,bundesliga_2023_110_m'gladbach_hoffenheim,02/12/2023,M'gladbach,Hoffenheim,2,1,0,0,9,17,3,5,6,3,12,14,2,2,0,0,2.25,4.07,2.85,1.36,3.11
+bundesliga,2023,bundesliga_2023_111_rb_leipzig_heidenheim,02/12/2023,RB Leipzig,Heidenheim,2,1,2,1,23,7,8,1,5,3,13,16,2,2,0,0,1.24,7.01,10.83,1.38,3.04
+bundesliga,2023,bundesliga_2023_112_stuttgart_werder_bremen,02/12/2023,Stuttgart,Werder Bremen,2,0,1,0,17,11,6,3,6,7,7,9,1,0,0,0,1.41,5.18,7.35,1.49,2.62
+bundesliga,2023,bundesliga_2023_113_mainz_freiburg,03/12/2023,Mainz,Freiburg,0,1,0,0,19,13,6,5,14,3,16,11,1,1,0,0,2.29,3.53,3.12,1.91,1.92
+bundesliga,2023,bundesliga_2023_114_leverkusen_dortmund,03/12/2023,Leverkusen,Dortmund,1,1,0,1,22,6,6,2,16,1,12,12,3,2,0,0,1.67,4.5,4.57,1.38,3.07
+bundesliga,2023,bundesliga_2023_115_augsburg_ein_frankfurt,03/12/2023,Augsburg,Ein Frankfurt,2,1,1,0,9,12,4,6,2,4,9,10,1,1,0,0,2.68,3.58,2.59,1.78,2.06
+bundesliga,2023,bundesliga_2023_116_hoffenheim_bochum,08/12/2023,Hoffenheim,Bochum,3,1,2,0,18,22,7,5,4,5,18,11,3,2,0,0,1.72,4.25,4.44,1.48,2.67
+bundesliga,2023,bundesliga_2023_117_ein_frankfurt_bayern_munich,09/12/2023,Ein Frankfurt,Bayern Munich,5,1,3,1,14,17,6,6,1,9,8,7,1,2,0,0,8.81,5.82,1.32,1.42,2.85
+bundesliga,2023,bundesliga_2023_118_heidenheim_darmstadt,09/12/2023,Heidenheim,Darmstadt,3,2,1,0,16,20,7,7,8,3,17,13,2,2,0,0,2.08,3.66,3.48,1.77,2.07
+bundesliga,2023,bundesliga_2023_119_union_berlin_m'gladbach,09/12/2023,Union Berlin,M'gladbach,3,1,1,0,16,13,6,4,6,7,9,8,1,3,0,0,2.15,3.66,3.29,1.74,2.13
+bundesliga,2023,bundesliga_2023_120_werder_bremen_augsburg,09/12/2023,Werder Bremen,Augsburg,2,0,1,0,12,11,5,1,5,2,13,9,1,2,0,0,2.42,3.71,2.77,1.61,2.35
+bundesliga,2023,bundesliga_2023_121_wolfsburg_freiburg,09/12/2023,Wolfsburg,Freiburg,0,1,0,0,10,4,3,1,5,3,11,16,1,4,0,0,2.27,3.68,3.03,1.7,2.18
+bundesliga,2023,bundesliga_2023_122_dortmund_rb_leipzig,09/12/2023,Dortmund,RB Leipzig,2,3,1,1,18,24,6,8,6,6,6,11,1,3,1,0,2.55,3.89,2.54,1.43,2.81
+bundesliga,2023,bundesliga_2023_123_stuttgart_leverkusen,10/12/2023,Stuttgart,Leverkusen,1,1,1,0,22,20,12,6,8,8,8,7,1,1,0,0,2.88,3.78,2.32,1.53,2.49
+bundesliga,2023,bundesliga_2023_124_fc_koln_mainz,10/12/2023,FC Koln,Mainz,0,0,0,0,7,13,3,5,1,7,10,10,2,4,0,0,2.39,3.49,2.97,1.89,1.94
+bundesliga,2023,bundesliga_2023_125_m'gladbach_werder_bremen,15/12/2023,M'gladbach,Werder Bremen,2,2,1,1,15,10,4,5,4,3,10,12,4,2,0,0,2.0,3.96,3.48,1.52,2.54
+bundesliga,2023,bundesliga_2023_126_augsburg_dortmund,16/12/2023,Augsburg,Dortmund,1,1,1,1,20,24,4,6,4,7,13,4,2,1,0,0,3.5,4.2,1.93,1.43,2.82
+bundesliga,2023,bundesliga_2023_127_bochum_union_berlin,16/12/2023,Bochum,Union Berlin,3,0,1,0,21,10,7,2,6,4,12,13,2,2,0,0,2.68,3.46,2.64,1.93,1.9
+bundesliga,2023,bundesliga_2023_128_darmstadt_wolfsburg,16/12/2023,Darmstadt,Wolfsburg,0,1,0,0,14,11,4,3,7,7,16,10,2,0,0,1,3.21,3.62,2.21,1.75,2.11
+bundesliga,2023,bundesliga_2023_129_mainz_heidenheim,16/12/2023,Mainz,Heidenheim,0,1,0,1,16,5,4,2,8,1,9,20,3,3,0,0,1.68,4.22,4.77,1.66,2.27
+bundesliga,2023,bundesliga_2023_130_rb_leipzig_hoffenheim,16/12/2023,RB Leipzig,Hoffenheim,3,1,1,1,23,10,11,4,9,2,11,9,3,2,0,0,1.45,5.21,6.14,1.37,3.1
+bundesliga,2023,bundesliga_2023_131_freiburg_fc_koln,17/12/2023,Freiburg,FC Koln,2,0,0,0,23,7,7,1,5,2,13,10,1,4,0,1,1.83,3.77,4.36,1.87,1.96
+bundesliga,2023,bundesliga_2023_132_leverkusen_ein_frankfurt,17/12/2023,Leverkusen,Ein Frankfurt,3,0,1,0,14,4,6,2,5,5,4,13,1,1,0,0,1.35,5.48,8.06,1.47,2.69
+bundesliga,2023,bundesliga_2023_133_bayern_munich_stuttgart,17/12/2023,Bayern Munich,Stuttgart,3,0,1,0,17,5,8,2,6,2,7,8,0,3,0,0,1.46,5.29,6.01,1.35,3.18
+bundesliga,2023,bundesliga_2023_134_werder_bremen_rb_leipzig,19/12/2023,Werder Bremen,RB Leipzig,1,1,0,0,11,18,3,9,1,4,15,9,4,2,0,0,5.06,4.62,1.6,1.45,2.76
+bundesliga,2023,bundesliga_2023_135_dortmund_mainz,19/12/2023,Dortmund,Mainz,1,1,1,1,21,11,8,6,6,1,11,14,0,4,0,0,1.54,4.84,5.46,1.46,2.74
+bundesliga,2023,bundesliga_2023_136_hoffenheim_darmstadt,19/12/2023,Hoffenheim,Darmstadt,3,3,2,1,13,14,4,3,8,3,9,15,2,4,0,0,1.45,4.97,6.55,1.48,2.65
+bundesliga,2023,bundesliga_2023_137_union_berlin_fc_koln,20/12/2023,Union Berlin,FC Koln,2,0,0,0,12,15,8,7,4,5,10,7,0,0,0,0,1.95,3.58,4.02,2.0,1.84
+bundesliga,2023,bundesliga_2023_138_ein_frankfurt_m'gladbach,20/12/2023,Ein Frankfurt,M'gladbach,2,1,0,1,15,7,7,2,8,2,11,14,1,6,0,1,1.87,3.97,3.91,1.61,2.34
+bundesliga,2023,bundesliga_2023_139_heidenheim_freiburg,20/12/2023,Heidenheim,Freiburg,3,2,0,1,14,10,3,4,7,4,20,12,3,4,0,0,2.85,3.59,2.43,1.74,2.12
+bundesliga,2023,bundesliga_2023_140_leverkusen_bochum,20/12/2023,Leverkusen,Bochum,4,0,3,0,15,6,8,1,4,3,7,12,0,2,0,0,1.19,7.95,13.9,1.37,3.11
+bundesliga,2023,bundesliga_2023_141_stuttgart_augsburg,20/12/2023,Stuttgart,Augsburg,3,0,2,0,17,6,7,5,4,4,8,14,0,4,0,0,1.37,5.34,7.83,1.48,2.67
+bundesliga,2023,bundesliga_2023_142_wolfsburg_bayern_munich,20/12/2023,Wolfsburg,Bayern Munich,1,2,1,2,5,20,4,7,0,6,14,12,4,2,0,0,7.57,5.63,1.36,1.39,3.01
+bundesliga,2023,bundesliga_2023_143_bayern_munich_hoffenheim,12/01/2024,Bayern Munich,Hoffenheim,3,0,1,0,27,12,12,4,11,2,8,6,1,3,0,1,1.15,9.39,15.67,1.21,4.38
+bundesliga,2023,bundesliga_2023_144_augsburg_leverkusen,13/01/2024,Augsburg,Leverkusen,0,1,0,0,2,25,0,6,0,12,11,4,3,1,0,0,5.67,4.63,1.54,1.54,2.49
+bundesliga,2023,bundesliga_2023_145_fc_koln_heidenheim,13/01/2024,FC Koln,Heidenheim,1,1,1,0,13,10,6,2,9,6,12,11,2,1,0,0,2.08,3.71,3.45,1.73,2.14
+bundesliga,2023,bundesliga_2023_146_freiburg_union_berlin,13/01/2024,Freiburg,Union Berlin,0,0,0,0,14,8,4,4,4,3,7,9,0,2,0,0,2.09,3.58,3.52,1.98,1.85
+bundesliga,2023,bundesliga_2023_147_mainz_wolfsburg,13/01/2024,Mainz,Wolfsburg,1,1,0,1,12,9,4,4,7,3,21,16,3,4,0,0,2.22,3.49,3.3,1.91,1.92
+bundesliga,2023,bundesliga_2023_148_rb_leipzig_ein_frankfurt,13/01/2024,RB Leipzig,Ein Frankfurt,0,1,0,1,26,5,7,1,15,4,7,16,0,2,0,0,1.44,4.98,6.88,1.51,2.59
+bundesliga,2023,bundesliga_2023_149_darmstadt_dortmund,13/01/2024,Darmstadt,Dortmund,0,3,0,1,10,17,2,8,3,4,10,13,1,3,0,0,5.44,4.74,1.54,1.45,2.75
+bundesliga,2023,bundesliga_2023_150_bochum_werder_bremen,14/01/2024,Bochum,Werder Bremen,1,1,0,0,13,15,4,4,3,4,14,14,6,5,0,0,2.19,3.72,3.15,1.64,2.28
+bundesliga,2023,bundesliga_2023_151_m'gladbach_stuttgart,14/01/2024,M'gladbach,Stuttgart,3,1,2,0,8,14,4,2,0,3,7,11,3,3,0,0,3.6,4.05,1.93,1.51,2.58
+bundesliga,2023,bundesliga_2023_152_bochum_stuttgart,20/01/2024,Bochum,Stuttgart,1,0,0,0,6,17,1,4,1,7,16,16,5,3,0,0,3.65,3.87,1.97,1.67,2.24
+bundesliga,2023,bundesliga_2023_153_darmstadt_ein_frankfurt,20/01/2024,Darmstadt,Ein Frankfurt,2,2,0,1,13,7,3,4,4,1,11,7,1,1,0,0,3.82,3.7,1.96,1.84,2.0
+bundesliga,2023,bundesliga_2023_154_fc_koln_dortmund,20/01/2024,FC Koln,Dortmund,0,4,0,1,16,11,5,7,13,4,16,7,2,2,0,0,4.32,4.22,1.75,1.54,2.49
+bundesliga,2023,bundesliga_2023_155_freiburg_hoffenheim,20/01/2024,Freiburg,Hoffenheim,3,2,1,0,16,16,8,4,2,2,18,10,3,3,1,0,2.05,3.84,3.42,1.64,2.29
+bundesliga,2023,bundesliga_2023_156_heidenheim_wolfsburg,20/01/2024,Heidenheim,Wolfsburg,1,1,1,1,12,12,3,3,4,2,11,10,0,1,0,0,2.71,3.55,2.56,1.77,2.09
+bundesliga,2023,bundesliga_2023_157_rb_leipzig_leverkusen,20/01/2024,RB Leipzig,Leverkusen,2,3,1,0,11,18,6,5,1,9,11,11,2,3,0,0,2.44,3.75,2.74,1.6,2.38
+bundesliga,2023,bundesliga_2023_158_bayern_munich_werder_bremen,21/01/2024,Bayern Munich,Werder Bremen,0,1,0,0,21,8,6,3,10,2,12,7,2,1,0,0,1.09,11.9,24.26,1.21,4.34
+bundesliga,2023,bundesliga_2023_159_m'gladbach_augsburg,21/01/2024,M'gladbach,Augsburg,1,2,1,0,18,15,4,7,5,7,10,20,1,2,0,0,1.92,3.97,3.67,1.54,2.46
+bundesliga,2023,bundesliga_2023_160_bayern_munich_union_berlin,24/01/2024,Bayern Munich,Union Berlin,1,0,0,0,24,4,10,1,12,1,5,9,2,4,0,0,1.16,8.09,17.3,1.4,2.94
+bundesliga,2023,bundesliga_2023_161_ein_frankfurt_mainz,26/01/2024,Ein Frankfurt,Mainz,1,0,0,0,13,7,4,0,2,1,10,12,2,1,0,0,2.14,3.46,3.52,2.04,1.8
+bundesliga,2023,bundesliga_2023_162_augsburg_bayern_munich,27/01/2024,Augsburg,Bayern Munich,2,3,0,2,14,13,7,4,4,5,12,11,2,6,0,0,9.05,6.01,1.31,1.39,3.04
+bundesliga,2023,bundesliga_2023_163_hoffenheim_heidenheim,27/01/2024,Hoffenheim,Heidenheim,1,1,1,1,20,15,8,3,9,5,11,13,4,0,0,0,1.7,4.28,4.55,1.5,2.55
+bundesliga,2023,bundesliga_2023_164_stuttgart_rb_leipzig,27/01/2024,Stuttgart,RB Leipzig,5,2,2,1,19,4,11,2,9,3,9,11,1,4,0,0,2.71,3.77,2.45,1.57,2.4
+bundesliga,2023,bundesliga_2023_165_werder_bremen_freiburg,27/01/2024,Werder Bremen,Freiburg,3,1,1,1,14,7,4,4,5,5,14,10,2,1,0,0,2.45,3.55,2.83,1.77,2.06
+bundesliga,2023,bundesliga_2023_166_wolfsburg_fc_koln,27/01/2024,Wolfsburg,FC Koln,1,1,1,1,12,6,5,2,6,3,17,12,5,3,0,0,1.84,3.79,4.28,1.83,2.02
+bundesliga,2023,bundesliga_2023_167_leverkusen_m'gladbach,27/01/2024,Leverkusen,M'gladbach,0,0,0,0,28,4,8,3,8,2,15,6,3,1,0,0,1.28,6.31,9.71,1.38,3.08
+bundesliga,2023,bundesliga_2023_168_union_berlin_darmstadt,28/01/2024,Union Berlin,Darmstadt,1,0,0,0,19,15,6,1,4,3,13,9,3,2,0,0,1.63,4.01,5.58,1.89,1.93
+bundesliga,2023,bundesliga_2023_169_dortmund_bochum,28/01/2024,Dortmund,Bochum,3,1,1,1,15,10,6,4,8,4,10,16,1,3,0,0,1.37,5.56,7.43,1.41,2.92
+bundesliga,2023,bundesliga_2023_170_heidenheim_dortmund,02/02/2024,Heidenheim,Dortmund,0,0,0,0,11,13,0,5,4,6,7,7,0,2,0,0,3.94,4.32,1.81,1.43,2.85
+bundesliga,2023,bundesliga_2023_171_bayern_munich_m'gladbach,03/02/2024,Bayern Munich,M'gladbach,3,1,1,1,21,11,6,4,6,5,11,9,0,1,0,0,1.15,8.9,16.45,1.24,4.07
+bundesliga,2023,bundesliga_2023_172_bochum_augsburg,03/02/2024,Bochum,Augsburg,1,1,1,0,9,12,4,6,3,5,17,14,3,1,0,0,2.18,3.62,3.25,1.74,2.08
+bundesliga,2023,bundesliga_2023_173_darmstadt_leverkusen,03/02/2024,Darmstadt,Leverkusen,0,2,0,1,8,18,6,7,4,3,14,8,2,2,0,0,9.56,6.21,1.29,1.44,2.79
+bundesliga,2023,bundesliga_2023_174_freiburg_stuttgart,03/02/2024,Freiburg,Stuttgart,1,3,1,2,7,17,4,9,1,6,10,7,4,2,1,0,3.12,3.71,2.21,1.74,2.13
+bundesliga,2023,bundesliga_2023_175_mainz_werder_bremen,03/02/2024,Mainz,Werder Bremen,0,1,0,1,20,6,5,1,11,1,22,16,4,3,0,0,2.1,3.53,3.53,1.95,1.89
+bundesliga,2023,bundesliga_2023_176_fc_koln_ein_frankfurt,03/02/2024,FC Koln,Ein Frankfurt,2,0,0,0,14,11,4,4,7,7,8,13,1,4,0,2,3.23,3.46,2.26,1.97,1.87
+bundesliga,2023,bundesliga_2023_177_wolfsburg_hoffenheim,04/02/2024,Wolfsburg,Hoffenheim,2,2,0,1,14,17,8,7,7,2,12,16,2,3,0,0,2.12,3.8,3.24,1.6,2.36
+bundesliga,2023,bundesliga_2023_178_rb_leipzig_union_berlin,04/02/2024,RB Leipzig,Union Berlin,2,0,1,0,16,10,6,2,5,4,13,11,1,2,0,1,1.4,5.0,7.76,1.63,2.3
+bundesliga,2023,bundesliga_2023_179_mainz_union_berlin,07/02/2024,Mainz,Union Berlin,1,1,1,1,16,15,7,4,8,3,14,15,2,4,0,0,2.18,3.31,3.56,2.24,1.67
+bundesliga,2023,bundesliga_2023_180_dortmund_freiburg,09/02/2024,Dortmund,Freiburg,3,0,2,0,17,6,8,3,5,3,13,7,2,0,0,0,1.46,4.95,6.37,1.44,2.82
+bundesliga,2023,bundesliga_2023_181_augsburg_rb_leipzig,10/02/2024,Augsburg,RB Leipzig,2,2,1,1,11,9,4,6,1,3,15,10,5,1,0,0,4.21,4.23,1.76,1.52,2.56
+bundesliga,2023,bundesliga_2023_182_ein_frankfurt_bochum,10/02/2024,Ein Frankfurt,Bochum,1,1,1,1,8,14,2,5,8,3,6,12,2,2,0,0,1.76,3.85,4.67,1.86,1.97
+bundesliga,2023,bundesliga_2023_183_m'gladbach_darmstadt,10/02/2024,M'gladbach,Darmstadt,0,0,0,0,22,10,8,1,7,2,11,15,0,5,0,0,1.6,4.32,5.37,1.68,2.23
+bundesliga,2023,bundesliga_2023_184_union_berlin_wolfsburg,10/02/2024,Union Berlin,Wolfsburg,1,0,1,0,7,15,2,5,6,10,12,9,1,2,0,0,2.3,3.37,3.21,2.09,1.77
+bundesliga,2023,bundesliga_2023_185_werder_bremen_heidenheim,10/02/2024,Werder Bremen,Heidenheim,1,2,1,2,14,10,3,3,5,10,10,13,1,2,0,0,1.85,3.81,4.17,1.74,2.13
+bundesliga,2023,bundesliga_2023_186_leverkusen_bayern_munich,10/02/2024,Leverkusen,Bayern Munich,3,0,1,0,14,8,8,1,4,6,13,13,3,2,0,0,2.63,3.84,2.48,1.48,2.66
+bundesliga,2023,bundesliga_2023_187_stuttgart_mainz,11/02/2024,Stuttgart,Mainz,3,1,2,0,10,16,7,6,4,5,7,9,1,1,0,0,1.44,4.7,7.27,1.71,2.16
+bundesliga,2023,bundesliga_2023_188_hoffenheim_fc_koln,11/02/2024,Hoffenheim,FC Koln,1,1,0,0,10,5,4,1,10,3,12,13,3,4,0,0,1.83,3.96,4.08,1.6,2.36
+bundesliga,2023,bundesliga_2023_189_fc_koln_werder_bremen,16/02/2024,FC Koln,Werder Bremen,0,1,0,0,10,13,2,4,5,3,16,11,4,4,0,0,2.5,3.4,2.88,1.98,1.86
+bundesliga,2023,bundesliga_2023_190_darmstadt_stuttgart,17/02/2024,Darmstadt,Stuttgart,1,2,0,1,21,13,9,4,5,3,15,14,4,5,0,1,6.89,4.77,1.45,1.66,2.27
+bundesliga,2023,bundesliga_2023_191_heidenheim_leverkusen,17/02/2024,Heidenheim,Leverkusen,1,2,0,1,6,17,3,4,4,5,15,5,2,1,0,0,8.33,5.58,1.35,1.52,2.56
+bundesliga,2023,bundesliga_2023_192_hoffenheim_union_berlin,17/02/2024,Hoffenheim,Union Berlin,0,1,0,0,16,10,4,3,6,2,10,7,3,4,1,1,2.04,3.7,3.54,1.78,2.08
+bundesliga,2023,bundesliga_2023_193_mainz_augsburg,17/02/2024,Mainz,Augsburg,1,0,1,0,19,10,4,4,7,7,8,16,3,2,0,1,2.02,3.61,3.68,1.95,1.89
+bundesliga,2023,bundesliga_2023_194_wolfsburg_dortmund,17/02/2024,Wolfsburg,Dortmund,1,1,0,1,9,12,4,5,5,3,18,5,3,1,0,0,3.22,3.82,2.13,1.58,2.42
+bundesliga,2023,bundesliga_2023_195_rb_leipzig_m'gladbach,17/02/2024,RB Leipzig,M'gladbach,2,0,1,0,16,13,9,0,8,4,12,13,1,5,0,0,1.38,5.55,7.2,1.38,3.07
+bundesliga,2023,bundesliga_2023_196_freiburg_ein_frankfurt,18/02/2024,Freiburg,Ein Frankfurt,3,3,2,2,13,10,8,6,6,1,8,10,0,0,0,0,2.32,3.4,3.13,2.0,1.83
+bundesliga,2023,bundesliga_2023_197_bochum_bayern_munich,18/02/2024,Bochum,Bayern Munich,3,2,2,1,14,26,5,10,4,9,12,10,2,4,0,1,8.25,5.75,1.33,1.41,2.92
+bundesliga,2023,bundesliga_2023_198_leverkusen_mainz,23/02/2024,Leverkusen,Mainz,2,1,1,1,18,13,7,4,11,2,14,16,3,5,0,1,1.26,6.22,11.85,1.58,2.42
+bundesliga,2023,bundesliga_2023_199_m'gladbach_bochum,24/02/2024,M'gladbach,Bochum,5,2,2,0,22,15,6,5,5,6,13,13,2,4,0,0,2.01,3.83,3.52,1.63,2.31
+bundesliga,2023,bundesliga_2023_200_stuttgart_fc_koln,24/02/2024,Stuttgart,FC Koln,1,1,0,0,13,12,5,6,9,4,11,13,1,0,0,0,1.32,5.63,9.5,1.54,2.49
+bundesliga,2023,bundesliga_2023_201_union_berlin_heidenheim,24/02/2024,Union Berlin,Heidenheim,2,2,2,1,12,9,3,4,4,2,9,12,2,1,0,0,2.01,3.52,3.82,2.03,1.81
+bundesliga,2023,bundesliga_2023_202_werder_bremen_darmstadt,24/02/2024,Werder Bremen,Darmstadt,1,1,1,1,13,11,4,3,4,6,10,13,3,4,0,0,1.68,4.04,5.03,1.81,2.03
+bundesliga,2023,bundesliga_2023_203_bayern_munich_rb_leipzig,24/02/2024,Bayern Munich,RB Leipzig,2,1,0,0,16,11,4,5,6,4,11,10,3,3,0,0,1.69,4.41,4.46,1.42,2.9
+bundesliga,2023,bundesliga_2023_204_ein_frankfurt_wolfsburg,25/02/2024,Ein Frankfurt,Wolfsburg,2,2,1,2,12,14,5,8,5,3,9,7,2,1,0,0,2.25,3.47,3.22,1.93,1.89
+bundesliga,2023,bundesliga_2023_205_dortmund_hoffenheim,25/02/2024,Dortmund,Hoffenheim,2,3,2,1,19,7,7,5,10,3,7,10,2,3,0,0,1.51,5.0,5.42,1.32,3.36
+bundesliga,2023,bundesliga_2023_206_augsburg_freiburg,25/02/2024,Augsburg,Freiburg,2,1,0,1,21,5,8,1,10,2,16,11,3,1,0,0,2.28,3.6,3.05,1.77,2.07
+bundesliga,2023,bundesliga_2023_207_freiburg_bayern_munich,01/03/2024,Freiburg,Bayern Munich,2,2,1,1,17,21,5,9,3,6,11,7,1,2,0,0,5.97,4.78,1.5,1.52,2.56
+bundesliga,2023,bundesliga_2023_208_bochum_rb_leipzig,02/03/2024,Bochum,RB Leipzig,1,4,1,1,15,10,4,4,2,5,13,10,3,2,1,0,4.76,4.4,1.65,1.51,2.57
+bundesliga,2023,bundesliga_2023_209_darmstadt_augsburg,02/03/2024,Darmstadt,Augsburg,0,6,0,5,10,21,5,6,3,6,4,12,2,0,0,0,2.85,3.44,2.48,1.81,2.04
+bundesliga,2023,bundesliga_2023_210_heidenheim_ein_frankfurt,02/03/2024,Heidenheim,Ein Frankfurt,1,2,0,1,16,11,3,6,7,3,6,10,1,4,0,0,2.8,3.39,2.56,1.9,1.93
+bundesliga,2023,bundesliga_2023_211_mainz_m'gladbach,02/03/2024,Mainz,M'gladbach,1,1,1,0,21,14,5,5,12,6,12,15,5,1,1,0,1.97,3.76,3.71,1.78,2.07
+bundesliga,2023,bundesliga_2023_212_union_berlin_dortmund,02/03/2024,Union Berlin,Dortmund,0,2,0,1,13,12,5,7,8,7,11,8,2,1,0,0,3.44,3.6,2.11,1.74,2.13
+bundesliga,2023,bundesliga_2023_213_wolfsburg_stuttgart,02/03/2024,Wolfsburg,Stuttgart,2,3,0,1,12,7,2,3,5,4,20,12,3,2,0,0,3.26,3.58,2.19,1.73,2.14
+bundesliga,2023,bundesliga_2023_214_fc_koln_leverkusen,03/03/2024,FC Koln,Leverkusen,0,2,0,1,6,17,0,6,1,9,10,9,2,2,1,0,8.43,5.02,1.38,1.67,2.22
+bundesliga,2023,bundesliga_2023_215_hoffenheim_werder_bremen,03/03/2024,Hoffenheim,Werder Bremen,2,1,2,0,14,18,7,8,3,3,11,10,5,1,1,0,1.95,3.92,3.62,1.56,2.43
+bundesliga,2023,bundesliga_2023_216_stuttgart_union_berlin,08/03/2024,Stuttgart,Union Berlin,2,0,1,0,14,10,5,4,4,3,7,14,1,2,0,1,1.48,4.53,6.92,1.76,2.1
+bundesliga,2023,bundesliga_2023_217_augsburg_heidenheim,09/03/2024,Augsburg,Heidenheim,1,0,1,0,8,6,4,1,5,2,14,20,1,3,0,0,1.89,3.92,3.87,1.67,2.25
+bundesliga,2023,bundesliga_2023_218_bayern_munich_mainz,09/03/2024,Bayern Munich,Mainz,8,1,3,1,25,13,12,3,6,7,8,7,1,1,0,0,1.23,6.88,11.56,1.39,3.01
+bundesliga,2023,bundesliga_2023_219_m'gladbach_fc_koln,09/03/2024,M'gladbach,FC Koln,3,3,1,1,16,12,5,5,8,3,15,15,3,4,0,0,1.85,3.82,4.18,1.74,2.08
+bundesliga,2023,bundesliga_2023_220_rb_leipzig_darmstadt,09/03/2024,RB Leipzig,Darmstadt,2,0,1,0,28,9,8,4,8,4,3,14,0,3,0,0,1.15,8.73,17.28,1.35,3.25
+bundesliga,2023,bundesliga_2023_221_werder_bremen_dortmund,09/03/2024,Werder Bremen,Dortmund,1,2,0,2,15,13,5,6,10,4,6,8,1,2,0,1,3.77,4.08,1.88,1.46,2.72
+bundesliga,2023,bundesliga_2023_222_bochum_freiburg,10/03/2024,Bochum,Freiburg,1,2,0,1,18,9,6,5,12,5,11,11,3,7,0,0,2.27,3.61,3.06,1.78,2.06
+bundesliga,2023,bundesliga_2023_223_ein_frankfurt_hoffenheim,10/03/2024,Ein Frankfurt,Hoffenheim,3,1,1,1,17,6,7,2,5,1,11,10,2,3,0,2,2.06,3.87,3.35,1.6,2.36
+bundesliga,2023,bundesliga_2023_224_leverkusen_wolfsburg,10/03/2024,Leverkusen,Wolfsburg,2,0,1,0,19,2,7,1,9,2,6,7,1,3,0,1,1.32,5.66,8.97,1.55,2.47
+bundesliga,2023,bundesliga_2023_225_fc_koln_rb_leipzig,15/03/2024,FC Koln,RB Leipzig,1,5,1,1,9,23,2,7,3,6,11,12,2,2,0,0,6.54,4.72,1.48,1.61,2.38
+bundesliga,2023,bundesliga_2023_226_darmstadt_bayern_munich,16/03/2024,Darmstadt,Bayern Munich,2,5,1,2,7,26,3,6,2,9,9,6,1,0,0,0,16.6,9.19,1.14,1.28,3.75
+bundesliga,2023,bundesliga_2023_227_heidenheim_m'gladbach,16/03/2024,Heidenheim,M'gladbach,1,1,0,1,16,6,5,2,10,4,16,8,1,3,0,0,2.45,3.64,2.78,1.67,2.24
+bundesliga,2023,bundesliga_2023_228_mainz_bochum,16/03/2024,Mainz,Bochum,2,0,1,0,13,11,4,4,7,6,15,15,4,3,0,0,1.78,3.88,4.47,1.8,2.04
+bundesliga,2023,bundesliga_2023_229_union_berlin_werder_bremen,16/03/2024,Union Berlin,Werder Bremen,2,1,0,0,11,10,5,2,4,3,16,16,3,5,0,0,2.03,3.56,3.7,1.96,1.88
+bundesliga,2023,bundesliga_2023_230_wolfsburg_augsburg,16/03/2024,Wolfsburg,Augsburg,1,3,1,1,15,14,4,5,8,6,12,19,1,3,1,0,2.09,3.64,3.44,1.77,2.08
+bundesliga,2023,bundesliga_2023_231_hoffenheim_stuttgart,16/03/2024,Hoffenheim,Stuttgart,0,3,0,2,8,25,1,12,5,6,8,12,1,0,0,0,3.75,4.15,1.87,1.44,2.7
+bundesliga,2023,bundesliga_2023_232_freiburg_leverkusen,17/03/2024,Freiburg,Leverkusen,2,3,1,2,9,18,3,7,2,8,13,6,1,0,0,0,5.69,4.35,1.56,1.72,2.15
+bundesliga,2023,bundesliga_2023_233_dortmund_ein_frankfurt,17/03/2024,Dortmund,Ein Frankfurt,3,1,1,1,16,8,6,6,8,3,5,9,1,2,0,0,1.62,4.43,4.92,1.5,2.58
+bundesliga,2023,bundesliga_2023_234_ein_frankfurt_union_berlin,30/03/2024,Ein Frankfurt,Union Berlin,0,0,0,0,18,10,4,2,6,2,8,14,3,1,0,0,2.04,3.44,3.81,2.11,1.75
+bundesliga,2023,bundesliga_2023_235_leverkusen_hoffenheim,30/03/2024,Leverkusen,Hoffenheim,2,1,0,1,36,6,12,2,9,2,9,8,0,1,0,0,1.22,7.36,11.77,1.31,3.47
+bundesliga,2023,bundesliga_2023_236_m'gladbach_freiburg,30/03/2024,M'gladbach,Freiburg,0,3,0,1,18,13,4,8,14,1,11,7,1,0,0,0,2.23,3.68,3.11,1.65,2.28
+bundesliga,2023,bundesliga_2023_237_rb_leipzig_mainz,30/03/2024,RB Leipzig,Mainz,0,0,0,0,23,8,10,2,12,2,10,15,2,5,0,0,1.38,5.3,7.65,1.53,2.52
+bundesliga,2023,bundesliga_2023_238_werder_bremen_wolfsburg,30/03/2024,Werder Bremen,Wolfsburg,0,2,0,1,6,15,1,5,3,6,13,15,4,4,1,1,2.84,3.56,2.43,1.77,2.08
+bundesliga,2023,bundesliga_2023_239_bayern_munich_dortmund,30/03/2024,Bayern Munich,Dortmund,0,2,0,1,16,11,3,5,7,4,7,7,0,0,0,0,1.4,5.71,6.47,1.24,4.08
+bundesliga,2023,bundesliga_2023_240_augsburg_fc_koln,31/03/2024,Augsburg,FC Koln,1,1,1,1,24,12,6,2,12,6,9,13,0,3,0,0,1.79,3.87,4.42,1.78,2.06
+bundesliga,2023,bundesliga_2023_241_stuttgart_heidenheim,31/03/2024,Stuttgart,Heidenheim,3,3,1,0,20,6,6,3,6,7,5,9,1,0,0,1,1.27,6.35,10.32,1.41,2.91
+bundesliga,2023,bundesliga_2023_242_bochum_darmstadt,31/03/2024,Bochum,Darmstadt,2,2,1,0,20,13,7,3,6,5,7,15,2,2,0,0,1.65,4.18,5.06,1.68,2.22
+bundesliga,2023,bundesliga_2023_243_ein_frankfurt_werder_bremen,05/04/2024,Ein Frankfurt,Werder Bremen,1,1,0,0,19,10,5,7,9,0,10,14,3,2,1,1,1.79,3.9,4.44,1.73,2.15
+bundesliga,2023,bundesliga_2023_244_fc_koln_bochum,06/04/2024,FC Koln,Bochum,2,1,0,0,17,8,6,2,9,4,16,13,3,3,0,0,2.3,3.59,3.05,1.8,2.04
+bundesliga,2023,bundesliga_2023_245_freiburg_rb_leipzig,06/04/2024,Freiburg,RB Leipzig,1,4,0,3,15,15,4,6,8,4,7,12,3,4,0,0,4.63,4.27,1.69,1.54,2.49
+bundesliga,2023,bundesliga_2023_246_heidenheim_bayern_munich,06/04/2024,Heidenheim,Bayern Munich,3,2,0,2,9,15,4,8,3,3,9,8,2,0,0,0,7.21,5.88,1.36,1.33,3.36
+bundesliga,2023,bundesliga_2023_247_mainz_darmstadt,06/04/2024,Mainz,Darmstadt,4,0,1,0,18,14,9,2,5,1,16,9,2,3,0,0,1.42,4.87,7.63,1.7,2.2
+bundesliga,2023,bundesliga_2023_248_union_berlin_leverkusen,06/04/2024,Union Berlin,Leverkusen,0,1,0,1,8,19,1,8,7,10,10,14,3,2,1,0,6.02,4.28,1.56,1.82,2.02
+bundesliga,2023,bundesliga_2023_249_dortmund_stuttgart,06/04/2024,Dortmund,Stuttgart,0,1,0,0,14,10,7,2,8,3,8,8,2,4,0,0,2.27,3.99,2.85,1.4,2.96
+bundesliga,2023,bundesliga_2023_250_hoffenheim_augsburg,07/04/2024,Hoffenheim,Augsburg,3,1,2,0,17,14,6,7,11,6,8,14,3,1,0,0,2.25,3.93,2.91,1.48,2.67
+bundesliga,2023,bundesliga_2023_251_wolfsburg_m'gladbach,07/04/2024,Wolfsburg,M'gladbach,1,3,1,0,13,10,4,6,4,4,9,12,2,2,0,0,1.9,3.88,3.86,1.65,2.27
+bundesliga,2023,bundesliga_2023_252_augsburg_union_berlin,12/04/2024,Augsburg,Union Berlin,2,0,0,0,12,17,4,4,5,4,15,14,1,1,0,0,2.13,3.48,3.51,1.94,1.9
+bundesliga,2023,bundesliga_2023_253_bayern_munich_fc_koln,13/04/2024,Bayern Munich,FC Koln,2,0,0,0,17,11,7,5,5,5,3,15,0,3,0,0,1.2,7.74,12.41,1.31,3.45
+bundesliga,2023,bundesliga_2023_254_bochum_heidenheim,13/04/2024,Bochum,Heidenheim,1,1,0,0,24,10,5,3,6,2,12,22,4,1,0,0,2.1,3.72,3.38,1.66,2.25
+bundesliga,2023,bundesliga_2023_255_mainz_hoffenheim,13/04/2024,Mainz,Hoffenheim,4,1,0,1,23,5,8,1,9,3,12,14,0,2,0,0,1.99,3.93,3.52,1.58,2.42
+bundesliga,2023,bundesliga_2023_256_m'gladbach_dortmund,13/04/2024,M'gladbach,Dortmund,1,2,1,2,16,12,5,4,2,4,13,11,1,4,0,1,3.26,4.1,2.03,1.4,2.99
+bundesliga,2023,bundesliga_2023_257_rb_leipzig_wolfsburg,13/04/2024,RB Leipzig,Wolfsburg,3,0,1,0,15,10,6,3,6,4,12,7,2,4,0,0,1.36,5.47,7.77,1.45,2.74
+bundesliga,2023,bundesliga_2023_258_stuttgart_ein_frankfurt,13/04/2024,Stuttgart,Ein Frankfurt,3,0,3,0,9,10,6,3,4,5,4,15,1,3,0,0,1.52,4.65,5.86,1.56,2.43
+bundesliga,2023,bundesliga_2023_259_darmstadt_freiburg,14/04/2024,Darmstadt,Freiburg,0,1,0,1,16,9,4,3,2,2,6,12,0,1,0,0,3.96,3.92,1.86,1.66,2.26
+bundesliga,2023,bundesliga_2023_260_leverkusen_werder_bremen,14/04/2024,Leverkusen,Werder Bremen,5,0,1,0,19,7,10,3,7,0,10,4,2,1,0,0,1.2,7.2,13.63,1.43,2.82
+bundesliga,2023,bundesliga_2023_261_ein_frankfurt_augsburg,19/04/2024,Ein Frankfurt,Augsburg,3,1,0,1,12,6,7,1,6,5,2,19,3,3,0,0,2.05,3.77,3.48,1.67,2.26
+bundesliga,2023,bundesliga_2023_262_fc_koln_darmstadt,20/04/2024,FC Koln,Darmstadt,0,2,0,0,18,12,4,6,4,3,10,13,0,1,0,0,1.5,4.57,6.35,1.65,2.28
+bundesliga,2023,bundesliga_2023_263_heidenheim_rb_leipzig,20/04/2024,Heidenheim,RB Leipzig,1,2,0,1,9,11,5,4,2,6,14,7,3,1,0,0,6.24,5.1,1.46,1.44,2.8
+bundesliga,2023,bundesliga_2023_264_hoffenheim_m'gladbach,20/04/2024,Hoffenheim,M'gladbach,4,3,1,1,27,13,9,7,6,5,6,11,1,3,0,0,2.12,4.02,3.09,1.44,2.8
+bundesliga,2023,bundesliga_2023_265_wolfsburg_bochum,20/04/2024,Wolfsburg,Bochum,1,0,1,0,10,9,5,1,5,8,11,16,4,3,0,0,1.79,3.98,4.32,1.68,2.22
+bundesliga,2023,bundesliga_2023_266_union_berlin_bayern_munich,20/04/2024,Union Berlin,Bayern Munich,1,5,0,2,15,18,4,9,5,3,5,4,0,0,0,0,4.94,4.51,1.62,1.6,2.38
+bundesliga,2023,bundesliga_2023_267_werder_bremen_stuttgart,21/04/2024,Werder Bremen,Stuttgart,2,1,1,0,9,14,2,5,1,7,11,10,3,3,0,0,4.99,4.54,1.6,1.48,2.67
+bundesliga,2023,bundesliga_2023_268_dortmund_leverkusen,21/04/2024,Dortmund,Leverkusen,1,1,0,0,9,13,2,5,2,6,14,11,4,3,0,0,2.55,3.84,2.55,1.48,2.58
+bundesliga,2023,bundesliga_2023_269_freiburg_mainz,21/04/2024,Freiburg,Mainz,1,1,1,1,7,17,3,4,2,4,17,15,3,4,0,0,2.58,3.56,2.67,1.75,2.11
+bundesliga,2023,bundesliga_2023_270_bochum_hoffenheim,26/04/2024,Bochum,Hoffenheim,3,2,2,0,35,12,13,4,10,4,13,10,1,1,0,0,2.21,3.92,2.99,1.44,2.8
+bundesliga,2023,bundesliga_2023_271_augsburg_werder_bremen,27/04/2024,Augsburg,Werder Bremen,0,3,0,0,14,16,1,8,6,4,18,8,1,2,0,0,1.81,4.09,4.05,1.55,2.45
+bundesliga,2023,bundesliga_2023_272_bayern_munich_ein_frankfurt,27/04/2024,Bayern Munich,Ein Frankfurt,2,1,1,1,19,10,9,3,4,2,11,7,0,3,0,0,1.41,5.4,6.67,1.36,3.17
+bundesliga,2023,bundesliga_2023_273_freiburg_wolfsburg,27/04/2024,Freiburg,Wolfsburg,1,2,1,0,16,13,3,5,3,6,12,7,4,2,1,0,2.33,3.56,3.0,1.83,2.02
+bundesliga,2023,bundesliga_2023_274_rb_leipzig_dortmund,27/04/2024,RB Leipzig,Dortmund,4,1,2,1,21,12,7,5,5,8,11,7,1,2,0,0,1.68,4.41,4.51,1.4,2.98
+bundesliga,2023,bundesliga_2023_275_leverkusen_stuttgart,27/04/2024,Leverkusen,Stuttgart,2,2,0,0,14,11,6,4,5,2,10,19,4,3,0,0,1.75,4.22,4.27,1.55,2.46
+bundesliga,2023,bundesliga_2023_276_m'gladbach_union_berlin,28/04/2024,M'gladbach,Union Berlin,0,0,0,0,13,14,4,7,3,4,3,13,2,2,0,0,2.33,3.46,3.07,1.93,1.89
+bundesliga,2023,bundesliga_2023_277_mainz_fc_koln,28/04/2024,Mainz,FC Koln,1,1,1,0,16,16,4,6,6,6,17,13,4,4,1,0,1.54,4.34,6.02,1.73,2.13
+bundesliga,2023,bundesliga_2023_278_darmstadt_heidenheim,28/04/2024,Darmstadt,Heidenheim,0,1,0,0,12,19,4,6,3,8,14,12,2,1,0,0,3.33,3.71,2.11,1.67,2.23
+bundesliga,2023,bundesliga_2023_279_hoffenheim_rb_leipzig,03/05/2024,Hoffenheim,RB Leipzig,1,1,0,1,18,8,8,5,4,4,6,8,1,3,0,1,5.4,5.19,1.51,1.26,3.85
+bundesliga,2023,bundesliga_2023_280_dortmund_augsburg,04/05/2024,Dortmund,Augsburg,5,1,4,1,21,20,10,4,6,9,4,11,0,1,0,0,1.85,4.32,3.69,1.32,3.33
+bundesliga,2023,bundesliga_2023_281_stuttgart_bayern_munich,04/05/2024,Stuttgart,Bayern Munich,3,1,1,1,24,10,11,3,3,1,10,8,1,2,0,0,2.13,4.04,3.07,1.41,2.9
+bundesliga,2023,bundesliga_2023_282_werder_bremen_m'gladbach,04/05/2024,Werder Bremen,M'gladbach,2,2,1,1,17,17,6,7,7,2,6,7,0,0,0,0,2.3,3.75,2.91,1.56,2.44
+bundesliga,2023,bundesliga_2023_283_wolfsburg_darmstadt,04/05/2024,Wolfsburg,Darmstadt,3,0,2,0,18,6,6,1,9,2,11,13,0,3,0,0,1.39,5.15,7.64,1.55,2.46
+bundesliga,2023,bundesliga_2023_284_fc_koln_freiburg,04/05/2024,FC Koln,Freiburg,0,0,0,0,20,4,7,0,7,1,10,9,1,1,0,0,2.36,3.64,2.9,1.75,2.11
+bundesliga,2023,bundesliga_2023_285_union_berlin_bochum,05/05/2024,Union Berlin,Bochum,3,4,0,3,12,17,6,5,6,4,13,16,0,1,0,0,1.97,3.47,4.02,2.05,1.78
+bundesliga,2023,bundesliga_2023_286_ein_frankfurt_leverkusen,05/05/2024,Ein Frankfurt,Leverkusen,1,5,1,2,16,10,5,6,10,5,10,4,0,0,0,0,3.16,3.59,2.23,1.71,2.15
+bundesliga,2023,bundesliga_2023_287_heidenheim_mainz,05/05/2024,Heidenheim,Mainz,1,1,0,1,16,10,6,4,6,3,8,8,2,3,0,0,2.99,3.58,2.33,1.7,2.19
+bundesliga,2023,bundesliga_2023_288_augsburg_stuttgart,10/05/2024,Augsburg,Stuttgart,0,1,0,0,9,19,1,7,5,5,15,9,4,2,0,0,3.88,4.34,1.81,1.36,3.16
+bundesliga,2023,bundesliga_2023_289_fc_koln_union_berlin,11/05/2024,FC Koln,Union Berlin,3,2,1,2,18,14,5,6,6,8,15,16,3,2,0,0,2.8,3.38,2.57,1.98,1.82
+bundesliga,2023,bundesliga_2023_290_freiburg_heidenheim,11/05/2024,Freiburg,Heidenheim,1,1,1,1,19,9,3,3,2,4,9,11,1,1,0,0,1.73,4.06,4.59,1.63,2.31
+bundesliga,2023,bundesliga_2023_291_m'gladbach_ein_frankfurt,11/05/2024,M'gladbach,Ein Frankfurt,1,1,1,1,6,16,3,1,2,8,9,10,1,0,0,0,2.51,3.71,2.66,1.57,2.43
+bundesliga,2023,bundesliga_2023_292_rb_leipzig_werder_bremen,11/05/2024,RB Leipzig,Werder Bremen,1,1,0,1,13,10,5,1,4,3,12,6,1,0,0,0,1.29,6.54,8.64,1.29,3.63
+bundesliga,2023,bundesliga_2023_293_mainz_dortmund,11/05/2024,Mainz,Dortmund,3,0,3,0,14,10,6,2,4,2,14,11,2,2,0,0,2.21,3.9,2.98,1.48,2.65
+bundesliga,2023,bundesliga_2023_294_darmstadt_hoffenheim,12/05/2024,Darmstadt,Hoffenheim,0,6,0,5,9,12,1,7,2,3,9,3,3,0,0,0,4.66,4.62,1.64,1.35,3.2
+bundesliga,2023,bundesliga_2023_295_bayern_munich_wolfsburg,12/05/2024,Bayern Munich,Wolfsburg,2,0,2,0,5,5,3,2,4,0,7,8,0,2,0,0,1.35,5.89,7.55,1.35,3.22
+bundesliga,2023,bundesliga_2023_296_bochum_leverkusen,12/05/2024,Bochum,Leverkusen,0,5,0,2,2,28,0,10,2,6,5,10,2,1,1,0,4.34,4.32,1.72,1.48,2.66
+bundesliga,2023,bundesliga_2023_297_dortmund_darmstadt,18/05/2024,Dortmund,Darmstadt,4,0,2,0,21,7,10,1,7,3,4,10,0,3,0,0,1.16,8.99,14.24,1.21,4.43
+bundesliga,2023,bundesliga_2023_298_ein_frankfurt_rb_leipzig,18/05/2024,Ein Frankfurt,RB Leipzig,2,2,0,1,19,9,6,5,8,3,10,11,2,2,0,0,2.76,3.79,2.4,1.47,2.7
+bundesliga,2023,bundesliga_2023_299_heidenheim_fc_koln,18/05/2024,Heidenheim,FC Koln,4,1,3,0,13,19,7,9,5,12,9,20,1,3,0,0,2.35,3.97,2.74,1.51,2.59
+bundesliga,2023,bundesliga_2023_300_hoffenheim_bayern_munich,18/05/2024,Hoffenheim,Bayern Munich,4,2,1,2,17,12,9,4,6,5,7,9,3,1,0,0,3.0,4.43,2.06,1.23,4.09
+bundesliga,2023,bundesliga_2023_301_leverkusen_augsburg,18/05/2024,Leverkusen,Augsburg,2,1,2,0,19,8,8,2,5,4,6,7,0,1,0,0,1.29,6.59,8.71,1.24,4.01
+bundesliga,2023,bundesliga_2023_302_stuttgart_m'gladbach,18/05/2024,Stuttgart,M'gladbach,4,0,2,0,21,13,11,5,8,4,4,9,1,2,0,0,1.28,6.63,8.97,1.23,4.19
+bundesliga,2023,bundesliga_2023_303_union_berlin_freiburg,18/05/2024,Union Berlin,Freiburg,2,1,0,0,14,11,5,5,3,7,14,9,7,4,0,0,2.13,3.47,3.51,1.92,1.92
+bundesliga,2023,bundesliga_2023_304_werder_bremen_bochum,18/05/2024,Werder Bremen,Bochum,4,1,1,0,25,26,12,8,8,8,12,12,1,1,0,0,2.38,3.67,2.86,1.54,2.48
+bundesliga,2023,bundesliga_2023_305_wolfsburg_mainz,18/05/2024,Wolfsburg,Mainz,1,3,1,1,12,12,4,6,1,3,13,15,2,3,0,0,3.23,3.58,2.21,1.75,2.11

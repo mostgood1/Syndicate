@@ -1,0 +1,61 @@
+match,score_at_cutoff,actual_final_score,actual_result,model_result_probability,predicted_home_win,predicted_draw,predicted_away_win,predicted_total,actual_total,total_error,predicted_btts,actual_btts,predicted_over_2_5,actual_over_2_5,predicted_home_corners,actual_home_corners,predicted_away_corners,actual_away_corners,corner_error
+Liverpool v AFC Bournemouth,0-0,4-2,home,0.38,0.38,0.305,0.315,2.16,6,3.84,0.485,True,0.375,True,8.6,9,3.395,0,2.994999999999999
+Chelsea v Crystal Palace,0-0,0-0,draw,0.33,0.375,0.33,0.295,2.145,0,2.145,0.445,False,0.36,False,4.625,1,6.245,6,3.870000000000001
+AFC Bournemouth v Wolverhampton Wanderers,1-0,1-0,home,0.8,0.8,0.13,0.07,3.14,1,2.14,0.52,False,0.61,False,7.005,3,4.85,4,4.855
+Newcastle United v Liverpool,0-0,2-3,away,0.38,0.315,0.305,0.38,2.155,5,2.845,0.475,True,0.37,True,5.575,2,3.31,5,1.8849999999999998
+Leeds United v Newcastle United,0-0,0-0,draw,0.28,0.37,0.28,0.35,2.1,0,2.1,0.395,False,0.345,False,5.33,4,3.12,3,1.4499999999999993
+AFC Bournemouth v Brighton & Hove Albion,1-0,1-1,draw,0.245,0.65,0.245,0.105,3.155,2,1.1549999999999998,0.605,True,0.6,False,3.355,6,3.095,0,0.4500000000000002
+Burnley v Liverpool,0-0,0-0,draw,0.33,0.195,0.33,0.475,2.0,0,2.0,0.425,False,0.28,False,4.88,4,4.91,9,3.210000000000001
+Wolverhampton Wanderers v Leeds United,1-0,1-3,away,0.14,0.64,0.22,0.14,2.95,4,1.0499999999999998,0.65,True,0.57,True,3.155,0,3.395,3,3.55
+Brentford v Manchester United,2-1,3-1,home,0.655,0.655,0.185,0.16,5.075,4,1.0750000000000002,1.0,True,1.0,True,3.56,2,5.27,3,3.83
+Aston Villa v Fulham,0-1,3-1,home,0.19,0.19,0.275,0.535,3.08,4,0.9199999999999999,0.71,True,0.595,True,5.82,5,2.92,1,2.74
+Manchester United v Sunderland,1-0,2-0,home,0.79,0.79,0.145,0.065,3.185,2,1.185,0.56,False,0.64,False,3.87,4,3.04,0,2.91
+Brentford v Manchester City,0-1,0-1,away,0.65,0.135,0.215,0.65,3.16,1,2.16,0.625,False,0.6,False,3.17,1,4.295,3,3.465
+Fulham v Arsenal,0-0,0-1,away,0.43,0.27,0.3,0.43,2.015,1,1.0150000000000001,0.415,False,0.355,False,2.795,4,7.78,6,0.5749999999999993
+Newcastle United v Fulham,1-0,2-1,home,0.685,0.685,0.235,0.08,3.23,3,0.22999999999999998,0.63,True,0.615,True,4.665,3,2.915,2,2.58
+Wolverhampton Wanderers v Burnley,0-2,1-3,away,0.825,0.05,0.125,0.825,3.975,4,0.02499999999999991,0.73,True,0.895,True,4.495,4,2.715,4,0.79
+Tottenham Hotspur v Chelsea,0-0,0-1,away,0.395,0.335,0.27,0.395,2.14,1,1.1400000000000001,0.39,False,0.34,False,5.13,2,6.51,8,1.6400000000000006
+Everton v Fulham,0-0,2-0,home,0.475,0.475,0.245,0.28,2.025,2,0.02499999999999991,0.4,False,0.31,False,3.47,4,4.38,6,2.1500000000000004
+Crystal Palace v Brighton & Hove Albion,0-0,0-0,draw,0.275,0.425,0.275,0.3,2.135,0,2.135,0.425,False,0.385,False,3.43,2,7.21,10,1.3599999999999994
+Liverpool v Nottingham Forest,0-0,0-3,away,0.23,0.48,0.29,0.23,2.065,3,0.935,0.415,False,0.34,True,6.035,9,4.83,2,0.1349999999999998
+Brentford v Burnley,0-0,2-0,home,0.615,0.615,0.23,0.155,2.03,2,0.029999999999999805,0.31,False,0.31,False,5.175,6,2.65,2,0.1750000000000007
+Aston Villa v Wolverhampton Wanderers,0-0,1-0,home,0.46,0.46,0.34,0.2,2.1,1,1.1,0.435,False,0.325,False,3.83,2,4.96,8,1.2100000000000009
+Arsenal v Brentford,1-0,2-0,home,0.805,0.805,0.14,0.055,3.08,2,1.08,0.52,False,0.61,False,8.02,9,4.015,2,1.0350000000000001
+Manchester United v West Ham United,0-0,1-1,draw,0.3,0.47,0.3,0.23,2.1,2,0.10000000000000009,0.43,True,0.35,False,6.99,8,2.975,2,0.03500000000000014
+Tottenham Hotspur v Brentford,1-0,2-0,home,0.59,0.59,0.225,0.185,3.1,2,1.1,0.725,False,0.67,False,4.985,6,5.37,4,0.3550000000000004
+Burnley v Fulham,1-1,2-3,away,0.405,0.29,0.305,0.405,3.895,5,1.105,1.0,True,0.87,True,3.005,1,4.485,6,0.4900000000000002
+Brentford v Leeds United,0-0,1-1,draw,0.265,0.455,0.265,0.28,2.105,2,0.10499999999999998,0.41,True,0.35,False,4.5,2,3.145,0,5.645
+Wolverhampton Wanderers v Brentford,0-0,0-2,away,0.415,0.26,0.325,0.415,1.985,2,0.014999999999999902,0.4,False,0.3,False,4.065,2,5.64,3,4.705
+Nottingham Forest v Manchester City,0-0,1-2,away,0.425,0.285,0.29,0.425,2.1,3,0.8999999999999999,0.455,True,0.34,True,3.25,1,6.61,6,2.8599999999999994
+Chelsea v Aston Villa,0-0,1-2,away,0.3,0.42,0.28,0.3,2.135,3,0.8650000000000002,0.42,True,0.38,True,3.72,11,2.945,0,4.335
+West Ham United v Brighton & Hove Albion,1-0,1-1,draw,0.195,0.645,0.195,0.16,3.13,2,1.13,0.695,True,0.65,False,2.995,3,6.415,5,1.4100000000000001
+Aston Villa v Nottingham Forest,0-0,3-1,home,0.435,0.435,0.325,0.24,2.09,4,1.9100000000000001,0.445,True,0.325,True,6.625,6,3.04,1,2.664999999999999
+Newcastle United v Crystal Palace,0-0,2-0,home,0.365,0.365,0.32,0.315,2.19,2,0.18999999999999995,0.455,False,0.39,False,6.52,5,4.215,5,0.7349999999999994
+Brentford v Sunderland,1-0,3-0,home,0.785,0.785,0.175,0.04,3.22,3,0.2200000000000002,0.585,False,0.615,True,3.925,1,2.85,7,1.2249999999999996
+Arsenal v Liverpool,0-0,0-0,draw,0.295,0.45,0.295,0.255,2.175,0,2.175,0.45,False,0.355,False,3.79,0,4.315,2,6.105
+Tottenham Hotspur v West Ham United,0-1,1-2,away,0.615,0.185,0.2,0.615,2.98,3,0.020000000000000018,0.675,True,0.64,True,3.435,6,5.325,9,6.24
+Burnley v Tottenham Hotspur,0-0,2-2,draw,0.31,0.32,0.31,0.37,1.935,4,2.065,0.38,True,0.29,True,2.915,1,3.545,1,4.46
+Arsenal v Manchester United,0-0,1-3,away,0.265,0.445,0.29,0.265,2.095,4,1.9049999999999998,0.425,True,0.345,True,7.89,9,3.165,2,0.054999999999999716
+Liverpool v Newcastle United,0-0,4-1,home,0.375,0.375,0.33,0.295,2.13,5,2.87,0.47,True,0.365,True,7.645,10,4.28,2,0.07499999999999929
+Leeds United v Nottingham Forest,2-0,3-1,home,0.905,0.905,0.07,0.025,4.12,4,0.1200000000000001,0.625,True,0.865,True,7.725,8,3.845,2,1.5700000000000003
+Newcastle United v Brentford,1-0,1-2,away,0.165,0.645,0.19,0.165,3.19,3,0.18999999999999995,0.68,True,0.655,True,3.535,2,7.355,8,0.8900000000000006
+West Ham United v Manchester United,0-0,1-1,draw,0.28,0.31,0.28,0.41,2.04,2,0.040000000000000036,0.395,True,0.29,False,3.235,0,3.44,0,6.675
+Brentford v Arsenal,0-0,1-1,draw,0.22,0.355,0.22,0.425,2.325,2,0.3250000000000002,0.455,True,0.395,False,4.155,2,5.43,6,1.5850000000000009
+Crystal Palace v Wolverhampton Wanderers,0-0,1-0,home,0.505,0.505,0.24,0.255,2.07,1,1.0699999999999998,0.345,False,0.335,False,4.95,2,4.875,6,1.8249999999999993
+AFC Bournemouth v Sunderland,0-1,1-1,draw,0.285,0.22,0.285,0.495,3.15,2,1.15,0.74,True,0.59,False,3.77,2,6.875,7,1.6449999999999996
+Fulham v Tottenham Hotspur,1-0,2-1,home,0.705,0.705,0.19,0.105,3.105,3,0.10499999999999998,0.64,True,0.65,True,5.44,9,3.205,1,1.3550000000000004
+Aston Villa v Chelsea,1-0,1-4,away,0.14,0.69,0.17,0.14,3.16,5,1.8399999999999999,0.69,True,0.665,True,5.295,3,6.205,7,1.5
+Burnley v AFC Bournemouth,0-0,0-0,draw,0.3,0.27,0.3,0.43,2.02,0,2.02,0.445,False,0.315,False,4.85,2,6.995,6,3.844999999999999
+Manchester United v Aston Villa,0-0,3-1,home,0.47,0.47,0.29,0.24,2.19,4,1.81,0.44,True,0.395,True,3.705,5,5.01,3,0.7149999999999999
+Everton v Chelsea,0-0,3-0,home,0.295,0.295,0.3,0.405,2.085,3,0.915,0.415,False,0.325,True,4.11,4,5.605,7,1.2850000000000001
+Arsenal v AFC Bournemouth,0-1,0-2,away,0.48,0.21,0.31,0.48,3.12,2,1.12,0.74,False,0.62,False,4.835,1,2.91,6,0.7450000000000001
+Sunderland v Tottenham Hotspur,0-0,1-0,home,0.39,0.39,0.285,0.325,1.965,1,0.9650000000000001,0.41,False,0.29,False,4.29,6,5.275,2,1.5650000000000013
+Chelsea v Manchester United,0-0,0-1,away,0.365,0.345,0.29,0.365,2.105,1,1.105,0.475,False,0.355,False,3.44,1,4.41,5,1.8499999999999996
+Brighton & Hove Albion v Chelsea,1-0,3-0,home,0.635,0.635,0.24,0.125,3.175,3,0.17499999999999982,0.665,False,0.625,True,5.49,7,5.3,2,1.7899999999999991
+West Ham United v Everton,0-0,2-1,home,0.42,0.42,0.25,0.33,2.125,3,0.875,0.405,True,0.34,True,4.365,4,5.295,2,3.66
+Wolverhampton Wanderers v Sunderland,0-1,1-1,draw,0.26,0.195,0.26,0.545,2.885,2,0.8849999999999998,0.715,True,0.585,False,3.55,1,5.84,8,0.39000000000000057
+Everton v Manchester City,0-0,3-3,draw,0.345,0.255,0.345,0.4,2.085,6,3.915,0.45,True,0.33,True,4.945,2,5.53,9,0.5249999999999986
+Burnley v Aston Villa,1-0,2-2,draw,0.215,0.58,0.215,0.205,3.045,4,0.9550000000000001,0.715,True,0.645,True,4.015,6,4.785,4,1.1999999999999993
+Manchester United v Nottingham Forest,1-0,3-2,home,0.77,0.77,0.155,0.075,3.105,5,1.895,0.59,True,0.645,True,5.82,9,3.005,1,1.1750000000000007
+Arsenal v Burnley,0-0,1-0,home,0.67,0.67,0.235,0.095,2.405,1,1.4049999999999998,0.435,False,0.445,False,5.57,2,3.44,3,4.01
+Fulham v Newcastle United,1-0,2-0,home,0.645,0.645,0.21,0.145,3.105,2,1.105,0.69,False,0.64,False,4.095,6,5.45,5,1.455

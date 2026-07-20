@@ -27,6 +27,7 @@ from syndicate.blueprints.ncaab import ncaab_bp
 from syndicate.blueprints.ncaaf import ncaaf_bp
 from syndicate.blueprints.nba import nba_bp
 from syndicate.blueprints.mlb import mlb_bp
+from syndicate.blueprints.soccer import soccer_bp
 from syndicate.blueprints.sports import sports_bp
 from syndicate.blueprints.wnba import wnba_bp
 from syndicate.features.shared.live_refresh_loop import start_live_refresh_background_loop
@@ -250,6 +251,23 @@ def create_app() -> Flask:
                     "fallback_surfaces": [],
                 },
             },
+            {
+                "slug": "soccer",
+                "name": "Soccer",
+                "status": "Active migration",
+                "phase": "SoccerSim-backed cards + game + props + live lens + daily archive across leagues",
+                "summary": "Soccer runs its own possession-based Monte Carlo engine (SoccerSim) across multiple leagues, with artifact-backed cards, a game drill-in, player-prop boards (anytime scorer / shots / shots on target), a resumed-match live lens covering live corners, live shots/SOT, live goals/BTTS/team totals, and scoring-in-a-window probabilities, and a stored-date daily archive. No settlement/accuracy pipeline is wired up yet, so market-accuracy, reconciliation, and picks lanes are not published for soccer.",
+                "primary_href": "/soccer/epl/cards",
+                "primary_label": "Open Soccer cards",
+                "surfaces": ["cards", "game", "props", "live-lens", "daily archive", "hub"],
+                "next_step": "Wire a daily artifact-generation job (scripts/build_soccer_artifacts.py + poll_soccer_live_state.py) into the scheduled refresh loop, then add settlement so market-accuracy/reconciliation/picks can follow the same pattern as the other sports.",
+                "runtime_contract": {
+                    "dependency_tier": "owned_local",
+                    "ownership_goal": "full_local",
+                    "source_of_truth": "SoccerSim-generated artifacts from ESPN + Understat/ASA/football-data.co.uk ingestion",
+                    "fallback_surfaces": [],
+                },
+            },
         ]
     if not app.config.get("SYNDICATE_ACTIVE_SPORTS"):
         app.config["SYNDICATE_ACTIVE_SPORTS"] = ["mlb", "wnba"]
@@ -269,6 +287,7 @@ def create_app() -> Flask:
     app.register_blueprint(wnba_bp)
     app.register_blueprint(ncaaf_bp)
     app.register_blueprint(ncaab_bp)
+    app.register_blueprint(soccer_bp)
     app.register_blueprint(sports_bp)
 
     
