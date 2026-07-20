@@ -1052,6 +1052,68 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertTrue(response["state_last_updated"])
         self.assertEqual(response["state_last_updated"], response["snapshot_generated_at"])
 
+    def test_board_publication_does_not_roll_over_when_next_day_is_also_empty(self) -> None:
+        # A transient zero for today (e.g. an artifact-pull hiccup on one
+        # cycle) must not permanently pin the published board to tomorrow's
+        # date when tomorrow is *also* empty -- tomorrow is guaranteed to be
+        # empty for most of today, since it hasn't started yet, and nothing
+        # ever re-checks today once rolled over. Confirmed in production:
+        # today had real games the whole time; a single zero reading rolled
+        # the board over to a permanently-empty tomorrow.
+        service = IntelligenceStateService()
+        today = "2026-06-15"
+        tomorrow = "2026-06-16"
+
+        def fake_build_pool(selected_date: str, source_fingerprint: str) -> dict:
+            return {
+                "selected_date": selected_date,
+                "source_fingerprint": source_fingerprint,
+                "candidate_count": 0,
+                "candidate_pools": {},
+                "global_pool": [],
+                "candidates": [],
+            }
+
+        with patch.object(intelligence_state_module, "central_today_iso", return_value=today):
+            with patch.object(intelligence_state_module, "_next_supported_intelligence_date", return_value=tomorrow):
+                with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-1"):
+                    with patch.object(service, "_build_candidate_pool", side_effect=fake_build_pool) as mocked_pool:
+                        response = service._compute_board_publication_response({"question": "top edges today", "date": today, "limit": 5})
+
+        self.assertEqual(response["candidate_count"], 0)
+        self.assertEqual(response["selected_date"], today)
+        called_dates = [call.args[0] for call in mocked_pool.call_args_list]
+        self.assertIn(tomorrow, called_dates)
+
+    def test_board_publication_rolls_over_when_next_day_has_more_candidates(self) -> None:
+        service = IntelligenceStateService()
+        today = "2026-06-15"
+        tomorrow = "2026-06-16"
+
+        def fake_build_pool(selected_date: str, source_fingerprint: str) -> dict:
+            count = 0 if selected_date == today else 3
+            candidates = [
+                {"name": f"Play {i}", "sport_slug": "mlb", "market": "Hits", "score": 5.0, "confidence": 0.5, "updated_at": "2026-06-16T12:00:00Z"}
+                for i in range(count)
+            ]
+            return {
+                "selected_date": selected_date,
+                "source_fingerprint": source_fingerprint,
+                "candidate_count": count,
+                "candidate_pools": {},
+                "global_pool": candidates,
+                "candidates": candidates,
+            }
+
+        with patch.object(intelligence_state_module, "central_today_iso", return_value=today):
+            with patch.object(intelligence_state_module, "_next_supported_intelligence_date", return_value=tomorrow):
+                with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-1"):
+                    with patch.object(service, "_build_candidate_pool", side_effect=fake_build_pool):
+                        response = service._compute_board_publication_response({"question": "top edges today", "date": today, "limit": 5})
+
+        self.assertEqual(response["candidate_count"], 3)
+        self.assertEqual(response["selected_date"], tomorrow)
+
     def test_background_loop_consumes_persisted_queue_payloads(self) -> None:
         service = IntelligenceStateService()
         service._interval_seconds = 0

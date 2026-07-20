@@ -1798,13 +1798,28 @@ class IntelligenceStateService:
         if candidate_pool_count <= 0 and selected_date == central_today_iso():
             rollover_date = _next_supported_intelligence_date(selected_date)
             if rollover_date and rollover_date != selected_date:
-                logger.info("BETTING_BOARD_PUBLISH_DATE", extra={"requested_date": selected_date, "selected_date": rollover_date, "rollover": True})
-                selected_date = rollover_date
-                request_payload["date"] = rollover_date
-                source_fingerprint = self._source_state_fingerprint(selected_date)
-                cache_key = _payload_key(request_payload)
-                candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
-                candidate_pool_count = int(candidate_pool.get("candidate_count") or 0)
+                rollover_fingerprint = self._source_state_fingerprint(rollover_date)
+                rollover_pool = self._build_candidate_pool(rollover_date, rollover_fingerprint)
+                rollover_count = int(rollover_pool.get("candidate_count") or 0)
+                # 2026-07-20: only actually commit to the rollover if it
+                # produced more than today did -- otherwise a merely
+                # transient zero for today (e.g. an artifact-pull hiccup on
+                # this one cycle, not "today's slate is over") permanently
+                # switches the published board to tomorrow's date, which is
+                # guaranteed to also be zero since tomorrow hasn't started
+                # yet, and nothing here ever switches back to today even
+                # once today's real data becomes available on a later
+                # cycle. Confirmed in production: today had real WNBA/MLB
+                # games the whole time; a single zero reading rolled the
+                # board over to a permanently-empty tomorrow.
+                if rollover_count > candidate_pool_count:
+                    logger.info("BETTING_BOARD_PUBLISH_DATE", extra={"requested_date": selected_date, "selected_date": rollover_date, "rollover": True})
+                    selected_date = rollover_date
+                    request_payload["date"] = rollover_date
+                    source_fingerprint = rollover_fingerprint
+                    cache_key = _payload_key(request_payload)
+                    candidate_pool = rollover_pool
+                    candidate_pool_count = rollover_count
 
         logger.info("BETTING_BOARD_PUBLISH_DATE", extra={"requested_date": str(payload.get("date") or payload.get("selected_date") or "").strip() or None, "selected_date": selected_date, "candidate_count": candidate_pool_count})
         candidates = [self._serialize_candidate(candidate) for candidate in candidate_pool.get("candidates") if isinstance(candidate, Mapping)]
@@ -1898,13 +1913,21 @@ class IntelligenceStateService:
             if candidate_pool_count <= 0 and selected_date == central_today_iso():
                 rollover_date = _next_supported_intelligence_date(selected_date)
                 if rollover_date and rollover_date != selected_date:
-                    logger.info("BETTING_BOARD_REFRESH_DATE", extra={"requested_date": selected_date, "selected_date": rollover_date, "rollover": True})
-                    selected_date = rollover_date
-                    request_payload["date"] = rollover_date
-                    source_fingerprint = self._source_state_fingerprint(selected_date)
-                    cache_key = _payload_key(request_payload)
-                    candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
-                    candidate_pool_count = int(candidate_pool.get("candidate_count") or 0)
+                    rollover_fingerprint = self._source_state_fingerprint(rollover_date)
+                    rollover_pool = self._build_candidate_pool(rollover_date, rollover_fingerprint)
+                    rollover_count = int(rollover_pool.get("candidate_count") or 0)
+                    # See the matching comment in _compute_board_publication_response:
+                    # only commit to the rollover if it actually beats today,
+                    # otherwise a transient zero for today permanently pins
+                    # the board to a guaranteed-empty tomorrow.
+                    if rollover_count > candidate_pool_count:
+                        logger.info("BETTING_BOARD_REFRESH_DATE", extra={"requested_date": selected_date, "selected_date": rollover_date, "rollover": True})
+                        selected_date = rollover_date
+                        request_payload["date"] = rollover_date
+                        source_fingerprint = rollover_fingerprint
+                        cache_key = _payload_key(request_payload)
+                        candidate_pool = rollover_pool
+                        candidate_pool_count = rollover_count
             logger.info("BETTING_BOARD_REFRESH_DATE", extra={"requested_date": str(payload.get("date") or payload.get("selected_date") or "").strip() or None, "selected_date": selected_date, "candidate_count": candidate_pool_count})
             candidates = [self._serialize_candidate(candidate) for candidate in candidate_pool.get("candidates") if isinstance(candidate, Mapping)]
 
