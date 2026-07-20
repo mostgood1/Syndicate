@@ -18,6 +18,7 @@ from syndicate.blueprints.home import _prefer_today_or_latest
 from syndicate.blueprints.home import _game_bet_candidates_from_game
 from syndicate.blueprints.home import _prop_item_from_rank_card
 from syndicate.blueprints.home import _team_for_side_hint
+from syndicate.blueprints.home import _compact_prop_rows
 
 
 class HomePageCommandCenterTests(unittest.TestCase):
@@ -828,6 +829,22 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         item = _prop_item_from_rank_card(card, sport_slug="wnba")
         self.assertEqual(item["pick"], "Gabby Williams OVER 1.5")
         self.assertNotIn("EV", item["pick"])
+
+    def test_compact_prop_rows_carries_team_from_shared_prop_rows(self) -> None:
+        game = {
+            "away": {"abbr": "BOS", "name": "Boston Celtics"},
+            "home": {"abbr": "NYK", "name": "New York Knicks"},
+            "summary": "Test game",
+            "status": "Scheduled",
+            "shared_prop_rows": [
+                {"name": "Jayson Tatum", "detail": "Over 28.5", "value": "-", "team": "BOS"},
+            ],
+        }
+
+        rows = _compact_prop_rows([game])
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["team"], "BOS")
 
 
 if __name__ == "__main__":

@@ -308,13 +308,14 @@ def _build_top_play_rows(game: dict[str, Any]) -> list[dict[str, str]]:
 def _build_prop_rows(game: dict[str, Any]) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     prop_recs = game.get("prop_recommendations") if isinstance(game.get("prop_recommendations"), dict) else {}
-    for side_key, heading in (("away", game.get("away", {}).get("abbr", "Away")), ("home", game.get("home", {}).get("abbr", "Home"))):
+    for side_key, team_abbr in (("away", game.get("away", {}).get("abbr", "Away")), ("home", game.get("home", {}).get("abbr", "Home"))):
         for row in prop_recs.get(side_key) or []:
             if not isinstance(row, dict):
                 continue
             rows.append(
                 {
-                    "heading": f"{heading} props",
+                    "heading": f"{team_abbr} props",
+                    "team": team_abbr,
                     "name": _safe_text(row.get("player") or row.get("display_pick"), "Prop"),
                     "detail": _safe_text(row.get("display_pick") or row.get("market"), ""),
                     "value": _safe_text(row.get("tier") or row.get("line") or row.get("price"), "-"),

@@ -2999,12 +2999,15 @@ def _pregame_prop_rows_from_mlb_recommendations(
                         {"label": "Odds", "value": odds_text},
                     ]
                     
+                    pitcher_team_side = str(prop.get("team_side") or "").strip().lower()
+                    pitcher_team = row_home_label if pitcher_team_side == "home" else row_away_label if pitcher_team_side == "away" else None
                     rows.append({
                         "game_pk": _int_or_none(game_pk),
                         "matchup": row_matchup if re.fullmatch(r"Game\s+\d+", matchup_text, flags=re.IGNORECASE) else matchup_text,
                         "heading": "Betting Card",
                         "name": pitcher,
                         "player_name": pitcher,
+                        "team": pitcher_team,
                         "detail": f"{selection} {line_val}",
                         "value": edge_text,
                         "is_live": False,
@@ -3109,6 +3112,7 @@ def _pregame_prop_rows_from_mlb_recommendations(
                         "heading": "Betting Card",
                         "name": hitter,
                         "player_name": hitter,
+                        "team": team_label,
                         "detail": f"{selection} {line_val}",
                         "value": edge_text,
                         "is_live": False,
@@ -4037,6 +4041,7 @@ def _compact_prop_rows(games: list[dict[str, Any]], *, limit: int | None = None)
                     "name": name,
                     "detail": detail,
                     "value": value,
+                    "team": _safe_text(row.get("team"), None),
                     "photo": row.get("photo"),
                     "headshot_url": row.get("headshot_url") or row.get("photo"),
                     "away_label": _safe_text(away.get("abbr") or away.get("name"), None),
