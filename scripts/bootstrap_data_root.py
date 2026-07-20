@@ -33,6 +33,7 @@ BOOTSTRAP_ROOTS = (
     Path("data/ncaab_source/manifests"),
     Path("data/wnba_source/source_artifacts"),
     Path("data/wnba_source/manifests"),
+    Path("data/soccer_source"),
     Path("reports/odds_control_plane"),
     Path("reports/daily_update/latest"),
     Path("reports/refresh_status/latest"),
