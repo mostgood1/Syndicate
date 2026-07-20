@@ -1759,7 +1759,9 @@ def _smart_sim_run_date(
 
     # Run jobs serially or in parallel
     if jobs:
-        if workers == 1 or len(jobs) == 1:
+        if len(jobs) == 1:
+            # Nothing to isolate a single game's memory from within this
+            # invocation, so skip the subprocess-pool overhead.
             _smart_sim_worker_init(
                 date_str=str(date_str),
                 n_sims=int(n_sims),
@@ -1780,9 +1782,19 @@ def _smart_sim_run_date(
                 else:
                     failures.append({"home": res.get("home"), "away": res.get("away"), "error": res.get("error")})
         else:
+            # 2026-07-19: mirrors the same fix in wnba_betting/cli.py -- this
+            # previously only routed through ProcessPoolExecutor when
+            # workers > 1, so the common workers=1 (memory-peak-safety)
+            # config ran every game's possession-level Monte Carlo sim
+            # sequentially in-process, never releasing memory between games
+            # within a multi-game slate. Now always uses the pool (even at
+            # max_workers=1, i.e. still sequential/one game resident at a
+            # time), with max_tasks_per_child=1 so each worker process is
+            # torn down and its memory reclaimed after every single game.
             w = min(int(workers), int(len(jobs)))
             with ProcessPoolExecutor(
                 max_workers=int(w),
+                max_tasks_per_child=1,
                 initializer=_smart_sim_worker_init,
                 initargs=(
                     str(date_str),

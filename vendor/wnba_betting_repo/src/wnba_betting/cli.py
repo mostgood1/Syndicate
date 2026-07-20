@@ -1778,7 +1778,9 @@ def _smart_sim_run_date(
 
     # Run jobs serially or in parallel
     if jobs:
-        if workers == 1 or len(jobs) == 1:
+        if len(jobs) == 1:
+            # Nothing to isolate a single game's memory from within this
+            # invocation, so skip the subprocess-pool overhead.
             _smart_sim_worker_init(
                 date_str=str(date_str),
                 n_sims=int(n_sims),
@@ -1799,9 +1801,26 @@ def _smart_sim_run_date(
                 else:
                     failures.append({"home": res.get("home"), "away": res.get("away"), "error": res.get("error")})
         else:
+            # 2026-07-19: previously only routed through ProcessPoolExecutor
+            # when workers > 1, so the common workers=1 (memory-peak-safety)
+            # config ran every game's possession-level Monte Carlo sim
+            # sequentially in-process, in the SAME process as the rest of
+            # refresh_wnba_oddsapi_props.py -- so nothing was ever reclaimed
+            # between games, unlike MLB's daily sim, which runs as its own
+            # subprocess.run() and returns all its memory to the OS the
+            # moment it exits. Confirmed live: this in-process accumulation
+            # drove the live-odds-worker container to 100% memory and
+            # restarted the whole worker (not just this refresh), during a
+            # multi-game WNBA slate. Now always uses the pool (even at
+            # max_workers=1, i.e. still sequential/one game resident at a
+            # time -- same memory-peak profile as before), with
+            # max_tasks_per_child=1 so each worker process is torn down and
+            # its memory reclaimed after every single game, mirroring MLB's
+            # per-invocation subprocess isolation at per-game granularity.
             w = min(int(workers), int(len(jobs)))
             with ProcessPoolExecutor(
                 max_workers=int(w),
+                max_tasks_per_child=1,
                 initializer=_smart_sim_worker_init,
                 initargs=(
                     str(date_str),
