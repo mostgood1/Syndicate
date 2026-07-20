@@ -171,7 +171,34 @@ class PitchModelConfig:
         )
 
 
-def _combined(a: float, b: float) -> float:
+# League-average rates, used only as the log5 baseline term below. Mirror
+# the same fallback constants build_roster.py uses when a player has too few
+# PA/BF to compute a real rate (see _rate(..., default) call sites there).
+_LEAGUE_RATE = {
+    "hr": 0.03,
+    "inplay_hit": 0.275,
+}
+
+
+def _combined_log5(a: float, b: float, league: float) -> float:
+    return clamp01(_sigmoid(_logit01(a) + _logit01(b) - _logit01(league)))
+
+
+def _combined(a: float, b: float, league_key: Optional[str] = None) -> float:
+    # hr/inplay_hit use log5 (odds-ratio) combination instead of a flat
+    # average of the batter's own rate and the pitcher's allowed rate.
+    # Promoted 2026-07-19 after holdout backtesting: a plain average has no
+    # way to account for one side having much less spread than the other
+    # (pitchers have much less control over BABIP-type outcomes than batters
+    # per DIPS theory), which was suppressing HR/extra-base variance -- log5
+    # closes ~26% of the diagnosed HR under-projection gap and lands
+    # total_bases_4plus right at its empirical target. Applying log5 to
+    # k/bb/hbp as well was tested too and reverted: it amplifies matchup
+    # extremity on the pacing/baserunner side enough to significantly
+    # regress full-game total-runs accuracy, so those three stay on the
+    # plain average. See mlb_sim_accuracy_assessment_and_optimization_plan.md.
+    if league_key in _LEAGUE_RATE:
+        return _combined_log5(a, b, _LEAGUE_RATE[league_key])
     return clamp01(0.5 * float(a) + 0.5 * float(b))
 
 
@@ -332,8 +359,8 @@ def simulate_pitch(
     k_tgt = _combined(batter_k_rate, pitcher_k_rate)
     bb_tgt = _combined(batter_bb_rate, pitcher_bb_rate)
     hbp_tgt = _combined(batter_hbp_rate, pitcher_hbp_rate)
-    hr_tgt = _combined(float(batter_hr_rate) * float(batter_pt_hr_mult), float(pitcher_hr_rate) * float(pitcher_pt_hr_mult))
-    inplay_hit = _combined(batter_inplay_hit_rate, pitcher_inplay_hit_rate)
+    hr_tgt = _combined(float(batter_hr_rate) * float(batter_pt_hr_mult), float(pitcher_hr_rate) * float(pitcher_pt_hr_mult), "hr")
+    inplay_hit = _combined(batter_inplay_hit_rate, pitcher_inplay_hit_rate, "inplay_hit")
 
     # Optional K-target calibration (applied before translating k_tgt into call mix).
     k_mult = _cfg_float(cfg, "k_logit_mult", 1.0)

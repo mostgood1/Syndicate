@@ -1,13 +1,20 @@
 {
   "_meta": {
-    "generated_at": "2026-07-17",
-    "description": "First forward-tuning override for the MLB manager_pitching='v2' model. Fitted via sweep_mgr_starter_hook_add_pitches.py against the 2026-season backfill (35 tune days / 11 disjoint holdout days, seed 2026, 100 sims/game), across two sweeps totaling grid [-14,-11,-8,-5,-2]. See vendor/mlb_bettingv2/data/eval/batches/tuning_mgr_starter_hook_add_pitches/20260717_154342 and .../20260717_214518 for full sweep artifacts, and Syndicate/mlb_sim_accuracy_assessment_and_optimization_plan.md Phase 1 item #1.",
-    "selected_value": -11,
-    "rationale": "Only tested value landing inside the Phase 1 target of pitch bias within +/-2 (holdout bias +1.35, tune +0.87) while also clearing SO MAE <2.0 (1.97) and outs MAE <5.0 (4.25), with zero measurable regression to ML brier, totals MAE, or the hitter-HR guardrail. -8 undershoots the bias target (+3.63 holdout); -14 overshoots and fails the sweep's own holdout-MAE guardrail (14.71 vs baseline 14.15, bias flips to -0.86).",
-    "baseline_holdout_pitch_bias": 9.76,
-    "selected_holdout_pitch_bias": 1.35,
+    "generated_at": "2026-07-19",
+    "description": "Re-fit of the starter-hook-add-pitches override for the MLB manager_pitching='v2' model, made necessary by promoting log5/odds-ratio combination for hr_tgt/inplay_hit in sim_engine/pitch_model.py (2026-07-19) -- that change shifted the raw pitch-count bias curve enough that the prior fit (-11, from 2026-07-17 against the naive-average combiner) no longer lands near zero. Re-swept manually against the same 35-tune/11-holdout 2026-season backfill (seed 2026, 100 sims/game), grid [-12,-13,-14] under the new log5 combiner, calibration disabled to see the raw effect. See Syndicate/mlb_sim_accuracy_assessment_and_optimization_plan.md Phase 1 item #1 and the log5 combiner promotion note in pitch_model.py's _combined().",
+    "selected_value": -13,
+    "rationale": "Clean, monotonic bracket: -12 -> holdout bias +0.73 (tune), -13 -> holdout bias +0.44 / essentially zero on tune (-0.02), -14 -> overshoots negative (tune -0.73). -13 lands closest to zero on both tune and holdout without overshooting, and is a materially better pitch-count fit than the prior -11 value ever achieved even under the old naive-average combiner (holdout bias was +1.35 at best).",
+    "previous_fit": {
+      "generated_at": "2026-07-17",
+      "selected_value": -11,
+      "context": "Fit against the naive-average rate combiner (pre-log5). Grid [-14,-11,-8,-5,-2]. Superseded by this entry once log5 combination was promoted for hr/inplay_hit -- see description above.",
+      "baseline_holdout_pitch_bias": 9.76,
+      "selected_holdout_pitch_bias": 1.35
+    },
+    "baseline_holdout_pitch_bias_under_log5": 1.90,
+    "selected_holdout_pitch_bias_under_log5": 0.44,
     "holdout_games": 11,
     "tune_games": 35
   },
-  "starter_hook_add_pitches": -11
+  "starter_hook_add_pitches": -13
 }
