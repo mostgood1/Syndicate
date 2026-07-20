@@ -370,10 +370,27 @@ def pull_hot_artifacts(*, date_str: str | None = None, timeout_seconds: int = 30
     the files board computation actually needs; a handful of non-dated
     files (current_week.json, park_factors.json, etc.) are out of scope for
     this per-cycle pull and would need a separate, infrequent full sync.
+
+    2026-07-20: a plain f"*{date_str}*" (date_str = ISO "YYYY-MM-DD") only
+    matched hyphen-separated filenames (WNBA's
+    recommendations_slate_2026-07-20.json) and silently missed
+    underscore-separated ones (MLB's live_lens_report_2026_07_20.json,
+    season_betting_day_2026_07_20.json) -- confirmed in production: MLB's
+    candidate_generation stayed at 0 on every cycle, with artifact_status
+    showing artifact_exists=false, while WNBA worked fine, because MLB's
+    required artifacts were never being pulled at all. A bracket
+    expression matches either separator per date component.
     """
     token = _admin_token()
     if not token or not _env("SYNDICATE_WEB_PUBLISH_URL"):
         print(f"[artifact_publisher] PULL_SKIP_NOT_CONFIGURED url_set={bool(_env('SYNDICATE_WEB_PUBLISH_URL'))} token_set={bool(token)}", flush=True)
         return 0
-    pattern = f"*{date_str}*" if date_str else None
+    pattern = _date_glob_pattern(date_str) if date_str else None
     return _pull_hot_artifacts_request(_export_url(pattern), token, timeout_seconds=timeout_seconds)
+
+
+def _date_glob_pattern(date_str: str) -> str:
+    parts = str(date_str or "").strip().split("-")
+    if len(parts) == 3 and all(parts):
+        return f"*{parts[0]}[-_]{parts[1]}[-_]{parts[2]}*"
+    return f"*{date_str}*"

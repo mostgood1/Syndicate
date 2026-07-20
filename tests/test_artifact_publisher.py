@@ -248,10 +248,25 @@ class PullHotArtifactClientTests(unittest.TestCase):
                     pull_hot_artifacts(date_str="2026-07-20")
 
             sent_request = mocked_urlopen.call_args.args[0]
+            # A bracket expression per date component so this matches both
+            # hyphen-separated (WNBA: recommendations_slate_2026-07-20.json)
+            # and underscore-separated (MLB: live_lens_report_2026_07_20.json)
+            # filenames -- see _date_glob_pattern's docstring for why a
+            # plain "*2026-07-20*" silently missed MLB's artifacts.
             self.assertEqual(
                 sent_request.full_url,
-                "https://syndicate.onrender.com/api/ops/artifacts/export?pattern=%2A2026-07-20%2A",
+                "https://syndicate.onrender.com/api/ops/artifacts/export?pattern=%2A2026%5B-_%5D07%5B-_%5D20%2A",
             )
+
+    def test_date_glob_pattern_matches_both_separator_styles(self) -> None:
+        import fnmatch
+
+        from syndicate.features.shared.artifact_publisher import _date_glob_pattern
+
+        pattern = _date_glob_pattern("2026-07-20")
+        self.assertTrue(fnmatch.fnmatch("recommendations_slate_2026-07-20.json", pattern))
+        self.assertTrue(fnmatch.fnmatch("live_lens_report_2026_07_20.json", pattern))
+        self.assertFalse(fnmatch.fnmatch("recommendations_slate_2026-07-21.json", pattern))
 
     def test_unfiltered_request_omits_pattern_query_param(self) -> None:
         # A full, unfiltered export reproducibly hit Render's proxy timeout
