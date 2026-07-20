@@ -1387,13 +1387,22 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             snapshot_name = f"odds_wnba_player_props_{date_str}.csv"
             game_predictions_name = f"predictions_{date_str}.csv"
             predictions_name = f"props_predictions_{date_str}.csv"
+            recommendations_slate_name = f"recommendations_slate_{date_str}.json"
             core_csv = "snapshot_ts,event_id\n2026-05-22T12:00:00Z,evt-1\n"
+            # do_export=True now also requires recommendations_slate to exist
+            # (see _existing_refresh_state/_existing_artifact_bundle_state) --
+            # this test's own name/intent is that the recommendation *CSV*
+            # artifacts (recs_path) stay optional for reuse, not that the
+            # export stage's JSON output does.
+            recommendations_slate_json = '{"date": "2026-05-22", "counts": {"games": 0, "picks": 0}, "per_game": []}'
             (source_raw / snapshot_name).write_text(core_csv, encoding="utf-8")
             (source_processed / game_predictions_name).write_text("home_team,visitor_team\nCHI,MIN\n", encoding="utf-8")
             (source_processed / predictions_name).write_text("player\nA\n", encoding="utf-8")
+            (source_processed / recommendations_slate_name).write_text(recommendations_slate_json, encoding="utf-8")
             (bundle_raw / snapshot_name).write_text(core_csv, encoding="utf-8")
             (bundle_processed / game_predictions_name).write_text("home_team,visitor_team\nCHI,MIN\n", encoding="utf-8")
             (bundle_processed / predictions_name).write_text("player\nA\n", encoding="utf-8")
+            (bundle_processed / recommendations_slate_name).write_text(recommendations_slate_json, encoding="utf-8")
 
             refresh_state = module._existing_refresh_state(
                 source_root=source_root,
