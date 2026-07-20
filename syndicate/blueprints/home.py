@@ -4725,7 +4725,7 @@ def home():
 
 @home_bp.get("/syndicate")
 def syndicate():
-    return render_template("syndicate.html", show_app_header=False)
+    return render_template("syndicate.html")
 
 
 @home_bp.get("/api/home")

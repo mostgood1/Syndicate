@@ -1,9 +1,17 @@
 {% extends "shared/base.html" %}
 
 {% block title %}Syndicate | Ask The Syndicate{% endblock %}
+{% block header_meta %}{% endblock %}
 
 {% block extra_head %}
 <style>
+  /* app.css has no global box-sizing reset; width:100% + padding elements
+     below (the question input above all) overflow their rounded-corner
+     parent without this, most visibly at narrow viewports. */
+  .syndicate-page, .syndicate-page *, .syndicate-page *::before, .syndicate-page *::after {
+    box-sizing: border-box;
+  }
+
   :root {
     --bg0: #070b14;
     --bg1: #0a1020;
@@ -37,10 +45,8 @@
   }
 
   .syndicate-page {
-    display: grid;
-    grid-template-columns: minmax(0, 1.65fr) minmax(290px, 0.95fr);
-    gap: 18px;
-    align-items: start;
+    display: block;
+    width: 100%;
   }
 
   .syndicate-hero,
@@ -66,14 +72,9 @@
   }
   .syndicate-hero__content, .syndicate-panel__content, .syndicate-rail-card__content, .syndicate-result__content { position: relative; z-index: 1; }
 
-  .syndicate-brand { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
-  .syndicate-brand__logo {
-    width: 50px; height: 50px; border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: linear-gradient(135deg, rgba(154, 243, 222, 0.14), rgba(255, 191, 105, 0.10));
-    box-shadow: var(--shadow-soft); object-fit: cover;
-  }
   .syndicate-kicker { font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); margin-bottom: 8px; }
+  .syndicate-kicker-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .syndicate-kicker-row .syndicate-kicker { margin-bottom: 0; }
   .syndicate-title { margin: 0; font-size: clamp(30px, 4vw, 48px); line-height: 1.02; letter-spacing: -0.04em; }
   .syndicate-subtitle { margin: 12px 0 0; max-width: 62ch; color: var(--muted); font-size: 15px; line-height: 1.6; }
 
@@ -137,7 +138,7 @@
   .schema-divider { height: 1px; background: var(--line); margin: 4px 0; }
   .schema-footer { padding: 0 20px 20px; color: var(--muted); font-size: 12px; }
 
-  @media (max-width: 1080px) { .syndicate-page, .syndicate-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 1080px) { .syndicate-grid { grid-template-columns: 1fr; } }
   @media (max-width: 720px) {
     body.syndicate-body .cards-shell { padding: 16px 12px 28px; }
     .syndicate-hero, .syndicate-panel, .syndicate-rail-card, .syndicate-result { border-radius: 18px; }
@@ -154,16 +155,11 @@
     <div class="syndicate-panel__content">
       <div class="syndicate-hero">
         <div class="syndicate-hero__content">
-          <div class="syndicate-brand">
-            <img class="syndicate-brand__logo" src="{{ url_for('static', filename='shared/syndicate-logo.png') }}" alt="Syndicate logo" />
-            <div>
-              <div class="syndicate-kicker">Ask The Syndicate</div>
-              <div class="syndicate-meta-row" style="margin-top:4px;">
-                <span class="syndicate-pill">Analysis</span>
-                <span class="syndicate-pill">Matchups</span>
-                <span class="syndicate-pill">Edges</span>
-              </div>
-            </div>
+          <div class="syndicate-kicker-row">
+            <span class="syndicate-kicker">Ask The Syndicate</span>
+            <span class="syndicate-pill">Analysis</span>
+            <span class="syndicate-pill">Matchups</span>
+            <span class="syndicate-pill">Edges</span>
           </div>
           <h1 class="syndicate-title">Ask The Syndicate</h1>
           <p class="syndicate-subtitle">Put the model to work on bets, matchups, and market shape. The response is structured, deterministic, and grounded in the intelligence engine.</p>
