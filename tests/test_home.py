@@ -15,6 +15,9 @@ from syndicate.blueprints.home import build_home_overview
 from syndicate.blueprints.home import get_active_games
 from syndicate.blueprints.home import _sport_availability_reason
 from syndicate.blueprints.home import _prefer_today_or_latest
+from syndicate.blueprints.home import _game_bet_candidates_from_game
+from syndicate.blueprints.home import _prop_item_from_rank_card
+from syndicate.blueprints.home import _team_for_side_hint
 
 
 class HomePageCommandCenterTests(unittest.TestCase):
@@ -686,6 +689,118 @@ class HomePageCommandCenterTests(unittest.TestCase):
         body = response.get_json()
         self.assertTrue(body["ok"])
         self.assertEqual(body["command_center"]["schema"], "home_command_center_v1")
+
+
+class GameBetCandidateTeamAttributionTests(unittest.TestCase):
+    @staticmethod
+    def _sample_game(**overrides: object) -> dict[str, object]:
+        game: dict[str, object] = {
+            "away": {"name": "Boston Celtics"},
+            "home": {"name": "New York Knicks"},
+            "summary": "Test game",
+            "status": "Scheduled",
+        }
+        game.update(overrides)
+        return game
+
+    def test_team_for_side_hint_resolves_side_keywords_and_selection_text(self) -> None:
+        game = self._sample_game()
+        self.assertEqual(_team_for_side_hint(game, "home"), "New York Knicks")
+        self.assertEqual(_team_for_side_hint(game, "AWAY"), "Boston Celtics")
+        self.assertEqual(_team_for_side_hint(game, "Boston Celtics -9.5"), "Boston Celtics")
+        self.assertIsNone(_team_for_side_hint(game, "unknown"))
+        self.assertIsNone(_team_for_side_hint(game, None))
+
+    def test_moneyline_candidates_carry_team_name(self) -> None:
+        game = self._sample_game(
+            betting={"away_ml": -120, "home_ml": 105, "p_away_win": 0.55, "p_home_win": 0.45}
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "nba"}, game, fallback_epoch=0.0)
+        moneyline_by_pick = {c["pick"]: c["team"] for c in candidates if c["market"] == "Moneyline"}
+        self.assertEqual(moneyline_by_pick.get("Away ML"), "Boston Celtics")
+        self.assertEqual(moneyline_by_pick.get("Home ML"), "New York Knicks")
+
+    def test_spread_candidates_get_team_projected_and_confidence(self) -> None:
+        game = self._sample_game(
+            betting={
+                "home_puck_line": -1.5,
+                "away_puck_line": 1.5,
+                "home_spread": -1.5,
+                "p_home_cover": 0.58,
+                "p_away_cover": 0.42,
+            }
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "nhl"}, game, fallback_epoch=0.0)
+        spreads = {c["pick"].split(" ")[0]: c for c in candidates if c["market"] == "Spread"}
+        self.assertEqual(spreads["Away"]["team"], "Boston Celtics")
+        self.assertEqual(spreads["Home"]["team"], "New York Knicks")
+        # Previously these candidates never received odds, edge, confidence,
+        # or a projected value from this fallback path, so
+        # classify_candidate's missing_projection_or_odds gate always
+        # dropped them.
+        self.assertNotEqual(spreads["Away"]["projected"], "-")
+        self.assertNotEqual(spreads["Home"]["projected"], "-")
+        self.assertNotEqual(spreads["Away"]["confidence"], "-")
+        self.assertNotEqual(spreads["Home"]["confidence"], "-")
+
+    def test_game_market_recommendation_team_derived_from_selection_text(self) -> None:
+        game = self._sample_game(
+            game_market_recommendations=[
+                {
+                    "market_label": "Spread",
+                    "display_pick": "Boston Celtics -9.5",
+                    "selection": "Boston Celtics -9.5",
+                    "line": -9.5,
+                    "price": -110,
+                    "ev_pct": 5.0,
+                    "p_win": 0.6,
+                }
+            ]
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "nba"}, game, fallback_epoch=0.0)
+        self.assertEqual(candidates[0]["team"], "Boston Celtics")
+
+    def test_mlb_prop_candidate_team_from_team_side(self) -> None:
+        game = self._sample_game(
+            markets={
+                "pitcherProps": [
+                    {
+                        "pitcher_name": "Gerrit Cole",
+                        "team_side": "home",
+                        "market_label": "Outs",
+                        "selection": "OVER",
+                        "market_line": 15.5,
+                    }
+                ],
+            }
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "mlb"}, game, fallback_epoch=0.0)
+        self.assertEqual(candidates[0]["team"], "New York Knicks")
+
+    def test_prop_item_from_rank_card_derives_team_from_matchup_labels(self) -> None:
+        card = {
+            "title": "Jayson Tatum Over 28.5",
+            "meta": "BOS @ NYK",
+            "summary": "Tatum projected for 31.2 points as a member of BOS.",
+            "metrics": [{"label": "Projected", "value": "31.2"}],
+        }
+        item = _prop_item_from_rank_card(card, sport_slug="nba")
+        self.assertEqual(item["team"], "BOS")
+
+    def test_prop_item_from_rank_card_derives_team_from_eyebrow(self) -> None:
+        # wnba/picks.py and nba/picks.py's _card_from_pick() put the pick's
+        # team abbreviation in "eyebrow" (falling back to the market label
+        # when no team is known), never in title/badge/summary -- this is
+        # the shape real rank-card-sourced WNBA/NBA props actually have.
+        card = {
+            "title": "Kelsey Plum OVER 2.5",
+            "eyebrow": "LVA",
+            "meta": "LVA @ SEA",
+            "badge": "38.1% EV",
+            "metrics": [{"label": "Win prob", "value": "45.5%"}],
+        }
+        item = _prop_item_from_rank_card(card, sport_slug="wnba")
+        self.assertEqual(item["team"], "LVA")
 
 
 if __name__ == "__main__":

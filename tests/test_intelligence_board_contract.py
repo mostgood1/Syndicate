@@ -165,8 +165,45 @@ class IntelligenceBoardContractTests(unittest.TestCase):
         self.assertIn("pregame", contract["active_lanes"])
         self.assertEqual(contract["cards"][0]["lane"], "live")
         self.assertEqual(contract["cards"][0]["market"], "points")
-        self.assertEqual(contract["cards"][0]["movement"], "+0.5 (up)")
+        self.assertEqual(contract["cards"][0]["movement_summary"], "+0.5 (up)")
+        self.assertEqual(contract["cards"][0]["movement"]["delta"], 0.5)
+        self.assertEqual(contract["cards"][0]["movement"]["trend"], "up")
         self.assertEqual(contract["cards"][1]["lane"], "pregame")
+
+    def test_build_intelligence_board_contract_exposes_structured_movement_fields(self) -> None:
+        contract = build_intelligence_board_contract(
+            {
+                "headline": "The Syndicate board",
+                "recommendations": [
+                    {
+                        "sport": "mlb",
+                        "team": "New York Yankees",
+                        "name": "Aaron Judge",
+                        "market": "home_runs",
+                        "line": 1.5,
+                        "movement": {
+                            "previous_line": 1.5,
+                            "last_line": 1.75,
+                            "delta": 0.25,
+                            "trend": "up",
+                            "percent_change": 16.67,
+                            "history": [{"line": 1.5}, {"line": 1.75}],
+                        },
+                        "edge": 0.08,
+                        "is_live": True,
+                    }
+                ],
+            }
+        )
+
+        card = contract["cards"][0]
+        self.assertIn("movement_summary", contract["card_fields"])
+        self.assertEqual(card["movement"]["previous_line"], 1.5)
+        self.assertEqual(card["movement"]["last_line"], 1.75)
+        self.assertEqual(card["movement"]["delta"], 0.25)
+        self.assertEqual(card["movement"]["percent_change"], 16.67)
+        self.assertEqual(card["movement"]["history"], [{"line": 1.5}, {"line": 1.75}])
+        self.assertEqual(card["movement_summary"], "+0.2 (up)")
 
     def test_build_intelligence_board_contract_marks_settled_cards_archived(self) -> None:
         contract = build_intelligence_board_contract(
@@ -246,7 +283,9 @@ class IntelligenceBoardContractTests(unittest.TestCase):
         self.assertEqual(card["lane"], "pregame")
         self.assertEqual(card["game_pk"], 824255)
         self.assertEqual(card["team"], "Houston Astros")
-        self.assertEqual(card["movement"], "+0.4 (up)")
+        self.assertEqual(card["movement_summary"], "+0.4 (up)")
+        self.assertEqual(card["movement"]["delta"], 0.4)
+        self.assertEqual(card["movement"]["trend"], "up")
 
     def test_build_intelligence_board_contract_reads_nested_worker_payloads(self) -> None:
         contract = build_intelligence_board_contract(

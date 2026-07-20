@@ -196,6 +196,15 @@ def _recommendation_card(item: Mapping[str, Any]) -> dict[str, Any]:
         "matchup": _safe_text(sport_context.get("matchup") if isinstance(sport_context, Mapping) else None, card.get("matchup"), default=""),
     }
     trace = {key: value for key, value in trace.items() if value}
+    # _movement_summary() renders a short human-readable string, but the
+    # structured movement object computed upstream by
+    # _enrich_candidates_with_odds_history() (previous_line/last_line/delta/
+    # trend/percent_change/history) used to get discarded here -- this card
+    # is the last stop before the board contract reaches the frontend, and
+    # the frontend has no other way to render a real line-movement display
+    # without those fields. Keep both: the structured object under
+    # "movement", and the short string under "movement_summary".
+    movement_context = card.get("movement") if isinstance(card.get("movement"), Mapping) else {}
     card.update(
         {
             "lane": lane,
@@ -204,7 +213,16 @@ def _recommendation_card(item: Mapping[str, Any]) -> dict[str, Any]:
             "player": _safe_text(card.get("player_name"), card.get("name"), default="—"),
             "market": _safe_text(card.get("market"), card.get("market_label"), default="—"),
             "line": line,
-            "movement": _movement_summary(card),
+            "movement": {
+                "previous_line": movement_context.get("previous_line"),
+                "last_line": movement_context.get("last_line"),
+                "delta": movement_context.get("delta"),
+                "trend": _safe_text(movement_context.get("trend"), movement_context.get("movement"), default="flat"),
+                "percent_change": movement_context.get("percent_change"),
+                "last_updated": movement_context.get("last_updated"),
+                "history": movement_context.get("history") if isinstance(movement_context.get("history"), list) else [],
+            },
+            "movement_summary": _movement_summary(card),
             "simulated_edge": edge,
             "trace": trace,
             "trace_path": trace.get("path"),
@@ -323,7 +341,7 @@ def build_intelligence_board_contract(response: Mapping[str, Any] | None) -> dic
     ]
     return {
         "schema": "intelligence_board_v1",
-        "card_fields": ["sport", "team", "player", "market", "line", "projected", "live_projection", "actual", "status_display", "movement", "simulated_edge", "trace_path", "game_pk", "coverage_score", "coverage_tier", "coverage_warnings", "publication_status", "publication_priority"],
+        "card_fields": ["sport", "team", "player", "market", "line", "projected", "live_projection", "actual", "status_display", "movement", "movement_summary", "simulated_edge", "trace_path", "game_pk", "coverage_score", "coverage_tier", "coverage_warnings", "publication_status", "publication_priority"],
         "recommendation_count": len(cards),
         "lane_counts": lane_counts,
         "active_lanes": active_lanes,

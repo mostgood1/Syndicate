@@ -226,6 +226,41 @@ def _game_team_label(game: dict[str, Any], side: str) -> str | None:
     return text or None
 
 
+def _team_identifiers(game: dict[str, Any], side: str) -> set[str]:
+    payload = game.get(side) if isinstance(game.get(side), dict) else {}
+    values = (
+        _game_team_label(game, side),
+        payload.get("abbr"),
+        payload.get("name"),
+        game.get(f"{side}_tri"),
+        game.get(f"{side}_name"),
+    )
+    return {str(value).strip().lower() for value in values if str(value or "").strip()}
+
+
+def _team_for_side_hint(game: dict[str, Any], hint: Any) -> str | None:
+    """Resolve a side keyword ("home"/"away") or a selection string naming one
+    of this game's two teams into that team's display label. Only matched
+    against this game's own known team identifiers -- never open-ended text
+    parsing of arbitrary strings."""
+    text = str(hint or "").strip()
+    if not text:
+        return None
+    lowered = text.lower()
+    if lowered in {"home", "h"}:
+        return _game_team_label(game, "home")
+    if lowered in {"away", "a"}:
+        return _game_team_label(game, "away")
+    away_label = _game_team_label(game, "away")
+    home_label = _game_team_label(game, "home")
+    for label, identifiers in ((away_label, _team_identifiers(game, "away")), (home_label, _team_identifiers(game, "home"))):
+        if not label:
+            continue
+        if lowered in identifiers or any(identifier and identifier in lowered for identifier in identifiers):
+            return label
+    return None
+
+
 def _score_value(value: Any) -> str | None:
     if value is None:
         return None
@@ -1654,7 +1689,7 @@ def _game_row_updated_epoch(game: dict[str, Any], fallback_epoch: float) -> floa
     return fallback_epoch
 
 
-def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[str, Any], game: dict[str, Any], market: str, pick: str, line: Any = None, odds: Any = None, edge: Any = None, confidence: Any = None, projected: Any = None, live_projection: Any = None, detail: str | None = None, fallback_epoch: float, live_odds_game_ids: set[str] | None = None) -> None:
+def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[str, Any], game: dict[str, Any], market: str, pick: str, line: Any = None, odds: Any = None, edge: Any = None, confidence: Any = None, projected: Any = None, live_projection: Any = None, detail: str | None = None, fallback_epoch: float, live_odds_game_ids: set[str] | None = None, team: Any = None) -> None:
     pick_text = _safe_text(pick, "-")
     if pick_text == "-":
         return
@@ -1664,6 +1699,7 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
     confidence_text = _pct_text(confidence) if confidence is not None and _numeric_value(confidence) is not None else _safe_text(confidence, "-") if confidence is not None else "-"
     projected_text = _prop_metric_text(projected) if projected is not None else "-"
     live_projection_text = _prop_metric_text(live_projection) if live_projection is not None else "-"
+    team_text = _safe_text(team, "-") if team is not None else "-"
     fallback_live = bool(game.get("shared_is_live") or _is_liveish(game.get("status"), game.get("detail")) or "live" in _safe_text(market, "").lower())
     is_live = _live_odds_backed_live_flag(_game_identifier(game), live_odds_game_ids, fallback_live)
     game_state = _game_status_state(game)
@@ -1681,6 +1717,7 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
             "matchup": _sport_matchup(game),
             "market": _safe_text(market, _market_label_from_pick_text(pick_text)),
             "pick": pick_text,
+            "team": team_text,
             "is_live": is_live,
             "is_final": game_state == "final",
             "game_state": game_state or None,
@@ -1721,6 +1758,7 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
             detail=_first_present_text(row.get("summary"), row.get("reason"), game.get("summary")),
             fallback_epoch=fallback_epoch,
             live_odds_game_ids=live_odds_game_ids,
+            team=_team_for_side_hint(game, row.get("team_side") or row.get("side") or row.get("selection") or row.get("display_pick")),
         )
     if not candidates:
         game_markets = game.get("gameMarkets") if isinstance(game.get("gameMarkets"), dict) else {}
@@ -1742,8 +1780,8 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
             )
     betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
     if betting:
-        _append_game_bet_candidate(candidates, sport=sport, game=game, market="Moneyline", pick=f"Away ML", odds=betting.get("away_ml"), edge=betting.get("away_ml_ev"), confidence=betting.get("p_away_win"), detail=game.get("summary"), fallback_epoch=fallback_epoch, live_odds_game_ids=live_odds_game_ids)
-        _append_game_bet_candidate(candidates, sport=sport, game=game, market="Moneyline", pick=f"Home ML", odds=betting.get("home_ml"), edge=betting.get("home_ml_ev"), confidence=betting.get("p_home_win"), detail=game.get("summary"), fallback_epoch=fallback_epoch, live_odds_game_ids=live_odds_game_ids)
+        _append_game_bet_candidate(candidates, sport=sport, game=game, market="Moneyline", pick=f"Away ML", odds=betting.get("away_ml"), edge=betting.get("away_ml_ev"), confidence=betting.get("p_away_win"), detail=game.get("summary"), fallback_epoch=fallback_epoch, live_odds_game_ids=live_odds_game_ids, team=_game_team_label(game, "away"))
+        _append_game_bet_candidate(candidates, sport=sport, game=game, market="Moneyline", pick=f"Home ML", odds=betting.get("home_ml"), edge=betting.get("home_ml_ev"), confidence=betting.get("p_home_win"), detail=game.get("summary"), fallback_epoch=fallback_epoch, live_odds_game_ids=live_odds_game_ids, team=_game_team_label(game, "home"))
         if betting.get("total") is not None:
             total_projected = _first_present_text(betting.get("projected"), betting.get("projection"), betting.get("model"), betting.get("mean"))
             total_odds = _first_present_text(betting.get("odds"), betting.get("price"), betting.get("american_odds"))
@@ -1751,8 +1789,10 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
                 _append_game_bet_candidate(candidates, sport=sport, game=game, market="Total", pick=f"Over { _prop_metric_text(betting.get('total')) or '-' }", line=betting.get("total"), odds=total_odds, projected=total_projected or _prop_metric_text(betting.get("total")), edge=betting.get("over_ev"), confidence=betting.get("p_total_over"), detail=game.get("summary"), fallback_epoch=fallback_epoch, live_odds_game_ids=live_odds_game_ids)
                 _append_game_bet_candidate(candidates, sport=sport, game=game, market="Total", pick=f"Under { _prop_metric_text(betting.get('total')) or '-' }", line=betting.get("total"), odds=total_odds, projected=total_projected or _prop_metric_text(betting.get("total")), edge=betting.get("under_ev"), confidence=betting.get("p_total_under"), detail=game.get("summary"), fallback_epoch=fallback_epoch, live_odds_game_ids=live_odds_game_ids)
         if betting.get("home_puck_line") is not None or betting.get("away_puck_line") is not None:
-            _append_game_bet_candidate(candidates, sport=sport, game=game, market="Spread", pick=f"Away { _prop_metric_text(betting.get('away_puck_line')) or '' }".strip(), line=betting.get("away_puck_line"), edge=betting.get("away_puck_line_ev"), detail=game.get("summary"), fallback_epoch=fallback_epoch, live_odds_game_ids=live_odds_game_ids)
-            _append_game_bet_candidate(candidates, sport=sport, game=game, market="Spread", pick=f"Home { _prop_metric_text(betting.get('home_puck_line')) or '' }".strip(), line=betting.get("home_puck_line"), edge=betting.get("home_puck_line_ev"), detail=game.get("summary"), fallback_epoch=fallback_epoch, live_odds_game_ids=live_odds_game_ids)
+            home_spread_projected = _numeric_value(betting.get("home_spread"))
+            away_spread_projected = -home_spread_projected if home_spread_projected is not None else None
+            _append_game_bet_candidate(candidates, sport=sport, game=game, market="Spread", pick=f"Away { _prop_metric_text(betting.get('away_puck_line')) or '' }".strip(), line=betting.get("away_puck_line"), edge=betting.get("away_spread_ev"), confidence=betting.get("p_away_cover"), projected=away_spread_projected, detail=game.get("summary"), fallback_epoch=fallback_epoch, live_odds_game_ids=live_odds_game_ids, team=_game_team_label(game, "away"))
+            _append_game_bet_candidate(candidates, sport=sport, game=game, market="Spread", pick=f"Home { _prop_metric_text(betting.get('home_puck_line')) or '' }".strip(), line=betting.get("home_puck_line"), edge=betting.get("home_spread_ev"), confidence=betting.get("p_home_cover"), projected=home_spread_projected, detail=game.get("summary"), fallback_epoch=fallback_epoch, live_odds_game_ids=live_odds_game_ids, team=_game_team_label(game, "home"))
     top_rows = game.get("shared_top_play_rows") if isinstance(game.get("shared_top_play_rows"), list) else []
     for row in top_rows:
         if not isinstance(row, dict):
@@ -1773,6 +1813,7 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
             detail=row.get("detail"),
             fallback_epoch=fallback_epoch,
             live_odds_game_ids=live_odds_game_ids,
+            team=_team_for_side_hint(game, row.get("team_side") or row.get("side") or name),
         )
     lenses = game.get("gameLens") if isinstance(game.get("gameLens"), list) else []
     for lens in lenses:
@@ -1800,6 +1841,7 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
                 detail=game.get("summary"),
                 fallback_epoch=fallback_epoch,
                 live_odds_game_ids=live_odds_game_ids,
+                team=_team_for_side_hint(game, market.get("selection") or pick) if market_key != "total" else None,
             )
     if _safe_text(sport.get("slug"), "").lower() == "mlb":
         markets = game.get("markets") if isinstance(game.get("markets"), dict) else {}
@@ -1842,6 +1884,7 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
                     detail=detail,
                     fallback_epoch=fallback_epoch,
                     live_odds_game_ids=live_odds_game_ids,
+                    team=_team_for_side_hint(game, prop.get("team_side") or prop.get("teamSide")),
                 )
     filtered = [row for row in candidates if row.get("edge") not in {"-", None} or row.get("confidence") not in {"-", None}]
     return sorted(filtered or candidates, key=lambda row: row.get("score", 0.0), reverse=True)
@@ -2622,6 +2665,19 @@ def _prop_item_from_rank_card(
     value = badge or _safe_text((((card.get("metrics") or [None])[0] or {}).get("value") if isinstance(card.get("metrics"), list) else None), "Top play")
     href = str(card.get("href") or fallback_href or "").strip() or None
     away_label, home_label = _split_matchup_labels(meta if meta != "Props board" else title)
+    team_value = _metric_value(metrics, ["team", "team_tri", "team_abbr", "side"])
+    if not team_value:
+        # Rank-card builders across sports (e.g. wnba/picks.py, nba/picks.py
+        # _card_from_pick) put the pick's team abbreviation in "eyebrow"
+        # (falling back to the market label when no team is known) -- check
+        # it against this card's own known matchup labels before falling
+        # back to a broader text search, since eyebrow is otherwise never
+        # read here and every rank-card-sourced prop lost its team.
+        haystack = f"{title} {badge} {detail} {card.get('eyebrow', '')}".lower()
+        for candidate_label in (away_label, home_label):
+            if candidate_label and candidate_label.lower() in haystack:
+                team_value = candidate_label
+                break
     headshot_url = card.get("headshot_url") or card.get("photo") or card.get("player_photo")
     if not headshot_url and sport_slug in {"nba", "wnba"}:
         player_name = _player_name_from_prop_title(title) or _safe_text(card.get("summary"), None)
@@ -2647,6 +2703,7 @@ def _prop_item_from_rank_card(
         "edge": _metric_value(metrics, ["edge", "ev"]),
         "confidence": _metric_value(metrics, ["confidence", "win prob", "probability", "hit rate"]),
         "game_state": _metric_value(metrics, ["game state", "state", "status"]),
+        "team": team_value or None,
         "away_label": away_label,
         "home_label": home_label,
         "away_logo": _safe_text(card.get("away_logo"), None),

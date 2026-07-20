@@ -3,1482 +3,847 @@
 {% block title %}Syndicate | Betting Board{% endblock %}
 {% block page_title %}Intelligence{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/dense_cards.css') }}" />
+{% endblock %}
+
 {% block content %}
 <style>
-  :root {
-    --intel-bg0: #060913;
-    --intel-bg1: #0b1020;
-    --intel-panel: rgba(13, 20, 38, 0.94);
-    --intel-panel-2: rgba(16, 26, 49, 0.94);
-    --intel-line: rgba(148, 163, 184, 0.18);
-    --intel-line-strong: rgba(148, 163, 184, 0.3);
-    --intel-text: #f6f8ff;
-    --intel-muted: #a8b3cf;
-    --intel-muted-soft: #7f8aaa;
-    --intel-teal: #9af3de;
-    --intel-gold: #ffbf69;
-    --intel-blue: #8eb6ff;
-    --intel-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
-    --intel-shadow-soft: 0 16px 34px rgba(0, 0, 0, 0.26);
-  }
-
-  body.syndicate-body {
-    background:
-      radial-gradient(circle at top left, rgba(154, 243, 222, 0.12), transparent 28%),
-      radial-gradient(circle at top right, rgba(255, 191, 105, 0.1), transparent 24%),
-      radial-gradient(circle at 50% 0%, rgba(142, 182, 255, 0.1), transparent 28%),
-      linear-gradient(180deg, var(--intel-bg0), var(--intel-bg1) 42%, #060910 100%);
-    color: var(--intel-text);
-  }
-
   body.syndicate-body .cards-shell {
-    max-width: 1560px;
-    margin: 0 auto;
-    padding: 28px 18px 36px;
+    max-width: 1400px;
   }
 
-  .intelligence-page {
-    display: grid;
-    gap: 18px;
-  }
-  
-  .betting-board-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 16px;
-  }
-
-  .intelligence-shell {
-    max-width: 1560px;
-    margin: 0 auto;
-  }
-
-  .intelligence-hero,
-  .intelligence-lane,
-  .intelligence-card {
-    border: 1px solid var(--intel-line);
-    background: linear-gradient(180deg, var(--intel-panel), var(--intel-panel-2));
-    box-shadow: var(--intel-shadow);
-    border-radius: 22px;
-    backdrop-filter: blur(16px);
-    color: var(--intel-text);
-  }
-
-  .intelligence-hero {
-    display: grid;
-    grid-template-columns: minmax(0, 1.35fr) auto;
-    gap: 16px;
-    padding: 22px;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .intelligence-hero::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background:
-      radial-gradient(circle at top right, rgba(255, 191, 105, 0.14), transparent 24%),
-      radial-gradient(circle at bottom left, rgba(154, 243, 222, 0.08), transparent 34%);
-    pointer-events: none;
-  }
-
-  .intelligence-hero__copy,
-  .intelligence-hero__actions,
-  .intelligence-lane__content,
-  .intelligence-panel,
-  .intelligence-card__content {
-    position: relative;
-    z-index: 1;
-  }
-
-  .intelligence-hero__copy {
-    display: grid;
-    gap: 10px;
-    align-content: start;
-  }
-
-  .intelligence-hero__kicker,
-  .intelligence-lane__kicker,
-  .intelligence-card__kicker {
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.2em;
-    color: var(--intel-gold);
-  }
-
-  .intelligence-hero__title {
-    margin: 0;
-    font-size: clamp(2rem, 4vw, 3.4rem);
-    line-height: 0.98;
-    letter-spacing: -0.05em;
-  }
-
-  .intelligence-hero__lede,
-  .intelligence-lane__lede {
-    margin: 0;
-    color: var(--intel-muted);
-    font-size: 14px;
-    line-height: 1.65;
-    max-width: 78ch;
-  }
-
-  .intelligence-hero__meta {
+  .board-hero {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 4px;
+    gap: 16px;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 18px 20px;
+    margin-bottom: 16px;
   }
 
-  .intelligence-chip,
-  .intelligence-action,
-  .intelligence-link {
-    display: inline-flex;
+  .board-hero__copy {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .board-hero__lede {
+    margin: 0;
+    color: var(--cards-text-soft);
+    font-size: 13px;
+    max-width: 62ch;
+  }
+
+  .board-toolbar {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .board-toolbar-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
     align-items: center;
-    min-height: 34px;
-    padding: 0 12px;
-    border-radius: 999px;
-    border: 1px solid var(--intel-line);
-    background: rgba(255, 255, 255, 0.04);
-    color: #edf3ff;
-    font-size: 12px;
-    text-decoration: none;
-    white-space: nowrap;
+    justify-content: space-between;
   }
 
-  .intelligence-action {
-    border: 0;
-    background: linear-gradient(135deg, var(--intel-teal), var(--intel-gold));
-    color: #061018;
-    font-weight: 800;
-    box-shadow: 0 16px 28px rgba(255, 191, 105, 0.18);
-    cursor: pointer;
-  }
-
-  .intelligence-link {
-    color: #dbeafe;
-    opacity: 0.95;
-  }
-
-  .intelligence-hero__actions {
-    display: grid;
-    gap: 10px;
-    align-content: start;
-    justify-items: end;
-  }
-
-  .intelligence-hero__actions-row {
+  .board-tabs {
     display: flex;
-    gap: 10px;
     flex-wrap: wrap;
-    justify-content: flex-end;
-  }
-
-  .intelligence-lane {
-    padding: 18px;
-  }
-
-  .intelligence-lane__content {
-    display: grid;
-    gap: 12px;
-  }
-
-  .intelligence-lane__intro {
-    display: grid;
-    gap: 0.4rem;
-  }
-
-  .intelligence-lane__title {
-    margin: 0;
-    font-size: clamp(1.15rem, 2vw, 1.5rem);
-    font-weight: 800;
-    letter-spacing: -0.04em;
-  }
-
-  .intelligence-lane__rail {
-    display: grid;
-    gap: 10px;
-  }
-
-  .intelligence-summary-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 12px;
-  }
-
-  .intelligence-summary-card {
-    border: 1px solid var(--intel-line);
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.04);
-    padding: 14px;
-    display: grid;
     gap: 6px;
   }
 
-  .intelligence-summary-card__label {
-    color: var(--intel-muted);
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.16em;
-  }
-
-  .intelligence-summary-card__value {
-    font-size: 18px;
-    color: var(--intel-text);
-    letter-spacing: -0.03em;
-    font-weight: 800;
-  }
-
-  .intelligence-summary-card__meta {
-    color: var(--intel-muted);
+  .board-date-input {
+    min-height: 36px;
+    padding: 0 12px;
+    border-radius: 12px;
+    border: 1px solid var(--cards-line-strong);
+    background: rgba(7, 19, 29, 0.9);
+    color: var(--cards-text);
     font-size: 12px;
-    line-height: 1.55;
   }
 
-  .intelligence-status-row {
+  .board-refresh-status {
+    font-size: 11px;
+    color: var(--cards-text-soft);
+  }
+
+  .board-summary-strip {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
-    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border-radius: 16px;
+    border: 1px solid var(--cards-line);
+    background: rgba(8, 18, 30, 0.72);
+    margin-bottom: 16px;
   }
 
-  .intelligence-layout {
-    max-width: 1560px;
-    margin: 0 auto;
+  .board-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--cards-line);
+    color: var(--cards-text-soft);
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .board-layout {
     display: grid;
-    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-    gap: 20px;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+    gap: 18px;
     align-items: start;
   }
 
-  .intelligence-panel {
+  .board-main,
+  .board-rail {
     min-width: 0;
     display: grid;
-    gap: 18px;
+    gap: 16px;
   }
 
-  .intelligence-card {
-    padding: 18px;
+  .board-section-title {
+    margin: 0 0 10px;
+    font-size: 1rem;
   }
 
-  .intelligence-card__head {
+  .board-strip {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .board-strip-card {
+    min-width: 168px;
+    flex: 0 0 auto;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--cards-line);
+    background: rgba(10, 21, 34, 0.9);
+  }
+
+  .board-strip-card__title {
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .board-strip-card__edge {
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .board-strip-card__pick {
+    margin-top: 2px;
+    font-size: 10px;
+    color: var(--cards-text-dim);
+  }
+
+  .board-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px;
+  }
+
+  .board-card {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+    border-radius: 18px;
+    border: 1px solid var(--cards-line);
+    background: linear-gradient(180deg, rgba(13, 27, 43, 0.94), rgba(7, 16, 26, 0.98));
+    box-shadow: var(--cards-shadow);
+  }
+
+  .board-card--tier-high { border-color: rgba(46, 204, 113, 0.5); }
+  .board-card--tier-medium { border-color: rgba(241, 196, 15, 0.5); }
+  .board-card--tier-low { border-color: var(--cards-line); }
+
+  .board-card__head {
     display: flex;
     justify-content: space-between;
-    gap: 12px;
-    align-items: end;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
+    align-items: flex-start;
+    gap: 10px;
   }
 
-  .intelligence-card__title {
-    margin: 0;
-    font-size: 1.04rem;
-    letter-spacing: -0.03em;
+  .board-card__title {
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.3;
   }
 
-  .intelligence-card__lede {
-    margin: 4px 0 0;
-    color: var(--intel-muted);
-    font-size: 13px;
-    line-height: 1.55;
+  .board-card__subtitle {
+    margin-top: 2px;
+    font-size: 11px;
+    color: var(--cards-text-dim);
   }
 
-  .intelligence-card__body {
+  .board-card__edge {
+    font-size: 15px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .board-card--tier-high .board-card__edge { color: #2ecc71; }
+  .board-card--tier-medium .board-card__edge { color: #f1c40f; }
+  .board-card--tier-low .board-card__edge { color: var(--cards-text-dim); }
+
+  .board-card__facts {
     display: grid;
-    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 6px 10px;
+    font-size: 12px;
   }
 
-  .intelligence-surface {
-    border: 1px solid var(--intel-line);
+  .board-card__fact-label {
+    color: var(--cards-text-dim);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .board-card__fact-value {
+    color: var(--cards-text);
+    font-weight: 700;
+  }
+
+  .board-card__movement {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--cards-line);
+  }
+
+  .board-card__movement-arrow--up { color: #2ecc71; }
+  .board-card__movement-arrow--down { color: #e74c3c; }
+  .board-card__movement-arrow--flat { color: var(--cards-text-dim); }
+
+  .board-card__bar-track {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+  }
+
+  .board-card__bar-fill {
+    height: 100%;
+    width: var(--fill-pct, 0%);
+    border-radius: 999px;
+    background: currentColor;
+  }
+
+  .board-card--tier-high .board-card__bar-fill { color: #2ecc71; }
+  .board-card--tier-medium .board-card__bar-fill { color: #f1c40f; }
+  .board-card--tier-low .board-card__bar-fill { color: var(--cards-text-dim); }
+
+  .board-card__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .board-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--cards-text-soft);
+    border: 1px solid var(--cards-line);
+  }
+
+  .board-badge--live { background: rgba(59, 130, 246, 0.16); color: #d7e9ff; border-color: rgba(59, 130, 246, 0.38); }
+  .board-badge--pregame { background: rgba(168, 85, 247, 0.16); color: #efe0ff; border-color: rgba(168, 85, 247, 0.38); }
+  .board-badge--confidence { background: rgba(46, 204, 113, 0.16); color: #d6ffe4; border-color: rgba(46, 204, 113, 0.38); }
+
+  .board-card__footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .board-card__actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .board-action-button {
+    appearance: none;
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .board-action-button--add {
+    border: none;
+    background: rgba(37, 99, 235, 0.18);
+    color: #dbeafe;
+  }
+
+  .board-action-button--remove {
+    border: 1px solid var(--cards-line-strong);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--cards-text);
+  }
+
+  .board-card__updated {
+    font-size: 10px;
+    color: var(--cards-text-dim);
+  }
+
+  .board-empty,
+  .board-error {
+    padding: 18px;
     border-radius: 16px;
-    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--cards-line);
+    background: rgba(8, 18, 30, 0.72);
+    color: var(--cards-text-soft);
+  }
+
+  .board-error {
+    border-color: rgba(231, 76, 60, 0.4);
+    background: rgba(60, 20, 20, 0.5);
+    color: #ffd4d4;
+  }
+
+  .board-skeleton-card {
+    height: 110px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    animation: board-pulse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes board-pulse {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 0.9; }
+  }
+
+  .board-portfolio-card,
+  .board-parlay-card {
     padding: 14px;
+    border-radius: 16px;
+    border: 1px solid var(--cards-line);
+    background: rgba(8, 18, 30, 0.72);
   }
 
-  #intelligence-board-summary:empty,
-  #top-opportunities:empty,
-  #portfolio:empty,
-  #parlays:empty,
-  #scanner:empty,
-  #picks:empty {
-    min-height: 64px;
+  .board-portfolio-card__row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin-top: 6px;
   }
 
-  @media (max-width: 980px) {
-    .intelligence-hero,
-    .intelligence-layout {
+  .board-parlay-card + .board-parlay-card {
+    margin-top: 10px;
+  }
+
+  .board-parlay-card__leg {
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--cards-line);
+    font-size: 12px;
+    margin-top: 6px;
+  }
+
+  @media (max-width: 1080px) {
+    .board-layout {
       grid-template-columns: 1fr;
-    }
-
-    .intelligence-hero__actions {
-      justify-items: start;
-    }
-
-    .intelligence-hero__actions-row {
-      justify-content: flex-start;
     }
   }
 
   @media (max-width: 720px) {
-    body.syndicate-body .cards-shell {
-      padding: 16px 12px 28px;
+    .board-hero {
+      flex-direction: column;
     }
 
-    .intelligence-hero,
-    .intelligence-lane,
-    .intelligence-card {
-      border-radius: 18px;
+    .board-toolbar-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .board-grid {
+      grid-template-columns: 1fr;
     }
   }
 </style>
 
-<main class="intelligence-page">
-<section class="intelligence-shell">
-  <div class="intelligence-hero">
-    <div class="intelligence-hero__copy">
-      <div class="intelligence-hero__kicker">Initial board</div>
-      <h1 class="intelligence-hero__title">Betting Board</h1>
-      <p class="intelligence-hero__lede">Portfolio summary and live recommendations load from the routed betting board response.</p>
-      <div class="intelligence-hero__meta" aria-label="Board capabilities">
-        <span class="intelligence-chip">Structured evidence</span>
-        <span class="intelligence-chip">Live + pregame lanes</span>
-        <span class="intelligence-chip">Portfolio and policy</span>
-      </div>
+<main class="board-page">
+  <section class="cards-control-card board-hero">
+    <div class="board-hero__copy">
+      <span class="eyebrow">Betting Board</span>
+      <h1>Ranked bets across every tracked sport</h1>
+      <p class="board-hero__lede">Filter by sport and live/pregame lane, then track edges, odds/line movement, and portfolio exposure in one board.</p>
     </div>
-    <form id="intel-query-form" class="intelligence-hero__actions">
-      <a href="/intelligence/status" class="intelligence-link">View data coverage page</a>
-      <div style="display:grid; gap:10px; width:min(100%, 360px);">
-        <label style="display:grid; gap:5px; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--intel-muted);">
-          Date
-          <input id="intel-date" name="date" type="date" value="{{ initial_intelligence_selected_date | default('', true) }}" style="appearance:none; width:100%; min-height:38px; padding:0 12px; border-radius:12px; border:1px solid var(--intel-line-strong); background:rgba(255,255,255,.05); color:var(--intel-text);">
-        </label>
-        <label style="display:grid; gap:5px; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--intel-muted);">
-          Sport
-          <select id="intel-sport" name="sport" style="appearance:none; width:100%; min-height:38px; padding:0 12px; border-radius:12px; border:1px solid var(--intel-line-strong); background:rgba(255,255,255,.05); color:var(--intel-text);">
-            <option value="all" selected>All sports</option>
-            <option value="mlb">MLB</option>
-            <option value="nba">NBA</option>
-            <option value="wnba">WNBA</option>
-            <option value="nfl">NFL</option>
-            <option value="ncaaf">NCAAF</option>
-            <option value="ncaab">NCAAB</option>
-            <option value="nhl">NHL</option>
-          </select>
-        </label>
-        <label style="display:grid; gap:5px; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--intel-muted);">
-          Game state
-          <select id="intel-game-state" name="game_state" style="appearance:none; width:100%; min-height:38px; padding:0 12px; border-radius:12px; border:1px solid var(--intel-line-strong); background:rgba(255,255,255,.05); color:var(--intel-text);">
-            <option value="all" selected>All states</option>
-            <option value="live">Live</option>
-            <option value="pregame">Pregame</option>
-          </select>
-        </label>
-      </div>
-      <div class="intelligence-hero__actions-row">
-        <button type="submit" class="intelligence-action">Refresh Board</button>
-      </div>
-    </form>
-  </div>
+    <a class="cards-nav-pill" href="/intelligence/status">Data coverage</a>
+  </section>
+
   <script id="initial-intelligence-response" type="application/json">{{ initial_intelligence_response | default({}) | tojson }}</script>
-</section>
 
-<section class="intelligence-shell intelligence-lane">
-  <div class="intelligence-lane__content">
-    <div class="intelligence-lane__intro">
-      <div class="intelligence-lane__kicker">Board snapshot</div>
-      <h2 class="intelligence-lane__title">Live and pregame lanes</h2>
-      <p class="intelligence-lane__lede">The summary strip below keeps the active board contract, recommendation ledger, and portfolio state in one readable lane.</p>
-      <p class="intelligence-lane__lede">Decision lanes, policy control, and live refresh context stay visible without leaving the board.</p>
-    </div>
-    <div class="intelligence-status-row">
-      <div id="intelligence-refresh-status" role="status" aria-live="polite" aria-atomic="true"></div>
-    </div>
-    <div class="intelligence-surface">
-      <div id="intelligence-board-summary"></div>
-    </div>
-    <div class="intelligence-surface">
-      <div class="intelligence-card__head">
-        <div>
-          <div class="intelligence-card__kicker">Top opportunities</div>
-          <h3 class="intelligence-card__title">Shared board output</h3>
-          <p class="intelligence-card__lede">This lane reflects the active response payload that powers the home command center and the live board.</p>
-        </div>
+  <form id="board-toolbar" class="cards-control-card board-toolbar">
+    <div class="board-toolbar-row">
+      <div class="board-tabs cards-tabs" id="board-sport-tabs" role="tablist" aria-label="Sport filter"></div>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <input id="board-date" type="date" class="board-date-input" value="{{ initial_intelligence_selected_date | default('', true) }}" />
+        <button type="submit" class="cards-submit-button">Refresh</button>
       </div>
-      <div id="top-opportunities-evidence"></div>
-      <div id="top-opportunities"></div>
     </div>
+    <div class="board-toolbar-row">
+      <div class="board-tabs cards-tabs" id="board-state-tabs" role="tablist" aria-label="Game state filter"></div>
+      <div id="board-refresh-status" class="board-refresh-status" role="status" aria-live="polite"></div>
+    </div>
+  </form>
+
+  <div id="board-summary-strip" class="board-summary-strip" hidden></div>
+
+  <div class="board-layout">
+    <div class="board-main">
+      <section>
+        <div id="board-top-strip"></div>
+      </section>
+      <section>
+        <h2 class="board-section-title">Board</h2>
+        <div id="board-cards"></div>
+      </section>
+    </div>
+    <aside class="board-rail">
+      <section>
+        <h2 class="board-section-title">Portfolio</h2>
+        <div id="board-portfolio"></div>
+      </section>
+      <section>
+        <h2 class="board-section-title">Parlays</h2>
+        <div id="board-parlays"></div>
+      </section>
+    </aside>
   </div>
-</section>
-
-<section class="intelligence-layout">
-  <div class="intelligence-panel">
-    <section class="intelligence-card">
-      <div class="intelligence-card__head">
-        <div>
-          <div class="intelligence-card__kicker">Parlays</div>
-          <h3 class="intelligence-card__title">Correlation-aware tickets</h3>
-          <p class="intelligence-card__lede">Combination cards stay grouped here so the board can explain them in one place.</p>
-        </div>
-      </div>
-      <div class="intelligence-card__body">
-        <div id="parlays"></div>
-      </div>
-    </section>
-
-    <section class="intelligence-card">
-      <div class="intelligence-card__head">
-        <div>
-          <div class="intelligence-card__kicker">Scanner</div>
-          <h3 class="intelligence-card__title">Live board scan</h3>
-          <p class="intelligence-card__lede">Surface the best current board reads without leaving the intelligence surface.</p>
-        </div>
-      </div>
-      <div class="intelligence-card__body">
-        <div id="scanner"></div>
-      </div>
-    </section>
-  </div>
-
-  <div class="intelligence-panel">
-    <section class="intelligence-card">
-      <div class="intelligence-card__head">
-        <div>
-          <div class="intelligence-card__kicker">Picks</div>
-          <h3 class="intelligence-card__title">Recommendation detail</h3>
-          <p class="intelligence-card__lede">Cards and rationale stay grouped here for the focused evaluation path.</p>
-        </div>
-      </div>
-      <div class="intelligence-card__body">
-        <div id="picks"></div>
-      </div>
-    </section>
-  </div>
-</section>
 </main>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
-let lastVersion = null;
-let loadIntelligenceScheduled = false;
-let lastResponseTimestamp = null;
-let lastResponseHash = null;
-let lastWorkerStateUpdated = null;
-let hasRenderedIntelligence = false;
-let currentIntelligenceRequest = null;
-const initialIntelligenceResponseScript = document.getElementById("initial-intelligence-response");
-let initialIntelligenceResponse = {};
-const defaultIntelligenceQuestion = "top edges today";
-const defaultIntelligenceSport = "all";
-const defaultIntelligenceGameState = "all";
-const initialIntelligenceSelectedDate = (() => {
-  const dateInput = document.getElementById("intel-date");
-  return dateInput && typeof dateInput.value === "string" ? dateInput.value.trim() : "";
-})();
+(function () {
+  "use strict";
 
-try {
-  initialIntelligenceResponse = initialIntelligenceResponseScript && initialIntelligenceResponseScript.textContent
-    ? JSON.parse(initialIntelligenceResponseScript.textContent)
-    : {};
-} catch (err) {
-  initialIntelligenceResponse = {};
-}
+  const SPORT_TABS = [
+    { value: "all", label: "All sports" },
+    { value: "mlb", label: "MLB" },
+    { value: "nba", label: "NBA" },
+    { value: "wnba", label: "WNBA" },
+    { value: "nfl", label: "NFL" },
+    { value: "ncaaf", label: "NCAAF" },
+    { value: "ncaab", label: "NCAAB" },
+    { value: "nhl", label: "NHL" },
+  ];
+  const STATE_TABS = [
+    { value: "all", label: "All states" },
+    { value: "live", label: "Live" },
+    { value: "pregame", label: "Pregame" },
+  ];
+  const DEFAULT_QUESTION = "top edges today";
 
-function refreshStatusElement() {
-  return document.getElementById("intelligence-refresh-status");
-}
+  let lastVersion = null;
+  let lastResponseTimestamp = null;
+  let lastResponseHash = null;
+  let lastWorkerStateUpdated = null;
+  let hasRenderedIntelligence = false;
+  let currentIntelligenceRequest = null;
 
-function intelligenceFormElement() {
-  return document.getElementById("intel-query-form");
-}
-
-function intelligenceFormValue(fieldId) {
-  const element = document.getElementById(fieldId);
-  return element && typeof element.value === "string" ? element.value.trim() : "";
-}
-
-function intelligenceQueryPayload(options = {}) {
-  const date = intelligenceFormValue("intel-date") || initialIntelligenceSelectedDate;
-  const sport = intelligenceFormValue("intel-sport") || defaultIntelligenceSport;
-  const gameState = intelligenceFormValue("intel-game-state") || defaultIntelligenceGameState;
-  const hasCustomFilters = Boolean(
-    (date && date !== initialIntelligenceSelectedDate) ||
-    (sport && sport !== defaultIntelligenceSport) ||
-    (gameState && gameState !== defaultIntelligenceGameState)
-  );
-  const payload = {
-    question: hasCustomFilters ? "What are the best edges for this board?" : defaultIntelligenceQuestion,
-    mode: "recommendation",
-    timing: gameState === "all" ? "all" : gameState,
-    background: Boolean(options.background),
-    force_refresh: Boolean(options.forceRefresh),
+  const urlParams = new URLSearchParams(window.location.search);
+  const state = {
+    date: urlParams.get("date") || document.getElementById("board-date").value || "",
+    sport: urlParams.get("sport") || "all",
+    gameState: urlParams.get("game_state") || "all",
   };
-  if (date) {
-    payload.date = date;
-  }
-  if (sport) {
-    payload.sport = sport;
-  }
-  if (gameState) {
-    payload.game_state = gameState;
-  }
-  return payload;
-}
 
-function setRefreshStatus(message, tone = "idle") {
-  const element = refreshStatusElement();
-  if (!element) {
-    return;
+  const initialResponseScript = document.getElementById("initial-intelligence-response");
+  let initialIntelligenceResponse = {};
+  try {
+    initialIntelligenceResponse = initialResponseScript && initialResponseScript.textContent
+      ? JSON.parse(initialResponseScript.textContent)
+      : {};
+  } catch (err) {
+    initialIntelligenceResponse = {};
   }
-  element.setAttribute("aria-busy", tone === "loading" || tone === "refreshing" ? "true" : "false");
-  const styles = {
-    idle: { background: "rgba(255,255,255,.06)", border: "rgba(255,255,255,.12)", color: "#e5e7eb" },
-    loading: { background: "rgba(59,130,246,.14)", border: "rgba(59,130,246,.28)", color: "#dbeafe" },
-    refreshing: { background: "rgba(168,85,247,.14)", border: "rgba(168,85,247,.28)", color: "#efe0ff" },
-    error: { background: "rgba(239,68,68,.14)", border: "rgba(239,68,68,.28)", color: "#ffd4d4" },
-  };
-  const style = styles[tone] || styles.idle;
-  element.innerHTML = `
-    <span style="display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:${style.background}; color:${style.color}; border:1px solid ${style.border}; font-size:11px; font-weight:600; letter-spacing:.02em;">
-      <span style="width:7px; height:7px; border-radius:999px; background:${style.color}; display:inline-block;"></span>
-      ${message}
-    </span>
-  `;
-}
 
-function numericValue(value) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
+  function escapeHtml(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[char] || char));
+  }
 
-function displayTitle(item) {
-  return String(item.display_name || item.player_name || item.name || item.subject_key || item.pick || item.selection || item.market || "—").trim();
-}
+  function numericValue(value) {
+    return typeof value === "number" && Number.isFinite(value) ? value : null;
+  }
 
-function escapeHtml(value) {
-  return String(value == null ? "" : value).replace(/[&<>"']/g, (char) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  }[char] || char));
-}
+  function syncUrlState() {
+    const url = new URL(window.location.href);
+    if (state.date) url.searchParams.set("date", state.date); else url.searchParams.delete("date");
+    if (state.sport && state.sport !== "all") url.searchParams.set("sport", state.sport); else url.searchParams.delete("sport");
+    if (state.gameState && state.gameState !== "all") url.searchParams.set("game_state", state.gameState); else url.searchParams.delete("game_state");
+    window.history.replaceState({}, "", url.toString());
+  }
 
-function formatTimestamp(value) {
-  const raw = String(value || "").trim();
-  if (!raw || raw === "-" || raw === "—" || raw.toLowerCase() === "unknown") {
-    return "";
+  function renderTabs(containerId, tabs, activeValue, onSelect) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = tabs.map((tab) => `
+      <button type="button" class="cards-tab${tab.value === activeValue ? " is-active" : ""}" data-tab-value="${escapeHtml(tab.value)}">${escapeHtml(tab.label)}</button>
+    `).join("");
+    container.querySelectorAll("[data-tab-value]").forEach((button) => {
+      button.addEventListener("click", () => onSelect(button.getAttribute("data-tab-value")));
+    });
   }
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) {
-    return raw;
-  }
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
-}
 
-function displayUpdatedAt(item) {
-  return formatTimestamp(
-    item.last_updated_timestamp ||
-    item.last_updated_at ||
-    item.updated_at ||
-    item.timestamp ||
-    item.generated_at ||
-    item.created_at
-  );
-}
+  function renderFilterTabs() {
+    renderTabs("board-sport-tabs", SPORT_TABS, state.sport, (value) => {
+      state.sport = value;
+      syncUrlState();
+      renderFilterTabs();
+      void loadIntelligence({ forceRefresh: true });
+    });
+    renderTabs("board-state-tabs", STATE_TABS, state.gameState, (value) => {
+      state.gameState = value;
+      syncUrlState();
+      renderFilterTabs();
+      void loadIntelligence({ forceRefresh: true });
+    });
+  }
 
-function renderUpdatedLine(item) {
-  const updatedAt = displayUpdatedAt(item) || formatTimestamp(lastResponseTimestamp);
-  return updatedAt
-    ? `<div style="font-size:11px; opacity:.62; margin-top:6px;">Updated ${updatedAt}</div>`
-    : "";
-}
+  function setRefreshStatus(message, tone) {
+    const element = document.getElementById("board-refresh-status");
+    if (!element) return;
+    element.textContent = message;
+    element.setAttribute("aria-busy", tone === "loading" || tone === "refreshing" ? "true" : "false");
+  }
 
-function renderSupportingEvidence(response) {
-  const data = response && typeof response === "object" ? response : {};
-  const headline = String(data.headline || data.summary || "").trim();
-  const summary = String(data.summary || "").trim();
-  const portfolio = data.portfolio && typeof data.portfolio === "object" ? data.portfolio : {};
-  const policyControl = data.policyControl && typeof data.policyControl === "object"
-    ? data.policyControl
-    : (data.policy_control && typeof data.policy_control === "object" ? data.policy_control : {});
-  const recommendationHistory = data.recommendationHistory && typeof data.recommendationHistory === "object"
-    ? data.recommendationHistory
-    : (data.recommendation_history && typeof data.recommendation_history === "object" ? data.recommendation_history : {});
-  const portfolioTracking = data.portfolioTracking && typeof data.portfolioTracking === "object"
-    ? data.portfolioTracking
-    : (data.portfolio_tracking && typeof data.portfolio_tracking === "object" ? data.portfolio_tracking : {});
-  const portfolioEvents = data.portfolioEvents && typeof data.portfolioEvents === "object"
-    ? data.portfolioEvents
-    : (data.portfolio_events && typeof data.portfolio_events === "object" ? data.portfolio_events : {});
-  const boardContract = data.boardContract && typeof data.boardContract === "object"
-    ? data.boardContract
-    : (data.board_contract && typeof data.board_contract === "object" ? data.board_contract : {});
-  const laneCounts = boardContract.lane_counts && typeof boardContract.lane_counts === "object" ? boardContract.lane_counts : {};
-  const cardFields = Array.isArray(boardContract.card_fields) ? boardContract.card_fields : [];
-  const boardWaterfall = Array.isArray(boardContract.waterfall) ? boardContract.waterfall : [];
-  const evidenceBits = [];
-  if (headline) {
-    evidenceBits.push(`<div style="font-size:18px; font-weight:700; margin-bottom:6px;">${escapeHtml(headline)}</div>`);
+  function formatTimestamp(value) {
+    const raw = String(value || "").trim();
+    if (!raw || raw === "-" || raw === "—") return "";
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) return raw;
+    return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
   }
-  if (summary) {
-    evidenceBits.push(`<div style="opacity:.82; line-height:1.45;">${escapeHtml(summary)}</div>`);
-  }
-  if (data.state_last_updated || data.candidate_count !== undefined) {
-    evidenceBits.push(`
-      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; font-size:12px;">
-        <span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Last Updated: ${escapeHtml(data.state_last_updated || "—")}</span>
-        <span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Snapshot: ${escapeHtml(data.snapshot_generated_at || "—")}</span>
-        <span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Date: ${escapeHtml(data.selected_date || "—")}</span>
-        <span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Candidates: ${escapeHtml(data.candidate_count ?? "—")}</span>
-      </div>
-    `);
-  }
-  evidenceBits.push(`<div style="margin-top:10px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; opacity:.7;">Portfolio summary</div>`);
-  evidenceBits.push(`<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; font-size:12px;">` +
-    [
-      portfolio.total_exposure !== undefined && portfolio.total_exposure !== null && portfolio.total_exposure !== "" ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Exposure ${escapeHtml(portfolio.total_exposure)}</span>` : "",
-      portfolio.risk_label ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">${escapeHtml(portfolio.risk_label)}</span>` : "",
-      portfolio.diversification_score !== undefined && portfolio.diversification_score !== null && portfolio.diversification_score !== "" ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Diversification ${escapeHtml(portfolio.diversification_score)}</span>` : "",
-    ].filter(Boolean).join("") +
-    `</div>`);
-  if (boardContract.schema) {
-    evidenceBits.push(`<div style="margin-top:12px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; opacity:.7;">Board contract</div>`);
-    evidenceBits.push(`<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; font-size:12px;">` +
-      [
-        laneCounts.live !== undefined ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(59,130,246,.16);">Live ${escapeHtml(laneCounts.live)}</span>` : "",
-        laneCounts.pregame !== undefined ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(168,85,247,.16);">Pregame ${escapeHtml(laneCounts.pregame)}</span>` : "",
-        laneCounts.archived !== undefined ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(148,163,184,.16);">Archived ${escapeHtml(laneCounts.archived)}</span>` : "",
-        cardFields.length ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Fields ${escapeHtml(cardFields.join(", "))}</span>` : "",
-      ].filter(Boolean).join("") +
-      `</div>`);
-  }
-  if (recommendationHistory.history_status) {
-    evidenceBits.push(`<div style="margin-top:12px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; opacity:.7;">Recommendation history</div>`);
-    evidenceBits.push(`<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; font-size:12px;">` +
-      [
-        `<span style="padding:5px 8px; border-radius:999px; background:rgba(34,197,94,.16);">${escapeHtml(String(recommendationHistory.history_status || "empty"))}</span>`,
-        recommendationHistory.sample_size !== undefined ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Samples ${escapeHtml(recommendationHistory.sample_size)}</span>` : "",
-        recommendationHistory.settled_count !== undefined ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Settled ${escapeHtml(recommendationHistory.settled_count)}</span>` : "",
-        recommendationHistory.win_rate !== undefined && recommendationHistory.win_rate !== null ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Win rate ${escapeHtml(Number(recommendationHistory.win_rate).toFixed(2))}</span>` : "",
-      ].filter(Boolean).join("") +
-      `</div>`);
-  }
-  if (portfolioTracking.open_exposure !== undefined || portfolioTracking.wager_count !== undefined) {
-    evidenceBits.push(`<div style="margin-top:12px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; opacity:.7;">Portfolio tracking</div>`);
-    evidenceBits.push(`<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; font-size:12px;">` +
-      [
-        portfolioTracking.open_exposure !== undefined && portfolioTracking.open_exposure !== null ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(59,130,246,.16);">Open exposure ${escapeHtml(Number(portfolioTracking.open_exposure).toFixed(2))}</span>` : "",
-        portfolioTracking.risk_level ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Risk ${escapeHtml(String(portfolioTracking.risk_level))}</span>` : "",
-        portfolioTracking.wager_count !== undefined ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Wagers ${escapeHtml(portfolioTracking.wager_count)}</span>` : "",
-      ].filter(Boolean).join("") +
-      `</div>`);
-  }
-  if (portfolioEvents.event_count !== undefined) {
-    evidenceBits.push(`<div style="margin-top:12px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; opacity:.7;">Portfolio events</div>`);
-    evidenceBits.push(`<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; font-size:12px;">` +
-      [
-        `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Events ${escapeHtml(portfolioEvents.event_count)}</span>`,
-        portfolioEvents.added_count !== undefined ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(59,130,246,.16);">Added ${escapeHtml(portfolioEvents.added_count)}</span>` : "",
-        portfolioEvents.removed_count !== undefined ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(239,68,68,.16);">Removed ${escapeHtml(portfolioEvents.removed_count)}</span>` : "",
-        portfolioEvents.adjusted_count !== undefined ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(245,158,11,.16);">Adjusted ${escapeHtml(portfolioEvents.adjusted_count)}</span>` : "",
-      ].filter(Boolean).join("") +
-      `</div>`);
-  }
-  if (policyControl.policy_status) {
-    evidenceBits.push(`<div style="margin-top:12px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; opacity:.7;">Policy control</div>`);
-    evidenceBits.push(`<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; font-size:12px;">` +
-      [
-        `<span style="padding:5px 8px; border-radius:999px; background:rgba(168,85,247,.16);">${escapeHtml(String(policyControl.selected_policy || "default"))}</span>`,
-        policyControl.leader_policy ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Leader ${escapeHtml(String(policyControl.leader_policy))}</span>` : "",
-        Array.isArray(policyControl.policy_comparison) && policyControl.policy_comparison.length ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Comparisons ${escapeHtml(policyControl.policy_comparison.length)}</span>` : "",
-      ].filter(Boolean).join("") +
-      `</div>`);
-  }
-  return evidenceBits.join("");
-}
 
-function displayTeam(item) {
-  return String(item.team || item.team_name || item.player_team || item.home_team || item.away_team || "—").trim() || "—";
-}
-
-function displayMatchup(item) {
-  return String(item.matchup || item.event_matchup || "—").trim() || "—";
-}
-
-function displayLine(item) {
-  const line = item.line ?? item.market_data?.current_line ?? item.market_context?.current_line;
-  const text = String(line ?? "").trim();
-  return text || "—";
-}
-
-function displayOdds(item) {
-  const odds = item.odds ?? item.odds_current ?? item.market_context?.american_odds;
-  if (odds === null || odds === undefined || odds === "") {
-    return "—";
+  function displayTitle(item) {
+    return String(item.display_name || item.player_name || item.name || item.pick || item.selection || item.market || "—").trim();
   }
-  const numeric = Number(odds);
-  if (Number.isFinite(numeric)) {
-    return numeric > 0 ? `+${numeric}` : `${numeric}`;
-  }
-  return String(odds).trim() || "—";
-}
 
-function displayActualProp(item) {
-  const selection = String(item.selection || item.pick || "").trim();
-  const line = displayLine(item);
-  const market = String(item.market || item.market_key || "").trim();
-  if (selection) {
-    const pieces = [selection];
-    if (line && line !== "—") {
-      pieces.push(line);
+  function displayTeam(item) {
+    return String(item.team || item.team_name || item.player_team || "").trim() || null;
+  }
+
+  function displayMatchup(item) {
+    return String(item.matchup || item.event_matchup || "").trim() || null;
+  }
+
+  function displayLine(item) {
+    const line = item.line ?? item.market_data?.current_line;
+    const text = String(line ?? "").trim();
+    return text && text !== "-" ? text : null;
+  }
+
+  function displayOdds(item) {
+    const odds = item.odds ?? item.odds_current;
+    if (odds === null || odds === undefined || odds === "" || odds === "-") return null;
+    const numeric = Number(odds);
+    if (Number.isFinite(numeric)) return numeric > 0 ? `+${numeric}` : `${numeric}`;
+    return String(odds).trim() || null;
+  }
+
+  function displayProjection(item) {
+    const projection = item.sim_projection ?? item.projected ?? item.projected_sim;
+    if (projection === null || projection === undefined || projection === "" || projection === "-") return null;
+    const numeric = Number(projection);
+    return Number.isFinite(numeric) ? (Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1)) : String(projection).trim();
+  }
+
+  function displayLiveProjection(item) {
+    const projection = item.live_projection ?? item.live_total;
+    if (projection === null || projection === undefined || projection === "" || projection === "-") return null;
+    const numeric = Number(projection);
+    return Number.isFinite(numeric) ? (Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1)) : String(projection).trim();
+  }
+
+  // Line/odds movement: reads the structured movement object
+  // (previous_line/last_line/delta/trend/percent_change/history) computed
+  // server-side by _enrich_candidates_with_odds_history --  not made-up
+  // field names the backend never emitted (the earlier version of this
+  // page checked odds_open/line_open/delta_display, none of which existed).
+  function renderMovement(item) {
+    const movement = item.movement && typeof item.movement === "object" ? item.movement : {};
+    const trend = String(movement.trend || "flat").toLowerCase();
+    const delta = numericValue(movement.delta);
+    const history = Array.isArray(movement.history) ? movement.history : [];
+    const arrow = trend === "up" ? "▲" : trend === "down" ? "▼" : "→";
+    const parts = [];
+    if (delta !== null && delta !== 0) {
+      parts.push(`${delta > 0 ? "+" : ""}${delta.toFixed(2)}`);
     }
-    if (market && market.toLowerCase() !== selection.toLowerCase()) {
-      pieces.push(market.replace(/_/g, " "));
+    if (movement.previous_line !== undefined && movement.previous_line !== null && movement.last_line !== undefined && movement.last_line !== null && movement.previous_line !== movement.last_line) {
+      parts.push(`${movement.previous_line} → ${movement.last_line}`);
     }
-    return pieces.join(" ").trim();
-  }
-  return String(
-    item.detail ||
-    item.writeup ||
-    item.summary ||
-    item.surface_title ||
-    item.surface ||
-    item.market ||
-    "—"
-  ).trim() || "—";
-}
-
-function formatSettlementValue(value) {
-  if (value === null || value === undefined || value === "") {
-    return "—";
-  }
-  const numeric = Number(value);
-  if (Number.isFinite(numeric)) {
-    return Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1);
-  }
-  return String(value).trim() || "—";
-}
-
-function displayActualValue(item) {
-  const settlement = item.settlement && typeof item.settlement === "object" ? item.settlement : {};
-  return formatSettlementValue(
-    settlement.actual ??
-    item.actual ??
-    item.actual_value ??
-    item.actual_so_far ??
-    item.current_actual ??
-    item.live_actual
-  );
-}
-
-function displayLiveProjection(item) {
-  const projection = item.live_projection ?? item.live_total ?? item.projected_live ?? item.live_projection_display;
-  if (projection === null || projection === undefined || projection === "" || projection === "-") {
-    return "—";
-  }
-  const numeric = Number(projection);
-  if (Number.isFinite(numeric)) {
-    return Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1);
-  }
-  return String(projection).trim() || "—";
-}
-
-function displaySimProjection(item) {
-  const projection = item.sim_projection ?? item.projected ?? item.projected_sim ?? item.simulated_projection;
-  if (projection === null || projection === undefined || projection === "") {
-    return "—";
-  }
-  const numeric = Number(projection);
-  if (Number.isFinite(numeric)) {
-    return Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1);
-  }
-  return String(projection).trim() || "—";
-}
-
-function displayMovementSummary(item) {
-  const movement = item.movement && typeof item.movement === "object" ? item.movement : {};
-  const pieces = [];
-  const trend = String(movement.trend || item.movement_trend || item.odds_trend || "").trim();
-  const deltaDisplay = String(movement.delta_display || item.movement_delta_display || item.edge_delta_display || "").trim();
-  const history = Array.isArray(item.movement_history) ? item.movement_history : (Array.isArray(item.market_data?.movement_history) ? item.market_data.movement_history : []);
-  const oddsNow = displayOdds(item);
-  const oddsOpen = item.odds_open ?? item.market_context?.opening_odds ?? item.market_context?.odds_open;
-  const lineOpen = item.line_open ?? item.market_context?.opening_line ?? item.market_context?.line_open;
-
-  if (trend) {
-    pieces.push(trend);
-  }
-  if (deltaDisplay) {
-    pieces.push(deltaDisplay);
-  }
-  if (oddsOpen !== null && oddsOpen !== undefined && oddsOpen !== "" && oddsNow !== "—") {
-    const openText = displayOdds({ odds: oddsOpen });
-    if (openText !== oddsNow) {
-      pieces.push(`Odds ${openText} → ${oddsNow}`);
+    if (history.length > 1) {
+      parts.push(`${history.length} moves`);
     }
-  }
-  if (lineOpen !== null && lineOpen !== undefined && lineOpen !== "") {
-    const openText = displayLine({ line: lineOpen, market_data: {}, market_context: {} });
-    const currentLine = displayLine(item);
-    if (openText !== "—" && currentLine !== "—" && openText !== currentLine) {
-      pieces.push(`Line ${openText} → ${currentLine}`);
+    if (!parts.length) {
+      return null;
     }
-  }
-  if (history.length) {
-    pieces.push(`${history.length} moves tracked`);
-  }
-  if (oddsNow !== "—") {
-    pieces.push(`Odds ${oddsNow}`);
+    return `<span class="board-card__movement-arrow--${trend === "up" ? "up" : trend === "down" ? "down" : "flat"}">${arrow}</span> ${escapeHtml(parts.join(" · "))}`;
   }
 
-  return pieces.length ? pieces.join(" · ") : "—";
-}
-
-function displayActualText(item) {
-  const actual = displayActualValue(item);
-  if (actual !== "—" && actual !== "-") {
-    return actual;
-  }
-  const state = recommendationState(item);
-  if (state === "live" || state === "stale") {
-    return "live data unavailable";
-  }
-  if (state === "final") {
-    return "settled without current count";
-  }
-  return "—";
-}
-
-function displaySettlementSummary(item) {
-  const settlement = item.settlement && typeof item.settlement === "object" ? item.settlement : {};
-  const status = String(
-    settlement.status ||
-    item.settlement_status ||
-    item.outcome_state ||
-    ""
-  ).trim().toLowerCase();
-  const statusLabel = String(settlement.status_label || "").trim() || (status ? status.charAt(0).toUpperCase() + status.slice(1) : "");
-  const actual = displayActualValue(item);
-  const result = String(settlement.result || item.settlement_result || item.result || "").trim();
-  const pieces = [];
-
-  if (statusLabel) {
-    pieces.push(statusLabel);
-  }
-  if (actual !== "—" && actual !== "-") {
-    pieces.push(`Actual ${actual}`);
-  }
-  if (result) {
-    pieces.push(result.charAt(0).toUpperCase() + result.slice(1));
+  function edgeValue(item) {
+    return numericValue(item.edge) ?? numericValue(item.adjusted_edge) ?? numericValue(item.expected_value) ?? numericValue(item.ev_current) ?? 0;
   }
 
-  return pieces.length ? pieces.join(" · ") : "—";
-}
-
-function displayGameStatus(item) {
-  const status = String(
-    item.status_display ||
-    item.status_context ||
-    item.game_state?.detailed ||
-    item.game_state?.abstract ||
-    item.outcome_state ||
-    ""
-  ).trim();
-  if (status) {
-    return status;
-  }
-  return recommendationState(item) === "live" ? "Live" : "—";
-}
-
-function renderPropFacts(item, compact = false) {
-  const style = compact
-    ? "font-size:11px; opacity:.78; display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;"
-    : "display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:8px; margin-top:10px; font-size:12px; opacity:.88;";
-  return `
-    <div style="${style}">
-      <div><strong>Name:</strong> ${displayTitle(item)}</div>
-      <div><strong>Team:</strong> ${displayTeam(item)}</div>
-      <div><strong>Matchup:</strong> ${displayMatchup(item)}</div>
-      <div><strong>Game Status:</strong> ${displayGameStatus(item)}</div>
-      <div><strong>Line:</strong> ${displayLine(item)}</div>
-      <div><strong>Sport:</strong> ${String(item.sport || item.sport_slug || "—").trim() || "—"}</div>
-      <div><strong>Odds:</strong> ${displayOdds(item)}</div>
-      ${(displaySimProjection(item) !== "—") ? `<div><strong>Sim Projection:</strong> ${displaySimProjection(item)}</div>` : ""}
-      ${(displayLiveProjection(item) !== "—") ? `<div><strong>Live Projection:</strong> ${displayLiveProjection(item)}</div>` : ""}
-      ${(displayMovementSummary(item) !== "—") ? `<div><strong>Movement:</strong> ${displayMovementSummary(item)}</div>` : ""}
-      ${(displayActualValue(item) !== "—" || recommendationState(item) !== "pregame") ? `<div><strong>Actual:</strong> ${displayActualText(item)}</div>` : ""}
-      ${(displaySettlementSummary(item) !== "—") ? `<div><strong>Settlement:</strong> ${displaySettlementSummary(item)}</div>` : ""}
-      <div><strong>Actual Prop:</strong> ${displayActualProp(item)}</div>
-    </div>
-  `;
-}
-
-function renderRefreshStamp() {
-  const refreshedAt = formatTimestamp(lastResponseTimestamp);
-  return refreshedAt
-    ? `<div style="font-size:11px; opacity:.62; margin-top:6px;">Refreshed ${refreshedAt}</div>`
-    : "";
-}
-
-function edgeValue(item) {
-  return numericValue(item.edge)
-    ?? numericValue(item.adjusted_edge)
-    ?? numericValue(item.expected_value)
-    ?? numericValue(item.ev_current)
-    ?? 0;
-}
-
-function edgeTheme(item) {
-  const edge = edgeValue(item);
-  if (edge > 0.06) {
-    return {
-      color: "#2ecc71",
-      border: "rgba(46, 204, 113, .55)",
-      background: "rgba(46, 204, 113, .10)",
-      label: "HIGH EDGE",
-    };
-  }
-  if (edge > 0.03) {
-    return {
-      color: "#f1c40f",
-      border: "rgba(241, 196, 15, .55)",
-      background: "rgba(241, 196, 15, .10)",
-      label: "MEDIUM EDGE",
-    };
-  }
-  return {
-    color: "#7f8c8d",
-    border: "rgba(127, 140, 141, .45)",
-    background: "rgba(127, 140, 141, .10)",
-    label: "LOW EDGE",
-  };
-}
-
-function badgeStyle(kind) {
-  const styles = {
-    LIVE: { background: "rgba(59, 130, 246, .16)", color: "#d7e9ff", border: "rgba(59, 130, 246, .38)" },
-    PREGAME: { background: "rgba(168, 85, 247, .16)", color: "#efe0ff", border: "rgba(168, 85, 247, .38)" },
-    "HIGH CONFIDENCE": { background: "rgba(46, 204, 113, .16)", color: "#d6ffe4", border: "rgba(46, 204, 113, .38)" },
-    "HIGH VARIANCE": { background: "rgba(231, 76, 60, .16)", color: "#ffd9d5", border: "rgba(231, 76, 60, .38)" },
-    default: { background: "rgba(255,255,255,.08)", color: "#f3f4f6", border: "rgba(255,255,255,.16)" },
-  };
-  return styles[kind] || styles.default;
-}
-
-function renderBadge(label) {
-  const style = badgeStyle(label);
-  return `
-    <span style="display:inline-flex; align-items:center; padding:4px 8px; border-radius:999px; font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; background:${style.background}; color:${style.color}; border:1px solid ${style.border};">
-      ${label}
-    </span>
-  `;
-}
-
-function renderCardBadges(item) {
-  const badges = [];
-  const state = recommendationState(item);
-  const sportState = state === "live" ? "LIVE" : (state === "pregame" ? "PREGAME" : null);
-  if (sportState) {
-    badges.push(renderBadge(sportState));
+  function edgeTier(edge) {
+    if (edge > 0.06) return "high";
+    if (edge > 0.03) return "medium";
+    return "low";
   }
 
-  const confidence = numericValue(item.confidence);
-  if (confidence !== null && confidence >= 0.7) {
-    badges.push(renderBadge("HIGH CONFIDENCE"));
+  function isTimeLikeStatus(status) {
+    const value = String(status || "").trim().toLowerCase();
+    return /\b\d{1,2}:\d{2}\s?(?:am|pm)\b/.test(value) || /\b(?:ct|et|pt|mt|st)\b/.test(value);
   }
 
-  const variance = numericValue(item.volatility) ?? numericValue(item.volatility_score);
-  if (variance !== null && variance >= 0.67) {
-    badges.push(renderBadge("HIGH VARIANCE"));
+  function isPregameStatus(status) {
+    const value = String(status || "").trim().toLowerCase();
+    return Boolean(value && (isTimeLikeStatus(value) || ["pre-game", "pregame", "scheduled", "preview", "warmup", "not started", "lineups"].some((token) => value.includes(token))));
   }
 
-  const theme = edgeTheme(item);
-  badges.push(`
-    <span style="display:inline-flex; align-items:center; padding:4px 8px; border-radius:999px; font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; background:${theme.background}; color:${theme.color}; border:1px solid ${theme.border};">
-      ${theme.label}
-    </span>
-  `);
-
-  return `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">${badges.join("")}</div>`;
-}
-
-function renderBoardMetaRow(item) {
-  const chips = [];
-  const sport = String(item.sport || item.sport_slug || "").trim();
-  const team = displayTeam(item);
-  const player = String(item.player_name || item.name || "").trim();
-  const market = String(item.market || item.market_label || "").trim();
-  const line = displayLine(item);
-  const movement = displayMovementSummary(item);
-  const simulatedEdge = edgeValue(item);
-
-  if (sport) chips.push(`Sport: ${escapeHtml(sport.toUpperCase())}`);
-  if (team && team !== "—") chips.push(`Team: ${escapeHtml(team)}`);
-  if (player && player !== "—") chips.push(`Player: ${escapeHtml(player)}`);
-  if (market) chips.push(`Market: ${escapeHtml(market)}`);
-  if (line && line !== "—") chips.push(`Line: ${escapeHtml(line)}`);
-  if (movement && movement !== "—") chips.push(`Movement: ${escapeHtml(movement)}`);
-  if (simulatedEdge) chips.push(`Sim edge: ${escapeHtml((simulatedEdge * 100).toFixed(1))}%`);
-
-  return chips.length
-    ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; font-size:11px; opacity:.84;">${chips.map((chip) => `<span style="padding:4px 8px; border-radius:999px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08);">${chip}</span>`).join("")}</div>`
-    : "";
-}
-
-function normalizeIntelligenceResponse(response) {
-  const nestedResponse = response && typeof response.response === "object" && response.response ? response.response : {};
-  const analysis = response && typeof response.analysis === "object" && response.analysis ? response.analysis : {};
-  const nestedAnalysis = nestedResponse && typeof nestedResponse.analysis === "object" && nestedResponse.analysis ? nestedResponse.analysis : {};
-  const recommendationHistory = response.recommendation_history && typeof response.recommendation_history === "object"
-    ? response.recommendation_history
-    : (nestedResponse.recommendation_history && typeof nestedResponse.recommendation_history === "object"
-      ? nestedResponse.recommendation_history
-      : (analysis.recommendation_history && typeof analysis.recommendation_history === "object"
-        ? analysis.recommendation_history
-        : (nestedAnalysis.recommendation_history && typeof nestedAnalysis.recommendation_history === "object" ? nestedAnalysis.recommendation_history : {})));
-  const portfolioTracking = response.portfolio_tracking && typeof response.portfolio_tracking === "object"
-    ? response.portfolio_tracking
-    : (nestedResponse.portfolio_tracking && typeof nestedResponse.portfolio_tracking === "object"
-      ? nestedResponse.portfolio_tracking
-      : (analysis.portfolio_tracking && typeof analysis.portfolio_tracking === "object"
-        ? analysis.portfolio_tracking
-        : (nestedAnalysis.portfolio_tracking && typeof nestedAnalysis.portfolio_tracking === "object" ? nestedAnalysis.portfolio_tracking : {})));
-  const portfolioEvents = response.portfolio_events && typeof response.portfolio_events === "object"
-    ? response.portfolio_events
-    : (nestedResponse.portfolio_events && typeof nestedResponse.portfolio_events === "object"
-      ? nestedResponse.portfolio_events
-      : (analysis.portfolio_events && typeof analysis.portfolio_events === "object"
-        ? analysis.portfolio_events
-        : (nestedAnalysis.portfolio_events && typeof nestedAnalysis.portfolio_events === "object" ? nestedAnalysis.portfolio_events : {})));
-  const portfolioEventRecords = Array.isArray(response.portfolio_event_records) && response.portfolio_event_records.length
-    ? response.portfolio_event_records
-    : (Array.isArray(nestedResponse.portfolio_event_records) && nestedResponse.portfolio_event_records.length
-      ? nestedResponse.portfolio_event_records
-      : (Array.isArray(analysis.portfolio_event_records) ? analysis.portfolio_event_records : (Array.isArray(nestedAnalysis.portfolio_event_records) ? nestedAnalysis.portfolio_event_records : [])));
-  const boardContract = response.board_contract && typeof response.board_contract === "object"
-    ? response.board_contract
-    : (nestedResponse.board_contract && typeof nestedResponse.board_contract === "object"
-      ? nestedResponse.board_contract
-      : (analysis.board_contract && typeof analysis.board_contract === "object"
-        ? analysis.board_contract
-        : (nestedAnalysis.board_contract && typeof nestedAnalysis.board_contract === "object" ? nestedAnalysis.board_contract : {})));
-  const recommendations = Array.isArray(response.recommendations)
-    ? response.recommendations
-    : (Array.isArray(nestedResponse.recommendations)
-      ? nestedResponse.recommendations
-      : (Array.isArray(analysis.recommendations)
-        ? analysis.recommendations
-        : (Array.isArray(nestedAnalysis.recommendations)
-          ? nestedAnalysis.recommendations
-          : (Array.isArray(analysis.picks) ? analysis.picks : (Array.isArray(nestedAnalysis.picks) ? nestedAnalysis.picks : [])))));
-  const topOpportunities = Array.isArray(response.top_opportunities)
-    ? response.top_opportunities
-    : (Array.isArray(nestedResponse.top_opportunities)
-      ? nestedResponse.top_opportunities
-      : (Array.isArray(analysis.top_opportunities)
-        ? analysis.top_opportunities
-        : (Array.isArray(nestedAnalysis.top_opportunities) ? nestedAnalysis.top_opportunities : recommendations)));
-  const topLiveOpportunities = Array.isArray(response.top_live_opportunities) && response.top_live_opportunities.length
-    ? response.top_live_opportunities
-    : (Array.isArray(nestedResponse.top_live_opportunities) && nestedResponse.top_live_opportunities.length
-      ? nestedResponse.top_live_opportunities
-      : (Array.isArray(analysis.top_live_opportunities) && analysis.top_live_opportunities.length
-        ? analysis.top_live_opportunities
-        : (Array.isArray(nestedAnalysis.top_live_opportunities) && nestedAnalysis.top_live_opportunities.length
-          ? nestedAnalysis.top_live_opportunities
-          : (Array.isArray(boardContract.live) && boardContract.live.length
-            ? boardContract.live
-            : recommendations.filter((item) => String(item.tag || item.timing || item.phase || "").trim().toUpperCase() === "LIVE")))));
-  const bySport = response.by_sport && typeof response.by_sport === "object"
-    ? response.by_sport
-    : (nestedResponse.by_sport && typeof nestedResponse.by_sport === "object"
-      ? nestedResponse.by_sport
-      : (boardContract.by_sport && typeof boardContract.by_sport === "object"
-        ? boardContract.by_sport
-        : (analysis.by_sport && typeof analysis.by_sport === "object"
-          ? analysis.by_sport
-          : (nestedAnalysis.by_sport && typeof nestedAnalysis.by_sport === "object" ? nestedAnalysis.by_sport : {}))));
-  const portfolio = response.portfolio && typeof response.portfolio === "object"
-    ? response.portfolio
-    : (nestedResponse.portfolio && typeof nestedResponse.portfolio === "object"
-      ? nestedResponse.portfolio
-      : (analysis.portfolio && typeof analysis.portfolio === "object"
-        ? analysis.portfolio
-        : (nestedAnalysis.portfolio && typeof nestedAnalysis.portfolio === "object" ? nestedAnalysis.portfolio : {})));
-  const parlays = Array.isArray(response.parlays) && response.parlays.length
-    ? response.parlays
-    : (Array.isArray(nestedResponse.parlays) && nestedResponse.parlays.length
-      ? nestedResponse.parlays
-      : (Array.isArray(analysis.parlays)
-        ? analysis.parlays
-        : (Array.isArray(nestedAnalysis.parlays) ? nestedAnalysis.parlays : [])));
-
-  return {
-    analysis,
-    recommendations,
-    topOpportunities,
-    topLiveOpportunities,
-    bySport,
-    portfolio,
-    parlays,
-    recommendationHistory,
-    portfolioTracking,
-    portfolioEvents,
-    portfolioEventRecords,
-    boardContract,
-    state_last_updated: response.state_last_updated ?? analysis.state_last_updated ?? null,
-    candidate_count: response.candidate_count ?? analysis.candidate_count ?? null,
-    debug_source: response.debug_source ?? analysis.debug_source ?? null,
-    line_moves_tracked: response.line_moves_tracked ?? analysis.line_moves_tracked ?? 0,
-    line_move_history_count: response.line_move_history_count ?? analysis.line_move_history_count ?? 0,
-    line_move_source_count: response.line_move_source_count ?? analysis.line_move_source_count ?? 0,
-  };
-}
-
-function unwrapVersionedIntelligenceResponse(response) {
-  let current = response && typeof response === "object" ? response : {};
-  while (current && typeof current === "object" && current.version !== undefined && current.timestamp !== undefined && current.response && typeof current.response === "object") {
-    current = current.response;
+  function isLiveStatus(status) {
+    const value = String(status || "").trim().toLowerCase();
+    return Boolean(value && ["live", "in progress", "top of", "bottom of", "inning", "quarter", "period", "half"].some((token) => value.includes(token)));
   }
-  return current && typeof current === "object" ? current : {};
-}
 
-function mergeVersionedIntelligenceResponse(response) {
-  const versionedResponse = response && typeof response === "object" ? response : {};
-  const boardResponse = versionedResponse.response && typeof versionedResponse.response === "object" ? versionedResponse.response : {};
-  const baseResponse = unwrapVersionedIntelligenceResponse(boardResponse.response || boardResponse);
-  const surfacedCount = Array.isArray(versionedResponse.top_opportunities)
-    ? versionedResponse.top_opportunities.length
-    : Array.isArray(versionedResponse.recommendations)
-      ? versionedResponse.recommendations.length
-      : Array.isArray(boardResponse.top_opportunities)
-        ? boardResponse.top_opportunities.length
-        : Array.isArray(boardResponse.recommendations)
-          ? boardResponse.recommendations.length
-          : Array.isArray(baseResponse.top_opportunities)
-            ? baseResponse.top_opportunities.length
-            : Array.isArray(baseResponse.recommendations)
-              ? baseResponse.recommendations.length
-              : null;
-  const stateLastUpdated = versionedResponse.state_last_updated
-    ?? versionedResponse.timestamp
-    ?? boardResponse.state_last_updated
-    ?? boardResponse.updated_at
-    ?? baseResponse.state_last_updated
-    ?? baseResponse.updated_at
-    ?? null;
-  return {
-    ...versionedResponse,
-    ...boardResponse,
-    ...baseResponse,
-    version: versionedResponse.version ?? baseResponse.version ?? null,
-    timestamp: versionedResponse.timestamp ?? baseResponse.timestamp ?? null,
-    response_hash: versionedResponse.response_hash ?? baseResponse.response_hash ?? null,
-    debug_source: versionedResponse.debug_source ?? baseResponse.debug_source ?? null,
-    state_last_updated: stateLastUpdated,
-    candidate_count: versionedResponse.candidate_count ?? surfacedCount ?? boardResponse.candidate_count ?? baseResponse.candidate_count ?? null,
-  };
-}
+  function recommendationState(item) {
+    if (!item || typeof item !== "object") return "unknown";
+    const status = String(item.status_display || item.status_context || item.game_state?.detailed || item.game_state?.abstract || "").trim().toLowerCase();
+    const settlement = item.settlement && typeof item.settlement === "object" ? item.settlement : {};
+    const settlementStatus = String(settlement.status || item.settlement_status || "").trim().toLowerCase();
+    const settlementResult = String(settlement.result || item.settlement_result || item.result || "").trim().toLowerCase();
+    const liveFlag = typeof item.is_live === "boolean" ? item.is_live : null;
 
-function hasLiveSignal(item) {
-  if (!item || typeof item !== "object") {
-    return false;
-  }
-  const liveProjection = String(item.live_projection ?? item.live_total ?? item.live_projection_display ?? "").trim();
-  return Boolean(
-    item.hero_live_box ||
-    item.hero_sim_box ||
-    (liveProjection && liveProjection !== "-") ||
-    (item.live_total !== null && item.live_total !== undefined)
-  );
-}
-
-function isTimeLikeStatus(status) {
-  const value = String(status || "").trim().toLowerCase();
-  return /\b\d{1,2}:\d{2}\s?(?:am|pm)\b/.test(value) || /\b(?:ct|et|pt|mt|st)\b/.test(value);
-}
-
-function isPregameStatus(status) {
-  const value = String(status || "").trim().toLowerCase();
-  return Boolean(value && (isTimeLikeStatus(value) || ["pre-game", "pregame", "scheduled", "preview", "warmup", "not started", "lineups"].some((token) => value.includes(token))));
-}
-
-function isLiveStatus(status) {
-  const value = String(status || "").trim().toLowerCase();
-  return Boolean(value && ["live", "in progress", "top of", "bottom of", "inning", "quarter", "period", "half"].some((token) => value.includes(token)));
-}
-
-function recommendationState(item) {
-  if (!item || typeof item !== "object") {
-    return "unknown";
-  }
-  const status = String(item.status_display || item.status_context || item.game_state?.detailed || item.game_state?.abstract || "").trim().toLowerCase();
-  const settlement = item.settlement && typeof item.settlement === "object" ? item.settlement : {};
-  const settlementStatus = String(
-    settlement.status || settlement.status_label || item.settlement_status || item.settlement_state || item.settlement_label || ""
-  ).trim().toLowerCase();
-  const settlementResult = String(settlement.result || item.settlement_result || item.result || "").trim().toLowerCase();
-  const liveFlag = typeof item.is_live === "boolean" ? item.is_live : null;
-
-  if (status.includes("final") || status.includes("completed") || status.includes("settled") || status.includes("resolved") || status.includes("graded")) {
-    return "final";
-  }
-  if (["final", "completed", "settled", "resolved", "graded"].includes(settlementStatus)) {
-    return "final";
-  }
-  if (["won", "lost", "push", "graded", "final", "completed", "settled", "resolved"].includes(settlementResult)) {
-    return "final";
-  }
-  if (isPregameStatus(status)) {
+    if (["final", "completed", "settled", "resolved", "graded"].some((token) => status.includes(token))) return "final";
+    if (["final", "completed", "settled", "resolved", "graded"].includes(settlementStatus)) return "final";
+    if (["won", "lost", "push", "graded", "final", "completed", "settled", "resolved"].includes(settlementResult)) return "final";
+    if (isPregameStatus(status)) return "pregame";
+    if (isLiveStatus(status) && liveFlag) return "live";
+    if (liveFlag) return status ? "stale" : "live";
+    if (isLiveStatus(status)) return "stale";
     return "pregame";
   }
-  if (liveFlag && /^\d{4}-\d{2}-\d{2}$/.test(status)) {
-    return "pregame";
-  }
-  if (isLiveStatus(status) && (liveFlag || hasLiveSignal(item))) {
-    return "live";
-  }
-  if (liveFlag && hasLiveSignal(item)) {
-    return "live";
-  }
-  if (liveFlag) {
-    return status ? "stale" : "live";
-  }
-  if (isLiveStatus(status)) {
-    return "stale";
-  }
-  return "pregame";
-}
 
-function isLiveRecommendation(item) {
-  return recommendationState(item) === "live";
-}
+  function normalizeIntelligenceResponse(response) {
+    const nestedResponse = response && typeof response.response === "object" && response.response ? response.response : {};
+    const analysis = response && typeof response.analysis === "object" && response.analysis ? response.analysis : {};
+    const nestedAnalysis = nestedResponse && typeof nestedResponse.analysis === "object" && nestedResponse.analysis ? nestedResponse.analysis : {};
+    const boardContract = response.board_contract && typeof response.board_contract === "object"
+      ? response.board_contract
+      : (nestedResponse.board_contract && typeof nestedResponse.board_contract === "object" ? nestedResponse.board_contract : {});
+    const recommendations = Array.isArray(response.recommendations)
+      ? response.recommendations
+      : (Array.isArray(nestedResponse.recommendations) ? nestedResponse.recommendations : (Array.isArray(analysis.recommendations) ? analysis.recommendations : (Array.isArray(nestedAnalysis.recommendations) ? nestedAnalysis.recommendations : [])));
+    const topOpportunities = Array.isArray(response.top_opportunities)
+      ? response.top_opportunities
+      : (Array.isArray(nestedResponse.top_opportunities) ? nestedResponse.top_opportunities : recommendations);
+    const portfolio = response.portfolio && typeof response.portfolio === "object"
+      ? response.portfolio
+      : (nestedResponse.portfolio && typeof nestedResponse.portfolio === "object" ? nestedResponse.portfolio : {});
+    const parlays = Array.isArray(response.parlays) && response.parlays.length
+      ? response.parlays
+      : (Array.isArray(nestedResponse.parlays) ? nestedResponse.parlays : []);
 
-function isPregameRecommendation(item) {
-  return recommendationState(item) === "pregame";
-}
-
-function renderLoadingState() {
-  const portfolioEl = document.getElementById("portfolio");
-  const topOpportunitiesEvidenceEl = document.getElementById("top-opportunities-evidence");
-  const topOpportunitiesEl = document.getElementById("top-opportunities");
-  const scannerEl = document.getElementById("scanner");
-  const picksEl = document.getElementById("picks");
-  const parlaysEl = document.getElementById("parlays");
-
-  if (topOpportunitiesEl) {
-    topOpportunitiesEl.innerHTML = `
-      <div style="background:#101010;color:white;padding:18px;border-radius:14px;border:1px solid rgba(255,255,255,.08);">
-        <div style="height:18px;width:180px;background:rgba(255,255,255,.08);border-radius:999px;margin-bottom:12px;animation:pulse 1.4s ease-in-out infinite;"></div>
-        <div style="height:14px;width:85%;background:rgba(255,255,255,.06);border-radius:999px;margin-bottom:10px;animation:pulse 1.4s ease-in-out infinite;"></div>
-        <div style="height:14px;width:72%;background:rgba(255,255,255,.06);border-radius:999px;animation:pulse 1.4s ease-in-out infinite;"></div>
-      </div>
-    `;
+    return { analysis, recommendations, topOpportunities, portfolio, parlays, boardContract };
   }
 
-  if (topOpportunitiesEvidenceEl) {
-    topOpportunitiesEvidenceEl.innerHTML = `
-      <div style="background:#101010;color:white;padding:16px;border-radius:14px;border:1px solid rgba(255,255,255,.08);margin-bottom:12px;">
-        <div style="opacity:.65;">Loading supporting evidence…</div>
-      </div>
-    `;
+  function unwrapVersionedIntelligenceResponse(response) {
+    let current = response && typeof response === "object" ? response : {};
+    while (current && typeof current === "object" && current.version !== undefined && current.timestamp !== undefined && current.response && typeof current.response === "object") {
+      current = current.response;
+    }
+    return current && typeof current === "object" ? current : {};
   }
 
-  if (portfolioEl) {
-    portfolioEl.innerHTML = `
-      <div style="background:#111;color:white;padding:16px;border-radius:12px;">
-        <div style="font-size:13px; opacity:.7;">Portfolio Overview</div>
-        <div style="margin-top:10px;">
-          <div style="height:14px;width:70%;background:rgba(255,255,255,.08);border-radius:999px;margin-bottom:10px;animation:pulse 1.4s ease-in-out infinite;"></div>
-          <div style="height:14px;width:55%;background:rgba(255,255,255,.08);border-radius:999px;animation:pulse 1.4s ease-in-out infinite;"></div>
+  function mergeVersionedIntelligenceResponse(response) {
+    const versionedResponse = response && typeof response === "object" ? response : {};
+    const boardResponse = versionedResponse.response && typeof versionedResponse.response === "object" ? versionedResponse.response : {};
+    const baseResponse = unwrapVersionedIntelligenceResponse(boardResponse.response || boardResponse);
+    return {
+      ...versionedResponse,
+      ...boardResponse,
+      ...baseResponse,
+      version: versionedResponse.version ?? baseResponse.version ?? null,
+      timestamp: versionedResponse.timestamp ?? baseResponse.timestamp ?? null,
+      response_hash: versionedResponse.response_hash ?? baseResponse.response_hash ?? null,
+      state_last_updated: versionedResponse.state_last_updated ?? boardResponse.state_last_updated ?? baseResponse.state_last_updated ?? null,
+      candidate_count: versionedResponse.candidate_count ?? boardResponse.candidate_count ?? baseResponse.candidate_count ?? null,
+    };
+  }
+
+  function matchesFilters(item) {
+    if (state.sport !== "all") {
+      const sportSlug = String(item.sport_slug || item.sport || "").trim().toLowerCase();
+      if (sportSlug !== state.sport) return false;
+    }
+    if (state.gameState !== "all") {
+      const itemState = recommendationState(item);
+      if (state.gameState === "live" && itemState !== "live") return false;
+      if (state.gameState === "pregame" && itemState !== "pregame") return false;
+    }
+    return true;
+  }
+
+  function cardFacts(item) {
+    const facts = [];
+    const team = displayTeam(item);
+    const matchup = displayMatchup(item);
+    const line = displayLine(item);
+    const odds = displayOdds(item);
+    const projection = displayProjection(item);
+    const liveProjection = displayLiveProjection(item);
+    if (team) facts.push(["Team", team]);
+    if (matchup) facts.push(["Matchup", matchup]);
+    if (line) facts.push(["Line", line]);
+    if (odds) facts.push(["Odds", odds]);
+    if (projection) facts.push(["Projected", projection]);
+    if (liveProjection) facts.push(["Live proj.", liveProjection]);
+    return facts;
+  }
+
+  function renderCard(item, index) {
+    const edge = edgeValue(item);
+    const tier = edgeTier(edge);
+    const itemState = recommendationState(item);
+    const confidence = numericValue(item.confidence);
+    const movementHtml = renderMovement(item);
+    const facts = cardFacts(item);
+    const badges = [];
+    if (itemState === "live") badges.push('<span class="board-badge board-badge--live">Live</span>');
+    if (itemState === "pregame") badges.push('<span class="board-badge board-badge--pregame">Pregame</span>');
+    if (confidence !== null && confidence >= 0.7) badges.push('<span class="board-badge board-badge--confidence">High confidence</span>');
+    const sport = String(item.sport || item.sport_slug || "").trim().toUpperCase();
+    const market = String(item.market || item.market_label || "").trim();
+
+    return `
+      <article class="board-card board-card--tier-${tier}" data-syndicate-question="${escapeHtml(item.question || "")}" data-syndicate-sport="${escapeHtml(sport)}" data-syndicate-sport-slug="${escapeHtml(item.sport_slug || "")}" data-syndicate-market="${escapeHtml(market)}" data-syndicate-candidate-type="${escapeHtml(item.candidate_type || item.type || "")}" data-syndicate-selection="${escapeHtml(item.selection || item.pick || "")}" data-syndicate-matchup="${escapeHtml(displayMatchup(item) || "")}" data-syndicate-player-name="${escapeHtml(item.player_name || "")}" data-syndicate-name="${escapeHtml(displayTitle(item))}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}">
+        <div class="board-card__head">
+          <div>
+            <div class="board-card__title">${index === 0 ? "🔥 " : ""}${escapeHtml(displayTitle(item))}</div>
+            <div class="board-card__subtitle">${escapeHtml(sport)}${market ? ` · ${escapeHtml(market)}` : ""}</div>
+          </div>
+          <div class="board-card__edge">${(edge * 100).toFixed(1)}%</div>
         </div>
+        <div class="board-card__facts">
+          ${facts.map(([label, value]) => `<div><div class="board-card__fact-label">${escapeHtml(label)}</div><div class="board-card__fact-value">${escapeHtml(value)}</div></div>`).join("")}
+        </div>
+        ${confidence !== null ? `
+          <div class="board-card__bar-track"><div class="board-card__bar-fill" style="--fill-pct:${Math.round(confidence * 100)}%"></div></div>
+        ` : ""}
+        ${movementHtml ? `<div class="board-card__movement">${movementHtml}</div>` : ""}
+        ${badges.length ? `<div class="board-card__badges">${badges.join("")}</div>` : ""}
+        <div class="board-card__footer">
+          <div class="board-card__actions">
+            <button type="button" class="board-action-button board-action-button--add" data-portfolio-action="add">Add</button>
+            <button type="button" class="board-action-button board-action-button--remove" data-portfolio-action="remove">Remove</button>
+          </div>
+          ${lastResponseTimestamp ? `<div class="board-card__updated">Updated ${escapeHtml(formatTimestamp(lastResponseTimestamp))}</div>` : ""}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderTopStrip(items) {
+    const container = document.getElementById("board-top-strip");
+    if (!container) return;
+    const top = items.slice().sort((a, b) => edgeValue(b) - edgeValue(a)).slice(0, 6);
+    if (!top.length) {
+      container.innerHTML = "";
+      return;
+    }
+    container.innerHTML = `
+      <h2 class="board-section-title">🔥 Best opportunities</h2>
+      <div class="board-strip">
+        ${top.map((item) => `
+          <div class="board-strip-card">
+            <div class="board-strip-card__title">${escapeHtml(displayTitle(item))}</div>
+            <div class="board-strip-card__edge">${(edgeValue(item) * 100).toFixed(1)}%</div>
+            <div class="board-strip-card__pick">${escapeHtml(String(item.selection || item.pick || ""))}</div>
+          </div>
+        `).join("")}
       </div>
     `;
   }
 
-  if (scannerEl) {
-    scannerEl.innerHTML = `
-      <div style="background:#141414;color:white;padding:16px;border-radius:12px;margin-bottom:12px;">
-        <div style="height:16px;width:220px;background:rgba(255,255,255,.08);border-radius:999px;margin-bottom:12px;animation:pulse 1.4s ease-in-out infinite;"></div>
-        <div style="height:12px;width:90%;background:rgba(255,255,255,.06);border-radius:999px;margin-bottom:8px;animation:pulse 1.4s ease-in-out infinite;"></div>
-        <div style="height:12px;width:78%;background:rgba(255,255,255,.06);border-radius:999px;animation:pulse 1.4s ease-in-out infinite;"></div>
-      </div>
-    `;
+  function renderCards(items) {
+    const container = document.getElementById("board-cards");
+    if (!container) return;
+    if (!items.length) {
+      container.innerHTML = `<div class="board-empty">No opportunities match the current filters.</div>`;
+      return;
+    }
+    const sorted = items.slice().sort((a, b) => {
+      const edgeDiff = edgeValue(b) - edgeValue(a);
+      if (edgeDiff !== 0) return edgeDiff;
+      return (numericValue(b.confidence) || 0) - (numericValue(a.confidence) || 0);
+    });
+    container.innerHTML = `<div class="board-grid">${sorted.map((item, index) => renderCard(item, index)).join("")}</div>`;
+    container.querySelectorAll("[data-portfolio-action]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        const action = button.getAttribute("data-portfolio-action");
+        const card = button.closest("[data-syndicate-name]");
+        if (!action || !card) return;
+        void submitPortfolioEvent(action, {
+          name: card.getAttribute("data-syndicate-name") || "",
+          market: card.getAttribute("data-syndicate-market") || "",
+          prediction_id: card.getAttribute("data-syndicate-prediction-id") || "",
+          recommendation_id: card.getAttribute("data-syndicate-recommendation-id") || "",
+        });
+      });
+    });
   }
 
-  if (picksEl) {
-    picksEl.innerHTML = `
-      <div style="background:#1a1a1a;color:white;padding:16px;border-radius:12px;margin-bottom:12px;">
-        <div style="height:16px;width:200px;background:rgba(255,255,255,.08);border-radius:999px;margin-bottom:12px;animation:pulse 1.4s ease-in-out infinite;"></div>
-        <div style="height:72px;background:rgba(255,255,255,.06);border-radius:12px;margin-bottom:10px;animation:pulse 1.4s ease-in-out infinite;"></div>
-        <div style="height:72px;background:rgba(255,255,255,.06);border-radius:12px;animation:pulse 1.4s ease-in-out infinite;"></div>
-      </div>
-    `;
+  function renderLoadingState() {
+    const cardsEl = document.getElementById("board-cards");
+    if (cardsEl) {
+      cardsEl.innerHTML = `<div class="board-grid">${Array.from({ length: 4 }).map(() => '<div class="board-skeleton-card"></div>').join("")}</div>`;
+    }
+    setRefreshStatus("Loading board…", "loading");
   }
 
-  if (parlaysEl) {
-    parlaysEl.innerHTML = `
-      <div style="opacity:.8;color:white;padding:8px 0;">Loading parlays…</div>
-    `;
+  function renderErrorState(message) {
+    const cardsEl = document.getElementById("board-cards");
+    if (cardsEl) {
+      cardsEl.innerHTML = `<div class="board-error">${escapeHtml(message || "Failed to load data")}</div>`;
+    }
   }
 
-  setRefreshStatus("Loading intelligence…", "loading");
-}
+  let lastResponseForActions = {};
 
-function renderEmptyState() {
-  const portfolioEl = document.getElementById("portfolio");
-  const topOpportunitiesEvidenceEl = document.getElementById("top-opportunities-evidence");
-  const topOpportunitiesEl = document.getElementById("top-opportunities");
-  const scannerEl = document.getElementById("scanner");
-  const picksEl = document.getElementById("picks");
-  const parlaysEl = document.getElementById("parlays");
-
-  if (portfolioEl) {
-    portfolioEl.innerHTML = `
-      <div style="background:#111;color:white;padding:16px;border-radius:12px;">
-        <div style="font-size:13px; opacity:.7;">Portfolio Overview</div>
-        <div style="margin-top:10px; opacity:.8;">No opportunities available</div>
-      </div>
-    `;
-  }
-
-  if (topOpportunitiesEl) {
-    topOpportunitiesEl.innerHTML = `
-      <div style="background:#101010;color:white;padding:18px;border-radius:14px;border:1px solid rgba(255,255,255,.08);">
-        <h3 style="margin:0 0 8px 0;">Top Opportunities Right Now</h3>
-        <div style="opacity:.65;">No opportunities available</div>
-      </div>
-    `;
-  }
-
-  if (topOpportunitiesEvidenceEl) {
-    topOpportunitiesEvidenceEl.innerHTML = `
-      <div style="background:#101010;color:white;padding:16px;border-radius:14px;border:1px solid rgba(255,255,255,.08);margin-bottom:12px;">
-        <div style="opacity:.65;">No supporting evidence available</div>
-      </div>
-    `;
-  }
-
-  if (scannerEl) {
-    scannerEl.innerHTML = `
-      <div style="background:#141414;color:white;padding:16px;border-radius:12px;">
-        <div style="opacity:.65;">No opportunities available</div>
-      </div>
-    `;
-  }
-
-  if (picksEl) {
-    picksEl.innerHTML = `
-      <div style="background:#1a1a1a;color:white;padding:16px;border-radius:12px;">
-        <div style="opacity:.65;">No opportunities available</div>
-      </div>
-    `;
-  }
-
-  if (parlaysEl) {
-    parlaysEl.innerHTML = `<div style="opacity:.65;color:white;">No opportunities available</div>`;
-  }
-
-  hasRenderedIntelligence = true;
-  setRefreshStatus("Up to date", "idle");
-}
-
-function renderErrorState(message) {
-  const portfolioEl = document.getElementById("portfolio");
-  const topOpportunitiesEvidenceEl = document.getElementById("top-opportunities-evidence");
-  const topOpportunitiesEl = document.getElementById("top-opportunities");
-  const scannerEl = document.getElementById("scanner");
-  const picksEl = document.getElementById("picks");
-  const parlaysEl = document.getElementById("parlays");
-  const safeMessage = message || "Failed to load data";
-
-  if (topOpportunitiesEvidenceEl) {
-    topOpportunitiesEvidenceEl.innerHTML = `
-      <div style="background:#2a1111;color:#ffd4d4;padding:18px;border-radius:14px;border:1px solid rgba(255,100,100,.18);margin-bottom:12px;">
-        <div>${safeMessage}</div>
-      </div>
-    `;
-  }
-
-  if (topOpportunitiesEl) {
-    topOpportunitiesEl.innerHTML = `
-      <div style="background:#2a1111;color:#ffd4d4;padding:18px;border-radius:14px;border:1px solid rgba(255,100,100,.18);">
-        <h3 style="margin:0 0 8px 0;">Top Opportunities Right Now</h3>
-        <div>${safeMessage}</div>
-      </div>
-    `;
-  }
-
-  if (portfolioEl) {
-    portfolioEl.innerHTML = `
-      <div style="background:#2a1111;color:#ffd4d4;padding:16px;border-radius:12px;border:1px solid rgba(255,100,100,.18);">
-        <div style="font-size:13px; opacity:.85;">Portfolio Overview</div>
-        <div style="margin-top:10px;">${safeMessage}</div>
-      </div>
-    `;
-  }
-
-  if (scannerEl) {
-    scannerEl.innerHTML = `
-      <div style="background:#2a1111;color:#ffd4d4;padding:16px;border-radius:12px;border:1px solid rgba(255,100,100,.18);">
-        ${safeMessage}
-      </div>
-    `;
-  }
-
-  if (picksEl) {
-    picksEl.innerHTML = `
-      <div style="background:#2a1111;color:#ffd4d4;padding:16px;border-radius:12px;border:1px solid rgba(255,100,100,.18);">
-        ${safeMessage}
-      </div>
-    `;
-  }
-
-  if (parlaysEl) {
-    parlaysEl.innerHTML = `<div style="color:#ffd4d4;">${safeMessage}</div>`;
-  }
-}
-
-function renderIntelligence(response) {
-  if (!response || Object.keys(response).length === 0) {
-    renderEmptyState();
-    return;
-  }
-
-  const data = normalizeIntelligenceResponse(response);
-  console.log("[FRONTEND DATA]", data.state_last_updated, data.candidate_count);
-  const initialEvidenceEl = document.getElementById("top-opportunities-evidence");
-  if (initialEvidenceEl) {
-    initialEvidenceEl.innerHTML = `
-      <div style="background:#101010;color:white;padding:18px;border-radius:14px;border:1px solid rgba(255,255,255,.08);">
-        ${renderSupportingEvidence(data)}
-      </div>
-    `;
-  }
-
-  // ===== PORTFOLIO =====
-  const portfolio = data.portfolio || {};
-  const recommendationHistory = data.recommendationHistory || {};
-  const policyControl = data.policyControl || {};
-  const portfolioTracking = data.portfolioTracking || {};
-  const portfolioEvents = data.portfolioEvents || {};
-  const portfolioEventRecords = Array.isArray(data.portfolioEventRecords) ? data.portfolioEventRecords : [];
-  const boardContract = data.boardContract || {};
-  const portfolioEl = document.getElementById("portfolio");
-  const topOpportunitiesEl = document.getElementById("top-opportunities");
-
-  async function submitPortfolioEvent(action, item = {}) {
-    const defaultName = String(item.display_name || item.player_name || item.name || item.selection || item.pick || "").trim();
-    const defaultMarket = String(item.market || item.market_key || item.market_label || "").trim();
-    const name = defaultName || window.prompt(`Portfolio event name for ${action} (for example, Boston Celtics Over 28.5):`, "") || "";
-    const market = defaultMarket || window.prompt("Market label for this event:", "") || "";
-    if (!String(name).trim()) {
+  async function submitPortfolioEvent(action, item) {
+    const name = String(item.name || "").trim();
+    if (!name) {
       setRefreshStatus("Portfolio event cancelled", "idle");
       return;
     }
@@ -1486,12 +851,11 @@ function renderIntelligence(response) {
     try {
       const payload = {
         question: `manual ${action} portfolio event`,
-        selected_date: String(response.selected_date || response.date || "").trim() || undefined,
         portfolio_event: {
           action,
           status: action === "remove" ? "closed" : "open",
-          name: String(name).trim(),
-          market: String(market).trim() || undefined,
+          name,
+          market: String(item.market || "").trim() || undefined,
           prediction_id: String(item.prediction_id || "").trim() || undefined,
           recommendation_id: String(item.recommendation_id || "").trim() || undefined,
         },
@@ -1505,729 +869,168 @@ function renderIntelligence(response) {
       if (!apiResponse.ok || !data || data.ok === false) {
         throw new Error((data && data.error) || "Failed to record portfolio event");
       }
-      renderIntelligence({
-        ...response,
-        ...data,
-        evaluation_bundle: data.evaluation_bundle || response.evaluation_bundle,
-        board_contract: data.board_contract || response.board_contract || response.boardContract,
-        recommendation_history: data.recommendation_history || response.recommendation_history,
-        portfolio_tracking: data.portfolio_tracking || response.portfolio_tracking,
-        portfolio_events: data.portfolio_events || response.portfolio_events,
-        portfolio_event_records: data.portfolio_event_records || response.portfolio_event_records,
-      });
-      setRefreshStatus(`Recorded ${action} event for ${String(name).trim()}`, "idle");
+      renderIntelligence({ ...lastResponseForActions, ...data });
+      setRefreshStatus(`Recorded ${action} event for ${name}`, "idle");
     } catch (error) {
-      console.error("[PORTFOLIO EVENT ERROR]", error);
       setRefreshStatus(error && error.message ? error.message : "Failed to record portfolio event", "error");
     }
   }
 
-  if (portfolioEl) {
-    portfolioEl.innerHTML = `
-      <div style="background:#111;color:white;padding:16px;border-radius:12px;">
-        <div style="font-size:13px; opacity:.7;">Portfolio Overview</div>
-        <div style="margin-top:10px;">
-          <div><strong>Exposure:</strong> ${portfolio.total_exposure || "—"}</div>
-          <div><strong>Risk:</strong> ${portfolio.risk_level || "—"}</div>
-        </div>
-        ${recommendationHistory.history_status ? `<div style="margin-top:10px; font-size:11px; opacity:.78;">Ledger: ${escapeHtml(recommendationHistory.history_status)} · ${escapeHtml(String(recommendationHistory.sample_size ?? 0))} samples</div>` : ""}
-        ${portfolioTracking.wager_count !== undefined ? `<div style="margin-top:10px; font-size:11px; opacity:.78;">Portfolio: ${escapeHtml(String(portfolioTracking.wager_count))} wagers · ${escapeHtml(String(portfolioTracking.open_exposure ?? "—"))} open exposure</div>` : ""}
-        ${portfolioEvents.event_count !== undefined ? `<div style="margin-top:10px; font-size:11px; opacity:.78;">Events: ${escapeHtml(String(portfolioEvents.event_count))} · added ${escapeHtml(String(portfolioEvents.added_count ?? 0))} · removed ${escapeHtml(String(portfolioEvents.removed_count ?? 0))}</div>` : ""}
-        ${portfolioEventRecords.length ? `<div style="margin-top:10px; font-size:11px; opacity:.78;">Recent: ${escapeHtml(portfolioEventRecords.slice(0, 3).map((event) => `${String(event.action || event.event_type || event.type || "event").toUpperCase()} ${String(event.status || event.state || "").toUpperCase() || "OPEN"} ${String(event.name || event.market || event.label || "").trim()}`.trim()).join(" · "))}</div>` : ""}
-        ${boardContract.schema ? `<div style="margin-top:10px; font-size:11px; opacity:.78;">Board: ${escapeHtml(boardContract.schema)} · ${escapeHtml((boardContract.active_lanes || []).join(" / ") || "no active lanes")}</div>` : ""}
-        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
-          <button type="button" id="portfolio-event-add" aria-label="Add a manual portfolio event" style="appearance:none; border:none; border-radius:999px; padding:8px 12px; background:linear-gradient(135deg, #2563eb, #0ea5e9); color:white; font-weight:700; cursor:pointer;">Add Event</button>
-          <button type="button" id="portfolio-event-remove" aria-label="Remove a manual portfolio event" style="appearance:none; border:1px solid rgba(255,255,255,.14); border-radius:999px; padding:8px 12px; background:rgba(255,255,255,.06); color:#fff; font-weight:700; cursor:pointer;">Remove Event</button>
-        </div>
+  function renderPortfolio(data) {
+    const container = document.getElementById("board-portfolio");
+    if (!container) return;
+    const portfolio = data.portfolio || {};
+    container.innerHTML = `
+      <div class="board-portfolio-card">
+        <div class="board-portfolio-card__row"><span>Exposure</span><span>${escapeHtml(portfolio.total_exposure ?? "—")}</span></div>
+        <div class="board-portfolio-card__row"><span>Risk</span><span>${escapeHtml(portfolio.risk_level ?? "—")}</span></div>
       </div>
     `;
   }
 
-  const portfolioAddButton = document.getElementById("portfolio-event-add");
-  const portfolioRemoveButton = document.getElementById("portfolio-event-remove");
-  if (portfolioAddButton) {
-    portfolioAddButton.addEventListener("click", () => { void submitPortfolioEvent("add"); });
-  }
-  if (portfolioRemoveButton) {
-    portfolioRemoveButton.addEventListener("click", () => { void submitPortfolioEvent("remove"); });
-  }
-
-  // ===== PICKS =====
-  const scannerEl = document.getElementById("scanner");
-  const picksEl = document.getElementById("picks");
-
-  const topOpportunities = (data.topOpportunities || [])
-    .slice()
-    .sort((a, b) => (Number(b.expected_value) || 0) - (Number(a.expected_value) || 0));
-
-  const allRecs = (data.recommendations || [])
-    .sort((a, b) => (b.edge || 0) - (a.edge || 0));
-
-  const topLiveOpportunities = (data.topLiveOpportunities || []).slice(0, 5);
-  const bySport = data.bySport && typeof data.bySport === "object" ? data.bySport : {};
-
-  // ✅ Split by activity state
-  const liveRecs = allRecs.filter(isLiveRecommendation);
-  const pregameRecs = allRecs.filter(isPregameRecommendation);
-  const activeTopOpportunities = topOpportunities.filter((item) => recommendationState(item) !== "stale" && recommendationState(item) !== "final");
-  const activeTopLiveOpportunities = topLiveOpportunities.filter(isLiveRecommendation);
-  const visibleTopOpportunities = activeTopOpportunities.length ? activeTopOpportunities : topOpportunities.slice(0, 5);
-  const visibleTopLiveOpportunities = activeTopLiveOpportunities.length ? activeTopLiveOpportunities : topLiveOpportunities.slice(0, 5);
-
-  function renderSection(title, recs) {
-  if (!recs.length) {
-    return `<div style="opacity:.5; margin-bottom:20px;">No ${title} picks</div>`;
-  }
-
-  const sorted = recs
-    .slice()
-    .sort((a, b) => {
-      const edgeDiff = (edgeValue(b) || 0) - (edgeValue(a) || 0);
-      if (edgeDiff !== 0) return edgeDiff;
-      return (b.confidence || 0) - (a.confidence || 0);
-    });
-
-  return `
-    <div style="margin-bottom:25px;">
-      <h3 style="margin-bottom:10px;">${title}</h3>
-
-      <div class="betting-board-grid">
-        ${sorted.map((p, i) => {
-          const theme = edgeTheme(p);
-          const edge = (edgeValue(p) * 100).toFixed(1);
-          const confidence = p.confidence
-            ? Math.round(p.confidence * 100)
-            : null;
-
-          return `
-            <div style="
-              background:#161b22;
-              border-radius:14px;
-              padding:16px;
-              border:1px solid rgba(255,255,255,.08);
-              transition: all 0.2s ease;
-            ">
-
-              <!-- Header -->
-              <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div style="font-weight:600;">
-                  ${i === 0 ? "🔥 " : ""}${displayTitle(p)}
-                </div>
-                <div style="color:${theme.color}; font-weight:700;">
-                  ${edge}%
-                </div>
-              </div>
-
-              <!-- Matchup -->
-              <div style="font-size:12px; opacity:.7; margin-top:6px;">
-                ${displayMatchup(p)}
-              </div>
-
-              <!-- Pick -->
-              <div style="margin-top:10px; font-size:13px;">
-                <strong>Pick:</strong> ${p.selection || "—"}
-              </div>
-
-              <!-- Odds / Line -->
-              <div style="display:flex; gap:12px; margin-top:10px; font-size:12px; opacity:.85;">
-                <div>Odds: ${displayOdds(p)}</div>
-                <div>Line: ${displayLine(p)}</div>
-              </div>
-
-              <!-- Confidence Bar -->
-              ${confidence !== null ? `
-                <div style="margin-top:10px;">
-                  <div style="font-size:11px; opacity:.6;">Confidence</div>
-                  <div style="height:6px; background:#2b3440; border-radius:999px;">
-                    <div style="
-                      width:${confidence}%;
-                      background:${theme.color};
-                      height:100%;
-                      border-radius:999px;
-                    "></div>
-                  </div>
-                </div>
-              ` : ""}
-
-              <!-- Badges -->
-              ${renderCardBadges(p)}
-
-              <!-- Portfolio Actions -->
-              <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
-                <button
-                  type="button"
-                  data-portfolio-action="add"
-                  style="
-                    appearance:none;
-                    border:none;
-                    border-radius:999px;
-                    padding:7px 10px;
-                    background:rgba(37,99,235,.18);
-                    color:#dbeafe;
-                    font-weight:700;
-                    cursor:pointer;
-                  ">
-                  Add
-                </button>
-
-                <button
-                  type="button"
-                  data-portfolio-action="remove"
-                  style="
-                    appearance:none;
-                    border:1px solid rgba(255,255,255,.14);
-                    border-radius:999px;
-                    padding:7px 10px;
-                    background:rgba(255,255,255,.06);
-                    color:#fff;
-                    font-weight:700;
-                    cursor:pointer;
-                  ">
-                  Remove
-                </button>
-              </div>
-
-            </div>
-          `;
-        }).join("")}
-      </div>
-    </div>
-  `;
-}
-
-function renderTopStrip(recs) {
-  if (!recs.length) return "";
-
-  const top = recs
-    .slice()
-    .sort((a, b) => (edgeValue(b) || 0) - (edgeValue(a) || 0))
-    .slice(0, 5);
-
-  return `
-    <div style="
-      margin-bottom:20px;
-      padding:14px;
-      border-radius:14px;
-      background:#101418;
-      border:1px solid rgba(255,255,255,.08);
-    ">
-      <div style="
-        font-size:12px;
-        opacity:.6;
-        margin-bottom:10px;
-        text-transform:uppercase;
-        letter-spacing:.05em;
-      ">
-        🔥 Best Opportunities
-      </div>
-
-      <div style="display:flex; gap:10px; overflow-x:auto;">
-        ${top.map(p => {
-          const theme = edgeTheme(p);
-          return `
-            <div style="
-              min-width:180px;
-              padding:10px;
-              border-radius:10px;
-              background:#161b22;
-              border:1px solid rgba(255,255,255,.08);
-            ">
-              <div style="font-size:12px; font-weight:600;">
-                ${displayTitle(p)}
-              </div>
-
-              <div style="
-                margin-top:6px;
-                font-size:11px;
-                color:${theme.color};
-                font-weight:700;
-              ">
-                ${(edgeValue(p) * 100).toFixed(1)}%
-              </div>
-
-              <div style="font-size:10px; opacity:.6;">
-                ${p.selection || ""}
-              </div>
-            </div>
-          `;
-        }).join("")}
-      </div>
-    </div>
-  `;
-}
-
-  function renderScannerSection(title, recs) {
-    if (!recs.length) {
-      return "";
+  function renderParlays(data) {
+    const container = document.getElementById("board-parlays");
+    if (!container) return;
+    const parlays = data.parlays || [];
+    if (!parlays.length) {
+      container.innerHTML = `<div class="board-empty">No parlays available.</div>`;
+      return;
     }
-
-    function liveIndicatorChips(p) {
-      const chips = [];
-      const evDelta = numericValue(p.ev_delta) ?? numericValue(p.ev_change) ?? numericValue(p.expected_value_delta);
-      const lineDelta = numericValue(p.line_movement_impact) ?? numericValue(p.line_delta) ?? numericValue(p.line_move_delta);
-      const confidenceStability = numericValue(p.confidence_stability) ?? numericValue(p.confidence_delta) ?? numericValue(p.confidence_change);
-
-      if (evDelta !== null) {
-        chips.push(`
-          <span style="padding:4px 8px; border-radius:999px; background:${evDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${evDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">
-            EV ${evDelta > 0 ? '↑ improving' : evDelta < 0 ? '↓ worsening' : 'flat'}
-          </span>
-        `);
-      }
-
-      if (lineDelta !== null) {
-        chips.push(`
-          <span style="padding:4px 8px; border-radius:999px; background:${lineDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${lineDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">
-            Line ${lineDelta > 0 ? '↑' : lineDelta < 0 ? '↓' : '→'} ${lineDelta > 0 ? 'moving for us' : lineDelta < 0 ? 'moving against' : 'flat'}
-          </span>
-        `);
-      }
-
-      if (confidenceStability !== null) {
-        chips.push(`
-          <span style="padding:4px 8px; border-radius:999px; background:${confidenceStability > 0 ? 'rgba(125, 211, 252, .14)' : confidenceStability < 0 ? 'rgba(251, 191, 36, .14)' : 'rgba(255,255,255,.08)'}; color:${confidenceStability > 0 ? '#cfefff' : confidenceStability < 0 ? '#fde6a0' : '#d1d5db'};">
-            Confidence ${confidenceStability > 0 ? 'stable' : confidenceStability < 0 ? 'slipping' : 'unchanged'}
-          </span>
-        `);
-      }
-
-      return chips.length
-        ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; font-size:11px;">${chips.join("")}</div>`
-        : "";
-    }
-
-    return `
-      <div style="margin-bottom:25px;">
-        <h3 style="margin-bottom:10px;">${title}</h3>
-        ${recs.map((p, i) => {
-          const theme = edgeTheme(p);
-          const evCurrent = typeof p.ev_current === "number" ? (p.ev_current * 100).toFixed(1) : "—";
-          const evDelta = typeof p.ev_delta === "number" ? (p.ev_delta * 100).toFixed(1) : null;
-          const lineImpact = typeof p.line_movement_impact === "number" ? (p.line_movement_impact * 100).toFixed(1) : null;
-          const confidence = typeof p.confidence === "number" ? Math.round(p.confidence * 100) + "%" : "—";
-          const edge = (edgeValue(p) * 100).toFixed(1) + "%";
-          const badge = p.movement_label || (evDelta ? (Number(evDelta) > 0 ? "Edge improving" : "Edge softening") : theme.label);
-
-          return `
-            <div style="
-              background:${theme.background};
-              color:white;
-              padding:16px;
-              border-radius:12px;
-              margin-bottom:10px;
-              border-left:6px solid ${theme.color};
-              border:1px solid ${theme.border};
-            ">
-              <div style="display:flex; justify-content:space-between; gap:12px;">
-                <div style="font-size:16px; font-weight:600;">${i === 0 ? "⚡ " : ""}${p.selection}</div>
-                <div style="font-weight:600;color:${theme.color};">EV ${evCurrent}%</div>
-              </div>
-
-              <div style="font-size:12px; margin-top:4px; opacity:.7;">
-                ${p.sport} | ${p.market} | ${badge}
-              </div>
-
-              <div style="display:flex; gap:16px; margin-top:8px; flex-wrap:wrap; font-size:12px; opacity:.9;">
-                <div>Confidence: ${confidence}</div>
-                <div>Edge: ${edge}</div>
-                ${evDelta ? `<div>EV change: ${Number(evDelta) > 0 ? "+" : ""}${evDelta}%</div>` : ""}
-                ${lineImpact ? `<div>Line impact: ${Number(lineImpact) > 0 ? "+" : ""}${lineImpact}%</div>` : ""}
-              </div>
-
-              ${renderBoardMetaRow(p)}
-              ${renderCardBadges(p)}
-
-              ${liveIndicatorChips(p)}
-
-              ${p.reasoning ? `<div style="margin-top:8px; font-size:12px; opacity:.8;">${p.reasoning}</div>` : ""}
-            </div>
-          `;
-        }).join("")}
-      </div>
-    `;
-  }
-
-  function renderTopOpportunitiesSection(recs) {
-    if (!recs.length) {
-      return `
-        <div style="
-          background:#101010;
-          color:white;
-          padding:18px;
-          border-radius:14px;
-          border:1px solid rgba(255,255,255,.08);
-        ">
-          <h3 style="margin:0 0 8px 0;">Top Opportunities Right Now</h3>
-          <div style="opacity:.65;">No opportunities available</div>
-        </div>
-      `;
-    }
-
-    return `
-      <div style="
-        background:#101010;
-        color:white;
-        padding:18px;
-        border-radius:14px;
-        border:1px solid rgba(255,255,255,.08);
-        margin-bottom:20px;
-      ">
-        <h3 style="margin:0 0 12px 0;">Top Opportunities Right Now</h3>
-          ${renderRefreshStamp()}
-        ${recs.map((item, index) => {
-          const theme = edgeTheme(item);
-          const expectedValue = typeof item.expected_value === "number"
-            ? (item.expected_value * 100).toFixed(1) + "%"
-            : (item.expected_value ?? "—");
-          const confidence = typeof item.confidence === "number"
-            ? Math.round(item.confidence * 100) + "%"
-            : (item.confidence ?? "—");
-          const sport = item.sport || item.sport_slug || "—";
-          const bet = item.bet || item.selection || item.pick || item.market || "—";
-          const reasoning = item.reasoning || item.rationale || item.summary || "";
-          const evDelta = typeof item.ev_delta === "number" ? item.ev_delta : null;
-          const lineDelta = typeof item.line_movement_impact === "number" ? item.line_movement_impact : null;
-          const confidenceStability = typeof item.confidence_stability === "number" ? item.confidence_stability : (typeof item.confidence_delta === "number" ? item.confidence_delta : null);
-          const indicatorChips = [];
-
-          if (evDelta !== null) {
-            indicatorChips.push(`<span style="padding:4px 8px; border-radius:999px; background:${evDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${evDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">EV ${evDelta > 0 ? '↑ improving' : evDelta < 0 ? '↓ worsening' : 'flat'}</span>`);
-          }
-          if (lineDelta !== null) {
-            indicatorChips.push(`<span style="padding:4px 8px; border-radius:999px; background:${lineDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${lineDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">Line ${lineDelta > 0 ? '↑' : lineDelta < 0 ? '↓' : '→'} ${lineDelta > 0 ? 'moving for us' : lineDelta < 0 ? 'moving against' : 'flat'}</span>`);
-          }
-          if (confidenceStability !== null) {
-            indicatorChips.push(`<span style="padding:4px 8px; border-radius:999px; background:${confidenceStability > 0 ? 'rgba(125, 211, 252, .14)' : confidenceStability < 0 ? 'rgba(251, 191, 36, .14)' : 'rgba(255,255,255,.08)'}; color:${confidenceStability > 0 ? '#cfefff' : confidenceStability < 0 ? '#fde6a0' : '#d1d5db'};">Confidence ${confidenceStability > 0 ? 'stable' : confidenceStability < 0 ? 'slipping' : 'unchanged'}</span>`);
-          }
-
-          return `
-            <div style="
-              padding:14px 0;
-              border-top:${index === 0 ? "0" : "1px solid rgba(255,255,255,.08)"};
-            ">
-              <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-                <div style="font-weight:600;">${sport} · ${displayTitle(item)}</div>
-                <div style="font-weight:600; color:${theme.color};">EV ${expectedValue}</div>
-              </div>
-              <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:6px; font-size:12px; opacity:.82;">
-                <div><strong>Confidence:</strong> ${confidence}</div>
-              </div>
-              ${renderBoardMetaRow(item)}
-              ${renderPropFacts(item, true)}
-              ${renderUpdatedLine(item)}
-              ${renderCardBadges(item)}
-              ${indicatorChips.length ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; font-size:11px;">${indicatorChips.join("")}</div>` : ""}
-              ${reasoning ? `<div style="margin-top:8px; font-size:12px; line-height:1.5; opacity:.78;">${reasoning}</div>` : ""}
-            </div>
-          `;
-        }).join("")}
-      </div>
-    `;
-  }
-
-  // ✅ Render sections
-  if (topOpportunitiesEl) {
-    topOpportunitiesEl.innerHTML = renderTopOpportunitiesSection(visibleTopOpportunities);
-  }
-
-  if (scannerEl) {
-    scannerEl.innerHTML = renderScannerSection("⚡ Top Live Opportunities", visibleTopLiveOpportunities);
-  }
-
-  const sportLaneSections = Object.entries(bySport)
-    .filter(([, items]) => Array.isArray(items) && items.length)
-    .map(([sportKey, items]) => renderSection(`${String(sportKey).toUpperCase()} Lane`, items.slice(0, 5)))
-    .join("");
-
-  const allRecsCombined = [...liveRecs, ...pregameRecs];
-
-  picksEl.innerHTML = `
-    ${renderTopStrip(allRecsCombined)}
-    ${sportLaneSections}
-    ${renderSection("🔥 Live Props", liveRecs)}
-    ${renderSection("📊 Pregame Props", pregameRecs)}
-  `;
-
-  const portfolioActionButtons = picksEl.querySelectorAll("[data-portfolio-action]");
-  portfolioActionButtons.forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const action = String(button.getAttribute("data-portfolio-action") || "").trim();
-      const card = button.closest("[data-syndicate-question]");
-      if (!action || !card) {
-        return;
-      }
-      const selectedItem = {
-        question: String(card.getAttribute("data-syndicate-question") || "").trim(),
-        sport: String(card.getAttribute("data-syndicate-sport") || "").trim(),
-        sport_slug: String(card.getAttribute("data-syndicate-sport-slug") || "").trim(),
-        market: String(card.getAttribute("data-syndicate-market") || "").trim(),
-        candidate_type: String(card.getAttribute("data-syndicate-candidate-type") || "").trim(),
-        selection: String(card.getAttribute("data-syndicate-selection") || "").trim(),
-        matchup: String(card.getAttribute("data-syndicate-matchup") || "").trim(),
-        player_name: String(card.getAttribute("data-syndicate-player-name") || "").trim(),
-        name: String(card.getAttribute("data-syndicate-name") || "").trim(),
-        display_name: String(card.getAttribute("data-syndicate-name") || card.getAttribute("data-syndicate-selection") || "").trim(),
-        pick: String(card.getAttribute("data-syndicate-selection") || "").trim(),
-        prediction_id: String(card.getAttribute("data-syndicate-prediction-id") || "").trim(),
-        recommendation_id: String(card.getAttribute("data-syndicate-recommendation-id") || "").trim(),
-      };
-      void submitPortfolioEvent(action, selectedItem);
-    });
-  });
-
-  // ===== PARLAYS =====
-  const parlaysEl = document.getElementById("parlays");
-  const parlays = data.parlays || [];
-
-  const boardSummaryEl = document.getElementById("intelligence-board-summary");
-  if (boardSummaryEl) {
-    const trackedOddsCount = [...activeTopOpportunities, ...allRecs].filter((item) => Boolean(
-      item && (
-        item.odds_open !== undefined ||
-        item.odds_current !== undefined ||
-        item.odds !== undefined ||
-        item.line_open !== undefined ||
-        item.line !== undefined ||
-        item.movement_history
-      )
-    )).length;
-    const liveProjectionCount = [...activeTopOpportunities, ...allRecs].filter((item) => {
-      const projection = displayLiveProjection(item);
-      return projection !== "—" && projection !== "-";
-    }).length;
-    const summaryParts = [
-      `${visibleTopOpportunities.length} top picks`,
-      `${liveRecs.length} live`,
-      `${pregameRecs.length} pregame`,
-      `${parlays.length} parlays`,
-    ];
-    if (boardContract && boardContract.schema) {
-      const boardLaneCounts = boardContract.lane_counts && typeof boardContract.lane_counts === "object" ? boardContract.lane_counts : {};
-      if (boardLaneCounts.live !== undefined || boardLaneCounts.pregame !== undefined) {
-        summaryParts.push(`Contract ${boardLaneCounts.live ?? 0} live / ${boardLaneCounts.pregame ?? 0} pregame`);
-      }
-    }
-    if (recommendationHistory && recommendationHistory.history_status) {
-      summaryParts.push(`Ledger ${recommendationHistory.history_status}`);
-    }
-    if (portfolioTracking && portfolioTracking.wager_count !== undefined) {
-      summaryParts.push(`Portfolio ${portfolioTracking.wager_count} wagers`);
-    }
-    if (portfolioEvents && portfolioEvents.event_count !== undefined) {
-      summaryParts.push(`Events ${portfolioEvents.event_count}`);
-    }
-    if (policyControl && policyControl.policy_status) {
-      summaryParts.push(`Policy ${policyControl.selected_policy || "default"}`);
-    }
-    if (trackedOddsCount > 0) {
-      summaryParts.push(`${trackedOddsCount} odds tracked`);
-    }
-    if (liveProjectionCount > 0) {
-      summaryParts.push(`${liveProjectionCount} live projections`);
-    }
-    if (portfolio.total_exposure !== undefined && portfolio.total_exposure !== null && portfolio.total_exposure !== "") {
-      summaryParts.push(`Exposure ${portfolio.total_exposure}`);
-    }
-    const summaryChips = summaryParts.map((part) => `
-      <span style="display:inline-flex; align-items:center; padding:6px 10px; border-radius:999px; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.10); color:#f3f4f6; font-size:11px; font-weight:600; letter-spacing:.01em;">
-        ${escapeHtml(part)}
-      </span>
-    `).join("");
-    const boardWaterfall = Array.isArray(boardContract.waterfall) ? boardContract.waterfall : [];
-    const waterfallMarkup = boardWaterfall.length ? `
-      <details style="margin-top:12px; padding:12px; border-radius:12px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08);">
-        <summary style="cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; opacity:.78;">
-          <span>Board waterfall</span>
-          <span>${escapeHtml(boardWaterfall.length)} steps</span>
-        </summary>
-        <div style="display:grid; gap:8px; margin-top:12px;">
-          ${boardWaterfall.map((step, index) => `
-            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 10px; border-radius:10px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.06);">
-              <span style="min-width:24px; height:24px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,.10); font-size:11px; font-weight:700;">${index + 1}</span>
-              <span style="font-size:12px; font-weight:600;">${escapeHtml(step.label || step.step || `Step ${index + 1}`)}</span>
-              <span style="margin-left:auto; font-size:12px; opacity:.8;">${escapeHtml(step.count ?? 0)}</span>
-            </div>
-          `).join("")}
-        </div>
-      </details>
-    ` : "";
-    boardSummaryEl.innerHTML = `
-      <div style="display:grid; gap:10px; padding:12px 14px; border-radius:14px; background:linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.04)); border:1px solid rgba(255,255,255,.12); color:#e5e7eb;">
-        <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-start; justify-content:space-between;">
-          <div style="min-width:0;">
-            <div style="opacity:.72; text-transform:uppercase; letter-spacing:.04em; font-size:11px;">Decision lanes</div>
-            <div style="margin-top:4px; font-size:14px; font-weight:700; letter-spacing:-.02em;">${escapeHtml(String(boardContract.board_summary && boardContract.board_summary.headline || "Live and pregame lanes"))}</div>
-          </div>
-          <div style="opacity:.72; font-size:11px; white-space:nowrap;">Odds/opps refresh every 60s</div>
-        </div>
-        ${waterfallMarkup}
-        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-          ${summaryChips}
-        </div>
-      </div>
-    `;
-  }
-
-  if (parlays.length) {
-    parlaysEl.innerHTML = parlays.map(p => `
-      <div style="
-        padding:12px;
-        margin-bottom:10px;
-        border-radius:10px;
-        background:#222;
-        color:white;
-      ">
-        <div style="font-weight:600;">Parlay</div>
-        <div style="opacity:.75; margin-top:4px;">Edge: ${typeof p.combined_edge === "number" ? (p.combined_edge * 100).toFixed(1) + "%" : "—"}</div>
-        ${renderUpdatedLine(p)}
-        ${Array.isArray(p.legs) && p.legs.length ? `<div style="display:grid; gap:8px; margin-top:10px;">${p.legs.map((leg) => `
-          <div style="padding:10px; border-radius:10px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08);">
-            <div style="font-weight:600;">${displayTitle(leg)}</div>
-            ${renderPropFacts(leg, true)}
-          </div>
-        `).join("")}</div>` : ""}
+    container.innerHTML = parlays.map((parlay) => `
+      <div class="board-parlay-card">
+        <div class="board-card__title">Parlay</div>
+        <div class="board-card__subtitle">Edge: ${typeof parlay.combined_edge === "number" ? (parlay.combined_edge * 100).toFixed(1) + "%" : "—"}</div>
+        ${(Array.isArray(parlay.legs) ? parlay.legs : []).map((leg) => `
+          <div class="board-parlay-card__leg">${escapeHtml(displayTitle(leg))}</div>
+        `).join("")}
       </div>
     `).join("");
-  } else {
-    parlaysEl.innerHTML = `<div style="opacity:.6;">No parlays available</div>`;
   }
 
-  hasRenderedIntelligence = true;
-  setRefreshStatus(lastResponseTimestamp ? `Updated ${formatTimestamp(lastResponseTimestamp)}` : "Updated", "idle");
-}
+  function renderSummaryStrip(data) {
+    const container = document.getElementById("board-summary-strip");
+    if (!container) return;
+    const boardContract = data.boardContract || {};
+    const laneCounts = boardContract.lane_counts || {};
+    const parts = [];
+    if (boardContract.board_summary && boardContract.board_summary.headline) {
+      parts.push(boardContract.board_summary.headline);
+    }
+    if (laneCounts.live !== undefined) parts.push(`${laneCounts.live} live`);
+    if (laneCounts.pregame !== undefined) parts.push(`${laneCounts.pregame} pregame`);
+    if (data.parlays && data.parlays.length) parts.push(`${data.parlays.length} parlays`);
+    if (!parts.length) {
+      container.hidden = true;
+      return;
+    }
+    container.hidden = false;
+    container.innerHTML = parts.map((part) => `<span class="board-chip">${escapeHtml(part)}</span>`).join("");
+  }
 
-async function loadIntelligence(options = {}) {
-  const background = Boolean(options.background);
-  if (currentIntelligenceRequest) {
+  function renderIntelligence(response) {
+    lastResponseForActions = response;
+    if (!response || Object.keys(response).length === 0) {
+      renderCards([]);
+      return;
+    }
+    const data = normalizeIntelligenceResponse(response);
+    const filtered = (data.topOpportunities.length ? data.topOpportunities : data.recommendations).filter(matchesFilters);
+    renderTopStrip(filtered);
+    renderCards(filtered);
+    renderPortfolio(data);
+    renderParlays(data);
+    renderSummaryStrip(data);
+    hasRenderedIntelligence = true;
+    setRefreshStatus(lastResponseTimestamp ? `Updated ${formatTimestamp(lastResponseTimestamp)}` : "Updated", "idle");
+  }
+
+  function intelligenceQueryPayload(options) {
+    const opts = options || {};
+    const hasCustomFilters = Boolean(state.sport !== "all" || state.gameState !== "all");
+    const payload = {
+      question: hasCustomFilters ? "What are the best edges for this board?" : DEFAULT_QUESTION,
+      mode: "recommendation",
+      timing: state.gameState === "all" ? "all" : state.gameState,
+      background: Boolean(opts.background),
+      force_refresh: Boolean(opts.forceRefresh),
+    };
+    if (state.date) payload.date = state.date;
+    if (state.sport) payload.sport = state.sport;
+    if (state.gameState) payload.game_state = state.gameState;
+    return payload;
+  }
+
+  async function loadIntelligence(options) {
+    const opts = options || {};
+    const background = Boolean(opts.background);
+    if (currentIntelligenceRequest) return currentIntelligenceRequest;
+    if (background && !hasRenderedIntelligence) return null;
+    if (background) setRefreshStatus("Refreshing…", "refreshing");
+
+    currentIntelligenceRequest = (async () => {
+      try {
+        if (!hasRenderedIntelligence) renderLoadingState();
+        const res = await fetch("/api/intelligence/query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+          body: JSON.stringify(intelligenceQueryPayload(opts)),
+        });
+        if (!res.ok) {
+          if (!hasRenderedIntelligence) renderErrorState("Failed to load data");
+          else setRefreshStatus("Refresh failed", "error");
+          return;
+        }
+        const json = await res.json();
+        const version = json.version ?? null;
+        const responseHash = String(json.response_hash || "").trim() || null;
+        const workerStateUpdated = String(json.state_last_updated || "").trim() || null;
+        const hasFreshPayload = responseHash !== null ? responseHash !== lastResponseHash : version !== lastVersion;
+        const workerStateChanged = Boolean(workerStateUpdated && workerStateUpdated !== lastWorkerStateUpdated);
+        if (!hasFreshPayload && !workerStateChanged && !opts.forceRefresh) {
+          if (background) setRefreshStatus(lastResponseTimestamp ? `Updated ${formatTimestamp(lastResponseTimestamp)}` : "Up to date", "idle");
+          return;
+        }
+        lastVersion = version;
+        lastResponseHash = responseHash ?? lastResponseHash;
+        lastResponseTimestamp = json.timestamp ?? lastResponseTimestamp;
+        if (workerStateUpdated) lastWorkerStateUpdated = workerStateUpdated;
+        renderIntelligence(mergeVersionedIntelligenceResponse(json));
+      } catch (err) {
+        if (!hasRenderedIntelligence) renderErrorState("Failed to load data");
+        else setRefreshStatus("Refresh failed", "error");
+      } finally {
+        currentIntelligenceRequest = null;
+      }
+    })();
     return currentIntelligenceRequest;
   }
 
-  if (background && !hasRenderedIntelligence) {
-    return null;
-  }
-
-  if (background) {
-    setRefreshStatus("Refreshing intelligence…", "refreshing");
-  }
-
-  currentIntelligenceRequest = (async () => {
-  try {
-    if (!hasRenderedIntelligence && lastVersion === null) {
-      renderLoadingState();
-    }
-    const queryPayload = intelligenceQueryPayload({ background, forceRefresh: Boolean(options.forceRefresh) });
-    const res = await fetch("/api/intelligence/query", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      cache: "no-store",
-      body: JSON.stringify(queryPayload)
-    });
-
-    if (!res.ok) {
-      if (!hasRenderedIntelligence) {
-        renderErrorState("Failed to load data");
-      } else {
-        setRefreshStatus("Refresh failed", "error");
-      }
-      return;
-    }
-
-    const json = await res.json();
-    const version = json.version ?? null;
-    const responseHash = String(json.response_hash || "").trim() || null;
-    const workerStateUpdated = String(json.state_last_updated || json.response?.state_last_updated || json.response?.updated_at || json.timestamp || "").trim() || null;
-
-    const hasFreshPayload = responseHash !== null
-      ? responseHash !== lastResponseHash
-      : version !== null
-        ? version !== lastVersion
-        : true;
-    const workerStateChanged = Boolean(workerStateUpdated && workerStateUpdated !== lastWorkerStateUpdated);
-
-    if (!hasFreshPayload && !workerStateChanged && !Boolean(options.forceRefresh)) {
-      if (background) {
-        setRefreshStatus(lastResponseTimestamp ? `Updated ${formatTimestamp(lastResponseTimestamp)}` : "Up to date", "idle");
-      }
-      return;
-    }
-
-    lastVersion = version;
-    lastResponseHash = responseHash ?? lastResponseHash;
-    lastResponseTimestamp = json.timestamp ?? lastResponseTimestamp;
-    if (workerStateUpdated) {
-      lastWorkerStateUpdated = workerStateUpdated;
-    }
-
-    const response = mergeVersionedIntelligenceResponse(json);
-    const data = normalizeIntelligenceResponse(response);
-    const hasOpportunityData = Boolean(
-      (Array.isArray(data.topOpportunities) && data.topOpportunities.length) ||
-      (Array.isArray(data.recommendations) && data.recommendations.length) ||
-      (Array.isArray(data.parlays) && data.parlays.length) ||
-      (data.portfolio && Object.keys(data.portfolio).length)
-    );
-
-    if (!response || Object.keys(response).length === 0 || !hasOpportunityData) {
-      renderEmptyState();
-      return;
-    }
-
-    renderIntelligence(response);
-  } catch (err) {
-    if (!hasRenderedIntelligence) {
-      renderErrorState("Failed to load data");
-    } else {
-      setRefreshStatus("Refresh failed", "error");
-    }
-  } finally {
-    currentIntelligenceRequest = null;
-  }
-  })();
-
-  return currentIntelligenceRequest;
-}
-
-const intelligenceQueryForm = intelligenceFormElement();
-if (intelligenceQueryForm) {
-  intelligenceQueryForm.addEventListener("submit", (event) => {
+  document.getElementById("board-toolbar").addEventListener("submit", (event) => {
     event.preventDefault();
+    state.date = document.getElementById("board-date").value || state.date;
+    syncUrlState();
     void loadIntelligence({ forceRefresh: true });
   });
-}
 
-function scheduleIntelligencePolling() {
-  if (loadIntelligenceScheduled) {
-    return;
-  }
-  loadIntelligenceScheduled = true;
-  window.loadIntelligence = loadIntelligence;
-  const hasVersionedInitialResponse = Boolean(
-    initialIntelligenceResponse &&
-    typeof initialIntelligenceResponse === "object" &&
-    (initialIntelligenceResponse.version !== undefined ||
-      initialIntelligenceResponse.timestamp !== undefined ||
-      initialIntelligenceResponse.response_hash !== undefined)
-  );
+  renderFilterTabs();
+
   if (initialIntelligenceResponse && Object.keys(initialIntelligenceResponse).length > 0) {
+    const merged = mergeVersionedIntelligenceResponse(initialIntelligenceResponse);
     lastVersion = initialIntelligenceResponse.version ?? lastVersion;
     lastResponseHash = String(initialIntelligenceResponse.response_hash || "").trim() || lastResponseHash;
     lastResponseTimestamp = initialIntelligenceResponse.timestamp ?? lastResponseTimestamp;
-    lastWorkerStateUpdated = String(initialIntelligenceResponse.state_last_updated || initialIntelligenceResponse.response?.state_last_updated || initialIntelligenceResponse.response?.updated_at || "").trim() || lastWorkerStateUpdated;
-    renderIntelligence(mergeVersionedIntelligenceResponse(initialIntelligenceResponse));
-    if (!hasVersionedInitialResponse) {
-      void loadIntelligence({});
-    }
+    renderIntelligence(merged);
+    void loadIntelligence({});
   } else {
-    renderEmptyState();
     void loadIntelligence({});
   }
-  window.setInterval(() => {
-    void loadIntelligence({ background: true });
-  }, 60000);
-}
 
-scheduleIntelligencePolling();
+  window.SyndicatePolling.startFromPolicy(
+    {},
+    { onTick: () => loadIntelligence({ background: true }) },
+    { enabled: true, intervalMs: 60000, refreshOnVisible: true, refreshOnFocus: true, skipWhenHidden: true, preventOverlap: true }
+  );
+})();
 </script>
 {% endblock %}
