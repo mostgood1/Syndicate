@@ -56,20 +56,31 @@ def _bootstrap_render_data(bootstrap_main: Callable[[], int] | None = None) -> N
         # boxscore histories, BvP caches) on the web service's own disk
         # after a deploy -- so run it in a background thread instead: the
         # app binds immediately and the disk backfills within minutes.
-        # WEB_CONCURRENCY > 1 means several gunicorn workers each build the
-        # app; a stale-aware lock file keeps them from running the same tree
-        # copy concurrently.
+        # WEB_CONCURRENCY > 1 means several gunicorn worker *processes* each
+        # build the app independently at boot (no --preload), so a plain
+        # check-then-write lock would race: both could pass the exists()
+        # check before either writes the file. O_CREAT|O_EXCL is atomic --
+        # the OS guarantees only one process wins the open() call.
         def _run_bootstrap() -> None:
             import time
 
             data_root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() or "data"
             lock_path = os.path.join(data_root, ".bootstrap_sync.lock")
             try:
-                if os.path.exists(lock_path) and (time.time() - os.path.getmtime(lock_path)) < 1800:
-                    return
                 os.makedirs(data_root, exist_ok=True)
-                with open(lock_path, "w", encoding="utf-8") as handle:
-                    handle.write(str(os.getpid()))
+                fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.write(fd, str(os.getpid()).encode("utf-8"))
+                os.close(fd)
+            except FileExistsError:
+                try:
+                    if (time.time() - os.path.getmtime(lock_path)) < 1800:
+                        return  # another worker holds a fresh lock
+                    os.remove(lock_path)  # stale lock from a crashed run -- retry once
+                    fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                    os.write(fd, str(os.getpid()).encode("utf-8"))
+                    os.close(fd)
+                except OSError:
+                    return
             except OSError:
                 return
             try:
