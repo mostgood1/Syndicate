@@ -230,6 +230,13 @@ class PullHotArtifactClientTests(unittest.TestCase):
         mocked_urlopen.assert_not_called()
 
     def test_scopes_request_to_date_pattern_when_provided(self) -> None:
+        # Two separate requests, one per date-separator format -- WNBA's
+        # artifacts are hyphen-dated (recommendations_slate_2026-07-20.json),
+        # MLB's are underscore-dated (live_lens_report_2026_07_20.json). A
+        # single combined bracket-expression pattern matching both at once
+        # was tried first and reproducibly 502'd in production (roughly
+        # doubles the combined result size); two smaller requests each stay
+        # close to the original, already-safe per-request size.
         with TemporaryDirectory() as tmp_dir:
             mocked_response = MagicMock()
             mocked_response.__enter__.return_value = mocked_response
@@ -247,26 +254,25 @@ class PullHotArtifactClientTests(unittest.TestCase):
                 with patch("urllib.request.urlopen", return_value=mocked_response) as mocked_urlopen:
                     pull_hot_artifacts(date_str="2026-07-20")
 
-            sent_request = mocked_urlopen.call_args.args[0]
-            # A bracket expression per date component so this matches both
-            # hyphen-separated (WNBA: recommendations_slate_2026-07-20.json)
-            # and underscore-separated (MLB: live_lens_report_2026_07_20.json)
-            # filenames -- see _date_glob_pattern's docstring for why a
-            # plain "*2026-07-20*" silently missed MLB's artifacts.
+            self.assertEqual(mocked_urlopen.call_count, 2)
+            requested_urls = {call.args[0].full_url for call in mocked_urlopen.call_args_list}
             self.assertEqual(
-                sent_request.full_url,
-                "https://syndicate.onrender.com/api/ops/artifacts/export?pattern=%2A2026%5B-_%5D07%5B-_%5D20%2A",
+                requested_urls,
+                {
+                    "https://syndicate.onrender.com/api/ops/artifacts/export?pattern=%2A2026-07-20%2A",
+                    "https://syndicate.onrender.com/api/ops/artifacts/export?pattern=%2A2026_07_20%2A",
+                },
             )
 
-    def test_date_glob_pattern_matches_both_separator_styles(self) -> None:
+    def test_date_glob_patterns_cover_both_separator_styles(self) -> None:
         import fnmatch
 
-        from syndicate.features.shared.artifact_publisher import _date_glob_pattern
+        from syndicate.features.shared.artifact_publisher import _date_glob_patterns
 
-        pattern = _date_glob_pattern("2026-07-20")
-        self.assertTrue(fnmatch.fnmatch("recommendations_slate_2026-07-20.json", pattern))
-        self.assertTrue(fnmatch.fnmatch("live_lens_report_2026_07_20.json", pattern))
-        self.assertFalse(fnmatch.fnmatch("recommendations_slate_2026-07-21.json", pattern))
+        patterns = _date_glob_patterns("2026-07-20")
+        self.assertTrue(any(fnmatch.fnmatch("recommendations_slate_2026-07-20.json", p) for p in patterns))
+        self.assertTrue(any(fnmatch.fnmatch("live_lens_report_2026_07_20.json", p) for p in patterns))
+        self.assertFalse(any(fnmatch.fnmatch("recommendations_slate_2026-07-21.json", p) for p in patterns))
 
     def test_unfiltered_request_omits_pattern_query_param(self) -> None:
         # A full, unfiltered export reproducibly hit Render's proxy timeout

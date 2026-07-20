@@ -378,19 +378,32 @@ def pull_hot_artifacts(*, date_str: str | None = None, timeout_seconds: int = 30
     season_betting_day_2026_07_20.json) -- confirmed in production: MLB's
     candidate_generation stayed at 0 on every cycle, with artifact_status
     showing artifact_exists=false, while WNBA worked fine, because MLB's
-    required artifacts were never being pulled at all. A bracket
-    expression matches either separator per date component.
+    required artifacts were never being pulled at all.
+
+    A single combined bracket-expression pattern (matching either
+    separator in one request) was tried first and also 502'd in
+    production -- matching both separators at once roughly doubles the
+    combined WNBA+MLB result set, and that larger payload hit the exact
+    same Render proxy timeout this date-scoping was already built to
+    avoid. Two separate, smaller requests (one per format) each stay
+    close to the original per-request size that was already confirmed
+    safe, and a failure on one doesn't cost the other.
     """
     token = _admin_token()
     if not token or not _env("SYNDICATE_WEB_PUBLISH_URL"):
         print(f"[artifact_publisher] PULL_SKIP_NOT_CONFIGURED url_set={bool(_env('SYNDICATE_WEB_PUBLISH_URL'))} token_set={bool(token)}", flush=True)
         return 0
-    pattern = _date_glob_pattern(date_str) if date_str else None
-    return _pull_hot_artifacts_request(_export_url(pattern), token, timeout_seconds=timeout_seconds)
+    if not date_str:
+        return _pull_hot_artifacts_request(_export_url(None), token, timeout_seconds=timeout_seconds)
+    written = 0
+    for pattern in _date_glob_patterns(date_str):
+        written += _pull_hot_artifacts_request(_export_url(pattern), token, timeout_seconds=timeout_seconds)
+    return written
 
 
-def _date_glob_pattern(date_str: str) -> str:
+def _date_glob_patterns(date_str: str) -> list[str]:
     parts = str(date_str or "").strip().split("-")
     if len(parts) == 3 and all(parts):
-        return f"*{parts[0]}[-_]{parts[1]}[-_]{parts[2]}*"
-    return f"*{date_str}*"
+        joined = "-".join(parts)
+        return [f"*{joined}*", f"*{'_'.join(parts)}*"]
+    return [f"*{date_str}*"]
