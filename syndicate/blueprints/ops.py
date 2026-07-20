@@ -639,6 +639,76 @@ def api_ops_wnba_status_trace() -> Any:
     return jsonify(trace)
 
 
+@ops_bp.get("/api/ops/intelligence/candidate-trace")
+def api_ops_intelligence_candidate_trace() -> Any:
+    # Protected endpoint: requires admin token. Diagnostic-only: exercises the
+    # exact same build_intelligence_overview -> collect_candidates path the
+    # refresh-worker background loop uses, but returns the raw per-game
+    # betting/game_market_recommendations/prop_recommendations fields (which
+    # /api/ops/wnba/status-trace strips) so a zero-candidate output can be
+    # root-caused without relying on production log scraping.
+    date = str(request.args.get("date") or "").strip() or None
+    sport_filter = str(request.args.get("sport") or "").strip().lower() or None
+    try:
+        from syndicate.features.intelligence import build_intelligence_overview
+        from syndicate.features.intelligence import _query_preferences
+        from syndicate.features.intelligence import _collect_candidates
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"ImportError: {type(exc).__name__}: {exc}"}), 500
+
+    try:
+        overview = build_intelligence_overview(selected_date=date, force_refresh=True)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"build_intelligence_overview: {type(exc).__name__}: {exc}"}), 500
+
+    preferences = _query_preferences(
+        "top edges today",
+        mode="recommendation",
+        sport="all",
+        timing="all",
+        include_props=True,
+        include_games=True,
+    )
+
+    result: dict[str, Any] = {"ok": True, "date": date, "preferences": preferences, "sports": []}
+    for sport in overview:
+        if not isinstance(sport, dict):
+            continue
+        slug = str(sport.get("slug") or "").strip().lower()
+        if sport_filter and slug != sport_filter:
+            continue
+        dashboard_games = sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []
+        sample_game = dashboard_games[0] if dashboard_games else None
+        sample_game_summary = None
+        if isinstance(sample_game, dict):
+            sample_game_summary = {
+                "game_id": sample_game.get("game_id") or sample_game.get("gamePk"),
+                "betting": sample_game.get("betting"),
+                "game_market_recommendations": sample_game.get("game_market_recommendations"),
+                "prop_recommendations": sample_game.get("prop_recommendations"),
+                "status": sample_game.get("status"),
+                "live_state": sample_game.get("live_state"),
+                "home_rails_present": isinstance(sport.get("home_rails"), dict),
+            }
+        try:
+            sport_candidates = _collect_candidates([sport], preferences)
+        except Exception as exc:
+            sport_candidates = None
+            candidate_error = f"{type(exc).__name__}: {exc}"
+        else:
+            candidate_error = None
+        result["sports"].append(
+            {
+                "slug": slug,
+                "dashboard_games_count": len(dashboard_games),
+                "sample_game": sample_game_summary,
+                "candidate_count": len(sport_candidates) if isinstance(sport_candidates, list) else None,
+                "candidate_error": candidate_error,
+            }
+        )
+    return jsonify(result)
+
+
 @ops_bp.get("/api/ops/mlb/live-check")
 def api_ops_mlb_live_check() -> Any:
     # Protected endpoint: requires admin token
