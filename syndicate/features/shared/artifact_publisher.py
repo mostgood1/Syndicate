@@ -284,3 +284,77 @@ def publish_changed_hot_artifacts(since_epoch_seconds: float) -> int:
     a failed file -- see run_mlb_daily_sim_job.py / run_queued_refresh_job.py).
     """
     return sweep_changed_hot_artifacts(since_epoch_seconds).published_count
+
+
+def _export_url() -> str:
+    base = _env("SYNDICATE_WEB_PUBLISH_URL")
+    if not base:
+        return ""
+    return base.rstrip("/") + "/api/ops/artifacts/export"
+
+
+def pull_hot_artifacts(*, timeout_seconds: int = 45) -> int:
+    """Best-effort pull of the full hot-artifact set from the web service's
+    disk onto this process's own disk.
+
+    2026-07-20: refresh-worker's board-computation loop reads sport artifacts
+    (recommendations_slate, props_recommendations, game_cards, etc.) from its
+    own Render disk, which is a separate physical disk from the one
+    live-odds-worker (or an on-demand web request) actually writes them to --
+    Render disks are per-service, not shared, and publish_hot_artifact/
+    sweep_changed_hot_artifacts above only ever push worker -> web. Confirmed
+    in production: refresh-worker computed a genuinely empty candidate pool
+    for hours (repeated "Missing WNBA artifact" errors reading its own local
+    disk) while the identical computation, run against the web service's
+    disk, produced real candidates. This is the missing other direction: web
+    -> refresh-worker, pulled (refresh-worker doesn't run an HTTP server, so
+    it can't receive a push). Never raises -- a network blip here should
+    degrade to stale local data, not break board computation.
+    """
+    url = _export_url()
+    token = _admin_token()
+    if not url or not token:
+        print(f"[artifact_publisher] PULL_SKIP_NOT_CONFIGURED url_set={bool(url)} token_set={bool(token)}", flush=True)
+        return 0
+
+    request_obj = urllib_request.Request(
+        url,
+        method="GET",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    try:
+        with urllib_request.urlopen(request_obj, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (urllib_error.URLError, TimeoutError, OSError) as exc:
+        print(f"[artifact_publisher] PULL_FAILED url={url} error={exc}", flush=True)
+        return 0
+    except Exception as exc:  # pragma: no cover - defensive, must never raise
+        print(f"[artifact_publisher] PULL_UNEXPECTED_ERROR url={url} error={exc}", flush=True)
+        return 0
+
+    artifacts = payload.get("artifacts") if isinstance(payload, dict) else None
+    if not isinstance(artifacts, dict):
+        print(f"[artifact_publisher] PULL_EMPTY_RESPONSE url={url}", flush=True)
+        return 0
+
+    root = _data_root()
+    written = 0
+    for relative_path, content in artifacts.items():
+        normalized = str(relative_path or "").strip().replace("\\", "/")
+        if not normalized or normalized.startswith("/") or ".." in normalized.split("/"):
+            continue
+        if not is_hot_artifact_relative_path(normalized):
+            continue
+        target_path = root / Path(normalized)
+        try:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            temp_path = target_path.parent / f"{target_path.name}.{os.getpid()}.pull.tmp"
+            temp_path.write_text(str(content), encoding="utf-8")
+            os.replace(temp_path, target_path)
+            written += 1
+        except Exception as exc:
+            print(f"[artifact_publisher] PULL_WRITE_FAILED path={normalized} error={exc}", flush=True)
+            continue
+
+    print(f"[artifact_publisher] PULL_OK url={url} artifacts_received={len(artifacts)} written={written}", flush=True)
+    return written

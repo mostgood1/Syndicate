@@ -1300,6 +1300,21 @@ class IntelligenceStateService:
             if cached_pool is not None:
                 return json.loads(json.dumps(cached_pool, default=str))
 
+        # 2026-07-20: this process's own Render disk doesn't have the sport
+        # artifacts build_intelligence_overview below is about to read --
+        # live-odds-worker (or an on-demand web request) writes them to a
+        # different, unshared disk. Only publish_hot_artifact's push
+        # (worker -> web) existed before; pull the same allowlist back down
+        # here so this computation has fresh data instead of silently
+        # reading nothing every time. Best-effort/never-raises by design, so
+        # a network blip just means this cycle reads stale local data.
+        try:
+            from syndicate.features.shared.artifact_publisher import pull_hot_artifacts
+
+            pull_hot_artifacts()
+        except Exception as exc:
+            print(f"[intelligence_state] PULL_HOT_ARTIFACTS_FAILED error={exc}", flush=True)
+
         overview = None
         if self._app is not None:
             try:

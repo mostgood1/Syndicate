@@ -14,6 +14,7 @@ from syndicate.app import create_app
 from syndicate.features.shared.artifact_publisher import is_hot_artifact_relative_path
 from syndicate.features.shared.artifact_publisher import publish_hot_artifact
 from syndicate.features.shared.artifact_publisher import publish_changed_hot_artifacts
+from syndicate.features.shared.artifact_publisher import pull_hot_artifacts
 
 
 HOT_RELATIVE_PATH = "wnba_source/source_artifacts/data/processed/recommendations_slate_2026-07-13.json"
@@ -212,6 +213,103 @@ class PublishHotArtifactClientTests(unittest.TestCase):
 
         self.assertEqual(published_count, 1)
         mocked_urlopen.assert_called_once()
+
+
+class PullHotArtifactClientTests(unittest.TestCase):
+    def test_noop_when_publish_url_not_configured(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(
+                os.environ,
+                {"SYNDICATE_DATA_ROOT": tmp_dir, "ADMIN_TOKEN": "secret-token"},
+                clear=False,
+            ):
+                os.environ.pop("SYNDICATE_WEB_PUBLISH_URL", None)
+                with patch("urllib.request.urlopen") as mocked_urlopen:
+                    result = pull_hot_artifacts()
+        self.assertEqual(result, 0)
+        mocked_urlopen.assert_not_called()
+
+    def test_writes_allowlisted_artifacts_and_skips_the_rest(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir).resolve()
+            export_payload = {
+                "ok": True,
+                "count": 2,
+                "artifacts": {
+                    HOT_RELATIVE_PATH: json.dumps({"candidate_count": 7}),
+                    "reports/intelligence/evaluation_ledger_chunks/part_1.json": "{}",
+                },
+            }
+            mocked_response = MagicMock()
+            mocked_response.__enter__.return_value = mocked_response
+            mocked_response.read.return_value = json.dumps(export_payload).encode("utf-8")
+
+            with patch.dict(
+                os.environ,
+                {
+                    "SYNDICATE_DATA_ROOT": str(data_root),
+                    "ADMIN_TOKEN": "secret-token",
+                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                },
+                clear=False,
+            ):
+                with patch("urllib.request.urlopen", return_value=mocked_response) as mocked_urlopen:
+                    written = pull_hot_artifacts()
+
+            self.assertEqual(written, 1)
+            mocked_urlopen.assert_called_once()
+            sent_request = mocked_urlopen.call_args.args[0]
+            self.assertEqual(sent_request.full_url, "https://syndicate.onrender.com/api/ops/artifacts/export")
+            self.assertEqual(sent_request.get_header("Authorization"), "Bearer secret-token")
+
+            written_path = data_root / HOT_RELATIVE_PATH
+            self.assertTrue(written_path.exists())
+            self.assertEqual(json.loads(written_path.read_text(encoding="utf-8"))["candidate_count"], 7)
+            self.assertFalse((data_root / "reports" / "intelligence" / "evaluation_ledger_chunks" / "part_1.json").exists())
+            leftovers = list(written_path.parent.glob(f"{written_path.name}.*.pull.tmp"))
+            self.assertEqual(leftovers, [])
+
+    def test_rejects_path_traversal_in_response(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir)
+            export_payload = {
+                "ok": True,
+                "count": 1,
+                "artifacts": {f"../../{HOT_RELATIVE_PATH}": "{}"},
+            }
+            mocked_response = MagicMock()
+            mocked_response.__enter__.return_value = mocked_response
+            mocked_response.read.return_value = json.dumps(export_payload).encode("utf-8")
+
+            with patch.dict(
+                os.environ,
+                {
+                    "SYNDICATE_DATA_ROOT": str(data_root),
+                    "ADMIN_TOKEN": "secret-token",
+                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                },
+                clear=False,
+            ):
+                with patch("urllib.request.urlopen", return_value=mocked_response):
+                    written = pull_hot_artifacts()
+
+        self.assertEqual(written, 0)
+        self.assertFalse(any(data_root.parent.glob(HOT_RELATIVE_PATH)))
+
+    def test_network_failure_is_swallowed(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(
+                os.environ,
+                {
+                    "SYNDICATE_DATA_ROOT": tmp_dir,
+                    "ADMIN_TOKEN": "secret-token",
+                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                },
+                clear=False,
+            ):
+                with patch("urllib.request.urlopen", side_effect=URLError("boom")):
+                    result = pull_hot_artifacts()
+        self.assertEqual(result, 0)
 
 
 class ArtifactPublishEndpointTests(unittest.TestCase):
