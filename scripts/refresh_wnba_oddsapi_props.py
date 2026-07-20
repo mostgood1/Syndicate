@@ -4938,6 +4938,19 @@ def main() -> int:
     parser.add_argument("--do-export", action="store_true")
     parser.add_argument("--do-push", action="store_true")
     parser.add_argument("--force-refresh", action="store_true")
+    # 2026-07-19: --force-refresh alone used to also force smart_sim_overwrite
+    # (see 10f51327, a deliberate one-time manual "nuke and rebuild" admin
+    # use). But live_refresh_loop.py passes --force-refresh automatically on
+    # every lineup/injury-change trigger, so that admin-only behavior was
+    # silently inherited by the automated path too -- every trigger
+    # resimmed the ENTIRE slate's smart-sim (all games, not just the changed
+    # one), the same whole-slate-on-every-trigger problem already fixed for
+    # MLB via --only-game-pks. smart-sim's own per-game file check
+    # (smart_sim_overwrite=False) already skips games with an existing
+    # smart_sim_<date>_*.json, so leaving it off by default lets that
+    # existing scoping mechanism work; pass this explicitly for the real
+    # "rebuild everything" case instead of overloading --force-refresh.
+    parser.add_argument("--smart-sim-overwrite", action="store_true")
     parser.add_argument("--days-ahead", type=int, default=0)
     parser.add_argument("--started-at")
     parser.add_argument("--mode", choices=("fast", "full"), default="full")
@@ -4998,7 +5011,7 @@ def main() -> int:
                 do_edges=bool(args.do_edges),
                 do_export=bool(args.do_export),
                 do_push=bool(args.do_push),
-                smart_sim_overwrite=bool(args.force_refresh),
+                smart_sim_overwrite=bool(args.smart_sim_overwrite),
                 log_file=Path(args.log_file).resolve(),
                 started_at=started_at,
                 mode=str(args.mode or "full"),

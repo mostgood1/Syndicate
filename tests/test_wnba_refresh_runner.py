@@ -79,6 +79,73 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertTrue(calls[0]["do_edges"])
         self.assertTrue(calls[0]["do_export"])
 
+    def test_force_refresh_alone_does_not_force_smart_sim_overwrite(self) -> None:
+        # 2026-07-19: --force-refresh used to also force smart_sim_overwrite,
+        # so live_refresh_loop.py's automatic --force-refresh on every
+        # lineup/injury-change trigger silently resimmed the whole slate's
+        # smart-sim every time (the same whole-slate-on-every-trigger problem
+        # already fixed for MLB). smart_sim_overwrite is now a separate,
+        # explicit flag.
+        module = self._load_module()
+
+        calls = []
+
+        def _fake_refresh(**kwargs):
+            calls.append(kwargs)
+            return {"snapshot_rows": 1, "snapshot_alias_rows": 1, "edges_rows": 0, "recs_rows": 0, "error": None}
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            argv = [
+                "refresh_wnba_oddsapi_props.py",
+                "--date",
+                "2026-05-22",
+                "--regions",
+                "us",
+                "--source-root",
+                tmp_dir,
+                "--log-file",
+                str(Path(tmp_dir) / "refresh.log"),
+                "--do-edges",
+                "--do-export",
+                "--force-refresh",
+            ]
+            with patch.object(module, "_run_refresh_via_cli", side_effect=_fake_refresh), patch("sys.argv", argv):
+                module.main()
+
+        self.assertEqual(len(calls), 1)
+        self.assertFalse(calls[0]["smart_sim_overwrite"])
+
+    def test_smart_sim_overwrite_flag_is_forwarded_when_explicitly_passed(self) -> None:
+        module = self._load_module()
+
+        calls = []
+
+        def _fake_refresh(**kwargs):
+            calls.append(kwargs)
+            return {"snapshot_rows": 1, "snapshot_alias_rows": 1, "edges_rows": 0, "recs_rows": 0, "error": None}
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            argv = [
+                "refresh_wnba_oddsapi_props.py",
+                "--date",
+                "2026-05-22",
+                "--regions",
+                "us",
+                "--source-root",
+                tmp_dir,
+                "--log-file",
+                str(Path(tmp_dir) / "refresh.log"),
+                "--do-edges",
+                "--do-export",
+                "--force-refresh",
+                "--smart-sim-overwrite",
+            ]
+            with patch.object(module, "_run_refresh_via_cli", side_effect=_fake_refresh), patch("sys.argv", argv):
+                module.main()
+
+        self.assertEqual(len(calls), 1)
+        self.assertTrue(calls[0]["smart_sim_overwrite"])
+
     def test_ensure_source_game_inputs_fetches_with_periods_enabled(self) -> None:
         module = self._load_module()
 
