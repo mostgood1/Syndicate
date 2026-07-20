@@ -2,93 +2,112 @@ from __future__ import annotations
 
 from typing import Any
 
-from syndicate.features.soccer.sources import available_dates
+from syndicate.features.soccer.cards import week_games
+from syndicate.features.soccer.sources import available_weeks
 from syndicate.features.soccer.sources import build_module_links
+from syndicate.features.soccer.sources import default_season
+from syndicate.features.soccer.sources import default_week
 from syndicate.features.soccer.sources import league_display_name
+from syndicate.features.soccer.sources import league_select_control
 from syndicate.features.soccer.sources import normalize_league
-from syndicate.features.soccer.sources import recommendations_payload
-from syndicate.features.shared.date_archive import build_discrete_date_archive_api_payload
-from syndicate.features.shared.date_archive import build_discrete_date_archive_page_context
-from syndicate.features.shared.date_archive import selected_first_rank_cards
-from syndicate.features.shared.date_archive import windowed_discrete_dates
-from syndicate.features.shared.discrete_nav import resolve_selected_value
+from syndicate.features.soccer.sources import week_label
+from syndicate.features.shared.rank_board import build_rank_api_payload
+from syndicate.features.shared.rank_board import build_rank_page_context
+
+_WINDOW = 12
 
 
-def _archive_card(league: str, date_str: str) -> dict[str, Any]:
-    payload = recommendations_payload(league, date_str) or {}
-    matches = payload.get("matches") if isinstance(payload.get("matches"), list) else []
+def _week_card(league: str, season: int, week: int) -> dict[str, Any]:
+    games = week_games(league, week, season)
+    simulated = sum(1 for game in games if game.get("panels", [{}])[0].get("eyebrow") == "Match projection")
     league_label = league_display_name(league)
     return {
-        "title": date_str,
-        "eyebrow": f"{league_label} slate",
-        "badge": f"{len(matches)} matches",
-        "meta": f"{league_label} SoccerSim artifact",
+        "title": str(week),
+        "eyebrow": week_label(league, season, week),
+        "badge": f"{len(games)} matches",
+        "meta": f"{league_label} season {season}",
         "metrics": [
-            {"label": "Matches", "value": str(len(matches))},
-            {"label": "Player props", "value": str(len(payload.get("player_props") or []))},
-            {"label": "League", "value": league_label},
+            {"label": "Matches", "value": str(len(games))},
+            {"label": "Simulated", "value": str(simulated)},
+            {"label": "Season", "value": str(season)},
         ],
-        "summary": f"This archive date is sourced directly from the stored {league_label} SoccerSim recommendations artifact.",
-        "list_items": [
-            f"Matches simulated: {len(matches)}",
-            f"Archive date: {date_str}",
-        ],
-        "href": f"/soccer/{league}/cards?date={date_str}",
+        "summary": f"Week {week} of the {league_label} season {season} schedule, {simulated} of {len(games)} matches simulated.",
+        "list_items": [f"{game['away']['name']} @ {game['home']['name']}" for game in games[:6]] or ["No fixtures on the schedule for this week."],
+        "href": f"/soccer/{league}/cards?week={week}&season={season}",
         "href_label": "Open cards board",
     }
 
 
-def build_archive_page_context(league: str, selected_date: str) -> dict[str, Any]:
+def build_archive_page_context(league: str, week: int | None = None, season: int | None = None) -> dict[str, Any]:
     league = normalize_league(league)
     league_label = league_display_name(league)
-    dates = available_dates(league)
-    fallback = dates[-1] if dates else selected_date
-    resolved_date = resolve_selected_value(selected_date or fallback, dates, fallback)
-    window_dates = windowed_discrete_dates(dates, resolved_date)
-    cards = [_archive_card(league, date_str) for date_str in window_dates]
-    cards = selected_first_rank_cards(cards, resolved_date)
+    resolved_season = int(season) if season else default_season(league)
+    weeks = available_weeks(league, resolved_season)
+    resolved_week = int(week) if week else default_week(league, resolved_season)
 
-    selected_payload = recommendations_payload(league, resolved_date) or {}
-    selected_matches = selected_payload.get("matches") if isinstance(selected_payload.get("matches"), list) else []
+    if weeks:
+        try:
+            index = weeks.index(resolved_week)
+        except ValueError:
+            index = len(weeks) - 1
+        start = max(0, index - (_WINDOW // 2))
+        end = min(len(weeks), start + _WINDOW)
+        start = max(0, end - _WINDOW)
+        window_weeks = list(reversed(weeks[start:end]))
+    else:
+        window_weeks = []
 
-    context = build_discrete_date_archive_page_context(
-        selected_date=resolved_date,
-        dates=dates,
+    cards = [_week_card(league, resolved_season, week_number) for week_number in window_weeks]
+    cards.sort(key=lambda card: (0 if card.get("title") == str(resolved_week) else 1, card.get("title")))
+
+    prev_week = max([w for w in weeks if w < resolved_week], default=resolved_week)
+    next_week = min([w for w in weeks if w > resolved_week], default=resolved_week)
+    query = f"?week={resolved_week}&season={resolved_season}"
+
+    context = build_rank_page_context(
+        selected_date=str(resolved_week),
         route_path=f"/soccer/{league}/archive",
-        intro_title=f"{league_label} Daily Archive",
-        intro_body=f"This archive board lists stored {league_label} SoccerSim dates and links each one back into the cards board for matchup-level detail.",
-        aria_label=f"{league_label} daily archive",
-        source_path=f"data/soccer_source/{league}/api/recommendations/",
-        source_title=f"{league_label} SoccerSim archive" if cards else f"{league_label} archive unavailable",
+        intro_title=f"{league_label} Weekly Archive",
+        intro_body=f"This archive board lists {league_label} season {resolved_season} matchweeks and links each one back into the cards board.",
+        aria_label=f"{league_label} weekly archive",
+        source_path=f"data/soccer_source/{league}/api/schedule/schedule_{resolved_season}.json",
+        source_title=f"{league_label} SoccerSim schedule" if cards else f"{league_label} schedule unavailable",
         rank_cards=cards,
         using_sample_data=False,
         header_stats=[
-            {"label": "Archive dates", "value": str(len(dates))},
-            {"label": "Selected matches", "value": str(len(selected_matches))},
+            {"label": "Weeks in season", "value": str(len(weeks))},
+            {"label": "Selected week matches", "value": str(len(week_games(league, resolved_week, resolved_season)))},
             {"label": "League", "value": league_label},
         ],
-        module_links=build_module_links(league, resolved_date, "Daily archive"),
+        module_links=build_module_links(league, resolved_week, resolved_season, "Weekly Archive"),
         warning_panel={
             "eyebrow": "Archive lane",
-            "title": "Daily archive dates drill back into cards",
-            "body": "Use this archive to browse stored SoccerSim dates, then jump into the cards board for matchup-level detail.",
+            "title": "Weekly archive weeks drill back into cards",
+            "body": "Use this archive to browse the season's matchweeks, then jump into the cards board for matchup-level detail.",
             "list_items": [
-                "Each card summarizes one stored date from the SoccerSim recommendations artifact.",
-                f"Run scripts/build_soccer_artifacts.py --league {league} to add more dates.",
+                "Each card summarizes one matchweek from the SoccerSim schedule artifact.",
+                f"Run scripts/build_soccer_schedule.py --league {league} --season {resolved_season} to (re)populate the season schedule.",
             ],
         },
-        source_date_display=resolved_date,
+        control_label="Week",
+        control_type="number",
+        control_name="week",
+        control_value=str(resolved_week),
+        prev_href=f"/soccer/{league}/archive?week={prev_week}&season={resolved_season}",
+        next_href=f"/soccer/{league}/archive?week={next_week}&season={resolved_season}",
+        hidden_fields=[{"name": "season", "value": str(resolved_season)}],
+        extra_controls=[league_select_control(league, page_path="/archive", query_suffix=query)],
     )
     if not cards:
         context["empty_state"] = {
-            "eyebrow": f"{league_label} daily archive",
-            "title": "No stored SoccerSim dates were available",
-            "body": "The daily archive only renders stored SoccerSim artifact dates, and none were available for the selected window.",
-            "list_items": [f"Run scripts/build_soccer_artifacts.py --league {league} to populate this archive lane."],
+            "eyebrow": f"{league_label} weekly archive",
+            "title": "No stored SoccerSim weeks were available",
+            "body": "The weekly archive only renders weeks present in the SoccerSim schedule artifact, and none were available.",
+            "list_items": [f"Run scripts/build_soccer_schedule.py --league {league} --season {resolved_season} to populate this archive lane."],
         }
     return context
 
 
-def build_archive_api_payload(league: str, selected_date: str) -> dict[str, Any]:
-    context = build_archive_page_context(league, selected_date)
-    return build_discrete_date_archive_api_payload(context)
+def build_archive_api_payload(league: str, week: int | None = None, season: int | None = None) -> dict[str, Any]:
+    context = build_archive_page_context(league, week, season)
+    return build_rank_api_payload(context)

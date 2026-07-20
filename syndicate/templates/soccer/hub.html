@@ -4,11 +4,11 @@
 {% block page_title %}Soccer Hub{% endblock %}
 
 {% block content %}
-  {% with route_label='/soccer', title='Soccer now runs a full SoccerSim engine across multiple leagues', status='Active migration', body='Soccer now exposes SoccerSim-backed cards, a game drill-in, player-prop boards, a resumed-match live lens covering live corners/shots/goals/BTTS, and a stored-date daily archive, across ' ~ leagues|length ~ ' leagues.', action_href='/soccer/' ~ default_league ~ '/cards', action_label='Open ' ~ default_league|upper ~ ' cards' %}
+  {% with route_label='/soccer', title='Soccer now runs a full SoccerSim engine across multiple leagues', status='Active migration', body='Soccer now exposes SoccerSim-backed cards, a game drill-in, player-prop boards, a resumed-match live lens covering live corners/shots/goals/BTTS, a weekly archive, and full team rosters + season schedules, across ' ~ leagues|length ~ ' leagues.', action_href='/soccer/' ~ default_league ~ '/cards', action_label='Open ' ~ default_league|upper ~ ' cards' %}
     {% include 'shared/_module_intro.html' %}
   {% endwith %}
 
-  {% with eyebrow='Coverage', title='Leagues with stored SoccerSim dates', body='Leagues run through the same engine and UI surfaces; a league only appears here with real dates once scripts/build_soccer_artifacts.py has been run for it.', summary_stats=summary_stats %}
+  {% with eyebrow='Coverage', title='Leagues with a stored SoccerSim schedule', body='Leagues run through the same engine and UI surfaces; a league only appears here with real weeks once scripts/build_soccer_schedule.py has been run for it.', summary_stats=summary_stats %}
     {% include 'shared/_content_panel.html' %}
   {% endwith %}
 
@@ -16,13 +16,17 @@
     {% for league in leagues %}
       <article class="sport-card">
         <div class="section-label">{{ league.name }}</div>
-        <h3>{{ league.latest_date or "No stored dates" }}</h3>
-        <p>{{ league.dates|length }} stored SoccerSim date(s) for {{ league.name }}.</p>
+        <h3>{% if league.current_week %}Week {{ league.current_week }}{% else %}No stored schedule{% endif %}</h3>
+        <p>{{ league.weeks|length }} matchweek(s) stored for {{ league.name }} season {{ league.season }}.</p>
+        {% if league.sparse_roster_count %}
+          <p class="muted">Data gap: {{ league.sparse_roster_count }} team(s) have an incomplete ESPN roster on file.</p>
+        {% endif %}
+        {% set week_query = '?week=' ~ league.current_week ~ '&season=' ~ league.season if league.current_week else '' %}
         <div class="action-row">
-          <a class="cards-nav-pill" href="/soccer/{{ league.slug }}/cards{% if league.latest_date %}?date={{ league.latest_date }}{% endif %}">Cards</a>
-          <a class="cards-nav-pill" href="/soccer/{{ league.slug }}/props{% if league.latest_date %}?date={{ league.latest_date }}{% endif %}">Props</a>
-          <a class="cards-nav-pill" href="/soccer/{{ league.slug }}/live-lens{% if league.latest_date %}?date={{ league.latest_date }}{% endif %}">Live Lens</a>
-          <a class="cards-nav-pill" href="/soccer/{{ league.slug }}/archive{% if league.latest_date %}?date={{ league.latest_date }}{% endif %}">Daily Archive</a>
+          <a class="cards-nav-pill" href="/soccer/{{ league.slug }}/cards{{ week_query }}">Cards</a>
+          <a class="cards-nav-pill" href="/soccer/{{ league.slug }}/props{{ week_query }}">Props</a>
+          <a class="cards-nav-pill" href="/soccer/{{ league.slug }}/live-lens{{ week_query }}">Live Lens</a>
+          <a class="cards-nav-pill" href="/soccer/{{ league.slug }}/archive{{ week_query }}">Weekly Archive</a>
         </div>
       </article>
     {% endfor %}

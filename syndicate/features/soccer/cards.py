@@ -2,14 +2,19 @@ from __future__ import annotations
 
 from typing import Any
 
-from syndicate.features.soccer.sources import available_dates
+from syndicate.features.soccer.sources import available_weeks
 from syndicate.features.soccer.sources import build_module_links
-from syndicate.features.soccer.sources import default_date
+from syndicate.features.soccer.sources import default_season
+from syndicate.features.soccer.sources import default_week
 from syndicate.features.soccer.sources import league_display_name
+from syndicate.features.soccer.sources import league_select_control
 from syndicate.features.soccer.sources import normalize_league
-from syndicate.features.soccer.sources import recommendations_path
 from syndicate.features.soccer.sources import recommendations_payload
-from syndicate.features.shared.discrete_nav import neighboring_values
+from syndicate.features.soccer.sources import schedule_path
+from syndicate.features.soccer.sources import team_by_name
+from syndicate.features.soccer.sources import week_date_list
+from syndicate.features.soccer.sources import week_label
+from syndicate.features.soccer.sources import week_matches
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 
 
@@ -32,13 +37,39 @@ def _fmt_num(value: Any, digits: int = 2) -> str:
     return f"{number:.{digits}f}" if number is not None else "-"
 
 
-def _abbr(team: str) -> str:
+def _team_roster_href(team: str, league: str) -> str | None:
+    directory_team = team_by_name(league, team)
+    team_id = str((directory_team or {}).get("team_id") or "").strip()
+    return f"/soccer/{league}/team/{team_id}/roster" if team_id else None
+
+
+def _abbr(team: str, league: str) -> str:
+    directory_team = team_by_name(league, team)
+    if directory_team and str(directory_team.get("abbreviation") or "").strip():
+        return str(directory_team["abbreviation"]).strip().upper()
     tokens = [token for token in str(team or "").replace("&", " ").split() if token]
     if not tokens:
         return "TBD"
     if len(tokens) == 1:
         return tokens[0][:3].upper()
     return "".join(token[0] for token in tokens[:3]).upper()
+
+
+def _team_logo_url(team: str, league: str) -> str | None:
+    directory_team = team_by_name(league, team)
+    return str(directory_team.get("logo_url") or "").strip() or None if directory_team else None
+
+
+def _team_primary_color(team: str, league: str) -> str | None:
+    directory_team = team_by_name(league, team)
+    value = str((directory_team or {}).get("color") or "").strip()
+    return f"#{value}" if value else None
+
+
+def _team_secondary_color(team: str, league: str) -> str | None:
+    directory_team = team_by_name(league, team)
+    value = str((directory_team or {}).get("alternate_color") or "").strip()
+    return f"#{value}" if value else None
 
 
 def _status_label(status_state: str, kickoff: str | None) -> str:
@@ -58,7 +89,60 @@ def _prop_line(row: dict[str, Any]) -> str:
     return f"{name} ({team}) | Anytime scorer {scorer_prob} | xShots {shots}"
 
 
-def _match_to_game(match: dict[str, Any], *, league: str, selected_date: str) -> dict[str, Any]:
+def _unsimulated_game(fixture: dict[str, Any], *, league: str, week: int, season: int) -> dict[str, Any]:
+    home_team = str(fixture.get("home_team") or "Home").strip() or "Home"
+    away_team = str(fixture.get("away_team") or "Away").strip() or "Away"
+    event_id = str(fixture.get("event_id") or "").strip()
+    status_state = str(fixture.get("status_state") or "pre")
+    date_str = str(fixture.get("date") or "")[:10]
+    return {
+        "gamePk": event_id or f"{league}_{date_str}_{home_team}_{away_team}".replace(" ", "_"),
+        "event_id": event_id,
+        "away": {
+            "abbr": _abbr(away_team, league),
+            "name": away_team,
+            "score": fixture.get("away_score"),
+            "href": _team_roster_href(away_team, league),
+            "logo_url": _team_logo_url(away_team, league),
+            "primary_color": _team_primary_color(away_team, league),
+            "secondary_color": _team_secondary_color(away_team, league),
+        },
+        "home": {
+            "abbr": _abbr(home_team, league),
+            "name": home_team,
+            "score": fixture.get("home_score"),
+            "href": _team_roster_href(home_team, league),
+            "logo_url": _team_logo_url(home_team, league),
+            "primary_color": _team_primary_color(home_team, league),
+            "secondary_color": _team_secondary_color(home_team, league),
+        },
+        "status": _status_label(status_state, fixture.get("date")),
+        "detail": date_str or league_display_name(league),
+        "summary": f"{away_team} at {home_team} is on the schedule for Week {week} but has not been simulated yet.",
+        "href": f"/soccer/{league}/game/{event_id or 'unknown'}?week={week}&season={season}",
+        "href_label": "Open match card",
+        "metrics": [
+            {"label": "Home win", "value": "-"},
+            {"label": "Draw", "value": "-"},
+            {"label": "Away win", "value": "-"},
+            {"label": "Total goals", "value": "-"},
+            {"label": "BTTS", "value": "-"},
+            {"label": "Over 2.5", "value": "-"},
+        ],
+        "panels": [
+            {
+                "eyebrow": "Not yet simulated",
+                "title": f"{away_team} @ {home_team}",
+                "body": f"This fixture is on the real {league_display_name(league)} schedule for {date_str}, but SoccerSim has not simulated it yet.",
+                "items": [
+                    f"Run scripts/build_soccer_artifacts.py --league {league} --date {date_str} to populate this match.",
+                ],
+            }
+        ],
+    }
+
+
+def _match_to_game(match: dict[str, Any], *, league: str, week: int, season: int) -> dict[str, Any]:
     matchup = match.get("matchup") if isinstance(match.get("matchup"), dict) else {}
     home_team = str(matchup.get("home_team") or "Home").strip() or "Home"
     away_team = str(matchup.get("away_team") or "Away").strip() or "Away"
@@ -82,14 +166,30 @@ def _match_to_game(match: dict[str, Any], *, league: str, selected_date: str) ->
     )
 
     return {
-        "gamePk": event_id or f"{league}_{selected_date}_{home_team}_{away_team}".replace(" ", "_"),
+        "gamePk": event_id or f"{league}_{match.get('date')}_{home_team}_{away_team}".replace(" ", "_"),
         "event_id": event_id,
-        "away": {"abbr": _abbr(away_team), "name": away_team, "score": away_score},
-        "home": {"abbr": _abbr(home_team), "name": home_team, "score": home_score},
+        "away": {
+            "abbr": _abbr(away_team, league),
+            "name": away_team,
+            "score": away_score,
+            "href": _team_roster_href(away_team, league),
+            "logo_url": _team_logo_url(away_team, league),
+            "primary_color": _team_primary_color(away_team, league),
+            "secondary_color": _team_secondary_color(away_team, league),
+        },
+        "home": {
+            "abbr": _abbr(home_team, league),
+            "name": home_team,
+            "score": home_score,
+            "href": _team_roster_href(home_team, league),
+            "logo_url": _team_logo_url(home_team, league),
+            "primary_color": _team_primary_color(home_team, league),
+            "secondary_color": _team_secondary_color(home_team, league),
+        },
         "status": _status_label(status_state, match.get("kickoff")),
         "detail": score_text if score_text != "-" else league_display_name(league),
         "summary": summary,
-        "href": f"/soccer/{league}/game/{event_id or 'unknown'}?date={selected_date}",
+        "href": f"/soccer/{league}/game/{event_id or 'unknown'}?week={week}&season={season}",
         "href_label": "Open match card",
         "metrics": [
             {"label": "Home win", "value": _fmt_pct(win_prob.get("home"))},
@@ -130,29 +230,65 @@ def _match_to_game(match: dict[str, Any], *, league: str, selected_date: str) ->
     }
 
 
-def build_cards_page_context(league: str, selected_date: str) -> dict[str, Any]:
-    league = normalize_league(league)
-    dates = available_dates(league)
-    resolved_date = str(selected_date or default_date(league)).strip() or default_date(league)
-    payload = recommendations_payload(league, resolved_date) or {}
-    matches = payload.get("matches") if isinstance(payload.get("matches"), list) else []
-    games = [_match_to_game(match, league=league, selected_date=resolved_date) for match in matches]
+def week_games(league: str, week: int, season: int) -> list[dict[str, Any]]:
+    """The real fixture list for a week (from the schedule artifact),
+    enriched with SoccerSim's simulated output where it exists -- a fixture
+    on the schedule that hasn't been simulated yet still shows up, as a
+    lightweight "not yet simulated" card, instead of silently disappearing.
+    """
+    fixtures = week_matches(league, season, week)
+    if not fixtures:
+        return []
+    simulated_by_event_id: dict[str, dict[str, Any]] = {}
+    for date_str in week_date_list(league, season, week):
+        payload = recommendations_payload(league, date_str) or {}
+        for match in payload.get("matches") if isinstance(payload.get("matches"), list) else []:
+            event_id = str(match.get("event_id") or match.get("match_id") or "").strip()
+            if event_id:
+                simulated_by_event_id[event_id] = match
 
-    prev_date, next_date = neighboring_values(dates, resolved_date, fallback=resolved_date)
-    source_path = str(recommendations_path(league, resolved_date))
+    games: list[dict[str, Any]] = []
+    for fixture in fixtures:
+        event_id = str(fixture.get("event_id") or "").strip()
+        simulated = simulated_by_event_id.get(event_id)
+        if simulated is not None:
+            games.append(_match_to_game(simulated, league=league, week=week, season=season))
+        else:
+            games.append(_unsimulated_game(fixture, league=league, week=week, season=season))
+    return games
+
+
+def build_cards_page_context(league: str, week: int | None = None, season: int | None = None) -> dict[str, Any]:
+    league = normalize_league(league)
+    resolved_season = int(season) if season else default_season(league)
+    weeks = available_weeks(league, resolved_season)
+    resolved_week = int(week) if week else default_week(league, resolved_season)
+
+    games = week_games(league, resolved_week, resolved_season)
+    simulated_count = sum(1 for game in games if game.get("panels", [{}])[0].get("eyebrow") == "Match projection")
+
+    query = f"?week={resolved_week}&season={resolved_season}"
+    prev_week = max([w for w in weeks if w < resolved_week], default=resolved_week)
+    next_week = min([w for w in weeks if w > resolved_week], default=resolved_week)
+    source_path = str(schedule_path(league, resolved_season))
     league_label = league_display_name(league)
 
     return apply_game_board_contract(
         {
-            "date": resolved_date,
-            "requested_date": selected_date or resolved_date,
-            "prev_date": prev_date,
-            "next_date": next_date,
+            "date": week_label(league, resolved_season, resolved_week),
+            "requested_date": query,
+            "prev_date": str(prev_week),
+            "next_date": str(next_week),
             "control_action": f"/soccer/{league}/cards",
-            "controls_prev_href": f"/soccer/{league}/cards?date={prev_date}",
-            "controls_next_href": f"/soccer/{league}/cards?date={next_date}",
-            "control_value": resolved_date,
-            "module_links": build_module_links(league, resolved_date, "Cards"),
+            "controls_prev_href": f"/soccer/{league}/cards?week={prev_week}&season={resolved_season}",
+            "controls_next_href": f"/soccer/{league}/cards?week={next_week}&season={resolved_season}",
+            "control_value": str(resolved_week),
+            "control_label": "Week",
+            "control_type": "number",
+            "control_name": "week",
+            "hidden_fields": [{"name": "season", "value": str(resolved_season)}],
+            "extra_controls": [league_select_control(league, page_path="/cards", query_suffix=query)],
+            "module_links": build_module_links(league, resolved_week, resolved_season, "Cards"),
             "games": games,
             "scoreboard_items": [
                 {
@@ -163,29 +299,29 @@ def build_cards_page_context(league: str, selected_date: str) -> dict[str, Any]:
                 for game in games
             ],
             "source_path": source_path,
-            "source_title": f"{league_label} SoccerSim artifact" if games else f"{league_label} cards unavailable",
+            "source_title": f"{league_label} SoccerSim schedule + artifacts" if games else f"{league_label} schedule unavailable",
             "empty_state": {
                 "eyebrow": f"{league_label} cards",
-                "title": "No simulated matches were available for this date",
-                "body": "The cards board reads the SoccerSim-generated recommendations artifact for this league and date, and none was available.",
+                "title": "No scheduled matches were available for this week",
+                "body": "The cards board reads the SoccerSim-generated schedule artifact for this league/season, and none was available.",
                 "list_items": [
-                    f"Requested date: {selected_date or resolved_date}",
-                    f"Run scripts/build_soccer_artifacts.py --league {league} --date {resolved_date} to populate this date.",
+                    f"Requested week: {resolved_week} (season {resolved_season})",
+                    f"Run scripts/build_soccer_schedule.py --league {league} --season {resolved_season} to populate the season schedule.",
                 ],
             } if not games else None,
             "using_sample_data": False,
             "route_path": f"/soccer/{league}/cards",
             "intro_title": f"{league_label} Cards",
-            "intro_body": f"{league_label} cards render directly from SoccerSim's simulated match and player-prop outputs for the selected date.",
+            "intro_body": f"{league_label} cards show the full real schedule for the selected week, with SoccerSim's simulated match and player-prop outputs layered on top where available.",
             "cards_control_links": [
-                {"label": "Props", "href": f"/soccer/{league}/props?date={resolved_date}"},
-                {"label": "Live Lens", "href": f"/soccer/{league}/live-lens?date={resolved_date}"},
+                {"label": "Props", "href": f"/soccer/{league}/props{query}"},
+                {"label": "Live Lens", "href": f"/soccer/{league}/live-lens{query}"},
             ],
             "header_stats": [
-                {"label": "Matches", "value": str(len(games))},
-                {"label": "Dates stored", "value": str(len(dates) or "-")},
+                {"label": "Matches this week", "value": str(len(games))},
+                {"label": "Simulated", "value": str(simulated_count)},
+                {"label": "Weeks available", "value": str(len(weeks) or "-")},
                 {"label": "League", "value": league_label},
-                {"label": "Source", "value": "SoccerSim" if games else "No data"},
             ],
             "cards_stylesheet": None,
             "cards_grid_class": "cards-grid",

@@ -10,18 +10,34 @@
 
   <div class="cards-strip-head">
     <div class="cards-head-left cards-head-matchup">
-      <div class="cards-head-team">
-        <div class="cards-strip-logo">{{ game.away.abbr }}</div>
+      <div class="cards-head-team"{% if game.away.primary_color %} style="--cards-team-accent: {{ game.away.primary_color }};"{% endif %}>
+        {% if game.away.logo_url %}
+          <img class="cards-strip-logo cards-strip-crest" src="{{ game.away.logo_url }}" alt="{{ game.away.name }} crest" loading="lazy" />
+        {% else %}
+          <div class="cards-strip-logo">{{ game.away.abbr }}</div>
+        {% endif %}
         <div>
-          <div class="cards-head-team-name">{{ game.away.name }}</div>
+          {% if game.away.href %}
+            <a class="cards-head-team-name" href="{{ game.away.href }}">{{ game.away.name }}</a>
+          {% else %}
+            <div class="cards-head-team-name">{{ game.away.name }}</div>
+          {% endif %}
           <div class="cards-mini-copy">{{ game.away.abbr }}</div>
         </div>
       </div>
       <span class="cards-score-divider">@</span>
-      <div class="cards-head-team">
-        <div class="cards-strip-logo">{{ game.home.abbr }}</div>
+      <div class="cards-head-team"{% if game.home.primary_color %} style="--cards-team-accent: {{ game.home.primary_color }};"{% endif %}>
+        {% if game.home.logo_url %}
+          <img class="cards-strip-logo cards-strip-crest" src="{{ game.home.logo_url }}" alt="{{ game.home.name }} crest" loading="lazy" />
+        {% else %}
+          <div class="cards-strip-logo">{{ game.home.abbr }}</div>
+        {% endif %}
         <div>
-          <div class="cards-head-team-name">{{ game.home.name }}</div>
+          {% if game.home.href %}
+            <a class="cards-head-team-name" href="{{ game.home.href }}">{{ game.home.name }}</a>
+          {% else %}
+            <div class="cards-head-team-name">{{ game.home.name }}</div>
+          {% endif %}
           <div class="cards-mini-copy">{{ game.home.abbr }}</div>
         </div>
       </div>

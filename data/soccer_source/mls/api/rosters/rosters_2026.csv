@@ -1,0 +1,889 @@
+team_id,team,player_id,player_name,jersey,position,position_abbreviation,age,height,weight,date_of_birth,headshot_url
+18418,Atlanta United FC,109193,Lucas Hoyos,1,Goalkeeper,G,37.0,72.0,168.0,1989-04-29T07:00Z,
+18418,Atlanta United FC,385044,Jayden Hibbert,42,Goalkeeper,G,21.0,74.0,163.0,2004-08-05T07:00Z,
+18418,Atlanta United FC,138636,Matt Edwards,47,Defender,D,23.0,70.0,172.0,2003-02-17T08:00Z,
+18418,Atlanta United FC,188454,Stian Gregersen,5,Defender,D,31.0,76.0,183.0,1995-05-17T07:00Z,
+18418,Atlanta United FC,240783,Ronald Hernández,2,Defender,D,28.0,67.0,152.0,1997-09-21T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/240783.png
+18418,Atlanta United FC,243195,Enea Mihaj,4,Defender,D,28.0,73.0,172.0,1998-07-05T07:00Z,
+18418,Atlanta United FC,303125,Pedro Amador,18,Defender,D,27.0,71.0,161.0,1998-12-18T08:00Z,
+18418,Atlanta United FC,330082,Tomás Jacob,55,Defender,D,22.0,71.0,161.0,2004-04-20T07:00Z,
+18418,Atlanta United FC,361498,Elías Baez,3,Defender,D,21.0,69.0,132.0,2004-10-18T07:00Z,
+18418,Atlanta United FC,400742,Dominik Chong Qui,50,Defender,D,18.0,69.0,,2007-12-29T08:00Z,
+18418,Atlanta United FC,419246,Toto Majub,41,Defender,D,20.0,,,2006-06-03T07:00Z,
+18418,Atlanta United FC,185897,Alexey Miranchuk,59,Midfielder,M,30.0,72.0,161.0,1995-10-17T07:00Z,
+18418,Atlanta United FC,243384,Steven Alzate,7,Midfielder,M,27.0,71.0,163.0,1998-09-08T07:00Z,
+18418,Atlanta United FC,255802,Tristan Muyumba,8,Midfielder,M,29.0,65.0,117.0,1997-03-07T08:00Z,
+18418,Atlanta United FC,290024,Will Reilly,28,Midfielder,M,23.0,70.0,159.0,2002-12-03T08:00Z,
+18418,Atlanta United FC,304153,Jay Fortune,35,Midfielder,M,23.0,69.0,163.0,2002-12-30T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/304153.png
+18418,Atlanta United FC,308892,Luke Brennan,20,Midfielder,M,21.0,71.0,150.0,2005-02-24T08:00Z,
+18418,Atlanta United FC,371431,Adrian Gill,16,Midfielder,M,20.0,70.0,,2006-01-03T08:00Z,
+18418,Atlanta United FC,380821,Adyn Torres,23,Midfielder,M,18.0,69.0,152.0,2007-11-13T08:00Z,
+18418,Atlanta United FC,402315,Cooper Sanchez,48,Midfielder,M,18.0,68.0,,2008-03-26T07:00Z,
+18418,Atlanta United FC,416552,Santiago Pita,40,Midfielder,M,19.0,69.0,,2007-06-01T07:00Z,
+18418,Atlanta United FC,48128,Miguel Almirón,10,Forward,F,32.0,69.0,152.0,1994-02-10T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/48128.png
+18418,Atlanta United FC,211678,Fafà Picault,22,Forward,F,35.0,68.0,139.0,1991-02-23T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/211678.png
+18418,Atlanta United FC,214446,Sergio Santos,19,Forward,F,31.0,72.0,183.0,1994-09-04T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/214446.png
+18418,Atlanta United FC,221128,Saba Lobjanidze,11,Forward,F,31.0,69.0,159.0,1994-12-18T08:00Z,
+18418,Atlanta United FC,235093,Cayman Togashi,30,Forward,F,32.0,70.0,163.0,1993-08-10T07:00Z,
+18418,Atlanta United FC,242439,Emmanuel Latte Lath,9,Forward,F,27.0,70.0,163.0,1999-01-01T08:00Z,
+20906,Austin FC,183780,Brad Stuver,1,Goalkeeper,G,35.0,75.0,181.0,1991-04-16T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/183780.png
+20906,Austin FC,297379,Damian Las,12,Goalkeeper,G,24.0,74.0,183.0,2002-04-11T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/297379.png
+20906,Austin FC,196666,Oleksandr Svatok,5,Defender,D,31.0,73.0,172.0,1994-09-27T07:00Z,
+20906,Austin FC,213250,Mikkel Desler,3,Defender,D,31.0,72.0,161.0,1995-02-19T08:00Z,
+20906,Austin FC,231047,Jon Gallagher,17,Defender,D,30.0,69.0,159.0,1996-02-23T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/231047.png
+20906,Austin FC,238438,Brendan Hines-Ike,4,Defender,D,31.0,73.0,170.0,1994-11-30T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/238438.png
+20906,Austin FC,257193,Jon Bell,15,Defender,D,28.0,71.0,163.0,1997-08-26T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/257193.png
+20906,Austin FC,259805,Zan Kolmanic,23,Defender,D,26.0,70.0,150.0,2000-03-03T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/259805.png
+20906,Austin FC,304696,Guilherme Biro,29,Defender,D,26.0,74.0,172.0,2000-05-01T07:00Z,
+20906,Austin FC,308642,Riley Thomas,2,Defender,D,24.0,72.0,170.0,2002-03-15T08:00Z,
+20906,Austin FC,322966,Mateja Djordjevic,35,Defender,D,23.0,75.0,183.0,2003-01-17T08:00Z,
+20906,Austin FC,150185,Ilie Sánchez,6,Midfielder,M,35.0,72.0,172.0,1990-11-21T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/150185.png
+20906,Austin FC,225834,Besard Sabovic,14,Midfielder,M,28.0,73.0,170.0,1998-01-05T08:00Z,
+20906,Austin FC,286669,Joseph Rosales,30,Midfielder,M,25.0,71.0,161.0,2000-11-06T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/286669.png
+20906,Austin FC,287466,Przemyslaw Placheta,,Midfielder,M,28.0,70.0,159.0,1998-03-23T08:00Z,
+20906,Austin FC,304535,Owen Wolff,33,Midfielder,M,21.0,69.0,146.0,2004-12-30T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/304535.png
+20906,Austin FC,316077,Dani Pereira,8,Midfielder,M,26.0,69.0,150.0,2000-07-14T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/316077.png
+20906,Austin FC,318486,CJ Fodrey,19,Midfielder,M,22.0,74.0,183.0,2004-02-10T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/318486.png
+20906,Austin FC,365828,Micah Burton,32,Midfielder,M,20.0,68.0,168.0,2006-03-26T08:00Z,
+20906,Austin FC,374611,Jorge Alastuey,24,Midfielder,M,23.0,70.0,141.0,2003-05-14T07:00Z,
+20906,Austin FC,377602,Nicolás Dubersarsky,20,Midfielder,M,21.0,74.0,174.0,2004-12-21T08:00Z,
+20906,Austin FC,381219,Ervin Torres,38,Midfielder,M,18.0,70.0,152.0,2007-11-14T08:00Z,
+20906,Austin FC,67518,Facundo Torres,11,Forward,F,26.0,70.0,157.0,2000-04-13T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/67518.png
+20906,Austin FC,228620,Brandon Vázquez,9,Forward,F,27.0,74.0,196.0,1998-10-14T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/228620.png
+20906,Austin FC,235061,Christian Ramírez,21,Forward,F,35.0,74.0,185.0,1991-04-04T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/235061.png
+20906,Austin FC,275500,Myrto Uzuni,10,Forward,F,31.0,70.0,159.0,1995-05-31T07:00Z,
+20906,Austin FC,280612,Jayden Nelson,7,Forward,F,23.0,67.0,148.0,2002-09-26T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/280612.png
+9720,CF Montréal,252607,Sébastian Breza,1,Goalkeeper,G,28.0,77.0,192.0,1998-03-15T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/252607.png
+9720,CF Montréal,342164,Emil Gazdov,33,Goalkeeper,G,22.0,77.0,207.0,2003-09-11T07:00Z,
+9720,CF Montréal,413767,Samsy Keita,41,Goalkeeper,G,16.0,,,2009-07-27T07:00Z,
+9720,CF Montréal,270238,Brayan Vera,4,Defender,D,27.0,71.0,170.0,1999-01-15T08:00Z,
+9720,CF Montréal,271816,Luca Petrasso,13,Defender,D,26.0,71.0,168.0,2000-06-16T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/271816.png
+9720,CF Montréal,285939,Dagur Thórhallsson,17,Defender,D,26.0,70.0,,2000-05-02T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/285939.png
+9720,CF Montréal,295620,Bode Hidalgo,19,Defender,D,24.0,72.0,170.0,2002-02-22T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/295620.png
+9720,CF Montréal,303469,Jalen Neal,2,Defender,D,22.0,75.0,170.0,2003-08-24T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/303469.png
+9720,CF Montréal,304135,Brandan Craig,5,Defender,D,22.0,73.0,159.0,2004-04-07T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/304135.png
+9720,CF Montréal,304154,Efraín Morales,24,Defender,D,22.0,75.0,183.0,2004-03-04T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/304154.png
+9720,CF Montréal,358595,Tomás Avilés,3,Defender,D,22.0,73.0,159.0,2004-02-03T08:00Z,
+9720,CF Montréal,364675,Dawid Bugaj,27,Defender,D,22.0,73.0,161.0,2004-07-09T07:00Z,
+9720,CF Montréal,401057,Aleksandr Guboglo,39,Defender,D,19.0,72.0,148.0,2007-03-20T07:00Z,
+9720,CF Montréal,87387,Samuel Piette,6,Midfielder,M,31.0,67.0,161.0,1994-11-12T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/87387.png
+9720,CF Montréal,279758,Matthew Longstaff,8,Midfielder,M,26.0,67.0,152.0,2000-03-21T08:00Z,
+9720,CF Montréal,283228,Frankie Amaya,25,Midfielder,M,25.0,64.0,139.0,2000-09-26T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/283228.png
+9720,CF Montréal,315924,Wikelman Carmona,16,Midfielder,M,23.0,68.0,157.0,2003-02-24T08:00Z,
+9720,CF Montréal,343641,Victor Loturi,22,Midfielder,M,25.0,68.0,157.0,2001-05-21T07:00Z,
+9720,CF Montréal,362775,Noah Streit,23,Midfielder,M,20.0,71.0,163.0,2005-10-11T07:00Z,
+9720,CF Montréal,370126,Ivan Losenko,26,Midfielder,M,21.0,72.0,,2004-07-24T07:00Z,
+9720,CF Montréal,384984,Hennadii Synchuk,18,Midfielder,M,20.0,73.0,174.0,2006-07-10T07:00Z,
+9720,CF Montréal,413750,Josh-Duc Nteziryayo,36,Midfielder,M,17.0,,,2008-11-15T08:00Z,
+9720,CF Montréal,233047,Fabian Herbers,21,Forward,F,32.0,71.0,163.0,1993-08-17T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/233047.png
+9720,CF Montréal,275798,Prince Owusu,9,Forward,F,29.0,75.0,192.0,1997-01-07T08:00Z,
+9720,CF Montréal,351302,Daniel Ríos,14,Forward,F,31.0,73.0,183.0,1995-02-22T08:00Z,
+9720,CF Montréal,377044,Olger Escobar,29,Forward,F,19.0,68.0,150.0,2006-09-11T07:00Z,
+9720,CF Montréal,400462,Owen Graham-Roache,35,Forward,F,18.0,72.0,185.0,2008-02-11T08:00Z,
+21300,Charlotte FC,219661,Tyler Miller,21,Goalkeeper,G,33.0,76.0,192.0,1993-03-12T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/219661.png
+21300,Charlotte FC,221408,Kristijan Kahlina,1,Goalkeeper,G,33.0,74.0,,1992-07-24T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/221408.png
+21300,Charlotte FC,316838,Isaac Walker,42,Goalkeeper,G,26.0,76.0,,2000-07-03T07:00Z,
+21300,Charlotte FC,146290,Tim Ream,3,Defender,D,38.0,73.0,174.0,1987-10-05T07:00Z,
+21300,Charlotte FC,156506,Nathan Byrne,14,Defender,D,34.0,71.0,183.0,1992-06-05T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/156506.png
+21300,Charlotte FC,172833,Harry Toffolo,15,Defender,D,30.0,72.0,157.0,1995-08-19T07:00Z,
+21300,Charlotte FC,271242,David Schnegg,23,Defender,D,27.0,73.0,161.0,1998-09-29T07:00Z,
+21300,Charlotte FC,294222,Henry Kessler,22,Defender,D,28.0,76.0,183.0,1998-06-25T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/294222.png
+21300,Charlotte FC,319014,Andrew Privett,4,Defender,D,25.0,73.0,172.0,2000-08-02T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/319014.png
+21300,Charlotte FC,360850,Mikah Thomas,24,Defender,D,21.0,74.0,181.0,2005-02-21T08:00Z,
+21300,Charlotte FC,360934,Jack Neeley,39,Defender,D,21.0,73.0,181.0,2005-03-11T08:00Z,
+21300,Charlotte FC,400471,Andrew Johnson,34,Defender,D,22.0,74.0,170.0,2004-02-03T08:00Z,
+21300,Charlotte FC,419194,Will Cleary,35,Defender,D,23.0,74.0,,2003-02-17T08:00Z,
+21300,Charlotte FC,419242,Morrison Agyemang,44,Defender,D,21.0,,,2004-12-21T08:00Z,
+21300,Charlotte FC,7567,Ashley Westwood,8,Midfielder,M,36.0,69.0,174.0,1990-04-01T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/7567.png
+21300,Charlotte FC,225609,Luca de la Torre,17,Midfielder,M,28.0,70.0,139.0,1998-05-23T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/225609.png
+21300,Charlotte FC,246371,Brandt Bronico,13,Midfielder,M,31.0,69.0,152.0,1995-06-20T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/246371.png
+21300,Charlotte FC,268604,Pep Biel,16,Midfielder,M,29.0,66.0,137.0,1996-09-05T07:00Z,
+21300,Charlotte FC,282755,Djibril Diani,28,Midfielder,M,28.0,77.0,163.0,1998-02-11T08:00Z,
+21300,Charlotte FC,372070,Baye Coulibaly,20,Midfielder,M,20.0,72.0,,2006-01-08T08:00Z,
+21300,Charlotte FC,381698,Aron John,48,Midfielder,M,20.0,,,2006-04-03T07:00Z,
+21300,Charlotte FC,312976,Liel Abada,11,Forward,F,24.0,68.0,150.0,2001-10-03T07:00Z,
+21300,Charlotte FC,314343,Archie Goodwin,7,Forward,F,21.0,72.0,,2004-11-07T08:00Z,
+21300,Charlotte FC,340596,Kerwin Vargas,18,Forward,F,24.0,71.0,152.0,2002-01-02T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/340596.png
+21300,Charlotte FC,340698,Idan Toklomati,9,Forward,F,21.0,72.0,,2004-08-09T07:00Z,
+21300,Charlotte FC,355456,Nimfasha Berchimas,27,Forward,F,18.0,68.0,,2008-02-22T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/355456.png
+21300,Charlotte FC,383890,Tyger Smalls,25,Forward,F,23.0,73.0,,2002-09-18T07:00Z,
+21300,Charlotte FC,405394,Rodolfo Aloko,37,Forward,F,19.0,68.0,139.0,2006-12-26T08:00Z,
+182,Chicago Fire FC,254291,Josh Cohen,44,Goalkeeper,G,33.0,73.0,172.0,1992-08-18T07:00Z,
+182,Chicago Fire FC,303693,Chris Brady,1,Goalkeeper,G,22.0,75.0,170.0,2004-03-03T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/303693.png
+182,Chicago Fire FC,313969,Jeff Gal,25,Goalkeeper,G,33.0,74.0,,1993-04-06T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/313969.png
+182,Chicago Fire FC,160971,Mauricio Pineda,22,Defender,D,28.0,73.0,172.0,1997-10-17T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/160971.png
+182,Chicago Fire FC,236890,Joel Waterman,16,Defender,D,30.0,74.0,172.0,1996-01-24T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/236890.png
+182,Chicago Fire FC,245068,Andrew Gutman,15,Defender,D,29.0,71.0,159.0,1996-10-02T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/245068.png
+182,Chicago Fire FC,254300,Samual Rogers,5,Defender,D,27.0,76.0,190.0,1999-05-17T07:00Z,
+182,Chicago Fire FC,293671,Jonathan Dean,24,Defender,D,29.0,68.0,159.0,1997-05-15T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/293671.png
+182,Chicago Fire FC,355245,Viktor Radojevic,14,Defender,D,22.0,69.0,,2004-07-14T07:00Z,
+182,Chicago Fire FC,382779,Christopher Cupps,38,Defender,D,18.0,75.0,172.0,2008-05-26T07:00Z,
+182,Chicago Fire FC,396933,Jack Sandmeyer,30,Defender,D,23.0,78.0,170.0,2002-10-18T07:00Z,
+182,Chicago Fire FC,399516,Leonardo Barroso,2,Defender,D,21.0,66.0,159.0,2005-06-12T07:00Z,
+182,Chicago Fire FC,400594,Mbekezeli Mbokazi,4,Defender,D,20.0,71.0,139.0,2005-09-19T07:00Z,
+182,Chicago Fire FC,193105,Anton Saletros,6,Midfielder,M,30.0,72.0,157.0,1996-04-12T07:00Z,
+182,Chicago Fire FC,195992,Robin Lod,17,Midfielder,M,33.0,71.0,190.0,1993-04-17T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/195992.png
+182,Chicago Fire FC,259951,Maren Haile-Selassie,7,Midfielder,M,27.0,71.0,150.0,1999-03-13T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/259951.png
+182,Chicago Fire FC,321363,André Franco,10,Midfielder,M,28.0,70.0,161.0,1998-04-12T07:00Z,
+182,Chicago Fire FC,330207,Sergio Oregel,35,Midfielder,M,21.0,69.0,141.0,2005-05-16T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/330207.png
+182,Chicago Fire FC,335605,D'Avilla Dje Tah,42,Midfielder,M,23.0,75.0,170.0,2003-05-05T07:00Z,
+182,Chicago Fire FC,362678,David Poreba,29,Midfielder,M,23.0,72.0,170.0,2002-12-01T08:00Z,
+182,Chicago Fire FC,399344,Robert Turdean,37,Midfielder,M,16.0,67.0,132.0,2010-01-14T08:00Z,
+182,Chicago Fire FC,186466,Philip Zinckernagel,77,Forward,F,31.0,69.0,152.0,1994-12-16T08:00Z,
+182,Chicago Fire FC,210538,Jonathan Bamba,19,Forward,F,30.0,69.0,159.0,1996-03-26T08:00Z,
+182,Chicago Fire FC,235511,Hugo Cuypers,9,Forward,F,29.0,73.0,163.0,1997-02-07T08:00Z,
+182,Chicago Fire FC,249943,Chris Mueller,8,Forward,F,29.0,69.0,163.0,1996-08-29T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/249943.png
+182,Chicago Fire FC,314665,Jason Shokalook,20,Forward,F,23.0,73.0,159.0,2002-09-30T07:00Z,
+182,Chicago Fire FC,365549,Puso Dithejane,12,Forward,F,21.0,72.0,,2004-07-24T07:00Z,
+182,Chicago Fire FC,381210,Dylan Borso,27,Forward,F,20.0,72.0,163.0,2006-06-02T07:00Z,
+182,Chicago Fire FC,400475,Dean Boltz,28,Forward,F,20.0,74.0,,2006-06-07T07:00Z,
+184,Colorado Rapids,219276,Zack Steffen,1,Goalkeeper,G,31.0,75.0,190.0,1995-04-02T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/219276.png
+184,Colorado Rapids,293342,Nico Hansen,41,Goalkeeper,G,25.0,74.0,170.0,2001-07-10T07:00Z,
+184,Colorado Rapids,360855,Adam Beaudry,31,Goalkeeper,G,20.0,74.0,192.0,2006-04-18T07:00Z,
+184,Colorado Rapids,376512,Zackory Campagnolo,51,Goalkeeper,G,19.0,75.0,,2007-03-12T07:00Z,
+184,Colorado Rapids,218188,Rob Holding,6,Defender,D,30.0,74.0,179.0,1995-09-20T07:00Z,
+184,Colorado Rapids,233045,Keegan Rosenberry,2,Defender,D,32.0,68.0,161.0,1993-12-11T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/233045.png
+184,Colorado Rapids,251369,Reggie Cannon,4,Defender,D,28.0,71.0,161.0,1998-06-11T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/251369.png
+184,Colorado Rapids,285613,Miguel Navarro,29,Defender,D,27.0,69.0,152.0,1999-02-26T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/285613.png
+184,Colorado Rapids,296216,Ian Murphy,19,Defender,D,26.0,74.0,183.0,2000-01-16T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/296216.png
+184,Colorado Rapids,319389,Kosi Thompson,33,Defender,D,23.0,70.0,172.0,2003-01-27T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/319389.png
+184,Colorado Rapids,319441,Noah Cobb,24,Defender,D,21.0,73.0,163.0,2005-07-20T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/319441.png
+184,Colorado Rapids,380895,Jackson Travis,99,Defender,D,22.0,68.0,150.0,2004-02-23T08:00Z,
+184,Colorado Rapids,392320,Lucas Herrington,22,Defender,D,18.0,76.0,174.0,2007-09-05T07:00Z,
+184,Colorado Rapids,420363,Jabari De Coteau,45,Defender,D,21.0,73.0,181.0,2005-03-22T08:00Z,
+184,Colorado Rapids,277851,Joshua Atencio,12,Midfielder,M,24.0,73.0,172.0,2002-01-31T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/277851.png
+184,Colorado Rapids,288873,Ted Ku-Dipietro,21,Midfielder,M,24.0,69.0,161.0,2002-01-28T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/288873.png
+184,Colorado Rapids,298078,Hamzat Ojediran,8,Midfielder,M,22.0,68.0,172.0,2003-11-14T08:00Z,
+184,Colorado Rapids,304129,Paxten Aaronson,10,Midfielder,M,22.0,69.0,139.0,2003-08-26T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/304129.png
+184,Colorado Rapids,334205,Alexis Castillo Manyoma,11,Midfielder,M,23.0,67.0,150.0,2003-01-30T08:00Z,
+184,Colorado Rapids,377767,Ali Fadal,15,Midfielder,M,22.0,71.0,159.0,2004-01-14T08:00Z,
+184,Colorado Rapids,380600,Wayne Frederick,13,Midfielder,M,22.0,72.0,146.0,2004-06-13T07:00Z,
+184,Colorado Rapids,421802,Nathan Tchoumba,49,Midfielder,M,15.0,75.0,181.0,2010-11-24T08:00Z,
+184,Colorado Rapids,3100697,Grant Gilmore,,Midfielder,M,,,,,
+184,Colorado Rapids,179245,Alex Harris,16,Midfielder,M,31.0,70.0,150.0,1994-08-31T07:00Z,
+184,Colorado Rapids,288791,Rafael Navarro,9,Forward,F,26.0,72.0,183.0,2000-04-14T07:00Z,
+184,Colorado Rapids,304623,Darren Yapi,77,Forward,F,21.0,73.0,172.0,2004-11-19T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/304623.png
+184,Colorado Rapids,307221,Dante Sealy,7,Forward,F,23.0,70.0,174.0,2003-04-17T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/307221.png
+184,Colorado Rapids,350873,Bryce Jamison,18,Forward,F,20.0,72.0,170.0,2006-01-06T08:00Z,
+184,Colorado Rapids,362501,Georgi Minoungou,93,Forward,F,23.0,71.0,152.0,2002-07-25T07:00Z,
+184,Colorado Rapids,380601,Kimani Stewart-Baynes,27,Forward,F,21.0,69.0,,2005-01-17T08:00Z,
+184,Colorado Rapids,381753,Sydney Wathuta,47,Forward,F,22.0,75.0,172.0,2004-06-11T07:00Z,
+184,Colorado Rapids,385082,Donavan Phillip,32,Forward,F,21.0,74.0,,2005-04-01T08:00Z,
+184,Colorado Rapids,420362,Mamadou Billo Diop,26,Forward,F,19.0,74.0,172.0,2006-09-14T07:00Z,
+183,Columbus Crew,171562,Evan Bush,24,Goalkeeper,G,40.0,74.0,185.0,1986-03-06T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/171562.png
+183,Columbus Crew,224640,Nicholas Hagen,1,Goalkeeper,G,29.0,76.0,174.0,1996-08-02T07:00Z,
+183,Columbus Crew,275080,Patrick Schulte,28,Goalkeeper,G,25.0,76.0,172.0,2001-03-13T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/275080.png
+183,Columbus Crew,290563,Luke Pruter,54,Goalkeeper,G,24.0,77.0,207.0,2001-09-03T07:00Z,
+183,Columbus Crew,382614,Stanislav Lapkes,41,Goalkeeper,G,20.0,76.0,172.0,2006-03-03T08:00Z,
+183,Columbus Crew,152660,Rudy Camacho,4,Defender,D,35.0,73.0,172.0,1991-03-05T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/152660.png
+183,Columbus Crew,180113,Steven Moreira,31,Defender,D,31.0,70.0,159.0,1994-08-13T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/180113.png
+183,Columbus Crew,252778,Brooks Lennon,,Defender,D,28.0,70.0,157.0,1997-09-22T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/252778.png
+183,Columbus Crew,264469,Yevhen Cheberko,21,Defender,D,28.0,72.0,146.0,1998-01-23T08:00Z,
+183,Columbus Crew,271075,Malte Amundsen,18,Defender,D,28.0,70.0,179.0,1998-02-11T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/271075.png
+183,Columbus Crew,317021,Mohamed Farsi,23,Defender,D,26.0,70.0,150.0,1999-12-16T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/317021.png
+183,Columbus Crew,391430,Owen Presthus,45,Defender,D,20.0,70.0,152.0,2006-02-21T08:00Z,
+183,Columbus Crew,392011,Cesar Ruvalcaba,12,Defender,D,25.0,74.0,,2001-07-13T07:00Z,
+183,Columbus Crew,399918,Tristan Brown,22,Defender,D,18.0,71.0,,2007-10-17T07:00Z,
+183,Columbus Crew,175108,André Gomes,20,Midfielder,M,32.0,75.0,183.0,1993-07-30T07:00Z,
+183,Columbus Crew,231052,Amar Sejdic,14,Midfielder,M,29.0,70.0,159.0,1996-11-29T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/231052.png
+183,Columbus Crew,235817,Diego Rossi,17,Forward,F,28.0,67.0,141.0,1998-03-05T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/235817.png
+183,Columbus Crew,257844,Dániel Gazdag,8,Midfielder,M,30.0,70.0,168.0,1996-03-02T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/257844.png
+183,Columbus Crew,270189,Dylan Chambost,7,Midfielder,M,28.0,70.0,152.0,1997-08-19T07:00Z,
+183,Columbus Crew,296221,Sean Zawadzki,25,Midfielder,M,26.0,72.0,159.0,2000-04-21T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/296221.png
+183,Columbus Crew,322632,Johann Chirinos,40,Midfielder,M,21.0,70.0,,2005-06-11T07:00Z,
+183,Columbus Crew,346869,Sékou Tidiany Bangoura,17,Midfielder,M,24.0,67.0,,2002-04-05T08:00Z,
+183,Columbus Crew,349907,Quinton Elliot,47,Midfielder,M,22.0,70.0,159.0,2004-01-30T08:00Z,
+183,Columbus Crew,351379,Hugo Picard,30,Midfielder,M,23.0,66.0,150.0,2003-05-09T07:00Z,
+183,Columbus Crew,359542,Max Arfsten,27,Midfielder,M,25.0,73.0,172.0,2001-04-19T07:00Z,
+183,Columbus Crew,362812,Taha Habroune,16,Midfielder,M,20.0,72.0,168.0,2006-02-05T08:00Z,
+183,Columbus Crew,381406,Cole Mrowka,29,Midfielder,M,20.0,71.0,163.0,2006-04-06T07:00Z,
+183,Columbus Crew,381750,Zach Zengue,48,Midfielder,M,22.0,69.0,,2004-01-30T08:00Z,
+183,Columbus Crew,197351,Jamal Thiaré,19,Forward,F,33.0,72.0,152.0,1993-03-31T08:00Z,
+183,Columbus Crew,270819,Wessam Abou Ali,9,Forward,F,27.0,73.0,172.0,1999-01-04T08:00Z,
+183,Columbus Crew,346634,Nariman Akhundzade,90,Forward,F,22.0,73.0,,2004-04-23T07:00Z,
+183,Columbus Crew,399994,Chase Adams,46,Forward,F,18.0,72.0,,2008-04-17T07:00Z,
+183,Columbus Crew,403375,Kevin Gbamblé,39,Forward,F,19.0,,,2006-12-31T08:00Z,
+193,D.C. United,141316,Sean Johnson,1,Goalkeeper,G,37.0,75.0,214.0,1989-05-31T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/141316.png
+193,D.C. United,217514,Alex Bono,26,Goalkeeper,G,32.0,75.0,207.0,1994-04-25T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/217514.png
+193,D.C. United,410619,Grant Leveille,20,Goalkeeper,G,18.0,76.0,,2008-07-03T07:00Z,
+193,D.C. United,227891,Silvan Hefti,5,Defender,D,28.0,72.0,168.0,1997-10-25T07:00Z,
+193,D.C. United,228416,Kye Rowles,15,Defender,D,28.0,73.0,168.0,1998-06-24T07:00Z,
+193,D.C. United,230822,Sean Nealis,13,Defender,D,29.0,76.0,172.0,1997-01-13T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/230822.png
+193,D.C. United,273974,Conner Antley,12,Defender,D,31.0,73.0,172.0,1995-03-22T08:00Z,
+193,D.C. United,288348,Keisuke Kurokawa,6,Defender,D,29.0,68.0,152.0,1997-04-13T07:00Z,
+193,D.C. United,320300,Matti Peltola,4,Defender,D,24.0,73.0,,2002-07-03T07:00Z,
+193,D.C. United,333699,Lucas Bartlett,3,Defender,D,28.0,75.0,201.0,1997-07-26T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/333699.png
+193,D.C. United,418069,Nikola Markovic,27,Defender,D,21.0,76.0,183.0,2004-07-22T07:00Z,
+193,D.C. United,227789,Andre Dozzell,,Midfielder,M,27.0,70.0,139.0,1999-05-02T07:00Z,
+193,D.C. United,269158,Brandon Servania,23,Midfielder,M,27.0,70.0,161.0,1999-03-12T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/269158.png
+193,D.C. United,271884,Jared Stroud,8,Midfielder,M,30.0,70.0,159.0,1996-07-10T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/271884.png
+193,D.C. United,302991,Caden Clark,30,Midfielder,M,23.0,71.0,161.0,2003-05-27T07:00Z,
+193,D.C. United,307475,Gabriel Pirani,10,Midfielder,M,24.0,67.0,157.0,2002-04-12T07:00Z,
+193,D.C. United,308772,Hosei Kijima,77,Midfielder,M,24.0,70.0,,2002-07-01T07:00Z,
+193,D.C. United,324048,Jackson Hopkins,25,Midfielder,M,22.0,74.0,161.0,2004-07-01T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/324048.png
+193,D.C. United,336970,Gavin Turner,48,Midfielder,M,19.0,66.0,139.0,2007-01-05T08:00Z,
+193,D.C. United,286999,Louis Munteanu,11,Forward,F,24.0,72.0,,2002-06-16T07:00Z,
+193,D.C. United,289300,Gabriel Segal,14,Forward,F,25.0,70.0,159.0,2001-05-17T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/289300.png
+193,D.C. United,297079,João Peglow,7,Forward,F,24.0,68.0,161.0,2002-01-07T08:00Z,
+193,D.C. United,313068,Tai Baribo,9,Forward,F,28.0,71.0,172.0,1998-01-15T08:00Z,
+193,D.C. United,380712,Jacob Murrell,17,Forward,F,22.0,74.0,,2004-03-28T08:00Z,
+193,D.C. United,412984,Oscar Avilez,32,Forward,F,16.0,68.0,,2010-03-16T07:00Z,
+18267,FC Cincinnati,242975,Evan Louro,13,Goalkeeper,G,30.0,75.0,225.0,1996-01-19T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/242975.png
+18267,FC Cincinnati,299187,Bryan Dowd,31,Goalkeeper,G,24.0,75.0,174.0,2002-03-08T08:00Z,
+18267,FC Cincinnati,315972,Roman Celentano,18,Goalkeeper,G,25.0,75.0,201.0,2000-09-14T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/315972.png
+18267,FC Cincinnati,330606,Fabian Mrozek,93,Goalkeeper,G,22.0,76.0,,2003-09-28T07:00Z,
+18267,FC Cincinnati,42583,Gilberto Flores,3,Defender,D,23.0,70.0,172.0,2003-04-01T08:00Z,
+18267,FC Cincinnati,159296,Alvas Powell,2,Defender,D,32.0,72.0,163.0,1994-07-18T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/159296.png
+18267,FC Cincinnati,187273,Matt Miazga,21,Defender,D,31.0,76.0,183.0,1995-07-19T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/187273.png
+18267,FC Cincinnati,201354,Nick Hagglund,4,Defender,D,33.0,73.0,192.0,1992-09-14T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/201354.png
+18267,FC Cincinnati,232755,Teenage Hadebe,15,Defender,D,30.0,71.0,161.0,1995-09-17T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/232755.png
+18267,FC Cincinnati,236049,Bryan Ramirez,29,Defender,D,25.0,70.0,150.0,2000-08-11T07:00Z,
+18267,FC Cincinnati,236641,Kyle Smith,24,Defender,D,34.0,71.0,181.0,1992-01-09T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/236641.png
+18267,FC Cincinnati,249768,Miles Robinson,12,Defender,D,29.0,74.0,183.0,1997-03-14T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/249768.png
+18267,FC Cincinnati,399987,Andrei Chirila,88,Defender,D,17.0,74.0,,2008-08-15T07:00Z,
+18267,FC Cincinnati,419469,Ayoub Lajhar,55,Defender,D,22.0,72.0,,2004-07-10T07:00Z,
+18267,FC Cincinnati,86436,Evander,10,Midfielder,M,28.0,70.0,168.0,1998-06-09T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/86436.png
+18267,FC Cincinnati,254292,Tah Anunga,27,Midfielder,M,29.0,71.0,179.0,1996-08-10T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/254292.png
+18267,FC Cincinnati,275106,Obinna Nwobodo,5,Midfielder,M,29.0,71.0,141.0,1996-11-29T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/275106.png
+18267,FC Cincinnati,279180,Pavel Bucha,20,Midfielder,M,28.0,70.0,161.0,1998-03-11T08:00Z,
+18267,FC Cincinnati,353751,Stiven Jimenez,37,Midfielder,M,19.0,68.0,150.0,2007-06-24T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/353751.png
+18267,FC Cincinnati,362895,Gerardo Valenzuela,22,Midfielder,M,21.0,72.0,,2004-09-28T07:00Z,
+18267,FC Cincinnati,363908,Samuel Gidi,11,Midfielder,M,22.0,70.0,161.0,2004-04-15T07:00Z,
+18267,FC Cincinnati,398300,Stefan Chirila,19,Midfielder,M,19.0,73.0,,2007-01-15T08:00Z,
+18267,FC Cincinnati,401364,Ademar Chavez,30,Midfielder,M,17.0,69.0,170.0,2009-01-12T08:00Z,
+18267,FC Cincinnati,249926,Tom Barlow,16,Forward,F,31.0,74.0,183.0,1995-07-08T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/249926.png
+18267,FC Cincinnati,251694,Kévin Denkey,9,Forward,F,25.0,71.0,179.0,2000-11-30T08:00Z,
+18267,FC Cincinnati,305664,Ayoub Jabbari,99,Forward,F,26.0,76.0,192.0,2000-01-30T08:00Z,
+18267,FC Cincinnati,340690,Kristian Fletcher,14,Forward,F,20.0,72.0,152.0,2005-08-06T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/340690.png
+18267,FC Cincinnati,361138,Ender Echenique,66,Forward,F,22.0,66.0,132.0,2004-04-02T08:00Z,
+18267,FC Cincinnati,388854,Kenji Mboma Dem,17,Forward,F,24.0,73.0,150.0,2002-01-22T08:00Z,
+185,FC Dallas,324809,Enes Sali,,Forward,F,20.0,66.0,130.0,2006-02-23T08:00Z,
+185,FC Dallas,303555,Jonathan Sirois,40,Goalkeeper,G,25.0,74.0,179.0,2001-06-27T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/303555.png
+185,FC Dallas,379566,Michael Collodi,1,Goalkeeper,G,25.0,72.0,192.0,2001-05-25T07:00Z,
+185,FC Dallas,401844,Eryk Dymora,98,Goalkeeper,G,23.0,74.0,185.0,2002-10-15T07:00Z,
+185,FC Dallas,219275,Shaq Moore,18,Defender,D,29.0,71.0,161.0,1996-11-02T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/219275.png
+185,FC Dallas,233460,Sebastien Ibeagha,25,Defender,D,34.0,74.0,185.0,1992-01-21T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/233460.png
+185,FC Dallas,251801,Lalas Abubakar,5,Defender,D,31.0,73.0,181.0,1994-12-25T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/251801.png
+185,FC Dallas,268731,Osaze Urhoghide,3,Defender,D,26.0,74.0,172.0,2000-07-04T07:00Z,
+185,FC Dallas,314829,Geovane Jesus,2,Defender,D,24.0,71.0,172.0,2001-07-31T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/314829.png
+185,FC Dallas,356357,Nolan Norris,32,Defender,D,21.0,71.0,150.0,2005-02-17T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/356357.png
+185,FC Dallas,369029,Slade Starnes,26,Defender,D,22.0,,,2003-10-10T07:00Z,
+185,FC Dallas,400216,Enzo Newman,29,Defender,D,20.0,69.0,161.0,2005-12-08T08:00Z,
+185,FC Dallas,400247,Álvaro Augusto,22,Defender,D,21.0,76.0,,2005-04-17T07:00Z,
+185,FC Dallas,405592,Joshua Torquato,24,Defender,D,18.0,68.0,,2007-07-24T07:00Z,
+185,FC Dallas,417399,Kaka Scabin,34,Defender,D,19.0,74.0,170.0,2007-01-03T08:00Z,
+185,FC Dallas,157285,Ramiro,17,Midfielder,M,33.0,66.0,148.0,1993-05-22T07:00Z,
+185,FC Dallas,280931,Tsiki Ntsabeleng,,Midfielder,M,28.0,67.0,159.0,1998-02-09T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/280931.png
+185,FC Dallas,283864,Christian Cappis,12,Midfielder,M,26.0,73.0,159.0,1999-08-13T07:00Z,
+185,FC Dallas,297142,Patrickson Delgado,8,Midfielder,M,22.0,71.0,168.0,2003-10-17T07:00Z,
+185,FC Dallas,312876,Herman Johansson,14,Midfielder,M,28.0,75.0,183.0,1997-10-16T07:00Z,
+185,FC Dallas,324553,Diego García,50,Midfielder,M,19.0,68.0,117.0,2006-10-17T07:00Z,
+185,FC Dallas,359922,Joaquín Valiente,21,Midfielder,M,25.0,65.0,148.0,2001-04-13T07:00Z,
+185,FC Dallas,362657,Ran Binyamin,6,Midfielder,M,22.0,71.0,,2004-02-06T08:00Z,
+185,FC Dallas,380441,Kaick,55,Midfielder,M,20.0,69.0,150.0,2005-11-29T08:00Z,
+185,FC Dallas,417398,Jaidyn Contreras,20,Midfielder,M,18.0,72.0,139.0,2007-09-26T07:00Z,
+185,FC Dallas,417400,Caleb Swann,27,Midfielder,M,19.0,67.0,157.0,2007-02-04T08:00Z,
+185,FC Dallas,419187,Ricky Louis,15,Midfielder,M,21.0,74.0,,2004-10-04T07:00Z,
+185,FC Dallas,199822,Anderson Julio,11,Forward,F,30.0,71.0,152.0,1996-05-31T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/199822.png
+185,FC Dallas,277128,Petar Musa,9,Forward,F,28.0,75.0,183.0,1998-03-04T08:00Z,
+185,FC Dallas,285201,Santiago Moreno,10,Forward,F,26.0,70.0,148.0,2000-04-21T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/285201.png
+185,FC Dallas,291608,Louicius Deedson,7,Forward,F,25.0,70.0,157.0,2001-02-11T08:00Z,
+185,FC Dallas,318373,Bernard Kamungo,77,Forward,F,24.0,69.0,150.0,2002-01-01T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/318373.png
+185,FC Dallas,348652,Samuel Sarver,28,Forward,F,23.0,70.0,185.0,2003-03-03T08:00Z,
+185,FC Dallas,348870,Logan Farrington,23,Forward,F,24.0,74.0,172.0,2001-12-14T08:00Z,
+185,FC Dallas,365850,Nicholas Simmonds,16,Forward,F,19.0,75.0,183.0,2006-12-17T08:00Z,
+185,FC Dallas,398754,Daniel Baran,36,Forward,F,19.0,,,2006-09-16T07:00Z,
+6077,Houston Dynamo FC,346342,Exon Arzú,33,Forward,F,22.0,70.0,,2004-05-19T07:00Z,
+6077,Houston Dynamo FC,65434,Jonathan Bond,31,Goalkeeper,G,33.0,77.0,185.0,1993-05-19T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/65434.png
+6077,Houston Dynamo FC,156197,Jimmy Maurer,1,Goalkeeper,G,37.0,74.0,192.0,1988-10-14T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/156197.png
+6077,Houston Dynamo FC,416548,Logan Erb,,Goalkeeper,G,22.0,75.0,,2004-01-07T08:00Z,
+6077,Houston Dynamo FC,196842,Antônio Carlos,3,Defender,D,33.0,75.0,172.0,1993-03-07T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/196842.png
+6077,Houston Dynamo FC,218058,Erik Sviatchenko,28,Defender,D,34.0,72.0,181.0,1991-10-04T07:00Z,
+6077,Houston Dynamo FC,242613,Franco Negri,21,Defender,D,31.0,67.0,152.0,1995-02-20T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/242613.png
+6077,Houston Dynamo FC,260912,Sam Vines,13,Defender,D,27.0,70.0,150.0,1999-05-31T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/260912.png
+6077,Houston Dynamo FC,266281,Lucas Halter,5,Defender,D,26.0,74.0,205.0,2000-05-02T07:00Z,
+6077,Houston Dynamo FC,315455,Felipe Andrade,36,Defender,D,24.0,72.0,150.0,2002-05-29T07:00Z,
+6077,Houston Dynamo FC,354162,Reese Miller,27,Defender,D,22.0,,,2004-01-17T08:00Z,
+6077,Houston Dynamo FC,419253,Agustín Resch,34,Defender,D,24.0,78.0,,2002-02-28T08:00Z,
+6077,Houston Dynamo FC,422114,Vinicius Rodrigues Da Silva,33,Defender,D,20.0,70.0,,2006-03-22T08:00Z,
+6077,Houston Dynamo FC,146866,Héctor Herrera,16,Midfielder,M,36.0,73.0,174.0,1990-04-19T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/146866.png
+6077,Houston Dynamo FC,182070,Duane Holmes,14,Midfielder,M,31.0,68.0,141.0,1994-11-06T08:00Z,
+6077,Houston Dynamo FC,219466,Diadie Samassekou,18,Midfielder,M,30.0,70.0,152.0,1996-01-11T08:00Z,
+6077,Houston Dynamo FC,233725,Agustín Bouzat,30,Midfielder,M,32.0,67.0,161.0,1994-03-28T08:00Z,
+6077,Houston Dynamo FC,236342,Artur,6,Midfielder,M,30.0,71.0,150.0,1996-03-11T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/236342.png
+6077,Houston Dynamo FC,257090,Ondrej Lingr,9,Midfielder,M,27.0,69.0,152.0,1998-10-07T07:00Z,
+6077,Houston Dynamo FC,287841,Mateusz Bogusz,19,Midfielder,M,24.0,69.0,150.0,2001-08-22T07:00Z,
+6077,Houston Dynamo FC,303512,Jack McGlynn,8,Midfielder,M,23.0,72.0,161.0,2003-07-07T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/303512.png
+6077,Houston Dynamo FC,419255,Matthew Arana,22,Midfielder,M,15.0,,,2010-08-28T07:00Z,
+6077,Houston Dynamo FC,194553,Ezequiel Ponce,10,Forward,F,29.0,71.0,172.0,1997-03-29T08:00Z,
+6077,Houston Dynamo FC,233578,Guilherme Augusto,20,Forward,F,31.0,71.0,141.0,1995-04-13T07:00Z,
+6077,Houston Dynamo FC,287444,Ibrahim Aliyu,24,Forward,F,24.0,72.0,170.0,2002-01-16T08:00Z,
+6077,Houston Dynamo FC,323199,Lawrence Ennali,11,Forward,F,24.0,68.0,121.0,2002-03-07T08:00Z,
+6077,Houston Dynamo FC,323247,Nelson Quiñones,7,Forward,F,23.0,69.0,148.0,2002-08-20T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/323247.png
+6077,Houston Dynamo FC,333738,Nicholas Markanich,17,Forward,F,26.0,73.0,159.0,1999-12-26T08:00Z,
+20232,Inter Miami CF,231059,Dayne St. Clair,97,Goalkeeper,G,29.0,75.0,190.0,1997-05-09T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/231059.png
+20232,Inter Miami CF,256444,Luis Barraza,13,Goalkeeper,G,29.0,74.0,192.0,1996-11-08T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/256444.png
+20232,Inter Miami CF,297047,Rocco Ríos Novo,34,Goalkeeper,G,24.0,71.0,170.0,2002-06-04T07:00Z,
+20232,Inter Miami CF,231241,Sergio Reguilón,3,Defender,D,29.0,70.0,150.0,1996-12-16T08:00Z,
+20232,Inter Miami CF,285473,Facundo Mura,4,Defender,D,27.0,69.0,150.0,1999-03-24T08:00Z,
+20232,Inter Miami CF,310279,Maximiliano Falcón,37,Defender,D,29.0,70.0,174.0,1997-05-01T07:00Z,
+20232,Inter Miami CF,314952,Micael,16,Defender,D,25.0,75.0,181.0,2000-08-12T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/314952.png
+20232,Inter Miami CF,315617,Gonzalo Luján,2,Defender,D,25.0,72.0,181.0,2001-04-27T07:00Z,
+20232,Inter Miami CF,316269,Ian Fray,17,Defender,D,23.0,72.0,159.0,2002-08-31T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/316269.png
+20232,Inter Miami CF,316344,Noah Allen,32,Defender,D,22.0,69.0,146.0,2004-04-28T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/316344.png
+20232,Inter Miami CF,359239,Israel Boatwright,62,Defender,D,21.0,72.0,174.0,2005-06-02T07:00Z,
+20232,Inter Miami CF,364401,Tyler Hall,26,Defender,D,20.0,70.0,190.0,2006-02-05T08:00Z,
+20232,Inter Miami CF,399951,Cesar Abadia-Reda,76,Defender,D,20.0,,,2006-02-21T08:00Z,
+20232,Inter Miami CF,401415,Daniel Sumalla,70,Defender,D,19.0,,,2007-06-25T07:00Z,
+20232,Inter Miami CF,174466,Rodrigo De Paul,7,Midfielder,M,32.0,71.0,161.0,1994-05-24T07:00Z,
+20232,Inter Miami CF,199032,Santiago Morales,20,Midfielder,M,19.0,67.0,148.0,2007-02-09T08:00Z,
+20232,Inter Miami CF,229289,David Ruiz,41,Midfielder,M,22.0,71.0,161.0,2004-02-08T08:00Z,
+20232,Inter Miami CF,290715,David Ayala,22,Midfielder,M,23.0,69.0,137.0,2002-07-26T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/290715.png
+20232,Inter Miami CF,315594,Telasco Segovia,8,Midfielder,M,23.0,71.0,141.0,2003-04-02T08:00Z,
+20232,Inter Miami CF,329025,Yannick Bright,42,Midfielder,M,24.0,72.0,172.0,2001-09-03T07:00Z,
+20232,Inter Miami CF,399922,Joseph Convers,66,Midfielder,M,20.0,,,2005-10-28T07:00Z,
+20232,Inter Miami CF,401414,Preston Plambeck,59,Midfielder,M,20.0,,,2005-12-20T08:00Z,
+20232,Inter Miami CF,406938,Alexander Shaw,88,Midfielder,M,18.0,71.0,,2008-04-03T07:00Z,
+20232,Inter Miami CF,45843,Lionel Messi,10,Forward,F,39.0,67.0,148.0,1987-06-24T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/45843.png
+20232,Inter Miami CF,125088,Luis Suárez,9,Forward,F,39.0,72.0,159.0,1987-01-24T08:00Z,
+20232,Inter Miami CF,228394,Germán Berterame,19,Forward,F,27.0,71.0,141.0,1998-11-13T08:00Z,
+20232,Inter Miami CF,315801,Tadeo Allende,21,Forward,F,27.0,72.0,172.0,1999-02-20T08:00Z,
+20232,Inter Miami CF,387661,Mateo Silvetti,24,Forward,F,20.0,70.0,163.0,2006-01-14T08:00Z,
+20232,Inter Miami CF,399970,Dániel Pintér,56,Forward,F,19.0,71.0,,2007-06-06T07:00Z,
+187,LA Galaxy,242928,JT Marcinkowski,12,Goalkeeper,G,29.0,73.0,183.0,1997-05-09T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/242928.png
+187,LA Galaxy,256614,Brady Scott,31,Goalkeeper,G,27.0,75.0,183.0,1999-06-30T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/256614.png
+187,LA Galaxy,322058,Novak Micovic,1,Goalkeeper,G,24.0,75.0,170.0,2001-10-25T07:00Z,
+187,LA Galaxy,105803,Maya Yoshida,4,Defender,D,37.0,74.0,192.0,1988-08-24T07:00Z,
+187,LA Galaxy,133963,Carlos Garcés,25,Defender,D,24.0,73.0,163.0,2001-10-11T07:00Z,
+187,LA Galaxy,167059,Jose Magana,64,Defender,D,19.0,,,2007-07-01T07:00Z,
+187,LA Galaxy,225615,John Nelson,14,Defender,D,28.0,69.0,161.0,1998-07-11T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/225615.png
+187,LA Galaxy,234962,Jakob Glesnes,5,Defender,D,32.0,74.0,183.0,1994-03-25T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/234962.png
+187,LA Galaxy,238050,Miki Yamane,2,Defender,D,32.0,70.0,159.0,1993-12-22T08:00Z,
+187,LA Galaxy,294201,Chris Rindov,20,Defender,D,24.0,74.0,190.0,2001-10-08T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/294201.png
+187,LA Galaxy,297050,Julián Aude,3,Defender,D,23.0,71.0,157.0,2003-03-24T08:00Z,
+187,LA Galaxy,352194,Riley Dalgado,50,Defender,D,19.0,69.0,148.0,2006-08-13T07:00Z,
+187,LA Galaxy,366047,Harbor Miller,26,Defender,D,19.0,71.0,152.0,2007-06-21T07:00Z,
+187,LA Galaxy,122356,Marco Reus,18,Midfielder,M,37.0,71.0,157.0,1989-05-31T07:00Z,
+187,LA Galaxy,199926,Erik Thommy,27,Midfielder,M,31.0,69.0,159.0,1994-08-20T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/199926.png
+187,LA Galaxy,230580,Lucas Sanabria,8,Midfielder,M,22.0,70.0,161.0,2003-12-26T08:00Z,
+187,LA Galaxy,270611,Ricard Puig,10,Midfielder,M,26.0,67.0,121.0,1999-08-13T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/270611.png
+187,LA Galaxy,285383,Justin Haak,15,Midfielder,M,24.0,72.0,163.0,2001-09-12T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/285383.png
+187,LA Galaxy,286198,Edwin Cerrillo,6,Midfielder,M,25.0,69.0,172.0,2000-10-03T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/286198.png
+187,LA Galaxy,287568,Elijah Wynder,22,Midfielder,M,23.0,74.0,168.0,2003-03-10T08:00Z,
+187,LA Galaxy,293694,Isaiah Parente,16,Midfielder,M,26.0,70.0,152.0,2000-03-16T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/293694.png
+187,LA Galaxy,388199,Dylan Vanney,49,Midfielder,M,18.0,,,2007-11-27T08:00Z,
+187,LA Galaxy,421655,Troy Elgersma,76,Midfielder,M,22.0,,,2004-05-17T07:00Z,
+187,LA Galaxy,150409,João Klauss,99,Forward,F,29.0,75.0,183.0,1997-03-01T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/150409.png
+187,LA Galaxy,256843,Joseph Paintsil,28,Forward,F,28.0,67.0,152.0,1998-02-01T08:00Z,
+187,LA Galaxy,295005,Gabriel Pec,11,Forward,F,25.0,68.0,146.0,2001-02-11T08:00Z,
+187,LA Galaxy,321370,Ruben Ramos,24,Forward,F,19.0,69.0,152.0,2007-01-22T08:00Z,
+187,LA Galaxy,366046,Julian Placias,57,Forward,F,20.0,75.0,181.0,2006-04-06T07:00Z,
+18966,LAFC,43372,Hugo Lloris,1,Goalkeeper,G,39.0,74.0,181.0,1986-12-26T08:00Z,
+18966,LAFC,262728,Thomas Hasal,12,Goalkeeper,G,27.0,76.0,190.0,1999-07-09T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/262728.png
+18966,LAFC,337443,Cabral Carter,31,Goalkeeper,G,22.0,76.0,163.0,2004-07-05T07:00Z,
+18966,LAFC,183758,Ryan Hollingshead,24,Defender,D,35.0,74.0,183.0,1991-04-16T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/183758.png
+18966,LAFC,199904,Eddie Segura,4,Defender,D,29.0,70.0,152.0,1997-02-02T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/199904.png
+18966,LAFC,201103,Aaron Long,33,Defender,D,33.0,73.0,172.0,1992-10-12T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/201103.png
+18966,LAFC,218252,Sergi Palencia,14,Defender,D,30.0,66.0,148.0,1996-03-23T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/218252.png
+18966,LAFC,239175,Ryan Porteous,5,Forward,F,28.0,67.0,163.0,1997-10-01T07:00Z,
+18966,LAFC,283453,Nkosi Tafari,91,Defender,D,29.0,76.0,192.0,1997-03-23T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/283453.png
+18966,LAFC,319023,Kenny Nielsen,45,Defender,D,24.0,71.0,150.0,2002-02-13T08:00Z,
+18966,LAFC,364684,Lorenzo Dellavalle,15,Defender,D,22.0,74.0,168.0,2004-04-04T08:00Z,
+18966,LAFC,370116,Artem Smolyakov,29,Defender,D,23.0,71.0,152.0,2003-05-29T07:00Z,
+18966,LAFC,193171,Mark Delgado,8,Midfielder,M,31.0,69.0,148.0,1995-05-16T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/193171.png
+18966,LAFC,231192,Timothy Tillman,11,Midfielder,M,27.0,72.0,161.0,1999-01-04T08:00Z,
+18966,LAFC,274296,Mathieu Choinière,66,Midfielder,M,27.0,69.0,150.0,1999-02-07T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/274296.png
+18966,LAFC,295727,Ryan Raposo,21,Midfielder,M,27.0,67.0,139.0,1999-03-05T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/295727.png
+18966,LAFC,322658,Igor Jesus,6,Midfielder,M,23.0,70.0,163.0,2003-03-07T08:00Z,
+18966,LAFC,347031,Amin Boudri,65,Midfielder,M,21.0,69.0,163.0,2004-09-29T07:00Z,
+18966,LAFC,386924,Matthew Evans,70,Midfielder,M,20.0,72.0,152.0,2006-05-25T07:00Z,
+18966,LAFC,398302,Jude Terry,22,Midfielder,M,17.0,71.0,148.0,2008-10-08T07:00Z,
+18966,LAFC,115713,David Martínez,30,Forward,F,20.0,70.0,150.0,2006-02-07T08:00Z,
+18966,LAFC,149945,Son Heung-Min,7,Forward,F,34.0,72.0,168.0,1992-07-08T07:00Z,
+18966,LAFC,179237,Tyler Boyd,19,Forward,F,31.0,72.0,161.0,1994-12-30T08:00Z,
+18966,LAFC,213304,Denis Bouanga,99,Forward,F,31.0,71.0,152.0,1994-11-11T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/213304.png
+18966,LAFC,251805,Jeremy Ebobisse,17,Forward,F,29.0,72.0,181.0,1997-02-14T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/251805.png
+18966,LAFC,286214,Jacob Shaffelburg,18,Forward,F,26.0,71.0,161.0,1999-11-26T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/286214.png
+18966,LAFC,340613,Nathan Ordaz,27,Forward,F,22.0,71.0,163.0,2004-01-12T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/340613.png
+18966,LAFC,399932,Marius Aiyenero,47,Forward,F,18.0,,,2008-05-23T07:00Z,
+17362,Minnesota United FC,245083,Drake Callender,12,Goalkeeper,G,28.0,75.0,192.0,1997-10-07T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/245083.png
+17362,Minnesota United FC,256253,Alec Smir,1,Goalkeeper,G,27.0,74.0,183.0,1999-04-13T07:00Z,
+17362,Minnesota United FC,399962,Kayne Rizvanovich,94,Goalkeeper,G,18.0,76.0,201.0,2007-10-26T07:00Z,
+17362,Minnesota United FC,101934,Michael Boxall,15,Defender,D,37.0,75.0,207.0,1988-08-18T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/101934.png
+17362,Minnesota United FC,252481,Kyle Duncan,3,Defender,D,28.0,70.0,150.0,1997-08-08T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/252481.png
+17362,Minnesota United FC,260213,D.J. Taylor,27,Defender,D,28.0,68.0,183.0,1997-08-26T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/260213.png
+17362,Minnesota United FC,281323,Anthony Markanich,13,Defender,D,26.0,73.0,159.0,1999-12-26T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/281323.png
+17362,Minnesota United FC,313955,Nicolás Romero,5,Defender,D,22.0,73.0,174.0,2003-11-28T08:00Z,
+17362,Minnesota United FC,328543,Nectarios Triantis,25,Defender,D,23.0,75.0,172.0,2003-05-11T07:00Z,
+17362,Minnesota United FC,337030,Devin Padelford,2,Defender,D,23.0,72.0,172.0,2003-01-03T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/337030.png
+17362,Minnesota United FC,337922,Morris Duggan,23,Defender,D,25.0,76.0,203.0,2000-10-24T07:00Z,
+17362,Minnesota United FC,358517,Jefferson Díaz,28,Defender,D,25.0,73.0,183.0,2000-12-05T08:00Z,
+17362,Minnesota United FC,403365,Kieran Chandler,33,Defender,D,21.0,69.0,152.0,2005-06-09T07:00Z,
+17362,Minnesota United FC,82816,James Rodríguez,,Midfielder,M,35.0,71.0,161.0,1991-07-12T07:00Z,
+17362,Minnesota United FC,183726,Wil Trapp,20,Midfielder,M,33.0,68.0,161.0,1993-01-15T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/183726.png
+17362,Minnesota United FC,233943,Joaquín Pereyra,26,Midfielder,M,27.0,71.0,161.0,1998-12-01T08:00Z,
+17362,Minnesota United FC,251800,Julian Gressel,24,Midfielder,M,32.0,73.0,183.0,1993-12-16T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/251800.png
+17362,Minnesota United FC,270543,Dominik Fitz,7,Midfielder,M,27.0,69.0,148.0,1999-06-16T07:00Z,
+17362,Minnesota United FC,280811,Peter Stroud,6,Midfielder,M,24.0,70.0,150.0,2002-04-23T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/280811.png
+17362,Minnesota United FC,285452,Carlos Harvey,67,Midfielder,M,26.0,73.0,194.0,2000-02-03T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/285452.png
+17362,Minnesota United FC,327355,Owen Gene,30,Midfielder,M,23.0,73.0,172.0,2003-03-19T08:00Z,
+17362,Minnesota United FC,261168,Tomás Chancalay,8,Forward,F,27.0,70.0,168.0,1999-01-01T08:00Z,
+17362,Minnesota United FC,279779,Jordan Adebayo-Smith,99,Forward,F,25.0,71.0,181.0,2001-01-11T08:00Z,
+17362,Minnesota United FC,287784,Bongokuhle Hlongwane,21,Forward,F,26.0,73.0,172.0,2000-06-20T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/287784.png
+17362,Minnesota United FC,289941,Kelvin Yeboah,9,Forward,F,26.0,72.0,161.0,2000-05-06T07:00Z,
+17362,Minnesota United FC,324297,Marcus Caldeira,22,Forward,F,21.0,73.0,181.0,2004-10-14T07:00Z,
+17362,Minnesota United FC,352169,Kenyel Michel,14,Forward,F,21.0,67.0,141.0,2004-09-17T07:00Z,
+17362,Minnesota United FC,353246,Mauricio Gonzalez,18,Forward,F,21.0,70.0,,2004-09-15T07:00Z,
+17362,Minnesota United FC,381237,Alisa Randell,17,Forward,F,18.0,72.0,161.0,2007-08-25T07:00Z,
+17362,Minnesota United FC,381418,Mamadou Dieng,29,Forward,F,22.0,74.0,170.0,2004-02-04T08:00Z,
+17362,Minnesota United FC,411044,Troy Putt,32,Forward,F,19.0,69.0,159.0,2006-09-27T07:00Z,
+18986,Nashville SC,156217,Joe Willis,1,Goalkeeper,G,37.0,77.0,190.0,1988-08-10T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/156217.png
+18986,Nashville SC,296695,Brian Schwake,99,Goalkeeper,G,24.0,74.0,172.0,2001-08-24T07:00Z,
+18986,Nashville SC,336586,Xavier Valdez,13,Goalkeeper,G,22.0,77.0,190.0,2003-11-23T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/336586.png
+18986,Nashville SC,146355,Andy Nájar,31,Defender,D,33.0,67.0,150.0,1993-03-16T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/146355.png
+18986,Nashville SC,167061,Jeisson Palacios,4,Defender,D,32.0,73.0,163.0,1994-03-20T08:00Z,
+18986,Nashville SC,201353,Daniel Lovitz,2,Defender,D,34.0,70.0,170.0,1991-08-27T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/201353.png
+18986,Nashville SC,255501,Jack Maher,5,Defender,D,26.0,74.0,172.0,1999-10-28T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/255501.png
+18986,Nashville SC,266454,Josh Bauer,22,Defender,D,27.0,73.0,172.0,1998-07-22T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/266454.png
+18986,Nashville SC,290031,Maxwell Woledzi,3,Defender,D,25.0,75.0,183.0,2001-07-02T07:00Z,
+18986,Nashville SC,304120,Reed Baker-Whiting,27,Defender,D,21.0,71.0,152.0,2005-03-31T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/304120.png
+18986,Nashville SC,316325,Thomas Williams,21,Defender,D,21.0,75.0,170.0,2004-08-15T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/316325.png
+18986,Nashville SC,388342,Jordan Knight,23,Defender,D,24.0,75.0,170.0,2002-06-13T07:00Z,
+18986,Nashville SC,398878,Chris Applewhite,33,Defender,D,18.0,74.0,179.0,2007-08-23T07:00Z,
+18986,Nashville SC,174548,Hany Mukhtar,10,Midfielder,M,31.0,68.0,159.0,1995-03-21T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/174548.png
+18986,Nashville SC,201136,Bryan Acosta,6,Midfielder,M,32.0,69.0,174.0,1993-11-24T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/201136.png
+18986,Nashville SC,233041,Alex Muyl,19,Midfielder,M,30.0,71.0,172.0,1995-09-30T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/233041.png
+18986,Nashville SC,290109,Edvard Tagseth,20,Midfielder,M,25.0,67.0,148.0,2001-01-23T08:00Z,
+18986,Nashville SC,315524,Patrick Yazbek,8,Midfielder,M,24.0,72.0,172.0,2002-04-05T08:00Z,
+18986,Nashville SC,318341,Matthew Corcoran,16,Midfielder,M,20.0,72.0,168.0,2006-02-17T08:00Z,
+18986,Nashville SC,325936,Shakur Mohammed,14,Midfielder,M,22.0,70.0,159.0,2003-08-27T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/325936.png
+18986,Nashville SC,419163,Charles-Emile Brunet,12,Midfielder,M,22.0,68.0,146.0,2003-11-26T08:00Z,
+18986,Nashville SC,73200,Cristian Espinoza,7,Forward,F,31.0,69.0,161.0,1995-04-03T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/73200.png
+18986,Nashville SC,227627,Sam Surridge,9,Forward,F,27.0,75.0,170.0,1998-07-28T07:00Z,
+18986,Nashville SC,310068,Warren Madrigal,41,Forward,F,21.0,73.0,161.0,2004-07-24T07:00Z,
+18986,Nashville SC,313976,Ahmed Qasim,37,Forward,F,23.0,72.0,161.0,2003-07-12T07:00Z,
+18986,Nashville SC,324768,Woobens Pacius,17,Forward,F,25.0,73.0,174.0,2001-05-11T07:00Z,
+189,New England Revolution,384152,JD Gunn,73,Goalkeeper,G,26.0,78.0,,2000-01-21T08:00Z,
+189,New England Revolution,396928,Donovan Parisian,33,Goalkeeper,G,21.0,76.0,203.0,2004-09-27T07:00Z,
+189,New England Revolution,164551,Mamadou Fofana,2,Defender,D,28.0,74.0,163.0,1998-01-21T08:00Z,
+189,New England Revolution,183796,Andrew Farrell,88,Defender,D,34.0,71.0,183.0,1992-04-02T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/183796.png
+189,New England Revolution,231150,Tanner Beason,4,Defender,D,29.0,73.0,174.0,1997-03-23T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/231150.png
+189,New England Revolution,322977,Brayan Ceballos,3,Defender,D,25.0,72.0,161.0,2001-05-24T07:00Z,
+189,New England Revolution,334227,William Sands,23,Defender,D,26.0,70.0,150.0,2000-07-06T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/334227.png
+189,New England Revolution,343191,Ilay Feingold,12,Defender,D,21.0,69.0,139.0,2004-08-23T07:00Z,
+189,New England Revolution,360133,Ethan Kohler,22,Defender,D,21.0,72.0,172.0,2005-05-20T07:00Z,
+189,New England Revolution,360216,Damario Mcintosh,19,Defender,D,18.0,70.0,181.0,2007-08-17T07:00Z,
+189,New England Revolution,376513,Peyton Miller,25,Defender,D,18.0,67.0,152.0,2007-11-08T08:00Z,
+189,New England Revolution,401481,Mimy Schinieder,53,Defender,D,25.0,,,2001-01-12T08:00Z,
+189,New England Revolution,403643,Gabe Dahlin,56,Defender,D,22.0,75.0,172.0,2003-08-18T07:00Z,
+189,New England Revolution,409883,Chris Mbaï Assem,54,Defender,D,20.0,,,2005-08-12T07:00Z,
+189,New England Revolution,152168,Carles Gil,22,Midfielder,M,33.0,67.0,141.0,1992-11-22T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/152168.png
+189,New England Revolution,156187,Diego Fagundez,77,Midfielder,M,31.0,68.0,139.0,1995-02-14T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/156187.png
+189,New England Revolution,216609,Matt Polster,8,Midfielder,M,33.0,72.0,170.0,1993-06-08T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/216609.png
+189,New England Revolution,251806,Jackson Yueill,14,Midfielder,M,29.0,69.0,168.0,1997-03-19T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/251806.png
+189,New England Revolution,276684,Alhassan Yusuf,80,Midfielder,M,26.0,69.0,146.0,2000-07-18T07:00Z,
+189,New England Revolution,329364,Brooklyn Raines,21,Midfielder,M,21.0,68.0,139.0,2005-03-11T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/329364.png
+189,New England Revolution,376802,Allan Oyirwoth,18,Midfielder,M,19.0,73.0,168.0,2007-01-23T08:00Z,
+189,New England Revolution,381729,Carlos Zarzalejo,51,Midfielder,M,21.0,70.0,,2004-09-10T07:00Z,
+189,New England Revolution,400745,Eric Klein,38,Midfielder,M,19.0,,,2006-11-20T08:00Z,
+189,New England Revolution,403366,Cristiano Oliveira,35,Midfielder,M,18.0,72.0,168.0,2008-03-30T07:00Z,
+189,New England Revolution,419597,Javaun Mussenden,57,Midfielder,M,18.0,,,2007-09-05T07:00Z,
+189,New England Revolution,284834,Leonardo Campana,9,Forward,F,25.0,73.0,161.0,2000-07-24T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/284834.png
+189,New England Revolution,286757,Griffin Yow,7,Forward,F,23.0,69.0,132.0,2002-09-25T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/286757.png
+189,New England Revolution,305755,Dor Turgeman,11,Forward,F,22.0,74.0,161.0,2003-10-24T07:00Z,
+189,New England Revolution,317571,Malcolm Fry,32,Forward,F,21.0,69.0,157.0,2005-05-15T07:00Z,
+189,New England Revolution,327959,Jayden Da,59,Forward,F,24.0,75.0,,2002-04-08T07:00Z,
+189,New England Revolution,338883,Luca Langoni,41,Forward,F,24.0,68.0,146.0,2002-02-09T08:00Z,
+189,New England Revolution,382167,Shuma Sasaki,58,Forward,F,23.0,,,2003-02-17T08:00Z,
+189,New England Revolution,404655,Marcos Zambrano-Delgado,17,Forward,F,21.0,72.0,139.0,2005-01-20T08:00Z,
+17606,New York City FC,352320,Jovan Mijatovic,,Forward,F,21.0,70.0,,2005-07-11T07:00Z,
+17606,New York City FC,184786,Tomas Romero,30,Goalkeeper,G,25.0,74.0,190.0,2000-12-19T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/184786.png
+17606,New York City FC,220434,Greg Ranjitsingh,18,Goalkeeper,G,33.0,74.0,201.0,1993-07-18T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/220434.png
+17606,New York City FC,252974,Matt Freese,49,Goalkeeper,G,27.0,75.0,192.0,1998-09-02T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/252974.png
+17606,New York City FC,185792,Thiago Martins,13,Defender,D,31.0,73.0,172.0,1995-03-17T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/185792.png
+17606,New York City FC,254450,Kevin O'Toole,22,Defender,D,27.0,70.0,150.0,1998-12-14T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/254450.png
+17606,New York City FC,276051,Raul Gustavo,34,Defender,D,27.0,74.0,183.0,1999-04-24T07:00Z,
+17606,New York City FC,291697,Kai Trewin,5,Defender,D,25.0,72.0,161.0,2001-05-18T07:00Z,
+17606,New York City FC,297380,Tayvon Gray,24,Defender,D,23.0,71.0,161.0,2002-08-19T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/297380.png
+17606,New York City FC,301470,Kamran Acito,45,Defender,D,22.0,,,2004-03-05T08:00Z,
+17606,New York City FC,321979,Mitja Ilenic,35,Defender,D,21.0,70.0,157.0,2004-12-26T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/321979.png
+17606,New York City FC,328865,Max Murray,23,Defender,D,24.0,77.0,183.0,2002-04-08T07:00Z,
+17606,New York City FC,366218,Andrew Baiera,38,Defender,D,19.0,69.0,139.0,2007-02-28T08:00Z,
+17606,New York City FC,400718,Nico Cavallo,2,Defender,D,24.0,73.0,181.0,2001-12-27T08:00Z,
+17606,New York City FC,70624,Maxi Morález,10,Midfielder,M,39.0,63.0,115.0,1987-02-27T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/70624.png
+17606,New York City FC,108107,Nicolás Fernández,7,Midfielder,M,26.0,68.0,157.0,2000-01-11T08:00Z,
+17606,New York City FC,241031,Aiden O'Neill,21,Midfielder,M,28.0,72.0,152.0,1998-07-04T07:00Z,
+17606,New York City FC,258855,James Sands,6,Midfielder,M,26.0,73.0,183.0,2000-07-06T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/258855.png
+17606,New York City FC,259199,Andrés Perea,8,Midfielder,M,25.0,72.0,159.0,2000-11-14T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/259199.png
+17606,New York City FC,268192,Keaton Parks,55,Midfielder,M,28.0,75.0,179.0,1997-08-06T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/268192.png
+17606,New York City FC,301472,Cooper Flax,27,Midfielder,M,22.0,71.0,,2004-01-21T08:00Z,
+17606,New York City FC,358680,Jonathan Shore,32,Midfielder,M,19.0,68.0,132.0,2007-04-13T07:00Z,
+17606,New York City FC,358681,Maxi Carrizo,29,Midfielder,M,18.0,66.0,,2008-02-28T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/358681.png
+17606,New York City FC,381209,Jacob Arroyave,47,Midfielder,M,18.0,,,2007-11-12T08:00Z,
+17606,New York City FC,381250,Peter Molinari,71,Midfielder,M,17.0,69.0,148.0,2009-01-28T08:00Z,
+17606,New York City FC,419228,Kevin Pierre,15,Midfielder,M,23.0,73.0,183.0,2003-06-21T07:00Z,
+17606,New York City FC,250852,Hannes Wolf,17,Forward,F,27.0,70.0,150.0,1999-04-16T07:00Z,
+17606,New York City FC,288930,Talles Magno,11,Forward,F,24.0,73.0,152.0,2002-06-26T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/288930.png
+17606,New York City FC,310827,Alonso Martínez,16,Forward,F,27.0,70.0,159.0,1998-10-15T07:00Z,
+17606,New York City FC,337149,Agustin Ojeda,26,Forward,F,22.0,67.0,139.0,2004-06-19T07:00Z,
+17606,New York City FC,378653,Zidane Yañez,36,Forward,F,18.0,71.0,150.0,2008-01-26T08:00Z,
+17606,New York City FC,379908,Malachi Jones,88,Forward,F,22.0,70.0,,2003-09-23T07:00Z,
+17606,New York City FC,402322,Seymour Reid,99,Forward,F,18.0,,,2008-03-04T08:00Z,
+17606,New York City FC,421313,Arnau Farnós,87,Forward,F,23.0,69.0,,2003-01-18T08:00Z,
+12011,Orlando City SC,159382,Maxime Crépeau,71,Goalkeeper,G,32.0,71.0,192.0,1994-05-11T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/159382.png
+12011,Orlando City SC,316317,Javier Otero,12,Goalkeeper,G,23.0,78.0,190.0,2002-11-18T08:00Z,
+12011,Orlando City SC,330021,Tristan Himes,40,Goalkeeper,G,23.0,78.0,,2003-07-15T07:00Z,
+12011,Orlando City SC,147256,Robin Jansson,6,Defender,D,34.0,74.0,192.0,1991-11-15T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/147256.png
+12011,Orlando City SC,210228,Adrián Marín,3,Defender,D,29.0,71.0,161.0,1997-01-09T08:00Z,
+12011,Orlando City SC,267116,Griffin Dorsey,24,Defender,D,27.0,72.0,159.0,1999-03-05T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/267116.png
+12011,Orlando City SC,311532,David Brekalo,4,Defender,D,27.0,74.0,172.0,1998-12-03T08:00Z,
+12011,Orlando City SC,340588,Iago Teodoro,57,Defender,D,21.0,74.0,205.0,2005-04-18T07:00Z,
+12011,Orlando City SC,349254,Nolan Miller,21,Defender,D,21.0,74.0,179.0,2004-08-03T07:00Z,
+12011,Orlando City SC,376511,Tahir Reid-Brown,29,Defender,D,20.0,74.0,,2006-07-02T07:00Z,
+12011,Orlando City SC,181558,Wilder Cartagena,16,Midfielder,M,31.0,71.0,170.0,1994-09-23T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/181558.png
+12011,Orlando City SC,233401,Martín Ojeda,10,Midfielder,M,27.0,69.0,128.0,1998-11-27T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/233401.png
+12011,Orlando City SC,241473,Eduard Atuesta,20,Midfielder,M,29.0,71.0,157.0,1997-06-18T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/241473.png
+12011,Orlando City SC,250448,Iván Angulo,77,Midfielder,M,27.0,70.0,146.0,1999-03-22T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/250448.png
+12011,Orlando City SC,265977,Braian Ojeda,8,Midfielder,M,26.0,68.0,150.0,2000-06-27T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/265977.png
+12011,Orlando City SC,382896,Luis Otávio,5,Midfielder,M,19.0,71.0,,2007-04-12T07:00Z,
+12011,Orlando City SC,388445,Colin Guske,25,Midfielder,M,19.0,72.0,,2007-01-29T08:00Z,
+12011,Orlando City SC,390621,Joran Gerbet,35,Midfielder,M,25.0,71.0,,2001-06-30T07:00Z,
+12011,Orlando City SC,399674,Ignacio Gómez,80,Midfielder,M,20.0,71.0,157.0,2006-04-04T07:00Z,
+12011,Orlando City SC,401054,Zakaria Taifi,19,Midfielder,M,20.0,73.0,,2005-10-01T07:00Z,
+12011,Orlando City SC,403760,Dylan Judelson,74,Midfielder,M,18.0,71.0,,2008-06-05T07:00Z,
+12011,Orlando City SC,294071,Duncan McGuire,13,Forward,F,25.0,73.0,190.0,2001-02-05T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/294071.png
+12011,Orlando City SC,324270,Marco Pasalic,87,Forward,F,25.0,70.0,161.0,2000-09-14T07:00Z,
+12011,Orlando City SC,329273,Tyrese Spicer,14,Forward,F,25.0,73.0,150.0,2000-12-04T08:00Z,
+12011,Orlando City SC,354154,Yutaro Tsukada,34,Forward,F,24.0,71.0,,2001-07-28T07:00Z,
+12011,Orlando City SC,356098,Gustavo Caraballo,65,Forward,F,17.0,70.0,,2008-08-29T07:00Z,
+12011,Orlando City SC,379317,Pedro Leão,90,Forward,F,20.0,72.0,150.0,2006-06-28T07:00Z,
+12011,Orlando City SC,387395,Tiago,11,Forward,F,21.0,70.0,,2005-04-08T07:00Z,
+12011,Orlando City SC,403425,Justin Ellis,22,Forward,F,19.0,72.0,,2007-05-14T07:00Z,
+12011,Orlando City SC,408267,Bernardo Rhein Goncalves,44,Forward,F,18.0,68.0,,2007-09-21T07:00Z,
+12011,Orlando City SC,418358,Harvey Sarajian,23,Forward,F,21.0,74.0,,2005-01-26T08:00Z,
+10739,Philadelphia Union,186943,Andre Blake,18,Goalkeeper,G,35.0,74.0,172.0,1990-11-21T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/186943.png
+10739,Philadelphia Union,255097,George Marks,31,Goalkeeper,G,26.0,73.0,163.0,1999-11-10T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/255097.png
+10739,Philadelphia Union,365853,Andrew Rick,76,Goalkeeper,G,20.0,74.0,,2006-01-30T08:00Z,
+10739,Philadelphia Union,286778,Nathan Harriel,26,Defender,D,25.0,70.0,150.0,2001-04-23T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/286778.png
+10739,Philadelphia Union,288688,Japhet Sery,5,Defender,D,26.0,73.0,,2000-04-10T07:00Z,
+10739,Philadelphia Union,351372,Olwethu Makhanya,29,Defender,D,22.0,74.0,159.0,2004-04-30T07:00Z,
+10739,Philadelphia Union,361156,Giovanny Sequera,38,Defender,D,20.0,67.0,130.0,2006-02-14T08:00Z,
+10739,Philadelphia Union,366034,Frankie Westfield,39,Defender,D,20.0,67.0,163.0,2005-12-09T08:00Z,
+10739,Philadelphia Union,366558,Neil Pierre,44,Defender,D,18.0,77.0,174.0,2007-10-19T07:00Z,
+10739,Philadelphia Union,378634,Philippe Ndinga Ossibadjouo,20,Defender,D,21.0,70.0,159.0,2005-06-03T07:00Z,
+10739,Philadelphia Union,384323,Finn Sundstrom,66,Defender,D,19.0,72.0,170.0,2006-11-19T08:00Z,
+10739,Philadelphia Union,418595,Geiner Martínez,2,Defender,D,23.0,74.0,,2003-01-09T08:00Z,
+10739,Philadelphia Union,134066,Alejandro Bedoya,11,Midfielder,M,39.0,72.0,161.0,1987-04-29T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/134066.png
+10739,Philadelphia Union,266026,Indiana Vassilev,19,Midfielder,M,25.0,69.0,159.0,2001-02-16T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/266026.png
+10739,Philadelphia Union,271536,Jesús Bueno,8,Midfielder,M,27.0,70.0,161.0,1999-04-15T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/271536.png
+10739,Philadelphia Union,274002,Jeremy Rafanello,14,Midfielder,M,26.0,72.0,163.0,2000-04-14T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/274002.png
+10739,Philadelphia Union,288060,Ben Bender,16,Midfielder,M,25.0,72.0,,2001-03-07T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/288060.png
+10739,Philadelphia Union,304130,Quinn Sullivan,33,Midfielder,M,22.0,71.0,150.0,2004-03-27T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/304130.png
+10739,Philadelphia Union,322063,Jovan Lukic,4,Midfielder,M,24.0,71.0,161.0,2002-01-20T08:00Z,
+10739,Philadelphia Union,333939,Danley Jean Jacques,21,Midfielder,M,26.0,72.0,159.0,2000-05-20T07:00Z,
+10739,Philadelphia Union,384397,Cavan Sullivan,6,Midfielder,M,16.0,67.0,150.0,2009-09-28T07:00Z,
+10739,Philadelphia Union,403750,Kellan Leblanc,47,Midfielder,M,18.0,69.0,,2008-03-17T07:00Z,
+10739,Philadelphia Union,263585,Milan Iloski,10,Forward,F,26.0,71.0,172.0,1999-07-29T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/263585.png
+10739,Philadelphia Union,322680,Bruno Damiani,9,Forward,F,24.0,74.0,174.0,2002-04-18T07:00Z,
+10739,Philadelphia Union,338175,Edward Davis,77,Forward,F,20.0,72.0,150.0,2006-06-17T07:00Z,
+10739,Philadelphia Union,364774,Augustin Anello,28,Forward,F,24.0,72.0,163.0,2002-04-22T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/364774.png
+10739,Philadelphia Union,376494,Sal Olivas,55,Forward,F,20.0,75.0,,2006-07-11T07:00Z,
+10739,Philadelphia Union,399426,Ezekiel Alladoh,23,Forward,F,20.0,75.0,,2005-09-13T07:00Z,
+10739,Philadelphia Union,402321,Stas Korzeniowski,37,Forward,F,23.0,76.0,,2003-01-30T08:00Z,
+10739,Philadelphia Union,412100,Malik Jakupovic,51,Forward,F,17.0,75.0,,2009-06-24T07:00Z,
+9723,Portland Timbers,254340,Trey Muse,25,Goalkeeper,G,26.0,76.0,183.0,1999-07-26T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/254340.png
+9723,Portland Timbers,257619,James Pantemis,41,Goalkeeper,G,29.0,73.0,170.0,1997-02-21T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/257619.png
+9723,Portland Timbers,277661,Hunter Sulte,26,Goalkeeper,G,24.0,79.0,192.0,2002-04-25T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/277661.png
+9723,Portland Timbers,29447,Ian Smith,23,Defender,D,24.0,73.0,150.0,2002-07-16T07:00Z,
+9723,Portland Timbers,187782,Eric Miller,15,Defender,D,33.0,73.0,172.0,1993-01-15T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/187782.png
+9723,Portland Timbers,245451,Brandon Bye,5,Defender,D,30.0,72.0,172.0,1995-11-29T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/245451.png
+9723,Portland Timbers,249756,Kamal Miller,4,Defender,D,29.0,72.0,163.0,1997-05-16T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/249756.png
+9723,Portland Timbers,302672,Juan Mosquera,29,Defender,D,23.0,71.0,159.0,2002-09-05T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/302672.png
+9723,Portland Timbers,302907,Zac McGraw,18,Defender,D,29.0,76.0,203.0,1997-06-08T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/302907.png
+9723,Portland Timbers,332367,Finn Surman,20,Defender,D,22.0,75.0,183.0,2003-09-23T07:00Z,
+9723,Portland Timbers,340652,Alex Bonetig,6,Defender,D,23.0,74.0,,2002-08-20T07:00Z,
+9723,Portland Timbers,351975,Charles Ondo,94,Defender,D,22.0,75.0,172.0,2003-10-22T07:00Z,
+9723,Portland Timbers,371458,Sawyer Jura,16,Defender,D,20.0,,,2006-03-09T08:00Z,
+9723,Portland Timbers,71042,Diego Chará,21,Midfielder,M,40.0,67.0,150.0,1986-04-05T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/71042.png
+9723,Portland Timbers,156564,Joao Ortiz,80,Midfielder,M,30.0,70.0,152.0,1996-05-01T07:00Z,
+9723,Portland Timbers,199782,José Caicedo,30,Midfielder,M,24.0,72.0,172.0,2002-05-23T07:00Z,
+9723,Portland Timbers,277392,Cole Bassett,17,Midfielder,M,24.0,71.0,150.0,2001-07-28T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/277392.png
+9723,Portland Timbers,301463,Jimer Fory,27,Midfielder,M,24.0,74.0,183.0,2002-05-24T07:00Z,
+9723,Portland Timbers,303579,David Da Costa,10,Midfielder,M,25.0,66.0,139.0,2001-01-05T08:00Z,
+9723,Portland Timbers,386932,Eric Izoita,73,Midfielder,M,18.0,,,2007-09-08T07:00Z,
+9723,Portland Timbers,202539,Felipe Mora,9,Forward,F,32.0,69.0,150.0,1993-08-02T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/202539.png
+9723,Portland Timbers,222765,Ariel Lassiter,7,Forward,F,31.0,70.0,152.0,1994-09-27T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/222765.png
+9723,Portland Timbers,252818,Omir Fernández,22,Forward,F,27.0,67.0,139.0,1999-02-08T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/252818.png
+9723,Portland Timbers,255418,Kristoffer Velde,99,Forward,F,26.0,70.0,141.0,1999-09-09T07:00Z,
+9723,Portland Timbers,297127,Alexander Aravena,28,Forward,F,23.0,69.0,152.0,2002-09-06T07:00Z,
+9723,Portland Timbers,315294,Antony,11,Forward,F,24.0,73.0,163.0,2001-09-08T07:00Z,
+9723,Portland Timbers,354979,Kevin Kelsy,19,Forward,F,21.0,74.0,185.0,2004-07-27T07:00Z,
+9723,Portland Timbers,381216,Noah Santos,37,Forward,F,19.0,,,2007-01-10T08:00Z,
+9723,Portland Timbers,391712,Gage Guerra,88,Forward,F,23.0,70.0,181.0,2002-12-21T08:00Z,
+4771,Real Salt Lake,134307,Rafael,1,Goalkeeper,G,36.0,73.0,192.0,1990-05-20T07:00Z,
+4771,Real Salt Lake,400330,Max Kerkvliet,24,Goalkeeper,G,20.0,77.0,203.0,2005-10-01T07:00Z,
+4771,Real Salt Lake,73591,Luis Rivera,37,Defender,D,18.0,68.0,161.0,2007-12-01T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/73591.png
+4771,Real Salt Lake,137565,Juan Arias,21,Defender,D,22.0,74.0,,2004-01-08T08:00Z,
+4771,Real Salt Lake,183778,DeAndre Yedlin,2,Defender,D,33.0,68.0,163.0,1993-07-09T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/183778.png
+4771,Real Salt Lake,203329,Justen Glad,15,Defender,D,29.0,72.0,146.0,1997-02-28T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/203329.png
+4771,Real Salt Lake,243168,Alexandros Katranis,98,Defender,D,28.0,69.0,161.0,1998-05-04T07:00Z,
+4771,Real Salt Lake,256489,Samuel Junqua,29,Defender,D,29.0,72.0,170.0,1996-11-09T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/256489.png
+4771,Real Salt Lake,294874,Philip Quinton,26,Defender,D,26.0,78.0,203.0,1999-11-16T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/294874.png
+4771,Real Salt Lake,304126,Kobi Henry,3,Defender,D,22.0,74.0,170.0,2004-04-26T07:00Z,
+4771,Real Salt Lake,311520,Lukas Engel,4,Defender,D,27.0,70.0,161.0,1998-12-14T08:00Z,
+4771,Real Salt Lake,399188,Gio Villa,41,Defender,D,18.0,66.0,130.0,2008-01-03T08:00Z,
+4771,Real Salt Lake,401637,Ruben Messalles,77,Defender,D,23.0,72.0,161.0,2002-11-11T08:00Z,
+4771,Real Salt Lake,82716,Nelson Palacio,13,Midfielder,M,25.0,71.0,172.0,2001-06-16T07:00Z,
+4771,Real Salt Lake,148356,Diego Luna,8,Midfielder,M,22.0,68.0,185.0,2003-09-07T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/148356.png
+4771,Real Salt Lake,216288,Stijn Spierings,6,Midfielder,M,30.0,74.0,183.0,1996-03-12T08:00Z,
+4771,Real Salt Lake,228390,Pablo Ruiz,7,Midfielder,M,27.0,68.0,174.0,1998-12-20T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/228390.png
+4771,Real Salt Lake,287497,Juan Manuel Sanabria,8,Midfielder,M,26.0,68.0,130.0,2000-03-29T08:00Z,
+4771,Real Salt Lake,296109,Emeka Eneli,14,Midfielder,M,26.0,69.0,,1999-10-18T07:00Z,
+4771,Real Salt Lake,319083,Griffin Dillon,27,Midfielder,M,23.0,71.0,159.0,2003-04-25T07:00Z,
+4771,Real Salt Lake,326258,Zach Booth,23,Midfielder,M,22.0,72.0,172.0,2004-02-17T08:00Z,
+4771,Real Salt Lake,362114,Noel Caliskan,92,Midfielder,M,25.0,71.0,146.0,2000-08-29T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/362114.png
+4771,Real Salt Lake,380794,Luca Moisa,34,Midfielder,M,18.0,69.0,137.0,2008-04-20T07:00Z,
+4771,Real Salt Lake,399119,Owen Anderson,30,Midfielder,M,19.0,70.0,152.0,2007-06-06T07:00Z,
+4771,Real Salt Lake,401641,Antonio Riquelme,38,Midfielder,M,17.0,71.0,152.0,2008-08-08T07:00Z,
+4771,Real Salt Lake,292912,Victor Olatunji,17,Forward,F,26.0,76.0,190.0,1999-09-05T07:00Z,
+4771,Real Salt Lake,305777,Morgan Guilavogui,9,Forward,F,28.0,74.0,179.0,1998-03-10T08:00Z,
+4771,Real Salt Lake,319046,Jesús Barea,36,Forward,F,24.0,69.0,141.0,2002-04-28T07:00Z,
+4771,Real Salt Lake,358654,Ariath Piol,19,Forward,F,21.0,71.0,172.0,2004-10-11T07:00Z,
+4771,Real Salt Lake,364658,Dominik Marczuk,11,Forward,F,22.0,71.0,161.0,2003-11-01T08:00Z,
+4771,Real Salt Lake,374519,Zavier Gozo,72,Forward,F,19.0,71.0,139.0,2007-03-22T07:00Z,
+4771,Real Salt Lake,380005,Chance Cowell,44,Forward,F,18.0,67.0,,2008-07-05T07:00Z,
+4771,Real Salt Lake,399189,Omar Marquez,40,Forward,F,18.0,65.0,,2008-02-21T08:00Z,
+4771,Real Salt Lake,399190,Aiden Hezarkhani,39,Forward,F,19.0,70.0,152.0,2007-06-28T07:00Z,
+4771,Real Salt Lake,401803,Lineker Rodrigues,70,Forward,F,24.0,72.0,159.0,2002-03-12T08:00Z,
+4771,Real Salt Lake,413763,Van Parker,33,Forward,F,17.0,69.0,,2009-01-29T08:00Z,
+4771,Real Salt Lake,418187,Sergi Solans,22,Forward,F,23.0,73.0,,2003-02-26T08:00Z,
+190,Red Bull New York,192027,Ethan Horvath,34,Goalkeeper,G,31.0,75.0,183.0,1995-06-09T07:00Z,
+190,Red Bull New York,217162,John McCarthy,77,Goalkeeper,G,34.0,73.0,183.0,1992-07-04T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/217162.png
+190,Red Bull New York,318476,Anthony Marcucci,1,Goalkeeper,G,26.0,75.0,190.0,1999-07-31T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/318476.png
+190,Red Bull New York,339964,Aidan Stokes,21,Goalkeeper,G,18.0,76.0,150.0,2008-01-14T08:00Z,
+190,Red Bull New York,217009,Tim Parker,26,Defender,D,33.0,74.0,192.0,1993-02-23T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/217009.png
+190,Red Bull New York,242942,Dylan Nealis,12,Defender,D,27.0,71.0,172.0,1998-07-30T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/242942.png
+190,Red Bull New York,282582,Justin Che,2,Defender,D,22.0,73.0,172.0,2003-11-18T08:00Z,
+190,Red Bull New York,302060,Jahkeele Marshall-Rutty,3,Defender,D,22.0,67.0,152.0,2004-06-16T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/302060.png
+190,Red Bull New York,303521,Robert Voloder,6,Defender,D,25.0,73.0,172.0,2001-05-09T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/303521.png
+190,Red Bull New York,338899,Juan González,20,Defender,D,21.0,72.0,172.0,2004-07-27T07:00Z,
+190,Red Bull New York,342198,Omar Valencia,5,Defender,D,22.0,71.0,152.0,2004-06-08T07:00Z,
+190,Red Bull New York,361422,Julián Bazán,14,Defender,D,20.0,71.0,172.0,2005-11-25T08:00Z,
+190,Red Bull New York,385287,Matthew Dos Santos,56,Defender,D,18.0,,,2008-06-05T07:00Z,
+190,Red Bull New York,148641,Emil Forsberg,10,Midfielder,M,34.0,70.0,168.0,1991-10-23T07:00Z,
+190,Red Bull New York,238420,Gustaf Beggren,4,Midfielder,M,28.0,74.0,174.0,1997-09-07T07:00Z,
+190,Red Bull New York,336443,Nehuen Benedetti,39,Midfielder,M,21.0,70.0,170.0,2005-02-24T08:00Z,
+190,Red Bull New York,362442,Ronald Donkor,48,Midfielder,M,21.0,68.0,141.0,2004-11-20T08:00Z,
+190,Red Bull New York,381248,Tanner Rosborough,66,Midfielder,M,18.0,72.0,152.0,2008-03-21T07:00Z,
+190,Red Bull New York,381687,Adri Mehmeti,15,Midfielder,M,17.0,72.0,152.0,2009-04-06T07:00Z,
+190,Red Bull New York,102254,Eric Maxim Choupo-Moting,13,Forward,F,37.0,75.0,196.0,1989-03-23T08:00Z,
+190,Red Bull New York,270302,Cameron Harper,17,Forward,F,24.0,69.0,157.0,2001-11-19T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/270302.png
+190,Red Bull New York,285698,Cade Cowell,7,Forward,F,22.0,72.0,172.0,2003-10-14T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/285698.png
+190,Red Bull New York,288041,Julian Hall,16,Forward,F,18.0,70.0,163.0,2008-03-24T07:00Z,
+190,Red Bull New York,304159,Roald Mitchell,33,Forward,F,23.0,73.0,161.0,2003-01-13T08:00Z,
+190,Red Bull New York,329917,Jorge Ruvalcaba,11,Forward,F,24.0,70.0,139.0,2001-07-23T07:00Z,
+190,Red Bull New York,336755,Dennis Gjengaar,22,Forward,F,22.0,69.0,161.0,2004-02-24T08:00Z,
+190,Red Bull New York,362940,Rafael Mosquera,79,Forward,F,21.0,71.0,139.0,2005-05-24T07:00Z,
+190,Red Bull New York,378895,Andy Rojas,70,Forward,F,20.0,71.0,161.0,2005-12-05T08:00Z,
+190,Red Bull New York,380923,Mohammed Sofo,37,Forward,F,21.0,69.0,161.0,2004-11-30T08:00Z,
+22529,San Diego FC,265874,CJ dos Santos,1,Goalkeeper,G,25.0,75.0,168.0,2000-08-24T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/265874.png
+22529,San Diego FC,286424,Pablo Sisniega,13,Goalkeeper,G,31.0,75.0,174.0,1995-07-07T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/286424.png
+22529,San Diego FC,336963,Duran Ferree,18,Goalkeeper,G,19.0,74.0,172.0,2006-09-28T07:00Z,
+22529,San Diego FC,182014,Andrés Reyes,4,Defender,D,26.0,75.0,179.0,1999-09-08T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/182014.png
+22529,San Diego FC,257114,Christopher McVey,97,Defender,D,29.0,76.0,168.0,1997-04-12T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/257114.png
+22529,San Diego FC,329734,William Kumado,2,Defender,D,23.0,66.0,152.0,2002-10-16T07:00Z,
+22529,San Diego FC,365859,Oscar Verhoeven,33,Defender,D,20.0,72.0,172.0,2006-05-31T07:00Z,
+22529,San Diego FC,380677,Kieran Sargeant,5,Defender,D,23.0,72.0,163.0,2003-05-15T07:00Z,
+22529,San Diego FC,381072,Luca Bombino,27,Defender,D,20.0,72.0,161.0,2006-07-10T07:00Z,
+22529,San Diego FC,398859,Wilson Eisner,22,Defender,D,24.0,72.0,163.0,2002-05-03T07:00Z,
+22529,San Diego FC,399756,Ian Pilcher,25,Defender,D,23.0,72.0,170.0,2003-03-21T08:00Z,
+22529,San Diego FC,418058,Osvald Søe,17,Defender,D,20.0,74.0,,2005-11-05T08:00Z,
+22529,San Diego FC,116825,Aníbal Godoy,20,Midfielder,M,36.0,72.0,163.0,1990-02-10T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/116825.png
+22529,San Diego FC,191693,Emmanuel Boateng,24,Midfielder,M,32.0,66.0,150.0,1994-01-17T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/191693.png
+22529,San Diego FC,214371,Jeppe Tverskov,6,Midfielder,M,33.0,73.0,183.0,1993-03-12T08:00Z,
+22529,San Diego FC,250454,Anders Dreyer,10,Midfielder,M,28.0,69.0,150.0,1998-05-02T07:00Z,
+22529,San Diego FC,277212,Onni Valakari,8,Midfielder,M,26.0,74.0,168.0,1999-08-18T07:00Z,
+22529,San Diego FC,302238,Bryce Duke,21,Midfielder,M,25.0,67.0,148.0,2001-02-28T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/302238.png
+22529,San Diego FC,365854,David Vazquez,19,Midfielder,M,20.0,69.0,,2006-02-22T08:00Z,
+22529,San Diego FC,371488,Pedro Soma,15,Midfielder,M,20.0,70.0,170.0,2006-06-30T07:00Z,
+22529,San Diego FC,400713,Manu Duah,26,Midfielder,M,21.0,76.0,179.0,2005-06-05T07:00Z,
+22529,San Diego FC,181028,Lewis Morgan,9,Forward,F,29.0,70.0,163.0,1996-09-30T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/181028.png
+22529,San Diego FC,186324,Marcus Ingvartsen,7,Forward,F,30.0,73.0,172.0,1996-01-04T08:00Z,
+22529,San Diego FC,200161,Hirving Lozano,11,Forward,F,30.0,69.0,152.0,1995-07-30T07:00Z,
+22529,San Diego FC,207638,Amahl Pellegrino,90,Forward,F,36.0,75.0,150.0,1990-06-18T07:00Z,
+22529,San Diego FC,291999,Alex Mighten,77,Forward,F,24.0,68.0,152.0,2002-04-11T07:00Z,
+22529,San Diego FC,303619,Alejandro Alvarado Jr.,70,Forward,F,22.0,68.0,148.0,2003-07-29T07:00Z,
+22529,San Diego FC,419201,Bryan Zamblé,14,Forward,F,18.0,65.0,141.0,2008-02-19T08:00Z,
+191,San Jose Earthquakes,216999,Earl Edwards,36,Goalkeeper,G,34.0,75.0,203.0,1992-01-24T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/216999.png
+191,San Jose Earthquakes,243832,Daniel,42,Goalkeeper,G,32.0,74.0,203.0,1994-05-06T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/243832.png
+191,San Jose Earthquakes,279112,Francesco Montali,31,Goalkeeper,G,25.0,75.0,183.0,2000-09-06T07:00Z,
+191,San Jose Earthquakes,331104,Nate Crockford,22,Goalkeeper,G,23.0,76.0,190.0,2002-09-06T07:00Z,
+191,San Jose Earthquakes,403710,Luca Ulrich,97,Goalkeeper,G,23.0,74.0,,2003-03-17T08:00Z,
+191,San Jose Earthquakes,222188,Dave Romney,4,Defender,D,33.0,74.0,190.0,1993-06-12T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/222188.png
+191,San Jose Earthquakes,223355,Vítor Costa,87,Defender,D,32.0,72.0,161.0,1994-07-01T07:00Z,
+191,San Jose Earthquakes,229876,Paul Marie,3,Defender,D,31.0,67.0,150.0,1995-03-24T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/229876.png
+191,San Jose Earthquakes,249985,DeJuan Jones,24,Defender,D,29.0,71.0,163.0,1997-06-24T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/249985.png
+191,San Jose Earthquakes,281494,Daniel Munie,5,Defender,D,26.0,72.0,181.0,2000-02-10T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/281494.png
+191,San Jose Earthquakes,304134,Jack Jasinski,17,Defender,D,22.0,74.0,159.0,2003-12-04T08:00Z,
+191,San Jose Earthquakes,331616,Max Floriani,25,Defender,D,23.0,74.0,185.0,2003-02-06T08:00Z,
+191,San Jose Earthquakes,380800,Jamar Ricketts,2,Defender,D,24.0,69.0,,2001-10-24T07:00Z,
+191,San Jose Earthquakes,398860,Reid Roberts,18,Defender,D,22.0,73.0,179.0,2003-12-09T08:00Z,
+191,San Jose Earthquakes,66955,Jonathan Gonzalez,40,Midfielder,M,27.0,69.0,137.0,1999-04-13T07:00Z,
+191,San Jose Earthquakes,235593,Ronaldo Vieira,14,Midfielder,M,28.0,70.0,152.0,1998-07-19T07:00Z,
+191,San Jose Earthquakes,246337,Jack Skahan,16,Midfielder,M,28.0,70.0,172.0,1998-02-07T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/246337.png
+191,San Jose Earthquakes,249699,Ian Harkes,6,Midfielder,M,31.0,71.0,161.0,1995-03-30T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/249699.png
+191,San Jose Earthquakes,290745,Darius Johnson,79,Midfielder,M,26.0,70.0,170.0,2000-03-15T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/290745.png
+191,San Jose Earthquakes,317465,Noel Buck,21,Midfielder,M,21.0,71.0,159.0,2005-04-05T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/317465.png
+191,San Jose Earthquakes,333752,Niko Tsakiris,10,Midfielder,M,21.0,70.0,152.0,2005-06-19T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/333752.png
+191,San Jose Earthquakes,371459,Edwyn Mendoza,38,Midfielder,M,20.0,70.0,,2006-05-03T07:00Z,
+191,San Jose Earthquakes,382638,Beau Leroux,34,Midfielder,M,22.0,72.0,163.0,2003-08-31T07:00Z,
+191,San Jose Earthquakes,399104,Kaedren Spivey,29,Midfielder,M,17.0,71.0,146.0,2009-05-28T07:00Z,
+191,San Jose Earthquakes,400722,Nick Fernandez,20,Midfielder,M,24.0,71.0,150.0,2001-12-22T08:00Z,
+191,San Jose Earthquakes,416549,Rohan Rajagopal,35,Midfielder,M,19.0,,,2007-06-12T07:00Z,
+191,San Jose Earthquakes,191088,Timo Werner,11,Forward,F,30.0,71.0,163.0,1996-03-06T08:00Z,
+191,San Jose Earthquakes,295339,Preston Judd,19,Forward,F,27.0,75.0,207.0,1999-05-28T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/295339.png
+191,San Jose Earthquakes,300420,Ousseni Bouda,7,Forward,F,26.0,69.0,172.0,2000-04-28T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/300420.png
+191,San Jose Earthquakes,302893,Benjamin Kikanovic,28,Forward,F,26.0,72.0,163.0,2000-01-06T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/302893.png
+191,San Jose Earthquakes,389884,Nonso Adimabua,32,Forward,F,25.0,76.0,190.0,2000-09-07T07:00Z,
+9726,Seattle Sounders FC,131979,Stefan Frei,24,Goalkeeper,G,40.0,75.0,194.0,1986-04-20T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/131979.png
+9726,Seattle Sounders FC,268173,Andy Thomas,26,Goalkeeper,G,27.0,74.0,181.0,1998-09-01T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/268173.png
+9726,Seattle Sounders FC,341343,Max Anchor,50,Goalkeeper,G,21.0,75.0,190.0,2004-07-21T07:00Z,
+9726,Seattle Sounders FC,175922,Kim Kee-Hee,20,Defender,D,37.0,74.0,172.0,1989-07-13T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/175922.png
+9726,Seattle Sounders FC,206682,Yeimar Gómez,28,Defender,D,34.0,74.0,203.0,1992-06-30T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/206682.png
+9726,Seattle Sounders FC,252474,Nouhou Tolo,5,Defender,D,29.0,70.0,172.0,1997-06-23T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/252474.png
+9726,Seattle Sounders FC,254383,Jackson Ragen,25,Defender,D,27.0,78.0,203.0,1998-09-24T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/254383.png
+9726,Seattle Sounders FC,256514,Alex Roldan,16,Defender,D,29.0,70.0,152.0,1996-07-28T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/256514.png
+9726,Seattle Sounders FC,299188,Antino Lopez,35,Defender,D,24.0,72.0,150.0,2002-05-21T07:00Z,
+9726,Seattle Sounders FC,318520,Cody Baker,33,Defender,D,22.0,70.0,152.0,2004-01-07T08:00Z,
+9726,Seattle Sounders FC,319038,Ryan Sailor,4,Defender,D,27.0,76.0,181.0,1998-11-27T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/319038.png
+9726,Seattle Sounders FC,319045,Kalani Kossa-Rienzi,85,Defender,D,24.0,67.0,150.0,2002-06-27T07:00Z,
+9726,Seattle Sounders FC,371080,Stuart Hawkins,39,Defender,D,19.0,75.0,146.0,2006-09-18T07:00Z,
+9726,Seattle Sounders FC,171573,Albert Rusnák,11,Midfielder,M,32.0,69.0,132.0,1994-07-07T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/171573.png
+9726,Seattle Sounders FC,216617,Cristian Roldan,7,Midfielder,M,31.0,68.0,163.0,1995-06-03T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/216617.png
+9726,Seattle Sounders FC,245570,Hassani Dotson,31,Midfielder,M,28.0,71.0,172.0,1997-08-06T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/245570.png
+9726,Seattle Sounders FC,251571,Jesús Ferreira,9,Midfielder,M,25.0,70.0,150.0,2000-12-24T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/251571.png
+9726,Seattle Sounders FC,254382,Paul Rothrock,14,Midfielder,M,27.0,69.0,161.0,1999-01-09T08:00Z,
+9726,Seattle Sounders FC,272039,Peter Kingston,45,Midfielder,M,25.0,69.0,132.0,2001-07-14T07:00Z,
+9726,Seattle Sounders FC,322064,Nikola Petkovic,44,Midfielder,M,23.0,71.0,172.0,2003-02-23T08:00Z,
+9726,Seattle Sounders FC,384356,Snyder Brunell,37,Midfielder,M,19.0,70.0,132.0,2007-03-23T07:00Z,
+9726,Seattle Sounders FC,399948,Sebastian Gomez,90,Midfielder,M,20.0,68.0,139.0,2006-05-21T07:00Z,
+9726,Seattle Sounders FC,159491,Paul Arriola,17,Forward,F,31.0,66.0,146.0,1995-02-05T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/159491.png
+9726,Seattle Sounders FC,210252,Jordan Morris,13,Forward,F,31.0,71.0,183.0,1994-10-26T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/210252.png
+9726,Seattle Sounders FC,256450,Daniel Musovski,19,Forward,F,30.0,72.0,170.0,1995-11-30T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/256450.png
+9726,Seattle Sounders FC,280721,Pedro de la Vega,10,Forward,F,25.0,70.0,161.0,2001-02-07T08:00Z,
+9726,Seattle Sounders FC,301856,Osaze De Rosario,95,Forward,F,25.0,74.0,179.0,2001-07-19T07:00Z,
+9726,Seattle Sounders FC,400000,Yu Tsukanome,36,Forward,F,25.0,69.0,161.0,2000-12-21T08:00Z,
+186,Sporting Kansas City,249729,Stefan Cleveland,30,Goalkeeper,G,32.0,74.0,183.0,1994-05-25T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/249729.png
+186,Sporting Kansas City,272505,John Pulskamp,1,Goalkeeper,G,25.0,76.0,207.0,2001-04-19T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/272505.png
+186,Sporting Kansas City,319016,Ryan Schewe,36,Goalkeeper,G,24.0,76.0,192.0,2002-03-08T08:00Z,
+186,Sporting Kansas City,398299,Jack Kortkamp,12,Goalkeeper,G,18.0,75.0,,2008-01-28T08:00Z,
+186,Sporting Kansas City,217816,Ian James,2,Defender,D,18.0,74.0,190.0,2008-06-06T07:00Z,
+186,Sporting Kansas City,286194,Zorhan Bassong,22,Defender,D,27.0,70.0,172.0,1999-05-07T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/286194.png
+186,Sporting Kansas City,286804,Jansen Miller,15,Defender,D,24.0,74.0,181.0,2002-02-10T08:00Z,
+186,Sporting Kansas City,303894,Jayden Reid,99,Defender,D,24.0,71.0,,2001-08-29T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/303894.png
+186,Sporting Kansas City,315921,Ethan Bartlow,23,Defender,D,26.0,72.0,170.0,2000-02-02T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/315921.png
+186,Sporting Kansas City,316648,Or Blorian,,Defender,D,26.0,74.0,,2000-03-07T08:00Z,
+186,Sporting Kansas City,357792,Justin Reynolds,13,Defender,D,21.0,70.0,170.0,2004-08-04T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/357792.png
+186,Sporting Kansas City,379846,Diego Borges,57,Defender,D,21.0,76.0,,2004-12-15T08:00Z,
+186,Sporting Kansas City,389905,Wyatt Meyer,28,Defender,D,25.0,74.0,194.0,2001-01-11T08:00Z,
+186,Sporting Kansas City,395357,Jacob Bartlett,16,Defender,D,20.0,74.0,,2005-10-07T07:00Z,
+186,Sporting Kansas City,401233,Pierre Lurot,41,Defender,D,24.0,75.0,170.0,2002-03-11T08:00Z,
+186,Sporting Kansas City,222659,Manu García,6,Midfielder,M,28.0,67.0,141.0,1998-01-02T08:00Z,
+186,Sporting Kansas City,286434,Lasse Berg Johnsen,4,Midfielder,M,26.0,70.0,161.0,1999-08-18T07:00Z,
+186,Sporting Kansas City,286760,Jacob Davis,8,Midfielder,M,24.0,70.0,152.0,2002-01-03T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/286760.png
+186,Sporting Kansas City,388191,Cielo Tschantret,14,Midfielder,M,20.0,72.0,152.0,2006-02-22T08:00Z,
+186,Sporting Kansas City,399957,Johann Ortiz,76,Midfielder,M,19.0,69.0,168.0,2007-01-01T08:00Z,
+186,Sporting Kansas City,399958,Shane Donovan,88,Midfielder,M,19.0,67.0,132.0,2007-01-06T08:00Z,
+186,Sporting Kansas City,411674,Zamir Loyo Reynaga,61,Midfielder,M,15.0,72.0,170.0,2011-01-20T08:00Z,
+186,Sporting Kansas City,417725,Kwaku Agyabeng,20,Midfielder,M,20.0,68.0,152.0,2006-06-27T07:00Z,
+186,Sporting Kansas City,240110,Dejan Joveljic,9,Forward,F,26.0,71.0,163.0,1999-08-07T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/240110.png
+186,Sporting Kansas City,259070,Shapi Suleymanov,93,Forward,F,26.0,67.0,146.0,1999-12-16T08:00Z,
+186,Sporting Kansas City,293695,Calvin Harris,11,Forward,F,26.0,72.0,161.0,2000-03-20T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/293695.png
+186,Sporting Kansas City,297034,Capita,7,Forward,F,24.0,68.0,150.0,2002-01-10T08:00Z,
+186,Sporting Kansas City,362459,Stephen Afrifa,17,Forward,F,25.0,71.0,150.0,2001-02-19T08:00Z,
+186,Sporting Kansas City,381688,Taylor Calheira,19,Forward,F,24.0,73.0,183.0,2002-04-26T07:00Z,
+21812,St. Louis CITY SC,175906,Roman Bürki,1,Goalkeeper,G,35.0,74.0,185.0,1990-11-14T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/175906.png
+21812,St. Louis CITY SC,178054,Benjamin Lundt,39,Goalkeeper,G,30.0,78.0,218.0,1995-09-24T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/178054.png
+21812,St. Louis CITY SC,422918,Colin Welsh,34,Goalkeeper,G,23.0,74.0,203.0,2003-04-12T07:00Z,
+21812,St. Louis CITY SC,198189,Timo Baumgartl,32,Defender,D,30.0,75.0,194.0,1996-03-04T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/198189.png
+21812,St. Louis CITY SC,203974,Rafael Santos,20,Defender,D,28.0,71.0,161.0,1998-02-05T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/203974.png
+21812,St. Louis CITY SC,252749,Tomas Totland,14,Defender,D,26.0,71.0,,1999-09-28T07:00Z,
+21812,St. Louis CITY SC,308481,Jaziel Orozco,99,Defender,D,22.0,69.0,183.0,2004-06-02T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/308481.png
+21812,St. Louis CITY SC,319055,Kyle Hiebert,22,Defender,D,28.0,72.0,185.0,1997-07-30T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/319055.png
+21812,St. Louis CITY SC,334716,Lukas MacNaughton,5,Defender,D,31.0,73.0,190.0,1995-03-08T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/334716.png
+21812,St. Louis CITY SC,355253,Fallou Fall,27,Defender,D,22.0,76.0,,2004-04-15T07:00Z,
+21812,St. Louis CITY SC,387925,Mamadou Fall,4,Defender,D,23.0,74.0,161.0,2002-11-21T08:00Z,
+21812,St. Louis CITY SC,189505,Eduard Löwen,10,Midfielder,M,29.0,74.0,201.0,1997-01-28T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/189505.png
+21812,St. Louis CITY SC,220478,Christopher Durkin,8,Midfielder,M,26.0,72.0,163.0,2000-02-08T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/220478.png
+21812,St. Louis CITY SC,234125,Marcel Hartel,17,Midfielder,M,30.0,70.0,150.0,1996-01-19T08:00Z,
+21812,St. Louis CITY SC,289938,Tomas Ostrak,7,Midfielder,M,26.0,69.0,163.0,2000-02-05T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/289938.png
+21812,St. Louis CITY SC,296222,Dante Polvara,21,Midfielder,M,26.0,76.0,190.0,2000-06-21T07:00Z,
+21812,St. Louis CITY SC,304164,Daniel Edelman,24,Midfielder,M,23.0,70.0,139.0,2003-04-28T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/304164.png
+21812,St. Louis CITY SC,312934,Conrad Wallem,6,Midfielder,M,26.0,71.0,161.0,2000-06-09T07:00Z,
+21812,St. Louis CITY SC,336926,Jake Girdwood-Reich,3,Midfielder,M,22.0,73.0,163.0,2004-05-26T07:00Z,
+21812,St. Louis CITY SC,338133,Miguel Perez,28,Midfielder,M,21.0,68.0,139.0,2005-04-28T07:00Z,
+21812,St. Louis CITY SC,338135,Célio Pompeu,12,Midfielder,M,26.0,70.0,161.0,1999-12-10T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/338135.png
+21812,St. Louis CITY SC,346651,Mykhi Joyner,59,Midfielder,M,19.0,,,2006-08-30T07:00Z,
+21812,St. Louis CITY SC,380672,Tyson Pearce,33,Midfielder,M,18.0,,,2007-08-12T07:00Z,
+21812,St. Louis CITY SC,208341,Simon Becher,11,Forward,F,27.0,73.0,185.0,1999-07-20T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/208341.png
+21812,St. Louis CITY SC,297256,Jeong Sang-Bin,77,Forward,F,24.0,69.0,168.0,2002-04-01T08:00Z,
+21812,St. Louis CITY SC,354887,Caden Glover,46,Forward,F,19.0,74.0,,2007-03-08T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/354887.png
+21812,St. Louis CITY SC,385759,Brendan McSorley,80,Forward,F,24.0,71.0,,2002-02-01T08:00Z,
+7318,Toronto FC,174703,William Yarbrough,23,Goalkeeper,G,37.0,74.0,161.0,1989-03-20T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/174703.png
+7318,Toronto FC,294040,Luka Gavran,1,Goalkeeper,G,26.0,78.0,201.0,2000-05-09T07:00Z,
+7318,Toronto FC,359271,Adisa De Rosario,77,Goalkeeper,G,21.0,73.0,163.0,2004-10-27T07:00Z,
+7318,Toronto FC,183764,Walker Zimmerman,25,Defender,D,33.0,75.0,194.0,1993-05-19T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/183764.png
+7318,Toronto FC,204888,Benjamín Kuscevic,13,Defender,D,30.0,73.0,168.0,1996-05-02T07:00Z,
+7318,Toronto FC,230626,Richie Laryea,22,Defender,D,31.0,69.0,150.0,1995-01-07T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/230626.png
+7318,Toronto FC,237164,Raheem Edwards,44,Defender,D,31.0,68.0,150.0,1995-07-17T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/237164.png
+7318,Toronto FC,298072,Kobe Franklin,19,Defender,D,23.0,66.0,150.0,2003-05-10T07:00Z,
+7318,Toronto FC,301819,Matheus Pereira,3,Defender,D,25.0,68.0,150.0,2000-12-21T08:00Z,
+7318,Toronto FC,310293,Zane Monlouis,12,Defender,D,22.0,73.0,163.0,2003-10-16T07:00Z,
+7318,Toronto FC,337361,Nickseon Gomis,15,Defender,D,24.0,73.0,174.0,2002-03-15T08:00Z,
+7318,Toronto FC,353137,Jackson Gilman,38,Defender,D,22.0,71.0,179.0,2004-04-29T07:00Z,
+7318,Toronto FC,364702,Lazar Stefanovic,76,Defender,D,19.0,74.0,163.0,2006-08-10T07:00Z,
+7318,Toronto FC,371470,Richard Chukwu,96,Defender,D,18.0,72.0,,2008-02-25T08:00Z,
+7318,Toronto FC,381755,Reid Fisher,75,Defender,D,22.0,75.0,192.0,2004-05-26T07:00Z,
+7318,Toronto FC,413762,Stefan Kapor,98,Defender,D,17.0,72.0,,2009-04-04T07:00Z,
+7318,Toronto FC,422109,Micah Chisholm,73,Defender,D,21.0,74.0,163.0,2004-11-19T08:00Z,
+7318,Toronto FC,422239,Luca Costabile,74,Defender,D,24.0,71.0,163.0,2002-07-10T07:00Z,
+7318,Toronto FC,184221,Jonathan Osorio,21,Midfielder,M,34.0,69.0,150.0,1992-06-12T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/184221.png
+7318,Toronto FC,252351,Djordje Mihailovic,10,Midfielder,M,27.0,70.0,152.0,1998-11-10T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/252351.png
+7318,Toronto FC,308639,Malik Henry,78,Midfielder,M,23.0,64.0,,2002-07-23T07:00Z,
+7318,Toronto FC,359270,Markus Cimermancic,71,Midfielder,M,21.0,69.0,152.0,2004-10-01T07:00Z,
+7318,Toronto FC,359272,Alonso Coello,14,Midfielder,M,26.0,73.0,181.0,1999-10-12T07:00Z,
+7318,Toronto FC,403775,Antone Bossenberry,56,Midfielder,M,17.0,69.0,,2008-08-14T07:00Z,
+7318,Toronto FC,422108,Fletcher Bank,79,Midfielder,M,23.0,70.0,163.0,2003-05-01T07:00Z,
+7318,Toronto FC,231098,Derrick Etienne Jr.,11,Forward,F,29.0,70.0,152.0,1996-11-25T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/231098.png
+7318,Toronto FC,233050,Dániel Sallói,20,Forward,F,30.0,73.0,152.0,1996-07-19T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/233050.png
+7318,Toronto FC,256613,Josh Sargent,9,Forward,F,26.0,73.0,172.0,2000-02-20T08:00Z,
+7318,Toronto FC,290190,Theo Corbeanu,7,Forward,F,24.0,75.0,183.0,2002-05-17T07:00Z,
+7318,Toronto FC,298071,Deandre Kerr,29,Forward,F,23.0,71.0,179.0,2002-11-29T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/298071.png
+7318,Toronto FC,323130,Jules-Anthony Vilsaint,99,Forward,F,23.0,76.0,174.0,2003-01-06T08:00Z,
+7318,Toronto FC,366744,Emilio Aristizábal,17,Forward,F,20.0,74.0,152.0,2005-08-05T07:00Z,
+7318,Toronto FC,403288,Dékwon Barrow,91,Forward,F,22.0,72.0,170.0,2004-01-16T08:00Z,
+7318,Toronto FC,421738,Jahmarie Nolan,64,Forward,F,16.0,72.0,,2009-11-11T08:00Z,
+9727,Vancouver Whitecaps,223042,Adrián Zendejas,30,Goalkeeper,G,30.0,77.0,207.0,1995-08-30T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/223042.png
+9727,Vancouver Whitecaps,305783,Isaac Boehmer,32,Goalkeeper,G,24.0,74.0,183.0,2001-11-20T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/305783.png
+9727,Vancouver Whitecaps,186148,Sebastian Schonlau,15,Defender,D,31.0,73.0,174.0,1994-08-05T07:00Z,
+9727,Vancouver Whitecaps,193452,Sam Adekugbe,3,Defender,D,31.0,69.0,163.0,1995-01-16T08:00Z,
+9727,Vancouver Whitecaps,286523,Mathías Laborda,2,Defender,D,26.0,72.0,159.0,1999-09-15T07:00Z,
+9727,Vancouver Whitecaps,302798,Ranko Veselinovic,4,Defender,D,27.0,74.0,170.0,1999-03-24T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/302798.png
+9727,Vancouver Whitecaps,338836,Tate Johnson,28,Defender,D,21.0,67.0,161.0,2005-07-10T07:00Z,
+9727,Vancouver Whitecaps,341727,Édier Ocampo,18,Defender,D,22.0,69.0,150.0,2003-10-03T07:00Z,
+9727,Vancouver Whitecaps,343994,Belal Halbouni,12,Defender,D,26.0,74.0,185.0,1999-12-29T08:00Z,
+9727,Vancouver Whitecaps,365829,Mihail Gherasimencov,29,Defender,D,21.0,70.0,152.0,2005-03-25T08:00Z,
+9727,Vancouver Whitecaps,391991,Nikola Djordjevic,41,Defender,D,23.0,69.0,172.0,2002-11-14T08:00Z,
+9727,Vancouver Whitecaps,173404,Ryan Gauld,25,Midfielder,M,30.0,67.0,150.0,1995-12-16T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/173404.png
+9727,Vancouver Whitecaps,202501,Andrés Cubas,20,Midfielder,M,30.0,66.0,146.0,1996-05-11T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/202501.png
+9727,Vancouver Whitecaps,277302,Jean-Claude Ngando,26,Midfielder,M,26.0,69.0,172.0,1999-11-20T08:00Z,
+9727,Vancouver Whitecaps,297118,Ralph Priso-Mbongue,6,Midfielder,M,23.0,69.0,174.0,2002-08-02T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/297118.png
+9727,Vancouver Whitecaps,315920,Oliver Larraz,8,Midfielder,M,24.0,70.0,139.0,2001-09-16T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/315920.png
+9727,Vancouver Whitecaps,371467,Liam Mackenzie,97,Midfielder,M,19.0,71.0,163.0,2007-03-15T07:00Z,
+9727,Vancouver Whitecaps,371482,Jeevan Badwal,59,Midfielder,M,20.0,66.0,161.0,2006-03-11T08:00Z,
+9727,Vancouver Whitecaps,123465,Thomas Müller,13,Forward,F,36.0,73.0,168.0,1989-09-13T07:00Z,
+9727,Vancouver Whitecaps,256209,Emmanuel Sabbi,11,Forward,F,28.0,70.0,161.0,1997-12-24T08:00Z,
+9727,Vancouver Whitecaps,276451,Cheick Sabaly,7,Forward,F,27.0,66.0,121.0,1999-03-04T08:00Z,
+9727,Vancouver Whitecaps,309232,Kenji Cabrera,17,Forward,F,23.0,69.0,146.0,2003-01-27T08:00Z,
+9727,Vancouver Whitecaps,365154,Bruno Caicedo,14,Forward,F,21.0,70.0,152.0,2005-01-15T08:00Z,
+9727,Vancouver Whitecaps,405591,Rayan Elloumi,19,Forward,F,18.0,71.0,174.0,2007-09-17T07:00Z,

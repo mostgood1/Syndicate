@@ -1,0 +1,142 @@
+from __future__ import annotations
+
+import unittest
+from datetime import date
+from unittest.mock import patch
+
+from syndicate.features.soccer import sources
+
+
+class LeagueNormalizationTests(unittest.TestCase):
+    def test_normalize_league_passes_through_known_slugs(self) -> None:
+        self.assertEqual(sources.normalize_league("la_liga"), "la_liga")
+
+    def test_normalize_league_falls_back_to_default_for_unknown(self) -> None:
+        self.assertEqual(sources.normalize_league("not_a_real_league"), sources.DEFAULT_LEAGUE)
+        self.assertEqual(sources.normalize_league(None), sources.DEFAULT_LEAGUE)
+
+    def test_league_display_name(self) -> None:
+        self.assertEqual(sources.league_display_name("epl"), "EPL")
+        self.assertEqual(sources.league_display_name("belgian_pro_league"), "Belgian Pro League")
+
+
+class SparseRosterTeamsTests(unittest.TestCase):
+    def test_flags_teams_under_threshold_and_skips_full_squads(self) -> None:
+        roster_rows = (
+            {"team_id": "1"},
+            {"team_id": "1"},
+            {"team_id": "2"},
+        ) + tuple({"team_id": "3"} for _ in range(20))
+        teams = [
+            {"team_id": "1", "name": "Sparse FC"},
+            {"team_id": "2", "name": "Barely There FC"},
+            {"team_id": "3", "name": "Full Squad FC"},
+            {"team_id": "4", "name": "No Data FC"},
+        ]
+        with patch.object(sources, "roster_rows", return_value=roster_rows), \
+             patch.object(sources, "all_teams", return_value=teams):
+            sparse = sources.sparse_roster_teams("epl", 2026)
+        sparse_ids = {row["team_id"] for row in sparse}
+        self.assertEqual(sparse_ids, {"1", "2", "4"})
+        by_id = {row["team_id"]: row["player_count"] for row in sparse}
+        self.assertEqual(by_id["1"], 2)
+        self.assertEqual(by_id["4"], 0)
+
+    def test_no_sparse_teams_when_everyone_meets_threshold(self) -> None:
+        roster_rows = tuple({"team_id": "1"} for _ in range(20))
+        teams = [{"team_id": "1", "name": "Full Squad FC"}]
+        with patch.object(sources, "roster_rows", return_value=roster_rows), \
+             patch.object(sources, "all_teams", return_value=teams):
+            self.assertEqual(sources.sparse_roster_teams("epl", 2026), [])
+
+    def test_custom_threshold_is_respected(self) -> None:
+        roster_rows = tuple({"team_id": "1"} for _ in range(10))
+        teams = [{"team_id": "1", "name": "Ten Player FC"}]
+        with patch.object(sources, "roster_rows", return_value=roster_rows), \
+             patch.object(sources, "all_teams", return_value=teams):
+            self.assertEqual(sources.sparse_roster_teams("epl", 2026, threshold=5), [])
+            self.assertEqual(len(sources.sparse_roster_teams("epl", 2026, threshold=15)), 1)
+
+
+class WeekResolutionTests(unittest.TestCase):
+    def _payload(self) -> dict:
+        return {
+            "weeks": [
+                {"week": 1, "start_date": "2026-08-01", "end_date": "2026-08-07"},
+                {"week": 2, "start_date": "2026-08-08", "end_date": "2026-08-14"},
+                {"week": 3, "start_date": "2026-08-15", "end_date": "2026-08-21"},
+            ]
+        }
+
+    def test_available_weeks_sorted_and_deduped(self) -> None:
+        with patch.object(sources, "schedule_payload", return_value=self._payload()):
+            self.assertEqual(sources.available_weeks("epl", 2026), [1, 2, 3])
+
+    def test_default_week_picks_the_week_containing_today(self) -> None:
+        with patch.object(sources, "schedule_payload", return_value=self._payload()), \
+             patch("syndicate.features.soccer.sources.date_cls") as mock_date:
+            mock_date.today.return_value = date(2026, 8, 10)
+            mock_date.fromisoformat.side_effect = date.fromisoformat
+            self.assertEqual(sources.default_week("epl", 2026), 2)
+
+    def test_default_week_picks_nearest_upcoming_when_today_is_before_season(self) -> None:
+        with patch.object(sources, "schedule_payload", return_value=self._payload()), \
+             patch("syndicate.features.soccer.sources.date_cls") as mock_date:
+            mock_date.today.return_value = date(2026, 7, 1)
+            mock_date.fromisoformat.side_effect = date.fromisoformat
+            self.assertEqual(sources.default_week("epl", 2026), 1)
+
+    def test_default_week_falls_back_to_last_week_when_season_is_over(self) -> None:
+        with patch.object(sources, "schedule_payload", return_value=self._payload()), \
+             patch("syndicate.features.soccer.sources.date_cls") as mock_date:
+            mock_date.today.return_value = date(2026, 12, 1)
+            mock_date.fromisoformat.side_effect = date.fromisoformat
+            self.assertEqual(sources.default_week("epl", 2026), 3)
+
+    def test_default_week_is_1_when_no_weeks_stored(self) -> None:
+        with patch.object(sources, "schedule_payload", return_value={}):
+            self.assertEqual(sources.default_week("epl", 2026), 1)
+
+    def test_week_label_includes_date_range_when_known(self) -> None:
+        with patch.object(sources, "schedule_payload", return_value=self._payload()):
+            self.assertEqual(sources.week_label("epl", 2026, 1), "Week 1 (2026-08-01 to 2026-08-07)")
+
+    def test_week_label_falls_back_without_a_matching_entry(self) -> None:
+        with patch.object(sources, "schedule_payload", return_value=self._payload()):
+            self.assertEqual(sources.week_label("epl", 2026, 99), "Week 99")
+
+
+class WeekMatchesTests(unittest.TestCase):
+    def test_week_matches_filters_by_week_number(self) -> None:
+        payload = {
+            "matches": [
+                {"event_id": "1", "week": 1, "date": "2026-08-01T15:00Z"},
+                {"event_id": "2", "week": 2, "date": "2026-08-08T15:00Z"},
+                {"event_id": "3", "week": 1, "date": "2026-08-02T15:00Z"},
+            ]
+        }
+        with patch.object(sources, "schedule_payload", return_value=payload):
+            week_1 = sources.week_matches("epl", 2026, 1)
+            self.assertEqual({row["event_id"] for row in week_1}, {"1", "3"})
+            self.assertEqual(sources.week_date_list("epl", 2026, 1), ["2026-08-01", "2026-08-02"])
+
+
+class BuildModuleLinksTests(unittest.TestCase):
+    def test_carries_week_and_season_query_and_marks_active(self) -> None:
+        links = sources.build_module_links("epl", 5, 2026, "Props")
+        by_label = {link["label"]: link for link in links}
+        self.assertTrue(by_label["Props"]["active"])
+        self.assertFalse(by_label["Cards"]["active"])
+        self.assertIn("?week=5&season=2026", by_label["Cards"]["href"])
+
+
+class LeagueSelectControlTests(unittest.TestCase):
+    def test_includes_every_league_and_navigates_on_change(self) -> None:
+        control = sources.league_select_control("mls", page_path="/cards", query_suffix="?week=1&season=2026")
+        self.assertEqual(control["value"], "mls")
+        self.assertEqual({opt["value"] for opt in control["options"]}, set(sources.LEAGUE_DISPLAY_NAMES))
+        self.assertIn("/cards?week=1&season=2026", control["onchange"])
+
+
+if __name__ == "__main__":
+    unittest.main()

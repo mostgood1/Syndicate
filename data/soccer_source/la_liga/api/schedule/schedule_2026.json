@@ -1,0 +1,4026 @@
+{
+  "league": "la_liga",
+  "season": 2026,
+  "generated_at": "2026-07-20T21:05:27.139630+00:00",
+  "match_count": 380,
+  "weeks": [
+    {
+      "week": 1,
+      "start_date": "2026-08-15",
+      "end_date": "2026-08-21",
+      "match_count": 9
+    },
+    {
+      "week": 2,
+      "start_date": "2026-08-22",
+      "end_date": "2026-08-28",
+      "match_count": 13
+    },
+    {
+      "week": 3,
+      "start_date": "2026-08-29",
+      "end_date": "2026-08-31",
+      "match_count": 8
+    },
+    {
+      "week": 4,
+      "start_date": "2026-09-06",
+      "end_date": "2026-09-06",
+      "match_count": 10
+    },
+    {
+      "week": 5,
+      "start_date": "2026-09-13",
+      "end_date": "2026-09-16",
+      "match_count": 20
+    },
+    {
+      "week": 6,
+      "start_date": "2026-09-20",
+      "end_date": "2026-09-20",
+      "match_count": 10
+    },
+    {
+      "week": 7,
+      "start_date": "2026-10-11",
+      "end_date": "2026-10-11",
+      "match_count": 10
+    },
+    {
+      "week": 8,
+      "start_date": "2026-10-18",
+      "end_date": "2026-10-18",
+      "match_count": 10
+    },
+    {
+      "week": 9,
+      "start_date": "2026-10-25",
+      "end_date": "2026-10-25",
+      "match_count": 10
+    },
+    {
+      "week": 10,
+      "start_date": "2026-11-01",
+      "end_date": "2026-11-01",
+      "match_count": 10
+    },
+    {
+      "week": 11,
+      "start_date": "2026-11-08",
+      "end_date": "2026-11-08",
+      "match_count": 10
+    },
+    {
+      "week": 12,
+      "start_date": "2026-11-22",
+      "end_date": "2026-11-22",
+      "match_count": 10
+    },
+    {
+      "week": 13,
+      "start_date": "2026-11-29",
+      "end_date": "2026-11-29",
+      "match_count": 10
+    },
+    {
+      "week": 14,
+      "start_date": "2026-12-06",
+      "end_date": "2026-12-06",
+      "match_count": 10
+    },
+    {
+      "week": 15,
+      "start_date": "2026-12-13",
+      "end_date": "2026-12-13",
+      "match_count": 10
+    },
+    {
+      "week": 16,
+      "start_date": "2026-12-20",
+      "end_date": "2026-12-20",
+      "match_count": 10
+    },
+    {
+      "week": 17,
+      "start_date": "2027-01-03",
+      "end_date": "2027-01-03",
+      "match_count": 10
+    },
+    {
+      "week": 18,
+      "start_date": "2027-01-10",
+      "end_date": "2027-01-10",
+      "match_count": 10
+    },
+    {
+      "week": 19,
+      "start_date": "2027-01-17",
+      "end_date": "2027-01-17",
+      "match_count": 10
+    },
+    {
+      "week": 20,
+      "start_date": "2027-01-24",
+      "end_date": "2027-01-24",
+      "match_count": 10
+    },
+    {
+      "week": 21,
+      "start_date": "2027-01-31",
+      "end_date": "2027-01-31",
+      "match_count": 10
+    },
+    {
+      "week": 22,
+      "start_date": "2027-02-07",
+      "end_date": "2027-02-07",
+      "match_count": 10
+    },
+    {
+      "week": 23,
+      "start_date": "2027-02-14",
+      "end_date": "2027-02-14",
+      "match_count": 10
+    },
+    {
+      "week": 24,
+      "start_date": "2027-02-21",
+      "end_date": "2027-02-21",
+      "match_count": 10
+    },
+    {
+      "week": 25,
+      "start_date": "2027-02-28",
+      "end_date": "2027-02-28",
+      "match_count": 10
+    },
+    {
+      "week": 26,
+      "start_date": "2027-03-07",
+      "end_date": "2027-03-07",
+      "match_count": 10
+    },
+    {
+      "week": 27,
+      "start_date": "2027-03-14",
+      "end_date": "2027-03-14",
+      "match_count": 10
+    },
+    {
+      "week": 28,
+      "start_date": "2027-03-21",
+      "end_date": "2027-03-21",
+      "match_count": 10
+    },
+    {
+      "week": 29,
+      "start_date": "2027-04-04",
+      "end_date": "2027-04-04",
+      "match_count": 10
+    },
+    {
+      "week": 30,
+      "start_date": "2027-04-11",
+      "end_date": "2027-04-11",
+      "match_count": 10
+    },
+    {
+      "week": 31,
+      "start_date": "2027-04-18",
+      "end_date": "2027-04-21",
+      "match_count": 20
+    },
+    {
+      "week": 32,
+      "start_date": "2027-05-02",
+      "end_date": "2027-05-02",
+      "match_count": 10
+    },
+    {
+      "week": 33,
+      "start_date": "2027-05-09",
+      "end_date": "2027-05-09",
+      "match_count": 10
+    },
+    {
+      "week": 34,
+      "start_date": "2027-05-16",
+      "end_date": "2027-05-16",
+      "match_count": 10
+    },
+    {
+      "week": 35,
+      "start_date": "2027-05-23",
+      "end_date": "2027-05-23",
+      "match_count": 10
+    },
+    {
+      "week": 36,
+      "start_date": "2027-05-30",
+      "end_date": "2027-05-30",
+      "match_count": 10
+    }
+  ],
+  "matches": [
+    {
+      "event_id": "401882926",
+      "date": "2026-08-15T17:30Z",
+      "home_team": "Alav\u00e9s",
+      "away_team": "Getafe",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401882918",
+      "date": "2026-08-15T19:30Z",
+      "home_team": "Sevilla",
+      "away_team": "Rayo Vallecano",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401882920",
+      "date": "2026-08-16T15:00Z",
+      "home_team": "Racing Santander",
+      "away_team": "Villarreal",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401882922",
+      "date": "2026-08-16T17:00Z",
+      "home_team": "Espanyol",
+      "away_team": "Levante",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401882924",
+      "date": "2026-08-16T19:30Z",
+      "home_team": "Celta Vigo",
+      "away_team": "Osasuna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401882923",
+      "date": "2026-08-17T19:00Z",
+      "home_team": "Deportivo La Coru\u00f1a",
+      "away_team": "Elche",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401882925",
+      "date": "2026-08-19T19:00Z",
+      "home_team": "Atl\u00e9tico Madrid",
+      "away_team": "M\u00e1laga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401882908",
+      "date": "2026-08-20T19:00Z",
+      "home_team": "Rayo Vallecano",
+      "away_team": "Alav\u00e9s",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401882914",
+      "date": "2026-08-21T19:00Z",
+      "home_team": "Real Betis",
+      "away_team": "Real Sociedad",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401882916",
+      "date": "2026-08-22T15:00Z",
+      "home_team": "Athletic Club",
+      "away_team": "Sevilla",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401882907",
+      "date": "2026-08-22T17:30Z",
+      "home_team": "Valencia",
+      "away_team": "Celta Vigo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401882912",
+      "date": "2026-08-22T19:30Z",
+      "home_team": "Espanyol",
+      "away_team": "Real Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401882915",
+      "date": "2026-08-23T15:00Z",
+      "home_team": "Atl\u00e9tico Madrid",
+      "away_team": "Villarreal",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401882911",
+      "date": "2026-08-23T17:30Z",
+      "home_team": "Getafe",
+      "away_team": "Racing Santander",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401882913",
+      "date": "2026-08-23T19:30Z",
+      "home_team": "Elche",
+      "away_team": "Barcelona",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401882909",
+      "date": "2026-08-24T17:30Z",
+      "home_team": "Osasuna",
+      "away_team": "Levante",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401882910",
+      "date": "2026-08-24T19:30Z",
+      "home_team": "M\u00e1laga",
+      "away_team": "Deportivo La Coru\u00f1a",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401882917",
+      "date": "2026-08-25T19:00Z",
+      "home_team": "Valencia",
+      "away_team": "Real Betis",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401882919",
+      "date": "2026-08-26T19:00Z",
+      "home_team": "Real Madrid",
+      "away_team": "Real Sociedad",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401882921",
+      "date": "2026-08-27T19:00Z",
+      "home_team": "Barcelona",
+      "away_team": "Athletic Club",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401882900",
+      "date": "2026-08-28T17:00Z",
+      "home_team": "Racing Santander",
+      "away_team": "Elche",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401882906",
+      "date": "2026-08-28T19:30Z",
+      "home_team": "Alav\u00e9s",
+      "away_team": "Villarreal",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401882902",
+      "date": "2026-08-29T15:00Z",
+      "home_team": "Levante",
+      "away_team": "Real Betis",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401882898",
+      "date": "2026-08-29T17:00Z",
+      "home_team": "Real Sociedad",
+      "away_team": "Espanyol",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401882897",
+      "date": "2026-08-29T19:30Z",
+      "home_team": "Sevilla",
+      "away_team": "Atl\u00e9tico Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401882899",
+      "date": "2026-08-30T15:00Z",
+      "home_team": "Real Madrid",
+      "away_team": "M\u00e1laga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401882904",
+      "date": "2026-08-30T17:30Z",
+      "home_team": "Deportivo La Coru\u00f1a",
+      "away_team": "Valencia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401882905",
+      "date": "2026-08-30T19:30Z",
+      "home_team": "Celta Vigo",
+      "away_team": "Athletic Club",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401882901",
+      "date": "2026-08-31T17:30Z",
+      "home_team": "Osasuna",
+      "away_team": "Getafe",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401882903",
+      "date": "2026-08-31T19:30Z",
+      "home_team": "Barcelona",
+      "away_team": "Rayo Vallecano",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401882896",
+      "date": "2026-09-06T18:00Z",
+      "home_team": "Alav\u00e9s",
+      "away_team": "Osasuna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401882895",
+      "date": "2026-09-06T18:00Z",
+      "home_team": "Athletic Club",
+      "away_team": "Atl\u00e9tico Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401882893",
+      "date": "2026-09-06T18:00Z",
+      "home_team": "Elche",
+      "away_team": "Real Sociedad",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401882892",
+      "date": "2026-09-06T18:00Z",
+      "home_team": "Espanyol",
+      "away_team": "Sevilla",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401882891",
+      "date": "2026-09-06T18:00Z",
+      "home_team": "Getafe",
+      "away_team": "Celta Vigo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401882890",
+      "date": "2026-09-06T18:00Z",
+      "home_team": "M\u00e1laga",
+      "away_team": "Levante",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401882889",
+      "date": "2026-09-06T18:00Z",
+      "home_team": "Rayo Vallecano",
+      "away_team": "Racing Santander",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401882894",
+      "date": "2026-09-06T18:00Z",
+      "home_team": "Real Betis",
+      "away_team": "Real Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401882888",
+      "date": "2026-09-06T18:00Z",
+      "home_team": "Valencia",
+      "away_team": "Barcelona",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401882887",
+      "date": "2026-09-06T18:00Z",
+      "home_team": "Villarreal",
+      "away_team": "Deportivo La Coru\u00f1a",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401882886",
+      "date": "2026-09-13T18:00Z",
+      "home_team": "Athletic Club",
+      "away_team": "Elche",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401882885",
+      "date": "2026-09-13T18:00Z",
+      "home_team": "Celta Vigo",
+      "away_team": "M\u00e1laga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401882884",
+      "date": "2026-09-13T18:00Z",
+      "home_team": "Getafe",
+      "away_team": "Deportivo La Coru\u00f1a",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401882883",
+      "date": "2026-09-13T18:00Z",
+      "home_team": "Levante",
+      "away_team": "Barcelona",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401882882",
+      "date": "2026-09-13T18:00Z",
+      "home_team": "Osasuna",
+      "away_team": "Espanyol",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401882881",
+      "date": "2026-09-13T18:00Z",
+      "home_team": "Racing Santander",
+      "away_team": "Alav\u00e9s",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401882880",
+      "date": "2026-09-13T18:00Z",
+      "home_team": "Real Madrid",
+      "away_team": "Rayo Vallecano",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401882879",
+      "date": "2026-09-13T18:00Z",
+      "home_team": "Real Sociedad",
+      "away_team": "Atl\u00e9tico Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401882878",
+      "date": "2026-09-13T18:00Z",
+      "home_team": "Sevilla",
+      "away_team": "Valencia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401882877",
+      "date": "2026-09-13T18:00Z",
+      "home_team": "Villarreal",
+      "away_team": "Real Betis",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401882876",
+      "date": "2026-09-16T18:00Z",
+      "home_team": "Alav\u00e9s",
+      "away_team": "Valencia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401882875",
+      "date": "2026-09-16T18:00Z",
+      "home_team": "Atl\u00e9tico Madrid",
+      "away_team": "Osasuna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401882871",
+      "date": "2026-09-16T18:00Z",
+      "home_team": "Barcelona",
+      "away_team": "Racing Santander",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401882873",
+      "date": "2026-09-16T18:00Z",
+      "home_team": "Deportivo La Coru\u00f1a",
+      "away_team": "Sevilla",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401882872",
+      "date": "2026-09-16T18:00Z",
+      "home_team": "Elche",
+      "away_team": "Real Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401882870",
+      "date": "2026-09-16T18:00Z",
+      "home_team": "Levante",
+      "away_team": "Athletic Club",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401882869",
+      "date": "2026-09-16T18:00Z",
+      "home_team": "M\u00e1laga",
+      "away_team": "Villarreal",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401882868",
+      "date": "2026-09-16T18:00Z",
+      "home_team": "Rayo Vallecano",
+      "away_team": "Espanyol",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401882874",
+      "date": "2026-09-16T18:00Z",
+      "home_team": "Real Betis",
+      "away_team": "Getafe",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401882867",
+      "date": "2026-09-16T18:00Z",
+      "home_team": "Real Sociedad",
+      "away_team": "Celta Vigo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401882866",
+      "date": "2026-09-20T18:00Z",
+      "home_team": "Athletic Club",
+      "away_team": "Alav\u00e9s",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401882865",
+      "date": "2026-09-20T18:00Z",
+      "home_team": "Atl\u00e9tico Madrid",
+      "away_team": "Real Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401882864",
+      "date": "2026-09-20T18:00Z",
+      "home_team": "Celta Vigo",
+      "away_team": "Racing Santander",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401882863",
+      "date": "2026-09-20T18:00Z",
+      "home_team": "Deportivo La Coru\u00f1a",
+      "away_team": "Real Betis",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401882862",
+      "date": "2026-09-20T18:00Z",
+      "home_team": "Espanyol",
+      "away_team": "Elche",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401882861",
+      "date": "2026-09-20T18:00Z",
+      "home_team": "Getafe",
+      "away_team": "M\u00e1laga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401882860",
+      "date": "2026-09-20T18:00Z",
+      "home_team": "Osasuna",
+      "away_team": "Rayo Vallecano",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401882859",
+      "date": "2026-09-20T18:00Z",
+      "home_team": "Sevilla",
+      "away_team": "Barcelona",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401882858",
+      "date": "2026-09-20T18:00Z",
+      "home_team": "Valencia",
+      "away_team": "Real Sociedad",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401882857",
+      "date": "2026-09-20T18:00Z",
+      "home_team": "Villarreal",
+      "away_team": "Levante",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401882856",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Alav\u00e9s",
+      "away_team": "Atl\u00e9tico Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401882853",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Barcelona",
+      "away_team": "Getafe",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401882854",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Elche",
+      "away_team": "Celta Vigo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401882852",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Levante",
+      "away_team": "Sevilla",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401882851",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "M\u00e1laga",
+      "away_team": "Espanyol",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401882850",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Racing Santander",
+      "away_team": "Valencia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401882849",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Rayo Vallecano",
+      "away_team": "Athletic Club",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401882855",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Real Betis",
+      "away_team": "Osasuna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401882848",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Real Madrid",
+      "away_team": "Villarreal",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401882847",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Real Sociedad",
+      "away_team": "Deportivo La Coru\u00f1a",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401882845",
+      "date": "2026-10-18T18:00Z",
+      "home_team": "Celta Vigo",
+      "away_team": "Alav\u00e9s",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401882844",
+      "date": "2026-10-18T18:00Z",
+      "home_team": "Deportivo La Coru\u00f1a",
+      "away_team": "Levante",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401882843",
+      "date": "2026-10-18T18:00Z",
+      "home_team": "Espanyol",
+      "away_team": "Atl\u00e9tico Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401882842",
+      "date": "2026-10-18T18:00Z",
+      "home_team": "Getafe",
+      "away_team": "Rayo Vallecano",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401882841",
+      "date": "2026-10-18T18:00Z",
+      "home_team": "M\u00e1laga",
+      "away_team": "Real Sociedad",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401882840",
+      "date": "2026-10-18T18:00Z",
+      "home_team": "Osasuna",
+      "away_team": "Racing Santander",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401882846",
+      "date": "2026-10-18T18:00Z",
+      "home_team": "Real Betis",
+      "away_team": "Barcelona",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401882839",
+      "date": "2026-10-18T18:00Z",
+      "home_team": "Real Madrid",
+      "away_team": "Sevilla",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401882838",
+      "date": "2026-10-18T18:00Z",
+      "home_team": "Valencia",
+      "away_team": "Athletic Club",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401882837",
+      "date": "2026-10-18T18:00Z",
+      "home_team": "Villarreal",
+      "away_team": "Elche",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401882836",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Alav\u00e9s",
+      "away_team": "M\u00e1laga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401882835",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Athletic Club",
+      "away_team": "Getafe",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401882834",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Atl\u00e9tico Madrid",
+      "away_team": "Deportivo La Coru\u00f1a",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401882832",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Barcelona",
+      "away_team": "Real Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401882833",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Celta Vigo",
+      "away_team": "Real Betis",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401882831",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Racing Santander",
+      "away_team": "Espanyol",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401882830",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Rayo Vallecano",
+      "away_team": "Elche",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401882829",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Real Sociedad",
+      "away_team": "Levante",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401882828",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Sevilla",
+      "away_team": "Osasuna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401882827",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Valencia",
+      "away_team": "Villarreal",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401882826",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Athletic Club",
+      "away_team": "Real Sociedad",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401882822",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Barcelona",
+      "away_team": "Alav\u00e9s",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401882824",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Deportivo La Coru\u00f1a",
+      "away_team": "Osasuna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401882823",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Elche",
+      "away_team": "Valencia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401882821",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Getafe",
+      "away_team": "Sevilla",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401882820",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Levante",
+      "away_team": "Atl\u00e9tico Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401882819",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Racing Santander",
+      "away_team": "Real Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401882818",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Rayo Vallecano",
+      "away_team": "Celta Vigo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401882825",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Real Betis",
+      "away_team": "M\u00e1laga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401882817",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Villarreal",
+      "away_team": "Espanyol",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401882816",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Atl\u00e9tico Madrid",
+      "away_team": "Barcelona",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401882815",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Celta Vigo",
+      "away_team": "Levante",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401882814",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Elche",
+      "away_team": "Real Betis",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401882813",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Espanyol",
+      "away_team": "Deportivo La Coru\u00f1a",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401882812",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "M\u00e1laga",
+      "away_team": "Racing Santander",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401882811",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Osasuna",
+      "away_team": "Athletic Club",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401882810",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Real Sociedad",
+      "away_team": "Rayo Vallecano",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401882809",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Sevilla",
+      "away_team": "Alav\u00e9s",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401882808",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Valencia",
+      "away_team": "Real Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401882807",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Villarreal",
+      "away_team": "Getafe",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401882806",
+      "date": "2026-11-22T20:00Z",
+      "home_team": "Alav\u00e9s",
+      "away_team": "Deportivo La Coru\u00f1a",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401882805",
+      "date": "2026-11-22T20:00Z",
+      "home_team": "Athletic Club",
+      "away_team": "Espanyol",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401882804",
+      "date": "2026-11-22T20:00Z",
+      "home_team": "Barcelona",
+      "away_team": "Villarreal",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401882803",
+      "date": "2026-11-22T20:00Z",
+      "home_team": "Getafe",
+      "away_team": "Atl\u00e9tico Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401882802",
+      "date": "2026-11-22T20:00Z",
+      "home_team": "Levante",
+      "away_team": "Elche",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401882801",
+      "date": "2026-11-22T20:00Z",
+      "home_team": "Osasuna",
+      "away_team": "M\u00e1laga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401882800",
+      "date": "2026-11-22T20:00Z",
+      "home_team": "Racing Santander",
+      "away_team": "Real Sociedad",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401882799",
+      "date": "2026-11-22T20:00Z",
+      "home_team": "Rayo Vallecano",
+      "away_team": "Valencia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401882798",
+      "date": "2026-11-22T20:00Z",
+      "home_team": "Real Madrid",
+      "away_team": "Celta Vigo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401882797",
+      "date": "2026-11-22T20:00Z",
+      "home_team": "Sevilla",
+      "away_team": "Real Betis",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401882795",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Celta Vigo",
+      "away_team": "Villarreal",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401882794",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Deportivo La Coru\u00f1a",
+      "away_team": "Barcelona",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401882793",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Elche",
+      "away_team": "Atl\u00e9tico Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401882792",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Espanyol",
+      "away_team": "Getafe",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401882791",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Levante",
+      "away_team": "Racing Santander",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401882790",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "M\u00e1laga",
+      "away_team": "Athletic Club",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401882796",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Real Betis",
+      "away_team": "Rayo Vallecano",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401882789",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Real Madrid",
+      "away_team": "Alav\u00e9s",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401882788",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Real Sociedad",
+      "away_team": "Sevilla",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401882787",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Valencia",
+      "away_team": "Osasuna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401882786",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Alav\u00e9s",
+      "away_team": "Espanyol",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401882785",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Athletic Club",
+      "away_team": "Real Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401882784",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Atl\u00e9tico Madrid",
+      "away_team": "Real Betis",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401882783",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Barcelona",
+      "away_team": "Celta Vigo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401882782",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Getafe",
+      "away_team": "Valencia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401882781",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Osasuna",
+      "away_team": "Elche",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401882780",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Racing Santander",
+      "away_team": "Deportivo La Coru\u00f1a",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401882779",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Rayo Vallecano",
+      "away_team": "Levante",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401882778",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Sevilla",
+      "away_team": "M\u00e1laga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401882777",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Villarreal",
+      "away_team": "Real Sociedad",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401882776",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Atl\u00e9tico Madrid",
+      "away_team": "Valencia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401882774",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Deportivo La Coru\u00f1a",
+      "away_team": "Athletic Club",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401882773",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Elche",
+      "away_team": "Sevilla",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401882772",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Espanyol",
+      "away_team": "Celta Vigo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401882771",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Levante",
+      "away_team": "Alav\u00e9s",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401882770",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "M\u00e1laga",
+      "away_team": "Barcelona",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401882775",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Real Betis",
+      "away_team": "Racing Santander",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401882769",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Real Madrid",
+      "away_team": "Osasuna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401882768",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Real Sociedad",
+      "away_team": "Getafe",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401882767",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Villarreal",
+      "away_team": "Rayo Vallecano",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401882766",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Alav\u00e9s",
+      "away_team": "Elche",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401882765",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Athletic Club",
+      "away_team": "Real Betis",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401882762",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Barcelona",
+      "away_team": "Real Sociedad",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401882764",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Celta Vigo",
+      "away_team": "Atl\u00e9tico Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401882763",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Deportivo La Coru\u00f1a",
+      "away_team": "Real Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401882761",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Getafe",
+      "away_team": "Levante",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401882760",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Osasuna",
+      "away_team": "Villarreal",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401882759",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Rayo Vallecano",
+      "away_team": "M\u00e1laga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401882758",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Sevilla",
+      "away_team": "Racing Santander",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401882757",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Valencia",
+      "away_team": "Espanyol",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401882755",
+      "date": "2027-01-03T20:00Z",
+      "home_team": "Celta Vigo",
+      "away_team": "Deportivo La Coru\u00f1a",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401882754",
+      "date": "2027-01-03T20:00Z",
+      "home_team": "Espanyol",
+      "away_team": "Barcelona",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401882753",
+      "date": "2027-01-03T20:00Z",
+      "home_team": "Levante",
+      "away_team": "Valencia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401882752",
+      "date": "2027-01-03T20:00Z",
+      "home_team": "M\u00e1laga",
+      "away_team": "Elche",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401882751",
+      "date": "2027-01-03T20:00Z",
+      "home_team": "Racing Santander",
+      "away_team": "Athletic Club",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401882750",
+      "date": "2027-01-03T20:00Z",
+      "home_team": "Rayo Vallecano",
+      "away_team": "Atl\u00e9tico Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401882756",
+      "date": "2027-01-03T20:00Z",
+      "home_team": "Real Betis",
+      "away_team": "Alav\u00e9s",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401882749",
+      "date": "2027-01-03T20:00Z",
+      "home_team": "Real Madrid",
+      "away_team": "Getafe",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401882748",
+      "date": "2027-01-03T20:00Z",
+      "home_team": "Real Sociedad",
+      "away_team": "Osasuna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401882747",
+      "date": "2027-01-03T20:00Z",
+      "home_team": "Villarreal",
+      "away_team": "Sevilla",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401882746",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Alav\u00e9s",
+      "away_team": "Real Sociedad",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401882745",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Athletic Club",
+      "away_team": "Villarreal",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401882744",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Atl\u00e9tico Madrid",
+      "away_team": "Racing Santander",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401882743",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Deportivo La Coru\u00f1a",
+      "away_team": "Rayo Vallecano",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401882742",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Elche",
+      "away_team": "Getafe",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401882741",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Espanyol",
+      "away_team": "Real Betis",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401882740",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Osasuna",
+      "away_team": "Barcelona",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401882739",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Real Madrid",
+      "away_team": "Levante",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401882738",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Sevilla",
+      "away_team": "Celta Vigo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401882737",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Valencia",
+      "away_team": "M\u00e1laga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401882736",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Atl\u00e9tico Madrid",
+      "away_team": "Real Sociedad",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401882733",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Barcelona",
+      "away_team": "Elche",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401882734",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Celta Vigo",
+      "away_team": "Valencia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401882732",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Getafe",
+      "away_team": "Athletic Club",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401882731",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Levante",
+      "away_team": "Espanyol",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401882730",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "M\u00e1laga",
+      "away_team": "Real Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401882729",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Racing Santander",
+      "away_team": "Osasuna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401882728",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Rayo Vallecano",
+      "away_team": "Sevilla",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401882735",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Real Betis",
+      "away_team": "Deportivo La Coru\u00f1a",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401882727",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Villarreal",
+      "away_team": "Alav\u00e9s",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401882726",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Alav\u00e9s",
+      "away_team": "Barcelona",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401882725",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Athletic Club",
+      "away_team": "Levante",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401882724",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Deportivo La Coru\u00f1a",
+      "away_team": "Atl\u00e9tico Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401882723",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Elche",
+      "away_team": "Rayo Vallecano",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401882722",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Espanyol",
+      "away_team": "Villarreal",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401882721",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Getafe",
+      "away_team": "Osasuna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401882720",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Racing Santander",
+      "away_team": "Celta Vigo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401882719",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Real Madrid",
+      "away_team": "Real Betis",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401882718",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Real Sociedad",
+      "away_team": "M\u00e1laga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401882717",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Valencia",
+      "away_team": "Sevilla",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401882716",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Atl\u00e9tico Madrid",
+      "away_team": "Espanyol",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401882713",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Barcelona",
+      "away_team": "Valencia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401882714",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Celta Vigo",
+      "away_team": "Getafe",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401882712",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Levante",
+      "away_team": "Real Sociedad",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401882711",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "M\u00e1laga",
+      "away_team": "Alav\u00e9s",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401882710",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Osasuna",
+      "away_team": "Deportivo La Coru\u00f1a",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401882709",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Rayo Vallecano",
+      "away_team": "Real Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401882715",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Real Betis",
+      "away_team": "Elche",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401882708",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Sevilla",
+      "away_team": "Athletic Club",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401882707",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Villarreal",
+      "away_team": "Racing Santander",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401882706",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Alav\u00e9s",
+      "away_team": "Celta Vigo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401882705",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Athletic Club",
+      "away_team": "Osasuna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401882700",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Barcelona",
+      "away_team": "Atl\u00e9tico Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401882703",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Deportivo La Coru\u00f1a",
+      "away_team": "M\u00e1laga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401882702",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Elche",
+      "away_team": "Levante",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401882701",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Espanyol",
+      "away_team": "Rayo Vallecano",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401882699",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Getafe",
+      "away_team": "Villarreal",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401882704",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Real Betis",
+      "away_team": "Sevilla",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401882698",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Real Sociedad",
+      "away_team": "Real Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401882697",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Valencia",
+      "away_team": "Racing Santander",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401882696",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Celta Vigo",
+      "away_team": "Rayo Vallecano",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401882695",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Elche",
+      "away_team": "Deportivo La Coru\u00f1a",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401882694",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Levante",
+      "away_team": "M\u00e1laga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401882693",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Osasuna",
+      "away_team": "Atl\u00e9tico Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401882692",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Racing Santander",
+      "away_team": "Getafe",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401882691",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Real Madrid",
+      "away_team": "Athletic Club",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401882690",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Real Sociedad",
+      "away_team": "Real Betis",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401882689",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Sevilla",
+      "away_team": "Espanyol",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401882688",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Valencia",
+      "away_team": "Alav\u00e9s",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401882687",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Villarreal",
+      "away_team": "Barcelona",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401882686",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Alav\u00e9s",
+      "away_team": "Racing Santander",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401882685",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Athletic Club",
+      "away_team": "Celta Vigo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401882684",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Atl\u00e9tico Madrid",
+      "away_team": "Elche",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401882681",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Barcelona",
+      "away_team": "Levante",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401882683",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Deportivo La Coru\u00f1a",
+      "away_team": "Real Sociedad",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401882682",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Espanyol",
+      "away_team": "Osasuna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401882680",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "M\u00e1laga",
+      "away_team": "Real Betis",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401882679",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Rayo Vallecano",
+      "away_team": "Getafe",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401882678",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Sevilla",
+      "away_team": "Real Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401882677",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Villarreal",
+      "away_team": "Valencia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401882676",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Athletic Club",
+      "away_team": "Barcelona",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401882674",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Celta Vigo",
+      "away_team": "Espanyol",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401882673",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Getafe",
+      "away_team": "Alav\u00e9s",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401882672",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Levante",
+      "away_team": "Deportivo La Coru\u00f1a",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401882671",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "M\u00e1laga",
+      "away_team": "Atl\u00e9tico Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401882670",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Osasuna",
+      "away_team": "Sevilla",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401882669",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Racing Santander",
+      "away_team": "Rayo Vallecano",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401882675",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Real Betis",
+      "away_team": "Villarreal",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401882668",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Real Madrid",
+      "away_team": "Valencia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401882667",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Real Sociedad",
+      "away_team": "Elche",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401882666",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Alav\u00e9s",
+      "away_team": "Athletic Club",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401882665",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Atl\u00e9tico Madrid",
+      "away_team": "Celta Vigo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401882661",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Barcelona",
+      "away_team": "Real Betis",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401882664",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Deportivo La Coru\u00f1a",
+      "away_team": "Getafe",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401882663",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Elche",
+      "away_team": "M\u00e1laga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401882662",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Espanyol",
+      "away_team": "Racing Santander",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401882660",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Rayo Vallecano",
+      "away_team": "Osasuna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401882659",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Sevilla",
+      "away_team": "Real Sociedad",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401882658",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Valencia",
+      "away_team": "Levante",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401882657",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Villarreal",
+      "away_team": "Real Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401882656",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Alav\u00e9s",
+      "away_team": "Sevilla",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401882655",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Athletic Club",
+      "away_team": "Valencia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401882652",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Barcelona",
+      "away_team": "Deportivo La Coru\u00f1a",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401882653",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Elche",
+      "away_team": "Villarreal",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401882651",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Getafe",
+      "away_team": "Real Sociedad",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401882650",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "M\u00e1laga",
+      "away_team": "Rayo Vallecano",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401882649",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Osasuna",
+      "away_team": "Celta Vigo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401882648",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Racing Santander",
+      "away_team": "Atl\u00e9tico Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401882654",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Real Betis",
+      "away_team": "Levante",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401882647",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Real Madrid",
+      "away_team": "Espanyol",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401882646",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Atl\u00e9tico Madrid",
+      "away_team": "Getafe",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401882645",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Celta Vigo",
+      "away_team": "Real Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401882644",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Espanyol",
+      "away_team": "Athletic Club",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401882643",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Levante",
+      "away_team": "Osasuna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401882642",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Racing Santander",
+      "away_team": "Real Betis",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401882641",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Rayo Vallecano",
+      "away_team": "Barcelona",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401882640",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Real Sociedad",
+      "away_team": "Alav\u00e9s",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401882639",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Sevilla",
+      "away_team": "Elche",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401882638",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Valencia",
+      "away_team": "Deportivo La Coru\u00f1a",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401882637",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Villarreal",
+      "away_team": "M\u00e1laga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401882636",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Athletic Club",
+      "away_team": "Racing Santander",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401882632",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Barcelona",
+      "away_team": "Sevilla",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401882634",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Deportivo La Coru\u00f1a",
+      "away_team": "Villarreal",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401882633",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Elche",
+      "away_team": "Alav\u00e9s",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401882631",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Getafe",
+      "away_team": "Espanyol",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401882630",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Levante",
+      "away_team": "Rayo Vallecano",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401882629",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "M\u00e1laga",
+      "away_team": "Osasuna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401882635",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Real Betis",
+      "away_team": "Celta Vigo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401882628",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Real Madrid",
+      "away_team": "Atl\u00e9tico Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401882627",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Real Sociedad",
+      "away_team": "Valencia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401882626",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Alav\u00e9s",
+      "away_team": "Real Betis",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401882625",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Atl\u00e9tico Madrid",
+      "away_team": "Levante",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401882624",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Celta Vigo",
+      "away_team": "Elche",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401882623",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Espanyol",
+      "away_team": "M\u00e1laga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401882622",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Osasuna",
+      "away_team": "Real Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401882621",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Racing Santander",
+      "away_team": "Barcelona",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401882620",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Rayo Vallecano",
+      "away_team": "Real Sociedad",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401882619",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Sevilla",
+      "away_team": "Deportivo La Coru\u00f1a",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401882618",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Valencia",
+      "away_team": "Getafe",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401882617",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Villarreal",
+      "away_team": "Athletic Club",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401882616",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Alav\u00e9s",
+      "away_team": "Rayo Vallecano",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401882615",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Atl\u00e9tico Madrid",
+      "away_team": "Sevilla",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401882611",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Barcelona",
+      "away_team": "Espanyol",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401882613",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Deportivo La Coru\u00f1a",
+      "away_team": "Celta Vigo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401882612",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Elche",
+      "away_team": "Osasuna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401882610",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Getafe",
+      "away_team": "Real Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401882609",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Levante",
+      "away_team": "Villarreal",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401882608",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "M\u00e1laga",
+      "away_team": "Valencia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401882614",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Real Betis",
+      "away_team": "Athletic Club",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401882607",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Real Sociedad",
+      "away_team": "Racing Santander",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401882606",
+      "date": "2027-04-21T18:00Z",
+      "home_team": "Athletic Club",
+      "away_team": "Deportivo La Coru\u00f1a",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401882605",
+      "date": "2027-04-21T18:00Z",
+      "home_team": "Celta Vigo",
+      "away_team": "Barcelona",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401882604",
+      "date": "2027-04-21T18:00Z",
+      "home_team": "Espanyol",
+      "away_team": "Real Sociedad",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401882603",
+      "date": "2027-04-21T18:00Z",
+      "home_team": "Getafe",
+      "away_team": "Real Betis",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401882602",
+      "date": "2027-04-21T18:00Z",
+      "home_team": "Osasuna",
+      "away_team": "Alav\u00e9s",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401882601",
+      "date": "2027-04-21T18:00Z",
+      "home_team": "Racing Santander",
+      "away_team": "M\u00e1laga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401882600",
+      "date": "2027-04-21T18:00Z",
+      "home_team": "Real Madrid",
+      "away_team": "Elche",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401882599",
+      "date": "2027-04-21T18:00Z",
+      "home_team": "Sevilla",
+      "away_team": "Levante",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401882598",
+      "date": "2027-04-21T18:00Z",
+      "home_team": "Valencia",
+      "away_team": "Rayo Vallecano",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401882597",
+      "date": "2027-04-21T18:00Z",
+      "home_team": "Villarreal",
+      "away_team": "Atl\u00e9tico Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401882596",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Atl\u00e9tico Madrid",
+      "away_team": "Alav\u00e9s",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401882591",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Barcelona",
+      "away_team": "Osasuna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401882594",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Celta Vigo",
+      "away_team": "Sevilla",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401882593",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Deportivo La Coru\u00f1a",
+      "away_team": "Racing Santander",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401882592",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Elche",
+      "away_team": "Espanyol",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401882590",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Levante",
+      "away_team": "Real Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401882589",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "M\u00e1laga",
+      "away_team": "Getafe",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401882588",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Rayo Vallecano",
+      "away_team": "Villarreal",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401882595",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Real Betis",
+      "away_team": "Valencia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401882587",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Real Sociedad",
+      "away_team": "Athletic Club",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401882586",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Alav\u00e9s",
+      "away_team": "Levante",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401882585",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Athletic Club",
+      "away_team": "M\u00e1laga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401882583",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Getafe",
+      "away_team": "Elche",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401882582",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Osasuna",
+      "away_team": "Real Sociedad",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401882581",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Racing Santander",
+      "away_team": "Sevilla",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401882580",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Rayo Vallecano",
+      "away_team": "Deportivo La Coru\u00f1a",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401882584",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Real Betis",
+      "away_team": "Espanyol",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401882579",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Real Madrid",
+      "away_team": "Barcelona",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401882578",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Valencia",
+      "away_team": "Atl\u00e9tico Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401882577",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Villarreal",
+      "away_team": "Celta Vigo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401882576",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Atl\u00e9tico Madrid",
+      "away_team": "Rayo Vallecano",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401882575",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Deportivo La Coru\u00f1a",
+      "away_team": "Alav\u00e9s",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401882574",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Elche",
+      "away_team": "Athletic Club",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401882573",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Espanyol",
+      "away_team": "Valencia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401882572",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Levante",
+      "away_team": "Getafe",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401882571",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "M\u00e1laga",
+      "away_team": "Celta Vigo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401882570",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Osasuna",
+      "away_team": "Real Betis",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401882569",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Real Madrid",
+      "away_team": "Racing Santander",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401882568",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Real Sociedad",
+      "away_team": "Barcelona",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401882567",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Sevilla",
+      "away_team": "Villarreal",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401882566",
+      "date": "2027-05-23T18:00Z",
+      "home_team": "Alav\u00e9s",
+      "away_team": "Real Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401882565",
+      "date": "2027-05-23T18:00Z",
+      "home_team": "Atl\u00e9tico Madrid",
+      "away_team": "Athletic Club",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401882562",
+      "date": "2027-05-23T18:00Z",
+      "home_team": "Barcelona",
+      "away_team": "M\u00e1laga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401882564",
+      "date": "2027-05-23T18:00Z",
+      "home_team": "Celta Vigo",
+      "away_team": "Real Sociedad",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401882563",
+      "date": "2027-05-23T18:00Z",
+      "home_team": "Deportivo La Coru\u00f1a",
+      "away_team": "Espanyol",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401882561",
+      "date": "2027-05-23T18:00Z",
+      "home_team": "Racing Santander",
+      "away_team": "Levante",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401882560",
+      "date": "2027-05-23T18:00Z",
+      "home_team": "Rayo Vallecano",
+      "away_team": "Real Betis",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401882559",
+      "date": "2027-05-23T18:00Z",
+      "home_team": "Sevilla",
+      "away_team": "Getafe",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401882558",
+      "date": "2027-05-23T18:00Z",
+      "home_team": "Valencia",
+      "away_team": "Elche",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401882557",
+      "date": "2027-05-23T18:00Z",
+      "home_team": "Villarreal",
+      "away_team": "Osasuna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401882556",
+      "date": "2027-05-30T18:00Z",
+      "home_team": "Athletic Club",
+      "away_team": "Rayo Vallecano",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401882554",
+      "date": "2027-05-30T18:00Z",
+      "home_team": "Elche",
+      "away_team": "Racing Santander",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401882553",
+      "date": "2027-05-30T18:00Z",
+      "home_team": "Espanyol",
+      "away_team": "Alav\u00e9s",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401882552",
+      "date": "2027-05-30T18:00Z",
+      "home_team": "Getafe",
+      "away_team": "Barcelona",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401882551",
+      "date": "2027-05-30T18:00Z",
+      "home_team": "Levante",
+      "away_team": "Celta Vigo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401882550",
+      "date": "2027-05-30T18:00Z",
+      "home_team": "M\u00e1laga",
+      "away_team": "Sevilla",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401882549",
+      "date": "2027-05-30T18:00Z",
+      "home_team": "Osasuna",
+      "away_team": "Valencia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401882555",
+      "date": "2027-05-30T18:00Z",
+      "home_team": "Real Betis",
+      "away_team": "Atl\u00e9tico Madrid",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401882548",
+      "date": "2027-05-30T18:00Z",
+      "home_team": "Real Madrid",
+      "away_team": "Deportivo La Coru\u00f1a",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401882547",
+      "date": "2027-05-30T18:00Z",
+      "home_team": "Real Sociedad",
+      "away_team": "Villarreal",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    }
+  ]
+}

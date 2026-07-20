@@ -1,0 +1,5728 @@
+{
+  "league": "championship",
+  "season": 2026,
+  "generated_at": "2026-07-20T21:05:50.178391+00:00",
+  "match_count": 552,
+  "weeks": [
+    {
+      "week": 1,
+      "start_date": "2026-08-14",
+      "end_date": "2026-08-14",
+      "match_count": 1
+    },
+    {
+      "week": 2,
+      "start_date": "2026-08-15",
+      "end_date": "2026-08-17",
+      "match_count": 11
+    },
+    {
+      "week": 3,
+      "start_date": "2026-08-22",
+      "end_date": "2026-08-28",
+      "match_count": 13
+    },
+    {
+      "week": 4,
+      "start_date": "2026-08-29",
+      "end_date": "2026-09-02",
+      "match_count": 23
+    },
+    {
+      "week": 5,
+      "start_date": "2026-09-05",
+      "end_date": "2026-09-11",
+      "match_count": 25
+    },
+    {
+      "week": 6,
+      "start_date": "2026-09-12",
+      "end_date": "2026-09-18",
+      "match_count": 12
+    },
+    {
+      "week": 7,
+      "start_date": "2026-09-19",
+      "end_date": "2026-09-19",
+      "match_count": 11
+    },
+    {
+      "week": 8,
+      "start_date": "2026-10-10",
+      "end_date": "2026-10-14",
+      "match_count": 24
+    },
+    {
+      "week": 9,
+      "start_date": "2026-10-17",
+      "end_date": "2026-10-17",
+      "match_count": 12
+    },
+    {
+      "week": 10,
+      "start_date": "2026-10-24",
+      "end_date": "2026-10-24",
+      "match_count": 12
+    },
+    {
+      "week": 11,
+      "start_date": "2026-10-31",
+      "end_date": "2026-11-04",
+      "match_count": 24
+    },
+    {
+      "week": 12,
+      "start_date": "2026-11-07",
+      "end_date": "2026-11-07",
+      "match_count": 12
+    },
+    {
+      "week": 13,
+      "start_date": "2026-11-21",
+      "end_date": "2026-11-25",
+      "match_count": 24
+    },
+    {
+      "week": 14,
+      "start_date": "2026-11-28",
+      "end_date": "2026-11-28",
+      "match_count": 12
+    },
+    {
+      "week": 15,
+      "start_date": "2026-12-05",
+      "end_date": "2026-12-09",
+      "match_count": 24
+    },
+    {
+      "week": 16,
+      "start_date": "2026-12-12",
+      "end_date": "2026-12-12",
+      "match_count": 12
+    },
+    {
+      "week": 17,
+      "start_date": "2026-12-19",
+      "end_date": "2026-12-19",
+      "match_count": 12
+    },
+    {
+      "week": 18,
+      "start_date": "2026-12-26",
+      "end_date": "2027-01-01",
+      "match_count": 36
+    },
+    {
+      "week": 19,
+      "start_date": "2027-01-16",
+      "end_date": "2027-01-16",
+      "match_count": 12
+    },
+    {
+      "week": 20,
+      "start_date": "2027-01-23",
+      "end_date": "2027-01-27",
+      "match_count": 24
+    },
+    {
+      "week": 21,
+      "start_date": "2027-01-30",
+      "end_date": "2027-01-30",
+      "match_count": 12
+    },
+    {
+      "week": 22,
+      "start_date": "2027-02-06",
+      "end_date": "2027-02-06",
+      "match_count": 12
+    },
+    {
+      "week": 23,
+      "start_date": "2027-02-13",
+      "end_date": "2027-02-17",
+      "match_count": 24
+    },
+    {
+      "week": 24,
+      "start_date": "2027-02-20",
+      "end_date": "2027-02-20",
+      "match_count": 12
+    },
+    {
+      "week": 25,
+      "start_date": "2027-02-27",
+      "end_date": "2027-03-03",
+      "match_count": 24
+    },
+    {
+      "week": 26,
+      "start_date": "2027-03-06",
+      "end_date": "2027-03-06",
+      "match_count": 12
+    },
+    {
+      "week": 27,
+      "start_date": "2027-03-13",
+      "end_date": "2027-03-17",
+      "match_count": 24
+    },
+    {
+      "week": 28,
+      "start_date": "2027-03-20",
+      "end_date": "2027-03-20",
+      "match_count": 12
+    },
+    {
+      "week": 29,
+      "start_date": "2027-04-03",
+      "end_date": "2027-04-07",
+      "match_count": 24
+    },
+    {
+      "week": 30,
+      "start_date": "2027-04-10",
+      "end_date": "2027-04-10",
+      "match_count": 12
+    },
+    {
+      "week": 31,
+      "start_date": "2027-04-17",
+      "end_date": "2027-04-21",
+      "match_count": 24
+    },
+    {
+      "week": 32,
+      "start_date": "2027-04-24",
+      "end_date": "2027-04-24",
+      "match_count": 12
+    },
+    {
+      "week": 33,
+      "start_date": "2027-05-01",
+      "end_date": "2027-05-01",
+      "match_count": 12
+    }
+  ],
+  "matches": [
+    {
+      "event_id": "401880340",
+      "date": "2026-08-14T19:00Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401880339",
+      "date": "2026-08-15T11:30Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401880338",
+      "date": "2026-08-15T14:00Z",
+      "home_team": "Bristol City",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401880337",
+      "date": "2026-08-15T14:00Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401880336",
+      "date": "2026-08-15T14:00Z",
+      "home_team": "Middlesbrough",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401880335",
+      "date": "2026-08-15T14:00Z",
+      "home_team": "Norwich City",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401880334",
+      "date": "2026-08-15T14:00Z",
+      "home_team": "Portsmouth",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401880333",
+      "date": "2026-08-15T14:00Z",
+      "home_team": "Stoke City",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401880332",
+      "date": "2026-08-15T16:30Z",
+      "home_team": "Sheffield United",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401880331",
+      "date": "2026-08-16T12:30Z",
+      "home_team": "Watford",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401880330",
+      "date": "2026-08-16T15:00Z",
+      "home_team": "Burnley",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401880329",
+      "date": "2026-08-17T19:00Z",
+      "home_team": "Cardiff City",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401880328",
+      "date": "2026-08-22T11:30Z",
+      "home_team": "Birmingham City",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401880325",
+      "date": "2026-08-22T11:30Z",
+      "home_team": "Lincoln City",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401880324",
+      "date": "2026-08-22T11:30Z",
+      "home_team": "Millwall",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401880327",
+      "date": "2026-08-22T14:00Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401880326",
+      "date": "2026-08-22T14:00Z",
+      "home_team": "Derby County",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401880323",
+      "date": "2026-08-22T14:00Z",
+      "home_team": "Preston North End",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401880322",
+      "date": "2026-08-22T14:00Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401880321",
+      "date": "2026-08-22T14:00Z",
+      "home_team": "Southampton",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401880320",
+      "date": "2026-08-22T14:00Z",
+      "home_team": "Swansea City",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401880319",
+      "date": "2026-08-22T14:00Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401880318",
+      "date": "2026-08-22T14:00Z",
+      "home_team": "West Ham United",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401880317",
+      "date": "2026-08-22T14:00Z",
+      "home_team": "Wrexham",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401880305",
+      "date": "2026-08-28T19:00Z",
+      "home_team": "Wrexham",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401880311",
+      "date": "2026-08-29T11:30Z",
+      "home_team": "Derby County",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880316",
+      "date": "2026-08-29T14:00Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880315",
+      "date": "2026-08-29T14:00Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880314",
+      "date": "2026-08-29T14:00Z",
+      "home_team": "Bristol City",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880313",
+      "date": "2026-08-29T14:00Z",
+      "home_team": "Cardiff City",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880312",
+      "date": "2026-08-29T14:00Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880310",
+      "date": "2026-08-29T14:00Z",
+      "home_team": "Middlesbrough",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880309",
+      "date": "2026-08-29T14:00Z",
+      "home_team": "Norwich City",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880308",
+      "date": "2026-08-29T14:00Z",
+      "home_team": "Southampton",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880307",
+      "date": "2026-08-29T14:00Z",
+      "home_team": "Watford",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880306",
+      "date": "2026-08-29T14:00Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880304",
+      "date": "2026-09-01T18:45Z",
+      "home_team": "Birmingham City",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880303",
+      "date": "2026-09-01T18:45Z",
+      "home_team": "Lincoln City",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880302",
+      "date": "2026-09-01T18:45Z",
+      "home_team": "Portsmouth",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880301",
+      "date": "2026-09-01T18:45Z",
+      "home_team": "Preston North End",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880300",
+      "date": "2026-09-01T18:45Z",
+      "home_team": "Sheffield United",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880299",
+      "date": "2026-09-01T18:45Z",
+      "home_team": "Stoke City",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880298",
+      "date": "2026-09-01T18:45Z",
+      "home_team": "Swansea City",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880297",
+      "date": "2026-09-01T18:45Z",
+      "home_team": "West Ham United",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880296",
+      "date": "2026-09-02T18:45Z",
+      "home_team": "Burnley",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880295",
+      "date": "2026-09-02T18:45Z",
+      "home_team": "Millwall",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880294",
+      "date": "2026-09-02T18:45Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880293",
+      "date": "2026-09-02T18:45Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401880290",
+      "date": "2026-09-05T11:30Z",
+      "home_team": "Lincoln City",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880287",
+      "date": "2026-09-05T11:30Z",
+      "home_team": "Preston North End",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880284",
+      "date": "2026-09-05T11:30Z",
+      "home_team": "Stoke City",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880291",
+      "date": "2026-09-05T14:00Z",
+      "home_team": "Burnley",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880289",
+      "date": "2026-09-05T14:00Z",
+      "home_team": "Millwall",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880288",
+      "date": "2026-09-05T14:00Z",
+      "home_team": "Portsmouth",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880286",
+      "date": "2026-09-05T14:00Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880285",
+      "date": "2026-09-05T14:00Z",
+      "home_team": "Sheffield United",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880282",
+      "date": "2026-09-05T14:00Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880281",
+      "date": "2026-09-05T14:00Z",
+      "home_team": "West Ham United",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880283",
+      "date": "2026-09-05T19:00Z",
+      "home_team": "Swansea City",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880292",
+      "date": "2026-09-06T11:00Z",
+      "home_team": "Birmingham City",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880276",
+      "date": "2026-09-08T18:45Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880275",
+      "date": "2026-09-08T18:45Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880274",
+      "date": "2026-09-08T18:45Z",
+      "home_team": "Bristol City",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880273",
+      "date": "2026-09-08T18:45Z",
+      "home_team": "Cardiff City",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880280",
+      "date": "2026-09-08T18:45Z",
+      "home_team": "Middlesbrough",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880279",
+      "date": "2026-09-08T18:45Z",
+      "home_team": "Southampton",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880278",
+      "date": "2026-09-08T18:45Z",
+      "home_team": "Watford",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880269",
+      "date": "2026-09-08T18:45Z",
+      "home_team": "Wrexham",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880271",
+      "date": "2026-09-09T18:45Z",
+      "home_team": "Derby County",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880270",
+      "date": "2026-09-09T18:45Z",
+      "home_team": "Norwich City",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880277",
+      "date": "2026-09-09T18:45Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880272",
+      "date": "2026-09-09T19:00Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880257",
+      "date": "2026-09-11T19:00Z",
+      "home_team": "West Ham United",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401880265",
+      "date": "2026-09-12T11:30Z",
+      "home_team": "Derby County",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401880268",
+      "date": "2026-09-12T14:00Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401880267",
+      "date": "2026-09-12T14:00Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401880266",
+      "date": "2026-09-12T14:00Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401880264",
+      "date": "2026-09-12T14:00Z",
+      "home_team": "Middlesbrough",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401880263",
+      "date": "2026-09-12T14:00Z",
+      "home_team": "Preston North End",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401880262",
+      "date": "2026-09-12T14:00Z",
+      "home_team": "Sheffield United",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401880261",
+      "date": "2026-09-12T14:00Z",
+      "home_team": "Southampton",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401880260",
+      "date": "2026-09-12T14:00Z",
+      "home_team": "Swansea City",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401880259",
+      "date": "2026-09-12T14:00Z",
+      "home_team": "Watford",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401880258",
+      "date": "2026-09-12T14:00Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401880255",
+      "date": "2026-09-18T19:00Z",
+      "home_team": "Bristol City",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401880253",
+      "date": "2026-09-19T11:30Z",
+      "home_team": "Cardiff City",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401880251",
+      "date": "2026-09-19T11:30Z",
+      "home_team": "Millwall",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401880256",
+      "date": "2026-09-19T14:00Z",
+      "home_team": "Birmingham City",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401880254",
+      "date": "2026-09-19T14:00Z",
+      "home_team": "Burnley",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401880252",
+      "date": "2026-09-19T14:00Z",
+      "home_team": "Lincoln City",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401880250",
+      "date": "2026-09-19T14:00Z",
+      "home_team": "Norwich City",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401880249",
+      "date": "2026-09-19T14:00Z",
+      "home_team": "Portsmouth",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401880248",
+      "date": "2026-09-19T14:00Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401880247",
+      "date": "2026-09-19T14:00Z",
+      "home_team": "Stoke City",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401880246",
+      "date": "2026-09-19T14:00Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401880245",
+      "date": "2026-09-19T14:00Z",
+      "home_team": "Wrexham",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401880244",
+      "date": "2026-10-10T14:00Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880243",
+      "date": "2026-10-10T14:00Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880242",
+      "date": "2026-10-10T14:00Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880241",
+      "date": "2026-10-10T14:00Z",
+      "home_team": "Derby County",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880240",
+      "date": "2026-10-10T14:00Z",
+      "home_team": "Middlesbrough",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880239",
+      "date": "2026-10-10T14:00Z",
+      "home_team": "Preston North End",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880238",
+      "date": "2026-10-10T14:00Z",
+      "home_team": "Sheffield United",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880237",
+      "date": "2026-10-10T14:00Z",
+      "home_team": "Southampton",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880236",
+      "date": "2026-10-10T14:00Z",
+      "home_team": "Swansea City",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880235",
+      "date": "2026-10-10T14:00Z",
+      "home_team": "Watford",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880234",
+      "date": "2026-10-10T14:00Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880233",
+      "date": "2026-10-10T14:00Z",
+      "home_team": "West Ham United",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880232",
+      "date": "2026-10-13T18:45Z",
+      "home_team": "Birmingham City",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880231",
+      "date": "2026-10-13T18:45Z",
+      "home_team": "Bristol City",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880230",
+      "date": "2026-10-13T18:45Z",
+      "home_team": "Burnley",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880229",
+      "date": "2026-10-13T18:45Z",
+      "home_team": "Cardiff City",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880228",
+      "date": "2026-10-13T18:45Z",
+      "home_team": "Millwall",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880227",
+      "date": "2026-10-13T18:45Z",
+      "home_team": "Stoke City",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880226",
+      "date": "2026-10-13T18:45Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880225",
+      "date": "2026-10-13T18:45Z",
+      "home_team": "Wrexham",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880224",
+      "date": "2026-10-14T18:45Z",
+      "home_team": "Lincoln City",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880223",
+      "date": "2026-10-14T18:45Z",
+      "home_team": "Norwich City",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880222",
+      "date": "2026-10-14T18:45Z",
+      "home_team": "Portsmouth",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880221",
+      "date": "2026-10-14T18:45Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401880220",
+      "date": "2026-10-17T14:00Z",
+      "home_team": "Birmingham City",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401880219",
+      "date": "2026-10-17T14:00Z",
+      "home_team": "Bristol City",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401880218",
+      "date": "2026-10-17T14:00Z",
+      "home_team": "Burnley",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401880217",
+      "date": "2026-10-17T14:00Z",
+      "home_team": "Derby County",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401880216",
+      "date": "2026-10-17T14:00Z",
+      "home_team": "Middlesbrough",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401880215",
+      "date": "2026-10-17T14:00Z",
+      "home_team": "Millwall",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401880214",
+      "date": "2026-10-17T14:00Z",
+      "home_team": "Norwich City",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401880213",
+      "date": "2026-10-17T14:00Z",
+      "home_team": "Southampton",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401880212",
+      "date": "2026-10-17T14:00Z",
+      "home_team": "Swansea City",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401880211",
+      "date": "2026-10-17T14:00Z",
+      "home_team": "Watford",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401880210",
+      "date": "2026-10-17T14:00Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401880209",
+      "date": "2026-10-17T14:00Z",
+      "home_team": "Wrexham",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401880208",
+      "date": "2026-10-24T14:00Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401880207",
+      "date": "2026-10-24T14:00Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401880206",
+      "date": "2026-10-24T14:00Z",
+      "home_team": "Cardiff City",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401880205",
+      "date": "2026-10-24T14:00Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401880204",
+      "date": "2026-10-24T14:00Z",
+      "home_team": "Lincoln City",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401880203",
+      "date": "2026-10-24T14:00Z",
+      "home_team": "Portsmouth",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401880202",
+      "date": "2026-10-24T14:00Z",
+      "home_team": "Preston North End",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401880201",
+      "date": "2026-10-24T14:00Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401880200",
+      "date": "2026-10-24T14:00Z",
+      "home_team": "Sheffield United",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401880199",
+      "date": "2026-10-24T14:00Z",
+      "home_team": "Stoke City",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401880198",
+      "date": "2026-10-24T14:00Z",
+      "home_team": "West Ham United",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401880197",
+      "date": "2026-10-24T14:00Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401880196",
+      "date": "2026-10-31T15:00Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880195",
+      "date": "2026-10-31T15:00Z",
+      "home_team": "Burnley",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880194",
+      "date": "2026-10-31T15:00Z",
+      "home_team": "Lincoln City",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880193",
+      "date": "2026-10-31T15:00Z",
+      "home_team": "Middlesbrough",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880192",
+      "date": "2026-10-31T15:00Z",
+      "home_team": "Millwall",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880191",
+      "date": "2026-10-31T15:00Z",
+      "home_team": "Norwich City",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880190",
+      "date": "2026-10-31T15:00Z",
+      "home_team": "Sheffield United",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880189",
+      "date": "2026-10-31T15:00Z",
+      "home_team": "Southampton",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880188",
+      "date": "2026-10-31T15:00Z",
+      "home_team": "Stoke City",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880187",
+      "date": "2026-10-31T15:00Z",
+      "home_team": "Swansea City",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880186",
+      "date": "2026-10-31T15:00Z",
+      "home_team": "West Ham United",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880185",
+      "date": "2026-10-31T15:00Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880184",
+      "date": "2026-11-03T19:45Z",
+      "home_team": "Birmingham City",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880183",
+      "date": "2026-11-03T19:45Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880182",
+      "date": "2026-11-03T19:45Z",
+      "home_team": "Derby County",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880181",
+      "date": "2026-11-03T19:45Z",
+      "home_team": "Portsmouth",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880180",
+      "date": "2026-11-03T19:45Z",
+      "home_team": "Preston North End",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880179",
+      "date": "2026-11-03T19:45Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880178",
+      "date": "2026-11-03T19:45Z",
+      "home_team": "Watford",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880177",
+      "date": "2026-11-03T19:45Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880176",
+      "date": "2026-11-04T19:45Z",
+      "home_team": "Bristol City",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880175",
+      "date": "2026-11-04T19:45Z",
+      "home_team": "Cardiff City",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880174",
+      "date": "2026-11-04T19:45Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880173",
+      "date": "2026-11-04T19:45Z",
+      "home_team": "Wrexham",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401880172",
+      "date": "2026-11-07T15:00Z",
+      "home_team": "Birmingham City",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401880171",
+      "date": "2026-11-07T15:00Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401880170",
+      "date": "2026-11-07T15:00Z",
+      "home_team": "Bristol City",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401880169",
+      "date": "2026-11-07T15:00Z",
+      "home_team": "Cardiff City",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401880168",
+      "date": "2026-11-07T15:00Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401880167",
+      "date": "2026-11-07T15:00Z",
+      "home_team": "Derby County",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401880166",
+      "date": "2026-11-07T15:00Z",
+      "home_team": "Portsmouth",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401880165",
+      "date": "2026-11-07T15:00Z",
+      "home_team": "Preston North End",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401880164",
+      "date": "2026-11-07T15:00Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401880163",
+      "date": "2026-11-07T15:00Z",
+      "home_team": "Watford",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401880162",
+      "date": "2026-11-07T15:00Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401880161",
+      "date": "2026-11-07T15:00Z",
+      "home_team": "Wrexham",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401880160",
+      "date": "2026-11-21T15:00Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880159",
+      "date": "2026-11-21T15:00Z",
+      "home_team": "Burnley",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880158",
+      "date": "2026-11-21T15:00Z",
+      "home_team": "Lincoln City",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880157",
+      "date": "2026-11-21T15:00Z",
+      "home_team": "Middlesbrough",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880156",
+      "date": "2026-11-21T15:00Z",
+      "home_team": "Millwall",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880155",
+      "date": "2026-11-21T15:00Z",
+      "home_team": "Norwich City",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880154",
+      "date": "2026-11-21T15:00Z",
+      "home_team": "Sheffield United",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880153",
+      "date": "2026-11-21T15:00Z",
+      "home_team": "Southampton",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880152",
+      "date": "2026-11-21T15:00Z",
+      "home_team": "Stoke City",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880151",
+      "date": "2026-11-21T15:00Z",
+      "home_team": "Swansea City",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880150",
+      "date": "2026-11-21T15:00Z",
+      "home_team": "West Ham United",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880149",
+      "date": "2026-11-21T15:00Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880148",
+      "date": "2026-11-24T19:45Z",
+      "home_team": "Bristol City",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880147",
+      "date": "2026-11-24T19:45Z",
+      "home_team": "Cardiff City",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880146",
+      "date": "2026-11-24T19:45Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880145",
+      "date": "2026-11-24T19:45Z",
+      "home_team": "Middlesbrough",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880144",
+      "date": "2026-11-24T19:45Z",
+      "home_team": "Norwich City",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880143",
+      "date": "2026-11-24T19:45Z",
+      "home_team": "Portsmouth",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880142",
+      "date": "2026-11-24T19:45Z",
+      "home_team": "Sheffield United",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880141",
+      "date": "2026-11-24T19:45Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880140",
+      "date": "2026-11-25T19:45Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880139",
+      "date": "2026-11-25T19:45Z",
+      "home_team": "Burnley",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880138",
+      "date": "2026-11-25T19:45Z",
+      "home_team": "Stoke City",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880137",
+      "date": "2026-11-25T19:45Z",
+      "home_team": "Watford",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401880136",
+      "date": "2026-11-28T15:00Z",
+      "home_team": "Birmingham City",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401880135",
+      "date": "2026-11-28T15:00Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401880134",
+      "date": "2026-11-28T15:00Z",
+      "home_team": "Derby County",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401880133",
+      "date": "2026-11-28T15:00Z",
+      "home_team": "Lincoln City",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401880132",
+      "date": "2026-11-28T15:00Z",
+      "home_team": "Millwall",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401880131",
+      "date": "2026-11-28T15:00Z",
+      "home_team": "Preston North End",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401880130",
+      "date": "2026-11-28T15:00Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401880129",
+      "date": "2026-11-28T15:00Z",
+      "home_team": "Southampton",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401880128",
+      "date": "2026-11-28T15:00Z",
+      "home_team": "Swansea City",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401880127",
+      "date": "2026-11-28T15:00Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401880126",
+      "date": "2026-11-28T15:00Z",
+      "home_team": "West Ham United",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401880125",
+      "date": "2026-11-28T15:00Z",
+      "home_team": "Wrexham",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401880124",
+      "date": "2026-12-05T15:00Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880123",
+      "date": "2026-12-05T15:00Z",
+      "home_team": "Bristol City",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880122",
+      "date": "2026-12-05T15:00Z",
+      "home_team": "Burnley",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880121",
+      "date": "2026-12-05T15:00Z",
+      "home_team": "Cardiff City",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880120",
+      "date": "2026-12-05T15:00Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880119",
+      "date": "2026-12-05T15:00Z",
+      "home_team": "Middlesbrough",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880118",
+      "date": "2026-12-05T15:00Z",
+      "home_team": "Norwich City",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880117",
+      "date": "2026-12-05T15:00Z",
+      "home_team": "Portsmouth",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880116",
+      "date": "2026-12-05T15:00Z",
+      "home_team": "Sheffield United",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880115",
+      "date": "2026-12-05T15:00Z",
+      "home_team": "Stoke City",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880114",
+      "date": "2026-12-05T15:00Z",
+      "home_team": "Watford",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880113",
+      "date": "2026-12-05T15:00Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880112",
+      "date": "2026-12-08T19:45Z",
+      "home_team": "Birmingham City",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880111",
+      "date": "2026-12-08T19:45Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880110",
+      "date": "2026-12-08T19:45Z",
+      "home_team": "Millwall",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880109",
+      "date": "2026-12-08T19:45Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880108",
+      "date": "2026-12-08T19:45Z",
+      "home_team": "Swansea City",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880107",
+      "date": "2026-12-08T19:45Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880106",
+      "date": "2026-12-08T19:45Z",
+      "home_team": "West Ham United",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880105",
+      "date": "2026-12-08T19:45Z",
+      "home_team": "Wrexham",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880104",
+      "date": "2026-12-09T19:45Z",
+      "home_team": "Derby County",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880103",
+      "date": "2026-12-09T19:45Z",
+      "home_team": "Lincoln City",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880102",
+      "date": "2026-12-09T19:45Z",
+      "home_team": "Preston North End",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880101",
+      "date": "2026-12-09T19:45Z",
+      "home_team": "Southampton",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401880100",
+      "date": "2026-12-12T15:00Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401880099",
+      "date": "2026-12-12T15:00Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401880098",
+      "date": "2026-12-12T15:00Z",
+      "home_team": "Cardiff City",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401880097",
+      "date": "2026-12-12T15:00Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401880096",
+      "date": "2026-12-12T15:00Z",
+      "home_team": "Lincoln City",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401880095",
+      "date": "2026-12-12T15:00Z",
+      "home_team": "Portsmouth",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401880094",
+      "date": "2026-12-12T15:00Z",
+      "home_team": "Preston North End",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401880093",
+      "date": "2026-12-12T15:00Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401880092",
+      "date": "2026-12-12T15:00Z",
+      "home_team": "Sheffield United",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401880091",
+      "date": "2026-12-12T15:00Z",
+      "home_team": "Stoke City",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401880090",
+      "date": "2026-12-12T15:00Z",
+      "home_team": "West Ham United",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401880089",
+      "date": "2026-12-12T15:00Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401880088",
+      "date": "2026-12-19T15:00Z",
+      "home_team": "Birmingham City",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401880087",
+      "date": "2026-12-19T15:00Z",
+      "home_team": "Bristol City",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401880086",
+      "date": "2026-12-19T15:00Z",
+      "home_team": "Burnley",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401880085",
+      "date": "2026-12-19T15:00Z",
+      "home_team": "Derby County",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401880084",
+      "date": "2026-12-19T15:00Z",
+      "home_team": "Middlesbrough",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401880083",
+      "date": "2026-12-19T15:00Z",
+      "home_team": "Millwall",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401880082",
+      "date": "2026-12-19T15:00Z",
+      "home_team": "Norwich City",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401880081",
+      "date": "2026-12-19T15:00Z",
+      "home_team": "Southampton",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401880080",
+      "date": "2026-12-19T15:00Z",
+      "home_team": "Swansea City",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401880079",
+      "date": "2026-12-19T15:00Z",
+      "home_team": "Watford",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401880078",
+      "date": "2026-12-19T15:00Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401880077",
+      "date": "2026-12-19T15:00Z",
+      "home_team": "Wrexham",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401880076",
+      "date": "2026-12-26T15:00Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401880075",
+      "date": "2026-12-26T15:00Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401880074",
+      "date": "2026-12-26T15:00Z",
+      "home_team": "Cardiff City",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401880073",
+      "date": "2026-12-26T15:00Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401880072",
+      "date": "2026-12-26T15:00Z",
+      "home_team": "Lincoln City",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401880071",
+      "date": "2026-12-26T15:00Z",
+      "home_team": "Portsmouth",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401880070",
+      "date": "2026-12-26T15:00Z",
+      "home_team": "Preston North End",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401880069",
+      "date": "2026-12-26T15:00Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879681",
+      "date": "2026-12-26T15:00Z",
+      "home_team": "Sheffield United",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879680",
+      "date": "2026-12-26T15:00Z",
+      "home_team": "Stoke City",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879679",
+      "date": "2026-12-26T15:00Z",
+      "home_team": "West Ham United",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879678",
+      "date": "2026-12-26T15:00Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879677",
+      "date": "2026-12-29T19:45Z",
+      "home_team": "Birmingham City",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879676",
+      "date": "2026-12-29T19:45Z",
+      "home_team": "Bristol City",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879675",
+      "date": "2026-12-29T19:45Z",
+      "home_team": "Burnley",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879674",
+      "date": "2026-12-29T19:45Z",
+      "home_team": "Derby County",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879673",
+      "date": "2026-12-29T19:45Z",
+      "home_team": "Middlesbrough",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879672",
+      "date": "2026-12-29T19:45Z",
+      "home_team": "Millwall",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879671",
+      "date": "2026-12-29T19:45Z",
+      "home_team": "Norwich City",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879670",
+      "date": "2026-12-29T19:45Z",
+      "home_team": "Southampton",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879669",
+      "date": "2026-12-29T19:45Z",
+      "home_team": "Swansea City",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879668",
+      "date": "2026-12-29T19:45Z",
+      "home_team": "Watford",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879667",
+      "date": "2026-12-29T19:45Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879666",
+      "date": "2026-12-29T19:45Z",
+      "home_team": "Wrexham",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879665",
+      "date": "2027-01-01T15:00Z",
+      "home_team": "Birmingham City",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879664",
+      "date": "2027-01-01T15:00Z",
+      "home_team": "Bristol City",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879663",
+      "date": "2027-01-01T15:00Z",
+      "home_team": "Burnley",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879662",
+      "date": "2027-01-01T15:00Z",
+      "home_team": "Derby County",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879661",
+      "date": "2027-01-01T15:00Z",
+      "home_team": "Middlesbrough",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879660",
+      "date": "2027-01-01T15:00Z",
+      "home_team": "Millwall",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879659",
+      "date": "2027-01-01T15:00Z",
+      "home_team": "Norwich City",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879658",
+      "date": "2027-01-01T15:00Z",
+      "home_team": "Southampton",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401879657",
+      "date": "2027-01-01T15:00Z",
+      "home_team": "Swansea City",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401880562",
+      "date": "2027-01-01T15:00Z",
+      "home_team": "Watford",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401880563",
+      "date": "2027-01-01T15:00Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401880564",
+      "date": "2027-01-01T15:00Z",
+      "home_team": "Wrexham",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401880565",
+      "date": "2027-01-16T15:00Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401880566",
+      "date": "2027-01-16T15:00Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401880567",
+      "date": "2027-01-16T15:00Z",
+      "home_team": "Cardiff City",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401880568",
+      "date": "2027-01-16T15:00Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401880569",
+      "date": "2027-01-16T15:00Z",
+      "home_team": "Lincoln City",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401880570",
+      "date": "2027-01-16T15:00Z",
+      "home_team": "Portsmouth",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401880571",
+      "date": "2027-01-16T15:00Z",
+      "home_team": "Preston North End",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401880573",
+      "date": "2027-01-16T15:00Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401880572",
+      "date": "2027-01-16T15:00Z",
+      "home_team": "Sheffield United",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401880574",
+      "date": "2027-01-16T15:00Z",
+      "home_team": "Stoke City",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401880575",
+      "date": "2027-01-16T15:00Z",
+      "home_team": "West Ham United",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401880576",
+      "date": "2027-01-16T15:00Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401880577",
+      "date": "2027-01-23T15:00Z",
+      "home_team": "Birmingham City",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880578",
+      "date": "2027-01-23T15:00Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880579",
+      "date": "2027-01-23T15:00Z",
+      "home_team": "Bristol City",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880580",
+      "date": "2027-01-23T15:00Z",
+      "home_team": "Cardiff City",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880581",
+      "date": "2027-01-23T15:00Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880582",
+      "date": "2027-01-23T15:00Z",
+      "home_team": "Derby County",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880583",
+      "date": "2027-01-23T15:00Z",
+      "home_team": "Portsmouth",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880584",
+      "date": "2027-01-23T15:00Z",
+      "home_team": "Preston North End",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880585",
+      "date": "2027-01-23T15:00Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880586",
+      "date": "2027-01-23T15:00Z",
+      "home_team": "Watford",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880587",
+      "date": "2027-01-23T15:00Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880588",
+      "date": "2027-01-23T15:00Z",
+      "home_team": "Wrexham",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880589",
+      "date": "2027-01-26T19:45Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880590",
+      "date": "2027-01-26T19:45Z",
+      "home_team": "Burnley",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880591",
+      "date": "2027-01-26T19:45Z",
+      "home_team": "Lincoln City",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880592",
+      "date": "2027-01-26T19:45Z",
+      "home_team": "Millwall",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880593",
+      "date": "2027-01-26T19:45Z",
+      "home_team": "Norwich City",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880594",
+      "date": "2027-01-26T19:45Z",
+      "home_team": "Sheffield United",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880595",
+      "date": "2027-01-26T19:45Z",
+      "home_team": "Southampton",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880561",
+      "date": "2027-01-26T19:45Z",
+      "home_team": "Stoke City",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880560",
+      "date": "2027-01-27T19:45Z",
+      "home_team": "Middlesbrough",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880559",
+      "date": "2027-01-27T19:45Z",
+      "home_team": "Swansea City",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880558",
+      "date": "2027-01-27T19:45Z",
+      "home_team": "West Ham United",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880557",
+      "date": "2027-01-27T19:45Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401880556",
+      "date": "2027-01-30T15:00Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401880555",
+      "date": "2027-01-30T15:00Z",
+      "home_team": "Burnley",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401880554",
+      "date": "2027-01-30T15:00Z",
+      "home_team": "Lincoln City",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401880553",
+      "date": "2027-01-30T15:00Z",
+      "home_team": "Middlesbrough",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401880552",
+      "date": "2027-01-30T15:00Z",
+      "home_team": "Millwall",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401880551",
+      "date": "2027-01-30T15:00Z",
+      "home_team": "Norwich City",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401880550",
+      "date": "2027-01-30T15:00Z",
+      "home_team": "Sheffield United",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401880549",
+      "date": "2027-01-30T15:00Z",
+      "home_team": "Southampton",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401880548",
+      "date": "2027-01-30T15:00Z",
+      "home_team": "Stoke City",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401880547",
+      "date": "2027-01-30T15:00Z",
+      "home_team": "Swansea City",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401880546",
+      "date": "2027-01-30T15:00Z",
+      "home_team": "West Ham United",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401880545",
+      "date": "2027-01-30T15:00Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401880544",
+      "date": "2027-02-06T15:00Z",
+      "home_team": "Birmingham City",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401880543",
+      "date": "2027-02-06T15:00Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401880542",
+      "date": "2027-02-06T15:00Z",
+      "home_team": "Bristol City",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401880541",
+      "date": "2027-02-06T15:00Z",
+      "home_team": "Cardiff City",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401880540",
+      "date": "2027-02-06T15:00Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401880539",
+      "date": "2027-02-06T15:00Z",
+      "home_team": "Derby County",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401880538",
+      "date": "2027-02-06T15:00Z",
+      "home_team": "Portsmouth",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401880537",
+      "date": "2027-02-06T15:00Z",
+      "home_team": "Preston North End",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401880536",
+      "date": "2027-02-06T15:00Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401880535",
+      "date": "2027-02-06T15:00Z",
+      "home_team": "Watford",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401880534",
+      "date": "2027-02-06T15:00Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401880533",
+      "date": "2027-02-06T15:00Z",
+      "home_team": "Wrexham",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401880532",
+      "date": "2027-02-13T15:00Z",
+      "home_team": "Birmingham City",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880531",
+      "date": "2027-02-13T15:00Z",
+      "home_team": "Bristol City",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880530",
+      "date": "2027-02-13T15:00Z",
+      "home_team": "Burnley",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880529",
+      "date": "2027-02-13T15:00Z",
+      "home_team": "Cardiff City",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880528",
+      "date": "2027-02-13T15:00Z",
+      "home_team": "Lincoln City",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880527",
+      "date": "2027-02-13T15:00Z",
+      "home_team": "Millwall",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880526",
+      "date": "2027-02-13T15:00Z",
+      "home_team": "Norwich City",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880525",
+      "date": "2027-02-13T15:00Z",
+      "home_team": "Portsmouth",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880524",
+      "date": "2027-02-13T15:00Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880523",
+      "date": "2027-02-13T15:00Z",
+      "home_team": "Stoke City",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880522",
+      "date": "2027-02-13T15:00Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880521",
+      "date": "2027-02-13T15:00Z",
+      "home_team": "Wrexham",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880520",
+      "date": "2027-02-16T19:45Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880519",
+      "date": "2027-02-16T19:45Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880518",
+      "date": "2027-02-16T19:45Z",
+      "home_team": "Derby County",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880517",
+      "date": "2027-02-16T19:45Z",
+      "home_team": "Preston North End",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880516",
+      "date": "2027-02-16T19:45Z",
+      "home_team": "Sheffield United",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880515",
+      "date": "2027-02-16T19:45Z",
+      "home_team": "Watford",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880514",
+      "date": "2027-02-16T19:45Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880513",
+      "date": "2027-02-16T19:45Z",
+      "home_team": "West Ham United",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880512",
+      "date": "2027-02-17T19:45Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880511",
+      "date": "2027-02-17T19:45Z",
+      "home_team": "Middlesbrough",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880510",
+      "date": "2027-02-17T19:45Z",
+      "home_team": "Southampton",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880509",
+      "date": "2027-02-17T19:45Z",
+      "home_team": "Swansea City",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401880508",
+      "date": "2027-02-20T15:00Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401880507",
+      "date": "2027-02-20T15:00Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401880506",
+      "date": "2027-02-20T15:00Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401880505",
+      "date": "2027-02-20T15:00Z",
+      "home_team": "Derby County",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401880504",
+      "date": "2027-02-20T15:00Z",
+      "home_team": "Middlesbrough",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401880503",
+      "date": "2027-02-20T15:00Z",
+      "home_team": "Preston North End",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401880502",
+      "date": "2027-02-20T15:00Z",
+      "home_team": "Sheffield United",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401880501",
+      "date": "2027-02-20T15:00Z",
+      "home_team": "Southampton",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401880500",
+      "date": "2027-02-20T15:00Z",
+      "home_team": "Swansea City",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401880499",
+      "date": "2027-02-20T15:00Z",
+      "home_team": "Watford",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401880498",
+      "date": "2027-02-20T15:00Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401880497",
+      "date": "2027-02-20T15:00Z",
+      "home_team": "West Ham United",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401880496",
+      "date": "2027-02-27T15:00Z",
+      "home_team": "Birmingham City",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880495",
+      "date": "2027-02-27T15:00Z",
+      "home_team": "Bristol City",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880494",
+      "date": "2027-02-27T15:00Z",
+      "home_team": "Burnley",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880493",
+      "date": "2027-02-27T15:00Z",
+      "home_team": "Cardiff City",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880492",
+      "date": "2027-02-27T15:00Z",
+      "home_team": "Lincoln City",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880491",
+      "date": "2027-02-27T15:00Z",
+      "home_team": "Millwall",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880490",
+      "date": "2027-02-27T15:00Z",
+      "home_team": "Norwich City",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880489",
+      "date": "2027-02-27T15:00Z",
+      "home_team": "Portsmouth",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880488",
+      "date": "2027-02-27T15:00Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880487",
+      "date": "2027-02-27T15:00Z",
+      "home_team": "Stoke City",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880486",
+      "date": "2027-02-27T15:00Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880485",
+      "date": "2027-02-27T15:00Z",
+      "home_team": "Wrexham",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880484",
+      "date": "2027-03-02T19:45Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880483",
+      "date": "2027-03-02T19:45Z",
+      "home_team": "Bristol City",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880482",
+      "date": "2027-03-02T19:45Z",
+      "home_team": "Burnley",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880481",
+      "date": "2027-03-02T19:45Z",
+      "home_team": "Cardiff City",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880480",
+      "date": "2027-03-02T19:45Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880479",
+      "date": "2027-03-02T19:45Z",
+      "home_team": "Middlesbrough",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880478",
+      "date": "2027-03-02T19:45Z",
+      "home_team": "Norwich City",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880477",
+      "date": "2027-03-02T19:45Z",
+      "home_team": "Watford",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880476",
+      "date": "2027-03-03T19:45Z",
+      "home_team": "Portsmouth",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880475",
+      "date": "2027-03-03T19:45Z",
+      "home_team": "Sheffield United",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880474",
+      "date": "2027-03-03T19:45Z",
+      "home_team": "Stoke City",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880473",
+      "date": "2027-03-03T19:45Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401880472",
+      "date": "2027-03-06T15:00Z",
+      "home_team": "Birmingham City",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401880471",
+      "date": "2027-03-06T15:00Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401880470",
+      "date": "2027-03-06T15:00Z",
+      "home_team": "Derby County",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401880469",
+      "date": "2027-03-06T15:00Z",
+      "home_team": "Lincoln City",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401880468",
+      "date": "2027-03-06T15:00Z",
+      "home_team": "Millwall",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401880467",
+      "date": "2027-03-06T15:00Z",
+      "home_team": "Preston North End",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401880466",
+      "date": "2027-03-06T15:00Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401880465",
+      "date": "2027-03-06T15:00Z",
+      "home_team": "Southampton",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401880464",
+      "date": "2027-03-06T15:00Z",
+      "home_team": "Swansea City",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401880463",
+      "date": "2027-03-06T15:00Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401880462",
+      "date": "2027-03-06T15:00Z",
+      "home_team": "West Ham United",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401880461",
+      "date": "2027-03-06T15:00Z",
+      "home_team": "Wrexham",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401880460",
+      "date": "2027-03-13T15:00Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880459",
+      "date": "2027-03-13T15:00Z",
+      "home_team": "Bristol City",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880458",
+      "date": "2027-03-13T15:00Z",
+      "home_team": "Burnley",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880457",
+      "date": "2027-03-13T15:00Z",
+      "home_team": "Cardiff City",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880456",
+      "date": "2027-03-13T15:00Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880455",
+      "date": "2027-03-13T15:00Z",
+      "home_team": "Middlesbrough",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880454",
+      "date": "2027-03-13T15:00Z",
+      "home_team": "Norwich City",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880453",
+      "date": "2027-03-13T15:00Z",
+      "home_team": "Portsmouth",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880452",
+      "date": "2027-03-13T15:00Z",
+      "home_team": "Sheffield United",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880451",
+      "date": "2027-03-13T15:00Z",
+      "home_team": "Stoke City",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880450",
+      "date": "2027-03-13T15:00Z",
+      "home_team": "Watford",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880449",
+      "date": "2027-03-13T15:00Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880448",
+      "date": "2027-03-16T19:45Z",
+      "home_team": "Derby County",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880447",
+      "date": "2027-03-16T19:45Z",
+      "home_team": "Lincoln City",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880446",
+      "date": "2027-03-16T19:45Z",
+      "home_team": "Preston North End",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880445",
+      "date": "2027-03-16T19:45Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880444",
+      "date": "2027-03-16T19:45Z",
+      "home_team": "Southampton",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880443",
+      "date": "2027-03-16T19:45Z",
+      "home_team": "Swansea City",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880442",
+      "date": "2027-03-16T19:45Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880441",
+      "date": "2027-03-16T19:45Z",
+      "home_team": "Wrexham",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880440",
+      "date": "2027-03-17T19:45Z",
+      "home_team": "Birmingham City",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880439",
+      "date": "2027-03-17T19:45Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880438",
+      "date": "2027-03-17T19:45Z",
+      "home_team": "Millwall",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880437",
+      "date": "2027-03-17T19:45Z",
+      "home_team": "West Ham United",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401880436",
+      "date": "2027-03-20T15:00Z",
+      "home_team": "Birmingham City",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401880435",
+      "date": "2027-03-20T15:00Z",
+      "home_team": "Bristol City",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401880434",
+      "date": "2027-03-20T15:00Z",
+      "home_team": "Burnley",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401880433",
+      "date": "2027-03-20T15:00Z",
+      "home_team": "Derby County",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401880432",
+      "date": "2027-03-20T15:00Z",
+      "home_team": "Middlesbrough",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401880431",
+      "date": "2027-03-20T15:00Z",
+      "home_team": "Millwall",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401880430",
+      "date": "2027-03-20T15:00Z",
+      "home_team": "Norwich City",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401880429",
+      "date": "2027-03-20T15:00Z",
+      "home_team": "Southampton",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401880428",
+      "date": "2027-03-20T15:00Z",
+      "home_team": "Swansea City",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401880427",
+      "date": "2027-03-20T15:00Z",
+      "home_team": "Watford",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401880426",
+      "date": "2027-03-20T15:00Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401880425",
+      "date": "2027-03-20T15:00Z",
+      "home_team": "Wrexham",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401880424",
+      "date": "2027-04-03T14:00Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880423",
+      "date": "2027-04-03T14:00Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880422",
+      "date": "2027-04-03T14:00Z",
+      "home_team": "Cardiff City",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880421",
+      "date": "2027-04-03T14:00Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880420",
+      "date": "2027-04-03T14:00Z",
+      "home_team": "Lincoln City",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880419",
+      "date": "2027-04-03T14:00Z",
+      "home_team": "Portsmouth",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880418",
+      "date": "2027-04-03T14:00Z",
+      "home_team": "Preston North End",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880417",
+      "date": "2027-04-03T14:00Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880416",
+      "date": "2027-04-03T14:00Z",
+      "home_team": "Sheffield United",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880415",
+      "date": "2027-04-03T14:00Z",
+      "home_team": "Stoke City",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880414",
+      "date": "2027-04-03T14:00Z",
+      "home_team": "West Ham United",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880413",
+      "date": "2027-04-03T14:00Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880412",
+      "date": "2027-04-06T18:45Z",
+      "home_team": "Burnley",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880411",
+      "date": "2027-04-06T18:45Z",
+      "home_team": "Lincoln City",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880410",
+      "date": "2027-04-06T18:45Z",
+      "home_team": "Millwall",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880409",
+      "date": "2027-04-06T18:45Z",
+      "home_team": "Portsmouth",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880408",
+      "date": "2027-04-06T18:45Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880407",
+      "date": "2027-04-06T18:45Z",
+      "home_team": "Stoke City",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880406",
+      "date": "2027-04-06T18:45Z",
+      "home_team": "Swansea City",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880405",
+      "date": "2027-04-06T18:45Z",
+      "home_team": "West Ham United",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880404",
+      "date": "2027-04-07T18:45Z",
+      "home_team": "Birmingham City",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880403",
+      "date": "2027-04-07T18:45Z",
+      "home_team": "Preston North End",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880402",
+      "date": "2027-04-07T18:45Z",
+      "home_team": "Sheffield United",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880401",
+      "date": "2027-04-07T18:45Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401880400",
+      "date": "2027-04-10T14:00Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401880399",
+      "date": "2027-04-10T14:00Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401880398",
+      "date": "2027-04-10T14:00Z",
+      "home_team": "Bristol City",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401880397",
+      "date": "2027-04-10T14:00Z",
+      "home_team": "Cardiff City",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401880396",
+      "date": "2027-04-10T14:00Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401880395",
+      "date": "2027-04-10T14:00Z",
+      "home_team": "Derby County",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401880394",
+      "date": "2027-04-10T14:00Z",
+      "home_team": "Middlesbrough",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401880393",
+      "date": "2027-04-10T14:00Z",
+      "home_team": "Norwich City",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401880392",
+      "date": "2027-04-10T14:00Z",
+      "home_team": "Southampton",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401880391",
+      "date": "2027-04-10T14:00Z",
+      "home_team": "Watford",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401880390",
+      "date": "2027-04-10T14:00Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401880389",
+      "date": "2027-04-10T14:00Z",
+      "home_team": "Wrexham",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401880388",
+      "date": "2027-04-17T14:00Z",
+      "home_team": "Birmingham City",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880387",
+      "date": "2027-04-17T14:00Z",
+      "home_team": "Burnley",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880386",
+      "date": "2027-04-17T14:00Z",
+      "home_team": "Lincoln City",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880385",
+      "date": "2027-04-17T14:00Z",
+      "home_team": "Millwall",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880384",
+      "date": "2027-04-17T14:00Z",
+      "home_team": "Portsmouth",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880383",
+      "date": "2027-04-17T14:00Z",
+      "home_team": "Preston North End",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880382",
+      "date": "2027-04-17T14:00Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880381",
+      "date": "2027-04-17T14:00Z",
+      "home_team": "Sheffield United",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880380",
+      "date": "2027-04-17T14:00Z",
+      "home_team": "Stoke City",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880379",
+      "date": "2027-04-17T14:00Z",
+      "home_team": "Swansea City",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880378",
+      "date": "2027-04-17T14:00Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880377",
+      "date": "2027-04-17T14:00Z",
+      "home_team": "West Ham United",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880376",
+      "date": "2027-04-20T18:45Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880375",
+      "date": "2027-04-20T18:45Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880374",
+      "date": "2027-04-20T18:45Z",
+      "home_team": "Derby County",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880373",
+      "date": "2027-04-20T18:45Z",
+      "home_team": "Middlesbrough",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880372",
+      "date": "2027-04-20T18:45Z",
+      "home_team": "Norwich City",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880371",
+      "date": "2027-04-20T18:45Z",
+      "home_team": "Southampton",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880370",
+      "date": "2027-04-20T18:45Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880369",
+      "date": "2027-04-20T18:45Z",
+      "home_team": "Wrexham",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880368",
+      "date": "2027-04-21T18:45Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880367",
+      "date": "2027-04-21T18:45Z",
+      "home_team": "Bristol City",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880366",
+      "date": "2027-04-21T18:45Z",
+      "home_team": "Cardiff City",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880365",
+      "date": "2027-04-21T18:45Z",
+      "home_team": "Watford",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401880364",
+      "date": "2027-04-24T14:00Z",
+      "home_team": "Bolton Wanderers",
+      "away_team": "Swansea City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401880363",
+      "date": "2027-04-24T14:00Z",
+      "home_team": "Bristol City",
+      "away_team": "Derby County",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401880362",
+      "date": "2027-04-24T14:00Z",
+      "home_team": "Burnley",
+      "away_team": "Southampton",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401880361",
+      "date": "2027-04-24T14:00Z",
+      "home_team": "Cardiff City",
+      "away_team": "West Bromwich Albion",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401880360",
+      "date": "2027-04-24T14:00Z",
+      "home_team": "Charlton Athletic",
+      "away_team": "Wrexham",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401880359",
+      "date": "2027-04-24T14:00Z",
+      "home_team": "Middlesbrough",
+      "away_team": "West Ham United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401880358",
+      "date": "2027-04-24T14:00Z",
+      "home_team": "Norwich City",
+      "away_team": "Blackburn Rovers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401880357",
+      "date": "2027-04-24T14:00Z",
+      "home_team": "Portsmouth",
+      "away_team": "Preston North End",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401880356",
+      "date": "2027-04-24T14:00Z",
+      "home_team": "Sheffield United",
+      "away_team": "Millwall",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401880355",
+      "date": "2027-04-24T14:00Z",
+      "home_team": "Stoke City",
+      "away_team": "Lincoln City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401880354",
+      "date": "2027-04-24T14:00Z",
+      "home_team": "Watford",
+      "away_team": "Birmingham City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401880353",
+      "date": "2027-04-24T14:00Z",
+      "home_team": "Wolverhampton Wanderers",
+      "away_team": "Queens Park Rangers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401880352",
+      "date": "2027-05-01T11:30Z",
+      "home_team": "Birmingham City",
+      "away_team": "Burnley",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401880351",
+      "date": "2027-05-01T11:30Z",
+      "home_team": "Blackburn Rovers",
+      "away_team": "Watford",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401880350",
+      "date": "2027-05-01T11:30Z",
+      "home_team": "Derby County",
+      "away_team": "Wolverhampton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401880349",
+      "date": "2027-05-01T11:30Z",
+      "home_team": "Lincoln City",
+      "away_team": "Charlton Athletic",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401880348",
+      "date": "2027-05-01T11:30Z",
+      "home_team": "Millwall",
+      "away_team": "Stoke City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401880347",
+      "date": "2027-05-01T11:30Z",
+      "home_team": "Preston North End",
+      "away_team": "Cardiff City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401880346",
+      "date": "2027-05-01T11:30Z",
+      "home_team": "Queens Park Rangers",
+      "away_team": "Norwich City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401880345",
+      "date": "2027-05-01T11:30Z",
+      "home_team": "Southampton",
+      "away_team": "Sheffield United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401880344",
+      "date": "2027-05-01T11:30Z",
+      "home_team": "Swansea City",
+      "away_team": "Middlesbrough",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401880343",
+      "date": "2027-05-01T11:30Z",
+      "home_team": "West Bromwich Albion",
+      "away_team": "Bolton Wanderers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401880342",
+      "date": "2027-05-01T11:30Z",
+      "home_team": "West Ham United",
+      "away_team": "Portsmouth",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401880341",
+      "date": "2027-05-01T11:30Z",
+      "home_team": "Wrexham",
+      "away_team": "Bristol City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    }
+  ]
+}

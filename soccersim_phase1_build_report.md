@@ -745,3 +745,456 @@ this directly (`surfaces: ["cards", "game", "props", "live-lens", "daily
 archive", "hub"]`, `next_step` flags settlement as the unlock for the
 rest). Nothing in this phase has been pushed to git per the standing
 constraint -- confirmed via `git status` after the build.
+
+## Phase 13 addition: full rosters, a league selector, matchweek navigation, and full season schedules (2026-07-20, same session)
+
+User ask after Phase 12 shipped: "we need rosters in the same way other
+sports have them. The soccer endpoint needs the ability to select the
+league. We then need to display 'game weeks' as opposed to just dates
+(similarish to NFL/NCAAF) and we need to have full schedules for every
+team." Researched before building rather than guessing: no sport in this
+codebase has a roster-browsing page or a team-schedule page at all (roster
+data everywhere else is backend-only, feeding props/depth-chart math); NFL
+defines "week" as a query param (`?week=N&season=Y`), not a URL segment,
+derived from filenames, with no upstream source publishing an official
+matchday number for soccer either (checked ESPN's site API and football-
+data.co.uk directly -- neither carries one). So matchweeks are **computed**:
+`features/soccer/features/schedule.py::compute_matchweeks` buckets a
+league-season's full fixture list into 7-day windows from the season's
+start date and renumbers sequentially -- the same practical effect as NFL's
+fixed Tue-Mon week windows, with the same known edge case (a postponed/
+rearranged midweek fixture can land in a bucket a fan wouldn't call its
+"official" round).
+
+New ingestion: `ingestion/espn_teams.py` -- `fetch_league_teams` (every
+team's id/abbr/crest/colors; ESPN's site API turned out to already carry
+crest URLs and brand hex colors for free, closing the logo/color gap raised
+earlier this session) and `fetch_team_roster` (the *entire* rostered squad
+per team -- verified 33 players for Columbus Crew including backup
+keepers/reserves, vs. the Understat/ASA-derived `players_*.csv` rows which
+only cover players who accumulated meaningful per-90 minutes). Three new
+artifact-writer scripts: `build_soccer_teams.py` (`api/teams.json`),
+`build_soccer_rosters.py` (`api/rosters/rosters_{season}.csv`, mirroring
+other sports' `rosters_{season}.csv` naming), and `build_soccer_schedule.py`
+(`api/schedule/schedule_{season}.json` -- full-season fixture list with
+computed weeks, paged through ESPN's scoreboard in 21-day windows since a
+whole season in one query silently truncates around ~100 events).
+
+Every soccer page (`cards`, `live_lens`, `archive`, `props`) switched from
+`?date=` to `?week=&season=`, mirroring NFL's exact `control_type="number"`/
+`control_name="week"` convention -- no new template mechanism needed, same
+generic `control_*` slot every sport already uses. `cards.py::week_games`
+now starts from the **real schedule artifact** (every fixture ESPN has for
+the week) and layers SoccerSim's simulated output on top by event id, so a
+fixture that hasn't been simulated yet still shows up as a lightweight "not
+yet simulated" card instead of silently disappearing -- this is what
+satisfies "full schedules" at the cards-board level; a dedicated per-team
+schedule page (below) satisfies it at the team level. `archive.py` became a
+weekly archive (one card per matchweek) instead of a daily one.
+`build_soccer_artifacts.py` gained `--week`/`--season` to loop the existing
+per-date logic over every date in a resolved week in one command.
+
+League selector: `shared/_date_controls.html`'s existing-but-unused
+`extra_controls` slot (a `<select>`, no template changes needed for the
+control itself) got one small **additive** enhancement -- an optional
+`onchange` attribute, rendered only when a caller sets it, so switching
+league actually navigates instead of silently no-opping (a plain form
+submit couldn't work here since league is a URL path segment, not a query
+param; verified no other sport currently sets `extra_controls` at all, so
+this couldn't regress anything). `sources.py::league_select_control` builds
+the dropdown + the `window.location.href` swap for every soccer page.
+
+Two new pages, first of their kind anywhere in this codebase (confirmed
+before building -- no precedent to diverge from): `syndicate/features/
+soccer/team.py` -- `/soccer/<league>/team/<id>/roster` (full squad, grouped
+by position, `_rank_card.html`'s existing `headshot_url` field wired for
+free) and `/soccer/<league>/team/<id>/schedule` (every fixture for one team
+this season, linking into `cards`/`game` for weeks that have been
+simulated). Both reuse `shared/rank_board.html` -- consistent with every
+other soccer page's "generic shared template, no bespoke HTML" pattern.
+
+Verified against a live Flask dev server with real MLS 2026 data, not just
+unit tests: `build_soccer_teams.py` (30 teams), `build_soccer_schedule.py`
+(511 matches, 33 weeks), `build_soccer_rosters.py` (888 players). Week 17
+(2026-07-22 to 2026-07-25, the week containing "today" during this build)
+fully simulated via `--week 17 --season 2026`; cards/props/archive/live-lens
+all resolved to it by default, the league-selector `onchange` rendered
+correctly (HTML-entity-escaped, browser-safe), game-detail resolved a real
+match by id within the week, and both new team pages returned real data (33
+roster rows / 34 schedule rows for Columbus Crew). One real bug caught
+during this verification: an in-progress background artifact-writer run got
+killed by an over-broad `taskkill /IM python.exe` before finishing one of
+three dates in the week -- caught by checking the directory listing against
+what the run was supposed to produce, not by trusting the "completed" exit
+signal alone, and re-run individually to close the gap. 134 previously-
+green soccer tests (excluding the slow market-anchoring suite, unrelated to
+this pass) still pass; no new tests were added this pass since the changes
+are additive UI/ingestion, not new engine logic. Still uncommitted per the
+standing constraint.
+
+**Deliberately not done this pass:** logos/colors are captured in
+`teams.json` but not wired into the cards-board *display* -- confirmed the
+generic game-card template (`_game_card_generic.html`) doesn't render a
+team-crest `<img>` for **any** sport today, only a text/abbr badge, so
+threading a logo URL through would be inert until that template (shared
+across every sport) gets an image element, which is out of scope for a
+soccer-only pass. Roster/schedule data is not yet cross-linked from the
+cards board (no team-name-to-id link on each game card pointing at
+`/team/<id>/roster`) -- a natural next step, not attempted here.
+
+## Phase 14 addition: consolidated onto the shared team-branding pipeline, full rosters/schedules for all ten leagues (2026-07-20, same session)
+
+Immediately after Phase 13 shipped, discovered (via `git status`, not told
+about it) that a separate, concurrent uncommitted body of work already
+existed in this exact repo: `syndicate/features/shared/team_branding.py` +
+`scripts/build_team_branding_snapshot.py` (different Windows file owner,
+timestamps from the same day) -- a generic cross-sport team crest/color
+pipeline built on the same "ESPN's teams endpoint gives logo+hex-color for
+free" insight Phase 13 used, but designed to be shared across every sport
+instead of soccer-only. User's direction: fold soccer into that shared
+pipeline, then remove the soccer-only duplicate.
+
+Extended `SPORT_CONFIG` in `build_team_branding_snapshot.py` with all ten
+soccer leagues, keyed by the same league slugs `sources.py` already uses,
+each pointing at its ESPN league path (`soccer/eng.1`, `soccer/esp.1`, ...)
+and nested under `data/soccer_source/{league}/` via `local_dir_name`.
+
+Caught and fixed a real, pre-existing bug in that shared script while
+integrating it -- not something introduced this pass, but it blocked
+soccer (and every other sport using the script) equally: its synthetic
+repo-root probe path was missing a directory segment
+(`syndicate/features/_team_branding_probe.py`, 3 levels deep) relative to
+what `preferred_source_roots`' `parents[3]` assumes (a real sport's
+`sources.py` lives 4 levels deep: `sources.py -> {sport} -> features ->
+syndicate -> repo root`). The off-by-one meant every branding snapshot for
+every sport was silently written **one directory above the repo entirely**
+(`OneDrive/Coding/data/...` instead of `OneDrive/Coding/Syndicate/data/...`)
+-- present but invisible to anything that would ever read it. Fixed by
+adding the missing synthetic segment (`_probe/`) to the probe path;
+verified the corrected path lands inside the repo and matches what
+`sources.py` resolves independently.
+
+Generated real branding snapshots for all ten leagues (18-24 teams each,
+counts matching known league sizes) and rewired `sources.py`'s team
+directory (`team_by_id`/`team_by_name`/`all_teams`) to read
+`TeamBranding` rows from the shared snapshot instead of the Phase 13
+soccer-only `teams.json`. Removed the now-redundant code: `espn_teams.py`
+lost `fetch_league_teams`/`_primary_logo_url` (kept `fetch_team_roster`,
+which the shared module has no equivalent for), `scripts/
+build_soccer_teams.py` was deleted outright, `build_soccer_rosters.py`
+switched to reading `sources.py::all_teams` instead of the deleted
+`teams.json`. Confirmed with a grep sweep that no references to the
+removed `teams_payload`/`teams_path`/`build_soccer_teams.py` remained
+anywhere in soccer's own code.
+
+Then answered "did we pull schedules and rosters for all leagues" honestly:
+no, only MLS had been verified end-to-end in Phase 13. Ran
+`build_soccer_schedule.py` and `build_soccer_rosters.py` for the remaining
+nine leagues against the real, already-published 2026-27 season fixture
+lists (European leagues publish full-season schedules months before a
+ball is kicked): EPL 380 matches/34 weeks, La Liga 380/36, Bundesliga
+306/33, Serie A 380/36, Ligue 1 306/35, Eredivisie 306/36, Primeira Liga
+306/35, Championship 552/33, Belgian Pro League 306/35 -- all matching
+known league sizes (20/20/18/20/18/18/18/24/18 teams respectively) plus
+MLS's existing 511/33 from Phase 13. Rosters written for all ten leagues
+(4,354 player rows total across the nine new leagues).
+
+**Real data-quality gap found and reported, not silently absorbed:**
+roster completeness is uneven across leagues -- Bundesliga (6/18 clubs),
+La Liga (6/20), and especially Ligue 1 (9/17) each have several clubs
+where ESPN's own roster endpoint currently returns exactly one player
+(verified directly against the raw ESPN response, retried to rule out a
+transient blip -- consistently 1 athlete both times, e.g. RB Leipzig).
+This is an upstream ESPN data-completeness gap for the still-forming
+2026-27 squads on their platform, not a parsing bug in this pipeline (the
+other seven leagues, including MLS which is mid-season, have zero sparse
+clubs, median 28-39 players/team) -- worth a periodic re-run as ESPN's own
+squad pages fill in over the close season, not something to chase further
+on this pipeline's side. Verified end-to-end against a live dev server for
+EPL (real Arsenal roster: Raya, Kepa, etc.) and the sparse-Bundesliga case
+(renders cleanly with whatever ESPN currently has, no crash). 134 soccer
+tests plus 14 team-branding tests still green. Still uncommitted.
+
+## Phase 15 addition: an automated check for the sparse-roster data gap (2026-07-20, same session)
+
+User: "is there a check we can build in?" -- for the Bundesliga/La Liga/
+Ligue 1 sparse-roster gap from Phase 14. Built `sources.py::
+sparse_roster_teams(league, season, threshold=SPARSE_ROSTER_THRESHOLD=15)`
+(a bare matchday squad is 18; real registered squads run 20-30+) as the one
+shared check both the build script and the UI use, so the definition of
+"incomplete" lives in exactly one place.
+
+Three surfaces: (1) `build_soccer_rosters.py` prints a per-team warning
+list after every run, reading the just-written CSV back off disk through
+the same path the UI uses (catches a write-side bug here too, not only an
+ESPN-side gap); (2) `team.py`'s roster page shows a `warning_panel` when a
+team's stored roster is non-empty but under threshold (the true-zero case
+was already covered by the pre-existing empty-state message, so the new
+panel only needed to handle the 1-to-14 range -- verified both render
+correctly, not just the happy path); (3) the hub page shows a per-league
+"N team(s) have an incomplete ESPN roster on file" count, so a league-wide
+problem is visible without clicking into every team.
+
+While building this, added a retry (`_fetch_roster_with_retries`, 3
+attempts, ~2s apart) as a safety net for real request-level flakiness --
+then used it to test a live hypothesis: is the sparse data a per-request
+fluke, or a real (if unstable) state? Re-ran Bundesliga through the retry
+logic and got the *exact* same 14/18 sparse result, byte-for-byte matching
+the pre-retry run -- rules out sub-second flakiness. But re-checking
+`sparse_roster_teams()` across all ten leagues (no new fetch, just reading
+what was already on disk from Phase 14 vs. now) showed the picture had
+gotten *worse* over roughly 20-30 minutes within this same session:
+Bundesliga 6->14 sparse, La Liga 6->10, Ligue 1 9->10, and Championship
+went from zero sparse teams to 6/24. So the gap is real and drifts on a
+tens-of-minutes timescale, not something a request-level retry can paper
+over -- consistent with ESPN's own backend still assembling 2026-27 squad
+data during the close season, not a bug anywhere in this pipeline (retried
+and confirmed stable-in-the-moment each time). Final snapshot this
+session: EPL/Serie A/MLS/Eredivisie/Primeira Liga/Belgian Pro League all
+0 sparse; La Liga 10/20, Bundesliga 14/18, Ligue 1 10/18, Championship
+6/24. The automated check is what makes this trackable going forward --
+re-running `build_soccer_rosters.py` periodically (worth doing again
+closer to August) will show the real number moving toward zero as ESPN's
+own squad pages fill in, without anyone having to remember to look. 134
+soccer + 14 team-branding tests still green. Still uncommitted.
+
+## Phase 16 addition: a real UI validation pass across all ten leagues, and a genuine props bug it caught (2026-07-20, same session)
+
+User: "what's left, and can we do a UI validation for each league to ensure
+game cards look right and contain the right info?" Before validating,
+had to fix a gap the question itself exposed: only MLS had ever had real
+`recommendations_*.json` generated -- the other nine leagues had schedules/
+rosters/branding but zero simulated cards, so a "does the card look right"
+check would have had nothing to look at. Ran `build_soccer_artifacts.py`
+for each league's current default week (correctly resolved to "week 1,
+2026-27 season" for the nine European leagues since today is pre-season,
+and stayed on MLS's week 17 which was already populated) -- all ten now
+have real simulated cards.
+
+The validation itself: fetched every league's `/api/cards` and checked,
+programmatically, not just by eyeballing one card -- real team names (not
+a literal "Home"/"Away" fallback, which would mean fixture-to-rating
+team-name matching failed), win/draw/away probabilities summing to
+~100%, and no duplicate players within a match's top-prop panel. EPL's
+first card immediately failed the duplicate check: **Kai Havertz listed
+twice with two different anytime-scorer probabilities (19.4% and
+15.7%)**. Traced it to `build_soccer_artifacts.py::_load_player_rows`
+concatenating every season's `players_*.csv` it finds with no
+deduplication -- a player who appears in more than one season's file (the
+common case) gets one row per season, and `build_usage_profiles` treats
+each row as a distinct squad member. Checked the blast radius before
+calling it fixed: **586 of 893 combined EPL player-rows (293 of ~600
+distinct players) were duplicated this way**, and the same 2-season-file
+shape exists for Bundesliga/La Liga/Serie A/Ligue 1 -- five of the ten
+leagues, every big-five league with 2+ years of ingested player history.
+Not a cosmetic bug: a duplicated player dilutes every teammate's
+allocated shot/prop share and inflates the effective squad size used
+throughout `player_props.py`'s allocation math, so this was quietly
+distorting props for roughly half the league catalog since Phase 2 of
+the original engine build.
+
+Fixed by deduplicating on `player_id`, keeping the most recent season's
+row (`sorted(glob(...))` already orders frames oldest-to-newest, so
+`drop_duplicates(keep="last")` picks the latest); rows with no id are
+left alone since they can't be identified as duplicates. Regenerated all
+five affected leagues -- EPL's player-projection count for its one card
+dropped from 44 to 28 (roughly the expected ~1.6x reduction for ~50%
+duplication), Havertz now appears once. This one function is shared with
+`poll_soccer_live_state.py` too, so the live-lens path is fixed by the
+same change, not a second patch.
+
+Final validation result across all ten leagues, all green after the
+fix: real team names, probabilities summing correctly, no duplicate
+props, sensible card counts per week (EPL 1, La Liga 9, Bundesliga 1,
+Serie A 11, Ligue 1 1, MLS 23, Eredivisie/Primeira Liga/Championship/
+Belgian Pro League 1 each -- all matching the actual number of fixtures
+ESPN has on the schedule for each league's opening week). Also spot-
+checked props/archive/live-lens/game-detail/roster/team-schedule pages
+for non-MLS leagues, including the two known-props-gap leagues
+(Championship, Primeira Liga) to confirm they render a clean empty state
+rather than crashing. 134 soccer tests still green. Still uncommitted.
+
+**What's actually left, compiled honestly rather than assumed clean:**
+`attach_confirmed_starters` still isn't wired into the daily artifact job;
+shot-location calibration done for only 2 of 10 leagues; market validation
+(vs. live odds) never run for Primeira Liga/Eredivisie/Belgian Pro League/
+Championship; multi-week market-anchoring validation still only one
+slate; nothing is scheduled/automated (every artifact writer is a manual
+CLI run); logos/colors aren't wired into the cards-board *display* (needs
+a cross-sport template change, out of scope for soccer alone); no
+cross-linking from a game card to that team's roster/schedule page; no
+test coverage written for any of Phase 13-16's UI/schedule/roster/
+validation code (the 134 green tests are all pre-existing engine/
+ingestion tests); `poll_soccer_live_state.py` has never been run as a
+script against a genuinely live match, only validated via a manually-
+replicated cutoff-replay; and nothing has been pushed past the Phase
+1-12 commit (`df96c3fb`) -- Phases 13-16 remain uncommitted.
+
+## Phase 17 addition: working the Phase 16 punch list (2026-07-20, same session)
+
+User: "proceed with the full to do list." Worked through it in order of
+what was actually achievable this session, being explicit about what
+genuinely got done vs. what stayed blocked rather than marking everything
+complete.
+
+**`attach_confirmed_starters` wired into the daily job.** `build_soccer_artifacts.py`
+now calls it right after fixtures are built, grouping the date's player
+rows by team and searching a same-day ESPN date window for a posted
+lineup; on any failure it logs and falls back to season-only allocation
+rather than breaking the run. Verified two ways: the wiring runs clean
+end-to-end against real future MLS fixtures (correctly finds nothing --
+lineups aren't posted 2+ days out, which is the right behavior, not a
+bug), and the underlying starter-resolution mechanism was independently
+proven against a real completed match (9-10 real starters resolved per
+side for CF Montreal v Toronto FC) using the exact same code path with an
+explicit event list to bypass the live-only pre/in status filter that a
+completed match wouldn't otherwise pass.
+
+**Background scheduling.** `syndicate/features/soccer/refresh_loop.py`:
+a dark-launched (`SYNDICATE_ENABLE_SOCCER_REFRESH_LOOP`, default off)
+thread wired into `app.py` alongside the existing `live_refresh_loop`,
+deliberately much simpler than that file's OOM/memory-headroom/fingerprint
+machinery -- soccer has none of the incident history that justified that
+complexity, and preemptively copying it would be over-engineering for a
+sport that hasn't shipped. Each tick: refresh the current week's
+recommendations per league, poll live state for any league ESPN reports
+as currently in progress.
+
+**Cards board upgrades.** Team names on every game card now link to that
+team's new roster page (`_team_roster_href`, threaded through both
+`_match_to_game` and `_unsimulated_game`) -- a small additive change to
+`_game_card_generic.html` (an `<a>` only when an `href` field is present,
+verified zero effect on every other sport's cards). Real team crests now
+render too: `_game_card_generic.html` shows an `<img>` when `logo_url` is
+present, falling back to the existing text-abbreviation badge otherwise
+(verified: MLS/EPL show real ESPN crest images, MLB/NCAAB -- which never
+set this field -- render exactly as before). The crest/color *data*
+plumbing (`logo_url`/`primary_color`/`secondary_color` on each game's
+home/away dict) had already been added directly to `cards.py` outside
+this session's own edits by the time this phase started; this phase's
+work was specifically the template-side rendering that makes that data
+visible, plus the roster-link half of cross-linking.
+
+**Test coverage.** Zero tests existed for any Phase 13-16 code going into
+this phase; 65 new tests now cover it: `test_soccer_schedule.py` (season
+date ranges, matchweek bucketing including the sequential-numbering-
+despite-gaps case), `test_soccer_sources.py` (league normalization, the
+sparse-roster check, week resolution including the three date_cls-mocked
+default_week branches), `test_soccer_cards.py` (simulated vs.
+not-yet-simulated card rendering, the schedule+simulation merge in
+`week_games`), `test_soccer_team.py` (position ordering, player/fixture
+card rendering), `test_soccer_archive.py` (weekly windowing), and
+`test_soccer_blueprint_routes.py` (a real Flask test client against every
+route, mirroring the `test_nba_live_lens_routes.py` pattern already used
+elsewhere in this app -- verifies league/week/season actually thread
+through to the right context builder, and that an unknown league slug
+normalizes rather than 404s). 198 soccer tests green.
+
+**Shot-location calibration, scripted and run for the remaining leagues.**
+Built `scripts/calibrate_soccer_shot_locations.py`, generalizing the
+EPL/La Liga methodology: pull a season of real shots, measure P(goal|shot)
+per location/corner bucket, set the profile bases directly to the
+measured values, then re-anchor `goal_conversion_multiplier` against the
+league's documented truth total via a simulation-based scan. The first
+version's multiplier search (a small +/-0.06 nudge around the existing
+value, then a "refine" pass) was **wrong and caught by its own output**:
+Bundesliga's measured corner-conversion rate came in at more than double
+the v0 default, needing a far wider re-anchor than a small nudge could
+reach, and the two-phase coarse-then-fine version built to fix that
+produced a "best" gap (0.062) that came back as 0.633 on an independent
+verification batch -- pure sampling noise at ~150-200 sims/candidate, not
+a real property of that multiplier. Replaced with one wide single-pass
+scan (0.5-1.7 in steps of 0.1), each candidate evaluated with the full
+simulation budget once, plus an independent double-budget final
+verification -- a more honest use of a fixed compute budget than a second
+noisier pass that mostly re-measures its own error.
+
+Results applied so far:
+- **Bundesliga**: 7,536 shots. box=0.155, outside_box=0.042, corner=0.195
+  (corner nearly 2.3x the v0 default), goal_conversion_multiplier 1.06 ->
+  0.90. Verified 3.36 goals/match vs. truth 3.20 on an independent batch.
+- **MLS**: 12,924 shots. box=0.150, outside_box=0.043, corner=0.153,
+  multiplier 1.09 -> 1.00. Verified 3.42 vs. truth 3.30.
+- **Eredivisie**: 8,150 shots (1,298 unparseable-location shots correctly
+  excluded from the rates rather than miscounted). box=0.167,
+  outside_box=0.060, corner=0.172 -- Eredivisie converts noticeably higher
+  across the board, consistent with its known attacking profile.
+  multiplier 1.06 -> 0.80; best achievable gap (0.084) sits just outside
+  this script's 0.08 tolerance, documented as "verified to the nearest
+  0.1, not the last decimal" rather than overclaimed.
+- **Belgian Pro League**: attempted, explicitly NOT applied. All 711
+  pulled shots classified as "unknown" location -- checked the raw
+  commentary text before assuming a classifier bug, and it isn't one:
+  ESPN's own commentary for this league is simply much sparser than the
+  other nine (e.g. `"Kerim Mrabti (KV Mechelen) Goal at 7'"`, no
+  location phrase at all to classify). This looks like a real, likely-
+  permanent ceiling of ESPN's free commentary feed for this specific
+  league, not a to-do item -- documented in `league_profiles.py` directly
+  so a future pass doesn't waste time re-attempting the same dead end.
+  The profile's shot-location values are left at their v0 defaults.
+- **Serie A, Ligue 1, Primeira Liga, Championship**: the first batched
+  attempt (all 7 remaining leagues queued in one shell script) silently
+  produced no output for these four specifically -- re-run individually
+  rather than trusting a batch script whose failure mode wasn't
+  understood (root cause not chased down; possibly a resource/time limit
+  on very long chained background invocations, not a bug in the
+  calibration logic itself, since these leagues then worked cleanly run
+  alone). All four applied:
+  - **Serie A**: 8,726 shots. box=0.124, outside_box=0.040, corner=0.151,
+    multiplier 0.85 -> 0.90 -- the tightest fit of any league this pass
+    (scan gap 0.010, verified 2.544 vs. truth 2.53).
+  - **Ligue 1**: 7,093 shots. box=0.143, outside_box=0.043, corner=0.138
+    -- the closest measured rates to any league's pre-existing v0
+    defaults. multiplier 1.00 -> 0.90, verified 2.778 vs. truth 2.83.
+  - **Primeira Liga**: 6,649 shots (1,175 unparseable excluded).
+    box=0.175 -- the highest box-conversion rate measured for any league
+    -- outside_box=0.040, corner=0.176, needing the largest multiplier
+    cut of the batch (0.97 -> 0.70). Verified 2.60 vs. truth 2.71.
+  - **Championship**: 13,292 shots -- the largest single sample,
+    matching its own larger 24-team/1,656-match season. box=0.130,
+    outside_box=0.043, corner=0.160, multiplier 0.92 -> 0.80. Best scan
+    gap (0.124) and independent verification (2.43 vs. truth 2.58) both
+    landed outside this script's 0.08 tolerance, same as Eredivisie --
+    documented as a starting point good to roughly +/-0.15 goals/match,
+    not tuned tighter, rather than silently presented as fully closed.
+
+  Shot-location calibration now stands at 9 of 10 leagues applied (the
+  original two from Phase 11-12 plus these seven), with Belgian Pro
+  League's real ESPN-data ceiling the one documented exception.
+
+**Market validation, attempted for all 4 remaining leagues rather than
+assumed blocked.** `ODDS_API_KEY` is set. Primeira Liga: genuinely no
+odds posted yet (too far pre-season for markets to exist -- 0 events).
+Eredivisie, Belgian Pro League, and Championship all had real live odds
+despite being pre-season: 9/9/12 fixtures respectively, three-way MAE vs.
+devigged consensus 0.0463 / 0.0520 / 0.0834. Championship's higher error
+lines up with 5 of 12 fixtures involving teams the rating source has no
+prior-season Championship history for (West Ham United, Wolverhampton
+Wanderers, and others reading as "promoted-prior" teams) -- correct
+behavior for a club new to this division's own history file, not a
+matching bug.
+
+**A second anchoring validation data point, MLS.** Not truly "multi-week"
+in the end -- there's only one current MLS slate to check against in a
+single sitting, and getting real multi-week coverage means literally
+waiting weeks and re-running this later, not something achievable in one
+session. What this session could and did add: a second *league* validated
+non-circularly with the same method (anchor to one bookmaker, score
+against the devigged consensus of every other bookmaker), not just a
+second week of the same league. 30 MLS fixtures had h2h odds, 15 had both
+an anchor book (DraftKings) and >=3 held-out books; anchoring cut mean MAE
+vs. the held-out consensus from 0.0561 (unanchored) to 0.0400 (anchored,
+weight=0.4) -- a ~29% reduction, improving 9 of 15 fixtures. Smaller than
+EPL's opening-weekend 40-51% reduction but the same direction on a
+different league with different market depth, which is real (if partial)
+evidence the mechanism generalizes rather than being an EPL-specific
+artifact. True multi-week coverage (both leagues, tracked over successive
+weeks) remains a real open item, not something this session could close.
+
+**Still genuinely blocked, not faked:** no live match was in progress
+across any of the 10 leagues at any point this session (checked
+repeatedly), so `poll_soccer_live_state.py` has still never been run as a
+script against real live data -- the cutoff-replay validation from Phase
+12 remains the only evidence its live-poll logic works. Nothing has been
+committed past `df96c3fb` yet; that's the next and final step once this
+phase's remaining background runs land.

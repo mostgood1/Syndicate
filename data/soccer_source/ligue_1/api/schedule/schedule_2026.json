@@ -1,0 +1,3280 @@
+{
+  "league": "ligue_1",
+  "season": 2026,
+  "generated_at": "2026-07-20T21:05:39.150542+00:00",
+  "match_count": 306,
+  "weeks": [
+    {
+      "week": 1,
+      "start_date": "2026-08-21",
+      "end_date": "2026-08-21",
+      "match_count": 1
+    },
+    {
+      "week": 2,
+      "start_date": "2026-08-22",
+      "end_date": "2026-08-28",
+      "match_count": 9
+    },
+    {
+      "week": 3,
+      "start_date": "2026-08-29",
+      "end_date": "2026-08-30",
+      "match_count": 8
+    },
+    {
+      "week": 4,
+      "start_date": "2026-09-05",
+      "end_date": "2026-09-05",
+      "match_count": 9
+    },
+    {
+      "week": 5,
+      "start_date": "2026-09-12",
+      "end_date": "2026-09-12",
+      "match_count": 9
+    },
+    {
+      "week": 6,
+      "start_date": "2026-09-19",
+      "end_date": "2026-09-20",
+      "match_count": 9
+    },
+    {
+      "week": 7,
+      "start_date": "2026-10-10",
+      "end_date": "2026-10-10",
+      "match_count": 9
+    },
+    {
+      "week": 8,
+      "start_date": "2026-10-17",
+      "end_date": "2026-10-17",
+      "match_count": 9
+    },
+    {
+      "week": 9,
+      "start_date": "2026-10-24",
+      "end_date": "2026-10-25",
+      "match_count": 9
+    },
+    {
+      "week": 10,
+      "start_date": "2026-10-31",
+      "end_date": "2026-10-31",
+      "match_count": 9
+    },
+    {
+      "week": 11,
+      "start_date": "2026-11-07",
+      "end_date": "2026-11-07",
+      "match_count": 9
+    },
+    {
+      "week": 12,
+      "start_date": "2026-11-21",
+      "end_date": "2026-11-21",
+      "match_count": 9
+    },
+    {
+      "week": 13,
+      "start_date": "2026-11-28",
+      "end_date": "2026-11-28",
+      "match_count": 9
+    },
+    {
+      "week": 14,
+      "start_date": "2026-12-05",
+      "end_date": "2026-12-05",
+      "match_count": 9
+    },
+    {
+      "week": 15,
+      "start_date": "2026-12-12",
+      "end_date": "2026-12-13",
+      "match_count": 9
+    },
+    {
+      "week": 16,
+      "start_date": "2027-01-02",
+      "end_date": "2027-01-03",
+      "match_count": 9
+    },
+    {
+      "week": 17,
+      "start_date": "2027-01-16",
+      "end_date": "2027-01-16",
+      "match_count": 9
+    },
+    {
+      "week": 18,
+      "start_date": "2027-01-23",
+      "end_date": "2027-01-23",
+      "match_count": 9
+    },
+    {
+      "week": 19,
+      "start_date": "2027-01-30",
+      "end_date": "2027-01-30",
+      "match_count": 9
+    },
+    {
+      "week": 20,
+      "start_date": "2027-02-06",
+      "end_date": "2027-02-07",
+      "match_count": 9
+    },
+    {
+      "week": 21,
+      "start_date": "2027-02-13",
+      "end_date": "2027-02-13",
+      "match_count": 9
+    },
+    {
+      "week": 22,
+      "start_date": "2027-02-20",
+      "end_date": "2027-02-20",
+      "match_count": 9
+    },
+    {
+      "week": 23,
+      "start_date": "2027-02-27",
+      "end_date": "2027-02-28",
+      "match_count": 9
+    },
+    {
+      "week": 24,
+      "start_date": "2027-03-06",
+      "end_date": "2027-03-06",
+      "match_count": 9
+    },
+    {
+      "week": 25,
+      "start_date": "2027-03-13",
+      "end_date": "2027-03-13",
+      "match_count": 9
+    },
+    {
+      "week": 26,
+      "start_date": "2027-03-20",
+      "end_date": "2027-03-21",
+      "match_count": 9
+    },
+    {
+      "week": 27,
+      "start_date": "2027-04-03",
+      "end_date": "2027-04-03",
+      "match_count": 9
+    },
+    {
+      "week": 28,
+      "start_date": "2027-04-10",
+      "end_date": "2027-04-10",
+      "match_count": 9
+    },
+    {
+      "week": 29,
+      "start_date": "2027-04-17",
+      "end_date": "2027-04-17",
+      "match_count": 9
+    },
+    {
+      "week": 30,
+      "start_date": "2027-04-24",
+      "end_date": "2027-04-24",
+      "match_count": 9
+    },
+    {
+      "week": 31,
+      "start_date": "2027-05-01",
+      "end_date": "2027-05-01",
+      "match_count": 9
+    },
+    {
+      "week": 32,
+      "start_date": "2027-05-08",
+      "end_date": "2027-05-09",
+      "match_count": 9
+    },
+    {
+      "week": 33,
+      "start_date": "2027-05-16",
+      "end_date": "2027-05-16",
+      "match_count": 9
+    },
+    {
+      "week": 34,
+      "start_date": "2027-05-22",
+      "end_date": "2027-05-22",
+      "match_count": 9
+    },
+    {
+      "week": 35,
+      "start_date": "2027-05-29",
+      "end_date": "2027-05-29",
+      "match_count": 9
+    }
+  ],
+  "matches": [
+    {
+      "event_id": "401876489",
+      "date": "2026-08-21T18:45Z",
+      "home_team": "Marseille",
+      "away_team": "Strasbourg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401876490",
+      "date": "2026-08-22T15:15Z",
+      "home_team": "Lens",
+      "away_team": "AJ Auxerre",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401876491",
+      "date": "2026-08-22T18:45Z",
+      "home_team": "Le Mans",
+      "away_team": "Brest",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401876488",
+      "date": "2026-08-22T18:45Z",
+      "home_team": "Nice",
+      "away_team": "Lorient",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401876486",
+      "date": "2026-08-22T18:45Z",
+      "home_team": "Toulouse",
+      "away_team": "Lyon",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401876485",
+      "date": "2026-08-22T18:45Z",
+      "home_team": "Troyes",
+      "away_team": "Paris FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401876493",
+      "date": "2026-08-23T13:00Z",
+      "home_team": "Angers",
+      "away_team": "Lille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401876492",
+      "date": "2026-08-23T15:15Z",
+      "home_team": "Le Havre AC",
+      "away_team": "AS Monaco",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401876487",
+      "date": "2026-08-23T18:45Z",
+      "home_team": "Paris Saint-Germain",
+      "away_team": "Stade Rennais",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401876476",
+      "date": "2026-08-28T18:45Z",
+      "home_team": "Lille",
+      "away_team": "Paris Saint-Germain",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401876477",
+      "date": "2026-08-29T15:15Z",
+      "home_team": "Strasbourg",
+      "away_team": "Lens",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401876484",
+      "date": "2026-08-29T18:45Z",
+      "home_team": "AJ Auxerre",
+      "away_team": "Angers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401876483",
+      "date": "2026-08-29T18:45Z",
+      "home_team": "Brest",
+      "away_team": "Toulouse",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401876482",
+      "date": "2026-08-29T18:45Z",
+      "home_team": "Lorient",
+      "away_team": "Troyes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401876481",
+      "date": "2026-08-29T18:45Z",
+      "home_team": "Lyon",
+      "away_team": "Le Havre AC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401876479",
+      "date": "2026-08-30T13:00Z",
+      "home_team": "Paris FC",
+      "away_team": "Nice",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401876478",
+      "date": "2026-08-30T15:15Z",
+      "home_team": "Stade Rennais",
+      "away_team": "Le Mans",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401876480",
+      "date": "2026-08-30T18:45Z",
+      "home_team": "AS Monaco",
+      "away_team": "Marseille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401876475",
+      "date": "2026-09-05T18:00Z",
+      "home_team": "Angers",
+      "away_team": "Stade Rennais",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401876474",
+      "date": "2026-09-05T18:00Z",
+      "home_team": "Le Havre AC",
+      "away_team": "Brest",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401876473",
+      "date": "2026-09-05T18:00Z",
+      "home_team": "Lens",
+      "away_team": "Lorient",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401876472",
+      "date": "2026-09-05T18:00Z",
+      "home_team": "Lyon",
+      "away_team": "AJ Auxerre",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401876471",
+      "date": "2026-09-05T18:00Z",
+      "home_team": "Marseille",
+      "away_team": "Paris FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401876470",
+      "date": "2026-09-05T18:00Z",
+      "home_team": "Nice",
+      "away_team": "Le Mans",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401876469",
+      "date": "2026-09-05T18:00Z",
+      "home_team": "Paris Saint-Germain",
+      "away_team": "AS Monaco",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401876468",
+      "date": "2026-09-05T18:00Z",
+      "home_team": "Toulouse",
+      "away_team": "Lille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401876467",
+      "date": "2026-09-05T18:00Z",
+      "home_team": "Troyes",
+      "away_team": "Strasbourg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401876466",
+      "date": "2026-09-12T18:00Z",
+      "home_team": "AJ Auxerre",
+      "away_team": "Nice",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401876465",
+      "date": "2026-09-12T18:00Z",
+      "home_team": "Brest",
+      "away_team": "Paris Saint-Germain",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401876464",
+      "date": "2026-09-12T18:00Z",
+      "home_team": "Le Havre AC",
+      "away_team": "Angers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401876463",
+      "date": "2026-09-12T18:00Z",
+      "home_team": "Le Mans",
+      "away_team": "Lens",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401876462",
+      "date": "2026-09-12T18:00Z",
+      "home_team": "Lille",
+      "away_team": "Troyes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401876461",
+      "date": "2026-09-12T18:00Z",
+      "home_team": "Lorient",
+      "away_team": "Toulouse",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401876460",
+      "date": "2026-09-12T18:00Z",
+      "home_team": "Paris FC",
+      "away_team": "Lyon",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401876459",
+      "date": "2026-09-12T18:00Z",
+      "home_team": "Stade Rennais",
+      "away_team": "Marseille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401876458",
+      "date": "2026-09-12T18:00Z",
+      "home_team": "Strasbourg",
+      "away_team": "AS Monaco",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401876456",
+      "date": "2026-09-19T18:00Z",
+      "home_team": "AJ Auxerre",
+      "away_team": "Brest",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401876457",
+      "date": "2026-09-19T18:00Z",
+      "home_team": "Angers",
+      "away_team": "Troyes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401876453",
+      "date": "2026-09-19T18:00Z",
+      "home_team": "AS Monaco",
+      "away_team": "Lens",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401876455",
+      "date": "2026-09-19T18:00Z",
+      "home_team": "Le Mans",
+      "away_team": "Lorient",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401876454",
+      "date": "2026-09-19T18:00Z",
+      "home_team": "Lyon",
+      "away_team": "Stade Rennais",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401876452",
+      "date": "2026-09-19T18:00Z",
+      "home_team": "Nice",
+      "away_team": "Lille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401876451",
+      "date": "2026-09-19T18:00Z",
+      "home_team": "Paris FC",
+      "away_team": "Strasbourg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401876450",
+      "date": "2026-09-19T18:00Z",
+      "home_team": "Toulouse",
+      "away_team": "Le Havre AC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401876449",
+      "date": "2026-09-20T18:45Z",
+      "home_team": "Marseille",
+      "away_team": "Paris Saint-Germain",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401876444",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "AS Monaco",
+      "away_team": "Toulouse",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401876448",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "Brest",
+      "away_team": "Angers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401876447",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "Lens",
+      "away_team": "Lyon",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401876446",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "Lille",
+      "away_team": "Le Havre AC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401876445",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "Lorient",
+      "away_team": "Paris FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401876443",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "Nice",
+      "away_team": "Strasbourg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401876442",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "Paris Saint-Germain",
+      "away_team": "Le Mans",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401876441",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "Stade Rennais",
+      "away_team": "AJ Auxerre",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401876440",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "Troyes",
+      "away_team": "Marseille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401876439",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Angers",
+      "away_team": "Marseille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401876438",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Le Havre AC",
+      "away_team": "AJ Auxerre",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401876437",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Le Mans",
+      "away_team": "Toulouse",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401876436",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Lille",
+      "away_team": "Brest",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401876435",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Lorient",
+      "away_team": "AS Monaco",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401876434",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Lyon",
+      "away_team": "Nice",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401876433",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Paris FC",
+      "away_team": "Stade Rennais",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401876432",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Strasbourg",
+      "away_team": "Paris Saint-Germain",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401876431",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Troyes",
+      "away_team": "Lens",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401876429",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "AJ Auxerre",
+      "away_team": "Le Mans",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401876430",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "Angers",
+      "away_team": "Lorient",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401876425",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "AS Monaco",
+      "away_team": "Lille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401876428",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "Brest",
+      "away_team": "Nice",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401876427",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "Lens",
+      "away_team": "Paris FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401876426",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "Marseille",
+      "away_team": "Le Havre AC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401876424",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "Stade Rennais",
+      "away_team": "Strasbourg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401876423",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "Toulouse",
+      "away_team": "Troyes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401876422",
+      "date": "2026-10-25T19:45Z",
+      "home_team": "Paris Saint-Germain",
+      "away_team": "Lyon",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401876421",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Le Havre AC",
+      "away_team": "Paris Saint-Germain",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401876420",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Lille",
+      "away_team": "Lens",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401876419",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Lorient",
+      "away_team": "Brest",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401876418",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Lyon",
+      "away_team": "Angers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401876417",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Marseille",
+      "away_team": "Toulouse",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401876416",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Nice",
+      "away_team": "Stade Rennais",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401876415",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Paris FC",
+      "away_team": "AS Monaco",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401876414",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Strasbourg",
+      "away_team": "AJ Auxerre",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401876413",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Troyes",
+      "away_team": "Le Mans",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401876404",
+      "date": "2026-11-07T19:45Z",
+      "home_team": "Lens",
+      "away_team": "Marseille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401876411",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "AJ Auxerre",
+      "away_team": "Paris FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401876412",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "Angers",
+      "away_team": "Nice",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401876410",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "Brest",
+      "away_team": "Lyon",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401876409",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "Le Havre AC",
+      "away_team": "Lorient",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401876408",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "Le Mans",
+      "away_team": "AS Monaco",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401876407",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "Paris Saint-Germain",
+      "away_team": "Troyes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401876406",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "Stade Rennais",
+      "away_team": "Lille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401876405",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "Toulouse",
+      "away_team": "Strasbourg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401876399",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "AS Monaco",
+      "away_team": "AJ Auxerre",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401876403",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Lens",
+      "away_team": "Toulouse",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401876402",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Lille",
+      "away_team": "Lyon",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401876401",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Lorient",
+      "away_team": "Stade Rennais",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401876400",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Marseille",
+      "away_team": "Le Mans",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401876398",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Nice",
+      "away_team": "Paris Saint-Germain",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401876397",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Paris FC",
+      "away_team": "Angers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401876396",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Strasbourg",
+      "away_team": "Brest",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401876395",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Troyes",
+      "away_team": "Le Havre AC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401876393",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "AJ Auxerre",
+      "away_team": "Marseille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401876394",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Angers",
+      "away_team": "Lens",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401876392",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Brest",
+      "away_team": "Paris FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401876391",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Le Havre AC",
+      "away_team": "Strasbourg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401876390",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Le Mans",
+      "away_team": "Lille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401876389",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Lyon",
+      "away_team": "AS Monaco",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401876388",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Nice",
+      "away_team": "Troyes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401876387",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Paris Saint-Germain",
+      "away_team": "Lorient",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401876386",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Toulouse",
+      "away_team": "Stade Rennais",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401876382",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "AS Monaco",
+      "away_team": "Angers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401876385",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "Lens",
+      "away_team": "Le Havre AC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401876384",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "Lille",
+      "away_team": "AJ Auxerre",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401876383",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "Marseille",
+      "away_team": "Nice",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401876381",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "Paris FC",
+      "away_team": "Le Mans",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401876380",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "Stade Rennais",
+      "away_team": "Brest",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401876379",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "Strasbourg",
+      "away_team": "Lorient",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401876378",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "Toulouse",
+      "away_team": "Paris Saint-Germain",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401876377",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "Troyes",
+      "away_team": "Lyon",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401876375",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "AJ Auxerre",
+      "away_team": "Toulouse",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401876376",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "Angers",
+      "away_team": "Strasbourg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401876374",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "Brest",
+      "away_team": "Troyes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401876373",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "Le Havre AC",
+      "away_team": "Le Mans",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401876372",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "Lorient",
+      "away_team": "Lille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401876371",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "Nice",
+      "away_team": "Lens",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401876370",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "Paris Saint-Germain",
+      "away_team": "Paris FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401876369",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "Stade Rennais",
+      "away_team": "AS Monaco",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401876368",
+      "date": "2026-12-13T19:45Z",
+      "home_team": "Lyon",
+      "away_team": "Marseille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401876363",
+      "date": "2027-01-02T20:00Z",
+      "home_team": "AS Monaco",
+      "away_team": "Nice",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401876367",
+      "date": "2027-01-02T20:00Z",
+      "home_team": "Brest",
+      "away_team": "Marseille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401876366",
+      "date": "2027-01-02T20:00Z",
+      "home_team": "Le Mans",
+      "away_team": "Lyon",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401876365",
+      "date": "2027-01-02T20:00Z",
+      "home_team": "Lille",
+      "away_team": "Strasbourg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401876364",
+      "date": "2027-01-02T20:00Z",
+      "home_team": "Lorient",
+      "away_team": "AJ Auxerre",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401876362",
+      "date": "2027-01-02T20:00Z",
+      "home_team": "Paris FC",
+      "away_team": "Le Havre AC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401876361",
+      "date": "2027-01-02T20:00Z",
+      "home_team": "Toulouse",
+      "away_team": "Angers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401876360",
+      "date": "2027-01-02T20:00Z",
+      "home_team": "Troyes",
+      "away_team": "Stade Rennais",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401876359",
+      "date": "2027-01-03T19:45Z",
+      "home_team": "Lens",
+      "away_team": "Paris Saint-Germain",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401876357",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "AJ Auxerre",
+      "away_team": "Troyes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401876358",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Angers",
+      "away_team": "Paris Saint-Germain",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401876354",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "AS Monaco",
+      "away_team": "Brest",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401876356",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Lyon",
+      "away_team": "Lorient",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401876355",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Marseille",
+      "away_team": "Lille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401876353",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Nice",
+      "away_team": "Le Havre AC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401876352",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Paris FC",
+      "away_team": "Toulouse",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401876351",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Stade Rennais",
+      "away_team": "Lens",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401876350",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Strasbourg",
+      "away_team": "Le Mans",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401876349",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Le Havre AC",
+      "away_team": "Stade Rennais",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401876348",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Le Mans",
+      "away_team": "Angers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401876347",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Lens",
+      "away_team": "Brest",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401876346",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Lille",
+      "away_team": "Paris FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401876345",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Lorient",
+      "away_team": "Marseille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401876344",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Paris Saint-Germain",
+      "away_team": "AJ Auxerre",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401876343",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Strasbourg",
+      "away_team": "Lyon",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401876342",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Toulouse",
+      "away_team": "Nice",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401876341",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Troyes",
+      "away_team": "AS Monaco",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401876340",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "Angers",
+      "away_team": "Le Havre AC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401876335",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "AS Monaco",
+      "away_team": "Paris Saint-Germain",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401876339",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "Brest",
+      "away_team": "Strasbourg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401876338",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "Le Mans",
+      "away_team": "Nice",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401876337",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "Lyon",
+      "away_team": "Lille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401876336",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "Marseille",
+      "away_team": "Troyes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401876334",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "Paris FC",
+      "away_team": "AJ Auxerre",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401876333",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "Stade Rennais",
+      "away_team": "Lorient",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401876332",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "Toulouse",
+      "away_team": "Lens",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401876331",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "AJ Auxerre",
+      "away_team": "AS Monaco",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401876330",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "Le Havre AC",
+      "away_team": "Toulouse",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401876329",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "Lens",
+      "away_team": "Angers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401876328",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "Lorient",
+      "away_team": "Le Mans",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401876327",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "Nice",
+      "away_team": "Brest",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401876326",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "Stade Rennais",
+      "away_team": "Lyon",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401876325",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "Strasbourg",
+      "away_team": "Paris FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401876324",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "Troyes",
+      "away_team": "Lille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401876323",
+      "date": "2027-02-07T19:45Z",
+      "home_team": "Paris Saint-Germain",
+      "away_team": "Marseille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401876322",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "AJ Auxerre",
+      "away_team": "Strasbourg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401876321",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Brest",
+      "away_team": "Stade Rennais",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401876320",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Le Mans",
+      "away_team": "Paris Saint-Germain",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401876319",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Lille",
+      "away_team": "Nice",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401876318",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Lorient",
+      "away_team": "Le Havre AC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401876317",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Lyon",
+      "away_team": "Lens",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401876316",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Marseille",
+      "away_team": "Angers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401876315",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Paris FC",
+      "away_team": "Troyes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401876314",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Toulouse",
+      "away_team": "AS Monaco",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401876313",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Angers",
+      "away_team": "Paris FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401876309",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "AS Monaco",
+      "away_team": "Le Mans",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401876312",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Le Havre AC",
+      "away_team": "Lyon",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401876311",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Lens",
+      "away_team": "Troyes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401876310",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Lille",
+      "away_team": "Lorient",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401876308",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Nice",
+      "away_team": "AJ Auxerre",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401876307",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Paris Saint-Germain",
+      "away_team": "Brest",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401876306",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Stade Rennais",
+      "away_team": "Toulouse",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401876305",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Strasbourg",
+      "away_team": "Marseille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401876304",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "AJ Auxerre",
+      "away_team": "Lille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401876303",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Brest",
+      "away_team": "AS Monaco",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401876302",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Le Mans",
+      "away_team": "Paris FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401876301",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Lorient",
+      "away_team": "Angers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401876300",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Lyon",
+      "away_team": "Toulouse",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401876299",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Marseille",
+      "away_team": "Stade Rennais",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401876298",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Strasbourg",
+      "away_team": "Le Havre AC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401876297",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Troyes",
+      "away_team": "Nice",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401876296",
+      "date": "2027-02-28T19:45Z",
+      "home_team": "Paris Saint-Germain",
+      "away_team": "Lens",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401876295",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "Angers",
+      "away_team": "AJ Auxerre",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401876291",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "AS Monaco",
+      "away_team": "Lyon",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401876294",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "Le Havre AC",
+      "away_team": "Nice",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401876293",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "Lens",
+      "away_team": "Strasbourg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401876292",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "Lille",
+      "away_team": "Marseille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401876290",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "Paris FC",
+      "away_team": "Brest",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401876289",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "Stade Rennais",
+      "away_team": "Paris Saint-Germain",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401876288",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "Toulouse",
+      "away_team": "Le Mans",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401876287",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "Troyes",
+      "away_team": "Lorient",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401876286",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "AJ Auxerre",
+      "away_team": "Paris Saint-Germain",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401876285",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Brest",
+      "away_team": "Lille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401876284",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Le Havre AC",
+      "away_team": "Lens",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401876283",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Le Mans",
+      "away_team": "Stade Rennais",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401876282",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Lyon",
+      "away_team": "Troyes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401876281",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Marseille",
+      "away_team": "AS Monaco",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401876280",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Nice",
+      "away_team": "Toulouse",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401876279",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Paris FC",
+      "away_team": "Lorient",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401876278",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Strasbourg",
+      "away_team": "Angers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401876277",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "Angers",
+      "away_team": "Le Mans",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401876274",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "AS Monaco",
+      "away_team": "Le Havre AC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401876276",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "Lens",
+      "away_team": "Lille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401876275",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "Lorient",
+      "away_team": "Nice",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401876273",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "Paris Saint-Germain",
+      "away_team": "Strasbourg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401876272",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "Stade Rennais",
+      "away_team": "Paris FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401876271",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "Toulouse",
+      "away_team": "Brest",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401876270",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "Troyes",
+      "away_team": "AJ Auxerre",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401876269",
+      "date": "2027-03-21T19:45Z",
+      "home_team": "Marseille",
+      "away_team": "Lyon",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401876267",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "AJ Auxerre",
+      "away_team": "Lens",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401876268",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Angers",
+      "away_team": "AS Monaco",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401876266",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Brest",
+      "away_team": "Lorient",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401876265",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Le Havre AC",
+      "away_team": "Troyes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401876264",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Le Mans",
+      "away_team": "Marseille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401876263",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Lille",
+      "away_team": "Stade Rennais",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401876262",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Nice",
+      "away_team": "Lyon",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401876261",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Paris FC",
+      "away_team": "Paris Saint-Germain",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401876260",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Strasbourg",
+      "away_team": "Toulouse",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401876254",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "AS Monaco",
+      "away_team": "Stade Rennais",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401876259",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Le Mans",
+      "away_team": "AJ Auxerre",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401876258",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Lille",
+      "away_team": "Toulouse",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401876257",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Lorient",
+      "away_team": "Lens",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401876256",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Lyon",
+      "away_team": "Strasbourg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401876255",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Marseille",
+      "away_team": "Brest",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401876253",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Nice",
+      "away_team": "Paris FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401876252",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Paris Saint-Germain",
+      "away_team": "Le Havre AC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401876251",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Troyes",
+      "away_team": "Angers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401876249",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "AJ Auxerre",
+      "away_team": "Lorient",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401876250",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "Angers",
+      "away_team": "Lyon",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401876245",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "AS Monaco",
+      "away_team": "Strasbourg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401876248",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "Brest",
+      "away_team": "Le Mans",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401876247",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "Le Havre AC",
+      "away_team": "Marseille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401876246",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "Lens",
+      "away_team": "Nice",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401876244",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "Paris Saint-Germain",
+      "away_team": "Lille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401876243",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "Stade Rennais",
+      "away_team": "Troyes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401876242",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "Toulouse",
+      "away_team": "Paris FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401876241",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Le Mans",
+      "away_team": "Le Havre AC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401876240",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Lille",
+      "away_team": "AS Monaco",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401876239",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Lorient",
+      "away_team": "Paris Saint-Germain",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401876238",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Lyon",
+      "away_team": "Brest",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401876237",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Marseille",
+      "away_team": "AJ Auxerre",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401876236",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Nice",
+      "away_team": "Angers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401876235",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Paris FC",
+      "away_team": "Lens",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401876234",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Strasbourg",
+      "away_team": "Stade Rennais",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401876233",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Troyes",
+      "away_team": "Toulouse",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401876232",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "AJ Auxerre",
+      "away_team": "Lyon",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401876229",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "AS Monaco",
+      "away_team": "Lorient",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401876231",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "Le Havre AC",
+      "away_team": "Paris FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401876230",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "Lens",
+      "away_team": "Le Mans",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401876228",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "Paris Saint-Germain",
+      "away_team": "Angers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401876227",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "Stade Rennais",
+      "away_team": "Nice",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401876226",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "Strasbourg",
+      "away_team": "Lille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401876225",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "Toulouse",
+      "away_team": "Marseille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401876224",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "Troyes",
+      "away_team": "Brest",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401876223",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "Angers",
+      "away_team": "Toulouse",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401876222",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "Brest",
+      "away_team": "AJ Auxerre",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401876221",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "Le Mans",
+      "away_team": "Troyes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401876220",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "Lens",
+      "away_team": "AS Monaco",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401876219",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "Lorient",
+      "away_team": "Strasbourg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401876218",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "Nice",
+      "away_team": "Marseille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401876217",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "Paris FC",
+      "away_team": "Lille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401876216",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "Stade Rennais",
+      "away_team": "Le Havre AC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401876215",
+      "date": "2027-05-09T18:45Z",
+      "home_team": "Lyon",
+      "away_team": "Paris Saint-Germain",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401876214",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "AJ Auxerre",
+      "away_team": "Stade Rennais",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401876209",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "AS Monaco",
+      "away_team": "Paris FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401876213",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Brest",
+      "away_team": "Le Havre AC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401876212",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Lille",
+      "away_team": "Angers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401876211",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Lyon",
+      "away_team": "Le Mans",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401876210",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Marseille",
+      "away_team": "Lens",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401876208",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Paris Saint-Germain",
+      "away_team": "Nice",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401876207",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Strasbourg",
+      "away_team": "Troyes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401876206",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Toulouse",
+      "away_team": "Lorient",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401876205",
+      "date": "2027-05-22T18:00Z",
+      "home_team": "Angers",
+      "away_team": "Brest",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401876204",
+      "date": "2027-05-22T18:00Z",
+      "home_team": "Le Havre AC",
+      "away_team": "Lille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401876203",
+      "date": "2027-05-22T18:00Z",
+      "home_team": "Le Mans",
+      "away_team": "Strasbourg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401876202",
+      "date": "2027-05-22T18:00Z",
+      "home_team": "Lens",
+      "away_team": "Stade Rennais",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401876201",
+      "date": "2027-05-22T18:00Z",
+      "home_team": "Lorient",
+      "away_team": "Lyon",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401876200",
+      "date": "2027-05-22T18:00Z",
+      "home_team": "Nice",
+      "away_team": "AS Monaco",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401876199",
+      "date": "2027-05-22T18:00Z",
+      "home_team": "Paris FC",
+      "away_team": "Marseille",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401876198",
+      "date": "2027-05-22T18:00Z",
+      "home_team": "Toulouse",
+      "away_team": "AJ Auxerre",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401876197",
+      "date": "2027-05-22T18:00Z",
+      "home_team": "Troyes",
+      "away_team": "Paris Saint-Germain",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401876196",
+      "date": "2027-05-29T18:00Z",
+      "home_team": "AJ Auxerre",
+      "away_team": "Le Havre AC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401876191",
+      "date": "2027-05-29T18:00Z",
+      "home_team": "AS Monaco",
+      "away_team": "Troyes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401876195",
+      "date": "2027-05-29T18:00Z",
+      "home_team": "Brest",
+      "away_team": "Lens",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401876194",
+      "date": "2027-05-29T18:00Z",
+      "home_team": "Lille",
+      "away_team": "Le Mans",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401876193",
+      "date": "2027-05-29T18:00Z",
+      "home_team": "Lyon",
+      "away_team": "Paris FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401876192",
+      "date": "2027-05-29T18:00Z",
+      "home_team": "Marseille",
+      "away_team": "Lorient",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401876190",
+      "date": "2027-05-29T18:00Z",
+      "home_team": "Paris Saint-Germain",
+      "away_team": "Toulouse",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401876189",
+      "date": "2027-05-29T18:00Z",
+      "home_team": "Stade Rennais",
+      "away_team": "Angers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401876188",
+      "date": "2027-05-29T18:00Z",
+      "home_team": "Strasbourg",
+      "away_team": "Nice",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    }
+  ]
+}

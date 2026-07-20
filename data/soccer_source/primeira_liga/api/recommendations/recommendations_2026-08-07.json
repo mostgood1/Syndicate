@@ -1,0 +1,102 @@
+{
+  "league": "primeira_liga",
+  "date": "2026-08-07",
+  "generated_at": "2026-07-20T21:29:14.574023+00:00",
+  "simulations": 150,
+  "promoted_prior_teams": [],
+  "matches": [
+    {
+      "match_id": "401885491",
+      "league": "primeira_liga",
+      "date": "2026-08-07",
+      "index": 0,
+      "matchup": {
+        "home_team": "Estoril",
+        "away_team": "FC Famalicao"
+      },
+      "win_probability": {
+        "home": 0.4133,
+        "draw": 0.2867,
+        "away": 0.3
+      },
+      "team_projection": {
+        "home_mean": 1.3933,
+        "away_mean": 1.2067,
+        "total_mean": 2.6,
+        "margin_mean": 0.1867
+      },
+      "spread_distribution": {
+        "home": 0.1867,
+        "away": -0.1867
+      },
+      "total_distribution": {
+        "mean": 2.6,
+        "over_2_5_probability": 0.46,
+        "both_teams_scored_probability": 0.56
+      },
+      "volume_projection": {
+        "home_shots": 12.7067,
+        "away_shots": 12.0133,
+        "home_shots_on_target": 4.2267,
+        "away_shots_on_target": 4.0,
+        "home_corners": 5.16,
+        "away_corners": 4.9733
+      },
+      "scoreline_probabilities": {
+        "1-1": 0.1667,
+        "1-0": 0.1133,
+        "2-1": 0.1133,
+        "0-1": 0.1067,
+        "0-0": 0.0667,
+        "2-0": 0.0467,
+        "2-2": 0.0467,
+        "2-3": 0.0467,
+        "3-1": 0.0467,
+        "0-2": 0.04,
+        "1-3": 0.0267,
+        "1-2": 0.0267,
+        "4-0": 0.0267,
+        "3-0": 0.02,
+        "1-4": 0.02,
+        "3-2": 0.02,
+        "4-1": 0.0133,
+        "0-5": 0.0067,
+        "0-3": 0.0067,
+        "4-5": 0.0067,
+        "0-4": 0.0067,
+        "3-3": 0.0067,
+        "4-3": 0.0067,
+        "4-2": 0.0067,
+        "2-4": 0.0067
+      },
+      "simulations": 150,
+      "adapter_metadata": {
+        "home_rating_matched": true,
+        "away_rating_matched": true,
+        "home_rating_detail": {
+          "attack_rating": 0.0483,
+          "defense_rating": -0.1122,
+          "xg_for_per_match": 1.4556,
+          "xg_against_per_match": 1.6111,
+          "ppda": 0.0,
+          "matches": 90.0
+        },
+        "away_rating_detail": {
+          "attack_rating": -0.0385,
+          "defense_rating": 0.1116,
+          "xg_for_per_match": 1.2444,
+          "xg_against_per_match": 1.0667,
+          "ppda": 0.0,
+          "matches": 90.0
+        }
+      },
+      "event_id": "401885491",
+      "kickoff": "2026-08-07T19:15Z",
+      "status_state": "pre",
+      "live_home_score": "0",
+      "live_away_score": "0",
+      "top_props": []
+    }
+  ],
+  "player_props": []
+}

@@ -1,0 +1,3286 @@
+{
+  "league": "eredivisie",
+  "season": 2026,
+  "generated_at": "2026-07-20T21:05:42.768249+00:00",
+  "match_count": 306,
+  "weeks": [
+    {
+      "week": 1,
+      "start_date": "2026-08-07",
+      "end_date": "2026-08-07",
+      "match_count": 1
+    },
+    {
+      "week": 2,
+      "start_date": "2026-08-08",
+      "end_date": "2026-08-14",
+      "match_count": 9
+    },
+    {
+      "week": 3,
+      "start_date": "2026-08-15",
+      "end_date": "2026-08-16",
+      "match_count": 8
+    },
+    {
+      "week": 4,
+      "start_date": "2026-08-22",
+      "end_date": "2026-08-28",
+      "match_count": 8
+    },
+    {
+      "week": 5,
+      "start_date": "2026-08-29",
+      "end_date": "2026-09-04",
+      "match_count": 9
+    },
+    {
+      "week": 6,
+      "start_date": "2026-09-05",
+      "end_date": "2026-09-11",
+      "match_count": 10
+    },
+    {
+      "week": 7,
+      "start_date": "2026-09-12",
+      "end_date": "2026-09-18",
+      "match_count": 10
+    },
+    {
+      "week": 8,
+      "start_date": "2026-09-19",
+      "end_date": "2026-09-20",
+      "match_count": 8
+    },
+    {
+      "week": 9,
+      "start_date": "2026-10-10",
+      "end_date": "2026-10-16",
+      "match_count": 10
+    },
+    {
+      "week": 10,
+      "start_date": "2026-10-17",
+      "end_date": "2026-10-23",
+      "match_count": 9
+    },
+    {
+      "week": 11,
+      "start_date": "2026-10-24",
+      "end_date": "2026-10-25",
+      "match_count": 8
+    },
+    {
+      "week": 12,
+      "start_date": "2026-10-31",
+      "end_date": "2026-11-06",
+      "match_count": 10
+    },
+    {
+      "week": 13,
+      "start_date": "2026-11-07",
+      "end_date": "2026-11-08",
+      "match_count": 8
+    },
+    {
+      "week": 14,
+      "start_date": "2026-11-21",
+      "end_date": "2026-11-21",
+      "match_count": 9
+    },
+    {
+      "week": 15,
+      "start_date": "2026-11-28",
+      "end_date": "2026-11-28",
+      "match_count": 9
+    },
+    {
+      "week": 16,
+      "start_date": "2026-12-05",
+      "end_date": "2026-12-05",
+      "match_count": 9
+    },
+    {
+      "week": 17,
+      "start_date": "2026-12-12",
+      "end_date": "2026-12-12",
+      "match_count": 9
+    },
+    {
+      "week": 18,
+      "start_date": "2026-12-19",
+      "end_date": "2026-12-19",
+      "match_count": 9
+    },
+    {
+      "week": 19,
+      "start_date": "2027-01-08",
+      "end_date": "2027-01-08",
+      "match_count": 1
+    },
+    {
+      "week": 20,
+      "start_date": "2027-01-09",
+      "end_date": "2027-01-10",
+      "match_count": 8
+    },
+    {
+      "week": 21,
+      "start_date": "2027-01-16",
+      "end_date": "2027-01-16",
+      "match_count": 9
+    },
+    {
+      "week": 22,
+      "start_date": "2027-01-23",
+      "end_date": "2027-01-23",
+      "match_count": 9
+    },
+    {
+      "week": 23,
+      "start_date": "2027-01-30",
+      "end_date": "2027-01-30",
+      "match_count": 9
+    },
+    {
+      "week": 24,
+      "start_date": "2027-02-13",
+      "end_date": "2027-02-13",
+      "match_count": 9
+    },
+    {
+      "week": 25,
+      "start_date": "2027-02-20",
+      "end_date": "2027-02-20",
+      "match_count": 9
+    },
+    {
+      "week": 26,
+      "start_date": "2027-02-27",
+      "end_date": "2027-02-27",
+      "match_count": 9
+    },
+    {
+      "week": 27,
+      "start_date": "2027-03-06",
+      "end_date": "2027-03-06",
+      "match_count": 9
+    },
+    {
+      "week": 28,
+      "start_date": "2027-03-13",
+      "end_date": "2027-03-13",
+      "match_count": 9
+    },
+    {
+      "week": 29,
+      "start_date": "2027-03-20",
+      "end_date": "2027-03-20",
+      "match_count": 9
+    },
+    {
+      "week": 30,
+      "start_date": "2027-04-03",
+      "end_date": "2027-04-03",
+      "match_count": 9
+    },
+    {
+      "week": 31,
+      "start_date": "2027-04-10",
+      "end_date": "2027-04-10",
+      "match_count": 9
+    },
+    {
+      "week": 32,
+      "start_date": "2027-04-24",
+      "end_date": "2027-04-24",
+      "match_count": 9
+    },
+    {
+      "week": 33,
+      "start_date": "2027-05-01",
+      "end_date": "2027-05-01",
+      "match_count": 9
+    },
+    {
+      "week": 34,
+      "start_date": "2027-05-08",
+      "end_date": "2027-05-08",
+      "match_count": 9
+    },
+    {
+      "week": 35,
+      "start_date": "2027-05-16",
+      "end_date": "2027-05-16",
+      "match_count": 9
+    },
+    {
+      "week": 36,
+      "start_date": "2027-05-23",
+      "end_date": "2027-05-23",
+      "match_count": 9
+    }
+  ],
+  "matches": [
+    {
+      "event_id": "401875655",
+      "date": "2026-08-07T18:00Z",
+      "home_team": "SC Cambuur",
+      "away_team": "Excelsior",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401875654",
+      "date": "2026-08-08T14:30Z",
+      "home_team": "NEC Nijmegen",
+      "away_team": "Telstar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401875653",
+      "date": "2026-08-08T16:45Z",
+      "home_team": "Go Ahead Eagles",
+      "away_team": "Willem II",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401875652",
+      "date": "2026-08-08T18:00Z",
+      "home_team": "PSV Eindhoven",
+      "away_team": "Fortuna Sittard",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401875651",
+      "date": "2026-08-08T19:00Z",
+      "home_team": "AZ Alkmaar",
+      "away_team": "ADO Den Haag",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401875650",
+      "date": "2026-08-09T10:15Z",
+      "home_team": "Sparta Rotterdam",
+      "away_team": "Feyenoord Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401875649",
+      "date": "2026-08-09T12:30Z",
+      "home_team": "FC Groningen",
+      "away_team": "FC Utrecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401875648",
+      "date": "2026-08-09T12:30Z",
+      "home_team": "PEC Zwolle",
+      "away_team": "Ajax Amsterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401875647",
+      "date": "2026-08-09T14:45Z",
+      "home_team": "Heerenveen",
+      "away_team": "FC Twente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401875646",
+      "date": "2026-08-14T18:00Z",
+      "home_team": "Telstar",
+      "away_team": "Sparta Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401875645",
+      "date": "2026-08-15T14:30Z",
+      "home_team": "Willem II",
+      "away_team": "NEC Nijmegen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401875644",
+      "date": "2026-08-15T16:45Z",
+      "home_team": "FC Utrecht",
+      "away_team": "AZ Alkmaar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401875643",
+      "date": "2026-08-15T18:00Z",
+      "home_team": "Excelsior",
+      "away_team": "PSV Eindhoven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401875642",
+      "date": "2026-08-15T19:00Z",
+      "home_team": "Fortuna Sittard",
+      "away_team": "SC Cambuur",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401875641",
+      "date": "2026-08-16T10:15Z",
+      "home_team": "ADO Den Haag",
+      "away_team": "FC Groningen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401875639",
+      "date": "2026-08-16T12:30Z",
+      "home_team": "FC Twente",
+      "away_team": "PEC Zwolle",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401875640",
+      "date": "2026-08-16T12:30Z",
+      "home_team": "Feyenoord Rotterdam",
+      "away_team": "Go Ahead Eagles",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401875638",
+      "date": "2026-08-16T14:45Z",
+      "home_team": "Ajax Amsterdam",
+      "away_team": "Heerenveen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401875637",
+      "date": "2026-08-22T14:30Z",
+      "home_team": "Fortuna Sittard",
+      "away_team": "AZ Alkmaar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401875635",
+      "date": "2026-08-22T16:45Z",
+      "home_team": "Sparta Rotterdam",
+      "away_team": "FC Utrecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401875636",
+      "date": "2026-08-22T18:00Z",
+      "home_team": "NEC Nijmegen",
+      "away_team": "Excelsior",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401875634",
+      "date": "2026-08-22T19:00Z",
+      "home_team": "Heerenveen",
+      "away_team": "PEC Zwolle",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401875633",
+      "date": "2026-08-23T10:15Z",
+      "home_team": "Go Ahead Eagles",
+      "away_team": "ADO Den Haag",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401875632",
+      "date": "2026-08-23T12:30Z",
+      "home_team": "PSV Eindhoven",
+      "away_team": "FC Groningen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401875631",
+      "date": "2026-08-23T14:45Z",
+      "home_team": "SC Cambuur",
+      "away_team": "Feyenoord Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401875630",
+      "date": "2026-08-28T18:00Z",
+      "home_team": "FC Groningen",
+      "away_team": "Fortuna Sittard",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401875629",
+      "date": "2026-08-29T14:30Z",
+      "home_team": "Excelsior",
+      "away_team": "Sparta Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401875628",
+      "date": "2026-08-29T16:45Z",
+      "home_team": "AZ Alkmaar",
+      "away_team": "Go Ahead Eagles",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401875627",
+      "date": "2026-08-29T19:00Z",
+      "home_team": "PEC Zwolle",
+      "away_team": "NEC Nijmegen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401875626",
+      "date": "2026-08-30T10:15Z",
+      "home_team": "FC Utrecht",
+      "away_team": "PSV Eindhoven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401875624",
+      "date": "2026-08-30T12:30Z",
+      "home_team": "Feyenoord Rotterdam",
+      "away_team": "ADO Den Haag",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401875625",
+      "date": "2026-08-30T12:30Z",
+      "home_team": "Willem II",
+      "away_team": "Heerenveen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401875623",
+      "date": "2026-08-30T14:45Z",
+      "home_team": "Telstar",
+      "away_team": "Ajax Amsterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401875622",
+      "date": "2026-08-30T18:00Z",
+      "home_team": "SC Cambuur",
+      "away_team": "FC Twente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401875621",
+      "date": "2026-09-04T18:00Z",
+      "home_team": "Sparta Rotterdam",
+      "away_team": "PEC Zwolle",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401875620",
+      "date": "2026-09-05T14:30Z",
+      "home_team": "NEC Nijmegen",
+      "away_team": "Feyenoord Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401875619",
+      "date": "2026-09-05T16:45Z",
+      "home_team": "FC Utrecht",
+      "away_team": "Go Ahead Eagles",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401875618",
+      "date": "2026-09-05T18:00Z",
+      "home_team": "Ajax Amsterdam",
+      "away_team": "PSV Eindhoven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401875617",
+      "date": "2026-09-05T19:00Z",
+      "home_team": "Willem II",
+      "away_team": "Excelsior",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401875616",
+      "date": "2026-09-06T10:15Z",
+      "home_team": "FC Groningen",
+      "away_team": "FC Twente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401875615",
+      "date": "2026-09-06T12:30Z",
+      "home_team": "Heerenveen",
+      "away_team": "AZ Alkmaar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401875614",
+      "date": "2026-09-06T12:30Z",
+      "home_team": "Telstar",
+      "away_team": "SC Cambuur",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401875613",
+      "date": "2026-09-06T14:45Z",
+      "home_team": "ADO Den Haag",
+      "away_team": "Fortuna Sittard",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401875612",
+      "date": "2026-09-09T16:45Z",
+      "home_team": "FC Twente",
+      "away_team": "Telstar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401875611",
+      "date": "2026-09-11T18:00Z",
+      "home_team": "AZ Alkmaar",
+      "away_team": "Willem II",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401875610",
+      "date": "2026-09-12T14:30Z",
+      "home_team": "FC Twente",
+      "away_team": "ADO Den Haag",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401875609",
+      "date": "2026-09-12T16:45Z",
+      "home_team": "Go Ahead Eagles",
+      "away_team": "FC Groningen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401875608",
+      "date": "2026-09-12T18:00Z",
+      "home_team": "Fortuna Sittard",
+      "away_team": "Ajax Amsterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401875607",
+      "date": "2026-09-12T19:00Z",
+      "home_team": "Heerenveen",
+      "away_team": "Telstar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401875606",
+      "date": "2026-09-13T10:15Z",
+      "home_team": "Excelsior",
+      "away_team": "FC Utrecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401875605",
+      "date": "2026-09-13T12:30Z",
+      "home_team": "PSV Eindhoven",
+      "away_team": "Sparta Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401875604",
+      "date": "2026-09-13T12:30Z",
+      "home_team": "SC Cambuur",
+      "away_team": "NEC Nijmegen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401875603",
+      "date": "2026-09-13T14:45Z",
+      "home_team": "PEC Zwolle",
+      "away_team": "Feyenoord Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401875602",
+      "date": "2026-09-15T18:00Z",
+      "home_team": "Ajax Amsterdam",
+      "away_team": "Willem II",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401875599",
+      "date": "2026-09-18T18:00Z",
+      "home_team": "FC Groningen",
+      "away_team": "PEC Zwolle",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401875600",
+      "date": "2026-09-19T14:30Z",
+      "home_team": "ADO Den Haag",
+      "away_team": "SC Cambuur",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401875601",
+      "date": "2026-09-19T16:45Z",
+      "home_team": "Sparta Rotterdam",
+      "away_team": "Heerenveen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401875598",
+      "date": "2026-09-19T18:00Z",
+      "home_team": "Ajax Amsterdam",
+      "away_team": "Excelsior",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401875597",
+      "date": "2026-09-19T19:00Z",
+      "home_team": "Willem II",
+      "away_team": "Fortuna Sittard",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401875596",
+      "date": "2026-09-20T10:15Z",
+      "home_team": "Feyenoord Rotterdam",
+      "away_team": "FC Utrecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401875595",
+      "date": "2026-09-20T12:30Z",
+      "home_team": "AZ Alkmaar",
+      "away_team": "Telstar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401875594",
+      "date": "2026-09-20T12:30Z",
+      "home_team": "NEC Nijmegen",
+      "away_team": "Go Ahead Eagles",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401875593",
+      "date": "2026-09-20T14:45Z",
+      "home_team": "FC Twente",
+      "away_team": "PSV Eindhoven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401875592",
+      "date": "2026-10-10T14:30Z",
+      "home_team": "PSV Eindhoven",
+      "away_team": "Heerenveen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401875591",
+      "date": "2026-10-10T16:45Z",
+      "home_team": "Feyenoord Rotterdam",
+      "away_team": "AZ Alkmaar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401875590",
+      "date": "2026-10-10T16:45Z",
+      "home_team": "Go Ahead Eagles",
+      "away_team": "Sparta Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401875589",
+      "date": "2026-10-10T19:00Z",
+      "home_team": "Ajax Amsterdam",
+      "away_team": "NEC Nijmegen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401875588",
+      "date": "2026-10-10T19:00Z",
+      "home_team": "Fortuna Sittard",
+      "away_team": "FC Twente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401875587",
+      "date": "2026-10-11T10:15Z",
+      "home_team": "FC Utrecht",
+      "away_team": "Willem II",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401875586",
+      "date": "2026-10-11T12:30Z",
+      "home_team": "PEC Zwolle",
+      "away_team": "SC Cambuur",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401875585",
+      "date": "2026-10-11T12:30Z",
+      "home_team": "Telstar",
+      "away_team": "ADO Den Haag",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401875584",
+      "date": "2026-10-11T14:45Z",
+      "home_team": "Excelsior",
+      "away_team": "FC Groningen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401875583",
+      "date": "2026-10-16T18:00Z",
+      "home_team": "Heerenveen",
+      "away_team": "Excelsior",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401875582",
+      "date": "2026-10-17T14:30Z",
+      "home_team": "ADO Den Haag",
+      "away_team": "PSV Eindhoven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401875581",
+      "date": "2026-10-17T16:45Z",
+      "home_team": "NEC Nijmegen",
+      "away_team": "Fortuna Sittard",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401875580",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Telstar",
+      "away_team": "Feyenoord Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401875579",
+      "date": "2026-10-17T19:00Z",
+      "home_team": "Sparta Rotterdam",
+      "away_team": "Willem II",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401875578",
+      "date": "2026-10-18T10:15Z",
+      "home_team": "PEC Zwolle",
+      "away_team": "Go Ahead Eagles",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401875577",
+      "date": "2026-10-18T12:30Z",
+      "home_team": "FC Twente",
+      "away_team": "FC Utrecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401875576",
+      "date": "2026-10-18T12:30Z",
+      "home_team": "SC Cambuur",
+      "away_team": "AZ Alkmaar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401875575",
+      "date": "2026-10-18T14:45Z",
+      "home_team": "FC Groningen",
+      "away_team": "Ajax Amsterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401875574",
+      "date": "2026-10-23T18:00Z",
+      "home_team": "Go Ahead Eagles",
+      "away_team": "Telstar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401875573",
+      "date": "2026-10-24T14:30Z",
+      "home_team": "FC Utrecht",
+      "away_team": "PEC Zwolle",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401875572",
+      "date": "2026-10-24T16:45Z",
+      "home_team": "Willem II",
+      "away_team": "SC Cambuur",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401875571",
+      "date": "2026-10-24T19:00Z",
+      "home_team": "ADO Den Haag",
+      "away_team": "Heerenveen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401875570",
+      "date": "2026-10-25T11:15Z",
+      "home_team": "Fortuna Sittard",
+      "away_team": "Excelsior",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401875569",
+      "date": "2026-10-25T13:30Z",
+      "home_team": "NEC Nijmegen",
+      "away_team": "FC Groningen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401875568",
+      "date": "2026-10-25T13:30Z",
+      "home_team": "PSV Eindhoven",
+      "away_team": "Feyenoord Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401875567",
+      "date": "2026-10-25T15:45Z",
+      "home_team": "Sparta Rotterdam",
+      "away_team": "Ajax Amsterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401875566",
+      "date": "2026-10-25T19:00Z",
+      "home_team": "AZ Alkmaar",
+      "away_team": "FC Twente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401875565",
+      "date": "2026-10-31T15:30Z",
+      "home_team": "Feyenoord Rotterdam",
+      "away_team": "Fortuna Sittard",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401875563",
+      "date": "2026-10-31T17:45Z",
+      "home_team": "Heerenveen",
+      "away_team": "NEC Nijmegen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401875564",
+      "date": "2026-10-31T17:45Z",
+      "home_team": "PSV Eindhoven",
+      "away_team": "Willem II",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401875562",
+      "date": "2026-10-31T20:00Z",
+      "home_team": "Ajax Amsterdam",
+      "away_team": "AZ Alkmaar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401875561",
+      "date": "2026-10-31T20:00Z",
+      "home_team": "SC Cambuur",
+      "away_team": "Go Ahead Eagles",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401875560",
+      "date": "2026-11-01T11:15Z",
+      "home_team": "PEC Zwolle",
+      "away_team": "ADO Den Haag",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401875559",
+      "date": "2026-11-01T13:30Z",
+      "home_team": "Excelsior",
+      "away_team": "FC Twente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401875558",
+      "date": "2026-11-01T13:30Z",
+      "home_team": "Telstar",
+      "away_team": "FC Utrecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401875557",
+      "date": "2026-11-01T15:45Z",
+      "home_team": "FC Groningen",
+      "away_team": "Sparta Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401875556",
+      "date": "2026-11-06T19:00Z",
+      "home_team": "Willem II",
+      "away_team": "PEC Zwolle",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401875555",
+      "date": "2026-11-07T15:30Z",
+      "home_team": "Fortuna Sittard",
+      "away_team": "Telstar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401875552",
+      "date": "2026-11-07T17:45Z",
+      "home_team": "ADO Den Haag",
+      "away_team": "Sparta Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401875553",
+      "date": "2026-11-07T19:00Z",
+      "home_team": "SC Cambuur",
+      "away_team": "PSV Eindhoven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401875554",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "Excelsior",
+      "away_team": "Go Ahead Eagles",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401875551",
+      "date": "2026-11-08T11:15Z",
+      "home_team": "Heerenveen",
+      "away_team": "Feyenoord Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401875550",
+      "date": "2026-11-08T13:30Z",
+      "home_team": "FC Twente",
+      "away_team": "Ajax Amsterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401875549",
+      "date": "2026-11-08T13:30Z",
+      "home_team": "FC Utrecht",
+      "away_team": "NEC Nijmegen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401875548",
+      "date": "2026-11-08T15:45Z",
+      "home_team": "AZ Alkmaar",
+      "away_team": "FC Groningen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401875547",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Ajax Amsterdam",
+      "away_team": "ADO Den Haag",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401875546",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "FC Groningen",
+      "away_team": "Heerenveen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401875545",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "FC Twente",
+      "away_team": "Willem II",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401875544",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "FC Utrecht",
+      "away_team": "SC Cambuur",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401875543",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Feyenoord Rotterdam",
+      "away_team": "Excelsior",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401875542",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Go Ahead Eagles",
+      "away_team": "Fortuna Sittard",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401875541",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "NEC Nijmegen",
+      "away_team": "PSV Eindhoven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401875540",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Sparta Rotterdam",
+      "away_team": "AZ Alkmaar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401875539",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Telstar",
+      "away_team": "PEC Zwolle",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401875538",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "ADO Den Haag",
+      "away_team": "FC Utrecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401875537",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Excelsior",
+      "away_team": "Telstar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401875536",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "FC Groningen",
+      "away_team": "Willem II",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401875535",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Feyenoord Rotterdam",
+      "away_team": "Ajax Amsterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401875534",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Fortuna Sittard",
+      "away_team": "Heerenveen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401875533",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "NEC Nijmegen",
+      "away_team": "FC Twente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401875532",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "PEC Zwolle",
+      "away_team": "AZ Alkmaar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401875531",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "PSV Eindhoven",
+      "away_team": "Go Ahead Eagles",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401875530",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "SC Cambuur",
+      "away_team": "Sparta Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401875529",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "ADO Den Haag",
+      "away_team": "Excelsior",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401875528",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "Ajax Amsterdam",
+      "away_team": "FC Utrecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401875527",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "AZ Alkmaar",
+      "away_team": "PSV Eindhoven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401875526",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "Fortuna Sittard",
+      "away_team": "PEC Zwolle",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401875525",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "Go Ahead Eagles",
+      "away_team": "FC Twente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401875524",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "Heerenveen",
+      "away_team": "SC Cambuur",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401875523",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "Sparta Rotterdam",
+      "away_team": "NEC Nijmegen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401875522",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "Telstar",
+      "away_team": "FC Groningen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401875521",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "Willem II",
+      "away_team": "Feyenoord Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401875520",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "Ajax Amsterdam",
+      "away_team": "SC Cambuur",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401875519",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "AZ Alkmaar",
+      "away_team": "NEC Nijmegen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401875518",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "FC Groningen",
+      "away_team": "Feyenoord Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401875517",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "FC Twente",
+      "away_team": "Sparta Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401875516",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "FC Utrecht",
+      "away_team": "Fortuna Sittard",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401875513",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "Heerenveen",
+      "away_team": "Go Ahead Eagles",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401875515",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "PEC Zwolle",
+      "away_team": "Excelsior",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401875514",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "PSV Eindhoven",
+      "away_team": "Telstar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401875512",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "Willem II",
+      "away_team": "ADO Den Haag",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401875511",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "Excelsior",
+      "away_team": "AZ Alkmaar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401875510",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "FC Utrecht",
+      "away_team": "Heerenveen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401875509",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "Feyenoord Rotterdam",
+      "away_team": "FC Twente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401875508",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "Fortuna Sittard",
+      "away_team": "Sparta Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401875507",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "Go Ahead Eagles",
+      "away_team": "Ajax Amsterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401875506",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "NEC Nijmegen",
+      "away_team": "ADO Den Haag",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401875505",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "PSV Eindhoven",
+      "away_team": "PEC Zwolle",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401875504",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "SC Cambuur",
+      "away_team": "FC Groningen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401875503",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "Telstar",
+      "away_team": "Willem II",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401875502",
+      "date": "2027-01-08T19:00Z",
+      "home_team": "FC Twente",
+      "away_team": "Fortuna Sittard",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401875501",
+      "date": "2027-01-09T15:30Z",
+      "home_team": "Sparta Rotterdam",
+      "away_team": "Excelsior",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401875500",
+      "date": "2027-01-09T17:45Z",
+      "home_team": "PEC Zwolle",
+      "away_team": "FC Utrecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401875499",
+      "date": "2027-01-09T19:00Z",
+      "home_team": "Willem II",
+      "away_team": "Ajax Amsterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401875498",
+      "date": "2027-01-09T20:00Z",
+      "home_team": "AZ Alkmaar",
+      "away_team": "Heerenveen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401875497",
+      "date": "2027-01-10T11:15Z",
+      "home_team": "NEC Nijmegen",
+      "away_team": "SC Cambuur",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401875496",
+      "date": "2027-01-10T13:30Z",
+      "home_team": "ADO Den Haag",
+      "away_team": "Telstar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401875495",
+      "date": "2027-01-10T13:30Z",
+      "home_team": "Feyenoord Rotterdam",
+      "away_team": "PSV Eindhoven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401875494",
+      "date": "2027-01-10T15:45Z",
+      "home_team": "FC Groningen",
+      "away_team": "Go Ahead Eagles",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401875493",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "ADO Den Haag",
+      "away_team": "PEC Zwolle",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401875492",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Ajax Amsterdam",
+      "away_team": "FC Groningen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401875491",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Excelsior",
+      "away_team": "Feyenoord Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401875490",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "FC Utrecht",
+      "away_team": "FC Twente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401875489",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Fortuna Sittard",
+      "away_team": "PSV Eindhoven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401875488",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Go Ahead Eagles",
+      "away_team": "AZ Alkmaar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401875446",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Heerenveen",
+      "away_team": "Sparta Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401875447",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "SC Cambuur",
+      "away_team": "Willem II",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401875676",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Telstar",
+      "away_team": "NEC Nijmegen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401875675",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Ajax Amsterdam",
+      "away_team": "Telstar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401875674",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "AZ Alkmaar",
+      "away_team": "FC Utrecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401875673",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Excelsior",
+      "away_team": "Fortuna Sittard",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401875672",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "FC Twente",
+      "away_team": "Heerenveen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401875671",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Feyenoord Rotterdam",
+      "away_team": "PEC Zwolle",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401875670",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Go Ahead Eagles",
+      "away_team": "SC Cambuur",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401875669",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "NEC Nijmegen",
+      "away_team": "Willem II",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401875668",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "PSV Eindhoven",
+      "away_team": "ADO Den Haag",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401875667",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Sparta Rotterdam",
+      "away_team": "FC Groningen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401875666",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "ADO Den Haag",
+      "away_team": "Go Ahead Eagles",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401875665",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "AZ Alkmaar",
+      "away_team": "Feyenoord Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401875664",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "FC Groningen",
+      "away_team": "NEC Nijmegen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401875663",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "FC Twente",
+      "away_team": "SC Cambuur",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401875662",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "FC Utrecht",
+      "away_team": "Excelsior",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401875660",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "Heerenveen",
+      "away_team": "Ajax Amsterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401875661",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "PEC Zwolle",
+      "away_team": "Fortuna Sittard",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401875659",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "Sparta Rotterdam",
+      "away_team": "Telstar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401875658",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "Willem II",
+      "away_team": "PSV Eindhoven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401875657",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Excelsior",
+      "away_team": "Ajax Amsterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401875656",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "FC Groningen",
+      "away_team": "AZ Alkmaar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401875709",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Feyenoord Rotterdam",
+      "away_team": "NEC Nijmegen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401875708",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Fortuna Sittard",
+      "away_team": "ADO Den Haag",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401875707",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Go Ahead Eagles",
+      "away_team": "PEC Zwolle",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401875706",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "PSV Eindhoven",
+      "away_team": "FC Twente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401875705",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "SC Cambuur",
+      "away_team": "FC Utrecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401875704",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Telstar",
+      "away_team": "Heerenveen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401875703",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Willem II",
+      "away_team": "Sparta Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401875702",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Ajax Amsterdam",
+      "away_team": "Go Ahead Eagles",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401875701",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "AZ Alkmaar",
+      "away_team": "Fortuna Sittard",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401875700",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "FC Twente",
+      "away_team": "Excelsior",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401875699",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "FC Utrecht",
+      "away_team": "ADO Den Haag",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401875698",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Feyenoord Rotterdam",
+      "away_team": "Telstar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401875694",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Heerenveen",
+      "away_team": "Willem II",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401875697",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "NEC Nijmegen",
+      "away_team": "Sparta Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401875696",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "PEC Zwolle",
+      "away_team": "FC Groningen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401875695",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "PSV Eindhoven",
+      "away_team": "SC Cambuur",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401875693",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "ADO Den Haag",
+      "away_team": "FC Twente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401875692",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Ajax Amsterdam",
+      "away_team": "Feyenoord Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401875691",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Excelsior",
+      "away_team": "Heerenveen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401875690",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Fortuna Sittard",
+      "away_team": "FC Utrecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401875689",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "NEC Nijmegen",
+      "away_team": "AZ Alkmaar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401875688",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "SC Cambuur",
+      "away_team": "PEC Zwolle",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401875687",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Sparta Rotterdam",
+      "away_team": "PSV Eindhoven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401875686",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Telstar",
+      "away_team": "Go Ahead Eagles",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401875685",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Willem II",
+      "away_team": "FC Groningen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401875684",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "ADO Den Haag",
+      "away_team": "Ajax Amsterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401875683",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "FC Groningen",
+      "away_team": "Telstar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401875682",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "FC Twente",
+      "away_team": "AZ Alkmaar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401875681",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "Feyenoord Rotterdam",
+      "away_team": "Heerenveen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401875680",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "Fortuna Sittard",
+      "away_team": "NEC Nijmegen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401875679",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "Go Ahead Eagles",
+      "away_team": "Excelsior",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401875678",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "PEC Zwolle",
+      "away_team": "Willem II",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401875677",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "PSV Eindhoven",
+      "away_team": "FC Utrecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401875710",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "Sparta Rotterdam",
+      "away_team": "SC Cambuur",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401875711",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Ajax Amsterdam",
+      "away_team": "PEC Zwolle",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401875712",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "AZ Alkmaar",
+      "away_team": "Sparta Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401875713",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Excelsior",
+      "away_team": "NEC Nijmegen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401875714",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "FC Utrecht",
+      "away_team": "FC Groningen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401875715",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Go Ahead Eagles",
+      "away_team": "Feyenoord Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401875717",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Heerenveen",
+      "away_team": "Fortuna Sittard",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401875716",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "SC Cambuur",
+      "away_team": "ADO Den Haag",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401875718",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Telstar",
+      "away_team": "PSV Eindhoven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401875719",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Willem II",
+      "away_team": "FC Twente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401875720",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "ADO Den Haag",
+      "away_team": "Willem II",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401875721",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "AZ Alkmaar",
+      "away_team": "Excelsior",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401875722",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "FC Groningen",
+      "away_team": "PSV Eindhoven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401875723",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "FC Twente",
+      "away_team": "Go Ahead Eagles",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401875724",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "FC Utrecht",
+      "away_team": "Sparta Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401875725",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "Feyenoord Rotterdam",
+      "away_team": "SC Cambuur",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401875726",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "NEC Nijmegen",
+      "away_team": "Ajax Amsterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401875727",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "PEC Zwolle",
+      "away_team": "Heerenveen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401875728",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "Telstar",
+      "away_team": "Fortuna Sittard",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401875729",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Ajax Amsterdam",
+      "away_team": "FC Twente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401875730",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Excelsior",
+      "away_team": "PEC Zwolle",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401875731",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Fortuna Sittard",
+      "away_team": "Feyenoord Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401875732",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Go Ahead Eagles",
+      "away_team": "NEC Nijmegen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401875735",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Heerenveen",
+      "away_team": "FC Groningen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401875733",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "PSV Eindhoven",
+      "away_team": "AZ Alkmaar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401875734",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "SC Cambuur",
+      "away_team": "Telstar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401875736",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Sparta Rotterdam",
+      "away_team": "ADO Den Haag",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401875737",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Willem II",
+      "away_team": "FC Utrecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401875738",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "ADO Den Haag",
+      "away_team": "Feyenoord Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401875739",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "FC Groningen",
+      "away_team": "Excelsior",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401875740",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "FC Utrecht",
+      "away_team": "Ajax Amsterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401875741",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "NEC Nijmegen",
+      "away_team": "Heerenveen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401875742",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "PEC Zwolle",
+      "away_team": "PSV Eindhoven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401875743",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "SC Cambuur",
+      "away_team": "Fortuna Sittard",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401875744",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Sparta Rotterdam",
+      "away_team": "Go Ahead Eagles",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401875746",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Telstar",
+      "away_team": "FC Twente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401875745",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Willem II",
+      "away_team": "AZ Alkmaar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401875747",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "AZ Alkmaar",
+      "away_team": "SC Cambuur",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401875748",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Excelsior",
+      "away_team": "Willem II",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401875749",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "FC Twente",
+      "away_team": "NEC Nijmegen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401875750",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Feyenoord Rotterdam",
+      "away_team": "Sparta Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401875751",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Fortuna Sittard",
+      "away_team": "FC Groningen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401875752",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Go Ahead Eagles",
+      "away_team": "FC Utrecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401875755",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Heerenveen",
+      "away_team": "ADO Den Haag",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401875753",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "PEC Zwolle",
+      "away_team": "Telstar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401875754",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "PSV Eindhoven",
+      "away_team": "Ajax Amsterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401875756",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "Ajax Amsterdam",
+      "away_team": "Fortuna Sittard",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401875757",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "Excelsior",
+      "away_team": "SC Cambuur",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401875758",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "FC Groningen",
+      "away_team": "ADO Den Haag",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401875759",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "Feyenoord Rotterdam",
+      "away_team": "Willem II",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401875760",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "Go Ahead Eagles",
+      "away_team": "PSV Eindhoven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401875762",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "Heerenveen",
+      "away_team": "FC Utrecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401875761",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "NEC Nijmegen",
+      "away_team": "PEC Zwolle",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401875763",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "Sparta Rotterdam",
+      "away_team": "FC Twente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401875764",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "Telstar",
+      "away_team": "AZ Alkmaar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401875765",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "ADO Den Haag",
+      "away_team": "NEC Nijmegen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401875766",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "AZ Alkmaar",
+      "away_team": "Ajax Amsterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401875767",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "FC Twente",
+      "away_team": "FC Groningen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401875768",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "FC Utrecht",
+      "away_team": "Feyenoord Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401875769",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "Fortuna Sittard",
+      "away_team": "Go Ahead Eagles",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401875770",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "PEC Zwolle",
+      "away_team": "Sparta Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401875771",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "PSV Eindhoven",
+      "away_team": "Excelsior",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401875772",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "SC Cambuur",
+      "away_team": "Heerenveen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401875773",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "Willem II",
+      "away_team": "Telstar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401875774",
+      "date": "2027-05-16T12:30Z",
+      "home_team": "Ajax Amsterdam",
+      "away_team": "Sparta Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401875775",
+      "date": "2027-05-16T12:30Z",
+      "home_team": "AZ Alkmaar",
+      "away_team": "PEC Zwolle",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401875776",
+      "date": "2027-05-16T12:30Z",
+      "home_team": "Excelsior",
+      "away_team": "ADO Den Haag",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401875777",
+      "date": "2027-05-16T12:30Z",
+      "home_team": "FC Groningen",
+      "away_team": "SC Cambuur",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401875778",
+      "date": "2027-05-16T12:30Z",
+      "home_team": "FC Twente",
+      "away_team": "Feyenoord Rotterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401875779",
+      "date": "2027-05-16T12:30Z",
+      "home_team": "FC Utrecht",
+      "away_team": "Telstar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401875780",
+      "date": "2027-05-16T12:30Z",
+      "home_team": "Fortuna Sittard",
+      "away_team": "Willem II",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401875781",
+      "date": "2027-05-16T12:30Z",
+      "home_team": "Go Ahead Eagles",
+      "away_team": "Heerenveen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401875782",
+      "date": "2027-05-16T12:30Z",
+      "home_team": "PSV Eindhoven",
+      "away_team": "NEC Nijmegen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401875783",
+      "date": "2027-05-23T12:30Z",
+      "home_team": "ADO Den Haag",
+      "away_team": "AZ Alkmaar",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401875784",
+      "date": "2027-05-23T12:30Z",
+      "home_team": "Feyenoord Rotterdam",
+      "away_team": "FC Groningen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401875788",
+      "date": "2027-05-23T12:30Z",
+      "home_team": "Heerenveen",
+      "away_team": "PSV Eindhoven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401875785",
+      "date": "2027-05-23T12:30Z",
+      "home_team": "NEC Nijmegen",
+      "away_team": "FC Utrecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401875786",
+      "date": "2027-05-23T12:30Z",
+      "home_team": "PEC Zwolle",
+      "away_team": "FC Twente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401875787",
+      "date": "2027-05-23T12:30Z",
+      "home_team": "SC Cambuur",
+      "away_team": "Ajax Amsterdam",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401875789",
+      "date": "2027-05-23T12:30Z",
+      "home_team": "Sparta Rotterdam",
+      "away_team": "Fortuna Sittard",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401875790",
+      "date": "2027-05-23T12:30Z",
+      "home_team": "Telstar",
+      "away_team": "Excelsior",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401875791",
+      "date": "2027-05-23T12:30Z",
+      "home_team": "Willem II",
+      "away_team": "Go Ahead Eagles",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    }
+  ]
+}

@@ -1,0 +1,5318 @@
+{
+  "league": "mls",
+  "season": 2026,
+  "generated_at": "2026-07-20T20:45:10.426719+00:00",
+  "match_count": 511,
+  "weeks": [
+    {
+      "week": 1,
+      "start_date": "2026-02-21",
+      "end_date": "2026-02-21",
+      "match_count": 2
+    },
+    {
+      "week": 2,
+      "start_date": "2026-02-22",
+      "end_date": "2026-02-28",
+      "match_count": 17
+    },
+    {
+      "week": 3,
+      "start_date": "2026-03-01",
+      "end_date": "2026-03-07",
+      "match_count": 13
+    },
+    {
+      "week": 4,
+      "start_date": "2026-03-08",
+      "end_date": "2026-03-14",
+      "match_count": 18
+    },
+    {
+      "week": 5,
+      "start_date": "2026-03-15",
+      "end_date": "2026-03-21",
+      "match_count": 14
+    },
+    {
+      "week": 6,
+      "start_date": "2026-03-22",
+      "end_date": "2026-03-22",
+      "match_count": 10
+    },
+    {
+      "week": 7,
+      "start_date": "2026-04-04",
+      "end_date": "2026-04-04",
+      "match_count": 9
+    },
+    {
+      "week": 8,
+      "start_date": "2026-04-05",
+      "end_date": "2026-04-11",
+      "match_count": 14
+    },
+    {
+      "week": 9,
+      "start_date": "2026-04-12",
+      "end_date": "2026-04-18",
+      "match_count": 16
+    },
+    {
+      "week": 10,
+      "start_date": "2026-04-19",
+      "end_date": "2026-04-25",
+      "match_count": 23
+    },
+    {
+      "week": 11,
+      "start_date": "2026-04-26",
+      "end_date": "2026-05-02",
+      "match_count": 17
+    },
+    {
+      "week": 12,
+      "start_date": "2026-05-03",
+      "end_date": "2026-05-09",
+      "match_count": 12
+    },
+    {
+      "week": 13,
+      "start_date": "2026-05-10",
+      "end_date": "2026-05-16",
+      "match_count": 30
+    },
+    {
+      "week": 14,
+      "start_date": "2026-05-17",
+      "end_date": "2026-05-23",
+      "match_count": 13
+    },
+    {
+      "week": 15,
+      "start_date": "2026-05-24",
+      "end_date": "2026-05-25",
+      "match_count": 10
+    },
+    {
+      "week": 16,
+      "start_date": "2026-07-16",
+      "end_date": "2026-07-18",
+      "match_count": 5
+    },
+    {
+      "week": 17,
+      "start_date": "2026-07-22",
+      "end_date": "2026-07-25",
+      "match_count": 23
+    },
+    {
+      "week": 18,
+      "start_date": "2026-07-26",
+      "end_date": "2026-08-01",
+      "match_count": 16
+    },
+    {
+      "week": 19,
+      "start_date": "2026-08-02",
+      "end_date": "2026-08-08",
+      "match_count": 8
+    },
+    {
+      "week": 20,
+      "start_date": "2026-08-15",
+      "end_date": "2026-08-15",
+      "match_count": 5
+    },
+    {
+      "week": 21,
+      "start_date": "2026-08-16",
+      "end_date": "2026-08-22",
+      "match_count": 31
+    },
+    {
+      "week": 22,
+      "start_date": "2026-08-23",
+      "end_date": "2026-08-29",
+      "match_count": 16
+    },
+    {
+      "week": 23,
+      "start_date": "2026-08-30",
+      "end_date": "2026-09-05",
+      "match_count": 16
+    },
+    {
+      "week": 24,
+      "start_date": "2026-09-06",
+      "end_date": "2026-09-12",
+      "match_count": 26
+    },
+    {
+      "week": 25,
+      "start_date": "2026-09-13",
+      "end_date": "2026-09-19",
+      "match_count": 15
+    },
+    {
+      "week": 26,
+      "start_date": "2026-09-20",
+      "end_date": "2026-09-26",
+      "match_count": 16
+    },
+    {
+      "week": 27,
+      "start_date": "2026-09-27",
+      "end_date": "2026-10-02",
+      "match_count": 11
+    },
+    {
+      "week": 28,
+      "start_date": "2026-10-06",
+      "end_date": "2026-10-10",
+      "match_count": 10
+    },
+    {
+      "week": 29,
+      "start_date": "2026-10-11",
+      "end_date": "2026-10-17",
+      "match_count": 27
+    },
+    {
+      "week": 30,
+      "start_date": "2026-10-18",
+      "end_date": "2026-10-24",
+      "match_count": 15
+    },
+    {
+      "week": 31,
+      "start_date": "2026-10-25",
+      "end_date": "2026-10-31",
+      "match_count": 27
+    },
+    {
+      "week": 32,
+      "start_date": "2026-11-01",
+      "end_date": "2026-11-07",
+      "match_count": 19
+    },
+    {
+      "week": 33,
+      "start_date": "2026-11-08",
+      "end_date": "2026-11-08",
+      "match_count": 7
+    }
+  ],
+  "matches": [
+    {
+      "event_id": "761439",
+      "date": "2026-02-21T19:30Z",
+      "home_team": "St. Louis CITY SC",
+      "away_team": "Charlotte FC",
+      "home_score": "1",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 1
+    },
+    {
+      "event_id": "761440",
+      "date": "2026-02-21T21:45Z",
+      "home_team": "FC Cincinnati",
+      "away_team": "Atlanta United FC",
+      "home_score": "2",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 1
+    },
+    {
+      "event_id": "761441",
+      "date": "2026-02-22T00:30Z",
+      "home_team": "D.C. United",
+      "away_team": "Philadelphia Union",
+      "home_score": "1",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 2
+    },
+    {
+      "event_id": "761442",
+      "date": "2026-02-22T00:30Z",
+      "home_team": "Orlando City SC",
+      "away_team": "Red Bull New York",
+      "home_score": "1",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 2
+    },
+    {
+      "event_id": "761443",
+      "date": "2026-02-22T00:30Z",
+      "home_team": "Vancouver Whitecaps",
+      "away_team": "Real Salt Lake",
+      "home_score": "1",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 2
+    },
+    {
+      "event_id": "761446",
+      "date": "2026-02-22T01:30Z",
+      "home_team": "Austin FC",
+      "away_team": "Minnesota United FC",
+      "home_score": "2",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 2
+    },
+    {
+      "event_id": "761447",
+      "date": "2026-02-22T01:30Z",
+      "home_team": "FC Dallas",
+      "away_team": "Toronto FC",
+      "home_score": "3",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 2
+    },
+    {
+      "event_id": "761445",
+      "date": "2026-02-22T01:30Z",
+      "home_team": "Houston Dynamo FC",
+      "away_team": "Chicago Fire FC",
+      "home_score": "2",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 2
+    },
+    {
+      "event_id": "761444",
+      "date": "2026-02-22T01:30Z",
+      "home_team": "Nashville SC",
+      "away_team": "New England Revolution",
+      "home_score": "4",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 2
+    },
+    {
+      "event_id": "761448",
+      "date": "2026-02-22T02:30Z",
+      "home_team": "LAFC",
+      "away_team": "Inter Miami CF",
+      "home_score": "3",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 2
+    },
+    {
+      "event_id": "761451",
+      "date": "2026-02-22T03:30Z",
+      "home_team": "Portland Timbers",
+      "away_team": "Columbus Crew",
+      "home_score": "3",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 2
+    },
+    {
+      "event_id": "761449",
+      "date": "2026-02-22T03:30Z",
+      "home_team": "San Diego FC",
+      "away_team": "CF Montr\u00e9al",
+      "home_score": "5",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 2
+    },
+    {
+      "event_id": "761450",
+      "date": "2026-02-22T03:30Z",
+      "home_team": "San Jose Earthquakes",
+      "away_team": "Sporting Kansas City",
+      "home_score": "3",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 2
+    },
+    {
+      "event_id": "761452",
+      "date": "2026-02-23T00:00Z",
+      "home_team": "LA Galaxy",
+      "away_team": "New York City FC",
+      "home_score": "1",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 2
+    },
+    {
+      "event_id": "761453",
+      "date": "2026-02-23T02:15Z",
+      "home_team": "Seattle Sounders FC",
+      "away_team": "Colorado Rapids",
+      "home_score": "2",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 2
+    },
+    {
+      "event_id": "761454",
+      "date": "2026-02-28T19:30Z",
+      "home_team": "Chicago Fire FC",
+      "away_team": "CF Montr\u00e9al",
+      "home_score": "3",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 2
+    },
+    {
+      "event_id": "761455",
+      "date": "2026-02-28T19:30Z",
+      "home_team": "Red Bull New York",
+      "away_team": "New England Revolution",
+      "home_score": "1",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 2
+    },
+    {
+      "event_id": "761456",
+      "date": "2026-02-28T21:30Z",
+      "home_team": "Colorado Rapids",
+      "away_team": "Portland Timbers",
+      "home_score": "2",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 2
+    },
+    {
+      "event_id": "761457",
+      "date": "2026-02-28T21:30Z",
+      "home_team": "Minnesota United FC",
+      "away_team": "FC Cincinnati",
+      "home_score": "1",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 2
+    },
+    {
+      "event_id": "761459",
+      "date": "2026-03-01T00:30Z",
+      "home_team": "Real Salt Lake",
+      "away_team": "Seattle Sounders FC",
+      "home_score": "2",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 3
+    },
+    {
+      "event_id": "761458",
+      "date": "2026-03-01T00:30Z",
+      "home_team": "San Jose Earthquakes",
+      "away_team": "Atlanta United FC",
+      "home_score": "2",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 3
+    },
+    {
+      "event_id": "761462",
+      "date": "2026-03-01T01:30Z",
+      "home_team": "FC Dallas",
+      "away_team": "Nashville SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 3
+    },
+    {
+      "event_id": "761460",
+      "date": "2026-03-01T01:30Z",
+      "home_team": "Houston Dynamo FC",
+      "away_team": "LAFC",
+      "home_score": "0",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 3
+    },
+    {
+      "event_id": "761461",
+      "date": "2026-03-01T01:30Z",
+      "home_team": "Sporting Kansas City",
+      "away_team": "Columbus Crew",
+      "home_score": "2",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 3
+    },
+    {
+      "event_id": "761463",
+      "date": "2026-03-01T02:30Z",
+      "home_team": "Vancouver Whitecaps",
+      "away_team": "Toronto FC",
+      "home_score": "3",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 3
+    },
+    {
+      "event_id": "761464",
+      "date": "2026-03-01T03:30Z",
+      "home_team": "LA Galaxy",
+      "away_team": "Charlotte FC",
+      "home_score": "3",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 3
+    },
+    {
+      "event_id": "761465",
+      "date": "2026-03-01T19:30Z",
+      "home_team": "Austin FC",
+      "away_team": "D.C. United",
+      "home_score": "1",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 3
+    },
+    {
+      "event_id": "761466",
+      "date": "2026-03-01T21:30Z",
+      "home_team": "Philadelphia Union",
+      "away_team": "New York City FC",
+      "home_score": "1",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 3
+    },
+    {
+      "event_id": "761467",
+      "date": "2026-03-02T00:00Z",
+      "home_team": "Orlando City SC",
+      "away_team": "Inter Miami CF",
+      "home_score": "2",
+      "away_score": "4",
+      "status_state": "post",
+      "week": 3
+    },
+    {
+      "event_id": "761468",
+      "date": "2026-03-02T02:15Z",
+      "home_team": "San Diego FC",
+      "away_team": "St. Louis CITY SC",
+      "home_score": "2",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 3
+    },
+    {
+      "event_id": "761470",
+      "date": "2026-03-07T19:30Z",
+      "home_team": "New York City FC",
+      "away_team": "Orlando City SC",
+      "home_score": "5",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 3
+    },
+    {
+      "event_id": "761471",
+      "date": "2026-03-07T21:30Z",
+      "home_team": "D.C. United",
+      "away_team": "Inter Miami CF",
+      "home_score": "1",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 3
+    },
+    {
+      "event_id": "761474",
+      "date": "2026-03-08T00:30Z",
+      "home_team": "Atlanta United FC",
+      "away_team": "Real Salt Lake",
+      "home_score": "2",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 4
+    },
+    {
+      "event_id": "761475",
+      "date": "2026-03-08T00:30Z",
+      "home_team": "Charlotte FC",
+      "away_team": "Austin FC",
+      "home_score": "3",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 4
+    },
+    {
+      "event_id": "761472",
+      "date": "2026-03-08T00:30Z",
+      "home_team": "Columbus Crew",
+      "away_team": "Chicago Fire FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 4
+    },
+    {
+      "event_id": "761473",
+      "date": "2026-03-08T00:30Z",
+      "home_team": "Philadelphia Union",
+      "away_team": "San Jose Earthquakes",
+      "home_score": "0",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 4
+    },
+    {
+      "event_id": "761478",
+      "date": "2026-03-08T01:30Z",
+      "home_team": "Nashville SC",
+      "away_team": "Minnesota United FC",
+      "home_score": "3",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 4
+    },
+    {
+      "event_id": "761476",
+      "date": "2026-03-08T01:30Z",
+      "home_team": "Sporting Kansas City",
+      "away_team": "San Diego FC",
+      "home_score": "0",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 4
+    },
+    {
+      "event_id": "761477",
+      "date": "2026-03-08T01:30Z",
+      "home_team": "St. Louis CITY SC",
+      "away_team": "Seattle Sounders FC",
+      "home_score": "0",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 4
+    },
+    {
+      "event_id": "761479",
+      "date": "2026-03-08T02:30Z",
+      "home_team": "Colorado Rapids",
+      "away_team": "LA Galaxy",
+      "home_score": "4",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 4
+    },
+    {
+      "event_id": "761480",
+      "date": "2026-03-08T03:30Z",
+      "home_team": "LAFC",
+      "away_team": "FC Dallas",
+      "home_score": "1",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 4
+    },
+    {
+      "event_id": "761481",
+      "date": "2026-03-08T03:30Z",
+      "home_team": "Portland Timbers",
+      "away_team": "Vancouver Whitecaps",
+      "home_score": "1",
+      "away_score": "4",
+      "status_state": "post",
+      "week": 4
+    },
+    {
+      "event_id": "761482",
+      "date": "2026-03-08T20:30Z",
+      "home_team": "Red Bull New York",
+      "away_team": "CF Montr\u00e9al",
+      "home_score": "0",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 4
+    },
+    {
+      "event_id": "761483",
+      "date": "2026-03-08T23:00Z",
+      "home_team": "FC Cincinnati",
+      "away_team": "Toronto FC",
+      "home_score": "0",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 4
+    },
+    {
+      "event_id": "761484",
+      "date": "2026-03-14T17:00Z",
+      "home_team": "Toronto FC",
+      "away_team": "Red Bull New York",
+      "home_score": "1",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 4
+    },
+    {
+      "event_id": "761485",
+      "date": "2026-03-14T19:15Z",
+      "home_team": "Atlanta United FC",
+      "away_team": "Philadelphia Union",
+      "home_score": "3",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 4
+    },
+    {
+      "event_id": "761486",
+      "date": "2026-03-14T22:15Z",
+      "home_team": "Columbus Crew",
+      "away_team": "Nashville SC",
+      "home_score": "0",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 4
+    },
+    {
+      "event_id": "761489",
+      "date": "2026-03-14T23:30Z",
+      "home_team": "Charlotte FC",
+      "away_team": "Inter Miami CF",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 4
+    },
+    {
+      "event_id": "761487",
+      "date": "2026-03-14T23:30Z",
+      "home_team": "New York City FC",
+      "away_team": "Colorado Rapids",
+      "home_score": "3",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 4
+    },
+    {
+      "event_id": "761488",
+      "date": "2026-03-14T23:30Z",
+      "home_team": "Orlando City SC",
+      "away_team": "CF Montr\u00e9al",
+      "home_score": "2",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 4
+    },
+    {
+      "event_id": "761491",
+      "date": "2026-03-15T00:30Z",
+      "home_team": "Chicago Fire FC",
+      "away_team": "D.C. United",
+      "home_score": "1",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 5
+    },
+    {
+      "event_id": "761490",
+      "date": "2026-03-15T00:30Z",
+      "home_team": "FC Dallas",
+      "away_team": "San Diego FC",
+      "home_score": "3",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 5
+    },
+    {
+      "event_id": "761492",
+      "date": "2026-03-15T00:30Z",
+      "home_team": "Houston Dynamo FC",
+      "away_team": "Portland Timbers",
+      "home_score": "3",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 5
+    },
+    {
+      "event_id": "761493",
+      "date": "2026-03-15T01:30Z",
+      "home_team": "LA Galaxy",
+      "away_team": "Sporting Kansas City",
+      "home_score": "1",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 5
+    },
+    {
+      "event_id": "761494",
+      "date": "2026-03-15T01:30Z",
+      "home_team": "Real Salt Lake",
+      "away_team": "Austin FC",
+      "home_score": "2",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 5
+    },
+    {
+      "event_id": "761495",
+      "date": "2026-03-15T02:30Z",
+      "home_team": "LAFC",
+      "away_team": "St. Louis CITY SC",
+      "home_score": "2",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 5
+    },
+    {
+      "event_id": "761497",
+      "date": "2026-03-15T18:30Z",
+      "home_team": "New England Revolution",
+      "away_team": "FC Cincinnati",
+      "home_score": "6",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 5
+    },
+    {
+      "event_id": "761496",
+      "date": "2026-03-15T20:30Z",
+      "home_team": "Vancouver Whitecaps",
+      "away_team": "Minnesota United FC",
+      "home_score": "6",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 5
+    },
+    {
+      "event_id": "761498",
+      "date": "2026-03-15T23:00Z",
+      "home_team": "San Jose Earthquakes",
+      "away_team": "Seattle Sounders FC",
+      "home_score": "0",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 5
+    },
+    {
+      "event_id": "761499",
+      "date": "2026-03-21T17:00Z",
+      "home_team": "Toronto FC",
+      "away_team": "Columbus Crew",
+      "home_score": "2",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 5
+    },
+    {
+      "event_id": "761500",
+      "date": "2026-03-21T20:30Z",
+      "home_team": "Philadelphia Union",
+      "away_team": "Chicago Fire FC",
+      "home_score": "1",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 5
+    },
+    {
+      "event_id": "761501",
+      "date": "2026-03-21T22:15Z",
+      "home_team": "Nashville SC",
+      "away_team": "Orlando City SC",
+      "home_score": "5",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 5
+    },
+    {
+      "event_id": "761502",
+      "date": "2026-03-21T23:30Z",
+      "home_team": "Atlanta United FC",
+      "away_team": "D.C. United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 5
+    },
+    {
+      "event_id": "761503",
+      "date": "2026-03-21T23:30Z",
+      "home_team": "Charlotte FC",
+      "away_team": "Red Bull New York",
+      "home_score": "6",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 5
+    },
+    {
+      "event_id": "761505",
+      "date": "2026-03-22T00:30Z",
+      "home_team": "FC Dallas",
+      "away_team": "Houston Dynamo FC",
+      "home_score": "4",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 6
+    },
+    {
+      "event_id": "761508",
+      "date": "2026-03-22T00:30Z",
+      "home_team": "Sporting Kansas City",
+      "away_team": "Colorado Rapids",
+      "home_score": "1",
+      "away_score": "4",
+      "status_state": "post",
+      "week": 6
+    },
+    {
+      "event_id": "761507",
+      "date": "2026-03-22T00:30Z",
+      "home_team": "St. Louis CITY SC",
+      "away_team": "New England Revolution",
+      "home_score": "3",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 6
+    },
+    {
+      "event_id": "761506",
+      "date": "2026-03-22T00:45Z",
+      "home_team": "Austin FC",
+      "away_team": "LAFC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 6
+    },
+    {
+      "event_id": "761509",
+      "date": "2026-03-22T02:30Z",
+      "home_team": "Vancouver Whitecaps",
+      "away_team": "San Jose Earthquakes",
+      "home_score": "0",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 6
+    },
+    {
+      "event_id": "761504",
+      "date": "2026-03-22T17:00Z",
+      "home_team": "FC Cincinnati",
+      "away_team": "CF Montr\u00e9al",
+      "home_score": "4",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 6
+    },
+    {
+      "event_id": "761510",
+      "date": "2026-03-22T17:00Z",
+      "home_team": "New York City FC",
+      "away_team": "Inter Miami CF",
+      "home_score": "2",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 6
+    },
+    {
+      "event_id": "761511",
+      "date": "2026-03-22T18:30Z",
+      "home_team": "Minnesota United FC",
+      "away_team": "Seattle Sounders FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 6
+    },
+    {
+      "event_id": "761512",
+      "date": "2026-03-22T20:45Z",
+      "home_team": "Portland Timbers",
+      "away_team": "LA Galaxy",
+      "home_score": "1",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 6
+    },
+    {
+      "event_id": "761513",
+      "date": "2026-03-22T23:00Z",
+      "home_team": "San Diego FC",
+      "away_team": "Real Salt Lake",
+      "home_score": "2",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 6
+    },
+    {
+      "event_id": "761514",
+      "date": "2026-04-04T17:00Z",
+      "home_team": "Toronto FC",
+      "away_team": "Colorado Rapids",
+      "home_score": "3",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 7
+    },
+    {
+      "event_id": "761516",
+      "date": "2026-04-04T20:30Z",
+      "home_team": "New England Revolution",
+      "away_team": "CF Montr\u00e9al",
+      "home_score": "3",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 7
+    },
+    {
+      "event_id": "761515",
+      "date": "2026-04-04T20:30Z",
+      "home_team": "Real Salt Lake",
+      "away_team": "Sporting Kansas City",
+      "home_score": "3",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 7
+    },
+    {
+      "event_id": "761521",
+      "date": "2026-04-04T23:30Z",
+      "home_team": "Atlanta United FC",
+      "away_team": "Columbus Crew",
+      "home_score": "1",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 7
+    },
+    {
+      "event_id": "761520",
+      "date": "2026-04-04T23:30Z",
+      "home_team": "Charlotte FC",
+      "away_team": "Philadelphia Union",
+      "home_score": "2",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 7
+    },
+    {
+      "event_id": "761518",
+      "date": "2026-04-04T23:30Z",
+      "home_team": "D.C. United",
+      "away_team": "FC Dallas",
+      "home_score": "0",
+      "away_score": "4",
+      "status_state": "post",
+      "week": 7
+    },
+    {
+      "event_id": "761522",
+      "date": "2026-04-04T23:30Z",
+      "home_team": "Inter Miami CF",
+      "away_team": "Austin FC",
+      "home_score": "2",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 7
+    },
+    {
+      "event_id": "761519",
+      "date": "2026-04-04T23:30Z",
+      "home_team": "New York City FC",
+      "away_team": "St. Louis CITY SC",
+      "home_score": "1",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 7
+    },
+    {
+      "event_id": "761517",
+      "date": "2026-04-04T23:30Z",
+      "home_team": "Red Bull New York",
+      "away_team": "FC Cincinnati",
+      "home_score": "4",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 7
+    },
+    {
+      "event_id": "761524",
+      "date": "2026-04-05T00:30Z",
+      "home_team": "Chicago Fire FC",
+      "away_team": "Nashville SC",
+      "home_score": "1",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 8
+    },
+    {
+      "event_id": "761523",
+      "date": "2026-04-05T00:30Z",
+      "home_team": "Houston Dynamo FC",
+      "away_team": "Seattle Sounders FC",
+      "home_score": "0",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 8
+    },
+    {
+      "event_id": "761525",
+      "date": "2026-04-05T01:30Z",
+      "home_team": "LAFC",
+      "away_team": "Orlando City SC",
+      "home_score": "6",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 8
+    },
+    {
+      "event_id": "761527",
+      "date": "2026-04-05T02:30Z",
+      "home_team": "LA Galaxy",
+      "away_team": "Minnesota United FC",
+      "home_score": "1",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 8
+    },
+    {
+      "event_id": "761526",
+      "date": "2026-04-05T02:30Z",
+      "home_team": "San Jose Earthquakes",
+      "away_team": "San Diego FC",
+      "home_score": "3",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 8
+    },
+    {
+      "event_id": "761528",
+      "date": "2026-04-05T02:30Z",
+      "home_team": "Vancouver Whitecaps",
+      "away_team": "Portland Timbers",
+      "home_score": "3",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 8
+    },
+    {
+      "event_id": "761529",
+      "date": "2026-04-11T17:00Z",
+      "home_team": "Toronto FC",
+      "away_team": "FC Cincinnati",
+      "home_score": "1",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 8
+    },
+    {
+      "event_id": "761530",
+      "date": "2026-04-11T18:30Z",
+      "home_team": "Austin FC",
+      "away_team": "LA Galaxy",
+      "home_score": "1",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 8
+    },
+    {
+      "event_id": "761541",
+      "date": "2026-04-11T18:30Z",
+      "home_team": "CF Montr\u00e9al",
+      "away_team": "Philadelphia Union",
+      "home_score": "1",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 8
+    },
+    {
+      "event_id": "761531",
+      "date": "2026-04-11T20:45Z",
+      "home_team": "Portland Timbers",
+      "away_team": "LAFC",
+      "home_score": "2",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 8
+    },
+    {
+      "event_id": "761532",
+      "date": "2026-04-11T23:30Z",
+      "home_team": "Charlotte FC",
+      "away_team": "Nashville SC",
+      "home_score": "1",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 8
+    },
+    {
+      "event_id": "761533",
+      "date": "2026-04-11T23:30Z",
+      "home_team": "Inter Miami CF",
+      "away_team": "Red Bull New York",
+      "home_score": "2",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 8
+    },
+    {
+      "event_id": "761535",
+      "date": "2026-04-11T23:30Z",
+      "home_team": "New England Revolution",
+      "away_team": "D.C. United",
+      "home_score": "1",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 8
+    },
+    {
+      "event_id": "761534",
+      "date": "2026-04-11T23:30Z",
+      "home_team": "Vancouver Whitecaps",
+      "away_team": "New York City FC",
+      "home_score": "2",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 8
+    },
+    {
+      "event_id": "761536",
+      "date": "2026-04-12T00:30Z",
+      "home_team": "Chicago Fire FC",
+      "away_team": "Atlanta United FC",
+      "home_score": "1",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 9
+    },
+    {
+      "event_id": "761538",
+      "date": "2026-04-12T00:30Z",
+      "home_team": "FC Dallas",
+      "away_team": "St. Louis CITY SC",
+      "home_score": "1",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 9
+    },
+    {
+      "event_id": "761537",
+      "date": "2026-04-12T00:30Z",
+      "home_team": "Sporting Kansas City",
+      "away_team": "San Jose Earthquakes",
+      "home_score": "1",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 9
+    },
+    {
+      "event_id": "761539",
+      "date": "2026-04-12T01:30Z",
+      "home_team": "Colorado Rapids",
+      "away_team": "Houston Dynamo FC",
+      "home_score": "6",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 9
+    },
+    {
+      "event_id": "761540",
+      "date": "2026-04-12T02:30Z",
+      "home_team": "San Diego FC",
+      "away_team": "Minnesota United FC",
+      "home_score": "1",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 9
+    },
+    {
+      "event_id": "761542",
+      "date": "2026-04-12T23:00Z",
+      "home_team": "Columbus Crew",
+      "away_team": "Orlando City SC",
+      "home_score": "1",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 9
+    },
+    {
+      "event_id": "761544",
+      "date": "2026-04-18T02:30Z",
+      "home_team": "Vancouver Whitecaps",
+      "away_team": "Sporting Kansas City",
+      "home_score": "3",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 9
+    },
+    {
+      "event_id": "761545",
+      "date": "2026-04-18T17:00Z",
+      "home_team": "Toronto FC",
+      "away_team": "Austin FC",
+      "home_score": "3",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 9
+    },
+    {
+      "event_id": "761557",
+      "date": "2026-04-18T18:30Z",
+      "home_team": "CF Montr\u00e9al",
+      "away_team": "Red Bull New York",
+      "home_score": "4",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 9
+    },
+    {
+      "event_id": "761546",
+      "date": "2026-04-18T20:30Z",
+      "home_team": "Colorado Rapids",
+      "away_team": "Inter Miami CF",
+      "home_score": "2",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 9
+    },
+    {
+      "event_id": "761547",
+      "date": "2026-04-18T23:30Z",
+      "home_team": "Atlanta United FC",
+      "away_team": "Nashville SC",
+      "home_score": "0",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 9
+    },
+    {
+      "event_id": "761550",
+      "date": "2026-04-18T23:30Z",
+      "home_team": "FC Cincinnati",
+      "away_team": "Chicago Fire FC",
+      "home_score": "3",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 9
+    },
+    {
+      "event_id": "761552",
+      "date": "2026-04-18T23:30Z",
+      "home_team": "New England Revolution",
+      "away_team": "Columbus Crew",
+      "home_score": "2",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 9
+    },
+    {
+      "event_id": "761551",
+      "date": "2026-04-18T23:30Z",
+      "home_team": "New York City FC",
+      "away_team": "Charlotte FC",
+      "home_score": "1",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 9
+    },
+    {
+      "event_id": "761549",
+      "date": "2026-04-18T23:30Z",
+      "home_team": "Orlando City SC",
+      "away_team": "Houston Dynamo FC",
+      "home_score": "0",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 9
+    },
+    {
+      "event_id": "761548",
+      "date": "2026-04-18T23:30Z",
+      "home_team": "Philadelphia Union",
+      "away_team": "D.C. United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 9
+    },
+    {
+      "event_id": "761554",
+      "date": "2026-04-19T00:30Z",
+      "home_team": "FC Dallas",
+      "away_team": "LA Galaxy",
+      "home_score": "2",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761553",
+      "date": "2026-04-19T00:30Z",
+      "home_team": "Minnesota United FC",
+      "away_team": "Portland Timbers",
+      "home_score": "2",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761556",
+      "date": "2026-04-19T01:30Z",
+      "home_team": "Real Salt Lake",
+      "away_team": "San Diego FC",
+      "home_score": "4",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761555",
+      "date": "2026-04-19T01:30Z",
+      "home_team": "Seattle Sounders FC",
+      "away_team": "St. Louis CITY SC",
+      "home_score": "4",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761558",
+      "date": "2026-04-19T23:00Z",
+      "home_team": "LAFC",
+      "away_team": "San Jose Earthquakes",
+      "home_score": "1",
+      "away_score": "4",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761564",
+      "date": "2026-04-22T23:30Z",
+      "home_team": "New York City FC",
+      "away_team": "FC Cincinnati",
+      "home_score": "4",
+      "away_score": "4",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761562",
+      "date": "2026-04-22T23:30Z",
+      "home_team": "Orlando City SC",
+      "away_team": "Charlotte FC",
+      "home_score": "4",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761561",
+      "date": "2026-04-22T23:30Z",
+      "home_team": "Red Bull New York",
+      "away_team": "D.C. United",
+      "home_score": "4",
+      "away_score": "4",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761563",
+      "date": "2026-04-22T23:30Z",
+      "home_team": "Toronto FC",
+      "away_team": "Philadelphia Union",
+      "home_score": "3",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761560",
+      "date": "2026-04-22T23:45Z",
+      "home_team": "Atlanta United FC",
+      "away_team": "New England Revolution",
+      "home_score": "1",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761566",
+      "date": "2026-04-23T00:30Z",
+      "home_team": "FC Dallas",
+      "away_team": "Minnesota United FC",
+      "home_score": "0",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761565",
+      "date": "2026-04-23T00:30Z",
+      "home_team": "Houston Dynamo FC",
+      "away_team": "San Diego FC",
+      "home_score": "1",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761567",
+      "date": "2026-04-23T01:30Z",
+      "home_team": "Real Salt Lake",
+      "away_team": "Inter Miami CF",
+      "home_score": "0",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761559",
+      "date": "2026-04-23T01:45Z",
+      "home_team": "Columbus Crew",
+      "away_team": "LA Galaxy",
+      "home_score": "2",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761569",
+      "date": "2026-04-23T02:30Z",
+      "home_team": "LAFC",
+      "away_team": "Colorado Rapids",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761568",
+      "date": "2026-04-23T02:30Z",
+      "home_team": "San Jose Earthquakes",
+      "away_team": "Austin FC",
+      "home_score": "5",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761570",
+      "date": "2026-04-25T17:00Z",
+      "home_team": "Toronto FC",
+      "away_team": "Atlanta United FC",
+      "home_score": "1",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761583",
+      "date": "2026-04-25T18:30Z",
+      "home_team": "CF Montr\u00e9al",
+      "away_team": "New York City FC",
+      "home_score": "1",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761571",
+      "date": "2026-04-25T20:45Z",
+      "home_team": "Minnesota United FC",
+      "away_team": "LAFC",
+      "home_score": "0",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761573",
+      "date": "2026-04-25T23:30Z",
+      "home_team": "Columbus Crew",
+      "away_team": "Philadelphia Union",
+      "home_score": "2",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761572",
+      "date": "2026-04-25T23:30Z",
+      "home_team": "D.C. United",
+      "away_team": "Orlando City SC",
+      "home_score": "3",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761575",
+      "date": "2026-04-25T23:30Z",
+      "home_team": "FC Cincinnati",
+      "away_team": "Red Bull New York",
+      "home_score": "2",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761574",
+      "date": "2026-04-25T23:30Z",
+      "home_team": "Inter Miami CF",
+      "away_team": "New England Revolution",
+      "home_score": "1",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 10
+    },
+    {
+      "event_id": "761578",
+      "date": "2026-04-26T00:30Z",
+      "home_team": "Austin FC",
+      "away_team": "Houston Dynamo FC",
+      "home_score": "2",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 11
+    },
+    {
+      "event_id": "761577",
+      "date": "2026-04-26T00:30Z",
+      "home_team": "Chicago Fire FC",
+      "away_team": "Sporting Kansas City",
+      "home_score": "5",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 11
+    },
+    {
+      "event_id": "761579",
+      "date": "2026-04-26T00:30Z",
+      "home_team": "Nashville SC",
+      "away_team": "Charlotte FC",
+      "home_score": "4",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 11
+    },
+    {
+      "event_id": "761576",
+      "date": "2026-04-26T00:30Z",
+      "home_team": "St. Louis CITY SC",
+      "away_team": "San Jose Earthquakes",
+      "home_score": "2",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 11
+    },
+    {
+      "event_id": "761580",
+      "date": "2026-04-26T01:30Z",
+      "home_team": "San Diego FC",
+      "away_team": "Portland Timbers",
+      "home_score": "1",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 11
+    },
+    {
+      "event_id": "761581",
+      "date": "2026-04-26T02:30Z",
+      "home_team": "Seattle Sounders FC",
+      "away_team": "FC Dallas",
+      "home_score": "2",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 11
+    },
+    {
+      "event_id": "761582",
+      "date": "2026-04-26T02:30Z",
+      "home_team": "Vancouver Whitecaps",
+      "away_team": "Colorado Rapids",
+      "home_score": "3",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 11
+    },
+    {
+      "event_id": "761584",
+      "date": "2026-04-26T23:00Z",
+      "home_team": "LA Galaxy",
+      "away_team": "Real Salt Lake",
+      "home_score": "2",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 11
+    },
+    {
+      "event_id": "761597",
+      "date": "2026-05-02T17:00Z",
+      "home_team": "Toronto FC",
+      "away_team": "San Jose Earthquakes",
+      "home_score": "1",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 11
+    },
+    {
+      "event_id": "761585",
+      "date": "2026-05-02T18:30Z",
+      "home_team": "Sporting Kansas City",
+      "away_team": "Seattle Sounders FC",
+      "home_score": "1",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 11
+    },
+    {
+      "event_id": "761586",
+      "date": "2026-05-02T20:45Z",
+      "home_team": "Real Salt Lake",
+      "away_team": "Portland Timbers",
+      "home_score": "2",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 11
+    },
+    {
+      "event_id": "761587",
+      "date": "2026-05-02T23:15Z",
+      "home_team": "Inter Miami CF",
+      "away_team": "Orlando City SC",
+      "home_score": "3",
+      "away_score": "4",
+      "status_state": "post",
+      "week": 11
+    },
+    {
+      "event_id": "761590",
+      "date": "2026-05-02T23:30Z",
+      "home_team": "Atlanta United FC",
+      "away_team": "CF Montr\u00e9al",
+      "home_score": "3",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 11
+    },
+    {
+      "event_id": "761589",
+      "date": "2026-05-02T23:30Z",
+      "home_team": "Columbus Crew",
+      "away_team": "Minnesota United FC",
+      "home_score": "2",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 11
+    },
+    {
+      "event_id": "761591",
+      "date": "2026-05-02T23:30Z",
+      "home_team": "New England Revolution",
+      "away_team": "Charlotte FC",
+      "home_score": "1",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 11
+    },
+    {
+      "event_id": "761588",
+      "date": "2026-05-02T23:30Z",
+      "home_team": "Philadelphia Union",
+      "away_team": "Nashville SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 11
+    },
+    {
+      "event_id": "761592",
+      "date": "2026-05-02T23:30Z",
+      "home_team": "Red Bull New York",
+      "away_team": "FC Dallas",
+      "home_score": "0",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 11
+    },
+    {
+      "event_id": "761593",
+      "date": "2026-05-03T00:30Z",
+      "home_team": "Chicago Fire FC",
+      "away_team": "FC Cincinnati",
+      "home_score": "2",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 12
+    },
+    {
+      "event_id": "761594",
+      "date": "2026-05-03T00:30Z",
+      "home_team": "Houston Dynamo FC",
+      "away_team": "Colorado Rapids",
+      "home_score": "1",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 12
+    },
+    {
+      "event_id": "761595",
+      "date": "2026-05-03T01:30Z",
+      "home_team": "San Diego FC",
+      "away_team": "LAFC",
+      "home_score": "2",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 12
+    },
+    {
+      "event_id": "761596",
+      "date": "2026-05-03T02:30Z",
+      "home_team": "LA Galaxy",
+      "away_team": "Vancouver Whitecaps",
+      "home_score": "1",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 12
+    },
+    {
+      "event_id": "761598",
+      "date": "2026-05-03T19:00Z",
+      "home_team": "New York City FC",
+      "away_team": "D.C. United",
+      "home_score": "0",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 12
+    },
+    {
+      "event_id": "761599",
+      "date": "2026-05-03T21:30Z",
+      "home_team": "Austin FC",
+      "away_team": "St. Louis CITY SC",
+      "home_score": "2",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 12
+    },
+    {
+      "event_id": "761611",
+      "date": "2026-05-09T17:00Z",
+      "home_team": "Toronto FC",
+      "away_team": "Inter Miami CF",
+      "home_score": "2",
+      "away_score": "4",
+      "status_state": "post",
+      "week": 12
+    },
+    {
+      "event_id": "761600",
+      "date": "2026-05-09T18:30Z",
+      "home_team": "Chicago Fire FC",
+      "away_team": "Red Bull New York",
+      "home_score": "1",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 12
+    },
+    {
+      "event_id": "761610",
+      "date": "2026-05-09T20:30Z",
+      "home_team": "CF Montr\u00e9al",
+      "away_team": "Orlando City SC",
+      "home_score": "2",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 12
+    },
+    {
+      "event_id": "761602",
+      "date": "2026-05-09T23:30Z",
+      "home_team": "Atlanta United FC",
+      "away_team": "LA Galaxy",
+      "home_score": "1",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 12
+    },
+    {
+      "event_id": "761603",
+      "date": "2026-05-09T23:30Z",
+      "home_team": "Charlotte FC",
+      "away_team": "FC Cincinnati",
+      "home_score": "2",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 12
+    },
+    {
+      "event_id": "761601",
+      "date": "2026-05-09T23:30Z",
+      "home_team": "New England Revolution",
+      "away_team": "Philadelphia Union",
+      "home_score": "2",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 12
+    },
+    {
+      "event_id": "761604",
+      "date": "2026-05-10T00:30Z",
+      "home_team": "FC Dallas",
+      "away_team": "Real Salt Lake",
+      "home_score": "3",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761605",
+      "date": "2026-05-10T01:15Z",
+      "home_team": "Nashville SC",
+      "away_team": "D.C. United",
+      "home_score": "2",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761606",
+      "date": "2026-05-10T01:30Z",
+      "home_team": "Colorado Rapids",
+      "away_team": "St. Louis CITY SC",
+      "home_score": "0",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761607",
+      "date": "2026-05-10T02:30Z",
+      "home_team": "Portland Timbers",
+      "away_team": "Sporting Kansas City",
+      "home_score": "6",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761608",
+      "date": "2026-05-10T02:30Z",
+      "home_team": "San Jose Earthquakes",
+      "away_team": "Vancouver Whitecaps",
+      "home_score": "1",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761609",
+      "date": "2026-05-10T02:30Z",
+      "home_team": "Seattle Sounders FC",
+      "away_team": "San Diego FC",
+      "home_score": "1",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761612",
+      "date": "2026-05-10T20:30Z",
+      "home_team": "New York City FC",
+      "away_team": "Columbus Crew",
+      "home_score": "3",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761613",
+      "date": "2026-05-10T23:00Z",
+      "home_team": "Minnesota United FC",
+      "away_team": "Austin FC",
+      "home_score": "2",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761614",
+      "date": "2026-05-11T01:00Z",
+      "home_team": "LAFC",
+      "away_team": "Houston Dynamo FC",
+      "home_score": "1",
+      "away_score": "4",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761615",
+      "date": "2026-05-13T23:15Z",
+      "home_team": "Charlotte FC",
+      "away_team": "New York City FC",
+      "home_score": "0",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761618",
+      "date": "2026-05-13T23:30Z",
+      "home_team": "CF Montr\u00e9al",
+      "away_team": "Portland Timbers",
+      "home_score": "2",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761620",
+      "date": "2026-05-13T23:30Z",
+      "home_team": "D.C. United",
+      "away_team": "Chicago Fire FC",
+      "home_score": "1",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761619",
+      "date": "2026-05-13T23:30Z",
+      "home_team": "FC Cincinnati",
+      "away_team": "Inter Miami CF",
+      "home_score": "3",
+      "away_score": "5",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761617",
+      "date": "2026-05-13T23:30Z",
+      "home_team": "New England Revolution",
+      "away_team": "Nashville SC",
+      "home_score": "0",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761616",
+      "date": "2026-05-13T23:30Z",
+      "home_team": "Orlando City SC",
+      "away_team": "Philadelphia Union",
+      "home_score": "4",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761621",
+      "date": "2026-05-13T23:30Z",
+      "home_team": "Red Bull New York",
+      "away_team": "Columbus Crew",
+      "home_score": "3",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761622",
+      "date": "2026-05-14T00:30Z",
+      "home_team": "FC Dallas",
+      "away_team": "Vancouver Whitecaps",
+      "home_score": "2",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761624",
+      "date": "2026-05-14T00:30Z",
+      "home_team": "Minnesota United FC",
+      "away_team": "Colorado Rapids",
+      "home_score": "0",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761623",
+      "date": "2026-05-14T00:30Z",
+      "home_team": "Sporting Kansas City",
+      "away_team": "LA Galaxy",
+      "home_score": "3",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761625",
+      "date": "2026-05-14T00:30Z",
+      "home_team": "St. Louis CITY SC",
+      "away_team": "LAFC",
+      "home_score": "2",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761628",
+      "date": "2026-05-14T01:30Z",
+      "home_team": "Real Salt Lake",
+      "away_team": "Houston Dynamo FC",
+      "home_score": "3",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761627",
+      "date": "2026-05-14T01:30Z",
+      "home_team": "San Diego FC",
+      "away_team": "Austin FC",
+      "home_score": "5",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761626",
+      "date": "2026-05-14T01:30Z",
+      "home_team": "Seattle Sounders FC",
+      "away_team": "San Jose Earthquakes",
+      "home_score": "3",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761632",
+      "date": "2026-05-16T20:30Z",
+      "home_team": "CF Montr\u00e9al",
+      "away_team": "Chicago Fire FC",
+      "home_score": "0",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761631",
+      "date": "2026-05-16T23:30Z",
+      "home_team": "Charlotte FC",
+      "away_team": "Toronto FC",
+      "home_score": "3",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761630",
+      "date": "2026-05-16T23:30Z",
+      "home_team": "D.C. United",
+      "away_team": "St. Louis CITY SC",
+      "home_score": "1",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761635",
+      "date": "2026-05-16T23:30Z",
+      "home_team": "New England Revolution",
+      "away_team": "Minnesota United FC",
+      "home_score": "2",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761634",
+      "date": "2026-05-16T23:30Z",
+      "home_team": "Orlando City SC",
+      "away_team": "Atlanta United FC",
+      "home_score": "1",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761629",
+      "date": "2026-05-16T23:30Z",
+      "home_team": "Philadelphia Union",
+      "away_team": "Columbus Crew",
+      "home_score": "1",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761633",
+      "date": "2026-05-16T23:30Z",
+      "home_team": "Red Bull New York",
+      "away_team": "New York City FC",
+      "home_score": "1",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 13
+    },
+    {
+      "event_id": "761637",
+      "date": "2026-05-17T00:30Z",
+      "home_team": "Austin FC",
+      "away_team": "Sporting Kansas City",
+      "home_score": "1",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 14
+    },
+    {
+      "event_id": "761636",
+      "date": "2026-05-17T00:30Z",
+      "home_team": "Houston Dynamo FC",
+      "away_team": "Vancouver Whitecaps",
+      "home_score": "1",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 14
+    },
+    {
+      "event_id": "761638",
+      "date": "2026-05-17T01:15Z",
+      "home_team": "Seattle Sounders FC",
+      "away_team": "LA Galaxy",
+      "home_score": "0",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 14
+    },
+    {
+      "event_id": "761639",
+      "date": "2026-05-17T01:30Z",
+      "home_team": "Real Salt Lake",
+      "away_team": "Colorado Rapids",
+      "home_score": "2",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 14
+    },
+    {
+      "event_id": "761640",
+      "date": "2026-05-17T01:30Z",
+      "home_team": "San Diego FC",
+      "away_team": "FC Cincinnati",
+      "home_score": "3",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 14
+    },
+    {
+      "event_id": "761641",
+      "date": "2026-05-17T02:30Z",
+      "home_team": "San Jose Earthquakes",
+      "away_team": "FC Dallas",
+      "home_score": "2",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 14
+    },
+    {
+      "event_id": "761642",
+      "date": "2026-05-17T22:00Z",
+      "home_team": "Inter Miami CF",
+      "away_team": "Portland Timbers",
+      "home_score": "2",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 14
+    },
+    {
+      "event_id": "761643",
+      "date": "2026-05-18T00:00Z",
+      "home_team": "Nashville SC",
+      "away_team": "LAFC",
+      "home_score": "3",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 14
+    },
+    {
+      "event_id": "761644",
+      "date": "2026-05-23T18:45Z",
+      "home_team": "St. Louis CITY SC",
+      "away_team": "Austin FC",
+      "home_score": "3",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 14
+    },
+    {
+      "event_id": "761650",
+      "date": "2026-05-23T20:30Z",
+      "home_team": "Minnesota United FC",
+      "away_team": "Real Salt Lake",
+      "home_score": "1",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 14
+    },
+    {
+      "event_id": "761647",
+      "date": "2026-05-23T23:30Z",
+      "home_team": "Charlotte FC",
+      "away_team": "New England Revolution",
+      "home_score": "1",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 14
+    },
+    {
+      "event_id": "761646",
+      "date": "2026-05-23T23:30Z",
+      "home_team": "D.C. United",
+      "away_team": "CF Montr\u00e9al",
+      "home_score": "4",
+      "away_score": "4",
+      "status_state": "post",
+      "week": 14
+    },
+    {
+      "event_id": "761645",
+      "date": "2026-05-23T23:30Z",
+      "home_team": "FC Cincinnati",
+      "away_team": "Orlando City SC",
+      "home_score": "6",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 14
+    },
+    {
+      "event_id": "761648",
+      "date": "2026-05-24T00:30Z",
+      "home_team": "Chicago Fire FC",
+      "away_team": "Toronto FC",
+      "home_score": "2",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 15
+    },
+    {
+      "event_id": "761649",
+      "date": "2026-05-24T00:30Z",
+      "home_team": "Nashville SC",
+      "away_team": "New York City FC",
+      "home_score": "2",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 15
+    },
+    {
+      "event_id": "761651",
+      "date": "2026-05-24T00:30Z",
+      "home_team": "Sporting Kansas City",
+      "away_team": "Red Bull New York",
+      "home_score": "1",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 15
+    },
+    {
+      "event_id": "761654",
+      "date": "2026-05-24T01:30Z",
+      "home_team": "Colorado Rapids",
+      "away_team": "FC Dallas",
+      "home_score": "1",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 15
+    },
+    {
+      "event_id": "761653",
+      "date": "2026-05-24T01:30Z",
+      "home_team": "Portland Timbers",
+      "away_team": "San Jose Earthquakes",
+      "home_score": "1",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 15
+    },
+    {
+      "event_id": "761652",
+      "date": "2026-05-24T01:30Z",
+      "home_team": "San Diego FC",
+      "away_team": "Vancouver Whitecaps",
+      "home_score": "2",
+      "away_score": "4",
+      "status_state": "post",
+      "week": 15
+    },
+    {
+      "event_id": "761655",
+      "date": "2026-05-24T02:30Z",
+      "home_team": "LA Galaxy",
+      "away_team": "Houston Dynamo FC",
+      "home_score": "1",
+      "away_score": "1",
+      "status_state": "post",
+      "week": 15
+    },
+    {
+      "event_id": "761656",
+      "date": "2026-05-24T21:00Z",
+      "home_team": "Columbus Crew",
+      "away_team": "Atlanta United FC",
+      "home_score": "2",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 15
+    },
+    {
+      "event_id": "761657",
+      "date": "2026-05-24T23:00Z",
+      "home_team": "Inter Miami CF",
+      "away_team": "Philadelphia Union",
+      "home_score": "6",
+      "away_score": "4",
+      "status_state": "post",
+      "week": 15
+    },
+    {
+      "event_id": "761658",
+      "date": "2026-05-25T01:15Z",
+      "home_team": "LAFC",
+      "away_team": "Seattle Sounders FC",
+      "home_score": "1",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 15
+    },
+    {
+      "event_id": "761659",
+      "date": "2026-07-16T23:30Z",
+      "home_team": "CF Montr\u00e9al",
+      "away_team": "Toronto FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 16
+    },
+    {
+      "event_id": "761661",
+      "date": "2026-07-17T00:30Z",
+      "home_team": "St. Louis CITY SC",
+      "away_team": "Sporting Kansas City",
+      "home_score": "3",
+      "away_score": "2",
+      "status_state": "post",
+      "week": 16
+    },
+    {
+      "event_id": "761662",
+      "date": "2026-07-17T02:30Z",
+      "home_team": "Seattle Sounders FC",
+      "away_team": "Portland Timbers",
+      "home_score": "1",
+      "away_score": "5",
+      "status_state": "post",
+      "week": 16
+    },
+    {
+      "event_id": "761663",
+      "date": "2026-07-18T00:10Z",
+      "home_team": "Nashville SC",
+      "away_team": "Atlanta United FC",
+      "home_score": "1",
+      "away_score": "0",
+      "status_state": "post",
+      "week": 16
+    },
+    {
+      "event_id": "761664",
+      "date": "2026-07-18T02:25Z",
+      "home_team": "LA Galaxy",
+      "away_team": "LAFC",
+      "home_score": "0",
+      "away_score": "3",
+      "status_state": "post",
+      "week": 16
+    },
+    {
+      "event_id": "761668",
+      "date": "2026-07-22T23:30Z",
+      "home_team": "Columbus Crew",
+      "away_team": "New York City FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761669",
+      "date": "2026-07-22T23:30Z",
+      "home_team": "FC Cincinnati",
+      "away_team": "Vancouver Whitecaps",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761667",
+      "date": "2026-07-22T23:30Z",
+      "home_team": "Inter Miami CF",
+      "away_team": "Chicago Fire FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761666",
+      "date": "2026-07-22T23:30Z",
+      "home_team": "New England Revolution",
+      "away_team": "Toronto FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761665",
+      "date": "2026-07-22T23:30Z",
+      "home_team": "Philadelphia Union",
+      "away_team": "Red Bull New York",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761670",
+      "date": "2026-07-23T00:15Z",
+      "home_team": "Charlotte FC",
+      "away_team": "Atlanta United FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761674",
+      "date": "2026-07-23T00:30Z",
+      "home_team": "Austin FC",
+      "away_team": "Seattle Sounders FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761671",
+      "date": "2026-07-23T00:30Z",
+      "home_team": "Houston Dynamo FC",
+      "away_team": "D.C. United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761673",
+      "date": "2026-07-23T00:30Z",
+      "home_team": "Nashville SC",
+      "away_team": "CF Montr\u00e9al",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761672",
+      "date": "2026-07-23T00:30Z",
+      "home_team": "Sporting Kansas City",
+      "away_team": "Minnesota United FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761675",
+      "date": "2026-07-23T01:30Z",
+      "home_team": "Colorado Rapids",
+      "away_team": "San Diego FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761678",
+      "date": "2026-07-23T02:30Z",
+      "home_team": "LA Galaxy",
+      "away_team": "St. Louis CITY SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761679",
+      "date": "2026-07-23T02:30Z",
+      "home_team": "LAFC",
+      "away_team": "Real Salt Lake",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761677",
+      "date": "2026-07-23T02:30Z",
+      "home_team": "Portland Timbers",
+      "away_team": "FC Dallas",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761676",
+      "date": "2026-07-23T02:30Z",
+      "home_team": "San Jose Earthquakes",
+      "away_team": "Orlando City SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761685",
+      "date": "2026-07-25T22:30Z",
+      "home_team": "Red Bull New York",
+      "away_team": "Charlotte FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761680",
+      "date": "2026-07-25T23:00Z",
+      "home_team": "Columbus Crew",
+      "away_team": "FC Cincinnati",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761687",
+      "date": "2026-07-25T23:30Z",
+      "home_team": "CF Montr\u00e9al",
+      "away_team": "Inter Miami CF",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761681",
+      "date": "2026-07-25T23:30Z",
+      "home_team": "D.C. United",
+      "away_team": "Toronto FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761682",
+      "date": "2026-07-25T23:30Z",
+      "home_team": "New England Revolution",
+      "away_team": "Atlanta United FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761683",
+      "date": "2026-07-25T23:30Z",
+      "home_team": "New York City FC",
+      "away_team": "Chicago Fire FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761684",
+      "date": "2026-07-25T23:30Z",
+      "home_team": "Orlando City SC",
+      "away_team": "Nashville SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761686",
+      "date": "2026-07-25T23:30Z",
+      "home_team": "Philadelphia Union",
+      "away_team": "Seattle Sounders FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "761689",
+      "date": "2026-07-26T00:30Z",
+      "home_team": "Houston Dynamo FC",
+      "away_team": "Austin FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "761690",
+      "date": "2026-07-26T00:30Z",
+      "home_team": "Minnesota United FC",
+      "away_team": "Vancouver Whitecaps",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "761688",
+      "date": "2026-07-26T00:30Z",
+      "home_team": "St. Louis CITY SC",
+      "away_team": "Colorado Rapids",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "761691",
+      "date": "2026-07-26T01:30Z",
+      "home_team": "San Diego FC",
+      "away_team": "FC Dallas",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "761694",
+      "date": "2026-07-26T02:30Z",
+      "home_team": "LAFC",
+      "away_team": "Sporting Kansas City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "761692",
+      "date": "2026-07-26T02:30Z",
+      "home_team": "Portland Timbers",
+      "away_team": "Real Salt Lake",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "761693",
+      "date": "2026-07-26T02:30Z",
+      "home_team": "San Jose Earthquakes",
+      "away_team": "LA Galaxy",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401864004",
+      "date": "2026-07-30T00:00Z",
+      "home_team": "MLS All-Stars",
+      "away_team": "Liga MX All-Stars",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "761695",
+      "date": "2026-07-31T23:30Z",
+      "home_team": "New York City FC",
+      "away_team": "Toronto FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "761697",
+      "date": "2026-08-01T23:30Z",
+      "home_team": "CF Montr\u00e9al",
+      "away_team": "New England Revolution",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "761699",
+      "date": "2026-08-01T23:30Z",
+      "home_team": "D.C. United",
+      "away_team": "Nashville SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "761700",
+      "date": "2026-08-01T23:30Z",
+      "home_team": "FC Cincinnati",
+      "away_team": "San Jose Earthquakes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "761701",
+      "date": "2026-08-01T23:30Z",
+      "home_team": "Inter Miami CF",
+      "away_team": "Columbus Crew",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "761702",
+      "date": "2026-08-01T23:30Z",
+      "home_team": "Philadelphia Union",
+      "away_team": "Atlanta United FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "761696",
+      "date": "2026-08-01T23:30Z",
+      "home_team": "Red Bull New York",
+      "away_team": "Orlando City SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "761698",
+      "date": "2026-08-01T23:30Z",
+      "home_team": "Vancouver Whitecaps",
+      "away_team": "LAFC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "761704",
+      "date": "2026-08-02T00:30Z",
+      "home_team": "Chicago Fire FC",
+      "away_team": "Charlotte FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "761703",
+      "date": "2026-08-02T00:30Z",
+      "home_team": "Minnesota United FC",
+      "away_team": "San Diego FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "761706",
+      "date": "2026-08-02T00:30Z",
+      "home_team": "Sporting Kansas City",
+      "away_team": "Houston Dynamo FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "761705",
+      "date": "2026-08-02T00:30Z",
+      "home_team": "St. Louis CITY SC",
+      "away_team": "Real Salt Lake",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "761707",
+      "date": "2026-08-02T01:30Z",
+      "home_team": "Colorado Rapids",
+      "away_team": "Austin FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "761709",
+      "date": "2026-08-02T02:30Z",
+      "home_team": "LA Galaxy",
+      "away_team": "FC Dallas",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "761708",
+      "date": "2026-08-02T02:30Z",
+      "home_team": "Portland Timbers",
+      "away_team": "Seattle Sounders FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "761469",
+      "date": "2026-08-08T20:30Z",
+      "home_team": "New England Revolution",
+      "away_team": "Houston Dynamo FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "761712",
+      "date": "2026-08-15T23:30Z",
+      "home_team": "Atlanta United FC",
+      "away_team": "Red Bull New York",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "761711",
+      "date": "2026-08-15T23:30Z",
+      "home_team": "CF Montr\u00e9al",
+      "away_team": "D.C. United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "761710",
+      "date": "2026-08-15T23:30Z",
+      "home_team": "Charlotte FC",
+      "away_team": "Columbus Crew",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "761713",
+      "date": "2026-08-15T23:30Z",
+      "home_team": "Orlando City SC",
+      "away_team": "FC Cincinnati",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "761714",
+      "date": "2026-08-15T23:30Z",
+      "home_team": "Toronto FC",
+      "away_team": "New England Revolution",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "761715",
+      "date": "2026-08-16T00:30Z",
+      "home_team": "Houston Dynamo FC",
+      "away_team": "LA Galaxy",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761716",
+      "date": "2026-08-16T00:30Z",
+      "home_team": "Nashville SC",
+      "away_team": "Inter Miami CF",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761718",
+      "date": "2026-08-16T01:30Z",
+      "home_team": "Colorado Rapids",
+      "away_team": "Sporting Kansas City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761719",
+      "date": "2026-08-16T01:30Z",
+      "home_team": "Real Salt Lake",
+      "away_team": "Minnesota United FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761720",
+      "date": "2026-08-16T02:30Z",
+      "home_team": "LAFC",
+      "away_team": "San Diego FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761721",
+      "date": "2026-08-16T02:30Z",
+      "home_team": "San Jose Earthquakes",
+      "away_team": "St. Louis CITY SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761723",
+      "date": "2026-08-16T22:00Z",
+      "home_team": "Chicago Fire FC",
+      "away_team": "Portland Timbers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761722",
+      "date": "2026-08-16T22:30Z",
+      "home_team": "New York City FC",
+      "away_team": "Philadelphia Union",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761717",
+      "date": "2026-08-17T00:30Z",
+      "home_team": "Austin FC",
+      "away_team": "FC Dallas",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761724",
+      "date": "2026-08-17T01:00Z",
+      "home_team": "Seattle Sounders FC",
+      "away_team": "Vancouver Whitecaps",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761726",
+      "date": "2026-08-19T23:30Z",
+      "home_team": "Columbus Crew",
+      "away_team": "CF Montr\u00e9al",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761725",
+      "date": "2026-08-19T23:30Z",
+      "home_team": "D.C. United",
+      "away_team": "New England Revolution",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761730",
+      "date": "2026-08-19T23:30Z",
+      "home_team": "FC Cincinnati",
+      "away_team": "New York City FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761729",
+      "date": "2026-08-19T23:30Z",
+      "home_team": "Orlando City SC",
+      "away_team": "Chicago Fire FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761727",
+      "date": "2026-08-19T23:30Z",
+      "home_team": "Philadelphia Union",
+      "away_team": "Inter Miami CF",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761728",
+      "date": "2026-08-19T23:30Z",
+      "home_team": "Red Bull New York",
+      "away_team": "Nashville SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761731",
+      "date": "2026-08-19T23:30Z",
+      "home_team": "Toronto FC",
+      "away_team": "Charlotte FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761732",
+      "date": "2026-08-20T00:00Z",
+      "home_team": "Sporting Kansas City",
+      "away_team": "St. Louis CITY SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761733",
+      "date": "2026-08-20T00:30Z",
+      "home_team": "Minnesota United FC",
+      "away_team": "Atlanta United FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761734",
+      "date": "2026-08-20T01:30Z",
+      "home_team": "Colorado Rapids",
+      "away_team": "LAFC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761735",
+      "date": "2026-08-20T01:30Z",
+      "home_team": "Real Salt Lake",
+      "away_team": "FC Dallas",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761736",
+      "date": "2026-08-20T01:30Z",
+      "home_team": "Seattle Sounders FC",
+      "away_team": "Austin FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761738",
+      "date": "2026-08-20T02:30Z",
+      "home_team": "LA Galaxy",
+      "away_team": "San Jose Earthquakes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761737",
+      "date": "2026-08-20T02:30Z",
+      "home_team": "Portland Timbers",
+      "away_team": "San Diego FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761739",
+      "date": "2026-08-20T02:30Z",
+      "home_team": "Vancouver Whitecaps",
+      "away_team": "Houston Dynamo FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761745",
+      "date": "2026-08-22T23:30Z",
+      "home_team": "CF Montr\u00e9al",
+      "away_team": "LA Galaxy",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761741",
+      "date": "2026-08-22T23:30Z",
+      "home_team": "Charlotte FC",
+      "away_team": "D.C. United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761743",
+      "date": "2026-08-22T23:30Z",
+      "home_team": "FC Cincinnati",
+      "away_team": "Seattle Sounders FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761742",
+      "date": "2026-08-22T23:30Z",
+      "home_team": "Inter Miami CF",
+      "away_team": "Toronto FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761740",
+      "date": "2026-08-22T23:30Z",
+      "home_team": "Orlando City SC",
+      "away_team": "Real Salt Lake",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761744",
+      "date": "2026-08-22T23:30Z",
+      "home_team": "Red Bull New York",
+      "away_team": "Chicago Fire FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "761748",
+      "date": "2026-08-23T00:30Z",
+      "home_team": "Austin FC",
+      "away_team": "Philadelphia Union",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "761746",
+      "date": "2026-08-23T00:30Z",
+      "home_team": "Nashville SC",
+      "away_team": "Columbus Crew",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "761747",
+      "date": "2026-08-23T00:30Z",
+      "home_team": "St. Louis CITY SC",
+      "away_team": "Houston Dynamo FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "761749",
+      "date": "2026-08-23T01:30Z",
+      "home_team": "Vancouver Whitecaps",
+      "away_team": "FC Dallas",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "761751",
+      "date": "2026-08-23T02:30Z",
+      "home_team": "LAFC",
+      "away_team": "Portland Timbers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "761750",
+      "date": "2026-08-23T02:30Z",
+      "home_team": "San Diego FC",
+      "away_team": "Colorado Rapids",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "761752",
+      "date": "2026-08-23T02:30Z",
+      "home_team": "San Jose Earthquakes",
+      "away_team": "Minnesota United FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "761753",
+      "date": "2026-08-23T20:30Z",
+      "home_team": "New England Revolution",
+      "away_team": "New York City FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "761754",
+      "date": "2026-08-23T23:00Z",
+      "home_team": "Atlanta United FC",
+      "away_team": "Sporting Kansas City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "761755",
+      "date": "2026-08-29T20:30Z",
+      "home_team": "Seattle Sounders FC",
+      "away_team": "Chicago Fire FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "761759",
+      "date": "2026-08-29T23:30Z",
+      "home_team": "Atlanta United FC",
+      "away_team": "Charlotte FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "761758",
+      "date": "2026-08-29T23:30Z",
+      "home_team": "Columbus Crew",
+      "away_team": "New England Revolution",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "761756",
+      "date": "2026-08-29T23:30Z",
+      "home_team": "D.C. United",
+      "away_team": "LAFC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "761757",
+      "date": "2026-08-29T23:30Z",
+      "home_team": "Inter Miami CF",
+      "away_team": "CF Montr\u00e9al",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "761761",
+      "date": "2026-08-29T23:30Z",
+      "home_team": "Red Bull New York",
+      "away_team": "Philadelphia Union",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "761760",
+      "date": "2026-08-29T23:30Z",
+      "home_team": "Toronto FC",
+      "away_team": "New York City FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "761765",
+      "date": "2026-08-30T00:30Z",
+      "home_team": "Houston Dynamo FC",
+      "away_team": "San Jose Earthquakes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "761763",
+      "date": "2026-08-30T00:30Z",
+      "home_team": "Minnesota United FC",
+      "away_team": "Orlando City SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "761764",
+      "date": "2026-08-30T00:30Z",
+      "home_team": "Nashville SC",
+      "away_team": "FC Cincinnati",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "761762",
+      "date": "2026-08-30T00:30Z",
+      "home_team": "Sporting Kansas City",
+      "away_team": "Vancouver Whitecaps",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "761766",
+      "date": "2026-08-30T01:30Z",
+      "home_team": "Colorado Rapids",
+      "away_team": "Real Salt Lake",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "761768",
+      "date": "2026-08-30T02:30Z",
+      "home_team": "Portland Timbers",
+      "away_team": "Austin FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "761767",
+      "date": "2026-08-30T02:30Z",
+      "home_team": "San Diego FC",
+      "away_team": "LA Galaxy",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "761769",
+      "date": "2026-08-30T23:00Z",
+      "home_team": "St. Louis CITY SC",
+      "away_team": "FC Dallas",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "761770",
+      "date": "2026-09-04T23:30Z",
+      "home_team": "New York City FC",
+      "away_team": "Nashville SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "761774",
+      "date": "2026-09-05T23:30Z",
+      "home_team": "Charlotte FC",
+      "away_team": "Houston Dynamo FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "761775",
+      "date": "2026-09-05T23:30Z",
+      "home_team": "Columbus Crew",
+      "away_team": "Colorado Rapids",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "761773",
+      "date": "2026-09-05T23:30Z",
+      "home_team": "FC Cincinnati",
+      "away_team": "D.C. United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "761777",
+      "date": "2026-09-05T23:30Z",
+      "home_team": "Inter Miami CF",
+      "away_team": "Atlanta United FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "761771",
+      "date": "2026-09-05T23:30Z",
+      "home_team": "Orlando City SC",
+      "away_team": "San Diego FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "761772",
+      "date": "2026-09-05T23:30Z",
+      "home_team": "Philadelphia Union",
+      "away_team": "CF Montr\u00e9al",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "761776",
+      "date": "2026-09-05T23:30Z",
+      "home_team": "Toronto FC",
+      "away_team": "Chicago Fire FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "761778",
+      "date": "2026-09-06T00:30Z",
+      "home_team": "Austin FC",
+      "away_team": "San Jose Earthquakes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761779",
+      "date": "2026-09-06T00:30Z",
+      "home_team": "FC Dallas",
+      "away_team": "Sporting Kansas City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761780",
+      "date": "2026-09-06T00:30Z",
+      "home_team": "Seattle Sounders FC",
+      "away_team": "Red Bull New York",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761782",
+      "date": "2026-09-06T01:30Z",
+      "home_team": "LA Galaxy",
+      "away_team": "New England Revolution",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761781",
+      "date": "2026-09-06T01:30Z",
+      "home_team": "Real Salt Lake",
+      "away_team": "LAFC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761783",
+      "date": "2026-09-06T02:30Z",
+      "home_team": "Portland Timbers",
+      "away_team": "Minnesota United FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761784",
+      "date": "2026-09-06T02:30Z",
+      "home_team": "Vancouver Whitecaps",
+      "away_team": "St. Louis CITY SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761787",
+      "date": "2026-09-09T23:30Z",
+      "home_team": "Atlanta United FC",
+      "away_team": "Orlando City SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761785",
+      "date": "2026-09-09T23:30Z",
+      "home_team": "CF Montr\u00e9al",
+      "away_team": "Charlotte FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761789",
+      "date": "2026-09-09T23:30Z",
+      "home_team": "D.C. United",
+      "away_team": "Columbus Crew",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761788",
+      "date": "2026-09-09T23:30Z",
+      "home_team": "New York City FC",
+      "away_team": "New England Revolution",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761786",
+      "date": "2026-09-09T23:30Z",
+      "home_team": "Philadelphia Union",
+      "away_team": "FC Cincinnati",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761790",
+      "date": "2026-09-09T23:30Z",
+      "home_team": "Toronto FC",
+      "away_team": "Nashville SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761794",
+      "date": "2026-09-10T00:30Z",
+      "home_team": "Austin FC",
+      "away_team": "Colorado Rapids",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761792",
+      "date": "2026-09-10T00:30Z",
+      "home_team": "Chicago Fire FC",
+      "away_team": "Inter Miami CF",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761791",
+      "date": "2026-09-10T00:30Z",
+      "home_team": "Houston Dynamo FC",
+      "away_team": "Real Salt Lake",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761793",
+      "date": "2026-09-10T00:30Z",
+      "home_team": "Minnesota United FC",
+      "away_team": "FC Dallas",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761795",
+      "date": "2026-09-10T02:30Z",
+      "home_team": "LAFC",
+      "away_team": "Red Bull New York",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761796",
+      "date": "2026-09-10T02:30Z",
+      "home_team": "Portland Timbers",
+      "away_team": "St. Louis CITY SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761797",
+      "date": "2026-09-10T02:30Z",
+      "home_team": "San Diego FC",
+      "away_team": "San Jose Earthquakes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761799",
+      "date": "2026-09-10T02:30Z",
+      "home_team": "Vancouver Whitecaps",
+      "away_team": "LA Galaxy",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761804",
+      "date": "2026-09-12T23:30Z",
+      "home_team": "Columbus Crew",
+      "away_team": "Red Bull New York",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761803",
+      "date": "2026-09-12T23:30Z",
+      "home_team": "D.C. United",
+      "away_team": "Atlanta United FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761802",
+      "date": "2026-09-12T23:30Z",
+      "home_team": "FC Cincinnati",
+      "away_team": "Charlotte FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761800",
+      "date": "2026-09-12T23:30Z",
+      "home_team": "Inter Miami CF",
+      "away_team": "Nashville SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761801",
+      "date": "2026-09-12T23:30Z",
+      "home_team": "Orlando City SC",
+      "away_team": "Toronto FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "761805",
+      "date": "2026-09-13T00:30Z",
+      "home_team": "FC Dallas",
+      "away_team": "Portland Timbers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "761806",
+      "date": "2026-09-13T00:30Z",
+      "home_team": "Sporting Kansas City",
+      "away_team": "LAFC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "761807",
+      "date": "2026-09-13T00:30Z",
+      "home_team": "St. Louis CITY SC",
+      "away_team": "Minnesota United FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "761808",
+      "date": "2026-09-13T01:30Z",
+      "home_team": "Colorado Rapids",
+      "away_team": "CF Montr\u00e9al",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "761809",
+      "date": "2026-09-13T01:30Z",
+      "home_team": "Real Salt Lake",
+      "away_team": "New York City FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "761811",
+      "date": "2026-09-13T02:30Z",
+      "home_team": "LA Galaxy",
+      "away_team": "Seattle Sounders FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "761810",
+      "date": "2026-09-13T02:30Z",
+      "home_team": "San Jose Earthquakes",
+      "away_team": "Houston Dynamo FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "761812",
+      "date": "2026-09-13T22:30Z",
+      "home_team": "Chicago Fire FC",
+      "away_team": "New England Revolution",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "761813",
+      "date": "2026-09-13T22:30Z",
+      "home_team": "Vancouver Whitecaps",
+      "away_team": "Austin FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "761814",
+      "date": "2026-09-14T01:00Z",
+      "home_team": "San Diego FC",
+      "away_team": "Philadelphia Union",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "761815",
+      "date": "2026-09-18T23:30Z",
+      "home_team": "New York City FC",
+      "away_team": "Red Bull New York",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "761818",
+      "date": "2026-09-19T23:30Z",
+      "home_team": "CF Montr\u00e9al",
+      "away_team": "Columbus Crew",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "761819",
+      "date": "2026-09-19T23:30Z",
+      "home_team": "D.C. United",
+      "away_team": "Charlotte FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "761816",
+      "date": "2026-09-19T23:30Z",
+      "home_team": "New England Revolution",
+      "away_team": "Orlando City SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "761817",
+      "date": "2026-09-19T23:30Z",
+      "home_team": "San Jose Earthquakes",
+      "away_team": "LAFC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "761822",
+      "date": "2026-09-20T00:30Z",
+      "home_team": "FC Dallas",
+      "away_team": "Austin FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "761820",
+      "date": "2026-09-20T00:30Z",
+      "home_team": "Houston Dynamo FC",
+      "away_team": "FC Cincinnati",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "761821",
+      "date": "2026-09-20T00:30Z",
+      "home_team": "Minnesota United FC",
+      "away_team": "LA Galaxy",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "761823",
+      "date": "2026-09-20T00:30Z",
+      "home_team": "Sporting Kansas City",
+      "away_team": "Philadelphia Union",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "761824",
+      "date": "2026-09-20T00:30Z",
+      "home_team": "St. Louis CITY SC",
+      "away_team": "Toronto FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "761826",
+      "date": "2026-09-20T01:30Z",
+      "home_team": "Colorado Rapids",
+      "away_team": "Seattle Sounders FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "761827",
+      "date": "2026-09-20T01:30Z",
+      "home_team": "Nashville SC",
+      "away_team": "Chicago Fire FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "761825",
+      "date": "2026-09-20T01:30Z",
+      "home_team": "Real Salt Lake",
+      "away_team": "Vancouver Whitecaps",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "761828",
+      "date": "2026-09-20T02:30Z",
+      "home_team": "Portland Timbers",
+      "away_team": "Atlanta United FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "761829",
+      "date": "2026-09-20T23:00Z",
+      "home_team": "Inter Miami CF",
+      "away_team": "San Diego FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "761543",
+      "date": "2026-09-24T01:30Z",
+      "home_team": "Seattle Sounders FC",
+      "away_team": "Real Salt Lake",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "761830",
+      "date": "2026-09-26T23:30Z",
+      "home_team": "Atlanta United FC",
+      "away_team": "New York City FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "761831",
+      "date": "2026-09-26T23:30Z",
+      "home_team": "CF Montr\u00e9al",
+      "away_team": "FC Cincinnati",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "761832",
+      "date": "2026-09-26T23:30Z",
+      "home_team": "Charlotte FC",
+      "away_team": "Chicago Fire FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "761834",
+      "date": "2026-09-26T23:30Z",
+      "home_team": "Philadelphia Union",
+      "away_team": "Orlando City SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "761833",
+      "date": "2026-09-26T23:30Z",
+      "home_team": "Red Bull New York",
+      "away_team": "St. Louis CITY SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "761839",
+      "date": "2026-09-27T00:30Z",
+      "home_team": "Austin FC",
+      "away_team": "San Diego FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "761835",
+      "date": "2026-09-27T00:30Z",
+      "home_team": "FC Dallas",
+      "away_team": "LAFC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "761836",
+      "date": "2026-09-27T00:30Z",
+      "home_team": "Houston Dynamo FC",
+      "away_team": "Sporting Kansas City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "761838",
+      "date": "2026-09-27T00:30Z",
+      "home_team": "Nashville SC",
+      "away_team": "Toronto FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "761837",
+      "date": "2026-09-27T00:30Z",
+      "home_team": "Seattle Sounders FC",
+      "away_team": "Minnesota United FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "761840",
+      "date": "2026-09-27T01:30Z",
+      "home_team": "Real Salt Lake",
+      "away_team": "New England Revolution",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "761841",
+      "date": "2026-09-27T02:30Z",
+      "home_team": "LA Galaxy",
+      "away_team": "Colorado Rapids",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "761843",
+      "date": "2026-09-27T02:30Z",
+      "home_team": "San Jose Earthquakes",
+      "away_team": "Portland Timbers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "761842",
+      "date": "2026-09-27T02:30Z",
+      "home_team": "Vancouver Whitecaps",
+      "away_team": "D.C. United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "761844",
+      "date": "2026-09-27T23:00Z",
+      "home_team": "Columbus Crew",
+      "away_team": "Inter Miami CF",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "761798",
+      "date": "2026-10-02T01:30Z",
+      "home_team": "Seattle Sounders FC",
+      "away_team": "Sporting Kansas City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "761660",
+      "date": "2026-10-06T18:00Z",
+      "home_team": "Chicago Fire FC",
+      "away_team": "Vancouver Whitecaps",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "761845",
+      "date": "2026-10-10T17:00Z",
+      "home_team": "Toronto FC",
+      "away_team": "CF Montr\u00e9al",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "761846",
+      "date": "2026-10-10T18:30Z",
+      "home_team": "Chicago Fire FC",
+      "away_team": "New York City FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "761850",
+      "date": "2026-10-10T23:30Z",
+      "home_team": "Atlanta United FC",
+      "away_team": "FC Cincinnati",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "761852",
+      "date": "2026-10-10T23:30Z",
+      "home_team": "Charlotte FC",
+      "away_team": "FC Dallas",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "761847",
+      "date": "2026-10-10T23:30Z",
+      "home_team": "Inter Miami CF",
+      "away_team": "D.C. United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "761851",
+      "date": "2026-10-10T23:30Z",
+      "home_team": "New England Revolution",
+      "away_team": "Seattle Sounders FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "761848",
+      "date": "2026-10-10T23:30Z",
+      "home_team": "Orlando City SC",
+      "away_team": "Columbus Crew",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "761849",
+      "date": "2026-10-10T23:30Z",
+      "home_team": "Philadelphia Union",
+      "away_team": "Real Salt Lake",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "761853",
+      "date": "2026-10-10T23:30Z",
+      "home_team": "Red Bull New York",
+      "away_team": "San Diego FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "761856",
+      "date": "2026-10-11T00:30Z",
+      "home_team": "Austin FC",
+      "away_team": "Nashville SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761854",
+      "date": "2026-10-11T00:30Z",
+      "home_team": "Minnesota United FC",
+      "away_team": "Houston Dynamo FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761855",
+      "date": "2026-10-11T00:30Z",
+      "home_team": "Sporting Kansas City",
+      "away_team": "Portland Timbers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761857",
+      "date": "2026-10-11T01:30Z",
+      "home_team": "Colorado Rapids",
+      "away_team": "San Jose Earthquakes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761858",
+      "date": "2026-10-11T02:30Z",
+      "home_team": "LAFC",
+      "away_team": "Vancouver Whitecaps",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761859",
+      "date": "2026-10-11T23:00Z",
+      "home_team": "St. Louis CITY SC",
+      "away_team": "LA Galaxy",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761864",
+      "date": "2026-10-14T23:30Z",
+      "home_team": "CF Montr\u00e9al",
+      "away_team": "Atlanta United FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761865",
+      "date": "2026-10-14T23:30Z",
+      "home_team": "Columbus Crew",
+      "away_team": "Charlotte FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761863",
+      "date": "2026-10-14T23:30Z",
+      "home_team": "D.C. United",
+      "away_team": "Red Bull New York",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761862",
+      "date": "2026-10-14T23:30Z",
+      "home_team": "FC Cincinnati",
+      "away_team": "New England Revolution",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761861",
+      "date": "2026-10-14T23:30Z",
+      "home_team": "Inter Miami CF",
+      "away_team": "New York City FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761860",
+      "date": "2026-10-14T23:30Z",
+      "home_team": "Toronto FC",
+      "away_team": "Orlando City SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761869",
+      "date": "2026-10-15T00:30Z",
+      "home_team": "Chicago Fire FC",
+      "away_team": "Philadelphia Union",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761867",
+      "date": "2026-10-15T00:30Z",
+      "home_team": "FC Dallas",
+      "away_team": "Seattle Sounders FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761866",
+      "date": "2026-10-15T00:30Z",
+      "home_team": "Nashville SC",
+      "away_team": "Sporting Kansas City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761868",
+      "date": "2026-10-15T00:30Z",
+      "home_team": "St. Louis CITY SC",
+      "away_team": "Vancouver Whitecaps",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761871",
+      "date": "2026-10-15T01:30Z",
+      "home_team": "Colorado Rapids",
+      "away_team": "Minnesota United FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761870",
+      "date": "2026-10-15T01:30Z",
+      "home_team": "Real Salt Lake",
+      "away_team": "San Jose Earthquakes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761874",
+      "date": "2026-10-15T02:30Z",
+      "home_team": "LA Galaxy",
+      "away_team": "Portland Timbers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761873",
+      "date": "2026-10-15T02:30Z",
+      "home_team": "LAFC",
+      "away_team": "Austin FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761872",
+      "date": "2026-10-15T02:30Z",
+      "home_team": "San Diego FC",
+      "away_team": "Houston Dynamo FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761875",
+      "date": "2026-10-17T18:30Z",
+      "home_team": "Philadelphia Union",
+      "away_team": "Charlotte FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761876",
+      "date": "2026-10-17T20:30Z",
+      "home_team": "Minnesota United FC",
+      "away_team": "St. Louis CITY SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761880",
+      "date": "2026-10-17T23:30Z",
+      "home_team": "Atlanta United FC",
+      "away_team": "Inter Miami CF",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761879",
+      "date": "2026-10-17T23:30Z",
+      "home_team": "New England Revolution",
+      "away_team": "Chicago Fire FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761881",
+      "date": "2026-10-17T23:30Z",
+      "home_team": "Orlando City SC",
+      "away_team": "D.C. United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761878",
+      "date": "2026-10-17T23:30Z",
+      "home_team": "Red Bull New York",
+      "away_team": "Toronto FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "761882",
+      "date": "2026-10-18T00:30Z",
+      "home_team": "Austin FC",
+      "away_team": "Vancouver Whitecaps",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "761883",
+      "date": "2026-10-18T00:30Z",
+      "home_team": "Houston Dynamo FC",
+      "away_team": "FC Dallas",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "761884",
+      "date": "2026-10-18T00:30Z",
+      "home_team": "Sporting Kansas City",
+      "away_team": "Real Salt Lake",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "761887",
+      "date": "2026-10-18T02:30Z",
+      "home_team": "LA Galaxy",
+      "away_team": "San Diego FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "761888",
+      "date": "2026-10-18T02:30Z",
+      "home_team": "Portland Timbers",
+      "away_team": "Colorado Rapids",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "761886",
+      "date": "2026-10-18T02:30Z",
+      "home_team": "San Jose Earthquakes",
+      "away_team": "Nashville SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "761885",
+      "date": "2026-10-18T02:30Z",
+      "home_team": "Seattle Sounders FC",
+      "away_team": "CF Montr\u00e9al",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "761889",
+      "date": "2026-10-18T23:00Z",
+      "home_team": "FC Cincinnati",
+      "away_team": "Columbus Crew",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "761903",
+      "date": "2026-10-24T17:30Z",
+      "home_team": "CF Montr\u00e9al",
+      "away_team": "Nashville SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "761890",
+      "date": "2026-10-24T19:30Z",
+      "home_team": "Columbus Crew",
+      "away_team": "Toronto FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "761891",
+      "date": "2026-10-24T21:30Z",
+      "home_team": "Red Bull New York",
+      "away_team": "Inter Miami CF",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "761893",
+      "date": "2026-10-24T23:30Z",
+      "home_team": "Atlanta United FC",
+      "away_team": "Chicago Fire FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "761895",
+      "date": "2026-10-24T23:30Z",
+      "home_team": "D.C. United",
+      "away_team": "FC Cincinnati",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "761892",
+      "date": "2026-10-24T23:30Z",
+      "home_team": "Orlando City SC",
+      "away_team": "New York City FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "761894",
+      "date": "2026-10-24T23:30Z",
+      "home_team": "Philadelphia Union",
+      "away_team": "New England Revolution",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "761897",
+      "date": "2026-10-25T00:30Z",
+      "home_team": "Colorado Rapids",
+      "away_team": "Vancouver Whitecaps",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761900",
+      "date": "2026-10-25T00:30Z",
+      "home_team": "FC Dallas",
+      "away_team": "San Jose Earthquakes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761896",
+      "date": "2026-10-25T00:30Z",
+      "home_team": "Houston Dynamo FC",
+      "away_team": "Minnesota United FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761898",
+      "date": "2026-10-25T00:30Z",
+      "home_team": "Real Salt Lake",
+      "away_team": "St. Louis CITY SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761899",
+      "date": "2026-10-25T00:30Z",
+      "home_team": "Sporting Kansas City",
+      "away_team": "Austin FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761902",
+      "date": "2026-10-25T02:30Z",
+      "home_team": "Portland Timbers",
+      "away_team": "Charlotte FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761901",
+      "date": "2026-10-25T02:30Z",
+      "home_team": "San Diego FC",
+      "away_team": "Seattle Sounders FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761904",
+      "date": "2026-10-26T01:00Z",
+      "home_team": "LAFC",
+      "away_team": "LA Galaxy",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761907",
+      "date": "2026-10-28T23:30Z",
+      "home_team": "Charlotte FC",
+      "away_team": "CF Montr\u00e9al",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761908",
+      "date": "2026-10-28T23:30Z",
+      "home_team": "Inter Miami CF",
+      "away_team": "FC Cincinnati",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761909",
+      "date": "2026-10-28T23:30Z",
+      "home_team": "New England Revolution",
+      "away_team": "Red Bull New York",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761905",
+      "date": "2026-10-28T23:30Z",
+      "home_team": "New York City FC",
+      "away_team": "Atlanta United FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761906",
+      "date": "2026-10-28T23:30Z",
+      "home_team": "Toronto FC",
+      "away_team": "D.C. United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761910",
+      "date": "2026-10-29T00:30Z",
+      "home_team": "Austin FC",
+      "away_team": "Real Salt Lake",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761911",
+      "date": "2026-10-29T00:30Z",
+      "home_team": "Chicago Fire FC",
+      "away_team": "Orlando City SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761912",
+      "date": "2026-10-29T00:30Z",
+      "home_team": "FC Dallas",
+      "away_team": "Columbus Crew",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761913",
+      "date": "2026-10-29T00:30Z",
+      "home_team": "Minnesota United FC",
+      "away_team": "Sporting Kansas City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761914",
+      "date": "2026-10-29T00:30Z",
+      "home_team": "Nashville SC",
+      "away_team": "Philadelphia Union",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761915",
+      "date": "2026-10-29T00:30Z",
+      "home_team": "St. Louis CITY SC",
+      "away_team": "Portland Timbers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761917",
+      "date": "2026-10-29T02:30Z",
+      "home_team": "San Jose Earthquakes",
+      "away_team": "Colorado Rapids",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761916",
+      "date": "2026-10-29T02:30Z",
+      "home_team": "Seattle Sounders FC",
+      "away_team": "Houston Dynamo FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761918",
+      "date": "2026-10-29T02:30Z",
+      "home_team": "Vancouver Whitecaps",
+      "away_team": "San Diego FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761922",
+      "date": "2026-10-31T17:00Z",
+      "home_team": "Charlotte FC",
+      "away_team": "Orlando City SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761924",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Columbus Crew",
+      "away_team": "D.C. United",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761919",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "FC Cincinnati",
+      "away_team": "Philadelphia Union",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761928",
+      "date": "2026-10-31T19:00Z",
+      "home_team": "Sporting Kansas City",
+      "away_team": "FC Dallas",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761925",
+      "date": "2026-10-31T21:00Z",
+      "home_team": "LA Galaxy",
+      "away_team": "Austin FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "761923",
+      "date": "2026-11-01T01:30Z",
+      "home_team": "Colorado Rapids",
+      "away_team": "Chicago Fire FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "761921",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "LAFC",
+      "away_team": "Minnesota United FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "761930",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "New York City FC",
+      "away_team": "CF Montr\u00e9al",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "761929",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "San Jose Earthquakes",
+      "away_team": "Real Salt Lake",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "761926",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "St. Louis CITY SC",
+      "away_team": "San Diego FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "761931",
+      "date": "2026-11-01T21:30Z",
+      "home_team": "Atlanta United FC",
+      "away_team": "Toronto FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "761920",
+      "date": "2026-11-01T21:30Z",
+      "home_team": "Nashville SC",
+      "away_team": "Red Bull New York",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "761927",
+      "date": "2026-11-01T21:30Z",
+      "home_team": "Vancouver Whitecaps",
+      "away_team": "Seattle Sounders FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "761932",
+      "date": "2026-11-01T23:00Z",
+      "home_team": "New England Revolution",
+      "away_team": "Inter Miami CF",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "761933",
+      "date": "2026-11-02T01:00Z",
+      "home_team": "Portland Timbers",
+      "away_team": "Houston Dynamo FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "761877",
+      "date": "2026-11-05T00:30Z",
+      "home_team": "New York City FC",
+      "away_team": "LAFC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "761934",
+      "date": "2026-11-07T21:00Z",
+      "home_team": "CF Montr\u00e9al",
+      "away_team": "Vancouver Whitecaps",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "761935",
+      "date": "2026-11-07T21:00Z",
+      "home_team": "Chicago Fire FC",
+      "away_team": "Columbus Crew",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "761936",
+      "date": "2026-11-07T21:00Z",
+      "home_team": "D.C. United",
+      "away_team": "New York City FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "761937",
+      "date": "2026-11-07T21:00Z",
+      "home_team": "FC Cincinnati",
+      "away_team": "Nashville SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "761938",
+      "date": "2026-11-07T21:00Z",
+      "home_team": "Inter Miami CF",
+      "away_team": "Charlotte FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "761940",
+      "date": "2026-11-07T21:00Z",
+      "home_team": "Orlando City SC",
+      "away_team": "New England Revolution",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "761941",
+      "date": "2026-11-07T21:00Z",
+      "home_team": "Philadelphia Union",
+      "away_team": "Toronto FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "761939",
+      "date": "2026-11-07T21:00Z",
+      "home_team": "Red Bull New York",
+      "away_team": "Atlanta United FC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "761942",
+      "date": "2026-11-08T00:00Z",
+      "home_team": "Austin FC",
+      "away_team": "Portland Timbers",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "761943",
+      "date": "2026-11-08T00:00Z",
+      "home_team": "FC Dallas",
+      "away_team": "Colorado Rapids",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "761944",
+      "date": "2026-11-08T00:00Z",
+      "home_team": "Houston Dynamo FC",
+      "away_team": "St. Louis CITY SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "761945",
+      "date": "2026-11-08T00:00Z",
+      "home_team": "Minnesota United FC",
+      "away_team": "San Jose Earthquakes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "761946",
+      "date": "2026-11-08T00:00Z",
+      "home_team": "Real Salt Lake",
+      "away_team": "LA Galaxy",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "761947",
+      "date": "2026-11-08T00:00Z",
+      "home_team": "San Diego FC",
+      "away_team": "Sporting Kansas City",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "761948",
+      "date": "2026-11-08T00:00Z",
+      "home_team": "Seattle Sounders FC",
+      "away_team": "LAFC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    }
+  ]
+}

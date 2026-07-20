@@ -1,0 +1,3280 @@
+{
+  "league": "primeira_liga",
+  "season": 2026,
+  "generated_at": "2026-07-20T21:05:46.398927+00:00",
+  "match_count": 306,
+  "weeks": [
+    {
+      "week": 1,
+      "start_date": "2026-08-07",
+      "end_date": "2026-08-07",
+      "match_count": 1
+    },
+    {
+      "week": 2,
+      "start_date": "2026-08-08",
+      "end_date": "2026-08-14",
+      "match_count": 9
+    },
+    {
+      "week": 3,
+      "start_date": "2026-08-15",
+      "end_date": "2026-08-17",
+      "match_count": 8
+    },
+    {
+      "week": 4,
+      "start_date": "2026-08-23",
+      "end_date": "2026-08-23",
+      "match_count": 9
+    },
+    {
+      "week": 5,
+      "start_date": "2026-08-30",
+      "end_date": "2026-08-30",
+      "match_count": 9
+    },
+    {
+      "week": 6,
+      "start_date": "2026-09-06",
+      "end_date": "2026-09-06",
+      "match_count": 9
+    },
+    {
+      "week": 7,
+      "start_date": "2026-09-13",
+      "end_date": "2026-09-13",
+      "match_count": 9
+    },
+    {
+      "week": 8,
+      "start_date": "2026-09-20",
+      "end_date": "2026-09-20",
+      "match_count": 9
+    },
+    {
+      "week": 9,
+      "start_date": "2026-10-11",
+      "end_date": "2026-10-11",
+      "match_count": 9
+    },
+    {
+      "week": 10,
+      "start_date": "2026-10-25",
+      "end_date": "2026-10-25",
+      "match_count": 9
+    },
+    {
+      "week": 11,
+      "start_date": "2026-11-01",
+      "end_date": "2026-11-01",
+      "match_count": 9
+    },
+    {
+      "week": 12,
+      "start_date": "2026-11-08",
+      "end_date": "2026-11-08",
+      "match_count": 9
+    },
+    {
+      "week": 13,
+      "start_date": "2026-11-29",
+      "end_date": "2026-11-29",
+      "match_count": 9
+    },
+    {
+      "week": 14,
+      "start_date": "2026-12-06",
+      "end_date": "2026-12-06",
+      "match_count": 9
+    },
+    {
+      "week": 15,
+      "start_date": "2026-12-13",
+      "end_date": "2026-12-13",
+      "match_count": 9
+    },
+    {
+      "week": 16,
+      "start_date": "2026-12-20",
+      "end_date": "2026-12-20",
+      "match_count": 9
+    },
+    {
+      "week": 17,
+      "start_date": "2026-12-27",
+      "end_date": "2026-12-27",
+      "match_count": 9
+    },
+    {
+      "week": 18,
+      "start_date": "2027-01-10",
+      "end_date": "2027-01-10",
+      "match_count": 9
+    },
+    {
+      "week": 19,
+      "start_date": "2027-01-17",
+      "end_date": "2027-01-17",
+      "match_count": 9
+    },
+    {
+      "week": 20,
+      "start_date": "2027-01-24",
+      "end_date": "2027-01-24",
+      "match_count": 9
+    },
+    {
+      "week": 21,
+      "start_date": "2027-01-31",
+      "end_date": "2027-01-31",
+      "match_count": 9
+    },
+    {
+      "week": 22,
+      "start_date": "2027-02-07",
+      "end_date": "2027-02-07",
+      "match_count": 9
+    },
+    {
+      "week": 23,
+      "start_date": "2027-02-14",
+      "end_date": "2027-02-14",
+      "match_count": 9
+    },
+    {
+      "week": 24,
+      "start_date": "2027-02-21",
+      "end_date": "2027-02-21",
+      "match_count": 9
+    },
+    {
+      "week": 25,
+      "start_date": "2027-02-28",
+      "end_date": "2027-02-28",
+      "match_count": 9
+    },
+    {
+      "week": 26,
+      "start_date": "2027-03-07",
+      "end_date": "2027-03-07",
+      "match_count": 9
+    },
+    {
+      "week": 27,
+      "start_date": "2027-03-14",
+      "end_date": "2027-03-14",
+      "match_count": 9
+    },
+    {
+      "week": 28,
+      "start_date": "2027-03-21",
+      "end_date": "2027-03-21",
+      "match_count": 9
+    },
+    {
+      "week": 29,
+      "start_date": "2027-04-04",
+      "end_date": "2027-04-04",
+      "match_count": 9
+    },
+    {
+      "week": 30,
+      "start_date": "2027-04-11",
+      "end_date": "2027-04-11",
+      "match_count": 9
+    },
+    {
+      "week": 31,
+      "start_date": "2027-04-18",
+      "end_date": "2027-04-18",
+      "match_count": 9
+    },
+    {
+      "week": 32,
+      "start_date": "2027-04-25",
+      "end_date": "2027-04-25",
+      "match_count": 9
+    },
+    {
+      "week": 33,
+      "start_date": "2027-05-02",
+      "end_date": "2027-05-02",
+      "match_count": 9
+    },
+    {
+      "week": 34,
+      "start_date": "2027-05-09",
+      "end_date": "2027-05-09",
+      "match_count": 9
+    },
+    {
+      "week": 35,
+      "start_date": "2027-05-16",
+      "end_date": "2027-05-16",
+      "match_count": 9
+    }
+  ],
+  "matches": [
+    {
+      "event_id": "401885491",
+      "date": "2026-08-07T19:15Z",
+      "home_team": "Estoril",
+      "away_team": "FC Famalicao",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401885489",
+      "date": "2026-08-08T14:30Z",
+      "home_team": "Maritimo",
+      "away_team": "Casa Pia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401885484",
+      "date": "2026-08-08T17:00Z",
+      "home_team": "Vit\u00f3ria de Guimaraes",
+      "away_team": "Arouca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401885492",
+      "date": "2026-08-08T19:30Z",
+      "home_team": "Estrela",
+      "away_team": "Sporting CP",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401885487",
+      "date": "2026-08-09T17:00Z",
+      "home_team": "FC Porto",
+      "away_team": "Alverca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401885485",
+      "date": "2026-08-09T18:00Z",
+      "home_team": "Benfica",
+      "away_team": "Acad\u00e9mico de Viseu",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401885488",
+      "date": "2026-08-09T18:00Z",
+      "home_team": "Moreirense",
+      "away_team": "Braga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401885490",
+      "date": "2026-08-09T19:30Z",
+      "home_team": "Gil Vicente",
+      "away_team": "Rio Ave",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401885486",
+      "date": "2026-08-10T19:15Z",
+      "home_team": "Santa Clara",
+      "away_team": "C.D. Nacional",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401885475",
+      "date": "2026-08-14T19:15Z",
+      "home_team": "Sporting CP",
+      "away_team": "Vit\u00f3ria de Guimaraes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401885482",
+      "date": "2026-08-15T14:30Z",
+      "home_team": "Alverca",
+      "away_team": "Estrela",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401885483",
+      "date": "2026-08-15T17:00Z",
+      "home_team": "Acad\u00e9mico de Viseu",
+      "away_team": "Santa Clara",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401885476",
+      "date": "2026-08-15T19:30Z",
+      "home_team": "Rio Ave",
+      "away_team": "FC Porto",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401885477",
+      "date": "2026-08-16T14:30Z",
+      "home_team": "C.D. Nacional",
+      "away_team": "Estoril",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401885480",
+      "date": "2026-08-16T18:00Z",
+      "home_team": "Braga",
+      "away_team": "Gil Vicente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401885479",
+      "date": "2026-08-16T18:00Z",
+      "home_team": "Casa Pia",
+      "away_team": "Benfica",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401885478",
+      "date": "2026-08-16T18:00Z",
+      "home_team": "FC Famalicao",
+      "away_team": "Maritimo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401885481",
+      "date": "2026-08-17T18:00Z",
+      "home_team": "Arouca",
+      "away_team": "Moreirense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401885473",
+      "date": "2026-08-23T18:00Z",
+      "home_team": "Estoril",
+      "away_team": "Rio Ave",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401885474",
+      "date": "2026-08-23T18:00Z",
+      "home_team": "Estrela",
+      "away_team": "Braga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401885469",
+      "date": "2026-08-23T18:00Z",
+      "home_team": "FC Porto",
+      "away_team": "Arouca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401885472",
+      "date": "2026-08-23T18:00Z",
+      "home_team": "Gil Vicente",
+      "away_team": "Casa Pia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401885471",
+      "date": "2026-08-23T18:00Z",
+      "home_team": "Maritimo",
+      "away_team": "Acad\u00e9mico de Viseu",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401885470",
+      "date": "2026-08-23T18:00Z",
+      "home_team": "Moreirense",
+      "away_team": "Benfica",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401885468",
+      "date": "2026-08-23T18:00Z",
+      "home_team": "Santa Clara",
+      "away_team": "FC Famalicao",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401885467",
+      "date": "2026-08-23T18:00Z",
+      "home_team": "Sporting CP",
+      "away_team": "Alverca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401885466",
+      "date": "2026-08-23T18:00Z",
+      "home_team": "Vit\u00f3ria de Guimaraes",
+      "away_team": "C.D. Nacional",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401885465",
+      "date": "2026-08-30T18:00Z",
+      "home_team": "Acad\u00e9mico de Viseu",
+      "away_team": "FC Porto",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401885464",
+      "date": "2026-08-30T18:00Z",
+      "home_team": "Alverca",
+      "away_team": "Santa Clara",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401885463",
+      "date": "2026-08-30T18:00Z",
+      "home_team": "Arouca",
+      "away_team": "Maritimo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401885457",
+      "date": "2026-08-30T18:00Z",
+      "home_team": "Benfica",
+      "away_team": "Estoril",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401885462",
+      "date": "2026-08-30T18:00Z",
+      "home_team": "Braga",
+      "away_team": "Vit\u00f3ria de Guimaraes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401885459",
+      "date": "2026-08-30T18:00Z",
+      "home_team": "C.D. Nacional",
+      "away_team": "Estrela",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401885461",
+      "date": "2026-08-30T18:00Z",
+      "home_team": "Casa Pia",
+      "away_team": "Moreirense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401885460",
+      "date": "2026-08-30T18:00Z",
+      "home_team": "FC Famalicao",
+      "away_team": "Gil Vicente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401885458",
+      "date": "2026-08-30T18:00Z",
+      "home_team": "Rio Ave",
+      "away_team": "Sporting CP",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401885456",
+      "date": "2026-09-06T18:00Z",
+      "home_team": "Alverca",
+      "away_team": "Braga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401885454",
+      "date": "2026-09-06T18:00Z",
+      "home_team": "Estoril",
+      "away_team": "Arouca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401885455",
+      "date": "2026-09-06T18:00Z",
+      "home_team": "Estrela",
+      "away_team": "FC Famalicao",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401885451",
+      "date": "2026-09-06T18:00Z",
+      "home_team": "FC Porto",
+      "away_team": "Moreirense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401885453",
+      "date": "2026-09-06T18:00Z",
+      "home_team": "Gil Vicente",
+      "away_team": "Acad\u00e9mico de Viseu",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401885452",
+      "date": "2026-09-06T18:00Z",
+      "home_team": "Maritimo",
+      "away_team": "Benfica",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401885450",
+      "date": "2026-09-06T18:00Z",
+      "home_team": "Santa Clara",
+      "away_team": "Rio Ave",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401885449",
+      "date": "2026-09-06T18:00Z",
+      "home_team": "Sporting CP",
+      "away_team": "C.D. Nacional",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401885448",
+      "date": "2026-09-06T18:00Z",
+      "home_team": "Vit\u00f3ria de Guimaraes",
+      "away_team": "Casa Pia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401885447",
+      "date": "2026-09-13T18:00Z",
+      "home_team": "Acad\u00e9mico de Viseu",
+      "away_team": "Vit\u00f3ria de Guimaraes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401885446",
+      "date": "2026-09-13T18:00Z",
+      "home_team": "Arouca",
+      "away_team": "Santa Clara",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401885439",
+      "date": "2026-09-13T18:00Z",
+      "home_team": "Benfica",
+      "away_team": "Gil Vicente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401885445",
+      "date": "2026-09-13T18:00Z",
+      "home_team": "Braga",
+      "away_team": "Estoril",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401885441",
+      "date": "2026-09-13T18:00Z",
+      "home_team": "C.D. Nacional",
+      "away_team": "Alverca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401885444",
+      "date": "2026-09-13T18:00Z",
+      "home_team": "Casa Pia",
+      "away_team": "FC Porto",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401885443",
+      "date": "2026-09-13T18:00Z",
+      "home_team": "FC Famalicao",
+      "away_team": "Sporting CP",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401885442",
+      "date": "2026-09-13T18:00Z",
+      "home_team": "Moreirense",
+      "away_team": "Maritimo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401885440",
+      "date": "2026-09-13T18:00Z",
+      "home_team": "Rio Ave",
+      "away_team": "Estrela",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401885438",
+      "date": "2026-09-20T18:00Z",
+      "home_team": "Alverca",
+      "away_team": "Rio Ave",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401885434",
+      "date": "2026-09-20T18:00Z",
+      "home_team": "C.D. Nacional",
+      "away_team": "FC Famalicao",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401885436",
+      "date": "2026-09-20T18:00Z",
+      "home_team": "Estoril",
+      "away_team": "Casa Pia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401885437",
+      "date": "2026-09-20T18:00Z",
+      "home_team": "Estrela",
+      "away_team": "Acad\u00e9mico de Viseu",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401885433",
+      "date": "2026-09-20T18:00Z",
+      "home_team": "FC Porto",
+      "away_team": "Benfica",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401885435",
+      "date": "2026-09-20T18:00Z",
+      "home_team": "Gil Vicente",
+      "away_team": "Maritimo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401885432",
+      "date": "2026-09-20T18:00Z",
+      "home_team": "Santa Clara",
+      "away_team": "Braga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401885431",
+      "date": "2026-09-20T18:00Z",
+      "home_team": "Sporting CP",
+      "away_team": "Arouca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401885430",
+      "date": "2026-09-20T18:00Z",
+      "home_team": "Vit\u00f3ria de Guimaraes",
+      "away_team": "Moreirense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401885429",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Acad\u00e9mico de Viseu",
+      "away_team": "Estoril",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401885428",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Arouca",
+      "away_team": "Estrela",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401885421",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Benfica",
+      "away_team": "Vit\u00f3ria de Guimaraes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401885427",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Braga",
+      "away_team": "Sporting CP",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401885426",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Casa Pia",
+      "away_team": "Santa Clara",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401885425",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "FC Famalicao",
+      "away_team": "Alverca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401885424",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Maritimo",
+      "away_team": "FC Porto",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401885423",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Moreirense",
+      "away_team": "Gil Vicente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401885422",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Rio Ave",
+      "away_team": "C.D. Nacional",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401885420",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Alverca",
+      "away_team": "Arouca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401885416",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "C.D. Nacional",
+      "away_team": "Braga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401885418",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Estoril",
+      "away_team": "Moreirense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401885419",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Estrela",
+      "away_team": "Casa Pia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401885417",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Gil Vicente",
+      "away_team": "FC Porto",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401885415",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Rio Ave",
+      "away_team": "FC Famalicao",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401885414",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Santa Clara",
+      "away_team": "Benfica",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401885413",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Sporting CP",
+      "away_team": "Acad\u00e9mico de Viseu",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401885412",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Vit\u00f3ria de Guimaraes",
+      "away_team": "Maritimo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401885411",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Acad\u00e9mico de Viseu",
+      "away_team": "Rio Ave",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401885410",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Arouca",
+      "away_team": "C.D. Nacional",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401885403",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Benfica",
+      "away_team": "Alverca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401885409",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Braga",
+      "away_team": "FC Famalicao",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401885408",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Casa Pia",
+      "away_team": "Sporting CP",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401885404",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "FC Porto",
+      "away_team": "Estoril",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401885407",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Gil Vicente",
+      "away_team": "Vit\u00f3ria de Guimaraes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401885406",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Maritimo",
+      "away_team": "Santa Clara",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401885405",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Moreirense",
+      "away_team": "Estrela",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401885402",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Alverca",
+      "away_team": "Casa Pia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401885398",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "C.D. Nacional",
+      "away_team": "Acad\u00e9mico de Viseu",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401885400",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Estoril",
+      "away_team": "Maritimo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401885401",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Estrela",
+      "away_team": "Benfica",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401885399",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "FC Famalicao",
+      "away_team": "Arouca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401885397",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Rio Ave",
+      "away_team": "Braga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401885396",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Santa Clara",
+      "away_team": "Gil Vicente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401885395",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Sporting CP",
+      "away_team": "Moreirense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401885394",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Vit\u00f3ria de Guimaraes",
+      "away_team": "FC Porto",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401885393",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Acad\u00e9mico de Viseu",
+      "away_team": "Alverca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401885392",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Arouca",
+      "away_team": "Rio Ave",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401885386",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Benfica",
+      "away_team": "FC Famalicao",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401885391",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Casa Pia",
+      "away_team": "Braga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401885387",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "FC Porto",
+      "away_team": "Sporting CP",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401885390",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Gil Vicente",
+      "away_team": "Estoril",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401885389",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Maritimo",
+      "away_team": "C.D. Nacional",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401885388",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Moreirense",
+      "away_team": "Santa Clara",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401885385",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Vit\u00f3ria de Guimaraes",
+      "away_team": "Estrela",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401885384",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Alverca",
+      "away_team": "Moreirense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401885382",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Braga",
+      "away_team": "Arouca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401885379",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "C.D. Nacional",
+      "away_team": "Benfica",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401885381",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Estoril",
+      "away_team": "Vit\u00f3ria de Guimaraes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401885383",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Estrela",
+      "away_team": "Gil Vicente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401885380",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "FC Famalicao",
+      "away_team": "Acad\u00e9mico de Viseu",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401885378",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Rio Ave",
+      "away_team": "Casa Pia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401885377",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Santa Clara",
+      "away_team": "FC Porto",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401885376",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Sporting CP",
+      "away_team": "Maritimo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401885375",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Acad\u00e9mico de Viseu",
+      "away_team": "Arouca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401885368",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Benfica",
+      "away_team": "Braga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401885374",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Casa Pia",
+      "away_team": "C.D. Nacional",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401885373",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Estoril",
+      "away_team": "Santa Clara",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401885369",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "FC Porto",
+      "away_team": "Estrela",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401885372",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Gil Vicente",
+      "away_team": "Sporting CP",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401885371",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Maritimo",
+      "away_team": "Rio Ave",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401885370",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Moreirense",
+      "away_team": "FC Famalicao",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401885367",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Vit\u00f3ria de Guimaraes",
+      "away_team": "Alverca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401885366",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Alverca",
+      "away_team": "Gil Vicente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401885364",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Arouca",
+      "away_team": "Casa Pia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401885363",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Braga",
+      "away_team": "Acad\u00e9mico de Viseu",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401885361",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "C.D. Nacional",
+      "away_team": "Moreirense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401885365",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Estrela",
+      "away_team": "Maritimo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401885362",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "FC Famalicao",
+      "away_team": "FC Porto",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401885360",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Rio Ave",
+      "away_team": "Benfica",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401885359",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Santa Clara",
+      "away_team": "Vit\u00f3ria de Guimaraes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401885358",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Sporting CP",
+      "away_team": "Estoril",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401885350",
+      "date": "2026-12-27T20:00Z",
+      "home_team": "Benfica",
+      "away_team": "Sporting CP",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401885357",
+      "date": "2026-12-27T20:00Z",
+      "home_team": "Casa Pia",
+      "away_team": "FC Famalicao",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401885356",
+      "date": "2026-12-27T20:00Z",
+      "home_team": "Estoril",
+      "away_team": "Alverca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401885352",
+      "date": "2026-12-27T20:00Z",
+      "home_team": "FC Porto",
+      "away_team": "C.D. Nacional",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401885355",
+      "date": "2026-12-27T20:00Z",
+      "home_team": "Gil Vicente",
+      "away_team": "Arouca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401885354",
+      "date": "2026-12-27T20:00Z",
+      "home_team": "Maritimo",
+      "away_team": "Braga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401885353",
+      "date": "2026-12-27T20:00Z",
+      "home_team": "Moreirense",
+      "away_team": "Acad\u00e9mico de Viseu",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401885351",
+      "date": "2026-12-27T20:00Z",
+      "home_team": "Santa Clara",
+      "away_team": "Estrela",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401885349",
+      "date": "2026-12-27T20:00Z",
+      "home_team": "Vit\u00f3ria de Guimaraes",
+      "away_team": "Rio Ave",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401885348",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Acad\u00e9mico de Viseu",
+      "away_team": "Casa Pia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401885347",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Alverca",
+      "away_team": "Maritimo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401885345",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Arouca",
+      "away_team": "Benfica",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401885344",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Braga",
+      "away_team": "FC Porto",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401885342",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "C.D. Nacional",
+      "away_team": "Gil Vicente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401885346",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Estrela",
+      "away_team": "Estoril",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401885343",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "FC Famalicao",
+      "away_team": "Vit\u00f3ria de Guimaraes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401885341",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Rio Ave",
+      "away_team": "Moreirense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401885340",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Sporting CP",
+      "away_team": "Santa Clara",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401885332",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Acad\u00e9mico de Viseu",
+      "away_team": "Benfica",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401885334",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Alverca",
+      "away_team": "FC Porto",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401885331",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Arouca",
+      "away_team": "Vit\u00f3ria de Guimaraes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401885335",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Braga",
+      "away_team": "Moreirense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401885333",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "C.D. Nacional",
+      "away_team": "Santa Clara",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401885336",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Casa Pia",
+      "away_team": "Maritimo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401885338",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "FC Famalicao",
+      "away_team": "Estoril",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401885337",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Rio Ave",
+      "away_team": "Gil Vicente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401885339",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Sporting CP",
+      "away_team": "Estrela",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401885326",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Benfica",
+      "away_team": "Casa Pia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401885324",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Estoril",
+      "away_team": "C.D. Nacional",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401885329",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Estrela",
+      "away_team": "Alverca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401885323",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "FC Porto",
+      "away_team": "Rio Ave",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401885327",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Gil Vicente",
+      "away_team": "Braga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401885325",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Maritimo",
+      "away_team": "FC Famalicao",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401885328",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Moreirense",
+      "away_team": "Arouca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401885330",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Santa Clara",
+      "away_team": "Acad\u00e9mico de Viseu",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401885322",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Vit\u00f3ria de Guimaraes",
+      "away_team": "Sporting CP",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401885318",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Acad\u00e9mico de Viseu",
+      "away_team": "Maritimo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401885314",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Alverca",
+      "away_team": "Sporting CP",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401885316",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Arouca",
+      "away_team": "FC Porto",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401885317",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Benfica",
+      "away_team": "Moreirense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401885321",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Braga",
+      "away_team": "Estrela",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401885313",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "C.D. Nacional",
+      "away_team": "Vit\u00f3ria de Guimaraes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401885319",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Casa Pia",
+      "away_team": "Gil Vicente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401885315",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "FC Famalicao",
+      "away_team": "Santa Clara",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401885320",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Rio Ave",
+      "away_team": "Estoril",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401885304",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Estoril",
+      "away_team": "Benfica",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401885306",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Estrela",
+      "away_team": "C.D. Nacional",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401885312",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "FC Porto",
+      "away_team": "Acad\u00e9mico de Viseu",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401885307",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Gil Vicente",
+      "away_team": "FC Famalicao",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401885310",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Maritimo",
+      "away_team": "Arouca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401885308",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Moreirense",
+      "away_team": "Casa Pia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401885311",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Santa Clara",
+      "away_team": "Alverca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401885305",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Sporting CP",
+      "away_team": "Rio Ave",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401885309",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Vit\u00f3ria de Guimaraes",
+      "away_team": "Braga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401885300",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Acad\u00e9mico de Viseu",
+      "away_team": "Gil Vicente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401885301",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Arouca",
+      "away_team": "Estoril",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401885299",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Benfica",
+      "away_team": "Maritimo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401885303",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Braga",
+      "away_team": "Alverca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401885296",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "C.D. Nacional",
+      "away_team": "Sporting CP",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401885295",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Casa Pia",
+      "away_team": "Vit\u00f3ria de Guimaraes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401885302",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "FC Famalicao",
+      "away_team": "Estrela",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401885298",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Moreirense",
+      "away_team": "FC Porto",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401885297",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Rio Ave",
+      "away_team": "Santa Clara",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401885288",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Alverca",
+      "away_team": "C.D. Nacional",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401885292",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Estoril",
+      "away_team": "Braga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401885287",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Estrela",
+      "away_team": "Rio Ave",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401885291",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "FC Porto",
+      "away_team": "Casa Pia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401885286",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Gil Vicente",
+      "away_team": "Benfica",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401885289",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Maritimo",
+      "away_team": "Moreirense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401885293",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Santa Clara",
+      "away_team": "Arouca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401885290",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Sporting CP",
+      "away_team": "FC Famalicao",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401885294",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Vit\u00f3ria de Guimaraes",
+      "away_team": "Acad\u00e9mico de Viseu",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401885284",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Acad\u00e9mico de Viseu",
+      "away_team": "Estrela",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401885278",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Arouca",
+      "away_team": "Sporting CP",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401885280",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Benfica",
+      "away_team": "FC Porto",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401885279",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Braga",
+      "away_team": "Santa Clara",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401885283",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Casa Pia",
+      "away_team": "Estoril",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401885281",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "FC Famalicao",
+      "away_team": "C.D. Nacional",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401885282",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Maritimo",
+      "away_team": "Gil Vicente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401885277",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Moreirense",
+      "away_team": "Vit\u00f3ria de Guimaraes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401885285",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Rio Ave",
+      "away_team": "Alverca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401885272",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Alverca",
+      "away_team": "FC Famalicao",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401885269",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "C.D. Nacional",
+      "away_team": "Rio Ave",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401885276",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Estoril",
+      "away_team": "Acad\u00e9mico de Viseu",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401885275",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Estrela",
+      "away_team": "Arouca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401885271",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "FC Porto",
+      "away_team": "Maritimo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401885270",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Gil Vicente",
+      "away_team": "Moreirense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401885273",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Santa Clara",
+      "away_team": "Casa Pia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401885274",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Sporting CP",
+      "away_team": "Braga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401885268",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Vit\u00f3ria de Guimaraes",
+      "away_team": "Benfica",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401885260",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Acad\u00e9mico de Viseu",
+      "away_team": "Sporting CP",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401885267",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Arouca",
+      "away_team": "Alverca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401885261",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Benfica",
+      "away_team": "Santa Clara",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401885263",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Braga",
+      "away_team": "C.D. Nacional",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401885266",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Casa Pia",
+      "away_team": "Estrela",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401885262",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "FC Famalicao",
+      "away_team": "Rio Ave",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401885264",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "FC Porto",
+      "away_team": "Gil Vicente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401885259",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Maritimo",
+      "away_team": "Vit\u00f3ria de Guimaraes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401885265",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Moreirense",
+      "away_team": "Estoril",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401885250",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Alverca",
+      "away_team": "Benfica",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401885257",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "C.D. Nacional",
+      "away_team": "Arouca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401885251",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Estoril",
+      "away_team": "FC Porto",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401885252",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Estrela",
+      "away_team": "Moreirense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401885256",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "FC Famalicao",
+      "away_team": "Braga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401885258",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Rio Ave",
+      "away_team": "Acad\u00e9mico de Viseu",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401885253",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Santa Clara",
+      "away_team": "Maritimo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401885255",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Sporting CP",
+      "away_team": "Casa Pia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401885254",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Vit\u00f3ria de Guimaraes",
+      "away_team": "Gil Vicente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401885245",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Acad\u00e9mico de Viseu",
+      "away_team": "C.D. Nacional",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401885246",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Arouca",
+      "away_team": "FC Famalicao",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401885248",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Benfica",
+      "away_team": "Estrela",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401885244",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Braga",
+      "away_team": "Rio Ave",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401885249",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Casa Pia",
+      "away_team": "Alverca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401885241",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "FC Porto",
+      "away_team": "Vit\u00f3ria de Guimaraes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401885243",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Gil Vicente",
+      "away_team": "Santa Clara",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401885247",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Maritimo",
+      "away_team": "Estoril",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401885242",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Moreirense",
+      "away_team": "Sporting CP",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401885240",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Alverca",
+      "away_team": "Acad\u00e9mico de Viseu",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401885238",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Braga",
+      "away_team": "Casa Pia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401885236",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "C.D. Nacional",
+      "away_team": "Maritimo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401885237",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Estoril",
+      "away_team": "Gil Vicente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401885232",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Estrela",
+      "away_team": "Vit\u00f3ria de Guimaraes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401885233",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "FC Famalicao",
+      "away_team": "Benfica",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401885239",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Rio Ave",
+      "away_team": "Arouca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401885235",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Santa Clara",
+      "away_team": "Moreirense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401885234",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Sporting CP",
+      "away_team": "FC Porto",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401885227",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Acad\u00e9mico de Viseu",
+      "away_team": "FC Famalicao",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401885229",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Arouca",
+      "away_team": "Braga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401885226",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Benfica",
+      "away_team": "C.D. Nacional",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401885225",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Casa Pia",
+      "away_team": "Rio Ave",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401885224",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "FC Porto",
+      "away_team": "Santa Clara",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401885230",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Gil Vicente",
+      "away_team": "Estrela",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401885223",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Maritimo",
+      "away_team": "Sporting CP",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401885231",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Moreirense",
+      "away_team": "Alverca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401885228",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Vit\u00f3ria de Guimaraes",
+      "away_team": "Estoril",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401884847",
+      "date": "2027-04-25T18:00Z",
+      "home_team": "Alverca",
+      "away_team": "Vit\u00f3ria de Guimaraes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401885222",
+      "date": "2027-04-25T18:00Z",
+      "home_team": "Arouca",
+      "away_team": "Acad\u00e9mico de Viseu",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401884848",
+      "date": "2027-04-25T18:00Z",
+      "home_team": "Braga",
+      "away_team": "Benfica",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401885221",
+      "date": "2027-04-25T18:00Z",
+      "home_team": "C.D. Nacional",
+      "away_team": "Casa Pia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401884849",
+      "date": "2027-04-25T18:00Z",
+      "home_team": "Estrela",
+      "away_team": "FC Porto",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401884850",
+      "date": "2027-04-25T18:00Z",
+      "home_team": "FC Famalicao",
+      "away_team": "Moreirense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401884851",
+      "date": "2027-04-25T18:00Z",
+      "home_team": "Rio Ave",
+      "away_team": "Maritimo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401884853",
+      "date": "2027-04-25T18:00Z",
+      "home_team": "Santa Clara",
+      "away_team": "Estoril",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401884852",
+      "date": "2027-04-25T18:00Z",
+      "home_team": "Sporting CP",
+      "away_team": "Gil Vicente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401884843",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Acad\u00e9mico de Viseu",
+      "away_team": "Braga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401884840",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Benfica",
+      "away_team": "Rio Ave",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401884844",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Casa Pia",
+      "away_team": "Arouca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401884838",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Estoril",
+      "away_team": "Sporting CP",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401884842",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "FC Porto",
+      "away_team": "FC Famalicao",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401884846",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Gil Vicente",
+      "away_team": "Alverca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401884845",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Maritimo",
+      "away_team": "Estrela",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401884841",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Moreirense",
+      "away_team": "C.D. Nacional",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401884839",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Vit\u00f3ria de Guimaraes",
+      "away_team": "Santa Clara",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401884833",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Acad\u00e9mico de Viseu",
+      "away_team": "Moreirense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401884836",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Alverca",
+      "away_team": "Estoril",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401884835",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Arouca",
+      "away_team": "Gil Vicente",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401884834",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Braga",
+      "away_team": "Maritimo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401884832",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "C.D. Nacional",
+      "away_team": "FC Porto",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401884831",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Estrela",
+      "away_team": "Santa Clara",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401884837",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "FC Famalicao",
+      "away_team": "Casa Pia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401884829",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Rio Ave",
+      "away_team": "Vit\u00f3ria de Guimaraes",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401884830",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Sporting CP",
+      "away_team": "Benfica",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401884825",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Benfica",
+      "away_team": "Arouca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401884828",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Casa Pia",
+      "away_team": "Acad\u00e9mico de Viseu",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401884826",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Estoril",
+      "away_team": "Estrela",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401884824",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "FC Porto",
+      "away_team": "Braga",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401884822",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Gil Vicente",
+      "away_team": "C.D. Nacional",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401884827",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Maritimo",
+      "away_team": "Alverca",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401884821",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Moreirense",
+      "away_team": "Rio Ave",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401884820",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Santa Clara",
+      "away_team": "Sporting CP",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401884823",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Vit\u00f3ria de Guimaraes",
+      "away_team": "FC Famalicao",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    }
+  ]
+}

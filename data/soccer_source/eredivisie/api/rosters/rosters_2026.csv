@@ -1,0 +1,544 @@
+team_id,team,player_id,player_name,jersey,position,position_abbreviation,age,height,weight,date_of_birth,headshot_url
+2726,ADO Den Haag,294425,Kilian Nikiema,1,Goalkeeper,G,23.0,74.0,172.0,2003-06-22T07:00Z,
+2726,ADO Den Haag,378247,Sem Eekhout,22,Goalkeeper,G,19.0,,,2006-10-24T07:00Z,
+2726,ADO Den Haag,408844,Caleb Kramer,29,Goalkeeper,G,19.0,,,2006-08-01T07:00Z,
+2726,ADO Den Haag,409511,Connor Ratford,28,Goalkeeper,G,,,,,
+2726,ADO Den Haag,281140,Sekou Sylla,18,Defender,D,27.0,71.0,161.0,1999-01-09T08:00Z,
+2726,ADO Den Haag,306880,Matteo Waem,4,Defender,D,26.0,74.0,172.0,2000-06-21T07:00Z,
+2726,ADO Den Haag,330170,Pascal Mulder,3,Defender,D,27.0,71.0,,1999-01-19T08:00Z,
+2726,ADO Den Haag,338118,Milan Hokke,15,Defender,D,22.0,75.0,174.0,2003-10-11T07:00Z,
+2726,ADO Den Haag,395146,Illaijh De Ruijter,26,Defender,D,19.0,76.0,174.0,2006-09-14T07:00Z,
+2726,ADO Den Haag,409797,Sanyika Bergtop,35,Defender,D,18.0,,,2007-07-31T07:00Z,
+2726,ADO Den Haag,272720,Jari Vlak,8,Midfielder,M,27.0,75.0,,1998-08-15T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/272720.png
+2726,ADO Den Haag,304046,Jalen Hawkins,77,Midfielder,M,25.0,70.0,161.0,2001-01-24T08:00Z,
+2726,ADO Den Haag,317286,Mylian Jimenez,14,Midfielder,M,23.0,69.0,139.0,2003-01-13T08:00Z,
+2726,ADO Den Haag,338244,Juho Kilo,25,Midfielder,M,24.0,70.0,,2002-06-23T07:00Z,
+2726,ADO Den Haag,378488,Finn De Bruin,16,Midfielder,M,22.0,69.0,159.0,2004-04-05T07:00Z,
+2726,ADO Den Haag,416390,Dani Van Loenen,32,Midfielder,M,19.0,,,2007-02-12T08:00Z,
+2726,ADO Den Haag,164263,Daryl van Mieghem,7,Forward,F,36.0,67.0,150.0,1989-12-05T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/164263.png
+2726,ADO Den Haag,284787,Nigel Thomas,27,Forward,F,25.0,70.0,170.0,2001-02-01T08:00Z,
+2726,ADO Den Haag,297069,Cameron Peupion,21,Forward,F,23.0,69.0,168.0,2002-09-23T07:00Z,
+2726,ADO Den Haag,304576,Evan Rottier,11,Forward,F,24.0,72.0,161.0,2002-02-11T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/304576.png
+2726,ADO Den Haag,329481,Luka Reischl,19,Forward,F,22.0,72.0,168.0,2004-01-10T08:00Z,
+2726,ADO Den Haag,373792,Jesse Bal,23,Forward,F,19.0,,,2006-10-01T07:00Z,
+140,AZ Alkmaar,304257,Mayckel Lahdo,,Forward,F,23.0,67.0,168.0,2002-12-30T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/304257.png
+140,AZ Alkmaar,130177,Jeroen Zoet,41,Goalkeeper,G,35.0,74.0,192.0,1991-01-06T08:00Z,
+140,AZ Alkmaar,150166,Hobie Verhulst,12,Goalkeeper,G,33.0,76.0,203.0,1993-04-02T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/150166.png
+140,AZ Alkmaar,255740,Jari De Busser,,Goalkeeper,G,26.0,75.0,,1999-10-21T07:00Z,
+140,AZ Alkmaar,332466,Rome-Jayden Owusu-Oduro,1,Goalkeeper,G,22.0,74.0,181.0,2004-07-02T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/332466.png
+140,AZ Alkmaar,360261,Jur Schipper,71,Goalkeeper,G,20.0,77.0,172.0,2006-07-11T07:00Z,
+140,AZ Alkmaar,261596,Mees De Wit,34,Defender,D,28.0,71.0,174.0,1998-04-17T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/261596.png
+140,AZ Alkmaar,299530,Denso Kasius,30,Defender,D,23.0,73.0,161.0,2002-10-06T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/299530.png
+140,AZ Alkmaar,306510,Alexandre Penetra,5,Defender,D,24.0,73.0,161.0,2001-09-09T07:00Z,
+140,AZ Alkmaar,318531,Maxim Dekker,4,Defender,D,22.0,75.0,174.0,2004-04-21T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/318531.png
+140,AZ Alkmaar,329972,Wouter Goes,3,Defender,D,22.0,74.0,163.0,2004-06-10T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/329972.png
+140,AZ Alkmaar,333892,Seiya Maikuma,2,Defender,D,28.0,70.0,150.0,1997-10-16T07:00Z,
+140,AZ Alkmaar,334064,Lewis Schouten,,Defender,D,22.0,75.0,174.0,2004-02-04T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/334064.png
+140,AZ Alkmaar,340532,Billy Van Duijl,23,Defender,D,20.0,75.0,159.0,2005-10-04T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/340532.png
+140,AZ Alkmaar,343924,Elijah Dijkstra,22,Defender,D,19.0,68.0,,2006-08-05T07:00Z,
+140,AZ Alkmaar,362961,Rion Ichihara,18,Defender,D,21.0,74.0,179.0,2005-07-07T07:00Z,
+140,AZ Alkmaar,379193,Mateo Chávez,15,Defender,D,22.0,70.0,161.0,2004-05-12T07:00Z,
+140,AZ Alkmaar,394410,Mathijs Menu,46,Defender,D,21.0,69.0,,2005-05-01T07:00Z,
+140,AZ Alkmaar,409683,Jesper Zwart,48,Defender,D,19.0,,,2006-11-08T08:00Z,
+140,AZ Alkmaar,150199,Jordy Clasie,8,Midfielder,M,35.0,67.0,150.0,1991-06-27T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/150199.png
+140,AZ Alkmaar,269610,Peer Koopmeiners,6,Midfielder,M,26.0,73.0,172.0,2000-05-04T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/269610.png
+140,AZ Alkmaar,287279,Sven Mijnans,10,Midfielder,M,26.0,75.0,152.0,2000-03-09T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/287279.png
+140,AZ Alkmaar,306400,Zico Buurmeester,,Midfielder,M,24.0,72.0,141.0,2002-06-07T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/306400.png
+140,AZ Alkmaar,346269,Dave Kwakman,,Midfielder,M,21.0,72.0,172.0,2004-08-07T07:00Z,
+140,AZ Alkmaar,353365,Kees Smit,26,Midfielder,M,20.0,71.0,146.0,2006-01-20T08:00Z,
+140,AZ Alkmaar,380172,Rio Robbemond,56,Midfielder,M,21.0,70.0,,2005-01-05T08:00Z,
+140,AZ Alkmaar,380174,Kasper Boogaard,20,Midfielder,M,20.0,72.0,,2006-01-29T08:00Z,
+140,AZ Alkmaar,382643,Matej Sin,33,Midfielder,M,22.0,,,2004-06-02T07:00Z,
+140,AZ Alkmaar,266593,Ibrahim Sadiq,11,Forward,F,26.0,66.0,150.0,2000-05-07T07:00Z,
+140,AZ Alkmaar,268688,Jizz Hornkamp,19,Forward,F,28.0,72.0,179.0,1998-03-07T08:00Z,
+140,AZ Alkmaar,279790,Troy Parrott,9,Forward,F,24.0,73.0,172.0,2002-02-04T08:00Z,
+140,AZ Alkmaar,309651,Isak Jensen,17,Forward,F,22.0,73.0,201.0,2003-12-23T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/309651.png
+140,AZ Alkmaar,332465,Mexx Meerdink,35,Forward,F,22.0,72.0,150.0,2003-07-24T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/332465.png
+140,AZ Alkmaar,338775,Ro-Zangelo Daal,27,Forward,F,22.0,68.0,161.0,2004-02-10T08:00Z,
+140,AZ Alkmaar,338959,Weslley Patati,7,Forward,F,22.0,68.0,132.0,2003-10-01T07:00Z,
+140,AZ Alkmaar,347443,Jasper Hartog,63,Forward,F,20.0,70.0,,2006-03-23T08:00Z,
+140,AZ Alkmaar,389354,Ayoub Oufkir,24,Forward,F,20.0,67.0,126.0,2006-01-04T08:00Z,
+140,AZ Alkmaar,398766,Wassim Bouziane,75,Forward,F,19.0,71.0,159.0,2006-12-22T08:00Z,
+140,AZ Alkmaar,408528,Bendegúz Kovács,45,Forward,F,19.0,76.0,,2007-03-31T07:00Z,
+139,Ajax Amsterdam,319067,Amourricho van Axel Dongen,,Forward,F,21.0,69.0,152.0,2004-09-29T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/319067.png
+139,Ajax Amsterdam,238919,Maarten Paes,26,Goalkeeper,G,28.0,75.0,181.0,1998-05-14T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/238919.png
+139,Ajax Amsterdam,362072,Paul Reverson,52,Goalkeeper,G,21.0,76.0,172.0,2005-06-20T07:00Z,
+139,Ajax Amsterdam,396040,Joeri Heerkens,12,Goalkeeper,G,20.0,,,2006-05-08T07:00Z,
+139,Ajax Amsterdam,238033,Kou Itakura,4,Defender,D,29.0,74.0,174.0,1997-01-27T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/238033.png
+139,Ajax Amsterdam,240353,Caio Henrique,,Defender,D,28.0,70.0,150.0,1997-07-31T07:00Z,
+139,Ajax Amsterdam,241392,Owen Wijndal,5,Defender,D,26.0,69.0,141.0,1999-11-28T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/241392.png
+139,Ajax Amsterdam,305552,Josip Sutalo,37,Defender,D,26.0,73.0,181.0,2000-02-28T08:00Z,
+139,Ajax Amsterdam,305590,Youri Baas,15,Defender,D,23.0,72.0,157.0,2003-03-17T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/305590.png
+139,Ajax Amsterdam,306806,Ahmetcan Kaplan,,Defender,D,23.0,74.0,159.0,2003-01-16T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/306806.png
+139,Ajax Amsterdam,333312,Anton Gaaei,3,Defender,D,23.0,72.0,161.0,2002-11-19T08:00Z,
+139,Ajax Amsterdam,351281,Lucas Rosa,2,Defender,D,26.0,69.0,150.0,2000-04-03T07:00Z,
+139,Ajax Amsterdam,384127,Aaron Bouwman,30,Defender,D,18.0,74.0,157.0,2007-08-28T07:00Z,
+139,Ajax Amsterdam,168993,Davy Klaassen,18,Midfielder,M,33.0,70.0,152.0,1993-02-21T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/168993.png
+139,Ajax Amsterdam,196234,Branco van den Boomen,,Midfielder,M,30.0,74.0,163.0,1995-07-21T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/196234.png
+139,Ajax Amsterdam,297292,Youri Regeer,6,Midfielder,M,22.0,70.0,150.0,2003-08-18T07:00Z,
+139,Ajax Amsterdam,305589,Kian Fitz-Jim,28,Midfielder,M,23.0,69.0,152.0,2003-07-05T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/305589.png
+139,Ajax Amsterdam,325609,Oscar Gloukh,10,Midfielder,M,22.0,67.0,150.0,2004-04-01T08:00Z,
+139,Ajax Amsterdam,381074,Jorthy Mokio,24,Midfielder,M,18.0,72.0,,2008-02-29T08:00Z,
+139,Ajax Amsterdam,384372,Sean Steur,48,Midfielder,M,18.0,72.0,,2008-01-11T08:00Z,
+139,Ajax Amsterdam,149577,Steven Berghuis,23,Forward,F,34.0,72.0,163.0,1991-12-19T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/149577.png
+139,Ajax Amsterdam,219284,Kasper Dolberg,9,Forward,F,28.0,74.0,174.0,1997-10-06T07:00Z,
+139,Ajax Amsterdam,295861,Oliver Edvardsen,17,Forward,F,27.0,69.0,141.0,1999-03-19T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/295861.png
+139,Ajax Amsterdam,353363,Mika Godts,11,Forward,F,21.0,69.0,152.0,2005-06-07T07:00Z,
+139,Ajax Amsterdam,376476,Maher Carrizo,7,Forward,F,20.0,71.0,181.0,2006-02-19T08:00Z,
+139,Ajax Amsterdam,386841,Don-Angelo Konadu,19,Forward,F,20.0,68.0,130.0,2006-05-03T07:00Z,
+139,Ajax Amsterdam,397492,Rayane Bounida,43,Forward,F,20.0,70.0,137.0,2006-03-03T08:00Z,
+2566,Excelsior,366388,Kasey Bos,,Forward,F,22.0,73.0,168.0,2004-05-08T07:00Z,
+2566,Excelsior,3100786,Yacqub Hassan Muse Finey,,,,,,,,
+2566,Excelsior,196688,Stijn van Gassel,1,Goalkeeper,G,29.0,73.0,172.0,1996-10-18T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/196688.png
+2566,Excelsior,295996,Calvin Raatsie,16,Goalkeeper,G,24.0,74.0,152.0,2002-02-09T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/295996.png
+2566,Excelsior,395979,Tijmen Holla,40,Goalkeeper,G,19.0,,,2006-07-25T07:00Z,
+2566,Excelsior,278383,Simon Janssen,15,Defender,D,25.0,70.0,159.0,2000-09-25T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/278383.png
+2566,Excelsior,291225,Hamdi Akujobi,,Defender,D,26.0,69.0,152.0,2000-01-20T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/291225.png
+2566,Excelsior,303840,Casper Widell,4,Defender,D,23.0,76.0,192.0,2003-05-05T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/303840.png
+2566,Excelsior,305597,Rick Meissen,3,Defender,D,24.0,75.0,194.0,2002-02-24T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/305597.png
+2566,Excelsior,324740,Stan Hendrikx,5,Defender,D,23.0,74.0,172.0,2003-07-08T07:00Z,
+2566,Excelsior,399246,Nolan Martens,,Defender,D,22.0,71.0,,2004-07-07T07:00Z,
+2566,Excelsior,408214,Marlon Van De Wetering,,Defender,D,18.0,,,2007-11-26T08:00Z,
+2566,Excelsior,246424,Gijs Van Den Berg,25,Midfielder,M,20.0,,,2006-05-25T07:00Z,
+2566,Excelsior,310133,Mathijs Tielemans,8,Midfielder,M,24.0,70.0,139.0,2002-04-26T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/310133.png
+2566,Excelsior,313971,Adam Carlén,6,Midfielder,M,26.0,76.0,192.0,2000-06-27T07:00Z,
+2566,Excelsior,321080,Lennard Hartjes,20,Midfielder,M,23.0,67.0,139.0,2003-04-07T07:00Z,
+2566,Excelsior,321341,Noah Naujoks,10,Midfielder,M,24.0,72.0,163.0,2002-05-02T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/321341.png
+2566,Excelsior,328957,Daniel Van Vianen,,Midfielder,M,23.0,70.0,157.0,2003-04-28T07:00Z,
+2566,Excelsior,343207,Irakli Yegoian,23,Midfielder,M,22.0,66.0,,2004-03-19T08:00Z,
+2566,Excelsior,388590,Guilliano Cairo,24,Midfielder,M,20.0,,,2006-03-18T08:00Z,
+2566,Excelsior,413914,Noa El Hamdaoui,34,Midfielder,M,18.0,,,2007-10-25T07:00Z,
+2566,Excelsior,214178,Emil Hansson,7,Forward,F,28.0,68.0,150.0,1998-06-15T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/214178.png
+2566,Excelsior,304484,Sanches Fernandes,30,Forward,F,25.0,70.0,161.0,2001-05-28T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/304484.png
+2566,Excelsior,332656,Gyan De Regt,11,Forward,F,22.0,69.0,152.0,2003-09-18T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/332656.png
+2566,Excelsior,344197,Nesto Groen,28,Forward,F,21.0,73.0,168.0,2004-07-22T07:00Z,
+2566,Excelsior,388592,Jerolldino Bergraaf,33,Forward,F,20.0,75.0,,2006-07-05T07:00Z,
+145,FC Groningen,308228,Noam Emeran,,Forward,F,23.0,70.0,148.0,2002-09-24T07:00Z,
+145,FC Groningen,378250,Nils Eggens,,Forward,F,21.0,70.0,,2005-04-08T07:00Z,
+145,FC Groningen,227420,Etienne Vaessen,1,Goalkeeper,G,30.0,74.0,203.0,1995-07-26T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/227420.png
+145,FC Groningen,306435,Rijk Janse,,Goalkeeper,G,24.0,74.0,159.0,2002-04-16T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/306435.png
+145,FC Groningen,347069,Lovro Štubljar,13,Goalkeeper,G,21.0,,,2004-08-09T07:00Z,
+145,FC Groningen,362898,Stijn Petiet,41,Goalkeeper,G,22.0,,,2003-08-26T07:00Z,
+145,FC Groningen,261212,Marco Rente,5,Defender,D,29.0,74.0,183.0,1997-02-25T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/261212.png
+145,FC Groningen,319298,Thijmen Blokzijl,3,Defender,D,21.0,75.0,163.0,2005-02-25T08:00Z,
+145,FC Groningen,371412,Wouter Prins,2,Defender,D,22.0,68.0,,2004-02-06T08:00Z,
+145,FC Groningen,375666,Tyrique Mercera,16,Defender,D,22.0,74.0,161.0,2003-12-19T08:00Z,
+145,FC Groningen,379550,Sven Bouland,22,Defender,D,20.0,72.0,,2006-02-22T08:00Z,
+145,FC Groningen,400799,Elvis Laan,15,Defender,D,18.0,,,2008-02-29T08:00Z,
+145,FC Groningen,408837,Robin Kelder,48,Defender,D,21.0,,,2005-03-25T08:00Z,
+145,FC Groningen,218947,Pelle Clement,,Midfielder,M,30.0,70.0,152.0,1996-05-19T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/218947.png
+145,FC Groningen,310482,Stije Resink,6,Midfielder,M,23.0,70.0,161.0,2003-05-28T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/310482.png
+145,FC Groningen,319297,Tika De Jonge,8,Midfielder,M,23.0,68.0,146.0,2003-03-11T08:00Z,
+145,FC Groningen,349089,Travis Hearnes,,Midfielder,M,20.0,70.0,159.0,2005-11-04T08:00Z,
+145,FC Groningen,352987,Jorg Schreuders,14,Midfielder,M,21.0,74.0,168.0,2004-09-09T07:00Z,
+145,FC Groningen,355957,Tygo Land,,Midfielder,M,20.0,66.0,121.0,2006-01-11T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/355957.png
+145,FC Groningen,385716,David Van Der Werff,17,Midfielder,M,21.0,,,2004-08-31T07:00Z,
+145,FC Groningen,408836,Jismerai Dillema,44,Midfielder,M,19.0,,,2007-02-14T08:00Z,
+145,FC Groningen,408839,Yénio Holder,55,Midfielder,M,19.0,,,2007-07-02T07:00Z,
+145,FC Groningen,206463,Oskar Zawada,19,Forward,F,30.0,76.0,192.0,1996-02-01T08:00Z,
+145,FC Groningen,289883,Brynjólfur Willumsson,9,Forward,F,25.0,73.0,181.0,2000-08-12T07:00Z,
+145,FC Groningen,351290,Thom Van Bergen,26,Forward,F,22.0,71.0,174.0,2004-01-06T08:00Z,
+145,FC Groningen,408838,Mark Hoekstra,69,Forward,F,20.0,,,2006-02-10T08:00Z,
+145,FC Groningen,417934,Ryan Metu,34,Forward,F,17.0,,,2008-08-28T07:00Z,
+152,FC Twente,177042,Wout Weghorst,9,Forward,F,33.0,78.0,196.0,1992-08-07T07:00Z,
+152,FC Twente,297298,Naci Ünüvar,,Forward,F,23.0,66.0,139.0,2003-06-13T07:00Z,
+152,FC Twente,324583,Younes Taha,,Forward,F,23.0,69.0,148.0,2002-11-27T08:00Z,
+152,FC Twente,342952,Sayfallah Ltaief,,Forward,F,26.0,70.0,170.0,2000-04-22T07:00Z,
+152,FC Twente,125136,Przemyslaw Tyton,22,Goalkeeper,G,39.0,77.0,192.0,1987-01-04T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/125136.png
+152,FC Twente,148868,Lars Unnerstall,1,Goalkeeper,G,36.0,78.0,225.0,1990-07-20T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/148868.png
+152,FC Twente,264945,Issam El Maach,16,Goalkeeper,G,26.0,74.0,212.0,2000-02-01T08:00Z,
+152,FC Twente,402998,Yannick Gerritsen,31,Goalkeeper,G,20.0,,,2006-02-14T08:00Z,
+152,FC Twente,169050,Robin Pröpper,3,Defender,D,32.0,75.0,172.0,1993-09-23T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/169050.png
+152,FC Twente,277855,Bart van Rooij,28,Defender,D,25.0,69.0,157.0,2001-05-26T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/277855.png
+152,FC Twente,304908,Mees Hilgers,2,Defender,D,25.0,72.0,172.0,2001-05-13T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/304908.png
+152,FC Twente,310724,Max Bruns,38,Defender,D,23.0,72.0,150.0,2002-11-06T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/310724.png
+152,FC Twente,340691,Stav Lemkin,23,Defender,D,23.0,75.0,183.0,2003-04-02T08:00Z,
+152,FC Twente,347026,Aske Adelgaard,,Defender,D,22.0,69.0,,2003-11-10T08:00Z,
+152,FC Twente,361218,Juliën Mesbahi,,Defender,D,20.0,71.0,163.0,2006-01-31T08:00Z,
+152,FC Twente,371984,Krzysztof Kurowski,,Defender,D,19.0,71.0,168.0,2006-08-29T07:00Z,
+152,FC Twente,399213,Ruud Nijstad,43,Defender,D,18.0,74.0,,2008-01-17T08:00Z,
+152,FC Twente,406780,Guilherme Peixoto,12,Defender,D,20.0,,,2006-05-25T07:00Z,
+152,FC Twente,415042,Bjorn Titulaer,33,Defender,D,17.0,,,2008-08-13T07:00Z,
+152,FC Twente,214666,Arno Verschueren,32,Midfielder,M,29.0,72.0,161.0,1997-04-08T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/214666.png
+152,FC Twente,277315,Thomas van den Belt,20,Midfielder,M,25.0,71.0,148.0,2001-06-18T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/277315.png
+152,FC Twente,293644,Mathias Kjølø,4,Midfielder,M,25.0,69.0,148.0,2001-06-27T07:00Z,
+152,FC Twente,311168,Kristian Hlynsson,14,Midfielder,M,22.0,70.0,159.0,2004-01-23T08:00Z,
+152,FC Twente,345579,Daouda Weidmann,42,Midfielder,M,23.0,71.0,163.0,2003-05-04T07:00Z,
+152,FC Twente,359745,Gijs Besselink,,Midfielder,M,22.0,71.0,150.0,2004-06-16T07:00Z,
+152,FC Twente,366306,Harrie Kuster,,Midfielder,M,20.0,63.0,,2005-09-11T07:00Z,
+152,FC Twente,379956,Sondre Ørjasaeter,27,Midfielder,M,22.0,71.0,,2003-11-28T08:00Z,
+152,FC Twente,411096,Benjamin Nagel,26,Midfielder,M,18.0,,,2007-11-11T08:00Z,
+152,FC Twente,418588,Nigel Groenewald,36,Midfielder,M,19.0,,,2007-02-01T08:00Z,
+152,FC Twente,187956,Marko Pjaca,7,Forward,F,31.0,73.0,183.0,1995-05-06T07:00Z,
+152,FC Twente,224042,Sam Lammers,10,Forward,F,29.0,74.0,170.0,1997-04-30T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/224042.png
+152,FC Twente,265872,Taylor Booth,8,Forward,F,25.0,68.0,146.0,2001-05-31T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/265872.png
+152,FC Twente,304905,Daan Rots,11,Forward,F,24.0,70.0,157.0,2001-07-25T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/304905.png
+152,FC Twente,379839,Lucas Vennegoor Of Hesselink,25,Forward,F,20.0,74.0,,2006-03-14T08:00Z,
+152,FC Twente,394464,Owen Panneflek,30,Forward,F,19.0,70.0,,2006-10-04T07:00Z,
+153,FC Utrecht,312759,Noah Ohio,,Forward,F,23.0,73.0,168.0,2003-01-16T08:00Z,
+153,FC Utrecht,340232,Miliano Jonathans,,Forward,F,22.0,70.0,146.0,2004-04-05T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/340232.png
+153,FC Utrecht,357698,Ángel Alarcón,,Forward,F,22.0,69.0,,2004-05-15T07:00Z,
+153,FC Utrecht,419917,Emmanuel Owen,,Forward,F,19.0,67.0,,2007-06-11T07:00Z,
+153,FC Utrecht,422003,Dani Bouchta,,Forward,F,15.0,,,2010-07-30T07:00Z,
+153,FC Utrecht,177022,Michael Brouwer,25,Goalkeeper,G,33.0,74.0,179.0,1993-01-21T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/177022.png
+153,FC Utrecht,223162,Vasilios Barkas,1,Goalkeeper,G,32.0,77.0,192.0,1994-05-30T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/223162.png
+153,FC Utrecht,313006,Kevin Gadellaa,33,Goalkeeper,G,23.0,81.0,192.0,2003-04-08T07:00Z,
+153,FC Utrecht,359675,Mees Eppink,51,Goalkeeper,G,20.0,72.0,161.0,2006-03-25T08:00Z,
+153,FC Utrecht,397993,Justin Eversen,,Goalkeeper,G,20.0,,,2006-04-18T07:00Z,
+153,FC Utrecht,240351,Siebe Horemans,2,Defender,D,28.0,73.0,150.0,1998-06-02T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/240351.png
+153,FC Utrecht,278644,Mike Eerdhuijzen,44,Defender,D,26.0,76.0,185.0,2000-07-13T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/278644.png
+153,FC Utrecht,304595,Guus Offerhaus,,Defender,D,25.0,74.0,,2001-01-03T08:00Z,
+153,FC Utrecht,315705,Matisse Didden,40,Defender,D,24.0,78.0,201.0,2001-10-08T07:00Z,
+153,FC Utrecht,319262,Niklas Vesterlund,23,Defender,D,27.0,73.0,174.0,1999-06-06T07:00Z,
+153,FC Utrecht,352629,Neville Nwankwo,,Defender,D,23.0,,,2002-10-08T07:00Z,
+153,FC Utrecht,355507,Neal Viereck,53,Defender,D,22.0,77.0,172.0,2004-05-03T07:00Z,
+153,FC Utrecht,358580,Emeka Adeile,5,Defender,D,18.0,68.0,,2007-07-31T07:00Z,
+153,FC Utrecht,365391,Per Kloosterboer,57,Defender,D,21.0,72.0,159.0,2005-03-08T08:00Z,
+153,FC Utrecht,388684,Jamie Schuldes,,Defender,D,19.0,,,2007-01-26T08:00Z,
+153,FC Utrecht,406251,Viggo Plantinga,50,Defender,D,19.0,,,2007-05-18T07:00Z,
+153,FC Utrecht,408701,Ferdinand Pohl,,Defender,D,19.0,72.0,150.0,2007-02-02T08:00Z,
+153,FC Utrecht,183529,Kevin Paredes,,Forward,F,19.0,67.0,132.0,2007-06-05T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/183529.png
+153,FC Utrecht,250528,Dani de Wit,20,Midfielder,M,28.0,72.0,168.0,1998-01-28T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/250528.png
+153,FC Utrecht,263618,Victor Jensen,7,Midfielder,M,26.0,69.0,141.0,2000-02-08T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/263618.png
+153,FC Utrecht,291665,Davy van den Berg,,Midfielder,M,26.0,75.0,163.0,2000-02-04T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/291665.png
+153,FC Utrecht,303790,Can Bozdogan,8,Midfielder,M,25.0,69.0,159.0,2001-04-05T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/303790.png
+153,FC Utrecht,305670,Yoann Cathline,10,Midfielder,M,23.0,69.0,150.0,2002-07-22T07:00Z,
+153,FC Utrecht,321347,Alonzo Engwanda,27,Midfielder,M,23.0,73.0,157.0,2003-01-27T08:00Z,
+153,FC Utrecht,325549,Zidane Iqbal,14,Midfielder,M,23.0,71.0,157.0,2003-04-27T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/325549.png
+153,FC Utrecht,337056,Rafik El Arguioui,43,Midfielder,M,20.0,70.0,161.0,2005-07-31T07:00Z,
+153,FC Utrecht,355506,Oualid Agougil,38,Midfielder,M,20.0,,,2005-08-07T07:00Z,
+153,FC Utrecht,399048,Jaygo Van Ommeren,46,Midfielder,M,18.0,,,2008-05-08T07:00Z,
+153,FC Utrecht,83494,Miguel Rodríguez,22,Forward,F,23.0,70.0,161.0,2003-04-29T07:00Z,
+153,FC Utrecht,164171,Sébastien Haller,91,Forward,F,32.0,75.0,181.0,1994-06-22T07:00Z,
+153,FC Utrecht,251979,David Min,9,Forward,F,27.0,76.0,172.0,1999-06-23T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/251979.png
+153,FC Utrecht,340665,Adrian Blake,15,Forward,F,21.0,68.0,141.0,2005-07-15T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/340665.png
+153,FC Utrecht,352177,Emirhan Demircan,17,Forward,F,21.0,,,2005-01-20T08:00Z,
+153,FC Utrecht,390471,Artem Stepanov,18,Forward,F,18.0,76.0,190.0,2007-08-10T07:00Z,
+153,FC Utrecht,399047,Bjorn Menzo,49,Forward,F,19.0,,,2007-04-22T07:00Z,
+142,Feyenoord Rotterdam,344195,Jaden Slory,,Forward,F,21.0,69.0,152.0,2005-05-09T07:00Z,
+142,Feyenoord Rotterdam,364582,Nacho Ferri,,Forward,F,21.0,76.0,174.0,2004-10-05T07:00Z,
+142,Feyenoord Rotterdam,371478,Stephano Carrillo,,Forward,F,20.0,,,2006-03-07T08:00Z,
+142,Feyenoord Rotterdam,408540,Matteo Malasomma,,Forward,F,19.0,,,2006-09-14T07:00Z,
+142,Feyenoord Rotterdam,3102195,Tijme Wessels,53,,,,,,,
+142,Feyenoord Rotterdam,182424,Timon Wellenreuther,22,Goalkeeper,G,30.0,74.0,174.0,1995-12-03T08:00Z,
+142,Feyenoord Rotterdam,226979,Liam Bossin,39,Goalkeeper,G,30.0,75.0,179.0,1996-07-15T07:00Z,
+142,Feyenoord Rotterdam,345509,Mannou Berger,37,Goalkeeper,G,21.0,71.0,159.0,2004-10-15T07:00Z,
+142,Feyenoord Rotterdam,395894,Ismail Ka,64,Goalkeeper,G,20.0,,,2006-03-09T08:00Z,
+142,Feyenoord Rotterdam,215172,Bart Nieuwkoop,2,Defender,D,30.0,71.0,163.0,1996-03-07T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/215172.png
+142,Feyenoord Rotterdam,215524,Jerry St. Juste,8,Defender,D,29.0,73.0,168.0,1996-10-19T07:00Z,
+142,Feyenoord Rotterdam,218529,Mats Deijl,20,Defender,D,29.0,71.0,159.0,1997-07-15T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/218529.png
+142,Feyenoord Rotterdam,238878,Jordan Lotomba,30,Defender,D,27.0,70.0,157.0,1998-09-29T07:00Z,
+142,Feyenoord Rotterdam,240911,Gijs Smal,5,Defender,D,28.0,72.0,161.0,1997-08-31T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/240911.png
+142,Feyenoord Rotterdam,245857,Anel Ahmedhodzic,21,Defender,D,27.0,75.0,183.0,1999-03-26T08:00Z,
+142,Feyenoord Rotterdam,276279,Tsuyoshi Watanabe,4,Defender,D,29.0,72.0,168.0,1997-02-05T08:00Z,
+142,Feyenoord Rotterdam,292393,Neraysho Kasanwirjo,,Defender,D,24.0,73.0,150.0,2002-02-18T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/292393.png
+142,Feyenoord Rotterdam,324952,Thomas Beelen,3,Defender,D,25.0,71.0,174.0,2001-06-11T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/324952.png
+142,Feyenoord Rotterdam,328541,Jordan Bos,15,Defender,D,23.0,72.0,183.0,2002-10-29T08:00Z,
+142,Feyenoord Rotterdam,332573,Mika Mármol,,Defender,D,25.0,71.0,152.0,2001-07-01T07:00Z,
+142,Feyenoord Rotterdam,337084,Givairo Read,26,Defender,D,20.0,72.0,,2006-06-02T07:00Z,
+142,Feyenoord Rotterdam,386880,Jan Plug,,Defender,D,21.0,74.0,174.0,2005-04-02T08:00Z,
+142,Feyenoord Rotterdam,228334,Luka Ivanusec,,Midfielder,M,27.0,69.0,168.0,1998-11-26T08:00Z,
+142,Feyenoord Rotterdam,248677,Calvin Stengs,,Midfielder,M,27.0,72.0,161.0,1998-12-18T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/248677.png
+142,Feyenoord Rotterdam,276260,Charles Vanhoutte,,Midfielder,M,27.0,72.0,168.0,1998-09-16T07:00Z,
+142,Feyenoord Rotterdam,277106,Sem Steijn,14,Midfielder,M,24.0,68.0,132.0,2001-11-12T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/277106.png
+142,Feyenoord Rotterdam,280061,Hwang In-Beom,6,Midfielder,M,29.0,70.0,152.0,1996-09-20T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/280061.png
+142,Feyenoord Rotterdam,287461,Jakub Moder,7,Midfielder,M,27.0,74.0,172.0,1999-04-07T07:00Z,
+142,Feyenoord Rotterdam,290517,Ramiz Zerrouki,,Midfielder,M,28.0,72.0,181.0,1998-05-26T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/290517.png
+142,Feyenoord Rotterdam,313354,Oussama Targhaline,28,Midfielder,M,24.0,73.0,152.0,2002-05-20T07:00Z,
+142,Feyenoord Rotterdam,319296,Luciano Valente,10,Midfielder,M,22.0,74.0,172.0,2003-10-04T07:00Z,
+142,Feyenoord Rotterdam,338120,Shiloh ’t Zand,25,Midfielder,M,23.0,70.0,,2003-05-14T07:00Z,
+142,Feyenoord Rotterdam,343202,Thijs Kraaijeveld,24,Midfielder,M,19.0,,,2007-05-03T07:00Z,
+142,Feyenoord Rotterdam,365021,Gjivai Zechiël,,Midfielder,M,22.0,67.0,148.0,2004-06-01T07:00Z,
+142,Feyenoord Rotterdam,399714,Tobias van den Elshout,44,Midfielder,M,19.0,74.0,,2007-02-02T08:00Z,
+142,Feyenoord Rotterdam,406923,Jivayno Zinhagel,68,Midfielder,M,17.0,,,2009-04-18T07:00Z,
+142,Feyenoord Rotterdam,406924,Bae Seung-Gyun,,Midfielder,M,19.0,71.0,141.0,2007-04-22T07:00Z,
+142,Feyenoord Rotterdam,415968,Hakeem Agboluaje,72,Midfielder,M,18.0,,,2007-09-24T07:00Z,
+142,Feyenoord Rotterdam,415969,Jerayno Schaken,70,Midfielder,M,17.0,,,2009-06-18T07:00Z,
+142,Feyenoord Rotterdam,417645,Arman Nahany,75,Midfielder,M,18.0,,,2008-05-10T07:00Z,
+142,Feyenoord Rotterdam,421381,Illai Grootfaam,79,Midfielder,M,16.0,,,2010-03-15T07:00Z,
+142,Feyenoord Rotterdam,156366,Raheem Sterling,19,Forward,F,31.0,68.0,150.0,1994-12-08T08:00Z,
+142,Feyenoord Rotterdam,274277,Ayase Ueda,9,Forward,F,27.0,72.0,168.0,1998-08-28T07:00Z,
+142,Feyenoord Rotterdam,306664,Casper Tengstedt,17,Forward,F,26.0,72.0,172.0,2000-06-01T07:00Z,
+142,Feyenoord Rotterdam,332362,Gonçalo Borges,11,Forward,F,25.0,72.0,159.0,2001-03-29T08:00Z,
+142,Feyenoord Rotterdam,341711,Anis Hadj Moussa,23,Forward,F,24.0,69.0,163.0,2002-02-11T08:00Z,
+142,Feyenoord Rotterdam,355487,Leo Sauer,16,Forward,F,20.0,72.0,161.0,2005-12-16T08:00Z,
+142,Feyenoord Rotterdam,388327,Aymen Sliti,32,Forward,F,20.0,,,2006-03-24T08:00Z,
+142,Feyenoord Rotterdam,402344,Gaoussou Diarra,27,Forward,F,23.0,72.0,152.0,2002-11-21T08:00Z,
+142,Feyenoord Rotterdam,415052,Shaqueel Van Persie,49,Forward,F,19.0,,,2006-11-16T08:00Z,
+143,Fortuna Sittard,318386,Lequincio Zeefuik,,Forward,F,21.0,78.0,174.0,2004-11-26T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/318386.png
+143,Fortuna Sittard,151900,Luuk Koopmans,1,Goalkeeper,G,32.0,75.0,183.0,1993-11-18T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/151900.png
+143,Fortuna Sittard,155965,Mattijs Branderhorst,31,Goalkeeper,G,32.0,76.0,192.0,1993-12-31T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/155965.png
+143,Fortuna Sittard,384165,Ramazan Bayram,,Goalkeeper,G,21.0,,,2004-10-12T07:00Z,
+143,Fortuna Sittard,418498,Lars Van Parys,48,Goalkeeper,G,19.0,,,2006-10-07T07:00Z,
+143,Fortuna Sittard,132666,Ivo Pinto,12,Defender,D,36.0,72.0,163.0,1990-01-07T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/132666.png
+143,Fortuna Sittard,190986,Daley Sinkgraven,24,Defender,D,31.0,70.0,148.0,1995-07-04T07:00Z,
+143,Fortuna Sittard,250659,Iván Márquez,44,Defender,D,32.0,75.0,181.0,1994-06-09T07:00Z,
+143,Fortuna Sittard,277375,Shawn Adewoye,4,Defender,D,26.0,71.0,179.0,2000-06-29T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/277375.png
+143,Fortuna Sittard,297295,Syb van Ottele,6,Defender,D,24.0,73.0,174.0,2002-02-02T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/297295.png
+143,Fortuna Sittard,305616,Jasper Dahlhaus,8,Defender,D,24.0,69.0,161.0,2001-11-27T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/305616.png
+143,Fortuna Sittard,346817,Justin Hubner,28,Defender,D,22.0,74.0,159.0,2003-09-14T07:00Z,
+143,Fortuna Sittard,403414,Alhaji Bah,43,Defender,D,18.0,,,2008-02-09T08:00Z,
+143,Fortuna Sittard,179195,Alen Halilovic,10,Midfielder,M,30.0,67.0,150.0,1996-06-18T07:00Z,
+143,Fortuna Sittard,210810,Samuel Bastien,22,Midfielder,M,29.0,69.0,163.0,1996-09-26T07:00Z,
+143,Fortuna Sittard,284701,Mohamed Ihattaren,52,Midfielder,M,24.0,72.0,170.0,2002-02-12T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/284701.png
+143,Fortuna Sittard,300592,Yassin Oukili,5,Midfielder,M,25.0,77.0,192.0,2001-01-03T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/300592.png
+143,Fortuna Sittard,304738,Edouard Michut,20,Midfielder,M,23.0,69.0,161.0,2003-03-04T08:00Z,
+143,Fortuna Sittard,324486,Philip Brittijn,23,Midfielder,M,22.0,72.0,161.0,2004-04-09T07:00Z,
+143,Fortuna Sittard,336547,Sven Simons,,Midfielder,M,22.0,66.0,139.0,2004-03-02T08:00Z,
+143,Fortuna Sittard,387950,Luka Tunjic,77,Midfielder,M,20.0,72.0,,2005-11-19T08:00Z,
+143,Fortuna Sittard,392583,Hasip Korkmazyürek,36,Midfielder,M,23.0,70.0,157.0,2003-05-01T07:00Z,
+143,Fortuna Sittard,408556,Moussa Gbemou,46,Midfielder,M,18.0,,,2007-09-09T07:00Z,
+143,Fortuna Sittard,411886,Amin Laoukili,47,Midfielder,M,21.0,,,2005-01-14T08:00Z,
+143,Fortuna Sittard,415966,Wassim Elasri,,Midfielder,M,22.0,69.0,,2004-06-20T07:00Z,
+143,Fortuna Sittard,422189,Ganni Buyukhan,40,Midfielder,M,16.0,,,2009-10-07T07:00Z,
+143,Fortuna Sittard,196353,Kristoffer Peterson,7,Forward,F,31.0,73.0,172.0,1994-11-28T08:00Z,
+143,Fortuna Sittard,376042,Owen Johnson,45,Forward,F,20.0,,,2005-08-03T07:00Z,
+3706,Go Ahead Eagles,150070,Nick Marsman,,Goalkeeper,G,35.0,74.0,192.0,1990-10-01T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/150070.png
+3706,Go Ahead Eagles,261423,Kjetil Haug,,Goalkeeper,G,28.0,75.0,183.0,1998-06-12T07:00Z,
+3706,Go Ahead Eagles,334352,Nando Verdoni,33,Goalkeeper,G,23.0,74.0,,2003-07-09T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/334352.png
+3706,Go Ahead Eagles,153764,Gerrit Nauber,3,Defender,D,34.0,73.0,161.0,1992-04-13T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/153764.png
+3706,Go Ahead Eagles,218424,Joris Kramer,4,Defender,D,29.0,74.0,161.0,1996-08-02T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/218424.png
+3706,Go Ahead Eagles,237839,Alfons Sampsted,2,Defender,D,28.0,71.0,159.0,1998-04-06T07:00Z,
+3706,Go Ahead Eagles,304868,Dean James,5,Defender,D,26.0,,,2000-04-30T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/304868.png
+3706,Go Ahead Eagles,312142,Julius Dirksen,26,Defender,D,23.0,73.0,,2003-02-02T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/312142.png
+3706,Go Ahead Eagles,318573,Giovanni van Zwam,25,Defender,D,22.0,73.0,172.0,2004-01-02T08:00Z,
+3706,Go Ahead Eagles,346986,Pim Saathof,28,Defender,D,22.0,70.0,150.0,2003-12-28T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/346986.png
+3706,Go Ahead Eagles,361534,Eus Waayers,20,Defender,D,20.0,,,2006-04-08T07:00Z,
+3706,Go Ahead Eagles,258453,Melle Meulensteen,21,Midfielder,M,27.0,72.0,168.0,1999-07-04T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/258453.png
+3706,Go Ahead Eagles,272716,Evert Linthorst,8,Midfielder,M,26.0,73.0,181.0,2000-03-03T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/272716.png
+3706,Go Ahead Eagles,289301,Sören Tengstedt,10,Midfielder,M,26.0,74.0,150.0,2000-06-30T07:00Z,
+3706,Go Ahead Eagles,303769,Jakob Breum,7,Midfielder,M,22.0,70.0,150.0,2003-11-17T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/303769.png
+3706,Go Ahead Eagles,307375,Calvin Twigt,,Midfielder,M,23.0,72.0,161.0,2003-01-30T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/307375.png
+3706,Go Ahead Eagles,308091,Mathis Suray,17,Midfielder,M,24.0,68.0,,2001-07-26T07:00Z,
+3706,Go Ahead Eagles,346985,Robbin Weijenberg,15,Midfielder,M,21.0,,,2004-11-08T08:00Z,
+3706,Go Ahead Eagles,406247,Yassir Rahmouni,34,Midfielder,M,20.0,,,2006-06-13T07:00Z,
+3706,Go Ahead Eagles,285014,Richonell Margaret,18,Forward,F,25.0,75.0,157.0,2000-09-07T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/285014.png
+3706,Go Ahead Eagles,293395,Stefan Ingi Sigurdarson,9,Forward,F,25.0,,,2001-01-27T08:00Z,
+3706,Go Ahead Eagles,303498,Oskar Siira Sivertsen,11,Forward,F,22.0,70.0,159.0,2004-02-15T08:00Z,
+3706,Go Ahead Eagles,308986,Thibo Baeten,23,Forward,F,24.0,72.0,172.0,2002-06-04T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/308986.png
+3706,Go Ahead Eagles,313972,Victor Edvardsen,16,Forward,F,30.0,73.0,161.0,1996-01-14T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/313972.png
+3706,Go Ahead Eagles,400957,Ofosu Boakye,32,Forward,F,19.0,,,2007-07-10T07:00Z,
+3706,Go Ahead Eagles,415246,Dani Tijman,31,Forward,F,20.0,,,2006-06-13T07:00Z,
+146,Heerenveen,190983,Andries Noppert,44,Goalkeeper,G,32.0,80.0,205.0,1994-04-07T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/190983.png
+146,Heerenveen,239685,Jan Bekkema,23,Goalkeeper,G,30.0,73.0,196.0,1996-04-09T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/239685.png
+146,Heerenveen,358318,Bernt Klaverboer,22,Goalkeeper,G,20.0,75.0,174.0,2005-09-26T07:00Z,
+146,Heerenveen,408546,Timo Schreuder,30,Goalkeeper,G,19.0,,,2006-09-25T07:00Z,
+146,Heerenveen,241526,Sam Kersten,4,Defender,D,28.0,75.0,172.0,1998-01-30T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/241526.png
+146,Heerenveen,290209,Vasilios Zagaritis,19,Defender,D,25.0,70.0,150.0,2001-05-04T07:00Z,
+146,Heerenveen,323268,Hristiyan Petrov,28,Defender,D,24.0,73.0,,2002-06-24T07:00Z,
+146,Heerenveen,324484,Maas Willemsen,3,Defender,D,23.0,75.0,174.0,2003-04-29T07:00Z,
+146,Heerenveen,333779,Nikolai Hopland,17,Defender,D,21.0,73.0,174.0,2004-07-24T07:00Z,
+146,Heerenveen,364727,Oliver Braude,45,Defender,D,22.0,69.0,130.0,2004-02-21T08:00Z,
+146,Heerenveen,367664,Mats Egbring,15,Defender,D,19.0,72.0,163.0,2006-09-17T07:00Z,
+146,Heerenveen,397714,Robin Bouw,34,Defender,D,20.0,72.0,139.0,2006-04-24T07:00Z,
+146,Heerenveen,418502,Ingmar Mulder,38,Defender,D,21.0,,,2005-01-23T08:00Z,
+146,Heerenveen,159252,Joris van Overeem,6,Midfielder,M,32.0,71.0,161.0,1994-06-01T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/159252.png
+146,Heerenveen,218528,Luuk Brouwers,8,Midfielder,M,28.0,72.0,172.0,1998-05-03T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/218528.png
+146,Heerenveen,291972,Ringo Meerveld,10,Midfielder,M,23.0,70.0,161.0,2002-12-21T08:00Z,
+146,Heerenveen,301323,Maxence Rivera,7,Midfielder,M,24.0,67.0,132.0,2002-05-30T07:00Z,
+146,Heerenveen,303548,Luca Oyen,11,Midfielder,M,23.0,69.0,150.0,2003-03-14T08:00Z,
+146,Heerenveen,308051,Jacob Trenskow,20,Midfielder,M,25.0,70.0,139.0,2000-11-26T08:00Z,
+146,Heerenveen,324739,Levi Smans,14,Midfielder,M,23.0,69.0,152.0,2003-03-25T08:00Z,
+146,Heerenveen,378834,Marcus Linday,16,Midfielder,M,23.0,74.0,,2003-06-02T07:00Z,
+146,Heerenveen,388723,Isaiah Ahmed,35,Midfielder,M,20.0,73.0,163.0,2005-12-28T08:00Z,
+146,Heerenveen,401302,Kai Jansen,32,Midfielder,M,19.0,,,2007-05-29T07:00Z,
+146,Heerenveen,407207,Nolhan Courtens,36,Midfielder,M,19.0,,,2006-12-20T08:00Z,
+146,Heerenveen,253396,Dylan Vente,9,Forward,F,27.0,71.0,170.0,1999-05-09T07:00Z,
+146,Heerenveen,395480,Eser Gürbüz,50,Forward,F,19.0,,,2007-03-06T08:00Z,
+146,Heerenveen,408544,Jermaine Rijssel,33,Forward,F,21.0,,,2005-03-25T08:00Z,
+146,Heerenveen,415191,Kirayno Schaken,37,Forward,F,17.0,,,2009-06-18T07:00Z,
+146,Heerenveen,422190,Clayton Bonevacia,40,Forward,F,20.0,,,2006-04-06T07:00Z,
+147,NEC Nijmegen,200194,Vito van Crooij,,Forward,F,30.0,70.0,168.0,1996-01-29T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/200194.png
+147,NEC Nijmegen,250529,Kaj Sierhuis,,Forward,F,28.0,71.0,183.0,1998-04-27T07:00Z,
+147,NEC Nijmegen,292223,Gonzalo Crettaz,1,Goalkeeper,G,26.0,72.0,172.0,2000-02-28T08:00Z,
+147,NEC Nijmegen,388586,Martijn Overmars,38,Goalkeeper,G,20.0,74.0,152.0,2006-06-07T07:00Z,
+147,NEC Nijmegen,398044,Freek Entius,36,Goalkeeper,G,20.0,,,2006-05-26T07:00Z,
+147,NEC Nijmegen,140350,Bram Nuytinck,17,Defender,D,36.0,75.0,174.0,1990-05-04T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/140350.png
+147,NEC Nijmegen,223312,Thomas Ouwejan,5,Defender,D,29.0,70.0,159.0,1996-09-30T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/223312.png
+147,NEC Nijmegen,233894,Perr Schuurs,,Defender,D,26.0,75.0,174.0,1999-11-26T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/233894.png
+147,NEC Nijmegen,239999,Philippe Sandler,3,Defender,D,29.0,75.0,181.0,1997-02-10T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/239999.png
+147,NEC Nijmegen,332960,Brayann Pereira,2,Defender,D,23.0,68.0,130.0,2003-05-21T07:00Z,
+147,NEC Nijmegen,335203,Deveron Fonville,24,Defender,D,23.0,74.0,181.0,2003-05-16T07:00Z,
+147,NEC Nijmegen,345556,Tobias Storm,,Defender,D,22.0,69.0,,2004-07-04T07:00Z,
+147,NEC Nijmegen,409658,Yassin Moslih,37,Defender,D,18.0,,,2007-07-24T07:00Z,
+147,NEC Nijmegen,418005,Douwe Vernooij,42,Defender,D,20.0,73.0,,2006-03-18T08:00Z,
+147,NEC Nijmegen,420331,Mees Rensen,44,Defender,D,16.0,,,2010-01-28T08:00Z,
+147,NEC Nijmegen,116893,Tjaronn Chery,10,Midfielder,M,38.0,67.0,150.0,1988-06-04T07:00Z,
+147,NEC Nijmegen,276579,Darko Nejasmic,6,Midfielder,M,27.0,,,1999-01-25T08:00Z,
+147,NEC Nijmegen,285471,Willum Thór Willumsson,19,Midfielder,M,27.0,76.0,183.0,1998-10-23T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/285471.png
+147,NEC Nijmegen,296510,Dirk Proper,71,Midfielder,M,24.0,66.0,139.0,2002-02-24T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/296510.png
+147,NEC Nijmegen,308227,Isak Hansen-Aarøen,8,Midfielder,M,21.0,68.0,148.0,2004-08-22T07:00Z,
+147,NEC Nijmegen,340685,Noé Lebreton,20,Midfielder,M,22.0,70.0,152.0,2004-04-22T07:00Z,
+147,NEC Nijmegen,341715,Kodai Sano,23,Midfielder,M,22.0,69.0,150.0,2003-09-25T07:00Z,
+147,NEC Nijmegen,346896,Sami Ouaissa,25,Midfielder,M,21.0,67.0,150.0,2004-10-02T07:00Z,
+147,NEC Nijmegen,399545,Yousri Sbai,,Midfielder,M,21.0,,,2004-08-08T07:00Z,
+147,NEC Nijmegen,408764,Sam De Laat,35,Midfielder,M,20.0,,,2006-06-12T07:00Z,
+147,NEC Nijmegen,411167,Merijn Van De Wiel,,Midfielder,M,20.0,,,2005-12-23T08:00Z,
+147,NEC Nijmegen,122954,Bryan Linssen,30,Forward,F,35.0,67.0,139.0,1990-10-08T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/122954.png
+147,NEC Nijmegen,238016,Koki Ogawa,18,Forward,F,28.0,73.0,172.0,1997-08-08T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/238016.png
+147,NEC Nijmegen,337855,Basar Önal,11,Forward,F,22.0,68.0,,2004-07-06T07:00Z,
+147,NEC Nijmegen,363412,Kevin Kers,39,Forward,F,20.0,,,2006-01-04T08:00Z,
+147,NEC Nijmegen,414285,Jesaja Mustapha,41,Forward,F,19.0,72.0,,2007-03-15T07:00Z,
+2565,PEC Zwolle,279756,Elias Sörensen,,Midfielder,M,26.0,74.0,,1999-09-18T07:00Z,
+2565,PEC Zwolle,286854,Dylan Mbayo,,Forward,F,24.0,69.0,141.0,2001-10-11T07:00Z,
+2565,PEC Zwolle,263619,Jasper Schendelaar,1,Goalkeeper,G,25.0,73.0,163.0,2000-09-02T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/263619.png
+2565,PEC Zwolle,321101,Duke Verduin,41,Goalkeeper,G,22.0,77.0,181.0,2003-10-30T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/321101.png
+2565,PEC Zwolle,330425,Tom De Graaff,,Goalkeeper,G,21.0,74.0,161.0,2004-12-10T08:00Z,
+2565,PEC Zwolle,398717,Nick Dobben,40,Goalkeeper,G,18.0,,,2008-05-17T07:00Z,
+2565,PEC Zwolle,410790,Len Bakker,48,Goalkeeper,G,20.0,,,2006-06-14T07:00Z,
+2565,PEC Zwolle,67437,Scott Calderwood,43,Defender,D,,,,,
+2565,PEC Zwolle,131354,Nick Viergever,,Defender,D,36.0,72.0,172.0,1989-08-03T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/131354.png
+2565,PEC Zwolle,224786,Sherel Floranus,2,Defender,D,27.0,71.0,161.0,1998-08-23T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/224786.png
+2565,PEC Zwolle,271210,Simon Graves,28,Defender,D,27.0,75.0,179.0,1999-05-22T07:00Z,
+2565,PEC Zwolle,295628,Tijs Velthuis,,Defender,D,24.0,75.0,170.0,2002-01-12T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/295628.png
+2565,PEC Zwolle,333618,Olivier Aertssen,3,Defender,D,21.0,72.0,168.0,2004-08-07T07:00Z,
+2565,PEC Zwolle,333760,Damian Van Der Haar,33,Defender,D,22.0,72.0,168.0,2004-01-16T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/333760.png
+2565,PEC Zwolle,379188,Dylan Ruward,42,Defender,D,21.0,71.0,152.0,2005-01-21T08:00Z,
+2565,PEC Zwolle,414069,Jayden Holtman,,Defender,D,17.0,,,2008-10-16T07:00Z,
+2565,PEC Zwolle,156146,Ryan Thomas,30,Midfielder,M,31.0,69.0,152.0,1994-12-20T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/156146.png
+2565,PEC Zwolle,239353,Odysseus Velanas,18,Midfielder,M,28.0,71.0,152.0,1998-06-05T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/239353.png
+2565,PEC Zwolle,272329,Thijs Oosting,,Midfielder,M,26.0,69.0,157.0,2000-05-02T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/272329.png
+2565,PEC Zwolle,365026,Nick Fichtinger,34,Midfielder,M,22.0,,,2004-04-06T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/365026.png
+2565,PEC Zwolle,386853,Gabriel Reiziger,20,Midfielder,M,20.0,,,2005-10-10T07:00Z,
+2565,PEC Zwolle,408619,Givaro Rahajaän,38,Midfielder,M,18.0,,,2008-02-19T08:00Z,
+2565,PEC Zwolle,408620,Jadiel Pereira Da Gama,26,Midfielder,M,16.0,,,2009-12-15T08:00Z,
+2565,PEC Zwolle,414063,Lasse Aelbers,43,Midfielder,M,18.0,,,2007-11-01T07:00Z,
+2565,PEC Zwolle,414363,Corean Drost,46,Midfielder,M,19.0,74.0,,2007-04-02T07:00Z,
+2565,PEC Zwolle,415365,Gilles Van Der Wal,37,Midfielder,M,18.0,,,2008-06-24T07:00Z,
+2565,PEC Zwolle,215159,Younes Namli,9,Forward,F,32.0,71.0,152.0,1994-06-20T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/215159.png
+2565,PEC Zwolle,241527,Koen Kostons,10,Forward,F,26.0,73.0,168.0,1999-09-18T07:00Z,
+2565,PEC Zwolle,271345,Kaj de Rooij,22,Forward,F,25.0,69.0,,2000-11-25T08:00Z,
+2565,PEC Zwolle,350346,David Voute,39,Forward,F,20.0,,,2005-11-04T08:00Z,
+2565,PEC Zwolle,422249,Maxim De Troije,49,Forward,F,,,,,
+148,PSV Eindhoven,190976,Nick Olij,1,Goalkeeper,G,30.0,74.0,172.0,1995-08-01T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/190976.png
+148,PSV Eindhoven,207780,Joel Drommel,,Goalkeeper,G,29.0,76.0,194.0,1996-11-16T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/207780.png
+148,PSV Eindhoven,277313,Matej Kovár,32,Goalkeeper,G,26.0,77.0,183.0,2000-05-17T07:00Z,
+148,PSV Eindhoven,343607,Tijn Smolenaars,51,Goalkeeper,G,21.0,78.0,174.0,2005-02-23T08:00Z,
+148,PSV Eindhoven,245918,Armando Obispo,4,Defender,D,27.0,73.0,172.0,1999-03-05T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/245918.png
+148,PSV Eindhoven,259136,Mauro Júnior,17,Defender,D,27.0,67.0,137.0,1999-05-06T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/259136.png
+148,PSV Eindhoven,266291,Sergiño Dest,8,Defender,D,25.0,68.0,137.0,2000-11-03T08:00Z,
+148,PSV Eindhoven,301279,Kiliann Sildillia,25,Defender,D,24.0,73.0,183.0,2002-05-16T07:00Z,
+148,PSV Eindhoven,304478,Ryan Flamingo,6,Defender,D,23.0,73.0,163.0,2002-12-31T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/304478.png
+148,PSV Eindhoven,316073,Adamo Nagalo,,Defender,D,23.0,73.0,163.0,2002-09-22T07:00Z,
+148,PSV Eindhoven,364814,Yarek Gasiorowski,3,Defender,D,21.0,75.0,163.0,2005-01-12T08:00Z,
+148,PSV Eindhoven,367997,Wessel Kuhn,36,Defender,D,19.0,72.0,163.0,2006-09-16T07:00Z,
+148,PSV Eindhoven,386881,Fabian Merién,38,Defender,D,17.0,,,2008-09-26T07:00Z,
+148,PSV Eindhoven,239998,Jerdy Schouten,22,Midfielder,M,29.0,73.0,170.0,1997-01-12T08:00Z,
+148,PSV Eindhoven,240912,Joey Veerman,23,Midfielder,M,27.0,73.0,179.0,1998-11-19T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/240912.png
+148,PSV Eindhoven,240965,Guus Til,20,Midfielder,M,28.0,74.0,172.0,1997-12-22T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/240965.png
+148,PSV Eindhoven,318782,Isaac Babadi,,Midfielder,M,21.0,70.0,161.0,2005-04-06T07:00Z,
+148,PSV Eindhoven,333399,Paul Wanner,10,Midfielder,M,20.0,73.0,163.0,2005-12-23T08:00Z,
+148,PSV Eindhoven,371409,Jordy Bawuah,52,Midfielder,M,19.0,72.0,,2006-11-17T08:00Z,
+148,PSV Eindhoven,384374,Joel Van Den Berg,35,Midfielder,M,19.0,,,2007-02-11T08:00Z,
+148,PSV Eindhoven,386885,Noah Fernandez,31,Midfielder,M,18.0,67.0,,2008-01-09T08:00Z,
+148,PSV Eindhoven,388509,Jim Koller,56,Midfielder,M,19.0,68.0,130.0,2007-03-31T07:00Z,
+148,PSV Eindhoven,103485,Ivan Perisic,5,Forward,F,37.0,73.0,174.0,1989-02-02T08:00Z,
+148,PSV Eindhoven,168318,Alassane Pléa,14,Forward,F,33.0,71.0,172.0,1993-03-10T08:00Z,
+148,PSV Eindhoven,245805,Dennis Man,27,Forward,F,27.0,72.0,181.0,1998-08-26T07:00Z,
+148,PSV Eindhoven,259143,Myron Boadu,21,Forward,F,25.0,72.0,148.0,2001-01-14T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/259143.png
+148,PSV Eindhoven,289120,Ricardo Pepi,9,Forward,F,23.0,73.0,161.0,2003-01-09T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/289120.png
+148,PSV Eindhoven,304592,Couhaib Driouech,11,Forward,F,24.0,69.0,163.0,2002-04-17T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/304592.png
+148,PSV Eindhoven,325410,Esmir Bajraktarevic,19,Forward,F,21.0,69.0,139.0,2005-03-10T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/325410.png
+148,PSV Eindhoven,340252,Ruben Van Bommel,7,Forward,F,21.0,73.0,183.0,2004-08-03T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/340252.png
+3736,SC Cambuur,323989,Ilyes Hamache,,Forward,F,23.0,70.0,161.0,2003-02-11T08:00Z,
+3736,SC Cambuur,368816,Skye Vink,,Forward,F,20.0,74.0,152.0,2006-07-01T07:00Z,
+3736,SC Cambuur,298565,Thijs Jansen,1,Goalkeeper,G,24.0,76.0,163.0,2001-11-29T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/298565.png
+3736,SC Cambuur,343579,Jasper Meijster,21,Goalkeeper,G,21.0,74.0,163.0,2005-01-03T08:00Z,
+3736,SC Cambuur,406925,Matthijs Kalisvaart,31,Goalkeeper,G,20.0,,,2006-06-06T07:00Z,
+3736,SC Cambuur,414176,Jannick Coehoorn,54,Goalkeeper,G,18.0,,,2008-04-14T07:00Z,
+3736,SC Cambuur,292770,Rik Mulders,16,Defender,D,25.0,67.0,130.0,2000-08-06T07:00Z,
+3736,SC Cambuur,306047,Jamal Amofa,6,Defender,D,27.0,73.0,181.0,1998-11-25T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/306047.png
+3736,SC Cambuur,306401,Jorn Berkhout,3,Defender,D,24.0,71.0,146.0,2002-03-18T08:00Z,
+3736,SC Cambuur,364402,Ismaël Baouf,4,Defender,D,19.0,72.0,159.0,2006-09-17T07:00Z,
+3736,SC Cambuur,386842,Lucas Jetten,,Defender,D,19.0,65.0,119.0,2007-06-07T07:00Z,
+3736,SC Cambuur,391955,Jelte Priem,33,Defender,D,20.0,,,2006-01-22T08:00Z,
+3736,SC Cambuur,394751,Morgan Costarelli,28,Defender,D,21.0,67.0,141.0,2005-04-28T07:00Z,
+3736,SC Cambuur,396638,Ryan Van De Pavert,,Defender,D,20.0,67.0,,2006-01-24T08:00Z,
+3736,SC Cambuur,397118,Amar Bakkati,43,Defender,D,18.0,72.0,,2007-09-14T07:00Z,
+3736,SC Cambuur,406926,Buddy Vogelzang,34,Defender,D,20.0,,,2005-11-23T08:00Z,
+3736,SC Cambuur,418062,Fabian Kvam,15,Defender,D,20.0,71.0,130.0,2005-10-18T07:00Z,
+3736,SC Cambuur,259186,Nicky Souren,8,Midfielder,M,26.0,68.0,159.0,1999-12-18T08:00Z,
+3736,SC Cambuur,402838,Daan Visser,20,Midfielder,M,21.0,,,2004-11-05T08:00Z,
+3736,SC Cambuur,408553,Wiebe Van Der Heide,48,Midfielder,M,,,,,
+3736,SC Cambuur,412287,Yme Bruinsma,38,Midfielder,M,20.0,,,2005-09-29T07:00Z,
+3736,SC Cambuur,416391,Danyello Look,47,Midfielder,M,19.0,,,2007-03-22T07:00Z,
+3736,SC Cambuur,416657,Ethan Apkakou,17,Midfielder,M,19.0,71.0,,2006-10-15T07:00Z,
+3736,SC Cambuur,421840,Wessel Van Der Goot,36,Midfielder,M,18.0,,,2008-04-29T07:00Z,
+3736,SC Cambuur,338919,Nicolas Binder,13,Forward,F,24.0,76.0,205.0,2002-01-13T08:00Z,
+3736,SC Cambuur,364992,Wiebe Kooistra,27,Forward,F,19.0,69.0,130.0,2006-07-23T07:00Z,
+3736,SC Cambuur,370607,Iwan Henstra,19,Forward,F,19.0,74.0,,2006-10-10T07:00Z,
+151,Sparta Rotterdam,310292,Joel Ideho,,Forward,F,23.0,69.0,141.0,2003-07-17T07:00Z,
+151,Sparta Rotterdam,320298,Casper Terho,,Forward,F,23.0,72.0,172.0,2003-06-24T07:00Z,
+151,Sparta Rotterdam,356979,Nökkvi Thórisson,,Forward,F,26.0,74.0,,1999-08-13T07:00Z,
+151,Sparta Rotterdam,167731,Filip Bednarek,,Goalkeeper,G,33.0,74.0,179.0,1992-09-26T07:00Z,
+151,Sparta Rotterdam,291354,Youri Schoonderwaldt,,Goalkeeper,G,26.0,77.0,183.0,2000-03-13T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/291354.png
+151,Sparta Rotterdam,308016,Pascal Kuiper,,Goalkeeper,G,22.0,76.0,192.0,2004-03-17T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/308016.png
+151,Sparta Rotterdam,422191,Rik Suur,30,Goalkeeper,G,19.0,77.0,163.0,2006-11-14T08:00Z,
+151,Sparta Rotterdam,149301,Bruno Martins Indi,,Defender,D,34.0,73.0,168.0,1992-02-08T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/149301.png
+151,Sparta Rotterdam,188458,Bas Kuipers,,Defender,D,31.0,71.0,161.0,1994-08-17T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/188458.png
+151,Sparta Rotterdam,272032,Boyd Reith,,Defender,D,27.0,69.0,,1999-05-05T07:00Z,
+151,Sparta Rotterdam,300260,Teo Quintero,,Defender,D,27.0,75.0,185.0,1999-03-02T08:00Z,
+151,Sparta Rotterdam,337603,Mike Kleijn,,Defender,D,21.0,69.0,137.0,2005-02-09T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/337603.png
+151,Sparta Rotterdam,368324,Nick Verschuren,,Defender,D,21.0,72.0,148.0,2005-01-13T08:00Z,
+151,Sparta Rotterdam,372845,Max De Ligt,,Defender,D,22.0,74.0,,2004-07-20T07:00Z,
+151,Sparta Rotterdam,388712,Marvin Young,,Defender,D,20.0,72.0,,2005-10-02T07:00Z,
+151,Sparta Rotterdam,408790,Giannino Vianello,,Defender,D,19.0,,,2007-06-10T07:00Z,
+151,Sparta Rotterdam,422248,Justice Esser,,Defender,D,19.0,,,2007-03-29T07:00Z,
+151,Sparta Rotterdam,142517,Jens Toornstra,,Midfielder,M,37.0,70.0,161.0,1989-04-04T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/142517.png
+151,Sparta Rotterdam,304485,Julian Baas,,Midfielder,M,24.0,72.0,174.0,2002-04-16T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/304485.png
+151,Sparta Rotterdam,364725,Alwande Roaldsöy,,Midfielder,M,22.0,,,2004-06-09T07:00Z,
+151,Sparta Rotterdam,405673,Ayoni Santos,,Midfielder,M,21.0,65.0,141.0,2005-07-18T07:00Z,
+151,Sparta Rotterdam,415046,Lushendry Martes,,Midfielder,M,18.0,,,2008-05-06T07:00Z,
+151,Sparta Rotterdam,415459,Younes El Meftahi,,Midfielder,M,18.0,,,2007-10-11T07:00Z,
+151,Sparta Rotterdam,231832,Mitchell van Bergen,,Forward,F,26.0,67.0,121.0,1999-08-27T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/231832.png
+151,Sparta Rotterdam,297252,Shunsuke Mito,,Forward,F,23.0,65.0,130.0,2002-09-28T07:00Z,
+151,Sparta Rotterdam,324585,Milan Zonneveld,,Forward,F,22.0,,,2003-10-08T07:00Z,
+3735,Telstar,79505,Ronald Koeman,1,Goalkeeper,G,31.0,74.0,174.0,1995-05-23T07:00Z,
+3735,Telstar,284790,Daan Reiziger,20,Goalkeeper,G,25.0,72.0,150.0,2001-06-18T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/284790.png
+3735,Telstar,297542,Tyrick Bodak,13,Goalkeeper,G,24.0,75.0,170.0,2002-05-15T07:00Z,
+3735,Telstar,399284,Finn Mulder,,Goalkeeper,G,18.0,,,2008-02-01T08:00Z,
+3735,Telstar,181345,Danny Bakker,6,Defender,D,31.0,72.0,152.0,1995-01-16T08:00Z,
+3735,Telstar,200158,Jeff Hardeveld,2,Defender,D,31.0,72.0,168.0,1995-02-27T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/200158.png
+3735,Telstar,281027,Nigel Ogidi Nwankwo,5,Defender,D,27.0,,,1998-08-04T07:00Z,
+3735,Telstar,356706,Abdelnour Soualhia,,Defender,D,25.0,,,2001-06-27T07:00Z,
+3735,Telstar,367650,Mano Olfers,25,Defender,D,19.0,,,2006-08-02T07:00Z,
+3735,Telstar,368817,Gerald Alders,,Defender,D,21.0,70.0,,2005-05-07T07:00Z,
+3735,Telstar,388595,Abdelraffie Benzzine,24,Defender,D,20.0,,,2006-04-04T07:00Z,
+3735,Telstar,408545,Rojendro Oudsten,28,Defender,D,18.0,,,2007-11-12T08:00Z,
+3735,Telstar,419027,Amin Bouchouari,15,Defender,D,17.0,,,2008-10-17T07:00Z,
+3735,Telstar,306461,Tyrone Owusu,8,Midfielder,M,27.0,71.0,,1999-03-05T08:00Z,
+3735,Telstar,332709,Nils Rossen,17,Midfielder,M,21.0,71.0,146.0,2004-08-01T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/332709.png
+3735,Telstar,359132,Tyrese Noslin,11,Midfielder,M,23.0,72.0,168.0,2002-09-11T07:00Z,
+3735,Telstar,404628,Rayyan Koubini,,Midfielder,M,21.0,,,2005-06-06T07:00Z,
+3735,Telstar,411548,Noach Shenkman,,Midfielder,M,19.0,,,2006-10-02T07:00Z,
+3735,Telstar,240916,Kay Tejan,30,Forward,F,29.0,74.0,172.0,1997-02-03T08:00Z,
+3735,Telstar,306445,Patrick Brouwer,27,Forward,F,25.0,69.0,,2001-03-19T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/306445.png
+3735,Telstar,372971,Soufiane Hetli,7,Forward,F,25.0,,,2001-05-30T07:00Z,
+3735,Telstar,397194,Jelani Seedorf,9,Forward,F,21.0,,,2004-12-12T08:00Z,
+156,Willem II,152989,Wouter van der Steen,21,Goalkeeper,G,36.0,74.0,183.0,1990-06-03T07:00Z,
+156,Willem II,188221,Thomas Didillon,1,Goalkeeper,G,30.0,76.0,174.0,1995-11-28T08:00Z,
+156,Willem II,397856,Karst De Leeuw,31,Goalkeeper,G,22.0,,,2004-04-19T07:00Z,
+156,Willem II,408847,Boet Van Der Linden,,Goalkeeper,G,19.0,,,2006-09-25T07:00Z,
+156,Willem II,409823,Vince Van Der Bas,44,Goalkeeper,G,20.0,,,2006-03-07T08:00Z,
+156,Willem II,414529,Tygo Kotte,41,Goalkeeper,G,19.0,76.0,,2007-03-27T07:00Z,
+156,Willem II,232390,Alessandro Ciranni,2,Defender,D,30.0,68.0,146.0,1996-06-28T07:00Z,
+156,Willem II,234375,Justin Hoogma,4,Defender,D,28.0,75.0,179.0,1998-06-11T07:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/234375.png
+156,Willem II,291612,Nathan Tjoe-A-On,24,Defender,D,24.0,72.0,172.0,2001-12-22T08:00Z,https://a.espncdn.com/i/headshots/soccer/players/full/291612.png
+156,Willem II,320464,Finn Stam,,Defender,D,23.0,74.0,181.0,2003-04-13T07:00Z,
+156,Willem II,363130,Amine Et-Taibi,15,Defender,D,23.0,,,2003-02-05T08:00Z,
+156,Willem II,388667,Jens Mathijsen,14,Defender,D,18.0,72.0,141.0,2007-08-15T07:00Z,
+156,Willem II,408845,Feliciano De Ruijeter,43,Defender,D,21.0,,,2005-02-04T08:00Z,
+156,Willem II,418777,Kayen Scheepens,46,Defender,D,19.0,,,2006-08-18T07:00Z,
+156,Willem II,215171,Jari Schuurman,10,Midfielder,M,29.0,71.0,141.0,1997-02-22T08:00Z,
+156,Willem II,352535,Amine Lachkar,34,Midfielder,M,23.0,74.0,183.0,2003-04-18T07:00Z,
+156,Willem II,388593,Anass Zarrouk,18,Midfielder,M,20.0,69.0,130.0,2006-07-18T07:00Z,
+156,Willem II,388668,Per Van Loon,22,Midfielder,M,21.0,69.0,157.0,2004-12-31T08:00Z,
+156,Willem II,397219,Uriel Van Aalst,19,Midfielder,M,19.0,67.0,161.0,2006-08-18T07:00Z,
+156,Willem II,408846,Pieter Van Maarschalkerwaard,,Midfielder,M,20.0,,,2005-09-07T07:00Z,
+156,Willem II,421271,Julian Van Esdonk,45,Midfielder,M,20.0,,,2006-04-27T07:00Z,
+156,Willem II,3099043,Stef Schreuders,,Midfielder,M,,,,,
+156,Willem II,195865,Thomas Verheydt,28,Forward,F,34.0,76.0,203.0,1992-01-24T08:00Z,
+156,Willem II,315631,Devin Haen,9,Forward,F,22.0,72.0,141.0,2004-06-18T07:00Z,
+156,Willem II,402840,Lasse Abildgaard,23,Forward,F,19.0,67.0,,2007-02-27T08:00Z,
+156,Willem II,408848,Siegert Baartmans,47,Forward,F,20.0,,,2006-04-06T07:00Z,
+156,Willem II,409864,Armin Culum,11,Forward,F,22.0,,,2003-11-05T08:00Z,

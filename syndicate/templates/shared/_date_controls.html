@@ -15,7 +15,7 @@
     {% for extra_control in extra_controls or [] %}
       <span class="cards-nav-pill cards-form-pill" aria-hidden="true">{{ extra_control.label }}</span>
       {% if extra_control.type == 'select' %}
-        <select name="{{ extra_control.name }}" aria-label="{{ extra_control.label }}">
+        <select name="{{ extra_control.name }}" aria-label="{{ extra_control.label }}"{% if extra_control.onchange %} onchange="{{ extra_control.onchange }}"{% endif %}>
           {% for option in extra_control.options or [] %}
             <option value="{{ option.value }}"{% if option.value == extra_control.value %} selected{% endif %}>{{ option.label }}</option>
           {% endfor %}

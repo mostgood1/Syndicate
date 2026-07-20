@@ -31,6 +31,7 @@ from syndicate.blueprints.soccer import soccer_bp
 from syndicate.blueprints.sports import sports_bp
 from syndicate.blueprints.wnba import wnba_bp
 from syndicate.features.shared.live_refresh_loop import start_live_refresh_background_loop
+from syndicate.features.soccer.refresh_loop import start_soccer_refresh_background_loop
 from pipeline.intelligence_state import start_intelligence_state_background_loop
 
 
@@ -312,6 +313,7 @@ def create_app() -> Flask:
                 start_intelligence_state_background_loop(app)
                 if not render_web_dyno:
                     start_live_refresh_background_loop()
+                    start_soccer_refresh_background_loop()
                 app.extensions["syndicate_background_loops_started"] = True
             finally:
                 app.extensions.pop("syndicate_background_loops_bootstrap_started", None)

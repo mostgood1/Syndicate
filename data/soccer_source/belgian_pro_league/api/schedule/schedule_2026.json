@@ -1,0 +1,3280 @@
+{
+  "league": "belgian_pro_league",
+  "season": 2026,
+  "generated_at": "2026-07-20T21:05:53.753854+00:00",
+  "match_count": 306,
+  "weeks": [
+    {
+      "week": 1,
+      "start_date": "2026-08-07",
+      "end_date": "2026-08-07",
+      "match_count": 1
+    },
+    {
+      "week": 2,
+      "start_date": "2026-08-08",
+      "end_date": "2026-08-14",
+      "match_count": 9
+    },
+    {
+      "week": 3,
+      "start_date": "2026-08-15",
+      "end_date": "2026-08-21",
+      "match_count": 9
+    },
+    {
+      "week": 4,
+      "start_date": "2026-08-22",
+      "end_date": "2026-08-28",
+      "match_count": 8
+    },
+    {
+      "week": 5,
+      "start_date": "2026-08-29",
+      "end_date": "2026-09-04",
+      "match_count": 10
+    },
+    {
+      "week": 6,
+      "start_date": "2026-09-05",
+      "end_date": "2026-09-11",
+      "match_count": 9
+    },
+    {
+      "week": 7,
+      "start_date": "2026-09-12",
+      "end_date": "2026-09-18",
+      "match_count": 9
+    },
+    {
+      "week": 8,
+      "start_date": "2026-09-19",
+      "end_date": "2026-09-20",
+      "match_count": 8
+    },
+    {
+      "week": 9,
+      "start_date": "2026-10-10",
+      "end_date": "2026-10-10",
+      "match_count": 9
+    },
+    {
+      "week": 10,
+      "start_date": "2026-10-24",
+      "end_date": "2026-10-24",
+      "match_count": 9
+    },
+    {
+      "week": 11,
+      "start_date": "2026-10-31",
+      "end_date": "2026-10-31",
+      "match_count": 9
+    },
+    {
+      "week": 12,
+      "start_date": "2026-11-07",
+      "end_date": "2026-11-07",
+      "match_count": 9
+    },
+    {
+      "week": 13,
+      "start_date": "2026-11-21",
+      "end_date": "2026-11-21",
+      "match_count": 9
+    },
+    {
+      "week": 14,
+      "start_date": "2026-11-28",
+      "end_date": "2026-11-28",
+      "match_count": 9
+    },
+    {
+      "week": 15,
+      "start_date": "2026-12-12",
+      "end_date": "2026-12-12",
+      "match_count": 9
+    },
+    {
+      "week": 16,
+      "start_date": "2026-12-19",
+      "end_date": "2026-12-19",
+      "match_count": 9
+    },
+    {
+      "week": 17,
+      "start_date": "2026-12-26",
+      "end_date": "2026-12-26",
+      "match_count": 9
+    },
+    {
+      "week": 18,
+      "start_date": "2027-01-16",
+      "end_date": "2027-01-16",
+      "match_count": 9
+    },
+    {
+      "week": 19,
+      "start_date": "2027-01-23",
+      "end_date": "2027-01-23",
+      "match_count": 9
+    },
+    {
+      "week": 20,
+      "start_date": "2027-01-30",
+      "end_date": "2027-01-30",
+      "match_count": 9
+    },
+    {
+      "week": 21,
+      "start_date": "2027-02-06",
+      "end_date": "2027-02-06",
+      "match_count": 9
+    },
+    {
+      "week": 22,
+      "start_date": "2027-02-13",
+      "end_date": "2027-02-13",
+      "match_count": 9
+    },
+    {
+      "week": 23,
+      "start_date": "2027-02-20",
+      "end_date": "2027-02-20",
+      "match_count": 9
+    },
+    {
+      "week": 24,
+      "start_date": "2027-02-27",
+      "end_date": "2027-02-27",
+      "match_count": 9
+    },
+    {
+      "week": 25,
+      "start_date": "2027-03-06",
+      "end_date": "2027-03-06",
+      "match_count": 9
+    },
+    {
+      "week": 26,
+      "start_date": "2027-03-13",
+      "end_date": "2027-03-13",
+      "match_count": 9
+    },
+    {
+      "week": 27,
+      "start_date": "2027-03-20",
+      "end_date": "2027-03-20",
+      "match_count": 9
+    },
+    {
+      "week": 28,
+      "start_date": "2027-04-03",
+      "end_date": "2027-04-03",
+      "match_count": 9
+    },
+    {
+      "week": 29,
+      "start_date": "2027-04-10",
+      "end_date": "2027-04-10",
+      "match_count": 9
+    },
+    {
+      "week": 30,
+      "start_date": "2027-04-17",
+      "end_date": "2027-04-17",
+      "match_count": 9
+    },
+    {
+      "week": 31,
+      "start_date": "2027-04-24",
+      "end_date": "2027-04-24",
+      "match_count": 9
+    },
+    {
+      "week": 32,
+      "start_date": "2027-05-01",
+      "end_date": "2027-05-01",
+      "match_count": 9
+    },
+    {
+      "week": 33,
+      "start_date": "2027-05-08",
+      "end_date": "2027-05-08",
+      "match_count": 9
+    },
+    {
+      "week": 34,
+      "start_date": "2027-05-15",
+      "end_date": "2027-05-15",
+      "match_count": 9
+    },
+    {
+      "week": 35,
+      "start_date": "2027-05-22",
+      "end_date": "2027-05-22",
+      "match_count": 9
+    }
+  ],
+  "matches": [
+    {
+      "event_id": "401879041",
+      "date": "2026-08-07T18:45Z",
+      "home_team": "Club Brugge",
+      "away_team": "KV Kortrijk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401879039",
+      "date": "2026-08-08T16:15Z",
+      "home_team": "Standard Liege",
+      "away_team": "Cercle Brugge KSV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401879037",
+      "date": "2026-08-08T18:45Z",
+      "home_team": "KVC Westerlo",
+      "away_team": "Union St.-Gilloise",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401879038",
+      "date": "2026-08-08T18:45Z",
+      "home_team": "Sint-Truidense",
+      "away_team": "Lommel SK",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401879036",
+      "date": "2026-08-09T11:30Z",
+      "home_team": "KAA Gent",
+      "away_team": "KV Mechelen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401879040",
+      "date": "2026-08-09T14:00Z",
+      "home_team": "Royal Charleroi SC",
+      "away_team": "OH Leuven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401879035",
+      "date": "2026-08-09T14:00Z",
+      "home_team": "Zulte-Waregem",
+      "away_team": "Racing Genk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401879034",
+      "date": "2026-08-09T16:30Z",
+      "home_team": "Anderlecht",
+      "away_team": "RAAL La Louvi\u00e8re",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401879033",
+      "date": "2026-08-09T17:15Z",
+      "home_team": "Antwerp",
+      "away_team": "Waasland-Beveren",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401879032",
+      "date": "2026-08-14T18:45Z",
+      "home_team": "Cercle Brugge KSV",
+      "away_team": "Sint-Truidense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401879031",
+      "date": "2026-08-15T14:00Z",
+      "home_team": "Union St.-Gilloise",
+      "away_team": "Zulte-Waregem",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401879030",
+      "date": "2026-08-15T16:15Z",
+      "home_team": "KV Kortrijk",
+      "away_team": "Antwerp",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401879029",
+      "date": "2026-08-15T18:45Z",
+      "home_team": "OH Leuven",
+      "away_team": "Club Brugge",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401879028",
+      "date": "2026-08-15T18:45Z",
+      "home_team": "Racing Genk",
+      "away_team": "KVC Westerlo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401879027",
+      "date": "2026-08-16T11:30Z",
+      "home_team": "Waasland-Beveren",
+      "away_team": "Anderlecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401879026",
+      "date": "2026-08-16T14:00Z",
+      "home_team": "RAAL La Louvi\u00e8re",
+      "away_team": "KAA Gent",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401879025",
+      "date": "2026-08-16T16:30Z",
+      "home_team": "KV Mechelen",
+      "away_team": "Standard Liege",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401879024",
+      "date": "2026-08-16T17:15Z",
+      "home_team": "Lommel SK",
+      "away_team": "Royal Charleroi SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401879023",
+      "date": "2026-08-21T18:45Z",
+      "home_team": "Standard Liege",
+      "away_team": "RAAL La Louvi\u00e8re",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401879022",
+      "date": "2026-08-22T14:00Z",
+      "home_team": "Zulte-Waregem",
+      "away_team": "Waasland-Beveren",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401879021",
+      "date": "2026-08-22T16:15Z",
+      "home_team": "Royal Charleroi SC",
+      "away_team": "KV Mechelen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401879019",
+      "date": "2026-08-22T18:45Z",
+      "home_team": "Antwerp",
+      "away_team": "Racing Genk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401879020",
+      "date": "2026-08-22T18:45Z",
+      "home_team": "KAA Gent",
+      "away_team": "OH Leuven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401879018",
+      "date": "2026-08-23T11:30Z",
+      "home_team": "Anderlecht",
+      "away_team": "KV Kortrijk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401879017",
+      "date": "2026-08-23T14:00Z",
+      "home_team": "Lommel SK",
+      "away_team": "KVC Westerlo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401879016",
+      "date": "2026-08-23T16:30Z",
+      "home_team": "Club Brugge",
+      "away_team": "Cercle Brugge KSV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401879015",
+      "date": "2026-08-28T18:45Z",
+      "home_team": "Racing Genk",
+      "away_team": "Waasland-Beveren",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401879014",
+      "date": "2026-08-29T14:00Z",
+      "home_team": "RAAL La Louvi\u00e8re",
+      "away_team": "KV Mechelen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401879013",
+      "date": "2026-08-29T16:15Z",
+      "home_team": "KV Kortrijk",
+      "away_team": "Royal Charleroi SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401879012",
+      "date": "2026-08-29T18:45Z",
+      "home_team": "Cercle Brugge KSV",
+      "away_team": "Lommel SK",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401879011",
+      "date": "2026-08-29T18:45Z",
+      "home_team": "OH Leuven",
+      "away_team": "Standard Liege",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401879010",
+      "date": "2026-08-30T11:30Z",
+      "home_team": "KAA Gent",
+      "away_team": "Club Brugge",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401879009",
+      "date": "2026-08-30T14:00Z",
+      "home_team": "Antwerp",
+      "away_team": "Sint-Truidense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401879008",
+      "date": "2026-08-30T16:30Z",
+      "home_team": "Union St.-Gilloise",
+      "away_team": "Anderlecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401879007",
+      "date": "2026-08-30T17:15Z",
+      "home_team": "KVC Westerlo",
+      "away_team": "Zulte-Waregem",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401879006",
+      "date": "2026-09-02T18:30Z",
+      "home_team": "Sint-Truidense",
+      "away_team": "Union St.-Gilloise",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401879005",
+      "date": "2026-09-04T18:45Z",
+      "home_team": "Lommel SK",
+      "away_team": "Club Brugge",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401879004",
+      "date": "2026-09-05T14:00Z",
+      "home_team": "Royal Charleroi SC",
+      "away_team": "Union St.-Gilloise",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401879003",
+      "date": "2026-09-05T16:15Z",
+      "home_team": "KV Mechelen",
+      "away_team": "KVC Westerlo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401879001",
+      "date": "2026-09-05T18:45Z",
+      "home_team": "Sint-Truidense",
+      "away_team": "RAAL La Louvi\u00e8re",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401879002",
+      "date": "2026-09-05T18:45Z",
+      "home_team": "Standard Liege",
+      "away_team": "Antwerp",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401879000",
+      "date": "2026-09-06T11:30Z",
+      "home_team": "Cercle Brugge KSV",
+      "away_team": "KAA Gent",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401878999",
+      "date": "2026-09-06T14:00Z",
+      "home_team": "KV Kortrijk",
+      "away_team": "Zulte-Waregem",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401878998",
+      "date": "2026-09-06T16:30Z",
+      "home_team": "Anderlecht",
+      "away_team": "Racing Genk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401878997",
+      "date": "2026-09-06T17:15Z",
+      "home_team": "Waasland-Beveren",
+      "away_team": "OH Leuven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401878996",
+      "date": "2026-09-11T18:45Z",
+      "home_team": "KV Mechelen",
+      "away_team": "Anderlecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401878995",
+      "date": "2026-09-12T14:00Z",
+      "home_team": "Waasland-Beveren",
+      "away_team": "Sint-Truidense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401878994",
+      "date": "2026-09-12T16:15Z",
+      "home_team": "KVC Westerlo",
+      "away_team": "Standard Liege",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401878993",
+      "date": "2026-09-12T18:45Z",
+      "home_team": "OH Leuven",
+      "away_team": "Cercle Brugge KSV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401878992",
+      "date": "2026-09-12T18:45Z",
+      "home_team": "Union St.-Gilloise",
+      "away_team": "Lommel SK",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401878991",
+      "date": "2026-09-13T11:30Z",
+      "home_team": "Club Brugge",
+      "away_team": "Antwerp",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401878990",
+      "date": "2026-09-13T14:00Z",
+      "home_team": "Racing Genk",
+      "away_team": "KAA Gent",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401878989",
+      "date": "2026-09-13T16:30Z",
+      "home_team": "Zulte-Waregem",
+      "away_team": "Royal Charleroi SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401878988",
+      "date": "2026-09-13T17:15Z",
+      "home_team": "RAAL La Louvi\u00e8re",
+      "away_team": "KV Kortrijk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401878987",
+      "date": "2026-09-18T18:45Z",
+      "home_team": "KAA Gent",
+      "away_team": "Standard Liege",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401878986",
+      "date": "2026-09-19T14:00Z",
+      "home_team": "OH Leuven",
+      "away_team": "RAAL La Louvi\u00e8re",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401878985",
+      "date": "2026-09-19T16:15Z",
+      "home_team": "Royal Charleroi SC",
+      "away_team": "Cercle Brugge KSV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401878984",
+      "date": "2026-09-19T18:45Z",
+      "home_team": "Anderlecht",
+      "away_team": "Zulte-Waregem",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401878983",
+      "date": "2026-09-19T18:45Z",
+      "home_team": "Lommel SK",
+      "away_team": "KV Mechelen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401878982",
+      "date": "2026-09-20T11:30Z",
+      "home_team": "Antwerp",
+      "away_team": "Union St.-Gilloise",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401878981",
+      "date": "2026-09-20T14:00Z",
+      "home_team": "Sint-Truidense",
+      "away_team": "KVC Westerlo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401878980",
+      "date": "2026-09-20T16:30Z",
+      "home_team": "Club Brugge",
+      "away_team": "Racing Genk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401878979",
+      "date": "2026-09-20T17:15Z",
+      "home_team": "KV Kortrijk",
+      "away_team": "Waasland-Beveren",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401878977",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "Cercle Brugge KSV",
+      "away_team": "Anderlecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401878972",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "KV Mechelen",
+      "away_team": "Sint-Truidense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401878970",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "KVC Westerlo",
+      "away_team": "Antwerp",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401878978",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "RAAL La Louvi\u00e8re",
+      "away_team": "Club Brugge",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401878973",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "Racing Genk",
+      "away_team": "KV Kortrijk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401878971",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "Standard Liege",
+      "away_team": "Royal Charleroi SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401878975",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "Union St.-Gilloise",
+      "away_team": "OH Leuven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401878976",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "Waasland-Beveren",
+      "away_team": "Lommel SK",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401878974",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "Zulte-Waregem",
+      "away_team": "KAA Gent",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401878968",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "Antwerp",
+      "away_team": "Royal Charleroi SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401878964",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "Club Brugge",
+      "away_team": "Sint-Truidense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401878962",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "KAA Gent",
+      "away_team": "Anderlecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401878967",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "KV Kortrijk",
+      "away_team": "KV Mechelen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401878965",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "KVC Westerlo",
+      "away_team": "Waasland-Beveren",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401878969",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "OH Leuven",
+      "away_team": "Lommel SK",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401878966",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "RAAL La Louvi\u00e8re",
+      "away_team": "Zulte-Waregem",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401878963",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "Racing Genk",
+      "away_team": "Standard Liege",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401878961",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "Union St.-Gilloise",
+      "away_team": "Cercle Brugge KSV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401878960",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Anderlecht",
+      "away_team": "KVC Westerlo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401878959",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Cercle Brugge KSV",
+      "away_team": "Antwerp",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401878958",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "KV Mechelen",
+      "away_team": "Racing Genk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401878954",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Lommel SK",
+      "away_team": "KAA Gent",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401878955",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Royal Charleroi SC",
+      "away_team": "RAAL La Louvi\u00e8re",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401878952",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Sint-Truidense",
+      "away_team": "OH Leuven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401878953",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Standard Liege",
+      "away_team": "KV Kortrijk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401878957",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Waasland-Beveren",
+      "away_team": "Union St.-Gilloise",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401878956",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Zulte-Waregem",
+      "away_team": "Club Brugge",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401878950",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "Antwerp",
+      "away_team": "Lommel SK",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401878946",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "Club Brugge",
+      "away_team": "Anderlecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401878945",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "KAA Gent",
+      "away_team": "KV Kortrijk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401878947",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "KVC Westerlo",
+      "away_team": "Royal Charleroi SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401878949",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "OH Leuven",
+      "away_team": "KV Mechelen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401878948",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "RAAL La Louvi\u00e8re",
+      "away_team": "Cercle Brugge KSV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401878944",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "Sint-Truidense",
+      "away_team": "Zulte-Waregem",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401878951",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "Standard Liege",
+      "away_team": "Waasland-Beveren",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401878943",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "Union St.-Gilloise",
+      "away_team": "Racing Genk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401878941",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Anderlecht",
+      "away_team": "OH Leuven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401878937",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Cercle Brugge KSV",
+      "away_team": "KVC Westerlo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401878936",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "KV Kortrijk",
+      "away_team": "Union St.-Gilloise",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401878935",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "KV Mechelen",
+      "away_team": "Club Brugge",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401878934",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Lommel SK",
+      "away_team": "Standard Liege",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401878939",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Racing Genk",
+      "away_team": "RAAL La Louvi\u00e8re",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401878940",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Royal Charleroi SC",
+      "away_team": "Sint-Truidense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401878942",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Waasland-Beveren",
+      "away_team": "KAA Gent",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401878938",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Zulte-Waregem",
+      "away_team": "Antwerp",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401878928",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Antwerp",
+      "away_team": "Anderlecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401878932",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Cercle Brugge KSV",
+      "away_team": "KV Mechelen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401878929",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "KVC Westerlo",
+      "away_team": "RAAL La Louvi\u00e8re",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401878931",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Lommel SK",
+      "away_team": "Zulte-Waregem",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401878930",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "OH Leuven",
+      "away_team": "KV Kortrijk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401878933",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Royal Charleroi SC",
+      "away_team": "Waasland-Beveren",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401878926",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Sint-Truidense",
+      "away_team": "Racing Genk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401878927",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Standard Liege",
+      "away_team": "Club Brugge",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401878925",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Union St.-Gilloise",
+      "away_team": "KAA Gent",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401878919",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "Anderlecht",
+      "away_team": "Royal Charleroi SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401878918",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "Club Brugge",
+      "away_team": "KVC Westerlo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401878917",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "KAA Gent",
+      "away_team": "Sint-Truidense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401878923",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "KV Kortrijk",
+      "away_team": "Lommel SK",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401878916",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "KV Mechelen",
+      "away_team": "Union St.-Gilloise",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401878922",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "RAAL La Louvi\u00e8re",
+      "away_team": "Antwerp",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401878924",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "Racing Genk",
+      "away_team": "OH Leuven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401878921",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "Waasland-Beveren",
+      "away_team": "Cercle Brugge KSV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401878920",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "Zulte-Waregem",
+      "away_team": "Standard Liege",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401878914",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "Antwerp",
+      "away_team": "OH Leuven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401878913",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "Cercle Brugge KSV",
+      "away_team": "Zulte-Waregem",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401878907",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "KVC Westerlo",
+      "away_team": "KAA Gent",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401878911",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "Lommel SK",
+      "away_team": "RAAL La Louvi\u00e8re",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401878912",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "Royal Charleroi SC",
+      "away_team": "Racing Genk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401878909",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "Sint-Truidense",
+      "away_team": "KV Kortrijk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401878910",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "Standard Liege",
+      "away_team": "Anderlecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401878908",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "Union St.-Gilloise",
+      "away_team": "Club Brugge",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401878915",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "Waasland-Beveren",
+      "away_team": "KV Mechelen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401878901",
+      "date": "2026-12-26T20:00Z",
+      "home_team": "Anderlecht",
+      "away_team": "Sint-Truidense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401878906",
+      "date": "2026-12-26T20:00Z",
+      "home_team": "Club Brugge",
+      "away_team": "Royal Charleroi SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401878904",
+      "date": "2026-12-26T20:00Z",
+      "home_team": "KAA Gent",
+      "away_team": "Antwerp",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401878903",
+      "date": "2026-12-26T20:00Z",
+      "home_team": "KV Kortrijk",
+      "away_team": "Cercle Brugge KSV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401878900",
+      "date": "2026-12-26T20:00Z",
+      "home_team": "KV Mechelen",
+      "away_team": "Zulte-Waregem",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401878902",
+      "date": "2026-12-26T20:00Z",
+      "home_team": "OH Leuven",
+      "away_team": "KVC Westerlo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401878899",
+      "date": "2026-12-26T20:00Z",
+      "home_team": "RAAL La Louvi\u00e8re",
+      "away_team": "Waasland-Beveren",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401878905",
+      "date": "2026-12-26T20:00Z",
+      "home_team": "Racing Genk",
+      "away_team": "Lommel SK",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401878898",
+      "date": "2026-12-26T20:00Z",
+      "home_team": "Standard Liege",
+      "away_team": "Union St.-Gilloise",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401878897",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Antwerp",
+      "away_team": "KV Mechelen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401878892",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Cercle Brugge KSV",
+      "away_team": "Racing Genk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401878893",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "KVC Westerlo",
+      "away_team": "KV Kortrijk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401878890",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Lommel SK",
+      "away_team": "Anderlecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401878891",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Royal Charleroi SC",
+      "away_team": "KAA Gent",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401878895",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Sint-Truidense",
+      "away_team": "Standard Liege",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401878894",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Union St.-Gilloise",
+      "away_team": "RAAL La Louvi\u00e8re",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401878896",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Waasland-Beveren",
+      "away_team": "Club Brugge",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401878889",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Zulte-Waregem",
+      "away_team": "OH Leuven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401878887",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Club Brugge",
+      "away_team": "RAAL La Louvi\u00e8re",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401878886",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "KAA Gent",
+      "away_team": "Cercle Brugge KSV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401878882",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "KV Kortrijk",
+      "away_team": "Anderlecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401878885",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "KV Mechelen",
+      "away_team": "Lommel SK",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401878881",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "OH Leuven",
+      "away_team": "Sint-Truidense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401878883",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Racing Genk",
+      "away_team": "Zulte-Waregem",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401878888",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Royal Charleroi SC",
+      "away_team": "Antwerp",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401878880",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Standard Liege",
+      "away_team": "KVC Westerlo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401878884",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Union St.-Gilloise",
+      "away_team": "Waasland-Beveren",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401878874",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "Anderlecht",
+      "away_team": "KAA Gent",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401878873",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "Antwerp",
+      "away_team": "Club Brugge",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401878879",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "Cercle Brugge KSV",
+      "away_team": "Standard Liege",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401878875",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "KVC Westerlo",
+      "away_team": "Racing Genk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401878878",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "Lommel SK",
+      "away_team": "OH Leuven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401878877",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "RAAL La Louvi\u00e8re",
+      "away_team": "Royal Charleroi SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401878872",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "Sint-Truidense",
+      "away_team": "KV Mechelen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401878876",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "Waasland-Beveren",
+      "away_team": "KV Kortrijk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401878871",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "Zulte-Waregem",
+      "away_team": "Union St.-Gilloise",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401878865",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "Club Brugge",
+      "away_team": "Standard Liege",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401878870",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "KAA Gent",
+      "away_team": "Waasland-Beveren",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401878863",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "KV Kortrijk",
+      "away_team": "RAAL La Louvi\u00e8re",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401878868",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "KV Mechelen",
+      "away_team": "Cercle Brugge KSV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401878867",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "OH Leuven",
+      "away_team": "Anderlecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401878864",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "Racing Genk",
+      "away_team": "Antwerp",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401878869",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "Royal Charleroi SC",
+      "away_team": "KVC Westerlo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401878862",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "Union St.-Gilloise",
+      "away_team": "Sint-Truidense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401878866",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "Zulte-Waregem",
+      "away_team": "Lommel SK",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401878856",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Anderlecht",
+      "away_team": "KV Mechelen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401878855",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Antwerp",
+      "away_team": "KV Kortrijk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401878860",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Cercle Brugge KSV",
+      "away_team": "Royal Charleroi SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401878857",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "KVC Westerlo",
+      "away_team": "Club Brugge",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401878859",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Lommel SK",
+      "away_team": "Union St.-Gilloise",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401878861",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "RAAL La Louvi\u00e8re",
+      "away_team": "OH Leuven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401878853",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Sint-Truidense",
+      "away_team": "KAA Gent",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401878858",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Standard Liege",
+      "away_team": "Zulte-Waregem",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401878854",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Waasland-Beveren",
+      "away_team": "Racing Genk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401878851",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Club Brugge",
+      "away_team": "Lommel SK",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401878847",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "KAA Gent",
+      "away_team": "RAAL La Louvi\u00e8re",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401878850",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "KV Kortrijk",
+      "away_team": "Racing Genk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401878849",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "KV Mechelen",
+      "away_team": "Waasland-Beveren",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401878846",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "OH Leuven",
+      "away_team": "Antwerp",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401878852",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Royal Charleroi SC",
+      "away_team": "Standard Liege",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401878845",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Sint-Truidense",
+      "away_team": "Cercle Brugge KSV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401878848",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Union St.-Gilloise",
+      "away_team": "KVC Westerlo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401878844",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Zulte-Waregem",
+      "away_team": "Anderlecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401878838",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Anderlecht",
+      "away_team": "Club Brugge",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401878842",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Antwerp",
+      "away_team": "Zulte-Waregem",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401878841",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Cercle Brugge KSV",
+      "away_team": "OH Leuven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401878839",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "KVC Westerlo",
+      "away_team": "KV Mechelen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401878840",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Lommel SK",
+      "away_team": "KV Kortrijk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401878836",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "RAAL La Louvi\u00e8re",
+      "away_team": "Sint-Truidense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401878837",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Racing Genk",
+      "away_team": "Union St.-Gilloise",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401878835",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Standard Liege",
+      "away_team": "KAA Gent",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401878843",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Waasland-Beveren",
+      "away_team": "Royal Charleroi SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401878833",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "Club Brugge",
+      "away_team": "Waasland-Beveren",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401878832",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "KAA Gent",
+      "away_team": "Royal Charleroi SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401878831",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "KV Mechelen",
+      "away_team": "KV Kortrijk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401878827",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "KVC Westerlo",
+      "away_team": "Anderlecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401878829",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "OH Leuven",
+      "away_team": "Racing Genk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401878834",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "RAAL La Louvi\u00e8re",
+      "away_team": "Lommel SK",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401878828",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "Sint-Truidense",
+      "away_team": "Antwerp",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401878830",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "Union St.-Gilloise",
+      "away_team": "Standard Liege",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401878826",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "Zulte-Waregem",
+      "away_team": "Cercle Brugge KSV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401878824",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Anderlecht",
+      "away_team": "Lommel SK",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401878820",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Antwerp",
+      "away_team": "RAAL La Louvi\u00e8re",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401878825",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Cercle Brugge KSV",
+      "away_team": "Union St.-Gilloise",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401878822",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "KAA Gent",
+      "away_team": "Zulte-Waregem",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401878818",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "KV Kortrijk",
+      "away_team": "OH Leuven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401878819",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Racing Genk",
+      "away_team": "Sint-Truidense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401878823",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Royal Charleroi SC",
+      "away_team": "Club Brugge",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401878817",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Standard Liege",
+      "away_team": "KV Mechelen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401878821",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Waasland-Beveren",
+      "away_team": "KVC Westerlo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401878811",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "Anderlecht",
+      "away_team": "Standard Liege",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401878810",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "Club Brugge",
+      "away_team": "KAA Gent",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401878815",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "KV Mechelen",
+      "away_team": "Royal Charleroi SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401878813",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "KVC Westerlo",
+      "away_team": "Cercle Brugge KSV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401878814",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "Lommel SK",
+      "away_team": "Antwerp",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401878809",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "OH Leuven",
+      "away_team": "Union St.-Gilloise",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401878808",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "RAAL La Louvi\u00e8re",
+      "away_team": "Racing Genk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401878816",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "Sint-Truidense",
+      "away_team": "Waasland-Beveren",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401878812",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "Zulte-Waregem",
+      "away_team": "KV Kortrijk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401878807",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Cercle Brugge KSV",
+      "away_team": "RAAL La Louvi\u00e8re",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401878801",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "KAA Gent",
+      "away_team": "KVC Westerlo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401878805",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "KV Kortrijk",
+      "away_team": "Club Brugge",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401878800",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "OH Leuven",
+      "away_team": "Zulte-Waregem",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401878802",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Racing Genk",
+      "away_team": "Anderlecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401878806",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Royal Charleroi SC",
+      "away_team": "Lommel SK",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401878803",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Standard Liege",
+      "away_team": "Sint-Truidense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401878799",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Union St.-Gilloise",
+      "away_team": "KV Mechelen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401878804",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Waasland-Beveren",
+      "away_team": "Antwerp",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401878793",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Anderlecht",
+      "away_team": "Waasland-Beveren",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401878792",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Antwerp",
+      "away_team": "Cercle Brugge KSV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401878797",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Club Brugge",
+      "away_team": "OH Leuven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401878798",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "KV Kortrijk",
+      "away_team": "Standard Liege",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401878796",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "KV Mechelen",
+      "away_team": "KAA Gent",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401878795",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Lommel SK",
+      "away_team": "Racing Genk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401878791",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "RAAL La Louvi\u00e8re",
+      "away_team": "Union St.-Gilloise",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401878794",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Sint-Truidense",
+      "away_team": "Royal Charleroi SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401878790",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Zulte-Waregem",
+      "away_team": "KVC Westerlo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401878789",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "Cercle Brugge KSV",
+      "away_team": "KV Kortrijk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401878783",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "KAA Gent",
+      "away_team": "Lommel SK",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401878782",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "KV Mechelen",
+      "away_team": "RAAL La Louvi\u00e8re",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401878785",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "KVC Westerlo",
+      "away_team": "Sint-Truidense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401878784",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "Racing Genk",
+      "away_team": "Club Brugge",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401878788",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "Royal Charleroi SC",
+      "away_team": "Anderlecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401878786",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "Standard Liege",
+      "away_team": "OH Leuven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401878226",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "Union St.-Gilloise",
+      "away_team": "Antwerp",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401878787",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "Waasland-Beveren",
+      "away_team": "Zulte-Waregem",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401878220",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Anderlecht",
+      "away_team": "Cercle Brugge KSV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401878224",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Antwerp",
+      "away_team": "KAA Gent",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401878223",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Club Brugge",
+      "away_team": "Union St.-Gilloise",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401878225",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "KV Kortrijk",
+      "away_team": "KVC Westerlo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401878219",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Lommel SK",
+      "away_team": "Sint-Truidense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401878218",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "OH Leuven",
+      "away_team": "Waasland-Beveren",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401878221",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "RAAL La Louvi\u00e8re",
+      "away_team": "Standard Liege",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401878222",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Racing Genk",
+      "away_team": "Royal Charleroi SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401878217",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Zulte-Waregem",
+      "away_team": "KV Mechelen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401878211",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "Cercle Brugge KSV",
+      "away_team": "Club Brugge",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401878210",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "KAA Gent",
+      "away_team": "Racing Genk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401878216",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "KV Mechelen",
+      "away_team": "Antwerp",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401878208",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "KVC Westerlo",
+      "away_team": "OH Leuven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401878215",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "Royal Charleroi SC",
+      "away_team": "Zulte-Waregem",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401878213",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "Sint-Truidense",
+      "away_team": "Anderlecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401878209",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "Standard Liege",
+      "away_team": "Lommel SK",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401878212",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "Union St.-Gilloise",
+      "away_team": "KV Kortrijk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401878214",
+      "date": "2027-05-01T18:00Z",
+      "home_team": "Waasland-Beveren",
+      "away_team": "RAAL La Louvi\u00e8re",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401878202",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "Anderlecht",
+      "away_team": "Union St.-Gilloise",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401878201",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "Antwerp",
+      "away_team": "Standard Liege",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401878206",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "Club Brugge",
+      "away_team": "KV Mechelen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401878200",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "KV Kortrijk",
+      "away_team": "KAA Gent",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401878204",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "Lommel SK",
+      "away_team": "Waasland-Beveren",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401878203",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "OH Leuven",
+      "away_team": "Royal Charleroi SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401878199",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "RAAL La Louvi\u00e8re",
+      "away_team": "KVC Westerlo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401878205",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "Racing Genk",
+      "away_team": "Cercle Brugge KSV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401878207",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "Zulte-Waregem",
+      "away_team": "Sint-Truidense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401878193",
+      "date": "2027-05-15T18:00Z",
+      "home_team": "Anderlecht",
+      "away_team": "Antwerp",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401878192",
+      "date": "2027-05-15T18:00Z",
+      "home_team": "Cercle Brugge KSV",
+      "away_team": "Waasland-Beveren",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401878196",
+      "date": "2027-05-15T18:00Z",
+      "home_team": "KAA Gent",
+      "away_team": "Union St.-Gilloise",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401878198",
+      "date": "2027-05-15T18:00Z",
+      "home_team": "KV Mechelen",
+      "away_team": "OH Leuven",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401878195",
+      "date": "2027-05-15T18:00Z",
+      "home_team": "KVC Westerlo",
+      "away_team": "Lommel SK",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401878197",
+      "date": "2027-05-15T18:00Z",
+      "home_team": "Royal Charleroi SC",
+      "away_team": "KV Kortrijk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401878190",
+      "date": "2027-05-15T18:00Z",
+      "home_team": "Sint-Truidense",
+      "away_team": "Club Brugge",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401878191",
+      "date": "2027-05-15T18:00Z",
+      "home_team": "Standard Liege",
+      "away_team": "Racing Genk",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401878194",
+      "date": "2027-05-15T18:00Z",
+      "home_team": "Zulte-Waregem",
+      "away_team": "RAAL La Louvi\u00e8re",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401878189",
+      "date": "2027-05-22T18:00Z",
+      "home_team": "Antwerp",
+      "away_team": "KVC Westerlo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401878188",
+      "date": "2027-05-22T18:00Z",
+      "home_team": "Club Brugge",
+      "away_team": "Zulte-Waregem",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401878186",
+      "date": "2027-05-22T18:00Z",
+      "home_team": "KV Kortrijk",
+      "away_team": "Sint-Truidense",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401878185",
+      "date": "2027-05-22T18:00Z",
+      "home_team": "Lommel SK",
+      "away_team": "Cercle Brugge KSV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401878184",
+      "date": "2027-05-22T18:00Z",
+      "home_team": "OH Leuven",
+      "away_team": "KAA Gent",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401878183",
+      "date": "2027-05-22T18:00Z",
+      "home_team": "RAAL La Louvi\u00e8re",
+      "away_team": "Anderlecht",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401878187",
+      "date": "2027-05-22T18:00Z",
+      "home_team": "Racing Genk",
+      "away_team": "KV Mechelen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401878181",
+      "date": "2027-05-22T18:00Z",
+      "home_team": "Union St.-Gilloise",
+      "away_team": "Royal Charleroi SC",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401878182",
+      "date": "2027-05-22T18:00Z",
+      "home_team": "Waasland-Beveren",
+      "away_team": "Standard Liege",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    }
+  ]
+}

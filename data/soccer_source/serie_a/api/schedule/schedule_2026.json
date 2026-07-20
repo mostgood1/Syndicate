@@ -1,0 +1,4026 @@
+{
+  "league": "serie_a",
+  "season": 2026,
+  "generated_at": "2026-07-20T21:05:35.163087+00:00",
+  "match_count": 380,
+  "weeks": [
+    {
+      "week": 1,
+      "start_date": "2026-08-22",
+      "end_date": "2026-08-28",
+      "match_count": 11
+    },
+    {
+      "week": 2,
+      "start_date": "2026-08-29",
+      "end_date": "2026-09-04",
+      "match_count": 10
+    },
+    {
+      "week": 3,
+      "start_date": "2026-09-05",
+      "end_date": "2026-09-11",
+      "match_count": 10
+    },
+    {
+      "week": 4,
+      "start_date": "2026-09-12",
+      "end_date": "2026-09-18",
+      "match_count": 10
+    },
+    {
+      "week": 5,
+      "start_date": "2026-09-19",
+      "end_date": "2026-09-20",
+      "match_count": 9
+    },
+    {
+      "week": 6,
+      "start_date": "2026-10-11",
+      "end_date": "2026-10-11",
+      "match_count": 10
+    },
+    {
+      "week": 7,
+      "start_date": "2026-10-17",
+      "end_date": "2026-10-17",
+      "match_count": 10
+    },
+    {
+      "week": 8,
+      "start_date": "2026-10-25",
+      "end_date": "2026-10-28",
+      "match_count": 20
+    },
+    {
+      "week": 9,
+      "start_date": "2026-11-01",
+      "end_date": "2026-11-01",
+      "match_count": 10
+    },
+    {
+      "week": 10,
+      "start_date": "2026-11-08",
+      "end_date": "2026-11-08",
+      "match_count": 10
+    },
+    {
+      "week": 11,
+      "start_date": "2026-11-22",
+      "end_date": "2026-11-22",
+      "match_count": 10
+    },
+    {
+      "week": 12,
+      "start_date": "2026-11-29",
+      "end_date": "2026-11-29",
+      "match_count": 10
+    },
+    {
+      "week": 13,
+      "start_date": "2026-12-06",
+      "end_date": "2026-12-06",
+      "match_count": 10
+    },
+    {
+      "week": 14,
+      "start_date": "2026-12-13",
+      "end_date": "2026-12-13",
+      "match_count": 10
+    },
+    {
+      "week": 15,
+      "start_date": "2026-12-20",
+      "end_date": "2026-12-20",
+      "match_count": 10
+    },
+    {
+      "week": 16,
+      "start_date": "2027-01-03",
+      "end_date": "2027-01-06",
+      "match_count": 20
+    },
+    {
+      "week": 17,
+      "start_date": "2027-01-10",
+      "end_date": "2027-01-10",
+      "match_count": 10
+    },
+    {
+      "week": 18,
+      "start_date": "2027-01-17",
+      "end_date": "2027-01-17",
+      "match_count": 10
+    },
+    {
+      "week": 19,
+      "start_date": "2027-01-24",
+      "end_date": "2027-01-24",
+      "match_count": 10
+    },
+    {
+      "week": 20,
+      "start_date": "2027-01-31",
+      "end_date": "2027-01-31",
+      "match_count": 10
+    },
+    {
+      "week": 21,
+      "start_date": "2027-02-07",
+      "end_date": "2027-02-07",
+      "match_count": 10
+    },
+    {
+      "week": 22,
+      "start_date": "2027-02-14",
+      "end_date": "2027-02-14",
+      "match_count": 10
+    },
+    {
+      "week": 23,
+      "start_date": "2027-02-21",
+      "end_date": "2027-02-21",
+      "match_count": 10
+    },
+    {
+      "week": 24,
+      "start_date": "2027-02-28",
+      "end_date": "2027-02-28",
+      "match_count": 10
+    },
+    {
+      "week": 25,
+      "start_date": "2027-03-07",
+      "end_date": "2027-03-07",
+      "match_count": 10
+    },
+    {
+      "week": 26,
+      "start_date": "2027-03-14",
+      "end_date": "2027-03-14",
+      "match_count": 10
+    },
+    {
+      "week": 27,
+      "start_date": "2027-03-21",
+      "end_date": "2027-03-21",
+      "match_count": 10
+    },
+    {
+      "week": 28,
+      "start_date": "2027-04-04",
+      "end_date": "2027-04-04",
+      "match_count": 10
+    },
+    {
+      "week": 29,
+      "start_date": "2027-04-11",
+      "end_date": "2027-04-11",
+      "match_count": 10
+    },
+    {
+      "week": 30,
+      "start_date": "2027-04-18",
+      "end_date": "2027-04-18",
+      "match_count": 10
+    },
+    {
+      "week": 31,
+      "start_date": "2027-04-25",
+      "end_date": "2027-04-25",
+      "match_count": 10
+    },
+    {
+      "week": 32,
+      "start_date": "2027-05-02",
+      "end_date": "2027-05-02",
+      "match_count": 10
+    },
+    {
+      "week": 33,
+      "start_date": "2027-05-09",
+      "end_date": "2027-05-09",
+      "match_count": 10
+    },
+    {
+      "week": 34,
+      "start_date": "2027-05-16",
+      "end_date": "2027-05-16",
+      "match_count": 10
+    },
+    {
+      "week": 35,
+      "start_date": "2027-05-23",
+      "end_date": "2027-05-23",
+      "match_count": 10
+    },
+    {
+      "week": 36,
+      "start_date": "2027-05-30",
+      "end_date": "2027-05-30",
+      "match_count": 10
+    }
+  ],
+  "matches": [
+    {
+      "event_id": "401874931",
+      "date": "2026-08-22T16:30Z",
+      "home_team": "Internazionale",
+      "away_team": "Monza",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401874745",
+      "date": "2026-08-22T16:30Z",
+      "home_team": "Udinese",
+      "away_team": "Como",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401874929",
+      "date": "2026-08-22T18:45Z",
+      "home_team": "Genoa",
+      "away_team": "Napoli",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401874747",
+      "date": "2026-08-22T18:45Z",
+      "home_team": "Parma",
+      "away_team": "Cagliari",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401874930",
+      "date": "2026-08-23T16:30Z",
+      "home_team": "Frosinone",
+      "away_team": "Juventus",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401874946",
+      "date": "2026-08-23T16:30Z",
+      "home_team": "Venezia",
+      "away_team": "Lecce",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401874748",
+      "date": "2026-08-23T18:45Z",
+      "home_team": "Atalanta",
+      "away_team": "Sassuolo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401874932",
+      "date": "2026-08-23T18:45Z",
+      "home_team": "Torino",
+      "away_team": "AC Milan",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401874927",
+      "date": "2026-08-24T16:30Z",
+      "home_team": "Bologna",
+      "away_team": "Lazio",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401874928",
+      "date": "2026-08-24T18:45Z",
+      "home_team": "AS Roma",
+      "away_team": "Fiorentina",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401874758",
+      "date": "2026-08-28T18:45Z",
+      "home_team": "AC Milan",
+      "away_team": "Venezia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401874942",
+      "date": "2026-08-29T16:30Z",
+      "home_team": "Fiorentina",
+      "away_team": "Frosinone",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401874749",
+      "date": "2026-08-29T16:30Z",
+      "home_team": "Monza",
+      "away_team": "Udinese",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401874743",
+      "date": "2026-08-29T16:30Z",
+      "home_team": "Sassuolo",
+      "away_team": "Torino",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401874746",
+      "date": "2026-08-29T18:45Z",
+      "home_team": "Juventus",
+      "away_team": "Parma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401874755",
+      "date": "2026-08-30T16:30Z",
+      "home_team": "Napoli",
+      "away_team": "Como",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401874938",
+      "date": "2026-08-30T18:45Z",
+      "home_team": "Cagliari",
+      "away_team": "Internazionale",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401874742",
+      "date": "2026-08-30T18:45Z",
+      "home_team": "Lazio",
+      "away_team": "Genoa",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401874945",
+      "date": "2026-08-31T16:30Z",
+      "home_team": "Lecce",
+      "away_team": "AS Roma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401874970",
+      "date": "2026-08-31T18:45Z",
+      "home_team": "Atalanta",
+      "away_team": "Bologna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401874744",
+      "date": "2026-09-04T18:45Z",
+      "home_team": "Genoa",
+      "away_team": "Como",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401874939",
+      "date": "2026-09-05T13:00Z",
+      "home_team": "Fiorentina",
+      "away_team": "Torino",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401874937",
+      "date": "2026-09-05T16:00Z",
+      "home_team": "Internazionale",
+      "away_team": "Napoli",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401874781",
+      "date": "2026-09-05T18:45Z",
+      "home_team": "AS Roma",
+      "away_team": "Atalanta",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401874768",
+      "date": "2026-09-06T13:00Z",
+      "home_team": "Frosinone",
+      "away_team": "Venezia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401874987",
+      "date": "2026-09-06T13:00Z",
+      "home_team": "Parma",
+      "away_team": "Monza",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401874751",
+      "date": "2026-09-06T16:00Z",
+      "home_team": "Bologna",
+      "away_team": "Sassuolo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401874954",
+      "date": "2026-09-06T18:45Z",
+      "home_team": "Juventus",
+      "away_team": "AC Milan",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401874943",
+      "date": "2026-09-07T16:00Z",
+      "home_team": "Cagliari",
+      "away_team": "Lecce",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401874962",
+      "date": "2026-09-07T18:45Z",
+      "home_team": "Udinese",
+      "away_team": "Lazio",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401874759",
+      "date": "2026-09-11T18:45Z",
+      "home_team": "Venezia",
+      "away_team": "Fiorentina",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401874991",
+      "date": "2026-09-12T13:00Z",
+      "home_team": "Genoa",
+      "away_team": "Frosinone",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401874750",
+      "date": "2026-09-12T16:00Z",
+      "home_team": "Sassuolo",
+      "away_team": "Juventus",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401874979",
+      "date": "2026-09-12T18:45Z",
+      "home_team": "Atalanta",
+      "away_team": "Cagliari",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401874950",
+      "date": "2026-09-13T10:30Z",
+      "home_team": "Torino",
+      "away_team": "AS Roma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401874933",
+      "date": "2026-09-13T13:00Z",
+      "home_team": "Como",
+      "away_team": "Parma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401874936",
+      "date": "2026-09-13T13:00Z",
+      "home_team": "Lecce",
+      "away_team": "Monza",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401874792",
+      "date": "2026-09-13T16:00Z",
+      "home_team": "Napoli",
+      "away_team": "Bologna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401874941",
+      "date": "2026-09-13T18:45Z",
+      "home_team": "Lazio",
+      "away_team": "AC Milan",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401874966",
+      "date": "2026-09-14T18:45Z",
+      "home_team": "Internazionale",
+      "away_team": "Udinese",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401874756",
+      "date": "2026-09-18T18:45Z",
+      "home_team": "Monza",
+      "away_team": "Sassuolo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401874767",
+      "date": "2026-09-19T13:00Z",
+      "home_team": "Bologna",
+      "away_team": "Torino",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401874964",
+      "date": "2026-09-19T13:00Z",
+      "home_team": "Udinese",
+      "away_team": "Cagliari",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401874753",
+      "date": "2026-09-19T16:00Z",
+      "home_team": "AS Roma",
+      "away_team": "Internazionale",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401874956",
+      "date": "2026-09-19T18:45Z",
+      "home_team": "Venezia",
+      "away_team": "Lazio",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401874934",
+      "date": "2026-09-20T10:30Z",
+      "home_team": "Fiorentina",
+      "away_team": "Napoli",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401874752",
+      "date": "2026-09-20T13:00Z",
+      "home_team": "Frosinone",
+      "away_team": "Como",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401874801",
+      "date": "2026-09-20T13:00Z",
+      "home_team": "Parma",
+      "away_team": "Genoa",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401874757",
+      "date": "2026-09-20T16:00Z",
+      "home_team": "Juventus",
+      "away_team": "Atalanta",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401874944",
+      "date": "2026-09-20T18:45Z",
+      "home_team": "AC Milan",
+      "away_team": "Lecce",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401875005",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Atalanta",
+      "away_team": "Venezia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401874764",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Cagliari",
+      "away_team": "Juventus",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401874940",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Como",
+      "away_team": "AS Roma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401874947",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Genoa",
+      "away_team": "Fiorentina",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401875021",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Internazionale",
+      "away_team": "Parma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401874951",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Lazio",
+      "away_team": "Monza",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401874776",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Lecce",
+      "away_team": "Bologna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401874754",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Napoli",
+      "away_team": "Frosinone",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401874789",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Sassuolo",
+      "away_team": "AC Milan",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401874763",
+      "date": "2026-10-11T18:00Z",
+      "home_team": "Torino",
+      "away_team": "Udinese",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401874978",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "AC Milan",
+      "away_team": "Atalanta",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401874935",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "AS Roma",
+      "away_team": "Genoa",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401874953",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Bologna",
+      "away_team": "Internazionale",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401874774",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Fiorentina",
+      "away_team": "Como",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401874959",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Frosinone",
+      "away_team": "Sassuolo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401874765",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Juventus",
+      "away_team": "Lazio",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401874762",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Monza",
+      "away_team": "Cagliari",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401874784",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Parma",
+      "away_team": "Torino",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401874771",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Udinese",
+      "away_team": "Lecce",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401874760",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Venezia",
+      "away_team": "Napoli",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401874972",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Atalanta",
+      "away_team": "Frosinone",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401874958",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Cagliari",
+      "away_team": "Bologna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401874961",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Como",
+      "away_team": "Sassuolo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401874952",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Genoa",
+      "away_team": "Venezia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401875036",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Internazionale",
+      "away_team": "Fiorentina",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401874955",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Lazio",
+      "away_team": "Parma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401874772",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Lecce",
+      "away_team": "Juventus",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401874948",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Napoli",
+      "away_team": "AS Roma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401874957",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Torino",
+      "away_team": "Monza",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401874779",
+      "date": "2026-10-25T18:00Z",
+      "home_team": "Udinese",
+      "away_team": "AC Milan",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401874993",
+      "date": "2026-10-28T18:00Z",
+      "home_team": "AC Milan",
+      "away_team": "Bologna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401874780",
+      "date": "2026-10-28T18:00Z",
+      "home_team": "AS Roma",
+      "away_team": "Cagliari",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401874969",
+      "date": "2026-10-28T18:00Z",
+      "home_team": "Fiorentina",
+      "away_team": "Atalanta",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401874976",
+      "date": "2026-10-28T18:00Z",
+      "home_team": "Frosinone",
+      "away_team": "Lecce",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401874988",
+      "date": "2026-10-28T18:00Z",
+      "home_team": "Genoa",
+      "away_team": "Juventus",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401874799",
+      "date": "2026-10-28T18:00Z",
+      "home_team": "Monza",
+      "away_team": "Napoli",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401874965",
+      "date": "2026-10-28T18:00Z",
+      "home_team": "Parma",
+      "away_team": "Udinese",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401874980",
+      "date": "2026-10-28T18:00Z",
+      "home_team": "Sassuolo",
+      "away_team": "Lazio",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401874786",
+      "date": "2026-10-28T18:00Z",
+      "home_team": "Torino",
+      "away_team": "Como",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401874773",
+      "date": "2026-10-28T18:00Z",
+      "home_team": "Venezia",
+      "away_team": "Internazionale",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401874795",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "AC Milan",
+      "away_team": "Internazionale",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401874971",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Atalanta",
+      "away_team": "Parma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401874798",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Bologna",
+      "away_team": "Monza",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401875002",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Como",
+      "away_team": "Venezia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401874782",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Frosinone",
+      "away_team": "Torino",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401874949",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Juventus",
+      "away_team": "Napoli",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401874983",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Lazio",
+      "away_team": "Cagliari",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401874968",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Lecce",
+      "away_team": "Genoa",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401874963",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Sassuolo",
+      "away_team": "Fiorentina",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401874990",
+      "date": "2026-11-01T20:00Z",
+      "home_team": "Udinese",
+      "away_team": "AS Roma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401874803",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "AS Roma",
+      "away_team": "Sassuolo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401874791",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Cagliari",
+      "away_team": "Frosinone",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401875003",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Fiorentina",
+      "away_team": "Juventus",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401875018",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Genoa",
+      "away_team": "AC Milan",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401874808",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Internazionale",
+      "away_team": "Como",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401874800",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Monza",
+      "away_team": "Atalanta",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401874810",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Napoli",
+      "away_team": "Lazio",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401874974",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Parma",
+      "away_team": "Bologna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401874811",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Torino",
+      "away_team": "Lecce",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401874815",
+      "date": "2026-11-08T20:00Z",
+      "home_team": "Venezia",
+      "away_team": "Udinese",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401874989",
+      "date": "2026-11-22T20:00Z",
+      "home_team": "AC Milan",
+      "away_team": "Frosinone",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401875001",
+      "date": "2026-11-22T20:00Z",
+      "home_team": "Atalanta",
+      "away_team": "Internazionale",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401875047",
+      "date": "2026-11-22T20:00Z",
+      "home_team": "Bologna",
+      "away_team": "Udinese",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401875056",
+      "date": "2026-11-22T20:00Z",
+      "home_team": "Como",
+      "away_team": "Cagliari",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401875008",
+      "date": "2026-11-22T20:00Z",
+      "home_team": "Juventus",
+      "away_team": "Venezia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401874981",
+      "date": "2026-11-22T20:00Z",
+      "home_team": "Lazio",
+      "away_team": "Lecce",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401875009",
+      "date": "2026-11-22T20:00Z",
+      "home_team": "Monza",
+      "away_team": "Fiorentina",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401875067",
+      "date": "2026-11-22T20:00Z",
+      "home_team": "Napoli",
+      "away_team": "Torino",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401874967",
+      "date": "2026-11-22T20:00Z",
+      "home_team": "Parma",
+      "away_team": "AS Roma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401874960",
+      "date": "2026-11-22T20:00Z",
+      "home_team": "Sassuolo",
+      "away_team": "Genoa",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401874769",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "AS Roma",
+      "away_team": "Monza",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401875019",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Cagliari",
+      "away_team": "AC Milan",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401874994",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Como",
+      "away_team": "Juventus",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401875081",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Frosinone",
+      "away_team": "Parma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401874977",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Internazionale",
+      "away_team": "Genoa",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401875095",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Lecce",
+      "away_team": "Atalanta",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401874992",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Sassuolo",
+      "away_team": "Napoli",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401874826",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Torino",
+      "away_team": "Lazio",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401875031",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Udinese",
+      "away_team": "Fiorentina",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401875004",
+      "date": "2026-11-29T20:00Z",
+      "home_team": "Venezia",
+      "away_team": "Bologna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401874995",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "AC Milan",
+      "away_team": "Parma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401874984",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Bologna",
+      "away_team": "AS Roma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401875107",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Fiorentina",
+      "away_team": "Cagliari",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401875023",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Frosinone",
+      "away_team": "Internazionale",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401875017",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Genoa",
+      "away_team": "Torino",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401875006",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Juventus",
+      "away_team": "Udinese",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401875029",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Lazio",
+      "away_team": "Atalanta",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401874975",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Monza",
+      "away_team": "Como",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401874788",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Napoli",
+      "away_team": "Lecce",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401875011",
+      "date": "2026-12-06T20:00Z",
+      "home_team": "Venezia",
+      "away_team": "Sassuolo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401875032",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Atalanta",
+      "away_team": "Genoa",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401874820",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Cagliari",
+      "away_team": "Venezia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401874821",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Como",
+      "away_team": "Bologna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401874766",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Internazionale",
+      "away_team": "Torino",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401874783",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Juventus",
+      "away_team": "Monza",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401875007",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Lazio",
+      "away_team": "AS Roma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401874982",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Lecce",
+      "away_team": "Sassuolo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401875028",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Napoli",
+      "away_team": "AC Milan",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401874761",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Parma",
+      "away_team": "Fiorentina",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401874775",
+      "date": "2026-12-13T20:00Z",
+      "home_team": "Udinese",
+      "away_team": "Frosinone",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401875044",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "AC Milan",
+      "away_team": "Como",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401874813",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "AS Roma",
+      "away_team": "Juventus",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401874777",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Atalanta",
+      "away_team": "Napoli",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401874836",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Fiorentina",
+      "away_team": "Bologna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401875016",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Frosinone",
+      "away_team": "Lazio",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401875045",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Genoa",
+      "away_team": "Udinese",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401874996",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Lecce",
+      "away_team": "Internazionale",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401874973",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Sassuolo",
+      "away_team": "Parma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401874785",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Torino",
+      "away_team": "Cagliari",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401875118",
+      "date": "2026-12-20T20:00Z",
+      "home_team": "Venezia",
+      "away_team": "Monza",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401875076",
+      "date": "2027-01-03T20:00Z",
+      "home_team": "AS Roma",
+      "away_team": "Frosinone",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401875000",
+      "date": "2027-01-03T20:00Z",
+      "home_team": "Bologna",
+      "away_team": "Juventus",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401875057",
+      "date": "2027-01-03T20:00Z",
+      "home_team": "Cagliari",
+      "away_team": "Genoa",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401874830",
+      "date": "2027-01-03T20:00Z",
+      "home_team": "Como",
+      "away_team": "Lecce",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401875014",
+      "date": "2027-01-03T20:00Z",
+      "home_team": "Fiorentina",
+      "away_team": "Lazio",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401874793",
+      "date": "2027-01-03T20:00Z",
+      "home_team": "Internazionale",
+      "away_team": "Sassuolo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401874986",
+      "date": "2027-01-03T20:00Z",
+      "home_team": "Monza",
+      "away_team": "AC Milan",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401875020",
+      "date": "2027-01-03T20:00Z",
+      "home_team": "Parma",
+      "away_team": "Napoli",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401875042",
+      "date": "2027-01-03T20:00Z",
+      "home_team": "Torino",
+      "away_team": "Venezia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401874770",
+      "date": "2027-01-03T20:00Z",
+      "home_team": "Udinese",
+      "away_team": "Atalanta",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401875034",
+      "date": "2027-01-06T20:00Z",
+      "home_team": "AC Milan",
+      "away_team": "Fiorentina",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401874843",
+      "date": "2027-01-06T20:00Z",
+      "home_team": "Atalanta",
+      "away_team": "Como",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401875087",
+      "date": "2027-01-06T20:00Z",
+      "home_team": "Frosinone",
+      "away_team": "Bologna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401875126",
+      "date": "2027-01-06T20:00Z",
+      "home_team": "Genoa",
+      "away_team": "Monza",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401875070",
+      "date": "2027-01-06T20:00Z",
+      "home_team": "Juventus",
+      "away_team": "Torino",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401874778",
+      "date": "2027-01-06T20:00Z",
+      "home_team": "Lazio",
+      "away_team": "Internazionale",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401875033",
+      "date": "2027-01-06T20:00Z",
+      "home_team": "Lecce",
+      "away_team": "Parma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401874787",
+      "date": "2027-01-06T20:00Z",
+      "home_team": "Napoli",
+      "away_team": "Cagliari",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401874999",
+      "date": "2027-01-06T20:00Z",
+      "home_team": "Sassuolo",
+      "away_team": "Udinese",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401875099",
+      "date": "2027-01-06T20:00Z",
+      "home_team": "Venezia",
+      "away_team": "AS Roma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401875089",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "AS Roma",
+      "away_team": "AC Milan",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401874997",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Bologna",
+      "away_team": "Genoa",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401874854",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Cagliari",
+      "away_team": "Sassuolo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401874805",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Como",
+      "away_team": "Lazio",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401875046",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Fiorentina",
+      "away_team": "Lecce",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401875035",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Internazionale",
+      "away_team": "Juventus",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401874794",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Monza",
+      "away_team": "Frosinone",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401875079",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Parma",
+      "away_team": "Venezia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401875015",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Torino",
+      "away_team": "Atalanta",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401874835",
+      "date": "2027-01-10T20:00Z",
+      "home_team": "Udinese",
+      "away_team": "Napoli",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401875010",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "AC Milan",
+      "away_team": "Torino",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401875030",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Atalanta",
+      "away_team": "AS Roma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401874846",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Cagliari",
+      "away_team": "Como",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401875059",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Juventus",
+      "away_team": "Genoa",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401874796",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Lazio",
+      "away_team": "Bologna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401875048",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Lecce",
+      "away_team": "Udinese",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401875092",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Napoli",
+      "away_team": "Fiorentina",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401875129",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Parma",
+      "away_team": "Internazionale",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401874818",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Sassuolo",
+      "away_team": "Monza",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401875132",
+      "date": "2027-01-17T20:00Z",
+      "home_team": "Venezia",
+      "away_team": "Frosinone",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401874824",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "AS Roma",
+      "away_team": "Udinese",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401875024",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Bologna",
+      "away_team": "Atalanta",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401874804",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Como",
+      "away_team": "Napoli",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401875022",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Fiorentina",
+      "away_team": "Sassuolo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401875061",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Frosinone",
+      "away_team": "AC Milan",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401875135",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Genoa",
+      "away_team": "Parma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401874856",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Internazionale",
+      "away_team": "Venezia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401875012",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Juventus",
+      "away_team": "Cagliari",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401874790",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Lecce",
+      "away_team": "Torino",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401874863",
+      "date": "2027-01-24T20:00Z",
+      "home_team": "Monza",
+      "away_team": "Lazio",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401875078",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "AC Milan",
+      "away_team": "Juventus",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401875109",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Atalanta",
+      "away_team": "Fiorentina",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401875121",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Cagliari",
+      "away_team": "Parma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401875058",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Genoa",
+      "away_team": "Lecce",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401874809",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Lazio",
+      "away_team": "Venezia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401875043",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Monza",
+      "away_team": "AS Roma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401875074",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Napoli",
+      "away_team": "Internazionale",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401874806",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Sassuolo",
+      "away_team": "Como",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401874867",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Torino",
+      "away_team": "Frosinone",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401875102",
+      "date": "2027-01-31T20:00Z",
+      "home_team": "Udinese",
+      "away_team": "Bologna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401875025",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "AS Roma",
+      "away_team": "Torino",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401875054",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Atalanta",
+      "away_team": "Lazio",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401874871",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Bologna",
+      "away_team": "AC Milan",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401875037",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Como",
+      "away_team": "Monza",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401875136",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Fiorentina",
+      "away_team": "Udinese",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401874812",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Internazionale",
+      "away_team": "Cagliari",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401875069",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Juventus",
+      "away_team": "Sassuolo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401875140",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Lecce",
+      "away_team": "Napoli",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401875091",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Parma",
+      "away_team": "Frosinone",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401874876",
+      "date": "2027-02-07T20:00Z",
+      "home_team": "Venezia",
+      "away_team": "Genoa",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401874998",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "AS Roma",
+      "away_team": "Parma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401875116",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Bologna",
+      "away_team": "Como",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401875073",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Cagliari",
+      "away_team": "Lazio",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401874985",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Frosinone",
+      "away_team": "Fiorentina",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401875125",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Genoa",
+      "away_team": "Atalanta",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401875105",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Internazionale",
+      "away_team": "AC Milan",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401875041",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Monza",
+      "away_team": "Lecce",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401874829",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Napoli",
+      "away_team": "Juventus",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401875027",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Torino",
+      "away_team": "Sassuolo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401874833",
+      "date": "2027-02-14T20:00Z",
+      "home_team": "Udinese",
+      "away_team": "Venezia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401875066",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "AC Milan",
+      "away_team": "Genoa",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401874819",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Atalanta",
+      "away_team": "Monza",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401875143",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Como",
+      "away_team": "Torino",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401874802",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Fiorentina",
+      "away_team": "Internazionale",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401874816",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Juventus",
+      "away_team": "Bologna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401874841",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Lazio",
+      "away_team": "Napoli",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401875137",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Lecce",
+      "away_team": "Frosinone",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401875146",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Sassuolo",
+      "away_team": "AS Roma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401875050",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Udinese",
+      "away_team": "Parma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401874797",
+      "date": "2027-02-21T20:00Z",
+      "home_team": "Venezia",
+      "away_team": "Cagliari",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401874823",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "AS Roma",
+      "away_team": "Venezia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401875090",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Bologna",
+      "away_team": "Lecce",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401875013",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Cagliari",
+      "away_team": "Udinese",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401875077",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Como",
+      "away_team": "AC Milan",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401875040",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Frosinone",
+      "away_team": "Napoli",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401874827",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Genoa",
+      "away_team": "Lazio",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401874839",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Internazionale",
+      "away_team": "Atalanta",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401875088",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Monza",
+      "away_team": "Juventus",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401874852",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Parma",
+      "away_team": "Sassuolo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401874844",
+      "date": "2027-02-28T20:00Z",
+      "home_team": "Torino",
+      "away_team": "Fiorentina",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401875100",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "AC Milan",
+      "away_team": "Cagliari",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401874855",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Atalanta",
+      "away_team": "Torino",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401875038",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Fiorentina",
+      "away_team": "Venezia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401874834",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Juventus",
+      "away_team": "AS Roma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401875053",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Lazio",
+      "away_team": "Frosinone",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401875026",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Lecce",
+      "away_team": "Como",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401875082",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Monza",
+      "away_team": "Genoa",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401875052",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Napoli",
+      "away_team": "Parma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401874845",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Sassuolo",
+      "away_team": "Bologna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401875139",
+      "date": "2027-03-07T20:00Z",
+      "home_team": "Udinese",
+      "away_team": "Internazionale",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401875144",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "AC Milan",
+      "away_team": "Sassuolo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401874825",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Bologna",
+      "away_team": "Napoli",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401875141",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Cagliari",
+      "away_team": "Fiorentina",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401875039",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Como",
+      "away_team": "Udinese",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401875086",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Frosinone",
+      "away_team": "Monza",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401874837",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Genoa",
+      "away_team": "AS Roma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401874865",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Lazio",
+      "away_team": "Juventus",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401874872",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Parma",
+      "away_team": "Lecce",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401874851",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Torino",
+      "away_team": "Internazionale",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401875060",
+      "date": "2027-03-14T18:00Z",
+      "home_team": "Venezia",
+      "away_team": "Atalanta",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401875049",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "AS Roma",
+      "away_team": "Lecce",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401875142",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Atalanta",
+      "away_team": "AC Milan",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401875147",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Fiorentina",
+      "away_team": "Genoa",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401875068",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Internazionale",
+      "away_team": "Frosinone",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401875083",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Juventus",
+      "away_team": "Como",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401874860",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Monza",
+      "away_team": "Bologna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401875051",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Napoli",
+      "away_team": "Venezia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401874807",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Parma",
+      "away_team": "Lazio",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401874880",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Sassuolo",
+      "away_team": "Cagliari",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401875055",
+      "date": "2027-03-21T18:00Z",
+      "home_team": "Udinese",
+      "away_team": "Torino",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401875101",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "AC Milan",
+      "away_team": "Monza",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401874864",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "AS Roma",
+      "away_team": "Bologna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401874882",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Cagliari",
+      "away_team": "Napoli",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401875065",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Como",
+      "away_team": "Fiorentina",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401874868",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Frosinone",
+      "away_team": "Udinese",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401875150",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Genoa",
+      "away_team": "Internazionale",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401875080",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Lecce",
+      "away_team": "Lazio",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401875094",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Sassuolo",
+      "away_team": "Atalanta",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401874814",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Torino",
+      "away_team": "Juventus",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401875063",
+      "date": "2027-04-04T18:00Z",
+      "home_team": "Venezia",
+      "away_team": "Parma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401874817",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Bologna",
+      "away_team": "Venezia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401875114",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Cagliari",
+      "away_team": "Atalanta",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401875093",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Fiorentina",
+      "away_team": "AC Milan",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401875149",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Frosinone",
+      "away_team": "Genoa",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401874822",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Internazionale",
+      "away_team": "AS Roma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401874832",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Juventus",
+      "away_team": "Lecce",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401875153",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Lazio",
+      "away_team": "Torino",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401875145",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Napoli",
+      "away_team": "Sassuolo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401875111",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Parma",
+      "away_team": "Como",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401874883",
+      "date": "2027-04-11T18:00Z",
+      "home_team": "Udinese",
+      "away_team": "Monza",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401874831",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "AC Milan",
+      "away_team": "Napoli",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401875148",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "AS Roma",
+      "away_team": "Lazio",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401875096",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Atalanta",
+      "away_team": "Udinese",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401874848",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Bologna",
+      "away_team": "Cagliari",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401875098",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Como",
+      "away_team": "Frosinone",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401875152",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Fiorentina",
+      "away_team": "Parma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401874874",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Monza",
+      "away_team": "Internazionale",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401874862",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Sassuolo",
+      "away_team": "Lecce",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401874884",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Torino",
+      "away_team": "Genoa",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401875072",
+      "date": "2027-04-18T18:00Z",
+      "home_team": "Venezia",
+      "away_team": "Juventus",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401874869",
+      "date": "2027-04-25T18:00Z",
+      "home_team": "Cagliari",
+      "away_team": "Monza",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401874853",
+      "date": "2027-04-25T18:00Z",
+      "home_team": "Frosinone",
+      "away_team": "AS Roma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401875123",
+      "date": "2027-04-25T18:00Z",
+      "home_team": "Genoa",
+      "away_team": "Sassuolo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401874870",
+      "date": "2027-04-25T18:00Z",
+      "home_team": "Internazionale",
+      "away_team": "Bologna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401875156",
+      "date": "2027-04-25T18:00Z",
+      "home_team": "Juventus",
+      "away_team": "Fiorentina",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401874873",
+      "date": "2027-04-25T18:00Z",
+      "home_team": "Lazio",
+      "away_team": "Como",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401874859",
+      "date": "2027-04-25T18:00Z",
+      "home_team": "Lecce",
+      "away_team": "AC Milan",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401874877",
+      "date": "2027-04-25T18:00Z",
+      "home_team": "Napoli",
+      "away_team": "Udinese",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401875124",
+      "date": "2027-04-25T18:00Z",
+      "home_team": "Parma",
+      "away_team": "Atalanta",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401875108",
+      "date": "2027-04-25T18:00Z",
+      "home_team": "Venezia",
+      "away_team": "Torino",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401875064",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "AC Milan",
+      "away_team": "Lazio",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401874828",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "AS Roma",
+      "away_team": "Napoli",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401875085",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Atalanta",
+      "away_team": "Juventus",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401875103",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Bologna",
+      "away_team": "Fiorentina",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401875128",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Como",
+      "away_team": "Internazionale",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401875131",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Lecce",
+      "away_team": "Cagliari",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401875112",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Monza",
+      "away_team": "Venezia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401875155",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Sassuolo",
+      "away_team": "Frosinone",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401875104",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Torino",
+      "away_team": "Parma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401875120",
+      "date": "2027-05-02T18:00Z",
+      "home_team": "Udinese",
+      "away_team": "Genoa",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401874885",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Fiorentina",
+      "away_team": "AS Roma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401874875",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Frosinone",
+      "away_team": "Atalanta",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401874838",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Genoa",
+      "away_team": "Cagliari",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401875127",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Internazionale",
+      "away_team": "Lecce",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401874886",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Lazio",
+      "away_team": "Sassuolo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401875151",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Napoli",
+      "away_team": "Monza",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401875106",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Parma",
+      "away_team": "AC Milan",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401875117",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Torino",
+      "away_team": "Bologna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401875115",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Udinese",
+      "away_team": "Juventus",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401875138",
+      "date": "2027-05-09T18:00Z",
+      "home_team": "Venezia",
+      "away_team": "Como",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401875110",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "AC Milan",
+      "away_team": "AS Roma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401875157",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Bologna",
+      "away_team": "Frosinone",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401875062",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Cagliari",
+      "away_team": "Torino",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401875130",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Como",
+      "away_team": "Atalanta",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401874849",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Juventus",
+      "away_team": "Internazionale",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401875113",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Lazio",
+      "away_team": "Udinese",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401875158",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Lecce",
+      "away_team": "Fiorentina",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401875097",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Monza",
+      "away_team": "Parma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401875133",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Napoli",
+      "away_team": "Genoa",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401874842",
+      "date": "2027-05-16T18:00Z",
+      "home_team": "Sassuolo",
+      "away_team": "Venezia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 34
+    },
+    {
+      "event_id": "401874887",
+      "date": "2027-05-23T18:00Z",
+      "home_team": "AS Roma",
+      "away_team": "Como",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401875134",
+      "date": "2027-05-23T18:00Z",
+      "home_team": "Atalanta",
+      "away_team": "Lecce",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401874840",
+      "date": "2027-05-23T18:00Z",
+      "home_team": "Fiorentina",
+      "away_team": "Monza",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401875071",
+      "date": "2027-05-23T18:00Z",
+      "home_team": "Frosinone",
+      "away_team": "Cagliari",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401875122",
+      "date": "2027-05-23T18:00Z",
+      "home_team": "Genoa",
+      "away_team": "Bologna",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401874881",
+      "date": "2027-05-23T18:00Z",
+      "home_team": "Internazionale",
+      "away_team": "Lazio",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401874847",
+      "date": "2027-05-23T18:00Z",
+      "home_team": "Parma",
+      "away_team": "Juventus",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401874858",
+      "date": "2027-05-23T18:00Z",
+      "home_team": "Torino",
+      "away_team": "Napoli",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401875119",
+      "date": "2027-05-23T18:00Z",
+      "home_team": "Udinese",
+      "away_team": "Sassuolo",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401874857",
+      "date": "2027-05-23T18:00Z",
+      "home_team": "Venezia",
+      "away_team": "AC Milan",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 35
+    },
+    {
+      "event_id": "401875159",
+      "date": "2027-05-30T18:00Z",
+      "home_team": "AC Milan",
+      "away_team": "Udinese",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401874878",
+      "date": "2027-05-30T18:00Z",
+      "home_team": "Bologna",
+      "away_team": "Parma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401874888",
+      "date": "2027-05-30T18:00Z",
+      "home_team": "Cagliari",
+      "away_team": "AS Roma",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401875084",
+      "date": "2027-05-30T18:00Z",
+      "home_team": "Como",
+      "away_team": "Genoa",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401874866",
+      "date": "2027-05-30T18:00Z",
+      "home_team": "Juventus",
+      "away_team": "Frosinone",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401874861",
+      "date": "2027-05-30T18:00Z",
+      "home_team": "Lazio",
+      "away_team": "Fiorentina",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401875075",
+      "date": "2027-05-30T18:00Z",
+      "home_team": "Lecce",
+      "away_team": "Venezia",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401874879",
+      "date": "2027-05-30T18:00Z",
+      "home_team": "Monza",
+      "away_team": "Torino",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401874850",
+      "date": "2027-05-30T18:00Z",
+      "home_team": "Napoli",
+      "away_team": "Atalanta",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    },
+    {
+      "event_id": "401875154",
+      "date": "2027-05-30T18:00Z",
+      "home_team": "Sassuolo",
+      "away_team": "Internazionale",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 36
+    }
+  ]
+}

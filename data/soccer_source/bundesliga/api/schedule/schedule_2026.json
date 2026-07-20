@@ -1,0 +1,3268 @@
+{
+  "league": "bundesliga",
+  "season": 2026,
+  "generated_at": "2026-07-20T21:05:31.061695+00:00",
+  "match_count": 306,
+  "weeks": [
+    {
+      "week": 1,
+      "start_date": "2026-08-28",
+      "end_date": "2026-08-28",
+      "match_count": 1
+    },
+    {
+      "week": 2,
+      "start_date": "2026-08-29",
+      "end_date": "2026-09-04",
+      "match_count": 9
+    },
+    {
+      "week": 3,
+      "start_date": "2026-09-05",
+      "end_date": "2026-09-11",
+      "match_count": 9
+    },
+    {
+      "week": 4,
+      "start_date": "2026-09-12",
+      "end_date": "2026-09-18",
+      "match_count": 9
+    },
+    {
+      "week": 5,
+      "start_date": "2026-09-19",
+      "end_date": "2026-09-20",
+      "match_count": 8
+    },
+    {
+      "week": 6,
+      "start_date": "2026-10-10",
+      "end_date": "2026-10-10",
+      "match_count": 9
+    },
+    {
+      "week": 7,
+      "start_date": "2026-10-17",
+      "end_date": "2026-10-17",
+      "match_count": 9
+    },
+    {
+      "week": 8,
+      "start_date": "2026-10-24",
+      "end_date": "2026-10-24",
+      "match_count": 9
+    },
+    {
+      "week": 9,
+      "start_date": "2026-10-31",
+      "end_date": "2026-10-31",
+      "match_count": 9
+    },
+    {
+      "week": 10,
+      "start_date": "2026-11-07",
+      "end_date": "2026-11-07",
+      "match_count": 9
+    },
+    {
+      "week": 11,
+      "start_date": "2026-11-21",
+      "end_date": "2026-11-21",
+      "match_count": 9
+    },
+    {
+      "week": 12,
+      "start_date": "2026-11-28",
+      "end_date": "2026-11-28",
+      "match_count": 9
+    },
+    {
+      "week": 13,
+      "start_date": "2026-12-05",
+      "end_date": "2026-12-05",
+      "match_count": 9
+    },
+    {
+      "week": 14,
+      "start_date": "2026-12-12",
+      "end_date": "2026-12-12",
+      "match_count": 9
+    },
+    {
+      "week": 15,
+      "start_date": "2026-12-19",
+      "end_date": "2026-12-19",
+      "match_count": 9
+    },
+    {
+      "week": 16,
+      "start_date": "2027-01-09",
+      "end_date": "2027-01-13",
+      "match_count": 18
+    },
+    {
+      "week": 17,
+      "start_date": "2027-01-16",
+      "end_date": "2027-01-16",
+      "match_count": 9
+    },
+    {
+      "week": 18,
+      "start_date": "2027-01-23",
+      "end_date": "2027-01-23",
+      "match_count": 9
+    },
+    {
+      "week": 19,
+      "start_date": "2027-01-30",
+      "end_date": "2027-01-30",
+      "match_count": 9
+    },
+    {
+      "week": 20,
+      "start_date": "2027-02-06",
+      "end_date": "2027-02-06",
+      "match_count": 9
+    },
+    {
+      "week": 21,
+      "start_date": "2027-02-13",
+      "end_date": "2027-02-13",
+      "match_count": 9
+    },
+    {
+      "week": 22,
+      "start_date": "2027-02-20",
+      "end_date": "2027-02-20",
+      "match_count": 9
+    },
+    {
+      "week": 23,
+      "start_date": "2027-02-27",
+      "end_date": "2027-03-03",
+      "match_count": 18
+    },
+    {
+      "week": 24,
+      "start_date": "2027-03-06",
+      "end_date": "2027-03-06",
+      "match_count": 9
+    },
+    {
+      "week": 25,
+      "start_date": "2027-03-13",
+      "end_date": "2027-03-13",
+      "match_count": 9
+    },
+    {
+      "week": 26,
+      "start_date": "2027-03-20",
+      "end_date": "2027-03-20",
+      "match_count": 9
+    },
+    {
+      "week": 27,
+      "start_date": "2027-04-03",
+      "end_date": "2027-04-03",
+      "match_count": 9
+    },
+    {
+      "week": 28,
+      "start_date": "2027-04-10",
+      "end_date": "2027-04-10",
+      "match_count": 9
+    },
+    {
+      "week": 29,
+      "start_date": "2027-04-17",
+      "end_date": "2027-04-17",
+      "match_count": 9
+    },
+    {
+      "week": 30,
+      "start_date": "2027-04-24",
+      "end_date": "2027-04-24",
+      "match_count": 9
+    },
+    {
+      "week": 31,
+      "start_date": "2027-05-08",
+      "end_date": "2027-05-08",
+      "match_count": 9
+    },
+    {
+      "week": 32,
+      "start_date": "2027-05-15",
+      "end_date": "2027-05-15",
+      "match_count": 9
+    },
+    {
+      "week": 33,
+      "start_date": "2027-05-22",
+      "end_date": "2027-05-22",
+      "match_count": 9
+    }
+  ],
+  "matches": [
+    {
+      "event_id": "401884817",
+      "date": "2026-08-28T18:30Z",
+      "home_team": "Bayern Munich",
+      "away_team": "VfB Stuttgart",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 1
+    },
+    {
+      "event_id": "401884811",
+      "date": "2026-08-29T13:30Z",
+      "home_team": "1. FC Union Berlin",
+      "away_team": "Eintracht Frankfurt",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401884810",
+      "date": "2026-08-29T13:30Z",
+      "home_team": "FC Cologne",
+      "away_team": "TSG Hoffenheim",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401884812",
+      "date": "2026-08-29T13:30Z",
+      "home_team": "Mainz",
+      "away_team": "SC Paderborn 07",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401884815",
+      "date": "2026-08-29T13:30Z",
+      "home_team": "RB Leipzig",
+      "away_team": "Borussia M\u00f6nchengladbach",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401884809",
+      "date": "2026-08-29T13:30Z",
+      "home_team": "SV Elversberg",
+      "away_team": "Bayer Leverkusen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401884816",
+      "date": "2026-08-29T16:30Z",
+      "home_team": "Borussia Dortmund",
+      "away_team": "Hamburg SV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401884814",
+      "date": "2026-08-30T13:30Z",
+      "home_team": "SC Freiburg",
+      "away_team": "Werder Bremen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401884813",
+      "date": "2026-08-30T15:30Z",
+      "home_team": "FC Augsburg",
+      "away_team": "Schalke 04",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401884808",
+      "date": "2026-09-04T18:30Z",
+      "home_team": "VfB Stuttgart",
+      "away_team": "FC Cologne",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 2
+    },
+    {
+      "event_id": "401884806",
+      "date": "2026-09-05T13:30Z",
+      "home_team": "Bayer Leverkusen",
+      "away_team": "1. FC Union Berlin",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401884804",
+      "date": "2026-09-05T13:30Z",
+      "home_team": "Borussia M\u00f6nchengladbach",
+      "away_team": "SV Elversberg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401884800",
+      "date": "2026-09-05T13:30Z",
+      "home_team": "SC Paderborn 07",
+      "away_team": "SC Freiburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401884807",
+      "date": "2026-09-05T13:30Z",
+      "home_team": "TSG Hoffenheim",
+      "away_team": "Borussia Dortmund",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401884802",
+      "date": "2026-09-05T13:30Z",
+      "home_team": "Werder Bremen",
+      "away_team": "RB Leipzig",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401884801",
+      "date": "2026-09-05T16:30Z",
+      "home_team": "Schalke 04",
+      "away_team": "Bayern Munich",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401884803",
+      "date": "2026-09-06T13:30Z",
+      "home_team": "Hamburg SV",
+      "away_team": "Mainz",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401884805",
+      "date": "2026-09-06T15:30Z",
+      "home_team": "Eintracht Frankfurt",
+      "away_team": "FC Augsburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401884793",
+      "date": "2026-09-11T18:30Z",
+      "home_team": "1. FC Union Berlin",
+      "away_team": "Schalke 04",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 3
+    },
+    {
+      "event_id": "401884799",
+      "date": "2026-09-12T13:30Z",
+      "home_team": "Borussia Dortmund",
+      "away_team": "SC Paderborn 07",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401884795",
+      "date": "2026-09-12T13:30Z",
+      "home_team": "FC Augsburg",
+      "away_team": "Bayer Leverkusen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401884794",
+      "date": "2026-09-12T13:30Z",
+      "home_team": "Mainz",
+      "away_team": "Eintracht Frankfurt",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401884796",
+      "date": "2026-09-12T13:30Z",
+      "home_team": "SC Freiburg",
+      "away_team": "Borussia M\u00f6nchengladbach",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401884797",
+      "date": "2026-09-12T13:30Z",
+      "home_team": "TSG Hoffenheim",
+      "away_team": "VfB Stuttgart",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401884792",
+      "date": "2026-09-12T16:30Z",
+      "home_team": "FC Cologne",
+      "away_team": "Werder Bremen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401884798",
+      "date": "2026-09-13T13:30Z",
+      "home_team": "RB Leipzig",
+      "away_team": "Hamburg SV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401884791",
+      "date": "2026-09-13T15:30Z",
+      "home_team": "SV Elversberg",
+      "away_team": "Bayern Munich",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401884790",
+      "date": "2026-09-18T18:30Z",
+      "home_team": "Bayern Munich",
+      "away_team": "1. FC Union Berlin",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 4
+    },
+    {
+      "event_id": "401884786",
+      "date": "2026-09-19T13:30Z",
+      "home_team": "Borussia M\u00f6nchengladbach",
+      "away_team": "Mainz",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401884787",
+      "date": "2026-09-19T13:30Z",
+      "home_team": "Eintracht Frankfurt",
+      "away_team": "SC Freiburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401884785",
+      "date": "2026-09-19T13:30Z",
+      "home_team": "Hamburg SV",
+      "away_team": "FC Cologne",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401884784",
+      "date": "2026-09-19T13:30Z",
+      "home_team": "Werder Bremen",
+      "away_team": "FC Augsburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401884789",
+      "date": "2026-09-19T16:30Z",
+      "home_team": "VfB Stuttgart",
+      "away_team": "Borussia Dortmund",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401884788",
+      "date": "2026-09-20T13:30Z",
+      "home_team": "Bayer Leverkusen",
+      "away_team": "RB Leipzig",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401884783",
+      "date": "2026-09-20T15:30Z",
+      "home_team": "Schalke 04",
+      "away_team": "SV Elversberg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401884782",
+      "date": "2026-09-20T17:30Z",
+      "home_team": "SC Paderborn 07",
+      "away_team": "TSG Hoffenheim",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 5
+    },
+    {
+      "event_id": "401884775",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "1. FC Union Berlin",
+      "away_team": "SV Elversberg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401884781",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "Borussia Dortmund",
+      "away_team": "Werder Bremen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401884777",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "FC Augsburg",
+      "away_team": "Bayern Munich",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401884774",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "FC Cologne",
+      "away_team": "Borussia M\u00f6nchengladbach",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401884776",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "Mainz",
+      "away_team": "Bayer Leverkusen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401884780",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "RB Leipzig",
+      "away_team": "Eintracht Frankfurt",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401884778",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "SC Freiburg",
+      "away_team": "Schalke 04",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401884773",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "SC Paderborn 07",
+      "away_team": "VfB Stuttgart",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401884779",
+      "date": "2026-10-10T18:00Z",
+      "home_team": "TSG Hoffenheim",
+      "away_team": "Hamburg SV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 6
+    },
+    {
+      "event_id": "401884769",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "1. FC Union Berlin",
+      "away_team": "Borussia Dortmund",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401884771",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Bayer Leverkusen",
+      "away_team": "SC Freiburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401884772",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Bayern Munich",
+      "away_team": "RB Leipzig",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401884768",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Borussia M\u00f6nchengladbach",
+      "away_team": "TSG Hoffenheim",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401884770",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Eintracht Frankfurt",
+      "away_team": "FC Cologne",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401884767",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Hamburg SV",
+      "away_team": "VfB Stuttgart",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401884765",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Schalke 04",
+      "away_team": "Mainz",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401884764",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "SV Elversberg",
+      "away_team": "FC Augsburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401884766",
+      "date": "2026-10-17T18:00Z",
+      "home_team": "Werder Bremen",
+      "away_team": "SC Paderborn 07",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 7
+    },
+    {
+      "event_id": "401884763",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "Borussia Dortmund",
+      "away_team": "Eintracht Frankfurt",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401884758",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "FC Augsburg",
+      "away_team": "1. FC Union Berlin",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401884756",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "FC Cologne",
+      "away_team": "Schalke 04",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401884757",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "Mainz",
+      "away_team": "Werder Bremen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401884762",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "RB Leipzig",
+      "away_team": "SV Elversberg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401884759",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "SC Freiburg",
+      "away_team": "Bayern Munich",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401884755",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "SC Paderborn 07",
+      "away_team": "Hamburg SV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401884760",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "TSG Hoffenheim",
+      "away_team": "Bayer Leverkusen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401884761",
+      "date": "2026-10-24T18:00Z",
+      "home_team": "VfB Stuttgart",
+      "away_team": "Borussia M\u00f6nchengladbach",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 8
+    },
+    {
+      "event_id": "401884750",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "1. FC Union Berlin",
+      "away_team": "FC Cologne",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401884753",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Bayer Leverkusen",
+      "away_team": "VfB Stuttgart",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401884754",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Bayern Munich",
+      "away_team": "Borussia Dortmund",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401884749",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Borussia M\u00f6nchengladbach",
+      "away_team": "SC Paderborn 07",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401884752",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Eintracht Frankfurt",
+      "away_team": "Hamburg SV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401884751",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "FC Augsburg",
+      "away_team": "SC Freiburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401884747",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Schalke 04",
+      "away_team": "RB Leipzig",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401884746",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "SV Elversberg",
+      "away_team": "Mainz",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401884748",
+      "date": "2026-10-31T18:00Z",
+      "home_team": "Werder Bremen",
+      "away_team": "TSG Hoffenheim",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 9
+    },
+    {
+      "event_id": "401884745",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "Borussia Dortmund",
+      "away_team": "SV Elversberg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401884738",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "FC Cologne",
+      "away_team": "Bayer Leverkusen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401884739",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "Hamburg SV",
+      "away_team": "Borussia M\u00f6nchengladbach",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401884740",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "Mainz",
+      "away_team": "Bayern Munich",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401884744",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "RB Leipzig",
+      "away_team": "FC Augsburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401884741",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "SC Freiburg",
+      "away_team": "1. FC Union Berlin",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401884737",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "SC Paderborn 07",
+      "away_team": "Eintracht Frankfurt",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401884742",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "TSG Hoffenheim",
+      "away_team": "Schalke 04",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401884743",
+      "date": "2026-11-07T20:00Z",
+      "home_team": "VfB Stuttgart",
+      "away_team": "Werder Bremen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 10
+    },
+    {
+      "event_id": "401884732",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "1. FC Union Berlin",
+      "away_team": "RB Leipzig",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401884735",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Bayer Leverkusen",
+      "away_team": "SC Paderborn 07",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401884736",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Bayern Munich",
+      "away_team": "FC Cologne",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401884731",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Borussia M\u00f6nchengladbach",
+      "away_team": "Borussia Dortmund",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401884734",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Eintracht Frankfurt",
+      "away_team": "TSG Hoffenheim",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401884733",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "FC Augsburg",
+      "away_team": "Mainz",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401884729",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Schalke 04",
+      "away_team": "VfB Stuttgart",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401884728",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "SV Elversberg",
+      "away_team": "SC Freiburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401884730",
+      "date": "2026-11-21T20:00Z",
+      "home_team": "Werder Bremen",
+      "away_team": "Hamburg SV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 11
+    },
+    {
+      "event_id": "401884727",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Borussia Dortmund",
+      "away_team": "Bayer Leverkusen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401884721",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "FC Cologne",
+      "away_team": "SV Elversberg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401884722",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Hamburg SV",
+      "away_team": "Bayern Munich",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401884723",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Mainz",
+      "away_team": "1. FC Union Berlin",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401884724",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "SC Freiburg",
+      "away_team": "RB Leipzig",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401884719",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "SC Paderborn 07",
+      "away_team": "Schalke 04",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401884725",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "TSG Hoffenheim",
+      "away_team": "FC Augsburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401884726",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "VfB Stuttgart",
+      "away_team": "Eintracht Frankfurt",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401884720",
+      "date": "2026-11-28T20:00Z",
+      "home_team": "Werder Bremen",
+      "away_team": "Borussia M\u00f6nchengladbach",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 12
+    },
+    {
+      "event_id": "401884712",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "1. FC Union Berlin",
+      "away_team": "Hamburg SV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401884716",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "Bayer Leverkusen",
+      "away_team": "Borussia M\u00f6nchengladbach",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401884718",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "Bayern Munich",
+      "away_team": "SC Paderborn 07",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401884714",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "Eintracht Frankfurt",
+      "away_team": "Werder Bremen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401884713",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "FC Augsburg",
+      "away_team": "FC Cologne",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401884717",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "RB Leipzig",
+      "away_team": "Mainz",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401884715",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "SC Freiburg",
+      "away_team": "TSG Hoffenheim",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401884711",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "Schalke 04",
+      "away_team": "Borussia Dortmund",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401884710",
+      "date": "2026-12-05T20:00Z",
+      "home_team": "SV Elversberg",
+      "away_team": "VfB Stuttgart",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 13
+    },
+    {
+      "event_id": "401884709",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "Borussia Dortmund",
+      "away_team": "FC Augsburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401884705",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "Borussia M\u00f6nchengladbach",
+      "away_team": "Eintracht Frankfurt",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401884703",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "FC Cologne",
+      "away_team": "RB Leipzig",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401884704",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "Hamburg SV",
+      "away_team": "Schalke 04",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401884706",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "Mainz",
+      "away_team": "SC Freiburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401884701",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "SC Paderborn 07",
+      "away_team": "SV Elversberg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401884707",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "TSG Hoffenheim",
+      "away_team": "Bayern Munich",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401884708",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "VfB Stuttgart",
+      "away_team": "1. FC Union Berlin",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401884702",
+      "date": "2026-12-12T20:00Z",
+      "home_team": "Werder Bremen",
+      "away_team": "Bayer Leverkusen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 14
+    },
+    {
+      "event_id": "401884694",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "1. FC Union Berlin",
+      "away_team": "TSG Hoffenheim",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401884698",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "Bayer Leverkusen",
+      "away_team": "Eintracht Frankfurt",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401884700",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "Bayern Munich",
+      "away_team": "Werder Bremen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401884696",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "FC Augsburg",
+      "away_team": "SC Paderborn 07",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401884695",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "Mainz",
+      "away_team": "FC Cologne",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401884699",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "RB Leipzig",
+      "away_team": "Borussia Dortmund",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401884697",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "SC Freiburg",
+      "away_team": "VfB Stuttgart",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401884693",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "Schalke 04",
+      "away_team": "Borussia M\u00f6nchengladbach",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401884692",
+      "date": "2026-12-19T20:00Z",
+      "home_team": "SV Elversberg",
+      "away_team": "Hamburg SV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 15
+    },
+    {
+      "event_id": "401884691",
+      "date": "2027-01-09T20:00Z",
+      "home_team": "Borussia Dortmund",
+      "away_team": "Mainz",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401884687",
+      "date": "2027-01-09T20:00Z",
+      "home_team": "Borussia M\u00f6nchengladbach",
+      "away_team": "Bayern Munich",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401884688",
+      "date": "2027-01-09T20:00Z",
+      "home_team": "Eintracht Frankfurt",
+      "away_team": "Schalke 04",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401884685",
+      "date": "2027-01-09T20:00Z",
+      "home_team": "FC Cologne",
+      "away_team": "SC Freiburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401884686",
+      "date": "2027-01-09T20:00Z",
+      "home_team": "Hamburg SV",
+      "away_team": "Bayer Leverkusen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401884683",
+      "date": "2027-01-09T20:00Z",
+      "home_team": "SC Paderborn 07",
+      "away_team": "RB Leipzig",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401884689",
+      "date": "2027-01-09T20:00Z",
+      "home_team": "TSG Hoffenheim",
+      "away_team": "SV Elversberg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401884690",
+      "date": "2027-01-09T20:00Z",
+      "home_team": "VfB Stuttgart",
+      "away_team": "FC Augsburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401884684",
+      "date": "2027-01-09T20:00Z",
+      "home_team": "Werder Bremen",
+      "away_team": "1. FC Union Berlin",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401884677",
+      "date": "2027-01-13T20:00Z",
+      "home_team": "1. FC Union Berlin",
+      "away_team": "SC Paderborn 07",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401884682",
+      "date": "2027-01-13T20:00Z",
+      "home_team": "Bayern Munich",
+      "away_team": "Bayer Leverkusen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401884679",
+      "date": "2027-01-13T20:00Z",
+      "home_team": "FC Augsburg",
+      "away_team": "Borussia M\u00f6nchengladbach",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401884676",
+      "date": "2027-01-13T20:00Z",
+      "home_team": "FC Cologne",
+      "away_team": "Borussia Dortmund",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401884678",
+      "date": "2027-01-13T20:00Z",
+      "home_team": "Mainz",
+      "away_team": "TSG Hoffenheim",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401884681",
+      "date": "2027-01-13T20:00Z",
+      "home_team": "RB Leipzig",
+      "away_team": "VfB Stuttgart",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401884680",
+      "date": "2027-01-13T20:00Z",
+      "home_team": "SC Freiburg",
+      "away_team": "Hamburg SV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401884675",
+      "date": "2027-01-13T20:00Z",
+      "home_team": "Schalke 04",
+      "away_team": "Werder Bremen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401884674",
+      "date": "2027-01-13T20:00Z",
+      "home_team": "SV Elversberg",
+      "away_team": "Eintracht Frankfurt",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 16
+    },
+    {
+      "event_id": "401884670",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Bayer Leverkusen",
+      "away_team": "Schalke 04",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401884673",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Borussia Dortmund",
+      "away_team": "SC Freiburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401884668",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Borussia M\u00f6nchengladbach",
+      "away_team": "1. FC Union Berlin",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401884669",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Eintracht Frankfurt",
+      "away_team": "Bayern Munich",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401884667",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Hamburg SV",
+      "away_team": "FC Augsburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401884665",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "SC Paderborn 07",
+      "away_team": "FC Cologne",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401884671",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "TSG Hoffenheim",
+      "away_team": "RB Leipzig",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401884672",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "VfB Stuttgart",
+      "away_team": "Mainz",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401884666",
+      "date": "2027-01-16T20:00Z",
+      "home_team": "Werder Bremen",
+      "away_team": "SV Elversberg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 17
+    },
+    {
+      "event_id": "401884662",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Bayer Leverkusen",
+      "away_team": "SV Elversberg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401884660",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Borussia M\u00f6nchengladbach",
+      "away_team": "RB Leipzig",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401884661",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Eintracht Frankfurt",
+      "away_team": "1. FC Union Berlin",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401884659",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Hamburg SV",
+      "away_team": "Borussia Dortmund",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401884656",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "SC Paderborn 07",
+      "away_team": "Mainz",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401884657",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Schalke 04",
+      "away_team": "FC Augsburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401884663",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "TSG Hoffenheim",
+      "away_team": "FC Cologne",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401884664",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "VfB Stuttgart",
+      "away_team": "Bayern Munich",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401884658",
+      "date": "2027-01-23T20:00Z",
+      "home_team": "Werder Bremen",
+      "away_team": "SC Freiburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 18
+    },
+    {
+      "event_id": "401884649",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "1. FC Union Berlin",
+      "away_team": "Bayer Leverkusen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401884655",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "Bayern Munich",
+      "away_team": "Schalke 04",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401884654",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "Borussia Dortmund",
+      "away_team": "TSG Hoffenheim",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401884651",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "FC Augsburg",
+      "away_team": "Eintracht Frankfurt",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401884648",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "FC Cologne",
+      "away_team": "VfB Stuttgart",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401884650",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "Mainz",
+      "away_team": "Hamburg SV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401884653",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "RB Leipzig",
+      "away_team": "Werder Bremen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401884652",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "SC Freiburg",
+      "away_team": "SC Paderborn 07",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401884647",
+      "date": "2027-01-30T20:00Z",
+      "home_team": "SV Elversberg",
+      "away_team": "Borussia M\u00f6nchengladbach",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 19
+    },
+    {
+      "event_id": "401884644",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "Bayer Leverkusen",
+      "away_team": "FC Augsburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401884646",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "Bayern Munich",
+      "away_team": "SV Elversberg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401884642",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "Borussia M\u00f6nchengladbach",
+      "away_team": "SC Freiburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401884643",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "Eintracht Frankfurt",
+      "away_team": "Mainz",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401884641",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "Hamburg SV",
+      "away_team": "RB Leipzig",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401884638",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "SC Paderborn 07",
+      "away_team": "Borussia Dortmund",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401884639",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "Schalke 04",
+      "away_team": "1. FC Union Berlin",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401884645",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "VfB Stuttgart",
+      "away_team": "TSG Hoffenheim",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401884640",
+      "date": "2027-02-06T20:00Z",
+      "home_team": "Werder Bremen",
+      "away_team": "FC Cologne",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 20
+    },
+    {
+      "event_id": "401884631",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "1. FC Union Berlin",
+      "away_team": "Bayern Munich",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401884637",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Borussia Dortmund",
+      "away_team": "VfB Stuttgart",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401884633",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "FC Augsburg",
+      "away_team": "Werder Bremen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401884630",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "FC Cologne",
+      "away_team": "Hamburg SV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401884632",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "Mainz",
+      "away_team": "Borussia M\u00f6nchengladbach",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401884636",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "RB Leipzig",
+      "away_team": "Bayer Leverkusen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401884634",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "SC Freiburg",
+      "away_team": "Eintracht Frankfurt",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401884629",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "SV Elversberg",
+      "away_team": "Schalke 04",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401884635",
+      "date": "2027-02-13T20:00Z",
+      "home_team": "TSG Hoffenheim",
+      "away_team": "SC Paderborn 07",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 21
+    },
+    {
+      "event_id": "401884626",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Bayer Leverkusen",
+      "away_team": "Mainz",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401884628",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Bayern Munich",
+      "away_team": "FC Augsburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401884624",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Borussia M\u00f6nchengladbach",
+      "away_team": "FC Cologne",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401884625",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Eintracht Frankfurt",
+      "away_team": "RB Leipzig",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401884623",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Hamburg SV",
+      "away_team": "TSG Hoffenheim",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401884621",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Schalke 04",
+      "away_team": "SC Freiburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401884620",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "SV Elversberg",
+      "away_team": "1. FC Union Berlin",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401884627",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "VfB Stuttgart",
+      "away_team": "SC Paderborn 07",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401884622",
+      "date": "2027-02-20T20:00Z",
+      "home_team": "Werder Bremen",
+      "away_team": "Borussia Dortmund",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 22
+    },
+    {
+      "event_id": "401884619",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Borussia Dortmund",
+      "away_team": "1. FC Union Berlin",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401884614",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "FC Augsburg",
+      "away_team": "SV Elversberg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401884612",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "FC Cologne",
+      "away_team": "Eintracht Frankfurt",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401884613",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "Mainz",
+      "away_team": "Schalke 04",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401884618",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "RB Leipzig",
+      "away_team": "Bayern Munich",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401884615",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "SC Freiburg",
+      "away_team": "Bayer Leverkusen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401884611",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "SC Paderborn 07",
+      "away_team": "Werder Bremen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401884616",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "TSG Hoffenheim",
+      "away_team": "Borussia M\u00f6nchengladbach",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401884617",
+      "date": "2027-02-27T20:00Z",
+      "home_team": "VfB Stuttgart",
+      "away_team": "Hamburg SV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401884607",
+      "date": "2027-03-03T20:00Z",
+      "home_team": "1. FC Union Berlin",
+      "away_team": "FC Augsburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401884609",
+      "date": "2027-03-03T20:00Z",
+      "home_team": "Bayer Leverkusen",
+      "away_team": "TSG Hoffenheim",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401884610",
+      "date": "2027-03-03T20:00Z",
+      "home_team": "Bayern Munich",
+      "away_team": "SC Freiburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401884606",
+      "date": "2027-03-03T20:00Z",
+      "home_team": "Borussia M\u00f6nchengladbach",
+      "away_team": "VfB Stuttgart",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401884608",
+      "date": "2027-03-03T20:00Z",
+      "home_team": "Eintracht Frankfurt",
+      "away_team": "Borussia Dortmund",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401884605",
+      "date": "2027-03-03T20:00Z",
+      "home_team": "Hamburg SV",
+      "away_team": "SC Paderborn 07",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401884603",
+      "date": "2027-03-03T20:00Z",
+      "home_team": "Schalke 04",
+      "away_team": "FC Cologne",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401884602",
+      "date": "2027-03-03T20:00Z",
+      "home_team": "SV Elversberg",
+      "away_team": "RB Leipzig",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401884604",
+      "date": "2027-03-03T20:00Z",
+      "home_team": "Werder Bremen",
+      "away_team": "Mainz",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 23
+    },
+    {
+      "event_id": "401884601",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "Borussia Dortmund",
+      "away_team": "Bayern Munich",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401884594",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "FC Cologne",
+      "away_team": "1. FC Union Berlin",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401884595",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "Hamburg SV",
+      "away_team": "Eintracht Frankfurt",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401884596",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "Mainz",
+      "away_team": "SV Elversberg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401884600",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "RB Leipzig",
+      "away_team": "Schalke 04",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401884597",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "SC Freiburg",
+      "away_team": "FC Augsburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401884593",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "SC Paderborn 07",
+      "away_team": "Borussia M\u00f6nchengladbach",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401884598",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "TSG Hoffenheim",
+      "away_team": "Werder Bremen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401884599",
+      "date": "2027-03-06T20:00Z",
+      "home_team": "VfB Stuttgart",
+      "away_team": "Bayer Leverkusen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 24
+    },
+    {
+      "event_id": "401884588",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "1. FC Union Berlin",
+      "away_team": "SC Freiburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401884591",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Bayer Leverkusen",
+      "away_team": "FC Cologne",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401884592",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Bayern Munich",
+      "away_team": "Mainz",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401884587",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Borussia M\u00f6nchengladbach",
+      "away_team": "Hamburg SV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401884590",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Eintracht Frankfurt",
+      "away_team": "SC Paderborn 07",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401884589",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "FC Augsburg",
+      "away_team": "RB Leipzig",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401884585",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Schalke 04",
+      "away_team": "TSG Hoffenheim",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401884584",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "SV Elversberg",
+      "away_team": "Borussia Dortmund",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401884586",
+      "date": "2027-03-13T20:00Z",
+      "home_team": "Werder Bremen",
+      "away_team": "VfB Stuttgart",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 25
+    },
+    {
+      "event_id": "401884583",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "Borussia Dortmund",
+      "away_team": "Borussia M\u00f6nchengladbach",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401884576",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "FC Cologne",
+      "away_team": "Bayern Munich",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401884577",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "Hamburg SV",
+      "away_team": "Werder Bremen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401884578",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "Mainz",
+      "away_team": "FC Augsburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401884582",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "RB Leipzig",
+      "away_team": "1. FC Union Berlin",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401884579",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "SC Freiburg",
+      "away_team": "SV Elversberg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401884575",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "SC Paderborn 07",
+      "away_team": "Bayer Leverkusen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401884580",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "TSG Hoffenheim",
+      "away_team": "Eintracht Frankfurt",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401884581",
+      "date": "2027-03-20T18:00Z",
+      "home_team": "VfB Stuttgart",
+      "away_team": "Schalke 04",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 26
+    },
+    {
+      "event_id": "401884569",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "1. FC Union Berlin",
+      "away_team": "Mainz",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401884572",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Bayer Leverkusen",
+      "away_team": "Borussia Dortmund",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401884574",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Bayern Munich",
+      "away_team": "Hamburg SV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401884568",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Borussia M\u00f6nchengladbach",
+      "away_team": "Werder Bremen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401884571",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Eintracht Frankfurt",
+      "away_team": "VfB Stuttgart",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401884570",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "FC Augsburg",
+      "away_team": "TSG Hoffenheim",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401884573",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "RB Leipzig",
+      "away_team": "SC Freiburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401884567",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "Schalke 04",
+      "away_team": "SC Paderborn 07",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401884566",
+      "date": "2027-04-03T18:00Z",
+      "home_team": "SV Elversberg",
+      "away_team": "FC Cologne",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 27
+    },
+    {
+      "event_id": "401884565",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Borussia Dortmund",
+      "away_team": "Schalke 04",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401884561",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Borussia M\u00f6nchengladbach",
+      "away_team": "Bayer Leverkusen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401884559",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "FC Cologne",
+      "away_team": "FC Augsburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401884560",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Hamburg SV",
+      "away_team": "1. FC Union Berlin",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401884562",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Mainz",
+      "away_team": "RB Leipzig",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401884557",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "SC Paderborn 07",
+      "away_team": "Bayern Munich",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401884563",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "TSG Hoffenheim",
+      "away_team": "SC Freiburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401884564",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "VfB Stuttgart",
+      "away_team": "SV Elversberg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401884558",
+      "date": "2027-04-10T18:00Z",
+      "home_team": "Werder Bremen",
+      "away_team": "Eintracht Frankfurt",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 28
+    },
+    {
+      "event_id": "401884550",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "1. FC Union Berlin",
+      "away_team": "VfB Stuttgart",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401884554",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "Bayer Leverkusen",
+      "away_team": "Werder Bremen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401884556",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "Bayern Munich",
+      "away_team": "TSG Hoffenheim",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401884552",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "Eintracht Frankfurt",
+      "away_team": "Borussia M\u00f6nchengladbach",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401884551",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "FC Augsburg",
+      "away_team": "Borussia Dortmund",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401884555",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "RB Leipzig",
+      "away_team": "FC Cologne",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401884553",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "SC Freiburg",
+      "away_team": "Mainz",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401884549",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "Schalke 04",
+      "away_team": "Hamburg SV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401884548",
+      "date": "2027-04-17T18:00Z",
+      "home_team": "SV Elversberg",
+      "away_team": "SC Paderborn 07",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 29
+    },
+    {
+      "event_id": "401884547",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Borussia Dortmund",
+      "away_team": "RB Leipzig",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401884543",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Borussia M\u00f6nchengladbach",
+      "away_team": "Schalke 04",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401884544",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Eintracht Frankfurt",
+      "away_team": "Bayer Leverkusen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401884541",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "FC Cologne",
+      "away_team": "Mainz",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401884542",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Hamburg SV",
+      "away_team": "SV Elversberg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401884539",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "SC Paderborn 07",
+      "away_team": "FC Augsburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401884545",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "TSG Hoffenheim",
+      "away_team": "1. FC Union Berlin",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401884546",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "VfB Stuttgart",
+      "away_team": "SC Freiburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401884540",
+      "date": "2027-04-24T18:00Z",
+      "home_team": "Werder Bremen",
+      "away_team": "Bayern Munich",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 30
+    },
+    {
+      "event_id": "401884532",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "1. FC Union Berlin",
+      "away_team": "Werder Bremen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401884536",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "Bayer Leverkusen",
+      "away_team": "Hamburg SV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401884538",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "Bayern Munich",
+      "away_team": "Borussia M\u00f6nchengladbach",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401884534",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "FC Augsburg",
+      "away_team": "VfB Stuttgart",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401884533",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "Mainz",
+      "away_team": "Borussia Dortmund",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401884537",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "RB Leipzig",
+      "away_team": "SC Paderborn 07",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401884535",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "SC Freiburg",
+      "away_team": "FC Cologne",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401884531",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "Schalke 04",
+      "away_team": "Eintracht Frankfurt",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401884530",
+      "date": "2027-05-08T18:00Z",
+      "home_team": "SV Elversberg",
+      "away_team": "TSG Hoffenheim",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 31
+    },
+    {
+      "event_id": "401884526",
+      "date": "2027-05-15T18:00Z",
+      "home_team": "Bayer Leverkusen",
+      "away_team": "Bayern Munich",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401884529",
+      "date": "2027-05-15T18:00Z",
+      "home_team": "Borussia Dortmund",
+      "away_team": "FC Cologne",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401884524",
+      "date": "2027-05-15T18:00Z",
+      "home_team": "Borussia M\u00f6nchengladbach",
+      "away_team": "FC Augsburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401884525",
+      "date": "2027-05-15T18:00Z",
+      "home_team": "Eintracht Frankfurt",
+      "away_team": "SV Elversberg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401884503",
+      "date": "2027-05-15T18:00Z",
+      "home_team": "Hamburg SV",
+      "away_team": "SC Freiburg",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401884501",
+      "date": "2027-05-15T18:00Z",
+      "home_team": "SC Paderborn 07",
+      "away_team": "1. FC Union Berlin",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401884527",
+      "date": "2027-05-15T18:00Z",
+      "home_team": "TSG Hoffenheim",
+      "away_team": "Mainz",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401884528",
+      "date": "2027-05-15T18:00Z",
+      "home_team": "VfB Stuttgart",
+      "away_team": "RB Leipzig",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401884502",
+      "date": "2027-05-15T18:00Z",
+      "home_team": "Werder Bremen",
+      "away_team": "Schalke 04",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 32
+    },
+    {
+      "event_id": "401884495",
+      "date": "2027-05-22T13:30Z",
+      "home_team": "1. FC Union Berlin",
+      "away_team": "Borussia M\u00f6nchengladbach",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401884500",
+      "date": "2027-05-22T13:30Z",
+      "home_team": "Bayern Munich",
+      "away_team": "Eintracht Frankfurt",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401884497",
+      "date": "2027-05-22T13:30Z",
+      "home_team": "FC Augsburg",
+      "away_team": "Hamburg SV",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401884494",
+      "date": "2027-05-22T13:30Z",
+      "home_team": "FC Cologne",
+      "away_team": "SC Paderborn 07",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401884496",
+      "date": "2027-05-22T13:30Z",
+      "home_team": "Mainz",
+      "away_team": "VfB Stuttgart",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401884499",
+      "date": "2027-05-22T13:30Z",
+      "home_team": "RB Leipzig",
+      "away_team": "TSG Hoffenheim",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401884498",
+      "date": "2027-05-22T13:30Z",
+      "home_team": "SC Freiburg",
+      "away_team": "Borussia Dortmund",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401884493",
+      "date": "2027-05-22T13:30Z",
+      "home_team": "Schalke 04",
+      "away_team": "Bayer Leverkusen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    },
+    {
+      "event_id": "401884492",
+      "date": "2027-05-22T13:30Z",
+      "home_team": "SV Elversberg",
+      "away_team": "Werder Bremen",
+      "home_score": "0",
+      "away_score": "0",
+      "status_state": "pre",
+      "week": 33
+    }
+  ]
+}
