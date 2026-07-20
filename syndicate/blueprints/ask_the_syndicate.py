@@ -6,6 +6,7 @@ import json
 import os
 import re
 import threading
+import time
 
 from flask import Blueprint
 from flask import jsonify
@@ -15,6 +16,8 @@ from router.query_router import QueryRouter as IntelligenceQueryRouter
 from pipeline.intelligence_state import read_latest_intelligence_board_snapshot_response
 from pipeline.intelligence_state import read_latest_intelligence_state_response
 from syndicate.blueprints.ask_the_syndicate_adapter import build_syndicate_query_response
+from syndicate.blueprints.ask_the_syndicate_data import collect_focused_evidence
+from syndicate.blueprints.ask_the_syndicate_engine import generate_briefing
 from syndicate.blueprints.ask_the_syndicate_router import SyndicateQueryRouter
 from syndicate.blueprints.ask_the_syndicate_router import RouteDecision
 from syndicate.features.intelligence_board import build_intelligence_board_contract
@@ -261,12 +264,32 @@ def _query_cache_key(question: str, payload: dict[str, Any], decision: RouteDeci
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+_RESPONSE_CACHE_LOCK = threading.Lock()
+_RESPONSE_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+_RESPONSE_CACHE_TTL_SECONDS = float(os.environ.get("SYNDICATE_ASK_CACHE_TTL_SECONDS", "600"))
+_RESPONSE_CACHE_MAX_ENTRIES = 128
+
+
 def _read_cached_response(cache_key: str) -> dict[str, Any] | None:
-    return None
+    now = time.monotonic()
+    with _RESPONSE_CACHE_LOCK:
+        entry = _RESPONSE_CACHE.get(cache_key)
+        if entry is None:
+            return None
+        stored_at, response = entry
+        if now - stored_at > _RESPONSE_CACHE_TTL_SECONDS:
+            _RESPONSE_CACHE.pop(cache_key, None)
+            return None
+        return response
 
 
 def _store_cached_response(cache_key: str, response: dict[str, Any]) -> None:
-    return None
+    now = time.monotonic()
+    with _RESPONSE_CACHE_LOCK:
+        if len(_RESPONSE_CACHE) >= _RESPONSE_CACHE_MAX_ENTRIES:
+            oldest_key = min(_RESPONSE_CACHE, key=lambda key: _RESPONSE_CACHE[key][0])
+            _RESPONSE_CACHE.pop(oldest_key, None)
+        _RESPONSE_CACHE[cache_key] = (now, response)
 
 
 def _apply_intent_hints(pipeline_payload: dict[str, Any], intent: str) -> dict[str, Any]:
@@ -294,6 +317,47 @@ def _build_route_payload(payload: dict[str, Any], decision: RouteDecision) -> di
         decision=decision,
         result=result,
     )
+
+
+def _apply_briefing_to_response(response: dict[str, Any], briefing_payload: dict[str, Any]) -> None:
+    briefing = briefing_payload.get("briefing")
+    if not isinstance(briefing, dict):
+        return
+    response["briefing"] = briefing
+    response["answer_source"] = "llm"
+    response["llm"] = {
+        "model": briefing_payload.get("model"),
+        "usage": briefing_payload.get("usage"),
+    }
+
+    # Surface the synthesized narrative through the fields the UI already renders.
+    schema = response.get("schema")
+    if not isinstance(schema, dict):
+        return
+    verdict = str(briefing.get("verdict") or briefing.get("headline") or "").strip()
+    narrative = str(briefing.get("narrative") or "").strip()
+    risks = [str(item) for item in briefing.get("risks") or [] if str(item).strip()]
+
+    schema_type = schema.get("schema_type")
+    if schema_type == "bet_analysis":
+        if verdict:
+            schema["recommendation"] = verdict
+        explanation = schema.get("explanation")
+        if isinstance(explanation, dict) and narrative:
+            explanation["summary"] = narrative
+    elif schema_type == "matchup_analysis":
+        simulation_summary = schema.get("simulation_summary")
+        if isinstance(simulation_summary, dict) and narrative:
+            simulation_summary["summary"] = narrative
+        market_insight = schema.get("market_insight")
+        if isinstance(market_insight, dict) and verdict:
+            market_insight["summary"] = verdict
+        if risks:
+            schema["hidden_factors"] = [{"factor": risk} for risk in risks]
+    elif schema_type == "market_summary":
+        rationale_summary = schema.get("rationale_summary")
+        if isinstance(rationale_summary, dict) and narrative:
+            rationale_summary["summary"] = narrative
 
 
 def handle_bet_analysis(payload: dict[str, Any]) -> dict[str, Any]:
@@ -328,18 +392,52 @@ def ask_the_syndicate_query_api():
     decision = _QUERY_ROUTER.route(str(shaped_payload.get("question") or question))
 
     cache_key = _query_cache_key(question, payload, decision)
-    _read_cached_response(cache_key)
+    cached_response = _read_cached_response(cache_key)
+    if isinstance(cached_response, dict):
+        return _with_cors_headers(jsonify(cached_response))
 
     artifact_response = _build_artifact_response(shaped_payload, decision)
     if isinstance(artifact_response, dict):
         return _with_cors_headers(jsonify(artifact_response))
 
     snapshot = read_latest_intelligence_state(shaped_payload)
-    result = snapshot if isinstance(snapshot, dict) and snapshot else _empty_ask_result(shaped_payload, decision, reason="snapshot_missing")
+    has_snapshot = isinstance(snapshot, dict) and bool(snapshot)
+    result = snapshot if has_snapshot else _empty_ask_result(shaped_payload, decision, reason="snapshot_missing")
     response = build_syndicate_query_response(
         question=str(shaped_payload.get("original_question") or shaped_payload.get("question") or "").strip(),
         context=_coerce_context(shaped_payload),
         decision=decision,
         result=result,
     )
+
+    response["answer_source"] = "snapshot"
+
+    # Question-specific sim evidence (tables/charts) is deterministic and
+    # renders even when the LLM path is unavailable.
+    request_context = dict(shaped_payload)
+    request_context.update(_coerce_context(shaped_payload))
+    focused_evidence = collect_focused_evidence(question, request_context)
+    if isinstance(focused_evidence, dict):
+        response["visuals"] = {
+            "tables": focused_evidence.get("tables") or [],
+            "charts": focused_evidence.get("charts") or [],
+            "as_of": focused_evidence.get("as_of"),
+            "sport": focused_evidence.get("sport"),
+        }
+
+    if has_snapshot:
+        briefing_payload = generate_briefing(
+            question=question,
+            context=_coerce_context(shaped_payload),
+            intent=decision.intent,
+            snapshot=result,
+            focused_evidence=focused_evidence,
+        )
+        if isinstance(briefing_payload, dict):
+            _apply_briefing_to_response(response, briefing_payload)
+
+    # Only LLM answers are worth caching -- snapshot shaping is cheap, and
+    # caching it would serve stale boards for no cost savings.
+    if response.get("answer_source") == "llm":
+        _store_cached_response(cache_key, response)
     return _with_cors_headers(jsonify(response))

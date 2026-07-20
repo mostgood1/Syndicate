@@ -30,4 +30,8 @@ scikit-learn==1.5.2
 # failure silently killed the entire props predictions stage in production.
 onnxruntime==1.22.0
 pypdf==3.16.0
+# Ask the Syndicate LLM briefings (syndicate/blueprints/ask_the_syndicate_engine.py).
+# Imported lazily -- the app runs without it (and without ANTHROPIC_API_KEY) by
+# falling back to snapshot-only responses.
+anthropic>=0.116.0
 

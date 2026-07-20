@@ -36,6 +36,20 @@ services:
         generateValue: true
       - key: ODDS_API_KEY
         value: 77ae1c35140c82da1675af85dde36a44
+      # Ask the Syndicate LLM briefings (Claude API). Set the value in the
+      # Render dashboard; when absent the endpoint serves snapshot-only
+      # responses (no error, no LLM call).
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SYNDICATE_ASK_MODEL
+        value: claude-haiku-4-5
+      # Per-process cap on Claude calls (calls per window) so the public,
+      # unauthenticated /api/syndicate/query endpoint can't be used to run up
+      # API spend; excess traffic degrades to the snapshot response.
+      - key: SYNDICATE_ASK_LLM_MAX_CALLS
+        value: "30"
+      - key: SYNDICATE_ASK_LLM_WINDOW_SECONDS
+        value: "600"
       - key: SYNDICATE_REFRESH_LAUNCH_MODE
         value: detached_subprocess
       - key: SYNDICATE_WEB_DYNO
