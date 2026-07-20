@@ -667,6 +667,7 @@ def api_ops_intelligence_candidate_trace() -> Any:
 
     manifest_check: dict[str, Any] = {}
     full_pool_check: dict[str, Any] = {}
+    app_context_pool_check: dict[str, Any] = {}
     try:
         from pipeline.intelligence_state import _INTELLIGENCE_STATE_SERVICE
 
@@ -678,7 +679,29 @@ def api_ops_intelligence_candidate_trace() -> Any:
             "source_fingerprint": source_fingerprint,
             "candidate_count": pool.get("candidate_count"),
             "candidate_pool_keys": list(pool.keys()) if isinstance(pool, dict) else None,
+            "self_app_was": repr(_INTELLIGENCE_STATE_SERVICE._app),
         }
+
+        # refresh-worker's background loop sets self._app (via .start(app))
+        # and calls build_intelligence_overview inside
+        # `with self._app.app_context():` from a background thread -- this
+        # web-service diagnostic call runs inside a real Flask request
+        # context instead, with self._app left None (web never starts the
+        # background loop), so it never exercises that branch. Force it on,
+        # bust this exact cache entry, and rebuild to see if the
+        # manually-pushed background-thread app context changes the result.
+        cache_key = _INTELLIGENCE_STATE_SERVICE._candidate_pool_key(date, source_fingerprint)
+        with _INTELLIGENCE_STATE_SERVICE._condition:
+            _INTELLIGENCE_STATE_SERVICE._candidate_pools.pop(cache_key, None)
+        original_app = _INTELLIGENCE_STATE_SERVICE._app
+        try:
+            _INTELLIGENCE_STATE_SERVICE._app = current_app._get_current_object()
+            pool_with_app_context = _INTELLIGENCE_STATE_SERVICE._build_candidate_pool(date, source_fingerprint)
+            app_context_pool_check = {"candidate_count": pool_with_app_context.get("candidate_count")}
+        finally:
+            _INTELLIGENCE_STATE_SERVICE._app = original_app
+            with _INTELLIGENCE_STATE_SERVICE._condition:
+                _INTELLIGENCE_STATE_SERVICE._candidate_pools.pop(cache_key, None)
     except Exception as exc:
         manifest_check["error"] = f"{type(exc).__name__}: {exc}"
 
@@ -697,6 +720,7 @@ def api_ops_intelligence_candidate_trace() -> Any:
         "preferences": preferences,
         "manifest_check": manifest_check,
         "full_pool_check": full_pool_check,
+        "app_context_pool_check": app_context_pool_check,
         "sports": [],
     }
     for sport in overview:
