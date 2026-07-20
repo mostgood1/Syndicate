@@ -2693,7 +2693,15 @@ def _prop_item_from_rank_card(
         "headshot_url": headshot_url,
         "is_live": False,
         "market": _metric_value(metrics, ["market", "stat"]),
-        "pick": badge or _metric_value(metrics, ["pick", "lean", "selection", "side"]),
+        # badge is an EV/confidence percentage (e.g. "20.4% EV") -- it is
+        # never a valid "pick" value. It used to be checked first here, and
+        # since format_num() always produces a truthy string, it always won,
+        # so every rank-card-sourced prop's pick/selection ended up as a
+        # bare percentage instead of the actual selection. Real WNBA/NBA
+        # rank cards (_card_from_pick) never label a metric "pick"/"lean"/
+        # "selection"/"side" either, so title (the actual display_pick
+        # text, e.g. "Gabby Williams OVER 1.5") is the real fallback.
+        "pick": _metric_value(metrics, ["pick", "lean", "selection", "side"]) or title,
         "actual": _metric_value(metrics, ["actual"]),
         "projected": _metric_value(metrics, ["projected", "projection", "model", "mean", "median"]),
         "live_projection": _metric_value(metrics, ["live projection", "live_proj"]),

@@ -802,6 +802,33 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         item = _prop_item_from_rank_card(card, sport_slug="wnba")
         self.assertEqual(item["team"], "LVA")
 
+    def test_prop_item_from_rank_card_pick_prefers_title_over_ev_badge(self) -> None:
+        # Real bug found in production: wnba/nba's _card_from_pick() always
+        # sets "badge" to an EV-percentage string ("20.4% EV") and never
+        # labels a metric "pick"/"lean"/"selection"/"side" -- since badge is
+        # always truthy, `badge or _metric_value(...)` always won, so every
+        # rank-card-sourced prop's pick/selection ended up as a bare EV
+        # percentage instead of the real pick (e.g. "Gabby Williams OVER
+        # 1.5"). That corrupted "pick" then propagated into "selection" and
+        # even "name" downstream (_attach_intelligence_response_aliases
+        # recomputes name from pick), so the card's title, pick, and
+        # selection all showed the same nonsensical percentage.
+        card = {
+            "title": "Gabby Williams OVER 1.5",
+            "eyebrow": "GSV",
+            "meta": "GSV @ SEA",
+            "badge": "20.4% EV",
+            "metrics": [
+                {"label": "Win prob", "value": "58.2%"},
+                {"label": "EV", "value": "20.4%"},
+                {"label": "Price", "value": "+102"},
+                {"label": "Score", "value": "8.1"},
+            ],
+        }
+        item = _prop_item_from_rank_card(card, sport_slug="wnba")
+        self.assertEqual(item["pick"], "Gabby Williams OVER 1.5")
+        self.assertNotIn("EV", item["pick"])
+
 
 if __name__ == "__main__":
     unittest.main()
