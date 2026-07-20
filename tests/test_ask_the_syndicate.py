@@ -255,6 +255,75 @@ class AskTheSyndicateApiTests(unittest.TestCase):
 
         self.assertTrue(cache_key)
 
+    def test_adapter_promotes_question_relevant_recommendation(self) -> None:
+        # Reproduces the reported bug: "How do the Brewers look against the
+        # Pirates?" returned the board-wide #1 pick (an unrelated WNBA
+        # player prop) instead of anything about that game, because the
+        # schema always took recommendations[0] with no relevance check.
+        snapshot = {
+            "query_type": "bet_analysis",
+            "recommendations": [
+                {"selection": "Courtney Williams OVER 1.5", "market": "assists", "model_probability": 0.7, "confidence": 0.6},
+                {"selection": "Milwaukee Brewers ML", "market": "moneyline", "model_probability": 0.55, "confidence": 0.5, "matchup": "Milwaukee Brewers vs Pittsburgh Pirates"},
+                {"selection": "Some Other Pick", "market": "total", "model_probability": 0.5, "confidence": 0.5},
+            ],
+        }
+
+        payload = build_syndicate_query_response(
+            question="How do the Brewers look against the Pirates?",
+            context={"sport": "mlb"},
+            decision=RouteDecision(intent="bet_analysis", handler_name="handle_bet_analysis", matched_terms=(), score=0),
+            result=dict(snapshot),
+        )
+
+        self.assertEqual(payload["schema"]["selection"], "Milwaukee Brewers ML")
+
+    def test_adapter_leaves_order_unchanged_for_generic_question(self) -> None:
+        # Regression guard: a question naming no specific subject must keep
+        # today's "top board pick" behavior -- this is the desired result
+        # for questions like "what's the best bet today".
+        snapshot = {
+            "query_type": "market_summary",
+            "recommendations": [
+                {"selection": "Courtney Williams OVER 1.5", "market": "assists", "model_probability": 0.7, "confidence": 0.6},
+                {"selection": "Milwaukee Brewers ML", "market": "moneyline", "model_probability": 0.55, "confidence": 0.5},
+            ],
+        }
+
+        payload = build_syndicate_query_response(
+            question="best bets today",
+            context={"sport": "mlb"},
+            decision=RouteDecision(intent="market_summary", handler_name="handle_market_summary", matched_terms=(), score=0),
+            result=dict(snapshot),
+        )
+
+        self.assertEqual(payload["schema"]["top_opportunities"][0]["selection"], "Courtney Williams OVER 1.5")
+
+    def test_adapter_relevance_reorder_preserves_pipeline_context_on_intelligence_result(self) -> None:
+        # IntelligenceResult.to_dict() does not serialize pipeline_context
+        # (repr=False field) -- the reorder must extract routing_context
+        # before converting result, not after, or this silently disappears.
+        result = IntelligenceResult.from_raw(
+            {
+                "query_type": "bet_analysis",
+                "recommendations": [
+                    {"name": "Unrelated Pick", "confidence": 0.6},
+                    {"name": "Milwaukee Brewers ML", "confidence": 0.5, "matchup": "Milwaukee Brewers vs Pittsburgh Pirates"},
+                ],
+            },
+            pipeline_context={"routing_context": {"question": "How do the Brewers look?", "sport": "mlb"}},
+        )
+
+        payload = build_syndicate_query_response(
+            question="How do the Brewers look against the Pirates?",
+            context={"sport": "mlb"},
+            decision=RouteDecision(intent="bet_analysis", handler_name="handle_bet_analysis", matched_terms=(), score=0),
+            result=result,
+        )
+
+        self.assertEqual(payload["schema"]["selection"], "Milwaukee Brewers ML")
+        self.assertEqual(payload["routing_context"]["sport"], "mlb")
+
     def test_adapter_uses_engine_explainability(self) -> None:
         result = IntelligenceResult.from_raw(
             {

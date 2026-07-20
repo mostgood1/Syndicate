@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from pipeline.intelligence_models import IntelligenceResult
@@ -252,6 +253,53 @@ def _market_summary_schema(result: Any) -> dict[str, Any]:
     }
 
 
+# Ask is a pure consumer of the cached board snapshot -- recommendations
+# there are ranked by score across the WHOLE board, unrelated to what any
+# given question asked about. Without this, "How do the Brewers look
+# against the Pirates?" would surface whatever's #1 board-wide (observed:
+# an unrelated WNBA player prop) instead of anything about that game.
+# Deliberately narrow: only reorders when a question word actually matches
+# a recommendation field, so generic questions ("what's the best bet
+# today") keep today's "top board pick" behavior unchanged.
+_ASK_RELEVANCE_STOPWORDS = {
+    "the", "how", "what", "who", "do", "does", "did", "you", "think", "of", "is", "are",
+    "for", "with", "this", "that", "today", "tonight", "look", "looks", "looking",
+    "will", "get", "and", "against", "vs", "versus", "in", "on", "at", "to", "a", "an",
+    "about", "best", "top", "good", "any", "some", "there", "it", "its", "was", "were",
+}
+
+
+def _relevance_words(text: Any) -> set[str]:
+    words = set(re.findall(r"[a-z0-9']+", str(text or "").lower()))
+    return {word for word in words if len(word) >= 3 and word not in _ASK_RELEVANCE_STOPWORDS}
+
+
+def _recommendation_relevance_score(item: dict[str, Any], words: set[str]) -> int:
+    if not words:
+        return 0
+    text_fields = (
+        item.get("selection"), item.get("pick"), item.get("name"), item.get("label"),
+        item.get("matchup"), item.get("team"), item.get("market"), item.get("market_label"),
+    )
+    score = 0
+    for field in text_fields:
+        if not field:
+            continue
+        score += len(_relevance_words(field) & words)
+    return score
+
+
+def _reorder_by_relevance(items: list[dict[str, Any]], question: str) -> list[dict[str, Any]]:
+    words = _relevance_words(question)
+    if not words or not items:
+        return items
+    scored = [(item, _recommendation_relevance_score(item, words)) for item in items]
+    if max(score for _, score in scored) <= 0:
+        return items  # nothing in the snapshot names anything from the question -- leave as-is
+    ranked = sorted(scored, key=lambda pair: pair[1], reverse=True)  # stable: ties keep board order
+    return [item for item, _ in ranked]
+
+
 def build_syndicate_query_response(*, question: str, context: dict[str, Any], decision: RouteDecision, result: Any) -> dict[str, Any]:
     query_type = _result_value(result, "query_type", None) or decision.intent or "bet_analysis"
     pipeline_context = _mapping_or_empty(_result_value(result, "pipeline_context", {}))
@@ -260,6 +308,19 @@ def build_syndicate_query_response(*, question: str, context: dict[str, Any], de
     board_contract = build_intelligence_board_contract(_result_payload(result))
     daily_update = _mapping_or_empty(_result_value(result, "daily_update", {}))
     simulation_contract = _mapping_or_empty(daily_update.get("simulation_contract"))
+
+    # Only the schema below needs the question-relevant ordering -- board_contract
+    # above (a different rendering surface) and the metadata already extracted
+    # keep using the original result, so nothing computed from it is lost by
+    # the payload conversion this triggers (IntelligenceResult.to_dict() does
+    # not serialize pipeline_context, for one).
+    recommendations = _items_to_dicts(_result_value(result, "recommendations", ()))
+    if recommendations:
+        reordered = _reorder_by_relevance(recommendations, question)
+        if reordered is not recommendations:
+            result = _result_payload(result)
+            result["recommendations"] = reordered
+
     if decision.intent in {"matchup_analysis", "comparison"}:
         schema = _matchup_analysis_schema(question, result)
     elif decision.intent == "market_summary":
