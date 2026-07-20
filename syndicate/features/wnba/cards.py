@@ -1814,7 +1814,15 @@ def get_wnba_overview(selected_date: str) -> dict[str, Any]:
     from syndicate.blueprints.home import _finalize_home_prop_rows
     from syndicate.blueprints.home import _load_home_prop_items
 
-    cards_context = build_cards_page_context(requested_date, allow_stored_date_fallback=True)
+    # Uses the "source" execution-mode payload builder (not
+    # build_cards_page_context's static game_cards_{date}.csv snapshot),
+    # because the CSV snapshot is only ever written pregame and never
+    # updated with live/final state -- the cross-sport board would keep
+    # showing games as "Scheduled" (and their recommendations empty, since
+    # the recs join runs against that same stale snapshot) long after they
+    # went final. build_source_cards_payload re-hydrates live/final state
+    # and recommendations on every call.
+    cards_context = build_source_cards_payload(requested_date, allow_stored_date_fallback=True)
     games = list(cards_context.get("games") or [])
     prop_rows = _finalize_home_prop_rows(
         _load_home_prop_items(

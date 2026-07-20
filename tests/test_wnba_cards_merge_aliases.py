@@ -464,21 +464,20 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
 
     def test_wnba_overview_uses_stored_date_fallback(self) -> None:
         with patch("syndicate.features.wnba.cards.has_games_for_date", return_value=True), patch(
-            "syndicate.features.wnba.cards.build_cards_page_context"
-        ) as mocked_build_context:
-            mocked_build_context.side_effect = lambda selected_date, allow_stored_date_fallback=False: {
+            "syndicate.features.wnba.cards.build_source_cards_payload"
+        ) as mocked_build_payload:
+            mocked_build_payload.side_effect = lambda selected_date, allow_stored_date_fallback=False: {
                 "games": [{"event_id": "evt-1"}] if allow_stored_date_fallback else [],
                 "date": selected_date,
                 "requested_date": selected_date,
-                "source_title": "fallback",
-                "source_path": "fallback.csv",
+                "board_contract": {},
             }
 
             overview = get_wnba_overview("2026-06-30")
 
         self.assertEqual(overview["status"], "ok")
         self.assertEqual(len(overview["games"]), 1)
-        mocked_build_context.assert_called_once_with("2026-06-30", allow_stored_date_fallback=True)
+        mocked_build_payload.assert_called_once_with("2026-06-30", allow_stored_date_fallback=True)
 
     def test_source_cards_payload_keeps_explicit_today_date_without_stored_fallback(self) -> None:
         empty_bundle = {"rows": [], "recommendations": {}, "sim": {}, "props": {}}

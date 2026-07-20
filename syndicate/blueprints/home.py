@@ -1666,6 +1666,7 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
     live_projection_text = _prop_metric_text(live_projection) if live_projection is not None else "-"
     fallback_live = bool(game.get("shared_is_live") or _is_liveish(game.get("status"), game.get("detail")) or "live" in _safe_text(market, "").lower())
     is_live = _live_odds_backed_live_flag(_game_identifier(game), live_odds_game_ids, fallback_live)
+    game_state = _game_status_state(game)
     edge_value = _pct_number(edge_text)
     confidence_value = _pct_number(confidence_text)
     updated_epoch = _game_row_updated_epoch(game, fallback_epoch)
@@ -1681,6 +1682,8 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
             "market": _safe_text(market, _market_label_from_pick_text(pick_text)),
             "pick": pick_text,
             "is_live": is_live,
+            "is_final": game_state == "final",
+            "game_state": game_state or None,
             "line": line_text or "-",
             "odds": odds_text or "-",
             "edge": edge_text,
