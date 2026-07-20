@@ -30,6 +30,9 @@ from syndicate.features.shared.basketball_live_artifacts import build_live_lines
 from syndicate.features.shared.basketball_live_artifacts import build_live_player_lens_payload_from_artifacts
 from syndicate.features.shared.basketball_live_artifacts import resolve_event_ids_from_games
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
+from syndicate.features.shared.source_roots import preferred_source_roots
+from syndicate.features.shared.team_branding import read_team_branding_snapshot
+from syndicate.features.shared.team_branding import team_branding_index_by_abbreviation
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
 from syndicate.features.shared.game_board_contract import _sim_payload
 from syndicate.features.shared.timezone import central_now
@@ -201,8 +204,26 @@ def _normalize_remote_card_game(game: dict[str, Any]) -> dict[str, Any]:
         out.setdefault("away_tri", away_tri)
     if home_tri:
         out.setdefault("home_tri", home_tri)
-    out.setdefault("away", {"abbr": away_tri, "name": away_tri, "logo": _nba_logo_url(away_tri)})
-    out.setdefault("home", {"abbr": home_tri, "name": home_tri, "logo": _nba_logo_url(home_tri)})
+    out.setdefault(
+        "away",
+        {
+            "abbr": away_tri,
+            "name": away_tri,
+            "logo": _nba_logo_url(away_tri),
+            "primary_color": _nba_primary_color(away_tri),
+            "secondary_color": _nba_secondary_color(away_tri),
+        },
+    )
+    out.setdefault(
+        "home",
+        {
+            "abbr": home_tri,
+            "name": home_tri,
+            "logo": _nba_logo_url(home_tri),
+            "primary_color": _nba_primary_color(home_tri),
+            "secondary_color": _nba_secondary_color(home_tri),
+        },
+    )
     out.setdefault("away_name", away_tri)
     out.setdefault("home_name", home_tri)
     out.setdefault("away_logo", _nba_logo_url(away_tri))
@@ -277,11 +298,40 @@ def _canonical_nba_tri(team_tri: str) -> str:
     return mapped.get(value, mapped.get(compact, value))
 
 
+@lru_cache(maxsize=1)
+def _nba_team_branding_index() -> dict[str, Any]:
+    root = preferred_source_roots(__file__, env_var="SYNDICATE_NBA_SOURCE_ROOT", local_dir_name="nba_source")[0]
+    path = root / "source_artifacts" / "data" / "processed" / "team_branding" / "nba_team_branding.csv"
+    return team_branding_index_by_abbreviation(read_team_branding_snapshot(path))
+
+
+def _nba_branding(team_tri: str) -> Any | None:
+    abbr = _espn_logo_abbr(team_tri)
+    if not abbr:
+        return None
+    return _nba_team_branding_index().get(abbr.upper())
+
+
 def _nba_logo_url(team_tri: str) -> str | None:
+    branding = _nba_branding(team_tri)
+    if branding and branding.logo_url:
+        return branding.logo_url
+    # Fallback to the same CDN URL pattern the branding snapshot itself uses,
+    # in case the snapshot file is missing/stale in a given environment.
     abbr = _espn_logo_abbr(team_tri)
     if not abbr:
         return None
     return f"https://a.espncdn.com/i/teamlogos/nba/500/{abbr.lower()}.png"
+
+
+def _nba_primary_color(team_tri: str) -> str | None:
+    branding = _nba_branding(team_tri)
+    return branding.primary_color if branding else None
+
+
+def _nba_secondary_color(team_tri: str) -> str | None:
+    branding = _nba_branding(team_tri)
+    return branding.secondary_color if branding else None
 
 
 def _recommendation_index(summary: dict[str, Any] | None) -> dict[tuple[str, str], list[dict[str, Any]]]:
@@ -858,8 +908,20 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
                 "home_name": home_tri,
                 "away_logo": _nba_logo_url(away_tri),
                 "home_logo": _nba_logo_url(home_tri),
-                "away": {"abbr": away_tri, "name": away_tri, "logo": _nba_logo_url(away_tri)},
-                "home": {"abbr": home_tri, "name": home_tri, "logo": _nba_logo_url(home_tri)},
+                "away": {
+                    "abbr": away_tri,
+                    "name": away_tri,
+                    "logo": _nba_logo_url(away_tri),
+                    "primary_color": _nba_primary_color(away_tri),
+                    "secondary_color": _nba_secondary_color(away_tri),
+                },
+                "home": {
+                    "abbr": home_tri,
+                    "name": home_tri,
+                    "logo": _nba_logo_url(home_tri),
+                    "primary_color": _nba_primary_color(home_tri),
+                    "secondary_color": _nba_secondary_color(home_tri),
+                },
                 "status": normalized_status["status"],
                 "detail": normalized_status["detail"],
                 "summary": "Live scoreboard fallback",
@@ -1912,8 +1974,20 @@ def _normalize_source_game(game: dict[str, Any], *, idx: int, selected_date: str
         "home_name": home_name,
         "away_logo": _nba_logo_url(away_tri),
         "home_logo": _nba_logo_url(home_tri),
-        "away": {"abbr": away_tri, "name": away_name, "logo": _nba_logo_url(away_tri)},
-        "home": {"abbr": home_tri, "name": home_name, "logo": _nba_logo_url(home_tri)},
+        "away": {
+            "abbr": away_tri,
+            "name": away_name,
+            "logo": _nba_logo_url(away_tri),
+            "primary_color": _nba_primary_color(away_tri),
+            "secondary_color": _nba_secondary_color(away_tri),
+        },
+        "home": {
+            "abbr": home_tri,
+            "name": home_name,
+            "logo": _nba_logo_url(home_tri),
+            "primary_color": _nba_primary_color(home_tri),
+            "secondary_color": _nba_secondary_color(home_tri),
+        },
         "status": str(game.get("live_status") or game.get("date") or "Source API").strip() or "Source API",
         "detail": str(game.get("date") or game.get("live_status") or "Scheduled").strip() or "Scheduled",
         "summary": str(game.get("writeup") or "Source API snapshot").strip() or "Source API snapshot",
@@ -2035,8 +2109,20 @@ def _game_from_row(
         "home_name": home_name,
         "away_logo": _nba_logo_url(away_tri),
         "home_logo": _nba_logo_url(home_tri),
-        "away": {"abbr": away_tri, "name": away_name, "logo": _nba_logo_url(away_tri)},
-        "home": {"abbr": home_tri, "name": home_name, "logo": _nba_logo_url(home_tri)},
+        "away": {
+            "abbr": away_tri,
+            "name": away_name,
+            "logo": _nba_logo_url(away_tri),
+            "primary_color": _nba_primary_color(away_tri),
+            "secondary_color": _nba_secondary_color(away_tri),
+        },
+        "home": {
+            "abbr": home_tri,
+            "name": home_name,
+            "logo": _nba_logo_url(home_tri),
+            "primary_color": _nba_primary_color(home_tri),
+            "secondary_color": _nba_secondary_color(home_tri),
+        },
         "status": normalized_status["status"],
         "detail": normalized_status["detail"],
         "summary": f"{row.get('bookmaker') or 'Consensus'} market snapshot",

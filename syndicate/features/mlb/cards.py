@@ -5,6 +5,7 @@ from collections import defaultdict
 from collections import OrderedDict
 from datetime import date
 from datetime import datetime, timedelta
+from functools import lru_cache
 import importlib.util
 import json
 import os
@@ -19,6 +20,8 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
+from syndicate.features.shared.team_branding import read_team_branding_snapshot
+from syndicate.features.shared.team_branding import team_branding_index_by_abbreviation
 from syndicate.features.mlb.ladders_common import build_module_links
 from syndicate.features.mlb.sources import default_mlb_source_root
 from syndicate.features.mlb.sources import available_daily_summary_dates
@@ -387,10 +390,47 @@ def _schedule_context(
     }
 
 
+@lru_cache(maxsize=1)
+def _mlb_abbr_by_team_id() -> dict[int, str]:
+    # _MLB_TEAM_META_BY_ABBR's ids are MLB's own official numeric ids (used
+    # for the mlbstatic.com CDN below) -- a different numbering scheme than
+    # ESPN's own team ids, so branding lookups join on abbreviation instead.
+    return {int(meta["id"]): abbr for abbr, meta in _MLB_TEAM_META_BY_ABBR.items() if meta.get("id")}
+
+
+@lru_cache(maxsize=1)
+def _mlb_team_branding_index() -> dict[str, Any]:
+    root = default_mlb_source_root()
+    path = root / "source_artifacts" / "data" / "processed" / "team_branding" / "mlb_team_branding.csv"
+    return team_branding_index_by_abbreviation(read_team_branding_snapshot(path))
+
+
+def _mlb_branding(team_id: int | None) -> Any | None:
+    if not team_id:
+        return None
+    abbr = _mlb_abbr_by_team_id().get(int(team_id))
+    if not abbr:
+        return None
+    return _mlb_team_branding_index().get(abbr)
+
+
 def _mlb_logo_url(team_id: int | None) -> str | None:
     if not team_id:
         return None
+    branding = _mlb_branding(team_id)
+    if branding and branding.logo_url:
+        return branding.logo_url
     return f"https://www.mlbstatic.com/team-logos/{int(team_id)}.svg"
+
+
+def _mlb_primary_color(team_id: int | None) -> str | None:
+    branding = _mlb_branding(team_id)
+    return branding.primary_color if branding else None
+
+
+def _mlb_secondary_color(team_id: int | None) -> str | None:
+    branding = _mlb_branding(team_id)
+    return branding.secondary_color if branding else None
 
 
 def _mlb_headshot_url(player_id: int | None) -> str | None:
@@ -412,6 +452,8 @@ def _team_display(abbr: str, fallback_name: str | None = None) -> dict[str, Any]
         "abbr": team_abbr,
         "id": team_id,
         "logo": _mlb_logo_url(team_id),
+        "primary_color": _mlb_primary_color(team_id),
+        "secondary_color": _mlb_secondary_color(team_id),
         "name": team_name,
     }
 
@@ -649,6 +691,10 @@ def _hr_targets_shelf(selected_date: str) -> dict[str, Any] | None:
                 "headshot_url": _mlb_headshot_url(batter_id),
                 "team_logo_url": _mlb_logo_url(team_id),
                 "opponent_logo_url": _mlb_logo_url(opponent_team_id),
+                "team_primary_color": _mlb_primary_color(team_id),
+                "team_secondary_color": _mlb_secondary_color(team_id),
+                "opponent_primary_color": _mlb_primary_color(opponent_team_id),
+                "opponent_secondary_color": _mlb_secondary_color(opponent_team_id),
                 "drivers": reasons[:3],
             }
         )
@@ -704,6 +750,10 @@ def _k_targets_shelf(selected_date: str) -> dict[str, Any] | None:
                 "headshot_url": _mlb_headshot_url(pitcher_id),
                 "team_logo_url": _mlb_logo_url(team_id),
                 "opponent_logo_url": _mlb_logo_url(opponent_team_id),
+                "team_primary_color": _mlb_primary_color(team_id),
+                "team_secondary_color": _mlb_secondary_color(team_id),
+                "opponent_primary_color": _mlb_primary_color(opponent_team_id),
+                "opponent_secondary_color": _mlb_secondary_color(opponent_team_id),
                 "drivers": reasons[:3],
             }
         )

@@ -29,6 +29,9 @@ from syndicate.features.shared.game_board_contract import _sim_payload
 from syndicate.features.shared.memory_observability import log_runtime_memory
 from syndicate.features.shared.refresh_state_store import data_root as _refresh_state_data_root
 from syndicate.features.shared.refresh_state_store import read_json_file as _keyvalue_read_json_file
+from syndicate.features.shared.source_roots import preferred_source_roots
+from syndicate.features.shared.team_branding import read_team_branding_snapshot
+from syndicate.features.shared.team_branding import team_branding_index_by_abbreviation
 from syndicate.features.shared.refresh_state_store import read_text_file as _keyvalue_read_text_file
 from syndicate.features.wnba.sources import available_dates
 from syndicate.features.wnba.sources import build_module_links
@@ -248,6 +251,43 @@ def _canonical_wnba_tri(team_tri: str) -> str:
         "GOLDENSTATEVALKYRIES": "GSV",
     }
     return mapped.get(value, mapped.get(compact, value))
+
+
+# This module's canonical tri-codes occasionally differ from ESPN's own
+# abbreviation for the same team (e.g. canonical "LAS" vs ESPN's "LA") --
+# translated here only for the branding/color lookup, not touching
+# _canonical_wnba_tri()'s own established output used everywhere else.
+_ESPN_BRANDING_ABBR_ALIASES: dict[str, str] = {
+    "LAS": "LA",
+    "LVA": "LV",
+    "GSV": "GS",
+    "NYL": "NY",
+}
+
+
+@lru_cache(maxsize=1)
+def _wnba_team_branding_index() -> dict[str, Any]:
+    root = preferred_source_roots(__file__, env_var="SYNDICATE_WNBA_SOURCE_ROOT", local_dir_name="wnba_source")[0]
+    path = root / "source_artifacts" / "data" / "processed" / "team_branding" / "wnba_team_branding.csv"
+    return team_branding_index_by_abbreviation(read_team_branding_snapshot(path))
+
+
+def _wnba_branding(team_tri: str) -> Any | None:
+    canonical = _canonical_wnba_tri(team_tri)
+    if not canonical:
+        return None
+    index = _wnba_team_branding_index()
+    return index.get(canonical) or index.get(_ESPN_BRANDING_ABBR_ALIASES.get(canonical, canonical))
+
+
+def _wnba_primary_color(team_tri: str) -> str | None:
+    branding = _wnba_branding(team_tri)
+    return branding.primary_color if branding else None
+
+
+def _wnba_secondary_color(team_tri: str) -> str | None:
+    branding = _wnba_branding(team_tri)
+    return branding.secondary_color if branding else None
 
 
 def _load_csv_rows(path: Path) -> list[dict[str, str]]:
@@ -1621,6 +1661,10 @@ def _source_game_from_row(
         "home": home_tri,
         "away_logo": _source_logo_url(away_tri),
         "home_logo": _source_logo_url(home_tri),
+        "away_primary_color": _wnba_primary_color(away_tri),
+        "away_secondary_color": _wnba_secondary_color(away_tri),
+        "home_primary_color": _wnba_primary_color(home_tri),
+        "home_secondary_color": _wnba_secondary_color(home_tri),
         "start_time": str(row.get("commence_time") or "").strip() or None,
         "odds": {"commence_time": str(row.get("commence_time") or "").strip() or None},
         "status": {"detailed": _format_start_time_local(row.get("commence_time"))},
@@ -1918,8 +1962,20 @@ def _game_from_row(
     # score to report yet, so this is a no-op for them.
     row_away_pts = _safe_float(row.get("away_pts"))
     row_home_pts = _safe_float(row.get("home_pts"))
-    away_info = {"abbr": away_tri, "name": away_name, "logo": _source_logo_url(away_tri)}
-    home_info = {"abbr": home_tri, "name": home_name, "logo": _source_logo_url(home_tri)}
+    away_info = {
+        "abbr": away_tri,
+        "name": away_name,
+        "logo": _source_logo_url(away_tri),
+        "primary_color": _wnba_primary_color(away_tri),
+        "secondary_color": _wnba_secondary_color(away_tri),
+    }
+    home_info = {
+        "abbr": home_tri,
+        "name": home_name,
+        "logo": _source_logo_url(home_tri),
+        "primary_color": _wnba_primary_color(home_tri),
+        "secondary_color": _wnba_secondary_color(home_tri),
+    }
     if row_away_pts is not None:
         away_info["score"] = row_away_pts
     if row_home_pts is not None:
@@ -1939,6 +1995,10 @@ def _game_from_row(
         "home_name": home_name,
         "away_logo": _source_logo_url(away_tri),
         "home_logo": _source_logo_url(home_tri),
+        "away_primary_color": _wnba_primary_color(away_tri),
+        "away_secondary_color": _wnba_secondary_color(away_tri),
+        "home_primary_color": _wnba_primary_color(home_tri),
+        "home_secondary_color": _wnba_secondary_color(home_tri),
         "away": away_info,
         "home": home_info,
         "status": _source_status_contract(
@@ -2239,8 +2299,20 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
                 "home_name": home_tri,
                 "away_logo": _source_logo_url(away_tri),
                 "home_logo": _source_logo_url(home_tri),
-                "away": {"abbr": away_tri, "name": away_tri, "logo": _source_logo_url(away_tri)},
-                "home": {"abbr": home_tri, "name": home_tri, "logo": _source_logo_url(home_tri)},
+                "away": {
+                    "abbr": away_tri,
+                    "name": away_tri,
+                    "logo": _source_logo_url(away_tri),
+                    "primary_color": _wnba_primary_color(away_tri),
+                    "secondary_color": _wnba_secondary_color(away_tri),
+                },
+                "home": {
+                    "abbr": home_tri,
+                    "name": home_tri,
+                    "logo": _source_logo_url(home_tri),
+                    "primary_color": _wnba_primary_color(home_tri),
+                    "secondary_color": _wnba_secondary_color(home_tri),
+                },
                 "status": normalized_status["status"],
                 "detail": normalized_status["detail"],
                 "summary": "Live scoreboard fallback",

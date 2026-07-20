@@ -28,6 +28,8 @@ from syndicate.features.ncaaf.smartsim2_trial_monitoring import record_trial_pag
 from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.discrete_nav import resolve_selected_value
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
+from syndicate.features.shared.team_branding import read_team_branding_snapshot
+from syndicate.features.shared.team_branding import team_branding_index_by_id
 
 
 _WEEK1_PUBLISHABLE_MATCHUPS = {
@@ -515,6 +517,16 @@ def _roster_rows() -> tuple[dict[str, Any], ...]:
     return tuple(_load_csv_rows(_processed_artifact_path("roster", "ncaaf_roster_snapshot.csv")))
 
 
+@lru_cache(maxsize=1)
+def _team_branding_index() -> dict[str, Any]:
+    rows = read_team_branding_snapshot(_processed_artifact_path("team_branding", "ncaaf_team_branding.csv"))
+    return team_branding_index_by_id(rows)
+
+
+def _resolve_branding(team_id: str) -> Any | None:
+    return _team_branding_index().get(str(team_id).strip()) if team_id else None
+
+
 def _team_registry_index() -> dict[str, dict[str, Any]]:
     index: dict[str, dict[str, Any]] = {}
     for row in _team_registry_rows():
@@ -613,6 +625,7 @@ def _team_context(team_name: str, season: int) -> dict[str, Any]:
     returning_usage = _format_decimal(returning_row.get("usage") if returning_row else None, places=3)
     coach_continuity = _format_decimal(coach_row.get("continuity_score") if coach_row else None, places=3)
     coach_tenure = _format_decimal(coach_row.get("coach_tenure_years") if coach_row else None, places=1)
+    branding = _resolve_branding(team_id)
     return {
         "team_name": team_name,
         "team_id": team_id,
@@ -623,6 +636,9 @@ def _team_context(team_name: str, season: int) -> dict[str, Any]:
         "conference": str(registry_row.get("conference") or "").strip(),
         "conference_short_name": str(registry_row.get("conference_short_name") or "").strip(),
         "subdivision": str(registry_row.get("subdivision") or "").strip(),
+        "logo_url": branding.logo_url if branding else None,
+        "primary_color": branding.primary_color if branding else None,
+        "secondary_color": branding.secondary_color if branding else None,
         "returning": {
             "starter_estimate": returning_starter_estimate,
             "percent_ppa": returning_percent,
@@ -1017,8 +1033,10 @@ def _build_ncaaf_card_contract(row: dict[str, Any], week: int, *, season: int) -
             "mascot_name": away_context["mascot_name"],
             "conference": away_context["conference"],
             "conference_short_name": away_context["conference_short_name"],
-            "logo_url": None,
+            "logo_url": away_context["logo_url"],
             "logo_text": away_context["abbreviation"],
+            "primary_color": away_context["primary_color"],
+            "secondary_color": away_context["secondary_color"],
         },
         "home": {
             "abbr": home_context["abbreviation"],
@@ -1027,8 +1045,10 @@ def _build_ncaaf_card_contract(row: dict[str, Any], week: int, *, season: int) -
             "mascot_name": home_context["mascot_name"],
             "conference": home_context["conference"],
             "conference_short_name": home_context["conference_short_name"],
-            "logo_url": None,
+            "logo_url": home_context["logo_url"],
             "logo_text": home_context["abbreviation"],
+            "primary_color": home_context["primary_color"],
+            "secondary_color": home_context["secondary_color"],
         },
         "kickoff": scoreboard.get("kickoff") or f"{_week_label(week, season=season)} kickoff unavailable",
         "venue": scoreboard.get("venue") or "Venue unavailable",
@@ -1396,8 +1416,10 @@ def _build_smartsim_ncaaf_card_contract(row: dict[str, Any], week: int, *, seaso
                     "mascot_name": away_context["mascot_name"],
                     "conference": away_context["conference"],
                     "conference_short_name": away_context["conference_short_name"],
-                    "logo_url": None,
+                    "logo_url": away_context["logo_url"],
                     "logo_text": away_context["abbreviation"],
+                    "primary_color": away_context["primary_color"],
+                    "secondary_color": away_context["secondary_color"],
                 },
                 "home": {
                     "abbr": home_context["abbreviation"],
@@ -1406,8 +1428,10 @@ def _build_smartsim_ncaaf_card_contract(row: dict[str, Any], week: int, *, seaso
                     "mascot_name": home_context["mascot_name"],
                     "conference": home_context["conference"],
                     "conference_short_name": home_context["conference_short_name"],
-                    "logo_url": None,
+                    "logo_url": home_context["logo_url"],
                     "logo_text": home_context["abbreviation"],
+                    "primary_color": home_context["primary_color"],
+                    "secondary_color": home_context["secondary_color"],
                 },
                 "kickoff": scoreboard.get("kickoff") or f"{_week_label(week, season=season)} kickoff unavailable",
                 "venue": scoreboard.get("venue") or "Venue unavailable",

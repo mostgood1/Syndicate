@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 from syndicate.features.ncaab.cards import _group_rows
+from syndicate.features.ncaab.cards import _resolve_branding
 from syndicate.features.ncaab.sources import available_dates
 from syndicate.features.ncaab.sources import build_module_links
 from syndicate.features.ncaab.sources import default_season_date
@@ -92,11 +93,25 @@ def _results_only_game(row: dict[str, Any], selected_date: str) -> dict[str, Any
     away_team = str(row.get("away_team") or "Away").strip() or "Away"
     home_team = str(row.get("home_team") or "Home").strip() or "Home"
     game_id = str(row.get("game_id") or f"results-{selected_date}-{away_team}-{home_team}").strip()
+    away_branding = _resolve_branding(away_team)
+    home_branding = _resolve_branding(home_team)
     return {
         "gamePk": game_id,
         "card_variant": "shared_default",
-        "away": {"abbr": away_team[:3].upper(), "name": away_team, "logo": row.get("away_logo")},
-        "home": {"abbr": home_team[:3].upper(), "name": home_team, "logo": row.get("home_logo")},
+        "away": {
+            "abbr": away_team[:3].upper(),
+            "name": away_team,
+            "logo": row.get("away_logo") or (away_branding.logo_url if away_branding else None),
+            "primary_color": away_branding.primary_color if away_branding else None,
+            "secondary_color": away_branding.secondary_color if away_branding else None,
+        },
+        "home": {
+            "abbr": home_team[:3].upper(),
+            "name": home_team,
+            "logo": row.get("home_logo") or (home_branding.logo_url if home_branding else None),
+            "primary_color": home_branding.primary_color if home_branding else None,
+            "secondary_color": home_branding.secondary_color if home_branding else None,
+        },
         "status": selected_date,
         "detail": _fmt_score(row),
         "summary": _results_summary(row),

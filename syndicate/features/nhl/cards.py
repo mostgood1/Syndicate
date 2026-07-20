@@ -26,6 +26,8 @@ from syndicate.features.nhl.sources import props_lines_snapshot_path
 from syndicate.features.nhl.sources import scoreboard_snapshot_path
 from syndicate.features.nhl.sources import team_abbreviation
 from syndicate.features.nhl.sources import team_logo_url
+from syndicate.features.nhl.sources import team_primary_color
+from syndicate.features.nhl.sources import team_secondary_color
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.shared.game_board_contract import _sim_payload
 
@@ -217,8 +219,20 @@ def _game_from_row(row: dict[str, str], *, idx: int, selected_date: str) -> dict
         "home_name": home_name,
         "away_logo": team_logo_url(away_abbr),
         "home_logo": team_logo_url(home_abbr),
-        "away": {"abbr": away_abbr, "name": away_name, "logo": team_logo_url(away_abbr)},
-        "home": {"abbr": home_abbr, "name": home_name, "logo": team_logo_url(home_abbr)},
+        "away": {
+            "abbr": away_abbr,
+            "name": away_name,
+            "logo": team_logo_url(away_abbr),
+            "primary_color": team_primary_color(away_abbr),
+            "secondary_color": team_secondary_color(away_abbr),
+        },
+        "home": {
+            "abbr": home_abbr,
+            "name": home_name,
+            "logo": team_logo_url(home_abbr),
+            "primary_color": team_primary_color(home_abbr),
+            "secondary_color": team_secondary_color(home_abbr),
+        },
         "status": normalized_status["status"],
         "detail": normalized_status["detail"],
         "summary": f"Projected total {model_total} | spread {model_spread}",
@@ -806,9 +820,13 @@ def build_props_cards_payload(selected_date: str | None, top: int = 12) -> dict[
             "player_id": int(player_id) if player_id.isdigit() else None,
                 "headshot_url": _nhl_headshot_url(player_id, team_abbr=team, selected_date=resolved_date),
                 "team_logo": team_logo_url(team),
+                "team_primary_color": team_primary_color(team),
+                "team_secondary_color": team_secondary_color(team),
                 "team": team or None,
                 "opp": opp or None,
                 "opp_logo": team_logo_url(opp),
+                "opp_primary_color": team_primary_color(opp),
+                "opp_secondary_color": team_secondary_color(opp),
                 "market": str(row.get("market") or "").strip().upper() or None,
                 "side": str(row.get("side") or "").strip().title() or None,
                 "book": str(row.get("book") or "").strip().lower() or None,

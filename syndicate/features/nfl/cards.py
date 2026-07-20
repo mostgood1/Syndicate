@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 import csv
+import re
 from functools import lru_cache
 from typing import Any
 
 from syndicate.features.nfl.sources import available_weeks
 from syndicate.features.nfl.sources import build_module_links
+from syndicate.features.nfl.sources import default_nfl_source_root
 from syndicate.features.nfl.sources import default_week
 from syndicate.features.nfl.sources import latest_season
 from syndicate.features.nfl.sources import recommendation_path
 from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.discrete_nav import resolve_selected_value
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
+from syndicate.features.shared.team_branding import read_team_branding_snapshot
 
 
 def _safe_float(value: Any) -> float | None:
@@ -82,6 +85,27 @@ def _team_abbr(team_name: str) -> str:
         return initials[:3]
     letters = "".join(char for char in team_name.upper() if char.isalpha())
     return (letters[:3] or "TEAM")
+
+
+def _normalize_branding_key(text: Any) -> str:
+    return re.sub(r"[^a-z0-9]", "", str(text or "").lower())
+
+
+@lru_cache(maxsize=1)
+def _team_branding_index() -> dict[str, Any]:
+    path = default_nfl_source_root() / "source_artifacts" / "data" / "processed" / "team_branding" / "nfl_team_branding.csv"
+    rows = read_team_branding_snapshot(path)
+    index: dict[str, Any] = {}
+    for row in rows:
+        for key in (row.display_name, row.location, row.abbreviation):
+            normalized = _normalize_branding_key(key)
+            if normalized:
+                index.setdefault(normalized, row)
+    return index
+
+
+def _resolve_branding(team_name: str) -> Any | None:
+    return _team_branding_index().get(_normalize_branding_key(team_name))
 
 
 def _format_game_date(value: Any) -> str:
@@ -214,6 +238,8 @@ def _game_from_snapshot_bundle(bundle: dict[str, Any], season: int, week: int) -
     home_team = _safe_text(bundle.get("home_team"), "Home")
     away_abbr = _team_abbr(away_team)
     home_abbr = _team_abbr(home_team)
+    away_branding = _resolve_branding(away_team)
+    home_branding = _resolve_branding(home_team)
     game_date = _safe_text(bundle.get("game_date"), "TBD")
     ordered_rows = bundle.get("rows") if isinstance(bundle.get("rows"), list) else []
     top_row = bundle.get("top_row") if isinstance(bundle.get("top_row"), dict) else {}
@@ -228,8 +254,20 @@ def _game_from_snapshot_bundle(bundle: dict[str, Any], season: int, week: int) -
     return {
         "gamePk": game_pk,
         "card_variant": "shared_default",
-        "away": {"abbr": away_abbr, "name": away_team},
-        "home": {"abbr": home_abbr, "name": home_team},
+        "away": {
+            "abbr": away_abbr,
+            "name": away_team,
+            "logo_url": away_branding.logo_url if away_branding else None,
+            "primary_color": away_branding.primary_color if away_branding else None,
+            "secondary_color": away_branding.secondary_color if away_branding else None,
+        },
+        "home": {
+            "abbr": home_abbr,
+            "name": home_team,
+            "logo_url": home_branding.logo_url if home_branding else None,
+            "primary_color": home_branding.primary_color if home_branding else None,
+            "secondary_color": home_branding.secondary_color if home_branding else None,
+        },
         "href": f"/nfl/game/{game_pk}?season={season}&week={week}",
         "href_label": "Open NFL game detail",
         "status": f"Week {week}",

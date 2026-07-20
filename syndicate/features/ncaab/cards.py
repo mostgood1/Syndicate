@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+from functools import lru_cache
 from typing import Any
 
 from syndicate.features.ncaab.sources import build_module_links
@@ -8,6 +10,30 @@ from syndicate.features.ncaab.sources import mirrored_available_dates
 from syndicate.features.ncaab.sources import mirrored_recommendations_payload
 from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
+from syndicate.features.shared.source_roots import preferred_source_roots
+from syndicate.features.shared.team_branding import read_team_branding_snapshot
+
+
+def _normalize_branding_key(text: Any) -> str:
+    return re.sub(r"[^a-z0-9]", "", str(text or "").lower())
+
+
+@lru_cache(maxsize=1)
+def _team_branding_index() -> dict[str, Any]:
+    root = preferred_source_roots(__file__, env_var="SYNDICATE_NCAAB_SOURCE_ROOT", local_dir_name="ncaab_source")[0]
+    path = root / "source_artifacts" / "data" / "processed" / "team_branding" / "ncaab_team_branding.csv"
+    rows = read_team_branding_snapshot(path)
+    index: dict[str, Any] = {}
+    for row in rows:
+        for key in (row.display_name, row.location, row.abbreviation):
+            normalized = _normalize_branding_key(key)
+            if normalized:
+                index.setdefault(normalized, row)
+    return index
+
+
+def _resolve_branding(team_name: str) -> Any | None:
+    return _team_branding_index().get(_normalize_branding_key(team_name))
 
 
 def _safe_float(value: Any) -> float | None:
@@ -70,16 +96,30 @@ def _group_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         rep = max(best_by_code.values(), key=_row_rank)
         away_team = str(rep.get("away_team") or "Away").strip() or "Away"
         home_team = str(rep.get("home_team") or "Home").strip() or "Home"
-        away_logo = str(rep.get("away_logo") or "").strip()
-        home_logo = str(rep.get("home_logo") or "").strip()
+        away_branding = _resolve_branding(away_team)
+        home_branding = _resolve_branding(home_team)
+        away_logo = str(rep.get("away_logo") or "").strip() or (away_branding.logo_url if away_branding else "")
+        home_logo = str(rep.get("home_logo") or "").strip() or (home_branding.logo_url if home_branding else "")
         top_bet = str(rep.get("bet_label") or rep.get("pick") or "Recommendation").strip() or "Recommendation"
         summary = str(rep.get("basketball_summary") or rep.get("summary") or "").strip() or f"{top_bet} is the top source recommendation for this matchup."
         games.append(
             {
                 "gamePk": game_id,
                 "card_variant": "shared_default",
-                "away": {"abbr": away_team[:3].upper(), "name": away_team, "logo": away_logo},
-                "home": {"abbr": home_team[:3].upper(), "name": home_team, "logo": home_logo},
+                "away": {
+                    "abbr": away_team[:3].upper(),
+                    "name": away_team,
+                    "logo": away_logo,
+                    "primary_color": away_branding.primary_color if away_branding else None,
+                    "secondary_color": away_branding.secondary_color if away_branding else None,
+                },
+                "home": {
+                    "abbr": home_team[:3].upper(),
+                    "name": home_team,
+                    "logo": home_logo,
+                    "primary_color": home_branding.primary_color if home_branding else None,
+                    "secondary_color": home_branding.secondary_color if home_branding else None,
+                },
                 "status": str(rep.get("display_date") or rep.get("date") or "TBD"),
                 "detail": str(rep.get("display_time_str") or rep.get("start_time_display") or "TBD"),
                 "summary": summary,

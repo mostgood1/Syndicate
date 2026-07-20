@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 import re
@@ -13,6 +14,8 @@ from syndicate.features.shared.formatters import format_signed_price
 from syndicate.features.shared.odds_control_plane import current_odds_root_for_sport
 from syndicate.features.shared.source_roots import preferred_artifact_roots
 from syndicate.features.shared.source_roots import preferred_source_roots
+from syndicate.features.shared.team_branding import read_team_branding_snapshot
+from syndicate.features.shared.team_branding import team_branding_index_by_abbreviation
 from syndicate.features.shared.timezone import central_today
 from syndicate.features.shared.timezone import central_today_iso
 
@@ -215,11 +218,49 @@ def team_abbreviation(value: Any) -> str:
     return upper[:3]
 
 
+@lru_cache(maxsize=1)
+def _team_branding_index() -> dict[str, Any]:
+    root = _source_roots()[0]
+    path = root / "source_artifacts" / "data" / "processed" / "team_branding" / "nhl_team_branding.csv"
+    return team_branding_index_by_abbreviation(read_team_branding_snapshot(path))
+
+
+# ESPN's own abbreviation occasionally differs from this module's
+# team_abbreviation() (e.g. Utah's franchise rename settled on "UTAH" at
+# ESPN vs. this module's existing "UTA") -- translated here only for the
+# branding lookup, not touching team_abbreviation()'s own established output.
+_ESPN_BRANDING_ABBR_ALIASES: dict[str, str] = {
+    "UTA": "UTAH",
+}
+
+
+def team_branding(value: Any) -> Any | None:
+    abbr = team_abbreviation(value)
+    if not abbr:
+        return None
+    index = _team_branding_index()
+    upper = abbr.upper()
+    return index.get(upper) or index.get(_ESPN_BRANDING_ABBR_ALIASES.get(upper, upper))
+
+
 def team_logo_url(value: Any) -> str | None:
+    branding = team_branding(value)
+    if branding and branding.logo_url:
+        return branding.logo_url
     abbr = team_abbreviation(value)
     if not abbr:
         return None
     return f"https://assets.nhle.com/logos/nhl/svg/{abbr}_dark.svg"
+
+
+def team_primary_color(value: Any) -> str | None:
+    branding = team_branding(value)
+    return branding.primary_color if branding else None
+
+
+def team_secondary_color(value: Any) -> str | None:
+    branding = team_branding(value)
+    return branding.secondary_color if branding else None
 
 
 def market_label(value: Any) -> str:
