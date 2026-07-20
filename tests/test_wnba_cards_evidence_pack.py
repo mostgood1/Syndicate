@@ -106,6 +106,40 @@ class WnbaCardsEvidencePackTests(unittest.TestCase):
         self.assertEqual(evidence_pack[0].get("plain_text"), "Aces -2.5")
         self.assertEqual(evidence_pack[0].get("confidence"), "A")
 
+    def test_source_game_from_row_includes_betting_dict(self) -> None:
+        # _source_game_from_row computed a "betting" dict (moneyline/spread/
+        # total synthesized from sim margin/total, or from real odds on the
+        # row) but never actually included it in the returned game -- every
+        # pregame WNBA game built from this path always had betting={}
+        # downstream (home.py's `game.get("betting") if isinstance(...) else
+        # {}`), so _game_bet_candidates_from_game's entire Moneyline/Total/
+        # Spread block was skipped for every one of these games.
+        row = {
+            "visitor_team": "Las Vegas Aces",
+            "home_team": "Indiana Fever",
+            "away_tri": "LAS",
+            "home_tri": "IND",
+            "commence_time": "2026-07-02T23:00:00Z",
+            "home_ml": -150,
+            "away_ml": 130,
+            "pred_total": 169.5,
+            "pred_margin": 5.5,
+        }
+
+        game = _source_game_from_row(
+            row,
+            idx=1,
+            selected_date="2026-07-02",
+            rec_index={},
+            sim_index={},
+            props_index={},
+        )
+
+        self.assertIn("betting", game)
+        self.assertIsInstance(game["betting"], dict)
+        self.assertEqual(game["betting"].get("home_ml"), -150)
+        self.assertEqual(game["betting"].get("away_ml"), 130)
+
     def test_evidence_pack_handles_missing_values_gracefully(self) -> None:
         row = {
             "visitor_team": "Las Vegas Aces",

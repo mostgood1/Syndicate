@@ -67,8 +67,28 @@
   }
 
   .board-refresh-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
     font-size: 11px;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--cards-line);
     color: var(--cards-text-soft);
+  }
+
+  .board-refresh-status::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--cards-accent-strong);
+  }
+
+  .board-refresh-status[aria-busy="true"]::before {
+    background: #f1c40f;
   }
 
   .board-summary-strip {
@@ -194,6 +214,16 @@
   .board-card--tier-high .board-card__edge { color: #2ecc71; }
   .board-card--tier-medium .board-card__edge { color: #f1c40f; }
   .board-card--tier-low .board-card__edge { color: var(--cards-text-dim); }
+
+  .board-card__prop-line {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--cards-accent-strong);
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: rgba(78, 205, 196, 0.08);
+    border: 1px solid rgba(78, 205, 196, 0.2);
+  }
 
   .board-card__facts {
     display: grid;
@@ -544,12 +574,71 @@
     return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
   }
 
+  // Some candidate sources leak a badge/EV-percentage string ("38.1% EV")
+  // into name/player_name/pick/selection instead of the real text -- never
+  // trust those fields blindly as a title or as "the prop," or the card
+  // ends up showing a bare percentage with no player/team/market at all.
+  function looksLikeBadgeText(value) {
+    const text = String(value || "").trim();
+    if (!text) return true;
+    return /^[+-]?\d+(\.\d+)?\s*%/.test(text) || /\bev\b\s*$/i.test(text) && /%/.test(text);
+  }
+
+  // home.py's own placeholder convention for "no data" is a bare "-" (see
+  // _prop_dashboard_row etc.) -- that string is truthy and not badge-shaped,
+  // so without this check it was winning the candidate race in
+  // displayTitle/displaySelection over the real name/pick sitting right
+  // behind it in the fallback chain.
+  function isPlaceholderText(value) {
+    const text = String(value || "").trim().toLowerCase();
+    return !text || text === "-" || text === "—" || text === "n/a" || text === "unknown";
+  }
+
   function displayTitle(item) {
-    return String(item.display_name || item.player_name || item.name || item.pick || item.selection || item.market || "—").trim();
+    const candidates = [item.display_name, item.player_name, item.name, item.pick, item.selection];
+    for (const candidate of candidates) {
+      const text = String(candidate || "").trim();
+      if (text && !isPlaceholderText(text) && !looksLikeBadgeText(text)) return text;
+    }
+    const team = displayTeam(item);
+    const market = String(item.market || item.market_label || "").trim();
+    if (team && market) return `${team} — ${market}`;
+    if (team) return team;
+    if (market) return market;
+    return "Untitled pick";
+  }
+
+  function displaySelection(item) {
+    const candidates = [item.selection, item.pick];
+    for (const candidate of candidates) {
+      const text = String(candidate || "").trim();
+      if (text && !isPlaceholderText(text) && !looksLikeBadgeText(text)) return text;
+    }
+    return null;
+  }
+
+  // The one line that must always answer "what is this bet, actually" --
+  // separate from the title, which can legitimately just be a player or
+  // team name.
+  function propLine(item) {
+    const title = displayTitle(item);
+    const selection = displaySelection(item);
+    const market = String(item.market || item.market_label || "").trim();
+    const line = displayLine(item);
+    const parts = [];
+    if (selection && selection !== title) parts.push(selection);
+    if (line && !(selection && selection.includes(line))) parts.push(line);
+    if (market) parts.push(market);
+    return parts.length ? parts.join(" · ") : null;
   }
 
   function displayTeam(item) {
-    return String(item.team || item.team_name || item.player_team || "").trim() || null;
+    const candidates = [item.team, item.team_name, item.player_team];
+    for (const candidate of candidates) {
+      const text = String(candidate || "").trim();
+      if (text && !isPlaceholderText(text)) return text;
+    }
+    return null;
   }
 
   function displayMatchup(item) {
@@ -716,15 +805,11 @@
 
   function cardFacts(item) {
     const facts = [];
-    const team = displayTeam(item);
     const matchup = displayMatchup(item);
-    const line = displayLine(item);
     const odds = displayOdds(item);
     const projection = displayProjection(item);
     const liveProjection = displayLiveProjection(item);
-    if (team) facts.push(["Team", team]);
     if (matchup) facts.push(["Matchup", matchup]);
-    if (line) facts.push(["Line", line]);
     if (odds) facts.push(["Odds", odds]);
     if (projection) facts.push(["Projected", projection]);
     if (liveProjection) facts.push(["Live proj.", liveProjection]);
@@ -738,6 +823,9 @@
     const confidence = numericValue(item.confidence);
     const movementHtml = renderMovement(item);
     const facts = cardFacts(item);
+    const team = displayTeam(item);
+    const title = displayTitle(item);
+    const prop = propLine(item);
     const badges = [];
     if (itemState === "live") badges.push('<span class="board-badge board-badge--live">Live</span>');
     if (itemState === "pregame") badges.push('<span class="board-badge board-badge--pregame">Pregame</span>');
@@ -746,14 +834,15 @@
     const market = String(item.market || item.market_label || "").trim();
 
     return `
-      <article class="board-card board-card--tier-${tier}" data-syndicate-question="${escapeHtml(item.question || "")}" data-syndicate-sport="${escapeHtml(sport)}" data-syndicate-sport-slug="${escapeHtml(item.sport_slug || "")}" data-syndicate-market="${escapeHtml(market)}" data-syndicate-candidate-type="${escapeHtml(item.candidate_type || item.type || "")}" data-syndicate-selection="${escapeHtml(item.selection || item.pick || "")}" data-syndicate-matchup="${escapeHtml(displayMatchup(item) || "")}" data-syndicate-player-name="${escapeHtml(item.player_name || "")}" data-syndicate-name="${escapeHtml(displayTitle(item))}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}">
+      <article class="board-card board-card--tier-${tier}" data-syndicate-question="${escapeHtml(item.question || "")}" data-syndicate-sport="${escapeHtml(sport)}" data-syndicate-sport-slug="${escapeHtml(item.sport_slug || "")}" data-syndicate-market="${escapeHtml(market)}" data-syndicate-candidate-type="${escapeHtml(item.candidate_type || item.type || "")}" data-syndicate-selection="${escapeHtml(item.selection || item.pick || "")}" data-syndicate-matchup="${escapeHtml(displayMatchup(item) || "")}" data-syndicate-player-name="${escapeHtml(item.player_name || "")}" data-syndicate-name="${escapeHtml(title)}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}">
         <div class="board-card__head">
           <div>
-            <div class="board-card__title">${index === 0 ? "🔥 " : ""}${escapeHtml(displayTitle(item))}</div>
-            <div class="board-card__subtitle">${escapeHtml(sport)}${market ? ` · ${escapeHtml(market)}` : ""}</div>
+            <div class="board-card__title">${index === 0 ? "🔥 " : ""}${escapeHtml(title)}</div>
+            <div class="board-card__subtitle">${team && team !== title ? `${escapeHtml(team)} · ` : ""}${escapeHtml(sport)}</div>
           </div>
           <div class="board-card__edge">${(edge * 100).toFixed(1)}%</div>
         </div>
+        <div class="board-card__prop-line">${prop ? escapeHtml(prop) : "No market detail available for this pick."}</div>
         <div class="board-card__facts">
           ${facts.map(([label, value]) => `<div><div class="board-card__fact-label">${escapeHtml(label)}</div><div class="board-card__fact-value">${escapeHtml(value)}</div></div>`).join("")}
         </div>
@@ -788,7 +877,7 @@
           <div class="board-strip-card">
             <div class="board-strip-card__title">${escapeHtml(displayTitle(item))}</div>
             <div class="board-strip-card__edge">${(edgeValue(item) * 100).toFixed(1)}%</div>
-            <div class="board-strip-card__pick">${escapeHtml(String(item.selection || item.pick || ""))}</div>
+            <div class="board-strip-card__pick">${escapeHtml(propLine(item) || "")}</div>
           </div>
         `).join("")}
       </div>
@@ -1014,6 +1103,7 @@
   });
 
   renderFilterTabs();
+  setRefreshStatus("Loading board…", "loading");
 
   if (initialIntelligenceResponse && Object.keys(initialIntelligenceResponse).length > 0) {
     const merged = mergeVersionedIntelligenceResponse(initialIntelligenceResponse);

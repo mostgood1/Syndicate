@@ -1669,6 +1669,7 @@ def _source_game_from_row(
         "odds": {"commence_time": str(row.get("commence_time") or "").strip() or None},
         "status": {"detailed": _format_start_time_local(row.get("commence_time"))},
         "summary": f"{row.get('bookmaker') or 'Consensus'} market snapshot",
+        "betting": betting,
         "game_market_recommendations": game_market_recommendations,
         "evidence_pack": evidence_pack[:3],
         "sim": sim_payload,
