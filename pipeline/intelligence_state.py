@@ -1464,10 +1464,25 @@ class IntelligenceStateService:
             "global_pool": global_pool,
             "candidates": global_pool,
         }
-        with self._condition:
-            self._candidate_pools[cache_key] = pool
-            self._candidate_pools.move_to_end(cache_key)
-            self._trim_ordered_dict(self._candidate_pools, self._max_snapshots)
+        if pool["candidate_count"] > 0:
+            # 2026-07-20: only cache non-empty pools. This cache has no
+            # staleness check on the read side (see _build_candidate_pool
+            # above), keyed on (selected_date, source_fingerprint) -- and
+            # source_fingerprint doesn't change for hours at a time when
+            # odds-history data is quiet, so a single empty computation
+            # early in a long-running worker's life (e.g. right after
+            # restart, before manifests/artifacts existed yet) would get
+            # cached and then served for the rest of the day even once the
+            # underlying data was fine, since nothing ever invalidates it.
+            # Confirmed in production: refresh-worker kept publishing a
+            # zero-candidate board for hours while the same computation,
+            # run fresh on a freshly-restarted process, produced 72 real
+            # candidates. Not caching empty results means a bad early read
+            # just gets retried next cycle instead of sticking forever.
+            with self._condition:
+                self._candidate_pools[cache_key] = pool
+                self._candidate_pools.move_to_end(cache_key)
+                self._trim_ordered_dict(self._candidate_pools, self._max_snapshots)
         return json.loads(json.dumps(pool, default=str))
 
     def start(self, app: Flask | None = None) -> bool:
