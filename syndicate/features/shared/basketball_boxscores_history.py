@@ -159,6 +159,49 @@ def _event_rows_from_summary(*, summary: dict[str, Any], event_id: str, date_str
     return rows
 
 
+def boxscore_history_max_date(processed_root: Path) -> Any:
+    """Latest recorded game date in boxscores_history.{parquet,csv}, or None.
+
+    Reads only the "date" column (fast even on the ~20MB NBA history) rather
+    than loading the full frame -- used as a cheap freshness check before
+    deciding whether to re-run the (network-fetching) bootstrap below.
+    """
+    import pandas as pd
+
+    parquet_path = processed_root / "boxscores_history.parquet"
+    csv_path = processed_root / "boxscores_history.csv"
+    try:
+        if parquet_path.exists():
+            frame = pd.read_parquet(parquet_path, columns=["date"])
+        elif csv_path.exists():
+            frame = pd.read_csv(csv_path, usecols=["date"])
+        else:
+            return None
+        if frame.empty or "date" not in frame.columns:
+            return None
+        parsed = pd.to_datetime(frame["date"], errors="coerce")
+        if parsed.isna().all():
+            return None
+        return parsed.max()
+    except Exception:
+        return None
+
+
+def boxscore_history_is_stale(processed_root: Path, *, max_age_days: int) -> bool:
+    """True when the history file is missing, empty, or its newest game is
+    older than max_age_days. bootstrap_boxscores_history_local only ever
+    writes data through "yesterday" relative to the date it's run for, so a
+    file that's merely a day or two behind is normal, not stale.
+    """
+    import pandas as pd
+
+    max_date = boxscore_history_max_date(processed_root)
+    if max_date is None:
+        return True
+    age_days = (pd.Timestamp.now().normalize() - max_date.normalize()).days
+    return age_days > max(0, int(max_age_days))
+
+
 def bootstrap_boxscores_history_local(*, processed_root: Path, date_str: str, league_code: str, lookback_days: int = 35) -> dict[str, Any]:
     import pandas as pd
 

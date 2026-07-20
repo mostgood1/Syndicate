@@ -2368,8 +2368,23 @@ def _ensure_player_logs_for_props_refresh(*, source_root: Path, date_str: str, l
 
     if _player_logs_ready(source_root, max_age_minutes=max_age_minutes):
         return True, None
-    if any(path.exists() and path.stat().st_size > 0 for path in (_active_player_logs_paths(source_root) + _active_player_logs_fallback_paths(source_root))):
+    if any(path.exists() and path.stat().st_size > 0 for path in _active_player_logs_paths(source_root)):
         return True, None
+    fallback_paths = [path for path in _active_player_logs_fallback_paths(source_root) if path.exists() and path.stat().st_size > 0]
+    if fallback_paths:
+        # Bare existence used to be treated as "good enough" here forever --
+        # once boxscores_history.csv/.parquet existed at all, this branch
+        # returned True on every refresh tick and the (network-fetching)
+        # bootstrap below never ran again, so the file could go weeks stale
+        # silently (observed 2026-07-20 on the WNBA side of this same gate).
+        # Keep the original leniency (don't hard-block props modeling over a
+        # short outage) but bound it: only skip the bootstrap when the
+        # file's own newest game date is within max_age_days.
+        from syndicate.features.shared.basketball_boxscores_history import boxscore_history_is_stale
+
+        max_age_days = _env_int("REFRESH_PLAYER_LOGS_FALLBACK_MAX_AGE_DAYS", 5)
+        if not boxscore_history_is_stale(source_root / "data" / "processed", max_age_days=max_age_days):
+            return True, None
 
     bootstrapped_ok, bootstrap_error = _bootstrap_local_boxscores_history_for_props(
         source_root=source_root,
