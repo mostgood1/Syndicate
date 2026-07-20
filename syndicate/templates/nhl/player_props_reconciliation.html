@@ -18,8 +18,12 @@
     .good{color:#9ae6b4}.bad{color:#fca5a5}.table-wrap{overflow-x:auto;margin-top:18px}.data-table{width:100%;border-collapse:collapse}.data-table th,.data-table td{padding:8px;text-align:left;border-top:1px solid var(--border)}.data-table thead th{border-top:0;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
     @media (max-width:760px){.container{padding:0 10px;margin:12px auto}.value{font-size:20px}}
   </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='shared/standalone_shell.css') }}" />
 </head>
 <body>
+  {% with active_sport_slug='nhl', active_sport_name='NHL' %}
+    {% include 'shared/_standalone_app_header.html' %}
+  {% endwith %}
   <div class="container">
     <div class="nav">
       <a href="{{ back_href }}">{{ back_label }}</a> |

@@ -4,10 +4,18 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{ title }} - {{ date }}</title>
+    {% if not embed_mode %}
+      <link rel="stylesheet" href="{{ url_for('static', filename='shared/standalone_shell.css') }}" />
+    {% endif %}
     <link rel="stylesheet" href="{{ url_for('static', filename='mlb/cards.css') }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename='mlb/daily_top_props.css') }}" />
   </head>
   <body class="cards-body top-props-body{% if embed_mode %} top-props-body--embed{% endif %}">
+    {% if not embed_mode %}
+      {% with active_sport_slug='mlb', active_sport_name='MLB' %}
+        {% include 'shared/_standalone_app_header.html' %}
+      {% endwith %}
+    {% endif %}
     <div class="top-props-shell{% if embed_mode %} top-props-shell--embed{% endif %}">
       <header class="top-props-header{% if embed_mode %} top-props-header--embed{% endif %}">
         <div class="top-props-title-block">

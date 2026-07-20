@@ -38,8 +38,12 @@
     details > summary{cursor:pointer}
     @media (max-width:760px){ .container{padding:0 10px;margin:12px auto} h1{font-size:20px;margin-bottom:6px} .nav{font-size:12px;overflow-x:auto;white-space:nowrap;padding-bottom:4px} .nav a{display:inline-block;margin-right:6px} table{font-size:12px} th,td{padding:6px 4px} thead th{font-size:11px} form.filters input{padding:4px 6px;font-size:12px} form.filters button{padding:4px 8px;font-size:12px} }
   </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='shared/standalone_shell.css') }}" />
 </head>
 <body>
+  {% with active_sport_slug='wnba', active_sport_name='WNBA' %}
+    {% include 'shared/_standalone_app_header.html' %}
+  {% endwith %}
   <div class="container">
     <div class="nav">
       <a href="{{ back_href }}">{{ back_label }}</a> |

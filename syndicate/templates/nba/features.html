@@ -24,8 +24,12 @@
     async function boot(){ const note=document.getElementById('note'); const input=document.getElementById('q'); try{ const data=await fetchJson('{{ api_path }}'); window.__featuresData=data; render(data,input.value); input.addEventListener('input',()=>render(window.__featuresData,input.value)); }catch(e){ note.textContent=`Failed to load features: ${String(e && e.message ? e.message : e)}`; note.classList.remove('hidden'); } }
     window.addEventListener('DOMContentLoaded', boot);
   </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='shared/standalone_shell.css') }}" />
 </head>
 <body>
+  {% with active_sport_slug='nba', active_sport_name='NBA' %}
+    {% include 'shared/_standalone_app_header.html' %}
+  {% endwith %}
   <div class="container">
     <div class="nav">
       <a href="{{ back_href }}">{{ back_label }}</a> |

@@ -487,7 +487,7 @@ def api_picks():
 def props():
     selected_date = _selected_date()
     context = build_props_page_context(selected_date)
-    return render_template("wnba/prop_ladders.html", show_app_header=False, **context)
+    return render_template("wnba/prop_ladders.html", **context)
 
 
 @wnba_bp.get("/api/props")

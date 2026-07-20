@@ -839,7 +839,7 @@ def _props_response():
 @nba_bp.get("/prop-ladders")
 def props():
     context = _props_response()
-    return render_template("nba/prop_ladders.html", show_app_header=False, **context)
+    return render_template("nba/prop_ladders.html", **context)
 
 
 @nba_bp.get("/api/props")

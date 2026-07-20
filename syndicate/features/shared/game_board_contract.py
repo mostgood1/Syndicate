@@ -452,7 +452,10 @@ def apply_game_board_contract(
     games = out.get("games") if isinstance(out.get("games"), list) else []
     out["games"] = _normalize_games(games, sport=normalized_sport)
     out.setdefault("show_app_header", False)
-    out.setdefault("show_standalone_cards_header", str(module or "").strip().lower() == "cards")
+    out.setdefault(
+        "show_standalone_cards_header",
+        str(module or "").strip().lower() in {"cards", "game_detail", "season_review"},
+    )
     out.setdefault("active_sport_slug", normalized_sport)
     out.setdefault("active_sport_name", normalized_sport.upper())
     out.setdefault("show_intro", False)

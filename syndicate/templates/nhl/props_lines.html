@@ -15,8 +15,12 @@
     .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}.label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}.value{font-size:24px;font-weight:800}.muted{font-size:12px;color:var(--muted)}
     .table-wrap{overflow-x:auto;margin-top:18px}.data-table{width:100%;border-collapse:collapse}.data-table th,.data-table td{padding:8px;text-align:left;border-top:1px solid var(--border)}.data-table thead th{border-top:0;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
   </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='shared/standalone_shell.css') }}" />
 </head>
 <body>
+  {% with active_sport_slug='nhl', active_sport_name='NHL' %}
+    {% include 'shared/_standalone_app_header.html' %}
+  {% endwith %}
   <div class="container">
     <div class="nav">
       <a href="{{ back_href }}">{{ back_label }}</a> |

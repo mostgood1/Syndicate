@@ -4903,7 +4903,14 @@ class HomeBoardTests(unittest.TestCase):
         self.assertIn('Player Prop Ladders', html)
         self.assertIn('/wnba/cards?date=2026-05-20', html)
         self.assertIn('/wnba/season/2026/betting-card?date=2026-05-20', html)
-        self.assertNotIn('One app with seven feature modules.', html)
+        # The universal top nav (Home/The Syndicate/Betting Board/sports) was
+        # previously suppressed here via show_app_header=False -- that was a
+        # site-wide gap (most standalone pages had no way back to Ask the
+        # Syndicate or the Betting Board), not an intentional design choice
+        # for this page specifically, so the nav is now shown like every
+        # other hub-style page.
+        self.assertIn('href="/syndicate', html)
+        self.assertIn('href="/intelligence', html)
 
     def test_wnba_props_page_empty_state_renders_in_standalone_shell(self) -> None:
         response = self.client.get('/wnba/props?date=1900-01-01')

@@ -1,3 +1,22 @@
+/* Pre-existing gap: this file's rules below reference --cards-* custom
+   properties that are only ever defined in app.css's :root, but pages that
+   include _standalone_app_header.html (mlb/cards.html and every template
+   this stylesheet is scoped to) never link app.css -- only this file. That
+   left var(--cards-accent) etc. undefined, which per CSS spec invalidates
+   the whole declaration (e.g. the active-pill gradient silently resolved to
+   transparent). Values below are copied verbatim from app.css's :root so
+   pages that DO also load app.css (game_cards_board.html) get the exact
+   same values redeclared, not a conflicting second definition. */
+:root {
+  --cards-line: rgba(132, 166, 196, 0.16);
+  --cards-line-strong: rgba(132, 166, 196, 0.3);
+  --cards-text: #edf4fb;
+  --cards-text-soft: #bfd0df;
+  --cards-accent: #4ecdc4;
+  --cards-accent-strong: #9af3de;
+  --cards-shadow: 0 20px 55px rgba(0, 0, 0, 0.36);
+}
+
 .standalone-app-header {
   width: min(1640px, calc(100vw - 16px));
   margin: 0 auto 12px;

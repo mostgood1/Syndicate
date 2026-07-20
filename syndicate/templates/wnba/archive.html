@@ -143,8 +143,12 @@
         }
       }
     </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='shared/standalone_shell.css') }}" />
   </head>
   <body class="cards-body season-body betting-card-body">
+    {% with active_sport_slug='wnba', active_sport_name='WNBA' %}
+      {% include 'shared/_standalone_app_header.html' %}
+    {% endwith %}
     <div class="season-shell">
       <header class="season-header">
         <div class="season-title-block">

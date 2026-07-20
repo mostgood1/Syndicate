@@ -773,7 +773,6 @@ def live_lens():
         "back_href": f"/mlb/cards?date={selected_date}",
         "back_label": "Back to cards",
         "form_action": "/mlb/live-lens",
-        "show_app_header": False,
         "page_body_class": "cards-body syndicate-mlb-live-lens-page",
         "page_shell_class": "syndicate-mlb-live-lens-shell",
     }
@@ -827,7 +826,6 @@ def season_live_lens(season: int):
         "daily_accuracy_href": f"/mlb/live-lens-accuracy?date={selected_date}",
         "market_accuracy_href": f"/mlb/market-accuracy?date={selected_date}",
         "form_action": f"/mlb/season/{int(season)}/live-lens",
-        "show_app_header": False,
         "page_body_class": "cards-body syndicate-mlb-live-lens-page syndicate-mlb-live-lens-page--season",
         "page_shell_class": "syndicate-mlb-live-lens-shell",
     }

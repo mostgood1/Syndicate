@@ -4,10 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>MLB Official Betting Card - {{ season }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='shared/standalone_shell.css') }}" />
     <link rel="stylesheet" href="/mlb/assets/cards.css?v={{ asset_version }}" />
     <link rel="stylesheet" href="/mlb/assets/season.css?v={{ asset_version }}" />
   </head>
   <body class="cards-body season-body betting-card-body">
+    {% with active_sport_slug='mlb', active_sport_name='MLB' %}
+      {% include 'shared/_standalone_app_header.html' %}
+    {% endwith %}
     <div class="season-shell">
       <header class="season-header">
         <div class="season-title-block">

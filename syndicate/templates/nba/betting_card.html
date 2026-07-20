@@ -31,8 +31,12 @@
         max-width: 100%;
       }
     </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='shared/standalone_shell.css') }}" />
   </head>
   <body class="cards-body season-body betting-card-body">
+    {% with active_sport_slug='nba', active_sport_name='NBA' %}
+      {% include 'shared/_standalone_app_header.html' %}
+    {% endwith %}
     <div class="season-shell">
       <header class="season-header">
         <div class="season-title-block">
