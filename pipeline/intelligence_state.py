@@ -1514,6 +1514,19 @@ class IntelligenceStateService:
             latest_snapshot = self._snapshots.get(self._latest_key or "") if self._latest_key else None
             if not self._snapshots or latest_snapshot is None or self._is_stale(latest_snapshot):
                 self._enqueue_locked(self._default_payload())
+                # 2026-07-20: _enqueue_locked only updates in-memory state.
+                # _background_loop's very first iteration calls
+                # _sync_persisted_queue_locked(), which overwrites
+                # self._pending_keys/self._watched_payloads FROM the shared
+                # store -- so this boot-time enqueue was getting silently
+                # wiped before the loop thread ever got a chance to process
+                # it, unless the store already happened to have a matching
+                # entry. Confirmed in production: a freshly restarted
+                # refresh-worker with an empty/stale persisted queue never
+                # computed anything at all until manually re-queued from an
+                # external request. Persist immediately so the loop's first
+                # sync reads this entry back instead of losing it.
+                self._persist_locked()
             return True
 
     def status(self, *, force_refresh: bool = True) -> dict[str, Any]:
