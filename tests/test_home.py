@@ -19,6 +19,7 @@ from syndicate.blueprints.home import _game_bet_candidates_from_game
 from syndicate.blueprints.home import _prop_item_from_rank_card
 from syndicate.blueprints.home import _team_for_side_hint
 from syndicate.blueprints.home import _compact_prop_rows
+from syndicate.blueprints.home import _game_sim_vs_line_reasoning
 
 
 class HomePageCommandCenterTests(unittest.TestCase):
@@ -830,6 +831,25 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         self.assertEqual(item["pick"], "Gabby Williams OVER 1.5")
         self.assertNotIn("EV", item["pick"])
 
+    def test_prop_item_from_rank_card_surfaces_list_items_reasoning(self) -> None:
+        # Rank cards carry up to 4 real reasoning bullets in "list_items"
+        # (e.g. wnba/picks.py's top_play_reasons) that were never read here
+        # -- only the one-line "summary" survived, so the actual evidence
+        # behind a pick disappeared before it reached the Betting Board.
+        card = {
+            "title": "Gabby Williams OVER 1.5",
+            "eyebrow": "GSV",
+            "meta": "GSV @ SEA",
+            "badge": "20.4% EV",
+            "summary": "Model favors the over.",
+            "list_items": ["Averaging 2.1 over last 10 games.", "Opponent allows high three-point volume."],
+            "metrics": [{"label": "Win prob", "value": "58.2%"}],
+        }
+        item = _prop_item_from_rank_card(card, sport_slug="wnba")
+        self.assertIn("Model favors the over.", item["detail"])
+        self.assertIn("Averaging 2.1 over last 10 games.", item["detail"])
+        self.assertIn("Opponent allows high three-point volume.", item["detail"])
+
     def test_compact_prop_rows_carries_team_from_shared_prop_rows(self) -> None:
         game = {
             "away": {"abbr": "BOS", "name": "Boston Celtics"},
@@ -845,6 +865,43 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
 
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["team"], "BOS")
+
+    def test_game_sim_vs_line_reasoning_reads_full_game_period_row(self) -> None:
+        # game_board_contract.py's _build_period_rows already computes a
+        # sim-vs-market-line comparison (main/market/best_edge) onto the
+        # same game dict _game_bet_candidates_from_game has in scope --
+        # this was never read, so ATS/Total/Moneyline candidates never
+        # carried the same sim-vs-line context the sport pages show.
+        game = self._sample_game(
+            shared_period_rows=[
+                {
+                    "label": "Full Game",
+                    "main": "BOS 108.2 - NYK 104.5",
+                    "market": "ATS NYK -3.5 | Total 210.5",
+                    "best_edge": "ATS +1.2 | Total +2.1",
+                }
+            ]
+        )
+        reasoning = _game_sim_vs_line_reasoning(game)
+        self.assertIn("Sim: BOS 108.2 - NYK 104.5", reasoning)
+        self.assertIn("Market: ATS NYK -3.5 | Total 210.5", reasoning)
+        self.assertIn("Model edge vs. line: ATS +1.2 | Total +2.1", reasoning)
+
+    def test_game_sim_vs_line_reasoning_flows_into_moneyline_candidate_detail(self) -> None:
+        game = self._sample_game(
+            betting={"away_ml": -120, "home_ml": 105, "p_away_win": 0.55, "p_home_win": 0.45},
+            shared_period_rows=[
+                {"label": "Full Game", "main": "BOS 108.2 - NYK 104.5", "market": "ATS NYK -3.5", "best_edge": "ATS +1.2"}
+            ],
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "nba"}, game, fallback_epoch=0.0)
+        moneyline = next(c for c in candidates if c["market"] == "Moneyline" and c["pick"] == "Away ML")
+        self.assertIn("Model edge vs. line: ATS +1.2", moneyline["detail"])
+        self.assertEqual(moneyline["sim_context"], _game_sim_vs_line_reasoning(game))
+
+    def test_game_sim_vs_line_reasoning_returns_none_without_period_rows(self) -> None:
+        game = self._sample_game()
+        self.assertIsNone(_game_sim_vs_line_reasoning(game))
 
 
 if __name__ == "__main__":
