@@ -64,6 +64,17 @@ def _bootstrap_render_data(bootstrap_main: Callable[[], int] | None = None) -> N
         def _run_bootstrap() -> None:
             import time
 
+            # 2026-07-20: observed the container at ~100% of its 2GB ceiling
+            # (sub-1MB headroom, memory_observability.py's pre-existing
+            # instrumentation) immediately after this sync finished, while
+            # real post-deploy traffic hit WNBA's already-memory-tight card
+            # payload builder. Root cause is that builder's own memory use,
+            # not this sync -- but the two land in the same narrow
+            # post-deploy window, so give the initial traffic surge and
+            # health checks time to settle before adding this sync's disk
+            # I/O (and resulting page-cache pressure) on top of it.
+            time.sleep(20)
+
             data_root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() or "data"
             lock_path = os.path.join(data_root, ".bootstrap_sync.lock")
             try:

@@ -48,7 +48,7 @@ class AppBootstrapTests(unittest.TestCase):
             ), patch(
                 "syndicate.app.threading.Thread",
                 side_effect=lambda **kwargs: _ImmediateThread(**kwargs),
-            ):
+            ), patch("time.sleep"):
                 syndicate_app._bootstrap_render_data(lambda: calls.append(1) or 0)
                 # Second app worker in the same window: lock must dedupe...
                 with open(os.path.join(tmp, ".bootstrap_sync.lock"), "w") as handle:
