@@ -653,6 +653,10 @@ def api_ops_intelligence_candidate_trace() -> Any:
         from syndicate.features.intelligence import build_intelligence_overview
         from syndicate.features.intelligence import _query_preferences
         from syndicate.features.intelligence import _collect_candidates
+        from syndicate.features.intelligence import collect_candidates
+        from syndicate.features.intelligence import normalize_candidate
+        from syndicate.features.intelligence import classify_candidate
+        from syndicate.features.intelligence import _candidate_classification_removal_reason
     except Exception as exc:
         return jsonify({"ok": False, "error": f"ImportError: {type(exc).__name__}: {exc}"}), 500
 
@@ -697,6 +701,22 @@ def api_ops_intelligence_candidate_trace() -> Any:
             candidate_error = f"{type(exc).__name__}: {exc}"
         else:
             candidate_error = None
+
+        removal_reasons: dict[str, int] = {}
+        full_pipeline_count = None
+        full_pipeline_error = None
+        if isinstance(sport_candidates, list):
+            for raw_candidate in sport_candidates:
+                normalized = normalize_candidate(raw_candidate)
+                if classify_candidate(normalized) is None:
+                    reason = _candidate_classification_removal_reason(normalized)
+                    removal_reasons[reason] = removal_reasons.get(reason, 0) + 1
+            try:
+                full_pipeline_candidates = collect_candidates([sport], preferences)
+                full_pipeline_count = len(full_pipeline_candidates)
+            except Exception as exc:
+                full_pipeline_error = f"{type(exc).__name__}: {exc}"
+
         result["sports"].append(
             {
                 "slug": slug,
@@ -704,6 +724,9 @@ def api_ops_intelligence_candidate_trace() -> Any:
                 "sample_game": sample_game_summary,
                 "candidate_count": len(sport_candidates) if isinstance(sport_candidates, list) else None,
                 "candidate_error": candidate_error,
+                "second_pass_removal_reasons": removal_reasons,
+                "full_pipeline_candidate_count": full_pipeline_count,
+                "full_pipeline_error": full_pipeline_error,
             }
         )
     return jsonify(result)
