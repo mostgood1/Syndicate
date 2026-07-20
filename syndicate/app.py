@@ -43,13 +43,47 @@ def _env_bool(name: str, *, default: bool = False) -> bool:
 def _bootstrap_render_data(bootstrap_main: Callable[[], int] | None = None) -> None:
     if not _env_bool("SYNDICATE_BOOTSTRAP_ON_START", default=False):
         return
-    if _is_render_web_dyno():
-        return
     if bootstrap_main is None:
         try:
             from scripts.bootstrap_data_root import main as bootstrap_main  # type: ignore
         except Exception:
             return
+    if _is_render_web_dyno():
+        # 2026-07-05: running bootstrap synchronously during app creation
+        # blocked startup long enough for Render's proxy to 502, so it was
+        # skipped here outright. But with the GHA daily-update retired this
+        # is the only path that lands committed repo data (sim summaries,
+        # boxscore histories, BvP caches) on the web service's own disk
+        # after a deploy -- so run it in a background thread instead: the
+        # app binds immediately and the disk backfills within minutes.
+        # WEB_CONCURRENCY > 1 means several gunicorn workers each build the
+        # app; a stale-aware lock file keeps them from running the same tree
+        # copy concurrently.
+        def _run_bootstrap() -> None:
+            import time
+
+            data_root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() or "data"
+            lock_path = os.path.join(data_root, ".bootstrap_sync.lock")
+            try:
+                if os.path.exists(lock_path) and (time.time() - os.path.getmtime(lock_path)) < 1800:
+                    return
+                os.makedirs(data_root, exist_ok=True)
+                with open(lock_path, "w", encoding="utf-8") as handle:
+                    handle.write(str(os.getpid()))
+            except OSError:
+                return
+            try:
+                bootstrap_main()
+            except Exception:
+                pass
+            finally:
+                try:
+                    os.remove(lock_path)
+                except OSError:
+                    pass
+
+        threading.Thread(target=_run_bootstrap, name="render-bootstrap-sync", daemon=True).start()
+        return
     try:
         bootstrap_main()
     except Exception:

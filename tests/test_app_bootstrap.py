@@ -25,16 +25,39 @@ class AppBootstrapTests(unittest.TestCase):
 
         bootstrap_mock.assert_called_once()
 
-    def test_bootstrap_render_data_skips_render_web_dyno(self) -> None:
+    def test_bootstrap_render_data_runs_in_background_on_render_web_dyno(self) -> None:
+        import os
+        import tempfile
+
         calls: list[int] = []
 
-        with patch("syndicate.app._env_bool", return_value=True), patch(
-            "syndicate.app._is_render_web_dyno",
-            return_value=True,
-        ):
-            syndicate_app._bootstrap_render_data(lambda: calls.append(1) or 0)
+        class _ImmediateThread:
+            def __init__(self, *, target=None, name=None, daemon=None):
+                self._target = target
 
-        self.assertEqual(calls, [])
+            def start(self):
+                if self._target is not None:
+                    self._target()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": tmp}), patch(
+                "syndicate.app._env_bool", return_value=True
+            ), patch(
+                "syndicate.app._is_render_web_dyno",
+                return_value=True,
+            ), patch(
+                "syndicate.app.threading.Thread",
+                side_effect=lambda **kwargs: _ImmediateThread(**kwargs),
+            ):
+                syndicate_app._bootstrap_render_data(lambda: calls.append(1) or 0)
+                # Second app worker in the same window: lock must dedupe...
+                with open(os.path.join(tmp, ".bootstrap_sync.lock"), "w") as handle:
+                    handle.write("1")
+                syndicate_app._bootstrap_render_data(lambda: calls.append(2) or 0)
+
+        # Runs (via a background thread) rather than being skipped, and the
+        # stale-aware lock keeps a concurrent worker from re-running it.
+        self.assertEqual(calls, [1])
 
     def test_bootstrap_render_data_skips_when_disabled(self) -> None:
         calls: list[int] = []

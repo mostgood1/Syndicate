@@ -111,6 +111,18 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "*_source/data/manager/probable_pitcher_overrides.json",
     "*_source/data/park/park_factors.json",
     "*_source/data/umpire/umpire_factors*.json",
+    # Ask the Syndicate focused-evidence inputs (syndicate/blueprints/
+    # ask_the_syndicate_data.py). These are live web-side reads: the Ask
+    # endpoint builds last-10 game-log tables from the boxscore histories and
+    # the sim-accuracy trend from sim_vs_actual. One file per day (evals,
+    # ~4.5MB) or one rolling file per sport (boxscores). NBA's
+    # boxscores_history.csv (~20MB) is deliberately NOT listed -- it rides
+    # the git+bootstrap lane instead; the WNBA/NHL equivalents are small.
+    "mlb_source/source_artifacts/data/eval/batches/*/sim_vs_actual_*.json",
+    "wnba_source/source_artifacts/data/processed/boxscores_history.csv",
+    "wnba_source/data/processed/boxscores_history.csv",
+    "nhl_source/source_artifacts/data/raw/player_game_stats.csv",
+    "nhl_source/data/raw/player_game_stats.csv",
     # Note: reports/intelligence/board_snapshot.json and intelligence_state.json are
     # intentionally excluded here. They're written through refresh_state_store's
     # write_json_file, which already goes over the shared keyvalue (Redis) backend on
