@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import calendar
 import hashlib
 import json
 import logging
@@ -2011,7 +2012,22 @@ class IntelligenceStateService:
     def _is_stale(self, snapshot: IntelligenceSnapshot) -> bool:
         try:
             computed_at = time.strptime(snapshot.computed_at, "%Y-%m-%dT%H:%M:%SZ")
-            computed_epoch = time.mktime(computed_at)
+            # 2026-07-20: time.mktime() interprets its struct_time argument
+            # as LOCAL time -- but computed_at is a "...Z"-suffixed UTC
+            # timestamp (see _utc_now()), and every service here runs with
+            # TZ=America/Chicago. That mismatch made computed_epoch land
+            # ~5-6 hours ahead of the true value, so
+            # time.time() - computed_epoch came out deeply negative and
+            # never crossed _interval_seconds -- every snapshot silently
+            # read as "fresh" for ~5-6 hours after it was actually computed,
+            # regardless of the configured interval. Confirmed in
+            # production: this is very likely why refresh-worker's own
+            # stale-snapshot re-queue check never fired, and why an
+            # earlier staleness fix on the read side (345dd3d3) didn't
+            # actually resolve serving hours-old snapshots -- the
+            # staleness check itself was broken. calendar.timegm()
+            # interprets the struct_time as UTC, matching how it was built.
+            computed_epoch = calendar.timegm(computed_at)
         except Exception:
             return True
         return (time.time() - computed_epoch) >= self._interval_seconds
@@ -2022,7 +2038,7 @@ class IntelligenceStateService:
             return None
         try:
             computed_at = time.strptime(snapshot.computed_at, "%Y-%m-%dT%H:%M:%SZ")
-            computed_epoch = time.mktime(computed_at)
+            computed_epoch = calendar.timegm(computed_at)
         except Exception:
             return None
         return round(max(0.0, time.time() - computed_epoch), 3)
