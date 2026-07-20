@@ -975,6 +975,192 @@ class AskTheSyndicateFocusedEvidenceTests(unittest.TestCase):
         self.assertNotIn("charts", pack["focused_evidence"])  # charts stay out of the token budget
 
 
+class AskTheSyndicateTopCandidatesTests(unittest.TestCase):
+    """Covers the ranking-intent leaderboard fetcher and the disambiguation
+    fix for "best TB targets today" incorrectly resolving to the Tampa Bay
+    Rays' game instead of a Total Bases leaderboard (reported 2026-07-20).
+    """
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = self._tmp.name
+        self.daily_dir = os.path.join(self.root, "mlb", "daily")
+        os.makedirs(self.daily_dir, exist_ok=True)
+
+    def _write_daily_summary(self, *, extra_market_rows: dict | None = None) -> None:
+        topn = {
+            "total_bases_1plus": [
+                {"name": "Tommy Edman", "team": "LAD", "p_tb_1plus": 0.788, "p_tb_1plus_cal": 0.788},
+                {"name": "Luis Arraez", "team": "SF", "p_tb_1plus": 0.765, "p_tb_1plus_cal": 0.765},
+            ],
+            "rbi_1plus": [
+                {"name": "Josh Rojas", "team": "KC", "p_rbi_1plus": 0.409, "p_rbi_1plus_cal": 0.409},
+            ],
+            # Mirrors the real bug found in production: every entry across
+            # every game was exactly 0.0 for this market on 2026-07-12 --
+            # an upstream data gap, not a genuinely rare-but-real signal.
+            "hits_runs_rbis_2plus": [
+                {"name": "Christian Yelich", "team": "MIL", "p_hrr_2plus": 0.0, "p_hrr_2plus_cal": 0.0},
+                {"name": "Jackson Chourio", "team": "MIL", "p_hrr_2plus": 0.0, "p_hrr_2plus_cal": 0.0},
+            ],
+        }
+        if extra_market_rows:
+            topn.update(extra_market_rows)
+        summary = {
+            "date": "2026-07-20",
+            "outputs": [
+                {
+                    "game_pk": 1,
+                    "away": "SEA",
+                    "home": "TB",
+                    "starter_names": {"away": "Someone", "home": "Someone Else"},
+                    "full": {"home_win_prob": 0.585, "away_win_prob": 0.415, "away_runs_mean": 3.56, "home_runs_mean": 4.33, "total_runs_dist": {"5": 10}, "run_margin_dist": {"1": 5}},
+                    "pitcher_props": {},
+                    "hitter_props_likelihood_topn": topn,
+                },
+                {
+                    "game_pk": 2,
+                    "away": "AZ",
+                    "home": "LAD",
+                    "starter_names": {"away": "P1", "home": "P2"},
+                    "full": {"home_win_prob": 0.5, "away_win_prob": 0.5, "away_runs_mean": 4.0, "home_runs_mean": 4.0, "total_runs_dist": {"5": 10}, "run_margin_dist": {"1": 5}},
+                    "pitcher_props": {},
+                    "hitter_props_likelihood_topn": {},
+                },
+            ],
+        }
+        with open(os.path.join(self.daily_dir, "daily_summary_2026_07_20.json"), "w", encoding="utf-8") as f:
+            json.dump(summary, f)
+
+    def _write_hr_targets(self) -> None:
+        hr_targets = {
+            "games": [
+                {
+                    "game_pk": 1,
+                    "away": "Seattle Mariners",
+                    "home": "Tampa Bay Rays",
+                    "away_abbr": "SEA",
+                    "home_abbr": "TB",
+                    "targets": [
+                        {
+                            "player_name": "Josh Rojas", "team": "KC", "batter_id": 1,
+                            "opponent_pitcher_id": 5, "opponent_pitcher_name": "Shane Baz",
+                            "hr_target_score": 34.7, "p_hr_1plus": 0.178,
+                            "primary_reason": "Favorable park factor",
+                        },
+                        {
+                            "player_name": "Luis Urías", "team": "TOR", "batter_id": 2,
+                            "opponent_pitcher_id": 6, "opponent_pitcher_name": "Germán Márquez",
+                            "hr_target_score": 32.2, "p_hr_1plus": 0.177,
+                        },
+                    ],
+                }
+            ]
+        }
+        with open(os.path.join(self.daily_dir, "daily_summary_2026_07_20_hr_targets.json"), "w", encoding="utf-8") as f:
+            json.dump(hr_targets, f)
+
+    def _env(self) -> dict:
+        return {"MLB_BETTING_DATA_ROOT": os.path.join(self.root, "mlb")}
+
+    def test_total_bases_ranking_question_returns_leaderboard_not_team_game(self) -> None:
+        self._write_daily_summary()
+        with patch.dict(os.environ, self._env()):
+            result = ask_data.collect_focused_evidence(
+                "What are the best TB targets today", {"sport": "mlb"}
+            )
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["evidence"][0]["source"], "mlb_total_bases_candidates")
+        table = result["tables"][0]
+        self.assertIn("Total Bases", table["title"])
+        self.assertEqual(table["rows"][0][0], "Tommy Edman")
+        # Must NOT contain the Tampa Bay Rays game-outlook table -- this is
+        # the exact regression: "TB" used to match the Rays' tricode.
+        self.assertFalse(any("Tampa Bay" in t["title"] for t in result["tables"]))
+
+    def test_hrr_ranking_question_with_all_zero_data_returns_none(self) -> None:
+        self._write_daily_summary()
+        with patch.dict(os.environ, self._env()):
+            result = ask_data.collect_focused_evidence(
+                "What are the best HRR targets today", {"sport": "mlb"}
+            )
+        # Honest "no usable signal" rather than a table where every
+        # candidate ties at a meaningless 0.0%.
+        self.assertIsNone(result)
+
+    def test_hrr_ranking_question_with_real_signal_returns_leaderboard(self) -> None:
+        self._write_daily_summary(extra_market_rows={
+            "hits_runs_rbis_2plus": [
+                {"name": "Real Signal Guy", "team": "MIL", "p_hrr_2plus": 0.22, "p_hrr_2plus_cal": 0.22},
+            ],
+        })
+        with patch.dict(os.environ, self._env()):
+            result = ask_data.collect_focused_evidence(
+                "best hrr candidates today", {"sport": "mlb"}
+            )
+        self.assertIsNotNone(result)
+        self.assertEqual(result["tables"][0]["rows"][0][0], "Real Signal Guy")
+
+    def test_hr_candidates_question_ranks_by_target_score(self) -> None:
+        self._write_hr_targets()
+        with patch.dict(os.environ, self._env()):
+            result = ask_data.collect_focused_evidence(
+                "What are the top HR candidates today", {"sport": "mlb"}
+            )
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["evidence"][0]["source"], "mlb_hr_targets")
+        rows = result["tables"][0]["rows"]
+        self.assertEqual(rows[0][0], "Josh Rojas")  # higher hr_target_score (34.7) sorts first
+        self.assertEqual(rows[1][0], "Luis Urías")
+
+    def test_rbi_ranking_question_works(self) -> None:
+        self._write_daily_summary()
+        with patch.dict(os.environ, self._env()):
+            result = ask_data.collect_focused_evidence(
+                "best rbi targets today", {"sport": "mlb"}
+            )
+        self.assertIsNotNone(result)
+        self.assertEqual(result["tables"][0]["rows"][0][0], "Josh Rojas")
+
+    def test_non_ranking_question_mentioning_tb_still_matches_team_game(self) -> None:
+        # Regression guard: the ranking-intent gate must not swallow
+        # ordinary game questions that happen to contain a short tricode.
+        self._write_daily_summary()
+        self._write_hr_targets()  # supplies the away/home full-name resolution
+        with patch.dict(os.environ, self._env()):
+            result = ask_data.collect_focused_evidence(
+                "How do the Rays look tonight, TB is at home", {"sport": "mlb"}
+            )
+        self.assertIsNotNone(result)
+        self.assertIn("Tampa Bay", result["tables"][0]["title"])
+
+    def test_ranking_intent_detection_is_narrow(self) -> None:
+        # "best"/"top" alone must not trigger ranking intent -- too many
+        # unrelated questions use those words (e.g. market_summary-routed
+        # "what's the best bet today" is a different code path entirely).
+        self.assertFalse(ask_data._is_ranking_intent_question({"best", "bet", "today"}))
+        self.assertFalse(ask_data._is_ranking_intent_question({"top", "pick"}))
+        self.assertTrue(ask_data._is_ranking_intent_question({"best", "hr", "targets", "today"}))
+        self.assertTrue(ask_data._is_ranking_intent_question({"top", "candidates"}))
+
+    def test_market_detection_hr_and_hrr_do_not_collide(self) -> None:
+        hr = ask_data._detect_mlb_market("top hr candidates", {"top", "hr", "candidates"})
+        hrr = ask_data._detect_mlb_market("top hrr candidates", {"top", "hrr", "candidates"})
+        self.assertEqual(hr["key"], "hr")
+        self.assertEqual(hrr["key"], "hrr")
+
+    def test_ranking_intent_question_with_no_market_falls_through_to_none(self) -> None:
+        self._write_daily_summary()
+        with patch.dict(os.environ, self._env()):
+            result = ask_data.collect_focused_evidence(
+                "who are the best targets today", {"sport": "mlb"}
+            )
+        self.assertIsNone(result)
+
+
 class AskTheSyndicateEngineTests(unittest.TestCase):
     def test_llm_disabled_without_api_key(self) -> None:
         with patch.dict(os.environ, {"SYNDICATE_ASK_LLM_ENABLED": "true"}, clear=False):

@@ -56,6 +56,11 @@ def _question_words(question: str) -> set[str]:
     return set(re.findall(r"[a-z0-9']+", str(question or "").lower()))
 
 
+def _clip(text: Any, limit: int) -> str:
+    value = str(text or "").strip()
+    return value if len(value) <= limit else value[: limit - 1] + "…"
+
+
 def _name_matches(name: str, words: set[str]) -> bool:
     """True when a multi-word name is plausibly referenced by the question."""
     parts = [p for p in re.findall(r"[a-z0-9']+", str(name or "").lower()) if len(p) >= 3]
@@ -1078,6 +1083,204 @@ def _mlb_bvp_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] 
 
 
 # ---------------------------------------------------------------------------
+# MLB top-candidates leaderboards ("best HRR targets today", "top TB targets")
+# ---------------------------------------------------------------------------
+
+# Ranking-intent words are checked first and are deliberately narrow ("best"
+# and "top" alone are too generic -- "what's the best bet today" already
+# routes elsewhere). This whole path only activates when the question is
+# unambiguously asking for a ranked list, which also means it takes
+# precedence over team/player matching -- see _fetchers_for_sport, which
+# routes ranking-intent questions to *only* this fetcher. That precedence is
+# what fixes "best TB targets today" no longer resolving "TB" as the Tampa
+# Bay Rays tricode: a market word is required too, so a bare "how do the
+# Rays look, TB's pitching tonight" question is unaffected.
+_RANKING_INTENT_WORDS = {"target", "targets", "candidate", "candidates", "leader", "leaders", "leaderboard"}
+
+# Field names come straight from hitter_props_likelihood_topn's per-market
+# lists in daily_summary_*.json (e.g. total_bases_1plus entries carry
+# p_tb_1plus / p_tb_1plus_cal / tb_mean) -- confirmed against real data
+# rather than guessed, since the stat-code prefix differs per market (tb,
+# rbi, r, 2b, 3b, sb, hrr) and doesn't follow a single derivable pattern.
+_MLB_MARKET_REGISTRY: tuple[dict[str, Any], ...] = (
+    {"key": "hr", "words": {"hr", "hrs"}, "phrases": ("home run", "home runs", "homer", "homers", "long ball"), "source": "hr_targets", "label": "Home Run"},
+    {"key": "hrr", "words": {"hrr"}, "phrases": ("hits runs rbis", "hits+runs+rbis", "h+r+rbi"), "source": "topn", "prop_key": "hits_runs_rbis_2plus", "prob_field": "p_hrr_2plus", "label": "Hits+Runs+RBIs 2+"},
+    {"key": "total_bases", "words": {"tb"}, "phrases": ("total base", "total bases"), "source": "topn", "prop_key": "total_bases_1plus", "prob_field": "p_tb_1plus", "label": "Total Bases"},
+    {"key": "hits", "words": {"hits"}, "phrases": (), "source": "topn", "prop_key": "hits_1plus", "prob_field": "p_h_1plus", "label": "Hits"},
+    {"key": "rbi", "words": {"rbi", "rbis"}, "phrases": (), "source": "topn", "prop_key": "rbi_1plus", "prob_field": "p_rbi_1plus", "label": "RBIs"},
+    {"key": "runs", "words": {"runs"}, "phrases": ("runs scored",), "source": "topn", "prop_key": "runs_1plus", "prob_field": "p_r_1plus", "label": "Runs Scored"},
+    {"key": "doubles", "words": {"doubles"}, "phrases": (), "source": "topn", "prop_key": "doubles_1plus", "prob_field": "p_2b_1plus", "label": "Doubles"},
+    {"key": "triples", "words": {"triples"}, "phrases": (), "source": "topn", "prop_key": "triples_1plus", "prob_field": "p_3b_1plus", "label": "Triples"},
+    {"key": "sb", "words": {"sb"}, "phrases": ("stolen base", "stolen bases"), "source": "topn", "prop_key": "sb_1plus", "prob_field": "p_sb_1plus", "label": "Stolen Bases"},
+)
+
+
+def _is_ranking_intent_question(words: set[str]) -> bool:
+    return bool(words & _RANKING_INTENT_WORDS)
+
+
+def _detect_mlb_market(question: str, words: set[str]) -> dict[str, Any] | None:
+    normalized = f" {str(question or '').lower()} "
+    for market in _MLB_MARKET_REGISTRY:
+        if words & market["words"]:
+            return market
+        if any(phrase in normalized for phrase in market.get("phrases", ())):
+            return market
+    return None
+
+
+def _mlb_hr_candidates_evidence(selected_date: str | None) -> dict[str, Any] | None:
+    daily_dir = os.path.join(_mlb_data_root(), "daily")
+    loaded: tuple[str, str] | None = None
+    if selected_date:
+        path = os.path.join(daily_dir, f"daily_summary_{selected_date.replace('-', '_')}_hr_targets.json")
+        if os.path.exists(path):
+            loaded = (path, selected_date)
+    if loaded is None:
+        loaded = _latest_dated_file(
+            os.path.join(daily_dir, "daily_summary_????_??_??_hr_targets.json"),
+            r"daily_summary_(\d{4}_\d{2}_\d{2})_hr_targets\.json",
+        )
+    if loaded is None:
+        return None
+    path, resolved_date = loaded
+    try:
+        payload = _load_json(path)
+    except Exception:
+        return None
+
+    candidates: list[dict[str, Any]] = []
+    for game in payload.get("games") or []:
+        if not isinstance(game, dict):
+            continue
+        for target in game.get("targets") or []:
+            if not isinstance(target, dict):
+                continue
+            score = _to_float(target.get("hr_target_score"))
+            if score is None:
+                continue
+            candidates.append({
+                "player": str(target.get("player_name") or ""),
+                "team": str(target.get("team") or ""),
+                "opponent_pitcher": str(target.get("opponent_pitcher_name") or ""),
+                "score": score,
+                "p_hr_1plus": _to_float(target.get("p_hr_1plus")),
+                "reason": _clip(target.get("primary_reason") or target.get("hr_target_summary"), 200),
+            })
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: item["score"], reverse=True)
+    top = candidates[:10]
+    if top[0]["score"] <= 0:
+        return None  # degenerate/unpopulated market -- see the matching guard above
+
+    rows = [
+        [
+            c["player"], c["team"],
+            f"vs {c['opponent_pitcher']}" if c["opponent_pitcher"] else "",
+            f"{(c['p_hr_1plus'] or 0.0) * 100:.1f}%",
+            f"{c['score']:.1f}",
+        ]
+        for c in top
+    ]
+    tables = [{
+        "title": f"Top HR candidates — {resolved_date}",
+        "columns": ["Player", "Team", "Opponent Pitcher", "P(HR 1+)", "HR Target Score"],
+        "rows": rows,
+    }]
+    charts = [{
+        "type": "bar",
+        "title": f"HR probability leaders — {resolved_date}",
+        "x_label": "Player",
+        "y_label": "P(HR 1+) %",
+        "points": [{"x": c["player"], "y": round((c["p_hr_1plus"] or 0.0) * 100, 1)} for c in top],
+    }]
+    evidence = {"source": "mlb_hr_targets", "as_of": resolved_date, "top_candidates": top}
+    return {"evidence": evidence, "tables": tables, "charts": charts, "as_of": resolved_date, "sport": "mlb"}
+
+
+def _mlb_market_candidates_evidence(market: dict[str, Any], selected_date: str | None) -> dict[str, Any] | None:
+    loaded = _mlb_daily_summary(selected_date)
+    if not loaded:
+        return None
+    summary, resolved_date = loaded
+    outputs = summary.get("outputs") or []
+    if not isinstance(outputs, list):
+        return None
+
+    prop_key = market["prop_key"]
+    prob_field = market["prob_field"]
+    candidates: list[dict[str, Any]] = []
+    for game in outputs:
+        if not isinstance(game, dict):
+            continue
+        away, home = str(game.get("away") or ""), str(game.get("home") or "")
+        entries = ((game.get("hitter_props_likelihood_topn") or {}).get(prop_key)) or []
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            prob = _to_float(entry.get(f"{prob_field}_cal")) or _to_float(entry.get(prob_field))
+            if prob is None:
+                continue
+            team = str(entry.get("team") or "")
+            opponent = home if team == away else away if team == home else ""
+            candidates.append({
+                "player": str(entry.get("name") or ""),
+                "team": team,
+                "opponent": opponent,
+                "probability": prob,
+                "lineup_order": entry.get("lineup_order"),
+            })
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: item["probability"], reverse=True)
+    top = candidates[:10]
+    if top[0]["probability"] <= 0:
+        # Every candidate at exactly 0% means this market isn't populated
+        # for today's slate upstream (observed for hits_runs_rbis_2plus on
+        # 2026-07-12: all 270 entries across every game were 0.0, not a
+        # real -- if rare -- probability distribution). Showing a "top 10"
+        # that's actually a meaningless tie at zero would be worse than no
+        # table at all.
+        return None
+
+    label = market["label"]
+    rows = [
+        [c["player"], c["team"], f"vs {c['opponent']}" if c["opponent"] else "", f"{c['probability'] * 100:.1f}%"]
+        for c in top
+    ]
+    tables = [{
+        "title": f"Top {label} candidates — {resolved_date}",
+        "columns": ["Player", "Team", "Opponent", f"P({label} {prop_key.rsplit('_', 1)[-1].replace('plus', '+')})"],
+        "rows": rows,
+    }]
+    charts = [{
+        "type": "bar",
+        "title": f"{label} probability leaders — {resolved_date}",
+        "x_label": "Player",
+        "y_label": "Probability %",
+        "points": [{"x": c["player"], "y": round(c["probability"] * 100, 1)} for c in top],
+    }]
+    evidence = {"source": f"mlb_{market['key']}_candidates", "as_of": resolved_date, "market": label, "top_candidates": top}
+    return {"evidence": evidence, "tables": tables, "charts": charts, "as_of": resolved_date, "sport": "mlb"}
+
+
+def _mlb_top_candidates_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
+    words = _question_words(question)
+    if not _is_ranking_intent_question(words):
+        return None
+    market = _detect_mlb_market(question, words)
+    if market is None:
+        return None
+    selected_date = str(context.get("selected_date") or "") or None
+    if market["source"] == "hr_targets":
+        return _mlb_hr_candidates_evidence(selected_date)
+    return _mlb_market_candidates_evidence(market, selected_date)
+
+
+# ---------------------------------------------------------------------------
 # MLB sim accuracy trend (trust layer)
 # ---------------------------------------------------------------------------
 
@@ -1173,8 +1376,16 @@ def _mlb_accuracy_evidence(question: str, context: dict[str, Any]) -> dict[str, 
 # ---------------------------------------------------------------------------
 
 
-def _fetchers_for_sport(sport: str) -> list:
+def _fetchers_for_sport(sport: str, question: str) -> list:
     if sport == "mlb":
+        # A ranking-intent question ("best HRR targets today") is a
+        # fundamentally different shape than a game/player question, and
+        # letting both kinds of fetcher run together is what previously
+        # made "best TB targets today" return the Tampa Bay Rays' game (TB
+        # matched as a tricode) instead of a Total Bases leaderboard.
+        # Ranking intent takes exclusive precedence when detected.
+        if _is_ranking_intent_question(_question_words(question)):
+            return [_mlb_top_candidates_evidence]
         return [
             _mlb_accuracy_evidence,
             _mlb_focused_evidence,
@@ -1193,6 +1404,8 @@ def _fetchers_for_sport(sport: str) -> list:
     if sport == "nhl":
         return [_nhl_last10_evidence]
     if sport == "":
+        if _is_ranking_intent_question(_question_words(question)):
+            return [_mlb_top_candidates_evidence]
         # No sport hint: cheap fetchers only.
         return [_mlb_accuracy_evidence, _mlb_focused_evidence, _wnba_focused_evidence]
     return []
@@ -1202,7 +1415,7 @@ def collect_focused_evidence(question: str, context: dict[str, Any]) -> dict[str
     """Best-effort question-specific evidence; merges all matching sections. Never raises."""
     sport = str(context.get("sport_slug") or context.get("sport") or "").strip().lower()
     sections: list[dict[str, Any]] = []
-    for fetcher in _fetchers_for_sport(sport):
+    for fetcher in _fetchers_for_sport(sport, question):
         try:
             result = fetcher(question, context)
         except Exception:
