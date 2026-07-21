@@ -6,6 +6,7 @@ import tempfile
 import threading
 import time
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -1667,6 +1668,115 @@ class OpsRefreshApiTests(unittest.TestCase):
 
                 with self.assertRaises(ValueError):
                     ops_refresh._assert_no_active_refresh_run()
+
+    def test_assert_no_active_refresh_run_blocks_recent_cross_service_pointer(self) -> None:
+        # A pid recorded by a DIFFERENT Render service (separate container,
+        # separate PID namespace) can never be verified via OS pid liveness
+        # from here -- checking it would almost always read "not running"
+        # even when genuinely alive elsewhere. Recent-enough cross-service
+        # pointers must still block (fail closed), even though
+        # _pid_is_running (mocked False here, simulating "no such pid in
+        # this container") says otherwise.
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            latest_dir = reports_root / "refresh_status" / "latest"
+            latest_dir.mkdir(parents=True, exist_ok=True)
+            (latest_dir / "refresh_status_latest.json").write_text(
+                json.dumps(
+                    {
+                        "state": "running",
+                        "pid": 4321,
+                        "launcherServiceId": "srv-refresh-worker",
+                        "generatedAt": datetime.now(timezone.utc).isoformat(),
+                        "externalRunner": {"kind": "external_runner", "queue_state": "running"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {"SYNDICATE_REPORTS_ROOT": str(reports_root), "RENDER_SERVICE_ID": "srv-live-odds-worker"},
+                clear=False,
+            ), patch("syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root), patch(
+                "syndicate.features.shared.ops_refresh._pid_is_running", return_value=False
+            ):
+                from syndicate.features.shared import ops_refresh
+
+                with self.assertRaises(ValueError):
+                    ops_refresh._assert_no_active_refresh_run()
+
+    def test_assert_no_active_refresh_run_allows_stale_cross_service_pointer(self) -> None:
+        # A cross-service pointer old enough that no legitimate refresh run
+        # could still be executing is treated as dead, so a crashed run in
+        # another service doesn't block launches forever.
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            latest_dir = reports_root / "refresh_status" / "latest"
+            latest_dir.mkdir(parents=True, exist_ok=True)
+            stale_generated_at = (datetime.now(timezone.utc) - timedelta(seconds=7200)).isoformat()
+            (latest_dir / "refresh_status_latest.json").write_text(
+                json.dumps(
+                    {
+                        "state": "running",
+                        "pid": 4321,
+                        "launcherServiceId": "srv-refresh-worker",
+                        "generatedAt": stale_generated_at,
+                        "externalRunner": {"kind": "external_runner", "queue_state": "running"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {"SYNDICATE_REPORTS_ROOT": str(reports_root), "RENDER_SERVICE_ID": "srv-live-odds-worker"},
+                clear=False,
+            ), patch("syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root), patch(
+                "syndicate.features.shared.ops_refresh._pid_is_running", return_value=False
+            ):
+                from syndicate.features.shared import ops_refresh
+
+                ops_refresh._assert_no_active_refresh_run()
+
+    def test_refresh_run_still_active_matches_expected_command_within_same_service(self) -> None:
+        from syndicate.features.shared import ops_refresh
+
+        with patch.dict(os.environ, {"RENDER_SERVICE_ID": "srv-live-odds-worker"}, clear=False), patch(
+            "syndicate.features.shared.ops_refresh._pid_is_running", return_value=True
+        ), patch(
+            "syndicate.features.shared.ops_refresh._process_cmdline", return_value=["python", "run_refresh_odds_job.py"]
+        ):
+            manifest = {"pid": 999, "launcherServiceId": "srv-live-odds-worker"}
+            run_summary = {"launcherCommand": ["python", "run_refresh_odds_job.py"]}
+            self.assertTrue(ops_refresh._refresh_run_still_active(manifest, run_summary=run_summary))
+
+            mismatched_run_summary = {"launcherCommand": ["python", "some_other_script.py"]}
+            self.assertFalse(ops_refresh._refresh_run_still_active(manifest, run_summary=mismatched_run_summary))
+
+    def test_launch_refresh_run_records_launcher_service_id(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+
+            with patch.dict(
+                os.environ,
+                {"SYNDICATE_REPORTS_ROOT": str(reports_root), "RENDER_SERVICE_ID": "srv-live-odds-worker"},
+                clear=False,
+            ), patch("syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root), patch(
+                "syndicate.features.shared.ops_refresh._assert_no_active_refresh_run"
+            ), patch(
+                "syndicate.features.shared.ops_refresh.subprocess.Popen"
+            ) as mocked_popen:
+                mocked_popen.return_value.pid = 8080
+                from syndicate.features.shared import ops_refresh
+
+                ops_refresh.launch_refresh_run(sports="mlb", phase="live", dry_run=True)
+
+            manifest = json.loads((reports_root / "refresh_status" / "latest" / "refresh_status_latest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest.get("launcherServiceId"), "srv-live-odds-worker")
 
     def test_assert_no_active_refresh_run_fails_closed_when_manifest_read_fails(self) -> None:
         # A transient keyvalue-backend read failure must never be treated the

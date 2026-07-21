@@ -427,6 +427,96 @@ def _ensure_refresh_context_consistent(context: dict[str, Any]) -> None:
         raise ValueError(consistency_error)
 
 
+def _this_service_identity() -> str:
+    return str(os.environ.get("RENDER_SERVICE_ID") or os.environ.get("RENDER_SERVICE_NAME") or "").strip()
+
+
+def _refresh_run_max_runtime_seconds() -> int:
+    # Cross-service pointers can't be verified via OS pid liveness (separate
+    # container, separate PID namespace), so a genuinely stuck/crashed
+    # cross-service run needs a time-based escape hatch instead. Refresh runs
+    # (even a busy live-phase slate with WNBA's forced props refresh) finish
+    # in low single-digit minutes; 20 minutes is a generous ceiling that
+    # still bounds how long a dead pointer from another service can block
+    # new launches.
+    raw = str(os.environ.get("SYNDICATE_REFRESH_RUN_MAX_RUNTIME_SECONDS") or "").strip()
+    try:
+        value = int(raw or 1200)
+    except Exception:
+        value = 1200
+    return max(60, value)
+
+
+def _process_cmdline(pid: int) -> list[str] | None:
+    if os.name == "nt":
+        return None
+    try:
+        raw = Path(f"/proc/{pid}/cmdline").read_bytes()
+    except Exception:
+        return None
+    parts = [part.decode("utf-8", errors="ignore") for part in raw.split(b"\x00") if part]
+    return parts or None
+
+
+def _process_matches_expected_command(pid: int, expected_command: Any) -> bool:
+    # Guards against PID reuse within the SAME container: a dead refresh
+    # run's pid can be reassigned to an unrelated process, which would make
+    # a stale pointer look perpetually held via liveness alone.
+    current = _process_cmdline(pid)
+    if current is None:
+        # Can't verify (Windows, /proc unavailable, process just exited) --
+        # fall back to trusting the liveness check alone.
+        return True
+    expected = expected_command if isinstance(expected_command, list) else []
+    if not expected:
+        return True
+    return [str(part) for part in current] == [str(part) for part in expected]
+
+
+def _refresh_run_still_active(manifest: dict[str, Any], *, run_summary: dict[str, Any] | None = None) -> bool:
+    # A raw OS pid check is meaningless when the recorded launch happened in
+    # a DIFFERENT Render service's container -- live-odds-worker's tick,
+    # refresh-worker's autoruns, and ops.py's/intelligence.py's HTTP-triggered
+    # launches can all call launch_refresh_run, each in its own container
+    # with its own PID namespace, so a pid from one almost always reads "not
+    # running" when checked from another, even while genuinely alive
+    # elsewhere. Unlike the MLB-sim pointer's advisory check (safe to
+    # default open -- a false negative there just costs an extra doomed
+    # subprocess), this guard is a real mutex: ambiguity must default to
+    # "still active" (fail closed), the opposite default.
+    pid_raw = manifest.get("pid")
+    pid = int(pid_raw) if isinstance(pid_raw, int) or (isinstance(pid_raw, str) and str(pid_raw).strip().isdigit()) else None
+    if pid is None:
+        return False
+
+    launcher_service_id = str(manifest.get("launcherServiceId") or "").strip()
+    this_service_id = _this_service_identity()
+    identity_known = bool(launcher_service_id) and bool(this_service_id)
+    same_service = identity_known and launcher_service_id == this_service_id
+
+    if identity_known and not same_service:
+        generated_at = str(manifest.get("generatedAt") or "").strip()
+        try:
+            generated_dt = datetime.fromisoformat(generated_at.replace("Z", "+00:00")) if generated_at else None
+        except Exception:
+            generated_dt = None
+        if generated_dt is None:
+            # Can't determine the age of a cross-service pointer -- fail closed.
+            return True
+        age_seconds = (datetime.now(timezone.utc) - generated_dt).total_seconds()
+        return age_seconds < _refresh_run_max_runtime_seconds()
+
+    # Same service (or identity unknown, e.g. local dev without
+    # RENDER_SERVICE_ID) -- a real, verifiable liveness check is possible.
+    if not _pid_is_running(pid):
+        return False
+    # launcherCommand (not command) is what was actually Popen'd under this
+    # pid -- command is the refresh_odds_sources.py invocation the wrapper
+    # spawns as its OWN child, a different, untracked pid.
+    expected_command = (run_summary or {}).get("launcherCommand") if isinstance(run_summary, dict) else None
+    return _process_matches_expected_command(pid, expected_command)
+
+
 def _assert_refresh_manifest_read_ok(context: dict[str, Any]) -> None:
     # A failed read (transient keyvalue-backend error, malformed JSON) must
     # never be treated the same as "no run recorded" -- that fail-open
@@ -442,20 +532,22 @@ def _assert_no_active_refresh_run() -> None:
     _assert_refresh_manifest_read_ok(context)
     _ensure_refresh_context_consistent(context)
     manifest: dict[str, Any] = context["manifest"] if isinstance(context.get("manifest"), dict) else {}
+    run_summary: dict[str, Any] = context["run_summary"] if isinstance(context.get("run_summary"), dict) else {}
     state = str(manifest.get("state") or "").strip().lower()
     pid_raw = manifest.get("pid")
     pid = int(pid_raw) if isinstance(pid_raw, int) or (isinstance(pid_raw, str) and str(pid_raw).strip().isdigit()) else None
-    if state == "running" and (pid is None or not _pid_is_running(pid)):
+    if state == "running" and not _refresh_run_still_active(manifest, run_summary=run_summary):
         _update_latest_state(state="failed", exit_code=1, finished_at=_utc_now())
         context = _latest_refresh_manifest_context()
         _assert_refresh_manifest_read_ok(context)
         manifest = context["manifest"] if isinstance(context.get("manifest"), dict) else {}
+        run_summary = context["run_summary"] if isinstance(context.get("run_summary"), dict) else {}
         state = str(manifest.get("state") or "").strip().lower()
         pid_raw = manifest.get("pid")
         pid = int(pid_raw) if isinstance(pid_raw, int) or (isinstance(pid_raw, str) and str(pid_raw).strip().isdigit()) else None
     if pid is not None:
         try:
-            if _pid_is_running(pid):
+            if _refresh_run_still_active(manifest, run_summary=run_summary):
                 raise ValueError(f"A refresh run is already active (pid={pid}). Cancel it before starting a new run.")
         except ValueError:
             raise
@@ -1028,6 +1120,7 @@ def launch_refresh_run(
         "executionMode": execution_mode_text,
         "launchMode": launch_mode,
         "launchOwner": "external_runner" if _is_external_runner_mode(launch_mode) else "web_process",
+        "launcherServiceId": _this_service_identity() or None,
         "dryRun": bool(dry_run),
         "state": "pending_external" if _is_external_runner_mode(launch_mode) else "running",
         "externalRunner": external_runner,
