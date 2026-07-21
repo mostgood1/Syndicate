@@ -459,6 +459,81 @@ class LiveRefreshLoopTests(unittest.TestCase):
         mocked_launch.assert_called_once()
         self.assertEqual(mocked_launch.call_args.kwargs["sports"], "mlb")
         self.assertEqual(payload["oddsRefreshWnbaSkipped"]["reason"], "mlb_daily_sim_still_running")
+        self.assertFalse(payload["oddsRefreshWnbaSkipped"]["forcedThrough"])
+
+    def test_run_tick_still_skips_wnba_when_wnba_starvation_override_disabled(self) -> None:
+        # 2026-07-19 fix landed WNBA-only exclusion (previous test) but its
+        # only escape hatch (_odds_refresh_starved) tracks a GLOBAL
+        # last-launch timestamp that keeps getting refreshed by the
+        # non-WNBA sports launching successfully -- so it could never detect
+        # "WNBA specifically has been skipped for hours," even if enabled.
+        # _wnba_odds_refresh_starved is the WNBA-specific equivalent, and
+        # it's off by default just like the general override -- being
+        # "starved" per that check alone must not force WNBA through.
+        with patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
+                "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false",
+                "SYNDICATE_LIVE_ODDS_REFRESH_SPORTS": "mlb,wnba",
+            },
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-19"), patch.object(
+            live_refresh_loop, "_should_force_sim_rerun", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=True
+        ), patch.object(
+            live_refresh_loop, "_wnba_odds_refresh_skip_seconds", return_value=99999.0
+        ), patch.object(
+            live_refresh_loop, "launch_refresh_run", return_value={"ok": True, "pid": 4242}
+        ) as mocked_launch:
+            payload = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertTrue(payload["ok"])
+        mocked_launch.assert_called_once()
+        self.assertEqual(mocked_launch.call_args.kwargs["sports"], "mlb")
+        self.assertFalse(payload["oddsRefreshWnbaSkipped"]["forcedThrough"])
+
+    def test_run_tick_forces_wnba_through_past_wnba_starvation_ceiling_when_override_enabled(self) -> None:
+        # The opt-in path: once explicitly enabled (a human with visibility
+        # into current container memory deciding the trade-off is worth it),
+        # WNBA specifically gets forced through after being skipped past its
+        # own ceiling -- despite the sim still blocking everything else.
+        with patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
+                "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false",
+                "SYNDICATE_LIVE_ODDS_REFRESH_SPORTS": "mlb,wnba",
+                "SYNDICATE_WNBA_ODDS_REFRESH_STARVATION_OVERRIDE_ENABLED": "true",
+            },
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-19"), patch.object(
+            live_refresh_loop, "_should_force_sim_rerun", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=True
+        ), patch.object(
+            live_refresh_loop, "_wnba_odds_refresh_skip_seconds", return_value=99999.0
+        ), patch.object(
+            live_refresh_loop, "launch_refresh_run", return_value={"ok": True, "pid": 4242}
+        ) as mocked_launch:
+            payload = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertTrue(payload["ok"])
+        mocked_launch.assert_called_once()
+        launched_sports = set((mocked_launch.call_args.kwargs["sports"] or "").split(","))
+        self.assertEqual(launched_sports, {"mlb", "wnba"})
+        self.assertTrue(payload["oddsRefreshWnbaSkipped"]["forcedThrough"])
+
+    def test_wnba_odds_refresh_skip_seconds_measures_gap_since_last_wnba_launch(self) -> None:
+        with TemporaryDirectory() as tmp_dir, patch.object(
+            live_refresh_loop, "_meta_dir", return_value=Path(tmp_dir)
+        ):
+            # No prior record -- nothing to measure a gap against yet, but
+            # this seeds the record so the ceiling has a real anchor.
+            self.assertIsNone(live_refresh_loop._wnba_odds_refresh_skip_seconds(now_epoch=1000.0))
+            skip_seconds = live_refresh_loop._wnba_odds_refresh_skip_seconds(now_epoch=1000.0 + 1800.0)
+            self.assertEqual(skip_seconds, 1800.0)
 
     def test_run_tick_still_defers_past_starvation_ceiling_when_override_disabled(self) -> None:
         # Reverted 2026-07-18: the starvation-ceiling override ("force the

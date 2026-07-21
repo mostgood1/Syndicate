@@ -1163,6 +1163,78 @@ def _odds_refresh_starved(*, now_epoch: float) -> bool:
 	return (now_epoch - last_epoch) >= ceiling
 
 
+def _last_wnba_odds_refresh_launch_path() -> Path:
+	return _meta_dir() / "last_wnba_odds_refresh_launch.json"
+
+
+def _read_last_wnba_odds_refresh_launch() -> dict[str, Any]:
+	payload = read_json_file(_last_wnba_odds_refresh_launch_path())
+	return payload if isinstance(payload, dict) else {}
+
+
+def _record_wnba_odds_refresh_launch(epoch: float) -> None:
+	write_json_file(_last_wnba_odds_refresh_launch_path(), {"epoch": epoch, "recordedAt": _utc_now()})
+
+
+def _wnba_odds_refresh_skip_seconds(*, now_epoch: float) -> float | None:
+	# 2026-07-19: the "scope the sim-vs-refresh mutex to WNBA only" fix
+	# (launch every other configured sport, defer only WNBA while a sim is
+	# resident) fixed MLB's starvation by shifting the exact same risk onto
+	# WNBA -- and the only escape hatch that existed at the time
+	# (_odds_refresh_starved) tracks a GLOBAL last-launch timestamp that
+	# keeps getting refreshed by the non-WNBA sports launching successfully,
+	# so it could never detect "WNBA specifically has been skipped for
+	# hours" even if enabled. This is a WNBA-specific equivalent. Returns
+	# None if WNBA has never been recorded as launched (nothing to measure
+	# a gap against yet) or launched too recently to matter.
+	last = _read_last_wnba_odds_refresh_launch()
+	last_epoch = float(last.get("epoch") or 0.0)
+	if last_epoch <= 0.0:
+		_record_wnba_odds_refresh_launch(now_epoch)
+		return None
+	return max(0.0, now_epoch - last_epoch)
+
+
+def _wnba_odds_refresh_starvation_override_enabled() -> bool:
+	# Off by default, deliberately: forcing WNBA's refresh through on a blind
+	# timer while an MLB sim is resident is the exact mechanism
+	# _odds_refresh_starvation_override_enabled() above already tried and
+	# reverted for the whole-tick case, after confirming it reliably
+	# reproduced the OOM it exists to prevent. Real production evidence from
+	# 2026-07-19 (the same day the per-game MLB sim scoping and
+	# memory-headroom checks landed) still measured only 900-1550MB of real
+	# headroom on a busy 16-game slate -- under the 1800MB bar
+	# _odds_refresh_memory_headroom_snapshot() requires -- so the
+	# improvements help but don't make a blind timer safe on the busiest
+	# days. This is a separate, explicit opt-in specifically for accepting
+	# that residual risk in exchange for bounding how stale WNBA can get,
+	# for whoever has visibility into current container memory to enable
+	# deliberately (e.g. via Render's dashboard) rather than something this
+	# code silently assumes is now safe.
+	return _env_bool("SYNDICATE_WNBA_ODDS_REFRESH_STARVATION_OVERRIDE_ENABLED", default=False)
+
+
+def _wnba_odds_refresh_starvation_ceiling_seconds() -> int:
+	raw = str(os.environ.get("SYNDICATE_WNBA_ODDS_REFRESH_STARVATION_CEILING_SECONDS") or "").strip()
+	try:
+		value = int(raw or 2700)  # 45 minutes -- deliberately much longer than
+		# the general 900s ceiling, since firing here means "force through
+		# despite insufficient measured memory headroom," not just "despite
+		# a resident sim."
+	except Exception:
+		value = 2700
+	return max(0, value)
+
+
+def _wnba_odds_refresh_starved(*, now_epoch: float) -> bool:
+	if not _wnba_odds_refresh_starvation_override_enabled():
+		return False
+	skip_seconds = _wnba_odds_refresh_skip_seconds(now_epoch=now_epoch)
+	if skip_seconds is None:
+		return False
+	return skip_seconds >= _wnba_odds_refresh_starvation_ceiling_seconds()
+
+
 def _odds_refresh_memory_overlap_enabled() -> bool:
 	return _env_bool("SYNDICATE_LIVE_ODDS_REFRESH_MEMORY_OVERLAP_ENABLED", default=True)
 
@@ -1355,13 +1427,30 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 	# every other configured sport anyway and defer only WNBA specifically.
 	skip_launch = False
 	launch_sports = _live_refresh_loop_sports()
+	wnba_forced_through = False
 	if sim_blocks_refresh:
 		effective_sports = _live_refresh_loop_effective_sports(selected_date)
 		if "wnba" in effective_sports:
-			meta["oddsRefreshWnbaSkipped"] = {"reason": "mlb_daily_sim_still_running", "headroom": memory_headroom_snapshot}
-		non_wnba_sports = [sport for sport in effective_sports if sport != "wnba"]
-		if non_wnba_sports:
-			launch_sports = ",".join(non_wnba_sports)
+			wnba_skip_seconds = _wnba_odds_refresh_skip_seconds(now_epoch=tick_started_epoch)
+			wnba_starved = _wnba_odds_refresh_starved(now_epoch=tick_started_epoch)
+			meta["oddsRefreshWnbaSkipped"] = {
+				"reason": "mlb_daily_sim_still_running",
+				"headroom": memory_headroom_snapshot,
+				"skippedForSeconds": wnba_skip_seconds,
+				"starvationOverrideEnabled": _wnba_odds_refresh_starvation_override_enabled(),
+				"forcedThrough": wnba_starved,
+			}
+			if wnba_starved:
+				# Opt-in only (see _wnba_odds_refresh_starvation_override_enabled) --
+				# accepting the same OOM risk the whole-tick override was reverted
+				# for, deliberately, because this only fires after WNBA has been
+				# skipped for _wnba_odds_refresh_starvation_ceiling_seconds()
+				# straight, not on every resident-sim tick.
+				print(f"[live_refresh_loop] WNBA_ODDS_REFRESH_FORCED_THROUGH skipped_for_seconds={wnba_skip_seconds}", flush=True)
+				wnba_forced_through = True
+		sports_to_launch = [sport for sport in effective_sports if sport != "wnba" or wnba_forced_through]
+		if sports_to_launch:
+			launch_sports = ",".join(sports_to_launch)
 		else:
 			meta["ok"] = False
 			meta["skipped"] = True
@@ -1392,6 +1481,13 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			meta["ok"] = True
 			meta["result"] = result
 			_record_odds_refresh_launch(tick_started_epoch)
+			# launch_sports is None when unconfigured (launch_refresh_run then
+			# resolves the full season-active-for-date set itself) -- resolve
+			# the same way here rather than assuming an unset launch_sports
+			# means WNBA wasn't included.
+			launched_sports = launch_sports.split(",") if launch_sports else _live_refresh_loop_effective_sports(selected_date)
+			if "wnba" in launched_sports:
+				_record_wnba_odds_refresh_launch(tick_started_epoch)
 			if force_sim_rerun:
 				print(f"[live_refresh_loop] LINEUP_INJURY_CHANGE_RESIM_TRIGGERED date={meta['date']} phase={meta['phase']}", flush=True)
 		except ValueError as exc:
