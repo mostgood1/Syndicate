@@ -129,5 +129,6 @@ def build_props_page_context(league: str, week: int | None = None, season: int |
         prev_href=f"/soccer/{league}/props?week={prev_week}&season={resolved_season}",
         next_href=f"/soccer/{league}/props?week={next_week}&season={resolved_season}",
         hidden_fields=[{"name": "season", "value": str(resolved_season)}],
-        extra_controls=[league_select_control(league, page_path="/props", query_suffix=query)],
+        # No query_suffix -- see cards.py's build_cards_page_context for why.
+        extra_controls=[league_select_control(league, page_path="/props")],
     )

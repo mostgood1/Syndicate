@@ -151,7 +151,8 @@ def build_live_lens_page_context(league: str, week: int | None = None, season: i
         prev_href=f"/soccer/{league}/live-lens?week={prev_week}&season={resolved_season}",
         next_href=f"/soccer/{league}/live-lens?week={next_week}&season={resolved_season}",
         hidden_fields=[{"name": "season", "value": str(resolved_season)}],
-        extra_controls=[league_select_control(league, page_path="/live-lens", query_suffix=query)],
+        # No query_suffix -- see cards.py's build_cards_page_context for why.
+        extra_controls=[league_select_control(league, page_path="/live-lens")],
     )
     if latest_generated_at:
         context["generatedAt"] = latest_generated_at

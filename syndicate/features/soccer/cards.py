@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
+from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
 from syndicate.features.soccer.sources import available_weeks
 from syndicate.features.soccer.sources import build_module_links
 from syndicate.features.soccer.sources import default_season
@@ -73,13 +75,52 @@ def _team_secondary_color(team: str, league: str) -> str | None:
     return f"#{value}" if value else None
 
 
+def _format_kickoff_display(kickoff: str | None) -> str:
+    # Mirrors mlb/cards.py and wnba/cards.py's _format_start_time_local: the
+    # raw value here is ESPN's ISO-8601 UTC event date, and without this it
+    # renders straight through as e.g. "2026-07-22T23:30Z" -- confirmed live
+    # on the MLS compact cards. Includes the day/date (unlike the MLB/WNBA
+    # versions) since soccer's cards span a whole week, not one day.
+    text = str(kickoff or "").strip()
+    if not text:
+        return "Scheduled"
+    try:
+        stamp = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=CENTRAL_TIMEZONE)
+        local_stamp = stamp.astimezone(CENTRAL_TIMEZONE)
+        time_text = f"{local_stamp.strftime('%I').lstrip('0') or '12'}:{local_stamp.strftime('%M')} {local_stamp.strftime('%p')} CT"
+        return f"{local_stamp.strftime('%a')}, {local_stamp.strftime('%b')} {local_stamp.strftime('%d').lstrip('0')} · {time_text}"
+    except Exception:
+        return "Scheduled"
+
+
 def _status_label(status_state: str, kickoff: str | None) -> str:
     state = str(status_state or "pre").strip().lower()
     if state == "post":
         return "Final"
     if state == "in":
         return "Live"
-    return str(kickoff or "Scheduled").strip() or "Scheduled"
+    return _format_kickoff_display(kickoff)
+
+
+def _box_score_line(
+    *,
+    away_abbr: str,
+    home_abbr: str,
+    periods: dict[str, Any],
+    team_projection: dict[str, Any],
+) -> str:
+    h1 = periods.get("h1") if isinstance(periods.get("h1"), dict) else {}
+    h2 = periods.get("h2") if isinstance(periods.get("h2"), dict) else {}
+    if not h1 and not h2:
+        return ""
+
+    def _leg(entry: dict[str, Any]) -> str:
+        return f"{_fmt_num(entry.get('away_mean'), 1)}-{_fmt_num(entry.get('home_mean'), 1)}"
+
+    ft = f"{_fmt_num(team_projection.get('away_mean'), 1)}-{_fmt_num(team_projection.get('home_mean'), 1)}"
+    return f"Proj {away_abbr}-{home_abbr} · 1H {_leg(h1)} · 2H {_leg(h2)} · FT {ft}"
 
 
 def _prop_line(row: dict[str, Any]) -> str:
@@ -117,9 +158,11 @@ def _unsimulated_game(fixture: dict[str, Any], *, league: str, week: int, season
             "primary_color": _team_primary_color(home_team, league),
             "secondary_color": _team_secondary_color(home_team, league),
         },
+        "card_variant": "soccer_main",
         "status": _status_label(status_state, fixture.get("date")),
         "detail": date_str or league_display_name(league),
         "summary": f"{away_team} at {home_team} is on the schedule for Week {week} but has not been simulated yet.",
+        "compact_box_line": "",
         "href": f"/soccer/{league}/game/{event_id or 'unknown'}?week={week}&season={season}",
         "href_label": "Open match card",
         "metrics": [
@@ -272,11 +315,18 @@ def _match_to_game(match: dict[str, Any], *, league: str, week: int, season: int
             "primary_color": _team_primary_color(home_team, league),
             "secondary_color": _team_secondary_color(home_team, league),
         },
+        "card_variant": "soccer_main",
         "status": _status_label(status_state, match.get("kickoff")),
         "detail": score_text if score_text != "-" else league_display_name(league),
         "summary": summary,
         "href": f"/soccer/{league}/game/{event_id or 'unknown'}?week={week}&season={season}",
         "href_label": "Open match card",
+        "compact_box_line": _box_score_line(
+            away_abbr=_abbr(away_team, league),
+            home_abbr=_abbr(home_team, league),
+            periods=periods,
+            team_projection=team_projection,
+        ),
         "sim": {
             "score": {"away_mean": team_projection.get("away_mean"), "home_mean": team_projection.get("home_mean")},
             "periods": periods,
@@ -375,7 +425,12 @@ def build_cards_page_context(league: str, week: int | None = None, season: int |
             "control_type": "number",
             "control_name": "week",
             "hidden_fields": [{"name": "season", "value": str(resolved_season)}],
-            "extra_controls": [league_select_control(league, page_path="/cards", query_suffix=query)],
+            # No query_suffix: switching leagues should land on that league's
+            # own default week/season, not carry the current league's ?week=
+            # over (e.g. MLS's week 17 landing EPL on ITS week 17, when EPL's
+            # own current week is 1) -- build_cards_page_context already
+            # resolves default_week()/default_season() for a bare URL.
+            "extra_controls": [league_select_control(league, page_path="/cards")],
             "module_links": build_module_links(league, resolved_week, resolved_season, "Cards"),
             "games": games,
             "scoreboard_items": [

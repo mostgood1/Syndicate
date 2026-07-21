@@ -1,0 +1,44 @@
+<section class="cards-scoreboard" id="cardsScoreboard" aria-label="Games">
+  {% if games %}
+    <div class="cards-scoreboard-strip">
+      {% for game in games %}
+        <a class="cards-strip-card" href="#game-{{ game.gamePk }}" data-game-pk="{{ game.gamePk }}">
+          <div class="cards-strip-head">
+            <span class="cards-status-badge">{{ game.status }}</span>
+            <span data-role="strip-detail">{{ game.detail }}</span>
+          </div>
+          <div class="cards-head-left cards-head-matchup">
+            <div class="cards-head-team">
+              {% if game.away.logo_url %}
+                <img class="cards-strip-logo cards-strip-crest" src="{{ game.away.logo_url }}" alt="{{ game.away.name }} crest" loading="lazy" />
+              {% else %}
+                <div class="cards-strip-logo">{{ game.away.abbr }}</div>
+              {% endif %}
+              <div>
+                <div class="cards-head-team-name">{{ game.away.name }}</div>
+                <div class="cards-mini-copy">{{ game.away.abbr }}</div>
+              </div>
+            </div>
+            <span class="cards-score-divider">@</span>
+            <div class="cards-head-team">
+              {% if game.home.logo_url %}
+                <img class="cards-strip-logo cards-strip-crest" src="{{ game.home.logo_url }}" alt="{{ game.home.name }} crest" loading="lazy" />
+              {% else %}
+                <div class="cards-strip-logo">{{ game.home.abbr }}</div>
+              {% endif %}
+              <div>
+                <div class="cards-head-team-name">{{ game.home.name }}</div>
+                <div class="cards-mini-copy">{{ game.home.abbr }}</div>
+              </div>
+            </div>
+          </div>
+          {% if game.compact_box_line %}
+            <div class="cards-mini-copy cards-strip-boxline">{{ game.compact_box_line }}</div>
+          {% endif %}
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="cards-loading-strip">{{ empty_text }}</div>
+  {% endif %}
+</section>

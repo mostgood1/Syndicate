@@ -96,7 +96,8 @@ def build_archive_page_context(league: str, week: int | None = None, season: int
         prev_href=f"/soccer/{league}/archive?week={prev_week}&season={resolved_season}",
         next_href=f"/soccer/{league}/archive?week={next_week}&season={resolved_season}",
         hidden_fields=[{"name": "season", "value": str(resolved_season)}],
-        extra_controls=[league_select_control(league, page_path="/archive", query_suffix=query)],
+        # No query_suffix -- see cards.py's build_cards_page_context for why.
+        extra_controls=[league_select_control(league, page_path="/archive")],
     )
     if not cards:
         context["empty_state"] = {

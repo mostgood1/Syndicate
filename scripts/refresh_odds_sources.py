@@ -62,6 +62,9 @@ from syndicate.features.nfl.sources import latest_season as nfl_latest_season
 from syndicate.features.nfl.sources import week_summaries as nfl_week_summaries
 from syndicate.features.nhl.sources import available_dates as nhl_available_dates
 from syndicate.features.soccer.sources import active_leagues_for_date as soccer_active_leagues_for_date
+from syndicate.features.soccer.sources import default_season as soccer_default_season
+from syndicate.features.soccer.sources import default_week as soccer_default_week
+from syndicate.features.soccer.sources import week_date_list as soccer_week_date_list
 from syndicate.features.wnba.sources import available_dates as wnba_available_dates
 
 
@@ -939,6 +942,31 @@ _SOCCER_LEAGUE_SLUGS = (
 )
 
 
+def _soccer_artifact_scope_args(league: str, fallback_date: str) -> tuple[str, ...]:
+    # Regenerating only args.date's fixtures meant a match several days out
+    # in the currently-displayed week (soccer's cards are week-based nav,
+    # not date-based) never got refreshed until "today" naturally caught up
+    # to it -- confirmed 2026-07-21: today had no MLS games, so the routine
+    # tick kept rewriting an empty artifact for today while the real
+    # 07-22..07-25 slate everyone was looking at sat stale. Unlike MLB/NBA/etc,
+    # which are refreshed per-day but re-run daily anyway, soccer's board is
+    # scoped to a whole week at a time, so the refresh needs to cover the
+    # whole week too. build_soccer_artifacts.py already supports this via
+    # --week/--season (loops every date the schedule artifact lists for that
+    # week); this just always uses it instead of a single --date.
+    try:
+        season = soccer_default_season(league)
+        week = soccer_default_week(league, season)
+        if soccer_week_date_list(league, season, week):
+            return ("--week", str(week), "--season", str(season))
+    except Exception:
+        pass
+    # Fall back to single-date scope if the current week can't be resolved
+    # (e.g. schedule artifact not fetched yet on a fresh disk) rather than
+    # failing the step outright.
+    return ("--date", fallback_date)
+
+
 def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
     python_exe = _venv_python(REPO_ROOT)
     soccer_root = _local_source_bundle_root("soccer")
@@ -981,14 +1009,13 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
                     "scripts/build_soccer_artifacts.py",
                     "--league",
                     league,
-                    "--date",
-                    args.date,
+                    *_soccer_artifact_scope_args(league, args.date),
                     "--source-root",
                     str(soccer_root),
                     "--out-root",
                     str(soccer_root),
                 ),
-                description=f"Refresh {league} simulation, props, and recommendation artifacts.",
+                description=f"Refresh {league}'s current-week simulation, props, and recommendation artifacts.",
             )
         )
     for league in league_slugs:
