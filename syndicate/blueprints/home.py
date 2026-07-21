@@ -3966,7 +3966,7 @@ def _mlb_top_prop_rows_from_group(
                         "is_live": False,
                         "market": market,
                         "pick": pick,
-                        "detail": f"{pick} {market} | Daily top props fallback".strip(),
+                        "detail": f"{pick} {market} | {heading}".strip(),
                         "value": f"{probability * 100:.1f}% win" if probability is not None else heading,
                         "projected": _prop_metric_text(value.get("mean")),
                         "sim_projection": _prop_metric_text(value.get("mean")),
