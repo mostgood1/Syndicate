@@ -2,7 +2,7 @@
   {% if games %}
     <div class="cards-scoreboard-strip">
       {% for game in games %}
-        <a class="cards-strip-card" href="#game-{{ game.gamePk }}" data-game-pk="{{ game.gamePk }}">
+        <a class="cards-strip-card cards-strip-card--soccer" href="#game-{{ game.gamePk }}" data-game-pk="{{ game.gamePk }}">
           <div class="cards-strip-head">
             <span class="cards-status-badge">{{ game.status }}</span>
             <span data-role="strip-detail">{{ game.detail }}</span>

@@ -116,6 +116,23 @@
   overflow-wrap: anywhere;
 }
 
+/* Soccer's compact scoreboard strip only (.cards-strip-card--soccer,
+   set in _scoreboard_strip_soccer.html) -- not the shared strip every other
+   sport uses. Full club names ("New England Revolution", "Columbus Crew")
+   at the shared 16px + overflow-wrap:anywhere were breaking mid-word across
+   2-3 lines in a ~380px card; single-line truncation at a smaller size
+   reads cleanly and the abbreviation + full card below still carry the
+   complete name. */
+.cards-strip-card--soccer .cards-head-team-name {
+  display: block;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.15;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+}
+
 .cards-score-divider {
   display: inline-flex;
   align-items: center;

@@ -211,9 +211,15 @@ def _box_score_panel(
     # ESPN's live feed) takes over from the pregame sim projection once a
     # match goes live, rather than showing both -- once the actual count is
     # known, the projection of it is no longer the useful number.
+    # Eyebrow deliberately avoids "sim"/"box"/"player outcome" -- those are
+    # game_board_contract.py's _build_box_sections keyword match for the Box
+    # Score tab, and team-level volume isn't a box score (a box score is
+    # player stat lines -- see _player_box_score_panel below, which owns that
+    # tab now). This panel's items/table_groups still flow into the Game
+    # tab's top-plays lane via _build_top_play_rows, same as any panel.
     if live_state is not None:
         return {
-            "eyebrow": "Live box score",
+            "eyebrow": "Live match volume",
             "title": "Shots / SOT / corners / red cards -- so far",
             "body": "Actual match state from ESPN's live feed, refreshed on each live poll.",
             "table_groups": [
@@ -241,7 +247,7 @@ def _box_score_panel(
             ],
         }
     return {
-        "eyebrow": "Sim box score",
+        "eyebrow": "Projected match volume",
         "title": "Shots / SOT / corners",
         "body": "Projected volume markets for live shot props and corner totals.",
         "table_groups": [
@@ -266,6 +272,52 @@ def _box_score_panel(
             f"On target: {away_team} {_fmt_num(volume.get('away_shots_on_target'), 1)} | {home_team} {_fmt_num(volume.get('home_shots_on_target'), 1)}",
             f"Corners: {away_team} {_fmt_num(volume.get('away_corners'), 1)} | {home_team} {_fmt_num(volume.get('home_corners'), 1)}",
         ],
+    }
+
+
+def _player_box_score_panel(
+    *,
+    away_team: str,
+    home_team: str,
+    top_props: list[dict[str, Any]],
+    live_state: dict[str, Any] | None,
+) -> dict[str, Any]:
+    # The actual box score (player stat lines), separate from the team-level
+    # volume panel above. "box"/"sim" in the eyebrow is what
+    # game_board_contract.py's _build_box_sections keys off of to route this
+    # into the Box Score tab.
+    if live_state is not None:
+        live_props = live_state.get("live_player_props") if isinstance(live_state.get("live_player_props"), list) else []
+        rows = [
+            {
+                "name": str(row.get("player_name") or "Player"),
+                "detail": f"{away_team if row.get('side') == 'away' else home_team} · live",
+                "value": f"{_fmt_num(row.get('shots_so_far'), 0)} sh so far → proj {_fmt_num(row.get('projected_final_shots'), 1)}",
+            }
+            for row in live_props[:8]
+            if isinstance(row, dict)
+        ]
+        return {
+            "eyebrow": "Live box score",
+            "title": "Player stat lines",
+            "body": "Shots so far and projected final shots for players who have appeared, from ESPN's live feed.",
+            "table_groups": [{"heading": "Live", "rows": rows}] if rows else [],
+            "items": [f"{row['name']} ({row['detail']}): {row['value']}" for row in rows] or ["No players have recorded a shot yet."],
+        }
+    rows = [
+        {
+            "name": str(row.get("player_name") or "Player"),
+            "detail": f"{row.get('team') or (away_team if row.get('side') == 'away' else home_team)} · {row.get('position') or '-'}",
+            "value": f"{_fmt_num(row.get('expected_shots'), 1)} xSh · {_fmt_num(row.get('expected_shots_on_target'), 1)} xSOT · {_fmt_pct(row.get('anytime_scorer_probability'))} scorer",
+        }
+        for row in top_props[:8]
+    ]
+    return {
+        "eyebrow": "Sim box score",
+        "title": "Player stat lines",
+        "body": "Projected shots, shots on target, and anytime-scorer probability from the simulated player-props pass.",
+        "table_groups": [{"heading": "Projected", "rows": rows}] if rows else [],
+        "items": [f"{row['name']} ({row['detail']}): {row['value']}" for row in rows] or ["No player-prop rows were available for this match."],
     }
 
 
@@ -356,6 +408,12 @@ def _match_to_game(match: dict[str, Any], *, league: str, week: int, season: int
                 away_abbr=_abbr(away_team, league),
                 home_abbr=_abbr(home_team, league),
                 volume=volume,
+                live_state=live_state,
+            ),
+            _player_box_score_panel(
+                away_team=away_team,
+                home_team=home_team,
+                top_props=top_props,
                 live_state=live_state,
             ),
             {
