@@ -342,9 +342,30 @@ def _promote_board_contract_cards(state: dict[str, Any] | None) -> dict[str, Any
 
 def _intelligence_state_candidate_count(state: dict[str, Any] | None) -> int:
     current = dict(state or {})
+    # by_sport is built from the full ranked candidate pool BEFORE any
+    # per-request sport-scoping or limit slicing is applied (see
+    # _compute_response/_compute_board_publication_response), so its total is
+    # the only field here that reflects true pool size. Confirmed live
+    # 2026-07-21: a persisted snapshot had by_sport.mlb with 181 candidates
+    # but top_opportunities/recommendations sliced to 10 (whatever limit that
+    # particular cached request happened to carry) -- checking
+    # top_opportunities first silently overwrote the real 181 with a
+    # request-specific display count every time this ran (on every read AND
+    # write), which is the actual mechanism behind the "stuck at 10" board.
+    by_sport_total = 0
+    by_sport = current.get("by_sport")
+    if isinstance(by_sport, Mapping) and by_sport:
+        by_sport_total = sum(len(items) for items in by_sport.values() if isinstance(items, list))
     opportunities = current.get("top_opportunities")
-    if isinstance(opportunities, list) and opportunities:
-        return len([item for item in opportunities if isinstance(item, Mapping)])
+    opportunities_total = len([item for item in opportunities if isinstance(item, Mapping)]) if isinstance(opportunities, list) else 0
+    # Take whichever is larger rather than strictly preferring by_sport: in
+    # real responses by_sport is always >= top_opportunities (it's built
+    # before any per-request sport-scoping/limit slice is applied), but
+    # falling back to max() here also tolerates hand-built/legacy state
+    # shapes where that invariant doesn't hold, without reintroducing the
+    # original bug of trusting a request-scoped slice as the true total.
+    if by_sport_total > 0 or opportunities_total > 0:
+        return max(by_sport_total, opportunities_total)
     recommendations = current.get("recommendations")
     if isinstance(recommendations, list) and recommendations:
         return len([item for item in recommendations if isinstance(item, Mapping)])
