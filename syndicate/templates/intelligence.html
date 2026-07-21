@@ -515,6 +515,249 @@
       grid-template-columns: 1fr;
     }
   }
+
+  .board-action-button--slip {
+    border: 1px solid rgba(46, 204, 113, 0.38);
+    background: rgba(46, 204, 113, 0.14);
+    color: #d6ffe4;
+  }
+
+  .board-action-button--slip[data-in-slip="true"] {
+    background: rgba(46, 204, 113, 0.32);
+  }
+
+  #bet-slip-panel {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    width: 320px;
+    max-width: calc(100vw - 40px);
+    max-height: min(70vh, 560px);
+    display: flex;
+    flex-direction: column;
+    background: var(--cards-surface-strong, #0f1e2f);
+    border: 1px solid var(--cards-line-strong, rgba(132, 166, 196, 0.3));
+    border-radius: 16px;
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+    z-index: 60;
+    overflow: hidden;
+    font-size: 13px;
+  }
+
+  #bet-slip-panel[data-empty="true"] {
+    width: auto;
+  }
+
+  .bet-slip__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 12px 14px;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid var(--cards-line);
+  }
+
+  #bet-slip-panel[data-collapsed="true"] .bet-slip__header {
+    border-bottom: none;
+  }
+
+  .bet-slip__title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    color: var(--cards-text);
+  }
+
+  .bet-slip__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: rgba(46, 204, 113, 0.28);
+    color: #d6ffe4;
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .bet-slip__toggle {
+    color: var(--cards-text-soft);
+    font-size: 12px;
+    transform: rotate(0deg);
+    transition: transform 0.15s ease;
+  }
+
+  #bet-slip-panel[data-collapsed="true"] .bet-slip__toggle {
+    transform: rotate(180deg);
+  }
+
+  .bet-slip__body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  #bet-slip-panel[data-collapsed="true"] .bet-slip__body {
+    display: none;
+  }
+
+  .bet-slip__legs {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 14px;
+  }
+
+  .bet-slip__leg {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 10px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--cards-line);
+  }
+
+  .bet-slip__leg-name {
+    font-weight: 700;
+    color: var(--cards-text);
+    font-size: 12px;
+    grid-column: 1;
+  }
+
+  .bet-slip__leg-remove {
+    grid-column: 2;
+    justify-self: end;
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--cards-text-dim);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 2px 4px;
+  }
+
+  .bet-slip__leg-remove:hover {
+    color: #ff8f8f;
+  }
+
+  .bet-slip__leg-meta {
+    grid-column: 1 / -1;
+    color: var(--cards-text-soft);
+    font-size: 11px;
+  }
+
+  .bet-slip__leg-stake {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 2px;
+  }
+
+  .bet-slip__leg-stake label {
+    color: var(--cards-text-dim);
+    font-size: 11px;
+  }
+
+  .bet-slip__leg-stake input {
+    width: 72px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--cards-line-strong);
+    border-radius: 6px;
+    color: var(--cards-text);
+    padding: 4px 6px;
+    font-size: 12px;
+  }
+
+  .bet-slip__leg-payout {
+    margin-left: auto;
+    color: #d6ffe4;
+    font-weight: 700;
+    font-size: 12px;
+  }
+
+  .bet-slip__empty {
+    padding: 18px 14px;
+    color: var(--cards-text-soft);
+    font-size: 12px;
+    text-align: center;
+  }
+
+  .bet-slip__totals {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 10px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--cards-line);
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .bet-slip__totals-label {
+    color: var(--cards-text-dim);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .bet-slip__totals-value {
+    color: var(--cards-text);
+    font-weight: 800;
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bet-slip__actions {
+    display: flex;
+    gap: 8px;
+    padding: 10px 14px 14px;
+  }
+
+  .bet-slip__actions button {
+    flex: 1;
+    appearance: none;
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .bet-slip__commit {
+    border: none;
+    background: rgba(46, 204, 113, 0.85);
+    color: #04170c;
+  }
+
+  .bet-slip__commit:disabled {
+    background: rgba(46, 204, 113, 0.25);
+    color: var(--cards-text-dim);
+    cursor: not-allowed;
+  }
+
+  .bet-slip__clear {
+    border: 1px solid var(--cards-line-strong);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--cards-text-soft);
+  }
+
+  @media (max-width: 480px) {
+    #bet-slip-panel {
+      right: 10px;
+      left: 10px;
+      bottom: 10px;
+      width: auto;
+      max-width: none;
+    }
+  }
 </style>
 
 <main class="board-page">
@@ -1023,7 +1266,7 @@
     const market = String(item.market || item.market_label || "").trim();
 
     return `
-      <article class="board-card board-card--tier-${tier}" data-syndicate-question="${escapeHtml(item.question || "")}" data-syndicate-sport="${escapeHtml(sport)}" data-syndicate-sport-slug="${escapeHtml(item.sport_slug || "")}" data-syndicate-market="${escapeHtml(market)}" data-syndicate-candidate-type="${escapeHtml(item.candidate_type || item.type || "")}" data-syndicate-selection="${escapeHtml(item.selection || item.pick || "")}" data-syndicate-matchup="${escapeHtml(displayMatchup(item) || "")}" data-syndicate-player-name="${escapeHtml(item.player_name || "")}" data-syndicate-name="${escapeHtml(title)}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}">
+      <article class="board-card board-card--tier-${tier}" data-syndicate-question="${escapeHtml(item.question || "")}" data-syndicate-sport="${escapeHtml(sport)}" data-syndicate-sport-slug="${escapeHtml(item.sport_slug || "")}" data-syndicate-market="${escapeHtml(market)}" data-syndicate-candidate-type="${escapeHtml(item.candidate_type || item.type || "")}" data-syndicate-selection="${escapeHtml(item.selection || item.pick || "")}" data-syndicate-matchup="${escapeHtml(displayMatchup(item) || "")}" data-syndicate-player-name="${escapeHtml(item.player_name || "")}" data-syndicate-name="${escapeHtml(title)}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}" data-syndicate-odds="${escapeHtml(String(item.odds ?? item.odds_current ?? ""))}" data-syndicate-prop-line="${escapeHtml(prop || "")}">
         <div class="board-card__head">
           <div>
             <div class="board-card__title">${index === 0 ? "🔥 " : ""}${escapeHtml(title)}</div>
@@ -1050,6 +1293,7 @@
           <div class="board-card__actions">
             <button type="button" class="board-action-button board-action-button--add" data-portfolio-action="add">Add</button>
             <button type="button" class="board-action-button board-action-button--remove" data-portfolio-action="remove">Remove</button>
+            <button type="button" class="board-action-button board-action-button--slip" data-slip-action="toggle" data-slip-label-full="true">🎫 Slip</button>
           </div>
           ${lastResponseTimestamp ? `<div class="board-card__updated">Updated ${escapeHtml(formatTimestamp(lastResponseTimestamp))}</div>` : ""}
         </div>
@@ -1106,6 +1350,7 @@
         });
       });
     });
+    wireSlipButtons(container);
   }
 
   function renderBlotter(items) {
@@ -1133,7 +1378,9 @@
               const matchup = displayMatchup(item);
               const sport = String(item.sport || item.sport_slug || "").trim().toUpperCase();
               const title = displayTitle(item);
-              const rowAttrs = `data-syndicate-name="${escapeHtml(title)}" data-syndicate-market="${escapeHtml(item.market || item.market_label || "")}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}"`;
+              const propText = propLine(item) || "";
+              const oddsText = String(item.odds ?? item.odds_current ?? "");
+              const rowAttrs = `data-syndicate-name="${escapeHtml(title)}" data-syndicate-market="${escapeHtml(item.market || item.market_label || "")}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}" data-syndicate-odds="${escapeHtml(oddsText)}" data-syndicate-prop-line="${escapeHtml(propText)}"`;
               return `
                 <tr ${rowAttrs}>
                   <td><span class="board-badge board-badge--${itemState === "live" ? "live" : "pregame"}">${itemState === "live" ? "Live" : "Pre"}</span></td>
@@ -1141,11 +1388,14 @@
                     <div class="board-blotter__primary">${escapeHtml(title)}</div>
                     <div class="board-blotter__meta">${escapeHtml(sport)}${matchup ? " &middot; " + escapeHtml(matchup) : ""}</div>
                   </td>
-                  <td>${escapeHtml(propLine(item) || "-")}</td>
+                  <td>${escapeHtml(propText || "-")}</td>
                   <td>${confidence !== null ? Math.round(confidence * 100) + "%" : "&mdash;"}</td>
                   <td class="board-blotter__edge board-blotter__edge--${tier}">${(edge * 100).toFixed(1)}%</td>
                   <td>${movementHtml || "&mdash;"}</td>
-                  <td><button type="button" class="board-action-button board-action-button--add" data-portfolio-action="add">Add</button></td>
+                  <td style="display:flex;gap:6px;">
+                    <button type="button" class="board-action-button board-action-button--add" data-portfolio-action="add">Add</button>
+                    <button type="button" class="board-action-button board-action-button--slip" data-slip-action="toggle">🎫</button>
+                  </td>
                 </tr>
                 ${reasoning ? `<tr class="board-blotter__reason-row" ${rowAttrs}><td></td><td colspan="6">${escapeHtml(reasoning)}</td></tr>` : ""}
               `;
@@ -1168,6 +1418,7 @@
         });
       });
     });
+    wireSlipButtons(container);
   }
 
   function renderBoardBody() {
@@ -1250,6 +1501,246 @@
     } catch (error) {
       setRefreshStatus(error && error.message ? error.message : "Failed to record portfolio event", "error");
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Bet slip: a client-side staging area (persisted to localStorage) so a
+  // bettor can collect picks while browsing the board, adjust a stake per
+  // leg, see running total stake/payout, then commit the whole slip to the
+  // real portfolio ledger in one action via the existing portfolio-event API
+  // -- not a second, fake source of truth.
+  // -------------------------------------------------------------------------
+
+  const BET_SLIP_STORAGE_KEY = "syndicate_bet_slip_v1";
+  const DEFAULT_SLIP_STAKE = 10;
+  let betSlip = loadBetSlip();
+  let betSlipCollapsed = false;
+
+  function loadBetSlip() {
+    try {
+      const raw = window.localStorage.getItem(BET_SLIP_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function saveBetSlip() {
+    try {
+      window.localStorage.setItem(BET_SLIP_STORAGE_KEY, JSON.stringify(betSlip));
+    } catch (error) {
+      // Storage unavailable (private browsing, quota) -- slip still works
+      // for this page load, just won't survive a refresh.
+    }
+  }
+
+  function slipLegKey(leg) {
+    return [leg.predictionId, leg.recommendationId, leg.name, leg.market].join("|");
+  }
+
+  // American odds -> decimal odds -> payout for a given stake. Standard
+  // sportsbook convention: +150 means $100 wins $150 (decimal 2.5); -150
+  // means $150 wins $100 (decimal 1.667). Odds of 0/blank/non-numeric can't
+  // be priced, so those legs show "--" rather than a fabricated number.
+  function decimalOddsFromAmerican(odds) {
+    const numeric = Number(odds);
+    if (!Number.isFinite(numeric) || numeric === 0) return null;
+    return numeric > 0 ? 1 + numeric / 100 : 1 + 100 / Math.abs(numeric);
+  }
+
+  function legPayout(leg) {
+    const decimal = decimalOddsFromAmerican(leg.odds);
+    const stake = Number(leg.stake);
+    if (decimal === null || !Number.isFinite(stake) || stake <= 0) return null;
+    return stake * decimal;
+  }
+
+  function formatUsd(value) {
+    if (value === null || !Number.isFinite(value)) return "--";
+    return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  function isInSlip(key) {
+    return betSlip.some((leg) => slipLegKey(leg) === key);
+  }
+
+  function addToSlip(card) {
+    const leg = {
+      name: card.getAttribute("data-syndicate-name") || "",
+      market: card.getAttribute("data-syndicate-market") || "",
+      propLine: card.getAttribute("data-syndicate-prop-line") || "",
+      odds: card.getAttribute("data-syndicate-odds") || "",
+      sport: card.getAttribute("data-syndicate-sport") || "",
+      predictionId: card.getAttribute("data-syndicate-prediction-id") || "",
+      recommendationId: card.getAttribute("data-syndicate-recommendation-id") || "",
+      stake: DEFAULT_SLIP_STAKE,
+    };
+    const key = slipLegKey(leg);
+    if (isInSlip(key)) return;
+    betSlip.push(leg);
+    saveBetSlip();
+    renderBetSlip();
+    syncSlipButtonStates();
+  }
+
+  function removeFromSlip(key) {
+    betSlip = betSlip.filter((leg) => slipLegKey(leg) !== key);
+    saveBetSlip();
+    renderBetSlip();
+    syncSlipButtonStates();
+  }
+
+  function setLegStake(key, value) {
+    const leg = betSlip.find((item) => slipLegKey(item) === key);
+    if (!leg) return;
+    const numeric = Number(value);
+    leg.stake = Number.isFinite(numeric) && numeric >= 0 ? numeric : 0;
+    saveBetSlip();
+    renderBetSlip();
+  }
+
+  function syncSlipButtonStates() {
+    document.querySelectorAll("[data-slip-action='toggle']").forEach((button) => {
+      const card = button.closest("[data-syndicate-name]");
+      if (!card) return;
+      const key = [
+        card.getAttribute("data-syndicate-prediction-id") || "",
+        card.getAttribute("data-syndicate-recommendation-id") || "",
+        card.getAttribute("data-syndicate-name") || "",
+        card.getAttribute("data-syndicate-market") || "",
+      ].join("|");
+      const inSlip = isInSlip(key);
+      button.setAttribute("data-in-slip", inSlip ? "true" : "false");
+      const fullLabel = button.getAttribute("data-slip-label-full") === "true";
+      button.textContent = fullLabel ? (inSlip ? "🎫 In slip" : "🎫 Slip") : (inSlip ? "🎫✓" : "🎫");
+    });
+  }
+
+  function wireSlipButtons(container) {
+    container.querySelectorAll("[data-slip-action='toggle']").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        const card = button.closest("[data-syndicate-name]");
+        if (!card) return;
+        addToSlip(card);
+      });
+    });
+    syncSlipButtonStates();
+  }
+
+  async function commitBetSlip() {
+    if (!betSlip.length) return;
+    const commitButton = document.getElementById("bet-slip-commit");
+    if (commitButton) commitButton.disabled = true;
+    try {
+      for (const leg of betSlip.slice()) {
+        await submitPortfolioEvent("add", { name: leg.name, market: leg.market, prediction_id: leg.predictionId, recommendation_id: leg.recommendationId });
+      }
+      betSlip = [];
+      saveBetSlip();
+      renderBetSlip();
+      syncSlipButtonStates();
+      setRefreshStatus("Slip logged to portfolio", "idle");
+    } finally {
+      if (commitButton) commitButton.disabled = false;
+    }
+  }
+
+  function ensureBetSlipPanel() {
+    let panel = document.getElementById("bet-slip-panel");
+    if (panel) return panel;
+    panel = document.createElement("div");
+    panel.id = "bet-slip-panel";
+    document.body.appendChild(panel);
+    panel.addEventListener("click", (event) => {
+      if (event.target.closest(".bet-slip__header")) {
+        betSlipCollapsed = !betSlipCollapsed;
+        renderBetSlip();
+      }
+    });
+    return panel;
+  }
+
+  function renderBetSlip() {
+    const panel = ensureBetSlipPanel();
+    const legs = betSlip;
+    panel.setAttribute("data-empty", legs.length ? "false" : "true");
+    panel.setAttribute("data-collapsed", betSlipCollapsed ? "true" : "false");
+    if (!legs.length) {
+      panel.innerHTML = `
+        <div class="bet-slip__header">
+          <div class="bet-slip__title">🎫 Bet slip</div>
+        </div>
+      `;
+      return;
+    }
+    let totalStake = 0;
+    let totalPayout = 0;
+    let hasUnpriced = false;
+    const legRows = legs.map((leg) => {
+      const key = slipLegKey(leg);
+      const payout = legPayout(leg);
+      const stakeNum = Number(leg.stake) || 0;
+      totalStake += stakeNum;
+      if (payout === null) hasUnpriced = true;
+      else totalPayout += payout;
+      const oddsLabel = leg.odds && Number(leg.odds) ? (Number(leg.odds) > 0 ? `+${Number(leg.odds)}` : `${Number(leg.odds)}`) : "--";
+      return `
+        <div class="bet-slip__leg" data-slip-key="${escapeHtml(key)}">
+          <div class="bet-slip__leg-name">${escapeHtml(leg.name)}</div>
+          <button type="button" class="bet-slip__leg-remove" data-slip-remove="${escapeHtml(key)}" aria-label="Remove">&times;</button>
+          <div class="bet-slip__leg-meta">${escapeHtml(leg.propLine || leg.market || "")} &middot; ${escapeHtml(oddsLabel)}</div>
+          <div class="bet-slip__leg-stake">
+            <label for="slip-stake-${escapeHtml(key)}">Stake $</label>
+            <input type="number" min="0" step="1" id="slip-stake-${escapeHtml(key)}" data-slip-stake="${escapeHtml(key)}" value="${escapeHtml(String(leg.stake))}" />
+            <span class="bet-slip__leg-payout">${payout === null ? "--" : `to win ${formatUsd(payout - stakeNum)}`}</span>
+          </div>
+        </div>
+      `;
+    }).join("");
+    panel.innerHTML = `
+      <div class="bet-slip__header">
+        <div class="bet-slip__title">🎫 Bet slip <span class="bet-slip__count">${legs.length}</span></div>
+        <div class="bet-slip__toggle">▾</div>
+      </div>
+      <div class="bet-slip__body">
+        <div class="bet-slip__legs">${legRows}</div>
+        <div class="bet-slip__totals">
+          <div class="bet-slip__totals-label">Total stake</div>
+          <div class="bet-slip__totals-label">Potential payout</div>
+          <div class="bet-slip__totals-value">${formatUsd(totalStake)}</div>
+          <div class="bet-slip__totals-value">${hasUnpriced ? `${formatUsd(totalPayout)}+` : formatUsd(totalPayout)}</div>
+        </div>
+        <div class="bet-slip__actions">
+          <button type="button" class="bet-slip__clear" id="bet-slip-clear">Clear</button>
+          <button type="button" class="bet-slip__commit" id="bet-slip-commit">Log to portfolio</button>
+        </div>
+      </div>
+    `;
+    panel.querySelectorAll("[data-slip-remove]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        removeFromSlip(button.getAttribute("data-slip-remove"));
+      });
+    });
+    panel.querySelectorAll("[data-slip-stake]").forEach((input) => {
+      input.addEventListener("click", (event) => event.stopPropagation());
+      input.addEventListener("change", () => setLegStake(input.getAttribute("data-slip-stake"), input.value));
+    });
+    const clearButton = document.getElementById("bet-slip-clear");
+    if (clearButton) clearButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      betSlip = [];
+      saveBetSlip();
+      renderBetSlip();
+      syncSlipButtonStates();
+    });
+    const commitButton = document.getElementById("bet-slip-commit");
+    if (commitButton) commitButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      void commitBetSlip();
+    });
   }
 
   function renderPortfolio(data) {
@@ -1391,6 +1882,7 @@
   });
 
   renderFilterTabs();
+  renderBetSlip();
   setRefreshStatus("Loading board…", "loading");
 
   if (initialIntelligenceResponse && Object.keys(initialIntelligenceResponse).length > 0) {
