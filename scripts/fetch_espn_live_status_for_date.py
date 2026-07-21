@@ -26,6 +26,20 @@ _ESPN_SPORT_LEAGUE = {
     "wnba": ("basketball", "wnba"),
     "nba": ("basketball", "nba"),
     "nhl": ("hockey", "nhl"),
+    # Soccer leagues, one entry per league (mirrors
+    # syndicate/features/soccer/ingestion/espn_lineups.LEAGUE_ESPN_SLUGS --
+    # not imported directly so this script stays a standalone, dependency-free
+    # subprocess target per its own module docstring above).
+    "epl": ("soccer", "eng.1"),
+    "la_liga": ("soccer", "esp.1"),
+    "bundesliga": ("soccer", "ger.1"),
+    "serie_a": ("soccer", "ita.1"),
+    "ligue_1": ("soccer", "fra.1"),
+    "mls": ("soccer", "usa.1"),
+    "eredivisie": ("soccer", "ned.1"),
+    "primeira_liga": ("soccer", "por.1"),
+    "championship": ("soccer", "eng.2"),
+    "belgian_pro_league": ("soccer", "bel.1"),
 }
 
 

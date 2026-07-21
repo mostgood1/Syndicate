@@ -283,11 +283,56 @@ def _fetch_nhl_schedule(date_str: str) -> list[dict[str, Any]]:
     return rows
 
 
+# ---------------------------------------------------------------------------
+# Soccer: pure Syndicate code (espn_lineups.fetch_events), same in-process
+# posture as NHL above. Unlike every other sport here, soccer is 10
+# independently-scheduled leagues rather than one competition, so this loops
+# over whichever leagues are currently in season (see
+# syndicate/features/soccer/sources.py's active_leagues_for_date -- MLS runs
+# Feb-Dec, the rest follow the Aug-May European calendar) and merges their
+# events into one list under the single "soccer" sport key every other
+# _FETCHERS/consumer (look-ahead, _LIVE_STATUS_CHECKERS) already expects.
+# Event ids are prefixed with the league slug: ESPN ids are only unique
+# within one competition, and ScheduleEvent.event_id is read as a bare string
+# by callers like _mlb_sim_input_fingerprint_by_game for other sports, so an
+# unprefixed id could collide across two leagues' fixtures on the same date.
+# ---------------------------------------------------------------------------
+
+def _fetch_soccer_schedule(date_str: str) -> list[dict[str, Any]]:
+    try:
+        from syndicate.features.soccer.ingestion.espn_lineups import fetch_events
+        from syndicate.features.soccer.sources import active_leagues_for_date
+    except Exception:
+        return []
+    compact = str(date_str).replace("-", "")
+    window = f"{compact}-{compact}"
+    rows: list[dict[str, Any]] = []
+    for league in active_leagues_for_date(date_str):
+        try:
+            events = fetch_events(league, date_windows=[window])
+        except Exception:
+            continue
+        for event in events:
+            event_id = str(event.get("event_id") or "").strip()
+            if not event_id:
+                continue
+            rows.append(
+                {
+                    "event_id": f"{league}:{event_id}",
+                    "home": event.get("home_team"),
+                    "away": event.get("away_team"),
+                    "start_time_utc": event.get("date"),
+                }
+            )
+    return rows
+
+
 _FETCHERS = {
     "mlb": _fetch_mlb_schedule,
     "nba": lambda date_str: _fetch_basketball_schedule("nba", date_str),
     "wnba": lambda date_str: _fetch_basketball_schedule("wnba", date_str),
     "nhl": _fetch_nhl_schedule,
+    "soccer": _fetch_soccer_schedule,
 }
 
 

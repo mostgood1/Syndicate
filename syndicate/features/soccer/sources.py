@@ -38,6 +38,40 @@ def normalize_league(league: str | None) -> str:
     return text if text in LEAGUE_DISPLAY_NAMES else DEFAULT_LEAGUE
 
 
+# Approximate calendar-month season windows, mirroring the month-level
+# granularity ops_refresh.py's _active_sports_for_date() already uses for
+# every other sport (e.g. NBA/NHL: "month >= 10 or month <= 6") rather than
+# tracking exact real fixture-list start dates per league/season. Being a
+# couple weeks early or late on either edge is low-cost: a league flagged
+# "active" too early just means an ESPN schedule/fixture check comes back
+# empty for a few ticks (build_soccer_artifacts.py already writes a cheap
+# empty artifact and returns when there are no fixtures for the date), while
+# being flagged inactive too late would silently stop refreshing a league
+# that already has real games -- so windows below lean generous.
+#
+# MLS runs Feb/Mar - Dec (including playoffs/MLS Cup); every other league
+# here follows the standard European Aug - May calendar (a couple, e.g.
+# Belgian Pro League, sometimes start a few weeks earlier in practice, but
+# are kept on the same Aug - May window rather than guessing an exact date).
+_MLS_OFF_SEASON_MONTHS = (1,)
+_EUROPEAN_OFF_SEASON_MONTHS = (6, 7)
+
+
+def league_active_for_date(league: str, date_str: str) -> bool:
+    normalized = normalize_league(league)
+    try:
+        month = date_cls.fromisoformat(str(date_str)[:10]).month
+    except Exception:
+        return True
+    if normalized == "mls":
+        return month not in _MLS_OFF_SEASON_MONTHS
+    return month not in _EUROPEAN_OFF_SEASON_MONTHS
+
+
+def active_leagues_for_date(date_str: str) -> list[str]:
+    return [league for league in LEAGUE_DISPLAY_NAMES if league_active_for_date(league, date_str)]
+
+
 def _source_roots() -> list[Path]:
     return preferred_source_roots(
         __file__,

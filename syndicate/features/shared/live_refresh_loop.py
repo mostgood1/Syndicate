@@ -307,11 +307,44 @@ def _nhl_has_live_game(date_str: str) -> bool:
 	return _espn_has_live_game("nhl", date_str)
 
 
+def _soccer_has_live_game_via_artifact(league: str, date_str: str) -> bool:
+	# poll_soccer_live_state.py writes {"count": len(games), ...} per
+	# league/date -- same fast local-artifact-first shape as the WNBA/NBA
+	# checks above, before falling back to ESPN's scoreboard.
+	path = data_root() / "soccer_source" / league / "api" / "live_state" / f"live_state_{date_str}.json"
+	payload = read_json_file(path)
+	if not isinstance(payload, dict):
+		return False
+	try:
+		return int(payload.get("count") or 0) > 0
+	except (TypeError, ValueError):
+		return False
+
+
+def _soccer_has_live_game(date_str: str) -> bool:
+	# Soccer is 10 independently-scheduled leagues, not one competition --
+	# only check leagues currently in season (see
+	# syndicate/features/soccer/sources.py's active_leagues_for_date), same
+	# scoping _build_soccer_steps() in refresh_odds_sources.py already uses.
+	try:
+		from syndicate.features.soccer.sources import active_leagues_for_date
+		leagues = active_leagues_for_date(date_str)
+	except Exception:
+		leagues = []
+	for league in leagues:
+		if _soccer_has_live_game_via_artifact(league, date_str):
+			return True
+		if _espn_has_live_game(league, date_str):
+			return True
+	return False
+
+
 _LIVE_STATUS_CHECKERS = {
 	"mlb": _mlb_has_live_game,
 	"wnba": _wnba_has_live_game,
 	"nba": _nba_has_live_game,
 	"nhl": _nhl_has_live_game,
+	"soccer": _soccer_has_live_game,
 }
 
 

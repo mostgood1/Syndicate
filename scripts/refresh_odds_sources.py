@@ -61,6 +61,7 @@ from syndicate.features.ncaaf.sources import week_summaries as ncaaf_week_summar
 from syndicate.features.nfl.sources import latest_season as nfl_latest_season
 from syndicate.features.nfl.sources import week_summaries as nfl_week_summaries
 from syndicate.features.nhl.sources import available_dates as nhl_available_dates
+from syndicate.features.soccer.sources import active_leagues_for_date as soccer_active_leagues_for_date
 from syndicate.features.wnba.sources import available_dates as wnba_available_dates
 
 
@@ -941,8 +942,18 @@ _SOCCER_LEAGUE_SLUGS = (
 def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
     python_exe = _venv_python(REPO_ROOT)
     soccer_root = _local_source_bundle_root("soccer")
+    # Same treatment as _active_sports_for_date() gives MLB/NBA/etc a season
+    # window: each of the 10 leagues has its own calendar (MLS Feb-Dec vs the
+    # European Aug-May leagues), so skip building steps for leagues that are
+    # out of season for args.date entirely, rather than running -- and always
+    # sequentially executing -- all 30 steps every tick regardless of season.
+    try:
+        active_leagues = set(soccer_active_leagues_for_date(args.date))
+    except Exception:
+        active_leagues = set(_SOCCER_LEAGUE_SLUGS)
+    league_slugs = tuple(league for league in _SOCCER_LEAGUE_SLUGS if league in active_leagues)
     steps: list[RefreshStep] = []
-    for league in _SOCCER_LEAGUE_SLUGS:
+    for league in league_slugs:
         steps.append(
             RefreshStep(
                 name=f"soccer_{league}_schedule",
@@ -959,7 +970,7 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 description=f"Refresh {league} ESPN schedule/fixture artifact.",
             )
         )
-    for league in _SOCCER_LEAGUE_SLUGS:
+    for league in league_slugs:
         steps.append(
             RefreshStep(
                 name=f"soccer_{league}_artifacts",
@@ -980,7 +991,7 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 description=f"Refresh {league} simulation, props, and recommendation artifacts.",
             )
         )
-    for league in _SOCCER_LEAGUE_SLUGS:
+    for league in league_slugs:
         steps.append(
             RefreshStep(
                 name=f"soccer_{league}_live_state",
