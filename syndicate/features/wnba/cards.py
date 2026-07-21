@@ -1868,6 +1868,27 @@ def get_wnba_overview(selected_date: str) -> dict[str, Any]:
     # went final. build_source_cards_payload re-hydrates live/final state
     # and recommendations on every call.
     cards_context = build_source_cards_payload(requested_date, allow_stored_date_fallback=True)
+    resolved_date = str(cards_context.get("date") or "").strip()
+    if resolved_date and resolved_date != requested_date:
+        # allow_stored_date_fallback=True silently substitutes the most
+        # recent PRIOR date's games whenever today's artifact bundle isn't
+        # ready yet -- fine for the standalone WNBA cards page (better than
+        # a blank page during a brief sync gap), but wrong for the
+        # cross-sport betting board: those substituted games carry
+        # yesterday's (or older) live/final state frozen at whatever it was
+        # when that day's tracking stopped, so an already-settled game can
+        # show up looking perpetually "live" days later. Confirmed live
+        # 2026-07-21: yesterday's WNBA games appearing as board candidates,
+        # traced to exactly this fallback. Treat it the same as "no games
+        # yet today" instead of silently presenting stale games as current.
+        return {
+            "status": "no_games",
+            "date": requested_date,
+            "games": [],
+            "prop_rows": [],
+            "source_title": "WNBA cards unavailable",
+            "source_path": str(processed_root() / f"game_cards_{requested_date}.csv"),
+        }
     games = list(cards_context.get("games") or [])
     # Every other sport's home-dashboard games come from build_cards_page_
     # context, which runs apply_game_board_contract -- the step that
