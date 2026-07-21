@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import datetime as dt
+import io
 import math
 import unicodedata
 from pathlib import Path
@@ -10,6 +11,7 @@ import pandas as pd
 
 from syndicate.features.shared.memory_observability import log_dataframe_memory
 from syndicate.features.shared.memory_observability import log_list_memory
+from syndicate.features.shared.refresh_state_store import _atomic_write_text
 
 
 OUTPUT_COLUMNS = [
@@ -69,12 +71,18 @@ def _read_csv_rows(path: Path) -> list[dict[str, object]]:
 
 
 def _write_csv_rows(path: Path, rows: list[dict[str, object]]) -> None:
+    # Built into an in-memory buffer first, then written atomically -- a
+    # concurrent overlapping writer (see docs/fix_notes_log.md) opening this
+    # same path with the old plain path.open("w") could interleave writes at
+    # the OS level, leaving readers (the Betting Board's candidate collection)
+    # with a truncated/corrupted CSV that fails silent-and-empty.
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=OUTPUT_COLUMNS)
-        writer.writeheader()
-        for row in rows:
-            writer.writerow({column: row.get(column, "") for column in OUTPUT_COLUMNS})
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=OUTPUT_COLUMNS)
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({column: row.get(column, "") for column in OUTPUT_COLUMNS})
+    _atomic_write_text(path, buffer.getvalue())
 
 
 def _canonical_standard_plays(plays: object) -> list[dict]:

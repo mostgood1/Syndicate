@@ -5,8 +5,10 @@ import csv
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from syndicate.features.shared.basketball_props_recommendations import OUTPUT_COLUMNS
+from syndicate.features.shared.basketball_props_recommendations import _write_csv_rows
 from syndicate.features.shared.basketball_props_recommendations import export_props_recommendations_local
 
 
@@ -75,6 +77,29 @@ class BasketballPropsRecommendationsTests(unittest.TestCase):
         self.assertEqual(ast.literal_eval(row["sim_ladders"]), [])
         self.assertEqual(row["top_play"], "")
         self.assertEqual(float(ast.literal_eval(row["model"])["pa"]), 15.0)
+
+    def test_write_csv_rows_writes_atomically(self) -> None:
+        # Overlapping refresh runs (see docs/fix_notes_log.md) can call this
+        # writer concurrently for the same path -- a plain path.open("w")
+        # could interleave writes and leave a corrupted CSV for the Betting
+        # Board to read. Confirms this goes through the atomic write helper.
+        with TemporaryDirectory() as tmp_dir:
+            out_path = Path(tmp_dir) / "props_recommendations_2026-05-22.csv"
+            captured: dict[str, object] = {}
+
+            def _capture(path: Path, payload: str) -> None:
+                captured["path"] = path
+                captured["payload"] = payload
+
+            with patch(
+                "syndicate.features.shared.basketball_props_recommendations._atomic_write_text",
+                side_effect=_capture,
+            ):
+                _write_csv_rows(out_path, [{"player": "Jane Doe", "team": "HTM"}])
+
+        self.assertEqual(captured["path"], out_path)
+        self.assertIn("Jane Doe", str(captured["payload"]))
+        self.assertFalse(out_path.exists())
 
 
 if __name__ == "__main__":

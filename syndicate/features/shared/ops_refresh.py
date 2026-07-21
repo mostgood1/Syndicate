@@ -33,6 +33,7 @@ from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import path_exists
 from syndicate.features.shared.refresh_state_store import path_size
 from syndicate.features.shared.refresh_state_store import read_json_file
+from syndicate.features.shared.refresh_state_store import read_json_file_result
 from syndicate.features.shared.refresh_state_store import read_text_file
 from syndicate.features.shared.refresh_state_store import write_json_file
 from syndicate.features.shared.source_roots import repo_root_from
@@ -370,7 +371,8 @@ def _load_recent_refresh_history(*, limit: int = 6) -> list[dict[str, Any]]:
 
 def _latest_refresh_manifest_context() -> dict[str, Any]:
     refresh_manifest_path = _reports_root() / "refresh_status" / "latest" / "refresh_status_latest.json"
-    manifest = read_json_file(refresh_manifest_path) or {}
+    manifest_raw, manifest_read_ok = read_json_file_result(refresh_manifest_path)
+    manifest = manifest_raw if isinstance(manifest_raw, dict) else {}
     artifacts_dir_raw = str(manifest.get("artifactsDir") or "").strip()
     artifacts_dir = Path(artifacts_dir_raw) if artifacts_dir_raw else None
     run_summary_path = Path(str(manifest.get("runSummaryPath") or "").strip()) if str(manifest.get("runSummaryPath") or "").strip() else None
@@ -391,6 +393,7 @@ def _latest_refresh_manifest_context() -> dict[str, Any]:
     return {
         "manifest_path": refresh_manifest_path,
         "manifest": manifest,
+        "manifest_read_ok": manifest_read_ok,
         "artifacts_dir": artifacts_dir,
         "run_summary_path": run_summary_path,
         "run_summary": run_summary,
@@ -424,8 +427,19 @@ def _ensure_refresh_context_consistent(context: dict[str, Any]) -> None:
         raise ValueError(consistency_error)
 
 
+def _assert_refresh_manifest_read_ok(context: dict[str, Any]) -> None:
+    # A failed read (transient keyvalue-backend error, malformed JSON) must
+    # never be treated the same as "no run recorded" -- that fail-open
+    # behavior let overlapping refresh_odds_sources.py launches slip past
+    # this guard in production, stacking process trees until the container
+    # OOMed. Refuse to launch rather than guess when we can't confirm state.
+    if context.get("manifest_read_ok") is False:
+        raise ValueError("Cannot confirm refresh-run state (manifest read failed) -- refusing to launch a new run until state is confirmed.")
+
+
 def _assert_no_active_refresh_run() -> None:
     context = _latest_refresh_manifest_context()
+    _assert_refresh_manifest_read_ok(context)
     _ensure_refresh_context_consistent(context)
     manifest: dict[str, Any] = context["manifest"] if isinstance(context.get("manifest"), dict) else {}
     state = str(manifest.get("state") or "").strip().lower()
@@ -434,6 +448,7 @@ def _assert_no_active_refresh_run() -> None:
     if state == "running" and (pid is None or not _pid_is_running(pid)):
         _update_latest_state(state="failed", exit_code=1, finished_at=_utc_now())
         context = _latest_refresh_manifest_context()
+        _assert_refresh_manifest_read_ok(context)
         manifest = context["manifest"] if isinstance(context.get("manifest"), dict) else {}
         state = str(manifest.get("state") or "").strip().lower()
         pid_raw = manifest.get("pid")
@@ -1017,11 +1032,10 @@ def launch_refresh_run(
         "state": "pending_external" if _is_external_runner_mode(launch_mode) else "running",
         "externalRunner": external_runner,
     }
-    write_json_file(refresh_and_gate_run_path, run_summary)
-    write_json_file(refresh_status_manifest_path, refresh_status_manifest)
-    write_json_file(refresh_status_latest_path, refresh_status_manifest)
-
     if _is_external_runner_mode(launch_mode):
+        write_json_file(refresh_and_gate_run_path, run_summary)
+        write_json_file(refresh_status_manifest_path, refresh_status_manifest)
+        write_json_file(refresh_status_latest_path, refresh_status_manifest)
         return {
             "ok": True,
             "pid": None,
@@ -1062,8 +1076,14 @@ def launch_refresh_run(
         popen_kwargs["start_new_session"] = True
     process = subprocess.Popen(command, **popen_kwargs)
 
+    # state and pid land in the manifest in the SAME write, only after the
+    # subprocess is confirmed spawned. This used to write state="running"
+    # with no pid BEFORE Popen, then a second write added pid afterward -- a
+    # reader landing in that window saw state=="running", pid==None, which
+    # _assert_no_active_refresh_run's self-heal logic (mis)treated as "died
+    # without updating status" and stamped "failed", silently clearing the
+    # way for a new launch while the original was still starting.
     refresh_status_manifest["pid"] = int(process.pid)
-
     run_summary["pid"] = int(process.pid)
     write_json_file(refresh_and_gate_run_path, run_summary)
     write_json_file(refresh_status_manifest_path, refresh_status_manifest)

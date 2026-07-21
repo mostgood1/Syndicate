@@ -35,6 +35,7 @@ from syndicate.features.shared.memory_observability import log_list_memory
 from syndicate.features.shared.memory_observability import log_runtime_memory
 from syndicate.features.shared.refresh_state_store import build_input_hash
 from syndicate.features.shared.refresh_state_store import path_fingerprint
+from syndicate.features.shared.refresh_state_store import _atomic_write_text
 from syndicate.features.shared.refresh_state_store import path_exists as _keyvalue_path_exists
 from syndicate.features.shared.refresh_state_store import read_json_file as _keyvalue_read_json_file
 from syndicate.features.shared.refresh_state_store import read_text_file as _keyvalue_read_text_file
@@ -1701,7 +1702,7 @@ def _build_local_recommendations_slate_artifact(*, processed_root: Path, date_st
     payload = {"date": date_str, "counts": {"games": len(per_game), "picks": picks_count}, "per_game": per_game}
     out_path = processed_root / f"recommendations_slate_{date_str}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    _atomic_write_text(out_path, json.dumps(payload, indent=2))
     return len(per_game), out_path
 
 
@@ -1761,7 +1762,7 @@ def _build_local_top_by_game_snapshot(*, processed_root: Path, date_str: str) ->
 
     out_path = processed_root / f"props_recommendations_top_by_game_{date_str}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps({"date": date_str, "data": rows_out}, indent=2), encoding="utf-8")
+    _atomic_write_text(out_path, json.dumps({"date": date_str, "data": rows_out}, indent=2))
     return len(rows_out), out_path
 
 
@@ -1818,7 +1819,7 @@ def _build_local_cards_props_snapshot_artifact(*, processed_root: Path, date_str
 
     out_path = processed_root / f"cards_props_snapshot_{date_str}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps({"date": date_str, "games": games_out}, indent=2), encoding="utf-8")
+    _atomic_write_text(out_path, json.dumps({"date": date_str, "games": games_out}, indent=2))
     return len(games_out), out_path
 
 
@@ -1860,7 +1861,7 @@ def _write_game_cards_csv_rows(out_path: Path, rows_out: list[dict[str, object]]
     content = buffer.getvalue()
     _keyvalue_write_text_file(out_path, content)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(content, encoding="utf-8")
+    _atomic_write_text(out_path, content)
 
 
 def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path, date_str: str, log_file: Path | None = None) -> tuple[int, Path | None]:

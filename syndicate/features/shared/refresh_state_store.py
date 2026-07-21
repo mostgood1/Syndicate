@@ -254,23 +254,37 @@ def data_root() -> Path:
 
 
 def read_json_file(path: Path) -> dict[str, Any] | None:
+    return read_json_file_result(path)[0]
+
+
+def read_json_file_result(path: Path) -> tuple[dict[str, Any] | None, bool]:
+    # Same data as read_json_file, but also reports whether the read itself
+    # succeeded. read_json_file collapses "key/file genuinely doesn't exist"
+    # and "the read failed" into the same None -- callers that use "no
+    # manifest recorded" as a safety-relevant signal (e.g. the refresh-run
+    # concurrency guard) need to tell those apart: a transient keyvalue-store
+    # hiccup must not be treated the same as "nothing is running." The second
+    # element is False only when the read could not be completed/trusted
+    # (backend error, malformed JSON) -- never for a confirmed-absent key.
     if _state_backend_kind() == "keyvalue":
         try:
             payload_text = _execute_keyvalue_operation(lambda client: client.get(_state_key_for_path(path)))
         except Exception:
-            return None
+            return None, False
         if not payload_text:
-            return None
+            return None, True
         try:
             payload = json.loads(str(payload_text))
         except Exception:
-            return None
-        return payload if isinstance(payload, dict) else None
+            return None, False
+        return (payload if isinstance(payload, dict) else None), True
     try:
         payload = json.loads(path.read_text(encoding="utf-8-sig"))
+    except FileNotFoundError:
+        return None, True
     except Exception:
-        return None
-    return payload if isinstance(payload, dict) else None
+        return None, False
+    return (payload if isinstance(payload, dict) else None), True
 
 
 def read_text_file(path: Path) -> str | None:

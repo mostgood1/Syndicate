@@ -1668,6 +1668,107 @@ class OpsRefreshApiTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     ops_refresh._assert_no_active_refresh_run()
 
+    def test_assert_no_active_refresh_run_fails_closed_when_manifest_read_fails(self) -> None:
+        # A transient keyvalue-backend read failure must never be treated the
+        # same as "no run recorded" -- that fail-open behavior let
+        # overlapping refresh_odds_sources.py launches slip past this guard
+        # in production, stacking process trees until the container OOMed.
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+
+            with patch.dict(os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ), patch(
+                "syndicate.features.shared.ops_refresh.read_json_file_result", return_value=(None, False)
+            ):
+                from syndicate.features.shared import ops_refresh
+
+                with self.assertRaises(ValueError):
+                    ops_refresh._assert_no_active_refresh_run()
+
+    def test_assert_no_active_refresh_run_proceeds_when_manifest_genuinely_absent(self) -> None:
+        # Local dev/tests (and a genuinely first-ever run) have no manifest
+        # file at all -- this must NOT be treated the same as a failed read,
+        # or the guard would block every launch forever.
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+
+            with patch.dict(os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ):
+                from syndicate.features.shared import ops_refresh
+
+                ops_refresh._assert_no_active_refresh_run()
+
+    def test_launch_refresh_run_spawns_subprocess_before_any_manifest_write(self) -> None:
+        # launch_refresh_run used to write state="running" with no pid
+        # BEFORE spawning the subprocess, then add pid in a second write --
+        # a reader landing in that window saw state=="running", pid==None,
+        # which _assert_no_active_refresh_run's self-heal logic (mis)treated
+        # as "died without updating status" and cleared the way for a new
+        # launch while the original was still starting.
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            call_order: list[str] = []
+
+            class _FakeProcess:
+                pid = 7070
+
+            def _fake_popen(*_args: object, **_kwargs: object) -> _FakeProcess:
+                call_order.append("popen")
+                return _FakeProcess()
+
+            def _record_write(path: Path, payload: dict[str, object]) -> None:
+                call_order.append("write")
+
+            with patch.dict(os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ), patch(
+                "syndicate.features.shared.ops_refresh._assert_no_active_refresh_run"
+            ), patch(
+                "syndicate.features.shared.ops_refresh.write_json_file", side_effect=_record_write
+            ), patch(
+                "syndicate.features.shared.ops_refresh.subprocess.Popen", side_effect=_fake_popen
+            ):
+                from syndicate.features.shared import ops_refresh
+
+                ops_refresh.launch_refresh_run(sports="mlb", phase="live", dry_run=True)
+
+            self.assertEqual(call_order[0], "popen")
+            self.assertIn("write", call_order[1:])
+
+    def test_launch_refresh_run_includes_pid_in_every_observed_manifest_write(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            observed_payloads: list[dict[str, object]] = []
+
+            def _record_write(path: Path, payload: dict[str, object]) -> None:
+                observed_payloads.append(dict(payload))
+
+            with patch.dict(os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ), patch(
+                "syndicate.features.shared.ops_refresh._assert_no_active_refresh_run"
+            ), patch(
+                "syndicate.features.shared.ops_refresh.write_json_file", side_effect=_record_write
+            ), patch(
+                "syndicate.features.shared.ops_refresh.subprocess.Popen"
+            ) as mocked_popen:
+                mocked_popen.return_value.pid = 5150
+                from syndicate.features.shared import ops_refresh
+
+                result = ops_refresh.launch_refresh_run(sports="mlb", phase="live", dry_run=True)
+
+            self.assertTrue(result["ok"])
+            self.assertGreaterEqual(len(observed_payloads), 2)
+            for payload in observed_payloads:
+                self.assertEqual(payload.get("state"), "running")
+                self.assertEqual(payload.get("pid"), 5150)
+
     def test_latest_refresh_context_rejects_mismatched_run_stamp(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             repo_root = Path(tmp_dir)

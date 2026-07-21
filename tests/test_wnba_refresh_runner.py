@@ -3166,3 +3166,36 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(module._canonical_wnba_tri("LV"), "LVA")
         self.assertEqual(module._canonical_wnba_tri("LVA"), "LVA")
         self.assertEqual(module._canonical_wnba_tri(module._to_tricode_local("Las Vegas Aces")), "LVA")
+
+    def test_local_artifact_writers_use_atomic_write_text(self) -> None:
+        # Overlapping refresh_odds_sources.py launches (see
+        # docs/fix_notes_log.md) have been confirmed running concurrently in
+        # production -- a plain Path.write_text on these artifacts could
+        # interleave and leave the Betting Board reading a truncated/corrupt
+        # file. Confirms these writers route through the atomic temp-file +
+        # os.replace helper instead of a raw write.
+        module = self._load_module()
+        real_atomic_write_text = module._atomic_write_text
+        written_paths: list[Path] = []
+
+        def _tracking_atomic_write_text(path: Path, payload: str) -> None:
+            written_paths.append(path)
+            real_atomic_write_text(path, payload)
+
+        with tempfile.TemporaryDirectory() as tmp_dir, patch.object(
+            module, "_atomic_write_text", side_effect=_tracking_atomic_write_text
+        ):
+            processed_root = Path(tmp_dir)
+            date_str = "2026-05-22"
+
+            slate_rows, slate_path = module._build_local_recommendations_slate_artifact(processed_root=processed_root, date_str=date_str)
+            self.assertEqual(slate_rows, 0)
+            self.assertIsNotNone(slate_path)
+            self.assertTrue(json.loads(slate_path.read_text(encoding="utf-8")))
+
+            game_cards_path = processed_root / f"game_cards_{date_str}.csv"
+            module._write_game_cards_csv_rows(game_cards_path, [])
+            self.assertTrue(game_cards_path.exists())
+
+        self.assertIn(slate_path, written_paths)
+        self.assertIn(game_cards_path, written_paths)

@@ -408,6 +408,33 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertEqual(events[-1]["line"], 7.0)
             self.assertEqual(events[-1]["sport"], "nhl")
 
+    def test_write_json_writes_atomically(self) -> None:
+        # This writes the odds-history artifacts that feed the Betting
+        # Board's line-movement/CLV display. Overlapping refresh runs (see
+        # docs/fix_notes_log.md) calling this concurrently for the same path
+        # with a plain write_text could leave a truncated/corrupt file --
+        # the likely cause of the board's "Move" column going blank.
+        # Confirms this now routes through the atomic write helper.
+        from syndicate.features.shared.odds_refresh_tracking import _write_json
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            out_path = Path(tmp_dir) / "odds_history" / "2026-05-22.json"
+            captured: dict[str, object] = {}
+
+            def _capture(path: Path, payload: str) -> None:
+                captured["path"] = path
+                captured["payload"] = payload
+
+            with patch(
+                "syndicate.features.shared.odds_refresh_tracking._atomic_write_text",
+                side_effect=_capture,
+            ):
+                _write_json(out_path, {"markets": ["h2h"]})
+
+            self.assertEqual(captured["path"], out_path)
+            self.assertIn("h2h", str(captured["payload"]))
+            self.assertFalse(out_path.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

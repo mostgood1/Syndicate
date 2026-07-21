@@ -192,6 +192,48 @@ class RefreshStateStoreTests(unittest.TestCase):
                 },
             )
 
+    def test_read_json_file_result_distinguishes_absent_from_read_failure(self) -> None:
+        # read_json_file collapses "genuinely absent" and "read failed" into
+        # the same None -- callers that use "no manifest" as a
+        # safety-relevant signal (the refresh-run concurrency guard) need to
+        # tell those apart, or a transient backend hiccup gets treated the
+        # same as "nothing is running."
+        with TemporaryDirectory() as tmp_dir:
+            missing_path = Path(tmp_dir) / "does_not_exist.json"
+            payload, ok = refresh_state_store.read_json_file_result(missing_path)
+            self.assertIsNone(payload)
+            self.assertTrue(ok)
+
+            malformed_path = Path(tmp_dir) / "malformed.json"
+            malformed_path.write_text("{not valid json", encoding="utf-8")
+            payload, ok = refresh_state_store.read_json_file_result(malformed_path)
+            self.assertIsNone(payload)
+            self.assertFalse(ok)
+
+            good_path = Path(tmp_dir) / "good.json"
+            good_path.write_text(json.dumps({"state": "running"}), encoding="utf-8")
+            payload, ok = refresh_state_store.read_json_file_result(good_path)
+            self.assertEqual(payload, {"state": "running"})
+            self.assertTrue(ok)
+
+    def test_read_json_file_result_reports_keyvalue_backend_failures(self) -> None:
+        with TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue",
+                "SYNDICATE_REFRESH_STATE_URL": "redis://example",
+            },
+            clear=False,
+        ), patch(
+            "syndicate.features.shared.refresh_state_store._get_keyvalue_client",
+            side_effect=RuntimeError("connection reset"),
+        ):
+            path = Path(tmp_dir) / "reports" / "refresh_status" / "latest" / "refresh_status_latest.json"
+            payload, ok = refresh_state_store.read_json_file_result(path)
+
+        self.assertIsNone(payload)
+        self.assertFalse(ok)
+
     def test_ops_status_reads_latest_manifest_and_artifacts_from_keyvalue_backend(self) -> None:
         fake_client = _FakeKeyValueClient()
         with TemporaryDirectory() as tmp_dir:

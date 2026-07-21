@@ -15,6 +15,7 @@ from syndicate.features.shared.odds_control_plane import shared_odds_history_roo
 from syndicate.features.shared.odds_framework import normalize_odds_entry
 from syndicate.features.shared.odds_lifecycle import append_odds_lifecycle_events
 from syndicate.features.shared.odds_lifecycle import odds_lifecycle_path
+from syndicate.features.shared.refresh_state_store import _atomic_write_text
 from syndicate.features.shared.recommendation_engine import build_recommendation_output
 from syndicate.features.shared.week_calendar import shard_key_for_week
 from syndicate.features.shared.week_calendar import week_for_date
@@ -88,11 +89,17 @@ def _read_json(path: Path) -> Any:
 
 
 def _write_json(path: Path, payload: Any) -> None:
+    # Atomic (temp-file + os.replace) rather than a plain write_text -- this
+    # writes the odds-history artifacts that feed the Betting Board's
+    # line-movement/CLV display. Overlapping refresh_odds_sources.py runs
+    # (see docs/fix_notes_log.md) can call this concurrently for the same
+    # path; a non-atomic write there can leave a truncated/corrupted file,
+    # which is the likely cause of the board's "Move" column going blank.
     started = time.perf_counter()
     payload_rows = len(payload) if isinstance(payload, list) else len(payload.get("rows", [])) if isinstance(payload, dict) else None
     _trace_log("before_write_json_payload", **_trace_path_payload(path, rows=payload_rows))
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    _atomic_write_text(path, json.dumps(payload, indent=2, sort_keys=True))
     _trace_log("after_write_json", **_trace_path_payload(path), elapsed_ms=round((time.perf_counter() - started) * 1000, 3))
 
 
