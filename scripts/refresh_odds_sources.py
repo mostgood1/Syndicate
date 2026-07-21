@@ -698,7 +698,7 @@ def _local_source_bundle_root(slug: str) -> Path:
 def _post_refresh_root(spec: SportSpec) -> Path:
     if spec.slug == "mlb":
         return _local_mlb_bundle_root()
-    if spec.slug in {"nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab"}:
+    if spec.slug in {"nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"}:
         return _local_source_bundle_root(spec.slug)
     return _source_repo_root(spec.slug, spec.source_repo_name)
 
@@ -726,6 +726,9 @@ def _local_mlb_bundle_root() -> Path:
 def _source_root_resolution(spec: SportSpec) -> dict[str, Any]:
     if spec.slug == "mlb":
         chosen_root = _local_mlb_bundle_root()
+        origin = "render_data_root" if _render_data_root_text() else "repo_data_root"
+    elif spec.slug == "soccer":
+        chosen_root = _local_source_bundle_root("soccer")
         origin = "render_data_root" if _render_data_root_text() else "repo_data_root"
     elif spec.slug in {"nba", "wnba"}:
         vendor_repo_name = "nba_betting_repo" if spec.slug == "nba" else "wnba_betting_repo"
@@ -921,6 +924,86 @@ def _build_ncaaf_steps(args: argparse.Namespace) -> list[RefreshStep]:
     ]
 
 
+_SOCCER_LEAGUE_SLUGS = (
+    "epl",
+    "la_liga",
+    "bundesliga",
+    "serie_a",
+    "ligue_1",
+    "mls",
+    "eredivisie",
+    "primeira_liga",
+    "championship",
+    "belgian_pro_league",
+)
+
+
+def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
+    python_exe = _venv_python(REPO_ROOT)
+    soccer_root = _local_source_bundle_root("soccer")
+    steps: list[RefreshStep] = []
+    for league in _SOCCER_LEAGUE_SLUGS:
+        steps.append(
+            RefreshStep(
+                name=f"soccer_{league}_schedule",
+                phases=("pregame",),
+                cwd=REPO_ROOT,
+                command=(
+                    python_exe,
+                    "scripts/build_soccer_schedule.py",
+                    "--league",
+                    league,
+                    "--out-root",
+                    str(soccer_root),
+                ),
+                description=f"Refresh {league} ESPN schedule/fixture artifact.",
+            )
+        )
+    for league in _SOCCER_LEAGUE_SLUGS:
+        steps.append(
+            RefreshStep(
+                name=f"soccer_{league}_artifacts",
+                phases=("pregame", "live"),
+                cwd=REPO_ROOT,
+                command=(
+                    python_exe,
+                    "scripts/build_soccer_artifacts.py",
+                    "--league",
+                    league,
+                    "--date",
+                    args.date,
+                    "--source-root",
+                    str(soccer_root),
+                    "--out-root",
+                    str(soccer_root),
+                ),
+                description=f"Refresh {league} simulation, props, and recommendation artifacts.",
+            )
+        )
+    for league in _SOCCER_LEAGUE_SLUGS:
+        steps.append(
+            RefreshStep(
+                name=f"soccer_{league}_live_state",
+                phases=("live",),
+                cwd=REPO_ROOT,
+                command=(
+                    python_exe,
+                    "scripts/poll_soccer_live_state.py",
+                    "--league",
+                    league,
+                    "--date",
+                    args.date,
+                    "--source-root",
+                    str(soccer_root),
+                    "--out-root",
+                    str(soccer_root),
+                ),
+                description=f"Refresh {league} live match state and win-probability artifacts.",
+            )
+        )
+    return steps
+
+
 REGISTRY: dict[str, SportSpec] = {
     "mlb": SportSpec(
         slug="mlb",
@@ -985,6 +1068,15 @@ REGISTRY: dict[str, SportSpec] = {
         ingest_contract_notes="Hosted-safe ingest can rebuild from existing files under data/ncaaf_source or from a published NCAAF artifact bundle root via SYNDICATE_ARTIFACT_ROOT_NCAAF.",
         notes="Uses a Syndicate-owned NCAAF lines runner that reads and writes the local artifact bundle contract instead of calling the sibling fetch script directly.",
     ),
+    "soccer": SportSpec(
+        slug="soccer",
+        source_repo_name="soccer_source",
+        mirror_script_name="",
+        step_builder=_build_soccer_steps,
+        ingest_contract_kind="artifact_bundle_or_existing_mirror",
+        ingest_contract_notes="Hosted-safe ingest can rebuild from existing files under data/soccer_source; there is no vendored source repo or mirror script to pull from.",
+        notes="Uses Syndicate-owned soccer schedule/artifact/live-state builders (SoccerSim engine) across all 10 leagues; there is no bookmaker odds ingestion, so recommendations are simulation-derived.",
+    ),
 }
 
 
@@ -1033,6 +1125,14 @@ def _generation_payload(spec: SportSpec, *, execution_mode: str, source_root: Pa
             "source_repo": str(source_root),
             "steps": [],
         }
+    if execution_mode == "source" and spec.slug == "soccer":
+        return {
+            "kind": "local_artifact_bundle",
+            "source_dependency": "local_artifact_bundle",
+            "hosted_safe": True,
+            "source_repo": str(source_root),
+            "steps": [],
+        }
     return {
         "kind": "source_repo" if execution_mode == "source" else "none",
         "source_dependency": "source_repo" if execution_mode == "source" else "none",
@@ -1050,7 +1150,7 @@ def _ingestion_payload(spec: SportSpec, *, skip_mirror: bool, execution_mode: st
         source_dependency = "local_artifacts"
     elif execution_mode == "source" and spec.slug == "ncaab":
         source_dependency = "local_artifacts"
-    elif execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaaf"}:
+    elif execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "soccer"}:
         source_dependency = "local_artifact_bundle"
     return {
         "kind": "mirror_script",
@@ -1671,6 +1771,10 @@ def _mirror_command(script_name: str, *, date: str, sport: str | None = None, mi
 def _hosted_source_mode_writes_directly(*, spec: SportSpec, execution_mode: str, mirror_only: bool) -> bool:
     if mirror_only or execution_mode != "source":
         return False
+    if spec.slug == "soccer":
+        # Soccer has no vendored source repo to mirror in any environment --
+        # build_soccer_*.py scripts always write directly to --out-root.
+        return True
     if not str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip():
         return False
     return spec.slug in {"mlb", "nba", "nhl", "nfl", "wnba", "ncaaf"}
@@ -1700,7 +1804,7 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
     generation_mode = "source_repo"
     if execution_mode == "source" and spec.slug == "mlb":
         generation_mode = "local_artifact_bundle"
-    if execution_mode == "source" and spec.slug in {"ncaaf", "nhl", "nba", "wnba"}:
+    if execution_mode == "source" and spec.slug in {"ncaaf", "nhl", "nba", "wnba", "soccer"}:
         generation_mode = "local_artifact_bundle"
     elif execution_mode == "source" and spec.slug == "ncaab":
         generation_mode = "local_raw_outputs"

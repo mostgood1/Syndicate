@@ -123,6 +123,16 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "wnba_source/data/processed/boxscores_history.csv",
     "nhl_source/source_artifacts/data/raw/player_game_stats.csv",
     "nhl_source/data/raw/player_game_stats.csv",
+    # Soccer has no bookmaker odds ingestion (simulation-derived recommendations
+    # only) and no source_artifacts/data/processed nesting -- build_soccer_artifacts.py,
+    # poll_soccer_live_state.py, and build_soccer_schedule.py all write directly
+    # under soccer_source/<league>/api/, so the generic "*_source/..." patterns
+    # above never match soccer's files. Literal sport prefix, same as the
+    # mlb_source/wnba_source/nhl_source eval/boxscore entries above.
+    "soccer_source/*/api/recommendations/recommendations_*.json",
+    "soccer_source/*/api/live_state/live_state_*.json",
+    "soccer_source/*/api/display_prediction_dates.json",
+    "soccer_source/*/api/schedule/schedule_*.json",
     # Note: reports/intelligence/board_snapshot.json and intelligence_state.json are
     # intentionally excluded here. They're written through refresh_state_store's
     # write_json_file, which already goes over the shared keyvalue (Redis) backend on
