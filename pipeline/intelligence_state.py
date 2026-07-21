@@ -180,6 +180,24 @@ def _requested_sport_from_payload(payload: dict[str, Any] | None) -> str | None:
     return str(current.get("sport") or current.get("selected_sport") or current.get("sport_slug") or "").strip().lower() or None
 
 
+def _response_has_sport_data(response: dict[str, Any] | None, requested_sport: str | None) -> bool:
+    if not requested_sport or requested_sport == "all":
+        return True
+    current = dict(response or {})
+    by_sport = current.get("by_sport")
+    if isinstance(by_sport, Mapping) and by_sport:
+        # by_sport reflects the true full pool (see _intelligence_state_candidate_count),
+        # so when present it's authoritative: absence/emptiness for the
+        # requested sport means this particular cached response genuinely
+        # doesn't cover it, not that the sport itself has no data anywhere.
+        entries = by_sport.get(requested_sport)
+        return isinstance(entries, list) and len(entries) > 0
+    # Legacy/older snapshot shapes without by_sport at all -- don't block on
+    # sport in that case, only date-match as before (avoids regressing
+    # responses that predate by_sport being populated).
+    return True
+
+
 def _snapshot_sport(snapshot: "IntelligenceSnapshot") -> str | None:
     payload = dict(snapshot.payload or {}) if isinstance(snapshot.payload, dict) else {}
     for key in ("sport", "selected_sport", "sport_slug"):
@@ -2313,11 +2331,24 @@ def _decorate_intelligence_board_snapshot_response(
     requested_date: str | None,
     source_label: str,
     strict_date: bool,
+    requested_sport: str | None = None,
 ) -> dict[str, Any] | None:
     updated_at = str(snapshot.get("updated_at") or "").strip() or None
     response = snapshot.get("response")
     if isinstance(response, dict):
         if strict_date and requested_date and _selected_date_from_response(response) not in {None, requested_date}:
+            return None
+        # BOARD_SNAPSHOT_PATH/intelligence_state.json are single global files
+        # that every watched-payload cycle overwrites, regardless of which
+        # sport that particular cycle was scoped for -- so this fallback read
+        # (used whenever the sport-aware in-memory snapshot happens to be
+        # momentarily stale) could silently hand a sport=mlb request whatever
+        # an unrelated sport=wnba (or otherwise-scoped) cycle last wrote here.
+        # Confirmed live 2026-07-21: candidate_count stayed correct (from
+        # by_sport) across writes, but the visible board_input/cards count
+        # swung 181 -> 10 -> 0 across consecutive background-loop cycles,
+        # each one a different watched payload clobbering the same file.
+        if not _response_has_sport_data(response, requested_sport):
             return None
         decorated = _promote_board_contract_cards(dict(response))
         candidate_count = _intelligence_state_candidate_count(decorated)
@@ -2345,6 +2376,8 @@ def _decorate_intelligence_board_snapshot_response(
         return decorated if candidate_count > 0 else None
     if all(key in snapshot for key in ("ok", "analysis", "top_opportunities")):
         if strict_date and requested_date and _selected_date_from_response(snapshot) not in {None, requested_date}:
+            return None
+        if not _response_has_sport_data(snapshot, requested_sport):
             return None
         decorated = _promote_board_contract_cards(dict(snapshot))
         updated_at = str(decorated.get("updated_at") or decorated.get("state_last_updated") or "").strip() or None
@@ -2375,6 +2408,7 @@ def _decorate_intelligence_board_snapshot_response(
 
 def _latest_non_empty_intelligence_board_snapshot_response(payload: dict[str, Any] | None = None) -> dict[str, Any] | None:
     requested_date = _selected_date_from_payload(payload)
+    requested_sport = _requested_sport_from_payload(payload)
     candidate_paths: list[Path] = []
     seen_paths: set[str] = set()
     for path in [
@@ -2394,7 +2428,7 @@ def _latest_non_empty_intelligence_board_snapshot_response(payload: dict[str, An
         snapshot = read_json_file(path)
         if not isinstance(snapshot, dict):
             continue
-        decorated = _decorate_intelligence_board_snapshot_response(snapshot, requested_date=requested_date, source_label="board_snapshot_latest", strict_date=False)
+        decorated = _decorate_intelligence_board_snapshot_response(snapshot, requested_date=requested_date, source_label="board_snapshot_latest", strict_date=False, requested_sport=requested_sport)
         if isinstance(decorated, dict):
             return decorated
     return None
@@ -2402,11 +2436,12 @@ def _latest_non_empty_intelligence_board_snapshot_response(payload: dict[str, An
 
 def read_latest_intelligence_board_snapshot_response(payload: dict[str, Any] | None = None, *, force_refresh: bool = True) -> dict[str, Any] | None:
     requested_date = _selected_date_from_payload(payload)
+    requested_sport = _requested_sport_from_payload(payload)
     _ = force_refresh
     snapshot_path = _intelligence_state_read_path("board_snapshot", BOARD_SNAPSHOT_PATH)
     snapshot = read_json_file(snapshot_path)
     if isinstance(snapshot, dict):
-        decorated = _decorate_intelligence_board_snapshot_response(snapshot, requested_date=requested_date, source_label="board_snapshot", strict_date=False)
+        decorated = _decorate_intelligence_board_snapshot_response(snapshot, requested_date=requested_date, source_label="board_snapshot", strict_date=False, requested_sport=requested_sport)
         if isinstance(decorated, dict):
             if requested_date and _selected_date_from_response(decorated) not in {None, requested_date}:
                 return None
