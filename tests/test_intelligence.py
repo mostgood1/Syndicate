@@ -17,6 +17,7 @@ from syndicate.blueprints.intelligence import intelligence_bp
 from syndicate.blueprints.intelligence import intelligence_query_api
 from syndicate.blueprints.intelligence import intelligence_status_api
 from pipeline.intelligence_state import _payload_key
+from pipeline.intelligence_state import IntelligenceStateService
 from syndicate.blueprints.home import _finalize_home_prop_rows
 from syndicate.blueprints.home import _load_home_pregame_prop_items
 from syndicate.blueprints.home import _game_bet_candidates_from_game
@@ -827,6 +828,56 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertGreaterEqual(board["recommendation_count"], 1)
 
     def setUp(self) -> None:
+        # Isolate every test in this class from ambient dev-machine state
+        # *before* create_app() runs, in this order:
+        #
+        # 1. Prevent create_app()'s real background loops. On a non-Render
+        #    dyno (true for every local/CI test run), create_app()
+        #    registers a Flask before_request hook that -- on this test
+        #    class's very first client request -- spawns a real daemon
+        #    thread calling start_intelligence_state_background_loop() and
+        #    start_live_refresh_background_loop(). Since setUp() builds a
+        #    brand-new app per test, every single test method was
+        #    triggering a fresh background thread that outlives the test,
+        #    accumulating dozens of live threads across a full run and
+        #    doing real (if throttled) I/O/refresh work concurrently with
+        #    whatever the test itself was asserting -- a real contributor
+        #    to both non-determinism and the suite's runtime.
+        # 2. Redirect the on-disk intelligence-state cache
+        #    (reports/intelligence/*.json) to a fresh temp directory per
+        #    test, and swap in a brand-new IntelligenceStateService so its
+        #    in-memory snapshot cache doesn't leak across test methods
+        #    either. Previously every test shared this repo's real,
+        #    already-populated reports/intelligence/ files (this being a
+        #    dev machine also used to run the app directly), so a test's
+        #    build_intelligence_overview mock frequently never even ran --
+        #    the cache-first read path
+        #    (_latest_non_empty_intelligence_board_snapshot_response)
+        #    found real on-disk data first and returned that, silently
+        #    bypassing the mock entirely.
+        self._background_loop_patchers = [
+            patch("syndicate.app.start_intelligence_state_background_loop", return_value=False),
+            patch("syndicate.app.start_live_refresh_background_loop", return_value=None),
+        ]
+        for loop_patcher in self._background_loop_patchers:
+            loop_patcher.start()
+
+        self._intel_state_tempdir = TemporaryDirectory()
+        temp_reports_dir = Path(self._intel_state_tempdir.name) / "intelligence"
+        temp_reports_dir.mkdir(parents=True, exist_ok=True)
+        self._intel_state_path_patchers = [
+            patch("pipeline.intelligence_state.STATE_PATH", temp_reports_dir / "query_state_cache.json"),
+            patch("pipeline.intelligence_state.BOARD_SNAPSHOT_PATH", temp_reports_dir / "board_snapshot.json"),
+            patch("pipeline.intelligence_state.STATUS_CACHE_PATH", temp_reports_dir / "status_response_cache.json"),
+            patch("pipeline.intelligence_state.INTELLIGENCE_STATE_PATH", temp_reports_dir / "intelligence_state.json"),
+            patch("pipeline.intelligence_state.INTELLIGENCE_HISTORY_PATH", temp_reports_dir / "intelligence_state_history.jsonl"),
+            patch("pipeline.intelligence_state.LIVE_PIPELINE_LAST_SUCCESSFUL_PATH", temp_reports_dir / "live_pipeline_last_successful.json"),
+            patch("pipeline.intelligence_state.reports_root", return_value=Path(self._intel_state_tempdir.name)),
+            patch("pipeline.intelligence_state._INTELLIGENCE_STATE_SERVICE", IntelligenceStateService()),
+        ]
+        for path_patcher in self._intel_state_path_patchers:
+            path_patcher.start()
+
         app = create_app()
         app.config.update(TESTING=True)
         self.client = app.test_client()
@@ -850,6 +901,22 @@ class IntelligenceBlueprintTests(unittest.TestCase):
             return_value={},
         )
         self._simulation_patcher.start()
+        # Both genuinely fast/pure (no I/O), but they log "compute in request
+        # path" warnings and, more importantly, were previously reached far
+        # less often because the disk-cache leak (fixed above) usually
+        # short-circuited before the query pipeline got this far. Mocking
+        # them keeps these tests deterministic regardless of the specific
+        # candidate pool a test's fixture produces.
+        self._bet_size_patcher = patch(
+            "syndicate.features.intelligence._compute_bet_size",
+            return_value={"model_probability": 0.5, "implied_probability": 0.5, "odds": None, "odds_adjustment": 0.5, "edge": 0.0, "kelly_fraction": 0.0, "confidence": 0.5, "cap_fraction": 0.02, "recommended_bet_size": 0.0},
+        )
+        self._bet_size_patcher.start()
+        self._correlation_patcher = patch(
+            "syndicate.features.intelligence._compute_candidate_correlation",
+            return_value={"correlation_score": 0.0, "same_game": False, "same_team": False},
+        )
+        self._correlation_patcher.start()
 
     def test_build_intelligence_overview_preserves_requested_date(self) -> None:
         app = create_app()
@@ -962,6 +1029,13 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self._artifact_manifests_patcher.stop()
         self._reliability_profile_patcher.stop()
         self._simulation_patcher.stop()
+        self._bet_size_patcher.stop()
+        self._correlation_patcher.stop()
+        for path_patcher in self._intel_state_path_patchers:
+            path_patcher.stop()
+        self._intel_state_tempdir.cleanup()
+        for loop_patcher in self._background_loop_patchers:
+            loop_patcher.stop()
 
     def test_query_preferences_parses_exact_parlay_leg_count(self) -> None:
         preferences = _query_preferences("Build me a four-leg parlay from the best NBA edges")

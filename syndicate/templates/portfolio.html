@@ -1,0 +1,286 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | Portfolio{% endblock %}
+{% block page_title %}Portfolio{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/dense_cards.css') }}" />
+{% endblock %}
+
+{% block content %}
+<style>
+  body.syndicate-body .cards-shell {
+    max-width: 1220px;
+  }
+
+  .portfolio-hero {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+  }
+
+  .portfolio-hero__lede {
+    margin: 6px 0 0;
+    color: var(--cards-text-soft);
+    font-size: 13px;
+    max-width: 68ch;
+  }
+
+  .portfolio-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .portfolio-tile {
+    border: 1px solid var(--cards-line);
+    border-radius: 14px;
+    background: rgba(8, 18, 30, 0.72);
+    padding: 12px 14px;
+  }
+
+  .portfolio-tile__label {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--cards-text-dim);
+  }
+
+  .portfolio-tile__value {
+    font-size: 22px;
+    font-weight: 600;
+    margin-top: 4px;
+    color: var(--cards-text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .portfolio-tile__value.pos { color: #2ecc71; }
+  .portfolio-tile__value.neg { color: #e74c3c; }
+
+  .portfolio-tile__meta {
+    font-size: 11px;
+    color: var(--cards-text-dim);
+    margin-top: 2px;
+  }
+
+  .portfolio-note {
+    border: 1px solid var(--cards-line);
+    border-radius: 14px;
+    background: rgba(241, 196, 15, 0.06);
+    color: var(--cards-text-soft);
+    padding: 10px 14px;
+    font-size: 12.5px;
+    margin-bottom: 16px;
+  }
+
+  .portfolio-section-title {
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--cards-text-dim);
+    margin: 0 0 8px;
+  }
+
+  .portfolio-sport-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .portfolio-sport-card {
+    border: 1px solid var(--cards-line);
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: rgba(8, 18, 30, 0.5);
+    font-size: 12.5px;
+  }
+
+  .portfolio-sport-card__name {
+    font-weight: 600;
+    color: var(--cards-text);
+    text-transform: capitalize;
+  }
+
+  .portfolio-sport-card__row {
+    display: flex;
+    justify-content: space-between;
+    color: var(--cards-text-soft);
+    margin-top: 3px;
+  }
+
+  .portfolio-table-wrap {
+    border: 1px solid var(--cards-line);
+    border-radius: 16px;
+    overflow-x: auto;
+    background: rgba(8, 18, 30, 0.6);
+  }
+
+  table.portfolio-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+    min-width: 720px;
+  }
+
+  table.portfolio-table th {
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--cards-text-dim);
+    border-bottom: 1px solid var(--cards-line-strong);
+    background: rgba(15, 30, 47, 0.9);
+  }
+
+  table.portfolio-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--cards-line);
+    color: var(--cards-text-soft);
+    vertical-align: middle;
+  }
+
+  table.portfolio-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .portfolio-table__primary {
+    color: var(--cards-text);
+  }
+
+  .status-pill-inline {
+    display: inline-block;
+    font-size: 10.5px;
+    letter-spacing: 0.03em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--cards-line-strong);
+  }
+
+  .status-pill-inline--pending { color: #f1c40f; border-color: rgba(241, 196, 15, 0.4); }
+  .status-pill-inline--win { color: #2ecc71; border-color: rgba(46, 204, 113, 0.4); }
+  .status-pill-inline--loss { color: #e74c3c; border-color: rgba(231, 76, 60, 0.4); }
+  .status-pill-inline--push,
+  .status-pill-inline--void { color: var(--cards-text-dim); }
+
+  .portfolio-empty {
+    padding: 24px;
+    text-align: center;
+    color: var(--cards-text-dim);
+    font-size: 13px;
+  }
+</style>
+
+{% set summary = portfolio_summary or {} %}
+
+<main class="portfolio-page">
+  <section class="cards-control-card portfolio-hero">
+    <div>
+      <span class="eyebrow">Portfolio &amp; ledger</span>
+      <h1>Tracked plays and outcomes</h1>
+      <p class="portfolio-hero__lede">Every recommendation the board has recorded, plus grading once results settle. Reported in the ledger's own terms -- edge, win rate, ROI, and CLV -- not a fabricated dollar bankroll the data model doesn't carry.</p>
+    </div>
+    <a class="cards-nav-pill" href="/intelligence">Back to board</a>
+  </section>
+
+  {% if (summary.settled_count or 0) == 0 %}
+    <div class="portfolio-note">Awaiting grading -- {{ summary.total_tracked or 0 }} tracked play{{ '' if (summary.total_tracked or 0) == 1 else 's' }}, 0 settled yet. Win rate, ROI, and CLV populate once reconciliation grades results.</div>
+  {% endif %}
+
+  <div class="portfolio-tiles">
+    <div class="portfolio-tile">
+      <div class="portfolio-tile__label">Tracked plays</div>
+      <div class="portfolio-tile__value">{{ summary.total_tracked or 0 }}</div>
+      <div class="portfolio-tile__meta">{{ summary.today_count or 0 }} today</div>
+    </div>
+    <div class="portfolio-tile">
+      <div class="portfolio-tile__label">Open / pending</div>
+      <div class="portfolio-tile__value">{{ summary.pending_count or 0 }}</div>
+      <div class="portfolio-tile__meta">awaiting settlement</div>
+    </div>
+    <div class="portfolio-tile">
+      <div class="portfolio-tile__label">Settled</div>
+      <div class="portfolio-tile__value">{{ summary.settled_count or 0 }}</div>
+      <div class="portfolio-tile__meta">{{ summary.decisive_count or 0 }} decisive (win/loss)</div>
+    </div>
+    <div class="portfolio-tile">
+      <div class="portfolio-tile__label">Win rate</div>
+      <div class="portfolio-tile__value">{{ "%.1f%%"|format(summary.win_rate * 100) if summary.win_rate is not none else "—" }}</div>
+      <div class="portfolio-tile__meta">of decisive settled plays</div>
+    </div>
+    <div class="portfolio-tile">
+      <div class="portfolio-tile__label">ROI</div>
+      <div class="portfolio-tile__value{{ ' pos' if summary.roi and summary.roi > 0 else ' neg' if summary.roi and summary.roi < 0 else '' }}">{{ "%+.1f%%"|format(summary.roi * 100) if summary.roi is not none else "—" }}</div>
+      <div class="portfolio-tile__meta">settled P/L per unit staked</div>
+    </div>
+    <div class="portfolio-tile">
+      <div class="portfolio-tile__label">Avg edge (open)</div>
+      <div class="portfolio-tile__value">{{ "%.1f%%"|format(summary.avg_edge * 100) if summary.avg_edge is not none else "—" }}</div>
+      <div class="portfolio-tile__meta">across all tracked plays</div>
+    </div>
+    <div class="portfolio-tile">
+      <div class="portfolio-tile__label">Avg CLV</div>
+      <div class="portfolio-tile__value">{{ "%+.2f"|format(summary.avg_clv) if summary.avg_clv is not none else "—" }}</div>
+      <div class="portfolio-tile__meta">closing line value, settled</div>
+    </div>
+  </div>
+
+  {% if summary.by_sport %}
+    <h2 class="portfolio-section-title">By sport</h2>
+    <div class="portfolio-sport-grid">
+      {% for row in summary.by_sport %}
+        <div class="portfolio-sport-card">
+          <div class="portfolio-sport-card__name">{{ row.sport }}</div>
+          <div class="portfolio-sport-card__row"><span>Tracked</span><span>{{ row.predictions }}</span></div>
+          <div class="portfolio-sport-card__row"><span>Settled</span><span>{{ row.settled }}</span></div>
+          <div class="portfolio-sport-card__row"><span>Win rate</span><span>{{ "%.0f%%"|format(row.win_rate * 100) if row.win_rate is not none else "—" }}</span></div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <h2 class="portfolio-section-title">Recent positions</h2>
+  <div class="portfolio-table-wrap">
+    {% if summary.positions %}
+      <table class="portfolio-table">
+        <thead>
+          <tr>
+            <th>Recorded</th>
+            <th>Sport</th>
+            <th>Market</th>
+            <th>Selection</th>
+            <th>Odds</th>
+            <th>Edge</th>
+            <th>Confidence</th>
+            <th>Status</th>
+            <th>P/L</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in summary.positions %}
+            <tr>
+              <td>{{ row.timestamp or "—" }}</td>
+              <td class="portfolio-table__primary">{{ row.sport or "—" }}</td>
+              <td>{{ row.market or "—" }}</td>
+              <td class="portfolio-table__primary">{{ row.selection or "—" }}{% if row.matchup %} <span style="color:var(--cards-text-dim);">· {{ row.matchup }}</span>{% endif %}</td>
+              <td>{{ row.odds if row.odds is not none else "—" }}</td>
+              <td>{{ "%.1f%%"|format(row.edge * 100) if row.edge is not none else "—" }}</td>
+              <td>{{ "%.0f"|format(row.confidence) if row.confidence is not none else "—" }}</td>
+              <td><span class="status-pill-inline status-pill-inline--{{ row.status }}">{{ row.status }}</span></td>
+              <td>{{ "%+.2f"|format(row.pnl) if row.pnl is not none else "—" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="portfolio-empty">No tracked plays yet.</div>
+    {% endif %}
+  </div>
+</main>
+{% endblock %}

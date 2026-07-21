@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import csv
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import wait as _futures_wait
 from datetime import date
 from datetime import datetime
 from datetime import timedelta
@@ -1718,6 +1719,102 @@ def _game_sim_vs_line_reasoning(game: dict[str, Any]) -> str | None:
     return " | ".join(parts) if parts else None
 
 
+def _looks_like_badge_text(value: Any) -> bool:
+    text = str(value or "").strip()
+    if not text:
+        return True
+    if re.match(r"^[+-]?\d+(?:\.\d+)?\s*%", text):
+        return True
+    return text.lower().endswith("ev") and "%" in text
+
+
+def _candidate_pick_text(item: dict[str, Any]) -> str:
+    # player_name/name/pick/selection are frequently duplicates of the same
+    # string, but on "prop"-typed candidates name/pick/selection sometimes
+    # leak a bare "36.2% EV" badge instead of the real pick text while
+    # player_name stays clean -- so player_name is checked first, matching
+    # the same guard intelligence.html's board JS already applies.
+    for key in ("player_name", "name", "pick", "selection"):
+        text = str(item.get(key) or "").strip()
+        if text and text.lower() not in {"-", "—", "n/a", "unknown"} and not _looks_like_badge_text(text):
+            return text
+    return "-"
+
+
+def _candidate_edge_fraction(item: dict[str, Any]) -> float:
+    # Mirrors intelligence.html's edgeValue() precedence exactly (edge ??
+    # adjusted_edge ?? expected_value ?? ev_current ?? 0) so the home page
+    # and the board never disagree about which number is "the edge" for the
+    # same candidate -- an `or` chain would wrongly skip a real 0.0/-0.0 edge.
+    for key in ("edge", "adjusted_edge", "expected_value", "ev_current"):
+        value = _numeric_value(item.get(key))
+        if value is not None:
+            return value
+    return 0.0
+
+
+def _board_candidate_rows(selected_date: str, *, limit: int = 12) -> list[dict[str, Any]]:
+    """Read-only reuse of whatever the /intelligence board already has cached
+    for this date, instead of re-deriving a second, much narrower candidate
+    list from raw per-sport dashboard artifacts. force_refresh is always
+    False here -- the home page must never trigger a live board recompute
+    just to render its top-edges rail (Render web/worker headroom is tight)."""
+    try:
+        from syndicate.blueprints.intelligence import _intelligence_page_payload
+        from syndicate.blueprints.intelligence import _response_has_board_content
+        from pipeline.intelligence_state import read_latest_intelligence_board_snapshot_response
+        from pipeline.intelligence_state import read_latest_intelligence_state_response
+    except Exception:
+        return []
+
+    try:
+        payload = _intelligence_page_payload(selected_date, force_refresh=False)
+        response = read_latest_intelligence_state_response(payload, force_refresh=False, allow_latest_fallback=False)
+        if not (isinstance(response, dict) and _response_has_board_content(response)):
+            board_snapshot = read_latest_intelligence_board_snapshot_response(payload, force_refresh=False)
+            response = board_snapshot if isinstance(board_snapshot, dict) and _response_has_board_content(board_snapshot) else None
+    except Exception:
+        return []
+    if not isinstance(response, dict):
+        return []
+
+    nested = response.get("response") if isinstance(response.get("response"), dict) else {}
+    analysis = response.get("analysis") if isinstance(response.get("analysis"), dict) else (nested.get("analysis") if isinstance(nested.get("analysis"), dict) else {})
+    candidates = (
+        response.get("recommendations")
+        or nested.get("recommendations")
+        or response.get("top_opportunities")
+        or nested.get("top_opportunities")
+        or analysis.get("recommendations")
+        or []
+    )
+    if not isinstance(candidates, list):
+        return []
+
+    rows: list[dict[str, Any]] = []
+    for item in candidates:
+        if not isinstance(item, dict):
+            continue
+        edge_fraction = _candidate_edge_fraction(item)
+        rows.append(
+            {
+                "sport": _safe_text(item.get("sport"), str(item.get("sport_slug") or "").upper()),
+                "sport_slug": _safe_text(item.get("sport_slug"), "sport").lower(),
+                "matchup": _safe_text(item.get("matchup"), "-"),
+                "market": _safe_text(item.get("market_type") or item.get("market") or item.get("candidate_type"), "-"),
+                "pick": _candidate_pick_text(item),
+                "edge": f"{edge_fraction * 100:.1f}%",
+                "confidence": _safe_text(item.get("confidence"), "-"),
+                "is_live": bool(item.get("is_live")),
+                "href": str(item.get("href") or "").strip() or None,
+                "score": abs(edge_fraction) * 150.0,
+            }
+        )
+        if len(rows) >= limit:
+            break
+    return rows
+
+
 def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[str, Any], game: dict[str, Any], market: str, pick: str, line: Any = None, odds: Any = None, edge: Any = None, confidence: Any = None, projected: Any = None, live_projection: Any = None, detail: str | None = None, fallback_epoch: float, live_odds_game_ids: set[str] | None = None, team: Any = None, sim_context: str | None = None) -> None:
     pick_text = _safe_text(pick, "-")
     if pick_text == "-":
@@ -2211,6 +2308,20 @@ def _build_home_dashboard(overview: list[dict[str, Any]], *, selected_date: str,
     prop_rows = sorted(prop_rows, key=lambda row: row.get("score", 0.0), reverse=True)
     live_props = [row for row in prop_rows if bool(row.get("is_live"))]
     live_sports = sum(1 for sport in overview if bool((sport or {}).get("active_today")))
+    # Command-bar "top edges" rail: game bets and props both already carry a
+    # comparable edge/confidence text shape (_append_game_bet_candidate and
+    # _build_prop_dashboard_row), so they can be merged and ranked by edge
+    # magnitude directly instead of building a third parallel candidate list.
+    # Also merged in: the /intelligence board's own cached candidates
+    # (_board_candidate_rows) -- home.py's per-sport artifact scan above is
+    # meaningfully narrower than the board's real candidate-generation path
+    # (it can find zero game bets/props on slates where the board finds
+    # several), so relying on it alone understates what's actually on offer.
+    top_edges = sorted(
+        [*game_bets, *prop_rows, *_board_candidate_rows(selected_date, limit=16)],
+        key=lambda row: _pct_number(row.get("edge")) or 0.0,
+        reverse=True,
+    )[:12]
     summary_cards = [
         {"label": "Board date", "value": selected_date, "meta": f"Polled {_format_home_timestamp(polled_at)}"},
         {"label": "Live sports", "value": str(live_sports), "meta": f"{len(live_watch)} game reads surfaced"},
@@ -2223,6 +2334,7 @@ def _build_home_dashboard(overview: list[dict[str, Any]], *, selected_date: str,
         "top_game_bets": game_bets[:12],
         "live_watch": live_watch[:10],
         "top_props": prop_rows[:14],
+        "top_edges": top_edges,
         "sport_summaries": sport_summaries,
     }
 
@@ -2330,13 +2442,61 @@ def _mlb_feed_live_state(selected_date: str, game_pk: int) -> dict[str, Any] | N
     }
 
 
+def _mlb_feed_live_states(game_pks: list[int], selected_date: str, *, overall_timeout: float = 8.0) -> dict[int, dict[str, Any] | None]:
+    # Each _mlb_feed_live_state() call can fall through to a real network
+    # call (_fetch_mlb_feed_live -> statsapi.mlb.com, 5s socket timeout) when
+    # no local raw-feed artifact exists yet for that game. Running them one
+    # thread per game (instead of the previous sequential loop) already
+    # bounds a well-behaved batch to roughly one game's worst case (~5s)
+    # instead of the sum (a full 15-game slate run sequentially could total
+    # 70s+ of blocking I/O in a single request -- comfortably past
+    # gunicorn's 60s worker timeout in production, per render.yaml's
+    # GUNICORN_TIMEOUT=60). But per-call timeouts aren't always honored by
+    # the underlying socket for every failure mode (observed: some cold
+    # /api/home calls still took 90s+ even after parallelizing, with no
+    # single sub-step accounting for it in direct profiling -- consistent
+    # with a connection that accepts but never sends, which can outlast a
+    # read timeout). So this also enforces its own hard wall-clock budget:
+    # whatever hasn't finished by `overall_timeout` is abandoned rather than
+    # blocking the request further. shutdown(wait=False) lets those
+    # straggler threads resolve (or hit their own 5s timeout) in the
+    # background instead of forcing this request to wait on them -- the
+    # request's latency is bounded no matter what the external API does.
+    results: dict[int, dict[str, Any] | None] = {pk: None for pk in game_pks}
+    if not game_pks:
+        return results
+    executor = ThreadPoolExecutor(max_workers=min(len(game_pks), 16))
+    futures = {executor.submit(_mlb_feed_live_state, selected_date, pk): pk for pk in game_pks}
+    done, _not_done = _futures_wait(futures, timeout=overall_timeout)
+    for future in done:
+        pk = futures[future]
+        try:
+            results[pk] = future.result()
+        except Exception:
+            results[pk] = None
+    executor.shutdown(wait=False)
+    return results
+
+
 def _apply_mlb_live_scores(games: list[dict[str, Any]], selected_date: str) -> list[dict[str, Any]]:
+    game_pks: list[int] = []
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        try:
+            game_pk = int(game.get("gamePk") or 0)
+        except (TypeError, ValueError):
+            continue
+        if game_pk:
+            game_pks.append(game_pk)
+    live_states = _mlb_feed_live_states(game_pks, selected_date)
+
     enriched: list[dict[str, Any]] = []
     for game in games:
         if not isinstance(game, dict):
             continue
         game_pk = int(game.get("gamePk") or 0)
-        live_state = _mlb_feed_live_state(selected_date, game_pk) if game_pk else None
+        live_state = live_states.get(game_pk) if game_pk else None
         if not live_state:
             enriched.append(game)
             continue

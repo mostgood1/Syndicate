@@ -29,6 +29,7 @@ from syndicate.features.shared.timezone import normalize_timestamped_payload
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.shared.ops_refresh import launch_refresh_run
 from syndicate.features.shared.ops_refresh import load_latest_refresh_status
+from syndicate.features.portfolio_summary import build_portfolio_summary
 
 
 intelligence_bp = Blueprint("syndicate_intelligence", __name__)
@@ -1199,23 +1200,136 @@ def intelligence_query_api():
     if force_refresh:
         _safe_queue_intelligence_state_refresh(dict(payload))
     board_snapshot_payload = read_latest_intelligence_board_snapshot_response(payload, force_refresh=False)
-    if not _response_has_board_content(state_payload):
-        if _response_has_board_content(board_snapshot_payload):
+
+    # "Has board content" alone only checks that a candidate carries *some*
+    # recommendations -- it says nothing about whether that content is for
+    # the date/lane actually requested. _response_needs_refresh() already
+    # catches a date mismatch (among other staleness signals) but was never
+    # consulted here, which let a cached response for a completely
+    # different day (observed: a request for today served candidates
+    # stamped six weeks earlier) get accepted as-is with no indication
+    # anything was wrong. Prefer a candidate that is both non-empty AND
+    # date-matched before ever falling back to a stale one.
+    #
+    # _response_needs_refresh only checks date/hydration/age -- it has no
+    # concept of sport. read_latest_intelligence_board_snapshot_response's
+    # board_snapshot.json fallback is *also* sport-agnostic (unlike
+    # pipeline.intelligence_state's IntelligenceStateService, which does
+    # track sport per snapshot). Observed: requesting sport="wnba" on a day
+    # WNBA has no games returned MLB-tagged candidates instead of an honest
+    # empty result, because nothing here ever checked which sport the
+    # cached candidates actually belonged to.
+    def _response_sport_slugs(response_payload: dict[str, object] | None) -> set[str]:
+        # Deliberately self-contained: _recommendation_sources (used
+        # elsewhere in this file, e.g. _board_response_needs_refresh) is
+        # referenced but never actually defined anywhere in this repo --
+        # every call site wraps it in a bare try/except, so it has always
+        # silently evaluated to an empty list rather than raising. Extract
+        # candidates directly instead of depending on that phantom name.
+        current = dict(response_payload or {})
+        nested = current.get("response") if isinstance(current.get("response"), dict) else {}
+        analysis = current.get("analysis") if isinstance(current.get("analysis"), dict) else (nested.get("analysis") if isinstance(nested.get("analysis"), dict) else {})
+        candidates: list[object] = []
+        for container in (current, nested, analysis):
+            if not isinstance(container, dict):
+                continue
+            for key in ("recommendations", "top_opportunities"):
+                value = container.get(key)
+                if isinstance(value, list):
+                    candidates.extend(value)
+        slugs: set[str] = set()
+        for item in candidates:
+            if not isinstance(item, dict):
+                continue
+            value = str(item.get("sport_slug") or item.get("sport") or "").strip().lower()
+            if value:
+                slugs.add(value)
+        return slugs
+
+    def _matches_requested_sport(candidate: dict[str, object] | None) -> bool:
+        requested_sport = str(payload.get("sport") or "").strip().lower()
+        if not requested_sport or requested_sport == "all":
+            return True
+        candidate_sports = _response_sport_slugs(candidate)
+        if not candidate_sports:
+            # No sport tag found on any candidate -- can't confirm a match,
+            # but can't prove a mismatch either; do not block on an absent
+            # field the same way the date check treats a missing date.
+            return True
+        return requested_sport in candidate_sports
+
+    def _fresh_enough(candidate: dict[str, object] | None) -> bool:
+        return (
+            isinstance(candidate, dict)
+            and _response_has_board_content(candidate)
+            and not _response_needs_refresh(payload, candidate)
+            and _matches_requested_sport(candidate)
+        )
+
+    # A confirmed synchronous recompute for a genuinely stale slate can
+    # return zero candidates (there just isn't a game today) -- so a
+    # "stale" cached candidate isn't always secretly hiding fresher data
+    # somewhere; sometimes it's just old. Old-but-recent (e.g. yesterday's
+    # board, still refreshing) is still useful labeled as stale; a cached
+    # response from weeks ago is not "today's board, a bit behind" -- it's
+    # a different day's settled slate, and showing it (even labeled) would
+    # be misleading for a "today" board. Cap how old a stale fallback can
+    # be before we'd rather show honestly empty.
+    def _stale_within_threshold(candidate: dict[str, object] | None, *, max_age_days: int = 2) -> bool:
+        request_date_text = str(payload.get("date") or payload.get("selected_date") or "").strip()
+        candidate_date_text = _response_selected_date(candidate) if isinstance(candidate, dict) else None
+        if not request_date_text or not candidate_date_text:
+            return True
+        try:
+            request_dt = datetime.fromisoformat(request_date_text)
+            candidate_dt = datetime.fromisoformat(candidate_date_text)
+        except Exception:
+            return True
+        return abs((request_dt - candidate_dt).days) <= max_age_days
+
+    if not _fresh_enough(state_payload):
+        if _fresh_enough(board_snapshot_payload):
             state_payload = board_snapshot_payload
         else:
             _safe_queue_intelligence_state_refresh(dict(payload))
             queued_state = read_latest_intelligence_state(dict(payload))
-            if _response_has_board_content(queued_state):
+            if _fresh_enough(queued_state):
                 state_payload = queued_state
             else:
-                state_payload = _empty_default_intelligence_response()
-                state_payload["queued"] = True
+                # Nothing date-matched is available yet -- a background
+                # refresh was just queued above. Serve the best
+                # content-bearing, not-too-old candidate we do have rather
+                # than an empty board, but say so explicitly instead of
+                # presenting it as current.
+                stale_fallback = next(
+                    (
+                        candidate
+                        for candidate in (queued_state, state_payload, board_snapshot_payload)
+                        if isinstance(candidate, dict) and _response_has_board_content(candidate) and _stale_within_threshold(candidate) and _matches_requested_sport(candidate)
+                    ),
+                    None,
+                )
+                if stale_fallback is not None:
+                    state_payload = dict(stale_fallback)
+                    state_payload["stale"] = True
+                    state_payload["freshness_state"] = "stale"
+                else:
+                    state_payload = _empty_default_intelligence_response()
+                    state_payload["queued"] = True
     candidate_count = _response_candidate_count(state_payload) if isinstance(state_payload, dict) else 0
     if candidate_count <= 0 or not isinstance(state_payload, dict) or not _response_has_board_content(state_payload):
         _safe_queue_intelligence_state_refresh(dict(payload))
         queued_state = read_latest_intelligence_state(dict(payload))
-        if _response_has_board_content(queued_state):
+        # This is the same re-fetch-after-queuing pattern as above, so it
+        # needs the same discipline: "has content" alone previously let this
+        # block re-accept the identical stale, wrong-date cache it was just
+        # rejected for above, silently undoing that rejection.
+        if _fresh_enough(queued_state):
             state_payload = queued_state
+        elif isinstance(queued_state, dict) and _response_has_board_content(queued_state) and _stale_within_threshold(queued_state) and _matches_requested_sport(queued_state):
+            state_payload = dict(queued_state)
+            state_payload["stale"] = True
+            state_payload["freshness_state"] = "stale"
         else:
             state_payload = _empty_default_intelligence_response()
             state_payload["queued"] = True
@@ -1373,3 +1487,24 @@ def intelligence_status_page():
     if selected_sport:
         redirect_target = f"{redirect_target}&sport={selected_sport}"
     return redirect(redirect_target, code=302)
+
+
+def _portfolio_summary_limit() -> int:
+    raw = str(request.args.get("limit") or "").strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        return 60
+    return max(1, min(value, 500))
+
+
+@intelligence_bp.get("/api/portfolio/summary")
+def portfolio_summary_api():
+    summary = build_portfolio_summary(limit=_portfolio_summary_limit())
+    return _no_cache_response(jsonify({"ok": True, **summary}))
+
+
+@intelligence_bp.get("/portfolio")
+def portfolio_home():
+    summary = build_portfolio_summary(limit=100)
+    return render_template("portfolio.html", portfolio_summary=summary)

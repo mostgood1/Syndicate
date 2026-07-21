@@ -432,6 +432,69 @@
     margin-top: 6px;
   }
 
+  .board-blotter-wrap {
+    border: 1px solid var(--cards-line);
+    border-radius: 16px;
+    overflow-x: auto;
+    background: rgba(8, 18, 30, 0.72);
+  }
+
+  table.board-blotter {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+    min-width: 640px;
+  }
+
+  table.board-blotter th {
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--cards-text-dim);
+    border-bottom: 1px solid var(--cards-line-strong);
+    background: rgba(15, 30, 47, 0.9);
+  }
+
+  table.board-blotter td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--cards-line);
+    color: var(--cards-text-soft);
+    vertical-align: middle;
+  }
+
+  table.board-blotter tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .board-blotter__primary {
+    color: var(--cards-text);
+    font-weight: 600;
+  }
+
+  .board-blotter__meta {
+    font-size: 11px;
+    color: var(--cards-text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .board-blotter__edge {
+    font-weight: 700;
+  }
+
+  .board-blotter__edge--high { color: #2ecc71; }
+  .board-blotter__edge--medium { color: #f1c40f; }
+  .board-blotter__edge--low { color: var(--cards-text-dim); }
+
+  .board-blotter__reason-row td {
+    padding: 0 12px 12px;
+    color: var(--cards-text-soft);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
   @media (max-width: 1080px) {
     .board-layout {
       grid-template-columns: 1fr;
@@ -476,7 +539,17 @@
     </div>
     <div class="board-toolbar-row">
       <div class="board-tabs cards-tabs" id="board-state-tabs" role="tablist" aria-label="Game state filter"></div>
-      <div id="board-refresh-status" class="board-refresh-status" role="status" aria-live="polite"></div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <div id="board-freshness-chip" class="board-chip" hidden></div>
+        <div id="board-refresh-status" class="board-refresh-status" role="status" aria-live="polite"></div>
+      </div>
+    </div>
+    <div class="board-toolbar-row">
+      <div class="board-tabs cards-tabs" id="board-market-tabs" role="tablist" aria-label="Market family filter"></div>
+      <div class="board-tabs cards-tabs" id="board-edge-tabs" role="tablist" aria-label="Minimum edge filter"></div>
+    </div>
+    <div class="board-toolbar-row">
+      <div class="board-tabs cards-tabs" id="board-view-tabs" role="tablist" aria-label="Board view"></div>
     </div>
   </form>
 
@@ -526,6 +599,21 @@
     { value: "live", label: "Live" },
     { value: "pregame", label: "Pregame" },
   ];
+  const MARKET_TABS = [
+    { value: "all", label: "All markets" },
+    { value: "game", label: "Game markets" },
+    { value: "prop", label: "Player props" },
+  ];
+  const EDGE_TABS = [
+    { value: "0", label: "Any edge" },
+    { value: "3", label: "3%+" },
+    { value: "5", label: "5%+" },
+    { value: "8", label: "8%+" },
+  ];
+  const VIEW_TABS = [
+    { value: "cards", label: "Cards" },
+    { value: "blotter", label: "Blotter" },
+  ];
   const DEFAULT_QUESTION = "top edges today";
 
   let lastVersion = null;
@@ -534,12 +622,16 @@
   let lastWorkerStateUpdated = null;
   let hasRenderedIntelligence = false;
   let currentIntelligenceRequest = null;
+  let lastRenderItems = [];
 
   const urlParams = new URLSearchParams(window.location.search);
   const state = {
     date: urlParams.get("date") || document.getElementById("board-date").value || "",
     sport: urlParams.get("sport") || "all",
     gameState: urlParams.get("game_state") || "all",
+    marketFamily: urlParams.get("market_family") || "all",
+    minEdge: Number(urlParams.get("min_edge") || 0) || 0,
+    view: urlParams.get("view") === "blotter" ? "blotter" : "cards",
   };
 
   const initialResponseScript = document.getElementById("initial-intelligence-response");
@@ -567,6 +659,9 @@
     if (state.date) url.searchParams.set("date", state.date); else url.searchParams.delete("date");
     if (state.sport && state.sport !== "all") url.searchParams.set("sport", state.sport); else url.searchParams.delete("sport");
     if (state.gameState && state.gameState !== "all") url.searchParams.set("game_state", state.gameState); else url.searchParams.delete("game_state");
+    if (state.marketFamily && state.marketFamily !== "all") url.searchParams.set("market_family", state.marketFamily); else url.searchParams.delete("market_family");
+    if (state.minEdge > 0) url.searchParams.set("min_edge", String(state.minEdge)); else url.searchParams.delete("min_edge");
+    if (state.view && state.view !== "cards") url.searchParams.set("view", state.view); else url.searchParams.delete("view");
     window.history.replaceState({}, "", url.toString());
   }
 
@@ -593,6 +688,27 @@
       syncUrlState();
       renderFilterTabs();
       void loadIntelligence({ forceRefresh: true });
+    });
+    // Market family, min-edge, and view are client-side refinements over
+    // whatever the server already returned for the current sport/lane --
+    // they re-render from lastRenderItems instead of re-querying the board.
+    renderTabs("board-market-tabs", MARKET_TABS, state.marketFamily, (value) => {
+      state.marketFamily = value;
+      syncUrlState();
+      renderFilterTabs();
+      renderBoardBody();
+    });
+    renderTabs("board-edge-tabs", EDGE_TABS, String(state.minEdge), (value) => {
+      state.minEdge = Number(value) || 0;
+      syncUrlState();
+      renderFilterTabs();
+      renderBoardBody();
+    });
+    renderTabs("board-view-tabs", VIEW_TABS, state.view, (value) => {
+      state.view = value;
+      syncUrlState();
+      renderFilterTabs();
+      renderBoardBody();
     });
   }
 
@@ -840,6 +956,20 @@
     return true;
   }
 
+  // Market family and min-edge are refinements over an already-fetched
+  // board response, so they filter in place rather than triggering a new
+  // /api/intelligence/query round trip.
+  function matchesClientFilters(item) {
+    if (state.minEdge > 0 && edgeValue(item) * 100 < state.minEdge) return false;
+    if (state.marketFamily !== "all") {
+      const candidateType = String(item.candidate_type || item.type || "").trim().toLowerCase();
+      const isProp = candidateType === "prop" || Boolean(item.player_name || item.player_id);
+      if (state.marketFamily === "prop" && !isProp) return false;
+      if (state.marketFamily === "game" && isProp) return false;
+    }
+    return true;
+  }
+
   // Generic placeholder text real candidates fall back to when no actual
   // model reasoning exists yet (e.g. a bare market-odds snapshot with no
   // sim run). Showing these as "Why this pick" would be worse than
@@ -978,6 +1108,98 @@
     });
   }
 
+  function renderBlotter(items) {
+    const container = document.getElementById("board-cards");
+    if (!container) return;
+    if (!items.length) {
+      container.innerHTML = `<div class="board-empty">No opportunities match the current filters.</div>`;
+      return;
+    }
+    const sorted = items.slice().sort((a, b) => edgeValue(b) - edgeValue(a));
+    container.innerHTML = `
+      <div class="board-blotter-wrap">
+        <table class="board-blotter">
+          <thead>
+            <tr><th>Lane</th><th>Matchup</th><th>Pick</th><th>Win%</th><th>Edge</th><th>Move</th><th></th></tr>
+          </thead>
+          <tbody>
+            ${sorted.map((item) => {
+              const edge = edgeValue(item);
+              const tier = edgeTier(edge);
+              const itemState = recommendationState(item);
+              const confidence = numericValue(item.confidence);
+              const movementHtml = renderMovement(item);
+              const reasoning = pickReasoning(item);
+              const matchup = displayMatchup(item);
+              const sport = String(item.sport || item.sport_slug || "").trim().toUpperCase();
+              const title = displayTitle(item);
+              const rowAttrs = `data-syndicate-name="${escapeHtml(title)}" data-syndicate-market="${escapeHtml(item.market || item.market_label || "")}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}"`;
+              return `
+                <tr ${rowAttrs}>
+                  <td><span class="board-badge board-badge--${itemState === "live" ? "live" : "pregame"}">${itemState === "live" ? "Live" : "Pre"}</span></td>
+                  <td>
+                    <div class="board-blotter__primary">${escapeHtml(title)}</div>
+                    <div class="board-blotter__meta">${escapeHtml(sport)}${matchup ? " &middot; " + escapeHtml(matchup) : ""}</div>
+                  </td>
+                  <td>${escapeHtml(propLine(item) || "-")}</td>
+                  <td>${confidence !== null ? Math.round(confidence * 100) + "%" : "&mdash;"}</td>
+                  <td class="board-blotter__edge board-blotter__edge--${tier}">${(edge * 100).toFixed(1)}%</td>
+                  <td>${movementHtml || "&mdash;"}</td>
+                  <td><button type="button" class="board-action-button board-action-button--add" data-portfolio-action="add">Add</button></td>
+                </tr>
+                ${reasoning ? `<tr class="board-blotter__reason-row" ${rowAttrs}><td></td><td colspan="6">${escapeHtml(reasoning)}</td></tr>` : ""}
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
+    container.querySelectorAll("[data-portfolio-action]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        const action = button.getAttribute("data-portfolio-action");
+        const row = button.closest("[data-syndicate-name]");
+        if (!action || !row) return;
+        void submitPortfolioEvent(action, {
+          name: row.getAttribute("data-syndicate-name") || "",
+          market: row.getAttribute("data-syndicate-market") || "",
+          prediction_id: row.getAttribute("data-syndicate-prediction-id") || "",
+          recommendation_id: row.getAttribute("data-syndicate-recommendation-id") || "",
+        });
+      });
+    });
+  }
+
+  function renderBoardBody() {
+    const clientFiltered = lastRenderItems.filter(matchesClientFilters);
+    renderTopStrip(clientFiltered);
+    if (state.view === "blotter") {
+      renderBlotter(clientFiltered);
+    } else {
+      renderCards(clientFiltered);
+    }
+  }
+
+  function renderFreshnessChip(response) {
+    const el = document.getElementById("board-freshness-chip");
+    if (!el) return;
+    const source = String((response && (response.debug_source || response.execution_source)) || "").trim();
+    const sourceLabel = source === "worker" ? "Worker-refreshed" : source === "board_snapshot" ? "Board snapshot" : source === "compute_refresh" ? "Live compute" : source;
+    const stateUpdated = (response && (response.state_last_updated || response.snapshot_generated_at)) || null;
+    const count = numericValue(response && response.candidate_count);
+    const parts = [];
+    if (sourceLabel) parts.push(sourceLabel);
+    const formattedUpdate = formatTimestamp(stateUpdated);
+    if (formattedUpdate) parts.push(`as of ${formattedUpdate}`);
+    if (count !== null) parts.push(`${count} candidates`);
+    if (!parts.length) {
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    el.textContent = parts.join(" · ");
+  }
+
   function renderLoadingState() {
     const cardsEl = document.getElementById("board-cards");
     if (cardsEl) {
@@ -1089,11 +1311,12 @@
     }
     const data = normalizeIntelligenceResponse(response);
     const filtered = (data.topOpportunities.length ? data.topOpportunities : data.recommendations).filter(matchesFilters);
-    renderTopStrip(filtered);
-    renderCards(filtered);
+    lastRenderItems = filtered;
+    renderBoardBody();
     renderPortfolio(data);
     renderParlays(data);
     renderSummaryStrip(data);
+    renderFreshnessChip(response);
     hasRenderedIntelligence = true;
     setRefreshStatus(lastResponseTimestamp ? `Updated ${formatTimestamp(lastResponseTimestamp)}` : "Updated", "idle");
   }

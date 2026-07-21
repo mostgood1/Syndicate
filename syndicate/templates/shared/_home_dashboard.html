@@ -1,3 +1,90 @@
+{% if dashboard and dashboard.summary_cards %}
+<section class="home-command-center home-command-center--split" aria-label="Command center">
+	<div class="home-command-center__hero">
+		<span class="eyebrow">Syndicate command center</span>
+		<h1 class="home-command-center__headline">Today's board at a glance</h1>
+		<p class="home-command-center__lede">Bankroll-free by design -- every number below traces back to a live sim read, an odds snapshot, or a graded ledger entry, not a placeholder.</p>
+		<div class="home-command-center__snapshot">
+			<span class="home-command-center__snapshot-pill">{{ dashboard.sport_summaries|length }} sports tracked</span>
+			<span class="home-command-center__snapshot-pill">{{ dashboard.live_watch|length }} live reads</span>
+			<span class="home-command-center__snapshot-pill">{{ dashboard.top_edges|length }} edges surfaced</span>
+		</div>
+		<div class="home-command-center__actions">
+			<a class="cards-nav-pill" href="/intelligence">Open full board</a>
+			<a class="cards-nav-pill" href="/portfolio">Portfolio</a>
+		</div>
+	</div>
+	<div class="home-command-center__summary-rail">
+		{% for card in dashboard.summary_cards %}
+			<div class="home-summary-card">
+				<div class="home-summary-card__label">{{ card.label }}</div>
+				<div class="home-summary-card__value">{{ card.value }}</div>
+				<div class="home-summary-card__meta">{{ card.meta }}</div>
+			</div>
+		{% endfor %}
+	</div>
+</section>
+
+<section class="home-decision-grid">
+	{% set live_rows = dashboard.live_watch|selectattr("is_live")|list %}
+	<div class="home-decision-card" id="home-live-lane">
+		<div class="home-decision-card__header">
+			<h2 class="home-decision-card__title">Live now</h2>
+			<span class="home-decision-card__meta">{{ live_rows|length }} live</span>
+		</div>
+		<div class="home-live-ticker__row home-opportunity-list">
+			{% for row in live_rows[:8] %}
+				<a class="home-opportunity-row" href="{{ row.href or '#' }}">
+					<div class="home-opportunity-row__eyebrow">
+						<span class="home-opportunity-pill home-opportunity-pill--sport">{{ row.sport }}</span>
+						<span class="home-opportunity-pill home-opportunity-pill--live">Live</span>
+					</div>
+					<div class="home-opportunity-row__headline">{{ row.matchup }}</div>
+					<div class="home-opportunity-row__subline">{{ row.status }}</div>
+					<div class="home-opportunity-row__signal">{{ row.signal }}</div>
+					<div class="home-opportunity-row__summary">{{ row.summary }}</div>
+				</a>
+			{% else %}
+				<p class="home-decision-card__meta">No live games tracked for this date yet.</p>
+			{% endfor %}
+		</div>
+	</div>
+	<div class="home-decision-card" id="home-top-edges-lane">
+		<div class="home-decision-card__header">
+			<h2 class="home-decision-card__title">Top edges today</h2>
+			<a class="home-opportunity-row__link" href="/intelligence">Full board &rarr;</a>
+		</div>
+		<div class="home-game-table">
+			{% if dashboard.top_edges %}
+				<div class="home-game-table__head">
+					<div>Matchup</div>
+					<div>Lane</div>
+					<div>Sport</div>
+					<div>Market</div>
+					<div>Edge</div>
+					<div>Win%</div>
+				</div>
+				{% for row in dashboard.top_edges[:8] %}
+					<a class="home-game-table__row" href="{{ row.href or '/intelligence' }}">
+						<div class="home-game-table__cell home-game-table__cell--primary">
+							<span>{{ row.matchup }}</span>
+							<span style="color:rgba(191,208,223,0.7);font-size:0.78rem;">{{ row.pick }}</span>
+						</div>
+						<div class="home-game-table__cell">{{ "LIVE" if row.is_live else "PRE" }}</div>
+						<div class="home-game-table__cell">{{ row.sport }}</div>
+						<div class="home-game-table__cell">{{ row.market }}</div>
+						<div class="home-game-table__cell">{{ row.edge }}</div>
+						<div class="home-game-table__cell">{{ row.confidence }}</div>
+					</a>
+				{% endfor %}
+			{% else %}
+				<p class="home-decision-card__meta">No edges surfaced for this date yet.</p>
+			{% endif %}
+		</div>
+	</div>
+</section>
+{% endif %}
+
 <section class="home-active-strip" aria-label="Active sport controls">
 	<div class="home-active-strip__header">
 		<div class="section-label">Active sports</div>
