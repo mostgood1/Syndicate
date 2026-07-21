@@ -604,24 +604,36 @@ def _derive_stamina_pitches_from_season_stats(
     sp_prior = 92.0
     rp_prior = 25.0
 
-    if force_starter:
-        # If we don't have a pitch count sample yet (early season), keep a SP-like prior.
-        if total_pitches > 0 and gs >= 1:
+    # total_pitches is the season total across ALL appearances (starts +
+    # relief), so total_pitches/gs is only a valid "pitches per start"
+    # estimate when starts account for nearly all of a pitcher's outings.
+    # For anyone with meaningful relief work mixed in this season (swingmen,
+    # recent call-ups, spot starters, injury fill-ins), that division wrongly
+    # folds relief-outing pitches into the numerator while dividing by the
+    # much smaller start count -- e.g. 1 start + 3 relief outings totalling
+    # 334 pitches this season computed as 334 "pitches in that one start",
+    # inflating the estimate arbitrarily (even past what a true workhorse
+    # starter's own clean per-start average would produce). Only trust the
+    # observed average when starts are effectively the pitcher's whole role.
+    start_purity = (gs / g) if g > 0 else (1.0 if gs > 0 else 0.0)
+
+    def _starter_estimate() -> float:
+        if total_pitches > 0 and gs >= 1 and start_purity >= 0.5:
             obs = total_pitches / max(1.0, gs)
-            est = _shrink_to_prior(obs, sp_prior, n=gs, n0=10.0)
-        else:
-            est = sp_prior
+            return _shrink_to_prior(obs, sp_prior, n=gs, n0=10.0)
+        return sp_prior
+
+    if force_starter:
+        # If we don't have a pure-starter pitch count sample yet (early
+        # season, or a mostly-relief role), keep a SP-like prior.
+        est = _starter_estimate()
         return int(max(70, min(115, round(est))))
 
     # Heuristic role classification: starter-like if they start often.
     starter_like = (gs >= 3.0) and (g <= 0 or (gs / max(1.0, g)) >= 0.45)
 
     if starter_like:
-        if total_pitches > 0 and gs >= 1:
-            obs = total_pitches / max(1.0, gs)
-            est = _shrink_to_prior(obs, sp_prior, n=gs, n0=10.0)
-        else:
-            est = sp_prior
+        est = _starter_estimate()
         return int(max(70, min(115, round(est))))
 
     # Reliever-like: estimate by pitches per game pitched, shrunk to RP prior.

@@ -1365,13 +1365,13 @@ def _sigmoid(x: float) -> float:
         return 0.5
 
 
-def _starter_effective_hook(base_hook: int, stamina_hook: int, availability_mult: float) -> int:
+def _starter_effective_hook(base_hook: int, stamina_hook: int, availability_mult: float, stamina_excess_weight: float = 0.25) -> int:
     base = int(base_hook)
     stamina = int(stamina_hook)
     avail = _clamp01(float(availability_mult))
     eff_hook = min(base, stamina)
     if stamina > base:
-        eff_hook += int(round(0.25 * float(stamina - base)))
+        eff_hook += int(round(float(stamina_excess_weight) * float(stamina - base)))
     eff_hook -= int(round((1.0 - avail) * 10.0))
     return int(eff_hook)
 
@@ -1497,6 +1497,16 @@ def _select_pitcher_v2(roster: TeamRoster, state: GameState, rng: random.Random,
     # Tuning knobs (defaults are the current promoted behavior)
     hook_jitter_pitches = max(0, _ov_i("hook_jitter_pitches", 0))
     starter_hook_add_pitches = _ov_i("starter_hook_add_pitches", 0)
+    # Weight applied to stamina above the manager's baseline hook when
+    # computing a starter's effective pull threshold -- see
+    # _starter_effective_hook. Default 0.25 severely dampens the upside for
+    # high-stamina workhorses (min(base,stamina) discards the excess
+    # entirely, then only this fraction of it is credited back), while
+    # below-baseline stamina gets full credit via the min(). Investigation
+    # 2026-07-20: this asymmetry was a primary driver of pitcher pitch-count
+    # projections converging toward a narrow band regardless of real
+    # workhorse-vs-short-outing differences.
+    starter_hook_stamina_excess_weight = _clamp01(_ov_f("starter_hook_stamina_excess_weight", 0.25))
     starter_hook_spread = max(1.0, _ov_f("starter_hook_spread", 6.0))
     starter_pull_bias = _clamp01(_ov_f("starter_pull_bias", 0.15))
     starter_hard_cap_buffer = max(0, _ov_i("starter_hard_cap_buffer", 28))
@@ -1579,7 +1589,7 @@ def _select_pitcher_v2(roster: TeamRoster, state: GameState, rng: random.Random,
         base_hook = int(roster.manager.pull_starter_pitch_count)
         stamina_hook = int(getattr(starter_prof, "stamina_pitches", base_hook) or base_hook)
         avail = _avail_pitcher(starter_prof)
-        eff_hook = _starter_effective_hook(base_hook, stamina_hook, avail)
+        eff_hook = _starter_effective_hook(base_hook, stamina_hook, avail, starter_hook_stamina_excess_weight)
 
         if early_sample_scale > 0:
             eff_hook -= int(round(float(starter_early_sample_hook_delta_max) * float(early_sample_scale)))

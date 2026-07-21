@@ -1,20 +1,33 @@
 {
   "_meta": {
-    "generated_at": "2026-07-19",
-    "description": "Re-fit of the starter-hook-add-pitches override for the MLB manager_pitching='v2' model, made necessary by promoting log5/odds-ratio combination for hr_tgt/inplay_hit in sim_engine/pitch_model.py (2026-07-19) -- that change shifted the raw pitch-count bias curve enough that the prior fit (-11, from 2026-07-17 against the naive-average combiner) no longer lands near zero. Re-swept manually against the same 35-tune/11-holdout 2026-season backfill (seed 2026, 100 sims/game), grid [-12,-13,-14] under the new log5 combiner, calibration disabled to see the raw effect. See Syndicate/mlb_sim_accuracy_assessment_and_optimization_plan.md Phase 1 item #1 and the log5 combiner promotion note in pitch_model.py's _combined().",
-    "selected_value": -13,
-    "rationale": "Clean, monotonic bracket: -12 -> holdout bias +0.73 (tune), -13 -> holdout bias +0.44 / essentially zero on tune (-0.02), -14 -> overshoots negative (tune -0.73). -13 lands closest to zero on both tune and holdout without overshooting, and is a materially better pitch-count fit than the prior -11 value ever achieved even under the old naive-average combiner (holdout bias was +1.35 at best).",
-    "previous_fit": {
-      "generated_at": "2026-07-17",
-      "selected_value": -11,
-      "context": "Fit against the naive-average rate combiner (pre-log5). Grid [-14,-11,-8,-5,-2]. Superseded by this entry once log5 combination was promoted for hr/inplay_hit -- see description above.",
-      "baseline_holdout_pitch_bias": 9.76,
-      "selected_holdout_pitch_bias": 1.35
+    "description": "Forward-tuning overrides for manager_pitching='v2', active for any sim date >= 2026-04-14 via should_use_forward_tuning(). Each key below has its own provenance block. See Syndicate/mlb_sim_accuracy_assessment_and_optimization_plan.md Phase 1 item #1 for full context.",
+    "starter_hook_add_pitches": {
+      "generated_at": "2026-07-19",
+      "description": "Re-fit of the starter-hook-add-pitches override for the MLB manager_pitching='v2' model, made necessary by promoting log5/odds-ratio combination for hr_tgt/inplay_hit in sim_engine/pitch_model.py (2026-07-19) -- that change shifted the raw pitch-count bias curve enough that the prior fit (-11, from 2026-07-17 against the naive-average combiner) no longer lands near zero. Re-swept manually against the same 35-tune/11-holdout 2026-season backfill (seed 2026, 100 sims/game), grid [-12,-13,-14] under the new log5 combiner, calibration disabled to see the raw effect. See the log5 combiner promotion note in pitch_model.py's _combined().",
+      "selected_value": -13,
+      "rationale": "Clean, monotonic bracket: -12 -> holdout bias +0.73 (tune), -13 -> holdout bias +0.44 / essentially zero on tune (-0.02), -14 -> overshoots negative (tune -0.73). -13 lands closest to zero on both tune and holdout without overshooting, and is a materially better pitch-count fit than the prior -11 value ever achieved even under the old naive-average combiner (holdout bias was +1.35 at best).",
+      "previous_fit": {
+        "generated_at": "2026-07-17",
+        "selected_value": -11,
+        "context": "Fit against the naive-average rate combiner (pre-log5). Grid [-14,-11,-8,-5,-2]. Superseded by this entry once log5 combination was promoted for hr/inplay_hit.",
+        "baseline_holdout_pitch_bias": 9.76,
+        "selected_holdout_pitch_bias": 1.35
+      },
+      "baseline_holdout_pitch_bias_under_log5": 1.90,
+      "selected_holdout_pitch_bias_under_log5": 0.44,
+      "holdout_games": 11,
+      "tune_games": 35
     },
-    "baseline_holdout_pitch_bias_under_log5": 1.90,
-    "selected_holdout_pitch_bias_under_log5": 0.44,
-    "holdout_games": 11,
-    "tune_games": 35
+    "starter_hook_stamina_excess_weight": {
+      "generated_at": "2026-07-20",
+      "description": "New tunable added 2026-07-20: sim_engine/simulate.py's _starter_effective_hook previously hardcoded a 0.25 weight on stamina above the manager's baseline hook -- min(base,stamina) discarded any excess entirely, then only 25% of it was credited back, while below-baseline stamina got full credit via the min(). This severely dampened upside for high-stamina workhorses (a maxed-out stamina_pitches=115 vs base=95 only reached eff_hook=100, barely above a league-average pitcher's 92), which combined with a real data-attribution bug in _derive_stamina_pitches_from_season_stats (season-total pitches divided by start count alone, corrupting estimates for mixed-role pitchers -- see build_roster.py fix same day) to make pitcher pitch-count projections converge toward a narrow band regardless of real ace-vs-back-end differences. Fixed the data-attribution bug directly in code; made the 0.25 weight tunable and swept it here since it's a genuine magnitude question, not a correctness bug. Swept grid [0.25,0.50,0.75,1.00] against the same 35-tune/11-holdout 2026-season backfill, on top of the stamina fix + the newly-populated Statcast player-feature set (see data/statcast/features/) + selective log5 + starter_hook_add_pitches=-13.",
+      "selected_value": 0.75,
+      "rationale": "Clean monotonic tune-day trend crossing zero near weight=1.00 (0.25->-0.63, 0.50->-0.38, 0.75->-0.15, 1.00->+0.06), but holdout generalization favored 0.75 over 1.00 (holdout bias +0.20 vs +0.39, outs_mae 3.877 vs 3.914) -- the tune-day optimum didn't hold on holdout, so the more conservative value was selected. HR/hits/total-runs metrics stayed completely flat across the whole grid (hr_avg_p 0.0945-0.0946, full_mae_total_runs 3.539-3.548), confirming this change is cleanly isolated to pitcher workload with no side effects.",
+      "old_hardcoded_value": 0.25,
+      "holdout_games": 11,
+      "tune_games": 35
+    }
   },
-  "starter_hook_add_pitches": -13
+  "starter_hook_add_pitches": -13,
+  "starter_hook_stamina_excess_weight": 0.75
 }

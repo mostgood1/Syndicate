@@ -314,6 +314,15 @@ def _iter_statcast_files(raw_root: Path, season: int) -> Iterable[Path]:
     base = raw_root / str(int(season))
     if not base.exists():
         return
+    # Support both layouts: files nested one level under a month/date-range
+    # subdirectory, and files written flat directly under the season dir
+    # (e.g. fetch_statcast_raw_pitches_x64.py writes
+    # {season}/statcast_{start}_{end}.csv.gz with no subdirectory). Bug found
+    # 2026-07-20: this previously only checked subdirectories, so a flat
+    # layout silently produced zero files and an empty feature set with no
+    # error.
+    for f in sorted(base.glob("*.csv.gz")):
+        yield f
     for month_dir in sorted([p for p in base.iterdir() if p.is_dir()], key=lambda p: p.name):
         for f in sorted(month_dir.glob("*.csv.gz")):
             yield f
