@@ -1393,6 +1393,31 @@ class IntelligenceStateService:
                 sport=None,
             )
 
+        # collect_candidates (the primary path above) and collect_all_recommendations
+        # (the fallback) are two genuinely different pipelines that don't always
+        # agree on completeness -- confirmed live 2026-07-21: collect_candidates
+        # returning a non-empty but thin result (e.g. 10) permanently skipped the
+        # richer fallback (which found 181 for the identical date/sport), because
+        # the "if not raw_candidates" check above only ever fires on a literal
+        # empty list. A fresh direct compute minutes apart, same payload, same
+        # underlying data, produced 10 vs 181 -- not a timing artifact. Try the
+        # richer pipeline whenever the primary result looks suspiciously thin
+        # (not just when it's empty), and keep whichever is actually bigger.
+        _THIN_CANDIDATE_POOL_THRESHOLD = 20
+        if 0 < len(raw_candidates) < _THIN_CANDIDATE_POOL_THRESHOLD:
+            try:
+                richer_candidates = _profile_stage(
+                    "simulation_aggregation_fallback_thin_check",
+                    collect_all_recommendations,
+                    selected_date=selected_date,
+                    force_refresh=True,
+                    log_pipeline=False,
+                )
+            except TypeError:
+                richer_candidates = []
+            if len(richer_candidates) > len(raw_candidates):
+                raw_candidates = richer_candidates
+
         raw_candidates = [candidate for candidate in raw_candidates if isinstance(candidate, Mapping)]
         candidate_build_started_at = time.perf_counter()
         candidate_entries: list[dict[str, Any]] = []
