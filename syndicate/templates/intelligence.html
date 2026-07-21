@@ -537,25 +537,13 @@
   }
 
   #bet-slip-panel {
-    position: fixed;
-    right: 20px;
-    bottom: 20px;
-    width: 320px;
-    max-width: calc(100vw - 40px);
-    max-height: min(70vh, 560px);
     display: flex;
     flex-direction: column;
-    background: var(--cards-surface-strong, #0f1e2f);
-    border: 1px solid var(--cards-line-strong, rgba(132, 166, 196, 0.3));
+    background: rgba(8, 18, 30, 0.72);
+    border: 1px solid var(--cards-line);
     border-radius: 16px;
-    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
-    z-index: 60;
     overflow: hidden;
     font-size: 13px;
-  }
-
-  #bet-slip-panel[data-empty="true"] {
-    width: auto;
   }
 
   .bet-slip__header {
@@ -563,10 +551,15 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    padding: 12px 14px;
+    padding: 10px 12px;
     cursor: pointer;
     background: rgba(255, 255, 255, 0.03);
     border-bottom: 1px solid var(--cards-line);
+  }
+
+  #bet-slip-panel[data-empty="true"] .bet-slip__header {
+    cursor: default;
+    border-bottom: none;
   }
 
   #bet-slip-panel[data-collapsed="true"] .bet-slip__header {
@@ -618,6 +611,7 @@
   }
 
   .bet-slip__legs {
+    max-height: 360px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -759,15 +753,6 @@
     color: var(--cards-text-soft);
   }
 
-  @media (max-width: 480px) {
-    #bet-slip-panel {
-      right: 10px;
-      left: 10px;
-      bottom: 10px;
-      width: auto;
-      max-width: none;
-    }
-  }
 </style>
 
 <main class="board-page">
@@ -819,6 +804,10 @@
       </section>
     </div>
     <aside class="board-rail">
+      <section>
+        <h2 class="board-section-title">Bet slip</h2>
+        <div id="bet-slip-panel"></div>
+      </section>
       <section>
         <h2 class="board-section-title">Portfolio</h2>
         <div id="board-portfolio"></div>
@@ -1657,18 +1646,20 @@
     }
   }
 
+  let betSlipPanelWired = false;
+
   function ensureBetSlipPanel() {
-    let panel = document.getElementById("bet-slip-panel");
-    if (panel) return panel;
-    panel = document.createElement("div");
-    panel.id = "bet-slip-panel";
-    document.body.appendChild(panel);
-    panel.addEventListener("click", (event) => {
-      if (event.target.closest(".bet-slip__header")) {
-        betSlipCollapsed = !betSlipCollapsed;
-        renderBetSlip();
-      }
-    });
+    const panel = document.getElementById("bet-slip-panel");
+    if (panel && !betSlipPanelWired) {
+      betSlipPanelWired = true;
+      panel.addEventListener("click", (event) => {
+        if (event.target.closest(".bet-slip__header") && !betSlip.length) return;
+        if (event.target.closest(".bet-slip__header")) {
+          betSlipCollapsed = !betSlipCollapsed;
+          renderBetSlip();
+        }
+      });
+    }
     return panel;
   }
 
@@ -1680,8 +1671,9 @@
     if (!legs.length) {
       panel.innerHTML = `
         <div class="bet-slip__header">
-          <div class="bet-slip__title">🎫 Bet slip</div>
+          <div class="bet-slip__title">Your slip is empty</div>
         </div>
+        <div class="bet-slip__empty">Tap 🎫 Slip on any pick to add it here.</div>
       `;
       return;
     }
@@ -1711,7 +1703,7 @@
     }).join("");
     panel.innerHTML = `
       <div class="bet-slip__header">
-        <div class="bet-slip__title">🎫 Bet slip <span class="bet-slip__count">${legs.length}</span></div>
+        <div class="bet-slip__title"><span class="bet-slip__count">${legs.length}</span> pick${legs.length === 1 ? "" : "s"} staged</div>
         <div class="bet-slip__toggle">▾</div>
       </div>
       <div class="bet-slip__body">
