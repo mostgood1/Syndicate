@@ -45,6 +45,17 @@ _LIVE_REFRESH_LOOP_THREAD: threading.Thread | None = None
 _LIVE_REFRESH_LOOP_LOCK = threading.Lock()
 _LIVE_REFRESH_LOOP_STOP = threading.Event()
 _LIVE_REFRESH_PROCESS_LOCK_HANDLE: Any | None = None
+# Captured once at import time -- i.e. "when this container/process started."
+# refresh-worker runs as a single instance (no horizontal scaling in
+# render.yaml), so a shared active-run pointer whose started_at predates this
+# process's own start can only have been written by a previous, now-dead
+# container. That's a strictly more certain signal than PID+cmdline
+# comparison for the cross-container-restart case specifically -- confirmed
+# in production 2026-07-21: a container only 14 seconds past its own deploy
+# already reported "previous_run_still_active" from a pointer that had to
+# predate it, suggesting the PID/cmdline check alone wasn't reliably
+# detecting staleness across a full container restart.
+_PROCESS_STARTED_AT = datetime.now(timezone.utc)
 
 
 def _utc_now() -> str:
@@ -872,6 +883,15 @@ def _shared_mlb_sim_still_running() -> bool:
 	if started_dt is not None:
 		age_seconds = (datetime.now(timezone.utc) - started_dt).total_seconds()
 		if age_seconds > _MLB_SIM_MAX_RUNTIME_SECONDS:
+			_clear_active_pointer(expected_pid=pid)
+			return False
+		# A pointer recorded before this very process started can only belong
+		# to a previous, now-dead container (single-instance service -- see
+		# _PROCESS_STARTED_AT above) -- a definitive signal, unlike PID
+		# liveness/cmdline matching, which can false-positive on a reused PID
+		# whose /proc/<pid>/cmdline happens to be unreadable during the new
+		# container's own early boot.
+		if started_dt < _PROCESS_STARTED_AT:
 			_clear_active_pointer(expected_pid=pid)
 			return False
 	if not _process_exists(pid):
