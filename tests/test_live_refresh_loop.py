@@ -1175,6 +1175,61 @@ class LiveRefreshLoopTests(unittest.TestCase):
         self.assertFalse(result["launched"])
         self.assertTrue(result["skipped"])
 
+    def test_look_ahead_target_date_day2_computes_two_days_ahead(self) -> None:
+        self.assertEqual(live_refresh_loop._look_ahead_target_date_day2("2026-07-15"), "2026-07-17")
+        self.assertEqual(live_refresh_loop._look_ahead_target_date_day2("2026-12-30"), "2027-01-01")
+
+    def test_look_ahead_decision_day2_launches_when_day1_has_no_games_but_day2_does(self) -> None:
+        def fake_schedule(sport, date_str):
+            return [] if date_str == "2026-07-16" else [{"id": "401857071"}]
+
+        with patch.dict(
+            os.environ, {"SYNDICATE_LOOK_AHEAD_ENABLED": "true"}, clear=False
+        ), patch.object(live_refresh_loop, "_read_last_look_ahead_check_day2", return_value={}), patch.object(
+            live_refresh_loop, "_record_look_ahead_check_day2"
+        ) as mocked_record, patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", side_effect=fake_schedule
+        ):
+            decision = live_refresh_loop._look_ahead_decision_day2(now_epoch=1000.0, selected_date="2026-07-15", any_live=False)
+
+        self.assertTrue(decision["launch"])
+        self.assertEqual(decision["date"], "2026-07-17")
+        self.assertEqual(decision["reason"], "warm_day_after_next_slate")
+        mocked_record.assert_called_once_with(1000.0, "2026-07-17", launched=True)
+
+    def test_look_ahead_decision_day2_skips_when_window_disabled(self) -> None:
+        with patch.dict(
+            os.environ, {"SYNDICATE_LOOK_AHEAD_ENABLED": "true", "SYNDICATE_LOOK_AHEAD_48H_ENABLED": "false"}, clear=False
+        ):
+            decision = live_refresh_loop._look_ahead_decision_day2(now_epoch=1000.0, selected_date="2026-07-15", any_live=False)
+
+        self.assertFalse(decision["launch"])
+        self.assertEqual(decision["reason"], "disabled")
+
+    def test_run_mlb_sim_tick_skips_day2_when_day1_launches_this_tick(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true", "SYNDICATE_LOOK_AHEAD_ENABLED": "true"},
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-15"), patch.object(
+            live_refresh_loop, "_any_tracked_sport_game_live", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_read_last_look_ahead_check", return_value={}
+        ), patch.object(
+            live_refresh_loop, "_record_look_ahead_check"
+        ), patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=[{"id": "401857071"}]
+        ), patch.object(
+            live_refresh_loop, "launch_refresh_run", return_value={"ok": True, "state": "running"}
+        ) as mocked_launch:
+            meta = live_refresh_loop._run_mlb_sim_tick()
+
+        self.assertTrue(meta["lookAhead"]["launched"])
+        self.assertFalse(meta["lookAheadDay2"]["launched"])
+        self.assertEqual(meta["lookAheadDay2"]["reason"], "day1_launched_this_tick")
+        # Only day 1's look-ahead call -- day 2 must not also launch this tick.
+        mocked_launch.assert_called_once()
+
     def test_run_tick_launches_look_ahead_refresh_when_enabled_idle_and_games_scheduled(self) -> None:
         with patch.dict(
             os.environ,

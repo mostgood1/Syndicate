@@ -1163,6 +1163,56 @@ def _look_ahead_decision(*, now_epoch: float, selected_date: str, any_live: bool
 	return {"launch": True, "reason": "warm_next_day_slate", "date": target_date}
 
 
+# Second day of the look-ahead window (selected_date + 2), extending warm-up
+# coverage to a full 48 hours as requested -- e.g. a WNBA slate starting
+# tomorrow evening previously wasn't warmed until the day itself rolled
+# over. Kept as fully separate functions/state file from the day-1 ones
+# above (rather than adding a days_ahead parameter to them) so the existing
+# day-1 tests' exact call-signature assertions can't be broken by this.
+
+def _look_ahead_window_enabled() -> bool:
+	return _env_bool("SYNDICATE_LOOK_AHEAD_48H_ENABLED", default=True)
+
+
+def _look_ahead_target_date_day2(selected_date: str) -> str:
+	return (date.fromisoformat(selected_date) + timedelta(days=2)).isoformat()
+
+
+def _last_look_ahead_check_day2_path() -> Path:
+	return _meta_dir() / "last_look_ahead_check_day2.json"
+
+
+def _read_last_look_ahead_check_day2() -> dict[str, Any]:
+	payload = read_json_file(_last_look_ahead_check_day2_path())
+	return payload if isinstance(payload, dict) else {}
+
+
+def _record_look_ahead_check_day2(epoch: float, date_str: str, *, launched: bool) -> None:
+	write_json_file(
+		_last_look_ahead_check_day2_path(),
+		{"epoch": epoch, "date": date_str, "launched": bool(launched), "recordedAt": _utc_now()},
+	)
+
+
+def _look_ahead_decision_day2(*, now_epoch: float, selected_date: str, any_live: bool | None) -> dict[str, Any]:
+	if not _look_ahead_enabled() or not _look_ahead_window_enabled():
+		return {"launch": False, "reason": "disabled"}
+	if any_live:
+		return {"launch": False, "reason": "sport_currently_live"}
+	target_date = _look_ahead_target_date_day2(selected_date)
+	last = _read_last_look_ahead_check_day2()
+	last_epoch = float(last.get("epoch") or 0.0)
+	last_date = str(last.get("date") or "")
+	interval = _look_ahead_interval_seconds()
+	if last_epoch > 0.0 and last_date == target_date and (now_epoch - last_epoch) < interval:
+		return {"launch": False, "reason": "within_check_interval", "date": target_date}
+	if not _look_ahead_has_scheduled_games(target_date, sports=_live_refresh_loop_sports()):
+		_record_look_ahead_check_day2(now_epoch, target_date, launched=False)
+		return {"launch": False, "reason": "no_games_scheduled", "date": target_date}
+	_record_look_ahead_check_day2(now_epoch, target_date, launched=True)
+	return {"launch": True, "reason": "warm_day_after_next_slate", "date": target_date}
+
+
 def _launch_look_ahead_refresh(decision: dict[str, Any]) -> dict[str, Any]:
 	target_date = str(decision.get("date") or "")
 	try:
@@ -1615,6 +1665,22 @@ def _run_mlb_sim_tick() -> dict[str, Any]:
 			meta["lookAhead"] = {"ok": False, "launched": False, "reason": look_ahead_decision.get("reason")}
 	except Exception as exc:
 		meta["lookAhead"] = {"ok": False, "launched": False, "error": f"{type(exc).__name__}: {exc}"}
+
+	# Second day of the look-ahead window (selected_date + 2). Skipped
+	# whenever day 1 just launched this same tick -- don't stack two heavy
+	# refresh launches back to back on Render's tight memory headroom; the
+	# next idle tick picks day 2 up instead.
+	if meta.get("lookAhead", {}).get("launched"):
+		meta["lookAheadDay2"] = {"ok": True, "launched": False, "reason": "day1_launched_this_tick"}
+	else:
+		try:
+			look_ahead_day2_decision = _look_ahead_decision_day2(now_epoch=tick_started_epoch, selected_date=selected_date, any_live=any_live)
+			if look_ahead_day2_decision.get("launch"):
+				meta["lookAheadDay2"] = _launch_look_ahead_refresh(look_ahead_day2_decision)
+			else:
+				meta["lookAheadDay2"] = {"ok": False, "launched": False, "reason": look_ahead_day2_decision.get("reason")}
+		except Exception as exc:
+			meta["lookAheadDay2"] = {"ok": False, "launched": False, "error": f"{type(exc).__name__}: {exc}"}
 
 	try:
 		evening_sim_decision = _mlb_evening_next_day_sim_decision(now_epoch=tick_started_epoch, selected_date=selected_date, any_live=any_live)
