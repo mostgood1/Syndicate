@@ -1415,8 +1415,27 @@ class IntelligenceStateService:
                 )
             except TypeError:
                 richer_candidates = []
+            richer_candidates = [c for c in richer_candidates if isinstance(c, Mapping)]
             if len(richer_candidates) > len(raw_candidates):
-                raw_candidates = richer_candidates
+                # Merge, don't replace: confirmed live 2026-07-21 that a wholesale
+                # swap loses coverage whenever the two pipelines don't have
+                # identical sport reach -- MLB came back at the richer pipeline's
+                # 181-candidate count, but WNBA (present in the primary result)
+                # disappeared entirely from the combined board. Union both pools
+                # by candidate identity so a sport/candidate either pipeline
+                # uniquely finds survives instead of one silently overwriting
+                # the other's coverage.
+                merged_by_id: dict[str, dict[str, Any]] = {}
+                for source in (raw_candidates, richer_candidates):
+                    for candidate in source:
+                        candidate = dict(candidate)
+                        try:
+                            identity = self._candidate_id(candidate)
+                        except Exception:
+                            identity = ""
+                        key = identity or f"_unkeyed_{id(candidate)}"
+                        merged_by_id.setdefault(key, candidate)
+                raw_candidates = list(merged_by_id.values())
 
         raw_candidates = [candidate for candidate in raw_candidates if isinstance(candidate, Mapping)]
         candidate_build_started_at = time.perf_counter()
