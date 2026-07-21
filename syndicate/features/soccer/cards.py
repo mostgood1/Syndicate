@@ -12,6 +12,7 @@ from syndicate.features.soccer.sources import league_display_name
 from syndicate.features.soccer.sources import league_select_control
 from syndicate.features.soccer.sources import live_state_payload
 from syndicate.features.soccer.sources import normalize_league
+from syndicate.features.soccer.sources import picks_rows
 from syndicate.features.soccer.sources import recommendations_payload
 from syndicate.features.soccer.sources import schedule_path
 from syndicate.features.soccer.sources import team_by_name
@@ -195,6 +196,59 @@ def _live_match_state(league: str, date_str: str, event_id: str) -> dict[str, An
         return None
     entry = games.get(event_id)
     return entry if isinstance(entry, dict) else None
+
+
+def _market_data_for_match(league: str, date_str: str, home_team: str, away_team: str) -> dict[str, Any]:
+    # game_board_contract.py's _build_period_rows/_build_box_sections already
+    # know how to compare a sim projection against game["betting"] (every
+    # other sport populates it from a real book line) -- soccer never set
+    # this key at all, so its market/edge columns always rendered "-" even
+    # though build_soccer_picks.py now computes exactly this comparison.
+    # Reads the same graded picks_{date}.csv the picks pipeline writes,
+    # rather than re-deriving devig/probability math here.
+    #
+    # Matched by team name, not event_id: build_soccer_picks.py's picks CSV
+    # carries the Odds API's own event id (a different id space than ESPN's,
+    # which is what the sim payload's event_id/match_id actually is), so
+    # team-name matching is the only field both sources share -- same join
+    # key build_soccer_picks.py itself already uses internally.
+    if not date_str or not home_team or not away_team:
+        return {}
+    rows = [
+        row
+        for row in picks_rows(league, date_str)
+        if str(row.get("home") or "").strip() == home_team and str(row.get("away") or "").strip() == away_team
+    ]
+    if not rows:
+        return {}
+    betting: dict[str, Any] = {}
+    for row in rows:
+        market = str(row.get("market") or "").strip().upper()
+        side = str(row.get("side") or "").strip().lower()
+        line_text = row.get("line")
+        if market == "ML":
+            prob = _safe_float(row.get("market_probability"))
+            if prob is None:
+                continue
+            if side == "home":
+                betting["p_home_win"] = prob
+            elif side == "away":
+                betting["p_away_win"] = prob
+        elif market == "TOTAL" and "total" not in betting:
+            line = _safe_float(line_text)
+            if line is not None:
+                betting["total"] = line
+        elif market == "SPREAD" and side == "home":
+            line = _safe_float(line_text)
+            if line is None:
+                continue
+            current = betting.get("home_spread")
+            # Multiple books quote different Asian-handicap lines; the one
+            # closest to pick'em is the most representative single line to
+            # show, same convention a real odds board defaults to.
+            if current is None or abs(line) < abs(current):
+                betting["home_spread"] = line
+    return betting
 
 
 def _box_score_panel(
@@ -383,6 +437,7 @@ def _match_to_game(match: dict[str, Any], *, league: str, week: int, season: int
             "score": {"away_mean": team_projection.get("away_mean"), "home_mean": team_projection.get("home_mean")},
             "periods": periods,
         },
+        "betting": _market_data_for_match(league, str(match.get("date") or "")[:10], home_team, away_team),
         "metrics": [
             {"label": "Home win", "value": _fmt_pct(win_prob.get("home"))},
             {"label": "Draw", "value": _fmt_pct(win_prob.get("draw"))},

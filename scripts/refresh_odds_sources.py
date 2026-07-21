@@ -1021,6 +1021,43 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
     for league in league_slugs:
         steps.append(
             RefreshStep(
+                name=f"soccer_{league}_odds",
+                phases=("pregame",),
+                cwd=REPO_ROOT,
+                command=(
+                    python_exe,
+                    "scripts/fetch_soccer_oddsapi_odds_local.py",
+                    "--league",
+                    league,
+                    "--out",
+                    str(soccer_root / league / "api" / "odds" / "game_odds_current.csv"),
+                ),
+                description=f"Capture {league} game-level odds (h2h/totals/spreads) from The Odds API.",
+            )
+        )
+    for league in league_slugs:
+        steps.append(
+            RefreshStep(
+                name=f"soccer_{league}_picks",
+                phases=("pregame",),
+                cwd=REPO_ROOT,
+                command=(
+                    python_exe,
+                    "scripts/build_soccer_picks.py",
+                    "--league",
+                    league,
+                    *_soccer_artifact_scope_args(league, args.date),
+                    "--source-root",
+                    str(soccer_root),
+                    "--out-root",
+                    str(soccer_root),
+                ),
+                description=f"Grade {league}'s simulated projections against captured odds into an EV/edge picks artifact.",
+            )
+        )
+    for league in league_slugs:
+        steps.append(
+            RefreshStep(
                 name=f"soccer_{league}_live_state",
                 phases=("live",),
                 cwd=REPO_ROOT,

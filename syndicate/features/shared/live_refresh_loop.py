@@ -307,6 +307,18 @@ def _nhl_has_live_game(date_str: str) -> bool:
 	return _espn_has_live_game("nhl", date_str)
 
 
+def _nfl_has_live_game(date_str: str) -> bool:
+	# No local live-state artifact of their own (unlike WNBA/NBA/NHL/soccer
+	# above) -- NFL/NCAAF's own refresh steps aren't date-scoped so they've
+	# never needed one. ESPN's scoreboard is the only signal, same as it is
+	# for every sport above as a fallback.
+	return _espn_has_live_game("nfl", date_str)
+
+
+def _ncaaf_has_live_game(date_str: str) -> bool:
+	return _espn_has_live_game("ncaaf", date_str)
+
+
 def _soccer_has_live_game_via_artifact(league: str, date_str: str) -> bool:
 	# poll_soccer_live_state.py writes {"count": len(games), ...} per
 	# league/date -- same fast local-artifact-first shape as the WNBA/NBA
@@ -345,6 +357,8 @@ _LIVE_STATUS_CHECKERS = {
 	"nba": _nba_has_live_game,
 	"nhl": _nhl_has_live_game,
 	"soccer": _soccer_has_live_game,
+	"nfl": _nfl_has_live_game,
+	"ncaaf": _ncaaf_has_live_game,
 }
 
 

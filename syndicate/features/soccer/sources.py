@@ -114,6 +114,25 @@ def live_state_payload(league: str, selected_date: str) -> dict[str, Any] | None
     return load_json(live_state_path(league, selected_date))
 
 
+def picks_path(league: str, selected_date: str) -> Path:
+    return _api_root(league) / "picks" / f"picks_{selected_date}.csv"
+
+
+@lru_cache(maxsize=256)
+def picks_rows(league: str, selected_date: str) -> tuple[dict[str, str], ...]:
+    # Same once-per-tick update cadence as recommendations_payload above
+    # (both written by the pregame-phase dispatcher steps), so cached the
+    # same way. Tuple (not list) so the cached value stays hashable/immutable.
+    path = picks_path(league, selected_date)
+    if not path.exists():
+        return ()
+    try:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            return tuple(dict(row) for row in csv.DictReader(handle))
+    except Exception:
+        return ()
+
+
 def date_index_path(league: str) -> Path:
     return _api_root(league) / "display_prediction_dates.json"
 

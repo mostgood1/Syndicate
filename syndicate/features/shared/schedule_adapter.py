@@ -27,6 +27,9 @@ import json
 import os
 import subprocess
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -327,12 +330,78 @@ def _fetch_soccer_schedule(date_str: str) -> list[dict[str, Any]]:
     return rows
 
 
+# ---------------------------------------------------------------------------
+# NFL / NCAAF: neither has a schedule source anywhere else in this codebase
+# (their refresh steps auto-infer season/week from existing recommendation
+# snapshots rather than fetching a real per-game kickoff-time schedule) --
+# unlike every fetcher above, this isn't reading an existing pipeline, it's
+# the first schedule source these two sports have. Uses ESPN's public
+# unauthenticated scoreboard API directly (same one
+# fetch_espn_live_status_for_date.py hits via subprocess for the live-status
+# check; this one runs in-process like NHL/soccer above since it's a single
+# GET with no vendored-repo import risk).
+# ---------------------------------------------------------------------------
+
+_ESPN_FOOTBALL_LEAGUE = {
+    "nfl": "nfl",
+    "ncaaf": "college-football",
+}
+
+
+def _fetch_espn_football_schedule(sport: str, date_str: str, *, timeout: int = 12) -> list[dict[str, Any]]:
+    league_slug = _ESPN_FOOTBALL_LEAGUE.get(sport)
+    if not league_slug:
+        return []
+    try:
+        compact_date = datetime.strptime(str(date_str).strip(), "%Y-%m-%d").strftime("%Y%m%d")
+    except ValueError:
+        return []
+    url = (
+        f"https://site.api.espn.com/apis/site/v2/sports/football/{league_slug}/scoreboard"
+        f"?dates={urllib.parse.quote(compact_date)}"
+    )
+    request_obj = urllib.request.Request(
+        url,
+        headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json,text/plain,*/*"},
+    )
+    try:
+        with urllib.request.urlopen(request_obj, timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+        return []
+
+    rows: list[dict[str, Any]] = []
+    events = payload.get("events") if isinstance(payload, dict) else None
+    for event in events or []:
+        if not isinstance(event, dict):
+            continue
+        competitions = event.get("competitions") or []
+        competition = competitions[0] if competitions else {}
+        competitors = competition.get("competitors") or []
+        home = next((c for c in competitors if c.get("homeAway") == "home"), {})
+        away = next((c for c in competitors if c.get("homeAway") == "away"), {})
+        event_id = str(event.get("id") or "").strip()
+        if not event_id:
+            continue
+        rows.append(
+            {
+                "event_id": event_id,
+                "home": (home.get("team") or {}).get("displayName"),
+                "away": (away.get("team") or {}).get("displayName"),
+                "start_time_utc": event.get("date"),
+            }
+        )
+    return rows
+
+
 _FETCHERS = {
     "mlb": _fetch_mlb_schedule,
     "nba": lambda date_str: _fetch_basketball_schedule("nba", date_str),
     "wnba": lambda date_str: _fetch_basketball_schedule("wnba", date_str),
     "nhl": _fetch_nhl_schedule,
     "soccer": _fetch_soccer_schedule,
+    "nfl": lambda date_str: _fetch_espn_football_schedule("nfl", date_str),
+    "ncaaf": lambda date_str: _fetch_espn_football_schedule("ncaaf", date_str),
 }
 
 

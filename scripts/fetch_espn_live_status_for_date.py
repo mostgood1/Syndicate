@@ -26,6 +26,8 @@ _ESPN_SPORT_LEAGUE = {
     "wnba": ("basketball", "wnba"),
     "nba": ("basketball", "nba"),
     "nhl": ("hockey", "nhl"),
+    "nfl": ("football", "nfl"),
+    "ncaaf": ("football", "college-football"),
     # Soccer leagues, one entry per league (mirrors
     # syndicate/features/soccer/ingestion/espn_lineups.LEAGUE_ESPN_SLUGS --
     # not imported directly so this script stays a standalone, dependency-free
