@@ -29,6 +29,30 @@ def central_datetime_from_epoch(epoch: float) -> datetime:
     return datetime.fromtimestamp(float(epoch), tz=CENTRAL_TIMEZONE)
 
 
+def central_date_from_iso(value: Any) -> date | None:
+    """Central-calendar-day a UTC/ISO timestamp actually falls on.
+
+    Bug found 2026-07-21: WNBA game-card filtering compared a raw UTC
+    commence_time string's date PREFIX against the requested slate date,
+    e.g. treating "2026-07-21T00:00:00Z" as belonging to 2026-07-21. A
+    7pm Central tip-off is 00:00 UTC the *next* calendar day (19:00 + 5h),
+    so essentially every evening game's UTC-date prefix is slate_date + 1,
+    not slate_date -- naive prefix matching against slate_date was actually
+    selecting the PRIOR day's evening games. Use this for any "which slate
+    day does this game belong to" comparison instead of string prefixes.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        stamp = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=CENTRAL_TIMEZONE)
+        return stamp.astimezone(CENTRAL_TIMEZONE).date()
+    except Exception:
+        return None
+
+
 def _centralize_iso_timestamp(value: Any) -> str | None:
     text = str(value or "").strip()
     if not text:

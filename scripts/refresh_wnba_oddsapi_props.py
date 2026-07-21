@@ -42,6 +42,7 @@ from syndicate.features.shared.refresh_state_store import record_refresh_state
 from syndicate.features.shared.refresh_state_store import should_recompute
 from syndicate.features.shared.refresh_state_store import write_json_file as _keyvalue_write_json_file
 from syndicate.features.shared.refresh_state_store import write_text_file as _keyvalue_write_text_file
+from syndicate.features.shared.timezone import central_date_from_iso
 
 
 def _json_ready(value):
@@ -1888,12 +1889,22 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
             return set()
         return matchups
 
-    def _game_card_date_prefixes() -> tuple[str, str]:
+    def _commence_time_matches_slate_date(commence_time: object) -> bool:
+        # Bug found 2026-07-21: this used to compare the raw UTC commence_time
+        # string's date PREFIX against date_str (plus a next-day prefix as a
+        # secondary case). A 7pm Central tip-off is 00:00 UTC the *next*
+        # calendar day, so nearly every evening game's UTC-date prefix is
+        # date_str + 1, not date_str -- the "primary" prefix match was
+        # actually selecting the PRIOR day's evening slate. Compare the
+        # Central-converted date directly instead of guessing from string
+        # prefixes.
+        game_date = central_date_from_iso(commence_time)
+        if game_date is None:
+            return False
         try:
-            game_date = dt.date.fromisoformat(date_str)
+            return game_date == dt.date.fromisoformat(date_str)
         except Exception:
-            return (date_str, date_str)
-        return (date_str, (game_date + dt.timedelta(days=1)).isoformat())
+            return False
 
     expected_matchups = _prediction_matchups()
     snapshot_matchups: set[tuple[str, str]] = set()
@@ -1921,7 +1932,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                 working = props_frame.copy()
                 _log_frame_memory("wnba_props_snapshot_copied", working, path=str(props_snapshot_path))
                 working["commence_time"] = working["commence_time"].astype(str)
-                working = working[working["commence_time"].str.startswith(_game_card_date_prefixes())].copy()
+                working = working[working["commence_time"].apply(_commence_time_matches_slate_date)].copy()
                 _log_frame_memory("wnba_props_snapshot_filtered", working, path=str(props_snapshot_path))
                 if not working.empty:
                     rows_out: list[dict[str, object]] = []
@@ -2111,7 +2122,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
     working = raw_frame.copy()
     _log_frame_memory("wnba_game_cards_copied", working, path=str(raw_path))
     working["commence_time"] = working["commence_time"].astype(str)
-    working = working[working["commence_time"].str.startswith(_game_card_date_prefixes())].copy()
+    working = working[working["commence_time"].apply(_commence_time_matches_slate_date)].copy()
     _log_frame_memory("wnba_game_cards_filtered", working, path=str(raw_path))
     if working.empty:
         return 0, None

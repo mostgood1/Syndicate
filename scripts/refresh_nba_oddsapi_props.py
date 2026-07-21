@@ -32,6 +32,7 @@ from syndicate.features.shared.refresh_state_store import build_input_hash
 from syndicate.features.shared.refresh_state_store import path_fingerprint
 from syndicate.features.shared.refresh_state_store import record_refresh_state
 from syndicate.features.shared.refresh_state_store import should_recompute
+from syndicate.features.shared.timezone import central_date_from_iso
 
 
 def _json_ready(value):
@@ -1349,7 +1350,17 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
 
     working = raw_frame.copy()
     working["commence_time"] = working["commence_time"].astype(str)
-    working = working[working["commence_time"].str.startswith(date_str)].copy()
+    # Bug found 2026-07-21 (same one fixed in refresh_wnba_oddsapi_props.py):
+    # comparing the raw UTC commence_time string's date PREFIX against
+    # date_str is wrong for evening games -- a 7pm Central tip-off is
+    # 00:00 UTC the *next* calendar day, so this was actually selecting the
+    # PRIOR day's evening slate for most games. Compare the Central-converted
+    # date directly instead.
+    try:
+        _target_date = dt.date.fromisoformat(date_str)
+    except Exception:
+        _target_date = None
+    working = working[working["commence_time"].apply(lambda value: central_date_from_iso(value) == _target_date)].copy()
     if working.empty:
         return _build_from_source_cards_api()
 
