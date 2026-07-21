@@ -1797,8 +1797,18 @@ def _prepare_current_day_overwrite_stage(
         game_out / "ladders" / f"daily_ladder_audit_{token}.json",
         game_out / "season_frontend" / f"season_manifest_{season}_{token}.json",
         game_out / "season_frontend" / f"season_day_{season}_{token}_{profile_slug}.json",
-        game_out / "season_frontend" / f"season_betting_day_{season}_{token}_{profile_slug}.json",
-        game_out / "season_frontend" / f"season_official_betting_day_{season}_{token}_{profile_slug}.json",
+        # season_betting_day / season_official_betting_day deliberately excluded:
+        # these are the board's live game-market candidate source, unconditionally
+        # rewritten every run by write_current_day_season_frontend_artifacts (no
+        # "skip if exists" check), so pre-deleting them here served no purpose for
+        # these two files -- it only opened a window where an interrupted run
+        # (e.g. a Render redeploy mid-sim, which happens frequently -- see
+        # syndicate-mlb-sim-vs-redeploy-cadence in project memory) left the board
+        # with NO game markets at all instead of the last complete day's data.
+        # Confirmed live 2026-07-21: candidate counts swinging 0 -> 244 -> 10
+        # within minutes traced directly to this file being deleted/rewritten
+        # mid-run. Leaving the last-known-good file in place until a full run
+        # actually finishes is strictly safer than deleting it up front.
         pitcher_out / f"daily_summary_{token}.json",
         pitcher_out / "sims" / date_str,
         pitcher_out / "snapshots" / date_str,
