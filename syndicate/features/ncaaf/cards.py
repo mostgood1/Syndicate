@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import csv
+import json
 import os
 import re
+import statistics
 from typing import Any
 from functools import lru_cache
 from pathlib import Path
@@ -17,6 +19,7 @@ from syndicate.features.ncaaf.sources import format_num
 from syndicate.features.ncaaf.sources import format_pct
 from syndicate.features.ncaaf.sources import load_json
 from syndicate.features.ncaaf.sources import summary_path
+from syndicate.features.football.sim_engine.smartsim2.historical_truth.ncaaf_historical_loader import load_games_season
 from syndicate.features.ncaaf.smartsim2_blend import compute_blend
 from syndicate.features.ncaaf.smartsim2_projection import CONSENSUS_SOURCE_LABEL
 from syndicate.features.ncaaf.smartsim2_projection import LEGACY_ENGINE_SOURCE_LABEL
@@ -76,7 +79,7 @@ def _prediction_rows() -> tuple[dict[str, Any], ...]:
     if not data_root.exists():
         return ()
     candidate_paths = sorted(
-        data_root.glob("college_football_schedule_2025_predicted_totals_enhanced*.csv"),
+        data_root.glob("college_football_schedule_*_predicted_totals_enhanced*.csv"),
         key=lambda path: path.stat().st_mtime,
         reverse=True,
     )
@@ -105,7 +108,7 @@ def _prediction_source_path() -> Path | None:
     if not data_root.exists():
         return None
     candidate_paths = sorted(
-        data_root.glob("college_football_schedule_2025_predicted_totals_enhanced*.csv"),
+        data_root.glob("college_football_schedule_*_predicted_totals_enhanced*.csv"),
         key=lambda path: path.stat().st_mtime,
         reverse=True,
     )
@@ -120,6 +123,141 @@ def _prediction_source_path() -> Path | None:
         except Exception:
             continue
     return None
+
+
+_SMARTSIM2_PROJECTION_FILENAME_RE = re.compile(r"^smartsim2_projections_(\d{4})_wk(\d+)\.csv$")
+
+
+@lru_cache(maxsize=1)
+def _smartsim2_standalone_seasons_and_weeks() -> dict[int, list[int]]:
+    """Every (season, week) with a real, already-generated SmartSim 2.0
+    projection artifact on disk -- independent of whether the legacy engine
+    has any data for that season. The engine's own predicted-totals snapshot
+    is only ever refreshed for its own season (see the 2026 season bootstrap:
+    NCAAFCompare, the engine's real source, was unavailable), so this is the
+    only reliable signal for "is there real projection data for a season the
+    engine hasn't touched"."""
+    data_root = default_ncaaf_source_root() / "data"
+    if not data_root.exists():
+        return {}
+    result: dict[int, list[int]] = {}
+    for path in data_root.glob("smartsim2_projections_*_wk*.csv"):
+        match = _SMARTSIM2_PROJECTION_FILENAME_RE.match(path.name)
+        if not match:
+            continue
+        season = int(match.group(1))
+        week = int(match.group(2))
+        result.setdefault(season, []).append(week)
+    for season in result:
+        result[season] = sorted(set(result[season]))
+    return result
+
+
+def _engine_seasons_and_weeks() -> dict[int, list[int]]:
+    result: dict[int, list[int]] = {}
+    for row in _prediction_rows():
+        try:
+            season = int(str(row.get("season") or "").strip())
+            week = int(str(row.get("week") or "").strip())
+        except (TypeError, ValueError):
+            continue
+        result.setdefault(season, []).append(week)
+    for season in result:
+        result[season] = sorted(set(result[season]))
+    return result
+
+
+def _engine_rows_for_season_week(season: int, week: int) -> list[dict[str, Any]]:
+    """Reuses ``_runtime_prediction_rows()``'s own completeness filtering and
+    (away, home) dedup (a row missing predicted points, or a duplicate
+    matchup, was never a valid engine row) and adds a season filter on top --
+    harmless today (the engine CSV has only ever held one season), but
+    required once its glob covers more than one season's file."""
+    return [row for row in _runtime_prediction_rows(week) if str(row.get("season") or "").strip() == str(season)]
+
+
+def _resolve_ncaaf_active_season_and_weeks() -> tuple[int, list[int]]:
+    """The season/week source of truth for the runtime cards page: prefers
+    whichever season has the most recent real data across *either* the
+    legacy engine's predicted-totals snapshot or SmartSim 2.0's own
+    projection artifacts, so a season the engine has no data for is still
+    reachable once real SmartSim 2.0 projections exist for it."""
+    engine_seasons = _engine_seasons_and_weeks()
+    smartsim2_seasons = _smartsim2_standalone_seasons_and_weeks()
+    all_seasons = set(engine_seasons) | set(smartsim2_seasons)
+    if not all_seasons:
+        return default_season(), []
+    active_season = max(all_seasons)
+    weeks = sorted(set(engine_seasons.get(active_season, [])) | set(smartsim2_seasons.get(active_season, [])))
+    return active_season, weeks
+
+
+def _smartsim2_standalone_market_lines(season: int, week: int) -> dict[tuple[str, str], dict[str, float | None]]:
+    data_root = default_ncaaf_source_root() / "data"
+    path = data_root / f"cfbd_lines_{season}_wk{week}.json"
+    if not path.exists():
+        return {}
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            games = json.load(handle)
+    except Exception:
+        return {}
+    index: dict[tuple[str, str], dict[str, float | None]] = {}
+    if not isinstance(games, list):
+        return index
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        lines = game.get("lines") if isinstance(game.get("lines"), list) else []
+        spreads = [line["spread"] for line in lines if isinstance(line, dict) and line.get("spread") is not None]
+        totals = [line["overUnder"] for line in lines if isinstance(line, dict) and line.get("overUnder") is not None]
+        market_margin = -statistics.mean(spreads) if spreads else None
+        market_total = statistics.mean(totals) if totals else None
+        key = (_normalize_text(game.get("homeTeam")), _normalize_text(game.get("awayTeam")))
+        index[key] = {"market_margin": market_margin, "market_total": market_total}
+    return index
+
+
+def _smartsim2_standalone_rows(season: int, week: int) -> list[dict[str, Any]]:
+    """Real schedule + real SmartSim 2.0 projections, joined directly --
+    used only for a (season, week) the legacy engine has no rows for, so
+    this never overrides or competes with the engine's own path."""
+    try:
+        schedule = load_games_season(season)
+    except Exception:
+        return []
+    projection_index = _smartsim2_projection_index(season, week)
+    if not projection_index:
+        return []
+    lines_index = _smartsim2_standalone_market_lines(season, week)
+    rows: list[dict[str, Any]] = []
+    for game in schedule:
+        if not isinstance(game, dict) or game.get("week") != week:
+            continue
+        if game.get("homeClassification") != "fbs" or game.get("awayClassification") != "fbs":
+            continue
+        home_team = str(game.get("homeTeam") or "").strip()
+        away_team = str(game.get("awayTeam") or "").strip()
+        if not home_team or not away_team:
+            continue
+        key = (_normalize_text(home_team), _normalize_text(away_team))
+        projection = projection_index.get(key)
+        if projection is None:
+            continue
+        market = lines_index.get(key, {"market_margin": None, "market_total": None})
+        rows.append(
+            {
+                "game_id": str(game.get("id") or f"{season}_{week}_{home_team}_{away_team}"),
+                "home_team": home_team,
+                "away_team": away_team,
+                "start_date": game.get("startDate"),
+                "venue": game.get("venue"),
+                "projection": projection,
+                "market_margin": market.get("market_margin"),
+                "market_total": market.get("market_total"),
+            }
+        )
+    return rows
 
 
 def _prediction_weeks() -> list[int]:
@@ -1445,20 +1583,226 @@ def _build_smartsim_ncaaf_card_contract(row: dict[str, Any], week: int, *, seaso
         },
     }
 
+def _build_smartsim2_standalone_ncaaf_card_contract(row: dict[str, Any], week: int, *, season: int) -> dict[str, Any]:
+    """Honestly-labeled card for a (season, week) the legacy engine has no
+    data for -- every label says SmartSim 2.0, never Enhanced Totals Engine.
+    Fabricating engine involvement that never happened would violate this
+    whole project's disclosure discipline (see smartsim_ats_policy_implementation_report.md
+    and the 2026 season bootstrap this path was built for). Produces the
+    same ``ncaaf_card`` contract shape as the engine path so templates need
+    no changes; only the content and labeling differ."""
+    home_team = str(row["home_team"])
+    away_team = str(row["away_team"])
+    projection: SmartSimNcaafProjection = row["projection"]
+    home_abbr = _abbr(home_team)
+    away_abbr = _abbr(away_team)
+    home_context = _team_context(home_team, season)
+    away_context = _team_context(away_team, season)
+
+    home_points = round(projection.home_score_mean, 1)
+    away_points = round(projection.away_score_mean, 1)
+    total_points = round(projection.total_mean, 1)
+    margin = projection.margin_mean
+    if margin > 0:
+        spread_label = f"{home_team} by {abs(margin):.1f}"
+    elif margin < 0:
+        spread_label = f"{away_team} by {abs(margin):.1f}"
+    else:
+        spread_label = "Pick'em"
+    win_probability = format_pct(projection.home_win_rate)
+    market_margin = row.get("market_margin")
+    market_total = row.get("market_total")
+
+    scoreboard = {
+        "home_points": home_points,
+        "away_points": away_points,
+        "total_points": total_points,
+        "spread_label": spread_label,
+        "win_probability": win_probability,
+        "source_label": SMARTSIM2_PUBLIC_LABEL,
+        "kickoff": row.get("start_date") or "Kickoff unavailable",
+        "venue": row.get("venue") or "Venue unavailable",
+        "smartsim2_available": True,
+        "smartsim2_margin": projection.margin_mean,
+        "smartsim2_total_points": projection.total_mean,
+        "market_margin": market_margin,
+        "market_total": market_total,
+    }
+
+    summary_text = (
+        f"{SMARTSIM2_PUBLIC_LABEL} projects {home_team} {home_points} - {away_points} {away_team} "
+        f"with a total of {total_points} and a home win probability of {win_probability}. "
+        f"{LEGACY_ENGINE_SOURCE_LABEL} has no prediction for this game yet."
+    )
+    metric_rows = [
+        {"label": "Home mean", "value": home_points},
+        {"label": "Away mean", "value": away_points},
+        {"label": "Projected total", "value": total_points},
+        {"label": "Projected spread", "value": spread_label},
+        {"label": "Win probability", "value": win_probability},
+    ]
+    matchup_context_sections = [
+        {
+            "label": "Returned production",
+            "home": home_context["returning"]["summary"],
+            "away": away_context["returning"]["summary"],
+            "detail": "Starter estimate, production share, and usage from the published snapshot.",
+        },
+        {
+            "label": "Coach continuity",
+            "home": home_context["coach"]["summary"],
+            "away": away_context["coach"]["summary"],
+            "detail": "Continuity score and tenure from the published coach snapshot.",
+        },
+        {
+            "label": "Transfer activity",
+            "home": home_context["transfer"]["summary"],
+            "away": away_context["transfer"]["summary"],
+            "detail": "Incoming, outgoing, and net transfer counts.",
+        },
+        {
+            "label": "Roster base",
+            "home": home_context["roster"]["summary"],
+            "away": away_context["roster"]["summary"],
+            "detail": "Active roster snapshot rows linked to each team.",
+        },
+    ]
+    team_context = {
+        "items": _build_team_context_items(home_context, away_context),
+        "summary": "Return production, portal impact, coach continuity, and roster experience",
+    }
+    matchup_context = {
+        "items": _build_matchup_context_items(home_context, away_context),
+        "summary": "Conference, returning production, portal, coach, and roster comparisons",
+    }
+
+    return {
+        "gamePk": f"{week}_{away_team}_{home_team}".replace(" ", "_"),
+        "card_variant": "ncaaf_main",
+        "away": {"abbr": away_abbr, "name": away_team},
+        "home": {"abbr": home_abbr, "name": home_team},
+        "href": f"/ncaaf/game/{f'{week}_{away_team}_{home_team}'.replace(' ', '_')}?week={week}",
+        "href_label": "Open NCAAF game detail",
+        "status": f"Week {week}",
+        "detail": SMARTSIM2_PUBLIC_LABEL,
+        "summary": summary_text,
+        "metrics": metric_rows,
+        "smartsim_reasons": [],
+        "panels": [
+            {
+                "eyebrow": SMARTSIM2_PUBLIC_LABEL,
+                "title": "Projection contract",
+                "body": f"{LEGACY_ENGINE_SOURCE_LABEL} has no prediction for this game yet, so this card shows SmartSim 2.0's own projection directly, unblended.",
+                "items": [
+                    f"Home mean: {scoreboard['home_points']}",
+                    f"Away mean: {scoreboard['away_points']}",
+                    f"Projected spread: {scoreboard['spread_label']}",
+                    f"Projected total: {scoreboard['total_points']}",
+                    f"Win probability: {scoreboard['win_probability']}",
+                ],
+            },
+            {
+                "eyebrow": SMARTSIM2_PUBLIC_LABEL,
+                "title": "Source and fallback",
+                "body": "This game has no Enhanced Totals Engine row for this season yet -- there is no blend to fall back to.",
+                "items": [
+                    f"Projection source: {SMARTSIM2_PUBLIC_LABEL}",
+                    f"Kickoff: {scoreboard['kickoff']}",
+                    f"Venue: {scoreboard['venue']}",
+                ],
+            },
+        ],
+        "market_tiles": [
+            {"label": "Source", "title": "SmartSim 2.0", "sub": "No Engine data yet"},
+            {"label": "Tier", "title": "Preview", "sub": "Not yet calibrated"},
+            {"label": "Status", "title": "Publishable", "sub": "Publication state"},
+            {"label": "Priority", "title": "-", "sub": "Board order"},
+        ],
+        "ncaaf_card": {
+            "version": _NCAAF_CARD_CONTRACT_VERSION,
+            "summary": {
+                "coverage_score": None,
+                "coverage_tier": "smartsim2_only",
+                "publication_status": "publishable",
+                "publication_priority": None,
+                "publication_ready": True,
+                "ready_label": "Publication ready",
+                "tier_badges": [{"label": "SmartSim 2.0", "active": True}],
+            },
+            "teams": {
+                "home": home_context,
+                "away": away_context,
+            },
+            "scoreboard": scoreboard,
+            "scoreboard_header": {
+                "away": {
+                    "abbr": away_context["abbreviation"],
+                    "rank": away_context["rank"],
+                    "school_name": away_context["school_name"],
+                    "mascot_name": away_context["mascot_name"],
+                    "conference": away_context["conference"],
+                    "conference_short_name": away_context["conference_short_name"],
+                    "logo_url": away_context["logo_url"],
+                    "logo_text": away_context["abbreviation"],
+                    "primary_color": away_context["primary_color"],
+                    "secondary_color": away_context["secondary_color"],
+                },
+                "home": {
+                    "abbr": home_context["abbreviation"],
+                    "rank": home_context["rank"],
+                    "school_name": home_context["school_name"],
+                    "mascot_name": home_context["mascot_name"],
+                    "conference": home_context["conference"],
+                    "conference_short_name": home_context["conference_short_name"],
+                    "logo_url": home_context["logo_url"],
+                    "logo_text": home_context["abbreviation"],
+                    "primary_color": home_context["primary_color"],
+                    "secondary_color": home_context["secondary_color"],
+                },
+                "kickoff": scoreboard["kickoff"],
+                "venue": scoreboard["venue"],
+                "status": f"Week {week}",
+                "status_detail": SMARTSIM2_PUBLIC_LABEL,
+            },
+            "team_context": team_context,
+            "matchup_context": matchup_context,
+            "smartsim_reasons": [],
+            "context_sections": matchup_context_sections,
+        },
+    }
+
+
 def build_smartsim_cards_page_context(selected_week: int) -> dict[str, Any]:
-    season = default_season()
-    runtime_weeks = _prediction_weeks()
+    season, runtime_weeks = _resolve_ncaaf_active_season_and_weeks()
     if not runtime_weeks:
         return build_cards_page_context(selected_week)
     requested_week = int(selected_week or runtime_weeks[-1])
     resolved_week = resolve_selected_value(requested_week, runtime_weeks, runtime_weeks[-1])
-    runtime_rows = _runtime_prediction_rows(resolved_week)
-    if not runtime_rows:
-        return build_cards_page_context(selected_week)
-    games = [
-        _build_smartsim_ncaaf_card_contract(row, resolved_week, season=season)
-        for row in runtime_rows[:16]
-    ]
+
+    engine_rows = _engine_rows_for_season_week(season, resolved_week)
+    if engine_rows:
+        # Unchanged path: real Enhanced Totals Engine data exists for this
+        # exact (season, week) -- byte-identical to the pre-2026-bootstrap
+        # behavior.
+        runtime_rows = engine_rows
+        games = [
+            _build_smartsim_ncaaf_card_contract(row, resolved_week, season=season)
+            for row in runtime_rows[:16]
+        ]
+        source_label_for_page = LEGACY_ENGINE_SOURCE_LABEL
+    else:
+        # No engine row for this season/week (e.g. 2026, while NCAAFCompare
+        # is unavailable) -- fall back to real schedule + real SmartSim 2.0
+        # projections, honestly labeled, never claiming engine involvement.
+        runtime_rows = _smartsim2_standalone_rows(season, resolved_week)
+        if not runtime_rows:
+            return build_cards_page_context(selected_week)
+        games = [
+            _build_smartsim2_standalone_ncaaf_card_contract(row, resolved_week, season=season)
+            for row in runtime_rows[:16]
+        ]
+        source_label_for_page = SMARTSIM2_PUBLIC_LABEL
+
     record_trial_page_view(
         route="/ncaaf/cards",
         season=season,
@@ -1471,7 +1815,7 @@ def build_smartsim_cards_page_context(selected_week: int) -> dict[str, Any]:
     )
     weeks = runtime_weeks
     prev_week, next_week = neighboring_values(weeks, resolved_week, fallback=resolved_week)
-    source_path = _prediction_source_path()
+    source_path = _prediction_source_path() if engine_rows else None
     betting_href = f"/ncaaf/season/{season}/betting-card?week={resolved_week}"
     return apply_game_board_contract(
         {
@@ -1496,12 +1840,12 @@ def build_smartsim_cards_page_context(selected_week: int) -> dict[str, Any]:
                 }
                 for game in games
             ],
-            "source_path": str(source_path) if source_path else f"NCAAF {LEGACY_ENGINE_SOURCE_LABEL} predicted totals",
-            "source_title": f"NCAAF {LEGACY_ENGINE_SOURCE_LABEL} cards runtime",
+            "source_path": str(source_path) if source_path else f"NCAAF {source_label_for_page} predicted totals",
+            "source_title": f"NCAAF {source_label_for_page} cards runtime",
             "empty_state": {
                 "eyebrow": "NCAAF cards",
-                "title": f"No {LEGACY_ENGINE_SOURCE_LABEL} cards were available for this week",
-                "body": f"The cards board first reads the {LEGACY_ENGINE_SOURCE_LABEL} predicted-totals snapshot and falls back to saved weekly summaries only if the runtime path is unavailable.",
+                "title": f"No {source_label_for_page} cards were available for this week",
+                "body": f"The cards board first reads the {LEGACY_ENGINE_SOURCE_LABEL} predicted-totals snapshot, falls back to real SmartSim 2.0 projections for a season the engine has no data for, and falls back to saved weekly summaries only if neither runtime path is available.",
                 "list_items": [
                     f"Requested week: {selected_week}",
                     f"Resolved week: {resolved_week}",
@@ -1510,7 +1854,7 @@ def build_smartsim_cards_page_context(selected_week: int) -> dict[str, Any]:
             "using_sample_data": False,
             "route_path": "/ncaaf/cards",
             "intro_title": "NCAAF Cards",
-            "intro_body": f"NCAAF cards now read directly from {LEGACY_ENGINE_SOURCE_LABEL} predicted totals first, with saved recommendation summaries kept as a fallback path.",
+            "intro_body": f"NCAAF cards now read directly from {source_label_for_page} predicted totals first, with saved recommendation summaries kept as a fallback path.",
             "cards_control_links": [
                 {"label": "Betting Card", "href": betting_href},
                 {"label": "Picks", "href": f"/ncaaf/picks?week={resolved_week}"},
@@ -1520,7 +1864,7 @@ def build_smartsim_cards_page_context(selected_week: int) -> dict[str, Any]:
                 {"label": "Games", "value": str(len(games))},
                 {"label": "Candidates", "value": str(len(runtime_rows))},
                 {"label": "Weeks", "value": str(len(weeks) or "-")},
-                {"label": "Source", "value": LEGACY_ENGINE_SOURCE_LABEL if games else "No data"},
+                {"label": "Source", "value": source_label_for_page if games else "No data"},
             ],
             "cards_stylesheet": None,
             "cards_grid_class": "cards-grid",

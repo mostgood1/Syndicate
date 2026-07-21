@@ -96,6 +96,25 @@ def load_ppa_ratings(season: int) -> dict[str, dict]:
     return index
 
 
+def load_ppa_ratings_with_fallback(season: int) -> tuple[dict[str, dict], str]:
+    """PPA ratings are season-aggregate stats computed from games actually
+    played that season -- for the first week(s) of a brand-new season, CFBD
+    has nothing yet (confirmed empty for a pre-season 2026 request). Fall
+    back to the prior season's final ratings as a preseason proxy for team
+    strength, same idea real prediction systems use for week 1 of a new
+    season. The fallback is whole-index (not per-team): PPA data for a
+    season is either fully populated (games have been played) or entirely
+    empty (none have), not partially populated.
+    """
+    index = load_ppa_ratings(season)
+    if index:
+        return index, f"cfbd_ppa_season_{season}"
+    fallback_index = load_ppa_ratings(season - 1)
+    if fallback_index:
+        return fallback_index, f"cfbd_ppa_season_{season - 1}_fallback_for_{season}"
+    return index, f"cfbd_ppa_season_{season}"
+
+
 def offense_defense_rating(team: str, ppa_index: dict[str, dict]) -> tuple[float, float]:
     row = ppa_index.get(norm(team))
     if row is None:
@@ -103,6 +122,25 @@ def offense_defense_rating(team: str, ppa_index: dict[str, dict]) -> tuple[float
     offense = float((row.get("offense") or {}).get("overall") or 0.0)
     defense_allowed = float((row.get("defense") or {}).get("overall") or 0.0)
     return offense, -defense_allowed
+
+
+def games_from_cfbd_when_engine_schedule_empty(cfbd_games: dict[tuple[str, str], dict]) -> list[dict[str, str]]:
+    """Fallback game list for a season the legacy engine has no schedule for
+    (its predicted-totals CSV is a single, non-season-partitioned file that
+    is only ever refreshed for the engine's own season). Reuses the same
+    real CFBD game data already fetched for cross-referencing -- filtered to
+    strict FBS-vs-FBS, matching the same check the normal engine-schedule
+    path applies downstream."""
+    rows = []
+    for game in cfbd_games.values():
+        if game.get("homeClassification") != "fbs" or game.get("awayClassification") != "fbs":
+            continue
+        home_team = str(game.get("homeTeam") or "").strip()
+        away_team = str(game.get("awayTeam") or "").strip()
+        if not home_team or not away_team:
+            continue
+        rows.append({"home_team": home_team, "away_team": away_team})
+    return rows
 
 
 def build_projection(
@@ -113,6 +151,7 @@ def build_projection(
     away_team: str,
     game_id: str,
     ppa_index: dict[str, dict],
+    rating_source: str,
     seeds: int = SEEDS_PER_GAME,
 ) -> SmartSimNcaafProjection:
     home_off, home_def = offense_defense_rating(home_team, ppa_index)
@@ -153,7 +192,7 @@ def build_projection(
         home_win_rate=round(home_win_rate, 4),
         seeds_used=seeds,
         profile_name=PROFILE_NAME,
-        rating_source=f"cfbd_ppa_season_{season}",
+        rating_source=rating_source,
         generated_at=datetime.now(timezone.utc).isoformat(),
     )
 
@@ -180,8 +219,14 @@ def main() -> None:
     cfbd_games = load_cfbd_games(args.season, args.week)
     log(f"CFBD_GAMES fbs_vs_any={len(cfbd_games)}")
 
-    ppa_index = load_ppa_ratings(args.season)
-    log(f"PPA_RATINGS teams={len(ppa_index)}")
+    used_cfbd_schedule_fallback = False
+    if not schedule_rows:
+        schedule_rows = games_from_cfbd_when_engine_schedule_empty(cfbd_games)
+        used_cfbd_schedule_fallback = True
+        log(f"ENGINE_SCHEDULE_EMPTY falling back to CFBD games directly rows={len(schedule_rows)}")
+
+    ppa_index, rating_source = load_ppa_ratings_with_fallback(args.season)
+    log(f"PPA_RATINGS teams={len(ppa_index)} rating_source={rating_source}")
 
     projections: list[SmartSimNcaafProjection] = []
     skipped_no_cfbd_match: list[str] = []
@@ -207,6 +252,7 @@ def main() -> None:
             away_team=away_team,
             game_id=game_id,
             ppa_index=ppa_index,
+            rating_source=rating_source,
             seeds=args.seeds,
         )
         projections.append(projection)
@@ -219,6 +265,8 @@ def main() -> None:
     log(f"SKIPPED_NO_CFBD_MATCH count={len(skipped_no_cfbd_match)} {skipped_no_cfbd_match}")
     log(f"SKIPPED_NOT_FBS_VS_FBS count={len(skipped_not_fbs_vs_fbs)} {skipped_not_fbs_vs_fbs}")
     print(f"engine_schedule_rows={len(schedule_rows)}")
+    print(f"used_cfbd_schedule_fallback={used_cfbd_schedule_fallback}")
+    print(f"rating_source={rating_source}")
     print(f"projections_written={len(projections)}")
     print(f"skipped_no_cfbd_match={len(skipped_no_cfbd_match)}: {skipped_no_cfbd_match}")
     print(f"skipped_not_fbs_vs_fbs={len(skipped_not_fbs_vs_fbs)}: {skipped_not_fbs_vs_fbs}")

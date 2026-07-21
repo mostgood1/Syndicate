@@ -21,6 +21,7 @@ class NcaafCardsLocalTests(unittest.TestCase):
     def test_smartsim_cards_runtime_uses_prediction_rows(self) -> None:
         runtime_rows = [
             {
+                "season": "2025",
                 "week": "1",
                 "home_team": "Sam Houston",
                 "away_team": "UNLV",
@@ -35,9 +36,11 @@ class NcaafCardsLocalTests(unittest.TestCase):
         ]
 
         with patch("syndicate.features.ncaaf.cards.default_season", return_value=2025), patch(
-            "syndicate.features.ncaaf.cards._prediction_weeks", return_value=[1]
-        ), patch("syndicate.features.ncaaf.cards._prediction_rows", return_value=tuple(runtime_rows)), patch(
+            "syndicate.features.ncaaf.cards._prediction_rows", return_value=tuple(runtime_rows)
+        ), patch(
             "syndicate.features.ncaaf.cards._prediction_source_path", return_value=Path("/tmp/predicted_totals.csv")
+        ), patch(
+            "syndicate.features.ncaaf.cards._smartsim2_standalone_seasons_and_weeks", return_value={}
         ):
             context = build_smartsim_cards_page_context(1)
 
@@ -67,6 +70,7 @@ class NcaafCardsLocalTests(unittest.TestCase):
     def test_smartsim_cards_runtime_skips_incomplete_projection_rows(self) -> None:
         runtime_rows = [
             {
+                "season": "2025",
                 "week": "1",
                 "home_team": "Sam Houston",
                 "away_team": "UNLV",
@@ -79,6 +83,7 @@ class NcaafCardsLocalTests(unittest.TestCase):
                 "venue": "Test Stadium",
             },
             {
+                "season": "2025",
                 "week": "1",
                 "home_team": "Placeholder Home",
                 "away_team": "Placeholder Away",
@@ -93,9 +98,11 @@ class NcaafCardsLocalTests(unittest.TestCase):
         ]
 
         with patch("syndicate.features.ncaaf.cards.default_season", return_value=2025), patch(
-            "syndicate.features.ncaaf.cards._prediction_weeks", return_value=[1]
-        ), patch("syndicate.features.ncaaf.cards._prediction_rows", return_value=tuple(runtime_rows)), patch(
+            "syndicate.features.ncaaf.cards._prediction_rows", return_value=tuple(runtime_rows)
+        ), patch(
             "syndicate.features.ncaaf.cards._prediction_source_path", return_value=Path("/tmp/predicted_totals.csv")
+        ), patch(
+            "syndicate.features.ncaaf.cards._smartsim2_standalone_seasons_and_weeks", return_value={}
         ):
             context = build_smartsim_cards_page_context(1)
 
@@ -105,9 +112,9 @@ class NcaafCardsLocalTests(unittest.TestCase):
     def test_smartsim_cards_runtime_falls_back_to_summaries(self) -> None:
         fallback_context = {"date": "2025 Week 1", "games": [], "source_title": "Fallback"}
 
-        with patch("syndicate.features.ncaaf.cards._prediction_weeks", return_value=[]), patch(
-            "syndicate.features.ncaaf.cards.build_cards_page_context", return_value=fallback_context
-        ):
+        with patch("syndicate.features.ncaaf.cards._prediction_rows", return_value=()), patch(
+            "syndicate.features.ncaaf.cards._smartsim2_standalone_seasons_and_weeks", return_value={}
+        ), patch("syndicate.features.ncaaf.cards.build_cards_page_context", return_value=fallback_context):
             context = build_smartsim_cards_page_context(1)
 
         self.assertEqual(context, fallback_context)

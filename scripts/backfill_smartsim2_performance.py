@@ -67,8 +67,16 @@ def load_truth_games(season: int, week: int) -> list[dict]:
     ]
 
 
-def load_market_lines(lines_dir: Path, week: int) -> dict[tuple[str, str], dict]:
-    path = lines_dir / f"cfbd_lines_wk{week}.json"
+def load_market_lines(lines_dir: Path, week: int, *, season: int | None = None) -> dict[tuple[str, str], dict]:
+    # Season-aware naming (cfbd_lines_{season}_wk{week}.json) came later, once
+    # this cache started covering more than one season -- fall back to the
+    # original, non-season-partitioned convention for the 2025 caches already
+    # on disk under that name.
+    candidates = []
+    if season is not None:
+        candidates.append(lines_dir / f"cfbd_lines_{season}_wk{week}.json")
+    candidates.append(lines_dir / f"cfbd_lines_wk{week}.json")
+    path = next((candidate for candidate in candidates if candidate.exists()), candidates[-1])
     if not path.exists():
         return {}
     with path.open("r", encoding="utf-8") as handle:
@@ -113,7 +121,7 @@ def load_smartsim_projections(season: int, week: int) -> dict[tuple[str, str], d
 
 def backfill_week(season: int, week: int, lines_dir: Path) -> dict[str, int]:
     truth_games = load_truth_games(season, week)
-    lines_index = load_market_lines(lines_dir, week)
+    lines_index = load_market_lines(lines_dir, week, season=season)
     engine_index = load_engine_predictions(season, week)
     smartsim_index = load_smartsim_projections(season, week)
 

@@ -16,6 +16,28 @@ import requests
 from syndicate.features.ncaaf.sources import coach_continuity_snapshot_path
 from syndicate.features.ncaaf.sources import player_identity_snapshot_path
 from syndicate.features.ncaaf.sources import team_registry_snapshot_path
+
+
+def _merge_season_aware_rows(
+    path: Path,
+    *,
+    season: int,
+    new_rows: list[dict[str, Any]],
+    columns: tuple[str, ...],
+) -> list[dict[str, Any]]:
+    """Combine ``new_rows`` (all for ``season``) with whatever other seasons'
+    rows already exist on disk at ``path``, so refreshing one season never
+    destroys another -- these snapshot files hold every season in one CSV
+    (keyed by a ``season`` column), not one file per season, and a plain
+    overwrite here previously wiped a real, non-reproducible-from-git 2025
+    roster/identity snapshot when a 2026 refresh returned zero rows."""
+    other_season_rows: list[dict[str, Any]] = []
+    if path.exists():
+        with path.open("r", encoding="utf-8-sig", newline="") as handle:
+            for row in csv.DictReader(handle):
+                if str(row.get("season") or "").strip() != str(season):
+                    other_season_rows.append({column: row.get(column, "") for column in columns})
+    return other_season_rows + new_rows
 from syndicate.features.ncaaf.sources import returning_production_snapshot_path
 from syndicate.features.ncaaf.sources import roster_snapshot_path
 from syndicate.features.ncaaf.sources import transfer_portal_snapshot_path
@@ -517,10 +539,11 @@ def write_player_identity_snapshot_csv(
     validation_issues = tuple(validate_player_identity_rows(rows, team_registry_rows=team_registry_rows, season=season))
     path = output_path or player_identity_snapshot_path()
     path.parent.mkdir(parents=True, exist_ok=True)
+    combined_rows = _merge_season_aware_rows(path, season=season, new_rows=list(rows), columns=PLAYER_IDENTITY_COLUMNS)
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=PLAYER_IDENTITY_COLUMNS, extrasaction="ignore")
         writer.writeheader()
-        for row in rows:
+        for row in combined_rows:
             writer.writerow({column: row.get(column, "") for column in PLAYER_IDENTITY_COLUMNS})
     connectivity = {"connected": False, "endpoint": "", "season": season, "sample_count": 0, "sample_team": ""}
     return CfbdSnapshotResult(
@@ -648,18 +671,24 @@ def write_ncaaf_roster_snapshot_csv(
 ) -> NcaafRosterSnapshotResult:
     identity_path = identity_snapshot_path or player_identity_snapshot_path()
     loaded_identity_rows = list(identity_rows) if identity_rows is not None else _load_player_identity_snapshot_rows(identity_path)
+    # The identity snapshot holds every season in one file (see
+    # _merge_season_aware_rows), so this must filter to the requested season
+    # before building roster rows -- otherwise every other season's identity
+    # rows would be re-derived into roster rows here too, on every run.
+    season_identity_rows = [row for row in loaded_identity_rows if _safe_text(row.get("season")) == str(season)]
     rows = build_ncaaf_roster_snapshot_rows(
-        identity_rows=loaded_identity_rows,
+        identity_rows=season_identity_rows,
         source_system=source_system,
         source_snapshot_date=source_snapshot_date,
     )
     validation_issues = tuple(validate_ncaaf_roster_snapshot_rows(rows, expected_season=season))
     path = output_path or roster_snapshot_path()
     path.parent.mkdir(parents=True, exist_ok=True)
+    combined_rows = _merge_season_aware_rows(path, season=season, new_rows=list(rows), columns=ROSTER_SNAPSHOT_COLUMNS)
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=ROSTER_SNAPSHOT_COLUMNS, extrasaction="ignore")
         writer.writeheader()
-        for row in rows:
+        for row in combined_rows:
             writer.writerow({column: row.get(column, "") for column in ROSTER_SNAPSHOT_COLUMNS})
     return NcaafRosterSnapshotResult(
         rows=rows,
@@ -1196,10 +1225,11 @@ def run_cfbd_player_identity_build(
     validation_issues = tuple(validate_player_identity_rows(rows, team_registry_rows=team_registry_rows, season=season))
     path = output_path or player_identity_snapshot_path()
     path.parent.mkdir(parents=True, exist_ok=True)
+    combined_rows = _merge_season_aware_rows(path, season=season, new_rows=list(rows), columns=PLAYER_IDENTITY_COLUMNS)
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=PLAYER_IDENTITY_COLUMNS, extrasaction="ignore")
         writer.writeheader()
-        for row in rows:
+        for row in combined_rows:
             writer.writerow({column: row.get(column, "") for column in PLAYER_IDENTITY_COLUMNS})
     connectivity = {
         **connectivity,
