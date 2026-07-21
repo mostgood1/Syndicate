@@ -128,6 +128,16 @@
     gap: 16px;
   }
 
+  /* Grid items default to a content-based min-width (not 0), so a wide
+     child (the blotter table, the horizontally-scrolling opportunities
+     strip) was forcing these bare <section> wrappers -- and the whole
+     page body -- wider than the viewport instead of scrolling within
+     their own overflow-x:auto containers. */
+  .board-main > section,
+  .board-rail > section {
+    min-width: 0;
+  }
+
   .board-section-title {
     margin: 0 0 10px;
     font-size: 1rem;
