@@ -32,6 +32,14 @@ class MatchDistributionSummary:
     mean_away_shots_on_target: float = 0.0
     mean_home_corners: float = 0.0
     mean_away_corners: float = 0.0
+    # Half-by-half goal means, derived from each run's half_log (already
+    # computed per simulation, previously discarded at aggregation time).
+    # Purely additive: doesn't touch final_score/possession_log-derived
+    # aggregates above, so every existing field's value is unchanged.
+    mean_h1_home_goals: float = 0.0
+    mean_h1_away_goals: float = 0.0
+    mean_h2_home_goals: float = 0.0
+    mean_h2_away_goals: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -52,6 +60,10 @@ class MatchDistributionSummary:
             "mean_away_shots_on_target": self.mean_away_shots_on_target,
             "mean_home_corners": self.mean_home_corners,
             "mean_away_corners": self.mean_away_corners,
+            "mean_h1_home_goals": self.mean_h1_home_goals,
+            "mean_h1_away_goals": self.mean_h1_away_goals,
+            "mean_h2_home_goals": self.mean_h2_home_goals,
+            "mean_h2_away_goals": self.mean_h2_away_goals,
         }
 
 
@@ -83,6 +95,10 @@ def simulate_match_distribution(
     away_shots_on_target = 0
     home_corners = 0
     away_corners = 0
+    h1_home_goals = 0
+    h1_away_goals = 0
+    h2_home_goals = 0
+    h2_away_goals = 0
 
     for offset in range(simulations):
         seeded_input = replace(simulation_input, seed=base_seed + offset)
@@ -91,6 +107,17 @@ def simulate_match_distribution(
         away = int(output.final_score["away"])
         home_goals.append(float(home))
         away_goals.append(float(away))
+        for half_entry in output.half_log:
+            half_num = int(half_entry.get("half") or 0)
+            if half_num == 1:
+                h1_home_goals += int(half_entry.get("home_goals") or 0)
+                h1_away_goals += int(half_entry.get("away_goals") or 0)
+            elif half_num == 2:
+                h2_home_goals += int(half_entry.get("home_goals") or 0)
+                h2_away_goals += int(half_entry.get("away_goals") or 0)
+            # Extra-time halves (half >= 3, knockout draws only) are dropped
+            # here: this engine is used for league matches, and a 1H/2H
+            # market has no natural slot for extra time.
         for possession in output.possession_log:
             start_state = possession.get("start_state") or {}
             owner = str(start_state.get("possession_owner") or "")
@@ -139,6 +166,10 @@ def simulate_match_distribution(
         mean_away_shots_on_target=round(away_shots_on_target / simulations, 4),
         mean_home_corners=round(home_corners / simulations, 4),
         mean_away_corners=round(away_corners / simulations, 4),
+        mean_h1_home_goals=round(h1_home_goals / simulations, 4),
+        mean_h1_away_goals=round(h1_away_goals / simulations, 4),
+        mean_h2_home_goals=round(h2_home_goals / simulations, 4),
+        mean_h2_away_goals=round(h2_away_goals / simulations, 4),
     )
 
 

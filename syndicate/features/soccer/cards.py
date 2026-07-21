@@ -8,6 +8,7 @@ from syndicate.features.soccer.sources import default_season
 from syndicate.features.soccer.sources import default_week
 from syndicate.features.soccer.sources import league_display_name
 from syndicate.features.soccer.sources import league_select_control
+from syndicate.features.soccer.sources import live_state_payload
 from syndicate.features.soccer.sources import normalize_league
 from syndicate.features.soccer.sources import recommendations_payload
 from syndicate.features.soccer.sources import schedule_path
@@ -142,6 +143,89 @@ def _unsimulated_game(fixture: dict[str, Any], *, league: str, week: int, season
     }
 
 
+def _live_match_state(league: str, date_str: str, event_id: str) -> dict[str, Any] | None:
+    if not date_str or not event_id:
+        return None
+    payload = live_state_payload(league, date_str)
+    games = payload.get("games") if isinstance(payload, dict) else None
+    if not isinstance(games, dict):
+        return None
+    entry = games.get(event_id)
+    return entry if isinstance(entry, dict) else None
+
+
+def _box_score_panel(
+    *,
+    away_team: str,
+    home_team: str,
+    away_abbr: str,
+    home_abbr: str,
+    volume: dict[str, Any],
+    live_state: dict[str, Any] | None,
+) -> dict[str, Any]:
+    # Same volume-stat lane either way (shots / SOT / corners); live_state
+    # (poll_soccer_live_state.py's live_state_{date}.json, so-far counts from
+    # ESPN's live feed) takes over from the pregame sim projection once a
+    # match goes live, rather than showing both -- once the actual count is
+    # known, the projection of it is no longer the useful number.
+    if live_state is not None:
+        return {
+            "eyebrow": "Live box score",
+            "title": "Shots / SOT / corners / red cards -- so far",
+            "body": "Actual match state from ESPN's live feed, refreshed on each live poll.",
+            "table_groups": [
+                {
+                    "heading": "Live",
+                    "rows": [
+                        {
+                            "name": away_abbr,
+                            "detail": f"{away_team} shots / SOT / corners / red",
+                            "value": f"{_fmt_num(live_state.get('away_shots_so_far'), 0)} / {_fmt_num(live_state.get('away_shots_on_target_so_far'), 0)} / {_fmt_num(live_state.get('away_corners_so_far'), 0)} / {_fmt_num(live_state.get('away_red_cards'), 0)}",
+                        },
+                        {
+                            "name": home_abbr,
+                            "detail": f"{home_team} shots / SOT / corners / red",
+                            "value": f"{_fmt_num(live_state.get('home_shots_so_far'), 0)} / {_fmt_num(live_state.get('home_shots_on_target_so_far'), 0)} / {_fmt_num(live_state.get('home_corners_so_far'), 0)} / {_fmt_num(live_state.get('home_red_cards'), 0)}",
+                        },
+                    ],
+                }
+            ],
+            "items": [
+                f"Shots: {away_team} {_fmt_num(live_state.get('away_shots_so_far'), 0)} | {home_team} {_fmt_num(live_state.get('home_shots_so_far'), 0)}",
+                f"On target: {away_team} {_fmt_num(live_state.get('away_shots_on_target_so_far'), 0)} | {home_team} {_fmt_num(live_state.get('home_shots_on_target_so_far'), 0)}",
+                f"Corners: {away_team} {_fmt_num(live_state.get('away_corners_so_far'), 0)} | {home_team} {_fmt_num(live_state.get('home_corners_so_far'), 0)}",
+                f"Red cards: {away_team} {_fmt_num(live_state.get('away_red_cards'), 0)} | {home_team} {_fmt_num(live_state.get('home_red_cards'), 0)}",
+            ],
+        }
+    return {
+        "eyebrow": "Sim box score",
+        "title": "Shots / SOT / corners",
+        "body": "Projected volume markets for live shot props and corner totals.",
+        "table_groups": [
+            {
+                "heading": "Projected",
+                "rows": [
+                    {
+                        "name": away_abbr,
+                        "detail": f"{away_team} shots / SOT / corners",
+                        "value": f"{_fmt_num(volume.get('away_shots'), 1)} / {_fmt_num(volume.get('away_shots_on_target'), 1)} / {_fmt_num(volume.get('away_corners'), 1)}",
+                    },
+                    {
+                        "name": home_abbr,
+                        "detail": f"{home_team} shots / SOT / corners",
+                        "value": f"{_fmt_num(volume.get('home_shots'), 1)} / {_fmt_num(volume.get('home_shots_on_target'), 1)} / {_fmt_num(volume.get('home_corners'), 1)}",
+                    },
+                ],
+            }
+        ],
+        "items": [
+            f"Shots: {away_team} {_fmt_num(volume.get('away_shots'), 1)} | {home_team} {_fmt_num(volume.get('home_shots'), 1)}",
+            f"On target: {away_team} {_fmt_num(volume.get('away_shots_on_target'), 1)} | {home_team} {_fmt_num(volume.get('home_shots_on_target'), 1)}",
+            f"Corners: {away_team} {_fmt_num(volume.get('away_corners'), 1)} | {home_team} {_fmt_num(volume.get('home_corners'), 1)}",
+        ],
+    }
+
+
 def _match_to_game(match: dict[str, Any], *, league: str, week: int, season: int) -> dict[str, Any]:
     matchup = match.get("matchup") if isinstance(match.get("matchup"), dict) else {}
     home_team = str(matchup.get("home_team") or "Home").strip() or "Home"
@@ -150,9 +234,11 @@ def _match_to_game(match: dict[str, Any], *, league: str, week: int, season: int
     team_projection = match.get("team_projection") if isinstance(match.get("team_projection"), dict) else {}
     total_distribution = match.get("total_distribution") if isinstance(match.get("total_distribution"), dict) else {}
     volume = match.get("volume_projection") if isinstance(match.get("volume_projection"), dict) else {}
+    periods = match.get("periods") if isinstance(match.get("periods"), dict) else {}
     top_props = match.get("top_props") if isinstance(match.get("top_props"), list) else []
     event_id = str(match.get("event_id") or match.get("match_id") or "").strip()
     status_state = str(match.get("status_state") or "pre")
+    live_state = _live_match_state(league, str(match.get("date") or "")[:10], event_id) if status_state == "in" else None
 
     home_score = match.get("live_home_score")
     away_score = match.get("live_away_score")
@@ -191,6 +277,10 @@ def _match_to_game(match: dict[str, Any], *, league: str, week: int, season: int
         "summary": summary,
         "href": f"/soccer/{league}/game/{event_id or 'unknown'}?week={week}&season={season}",
         "href_label": "Open match card",
+        "sim": {
+            "score": {"away_mean": team_projection.get("away_mean"), "home_mean": team_projection.get("home_mean")},
+            "periods": periods,
+        },
         "metrics": [
             {"label": "Home win", "value": _fmt_pct(win_prob.get("home"))},
             {"label": "Draw", "value": _fmt_pct(win_prob.get("draw"))},
@@ -210,16 +300,14 @@ def _match_to_game(match: dict[str, Any], *, league: str, week: int, season: int
                     f"Simulations: {match.get('simulations') or '-'}",
                 ],
             },
-            {
-                "eyebrow": "Shot & set-piece volume",
-                "title": "Shots / SOT / corners",
-                "body": "Projected volume markets for live shot props and corner totals.",
-                "items": [
-                    f"Shots: {away_team} {_fmt_num(volume.get('away_shots'), 1)} | {home_team} {_fmt_num(volume.get('home_shots'), 1)}",
-                    f"On target: {away_team} {_fmt_num(volume.get('away_shots_on_target'), 1)} | {home_team} {_fmt_num(volume.get('home_shots_on_target'), 1)}",
-                    f"Corners: {away_team} {_fmt_num(volume.get('away_corners'), 1)} | {home_team} {_fmt_num(volume.get('home_corners'), 1)}",
-                ],
-            },
+            _box_score_panel(
+                away_team=away_team,
+                home_team=home_team,
+                away_abbr=_abbr(away_team, league),
+                home_abbr=_abbr(home_team, league),
+                volume=volume,
+                live_state=live_state,
+            ),
             {
                 "eyebrow": "Top prop signals",
                 "title": "Anytime scorer / shots leaders",

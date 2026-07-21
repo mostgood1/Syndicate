@@ -107,6 +107,10 @@ class SoccerSimulationAdapter:
                 "home_corners": distribution.mean_home_corners,
                 "away_corners": distribution.mean_away_corners,
             },
+            "periods": {
+                "h1": {"home_mean": distribution.mean_h1_home_goals, "away_mean": distribution.mean_h1_away_goals},
+                "h2": {"home_mean": distribution.mean_h2_home_goals, "away_mean": distribution.mean_h2_away_goals},
+            },
             "scoreline_probabilities": dict(distribution.scoreline_probabilities),
             "simulations": distribution.simulations,
             "adapter_metadata": dict(match.adapter_metadata or {}),
