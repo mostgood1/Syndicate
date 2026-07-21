@@ -518,6 +518,27 @@ def _response_has_live_hydration(item: dict[str, object] | None) -> bool:
     return False
 
 
+def _recommendation_sources(response_payload: dict[str, object] | None) -> list[dict[str, object]]:
+    # Referenced by _board_response_needs_refresh below for a long time
+    # without ever being defined anywhere in this repo -- every call site
+    # wrapped it in a bare try/except, so live-vs-pregame freshness
+    # classification always silently saw an empty list. Checks every shape a
+    # response can take (top-level, nested under "response", or nested under
+    # "analysis") since callers pass all three across this file.
+    current = dict(response_payload or {})
+    nested = current.get("response") if isinstance(current.get("response"), dict) else {}
+    analysis = current.get("analysis") if isinstance(current.get("analysis"), dict) else (nested.get("analysis") if isinstance(nested.get("analysis"), dict) else {})
+    sources: list[dict[str, object]] = []
+    for container in (current, nested, analysis):
+        if not isinstance(container, dict):
+            continue
+        for key in ("recommendations", "top_opportunities"):
+            value = container.get(key)
+            if isinstance(value, list):
+                sources.extend(item for item in value if isinstance(item, dict))
+    return sources
+
+
 def _board_response_needs_refresh(
     request_payload: dict[str, object],
     response_payload: dict[str, object] | None,
@@ -1219,27 +1240,8 @@ def intelligence_query_api():
     # empty result, because nothing here ever checked which sport the
     # cached candidates actually belonged to.
     def _response_sport_slugs(response_payload: dict[str, object] | None) -> set[str]:
-        # Deliberately self-contained: _recommendation_sources (used
-        # elsewhere in this file, e.g. _board_response_needs_refresh) is
-        # referenced but never actually defined anywhere in this repo --
-        # every call site wraps it in a bare try/except, so it has always
-        # silently evaluated to an empty list rather than raising. Extract
-        # candidates directly instead of depending on that phantom name.
-        current = dict(response_payload or {})
-        nested = current.get("response") if isinstance(current.get("response"), dict) else {}
-        analysis = current.get("analysis") if isinstance(current.get("analysis"), dict) else (nested.get("analysis") if isinstance(nested.get("analysis"), dict) else {})
-        candidates: list[object] = []
-        for container in (current, nested, analysis):
-            if not isinstance(container, dict):
-                continue
-            for key in ("recommendations", "top_opportunities"):
-                value = container.get(key)
-                if isinstance(value, list):
-                    candidates.extend(value)
         slugs: set[str] = set()
-        for item in candidates:
-            if not isinstance(item, dict):
-                continue
+        for item in _recommendation_sources(response_payload):
             value = str(item.get("sport_slug") or item.get("sport") or "").strip().lower()
             if value:
                 slugs.add(value)
