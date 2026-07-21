@@ -197,6 +197,24 @@ class WnbaCardsEvidencePackTests(unittest.TestCase):
         self.assertIn("Edge ${fmtPercentValue(evPct)}", js_content)
         self.assertIn("Confidence ${confidence}", js_content)
 
+    def test_cards_parity_upcoming_period_lengths_use_wnba_constants_not_nba(self) -> None:
+        # This file was built against NBA source and its game-length
+        # constants (10-minute WNBA quarter / 20-minute half, vs. NBA's
+        # 12/24) were adapted throughout -- except two spots that seed the
+        # "upcoming quarter/half" edge case (right at a period boundary,
+        # before the next period's clock has started) with NBA's raw 12/24
+        # instead of the WNBA_QUARTER_MINUTES/WNBA_HALF_MINUTES constants
+        # used everywhere else in the same function.
+        js_path = Path(__file__).resolve().parents[1] / "syndicate" / "static" / "wnba" / "cards-parity.js"
+        js_content = js_path.read_text(encoding="utf-8")
+
+        self.assertIn("const WNBA_QUARTER_MINUTES = 10;", js_content)
+        self.assertIn("const WNBA_HALF_MINUTES = 20;", js_content)
+        self.assertIn("useUpcomingQuarter ? WNBA_QUARTER_MINUTES : currentQuarterMinutesRemaining", js_content)
+        self.assertIn("useUpcomingHalf ? WNBA_HALF_MINUTES : currentHalfMinutesRemaining", js_content)
+        self.assertNotIn("useUpcomingQuarter ? 12 :", js_content)
+        self.assertNotIn("useUpcomingHalf ? 24 :", js_content)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1199,11 +1199,16 @@
     const lensQuarterKey = useUpcomingQuarter ? `q${Math.floor(currentPeriod) + 1}` : currentQuarterKey;
     const lensQuarterLabel = lensQuarterKey ? String(lensQuarterKey).toUpperCase() : '';
     const lensQuarterMinutesElapsed = useUpcomingQuarter ? 0 : currentQuarterMinutesElapsed;
-    const lensQuarterMinutesRemaining = useUpcomingQuarter ? 12 : currentQuarterMinutesRemaining;
+    // Two of the exact NBA-length constants the fix above this section
+    // exists to eliminate, missed here: an upcoming quarter/half (the
+    // "clock hasn't started yet" edge case right at a period boundary) was
+    // still seeded with NBA's 12-minute quarter / 24-minute half instead of
+    // WNBA's real 10-minute quarter / 20-minute half.
+    const lensQuarterMinutesRemaining = useUpcomingQuarter ? WNBA_QUARTER_MINUTES : currentQuarterMinutesRemaining;
     const lensHalfKey = useUpcomingHalf ? 'h2' : currentHalfKey;
     const lensHalfLabel = lensHalfKey === 'h2' ? '2H' : '1H';
     const lensHalfMinutesElapsed = useUpcomingHalf ? 0 : currentHalfMinutesElapsed;
-    const lensHalfMinutesRemaining = useUpcomingHalf ? 24 : currentHalfMinutesRemaining;
+    const lensHalfMinutesRemaining = useUpcomingHalf ? WNBA_HALF_MINUTES : currentHalfMinutesRemaining;
     const pregameContext = game?.sim?.context || {};
 
     function bucketForTeam(source, teamTri, sideKey) {
