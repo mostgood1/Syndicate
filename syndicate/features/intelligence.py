@@ -6504,6 +6504,47 @@ def rank_global_recommendations(recommendations: list[dict[str, Any]], *, limit:
     return ranked[: max(int(limit), 0)]
 
 
+def _recommendation_market_key(recommendation: dict[str, Any]) -> str:
+    return _safe_text(recommendation.get("market"), "") or _safe_text(recommendation.get("candidate_type"), "candidate")
+
+
+def _balanced_market_order(recommendations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Round-robin by market within a single sport bucket. Without this, one
+    market family (e.g. every hitter's "Under 0.5 Hits" prop) can
+    systematically score the highest edge and crowd out every other market
+    before diversity gets a look -- confirmed in production where 6 of 10
+    MLB candidates were the identical "Under 0 Hits" pick.
+    """
+    if len(recommendations) < 2:
+        return list(recommendations)
+    market_buckets: dict[str, list[dict[str, Any]]] = {}
+    for recommendation in recommendations:
+        market_buckets.setdefault(_recommendation_market_key(recommendation), []).append(recommendation)
+    if len(market_buckets) < 2:
+        return list(recommendations)
+    market_order = sorted(
+        market_buckets,
+        key=lambda market_key: _candidate_betting_rank_key(market_buckets[market_key][0]),
+        reverse=True,
+    )
+    balanced: list[dict[str, Any]] = []
+    index = 0
+    while len(balanced) < len(recommendations):
+        advanced = False
+        for market_key in market_order:
+            bucket = market_buckets.get(market_key) or []
+            if index >= len(bucket):
+                continue
+            balanced.append(bucket[index])
+            advanced = True
+            if len(balanced) >= len(recommendations):
+                break
+        if not advanced:
+            break
+        index += 1
+    return balanced or list(recommendations)
+
+
 def _balanced_recommendation_order(recommendations: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ranked = rank_global_recommendations(recommendations, limit=None)
     if len(ranked) < 2:
@@ -6514,15 +6555,12 @@ def _balanced_recommendation_order(recommendations: list[dict[str, Any]]) -> lis
         sport_key = _safe_text(recommendation.get("sport_slug") or recommendation.get("sport"), "sport").lower()
         sport_buckets.setdefault(sport_key, []).append(recommendation)
 
-    if len(sport_buckets) < 2:
-        return ranked
-
     sport_order = sorted(
         sport_buckets,
         key=lambda sport_key: _candidate_betting_rank_key(sport_buckets[sport_key][0]),
         reverse=True,
     )
-    for bucket in sport_buckets.values():
+    for sport_key, bucket in sport_buckets.items():
         bucket.sort(
             key=lambda recommendation: (
                 1 if bool(recommendation.get("is_live")) else 0,
@@ -6530,6 +6568,10 @@ def _balanced_recommendation_order(recommendations: list[dict[str, Any]]) -> lis
             ),
             reverse=True,
         )
+        sport_buckets[sport_key] = _balanced_market_order(bucket)
+
+    if len(sport_buckets) < 2:
+        return next(iter(sport_buckets.values()), ranked)
 
     balanced: list[dict[str, Any]] = []
     index = 0

@@ -1657,7 +1657,6 @@ class IntelligenceStateService:
             "mode": "live",
             "sport": "all",
             "timing": "",
-            "limit": 10,
             "include_props": True,
             "include_games": True,
             "force_refresh": True,
@@ -1676,7 +1675,6 @@ class IntelligenceStateService:
             normalized["date"] = central_today_iso()
         normalized.setdefault("mode", "live")
         normalized.setdefault("sport", "all")
-        normalized.setdefault("limit", 10)
         normalized["force_refresh"] = True
         return normalized
 
@@ -1785,9 +1783,9 @@ class IntelligenceStateService:
         selected_date = str(request_payload.get("date") or request_payload.get("selected_date") or "").strip() or None
         limit = request_payload.get("limit")
         try:
-            limit_value = int(limit) if limit is not None and str(limit).strip() else 10
+            limit_value = int(limit) if limit is not None and str(limit).strip() else None
         except Exception:
-            limit_value = 10
+            limit_value = None
 
         source_fingerprint = self._source_state_fingerprint(selected_date)
         cache_key = _payload_key(request_payload)
@@ -1832,8 +1830,11 @@ class IntelligenceStateService:
         else:
             top_candidates = []
 
-        opportunity_limit = max(int(limit_value), 1) if top_candidates else max(int(limit_value), 0)
-        top_opportunities = top_candidates[:opportunity_limit]
+        if limit_value is None:
+            top_opportunities = list(top_candidates)
+        else:
+            opportunity_limit = max(int(limit_value), 1) if top_candidates else max(int(limit_value), 0)
+            top_opportunities = top_candidates[:opportunity_limit]
         by_sport: dict[str, list[dict[str, object]]] = {}
         for recommendation in top_opportunities:
             sport_key = str(recommendation.get("sport") or recommendation.get("sport_slug") or "unknown").strip().lower() or "unknown"
@@ -1877,9 +1878,9 @@ class IntelligenceStateService:
         selected_date = str(request_payload.get("date") or request_payload.get("selected_date") or "").strip() or None
         limit = request_payload.get("limit")
         try:
-            limit_value = int(limit) if limit is not None and str(limit).strip() else 10
+            limit_value = int(limit) if limit is not None and str(limit).strip() else None
         except Exception:
-            limit_value = 10
+            limit_value = None
 
         source_fingerprint = self._source_state_fingerprint(selected_date)
         cache_key = _payload_key(request_payload)
@@ -1938,8 +1939,11 @@ class IntelligenceStateService:
                 top_candidates = self._rank_fallback_candidates(candidates)
             else:
                 top_candidates = []
-            opportunity_limit = max(int(limit_value), 1) if top_candidates else max(int(limit_value), 0)
-            top_opportunities = top_candidates[:opportunity_limit]
+            if limit_value is None:
+                top_opportunities = list(top_candidates)
+            else:
+                opportunity_limit = max(int(limit_value), 1) if top_candidates else max(int(limit_value), 0)
+                top_opportunities = top_candidates[:opportunity_limit]
             by_sport: dict[str, list[dict[str, object]]] = {}
             for recommendation in top_opportunities:
                 sport_key = str(recommendation.get("sport") or recommendation.get("sport_slug") or "unknown").strip().lower() or "unknown"
