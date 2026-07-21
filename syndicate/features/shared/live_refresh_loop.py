@@ -1304,23 +1304,10 @@ def _odds_refresh_memory_headroom_snapshot() -> dict[str, Any] | None:
 	if not _odds_refresh_memory_overlap_enabled():
 		return None
 	try:
-		from syndicate.features.shared.memory_observability import _read_container_memory_current_bytes
-		from syndicate.features.shared.memory_observability import _read_container_memory_max_bytes
+		from syndicate.features.shared.memory_observability import memory_headroom_snapshot
 	except Exception:
 		return None
-	current_bytes = _read_container_memory_current_bytes()
-	max_bytes = _read_container_memory_max_bytes()
-	if current_bytes is None or max_bytes is None or max_bytes <= 0:
-		return None
-	headroom_bytes = max_bytes - current_bytes
-	min_required_bytes = _odds_refresh_min_headroom_bytes()
-	return {
-		"current_mb": round(current_bytes / 1024 / 1024, 1),
-		"max_mb": round(max_bytes / 1024 / 1024, 1),
-		"headroom_mb": round(headroom_bytes / 1024 / 1024, 1),
-		"min_required_mb": round(min_required_bytes / 1024 / 1024, 1),
-		"sufficient": headroom_bytes >= min_required_bytes,
-	}
+	return memory_headroom_snapshot(_odds_refresh_min_headroom_bytes())
 
 
 

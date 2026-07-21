@@ -117,6 +117,30 @@ def _read_container_memory_max_bytes() -> int | None:
     return None
 
 
+def memory_headroom_snapshot(min_required_bytes: int) -> dict[str, Any] | None:
+    # Shared by any caller that wants to defer heavy in-process work rather
+    # than guess from elapsed time or trigger type -- originally lived only in
+    # live_refresh_loop.py's odds-refresh gate; extracted here so the MLB
+    # live-lens loop's estimate_live gate can reuse the same real,
+    # currently-measured cgroup headroom instead of duplicating this logic.
+    # Returns None when headroom can't be measured at all (e.g. local dev
+    # without cgroups) -- callers should treat that the same as "not
+    # sufficient," the safe default.
+    current_bytes = _read_container_memory_current_bytes()
+    max_bytes = _read_container_memory_max_bytes()
+    if current_bytes is None or max_bytes is None or max_bytes <= 0:
+        return None
+    headroom_bytes = max_bytes - current_bytes
+    min_required = max(0, int(min_required_bytes))
+    return {
+        "current_mb": round(current_bytes / 1024 / 1024, 1),
+        "max_mb": round(max_bytes / 1024 / 1024, 1),
+        "headroom_mb": round(headroom_bytes / 1024 / 1024, 1),
+        "min_required_mb": round(min_required / 1024 / 1024, 1),
+        "sufficient": headroom_bytes >= min_required,
+    }
+
+
 def _process_cmdline(value: Any) -> list[str]:
     if not value:
         return []

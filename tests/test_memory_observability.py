@@ -85,3 +85,27 @@ def test_log_all_process_memory_emits_debug_and_payload(monkeypatch, tmp_path, c
     assert payload["process_count"] == 2
     assert current_pid in {process["pid"] for process in payload["processes"]}
     assert parent_pid in {process["pid"] for process in payload["processes"]}
+
+
+def test_memory_headroom_snapshot_none_when_unmeasurable(monkeypatch):
+    monkeypatch.setattr(memory_observability, "_read_container_memory_current_bytes", lambda: None)
+    monkeypatch.setattr(memory_observability, "_read_container_memory_max_bytes", lambda: 2048 * BYTES_PER_MB)
+
+    assert memory_observability.memory_headroom_snapshot(1800 * BYTES_PER_MB) is None
+
+
+def test_memory_headroom_snapshot_reports_insufficient_and_sufficient(monkeypatch):
+    max_bytes = 2048 * BYTES_PER_MB
+    min_required_bytes = 1800 * BYTES_PER_MB
+
+    monkeypatch.setattr(memory_observability, "_read_container_memory_current_bytes", lambda: int(1900 * BYTES_PER_MB))
+    monkeypatch.setattr(memory_observability, "_read_container_memory_max_bytes", lambda: max_bytes)
+    tight = memory_observability.memory_headroom_snapshot(min_required_bytes)
+    assert tight is not None
+    assert tight["sufficient"] is False
+    assert tight["min_required_mb"] == 1800.0
+
+    monkeypatch.setattr(memory_observability, "_read_container_memory_current_bytes", lambda: int(100 * BYTES_PER_MB))
+    roomy = memory_observability.memory_headroom_snapshot(min_required_bytes)
+    assert roomy is not None
+    assert roomy["sufficient"] is True

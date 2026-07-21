@@ -539,7 +539,14 @@ services:
       - key: MLB_ENABLE_LIVE_LENS_LOOP
         value: "true"
       - key: MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS
-        value: "true"
+        # Syndicate's own live_lens_loop.py (SYNDICATE_ENABLE_LIVE_LENS_LOOP
+        # below) is now the sole trigger of the expensive
+        # _persist_live_lens_report/estimate_live sweep for MLB. This vendor
+        # loop's own report-refresh trigger raced it uncoordinated in the same
+        # process (see docs/fix_notes_log.md / commit 9307fb80) -- disabling
+        # just this flag stops that race while leaving this loop's other job
+        # (_warm_cards_api_cache) running untouched.
+        value: "false"
       - key: MLB_LIVE_LENS_LOOP_INTERVAL_SECONDS
         value: "30"
       - key: MLB_LIVE_LENS_REPORT_REFRESH_INTERVAL_SECONDS

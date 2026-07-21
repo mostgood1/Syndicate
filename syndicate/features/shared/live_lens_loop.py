@@ -14,6 +14,7 @@ from syndicate.features.nba.live_lens import build_live_lens_snapshot as _nba_bu
 from syndicate.features.nba.live_lens import live_lens_snapshot_path as _nba_snapshot_path
 from syndicate.features.nba.live_lens import validate_live_lens_snapshot as _nba_validate
 from syndicate.features.shared.memory_observability import log_all_process_memory
+from syndicate.features.shared.memory_observability import memory_headroom_snapshot
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
@@ -161,6 +162,57 @@ def _live_lens_loop_interval_seconds() -> int:
 	return max(5, int(value))
 
 
+def _mlb_live_lens_memory_gate_enabled() -> bool:
+	return _env_bool("SYNDICATE_LIVE_LENS_MEMORY_GATE_ENABLED", default=True)
+
+
+def _mlb_live_lens_min_headroom_bytes() -> int:
+	raw = str(os.environ.get("SYNDICATE_LIVE_LENS_MIN_HEADROOM_MB") or "").strip()
+	try:
+		value = int(raw or 1800)
+	except Exception:
+		value = 1800
+	return max(0, value) * 1024 * 1024
+
+
+def _mlb_live_lens_headroom_snapshot() -> dict[str, Any] | None:
+	# Guards the MLB builder only: it's the one sport whose build reaches
+	# estimate_live (a real Monte Carlo resim, 120 sims per live game,
+	# in-process, no batching) via _persist_live_lens_report. NBA/WNBA builders
+	# don't run a comparable heavy resim, so gating them too would just add
+	# unnecessary staleness risk without a matching memory benefit -- the same
+	# over-scoping mistake already made (and reverted) for the WNBA
+	# odds-refresh mutex.
+	if not _mlb_live_lens_memory_gate_enabled():
+		return None
+	return memory_headroom_snapshot(_mlb_live_lens_min_headroom_bytes())
+
+
+def _tally_mlb_live_mc_sources(snapshot: Any) -> dict[str, int]:
+	# estimate_live's own failures are swallowed by a bare except in the
+	# vendor code with zero logging -- the "source" field on each gameLens
+	# lane (live_mc / live_projection / segment_projection) is the only signal
+	# that survives. Tallying it here, once per tick, makes the real
+	# success/fallback rate observable through the existing tick-status
+	# plumbing instead of requiring a live API probe to find out.
+	tally: dict[str, int] = {}
+	games = snapshot.get("games") if isinstance(snapshot, dict) else None
+	if not isinstance(games, list):
+		return tally
+	for game in games:
+		if not isinstance(game, dict):
+			continue
+		lanes = game.get("gameLens")
+		if not isinstance(lanes, list):
+			continue
+		for lane in lanes:
+			if not isinstance(lane, dict):
+				continue
+			source = str(lane.get("source") or "unknown")
+			tally[source] = tally.get(source, 0) + 1
+	return tally
+
+
 def _run_live_lens_tick_for_sport(sport: str, date_str: str) -> dict[str, Any]:
 	meta: dict[str, Any] = {"sport": sport, "date": date_str, "startedAt": _utc_now()}
 	# This loop runs independently of live_refresh_loop.py's own tick, on its own
@@ -171,6 +223,14 @@ def _run_live_lens_tick_for_sport(sport: str, date_str: str) -> dict[str, Any]:
 	# the leading remaining candidate for where that gap is going.
 	try:
 		log_all_process_memory(f"live_lens_tick_before_{sport}", sport=sport, date=date_str)
+		if sport == "mlb":
+			headroom_snapshot = _mlb_live_lens_headroom_snapshot()
+			if headroom_snapshot is not None and not headroom_snapshot["sufficient"]:
+				meta["ok"] = False
+				meta["skipped"] = True
+				meta["reason"] = "low_headroom"
+				meta["memoryHeadroom"] = headroom_snapshot
+				return meta
 		builder = _LIVE_LENS_BUILDERS[sport]
 		validator = _LIVE_LENS_VALIDATORS[sport]
 		path_fn = _LIVE_LENS_SNAPSHOT_PATHS[sport]
@@ -181,6 +241,8 @@ def _run_live_lens_tick_for_sport(sport: str, date_str: str) -> dict[str, Any]:
 			meta["skipped"] = True
 			meta["reason"] = "invalid_snapshot"
 			return meta
+		if sport == "mlb":
+			meta["liveMcSources"] = _tally_mlb_live_mc_sources(snapshot)
 		write_json_file(path_fn(), snapshot)
 		meta["ok"] = True
 		meta["path"] = str(path_fn())
