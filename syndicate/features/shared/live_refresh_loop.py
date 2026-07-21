@@ -721,6 +721,154 @@ def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any
 	return {"force": False, "reason": "no_change"}
 
 
+def _process_exists(pid: Any) -> bool:
+	# Cross-platform PID-liveness probe, mirrored from
+	# vendor/mlb_bettingv2/tools/daily_update.py's _acquire_daily_update_run_lock
+	# guard (same proven fix applied there for live-odds-worker's stale-lock
+	# crash loop earlier this session). Needed here because with
+	# WEB_CONCURRENCY>1, the module-level _MLB_SIM_PROCESS handle below is
+	# only visible to the gunicorn worker that launched it -- other workers
+	# (and any worker after a container restart) have no in-memory signal at
+	# all and must verify against the actual OS process table instead.
+	try:
+		pid_i = int(pid or 0)
+	except Exception:
+		return False
+	if pid_i <= 0:
+		return False
+	if sys.platform.startswith("win") or os.name == "nt":
+		try:
+			import ctypes
+
+			PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+			SYNCHRONIZE = 0x00100000
+			WAIT_TIMEOUT = 0x00000102
+			WAIT_OBJECT_0 = 0x00000000
+
+			kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+			handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, False, pid_i)
+			if not handle:
+				err = ctypes.get_last_error()
+				if err == 5:
+					return True
+				return False
+			try:
+				wait_code = kernel32.WaitForSingleObject(handle, 0)
+				if wait_code == WAIT_TIMEOUT:
+					return True
+				if wait_code == WAIT_OBJECT_0:
+					return False
+				return True
+			finally:
+				kernel32.CloseHandle(handle)
+		except Exception:
+			return False
+	try:
+		os.kill(pid_i, 0)
+	except PermissionError:
+		return True
+	except (OSError, SystemError, ValueError):
+		return False
+	return True
+
+
+def _process_cmdline(pid: Any) -> list[str] | None:
+	try:
+		pid_i = int(pid or 0)
+	except Exception:
+		return None
+	if pid_i <= 0:
+		return None
+	if sys.platform.startswith("win") or os.name == "nt":
+		return None
+	try:
+		raw = Path(f"/proc/{pid_i}/cmdline").read_bytes()
+	except Exception:
+		return None
+	parts = [part.decode("utf-8", errors="ignore") for part in raw.split(b"\x00") if part]
+	return parts or None
+
+
+def _process_matches_lock(pid: Any, expected_command: Any) -> bool:
+	"""Guard against PID reuse: a dead sim's PID can be reassigned to an
+	unrelated process within minutes on Render's low-PID-churn containers,
+	which would make a stale pointer look perpetually "held" via
+	_process_exists (a pure liveness probe, no identity check) alone.
+	"""
+	current = _process_cmdline(pid)
+	if current is None:
+		# Can't verify (Windows, /proc unavailable, process just exited) --
+		# fall back to trusting the existing PID-liveness check alone.
+		return True
+	expected = expected_command if isinstance(expected_command, list) else []
+	if not expected:
+		return True
+	return [str(part) for part in current] == [str(part) for part in expected]
+
+
+# Hard ceiling on how long a "running" pointer is trusted regardless of PID
+# checks. A real sim run (even a full slate at high sim counts) should
+# finish well inside this; anything older is treated as an orphaned/stuck
+# record so a fresh launch isn't blocked forever by a hang.
+_MLB_SIM_MAX_RUNTIME_SECONDS = 90 * 60
+
+
+def _mlb_sim_active_pointer_path() -> Path:
+	return _mlb_sim_runs_state_dir() / "_active.json"
+
+
+def _write_active_pointer(meta: dict[str, Any]) -> None:
+	try:
+		write_json_file(_mlb_sim_active_pointer_path(), meta)
+	except Exception:
+		pass
+
+
+def _clear_active_pointer(expected_pid: Any = None) -> None:
+	try:
+		current = read_json_file(_mlb_sim_active_pointer_path())
+		if isinstance(current, dict) and expected_pid is not None and int(current.get("pid") or 0) != int(expected_pid or 0):
+			# Someone else's run is now the active pointer; don't clobber it.
+			return
+		write_json_file(_mlb_sim_active_pointer_path(), {})
+	except Exception:
+		pass
+
+
+def _shared_mlb_sim_still_running() -> bool:
+	"""Cross-worker, restart-safe check: is there a genuinely live sim
+	process behind the shared active-run pointer? Falls back to False (safe
+	to launch) on any ambiguity -- daily_update.py's own run-lock is the
+	backstop against a genuine double-launch race, so a false negative here
+	just costs a doomed extra subprocess, not a correctness problem; a false
+	positive would silently block every future sim run.
+	"""
+	try:
+		meta = read_json_file(_mlb_sim_active_pointer_path())
+	except Exception:
+		return False
+	if not isinstance(meta, dict) or not meta:
+		return False
+	pid = meta.get("pid")
+	started_at = str(meta.get("started_at") or "")
+	try:
+		started_dt = datetime.fromisoformat(started_at.replace("Z", "+00:00")) if started_at else None
+	except Exception:
+		started_dt = None
+	if started_dt is not None:
+		age_seconds = (datetime.now(timezone.utc) - started_dt).total_seconds()
+		if age_seconds > _MLB_SIM_MAX_RUNTIME_SECONDS:
+			_clear_active_pointer(expected_pid=pid)
+			return False
+	if not _process_exists(pid):
+		_clear_active_pointer(expected_pid=pid)
+		return False
+	if not _process_matches_lock(pid, meta.get("command")):
+		_clear_active_pointer(expected_pid=pid)
+		return False
+	return True
+
+
 _MLB_SIM_PROCESS: subprocess.Popen | None = None
 _MLB_SIM_LOG_HANDLE: Any = None
 _MLB_SIM_LOG_PATH: Path | None = None
@@ -772,6 +920,7 @@ def _persist_finished_mlb_sim_run() -> None:
 		status_payload["exit_code"] = returncode
 		status_payload["finished_at"] = _utc_now()
 		write_json_file(sim_base / f"{date_str}_{run_stamp}_status.json", status_payload)
+		_clear_active_pointer(expected_pid=meta.get("pid"))
 	except Exception:
 		pass
 	finally:
@@ -782,16 +931,25 @@ def _persist_finished_mlb_sim_run() -> None:
 
 def _mlb_daily_sim_process_still_running() -> bool:
 	global _MLB_SIM_PROCESS
-	if _MLB_SIM_PROCESS is None:
-		return False
-	try:
-		still_running = _MLB_SIM_PROCESS.poll() is None
-	except Exception:
-		return False
-	if not still_running:
-		_persist_finished_mlb_sim_run()
-		_MLB_SIM_PROCESS = None
-	return still_running
+	if _MLB_SIM_PROCESS is not None:
+		# Fast path: this worker holds the actual Popen handle for a sim it
+		# launched itself, so its own .poll() is the most direct signal.
+		try:
+			still_running = _MLB_SIM_PROCESS.poll() is None
+		except Exception:
+			still_running = False
+		if not still_running:
+			_persist_finished_mlb_sim_run()
+			_MLB_SIM_PROCESS = None
+			return False
+		return True
+	# No local handle -- either this worker never launched a sim, or a
+	# container restart wiped the in-memory state. Either way, fall back to
+	# the shared, PID-verified pointer so a sim launched by a different
+	# gunicorn worker (or by this same worker before a restart) is still
+	# correctly detected, instead of silently allowing a second sim to stack
+	# on top of it.
+	return _shared_mlb_sim_still_running()
 
 
 def _launch_mlb_daily_sim(date_str: str, decision: dict[str, Any]) -> dict[str, Any]:
@@ -844,6 +1002,7 @@ def _launch_mlb_daily_sim(date_str: str, decision: dict[str, Any]) -> dict[str, 
 			write_json_file(_mlb_sim_runs_state_dir() / f"{date_str}_{run_stamp}_status.json", {**_MLB_SIM_RUN_META, "state": "running"})
 		except Exception:
 			pass
+		_write_active_pointer(dict(_MLB_SIM_RUN_META))
 		print(f"[live_refresh_loop] MLB_DAILY_SIM_TRIGGERED date={date_str} reason={decision.get('reason')} pid={process.pid} run_stamp={run_stamp}", flush=True)
 		return {"ok": True, "pid": process.pid, "command": command, "reason": decision.get("reason"), "run_stamp": run_stamp}
 	except Exception as exc:
