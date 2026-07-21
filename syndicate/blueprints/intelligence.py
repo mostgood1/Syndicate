@@ -21,6 +21,7 @@ from syndicate.features.intelligence import _parlay_request_summary
 from syndicate.features.intelligence import _query_preferences
 from syndicate.features.intelligence import _attach_intelligence_response_aliases
 from syndicate.features.intelligence_board import build_intelligence_board_contract
+from syndicate.features.intelligence_board import _recommendation_lane
 from syndicate.features.shared.artifact_manifests import load_artifact_manifests
 from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
 from syndicate.features.shared.refresh_state_store import read_json_file
