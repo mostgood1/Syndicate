@@ -327,6 +327,57 @@ services:
       # possession simulation and returns real per-minute scoring buckets.
       - key: REFRESH_PREDICT_PROPS_SMART_SIM_PBP
         value: "true"
+      # Found 2026-07-20 while relocating MLB sim ownership here: these three
+      # autorun flags were only ever declared on the `syndicate` web
+      # service's env block (Render doesn't share env vars across services),
+      # so refresh-worker's actual deployed process has never received any
+      # of them -- MLB_ENABLE_REFRESH_WORKER_AUTORUN's staleness-check job
+      # was likely never firing in production despite the code being wired
+      # up for it. Declaring them here for real, plus turning weekly sports
+      # on per explicit request -- _active_weekly_sports_for_date() already
+      # season-gates NFL/NCAAF/NCAAB internally, so this is a safe no-op
+      # outside their seasons.
+      - key: MLB_ENABLE_REFRESH_WORKER_AUTORUN
+        value: "true"
+      - key: WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN
+        value: "true"
+      - key: WEEKLY_SPORTS_REFRESH_INTERVAL_SECONDS
+        value: "21600"
+      # MLB daily sim / look-ahead / evening-next-day sim: relocated here
+      # 2026-07-20 from live-odds-worker to isolate the 1000-sim Monte Carlo
+      # job's memory footprint from that worker's odds-refresh + NBA/WNBA
+      # SmartSim + live-lens load (documented OOM history there: sim workers
+      # cut to 1, WNBA sim count cut 500->250->100). refresh-worker was
+      # otherwise idle capacity already being paid for. See
+      # scripts/run_refresh_worker.py's call to
+      # syndicate.features.shared.live_refresh_loop._run_mlb_sim_tick().
+      - key: SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER
+        value: "true"
+      - key: SYNDICATE_EVENT_SIM_FORCE_WINDOW_MINUTES
+        value: "30"
+      - key: SYNDICATE_MLB_SIM_CHECK_INTERVAL_SECONDS
+        value: "600"
+      - key: SYNDICATE_MLB_SIM_TIMEOUT_SECONDS
+        value: "2700"
+      - key: SYNDICATE_MLB_SIM_COUNT
+        value: "1000"
+      # No longer sharing a container with odds refresh / SmartSim / live-lens,
+      # so the memory pressure that forced this down to 1 worker on
+      # live-odds-worker shouldn't apply here -- but keeping it at 1 for the
+      # first cycle on the new service until a clean run confirms real
+      # headroom before raising it.
+      - key: SYNDICATE_MLB_SIM_WORKERS
+        value: "1"
+      - key: SYNDICATE_SCHEDULE_ADAPTER_TTL_SECONDS
+        value: "900"
+      - key: SYNDICATE_LOOK_AHEAD_ENABLED
+        value: "true"
+      - key: SYNDICATE_LOOK_AHEAD_INTERVAL_SECONDS
+        value: "3600"
+      - key: SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_ENABLED
+        value: "true"
+      - key: SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_START_HOUR
+        value: "18"
 
   - type: worker
     name: live-odds-worker
@@ -449,60 +500,23 @@ services:
         value: us
       - key: SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR
         value: "true"
-      # Schedule-aware worker-centric MLB daily sim (replaces the GHA daily-update
-      # cron for MLB -- see the rollout plan in docs/). Defaults off for a dark
-      # launch; flip to "true" once ready to shadow alongside the still-running
-      # GHA pipeline. Only meaningful on this service: live_refresh_loop.py's
-      # background thread only runs where SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
-      # is true, which today is live-odds-worker only.
-      # Flipped on 2026-07-16: the GHA daily-update went backup-only (Phase 4,
-      # 3d67ed55) which left MLB with no sim owner -- the worker is now the
-      # sole in-environment sim runner.
+      # MLB daily sim / look-ahead / evening-next-day sim ownership moved to
+      # refresh-worker 2026-07-20 to isolate the 1000-sim Monte Carlo job's
+      # memory footprint from this worker's odds-refresh + NBA/WNBA SmartSim
+      # + live-lens load (documented OOM history: sim workers cut to 1, WNBA
+      # sim count cut 500->250->100, all fighting for the same 2GB). This
+      # worker still OBSERVES sim state (via the shared PID-verified pointer
+      # in live_refresh_loop.py) to keep gating its own odds-refresh launches
+      # around a resident sim -- see sim_process_running in
+      # _run_live_refresh_tick -- it just no longer LAUNCHES one itself.
+      - key: SYNDICATE_MLB_SIM_TICK_OWNER
+        value: "false"
       - key: SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER
-        value: "true"
-      - key: SYNDICATE_EVENT_SIM_FORCE_WINDOW_MINUTES
-        value: "30"
-      - key: SYNDICATE_MLB_SIM_CHECK_INTERVAL_SECONDS
-        value: "600"
-      - key: SYNDICATE_MLB_SIM_TIMEOUT_SECONDS
-        value: "2700"
-      - key: SYNDICATE_MLB_SIM_COUNT
-        value: "1000"
-      # 1 worker after the 2026-07-17 OOM: each sim worker is a full resident
-      # interpreter, and the sim phase shares this 2GB box with the odds and
-      # live-lens loops (and WNBA generation). Slower sim phase, but the box
-      # stays inside memory. Revisit after a clean cycle or an instance upgrade.
-      - key: SYNDICATE_MLB_SIM_WORKERS
-        value: "1"
-      - key: SYNDICATE_SCHEDULE_ADAPTER_TTL_SECONDS
-        value: "900"
-      # Look-ahead: proactively warms tomorrow's slate during idle ticks
-      # instead of only reacting once the calendar date rolls over -- another
-      # piece of what the GHA daily-update cron used to cover. Defaults off
-      # here for the same dark-launch reasoning as the MLB daily sim trigger
-      # above; flip to "true" once a session's worth of logs confirm it
-      # behaves as expected (reports/live_refresh_loop/latest_live_refresh_tick.json
-      # -> "lookAhead").
-      # Flipped on 2026-07-16 together with the MLB daily sim trigger: with
-      # the GHA daily-update backup-only, the worker owns next-day warm-up too
-      # (gates: never while live, hourly, only when tomorrow has games).
+        value: "false"
       - key: SYNDICATE_LOOK_AHEAD_ENABLED
-        value: "true"
-      - key: SYNDICATE_LOOK_AHEAD_INTERVAL_SECONDS
-        value: "3600"
-      # Evening next-day sim: with the GHA cron's --build-next-day step gone
-      # (removed in e13a1a03 to stop doubling sim-job runtime/memory), tomorrow's
-      # board only populated after the midnight-Central date rollover's
-      # first_appearance gate. This restores evening-before availability by
-      # reusing the same daily-sim launch path, pointed at tomorrow's date,
-      # gated to fire only from 18:00 Central onward (never while any sport is
-      # live, never if a sim is already running, never if tomorrow is already
-      # simmed). One evening's worth of logs should confirm behavior before
-      # this is considered proven the way SYNDICATE_LOOK_AHEAD_ENABLED is.
+        value: "false"
       - key: SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_ENABLED
-        value: "true"
-      - key: SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_START_HOUR
-        value: "18"
+        value: "false"
       - key: MLB_BETTING_DATA_ROOT
         value: /opt/render/project/data/mlb_source/source_artifacts/data
       - key: MLB_LIVE_LENS_DIR

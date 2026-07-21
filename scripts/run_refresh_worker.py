@@ -19,6 +19,7 @@ from syndicate.features.shared.ops_refresh import launch_refresh_run
 from syndicate.features.shared.ops_refresh import _active_sports_for_date
 from pipeline.intelligence_state import start_intelligence_state_background_loop
 from syndicate.features.shared.timezone import central_today_iso
+from syndicate.features.shared.live_refresh_loop import _run_mlb_sim_tick
 
 
 def _refresh_state_store() -> dict[str, Any]:
@@ -598,6 +599,23 @@ def main() -> int:
 
     iterations = 0
     while True:
+        # MLB daily sim / look-ahead / evening-next-day sim: independent of
+        # the queued-contract handling below, so it runs every poll cycle
+        # regardless of what the if/elif chain decides. Each sub-decision
+        # has its own interval gate (e.g. SYNDICATE_MLB_SIM_CHECK_INTERVAL_SECONDS),
+        # so calling this every ~30s is cheap -- most calls are a no-op.
+        # Ownership is controlled by SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER /
+        # SYNDICATE_LOOK_AHEAD_ENABLED / SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_ENABLED,
+        # relocated here from live-odds-worker 2026-07-20 to isolate the
+        # 1000-sim Monte Carlo job's memory footprint from that worker's
+        # odds-refresh/SmartSim/live-lens load.
+        try:
+            mlb_sim_meta = _run_mlb_sim_tick()
+            if mlb_sim_meta:
+                print(f"[refresh_worker] MLB_SIM_TICK {json.dumps(mlb_sim_meta, sort_keys=True, default=str)}", flush=True)
+        except Exception as exc:
+            print(f"[refresh_worker] MLB_SIM_TICK_ERROR {type(exc).__name__}: {exc}", flush=True)
+
         refresh_cycle = {"claimed_count": 0, "reclaimed_count": 0, "skipped_due_to_cap": 0}
         if _recover_stuck_claim(latest_manifest_path, timeout_minutes=stuck_claim_timeout_minutes):
             refresh_cycle["reclaimed_count"] = 1

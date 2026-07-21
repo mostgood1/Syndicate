@@ -1531,6 +1531,89 @@ def _record_hot_artifact_publish_watermark(epoch: float) -> None:
 	write_json_file(_hot_artifact_publish_watermark_path(), {"epoch": epoch, "recordedAt": _utc_now()})
 
 
+def _mlb_sim_tick_owner_here() -> bool:
+	# Whether THIS service's tick should attempt to launch the MLB daily
+	# sim / look-ahead / evening-next-day sim at all, vs. just observing
+	# whether one is running (via the shared PID-verified pointer) to gate
+	# its own odds-refresh launch. Defaults true so a service with no
+	# explicit opinion keeps today's behavior; set false on any service
+	# where sim-launch ownership has been relocated elsewhere (e.g.
+	# live-odds-worker once refresh-worker owns it) to avoid two services
+	# both attempting the same decision every tick -- harmless either way
+	# since _launch_mlb_daily_sim's own decision functions and the shared
+	# pointer prevent an actual double-launch, but wasteful and noisy.
+	raw = str(os.environ.get("SYNDICATE_MLB_SIM_TICK_OWNER") or "").strip().lower()
+	if not raw:
+		return True
+	return raw in ("1", "true", "yes", "y", "on")
+
+
+def _run_mlb_sim_tick() -> dict[str, Any]:
+	"""Self-contained MLB sim/look-ahead/evening-sim decision+launch pass.
+
+	Split out of _run_live_refresh_tick() so it can be called independently
+	from a different service's loop (see scripts/run_refresh_worker.py) --
+	the launch decisions (_mlb_daily_sim_enabled, _look_ahead_enabled,
+	_mlb_evening_next_day_sim_enabled) already read their own env-var gates,
+	so relocating ownership is just flipping those three flags between
+	services, not new gating logic here. Computes its own now_epoch/date/
+	any_live rather than accepting them as params so it's safe to call from
+	any context.
+	"""
+	meta: dict[str, Any] = {}
+	if not _mlb_sim_tick_owner_here():
+		return meta
+	if not (_mlb_daily_sim_enabled() or _look_ahead_enabled() or _mlb_evening_next_day_sim_enabled()):
+		# None of the three sub-features are on -- skip _any_tracked_sport_game_live()
+		# entirely rather than paying for its real per-sport live-status
+		# subprocess checks for nothing.
+		return meta
+	tick_started_epoch = datetime.now(timezone.utc).timestamp()
+	adaptive_enabled = _live_refresh_loop_adaptive_enabled()
+	any_live = _any_tracked_sport_game_live() if adaptive_enabled else None
+	selected_date = central_today_iso()
+
+	# MLB daily sim is dispatched independently of the odds-refresh call
+	# below: its cadence/gate differs from NBA/WNBA's, and the vendor
+	# script's own PID lock (not ops_refresh's single-active-refresh
+	# assertion) is the correct concurrency guard for it. The launched
+	# wrapper publishes its own results synchronously on completion (see
+	# run_mlb_daily_sim_job.py), so the tick's publish sweep doesn't need to
+	# account for it.
+	try:
+		mlb_decision = _mlb_daily_sim_decision(now_epoch=tick_started_epoch, date_str=selected_date)
+		if mlb_decision.get("force"):
+			meta["mlbDailySim"] = _launch_mlb_daily_sim(selected_date, mlb_decision)
+		else:
+			meta["mlbDailySim"] = {"launched": False, "reason": mlb_decision.get("reason")}
+	except Exception as exc:
+		meta["mlbDailySim"] = {"launched": False, "error": f"{type(exc).__name__}: {exc}"}
+
+	# Look-ahead: while idle, proactively warm tomorrow's slate instead of
+	# only reacting once central_today_iso() rolls over. Independent of the
+	# day's own odds-refresh launch -- a collision with it is handled by
+	# launch_refresh_run's existing single-active-refresh guard.
+	try:
+		look_ahead_decision = _look_ahead_decision(now_epoch=tick_started_epoch, selected_date=selected_date, any_live=any_live)
+		if look_ahead_decision.get("launch"):
+			meta["lookAhead"] = _launch_look_ahead_refresh(look_ahead_decision)
+		else:
+			meta["lookAhead"] = {"ok": False, "launched": False, "reason": look_ahead_decision.get("reason")}
+	except Exception as exc:
+		meta["lookAhead"] = {"ok": False, "launched": False, "error": f"{type(exc).__name__}: {exc}"}
+
+	try:
+		evening_sim_decision = _mlb_evening_next_day_sim_decision(now_epoch=tick_started_epoch, selected_date=selected_date, any_live=any_live)
+		if evening_sim_decision.get("force"):
+			meta["mlbEveningNextDaySim"] = _launch_mlb_daily_sim(str(evening_sim_decision.get("date")), evening_sim_decision)
+		else:
+			meta["mlbEveningNextDaySim"] = {"launched": False, "reason": evening_sim_decision.get("reason")}
+	except Exception as exc:
+		meta["mlbEveningNextDaySim"] = {"launched": False, "error": f"{type(exc).__name__}: {exc}"}
+
+	return meta
+
+
 def _run_live_refresh_tick() -> dict[str, Any]:
 	tick_started_epoch = datetime.now(timezone.utc).timestamp()
 	adaptive_enabled = _live_refresh_loop_adaptive_enabled()
@@ -1553,20 +1636,7 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 		"sports": _live_refresh_loop_sports() or "active",
 	}
 
-	# MLB daily sim is dispatched independently of the odds-refresh call below:
-	# its cadence/gate differs from NBA/WNBA's, and the vendor script's own
-	# PID lock (not ops_refresh's single-active-refresh assertion) is the
-	# correct concurrency guard for it. The launched wrapper publishes its own
-	# results synchronously on completion (see run_mlb_daily_sim_job.py), so
-	# this tick's publish sweep below doesn't need to account for it.
-	try:
-		mlb_decision = _mlb_daily_sim_decision(now_epoch=tick_started_epoch, date_str=selected_date)
-		if mlb_decision.get("force"):
-			meta["mlbDailySim"] = _launch_mlb_daily_sim(selected_date, mlb_decision)
-		else:
-			meta["mlbDailySim"] = {"launched": False, "reason": mlb_decision.get("reason")}
-	except Exception as exc:
-		meta["mlbDailySim"] = {"launched": False, "error": f"{type(exc).__name__}: {exc}"}
+	meta.update(_run_mlb_sim_tick())
 	sim_process_running = _mlb_daily_sim_process_still_running()
 	memory_headroom_snapshot = _odds_refresh_memory_headroom_snapshot() if sim_process_running else None
 	if memory_headroom_snapshot is not None:
@@ -1676,28 +1746,6 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 		except Exception as exc:
 			meta["ok"] = False
 			meta["error"] = f"{type(exc).__name__}: {exc}"
-
-	# Look-ahead: while idle, proactively warm tomorrow's slate instead of only
-	# reacting once central_today_iso() rolls over. Independent of the above
-	# today-scoped launch -- a collision with it (or with the day's own tick)
-	# is handled by launch_refresh_run's existing single-active-refresh guard.
-	try:
-		look_ahead_decision = _look_ahead_decision(now_epoch=tick_started_epoch, selected_date=selected_date, any_live=any_live)
-		if look_ahead_decision.get("launch"):
-			meta["lookAhead"] = _launch_look_ahead_refresh(look_ahead_decision)
-		else:
-			meta["lookAhead"] = {"ok": False, "launched": False, "reason": look_ahead_decision.get("reason")}
-	except Exception as exc:
-		meta["lookAhead"] = {"ok": False, "launched": False, "error": f"{type(exc).__name__}: {exc}"}
-
-	try:
-		evening_sim_decision = _mlb_evening_next_day_sim_decision(now_epoch=tick_started_epoch, selected_date=selected_date, any_live=any_live)
-		if evening_sim_decision.get("force"):
-			meta["mlbEveningNextDaySim"] = _launch_mlb_daily_sim(str(evening_sim_decision.get("date")), evening_sim_decision)
-		else:
-			meta["mlbEveningNextDaySim"] = {"launched": False, "reason": evening_sim_decision.get("reason")}
-	except Exception as exc:
-		meta["mlbEveningNextDaySim"] = {"launched": False, "error": f"{type(exc).__name__}: {exc}"}
 
 	meta["finishedAt"] = _utc_now()
 	write_json_file(_meta_dir() / "latest_live_refresh_tick.json", meta)
