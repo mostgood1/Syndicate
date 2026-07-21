@@ -3767,6 +3767,18 @@ def _mlb_subject_prop_candidates_from_artifact(
     return candidates
 
 
+_GAME_LEVEL_MARKET_KEYWORDS = ("moneyline", "spread", "total", "puck line", "puck_line", "run line", "run_line", "game bet")
+
+
+def _is_game_level_market(market_text: Any) -> bool:
+    lowered = _safe_text(market_text, "").strip().lower()
+    if not lowered:
+        return True
+    if lowered == "ats":
+        return True
+    return any(keyword in lowered for keyword in _GAME_LEVEL_MARKET_KEYWORDS)
+
+
 def _game_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
     dashboard_games = sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []
     candidates: list[dict[str, Any]] = []
@@ -3777,7 +3789,13 @@ def _game_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
             if not isinstance(row, dict):
                 continue
             row = dict(row)
-            row["candidate_type"] = "game"
+            # _game_bet_candidates_from_game's game_market_recommendations loop
+            # also surfaces per-game PLAYER props (market == "props") mixed in
+            # with true team/game-level markets (moneyline/spread/total/ats) --
+            # this used to force candidate_type="game" on every row unconditionally,
+            # mislabeling player props (e.g. "Gabby Williams OVER 1.5") as game
+            # markets. Confirmed live 2026-07-21 on the WNBA board.
+            row["candidate_type"] = "game" if _is_game_level_market(row.get("market")) else "prop"
             candidates.append(row)
     return candidates
 
