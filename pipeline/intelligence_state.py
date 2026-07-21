@@ -1781,6 +1781,7 @@ class IntelligenceStateService:
         request_payload = dict(payload)
         question = str(request_payload.get("question") or "").strip() or "top edges today"
         selected_date = str(request_payload.get("date") or request_payload.get("selected_date") or "").strip() or None
+        requested_sport = str(request_payload.get("sport") or "all").strip().lower() or "all"
         limit = request_payload.get("limit")
         try:
             limit_value = int(limit) if limit is not None and str(limit).strip() else None
@@ -1830,15 +1831,27 @@ class IntelligenceStateService:
         else:
             top_candidates = []
 
-        if limit_value is None:
-            top_opportunities = list(top_candidates)
-        else:
-            opportunity_limit = max(int(limit_value), 1) if top_candidates else max(int(limit_value), 0)
-            top_opportunities = top_candidates[:opportunity_limit]
+        # Group by sport from the full ranked pool (not the sport-scoped/
+        # limited slice below) so by_sport always reflects true per-sport
+        # availability, even when the request asks for one specific sport.
         by_sport: dict[str, list[dict[str, object]]] = {}
-        for recommendation in top_opportunities:
+        for recommendation in top_candidates:
             sport_key = str(recommendation.get("sport") or recommendation.get("sport_slug") or "unknown").strip().lower() or "unknown"
             by_sport.setdefault(sport_key, []).append(dict(recommendation))
+
+        # _build_candidate_pool always builds a sport="all" pool (it's cached
+        # by date only, not by sport), so without this the requested "sport"
+        # filter was applied nowhere: a request for sport=nba or sport=wnba
+        # silently got back the same MLB-dominated global ranking as
+        # sport=mlb or sport=all. Confirmed live in production: sport=nba and
+        # sport=wnba queries returned identical MLB-tagged candidates.
+        sport_scoped_candidates = top_candidates if requested_sport == "all" else by_sport.get(requested_sport, [])
+
+        if limit_value is None:
+            top_opportunities = list(sport_scoped_candidates)
+        else:
+            opportunity_limit = max(int(limit_value), 1) if sport_scoped_candidates else max(int(limit_value), 0)
+            top_opportunities = sport_scoped_candidates[:opportunity_limit]
 
         response_last_updated = _utc_now()
         response_candidate_count = len(candidates)
@@ -1876,6 +1889,7 @@ class IntelligenceStateService:
         request_payload = dict(payload)
         question = str(request_payload.get("question") or "").strip() or "top edges today"
         selected_date = str(request_payload.get("date") or request_payload.get("selected_date") or "").strip() or None
+        requested_sport = str(request_payload.get("sport") or "all").strip().lower() or "all"
         limit = request_payload.get("limit")
         try:
             limit_value = int(limit) if limit is not None and str(limit).strip() else None
@@ -1939,15 +1953,23 @@ class IntelligenceStateService:
                 top_candidates = self._rank_fallback_candidates(candidates)
             else:
                 top_candidates = []
-            if limit_value is None:
-                top_opportunities = list(top_candidates)
-            else:
-                opportunity_limit = max(int(limit_value), 1) if top_candidates else max(int(limit_value), 0)
-                top_opportunities = top_candidates[:opportunity_limit]
+
             by_sport: dict[str, list[dict[str, object]]] = {}
-            for recommendation in top_opportunities:
+            for recommendation in top_candidates:
                 sport_key = str(recommendation.get("sport") or recommendation.get("sport_slug") or "unknown").strip().lower() or "unknown"
                 by_sport.setdefault(sport_key, []).append(dict(recommendation))
+
+            # See the matching comment in _compute_board_publication_response:
+            # _build_candidate_pool always builds a sport="all" pool, so
+            # without this the requested sport filter was never actually
+            # applied to the flat recommendations/top_opportunities list.
+            sport_scoped_candidates = top_candidates if requested_sport == "all" else by_sport.get(requested_sport, [])
+
+            if limit_value is None:
+                top_opportunities = list(sport_scoped_candidates)
+            else:
+                opportunity_limit = max(int(limit_value), 1) if sport_scoped_candidates else max(int(limit_value), 0)
+                top_opportunities = sport_scoped_candidates[:opportunity_limit]
 
             response_build_started_at = time.perf_counter()
             if self._app is not None:
