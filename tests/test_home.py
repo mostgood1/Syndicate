@@ -20,6 +20,7 @@ from syndicate.blueprints.home import _prop_item_from_rank_card
 from syndicate.blueprints.home import _team_for_side_hint
 from syndicate.blueprints.home import _compact_prop_rows
 from syndicate.blueprints.home import _game_sim_vs_line_reasoning
+from syndicate.blueprints.home import _game_identifier
 
 
 class HomePageCommandCenterTests(unittest.TestCase):
@@ -902,6 +903,32 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
     def test_game_sim_vs_line_reasoning_returns_none_without_period_rows(self) -> None:
         game = self._sample_game()
         self.assertIsNone(_game_sim_vs_line_reasoning(game))
+
+    def test_moneyline_candidate_is_live_when_game_is_live_even_with_no_live_prop_rows(self) -> None:
+        # Real bug: live_odds_game_ids used to be built from live_prop_items
+        # alone (_game_identity_set(live_prop_items)), so a genuinely live
+        # game with zero live player-prop rows (an artifact gap, no active
+        # props for this matchup, an event-id mismatch in that one lookup)
+        # got every one of its OTHER candidates -- moneyline, spread, total,
+        # nothing to do with player props -- wrongly marked not-live too,
+        # because an empty identity set forces is_live=False for any game
+        # not in it. The fix builds the set from the game's own reliable
+        # in-progress status instead of from live-prop-row availability.
+        game = self._sample_game(
+            betting={"away_ml": -120, "home_ml": 105, "p_away_win": 0.55, "p_home_win": 0.45},
+            game_id="401700001",
+            status={"in_progress": True, "final": False},
+        )
+        live_odds_game_ids = {_game_identifier(game)}  # what the fixed construction now produces
+        candidates = _game_bet_candidates_from_game({"slug": "wnba"}, game, fallback_epoch=0.0, live_odds_game_ids=live_odds_game_ids)
+        moneyline = next(c for c in candidates if c["market"] == "Moneyline" and c["pick"] == "Away ML")
+        self.assertTrue(moneyline["is_live"])
+
+        # The old, buggy construction: an empty set because live_prop_items
+        # had nothing for this game, even though the game itself is live.
+        candidates_with_empty_live_odds_set = _game_bet_candidates_from_game({"slug": "wnba"}, game, fallback_epoch=0.0, live_odds_game_ids=set())
+        moneyline_old = next(c for c in candidates_with_empty_live_odds_set if c["market"] == "Moneyline" and c["pick"] == "Away ML")
+        self.assertFalse(moneyline_old["is_live"])
 
 
 if __name__ == "__main__":

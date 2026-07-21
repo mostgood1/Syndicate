@@ -1729,9 +1729,18 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
     projected_text = _prop_metric_text(projected) if projected is not None else "-"
     live_projection_text = _prop_metric_text(live_projection) if live_projection is not None else "-"
     team_text = _safe_text(team, "-") if team is not None else "-"
-    fallback_live = bool(game.get("shared_is_live") or _is_liveish(game.get("status"), game.get("detail")) or "live" in _safe_text(market, "").lower())
-    is_live = _live_odds_backed_live_flag(_game_identifier(game), live_odds_game_ids, fallback_live)
     game_state = _game_status_state(game)
+    # Used to be _is_liveish(game.get("status"), game.get("detail")) --
+    # _is_liveish expects TEXT (it string-matches for "in progress", etc.),
+    # but game.get("status") is a dict on every normalized game shape here.
+    # str()-ing that dict happened to contain "in_progress" (underscore),
+    # never the space-separated "in progress" _is_liveish actually looks
+    # for, so this never detected a live game on its own -- it only worked
+    # at all when game.get("shared_is_live") was already true. Reuse the
+    # already-reliable _game_status_state() instead of re-deriving liveness
+    # from raw status text.
+    fallback_live = bool(game.get("shared_is_live") or game_state == "live" or "live" in _safe_text(market, "").lower())
+    is_live = _live_odds_backed_live_flag(_game_identifier(game), live_odds_game_ids, fallback_live)
     edge_value = _pct_number(edge_text)
     confidence_value = _pct_number(confidence_text)
     updated_epoch = _game_row_updated_epoch(game, fallback_epoch)
@@ -4589,7 +4598,23 @@ def _build_sport_overview(
     betting_href, betting_label = _link_lookup_any(links, ["Betting Card"])
     picks_href, picks_label = _link_lookup_any(links, ["Picks", "Season Review"])
     game_bar["items"] = game_items
-    live_odds_game_ids = _game_identity_set(live_prop_items) if slug in _LIVE_PROP_SOURCED_SPORTS else None
+    # Used to be _game_identity_set(live_prop_items) -- i.e. "this game
+    # counts as live only if the (separate, narrower) live player-prop lens
+    # happened to return rows for it." That conflated two unrelated things:
+    # a game genuinely being in progress, and a specific sub-feature (live
+    # player props) having data for it. A live game with no live prop rows
+    # right now (artifact gap, no active props for this matchup, an
+    # event-id mismatch in that one lookup) was getting every one of its
+    # OTHER candidates (moneyline/spread/total) wrongly marked not-live too,
+    # since an empty set here forces is_live=False for every game not in
+    # it (see _live_odds_backed_live_flag's None-vs-empty-set handling).
+    # Build the set from the same reliable in-progress signal
+    # get_active_games/_game_status_state already use instead.
+    live_odds_game_ids = (
+        _game_identity_set([game for game in home_games if isinstance(game, dict) and _game_status_state(game) == "live"])
+        if slug in _LIVE_PROP_SOURCED_SPORTS
+        else None
+    )
     props_bar["items"] = list(pregame_prop_items)
     if game_bar["items"]:
         overview_stats = [{"label": "Games", "value": str(game_count)}] + overview_stats[1:]

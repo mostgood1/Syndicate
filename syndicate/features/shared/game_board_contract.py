@@ -70,10 +70,48 @@ def _render_web_dyno() -> bool:
     )
 
 
+def _team_side(game: dict[str, Any], side: str) -> dict[str, Any]:
+    # Most sports' game objects represent "home"/"away" as a dict
+    # ({"abbr": "BOS", "name": "..."}). WNBA's source-mode game builder
+    # (_source_game_from_row) represents them as a bare tri-code string
+    # instead -- every `.get(side, {}).get("abbr")` in this module assumed
+    # the dict shape and crashed with AttributeError the moment a
+    # string-shaped game reached it (first hit when WNBA's home-dashboard
+    # games started running through this module's normalization).
+    value = game.get(side)
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str) and value.strip():
+        return {"abbr": value.strip(), "name": value.strip()}
+    return {}
+
+
 def _infer_live_state(game: dict[str, Any]) -> bool:
+    # game.get("status") is a dict on every normalized game shape (e.g.
+    # {"in_progress": True, "final": False, "detailed": "Q3 4:12"}) -- this
+    # used to str()-format that whole dict into the text haystack below
+    # instead of reading its actual in_progress/final booleans, so whether a
+    # game was detected as live depended on Python's dict-repr happening to
+    # contain a lucky substring match rather than the real signal. Read the
+    # structured booleans first; only fall back to the text heuristic (kept
+    # for sources that never got a proper live_state) when neither the
+    # status dict nor live_state carries them.
+    status = game.get("status") if isinstance(game.get("status"), dict) else {}
+    live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+    in_progress = status.get("in_progress")
+    if in_progress is None:
+        in_progress = live_state.get("in_progress")
+    final = status.get("final")
+    if final is None:
+        final = live_state.get("final")
+    if final is not None or in_progress is not None:
+        if bool(final):
+            return False
+        if in_progress is not None:
+            return bool(in_progress)
     haystack = " ".join(
         [
-            str(game.get("status") or ""),
+            str(status.get("detailed") or status.get("detail") or status.get("status") or ""),
             str(game.get("detail") or ""),
             str(game.get("summary") or ""),
         ]
@@ -131,12 +169,27 @@ def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
     sim = _sim_payload(game)
     periods = sim.get("periods") if isinstance(sim.get("periods"), dict) else {}
     betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
-    home_abbr = _safe_text(game.get("home", {}).get("abbr"), "HME")
+    away_abbr = _safe_text(_team_side(game, "away").get("abbr"), "AWY")
+    home_abbr = _safe_text(_team_side(game, "home").get("abbr"), "HME")
     betting_total = _safe_float(betting.get("total"))
     betting_home_spread = _safe_float(betting.get("home_spread"))
-    for key, value in periods.items():
-        if not isinstance(value, dict):
-            continue
+    # betting_total/betting_home_spread are the game's ONE full-game market
+    # line -- when periods is per-quarter/half sim data (e.g. WNBA's
+    # q1/q2/q3/q4), comparing each individual period's much-smaller
+    # projected total/margin against that same full-game line produced a
+    # nonsensical "edge" on every row (a ~40-point quarter projection
+    # diffed against a ~165-point full-game total). Only a period whose own
+    # projection already represents the whole game should be compared
+    # against the market line; every individual sub-period gets "-" for
+    # market/best_edge instead, and a genuine full-game aggregate row
+    # (summed across all periods) is appended below so there's still
+    # exactly one row with a valid sim-vs-line comparison.
+    period_entries = [(key, value) for key, value in periods.items() if isinstance(value, dict)]
+    single_period_is_full_game = len(period_entries) <= 1
+    aggregate_away_mean = 0.0
+    aggregate_home_mean = 0.0
+    has_aggregate = False
+    for key, value in period_entries:
         away_mean = _safe_float(value.get("away_mean"))
         home_mean = _safe_float(value.get("home_mean"))
         total_mean = _safe_float(value.get("total_mean"))
@@ -146,32 +199,67 @@ def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
             home_mean = round((total_mean + margin_mean) / 2.0, 3)
         if total_mean is None and away_mean is not None and home_mean is not None:
             total_mean = away_mean + home_mean
+        if away_mean is not None:
+            aggregate_away_mean += away_mean
+            has_aggregate = True
+        if home_mean is not None:
+            aggregate_home_mean += home_mean
+            has_aggregate = True
         total = (away_mean or 0.0) + (home_mean or 0.0)
         away_pct = ((away_mean or 0.0) / total * 100.0) if total > 0 else 50.0
         home_pct = ((home_mean or 0.0) / total * 100.0) if total > 0 else 50.0
         p_home_win = _safe_float(value.get("p_home_win"))
-        market_bits: list[str] = []
-        edge_bits: list[str] = []
-        if betting_home_spread is not None:
-            market_bits.append(f"ATS {home_abbr} {_format_signed_num(betting_home_spread)}")
-            if margin_mean is not None:
-                edge_bits.append(f"ATS {_format_signed_num(margin_mean + betting_home_spread)}")
-        if betting_total is not None:
-            market_bits.append(f"Total {_format_num(betting_total)}")
-            if total_mean is not None:
-                edge_bits.append(f"Total {_format_signed_num(total_mean - betting_total)}")
-        market_value = " | ".join(market_bits) if market_bits else (_metric_lookup(game.get("metrics", []), "Spread") or _metric_lookup(game.get("metrics", []), "Total") or "-")
-        best_edge_value = " | ".join(edge_bits) if edge_bits else (_metric_lookup(game.get("metrics", []), "Edge") or "-")
+        market_value = "-"
+        best_edge_value = "-"
+        if single_period_is_full_game:
+            market_bits: list[str] = []
+            edge_bits: list[str] = []
+            if betting_home_spread is not None:
+                market_bits.append(f"ATS {home_abbr} {_format_signed_num(betting_home_spread)}")
+                if margin_mean is not None:
+                    edge_bits.append(f"ATS {_format_signed_num(margin_mean + betting_home_spread)}")
+            if betting_total is not None:
+                market_bits.append(f"Total {_format_num(betting_total)}")
+                if total_mean is not None:
+                    edge_bits.append(f"Total {_format_signed_num(total_mean - betting_total)}")
+            market_value = " | ".join(market_bits) if market_bits else (_metric_lookup(game.get("metrics", []), "Spread") or _metric_lookup(game.get("metrics", []), "Total") or "-")
+            best_edge_value = " | ".join(edge_bits) if edge_bits else (_metric_lookup(game.get("metrics", []), "Edge") or "-")
         rows.append(
             {
                 "label": _period_label(str(key)),
-                "main": f"{game.get('away', {}).get('abbr', 'AWY')} {_format_num(away_mean)} - {game.get('home', {}).get('abbr', 'HME')} {_format_num(home_mean)}",
+                "main": f"{away_abbr} {_format_num(away_mean)} - {home_abbr} {_format_num(home_mean)}",
                 "subtitle": f"Projected total {_format_num(total_mean)}",
                 "away_pct": away_pct,
                 "home_pct": home_pct,
                 "home_win": _format_pct(p_home_win),
                 "market": market_value,
                 "best_edge": best_edge_value,
+            }
+        )
+    if len(period_entries) > 1 and has_aggregate:
+        aggregate_total = round(aggregate_away_mean + aggregate_home_mean, 3)
+        aggregate_margin = round(aggregate_home_mean - aggregate_away_mean, 3)
+        aggregate_total_pct = aggregate_away_mean + aggregate_home_mean
+        away_pct = (aggregate_away_mean / aggregate_total_pct * 100.0) if aggregate_total_pct > 0 else 50.0
+        home_pct = (aggregate_home_mean / aggregate_total_pct * 100.0) if aggregate_total_pct > 0 else 50.0
+        market_bits = []
+        edge_bits = []
+        if betting_home_spread is not None:
+            market_bits.append(f"ATS {home_abbr} {_format_signed_num(betting_home_spread)}")
+            edge_bits.append(f"ATS {_format_signed_num(aggregate_margin + betting_home_spread)}")
+        if betting_total is not None:
+            market_bits.append(f"Total {_format_num(betting_total)}")
+            edge_bits.append(f"Total {_format_signed_num(aggregate_total - betting_total)}")
+        rows.append(
+            {
+                "label": "Full Game",
+                "main": f"{away_abbr} {_format_num(aggregate_away_mean)} - {home_abbr} {_format_num(aggregate_home_mean)}",
+                "subtitle": f"Projected total {_format_num(aggregate_total)}",
+                "away_pct": away_pct,
+                "home_pct": home_pct,
+                "home_win": _format_pct(home_pct / 100.0) if aggregate_total_pct > 0 else "-",
+                "market": " | ".join(market_bits) if market_bits else (_metric_lookup(game.get("metrics", []), "Spread") or _metric_lookup(game.get("metrics", []), "Total") or "-"),
+                "best_edge": " | ".join(edge_bits) if edge_bits else (_metric_lookup(game.get("metrics", []), "Edge") or "-"),
             }
         )
     if not rows:
@@ -308,7 +396,7 @@ def _build_top_play_rows(game: dict[str, Any]) -> list[dict[str, str]]:
 def _build_prop_rows(game: dict[str, Any]) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     prop_recs = game.get("prop_recommendations") if isinstance(game.get("prop_recommendations"), dict) else {}
-    for side_key, team_abbr in (("away", game.get("away", {}).get("abbr", "Away")), ("home", game.get("home", {}).get("abbr", "Home"))):
+    for side_key, team_abbr in (("away", _safe_text(_team_side(game, "away").get("abbr"), "Away")), ("home", _safe_text(_team_side(game, "home").get("abbr"), "Home"))):
         for row in prop_recs.get(side_key) or []:
             if not isinstance(row, dict):
                 continue
@@ -363,8 +451,8 @@ def _build_box_sections(game: dict[str, Any]) -> list[dict[str, Any]]:
     sections: list[dict[str, Any]] = []
     sim = _sim_payload(game)
     score = sim.get("score") if isinstance(sim.get("score"), dict) else {}
-    away_abbr = _safe_text(game.get("away", {}).get("abbr"), "AWY")
-    home_abbr = _safe_text(game.get("home", {}).get("abbr"), "HME")
+    away_abbr = _safe_text(_team_side(game, "away").get("abbr"), "AWY")
+    home_abbr = _safe_text(_team_side(game, "home").get("abbr"), "HME")
     away_mean = _safe_float(score.get("away_mean"))
     home_mean = _safe_float(score.get("home_mean"))
     if away_mean is not None or home_mean is not None:
@@ -373,8 +461,8 @@ def _build_box_sections(game: dict[str, Any]) -> list[dict[str, Any]]:
                 "title": "Sim game box",
                 "body": "Pregame and in-play sim scoring expectations stay pinned in the box score tab.",
                 "rows": [
-                    {"name": away_abbr, "detail": game.get("away", {}).get("name") or away_abbr, "value": _format_num(away_mean)},
-                    {"name": home_abbr, "detail": game.get("home", {}).get("name") or home_abbr, "value": _format_num(home_mean)},
+                    {"name": away_abbr, "detail": _team_side(game, "away").get("name") or away_abbr, "value": _format_num(away_mean)},
+                    {"name": home_abbr, "detail": _team_side(game, "home").get("name") or home_abbr, "value": _format_num(home_mean)},
                 ],
             }
         )
@@ -414,7 +502,7 @@ def _normalize_game(game: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(game)
     metrics = normalized.get("metrics") if isinstance(normalized.get("metrics"), list) else []
     period_rows = _build_period_rows(normalized)
-    normalized.setdefault("market_tiles", [{"label": metric.get("label"), "title": metric.get("value"), "sub": f"{normalized.get('away', {}).get('abbr', 'AWY')} @ {normalized.get('home', {}).get('abbr', 'HME')}"} for metric in metrics[:4]])
+    normalized.setdefault("market_tiles", [{"label": metric.get("label"), "title": metric.get("value"), "sub": f"{_safe_text(_team_side(normalized, 'away').get('abbr'), 'AWY')} @ {_safe_text(_team_side(normalized, 'home').get('abbr'), 'HME')}"} for metric in metrics[:4]])
     normalized["shared_is_live"] = _infer_live_state(normalized)
     normalized["shared_period_rows"] = period_rows
     normalized["shared_probability_rows"] = _build_probability_rows(normalized, period_rows)

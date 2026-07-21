@@ -1869,6 +1869,17 @@ def get_wnba_overview(selected_date: str) -> dict[str, Any]:
     # and recommendations on every call.
     cards_context = build_source_cards_payload(requested_date, allow_stored_date_fallback=True)
     games = list(cards_context.get("games") or [])
+    # Every other sport's home-dashboard games come from build_cards_page_
+    # context, which runs apply_game_board_contract -- the step that
+    # computes shared_is_live/shared_period_rows/shared_prop_rows/etc. This
+    # source-mode path never got that treatment, so these games never
+    # carried the sim-vs-line data other sports' candidates already do, and
+    # _home_games_have_live_action (home.py) couldn't reliably see a game as
+    # live even once it actually went live, since it reads shared_is_live
+    # as one of its signals.
+    from syndicate.features.shared.game_board_contract import _normalize_games
+
+    games = _normalize_games(games, sport="wnba")
     prop_rows = _finalize_home_prop_rows(
         _load_home_prop_items(
             "wnba",
