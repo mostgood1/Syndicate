@@ -511,6 +511,17 @@ services:
       # _run_live_refresh_tick -- it just no longer LAUNCHES one itself.
       - key: SYNDICATE_MLB_SIM_TICK_OWNER
         value: "false"
+      # This worker's own tick and refresh-worker's purpose-built MLB autorun
+      # (_launch_autorun_mlb_refresh, which reacts to the live-lens report's
+      # actual staleness) were both independently deciding "MLB needs a
+      # refresh" in the same window -- confirmed in production. The
+      # cross-service refresh-run lock (ops_refresh.py's
+      # _refresh_run_still_active) already makes that collision safe, but
+      # this removes the redundant decision-making at the source: MLB is
+      # excluded from what this worker's tick launches, same ownership split
+      # already made for the sim above.
+      - key: SYNDICATE_MLB_REFRESH_TICK_OWNER
+        value: "false"
       - key: SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER
         value: "false"
       - key: SYNDICATE_LOOK_AHEAD_ENABLED

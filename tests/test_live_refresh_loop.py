@@ -494,6 +494,95 @@ class LiveRefreshLoopTests(unittest.TestCase):
         self.assertEqual(mocked_launch.call_args.kwargs["sports"], "mlb")
         self.assertFalse(payload["oddsRefreshWnbaSkipped"]["forcedThrough"])
 
+    def test_mlb_refresh_tick_owner_here_defaults_true(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertTrue(live_refresh_loop._mlb_refresh_tick_owner_here())
+
+    def test_mlb_refresh_tick_owner_here_respects_env_override(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_MLB_REFRESH_TICK_OWNER": "false"}, clear=False):
+            self.assertFalse(live_refresh_loop._mlb_refresh_tick_owner_here())
+
+    def test_run_tick_excludes_mlb_when_not_owner(self) -> None:
+        # live-odds-worker's tick and refresh-worker's own MLB autorun
+        # (_launch_autorun_mlb_refresh) were both independently deciding "MLB
+        # needs a refresh" in the same window. The cross-service lock now
+        # makes that collision safe, but ownership removes the redundant
+        # decision at the source: with no explicit sports override and
+        # ownership set false, mlb must be excluded from what this tick
+        # launches even though it's part of the season-active set.
+        with patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
+                "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false",
+                "SYNDICATE_MLB_REFRESH_TICK_OWNER": "false",
+            },
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-21"), patch.object(
+            live_refresh_loop, "_should_force_sim_rerun", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_active_sports_for_date", return_value="mlb,nba,wnba"
+        ), patch.object(
+            live_refresh_loop, "launch_refresh_run", return_value={"ok": True, "pid": 4242}
+        ) as mocked_launch:
+            payload = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertTrue(payload["ok"])
+        mocked_launch.assert_called_once()
+        self.assertEqual(mocked_launch.call_args.kwargs["sports"], "nba,wnba")
+
+    def test_run_tick_includes_mlb_by_default(self) -> None:
+        # Regression: with no ownership override configured, behavior is
+        # unchanged -- no explicit sports list is built, and
+        # launch_refresh_run resolves the full active-season set itself.
+        with patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
+                "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false",
+            },
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-21"), patch.object(
+            live_refresh_loop, "_should_force_sim_rerun", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(
+            live_refresh_loop, "launch_refresh_run", return_value={"ok": True, "pid": 4242}
+        ) as mocked_launch:
+            payload = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertTrue(payload["ok"])
+        mocked_launch.assert_called_once()
+        self.assertIsNone(mocked_launch.call_args.kwargs["sports"])
+
+    def test_run_tick_still_excludes_mlb_when_sim_blocks_refresh_and_not_owner(self) -> None:
+        # The sim-blocked branch resolves its own sports_to_launch list
+        # independently of the normal-path branch above -- ownership must be
+        # respected there too, not just in the unblocked case.
+        with patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
+                "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false",
+                "SYNDICATE_LIVE_ODDS_REFRESH_SPORTS": "mlb,nba",
+                "SYNDICATE_MLB_REFRESH_TICK_OWNER": "false",
+            },
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-21"), patch.object(
+            live_refresh_loop, "_should_force_sim_rerun", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=True
+        ), patch.object(
+            live_refresh_loop, "launch_refresh_run", return_value={"ok": True, "pid": 4242}
+        ) as mocked_launch:
+            payload = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertTrue(payload["ok"])
+        mocked_launch.assert_called_once()
+        self.assertEqual(mocked_launch.call_args.kwargs["sports"], "nba")
+
     def test_run_tick_forces_wnba_through_past_wnba_starvation_ceiling_when_override_enabled(self) -> None:
         # The opt-in path: once explicitly enabled (a human with visibility
         # into current container memory deciding the trade-off is worth it),

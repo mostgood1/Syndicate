@@ -1632,6 +1632,26 @@ def _mlb_sim_tick_owner_here() -> bool:
 	return raw in ("1", "true", "yes", "y", "on")
 
 
+def _mlb_refresh_tick_owner_here() -> bool:
+	# Whether THIS service's tick should include "mlb" among the sports it
+	# launches live-phase odds refreshes for, vs. leaving that entirely to
+	# refresh-worker's own purpose-built MLB autorun
+	# (_launch_autorun_mlb_refresh in run_refresh_worker.py, which reacts to
+	# the live-lens report's actual staleness rather than a generic tick
+	# interval). Both were confirmed independently deciding "MLB needs a
+	# refresh" in the same window when both are enabled -- the cross-service
+	# refresh-run lock (see _refresh_run_still_active in ops_refresh.py)
+	# already makes that safe, but this removes the redundant decision-making
+	# at the source instead of just tolerating the collision. Defaults true
+	# so a service with no explicit opinion keeps today's behavior. Mirrors
+	# _mlb_sim_tick_owner_here's existing pattern (2026-07-20 sim-ownership
+	# move from live-odds-worker to refresh-worker).
+	raw = str(os.environ.get("SYNDICATE_MLB_REFRESH_TICK_OWNER") or "").strip().lower()
+	if not raw:
+		return True
+	return raw in ("1", "true", "yes", "y", "on")
+
+
 def _run_mlb_sim_tick() -> dict[str, Any]:
 	"""Self-contained MLB sim/look-ahead/evening-sim decision+launch pass.
 
@@ -1776,6 +1796,11 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 	# every other configured sport anyway and defer only WNBA specifically.
 	skip_launch = False
 	launch_sports = _live_refresh_loop_sports()
+	if launch_sports is None and not _mlb_refresh_tick_owner_here():
+		# No explicit sports override configured -- launch_refresh_run would
+		# otherwise resolve the full active-season set itself (including
+		# "mlb"), duplicating refresh-worker's own purpose-built MLB autorun.
+		launch_sports = ",".join(sport for sport in _live_refresh_loop_effective_sports(selected_date) if sport != "mlb")
 	wnba_forced_through = False
 	if sim_blocks_refresh:
 		effective_sports = _live_refresh_loop_effective_sports(selected_date)
@@ -1797,7 +1822,11 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 				# straight, not on every resident-sim tick.
 				print(f"[live_refresh_loop] WNBA_ODDS_REFRESH_FORCED_THROUGH skipped_for_seconds={wnba_skip_seconds}", flush=True)
 				wnba_forced_through = True
-		sports_to_launch = [sport for sport in effective_sports if sport != "wnba" or wnba_forced_through]
+		sports_to_launch = [
+			sport
+			for sport in effective_sports
+			if (sport != "wnba" or wnba_forced_through) and (sport != "mlb" or _mlb_refresh_tick_owner_here())
+		]
 		if sports_to_launch:
 			launch_sports = ",".join(sports_to_launch)
 		else:
