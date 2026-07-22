@@ -37,6 +37,7 @@ from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.shared.ops_refresh import launch_refresh_run
 from syndicate.features.shared.ops_refresh import load_latest_refresh_status
 from syndicate.features.portfolio_summary import build_portfolio_summary
+from syndicate.features.prediction_ledger import record_prediction
 
 
 intelligence_bp = Blueprint("syndicate_intelligence", __name__)
@@ -1542,6 +1543,62 @@ def intelligence_portfolio_event_api():
         return _no_cache_response(jsonify(response_payload))
     except Exception:
         _LOGGER.exception("INTELLIGENCE STATUS FAILURE")
+        raise
+
+
+@intelligence_bp.post("/api/portfolio/bets")
+def portfolio_bets_api():
+    # Writes into data/prediction_ledger.json -- the same store /portfolio
+    # reads (syndicate/features/prediction_ledger.py) -- unlike
+    # /api/intelligence/portfolio-event above, which writes into a
+    # separate evaluation ledger the Portfolio page never reads. The bet
+    # slip's "Log to portfolio" action needs THIS endpoint to actually
+    # show up as a position.
+    try:
+        payload = request.get_json(silent=True) or {}
+        bet_type = str(payload.get("bet_type") or "straight").strip().lower() or "straight"
+        stake = payload.get("stake")
+        odds = payload.get("odds")
+        recommendation_id = payload.get("recommendation_id")
+        features_snapshot = {"recommendation_id": recommendation_id} if recommendation_id else None
+
+        if bet_type == "parlay":
+            legs = payload.get("legs")
+            if not isinstance(legs, list) or not legs:
+                response = jsonify({"ok": False, "error": "legs is required for a parlay bet."})
+                response.status_code = 400
+                return _no_cache_response(response)
+            sport = "multi"
+            market = "parlay"
+            selection = f"{len(legs)}-leg parlay"
+        else:
+            legs = None
+            sport = payload.get("sport")
+            market = payload.get("market")
+            selection = payload.get("selection")
+            if not sport or not market or not selection:
+                response = jsonify({"ok": False, "error": "sport, market, and selection are required for a straight bet."})
+                response.status_code = 400
+                return _no_cache_response(response)
+
+        record = record_prediction(
+            sport=sport,
+            market=market,
+            selection=selection,
+            odds=odds,
+            edge=payload.get("edge"),
+            confidence=payload.get("confidence"),
+            model_probability=payload.get("model_probability"),
+            implied_probability=payload.get("implied_probability"),
+            stake=stake,
+            bet_type=bet_type,
+            legs=legs,
+            prediction_id=payload.get("prediction_id"),
+            features_snapshot=features_snapshot,
+        )
+        return _no_cache_response(jsonify({"ok": True, "bet": record}))
+    except Exception:
+        _LOGGER.exception("PORTFOLIO BET RECORD FAILURE")
         raise
 
 

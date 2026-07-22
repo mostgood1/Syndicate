@@ -175,6 +175,62 @@
     color: var(--cards-text-dim);
     font-size: 13px;
   }
+
+  .portfolio-legs {
+    margin-top: 4px;
+  }
+
+  .portfolio-legs summary {
+    cursor: pointer;
+    color: var(--cards-text-dim);
+    font-size: 11px;
+  }
+
+  .portfolio-legs ul {
+    margin: 6px 0 0;
+    padding-left: 16px;
+    color: var(--cards-text-soft);
+    font-size: 11.5px;
+  }
+
+  .portfolio-exposure {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .portfolio-exposure-row {
+    display: grid;
+    grid-template-columns: 90px 1fr 70px;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+  }
+
+  .portfolio-exposure-row__sport {
+    color: var(--cards-text);
+    text-transform: capitalize;
+  }
+
+  .portfolio-exposure-row__bar-wrap {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 999px;
+    height: 10px;
+    overflow: hidden;
+  }
+
+  .portfolio-exposure-row__bar {
+    height: 100%;
+    background: linear-gradient(90deg, rgba(46, 204, 113, 0.9), rgba(46, 204, 113, 0.5));
+    border-radius: 999px;
+  }
+
+  .portfolio-exposure-row__stake {
+    text-align: right;
+    color: var(--cards-text-soft);
+    font-variant-numeric: tabular-nums;
+  }
 </style>
 
 {% set summary = portfolio_summary or {} %}
@@ -245,6 +301,21 @@
     </div>
   {% endif %}
 
+  {% if summary.exposure_by_sport %}
+    <h2 class="portfolio-section-title">Open exposure by sport</h2>
+    <div class="portfolio-exposure">
+      {% for row in summary.exposure_by_sport %}
+        <div class="portfolio-exposure-row">
+          <div class="portfolio-exposure-row__sport">{{ row.sport }}</div>
+          <div class="portfolio-exposure-row__bar-wrap">
+            <div class="portfolio-exposure-row__bar" style="width: {{ row.pct }}%;"></div>
+          </div>
+          <div class="portfolio-exposure-row__stake">${{ "%.2f"|format(row.stake) }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
   <h2 class="portfolio-section-title">Recent positions</h2>
   <div class="portfolio-table-wrap">
     {% if summary.positions %}
@@ -253,8 +324,8 @@
           <tr>
             <th>Recorded</th>
             <th>Sport</th>
-            <th>Market</th>
-            <th>Selection</th>
+            <th>Placed bet</th>
+            <th>Stake</th>
             <th>Odds</th>
             <th>Edge</th>
             <th>Confidence</th>
@@ -267,8 +338,20 @@
             <tr>
               <td>{{ row.timestamp or "—" }}</td>
               <td class="portfolio-table__primary">{{ row.sport or "—" }}</td>
-              <td>{{ row.market or "—" }}</td>
-              <td class="portfolio-table__primary">{{ row.selection or "—" }}{% if row.matchup %} <span style="color:var(--cards-text-dim);">· {{ row.matchup }}</span>{% endif %}</td>
+              <td class="portfolio-table__primary">
+                {{ row.placed_bet or "—" }}{% if row.matchup %} <span style="color:var(--cards-text-dim);">· {{ row.matchup }}</span>{% endif %}
+                {% if row.legs %}
+                  <details class="portfolio-legs">
+                    <summary>{{ row.legs|length }} legs</summary>
+                    <ul>
+                      {% for leg in row.legs %}
+                        <li>{{ leg.selection or leg.name or "—" }}{% if leg.market %} ({{ leg.market }}){% endif %}{% if leg.sport %} — {{ leg.sport }}{% endif %}</li>
+                      {% endfor %}
+                    </ul>
+                  </details>
+                {% endif %}
+              </td>
+              <td>{{ "$%.2f"|format(row.stake) if row.stake is not none else "—" }}</td>
               <td>{{ row.odds if row.odds is not none else "—" }}</td>
               <td>{{ "%.1f%%"|format(row.edge * 100) if row.edge is not none else "—" }}</td>
               <td>{{ "%.0f"|format(row.confidence) if row.confidence is not none else "—" }}</td>

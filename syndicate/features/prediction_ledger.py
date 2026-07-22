@@ -195,6 +195,9 @@ class PredictionRecord:
     confidence: float | None = None
     signals: dict[str, Any] = field(default_factory=dict)
     features_snapshot: dict[str, Any] = field(default_factory=dict)
+    stake: float | None = None
+    bet_type: str = "straight"
+    legs: list[dict[str, Any]] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -210,6 +213,9 @@ class PredictionRecord:
             "confidence": self.confidence,
             "signals": dict(self.signals),
             "features_snapshot": dict(self.features_snapshot),
+            "stake": self.stake,
+            "bet_type": self.bet_type,
+            "legs": [dict(leg) for leg in self.legs] if self.legs else None,
         }
 
 
@@ -241,6 +247,13 @@ def _clv_from_lines(original_line: Any, closing_line: Any) -> float | None:
     return round(closing_value - original_value, 4)
 
 
+def _normalize_legs(value: Any) -> list[dict[str, Any]] | None:
+    if not isinstance(value, list):
+        return None
+    legs = [dict(leg) for leg in value if isinstance(leg, Mapping)]
+    return legs or None
+
+
 def _prediction_from_payload(payload: Mapping[str, Any]) -> PredictionRecord:
     return PredictionRecord(
         id=_normalize_text(payload.get("id")) or _new_id(),
@@ -255,6 +268,9 @@ def _prediction_from_payload(payload: Mapping[str, Any]) -> PredictionRecord:
         confidence=_coerce_float(payload.get("confidence")),
         signals=_normalize_signal_map(payload.get("signals")),
         features_snapshot=_normalize_signal_map(payload.get("features_snapshot")),
+        stake=_coerce_float(payload.get("stake")),
+        bet_type=_normalize_text(payload.get("bet_type")) or "straight",
+        legs=_normalize_legs(payload.get("legs")),
     )
 
 
@@ -294,6 +310,9 @@ def record_prediction(
     features_snapshot: Any = None,
     timestamp: str | None = None,
     prediction_id: str | None = None,
+    stake: Any = None,
+    bet_type: Any = None,
+    legs: Any = None,
     ledger_path: Path | str | None = None,
 ) -> dict[str, Any]:
     payload = _prediction_from_payload(
@@ -310,6 +329,9 @@ def record_prediction(
             "confidence": confidence,
             "signals": signals,
             "features_snapshot": features_snapshot,
+            "stake": stake,
+            "bet_type": bet_type,
+            "legs": legs,
         }
     )
     path = Path(ledger_path) if ledger_path is not None else _default_ledger_path()
