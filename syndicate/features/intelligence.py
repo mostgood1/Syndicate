@@ -7008,11 +7008,22 @@ def run_intelligence_query(
     _intel_trace_timed("ranking", ranking_started_at, pipeline="run_intelligence_query", recommendation_count=len(ranked_recommendations))
     evaluation_started_at = time.perf_counter()
     pre_selection_recommendations = [dict(candidate) for candidate in ranked_recommendations if isinstance(candidate, Mapping)]
-    recommendations = _greedy_low_correlation_selection(
-        [dict(candidate) for candidate in ranked_recommendations],
-        limit=len(ranked_recommendations),
-        threshold=MAX_CORRELATION_THRESHOLD,
-    )
+    # Was _greedy_low_correlation_selection(..., limit=len(ranked_recommendations)).
+    # That limit was already a no-op (set to the full length), but the
+    # correlation-threshold EXCLUSION inside it was not: it silently
+    # dropped any candidate scoring >0.65 "correlated" (same game/subject)
+    # with one already kept, which collapsed pools of 100+ real per-sport
+    # candidates down to ~5 -- not a numeric cap anywhere, but the same
+    # user-visible effect ("still only see 10 candidates"). Correlation
+    # exclusion is the right tool for building one parlay ticket's legs,
+    # which _build_parlays below already does independently (from
+    # filtered_candidates, with its own correlation check in
+    # intelligence_parlay_runtime.py) -- it was never needed here too. The
+    # board should show every real candidate; _balanced_recommendation_order
+    # above already keeps the most differentiated picks (by sport and
+    # market family) at the front for any client that only renders the
+    # first N, without dropping the rest.
+    recommendations = [dict(candidate) for candidate in ranked_recommendations]
     _log_candidate_stage(pipeline_name="run_intelligence_query", stage="_greedy_low_correlation_selection", before=pre_selection_recommendations, after=recommendations)
     _intel_trace_timed("evaluation", evaluation_started_at, pipeline="run_intelligence_query", recommendation_count=len(recommendations))
     _intel_trace(

@@ -3871,12 +3871,21 @@ class _MLBDataProvider(_HomeSportDataProviderBase):
 
     def pregame_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
         mlb_rows = _pregame_prop_rows_from_betting_card("mlb", context_label=context.context_label, season=context.season, week=context.week)
-        if mlb_rows:
-            return mlb_rows
-        mlb_top_prop_rows = _load_mlb_home_top_prop_items(context.context_label)
-        if mlb_top_prop_rows:
-            return mlb_top_prop_rows
-        return _compact_prop_rows(home_games)
+        if not mlb_rows:
+            mlb_rows = _load_mlb_home_top_prop_items(context.context_label)
+        if not mlb_rows:
+            mlb_rows = _compact_prop_rows(home_games)
+        # _load_mlb_home_hr_target_items was a complete, working home-page
+        # HR-targets adapter that nothing ever called -- dead code, so HR
+        # targets never reached the board despite the artifact existing and
+        # being current. HR targets are a distinct market from whatever's
+        # already in mlb_rows above (betting-card props, top props, or the
+        # compact fallback), so they're additive here, not another rung in
+        # the same fallback chain.
+        hr_target_rows = _load_mlb_home_hr_target_items(context.context_label)
+        if hr_target_rows:
+            return list(mlb_rows) + hr_target_rows
+        return mlb_rows
 
     def live_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
         if not is_active_today:
@@ -4041,6 +4050,19 @@ class _NHLDataProvider(_HomeSportDataProviderBase):
             return []
         if not _home_games_have_live_action(home_games):
             return []
+        # NOTE: this is still static pregame player-prop data, cosmetically
+        # labeled "live" whenever a game happens to be in progress -- a
+        # real, known bug (see the "Betting Board Reinvention" project
+        # notes). nhl/live_lens.py's build_live_lens_page_context looked
+        # like the fix (same rank_cards shape every other live-lens path
+        # uses) but its cards are per-GAME analysis (moneyline/total/margin
+        # for the matchup, consumed elsewhere via
+        # _compact_game_items_from_rank_cards) -- not per-player props, so
+        # routing them through _prop_rows_from_rank_cards (which expects a
+        # player name/team/market/line) would mislabel game data as player
+        # picks, the exact "inconsistent labeling" bug this migration is
+        # trying to reduce, not add to. Left as the original source until
+        # NHL has a genuine live player-prop feed to wire in instead.
         from syndicate.features.nhl.cards import build_props_cards_payload
 
         payload = build_props_cards_payload(context.context_label, top=18)
@@ -4074,6 +4096,13 @@ class _NCAABDataProvider(_HomeSportDataProviderBase):
         return _compact_prop_rows(home_games)
 
     def live_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
+        # No branch here has ever existed. _load_home_game_items already
+        # reads ncaab/live_lens.py's build_live_lens_page_context for the
+        # compact GAME rail, but its rank_cards are per-game analysis
+        # (moneyline/total/margin for the matchup), not per-player props --
+        # routing them through _prop_rows_from_rank_cards would mislabel
+        # game data as player picks. NCAAB has no genuine live player-prop
+        # feed to wire in here yet.
         return []
 
 
@@ -4099,6 +4128,11 @@ class _NFLDataProvider(_HomeSportDataProviderBase):
         return _compact_prop_rows(home_games)
 
     def live_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
+        # No branch here has ever existed. Same reasoning as NCAAB's
+        # live_props: nfl/live_lens.py's build_live_lens_page_context is a
+        # real live source, but its rank_cards are per-game analysis, not
+        # per-player props -- no genuine live player-prop feed to wire in
+        # here yet without mislabeling game data as picks.
         return []
 
 
@@ -4124,6 +4158,11 @@ class _NCAAFDataProvider(_HomeSportDataProviderBase):
         return _compact_prop_rows(home_games)
 
     def live_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
+        # No branch here has ever existed. Same reasoning as NCAAB's
+        # live_props: ncaaf/live_lens.py's build_live_lens_page_context is
+        # a real live source, but its rank_cards are per-game analysis, not
+        # per-player props -- no genuine live player-prop feed to wire in
+        # here yet without mislabeling game data as picks.
         return []
 
 
