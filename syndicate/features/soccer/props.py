@@ -48,6 +48,13 @@ def _prop_rank_card(row: dict[str, Any], *, league: str, week: int, season: int)
         "eyebrow": f"{team} ({side})" if side else team,
         "badge": _fmt_pct(row.get("anytime_scorer_probability")),
         "meta": league_display_name(league),
+        # Not read by this page's own rendering -- carried through so
+        # home.py's _prop_rows_from_rank_cards/_home_prop_matched_game can
+        # attach the real game_id/gamePk (props.py's "meta" is just the
+        # league name, not an "away @ home" matchup string like other
+        # sports' rank cards, so the usual team-label text match never
+        # hits for soccer without this).
+        "match_id": str(row.get("match_id") or "").strip() or None,
         "metrics": [
             {"label": "Anytime scorer", "value": _fmt_pct(row.get("anytime_scorer_probability"))},
             {"label": "If playing", "value": _fmt_pct(row.get("anytime_scorer_probability_if_playing"))},

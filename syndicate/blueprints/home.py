@@ -54,6 +54,11 @@ from syndicate.features.shared.timezone import central_datetime_from_epoch
 from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.shared.timezone import central_year
+from syndicate.features.shared.sport_data_provider import SportContext
+from syndicate.features.shared.sport_data_provider import artifact_signature
+from syndicate.features.shared.sport_data_provider import get_sport_data_provider
+from syndicate.features.shared.sport_data_provider import register_sport_data_provider
+from syndicate.features.shared.sport_data_provider import sport_manifest_signature
 
 
 home_bp = Blueprint("syndicate_home", __name__)
@@ -3791,41 +3796,14 @@ def _load_home_pregame_prop_items(
     week: int | None = None,
     is_active_today: bool,
 ) -> list[dict[str, Any]]:
-    if slug in {"nfl", "ncaaf"} and not is_active_today:
+    provider = get_sport_data_provider(slug)
+    if provider is None:
         return []
+    context = provider.resolve_context(requested_date=context_label, season=season, week=week)
     try:
-        if slug == "nba":
-            nba_rows = _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
-            if nba_rows:
-                return nba_rows
-            csv_rows = _prop_rows_from_props_recommendations_csv(slug, context_label=context_label, fallback_href=f"/nba/cards?date={context_label}")
-            if csv_rows:
-                return csv_rows
-            return _compact_prop_rows(home_games)
-        if slug == "wnba":
-            wnba_rows = _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
-            if wnba_rows:
-                return wnba_rows
-            csv_rows = _prop_rows_from_props_recommendations_csv(slug, context_label=context_label, fallback_href=f"/wnba/cards?date={context_label}")
-            if csv_rows:
-                return csv_rows
-            return _compact_prop_rows(home_games)
-        if slug == "mlb":
-            mlb_rows = _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
-            if mlb_rows:
-                return mlb_rows
-            mlb_top_prop_rows = _load_mlb_home_top_prop_items(context_label)
-            if mlb_top_prop_rows:
-                return mlb_top_prop_rows
-            return _compact_prop_rows(home_games)
-        if slug in {"mlb", "nhl", "nfl", "ncaaf", "ncaab"}:
-            betting_rows = _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
-            if betting_rows:
-                return betting_rows
-            return _compact_prop_rows(home_games)
+        return provider.pregame_props(context, home_games, is_active_today=is_active_today)
     except Exception:
         return []
-    return []
 
 
 # Sports with a real live-prop data source below (mlb/nhl/nba/wnba). NFL/
@@ -3847,77 +3825,407 @@ def _load_home_live_prop_items(
     week: int | None = None,
     is_active_today: bool,
 ) -> list[dict[str, Any]]:
-    if not is_active_today:
+    provider = get_sport_data_provider(slug)
+    if provider is None:
         return []
+    context = provider.resolve_context(requested_date=context_label, season=season, week=week)
     try:
-        if slug == "mlb":
-            from syndicate.features.mlb.live_lens import read_latest_live_lens_page_context
-
-            live_games = list(read_latest_live_lens_page_context(context_label).get("games") or [])
-            live_games = [game for game in live_games if isinstance(game, dict)]
-            if not live_games:
-                return []
-            liveish_games = [
-                game
-                for game in live_games
-                if _is_liveish(*(_scoreboard_state(game).get(key) for key in ["status_badge", "status_line"]))
-            ]
-            prop_backed_games = [
-                game
-                for game in (liveish_games or live_games)
-                if isinstance(game.get("liveProps"), list) or isinstance(game.get("archivedLiveProps"), list)
-            ]
-            live_rows = _prop_rows_from_mlb_live_games(prop_backed_games)
-            return live_rows
-        if not _home_games_have_live_action(home_games):
-            return []
-        if slug == "nhl":
-            from syndicate.features.nhl.cards import build_props_cards_payload
-
-            payload = build_props_cards_payload(context_label, top=18)
-            return _prop_rows_from_nhl_cards(
-                list(payload.get("cards") or []),
-                fallback_href=f"/nhl/cards?date={payload.get('date') or context_label}",
-            )
-        if slug == "nba":
-            from syndicate.features.nba.cards import build_live_player_lens_payload
-            from syndicate.features.nba.cards import build_live_state_payload
-
-            live_state = build_live_state_payload(context_label, ttl=12)
-            event_ids = [
-                str((game or {}).get("event_id") or "").strip()
-                for game in (live_state.get("games") if isinstance(live_state.get("games"), list) else [])
-                if str((game or {}).get("event_id") or "").strip()
-            ]
-            if not event_ids:
-                return []
-            payload = build_live_player_lens_payload(context_label, event_ids, ttl=20)
-            return _prop_rows_from_nba_live_lens(
-                list(payload.get("games") or []),
-                sport_slug="nba",
-                fallback_href=f"/nba/live-lens?date={context_label}",
-            )
-        if slug == "wnba":
-            from syndicate.features.wnba.cards import build_live_player_lens_payload
-            from syndicate.features.wnba.cards import build_live_state_payload
-
-            live_state = build_live_state_payload(context_label, ttl=12)
-            event_ids = [
-                str((game or {}).get("event_id") or "").strip()
-                for game in (live_state.get("games") if isinstance(live_state.get("games"), list) else [])
-                if str((game or {}).get("event_id") or "").strip()
-            ]
-            if not event_ids:
-                return []
-            payload = build_live_player_lens_payload(context_label, event_ids, ttl=20)
-            return _prop_rows_from_nba_live_lens(
-                list(payload.get("games") or []),
-                sport_slug="wnba",
-                fallback_href=f"/wnba/live-lens?date={context_label}",
-            )
+        return provider.live_props(context, home_games, is_active_today=is_active_today)
     except Exception:
         return []
-    return []
+
+
+class _HomeSportDataProviderBase:
+    """Shared, uniform bits of SportDataProvider every home.py adapter
+    below reuses verbatim -- date/week packaging and the manifest-backed
+    data_sources() diagnostic. See syndicate/features/shared/sport_data_provider.py
+    for the protocol these implement (duck-typed, not subclassed from it)."""
+
+    slug: str = ""
+
+    def resolve_context(
+        self,
+        *,
+        requested_date: str | None = None,
+        season: int | None = None,
+        week: int | None = None,
+    ) -> SportContext:
+        return SportContext(slug=self.slug, context_label=str(requested_date or ""), season=season, week=week)
+
+    def data_sources(self, context: SportContext) -> dict[str, Any]:
+        return {"manifest": sport_manifest_signature(self.slug)}
+
+
+class _MLBDataProvider(_HomeSportDataProviderBase):
+    slug = "mlb"
+
+    def is_active(self, *, today_value: str, context_label: str) -> bool:
+        return context_label == today_value
+
+    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+        from syndicate.features.mlb.cards import build_cards_page_context
+
+        payload = build_cards_page_context(context.context_label)
+        games = list(payload.get("games") or [])
+        return _apply_mlb_live_scores(games, context.context_label) if is_active_today else games
+
+    def pregame_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
+        mlb_rows = _pregame_prop_rows_from_betting_card("mlb", context_label=context.context_label, season=context.season, week=context.week)
+        if mlb_rows:
+            return mlb_rows
+        mlb_top_prop_rows = _load_mlb_home_top_prop_items(context.context_label)
+        if mlb_top_prop_rows:
+            return mlb_top_prop_rows
+        return _compact_prop_rows(home_games)
+
+    def live_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
+        if not is_active_today:
+            return []
+        from syndicate.features.mlb.live_lens import read_latest_live_lens_page_context
+
+        live_games = list(read_latest_live_lens_page_context(context.context_label).get("games") or [])
+        live_games = [game for game in live_games if isinstance(game, dict)]
+        if not live_games:
+            return []
+        liveish_games = [
+            game
+            for game in live_games
+            if _is_liveish(*(_scoreboard_state(game).get(key) for key in ["status_badge", "status_line"]))
+        ]
+        prop_backed_games = [
+            game
+            for game in (liveish_games or live_games)
+            if isinstance(game.get("liveProps"), list) or isinstance(game.get("archivedLiveProps"), list)
+        ]
+        return _prop_rows_from_mlb_live_games(prop_backed_games)
+
+
+class _NBADataProvider(_HomeSportDataProviderBase):
+    slug = "nba"
+
+    def is_active(self, *, today_value: str, context_label: str) -> bool:
+        return context_label == today_value
+
+    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+        from syndicate.features.nba.cards import build_cards_page_context
+
+        payload = build_cards_page_context(context.context_label, allow_stored_date_fallback=_allow_stored_date_fallback())
+        games = list(payload.get("games") or [])
+        if is_active_today and not games:
+            games = _nba_live_state_games(context.context_label)
+        return _apply_nba_live_scores(games, context.context_label) if is_active_today else games
+
+    def pregame_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
+        nba_rows = _pregame_prop_rows_from_betting_card("nba", context_label=context.context_label, season=context.season, week=context.week)
+        if nba_rows:
+            return nba_rows
+        csv_rows = _prop_rows_from_props_recommendations_csv("nba", context_label=context.context_label, fallback_href=f"/nba/cards?date={context.context_label}")
+        if csv_rows:
+            return csv_rows
+        return _compact_prop_rows(home_games)
+
+    def live_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
+        if not is_active_today:
+            return []
+        if not _home_games_have_live_action(home_games):
+            return []
+        from syndicate.features.nba.cards import build_live_player_lens_payload
+        from syndicate.features.nba.cards import build_live_state_payload
+
+        live_state = build_live_state_payload(context.context_label, ttl=12)
+        event_ids = [
+            str((game or {}).get("event_id") or "").strip()
+            for game in (live_state.get("games") if isinstance(live_state.get("games"), list) else [])
+            if str((game or {}).get("event_id") or "").strip()
+        ]
+        if not event_ids:
+            return []
+        payload = build_live_player_lens_payload(context.context_label, event_ids, ttl=20)
+        return _prop_rows_from_nba_live_lens(
+            list(payload.get("games") or []),
+            sport_slug="nba",
+            fallback_href=f"/nba/live-lens?date={context.context_label}",
+        )
+
+
+class _WNBADataProvider(_HomeSportDataProviderBase):
+    slug = "wnba"
+
+    def is_active(self, *, today_value: str, context_label: str) -> bool:
+        return context_label == today_value
+
+    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+        from syndicate.features.wnba.cards import build_cards_page_context
+
+        payload = build_cards_page_context(context.context_label, allow_stored_date_fallback=False)
+        source_title = _safe_text(payload.get("source_title"), "")
+        source_path = _safe_text(payload.get("source_path"), "")
+        games = list(payload.get("games") or [])
+        if is_active_today and not get_active_games(games):
+            live_games = _wnba_live_state_games(context.context_label)
+            if live_games:
+                games = live_games
+                source_title = "WNBA live-state artifact fallback"
+                source_path = f"live_state_{context.context_label}.jsonl"
+        if has_app_context():
+            current_app.logger.info(
+                "WNBA cards payload for %s: source_title=%s source_path=%s games=%s requested_date=%s date=%s",
+                context.context_label,
+                source_title or "<empty>",
+                source_path or "<empty>",
+                len(games),
+                _safe_text(payload.get("requested_date"), ""),
+                _safe_text(payload.get("date"), ""),
+            )
+        return _apply_wnba_live_scores(games, context.context_label) if is_active_today else games
+
+    def pregame_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
+        wnba_rows = _pregame_prop_rows_from_betting_card("wnba", context_label=context.context_label, season=context.season, week=context.week)
+        if wnba_rows:
+            return wnba_rows
+        csv_rows = _prop_rows_from_props_recommendations_csv("wnba", context_label=context.context_label, fallback_href=f"/wnba/cards?date={context.context_label}")
+        if csv_rows:
+            return csv_rows
+        return _compact_prop_rows(home_games)
+
+    def live_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
+        if not is_active_today:
+            return []
+        if not _home_games_have_live_action(home_games):
+            return []
+        from syndicate.features.wnba.cards import build_live_player_lens_payload
+        from syndicate.features.wnba.cards import build_live_state_payload
+
+        live_state = build_live_state_payload(context.context_label, ttl=12)
+        event_ids = [
+            str((game or {}).get("event_id") or "").strip()
+            for game in (live_state.get("games") if isinstance(live_state.get("games"), list) else [])
+            if str((game or {}).get("event_id") or "").strip()
+        ]
+        if not event_ids:
+            return []
+        payload = build_live_player_lens_payload(context.context_label, event_ids, ttl=20)
+        return _prop_rows_from_nba_live_lens(
+            list(payload.get("games") or []),
+            sport_slug="wnba",
+            fallback_href=f"/wnba/live-lens?date={context.context_label}",
+        )
+
+
+class _NHLDataProvider(_HomeSportDataProviderBase):
+    slug = "nhl"
+
+    def is_active(self, *, today_value: str, context_label: str) -> bool:
+        return context_label == today_value
+
+    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+        from syndicate.features.nhl.cards import build_cards_page_context
+
+        payload = build_cards_page_context(context.context_label)
+        if (
+            str(payload.get("requested_date") or context.context_label).strip() == str(context.context_label).strip()
+            and str(payload.get("date") or context.context_label).strip() != str(context.context_label).strip()
+        ):
+            return []
+        games = list(payload.get("games") or [])
+        return _apply_nhl_live_scores(games, context.context_label) if is_active_today else games
+
+    def pregame_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
+        betting_rows = _pregame_prop_rows_from_betting_card("nhl", context_label=context.context_label, season=context.season, week=context.week)
+        if betting_rows:
+            return betting_rows
+        return _compact_prop_rows(home_games)
+
+    def live_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
+        if not is_active_today:
+            return []
+        if not _home_games_have_live_action(home_games):
+            return []
+        from syndicate.features.nhl.cards import build_props_cards_payload
+
+        payload = build_props_cards_payload(context.context_label, top=18)
+        return _prop_rows_from_nhl_cards(
+            list(payload.get("cards") or []),
+            fallback_href=f"/nhl/cards?date={payload.get('date') or context.context_label}",
+        )
+
+
+class _NCAABDataProvider(_HomeSportDataProviderBase):
+    slug = "ncaab"
+
+    def is_active(self, *, today_value: str, context_label: str) -> bool:
+        return context_label == today_value
+
+    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+        from syndicate.features.ncaab.cards import build_cards_page_context
+
+        payload = build_cards_page_context(context.context_label)
+        if (
+            str(payload.get("requested_date") or context.context_label).strip() == str(context.context_label).strip()
+            and str(payload.get("date") or context.context_label).strip() != str(context.context_label).strip()
+        ):
+            return []
+        return list(payload.get("games") or [])
+
+    def pregame_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
+        betting_rows = _pregame_prop_rows_from_betting_card("ncaab", context_label=context.context_label, season=context.season, week=context.week)
+        if betting_rows:
+            return betting_rows
+        return _compact_prop_rows(home_games)
+
+    def live_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
+        return []
+
+
+class _NFLDataProvider(_HomeSportDataProviderBase):
+    slug = "nfl"
+
+    def is_active(self, *, today_value: str, context_label: str) -> bool:
+        return _football_in_season(today_value)
+
+    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+        if context.week is None:
+            return []
+        from syndicate.features.nfl.cards import build_cards_page_context
+
+        return list(build_cards_page_context(context.week, season=context.season).get("games") or [])
+
+    def pregame_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
+        if not is_active_today:
+            return []
+        betting_rows = _pregame_prop_rows_from_betting_card("nfl", context_label=context.context_label, season=context.season, week=context.week)
+        if betting_rows:
+            return betting_rows
+        return _compact_prop_rows(home_games)
+
+    def live_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
+        return []
+
+
+class _NCAAFDataProvider(_HomeSportDataProviderBase):
+    slug = "ncaaf"
+
+    def is_active(self, *, today_value: str, context_label: str) -> bool:
+        return _football_in_season(today_value)
+
+    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+        if context.week is None:
+            return []
+        from syndicate.features.ncaaf.cards import build_cards_page_context
+
+        return list(build_cards_page_context(context.week).get("games") or [])
+
+    def pregame_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
+        if not is_active_today:
+            return []
+        betting_rows = _pregame_prop_rows_from_betting_card("ncaaf", context_label=context.context_label, season=context.season, week=context.week)
+        if betting_rows:
+            return betting_rows
+        return _compact_prop_rows(home_games)
+
+    def live_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
+        return []
+
+
+class _SoccerDataProvider(_HomeSportDataProviderBase):
+    """Soccer is week-keyed per league (like NFL/NCAAF), not date-keyed like
+    mlb/nba/nhl/wnba/ncaab, and tracks several leagues at once. This
+    provider resolves ONE active league per call (preferring MLS -- the
+    league with real current data as of this migration -- then whichever
+    calendar-active league comes first, see _resolve_league) rather than
+    fanning games/props out across every league. That's a deliberate,
+    smaller fix: it's what makes soccer reachable through the same
+    dispatch every other sport uses at all (closing the "soccer missing
+    from three separate dispatch points" bug), not a genuine multi-league
+    board -- surfacing more than one league at once is a separate, larger
+    change than this migration's scope."""
+
+    slug = "soccer"
+
+    def _resolve_league(self, requested_date: str) -> str:
+        from syndicate.features.soccer.sources import DEFAULT_LEAGUE
+        from syndicate.features.soccer.sources import active_leagues_for_date
+
+        active = active_leagues_for_date(requested_date or central_today_iso())
+        if "mls" in active:
+            return "mls"
+        return active[0] if active else DEFAULT_LEAGUE
+
+    def resolve_context(self, *, requested_date: str | None = None, season: int | None = None, week: int | None = None) -> SportContext:
+        from syndicate.features.soccer.sources import default_season
+        from syndicate.features.soccer.sources import default_week
+        from syndicate.features.soccer.sources import league_display_name
+
+        today = str(requested_date or central_today_iso())
+        league = self._resolve_league(today)
+        resolved_season = int(season) if season else default_season(league)
+        resolved_week = int(week) if week else default_week(league, resolved_season)
+        return SportContext(
+            slug=self.slug,
+            context_label=f"{league_display_name(league)} {resolved_season} Week {resolved_week}",
+            season=resolved_season,
+            week=resolved_week,
+            league=league,
+        )
+
+    def is_active(self, *, today_value: str, context_label: str) -> bool:
+        from syndicate.features.soccer.sources import active_leagues_for_date
+
+        return bool(active_leagues_for_date(today_value))
+
+    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+        from syndicate.features.soccer.cards import build_cards_page_context
+
+        payload = build_cards_page_context(context.league, context.week, context.season)
+        return list(payload.get("games") or [])
+
+    def pregame_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
+        from syndicate.features.soccer.props import build_props_page_context
+
+        payload = build_props_page_context(context.league, context.week, context.season)
+        cards = list(payload.get("rank_cards") or [])
+        if not cards:
+            return _compact_prop_rows(home_games)
+        rows = _prop_rows_from_rank_cards(
+            cards,
+            sport_slug="soccer",
+            fallback_href=f"/soccer/{context.league}/props?week={context.week}&season={context.season}",
+        )
+        # _prop_rows_from_rank_cards never skips a valid dict card (see
+        # _prop_item_from_rank_card), so this zip is a true 1:1, order-
+        # preserved pairing even when the [:limit] truncation below it
+        # kicks in -- see props.py's _prop_rank_card for why match_id is
+        # needed at all (soccer's rank-card "meta" carries no away/home
+        # matchup text for the usual team-label match to key off of).
+        for card, row in zip(cards, rows):
+            match_id = str(card.get("match_id") or "").strip()
+            if match_id:
+                row.setdefault("game_id", match_id)
+                row.setdefault("gamePk", match_id)
+        return rows
+
+    def live_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
+        return []
+
+    def data_sources(self, context: SportContext) -> dict[str, Any]:
+        sources = super().data_sources(context)
+        sources["league"] = context.league
+        sources["keying"] = "week-keyed per league, not date-keyed"
+        return sources
+
+
+for _provider in (
+    _MLBDataProvider(),
+    _NBADataProvider(),
+    _WNBADataProvider(),
+    _NHLDataProvider(),
+    _NCAABDataProvider(),
+    _NFLDataProvider(),
+    _NCAAFDataProvider(),
+    _SoccerDataProvider(),
+):
+    register_sport_data_provider(_provider)
+del _provider
 
 
 def _mlb_top_prop_rows_from_group(
@@ -4289,71 +4597,14 @@ def _compact_prop_rows(games: list[dict[str, Any]], *, limit: int | None = None)
 
 
 def _load_home_games(slug: str, *, context_label: str, season: int | None = None, week: int | None = None, is_active_today: bool = False) -> list[dict[str, Any]]:
+    provider = get_sport_data_provider(slug)
+    if provider is None:
+        return []
+    context = provider.resolve_context(requested_date=context_label, season=season, week=week)
     try:
-        if slug == "mlb":
-            from syndicate.features.mlb.cards import build_cards_page_context
-
-            payload = build_cards_page_context(context_label)
-            games = list(payload.get("games") or [])
-            return _apply_mlb_live_scores(games, context_label) if is_active_today else games
-        if slug == "nba":
-            from syndicate.features.nba.cards import build_cards_page_context
-
-            payload = build_cards_page_context(context_label, allow_stored_date_fallback=_allow_stored_date_fallback())
-            games = list(payload.get("games") or [])
-            if is_active_today and not games:
-                games = _nba_live_state_games(context_label)
-            return _apply_nba_live_scores(games, context_label) if is_active_today else games
-        if slug == "nhl":
-            from syndicate.features.nhl.cards import build_cards_page_context
-
-            payload = build_cards_page_context(context_label)
-            if str(payload.get("requested_date") or context_label).strip() == str(context_label).strip() and str(payload.get("date") or context_label).strip() != str(context_label).strip():
-                return []
-            games = list(payload.get("games") or [])
-            return _apply_nhl_live_scores(games, context_label) if is_active_today else games
-        if slug == "wnba":
-            from syndicate.features.wnba.cards import build_cards_page_context
-
-            payload = build_cards_page_context(context_label, allow_stored_date_fallback=False)
-            source_title = _safe_text(payload.get("source_title"), "")
-            source_path = _safe_text(payload.get("source_path"), "")
-            games = list(payload.get("games") or [])
-            if is_active_today and not get_active_games(games):
-                live_games = _wnba_live_state_games(context_label)
-                if live_games:
-                    games = live_games
-                    source_title = "WNBA live-state artifact fallback"
-                    source_path = f"live_state_{context_label}.jsonl"
-            if has_app_context():
-                current_app.logger.info(
-                    "WNBA cards payload for %s: source_title=%s source_path=%s games=%s requested_date=%s date=%s",
-                    context_label,
-                    source_title or "<empty>",
-                    source_path or "<empty>",
-                    len(games),
-                    _safe_text(payload.get("requested_date"), ""),
-                    _safe_text(payload.get("date"), ""),
-                )
-            return _apply_wnba_live_scores(games, context_label) if is_active_today else games
-        if slug == "ncaab":
-            from syndicate.features.ncaab.cards import build_cards_page_context
-
-            payload = build_cards_page_context(context_label)
-            if str(payload.get("requested_date") or context_label).strip() == str(context_label).strip() and str(payload.get("date") or context_label).strip() != str(context_label).strip():
-                return []
-            return list(payload.get("games") or [])
-        if slug == "nfl" and week is not None:
-            from syndicate.features.nfl.cards import build_cards_page_context
-
-            return list(build_cards_page_context(week, season=season).get("games") or [])
-        if slug == "ncaaf" and week is not None:
-            from syndicate.features.ncaaf.cards import build_cards_page_context
-
-            return list(build_cards_page_context(week).get("games") or [])
+        return provider.games(context, is_active_today=is_active_today)
     except Exception:
         return []
-    return []
 
 
 def _prefer_today_or_latest(values: list[str], today_value: str, *, preserve_requested: bool = False) -> str:
@@ -4413,11 +4664,10 @@ def _football_in_season(today_value: str) -> bool:
 
 
 def _is_active_today(slug: str, today_value: str, context_label: str) -> bool:
-    if slug in {"mlb", "nba", "nhl", "wnba", "ncaab"}:
-        return context_label == today_value
-    if slug in {"nfl", "ncaaf"}:
-        return _football_in_season(today_value)
-    return False
+    provider = get_sport_data_provider(slug)
+    if provider is None:
+        return False
+    return provider.is_active(today_value=today_value, context_label=context_label)
 
 
 def _sport_cache_key(slug: str, today_value: str) -> str:
