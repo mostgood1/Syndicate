@@ -1639,6 +1639,71 @@ class IntelligenceBlueprintTests(unittest.TestCase):
 
         self.assertGreater(float(enabled.get("score") or 0.0), float(disabled.get("score") or 0.0))
 
+    def test_score_candidate_tags_news_triggered_when_sport_recently_changed(self) -> None:
+        # Plan item 1F0's deferred board callout: a candidate whose data was
+        # just regenerated because of a detected injury/lineup change should
+        # carry a distinct flag, separate from the (direction-agnostic)
+        # movement bonus above, which says nothing about *why* a line moved.
+        candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "prop",
+            "pick": "Over 4.5",
+            "market": "outs recorded",
+            "projection": 13.1,
+            "odds": "+110",
+            "edge": 1.0,
+            "source_strength": 0.5,
+        }
+
+        with patch(
+            "syndicate.features.shared.live_refresh_loop.sports_with_recent_lineup_injury_change",
+            return_value={"mlb"},
+        ):
+            scored = score_candidate(dict(candidate))
+
+        self.assertTrue(scored.get("news_triggered"))
+
+    def test_score_candidate_does_not_tag_news_triggered_for_a_different_sport(self) -> None:
+        candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "prop",
+            "pick": "Over 4.5",
+            "market": "outs recorded",
+            "projection": 13.1,
+            "odds": "+110",
+            "edge": 1.0,
+            "source_strength": 0.5,
+        }
+
+        with patch(
+            "syndicate.features.shared.live_refresh_loop.sports_with_recent_lineup_injury_change",
+            return_value={"nba"},
+        ):
+            scored = score_candidate(dict(candidate))
+
+        self.assertFalse(scored.get("news_triggered"))
+
+    def test_score_candidate_news_triggered_tag_never_raises_on_read_failure(self) -> None:
+        candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "prop",
+            "pick": "Over 4.5",
+            "market": "outs recorded",
+            "projection": 13.1,
+            "odds": "+110",
+            "edge": 1.0,
+            "source_strength": 0.5,
+        }
+
+        with patch(
+            "syndicate.features.shared.live_refresh_loop.sports_with_recent_lineup_injury_change",
+            side_effect=RuntimeError("boom"),
+        ):
+            scored = score_candidate(dict(candidate))
+
+        self.assertFalse(scored.get("news_triggered"))
+        self.assertIn("score", scored)
+
     def test_score_candidate_sets_scoring_mode_by_available_inputs(self) -> None:
         candidates = [
             {

@@ -1146,6 +1146,76 @@ class LiveRefreshLoopTests(unittest.TestCase):
         self.assertTrue(result)
         mocked_record.assert_called_once_with(1000.0 + 60, "2026-07-13", {"nba": "a", "wnba": "CHANGED"})
 
+    def test_should_force_sim_rerun_records_change_epoch_for_genuinely_changed_sport(self) -> None:
+        with patch.object(
+            live_refresh_loop,
+            "_read_last_lineup_check",
+            return_value={"epoch": 1000.0, "date": "2026-07-13", "fingerprints": {"nba": "a", "wnba": "b"}},
+        ), patch.object(
+            live_refresh_loop, "_any_gated_sport_event_within_force_window", return_value=False
+        ), patch.object(live_refresh_loop, "_fetch_injuries", return_value=True), patch.object(
+            live_refresh_loop, "_nba_lineup_injury_fingerprint", return_value="a"
+        ), patch.object(
+            live_refresh_loop, "_wnba_lineup_injury_fingerprint", return_value="CHANGED"
+        ), patch.object(
+            live_refresh_loop, "_record_lineup_check"
+        ), patch.object(
+            live_refresh_loop, "_record_lineup_injury_change_epochs"
+        ) as mocked_record_change:
+            live_refresh_loop._should_force_sim_rerun(now_epoch=1000.0 + 1800, date_str="2026-07-13")
+
+        mocked_record_change.assert_called_once_with({"wnba"}, now_epoch=1000.0 + 1800)
+
+    def test_should_force_sim_rerun_does_not_record_change_epoch_on_new_date(self) -> None:
+        # A pure date rollover marks every sport "changed" so the resim gets
+        # forced, but that isn't a real injury/lineup news event -- it must
+        # not feed the board-callout signal, or every sport would get
+        # falsely tagged "news-driven" once per day regardless of whether
+        # anything actually happened.
+        with patch.object(
+            live_refresh_loop,
+            "_read_last_lineup_check",
+            return_value={"epoch": 1000.0, "date": "2026-07-12", "fingerprints": {"nba": "a", "wnba": "b"}},
+        ), patch.object(
+            live_refresh_loop, "_any_gated_sport_event_within_force_window", return_value=False
+        ), patch.object(live_refresh_loop, "_fetch_injuries", return_value=True), patch.object(
+            live_refresh_loop, "_nba_lineup_injury_fingerprint", return_value="a"
+        ), patch.object(
+            live_refresh_loop, "_wnba_lineup_injury_fingerprint", return_value="b"
+        ), patch.object(
+            live_refresh_loop, "_record_lineup_check"
+        ), patch.object(
+            live_refresh_loop, "_record_lineup_injury_change_epochs"
+        ) as mocked_record_change:
+            result = live_refresh_loop._should_force_sim_rerun(now_epoch=1000.0 + 60, date_str="2026-07-13")
+
+        self.assertTrue(result)
+        mocked_record_change.assert_not_called()
+
+    def test_lineup_injury_change_epochs_round_trip_and_merge(self) -> None:
+        with TemporaryDirectory() as tmp_dir, patch.object(live_refresh_loop, "_meta_dir", return_value=Path(tmp_dir)):
+            self.assertEqual(live_refresh_loop._read_lineup_injury_change_epochs(), {})
+            live_refresh_loop._record_lineup_injury_change_epochs({"wnba"}, now_epoch=1000.0)
+            self.assertEqual(live_refresh_loop._read_lineup_injury_change_epochs(), {"wnba": 1000.0})
+            # A later call for a different sport must merge, not clobber, the
+            # earlier sport's recorded epoch.
+            live_refresh_loop._record_lineup_injury_change_epochs({"nba"}, now_epoch=2000.0)
+            self.assertEqual(live_refresh_loop._read_lineup_injury_change_epochs(), {"wnba": 1000.0, "nba": 2000.0})
+
+    def test_record_lineup_injury_change_epochs_is_noop_for_empty_set(self) -> None:
+        with TemporaryDirectory() as tmp_dir, patch.object(live_refresh_loop, "_meta_dir", return_value=Path(tmp_dir)):
+            live_refresh_loop._record_lineup_injury_change_epochs(set(), now_epoch=1000.0)
+            self.assertEqual(live_refresh_loop._read_lineup_injury_change_epochs(), {})
+
+    def test_sports_with_recent_lineup_injury_change_respects_window(self) -> None:
+        with TemporaryDirectory() as tmp_dir, patch.object(live_refresh_loop, "_meta_dir", return_value=Path(tmp_dir)):
+            live_refresh_loop._record_lineup_injury_change_epochs({"wnba"}, now_epoch=1000.0)
+            live_refresh_loop._record_lineup_injury_change_epochs({"nba"}, now_epoch=1000.0 - 10000.0)
+
+            recent = live_refresh_loop.sports_with_recent_lineup_injury_change(now_epoch=1000.0 + 100.0, within_seconds=3600)
+
+        self.assertEqual(recent, {"wnba"})
+
     def test_run_tick_uses_full_mode_and_forces_refresh_when_lineup_changed(self) -> None:
         with patch.dict(
             os.environ,

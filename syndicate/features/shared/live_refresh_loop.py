@@ -547,13 +547,76 @@ def _should_force_sim_rerun(*, now_epoch: float, date_str: str) -> bool:
 		for sport in current_fingerprints
 		if is_new_date or current_fingerprints.get(sport) != stored_fingerprints.get(sport)
 	}
+	# A new date marks every sport "changed" above so the resim-forcing
+	# behavior (changed_sports/the return value) correctly rechecks
+	# everything on day rollover -- but that's not a real injury/lineup news
+	# event, so it must not feed the board-callout signal below, or every
+	# sport would get falsely tagged "news-driven" once per day regardless
+	# of whether anything actually happened.
+	genuinely_changed_sports = {
+		sport
+		for sport in current_fingerprints
+		if not is_new_date and current_fingerprints.get(sport) != stored_fingerprints.get(sport)
+	}
 	_LAST_LINEUP_INJURY_CHANGED_SPORTS = changed_sports
 	_record_lineup_check(now_epoch, date_str, current_fingerprints)
+	if genuinely_changed_sports:
+		_record_lineup_injury_change_epochs(genuinely_changed_sports, now_epoch=now_epoch)
 	return bool(changed_sports)
 
 
 def _last_lineup_injury_changed_sports() -> set[str]:
 	return set(_LAST_LINEUP_INJURY_CHANGED_SPORTS)
+
+
+def _lineup_injury_change_epochs_path() -> Path:
+	return _meta_dir() / "last_lineup_injury_change_epochs.json"
+
+
+def _read_lineup_injury_change_epochs() -> dict[str, float]:
+	payload = read_json_file(_lineup_injury_change_epochs_path())
+	changed_at_epoch = payload.get("changed_at_epoch") if isinstance(payload, dict) else None
+	if not isinstance(changed_at_epoch, dict):
+		return {}
+	result: dict[str, float] = {}
+	for sport, epoch in changed_at_epoch.items():
+		if isinstance(epoch, (int, float)) and not isinstance(epoch, bool):
+			result[str(sport)] = float(epoch)
+	return result
+
+
+def _record_lineup_injury_change_epochs(changed_sports: set[str], *, now_epoch: float) -> None:
+	if not changed_sports:
+		return
+	existing = _read_lineup_injury_change_epochs()
+	existing.update({sport: now_epoch for sport in changed_sports})
+	write_json_file(_lineup_injury_change_epochs_path(), {"changed_at_epoch": existing, "recordedAt": _utc_now()})
+
+
+def _news_triggered_window_seconds() -> int:
+	raw = str(os.environ.get("SYNDICATE_INTELLIGENCE_NEWS_TRIGGERED_WINDOW_SECONDS") or "").strip()
+	try:
+		value = int(raw or 3600)
+	except Exception:
+		value = 3600
+	return max(60, value)
+
+
+def sports_with_recent_lineup_injury_change(*, now_epoch: float | None = None, within_seconds: int | None = None) -> set[str]:
+	# Cross-process read of plan item 1F0's deferred board callout signal:
+	# which sport(s) had a detected injury/lineup fingerprint change recently
+	# enough that a candidate whose line/projection just moved should say so
+	# distinctly ("news-driven"), instead of looking like an ordinary
+	# market-driven move. _LAST_LINEUP_INJURY_CHANGED_SPORTS above is an
+	# in-memory, single-tick, single-process signal (live-odds-worker); this
+	# persists the epoch of each sport's last detected change to disk so the
+	# board-building/scoring code (a different process/container) can ask
+	# "was this recent enough to still matter" independently of exactly when
+	# the tick that detected it ran.
+	resolved_now = now_epoch if now_epoch is not None else datetime.now(timezone.utc).timestamp()
+	resolved_window = within_seconds if within_seconds is not None else _news_triggered_window_seconds()
+	epochs = _read_lineup_injury_change_epochs()
+	return {sport for sport, changed_epoch in epochs.items() if 0.0 <= (resolved_now - changed_epoch) <= resolved_window}
 
 
 # ---------------------------------------------------------------------------

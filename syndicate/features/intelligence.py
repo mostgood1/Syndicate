@@ -6377,6 +6377,26 @@ def _candidate_movement_magnitude_bonus(candidate: dict[str, Any]) -> float:
     return max(0.0, min(0.05, abs(float(percent_change)) * 0.01))
 
 
+def _candidate_news_triggered_tag(candidate: dict[str, Any]) -> bool:
+    # Plan item 1F0's deferred board callout: a candidate whose line/
+    # projection was just regenerated because of a detected injury/lineup
+    # change (syndicate.features.shared.live_refresh_loop._should_force_sim_rerun)
+    # should say so distinctly, rather than looking like an ordinary
+    # market-driven move (see the movement-bonus function above, which is
+    # deliberately silent on *why* a line moved). Local import + broad catch:
+    # this is a display-only nicety and a transient read failure of the
+    # cross-process signal file must never be allowed to break scoring.
+    sport_slug = _safe_text(candidate.get("sport_slug"), _safe_text(candidate.get("sport"), "")).lower()
+    if not sport_slug:
+        return False
+    try:
+        from syndicate.features.shared.live_refresh_loop import sports_with_recent_lineup_injury_change
+
+        return sport_slug in sports_with_recent_lineup_injury_change()
+    except Exception:
+        return False
+
+
 def score_candidate(
     candidate: dict[str, Any],
     *,
@@ -6437,6 +6457,7 @@ def score_candidate(
         edge_value = 0.0
 
     movement_bonus = _candidate_movement_magnitude_bonus(scored_candidate)
+    scored_candidate["news_triggered"] = _candidate_news_triggered_tag(scored_candidate)
 
     confidence_value = _numeric_hint(scored_candidate.get("source_strength"))
     if confidence_value is None:
