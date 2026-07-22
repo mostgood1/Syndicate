@@ -16,6 +16,7 @@ from syndicate.blueprints.home import get_active_games
 from syndicate.blueprints.home import _sport_availability_reason
 from syndicate.blueprints.home import _prefer_today_or_latest
 from syndicate.blueprints.home import _game_bet_candidates_from_game
+from syndicate.blueprints.home import _game_status_state
 from syndicate.blueprints.home import _prop_item_from_rank_card
 from syndicate.blueprints.home import _team_for_side_hint
 from syndicate.blueprints.home import _compact_prop_rows
@@ -999,6 +1000,32 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         lens_moneyline = next(c for c in candidates if c["market"] == "Live Moneyline")
         self.assertFalse(spread["is_live"])
         self.assertFalse(lens_moneyline["is_live"])
+
+    def test_game_status_state_does_not_let_unrelated_text_override_known_in_progress_false(self) -> None:
+        # Real bug found in production: every WNBA game carries
+        # summary="Consensus market snapshot" -- "snapshot" contains "ot",
+        # one of the (very loose) live-token substrings this function
+        # falls back to checking. That text fallback used to run
+        # unconditionally (OR'd in alongside the structured in_progress
+        # check), so it silently overrode a definitive in_progress=False
+        # and made every hours-from-tip game read as "live".
+        game = self._sample_game(
+            status={"in_progress": False, "final": False, "status": "Scheduled"},
+            summary="Consensus market snapshot",
+            detail="7/22 - 10:00 PM EDT",
+        )
+        self.assertEqual(_game_status_state(game), "scheduled")
+
+    def test_game_status_state_still_uses_text_fallback_when_no_structured_signal(self) -> None:
+        game = self._sample_game(status={}, summary="Second quarter under way", detail="")
+        self.assertEqual(_game_status_state(game), "live")
+
+    def test_game_status_state_still_detects_live_from_structured_in_progress(self) -> None:
+        game = self._sample_game(
+            status={"in_progress": True, "final": False, "status": "In Progress"},
+            summary="Consensus market snapshot",
+        )
+        self.assertEqual(_game_status_state(game), "live")
 
 
 if __name__ == "__main__":

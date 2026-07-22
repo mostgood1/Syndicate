@@ -375,6 +375,9 @@ def _game_status_state(game: dict[str, Any]) -> str:
         return ""
     status = game.get("status") if isinstance(game.get("status"), dict) else {}
     live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+    in_progress = status.get("in_progress")
+    if in_progress is None:
+        in_progress = live_state.get("in_progress")
     if (
         bool(status.get("final"))
         or bool(status.get("is_final"))
@@ -383,12 +386,17 @@ def _game_status_state(game: dict[str, Any]) -> str:
         or any(token in status_text for token in ("final", "closed", "postponed", "suspended", "canceled", "cancelled"))
     ):
         return "final"
-    if (
-        bool(game.get("shared_is_live"))
-        or bool(status.get("in_progress"))
-        or bool(live_state.get("in_progress"))
-        or any(token in status_text for token in ("live", "in progress", "quarter", "period", "inning", "ot", "halftime", "intermission"))
-    ):
+    if bool(game.get("shared_is_live")) or bool(in_progress):
+        return "live"
+    # Only fall back to the loose live-token text heuristic when this
+    # game's own structured status/live_state says nothing at all about
+    # in_progress. Real bug found in production: this used to run
+    # unconditionally, so a definitive in_progress=False got silently
+    # overridden whenever unrelated text (e.g. game.get("summary") ==
+    # "Consensus market snapshot") happened to contain one of these
+    # tokens as a substring -- "snapshot" contains "ot" -- forcing hours-
+    # from-tip WNBA games to read as live.
+    if in_progress is None and any(token in status_text for token in ("live", "in progress", "quarter", "period", "inning", "ot", "halftime", "intermission")):
         return "live"
     if any(token in status_text for token in ("scheduled", "preview", "pregame", "warmup")):
         return "scheduled"
