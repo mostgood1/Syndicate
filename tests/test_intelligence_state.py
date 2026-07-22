@@ -2788,6 +2788,35 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(source, "worker")
         self.assertEqual(cached_response.get("top_opportunities", [])[0]["name"], "Legacy Fresh Play")
 
+    def test_safe_queue_intelligence_state_refresh_also_queues_board_state_when_canonical_enabled(self) -> None:
+        # Without this, _background_loop's canonical-state drain never has
+        # anything queued to write -- _watched_board_dates would stay empty
+        # forever regardless of the serving/shadow-compare flags, since
+        # nothing else in the codebase calls queue_board_state_refresh.
+        with patch("syndicate.blueprints.intelligence.canonical_board_state_enabled", return_value=True):
+            with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh"):
+                with patch("syndicate.blueprints.intelligence.queue_board_state_refresh") as mocked_queue_board_state:
+                    intelligence_module._safe_queue_intelligence_state_refresh({"date": "2026-06-10", "question": "top edges today"})
+
+        mocked_queue_board_state.assert_called_once_with("2026-06-10")
+
+    def test_safe_queue_intelligence_state_refresh_skips_board_state_when_both_flags_disabled(self) -> None:
+        with patch("syndicate.blueprints.intelligence.canonical_board_state_enabled", return_value=False):
+            with patch("syndicate.blueprints.intelligence.canonical_board_state_shadow_compare_enabled", return_value=False):
+                with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh"):
+                    with patch("syndicate.blueprints.intelligence.queue_board_state_refresh") as mocked_queue_board_state:
+                        intelligence_module._safe_queue_intelligence_state_refresh({"date": "2026-06-10"})
+
+        mocked_queue_board_state.assert_not_called()
+
+    def test_safe_queue_intelligence_state_refresh_swallows_board_state_queue_failure(self) -> None:
+        with patch("syndicate.blueprints.intelligence.canonical_board_state_enabled", return_value=True):
+            with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh"):
+                with patch("syndicate.blueprints.intelligence.queue_board_state_refresh", side_effect=RuntimeError("boom")):
+                    # Must not raise -- this is a best-effort side channel,
+                    # same discipline as the existing legacy queue call above it.
+                    intelligence_module._safe_queue_intelligence_state_refresh({"date": "2026-06-10"})
+
     def test_load_canonical_board_response_computes_when_only_shadow_compare_enabled(self) -> None:
         # The serving flag is off, but shadow-compare alone must still be
         # enough to trigger the canonical read -- otherwise there would be

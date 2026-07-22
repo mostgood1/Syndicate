@@ -1158,6 +1158,19 @@ def _safe_queue_intelligence_state_refresh(payload: dict[str, object]) -> None:
         queue_intelligence_state_refresh(dict(payload))
     except Exception:
         _LOGGER.warning("Intelligence refresh queue failed; serving cached or empty state instead.", exc_info=True)
+    # Additive, separate from the payload-keyed queue above (see the
+    # _watched_board_dates comment in pipeline/intelligence_state.py) --
+    # without this, _background_loop's canonical-state drain never has
+    # anything queued to write, regardless of whether
+    # SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE is on. Gated behind the
+    # same flag (or its shadow-compare sibling) so this is a genuine no-op
+    # while both are off, matching every other canonical-store call site.
+    if canonical_board_state_enabled() or canonical_board_state_shadow_compare_enabled():
+        try:
+            selected_date = str(payload.get("date") or payload.get("selected_date") or "").strip() or None
+            queue_board_state_refresh(selected_date)
+        except Exception:
+            _LOGGER.warning("Canonical board-state refresh queue failed.", exc_info=True)
 
 
 def _normalize_default_query_payload(payload: dict[str, object]) -> dict[str, object]:
