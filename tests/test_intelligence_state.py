@@ -2711,6 +2711,26 @@ class IntelligenceStateTests(unittest.TestCase):
 
         mocked_drain.assert_called_once()
 
+    def test_background_loop_drains_board_dates_when_only_shadow_compare_enabled(self) -> None:
+        # Confirmed live 2026-07-22: with only shadow-compare on (not the
+        # full serving flag), dates were queued (the queue side already
+        # checked either flag) but never drained here, since this gate used
+        # to check only the serving flag -- shadow-compare could never see
+        # anything but "canonical_miss" as a result.
+        service = IntelligenceStateService()
+        service._interval_seconds = 0
+
+        def stop_after_one_iteration(*args: object, **kwargs: object) -> None:
+            service._stop.set()
+
+        with patch.object(intelligence_state_module, "canonical_board_state_enabled", return_value=False):
+            with patch.object(intelligence_state_module, "canonical_board_state_shadow_compare_enabled", return_value=True):
+                with patch.object(service, "_drain_one_watched_board_date") as mocked_drain:
+                    with patch.object(service, "_sync_persisted_queue_locked", side_effect=stop_after_one_iteration):
+                        service._background_loop()
+
+        mocked_drain.assert_called_once()
+
     def test_background_loop_skips_board_date_drain_when_flag_disabled(self) -> None:
         service = IntelligenceStateService()
         service._interval_seconds = 0
@@ -2719,9 +2739,10 @@ class IntelligenceStateTests(unittest.TestCase):
             service._stop.set()
 
         with patch.object(intelligence_state_module, "canonical_board_state_enabled", return_value=False):
-            with patch.object(service, "_drain_one_watched_board_date") as mocked_drain:
-                with patch.object(service, "_sync_persisted_queue_locked", side_effect=stop_after_one_iteration):
-                    service._background_loop()
+            with patch.object(intelligence_state_module, "canonical_board_state_shadow_compare_enabled", return_value=False):
+                with patch.object(service, "_drain_one_watched_board_date") as mocked_drain:
+                    with patch.object(service, "_sync_persisted_queue_locked", side_effect=stop_after_one_iteration):
+                        service._background_loop()
 
         mocked_drain.assert_not_called()
 

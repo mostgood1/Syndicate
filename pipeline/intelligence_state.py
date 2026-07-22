@@ -1800,12 +1800,23 @@ class IntelligenceStateService:
         print("[intelligence_state] BACKGROUND_LOOP_START", flush=True)
         while not self._stop.is_set():
             iteration_started_at = time.time()
-            if canonical_board_state_enabled():
+            if canonical_board_state_enabled() or canonical_board_state_shadow_compare_enabled():
                 # Additive dual-write during the migration-step-2 validation
                 # window: drains _watched_board_dates and writes the new
                 # canonical board_state_*.json alongside the legacy
                 # board_snapshot_*.json/intelligence_state_*.json writes
-                # below. Deliberately called outside self._condition -- it
+                # below. Gated by either flag, not just the serving one --
+                # shadow-compare's whole point is to observe what canonical
+                # WOULD produce without serving it, which requires this
+                # write step to actually run. Confirmed live 2026-07-22:
+                # with only shadow-compare on, dates got queued (queue side
+                # already checked either flag) but never drained/written
+                # here (this check used to be serving-flag-only), so
+                # shadow-compare could never see anything but
+                # "canonical_miss" -- the read side (_load_canonical_board_response)
+                # already checked either flag correctly; only this write
+                # gate was inconsistent with it.
+                # Deliberately called outside self._condition -- it
                 # takes/releases the same lock internally just to pop one
                 # date, then does the real work unlocked, mirroring how
                 # payload_to_process is popped locked and processed unlocked
