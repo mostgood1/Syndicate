@@ -1758,21 +1758,26 @@ def _board_candidate_rows(selected_date: str, *, limit: int = 12) -> list[dict[s
     for this date, instead of re-deriving a second, much narrower candidate
     list from raw per-sport dashboard artifacts. force_refresh is always
     False here -- the home page must never trigger a live board recompute
-    just to render its top-edges rail (Render web/worker headroom is tight)."""
+    just to render its top-edges rail (Render web/worker headroom is tight).
+
+    Plan item 1F ("one contract, not one pipeline per surface"): this used
+    to hand-roll its own two-layer read (worker state, then board snapshot),
+    a parallel path that predated -- and so never benefited from -- the
+    canonical-board-state-first cascade in
+    _cached_intelligence_response_with_source (which also carries the
+    analysis_views/headline promotion fix and the same staleness checks).
+    Calling that shared function directly means Home and the Board can no
+    longer silently disagree about what "cached" means for the same date.
+    """
     try:
         from syndicate.blueprints.intelligence import _intelligence_page_payload
-        from syndicate.blueprints.intelligence import _response_has_board_content
-        from pipeline.intelligence_state import read_latest_intelligence_board_snapshot_response
-        from pipeline.intelligence_state import read_latest_intelligence_state_response
+        from syndicate.blueprints.intelligence import _cached_intelligence_response_with_source
     except Exception:
         return []
 
     try:
         payload = _intelligence_page_payload(selected_date, force_refresh=False)
-        response = read_latest_intelligence_state_response(payload, force_refresh=False, allow_latest_fallback=False)
-        if not (isinstance(response, dict) and _response_has_board_content(response)):
-            board_snapshot = read_latest_intelligence_board_snapshot_response(payload, force_refresh=False)
-            response = board_snapshot if isinstance(board_snapshot, dict) and _response_has_board_content(board_snapshot) else None
+        response, _source = _cached_intelligence_response_with_source(payload, force_refresh=False)
     except Exception:
         return []
     if not isinstance(response, dict):

@@ -230,6 +230,24 @@ def _hydrate_intelligence_snapshot_payload(snapshot: dict[str, Any] | None) -> d
 
 
 def read_latest_intelligence_state(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    # Plan item 1F ("one contract, not one pipeline per surface"): this was
+    # a third parallel read cascade (board_snapshot -> worker state), with
+    # its own precedence order, separate from _cached_intelligence_response_with_source
+    # in syndicate/blueprints/intelligence.py. Try the canonical board state
+    # first -- same as the Board's own read path -- before falling through
+    # to this function's existing order unchanged. Behind
+    # SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE (default off), so this is
+    # a no-op today: _load_canonical_board_response returns None immediately
+    # when the flag (and its shadow-compare sibling) are both off.
+    try:
+        from syndicate.blueprints.intelligence import _load_canonical_board_response
+
+        canonical_response, _canonical_source = _load_canonical_board_response(payload or {})
+    except Exception:
+        canonical_response = None
+    if isinstance(canonical_response, dict) and canonical_response:
+        return _hydrate_intelligence_snapshot_payload(canonical_response)
+
     board_snapshot = read_latest_intelligence_board_snapshot_response(payload or {}, force_refresh=False)
     if isinstance(board_snapshot, dict):
         return _hydrate_intelligence_snapshot_payload(board_snapshot)

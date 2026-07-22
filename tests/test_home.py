@@ -21,6 +21,7 @@ from syndicate.blueprints.home import _team_for_side_hint
 from syndicate.blueprints.home import _compact_prop_rows
 from syndicate.blueprints.home import _game_sim_vs_line_reasoning
 from syndicate.blueprints.home import _game_identifier
+from syndicate.blueprints.home import _board_candidate_rows
 
 
 class HomePageCommandCenterTests(unittest.TestCase):
@@ -692,6 +693,47 @@ class HomePageCommandCenterTests(unittest.TestCase):
         body = response.get_json()
         self.assertTrue(body["ok"])
         self.assertEqual(body["command_center"]["schema"], "home_command_center_v1")
+
+    def test_board_candidate_rows_reuses_shared_cascade(self) -> None:
+        # Plan item 1F: this used to hand-roll its own worker-state ->
+        # board-snapshot read sequence, a parallel path to (and so never
+        # benefiting from) _cached_intelligence_response_with_source's
+        # canonical-board-state-first cascade. Confirms it now delegates
+        # directly instead of re-implementing the read order itself.
+        response_payload = {
+            "recommendations": [
+                {
+                    "sport": "MLB",
+                    "sport_slug": "mlb",
+                    "matchup": "NYY at BOS",
+                    "market": "Total",
+                    "pick": "Over 8.5",
+                    "edge": "5.0%",
+                    "confidence": "60%",
+                    "is_live": False,
+                }
+            ]
+        }
+        with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", return_value=(response_payload, "worker")) as mocked_cascade:
+            rows = _board_candidate_rows("2026-06-13", limit=5)
+
+        mocked_cascade.assert_called_once()
+        self.assertEqual(mocked_cascade.call_args.kwargs.get("force_refresh"), False)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["sport_slug"], "mlb")
+        self.assertEqual(rows[0]["matchup"], "NYY at BOS")
+
+    def test_board_candidate_rows_returns_empty_when_cascade_finds_nothing(self) -> None:
+        with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", return_value=(None, "fallback")):
+            rows = _board_candidate_rows("2026-06-13")
+
+        self.assertEqual(rows, [])
+
+    def test_board_candidate_rows_swallows_exceptions(self) -> None:
+        with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", side_effect=RuntimeError("boom")):
+            rows = _board_candidate_rows("2026-06-13")
+
+        self.assertEqual(rows, [])
 
 
 class GameBetCandidateTeamAttributionTests(unittest.TestCase):

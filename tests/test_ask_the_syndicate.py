@@ -33,6 +33,36 @@ class AskTheSyndicateApiTests(unittest.TestCase):
         evidence_patcher.start()
         self.addCleanup(evidence_patcher.stop)
 
+    def test_read_latest_intelligence_state_prefers_canonical_board_state_when_enabled(self) -> None:
+        # Plan item 1F: this function used to be a third parallel read
+        # cascade (board_snapshot -> worker state), separate from the
+        # Board's own _cached_intelligence_response_with_source. Confirms
+        # it now tries the canonical board state first, behind the same
+        # flag, before falling through to its existing order.
+        canonical_response = {"top_opportunities": [{"name": "Canonical Play"}]}
+        with patch("syndicate.blueprints.intelligence._load_canonical_board_response", return_value=(canonical_response, "canonical_board_state")):
+            with patch("syndicate.blueprints.ask_the_syndicate.read_latest_intelligence_board_snapshot_response") as mocked_board_snapshot:
+                with patch("syndicate.blueprints.ask_the_syndicate.read_latest_intelligence_state_response") as mocked_state_response:
+                    result = ask_module.read_latest_intelligence_state({"selected_date": "2026-06-10"})
+
+        self.assertEqual(result.get("top_opportunities"), [{"name": "Canonical Play"}])
+        mocked_board_snapshot.assert_not_called()
+        mocked_state_response.assert_not_called()
+
+    def test_read_latest_intelligence_state_falls_back_when_canonical_disabled(self) -> None:
+        # canonical_board_state_enabled defaults off in the real code path,
+        # so _load_canonical_board_response itself would return (None,
+        # "canonical_disabled") unmocked -- this test just confirms the
+        # existing board_snapshot -> worker-state order survives untouched
+        # when canonical genuinely has nothing to offer.
+        board_snapshot = {"top_opportunities": [{"name": "Board Snapshot Play"}]}
+        with patch("syndicate.blueprints.ask_the_syndicate.read_latest_intelligence_board_snapshot_response", return_value=board_snapshot):
+            with patch("syndicate.blueprints.ask_the_syndicate.read_latest_intelligence_state_response") as mocked_state_response:
+                result = ask_module.read_latest_intelligence_state({"selected_date": "2026-06-10"})
+
+        self.assertEqual(result.get("top_opportunities"), [{"name": "Board Snapshot Play"}])
+        mocked_state_response.assert_not_called()
+
     def test_query_route_returns_bet_analysis_schema(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(ask_the_syndicate_bp)
