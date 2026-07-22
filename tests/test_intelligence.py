@@ -28,6 +28,7 @@ from syndicate.features.intelligence import _advanced_input_rows_for_sport
 from syndicate.features.intelligence import _advanced_signals_from_item
 from syndicate.features.intelligence import _build_parlays
 from syndicate.features.intelligence import _balanced_recommendation_order
+from syndicate.features.intelligence import _bind_candidate_state
 from syndicate.features.intelligence import _candidate_advanced_signal_score
 from syndicate.features.intelligence import _candidate_live_claim_is_stale
 from syndicate.features.intelligence import _basketball_source_summary_score
@@ -1497,15 +1498,17 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIn("inactive", str(scored.get("state_note") or "").lower())
         self.assertNotIn("score", scored)
 
-    def test_candidate_live_claim_is_stale_treats_missing_timestamp_as_stale(self) -> None:
-        # A candidate claiming live with NO updated_epoch at all used to be
-        # trusted as fresh (return False here) instead of treated as
-        # suspect -- the root cause of candidates being falsely marked
-        # live on the board.
-        self.assertTrue(_candidate_live_claim_is_stale({"is_live": True}))
-        self.assertTrue(_candidate_live_claim_is_stale({"is_live": True, "updated_epoch": None}))
-        self.assertTrue(_candidate_live_claim_is_stale({"is_live": True, "updated_epoch": 0}))
-        self.assertTrue(_candidate_live_claim_is_stale({"is_live": True, "updated_epoch": -5}))
+    def test_candidate_live_claim_is_stale_trusts_missing_timestamp(self) -> None:
+        # updated_epoch is only ever populated by home.py's
+        # _game_row_updated_epoch, which falls back to a hardcoded 0.0
+        # whenever a game lacks its own updated_at-style field -- the
+        # common case, not a rare one. Treating that as automatically
+        # stale (a prior, reverted change) silently disqualified nearly
+        # every genuinely-live candidate from ever showing as live.
+        self.assertFalse(_candidate_live_claim_is_stale({"is_live": True}))
+        self.assertFalse(_candidate_live_claim_is_stale({"is_live": True, "updated_epoch": None}))
+        self.assertFalse(_candidate_live_claim_is_stale({"is_live": True, "updated_epoch": 0}))
+        self.assertFalse(_candidate_live_claim_is_stale({"is_live": True, "updated_epoch": -5}))
 
     def test_candidate_live_claim_is_stale_uses_real_timestamp_when_present(self) -> None:
         self.assertFalse(_candidate_live_claim_is_stale({"is_live": True, "updated_epoch": time.time()}))
@@ -1514,6 +1517,30 @@ class IntelligenceBlueprintTests(unittest.TestCase):
     def test_candidate_live_claim_is_stale_ignores_non_live_candidates(self) -> None:
         self.assertFalse(_candidate_live_claim_is_stale({"is_live": False}))
         self.assertFalse(_candidate_live_claim_is_stale({}))
+
+    def test_bind_candidate_state_does_not_promote_scheduled_time_as_game_state(self) -> None:
+        # A prop candidate that fell back to pregame data carries a
+        # scheduled-time status_display (e.g. "6:10 PM CT") -- that must
+        # never become game_state, which used to make a scheduled game look
+        # like it might be live.
+        candidate = {"status_display": "6:10 PM CT", "is_live": False}
+        _bind_candidate_state(candidate)
+        self.assertFalse(bool(candidate.get("game_state")))
+
+    def test_bind_candidate_state_promotes_real_live_signal(self) -> None:
+        candidate = {"status_display": "Top 7th - In Progress", "is_live": True}
+        _bind_candidate_state(candidate)
+        self.assertEqual(candidate.get("game_state"), "Top 7th - In Progress")
+
+    def test_bind_candidate_state_promotes_final_signal_even_without_is_live(self) -> None:
+        candidate = {"status_display": "Final", "is_live": False}
+        _bind_candidate_state(candidate)
+        self.assertEqual(candidate.get("game_state"), "Final")
+
+    def test_bind_candidate_state_promotes_text_naming_live_state_without_explicit_flag(self) -> None:
+        candidate = {"status_context": "In Progress - Bot 4th"}
+        _bind_candidate_state(candidate)
+        self.assertEqual(candidate.get("game_state"), "In Progress - Bot 4th")
 
     def test_balanced_recommendation_order_preserves_multi_sport_live_mix(self) -> None:
         candidates = [

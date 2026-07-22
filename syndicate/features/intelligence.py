@@ -3867,14 +3867,29 @@ def _candidate_live_claim_is_stale(candidate: dict[str, Any]) -> bool:
     try:
         updated_epoch_value = float(candidate.get("updated_epoch"))
     except (TypeError, ValueError):
-        # Was `return False` -- a candidate claiming live with NO
-        # timestamp at all was trusted as fresh instead of treated as
-        # suspect, the opposite of what this staleness check exists for.
-        # This was the root cause of candidates being falsely marked live.
-        return True
+        # Reverted 2026-07-22: a prior change here treated a missing
+        # timestamp as automatically stale, on the theory that a live claim
+        # with no evidence behind it was suspect. In practice, updated_epoch
+        # is only ever populated by _game_row_updated_epoch (home.py), which
+        # falls back to a hardcoded 0.0 whenever a game lacks its own
+        # updated_at-style field -- the COMMON case, not a rare one. That
+        # change silently disqualified nearly every genuinely-live candidate
+        # from ever showing as live. Trust the claim when there's simply no
+        # timestamp evidence either way; only reject a claim backed by a
+        # timestamp that's actually, demonstrably old (below).
+        return False
     if updated_epoch_value <= 0:
-        return True
+        return False
     return (time.time() - updated_epoch_value) > _MAX_PLAUSIBLE_LIVE_AGE_SECONDS
+
+
+_CANDIDATE_LIVE_STATE_MARKERS = (
+    "live",
+    "in progress",
+    "in-progress",
+    "halftime",
+    "intermission",
+)
 
 
 def _bind_candidate_state(candidate: dict[str, Any]) -> None:
@@ -3882,7 +3897,23 @@ def _bind_candidate_state(candidate: dict[str, Any]) -> None:
     status_context = _safe_text(candidate.get("status_context"), "")
     game_state = _safe_text(candidate.get("game_state"), "")
     if not game_state and (status_display or status_context):
-        candidate["game_state"] = status_display or status_context
+        # status_display/status_context on a candidate that fell back to
+        # pregame data is often just a scheduled start time (e.g. "6:10 PM
+        # CT"), not an actual game state -- promoting it verbatim used to
+        # mislabel a scheduled game as if it might be live, since nothing
+        # here ever checked whether the text said anything about live/final
+        # state at all. Confirmed live 2026-07-22: candidates for genuinely
+        # in-progress MLB games showed a raw scheduled-time string as their
+        # game_state. Only backfill when there's a real signal -- the
+        # candidate already claims live, or the text itself names a
+        # live/final state -- otherwise leave game_state unset rather than
+        # echoing a meaningless scheduled-time string.
+        candidate_text = f"{status_display} {status_context}".lower()
+        has_live_marker = bool(candidate.get("is_live")) or any(
+            marker in candidate_text for marker in _CANDIDATE_LIVE_STATE_MARKERS
+        )
+        if has_live_marker or _candidate_is_final(candidate):
+            candidate["game_state"] = status_display or status_context
     if not status_display and game_state:
         candidate["status_display"] = game_state
     if not status_context and candidate.get("status_display"):
