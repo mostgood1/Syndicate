@@ -835,6 +835,7 @@
     { value: "ncaaf", label: "NCAAF" },
     { value: "ncaab", label: "NCAAB" },
     { value: "nhl", label: "NHL" },
+    { value: "soccer", label: "Soccer" },
   ];
   const STATE_TABS = [
     { value: "all", label: "All states" },
@@ -937,17 +938,30 @@
   }
 
   function renderFilterTabs() {
+    // Sport and game-state tabs used to call loadIntelligence({forceRefresh:
+    // true}) here -- a full server round trip. Two problems: (1) the board
+    // already fetches every sport/lane in one shot (recommendations/
+    // top_opportunities cover everything), so lastRenderItems already has
+    // what a tab click needs; (2) intelligenceQueryPayload used to vary the
+    // "question" text and add sport/game_state fields whenever a non-"all"
+    // tab was active, which changed the request's cache key -- the
+    // pre-warmed "top edges today" snapshot the background worker keeps
+    // fresh was never a hit for that key, so every tab click fell through
+    // to a slow, sometimes-empty-mid-compute cold path. Filtering
+    // client-side (matchesFilters, same as the market/min-edge tabs below
+    // already do via matchesClientFilters) makes tab switches instant and
+    // removes the dependence on that cold path entirely.
     renderTabs("board-sport-tabs", SPORT_TABS, state.sport, (value) => {
       state.sport = value;
       syncUrlState();
       renderFilterTabs();
-      void loadIntelligence({ forceRefresh: true });
+      renderBoardBody();
     });
     renderTabs("board-state-tabs", STATE_TABS, state.gameState, (value) => {
       state.gameState = value;
       syncUrlState();
       renderFilterTabs();
-      void loadIntelligence({ forceRefresh: true });
+      renderBoardBody();
     });
     // Market family, min-edge, and view are client-side refinements over
     // whatever the server already returned for the current sport/lane --
@@ -1439,7 +1453,7 @@
   }
 
   function renderBoardBody() {
-    const clientFiltered = lastRenderItems.filter(matchesClientFilters);
+    const clientFiltered = lastRenderItems.filter(matchesFilters).filter(matchesClientFilters);
     renderTopStrip(clientFiltered);
     if (state.view === "blotter") {
       renderBlotter(clientFiltered);
@@ -1821,8 +1835,12 @@
       return;
     }
     const data = normalizeIntelligenceResponse(response);
-    const filtered = (data.topOpportunities.length ? data.topOpportunities : data.recommendations).filter(matchesFilters);
-    lastRenderItems = filtered;
+    // Not sport/state-filtered here anymore -- the fetch itself now always
+    // asks for everything (see intelligenceQueryPayload), and matchesFilters
+    // is applied at render time in renderBoardBody instead, so switching
+    // sport/state tabs afterward doesn't need a re-fetch to see a different
+    // slice of what was already returned.
+    lastRenderItems = data.topOpportunities.length ? data.topOpportunities : data.recommendations;
     renderBoardBody();
     renderPortfolio(data);
     renderParlays(data);
@@ -1834,17 +1852,21 @@
 
   function intelligenceQueryPayload(options) {
     const opts = options || {};
-    const hasCustomFilters = Boolean(state.sport !== "all" || state.gameState !== "all");
+    // Sport/game-state are no longer sent here -- they used to vary both
+    // the question text and add sport/game_state fields, which changed the
+    // request's cache key and meant every non-"all" tab missed the
+    // pre-warmed snapshot the background worker keeps fresh (see
+    // renderFilterTabs). The fetch always asks for the full board now;
+    // state.sport/state.gameState only drive the client-side filter in
+    // renderBoardBody.
     const payload = {
-      question: hasCustomFilters ? "What are the best edges for this board?" : DEFAULT_QUESTION,
+      question: DEFAULT_QUESTION,
       mode: "recommendation",
-      timing: state.gameState === "all" ? "all" : state.gameState,
+      timing: "all",
       background: Boolean(opts.background),
       force_refresh: Boolean(opts.forceRefresh),
     };
     if (state.date) payload.date = state.date;
-    if (state.sport) payload.sport = state.sport;
-    if (state.gameState) payload.game_state = state.gameState;
     return payload;
   }
 
