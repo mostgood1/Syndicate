@@ -3559,6 +3559,15 @@ def _prop_rows_from_nba_live_lens(
         if clock:
             status_bits.append(clock)
         heading = " | ".join(status_bits) if status_bits else "Live props"
+        # Was hardcoded True on every row this function returns, regardless
+        # of the period/clock/in_progress evidence computed just above --
+        # confirmed live 2026-07-22 on WNBA: a pregame prop row (its own
+        # feed hadn't picked up the game going live yet) still claimed
+        # is_live=True, which then let its pregame scheduled-tip status
+        # text ("6:30 PM CT"/"7/22 - 7:30 PM EDT") pass straight through as
+        # if it were live game state. Only claim live when the underlying
+        # status evidence actually says so.
+        row_is_live = bool(status.get("in_progress")) or bool(status_bits)
         player = _safe_text(row.get("player"), "NBA prop")
         team = _safe_text(row.get("team_tri"), "Team")
         away_label = _game_team_label(game, "away") or "Away"
@@ -3593,7 +3602,7 @@ def _prop_rows_from_nba_live_lens(
                 "heading": heading,
                 "name": player,
                 "player_name": player,
-                "is_live": True,
+                "is_live": row_is_live,
                 "market": market,
                 "pick": side,
                 "detail": f"{side} {line} {market_label} | {_safe_text(row.get('basketball_summary') or row.get('shape_summary'), 'Live prop signal')}",
@@ -3613,7 +3622,18 @@ def _prop_rows_from_nba_live_lens(
                     else (row.get("liveEdge") if row.get("liveEdge") is not None else row.get("ev") if row.get("ev") is not None else row.get("edge"))
                 ),
                 "confidence": probability,
-                "game_state": _safe_text(status_bits[-1] if status_bits else row.get("status_label") or "Live", None),
+                # Was `... else row.get("status_label") or "Live"` -- when
+                # there's no real period/clock, status_label is often just
+                # a pregame scheduled-tip string (see row_is_live above),
+                # and the "Live" literal fallback was misleading for a row
+                # that isn't actually live. Only ever show real live text
+                # (status_bits) or the row's own status_label when we know
+                # this row is genuinely live; otherwise leave it unset.
+                "game_state": (
+                    _safe_text(status_bits[-1] if status_bits else row.get("status_label"), None)
+                    if row_is_live
+                    else None
+                ),
                 "team": team,
                 "opponent": opponent,
                 "away_label": away_label,

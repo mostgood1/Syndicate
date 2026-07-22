@@ -3940,6 +3940,71 @@ class HomeBoardTests(unittest.TestCase):
         self.assertEqual(finalized[0]["market_display"], "3PM")
         self.assertEqual(finalized[0]["meta_line"], "OVER 2.5")
 
+    def test_home_wnba_live_prop_rows_do_not_claim_live_without_real_evidence(self) -> None:
+        # Was hardcoded is_live=True on every row regardless of the game's
+        # own in_progress/period/clock evidence -- confirmed live 2026-07-22:
+        # a pregame row (status_label carrying a scheduled tip time, e.g.
+        # "7/22 - 7:30 PM EDT") still claimed is_live=True, letting that
+        # scheduled-time string pass through as if it were live game state.
+        from syndicate.blueprints import home as home_module
+
+        pregame_games = [
+            {
+                "event_id": "401857089",
+                "away": "LVA",
+                "home": "WSH",
+                "status": {"status": "7/22 - 7:30 PM EDT", "in_progress": False, "final": False, "period": None, "clock": ""},
+                "rows": [
+                    {
+                        "player": "A'ja Wilson",
+                        "team_tri": "LVA",
+                        "opponent_tri": "WSH",
+                        "stat": "reb_ast",
+                        "line": 6.5,
+                        "lean": "OVER",
+                        "price": 104.0,
+                        "ev": 0.1,
+                        "win_prob": 0.588,
+                        "recommendation_priority_score": 10.0,
+                        "klass": "BET",
+                        "status_label": "7/22 - 7:30 PM EDT",
+                    }
+                ],
+            }
+        ]
+        live_games = [
+            {
+                "event_id": "401857090",
+                "away": "CHI",
+                "home": "NYL",
+                "status": {"status": "In Progress", "in_progress": True, "final": False, "period": 3, "clock": "6:12"},
+                "rows": [
+                    {
+                        "player": "Angel Reese",
+                        "team_tri": "CHI",
+                        "opponent_tri": "NYL",
+                        "stat": "reb",
+                        "line": 8.5,
+                        "lean": "OVER",
+                        "price": -110.0,
+                        "ev": 0.2,
+                        "win_prob": 0.62,
+                        "recommendation_priority_score": 20.0,
+                        "klass": "BET",
+                    }
+                ],
+            }
+        ]
+
+        with patch("syndicate.blueprints.home._basketball_resolve_player_id", return_value=None):
+            pregame_rows = home_module._prop_rows_from_nba_live_lens(pregame_games, sport_slug="wnba")
+            live_rows = home_module._prop_rows_from_nba_live_lens(live_games, sport_slug="wnba")
+
+        self.assertFalse(pregame_rows[0]["is_live"])
+        self.assertIsNone(pregame_rows[0]["game_state"])
+        self.assertTrue(live_rows[0]["is_live"])
+        self.assertEqual(live_rows[0]["game_state"], "6:12")
+
     def test_wnba_rank_card_prop_rows_resolve_pregame_headshot(self) -> None:
         from syndicate.blueprints import home as home_module
 
