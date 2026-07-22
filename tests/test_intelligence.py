@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import time
 import unittest
 from collections import OrderedDict
 from pathlib import Path
@@ -28,6 +29,7 @@ from syndicate.features.intelligence import _advanced_signals_from_item
 from syndicate.features.intelligence import _build_parlays
 from syndicate.features.intelligence import _balanced_recommendation_order
 from syndicate.features.intelligence import _candidate_advanced_signal_score
+from syndicate.features.intelligence import _candidate_live_claim_is_stale
 from syndicate.features.intelligence import _basketball_source_summary_score
 from syndicate.features.intelligence import _candidate_market_fit
 from syndicate.features.intelligence import collect_candidates
@@ -1494,6 +1496,24 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(scored.get("state_invalid"))
         self.assertIn("inactive", str(scored.get("state_note") or "").lower())
         self.assertNotIn("score", scored)
+
+    def test_candidate_live_claim_is_stale_treats_missing_timestamp_as_stale(self) -> None:
+        # A candidate claiming live with NO updated_epoch at all used to be
+        # trusted as fresh (return False here) instead of treated as
+        # suspect -- the root cause of candidates being falsely marked
+        # live on the board.
+        self.assertTrue(_candidate_live_claim_is_stale({"is_live": True}))
+        self.assertTrue(_candidate_live_claim_is_stale({"is_live": True, "updated_epoch": None}))
+        self.assertTrue(_candidate_live_claim_is_stale({"is_live": True, "updated_epoch": 0}))
+        self.assertTrue(_candidate_live_claim_is_stale({"is_live": True, "updated_epoch": -5}))
+
+    def test_candidate_live_claim_is_stale_uses_real_timestamp_when_present(self) -> None:
+        self.assertFalse(_candidate_live_claim_is_stale({"is_live": True, "updated_epoch": time.time()}))
+        self.assertTrue(_candidate_live_claim_is_stale({"is_live": True, "updated_epoch": time.time() - 100000}))
+
+    def test_candidate_live_claim_is_stale_ignores_non_live_candidates(self) -> None:
+        self.assertFalse(_candidate_live_claim_is_stale({"is_live": False}))
+        self.assertFalse(_candidate_live_claim_is_stale({}))
 
     def test_balanced_recommendation_order_preserves_multi_sport_live_mix(self) -> None:
         candidates = [

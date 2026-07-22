@@ -3867,9 +3867,13 @@ def _candidate_live_claim_is_stale(candidate: dict[str, Any]) -> bool:
     try:
         updated_epoch_value = float(candidate.get("updated_epoch"))
     except (TypeError, ValueError):
-        return False
+        # Was `return False` -- a candidate claiming live with NO
+        # timestamp at all was trusted as fresh instead of treated as
+        # suspect, the opposite of what this staleness check exists for.
+        # This was the root cause of candidates being falsely marked live.
+        return True
     if updated_epoch_value <= 0:
-        return False
+        return True
     return (time.time() - updated_epoch_value) > _MAX_PLAUSIBLE_LIVE_AGE_SECONDS
 
 
