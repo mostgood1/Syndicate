@@ -324,7 +324,6 @@ def _queue_intelligence_snapshot_refresh(*, run_summary_path: Path) -> tuple[str
         "mode": "live",
         "sport": "all",
         "timing": "",
-        "limit": 10,
         "include_props": True,
         "include_games": True,
         "force_refresh": True,

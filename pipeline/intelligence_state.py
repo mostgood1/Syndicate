@@ -224,6 +224,25 @@ def _snapshot_sport(snapshot: "IntelligenceSnapshot") -> str | None:
     return None
 
 
+def _snapshot_limit_matches(snapshot: "IntelligenceSnapshot", payload: dict[str, Any]) -> bool:
+    # A background job (e.g. scripts/run_refresh_odds_job.py) queuing its own
+    # payload with a different "limit" than the frontend's own request used
+    # to be able to win the self._latest_key fallback race below and clobber
+    # every other caller's response with its own truncated recommendations
+    # list, even though the two payloads were never asking for the same
+    # thing. date/sport already gate this fallback; limit should too.
+    def _limit_of(source: dict[str, Any] | None) -> int | None:
+        raw = dict(source or {}).get("limit")
+        try:
+            return int(raw) if raw is not None and str(raw).strip() else None
+        except (TypeError, ValueError):
+            return None
+
+    requested_limit = _limit_of(payload)
+    snapshot_limit = _limit_of(snapshot.payload if isinstance(snapshot.payload, dict) else None)
+    return requested_limit == snapshot_limit
+
+
 def _snapshot_matches_payload(snapshot: "IntelligenceSnapshot", payload: dict[str, Any]) -> bool:
     requested_date = _selected_date_from_payload(payload)
     snapshot_date = _selected_date_from_payload(snapshot.payload if isinstance(snapshot.payload, dict) else None)
@@ -1728,7 +1747,11 @@ class IntelligenceStateService:
                 latest_snapshot = self._snapshots[self._latest_key]
                 latest_date = _selected_date_from_payload(latest_snapshot.payload)
                 latest_sport = _snapshot_sport(latest_snapshot)
-                if not self._is_stale(latest_snapshot) and (allow_latest_fallback or requested_date is None or latest_date is None or latest_date == requested_date):
+                if (
+                    not self._is_stale(latest_snapshot)
+                    and (allow_latest_fallback or requested_date is None or latest_date is None or latest_date == requested_date)
+                    and _snapshot_limit_matches(latest_snapshot, normalized_payload)
+                ):
                     if not requested_sport or requested_sport == "all" or latest_sport == requested_sport:
                         return dict(latest_snapshot.response)
             if requested_sport and requested_sport != "all":
@@ -1745,7 +1768,10 @@ class IntelligenceStateService:
             if latest_snapshot is not None:
                 latest_date = _selected_date_from_payload(latest_snapshot.payload)
                 latest_sport = _snapshot_sport(latest_snapshot)
-                if allow_latest_fallback or requested_date is None or latest_date is None or latest_date == requested_date:
+                if (
+                    (allow_latest_fallback or requested_date is None or latest_date is None or latest_date == requested_date)
+                    and _snapshot_limit_matches(latest_snapshot, normalized_payload)
+                ):
                     if not requested_sport or requested_sport == "all" or latest_sport == requested_sport:
                         return dict(latest_snapshot.response)
             return None
