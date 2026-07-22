@@ -6539,6 +6539,115 @@ def collect_all_recommendations(*, selected_date: str | None = None, force_refre
     return [dict(recommendation) for recommendation in ranked_recommendations if isinstance(recommendation, dict)]
 
 
+def candidate_identity_key(candidate: dict[str, Any]) -> str:
+    # Extracted from IntelligenceStateService._candidate_id (pipeline/intelligence_state.py)
+    # so collect_candidates_with_fallback_merge below can dedupe/union candidates
+    # without needing a service instance. That method now delegates here.
+    identifier = {
+        "sport_slug": str(candidate.get("sport_slug") or candidate.get("sport") or "").strip().lower(),
+        "candidate_type": str(candidate.get("candidate_type") or "").strip().lower(),
+        "event_id": str(candidate.get("event_id") or "").strip(),
+        "game_pk": str(candidate.get("game_pk") or candidate.get("gamePk") or "").strip(),
+        "subject_key": str(candidate.get("subject_key") or candidate.get("player_name") or candidate.get("name") or "").strip().lower(),
+        "market_key": str(candidate.get("market_key") or candidate.get("market") or "").strip().lower(),
+        "selection": str(candidate.get("selection") or candidate.get("pick") or "").strip().lower(),
+        "line": str(candidate.get("line") or candidate.get("market_line") or candidate.get("prop_line") or "").strip().lower(),
+        "odds": str(candidate.get("odds") or candidate.get("odds_current") or "").strip().lower(),
+    }
+    canonical = json.dumps(identifier, sort_keys=True, separators=(",", ":"), default=str)
+    return f"cand_{hashlib.sha256(canonical.encode('utf-8')).hexdigest()[:16]}"
+
+
+_THIN_CANDIDATE_POOL_THRESHOLD = 20
+
+
+def collect_candidates_with_fallback_merge(
+    overview: list[dict[str, Any]],
+    preferences: dict[str, Any],
+    odds_history_by_sport: dict[str, dict[str, Any]] | None = None,
+    *,
+    selected_date: str | None = None,
+    apply_edge_filter: bool = True,
+    advanced_by_sport: dict[str, list[dict[str, Any]]] | None = None,
+) -> list[dict[str, Any]]:
+    """Single collect-with-fallback entry point, extracted from
+    IntelligenceStateService._build_candidate_pool so every caller gets the
+    same behavior instead of only the board-publication path having it.
+
+    collect_candidates (the primary path) and collect_all_recommendations
+    (the fallback) don't always agree on completeness -- confirmed live
+    2026-07-21: collect_candidates returning a non-empty but thin result
+    (e.g. 10) permanently skipped the richer fallback (which found 181 for
+    the identical date/sport), because an "if not raw_candidates" check
+    only ever fires on a literal empty list. A fresh direct compute minutes
+    apart, same payload, same underlying data, produced 10 vs 181 -- not a
+    timing artifact. Try the richer pipeline whenever the primary result
+    looks suspiciously thin (not just when it's empty), and keep whichever
+    is actually bigger -- or, when both have non-overlapping coverage,
+    union them (see below) rather than picking one.
+
+    apply_edge_filter=False for callers (like run_intelligence_query) that
+    already run their own scoring/filtering downstream on the raw pool --
+    applying it here too would double-gate.
+    """
+    raw_candidates = collect_candidates(overview, preferences, odds_history_by_sport)
+    if not raw_candidates:
+        try:
+            # collect_all_recommendations() already runs _score_candidates()
+            # + filter_candidates() internally, so it doesn't need the
+            # explicit scoring/filtering step below applied a second time.
+            raw_candidates = collect_all_recommendations(
+                selected_date=selected_date,
+                force_refresh=True,
+                log_pipeline=False,
+            )
+        except TypeError:
+            raw_candidates = []
+    elif apply_edge_filter:
+        if advanced_by_sport is None:
+            tracked = _tracked_repo_files()
+            advanced_by_sport = {
+                _safe_text(sport_row.get("slug"), "sport").lower(): _advanced_input_rows_for_sport(sport_row, tracked)
+                for sport_row in overview
+                if isinstance(sport_row, dict)
+            }
+        scored_candidates = _score_candidates(raw_candidates, advanced_by_sport, preferences)
+        raw_candidates = filter_candidates(scored_candidates, sport=None)
+
+    if 0 < len(raw_candidates) < _THIN_CANDIDATE_POOL_THRESHOLD:
+        try:
+            richer_candidates = collect_all_recommendations(
+                selected_date=selected_date,
+                force_refresh=True,
+                log_pipeline=False,
+            )
+        except TypeError:
+            richer_candidates = []
+        richer_candidates = [c for c in richer_candidates if isinstance(c, Mapping)]
+        if len(richer_candidates) > len(raw_candidates):
+            # Merge, don't replace: confirmed live 2026-07-21 that a wholesale
+            # swap loses coverage whenever the two pipelines don't have
+            # identical sport reach -- MLB came back at the richer pipeline's
+            # 181-candidate count, but WNBA (present in the primary result)
+            # disappeared entirely from the combined board. Union both pools
+            # by candidate identity so a sport/candidate either pipeline
+            # uniquely finds survives instead of one silently overwriting
+            # the other's coverage.
+            merged_by_id: dict[str, dict[str, Any]] = {}
+            for source in (raw_candidates, richer_candidates):
+                for candidate in source:
+                    candidate = dict(candidate)
+                    try:
+                        identity = candidate_identity_key(candidate)
+                    except Exception:
+                        identity = ""
+                    key = identity or f"_unkeyed_{id(candidate)}"
+                    merged_by_id.setdefault(key, candidate)
+            raw_candidates = list(merged_by_id.values())
+
+    return [candidate for candidate in raw_candidates if isinstance(candidate, Mapping)]
+
+
 def rank_global_recommendations(recommendations: list[dict[str, Any]], *, limit: int | None = None) -> list[dict[str, Any]]:
     ranked = sorted(
         [dict(recommendation) for recommendation in recommendations if isinstance(recommendation, Mapping)],
@@ -6747,7 +6856,17 @@ def run_intelligence_query(
             )
             return cached_response
     candidate_started_at = time.perf_counter()
-    candidates = _primary_query_candidates(overview, preferences, odds_history_by_sport)
+    # apply_edge_filter=False: this function already runs its own
+    # _score_candidates()/filter_candidates() below (after subject/market
+    # resolution) -- applying the edge gate here too would double-gate.
+    candidates = collect_candidates_with_fallback_merge(
+        overview,
+        preferences,
+        odds_history_by_sport,
+        selected_date=effective_date,
+        apply_edge_filter=False,
+        advanced_by_sport=advanced_by_sport,
+    )
     _intel_trace_timed("candidate_generation", candidate_started_at, pipeline="run_intelligence_query", candidate_count=len(candidates))
     _log_candidate_stage(pipeline_name="run_intelligence_query", stage="collect_candidates", before=[], after=candidates)
     resolved_requested_subjects = _resolved_requested_subjects(question, candidates)

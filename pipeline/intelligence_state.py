@@ -22,17 +22,13 @@ from pipeline.intelligence_entrypoint import run_routed_intelligence_pipeline
 from pipeline.intelligence_pipeline import run_intelligence_pipeline
 from syndicate.features.intelligence import build_intelligence_status
 from syndicate.features.intelligence import build_intelligence_overview
-from syndicate.features.intelligence import _advanced_input_rows_for_sport
 from syndicate.features.intelligence import _build_board_dictionary
 from syndicate.features.intelligence import _balanced_recommendation_order
-from syndicate.features.intelligence import collect_candidates
-from syndicate.features.intelligence import collect_all_recommendations
+from syndicate.features.intelligence import candidate_identity_key
+from syndicate.features.intelligence import collect_candidates_with_fallback_merge
 from syndicate.features.intelligence import _apply_candidate_tier_penalty
-from syndicate.features.intelligence import filter_candidates
 from syndicate.features.intelligence import _greedy_low_correlation_selection
 from syndicate.features.intelligence import _query_preferences
-from syndicate.features.intelligence import _score_candidates
-from syndicate.features.intelligence import _tracked_repo_files
 from syndicate.features.intelligence import rank_global_recommendations
 from syndicate.features.intelligence import _shard_key_from_context_label
 from syndicate.features.intelligence_board import build_intelligence_board_contract
@@ -1105,19 +1101,11 @@ class IntelligenceStateService:
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     def _candidate_id(self, candidate: dict[str, Any]) -> str:
-        identifier = {
-            "sport_slug": str(candidate.get("sport_slug") or candidate.get("sport") or "").strip().lower(),
-            "candidate_type": str(candidate.get("candidate_type") or "").strip().lower(),
-            "event_id": str(candidate.get("event_id") or "").strip(),
-            "game_pk": str(candidate.get("game_pk") or candidate.get("gamePk") or "").strip(),
-            "subject_key": str(candidate.get("subject_key") or candidate.get("player_name") or candidate.get("name") or "").strip().lower(),
-            "market_key": str(candidate.get("market_key") or candidate.get("market") or "").strip().lower(),
-            "selection": str(candidate.get("selection") or candidate.get("pick") or "").strip().lower(),
-            "line": str(candidate.get("line") or candidate.get("market_line") or candidate.get("prop_line") or "").strip().lower(),
-            "odds": str(candidate.get("odds") or candidate.get("odds_current") or "").strip().lower(),
-        }
-        canonical = json.dumps(identifier, sort_keys=True, separators=(",", ":"), default=str)
-        return f"cand_{hashlib.sha256(canonical.encode('utf-8')).hexdigest()[:16]}"
+        # Delegates to the standalone syndicate.features.intelligence.candidate_identity_key
+        # so collect_candidates_with_fallback_merge can dedupe/union candidates
+        # without needing a service instance. Kept as a thin wrapper so
+        # existing callers/tests referencing self._candidate_id keep working.
+        return candidate_identity_key(candidate)
 
     def _candidate_raw_inputs(self, candidate: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -1377,104 +1365,23 @@ class IntelligenceStateService:
             include_games=True,
         )
         odds_history_by_sport = self._odds_history_payloads_by_sport(overview)
+        # collect_candidates_with_fallback_merge (syndicate/features/intelligence.py)
+        # is the shared collect-with-fallback entry point extracted from this
+        # function so run_intelligence_query gets the same
+        # thin-pool/empty-pool fallback-and-merge behavior instead of only
+        # this board-publication path having it. apply_edge_filter mirrors
+        # this path's own SYNDICATE_BOARD_APPLY_EDGE_FILTER toggle (default
+        # on) -- a kill-switch for the edge-quality gate without a code
+        # revert if published-candidate volume drops more than expected.
         raw_candidates = _profile_stage(
-            "simulation_aggregation",
-            collect_candidates,
+            "candidate_collection_with_fallback",
+            collect_candidates_with_fallback_merge,
             overview,
             preferences,
             odds_history_by_sport,
+            selected_date=selected_date,
+            apply_edge_filter=_env_bool("SYNDICATE_BOARD_APPLY_EDGE_FILTER", default=True),
         )
-        if not raw_candidates:
-            try:
-                # collect_all_recommendations() already runs _score_candidates()
-                # + filter_candidates() internally, so it doesn't need the
-                # explicit scoring/filtering step below applied a second time.
-                raw_candidates = _profile_stage(
-                    "simulation_aggregation_fallback",
-                    collect_all_recommendations,
-                    selected_date=selected_date,
-                    force_refresh=True,
-                    log_pipeline=False,
-                )
-            except TypeError:
-                raw_candidates = []
-        elif _env_bool("SYNDICATE_BOARD_APPLY_EDGE_FILTER", default=True):
-            # The on-demand /api/intelligence/query path (run_intelligence_query)
-            # runs _score_candidates() (edge/score computation, final-game state
-            # re-guard) and filter_candidates() (edge-below-threshold quality
-            # gate) after collect_candidates(); this background-loop path used
-            # to stop at collect_candidates() and publish the raw pool, so the
-            # cached board most page loads read could disagree with what a live
-            # query would return -- notably, no edge-quality gate at all. Route
-            # through the same two stages so both paths apply the same gate.
-            # Deliberately NOT calling the ranking/narrative/parlay layer here
-            # (_balanced_recommendation_order etc.) -- that stays query-only,
-            # board publication keeps its own ranking step further below.
-            # Toggle exists to disable this gate in production without a code
-            # revert if published-candidate volume drops more than expected.
-            tracked = _tracked_repo_files()
-            advanced_by_sport = {
-                _safe_text(sport_row.get("slug"), "sport").lower(): _advanced_input_rows_for_sport(sport_row, tracked)
-                for sport_row in overview
-                if isinstance(sport_row, dict)
-            }
-            scored_candidates = _profile_stage(
-                "candidate_scoring",
-                _score_candidates,
-                raw_candidates,
-                advanced_by_sport,
-                preferences,
-            )
-            raw_candidates = _profile_stage(
-                "candidate_edge_filter",
-                filter_candidates,
-                scored_candidates,
-                sport=None,
-            )
-
-        # collect_candidates (the primary path above) and collect_all_recommendations
-        # (the fallback) are two genuinely different pipelines that don't always
-        # agree on completeness -- confirmed live 2026-07-21: collect_candidates
-        # returning a non-empty but thin result (e.g. 10) permanently skipped the
-        # richer fallback (which found 181 for the identical date/sport), because
-        # the "if not raw_candidates" check above only ever fires on a literal
-        # empty list. A fresh direct compute minutes apart, same payload, same
-        # underlying data, produced 10 vs 181 -- not a timing artifact. Try the
-        # richer pipeline whenever the primary result looks suspiciously thin
-        # (not just when it's empty), and keep whichever is actually bigger.
-        _THIN_CANDIDATE_POOL_THRESHOLD = 20
-        if 0 < len(raw_candidates) < _THIN_CANDIDATE_POOL_THRESHOLD:
-            try:
-                richer_candidates = _profile_stage(
-                    "simulation_aggregation_fallback_thin_check",
-                    collect_all_recommendations,
-                    selected_date=selected_date,
-                    force_refresh=True,
-                    log_pipeline=False,
-                )
-            except TypeError:
-                richer_candidates = []
-            richer_candidates = [c for c in richer_candidates if isinstance(c, Mapping)]
-            if len(richer_candidates) > len(raw_candidates):
-                # Merge, don't replace: confirmed live 2026-07-21 that a wholesale
-                # swap loses coverage whenever the two pipelines don't have
-                # identical sport reach -- MLB came back at the richer pipeline's
-                # 181-candidate count, but WNBA (present in the primary result)
-                # disappeared entirely from the combined board. Union both pools
-                # by candidate identity so a sport/candidate either pipeline
-                # uniquely finds survives instead of one silently overwriting
-                # the other's coverage.
-                merged_by_id: dict[str, dict[str, Any]] = {}
-                for source in (raw_candidates, richer_candidates):
-                    for candidate in source:
-                        candidate = dict(candidate)
-                        try:
-                            identity = self._candidate_id(candidate)
-                        except Exception:
-                            identity = ""
-                        key = identity or f"_unkeyed_{id(candidate)}"
-                        merged_by_id.setdefault(key, candidate)
-                raw_candidates = list(merged_by_id.values())
 
         raw_candidates = [candidate for candidate in raw_candidates if isinstance(candidate, Mapping)]
         candidate_build_started_at = time.perf_counter()
