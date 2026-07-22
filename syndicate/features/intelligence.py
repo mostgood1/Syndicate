@@ -30,6 +30,7 @@ from itertools import combinations
 import hashlib
 import json
 import logging
+import os
 import threading
 import time
 from pathlib import Path
@@ -6331,6 +6332,51 @@ def collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, An
     return universal_candidates
 
 
+def _env_bool(name: str, *, default: bool = False) -> bool:
+    raw = str(os.environ.get(name) or "").strip().lower()
+    if not raw:
+        return bool(default)
+    return raw in {"1", "true", "t", "yes", "y", "on"}
+
+
+def _candidate_movement_magnitude_bonus(candidate: dict[str, Any]) -> float:
+    # CLV/line-movement as a scored input (not just the display-only
+    # movement/delta/odds_history fields _enrich_candidates_with_odds_history
+    # already attaches). Deliberately magnitude-only, not directional: which
+    # way a line moving is "favorable" depends on the candidate's own side
+    # (over vs under, spread favorite vs dog, moneyline sign) and market
+    # type, and getting that backwards would silently reward bad picks --
+    # ruled out by design discussion on 2026-07-21. A bigger move of either
+    # direction is treated as "the market is reacting to something", a
+    # modest, capped confidence signal -- same cap as readiness_bonus below.
+    if not _env_bool("SYNDICATE_INTELLIGENCE_SCORE_LINE_MOVEMENT", default=True):
+        return 0.0
+    odds_history = candidate.get("odds_history") if isinstance(candidate.get("odds_history"), dict) else {}
+    percent_change = _numeric_hint(candidate.get("percent_change"))
+    if percent_change is None:
+        percent_change = _numeric_hint(odds_history.get("percent_change"))
+    if percent_change is None:
+        # Older/other-pipeline candidate shapes (e.g. pipeline/intelligence_state.py's
+        # _build_candidate_pool) attach delta_line/last_line instead of a
+        # precomputed percent_change -- derive the same normalized signal
+        # from whatever raw values are actually present.
+        delta = _numeric_hint(candidate.get("delta"))
+        if delta is None:
+            delta = _numeric_hint(odds_history.get("delta"))
+        if delta is None:
+            delta = _numeric_hint(odds_history.get("delta_line"))
+        if delta is None:
+            delta = _numeric_hint(candidate.get("delta_line"))
+        last_line = _numeric_hint(odds_history.get("last_line"))
+        if last_line is None:
+            last_line = _numeric_hint(candidate.get("line"))
+        if delta is not None and last_line not in (None, 0):
+            percent_change = (float(delta) / abs(float(last_line))) * 100.0
+    if percent_change is None:
+        return 0.0
+    return max(0.0, min(0.05, abs(float(percent_change)) * 0.01))
+
+
 def score_candidate(
     candidate: dict[str, Any],
     *,
@@ -6390,10 +6436,12 @@ def score_candidate(
     if edge_value is None:
         edge_value = 0.0
 
+    movement_bonus = _candidate_movement_magnitude_bonus(scored_candidate)
+
     confidence_value = _numeric_hint(scored_candidate.get("source_strength"))
     if confidence_value is None:
         confidence_value = 0.5
-    confidence_value = max(0.0, min(1.0, float(confidence_value) + float(readiness_bonus)))
+    confidence_value = max(0.0, min(1.0, float(confidence_value) + float(readiness_bonus) + float(movement_bonus)))
 
     tier_penalty = {"tier_1": 0.0, "tier_2": 0.2}.get(_safe_text(scored_candidate.get("tier"), "tier_2"), 0.2)
     scored_candidate["score"] = round(float(edge_value) * float(confidence_value) - float(tier_penalty), 4)
@@ -6568,6 +6616,7 @@ def collect_candidates_with_fallback_merge(
     *,
     selected_date: str | None = None,
     apply_edge_filter: bool = True,
+    apply_thin_pool_merge: bool = True,
     advanced_by_sport: dict[str, list[dict[str, Any]]] | None = None,
 ) -> list[dict[str, Any]]:
     """Single collect-with-fallback entry point, extracted from
@@ -6589,6 +6638,18 @@ def collect_candidates_with_fallback_merge(
     apply_edge_filter=False for callers (like run_intelligence_query) that
     already run their own scoring/filtering downstream on the raw pool --
     applying it here too would double-gate.
+
+    apply_thin_pool_merge=False for callers whose primary result is
+    intentionally narrow/curated rather than a broad "everything available"
+    pool -- e.g. run_intelligence_query's own focused queries ("best home
+    run matchups today"), where the primary candidates ARE the whole
+    answer. Confirmed regression: unioning a 1-candidate curated HR-board
+    result with collect_all_recommendations' broad, unrelated pool passed
+    the thin-count check (1 < 20) and silently changed which candidates
+    the downstream subject/market-focused analysis view was built from,
+    losing the "home runs board" headline entirely. Only the empty-pool
+    fallback above still applies for these callers -- a pool with zero
+    candidates is never intentional.
     """
     raw_candidates = collect_candidates(overview, preferences, odds_history_by_sport)
     if not raw_candidates:
@@ -6614,7 +6675,7 @@ def collect_candidates_with_fallback_merge(
         scored_candidates = _score_candidates(raw_candidates, advanced_by_sport, preferences)
         raw_candidates = filter_candidates(scored_candidates, sport=None)
 
-    if 0 < len(raw_candidates) < _THIN_CANDIDATE_POOL_THRESHOLD:
+    if apply_thin_pool_merge and 0 < len(raw_candidates) < _THIN_CANDIDATE_POOL_THRESHOLD:
         try:
             richer_candidates = collect_all_recommendations(
                 selected_date=selected_date,
@@ -6859,12 +6920,18 @@ def run_intelligence_query(
     # apply_edge_filter=False: this function already runs its own
     # _score_candidates()/filter_candidates() below (after subject/market
     # resolution) -- applying the edge gate here too would double-gate.
+    # apply_thin_pool_merge=False: this function's questions are often
+    # intentionally narrow/curated (e.g. "best home run matchups today"),
+    # so a thin-but-correct primary result must not get unioned with
+    # collect_all_recommendations' broad, unrelated pool -- only fall back
+    # when the primary pool is genuinely empty.
     candidates = collect_candidates_with_fallback_merge(
         overview,
         preferences,
         odds_history_by_sport,
         selected_date=effective_date,
         apply_edge_filter=False,
+        apply_thin_pool_merge=False,
         advanced_by_sport=advanced_by_sport,
     )
     _intel_trace_timed("candidate_generation", candidate_started_at, pipeline="run_intelligence_query", candidate_count=len(candidates))

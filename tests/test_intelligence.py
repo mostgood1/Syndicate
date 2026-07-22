@@ -1556,6 +1556,89 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(boosted.get("advanced_gate", {}).get("ready"), True)
         self.assertGreater(float(boosted.get("score") or 0.0), float(baseline.get("score") or 0.0))
 
+    def test_score_candidate_rewards_larger_line_movement_regardless_of_direction(self) -> None:
+        base_candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "prop",
+            "pick": "Over 4.5",
+            "market": "outs recorded",
+            "projection": 13.1,
+            "odds": "+110",
+            "edge": 1.0,
+            "source_strength": 0.5,
+        }
+
+        baseline = score_candidate(dict(base_candidate))
+        moved_up = score_candidate(dict(base_candidate, percent_change=10.0))
+        moved_down = score_candidate(dict(base_candidate, percent_change=-10.0))
+
+        self.assertGreater(float(moved_up.get("score") or 0.0), float(baseline.get("score") or 0.0))
+        # Magnitude-only: a 10% move up and a 10% move down must score
+        # identically -- direction relative to the candidate's own side
+        # (over/under, spread side, moneyline sign) is deliberately not
+        # modeled, since getting that backwards would silently reward bad
+        # picks instead of good ones.
+        self.assertAlmostEqual(float(moved_up.get("score") or 0.0), float(moved_down.get("score") or 0.0), places=6)
+
+    def test_score_candidate_caps_line_movement_bonus(self) -> None:
+        base_candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "prop",
+            "pick": "Over 4.5",
+            "market": "outs recorded",
+            "projection": 13.1,
+            "odds": "+110",
+            "edge": 1.0,
+            "source_strength": 0.5,
+        }
+
+        moderate_move = score_candidate(dict(base_candidate, percent_change=20.0))
+        huge_move = score_candidate(dict(base_candidate, percent_change=500.0))
+
+        self.assertAlmostEqual(float(moderate_move.get("score") or 0.0), float(huge_move.get("score") or 0.0), places=6)
+
+    def test_score_candidate_derives_movement_bonus_from_odds_history_delta_line(self) -> None:
+        # pipeline/intelligence_state.py's _build_candidate_pool attaches a
+        # differently-shaped odds_history (delta_line/last_line, no
+        # precomputed percent_change) than
+        # _enrich_candidates_with_odds_history's delta/percent_change --
+        # the bonus must still kick in from that shape.
+        base_candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "prop",
+            "pick": "Over 4.5",
+            "market": "outs recorded",
+            "projection": 13.1,
+            "odds": "+110",
+            "edge": 1.0,
+            "source_strength": 0.5,
+        }
+        with_delta_line = dict(base_candidate, odds_history={"delta_line": 1.0, "last_line": 4.5})
+
+        baseline = score_candidate(dict(base_candidate))
+        boosted = score_candidate(with_delta_line)
+
+        self.assertGreater(float(boosted.get("score") or 0.0), float(baseline.get("score") or 0.0))
+
+    def test_score_candidate_line_movement_bonus_can_be_disabled(self) -> None:
+        base_candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "prop",
+            "pick": "Over 4.5",
+            "market": "outs recorded",
+            "projection": 13.1,
+            "odds": "+110",
+            "edge": 1.0,
+            "source_strength": 0.5,
+            "percent_change": 10.0,
+        }
+
+        with patch.dict(os.environ, {"SYNDICATE_INTELLIGENCE_SCORE_LINE_MOVEMENT": "false"}):
+            disabled = score_candidate(dict(base_candidate))
+        enabled = score_candidate(dict(base_candidate))
+
+        self.assertGreater(float(enabled.get("score") or 0.0), float(disabled.get("score") or 0.0))
+
     def test_score_candidate_sets_scoring_mode_by_available_inputs(self) -> None:
         candidates = [
             {
