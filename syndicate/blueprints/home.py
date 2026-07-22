@@ -396,7 +396,17 @@ def _game_status_state(game: dict[str, Any]) -> str:
     # "Consensus market snapshot") happened to contain one of these
     # tokens as a substring -- "snapshot" contains "ot" -- forcing hours-
     # from-tip WNBA games to read as live.
-    if in_progress is None and any(token in status_text for token in ("live", "in progress", "quarter", "period", "inning", "ot", "halftime", "intermission")):
+    #
+    # "ot" also needs a word boundary, not a bare substring check: some
+    # game objects (e.g. odds-sourced rows without a real status dict at
+    # all) leave in_progress as None permanently, so this fallback is the
+    # ONLY signal for them -- and a plain substring match still hits
+    # "snapshot"/"not"/"shot"/etc. every time. The other tokens are long
+    # enough that this isn't a practical risk.
+    if in_progress is None and (
+        any(token in status_text for token in ("live", "in progress", "quarter", "period", "inning", "halftime", "intermission"))
+        or re.search(r"(?<![a-z])ot(?![a-z])", status_text)
+    ):
         return "live"
     if any(token in status_text for token in ("scheduled", "preview", "pregame", "warmup")):
         return "scheduled"

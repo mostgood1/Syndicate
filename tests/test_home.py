@@ -1027,6 +1027,21 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         )
         self.assertEqual(_game_status_state(game), "live")
 
+    def test_game_status_state_ot_token_needs_word_boundary_even_with_no_structured_status(self) -> None:
+        # Real bug found in production: some game objects (odds-sourced
+        # rows feeding the intelligence board) never carry a status dict
+        # with in_progress at all, so the text fallback is the ONLY signal
+        # for them -- and a bare "ot" substring check still matched
+        # "oddsapi_consensus market snapshot" (via "snapshot") even after
+        # gating the fallback on in_progress being unknown. "ot" needs a
+        # word boundary, not just a missing in_progress guard.
+        game = self._sample_game(status={}, summary="oddsapi_consensus market snapshot", detail="")
+        self.assertNotEqual(_game_status_state(game), "live")
+
+    def test_game_status_state_still_detects_overtime_as_a_standalone_word(self) -> None:
+        game = self._sample_game(status={}, summary="Tied game headed to OT", detail="")
+        self.assertEqual(_game_status_state(game), "live")
+
 
 if __name__ == "__main__":
     unittest.main()
