@@ -2868,7 +2868,13 @@ def _path_date_token(path: Path) -> str | None:
     return None
 
 
-def _latest_matching_path(directory: Path, pattern: str, *, requested_date: str | None = None) -> Path | None:
+def _latest_matching_path(
+    directory: Path,
+    pattern: str,
+    *,
+    requested_date: str | None = None,
+    max_age_days: int | None = None,
+) -> Path | None:
     try:
         candidates = [path for path in directory.glob(pattern) if path.is_file()]
     except OSError:
@@ -2886,7 +2892,23 @@ def _latest_matching_path(directory: Path, pattern: str, *, requested_date: str 
         dated.append((token, path))
     if dated:
         dated.sort(key=lambda item: item[0])
-        return dated[-1][1]
+        latest_token, latest_path = dated[-1]
+        if max_age_days is not None:
+            # Without a ceiling, this silently returns whatever the most
+            # recent matching file is, no matter how old -- fine for most
+            # callers, but wrong for a "live, in-game right now" artifact:
+            # confirmed live 2026-07-22, WNBA's live_pbp_stats fell back to
+            # a 9-day-old file and _advanced_readiness_summary's exists-only
+            # check reported it "ready", a false freshness signal. Treat a
+            # fallback older than the ceiling as not found at all.
+            anchor = requested or central_today_iso()
+            try:
+                age_days = (date.fromisoformat(anchor) - date.fromisoformat(latest_token)).days
+            except (TypeError, ValueError):
+                age_days = None
+            if age_days is not None and age_days > max_age_days:
+                return None
+        return latest_path
     return max(candidates, key=lambda item: item.name)
 
 
@@ -2914,11 +2936,22 @@ def _resolve_nba_live_context_path(context_label: str) -> Path:
     return _latest_matching_path(direct.parent, "live_lens_projections_*.jsonl", requested_date=context_label) or direct
 
 
+_LIVE_PBP_MAX_AGE_DAYS = 1
+
+
 def _resolve_nba_live_pbp_context_path(context_label: str) -> Path:
     direct = nba_live_snapshot_path(f"live_pbp_stats_{context_label}.jsonl")
     if direct.exists():
         return direct
-    return _latest_matching_path(direct.parent, "live_pbp_stats_*.jsonl", requested_date=context_label) or direct
+    return (
+        _latest_matching_path(
+            direct.parent,
+            "live_pbp_stats_*.jsonl",
+            requested_date=context_label,
+            max_age_days=_LIVE_PBP_MAX_AGE_DAYS,
+        )
+        or direct
+    )
 
 
 def _resolve_wnba_live_context_path(context_label: str) -> Path:
@@ -2932,7 +2965,15 @@ def _resolve_wnba_live_pbp_context_path(context_label: str) -> Path:
     direct = _wnba_repo_artifact_path("live_snapshots", f"live_pbp_stats_{context_label}.jsonl")
     if direct.exists():
         return direct
-    return _latest_matching_path(direct.parent, "live_pbp_stats_*.jsonl", requested_date=context_label) or direct
+    return (
+        _latest_matching_path(
+            direct.parent,
+            "live_pbp_stats_*.jsonl",
+            requested_date=context_label,
+            max_age_days=_LIVE_PBP_MAX_AGE_DAYS,
+        )
+        or direct
+    )
 
 
 def _resolve_nfl_current_week_path() -> Path:

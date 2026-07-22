@@ -3667,6 +3667,38 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIsNotNone(resolved)
         self.assertEqual("date=2026-06-06/scoreboard.csv", str(resolved.relative_to(root)).replace("\\", "/"))
 
+    def test_latest_matching_path_max_age_days_rejects_stale_fallback(self) -> None:
+        # Confirmed live 2026-07-22: WNBA's live_pbp_stats fell back to a
+        # 9-day-old file with no age ceiling, and the readiness check
+        # treated it as "ready" -- a false freshness signal for a "live,
+        # in-game right now" artifact. max_age_days must reject a fallback
+        # older than the ceiling instead of silently returning it.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "live_pbp_stats_2026-07-13.jsonl").write_text("{}\n", encoding="utf-8")
+
+            stale_rejected = _latest_matching_path(
+                root, "live_pbp_stats_*.jsonl", requested_date="2026-07-22", max_age_days=1,
+            )
+            no_ceiling = _latest_matching_path(
+                root, "live_pbp_stats_*.jsonl", requested_date="2026-07-22",
+            )
+
+        self.assertIsNone(stale_rejected)
+        self.assertIsNotNone(no_ceiling)
+
+    def test_latest_matching_path_max_age_days_accepts_recent_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "live_pbp_stats_2026-07-22.jsonl").write_text("{}\n", encoding="utf-8")
+
+            resolved = _latest_matching_path(
+                root, "live_pbp_stats_*.jsonl", requested_date="2026-07-22", max_age_days=1,
+            )
+
+        self.assertIsNotNone(resolved)
+        self.assertEqual("live_pbp_stats_2026-07-22.jsonl", resolved.name)
+
     def test_intelligence_query_builds_football_analysis_views(self) -> None:
         advanced_rows = [
             {
