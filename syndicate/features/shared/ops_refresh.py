@@ -985,6 +985,7 @@ def launch_refresh_run(
     dry_run: bool = False,
     launch_mode: str | None = None,
     force_refresh: bool = False,
+    force_refresh_sports: str | None = None,
 ) -> dict[str, Any]:
     _assert_no_active_refresh_run()
     selected_date = date or _today_date()
@@ -1037,6 +1038,16 @@ def launch_refresh_run(
     refresh_command.extend(["--mode", refresh_mode])
     if bool(force_refresh):
         refresh_command.append("--force-refresh")
+        force_refresh_sports_text = str(force_refresh_sports or "").strip()
+        if force_refresh_sports_text:
+            # Scopes --force-refresh to just the sport(s) that actually need
+            # it (e.g. an NBA-only injury change) instead of every sport in
+            # this launch's --sports list -- an unscoped force-refresh was
+            # forcing WNBA's props refresh to bypass its cache on an NBA-only
+            # change, and vice versa. Omitted entirely == today's behavior
+            # (force-refresh applies to every force-refresh-capable sport in
+            # the launch), so this is purely additive.
+            refresh_command.extend(["--force-refresh-sports", force_refresh_sports_text])
     if season is not None:
         refresh_command.extend(["--season", str(season)])
     if week is not None:

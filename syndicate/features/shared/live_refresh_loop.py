@@ -517,7 +517,16 @@ def _any_gated_sport_event_within_force_window(date_str: str, *, now_epoch: floa
 	return False
 
 
+# Side channel for _run_live_refresh_tick to learn WHICH sport(s) actually
+# changed on the most recent _should_force_sim_rerun call, without changing
+# that function's plain-bool contract -- ~18 existing tests mock it directly
+# with return_value=True/False and must keep working unchanged. Populated as
+# a side effect; a caller that only cares about the bool never needs this.
+_LAST_LINEUP_INJURY_CHANGED_SPORTS: set[str] = set()
+
+
 def _should_force_sim_rerun(*, now_epoch: float, date_str: str) -> bool:
+	global _LAST_LINEUP_INJURY_CHANGED_SPORTS
 	interval = _lineup_check_interval_seconds()
 	last = _read_last_lineup_check()
 	last_epoch = float(last.get("epoch") or 0.0)
@@ -532,12 +541,19 @@ def _should_force_sim_rerun(*, now_epoch: float, date_str: str) -> bool:
 		"wnba": _wnba_lineup_injury_fingerprint(date_str),
 	}
 	stored_fingerprints = last.get("fingerprints") if isinstance(last.get("fingerprints"), dict) else {}
-	changed = last_date != date_str or any(
-		current_fingerprints.get(sport) != stored_fingerprints.get(sport)
+	is_new_date = last_date != date_str
+	changed_sports = {
+		sport
 		for sport in current_fingerprints
-	)
+		if is_new_date or current_fingerprints.get(sport) != stored_fingerprints.get(sport)
+	}
+	_LAST_LINEUP_INJURY_CHANGED_SPORTS = changed_sports
 	_record_lineup_check(now_epoch, date_str, current_fingerprints)
-	return changed
+	return bool(changed_sports)
+
+
+def _last_lineup_injury_changed_sports() -> set[str]:
+	return set(_LAST_LINEUP_INJURY_CHANGED_SPORTS)
 
 
 # ---------------------------------------------------------------------------
@@ -1741,6 +1757,15 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 	effective_phase = ("live" if any_live else "pregame") if adaptive_enabled else _live_refresh_loop_phase()
 	selected_date = central_today_iso()
 	force_sim_rerun = _should_force_sim_rerun(now_epoch=tick_started_epoch, date_str=selected_date)
+	# An NBA-only lineup/injury change was forcing WNBA's refresh script to
+	# bypass its cache too (and vice versa), since force_refresh applied to
+	# the whole combined launch rather than just the sport that changed.
+	# Falls back to forcing both when the changed-sport detail isn't
+	# available (e.g. a test mocks _should_force_sim_rerun directly) --
+	# same behavior as before this fix, just not narrowed.
+	force_refresh_sports = (
+		",".join(sorted(_last_lineup_injury_changed_sports())) if force_sim_rerun else None
+	) or (",".join(sorted(_LINEUP_INJURY_FETCH_PACKAGES)) if force_sim_rerun else None)
 	effective_mode = "full" if force_sim_rerun else _live_refresh_loop_mode()
 	meta = {
 		"startedAt": _utc_now(),
@@ -1855,6 +1880,7 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 				mirror_only=False,
 				dry_run=False,
 				force_refresh=force_sim_rerun,
+				force_refresh_sports=force_refresh_sports,
 			)
 			meta["ok"] = True
 			meta["result"] = result

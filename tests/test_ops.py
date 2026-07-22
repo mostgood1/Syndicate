@@ -1481,6 +1481,46 @@ class OpsRefreshApiTests(unittest.TestCase):
             self.assertIn("--execution-mode", called_command)
             self.assertIn("ingest", called_command)
 
+    def test_launch_refresh_run_scopes_force_refresh_to_specified_sports(self) -> None:
+        # An NBA-only lineup/injury change must not also force WNBA's
+        # refresh script to bypass its cache -- --force-refresh-sports scopes
+        # --force-refresh to just the sport(s) that actually changed.
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            with patch.dict(os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ), patch("syndicate.features.shared.ops_refresh.subprocess.Popen") as mocked_popen:
+                mocked_popen.return_value.pid = 2469
+                from syndicate.features.shared import ops_refresh
+
+                result = ops_refresh.launch_refresh_run(
+                    sports="nba,wnba", phase="live", dry_run=True, force_refresh=True, force_refresh_sports="nba"
+                )
+
+            self.assertTrue(result["ok"])
+            called_command = mocked_popen.call_args.args[0]
+            self.assertIn("--force-refresh", called_command)
+            self.assertIn("--force-refresh-sports", called_command)
+            self.assertIn("nba", called_command)
+
+    def test_launch_refresh_run_omits_force_refresh_sports_when_not_provided(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            with patch.dict(os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ), patch("syndicate.features.shared.ops_refresh.subprocess.Popen") as mocked_popen:
+                mocked_popen.return_value.pid = 2470
+                from syndicate.features.shared import ops_refresh
+
+                result = ops_refresh.launch_refresh_run(sports="nba,wnba", phase="live", dry_run=True, force_refresh=True)
+
+            self.assertTrue(result["ok"])
+            called_command = mocked_popen.call_args.args[0]
+            self.assertIn("--force-refresh", called_command)
+            self.assertNotIn("--force-refresh-sports", called_command)
+
     def test_launch_refresh_run_uses_render_live_refresh_defaults_when_args_are_omitted(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             repo_root = Path(tmp_dir)

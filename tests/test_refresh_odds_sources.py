@@ -592,3 +592,38 @@ class RefreshOddsSourcesTests(unittest.TestCase):
             rc = module.main()
 
         self.assertEqual(rc, 0)
+
+    def test_force_refresh_sports_argument_is_accepted_by_the_parser(self) -> None:
+        module = self._load_module()
+        with patch.object(
+            module.sys,
+            "argv",
+            ["refresh_odds_sources.py", "--date", "2026-07-13", "--force-refresh", "--force-refresh-sports", "nba", "--list"],
+        ), patch("builtins.print"):
+            rc = module.main()
+
+        self.assertEqual(rc, 0)
+
+    def test_sport_force_refresh_scope_defaults_to_all_when_unspecified(self) -> None:
+        # Omitting --force-refresh-sports must preserve the original
+        # behavior exactly: force_refresh applies to every sport.
+        module = self._load_module()
+        args = argparse.Namespace(force_refresh=True, force_refresh_sports="")
+
+        self.assertTrue(module._sport_force_refresh_scope(args, "nba"))
+        self.assertTrue(module._sport_force_refresh_scope(args, "wnba"))
+
+    def test_sport_force_refresh_scope_narrows_to_specified_sports(self) -> None:
+        # An NBA-only lineup/injury change must not also force WNBA's
+        # refresh script to bypass its cache.
+        module = self._load_module()
+        args = argparse.Namespace(force_refresh=True, force_refresh_sports="nba")
+
+        self.assertTrue(module._sport_force_refresh_scope(args, "nba"))
+        self.assertFalse(module._sport_force_refresh_scope(args, "wnba"))
+
+    def test_sport_force_refresh_scope_false_when_force_refresh_not_requested(self) -> None:
+        module = self._load_module()
+        args = argparse.Namespace(force_refresh=False, force_refresh_sports="nba")
+
+        self.assertFalse(module._sport_force_refresh_scope(args, "nba"))

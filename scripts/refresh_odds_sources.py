@@ -1870,6 +1870,21 @@ def _publish_sport_manifest_threadsafe(*, sport: str, artifact_paths: list[str],
         )
 
 
+def _sport_force_refresh_scope(args: argparse.Namespace, sport: str) -> bool:
+    # An NBA-only injury/lineup change was forcing WNBA's --force-refresh too
+    # (and vice versa) when both were in the same --sports launch, since
+    # force_refresh applied uniformly to every force-refresh-capable sport.
+    # --force-refresh-sports narrows that; leaving it unset preserves the
+    # original "applies to every sport" behavior exactly.
+    if not bool(getattr(args, "force_refresh", False)):
+        return False
+    scoped_raw = str(getattr(args, "force_refresh_sports", "") or "").strip()
+    if not scoped_raw:
+        return True
+    scoped_sports = {piece.strip().lower() for piece in scoped_raw.split(",") if piece.strip()}
+    return sport.strip().lower() in scoped_sports
+
+
 def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str) -> dict[str, Any]:
     spec = REGISTRY[sport]
     refresh_mode = str(getattr(args, "mode", "full") or "full").strip().lower() or "full"
@@ -1939,7 +1954,7 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
                 name=step.name,
                 phases=step.phases,
                 cwd=step.cwd,
-                command=_step_command_with_mode(step, refresh_mode, force_refresh=bool(getattr(args, "force_refresh", False))),
+                command=_step_command_with_mode(step, refresh_mode, force_refresh=_sport_force_refresh_scope(args, sport)),
                 env_updates=step.env_updates,
                 description=step.description,
             ),
@@ -2367,6 +2382,12 @@ def main() -> int:
     parser.add_argument("--execution-mode", choices=("source", "ingest"), default="source", help="Choose whether to run source-owned refresh generation or ingest-only mirror/import steps.")
     parser.add_argument("--mirror-only", action="store_true", help="Skip source refresh and only run the Syndicate mirror scripts.")
     parser.add_argument("--force-refresh", action="store_true", help="Bypass cached-output reuse for sports that support it (WNBA/NBA) and force a fresh regenerate.")
+    parser.add_argument(
+        "--force-refresh-sports",
+        default="",
+        help="Comma-separated sport slugs to scope --force-refresh to (e.g. an NBA-only injury change). "
+        "Omit to force-refresh every force-refresh-capable sport in --sports, matching prior behavior.",
+    )
     parser.add_argument("--continue-on-error", action="store_true", default=True, help="Continue across sports even when one refresh fails.")
     parser.add_argument("--no-continue-on-error", action="store_false", dest="continue_on_error")
     parser.add_argument("--dry-run", action="store_true", help="Resolve commands and source roots without executing refresh or mirror steps.")

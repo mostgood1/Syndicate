@@ -18,6 +18,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
         live_refresh_loop._LIVE_REFRESH_LOOP_STOP.set()
         live_refresh_loop._LIVE_REFRESH_LOOP_THREAD = None
         live_refresh_loop._release_process_lock()
+        live_refresh_loop._LAST_LINEUP_INJURY_CHANGED_SPORTS = set()
 
     def test_run_tick_launches_live_refresh_with_expected_defaults(self) -> None:
         with patch.dict(
@@ -51,6 +52,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             mirror_only=False,
             dry_run=False,
             force_refresh=False,
+            force_refresh_sports=None,
         )
 
     def test_run_tick_defaults_to_detached_subprocess_on_render(self) -> None:
@@ -86,6 +88,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             mirror_only=False,
             dry_run=False,
             force_refresh=False,
+            force_refresh_sports=None,
         )
 
     def test_run_tick_uses_explicit_launch_mode_override(self) -> None:
@@ -120,6 +123,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             mirror_only=False,
             dry_run=False,
             force_refresh=False,
+            force_refresh_sports=None,
         )
 
     def test_run_tick_marks_active_refresh_as_skipped(self) -> None:
@@ -319,6 +323,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             mirror_only=False,
             dry_run=False,
             force_refresh=False,
+            force_refresh_sports=None,
         )
 
     def test_pregame_relaunch_blocked_false_when_no_prior_launch(self) -> None:
@@ -997,6 +1002,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             mirror_only=False,
             dry_run=False,
             force_refresh=False,
+            force_refresh_sports=None,
         )
 
     def test_lineup_check_interval_defaults_to_thirty_minutes(self) -> None:
@@ -1076,6 +1082,28 @@ class LiveRefreshLoopTests(unittest.TestCase):
         self.assertTrue(result)
         mocked_record.assert_called_once_with(1000.0 + 1800, "2026-07-13", {"nba": "a", "wnba": "CHANGED"})
 
+    def test_should_force_sim_rerun_tracks_only_the_sport_that_actually_changed(self) -> None:
+        # An NBA-only fingerprint change must not also mark WNBA as changed --
+        # this is what let one sport's injury news force the OTHER sport's
+        # refresh script to bypass its cache too.
+        with patch.object(
+            live_refresh_loop,
+            "_read_last_lineup_check",
+            return_value={"epoch": 1000.0, "date": "2026-07-13", "fingerprints": {"nba": "a", "wnba": "b"}},
+        ), patch.object(
+            live_refresh_loop, "_any_gated_sport_event_within_force_window", return_value=False
+        ), patch.object(live_refresh_loop, "_fetch_injuries", return_value=True), patch.object(
+            live_refresh_loop, "_nba_lineup_injury_fingerprint", return_value="a"
+        ), patch.object(
+            live_refresh_loop, "_wnba_lineup_injury_fingerprint", return_value="CHANGED"
+        ), patch.object(
+            live_refresh_loop, "_record_lineup_check"
+        ):
+            result = live_refresh_loop._should_force_sim_rerun(now_epoch=1000.0 + 1800, date_str="2026-07-13")
+
+        self.assertTrue(result)
+        self.assertEqual(live_refresh_loop._last_lineup_injury_changed_sports(), {"wnba"})
+
     def test_should_force_sim_rerun_true_on_new_date_even_if_not_due(self) -> None:
         with patch.object(
             live_refresh_loop,
@@ -1147,7 +1175,46 @@ class LiveRefreshLoopTests(unittest.TestCase):
             mirror_only=False,
             dry_run=False,
             force_refresh=True,
+            # _should_force_sim_rerun is mocked here, so the real changed-sport
+            # tracking never populated -- falls back to today's original
+            # "force every basketball sport" behavior, same as before this fix.
+            force_refresh_sports="nba,wnba",
         )
+
+    def test_run_tick_narrows_force_refresh_sports_to_the_sport_that_changed(self) -> None:
+        # An NBA-only lineup/injury change must not also force WNBA's
+        # refresh script to bypass its cache -- confirmed end-to-end through
+        # the real _should_force_sim_rerun call (not mocked), which is what
+        # actually populates the changed-sport tracking.
+        with patch.dict(
+            os.environ,
+            {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true"},
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-13"), patch.object(
+            live_refresh_loop, "_any_tracked_sport_game_live", return_value=True
+        ), patch.object(
+            live_refresh_loop,
+            "_read_last_lineup_check",
+            return_value={"epoch": 0.0, "date": "2026-07-13", "fingerprints": {"nba": "OLD", "wnba": "SAME"}},
+        ), patch.object(
+            live_refresh_loop, "_any_gated_sport_event_within_force_window", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_fetch_injuries", return_value=True
+        ), patch.object(
+            live_refresh_loop, "_nba_lineup_injury_fingerprint", return_value="CHANGED"
+        ), patch.object(
+            live_refresh_loop, "_wnba_lineup_injury_fingerprint", return_value="SAME"
+        ), patch.object(
+            live_refresh_loop, "_record_lineup_check"
+        ), patch.object(
+            live_refresh_loop,
+            "launch_refresh_run",
+            return_value={"ok": True, "state": "running"},
+        ) as mocked_launch:
+            payload = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertTrue(payload["simRerunTriggered"])
+        self.assertEqual(mocked_launch.call_args.kwargs["force_refresh_sports"], "nba")
 
     def test_run_tick_reports_not_ok_when_launch_fails(self) -> None:
         with patch.dict(
