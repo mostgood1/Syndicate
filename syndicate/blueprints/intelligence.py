@@ -17,6 +17,7 @@ from pipeline.intelligence_state import read_latest_intelligence_state_response
 from pipeline.intelligence_state import queue_intelligence_state_refresh
 from pipeline.intelligence_state import queue_board_state_refresh
 from pipeline.intelligence_state import canonical_board_state_enabled
+from pipeline.intelligence_state import canonical_board_state_shadow_compare_enabled
 from pipeline.intelligence_state import read_intelligence_board_state
 from pipeline.intelligence_state import read_latest_intelligence_board_state
 from pipeline.intelligence_state import slice_intelligence_board_state_for_request
@@ -608,7 +609,12 @@ def _load_canonical_board_response(payload: dict[str, object]) -> tuple[dict[str
     # existing multi-layer cascade (unchanged) whenever the flag is off or
     # this read misses -- so with the flag off (the default) this is a
     # no-op and behavior is identical to before this function existed.
-    if not canonical_board_state_enabled():
+    #
+    # Also computed (but never served) when only the shadow-compare flag is
+    # on -- that's what lets _cached_intelligence_response_with_source below
+    # log a canonical-vs-legacy diff during the validation window without
+    # actually switching what gets served.
+    if not (canonical_board_state_enabled() or canonical_board_state_shadow_compare_enabled()):
         return None, "canonical_disabled"
     requested_date = str(payload.get("date") or payload.get("selected_date") or "").strip()
     state = read_intelligence_board_state(requested_date) if requested_date else read_latest_intelligence_board_state()
@@ -640,10 +646,7 @@ def _load_canonical_board_response(payload: dict[str, object]) -> tuple[dict[str
     return _hydrate_board_response_payload(response), "canonical_board_state"
 
 
-def _cached_intelligence_response_with_source(payload: dict[str, object], *, force_refresh: bool = True) -> tuple[dict[str, object] | None, str]:
-    canonical_response, canonical_source = _load_canonical_board_response(payload)
-    if canonical_response is not None and not _response_needs_refresh(payload, canonical_response):
-        return canonical_response, canonical_source
+def _cached_intelligence_response_from_legacy_cascade(payload: dict[str, object], *, force_refresh: bool = True) -> tuple[dict[str, object] | None, str]:
     cached_response = read_latest_intelligence_state_response(payload, force_refresh=force_refresh, allow_latest_fallback=False)
     if _is_board_response(cached_response) and _response_has_board_content(cached_response) and not _response_needs_refresh(payload, cached_response):
         return _hydrate_board_response_payload(cached_response), "worker"
@@ -656,6 +659,77 @@ def _cached_intelligence_response_with_source(payload: dict[str, object], *, for
         if _is_board_response(latest_board_snapshot) and _response_has_board_content(latest_board_snapshot):
             return _hydrate_board_response_payload(latest_board_snapshot), "board_snapshot_latest"
     return None, "fallback"
+
+
+def _log_canonical_board_state_shadow_diff(
+    payload: dict[str, object],
+    *,
+    canonical_response: dict[str, object] | None,
+    canonical_source: str,
+    served_response: dict[str, object] | None,
+    served_source: str,
+) -> None:
+    # Best-effort/never-raises: this is purely an observability aid for the
+    # migration step 4 validation window, watched via logs while the legacy
+    # cascade still serves every real request. A logging bug here must never
+    # be able to affect what a user actually sees.
+    try:
+        canonical_count = _status_candidate_count_from_response(canonical_response)
+        served_count = _status_candidate_count_from_response(served_response)
+
+        def _names(response: dict[str, object] | None) -> set[str]:
+            items = (response or {}).get("top_opportunities")
+            if not isinstance(items, list):
+                return set()
+            return {str(item.get("name") or "").strip() for item in items if isinstance(item, dict) and item.get("name")}
+
+        canonical_names = _names(canonical_response)
+        served_names = _names(served_response)
+        _LOGGER.info(
+            "CANONICAL_BOARD_STATE_SHADOW_DIFF",
+            extra={
+                "requested_date": str(payload.get("date") or payload.get("selected_date") or "").strip() or None,
+                "requested_sport": str(payload.get("sport") or "all").strip().lower() or "all",
+                "canonical_source": canonical_source,
+                "served_source": served_source,
+                "served_is_canonical": served_source == canonical_source and canonical_response is not None,
+                "canonical_candidate_count": canonical_count,
+                "served_candidate_count": served_count,
+                "candidate_count_delta": canonical_count - served_count,
+                "names_only_in_canonical": sorted(name for name in (canonical_names - served_names) if name),
+                "names_only_in_served": sorted(name for name in (served_names - canonical_names) if name),
+            },
+        )
+    except Exception:
+        _LOGGER.exception("CANONICAL_BOARD_STATE_SHADOW_DIFF_FAILED")
+
+
+def _cached_intelligence_response_with_source(payload: dict[str, object], *, force_refresh: bool = True) -> tuple[dict[str, object] | None, str]:
+    canonical_response, canonical_source = _load_canonical_board_response(payload)
+    canonical_fresh = canonical_response is not None and not _response_needs_refresh(payload, canonical_response)
+    shadow_compare = canonical_board_state_shadow_compare_enabled()
+
+    if canonical_board_state_enabled() and canonical_fresh:
+        if shadow_compare:
+            _log_canonical_board_state_shadow_diff(
+                payload,
+                canonical_response=canonical_response,
+                canonical_source=canonical_source,
+                served_response=canonical_response,
+                served_source=canonical_source,
+            )
+        return canonical_response, canonical_source
+
+    legacy_response, legacy_source = _cached_intelligence_response_from_legacy_cascade(payload, force_refresh=force_refresh)
+    if shadow_compare:
+        _log_canonical_board_state_shadow_diff(
+            payload,
+            canonical_response=canonical_response if canonical_fresh else None,
+            canonical_source=canonical_source if canonical_fresh else "canonical_miss",
+            served_response=legacy_response,
+            served_source=legacy_source,
+        )
+    return legacy_response, legacy_source
 
 
 def _cached_intelligence_response(payload: dict[str, object]) -> dict[str, object] | None:

@@ -2787,3 +2787,91 @@ class IntelligenceStateTests(unittest.TestCase):
 
         self.assertEqual(source, "worker")
         self.assertEqual(cached_response.get("top_opportunities", [])[0]["name"], "Legacy Fresh Play")
+
+    def test_load_canonical_board_response_computes_when_only_shadow_compare_enabled(self) -> None:
+        # The serving flag is off, but shadow-compare alone must still be
+        # enough to trigger the canonical read -- otherwise there would be
+        # nothing to compare against during the validation window.
+        with patch("syndicate.blueprints.intelligence.canonical_board_state_enabled", return_value=False):
+            with patch("syndicate.blueprints.intelligence.canonical_board_state_shadow_compare_enabled", return_value=True):
+                with patch("syndicate.blueprints.intelligence.read_intelligence_board_state", return_value=None) as mocked_read:
+                    intelligence_module._load_canonical_board_response({"date": "2026-06-10"})
+
+        mocked_read.assert_called_once()
+
+    def test_load_canonical_board_response_stays_disabled_when_both_flags_off(self) -> None:
+        with patch("syndicate.blueprints.intelligence.canonical_board_state_enabled", return_value=False):
+            with patch("syndicate.blueprints.intelligence.canonical_board_state_shadow_compare_enabled", return_value=False):
+                with patch("syndicate.blueprints.intelligence.read_intelligence_board_state") as mocked_read:
+                    response, source = intelligence_module._load_canonical_board_response({"date": "2026-06-10"})
+
+        self.assertIsNone(response)
+        self.assertEqual(source, "canonical_disabled")
+        mocked_read.assert_not_called()
+
+    def test_cached_intelligence_response_logs_shadow_diff_without_changing_what_is_served(self) -> None:
+        payload = {"question": "top edges today", "date": "2026-06-10", "sport": "mlb"}
+        canonical_state = {
+            "selected_date": "2026-06-10",
+            "candidate_count": 1,
+            "covered_sports": ["mlb"],
+            "by_sport": {"mlb": [{"name": "Canonical Only Play"}]},
+            "ranked_all": [{"name": "Canonical Only Play"}],
+        }
+        legacy_worker_response = {
+            "ok": True,
+            "selected_date": "2026-06-10",
+            "last_updated": "2026-06-10T18:40:54Z",
+            "top_opportunities": [{"name": "Legacy Only Play"}],
+            "analysis": {"recommendations": [{"name": "Legacy Only Play"}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+        }
+
+        with patch("syndicate.blueprints.intelligence.canonical_board_state_enabled", return_value=False):
+            with patch("syndicate.blueprints.intelligence.canonical_board_state_shadow_compare_enabled", return_value=True):
+                with patch("syndicate.blueprints.intelligence.read_intelligence_board_state", return_value=canonical_state):
+                    with patch("syndicate.blueprints.intelligence._response_needs_refresh", return_value=False):
+                        with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(legacy_worker_response)):
+                            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=None):
+                                with patch("syndicate.blueprints.intelligence._LOGGER.info") as mocked_log_info:
+                                    cached_response, source = intelligence_module._cached_intelligence_response_with_source(payload)
+
+        # The serving flag is off, so the legacy cascade's result must still
+        # be what's actually returned -- shadow-compare only observes.
+        self.assertEqual(source, "worker")
+        self.assertEqual(cached_response.get("top_opportunities", [])[0]["name"], "Legacy Only Play")
+
+        shadow_diff_calls = [call for call in mocked_log_info.call_args_list if call.args and call.args[0] == "CANONICAL_BOARD_STATE_SHADOW_DIFF"]
+        self.assertEqual(len(shadow_diff_calls), 1)
+        diff_extra = shadow_diff_calls[0].kwargs["extra"]
+        self.assertEqual(diff_extra["canonical_source"], "canonical_board_state")
+        self.assertEqual(diff_extra["served_source"], "worker")
+        self.assertFalse(diff_extra["served_is_canonical"])
+        self.assertEqual(diff_extra["names_only_in_canonical"], ["Canonical Only Play"])
+        self.assertEqual(diff_extra["names_only_in_served"], ["Legacy Only Play"])
+
+    def test_cached_intelligence_response_skips_shadow_diff_when_both_flags_disabled(self) -> None:
+        payload = {"question": "top edges today", "date": "2026-06-10"}
+        with patch("syndicate.blueprints.intelligence.canonical_board_state_enabled", return_value=False):
+            with patch("syndicate.blueprints.intelligence.canonical_board_state_shadow_compare_enabled", return_value=False):
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=None):
+                    with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=None):
+                        with patch("syndicate.blueprints.intelligence._LOGGER.info") as mocked_log_info:
+                            intelligence_module._cached_intelligence_response_with_source(payload)
+
+        shadow_diff_calls = [call for call in mocked_log_info.call_args_list if call.args and call.args[0] == "CANONICAL_BOARD_STATE_SHADOW_DIFF"]
+        self.assertEqual(shadow_diff_calls, [])
+
+    def test_log_canonical_board_state_shadow_diff_swallows_exceptions(self) -> None:
+        # A malformed response (not a Mapping-like get()) must never let a
+        # logging bug escape into the real request path.
+        with patch("syndicate.blueprints.intelligence._LOGGER.info", side_effect=RuntimeError("boom")):
+            with patch("syndicate.blueprints.intelligence._LOGGER.exception") as mocked_log_exception:
+                intelligence_module._log_canonical_board_state_shadow_diff(
+                    {"date": "2026-06-10"},
+                    canonical_response={"top_opportunities": [{"name": "A"}]},
+                    canonical_source="canonical_board_state",
+                    served_response={"top_opportunities": [{"name": "B"}]},
+                    served_source="worker",
+                )
+
+        mocked_log_exception.assert_called_once()

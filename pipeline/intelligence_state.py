@@ -562,10 +562,20 @@ def _intelligence_board_snapshot_payload(state: dict[str, Any], *, selected_date
 
 
 SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE_FLAG = "SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE"
+SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE_SHADOW_COMPARE_FLAG = "SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE_SHADOW_COMPARE"
 
 
 def canonical_board_state_enabled() -> bool:
     return _env_bool(SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE_FLAG, default=False)
+
+
+def canonical_board_state_shadow_compare_enabled() -> bool:
+    # Separate from the serving flag above: lets an operator watch
+    # canonical-vs-legacy comparison logs in production (migration step 4's
+    # validation window) while the legacy cascade still serves every real
+    # request -- i.e. "shadow-compare without serving it yet", per the
+    # rebuild plan. Turning this on alone never changes what a user sees.
+    return _env_bool(SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE_SHADOW_COMPARE_FLAG, default=False)
 
 
 def _intelligence_board_state_path(selected_date: str) -> Path:
