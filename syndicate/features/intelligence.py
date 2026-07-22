@@ -204,6 +204,26 @@ def _attach_intelligence_response_aliases(response: dict[str, Any]) -> dict[str,
             nested_items = nested_response.get(key)
             if isinstance(nested_items, list):
                 nested_response[key] = [_normalize_opportunity_item(item) for item in nested_items if isinstance(item, dict)]
+
+    # board_contract/policy_control/etc. above are promoted because
+    # IntelligenceStateService._compute_response (pipeline/intelligence_state.py)
+    # sets them directly at this dict's own top level. analysis_views/
+    # headline/summary/analysis_brief/supporting_evidence are NOT -- that
+    # method only nests them inside response["analysis"] (== response["response"],
+    # the same dict under two keys -- see its `response["response"] = analysis`
+    # line). run_intelligence_query's OWN direct callers (e.g. Ask the
+    # Syndicate) get these fields flat already; a request routed through
+    # /api/intelligence/query's force_refresh path did not, silently making
+    # them unreachable at the top level this response's other query-api
+    # consumers (and every test asserting on them) expect. Promote them the
+    # same way board_contract etc. already are, without overwriting a value
+    # that's already present at this top level from some other path.
+    nested_analysis = response.get("analysis") if isinstance(response.get("analysis"), dict) else (nested_response if isinstance(nested_response, dict) else {})
+    if isinstance(nested_analysis, dict):
+        for key in ("analysis_views", "headline", "summary", "analysis_brief", "supporting_evidence", "board_notes", "readiness_gate", "local_only"):
+            if key not in response and key in nested_analysis:
+                response[key] = nested_analysis[key]
+
     return response
 
 

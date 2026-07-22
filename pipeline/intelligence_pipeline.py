@@ -1092,23 +1092,24 @@ def _call_intelligence(normalized_request: IntelligencePipelineRequest, context:
     # ✅ SMART NORMALIZATION (handles real pipeline structure)
     print("STEP: normalizing response")
 
-    raw_response = {
-        "recommendations": (
-            raw_response.get("recommendations")
-            or raw_response.get("data", {}).get("recommendations")
-            or []
-        ),
-        "portfolio": (
-            raw_response.get("portfolio")
-            or raw_response.get("data", {}).get("portfolio")
-            or {}
-        ),
-        "parlays": (
-            raw_response.get("parlays")
-            or raw_response.get("data", {}).get("parlays")
-            or []
-        )
-    }
+    # Some upstream shapes wrap the real payload under a "data" key instead
+    # of returning it flat -- recover recommendations/portfolio/parlays from
+    # there when the top level doesn't already have them. This used to
+    # unconditionally REBUILD raw_response as a fresh 3-key dict here,
+    # silently discarding every other field run_intelligence_query's real
+    # response actually carries (analysis_views, headline, summary,
+    # analysis_brief, supporting_evidence, board_notes, readiness_gate,
+    # local_only, ...) even when raw_response already had the correct flat
+    # shape and nothing needed recovering from "data" at all. Confirmed:
+    # this was silently emptying analysis_views on every real query-api
+    # force_refresh request, long enough that ~40 tests asserting on
+    # analysis_views content had gone stale/failing without anyone noticing
+    # since it's a genuine field, not a stale-test mismatch.
+    nested_data = raw_response.get("data") if isinstance(raw_response.get("data"), dict) else {}
+    if nested_data:
+        for key in ("recommendations", "portfolio", "parlays"):
+            if not raw_response.get(key):
+                raw_response[key] = nested_data.get(key)
     # ✅ Ensure required pipeline fields exist
     raw_response.setdefault("recommendations", [])
     raw_response.setdefault("portfolio", {})

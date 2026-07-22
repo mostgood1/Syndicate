@@ -42,6 +42,7 @@ from syndicate.features.intelligence import _query_preferences
 from syndicate.features.intelligence import build_intelligence_overview
 from syndicate.features.intelligence import get_top_live_opportunities
 from syndicate.features.intelligence import run_intelligence_query
+from syndicate.features.intelligence import _attach_intelligence_response_aliases
 from syndicate.features.intelligence.api.response_builder import _recommendation_state
 
 
@@ -896,6 +897,35 @@ class IntelligenceBlueprintTests(unittest.TestCase):
             return_value={"sample_size": 0, "metrics": {}},
         )
         self._reliability_profile_patcher.start()
+        # Same isolation problem as the pipeline.intelligence_state.* paths
+        # above, for a completely separate module: build_intelligence_evaluation_bundle
+        # (invoked by force_refresh=True query-api requests) reads/writes
+        # syndicate.features.shared.intelligence_evaluation.DEFAULT_LEDGER_PATH
+        # (reports/intelligence/evaluation_ledger.jsonl) and its
+        # evaluation_ledger_chunks/ directory by default -- on this dev
+        # machine, that directory has grown to several GB of real
+        # accumulated data from actually running the app, making every one
+        # of these requests take 60-150+ seconds to scan/append to it, and
+        # growing it further on every test run. Redirect to the same
+        # per-test temp dir already used above.
+        self._evaluation_ledger_path_patcher = patch(
+            "syndicate.features.shared.intelligence_evaluation.DEFAULT_LEDGER_PATH",
+            temp_reports_dir / "evaluation_ledger.jsonl",
+        )
+        self._evaluation_ledger_path_patcher.start()
+        # syndicate.features.intelligence.load_artifact_manifests (mocked
+        # above via self._artifact_manifests_patcher) is that module's OWN
+        # bound import -- intelligence_evaluation.py imports the exact same
+        # function separately (`from syndicate.features.shared.artifact_manifests
+        # import load_artifact_manifests`), so patching the former never
+        # touched the latter's real, unmocked scan of this dev machine's
+        # actual per-sport artifact manifests inside
+        # build_artifact_metadata -> _artifact_manifest_summary.
+        self._evaluation_artifact_manifests_patcher = patch(
+            "syndicate.features.shared.intelligence_evaluation.load_artifact_manifests",
+            return_value=[],
+        )
+        self._evaluation_artifact_manifests_patcher.start()
         self._simulation_patcher = patch(
             "syndicate.features.simulation_engine.SimulationEngine.run_simulation",
             return_value={},
@@ -1028,6 +1058,8 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self._shared_recommendations_patcher.stop()
         self._artifact_manifests_patcher.stop()
         self._reliability_profile_patcher.stop()
+        self._evaluation_ledger_path_patcher.stop()
+        self._evaluation_artifact_manifests_patcher.stop()
         self._simulation_patcher.stop()
         self._bet_size_patcher.stop()
         self._correlation_patcher.stop()
@@ -1704,6 +1736,61 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertFalse(scored.get("news_triggered"))
         self.assertIn("score", scored)
 
+    def test_attach_intelligence_response_aliases_promotes_nested_analysis_fields(self) -> None:
+        # IntelligenceStateService._compute_response (pipeline/intelligence_state.py)
+        # only ever sets analysis_views/headline/summary/analysis_brief/
+        # supporting_evidence inside response["analysis"] (== response["response"],
+        # the same dict exposed under two keys) -- never at this dict's own
+        # top level, unlike board_contract/policy_control/etc., which ARE
+        # already top-level by the time this function runs. Confirmed real
+        # regression: every /api/intelligence/query force_refresh request had
+        # analysis_views genuinely computed but unreachable at the top level
+        # any real consumer (or these tests) actually reads from.
+        analysis = {
+            "recommendations": [{"name": "Donovan Mitchell Over 4.5 3PM"}],
+            "analysis_views": {"focus": "nba_matchups", "table": {"rows": [{"player": "Donovan Mitchell"}]}},
+            "headline": "The Syndicate brief",
+            "summary": "Top NBA matchup edges tonight.",
+            "analysis_brief": {"sections": [{"title": "Matchup case"}]},
+            "supporting_evidence": {"kind": "bundle", "sections": []},
+        }
+        response = {
+            "ok": True,
+            "top_opportunities": [],
+            "by_sport": {},
+            "analysis": analysis,
+            "response": analysis,
+            "board_contract": {"schema": "intelligence_board_v1"},
+        }
+
+        result = _attach_intelligence_response_aliases(response)
+
+        self.assertEqual(result.get("analysis_views"), analysis["analysis_views"])
+        self.assertEqual(result.get("headline"), "The Syndicate brief")
+        self.assertEqual(result.get("summary"), "Top NBA matchup edges tonight.")
+        self.assertEqual(result.get("analysis_brief"), analysis["analysis_brief"])
+        self.assertEqual(result.get("supporting_evidence"), analysis["supporting_evidence"])
+
+    def test_attach_intelligence_response_aliases_does_not_overwrite_existing_top_level_value(self) -> None:
+        analysis = {"headline": "Nested headline", "analysis_views": {"focus": "nested"}}
+        response = {
+            "headline": "Already-top-level headline",
+            "analysis": analysis,
+            "response": analysis,
+        }
+
+        result = _attach_intelligence_response_aliases(response)
+
+        self.assertEqual(result.get("headline"), "Already-top-level headline")
+
+    def test_attach_intelligence_response_aliases_is_noop_without_nested_analysis(self) -> None:
+        response = {"ok": True, "top_opportunities": [], "by_sport": {}}
+
+        result = _attach_intelligence_response_aliases(response)
+
+        self.assertNotIn("analysis_views", result)
+        self.assertNotIn("headline", result)
+
     def test_score_candidate_sets_scoring_mode_by_available_inputs(self) -> None:
         candidates = [
             {
@@ -1973,6 +2060,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Build a two-leg parlay from the best live and pregame NBA edges with a $100 bankroll and max 20% exposure",
                             "date": "2026-06-04",
                         },
@@ -2160,6 +2248,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                         response = self.client.post(
                             "/api/intelligence/query",
                             json={
+                                "force_refresh": True,
                                 "question": "Analyze Jayson Tatum tonight",
                                 "date": "2026-06-04",
                             },
@@ -2184,6 +2273,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                 response = self.client.post(
                     "/api/intelligence/query",
                     json={
+                        "force_refresh": True,
                         "question": "Analyze Jayson Tatum tonight",
                         "date": "2026-06-04",
                     },
@@ -2478,6 +2568,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                             response = self.client.post(
                                 "/api/intelligence/query",
                                 json={
+                                    "force_refresh": True,
                                     "question": "preview the Lakers game tonight",
                                 },
                             )
@@ -2610,6 +2701,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Rank the strongest in-session board targets right now.",
                             "date": "2026-06-04",
                             "timing": "live",
@@ -2723,6 +2815,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Give me the best pregame props across NBA and WNBA",
                             "date": "2026-06-04",
                         },
@@ -2756,6 +2849,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Give me the best MLB props using Statcast data",
                             "date": "2026-06-05",
                         },
@@ -2790,6 +2884,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "What are the best home run matchups today and why? Build a top 10 table and chart.",
                             "date": "2026-06-05",
                         },
@@ -2872,6 +2967,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                         response = self.client.post(
                             "/api/intelligence/query",
                             json={
+                                "force_refresh": True,
                                 "question": "What are the best home run matchups today and why? Build a top 10 table and chart.",
                                 "date": "2026-06-05",
                             },
@@ -2903,6 +2999,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                         json={
                             "question": "Explain the best NBA matchup targets today with a table and chart.",
                             "date": "2026-06-04",
+                            "force_refresh": True,
                         },
                     )
 
@@ -2972,6 +3069,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Explain the top 2 WNBA matchup targets today with a table and chart.",
                             "date": "2026-06-04",
                             "limit": 2,
@@ -3074,6 +3172,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Explain the top 2 WNBA matchup targets today with a table and chart.",
                             "date": "2026-06-04",
                             "limit": 2,
@@ -3142,6 +3241,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Explain the best NCAAB matchup targets today with a table and chart.",
                             "date": "2026-06-04",
                         },
@@ -3375,6 +3475,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Explain the top 2 WNBA matchup targets today with a table and chart.",
                             "date": "2026-06-04",
                             "limit": 2,
@@ -3536,6 +3637,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Explain the best NFL receiving yards targets today with a table and chart.",
                             "date": "2026-09-10",
                         },
@@ -3571,6 +3673,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Explain the best live NHL shots targets with a table and chart.",
                             "date": "2026-06-04",
                         },
@@ -3618,6 +3721,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                         response = self.client.post(
                             "/api/intelligence/query",
                             json={
+                                "force_refresh": True,
                                 "question": "Explain the best MLB strikeout matchups today with a table and chart.",
                                 "date": "2026-06-04",
                             },
@@ -3678,6 +3782,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                         response = self.client.post(
                             "/api/intelligence/query",
                             json={
+                                "force_refresh": True,
                                 "question": "Explain the best MLB total bases targets today with a table and chart.",
                                 "date": "2026-06-04",
                             },
@@ -3701,6 +3806,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Show me the best live NBA total edges",
                             "date": "2026-06-05",
                         },
@@ -3775,6 +3881,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Who are the top 3 strikeout targets for today?",
                             "date": "2026-06-04",
                         },
@@ -3869,6 +3976,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                             response = self.client.post(
                                 "/api/intelligence/query",
                                 json={
+                                    "force_refresh": True,
                                     "question": "Who are the top 5 strikeout targets for today?",
                                     "date": "2026-06-04",
                                 },
@@ -3891,6 +3999,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Explain the best points targets across NBA and WNBA today with a table and chart.",
                             "date": "2026-06-04",
                         },
@@ -3921,6 +4030,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Show me the highest confidence MLB props today",
                             "date": "2026-06-04",
                         },
@@ -3940,6 +4050,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Show me the highest-upside MLB props today",
                             "date": "2026-06-04",
                         },
@@ -3959,6 +4070,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Compare Judge vs Ohtani home run outlook today",
                             "date": "2026-06-04",
                         },
@@ -3985,6 +4097,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Show me the best live props for Judge right now",
                             "date": "2026-06-04",
                         },
@@ -4062,6 +4175,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                         response = self.client.post(
                             "/api/intelligence/query",
                             json={
+                                "force_refresh": True,
                                 "question": "What is Brandon Young strikeouts projection today?",
                                 "date": "2026-06-05",
                             },
@@ -4165,6 +4279,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                         response = self.client.post(
                             "/api/intelligence/query",
                             json={
+                                "force_refresh": True,
                                 "question": "What does Brandon Young's matchup today look like and how do his stats project against betting lines?",
                                 "date": "2026-06-05",
                             },
@@ -4216,6 +4331,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                         response = self.client.post(
                             "/api/intelligence/query",
                             json={
+                                "force_refresh": True,
                                 "question": "Best live MLB props right now",
                                 "date": "2026-06-05",
                             },
@@ -4235,6 +4351,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Julian champaigne 3ptM",
                             "date": "2026-06-05",
                         },
@@ -4583,6 +4700,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                         response = self.client.post(
                             "/api/intelligence/query",
                             json={
+                                "force_refresh": True,
                                 "question": "What are the best home run matchups today and why?",
                                 "date": "2026-06-05",
                             },
@@ -4641,6 +4759,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Show me the best live NBA props",
                             "date": "2026-06-04",
                         },
@@ -4789,6 +4908,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Give me the best NBA props plus money only",
                             "date": "2026-06-04",
                         },
@@ -4818,6 +4938,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Build me a two-leg parlay between +300 and +500 from the best NBA edges",
                             "date": "2026-06-04",
                         },
@@ -4933,6 +5054,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Build me a four-leg parlay from the best NBA edges",
                             "date": "2026-06-04",
                         },
@@ -4975,6 +5097,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Build me a cross-sport two-leg parlay across NBA and WNBA",
                             "date": "2026-06-04",
                         },
@@ -5066,6 +5189,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Build me a same game three-leg parlay from the best NBA edges",
                             "date": "2026-06-04",
                         },
@@ -5170,6 +5294,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
+                            "force_refresh": True,
                             "question": "Build me a four-leg round robin from the best NBA edges",
                             "date": "2026-06-04",
                         },
