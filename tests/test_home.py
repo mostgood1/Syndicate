@@ -972,6 +972,34 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         moneyline_old = next(c for c in candidates_with_empty_live_odds_set if c["market"] == "Moneyline" and c["pick"] == "Away ML")
         self.assertFalse(moneyline_old["is_live"])
 
+    def test_gamelens_sourced_candidate_does_not_force_live_from_decorative_label(self) -> None:
+        # Real bug found in production: a WNBA game hours before tip
+        # (status.in_progress=False) produced contradictory candidates for
+        # the SAME game -- Spread stayed correctly pregame, but Moneyline
+        # showed is_live=True. gameLens entries default their label to
+        # "Live" (lens.get("label", "Live")) purely as a decorative section
+        # name, even when the lens is open-but-pregame; the old fallback_live
+        # heuristic treated any "live" substring in the market text as
+        # real evidence, so "Live Moneyline" force-flipped is_live=True
+        # while the plain "Spread" market (from the betting dict) did not.
+        game = self._sample_game(
+            betting={"away_ml": -120, "home_ml": 105, "p_away_win": 0.55, "p_home_win": 0.45,
+                     "home_puck_line": -9.5, "away_puck_line": 9.5, "home_spread": -9.5,
+                     "p_home_cover": 0.55, "p_away_cover": 0.45},
+            status={"in_progress": False, "final": False, "status": "Scheduled"},
+            gameLens=[
+                {
+                    "closed": False,
+                    "markets": {"moneyline": {"pick": "Away ML", "odds": -120, "edge": 4.5, "p_win": 0.55}},
+                }
+            ],
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "wnba"}, game, fallback_epoch=0.0)
+        spread = next(c for c in candidates if c["market"] == "Spread" and c["pick"].startswith("Away"))
+        lens_moneyline = next(c for c in candidates if c["market"] == "Live Moneyline")
+        self.assertFalse(spread["is_live"])
+        self.assertFalse(lens_moneyline["is_live"])
+
 
 if __name__ == "__main__":
     unittest.main()

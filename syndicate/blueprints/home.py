@@ -1846,7 +1846,15 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
     # at all when game.get("shared_is_live") was already true. Reuse the
     # already-reliable _game_status_state() instead of re-deriving liveness
     # from raw status text.
-    fallback_live = bool(game.get("shared_is_live") or game_state == "live" or "live" in _safe_text(market, "").lower())
+    #
+    # NOTE: do NOT also check "live" in market text here. The gameLens loop
+    # below labels every market it emits with lens.get("label", "Live") --
+    # a decorative section name, not evidence the game has actually started
+    # -- so an open-but-pregame lens entry produced a "Live Moneyline"
+    # candidate that was force-flipped live while the same game's Spread
+    # candidate (built from the plain "betting" dict, no "Live" prefix)
+    # correctly stayed pregame. game_state/shared_is_live are the real signal.
+    fallback_live = bool(game.get("shared_is_live") or game_state == "live")
     is_live = _live_odds_backed_live_flag(_game_identifier(game), live_odds_game_ids, fallback_live)
     edge_value = _pct_number(edge_text)
     confidence_value = _pct_number(confidence_text)
