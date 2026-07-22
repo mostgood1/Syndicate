@@ -2033,11 +2033,23 @@ class IntelligenceStateService:
         # _watched_board_dates comment in __init__. Collapses however many
         # distinct sport-scoped/question-scoped payloads requested a refresh
         # for the same date into one watched date.
+        #
+        # Persisted immediately (mirroring queue_refresh below), not just
+        # held in memory: the web service (SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false)
+        # is where real requests queue a date, but refresh-worker (=true) is
+        # the process whose _background_loop actually drains and writes
+        # canonical board state -- two separate processes, two separate
+        # IntelligenceStateService instances. Confirmed live 2026-07-22:
+        # queuing on web never reached refresh-worker's in-memory
+        # _watched_board_dates at all until this was persisted through the
+        # same shared STATE_PATH store _sync_persisted_queue_locked already
+        # re-reads every background-loop iteration.
         normalized_date = str(selected_date or "").strip() or central_today_iso()
         with self._condition:
             self._watched_board_dates[normalized_date] = normalized_date
             self._watched_board_dates.move_to_end(normalized_date)
             self._trim_ordered_dict(self._watched_board_dates, self._max_snapshots)
+            self._persist_locked()
             self._condition.notify_all()
         return normalized_date
 
@@ -2046,6 +2058,12 @@ class IntelligenceStateService:
         with self._condition:
             if self._watched_board_dates:
                 selected_date, _ = self._watched_board_dates.popitem(last=False)
+                # Persist the pop immediately -- otherwise the next
+                # _sync_persisted_queue_locked() call (top of every
+                # _background_loop iteration) re-reads the still-stale
+                # persisted copy and resurrects the date this process just
+                # drained, redraining it every single iteration forever.
+                self._persist_locked()
         if not selected_date:
             return
         try:
@@ -2277,6 +2295,7 @@ class IntelligenceStateService:
             self._latest_key = None
             self._watched_payloads.clear()
             self._pending_keys.clear()
+            self._watched_board_dates.clear()
         payload = read_json_file(STATE_PATH)
         self._loaded_from_disk = True
         if not isinstance(payload, dict):
@@ -2311,6 +2330,11 @@ class IntelligenceStateService:
                     continue
                 self._pending_keys[str(key)] = dict(raw_payload)
             self._trim_ordered_dict(self._pending_keys, self._max_snapshots)
+        watched_board_dates = payload.get("watched_board_dates")
+        if isinstance(watched_board_dates, dict):
+            for key, raw_date in watched_board_dates.items():
+                self._watched_board_dates[str(key)] = str(raw_date)
+            self._trim_ordered_dict(self._watched_board_dates, self._max_snapshots)
         self._latest_key = str(payload.get("latest_key") or "").strip() or (next(reversed(self._snapshots)) if self._snapshots else None)
 
     def _sync_persisted_queue_locked(self) -> None:
@@ -2333,6 +2357,12 @@ class IntelligenceStateService:
                     continue
                 self._pending_keys[str(key)] = dict(raw_payload)
             self._trim_ordered_dict(self._pending_keys, self._max_snapshots)
+        watched_board_dates = payload.get("watched_board_dates")
+        if isinstance(watched_board_dates, dict):
+            self._watched_board_dates.clear()
+            for key, raw_date in watched_board_dates.items():
+                self._watched_board_dates[str(key)] = str(raw_date)
+            self._trim_ordered_dict(self._watched_board_dates, self._max_snapshots)
 
     def _persist_locked(self) -> None:
         print(f"[intelligence_state] PERSIST_LOCKED_BEGIN latest_key={self._latest_key} snapshot_count={len(self._snapshots)}", flush=True)
@@ -2342,6 +2372,7 @@ class IntelligenceStateService:
             "updated_at": _utc_now(),
             "watched_payloads": dict(self._watched_payloads),
             "pending_keys": dict(self._pending_keys),
+            "watched_board_dates": dict(self._watched_board_dates),
             "snapshots": {
                 key: {
                     "key": snapshot.key,

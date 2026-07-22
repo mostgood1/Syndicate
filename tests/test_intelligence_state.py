@@ -1054,6 +1054,73 @@ class IntelligenceStateTests(unittest.TestCase):
                 self.assertIn(queued_key, reloaded_service._watched_payloads)
                 self.assertIn(queued_key, reloaded_service._pending_keys)
 
+    def test_queue_board_state_refresh_persists_for_cross_process_pickup(self) -> None:
+        # Confirmed live 2026-07-22: web (which queues on real requests) and
+        # refresh-worker (whose _background_loop actually drains and writes)
+        # are separate processes with separate IntelligenceStateService
+        # instances -- queuing in one process's memory never reached the
+        # other's until this was persisted through the same shared
+        # STATE_PATH store _sync_persisted_queue_locked already re-reads
+        # every iteration, mirroring queue_refresh's existing behavior above.
+        service = IntelligenceStateService()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            state_path = temp_root / "query_state_cache.json"
+            board_snapshot_path = temp_root / "board_snapshot.json"
+            with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path):
+                queued_date = service.queue_board_state_refresh("2026-06-15")
+                persisted_payload = json.loads(state_path.read_text(encoding="utf-8"))
+
+                self.assertIn("watched_board_dates", persisted_payload)
+                self.assertEqual(persisted_payload["watched_board_dates"].get(queued_date), queued_date)
+
+                # A second, independent instance (standing in for the other
+                # process) must pick this up via a plain reload, exactly
+                # like the payload-keyed queue already does.
+                other_process_service = IntelligenceStateService()
+                with patch.object(intelligence_state_module, "STATE_PATH", state_path):
+                    other_process_service._load_persisted_state_locked(force=True)
+
+                self.assertIn(queued_date, other_process_service._watched_board_dates)
+
+    def test_sync_persisted_queue_locked_picks_up_board_dates_queued_by_another_process(self) -> None:
+        service = IntelligenceStateService()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            state_path = temp_root / "query_state_cache.json"
+            board_snapshot_path = temp_root / "board_snapshot.json"
+            with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path):
+                other_process_service = IntelligenceStateService()
+                other_process_service.queue_board_state_refresh("2026-06-20")
+
+                self.assertEqual(list(service._watched_board_dates), [])
+                service._sync_persisted_queue_locked()
+
+                self.assertIn("2026-06-20", service._watched_board_dates)
+
+    def test_drain_one_watched_board_date_persists_pop_to_avoid_resurrection(self) -> None:
+        # Without this, the next _sync_persisted_queue_locked() call (top of
+        # every _background_loop iteration) would re-read the still-stale
+        # persisted copy and put the just-drained date right back, redraining
+        # the same date forever.
+        service = IntelligenceStateService()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            state_path = temp_root / "query_state_cache.json"
+            board_snapshot_path = temp_root / "board_snapshot.json"
+            with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path):
+                service.queue_board_state_refresh("2026-06-15")
+                with patch.object(service, "_build_intelligence_board_state", return_value={"selected_date": "2026-06-15", "candidate_count": 0, "covered_sports": [], "by_sport": {}, "ranked_all": []}):
+                    with patch("pipeline.intelligence_state.write_intelligence_board_state"):
+                        service._drain_one_watched_board_date()
+
+                self.assertEqual(list(service._watched_board_dates), [])
+                persisted_payload = json.loads(state_path.read_text(encoding="utf-8"))
+                self.assertEqual(persisted_payload.get("watched_board_dates"), {})
+
     def test_board_publication_response_skips_full_intelligence_pipeline(self) -> None:
         service = IntelligenceStateService()
 
