@@ -3828,6 +3828,30 @@ def _candidate_state_text(candidate: dict[str, Any]) -> str:
     ).lower()
 
 
+# No real game stays "live" this long -- a candidate still claiming is_live
+# with data this old is stale tracking state (the upstream game/live_state
+# object frozen at whatever it last was before tracking stopped for that
+# game), not a genuinely ongoing game. Confirmed live 2026-07-21: settled
+# WNBA games from a prior date showing up on the board perpetually marked
+# "live" because nothing ever re-checked their actual final status once
+# tracking moved on. Generous ceiling (real games rarely exceed ~4 hours)
+# to avoid excluding a genuinely slow/delayed live game.
+_MAX_PLAUSIBLE_LIVE_AGE_SECONDS = 8 * 60 * 60
+
+
+def _candidate_live_claim_is_stale(candidate: dict[str, Any]) -> bool:
+    claims_live = bool(candidate.get("is_live")) or _safe_text(candidate.get("game_state"), "").lower() == "live"
+    if not claims_live:
+        return False
+    try:
+        updated_epoch_value = float(candidate.get("updated_epoch"))
+    except (TypeError, ValueError):
+        return False
+    if updated_epoch_value <= 0:
+        return False
+    return (time.time() - updated_epoch_value) > _MAX_PLAUSIBLE_LIVE_AGE_SECONDS
+
+
 def _bind_candidate_state(candidate: dict[str, Any]) -> None:
     status_display = _safe_text(candidate.get("status_display"), "")
     status_context = _safe_text(candidate.get("status_context"), "")
@@ -3845,6 +3869,10 @@ def _apply_candidate_state_guard(candidate: dict[str, Any]) -> None:
     if _candidate_is_final(candidate):
         candidate["state_invalid"] = True
         candidate.setdefault("state_note", "Final or settled game state excluded.")
+        return
+    if _candidate_live_claim_is_stale(candidate):
+        candidate["state_invalid"] = True
+        candidate.setdefault("state_note", "Stale live-state data excluded (no update in over 8 hours).")
         return
     if _safe_text(candidate.get("candidate_type"), "").lower() != "prop":
         return
