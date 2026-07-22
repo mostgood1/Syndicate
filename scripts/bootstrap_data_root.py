@@ -106,7 +106,15 @@ def _bootstrap_root_pairs(repo_root: Path, data_root: Path) -> list[tuple[Path, 
         pairs.append((src, dst, str(relative_file)))
     intelligence_root = repo_root / "reports" / "intelligence"
     if intelligence_root.exists() and intelligence_root.is_dir():
-        for pattern in ("board_snapshot_*.json", "intelligence_state_*.json", "intelligence_state_history_*.jsonl"):
+        for pattern in (
+            "board_snapshot_*.json",
+            "intelligence_state_*.json",
+            "intelligence_state_history_*.jsonl",
+            # Canonical per-date board state (intelligence-state rebuild
+            # plan, migration step 2/4) -- covers both
+            # board_state_{date}.json and board_state_latest_pointer.json.
+            "board_state_*.json",
+        ):
             for src in sorted(intelligence_root.glob(pattern)):
                 if not src.is_file():
                     continue

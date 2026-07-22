@@ -3783,6 +3783,11 @@ def main() -> int:
         "board_snapshot_*.json",
         "intelligence_state_*.json",
         "intelligence_state_history_*.jsonl",
+        # Canonical per-date board state (intelligence-state rebuild plan,
+        # migration step 2/4) -- board_state_{date}.json plus its latest
+        # pointer file, written by _drain_one_watched_board_date only when
+        # SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE is enabled.
+        "board_state_*.json",
     ]:
         if not intelligence_root.exists():
             break
