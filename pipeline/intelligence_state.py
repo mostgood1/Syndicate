@@ -1863,10 +1863,33 @@ class IntelligenceStateService:
             with self._condition:
                 self._sync_persisted_queue_locked()
                 if not self._pending_keys:
+                    stale_limited_keys: list[str] = []
                     for key, watched_payload in list(self._watched_payloads.items()):
+                        # No real caller sends an explicit "limit" anymore
+                        # (see intelligence.html's intelligenceQueryPayload) --
+                        # a payload with one left over from an old queued
+                        # request (e.g. scripts/run_refresh_odds_job.py's
+                        # since-fixed hardcoded limit:10) would otherwise sit
+                        # in _watched_payloads forever and get recomputed
+                        # every time its snapshot goes stale, repeatedly
+                        # clobbering self._latest_key with a truncated
+                        # response for every other caller (see
+                        # _snapshot_limit_matches). Drop it instead of
+                        # replaying it indefinitely.
+                        if dict(watched_payload or {}).get("limit") is not None:
+                            stale_limited_keys.append(key)
+                            continue
                         snapshot = self._snapshots.get(key)
                         if snapshot is None or self._is_stale(snapshot):
                             self._pending_keys[key] = watched_payload
+                    for key in stale_limited_keys:
+                        self._watched_payloads.pop(key, None)
+                        self._snapshots.pop(key, None)
+                        self._pending_keys.pop(key, None)
+                        if self._latest_key == key:
+                            self._latest_key = None
+                    if stale_limited_keys:
+                        self._persist_locked()
                     self._trim_ordered_dict(self._pending_keys, self._max_snapshots)
                 if self._pending_keys:
                     _, payload_to_process = self._pending_keys.popitem(last=False)
