@@ -561,6 +561,99 @@ def _intelligence_board_snapshot_payload(state: dict[str, Any], *, selected_date
     }
 
 
+SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE_FLAG = "SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE"
+
+
+def canonical_board_state_enabled() -> bool:
+    return _env_bool(SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE_FLAG, default=False)
+
+
+def _intelligence_board_state_path(selected_date: str) -> Path:
+    # One file per date -- an O(1) lookup by construction, unlike
+    # _intelligence_state_daily_candidates() above, which has to glob every
+    # board_snapshot_*.json under reports/intelligence/ and sort by filename
+    # to find "the latest one". Callers that don't know the date should use
+    # read_latest_intelligence_board_state()/the pointer file below instead.
+    suffix = str(selected_date or "").strip().replace("-", "_") or _intelligence_state_daily_suffix()
+    return reports_root() / "intelligence" / f"board_state_{suffix}.json"
+
+
+def _intelligence_board_state_latest_pointer_path() -> Path:
+    return reports_root() / "intelligence" / "board_state_latest_pointer.json"
+
+
+def write_intelligence_board_state(state: dict[str, Any]) -> dict[str, Any] | None:
+    normalized = dict(state or {})
+    selected_date = str(normalized.get("selected_date") or "").strip()
+    if not selected_date:
+        return None
+    write_json_file(_intelligence_board_state_path(selected_date), normalized)
+    write_json_file(
+        _intelligence_board_state_latest_pointer_path(),
+        {"selected_date": selected_date, "updated_at": _utc_now()},
+    )
+    return normalized
+
+
+def read_intelligence_board_state(selected_date: str | None) -> dict[str, Any] | None:
+    normalized_date = str(selected_date or "").strip()
+    if not normalized_date:
+        return None
+    payload = read_json_file(_intelligence_board_state_path(normalized_date))
+    return payload if isinstance(payload, dict) else None
+
+
+def read_latest_intelligence_board_state() -> dict[str, Any] | None:
+    pointer = read_json_file(_intelligence_board_state_latest_pointer_path())
+    pointer_date = str(pointer.get("selected_date") or "").strip() if isinstance(pointer, dict) else ""
+    if pointer_date:
+        state = read_intelligence_board_state(pointer_date)
+        if state is not None:
+            return state
+    # Pointer missing/stale (e.g. nothing has ever been written yet, or the
+    # pointer file itself was lost) -- today's date is the only reasonable
+    # guess left, matching every other "no explicit date" default in this
+    # module (see central_today_iso() usage elsewhere).
+    return read_intelligence_board_state(central_today_iso())
+
+
+def slice_intelligence_board_state_for_request(
+    state: dict[str, Any] | None,
+    *,
+    sport: str | None = "all",
+    limit: int | None = None,
+) -> dict[str, Any]:
+    # Pure function: the canonical per-date state is always built unsliced
+    # (every covered sport, full ranked_all) -- sport/limit narrowing for a
+    # specific request happens only here, at read time, never before
+    # persistence. Replaces the sport/limit-slicing logic that used to be
+    # duplicated inline in _compute_response and
+    # _compute_board_publication_response.
+    normalized_state = dict(state or {})
+    requested_sport = str(sport or "all").strip().lower() or "all"
+    by_sport = dict(normalized_state.get("by_sport") or {})
+    ranked_all = [item for item in (normalized_state.get("ranked_all") or []) if isinstance(item, Mapping)]
+    sport_scoped = ranked_all if requested_sport == "all" else [item for item in by_sport.get(requested_sport, []) if isinstance(item, Mapping)]
+
+    if limit is None:
+        top_opportunities = list(sport_scoped)
+    else:
+        try:
+            limit_value = int(limit)
+        except Exception:
+            limit_value = None
+        if limit_value is None:
+            top_opportunities = list(sport_scoped)
+        else:
+            opportunity_limit = max(limit_value, 1) if sport_scoped else max(limit_value, 0)
+            top_opportunities = sport_scoped[:opportunity_limit]
+
+    response = dict(normalized_state)
+    response["top_opportunities"] = [dict(item) for item in top_opportunities]
+    response["recommendations"] = [dict(item) for item in top_opportunities]
+    return response
+
+
 def _intelligence_state_read_path(artifact_name: str, fallback_path: Path) -> Path:
     daily_paths = _intelligence_state_daily_paths()
     daily_candidates = _intelligence_state_daily_candidates().get(artifact_name, [])
@@ -738,6 +831,12 @@ class IntelligenceStateService:
         self._snapshots: OrderedDict[str, IntelligenceSnapshot] = OrderedDict()
         self._watched_payloads: OrderedDict[str, dict[str, Any]] = OrderedDict()
         self._pending_keys: OrderedDict[str, dict[str, Any]] = OrderedDict()
+        # Separate from _watched_payloads/_pending_keys above (which are keyed
+        # by a hash of the whole request payload, incl. free-text "question" --
+        # see _payload_key). This is the additive, date-only-keyed registry for
+        # the canonical board-state rebuild (SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE),
+        # deliberately not merged into the payload-keyed queue above.
+        self._watched_board_dates: OrderedDict[str, str] = OrderedDict()
         self._candidate_pools: OrderedDict[str, dict[str, Any]] = OrderedDict()
         self._source_fingerprints: OrderedDict[str, tuple[float, str]] = OrderedDict()
         self._latest_key: str | None = None
@@ -1691,6 +1790,18 @@ class IntelligenceStateService:
         print("[intelligence_state] BACKGROUND_LOOP_START", flush=True)
         while not self._stop.is_set():
             iteration_started_at = time.time()
+            if canonical_board_state_enabled():
+                # Additive dual-write during the migration-step-2 validation
+                # window: drains _watched_board_dates and writes the new
+                # canonical board_state_*.json alongside the legacy
+                # board_snapshot_*.json/intelligence_state_*.json writes
+                # below. Deliberately called outside self._condition -- it
+                # takes/releases the same lock internally just to pop one
+                # date, then does the real work unlocked, mirroring how
+                # payload_to_process is popped locked and processed unlocked
+                # below. self._lock is a plain (non-reentrant) threading.Lock,
+                # so nesting `with self._condition` calls would deadlock.
+                self._drain_one_watched_board_date()
             payload_to_process: dict[str, Any] | None = None
             with self._condition:
                 self._sync_persisted_queue_locked()
@@ -1873,6 +1984,67 @@ class IntelligenceStateService:
         _log_stage_timing("board_publication", (time.perf_counter() - request_started_at) * 1000.0)
         logger.info("BETTING_BOARD_PUBLISH_COMPLETE", extra={"selected_date": selected_date, "candidate_count": response_candidate_count, "snapshot_generated_at": response_last_updated})
         return response
+
+    def _build_intelligence_board_state(self, selected_date: str | None) -> dict[str, Any]:
+        # Canonical, per-date, unsliced board state (migration step 2). Built
+        # on top of _compute_board_publication_response with sport="all" and
+        # no limit -- exactly what that method already computes internally
+        # before it (re-)applies a per-request sport/limit slice -- so this
+        # doesn't duplicate the candidate-pool/ranking/rollover logic, only
+        # the shape of what gets persisted. covered_sports/by_sport are
+        # widened to include every sport this pool considered, even ones with
+        # zero candidates, which _compute_board_publication_response's own
+        # by_sport does not: it only contains sports that actually produced
+        # candidates (see _build_candidate_pool's candidate_pools dict, which
+        # skips a sport entirely via `if not sport_candidates: continue`).
+        base_response = self._compute_board_publication_response(
+            {"date": selected_date, "sport": "all", "question": "top edges today"}
+        )
+        resolved_date = str(base_response.get("selected_date") or selected_date or central_today_iso()).strip() or central_today_iso()
+        covered_sports = sorted(self._available_sport_manifests(resolved_date).keys())
+        by_sport = {sport_slug: list(candidates) for sport_slug, candidates in dict(base_response.get("by_sport") or {}).items()}
+        for sport_slug in covered_sports:
+            by_sport.setdefault(sport_slug, [])
+        return {
+            "selected_date": resolved_date,
+            "source_fingerprint": self._source_state_fingerprint(resolved_date),
+            "computed_at": _utc_now(),
+            "candidate_count": int(base_response.get("candidate_count") or 0),
+            "covered_sports": covered_sports,
+            "by_sport": by_sport,
+            "ranked_all": [dict(item) for item in (base_response.get("top_opportunities") or []) if isinstance(item, Mapping)],
+            "board_contract": base_response.get("board_contract"),
+            "live_pipeline": base_response.get("live_pipeline"),
+            "state_meta": base_response.get("state_meta"),
+        }
+
+    def queue_board_state_refresh(self, selected_date: str | None = None) -> str:
+        # Separate from queue_refresh()/_watched_payloads below -- see the
+        # _watched_board_dates comment in __init__. Collapses however many
+        # distinct sport-scoped/question-scoped payloads requested a refresh
+        # for the same date into one watched date.
+        normalized_date = str(selected_date or "").strip() or central_today_iso()
+        with self._condition:
+            self._watched_board_dates[normalized_date] = normalized_date
+            self._watched_board_dates.move_to_end(normalized_date)
+            self._trim_ordered_dict(self._watched_board_dates, self._max_snapshots)
+            self._condition.notify_all()
+        return normalized_date
+
+    def _drain_one_watched_board_date(self) -> None:
+        selected_date: str | None = None
+        with self._condition:
+            if self._watched_board_dates:
+                selected_date, _ = self._watched_board_dates.popitem(last=False)
+        if not selected_date:
+            return
+        try:
+            state = self._build_intelligence_board_state(selected_date)
+            write_intelligence_board_state(state)
+            logger.info("BOARD_STATE_WRITTEN", extra={"selected_date": selected_date, "candidate_count": state.get("candidate_count")})
+        except Exception as exc:
+            logger.info("BOARD_STATE_DRAIN_FAILED", extra={"selected_date": selected_date, "error": f"{type(exc).__name__}: {exc}"})
+            print(f"[intelligence_state] BOARD_STATE_DRAIN_FAILED selected_date={selected_date} error={exc}", flush=True)
 
     def _compute_response(self, payload: dict[str, Any], *, force_refresh: bool = False) -> dict[str, Any]:
         request_started_at = time.perf_counter()
@@ -2204,6 +2376,10 @@ def start_intelligence_state_background_loop(app: Flask | None = None) -> bool:
 
 def queue_intelligence_state_refresh(payload: dict[str, Any]) -> str:
     return _INTELLIGENCE_STATE_SERVICE.queue_refresh(payload)
+
+
+def queue_board_state_refresh(selected_date: str | None = None) -> str:
+    return _INTELLIGENCE_STATE_SERVICE.queue_board_state_refresh(selected_date)
 
 
 def get_latest_intelligence_state_response(payload: dict[str, Any], *, refresh: bool = False, wait: bool = True, force_refresh: bool = True) -> dict[str, Any] | None:

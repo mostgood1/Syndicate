@@ -17,6 +17,10 @@ from pipeline.intelligence_state import IntelligenceStateService
 from pipeline.intelligence_state import _payload_key
 from syndicate.features.intelligence import candidate_identity_key
 from syndicate.features.intelligence import collect_candidates_with_fallback_merge
+from pipeline.intelligence_state import read_intelligence_board_state
+from pipeline.intelligence_state import read_latest_intelligence_board_state
+from pipeline.intelligence_state import write_intelligence_board_state
+from pipeline.intelligence_state import slice_intelligence_board_state_for_request
 from syndicate.app import create_app
 import syndicate.blueprints.intelligence as intelligence_module
 from syndicate.blueprints.intelligence import intelligence_bp
@@ -2484,3 +2488,172 @@ class IntelligenceStateTests(unittest.TestCase):
         )
 
         self.assertEqual([item["name"] for item in merged], ["MLB Play", "NBA Play"])
+
+    def test_intelligence_board_state_round_trip_by_date(self) -> None:
+        state = {
+            "selected_date": "2026-06-10",
+            "source_fingerprint": "fingerprint-1",
+            "candidate_count": 1,
+            "covered_sports": ["mlb"],
+            "by_sport": {"mlb": [{"name": "Play 1"}]},
+            "ranked_all": [{"name": "Play 1"}],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with patch.object(intelligence_state_module, "reports_root", return_value=Path(tmp_dir)):
+                written = write_intelligence_board_state(dict(state))
+                self.assertEqual(written, state)
+
+                by_date = read_intelligence_board_state("2026-06-10")
+                self.assertEqual(by_date, state)
+
+                latest = read_latest_intelligence_board_state()
+                self.assertEqual(latest, state)
+
+    def test_read_latest_intelligence_board_state_falls_back_to_today_without_pointer(self) -> None:
+        state = {"selected_date": "2026-07-04", "candidate_count": 0, "covered_sports": [], "by_sport": {}, "ranked_all": []}
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with patch.object(intelligence_state_module, "reports_root", return_value=Path(tmp_dir)):
+                # Write the dated file directly, skipping write_intelligence_board_state
+                # so the pointer file never gets created -- simulates a
+                # pointer that's missing/lost while the dated artifact itself
+                # still exists.
+                daily_path = intelligence_state_module._intelligence_board_state_path("2026-07-04")
+                daily_path.parent.mkdir(parents=True, exist_ok=True)
+                refresh_state_store.write_json_file(daily_path, state)
+
+                with patch.object(intelligence_state_module, "central_today_iso", return_value="2026-07-04"):
+                    latest = read_latest_intelligence_board_state()
+
+        self.assertEqual(latest, state)
+
+    def test_slice_intelligence_board_state_for_request_scopes_by_sport_and_limit(self) -> None:
+        state = {
+            "selected_date": "2026-06-10",
+            "by_sport": {
+                "mlb": [{"name": "MLB Play 1"}, {"name": "MLB Play 2"}],
+                "wnba": [{"name": "WNBA Play 1"}],
+            },
+            "ranked_all": [{"name": "MLB Play 1"}, {"name": "WNBA Play 1"}, {"name": "MLB Play 2"}],
+        }
+
+        sliced_all = slice_intelligence_board_state_for_request(state, sport="all", limit=None)
+        self.assertEqual([item["name"] for item in sliced_all["top_opportunities"]], ["MLB Play 1", "WNBA Play 1", "MLB Play 2"])
+
+        sliced_mlb_limited = slice_intelligence_board_state_for_request(state, sport="mlb", limit=1)
+        self.assertEqual([item["name"] for item in sliced_mlb_limited["top_opportunities"]], ["MLB Play 1"])
+        # The canonical state itself (by_sport/ranked_all) must survive
+        # unsliced in the returned dict -- only top_opportunities/
+        # recommendations are the request-scoped view.
+        self.assertEqual(sliced_mlb_limited["by_sport"], state["by_sport"])
+
+        sliced_missing_sport = slice_intelligence_board_state_for_request(state, sport="nhl", limit=None)
+        self.assertEqual(sliced_missing_sport["top_opportunities"], [])
+
+    def test_build_intelligence_board_state_widens_by_sport_to_zero_candidate_sports(self) -> None:
+        service = IntelligenceStateService()
+        base_response = {
+            "selected_date": "2026-06-10",
+            "candidate_count": 1,
+            "by_sport": {"mlb": [{"name": "MLB Play"}]},
+            "top_opportunities": [{"name": "MLB Play"}],
+            "board_contract": {"schema": "intelligence_board_v1"},
+            "live_pipeline": {},
+            "state_meta": {"freshness_status": "fresh"},
+        }
+
+        with patch.object(service, "_compute_board_publication_response", return_value=base_response):
+            with patch.object(service, "_available_sport_manifests", return_value={"mlb": {}, "wnba": {}}):
+                with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-1"):
+                    state = service._build_intelligence_board_state("2026-06-10")
+
+        self.assertEqual(state["covered_sports"], ["mlb", "wnba"])
+        self.assertEqual(state["by_sport"]["mlb"], [{"name": "MLB Play"}])
+        # wnba produced zero candidates but must still be present as an
+        # explicit empty list -- the whole point of covered_sports/by_sport
+        # widening is to stop callers from having to guess whether an absent
+        # key means "zero candidates" or "this sport wasn't considered at all".
+        self.assertEqual(state["by_sport"]["wnba"], [])
+        self.assertEqual(state["ranked_all"], [{"name": "MLB Play"}])
+        self.assertEqual(state["candidate_count"], 1)
+
+    def test_queue_board_state_refresh_collapses_repeated_calls_for_same_date(self) -> None:
+        service = IntelligenceStateService()
+
+        first_key = service.queue_board_state_refresh("2026-06-10")
+        second_key = service.queue_board_state_refresh("2026-06-10")
+
+        self.assertEqual(first_key, "2026-06-10")
+        self.assertEqual(second_key, "2026-06-10")
+        self.assertEqual(list(service._watched_board_dates), ["2026-06-10"])
+
+    def test_queue_board_state_refresh_defaults_to_today_when_date_missing(self) -> None:
+        service = IntelligenceStateService()
+
+        with patch.object(intelligence_state_module, "central_today_iso", return_value="2026-07-04"):
+            queued = service.queue_board_state_refresh(None)
+
+        self.assertEqual(queued, "2026-07-04")
+        self.assertEqual(list(service._watched_board_dates), ["2026-07-04"])
+
+    def test_drain_one_watched_board_date_writes_state_and_empties_queue(self) -> None:
+        service = IntelligenceStateService()
+        service.queue_board_state_refresh("2026-06-10")
+        built_state = {"selected_date": "2026-06-10", "candidate_count": 2, "covered_sports": ["mlb"], "by_sport": {"mlb": []}, "ranked_all": []}
+
+        with patch.object(service, "_build_intelligence_board_state", return_value=built_state) as mocked_build:
+            with patch("pipeline.intelligence_state.write_intelligence_board_state") as mocked_write:
+                service._drain_one_watched_board_date()
+
+        mocked_build.assert_called_once_with("2026-06-10")
+        mocked_write.assert_called_once_with(built_state)
+        self.assertEqual(list(service._watched_board_dates), [])
+
+    def test_drain_one_watched_board_date_is_noop_when_queue_empty(self) -> None:
+        service = IntelligenceStateService()
+
+        with patch.object(service, "_build_intelligence_board_state") as mocked_build:
+            service._drain_one_watched_board_date()
+
+        mocked_build.assert_not_called()
+
+    def test_drain_one_watched_board_date_swallows_build_failures(self) -> None:
+        service = IntelligenceStateService()
+        service.queue_board_state_refresh("2026-06-10")
+
+        with patch.object(service, "_build_intelligence_board_state", side_effect=RuntimeError("boom")):
+            # Must not raise -- the background loop calls this every
+            # iteration and a bad cycle should just be retried later, not
+            # crash the whole worker thread.
+            service._drain_one_watched_board_date()
+
+        self.assertEqual(list(service._watched_board_dates), [])
+
+    def test_background_loop_drains_board_dates_when_canonical_flag_enabled(self) -> None:
+        service = IntelligenceStateService()
+        service._interval_seconds = 0
+
+        def stop_after_one_iteration(*args: object, **kwargs: object) -> None:
+            service._stop.set()
+
+        with patch.object(intelligence_state_module, "canonical_board_state_enabled", return_value=True):
+            with patch.object(service, "_drain_one_watched_board_date") as mocked_drain:
+                with patch.object(service, "_sync_persisted_queue_locked", side_effect=stop_after_one_iteration):
+                    service._background_loop()
+
+        mocked_drain.assert_called_once()
+
+    def test_background_loop_skips_board_date_drain_when_flag_disabled(self) -> None:
+        service = IntelligenceStateService()
+        service._interval_seconds = 0
+
+        def stop_after_one_iteration(*args: object, **kwargs: object) -> None:
+            service._stop.set()
+
+        with patch.object(intelligence_state_module, "canonical_board_state_enabled", return_value=False):
+            with patch.object(service, "_drain_one_watched_board_date") as mocked_drain:
+                with patch.object(service, "_sync_persisted_queue_locked", side_effect=stop_after_one_iteration):
+                    service._background_loop()
+
+        mocked_drain.assert_not_called()
