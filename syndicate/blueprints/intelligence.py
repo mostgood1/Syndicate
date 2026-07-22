@@ -15,6 +15,11 @@ from flask import redirect
 from pipeline.intelligence_state import read_latest_intelligence_board_snapshot_response
 from pipeline.intelligence_state import read_latest_intelligence_state_response
 from pipeline.intelligence_state import queue_intelligence_state_refresh
+from pipeline.intelligence_state import queue_board_state_refresh
+from pipeline.intelligence_state import canonical_board_state_enabled
+from pipeline.intelligence_state import read_intelligence_board_state
+from pipeline.intelligence_state import read_latest_intelligence_board_state
+from pipeline.intelligence_state import slice_intelligence_board_state_for_request
 from pipeline.intelligence_state import _INTELLIGENCE_STATE_SERVICE
 from syndicate.features.intelligence import _market_focus_labels
 from syndicate.features.intelligence import _parlay_request_summary
@@ -596,7 +601,49 @@ def _response_needs_refresh(request_payload: dict[str, object], response_payload
     return _board_response_needs_refresh(request_payload, response_payload)
 
 
+def _load_canonical_board_response(payload: dict[str, object]) -> tuple[dict[str, object] | None, str]:
+    # Migration step 3 (intelligence-state rebuild plan): tried first in
+    # _cached_intelligence_response_with_source below, behind
+    # SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE. Falls through to the
+    # existing multi-layer cascade (unchanged) whenever the flag is off or
+    # this read misses -- so with the flag off (the default) this is a
+    # no-op and behavior is identical to before this function existed.
+    if not canonical_board_state_enabled():
+        return None, "canonical_disabled"
+    requested_date = str(payload.get("date") or payload.get("selected_date") or "").strip()
+    state = read_intelligence_board_state(requested_date) if requested_date else read_latest_intelligence_board_state()
+    if not isinstance(state, dict):
+        return None, "canonical_miss"
+    requested_sport = str(payload.get("sport") or "all").strip().lower() or "all"
+    covered_sports = state.get("covered_sports") if isinstance(state.get("covered_sports"), list) else []
+    # Direct membership check against the canonical state's own
+    # covered_sports list, in place of the legacy cascade's
+    # _response_has_sport_data guessing (which infers sport coverage from
+    # whatever candidates happen to be present, since the legacy
+    # board_snapshot/intelligence_state artifacts never recorded which
+    # sports a cycle actually considered).
+    if requested_sport != "all" and requested_sport not in covered_sports:
+        return None, "canonical_miss"
+    raw_limit = payload.get("limit")
+    try:
+        limit_value = int(raw_limit) if raw_limit is not None and str(raw_limit).strip() else None
+    except Exception:
+        limit_value = None
+    sliced = slice_intelligence_board_state_for_request(state, sport=requested_sport, limit=limit_value)
+    response = dict(sliced)
+    response.setdefault("ok", True)
+    response["selected_date"] = state.get("selected_date")
+    response.setdefault("candidate_count", state.get("candidate_count"))
+    response.setdefault("board_contract", state.get("board_contract"))
+    if not _is_board_response(response) or not _response_has_board_content(response):
+        return None, "canonical_miss"
+    return _hydrate_board_response_payload(response), "canonical_board_state"
+
+
 def _cached_intelligence_response_with_source(payload: dict[str, object], *, force_refresh: bool = True) -> tuple[dict[str, object] | None, str]:
+    canonical_response, canonical_source = _load_canonical_board_response(payload)
+    if canonical_response is not None and not _response_needs_refresh(payload, canonical_response):
+        return canonical_response, canonical_source
     cached_response = read_latest_intelligence_state_response(payload, force_refresh=force_refresh, allow_latest_fallback=False)
     if _is_board_response(cached_response) and _response_has_board_content(cached_response) and not _response_needs_refresh(payload, cached_response):
         return _hydrate_board_response_payload(cached_response), "worker"

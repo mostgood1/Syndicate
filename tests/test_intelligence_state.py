@@ -2657,3 +2657,133 @@ class IntelligenceStateTests(unittest.TestCase):
                     service._background_loop()
 
         mocked_drain.assert_not_called()
+
+    def test_load_canonical_board_response_returns_none_when_flag_disabled(self) -> None:
+        with patch("syndicate.blueprints.intelligence.canonical_board_state_enabled", return_value=False):
+            with patch("syndicate.blueprints.intelligence.read_intelligence_board_state") as mocked_read:
+                response, source = intelligence_module._load_canonical_board_response({"date": "2026-06-10"})
+
+        self.assertIsNone(response)
+        self.assertEqual(source, "canonical_disabled")
+        mocked_read.assert_not_called()
+
+    def test_load_canonical_board_response_misses_when_state_absent(self) -> None:
+        with patch("syndicate.blueprints.intelligence.canonical_board_state_enabled", return_value=True):
+            with patch("syndicate.blueprints.intelligence.read_intelligence_board_state", return_value=None):
+                response, source = intelligence_module._load_canonical_board_response({"date": "2026-06-10"})
+
+        self.assertIsNone(response)
+        self.assertEqual(source, "canonical_miss")
+
+    def test_load_canonical_board_response_misses_when_sport_not_covered(self) -> None:
+        state = {
+            "selected_date": "2026-06-10",
+            "candidate_count": 3,
+            "covered_sports": ["mlb"],
+            "by_sport": {"mlb": [{"name": "MLB Play"}]},
+            "ranked_all": [{"name": "MLB Play"}],
+        }
+        with patch("syndicate.blueprints.intelligence.canonical_board_state_enabled", return_value=True):
+            with patch("syndicate.blueprints.intelligence.read_intelligence_board_state", return_value=state):
+                response, source = intelligence_module._load_canonical_board_response({"date": "2026-06-10", "sport": "wnba"})
+
+        self.assertIsNone(response)
+        self.assertEqual(source, "canonical_miss")
+
+    def test_load_canonical_board_response_returns_sliced_response_for_covered_sport(self) -> None:
+        state = {
+            "selected_date": "2026-06-10",
+            "candidate_count": 2,
+            "covered_sports": ["mlb", "wnba"],
+            "by_sport": {
+                "mlb": [{"name": "MLB Play"}],
+                "wnba": [{"name": "WNBA Play"}],
+            },
+            "ranked_all": [{"name": "MLB Play"}, {"name": "WNBA Play"}],
+            "board_contract": {"schema": "intelligence_board_v1"},
+        }
+        with patch("syndicate.blueprints.intelligence.canonical_board_state_enabled", return_value=True):
+            with patch("syndicate.blueprints.intelligence.read_intelligence_board_state", return_value=state):
+                response, source = intelligence_module._load_canonical_board_response({"date": "2026-06-10", "sport": "wnba"})
+
+        self.assertEqual(source, "canonical_board_state")
+        self.assertIsNotNone(response)
+        self.assertEqual(response.get("selected_date"), "2026-06-10")
+        self.assertEqual([item["name"] for item in response.get("top_opportunities", [])], ["WNBA Play"])
+
+    def test_load_canonical_board_response_uses_latest_state_when_no_date_requested(self) -> None:
+        state = {
+            "selected_date": "2026-06-10",
+            "candidate_count": 1,
+            "covered_sports": ["mlb"],
+            "by_sport": {"mlb": [{"name": "MLB Play"}]},
+            "ranked_all": [{"name": "MLB Play"}],
+        }
+        with patch("syndicate.blueprints.intelligence.canonical_board_state_enabled", return_value=True):
+            with patch("syndicate.blueprints.intelligence.read_intelligence_board_state") as mocked_read_dated:
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_state", return_value=state) as mocked_read_latest:
+                    response, source = intelligence_module._load_canonical_board_response({"question": "top edges today"})
+
+        mocked_read_dated.assert_not_called()
+        mocked_read_latest.assert_called_once()
+        self.assertEqual(source, "canonical_board_state")
+        self.assertEqual(response.get("selected_date"), "2026-06-10")
+
+    def test_cached_intelligence_response_prefers_fresh_canonical_state_over_legacy_cascade(self) -> None:
+        payload = {"question": "top edges today", "date": "2026-06-10", "sport": "mlb"}
+        canonical_state = {
+            "selected_date": "2026-06-10",
+            "candidate_count": 1,
+            "covered_sports": ["mlb"],
+            "by_sport": {"mlb": [{"name": "Canonical MLB Play"}]},
+            "ranked_all": [{"name": "Canonical MLB Play"}],
+        }
+
+        with patch("syndicate.blueprints.intelligence.canonical_board_state_enabled", return_value=True):
+            with patch("syndicate.blueprints.intelligence.read_intelligence_board_state", return_value=canonical_state):
+                with patch("syndicate.blueprints.intelligence._response_needs_refresh", return_value=False):
+                    with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response") as mocked_legacy_state:
+                        with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response") as mocked_legacy_snapshot:
+                            cached_response, source = intelligence_module._cached_intelligence_response_with_source(payload)
+
+        self.assertEqual(source, "canonical_board_state")
+        self.assertEqual(cached_response.get("top_opportunities", [])[0]["name"], "Canonical MLB Play")
+        # A fresh canonical hit must short-circuit before ever touching the
+        # legacy cascade's own reads.
+        mocked_legacy_state.assert_not_called()
+        mocked_legacy_snapshot.assert_not_called()
+
+    def test_cached_intelligence_response_falls_back_to_legacy_cascade_when_canonical_is_stale(self) -> None:
+        payload = {"question": "top edges today", "date": "2026-06-10", "sport": "mlb"}
+        canonical_state = {
+            "selected_date": "2026-06-10",
+            "candidate_count": 1,
+            "covered_sports": ["mlb"],
+            "by_sport": {"mlb": [{"name": "Stale Canonical MLB Play"}]},
+            "ranked_all": [{"name": "Stale Canonical MLB Play"}],
+        }
+        legacy_worker_response = {
+            "ok": True,
+            "selected_date": "2026-06-10",
+            "last_updated": "2026-06-10T18:40:54Z",
+            "top_opportunities": [{"name": "Legacy Fresh Play"}],
+            "analysis": {"recommendations": [{"name": "Legacy Fresh Play"}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+        }
+
+        def needs_refresh_side_effect(request_payload: dict[str, object], response_payload: dict[str, object] | None) -> bool:
+            # Only the canonical response (identified by its distinct play
+            # name) is treated as stale -- the legacy worker response below
+            # should be accepted as fresh once the fallback reaches it.
+            top_opportunities = (response_payload or {}).get("top_opportunities") or []
+            names = {item.get("name") for item in top_opportunities if isinstance(item, dict)}
+            return "Stale Canonical MLB Play" in names
+
+        with patch("syndicate.blueprints.intelligence.canonical_board_state_enabled", return_value=True):
+            with patch("syndicate.blueprints.intelligence.read_intelligence_board_state", return_value=canonical_state):
+                with patch("syndicate.blueprints.intelligence._response_needs_refresh", side_effect=needs_refresh_side_effect):
+                    with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(legacy_worker_response)):
+                        with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=None):
+                            cached_response, source = intelligence_module._cached_intelligence_response_with_source(payload)
+
+        self.assertEqual(source, "worker")
+        self.assertEqual(cached_response.get("top_opportunities", [])[0]["name"], "Legacy Fresh Play")
