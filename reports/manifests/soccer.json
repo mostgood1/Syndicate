@@ -1,0 +1,48 @@
+{
+  "sport": "soccer",
+  "last_updated": "2026-07-21T14:09:07-05:00",
+  "artifact_paths": [
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
+  ],
+  "status": "complete",
+  "metadata": {
+    "date": "2026-07-21",
+    "phase": "pregame",
+    "execution_mode": "source",
+    "refresh_mode": "full",
+    "refresh_contract": {
+      "required": [
+        "snapshot",
+        "snapshot_alias",
+        "game_slate",
+        "predictions",
+        "board_contract",
+        "manifest"
+      ],
+      "optional": [
+        "smart_sim",
+        "recommendations",
+        "edges",
+        "live_lens",
+        "advanced_analytics",
+        "simulation_detail"
+      ]
+    },
+    "required_artifact_failures": [],
+    "optional_artifact_failures": [],
+    "ok": true,
+    "post_refresh_ok": null,
+    "mirror_ok": true,
+    "odds_control_plane": {
+      "source_precedence": [
+        "shared_history",
+        "artifact_history",
+        "tracking_history"
+      ],
+      "artifact_paths": [
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
+      ],
+      "has_post_refresh": false
+    }
+  }
+}

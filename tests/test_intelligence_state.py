@@ -2525,6 +2525,30 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(pool["global_pool"][0]["name"], "MLB Play")
         self.assertEqual(pool["candidates"], pool["global_pool"])
 
+    def test_every_configured_sport_ships_a_committed_baseline_manifest(self) -> None:
+        # Real bug found in production: reports/manifests/soccer.json was
+        # never committed (unlike the other 6 sport manifests), so on a
+        # fresh checkout/redeploy it simply didn't exist until the first
+        # fully-successful soccer refresh recreated it. Meanwhile
+        # _available_sport_manifests (see
+        # test_build_candidate_pool_skips_sports_without_manifests above)
+        # silently drops any sport whose manifest file doesn't exist --
+        # so soccer produced real candidates internally but they never
+        # survived into the published board, with no error anywhere.
+        # A committed baseline (however stale) means this gate always has
+        # something to read, even before the first refresh completes.
+        repo_root = Path(__file__).resolve().parents[1]
+        app = create_app()
+        configured_sports = app.config.get("SYNDICATE_SPORTS", [])
+        slugs = sorted({str(sport.get("slug") or "").strip().lower() for sport in configured_sports if isinstance(sport, dict) and sport.get("slug")})
+        self.assertIn("soccer", slugs)
+        for slug in slugs:
+            manifest_path = repo_root / "reports" / "manifests" / f"{slug}.json"
+            with self.subTest(slug=slug):
+                self.assertTrue(manifest_path.exists(), f"missing committed baseline manifest: {manifest_path}")
+                payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+                self.assertEqual(payload.get("sport"), slug)
+
     def test_collect_candidates_with_fallback_merge_falls_back_on_empty_pool(self) -> None:
         # Fallback result has >= 20 rows so it isn't itself "thin" and
         # doesn't trigger the separate thin-pool merge check below --
