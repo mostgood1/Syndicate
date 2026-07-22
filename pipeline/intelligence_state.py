@@ -847,6 +847,16 @@ class IntelligenceStateService:
         # the canonical board-state rebuild (SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE),
         # deliberately not merged into the payload-keyed queue above.
         self._watched_board_dates: OrderedDict[str, str] = OrderedDict()
+        # Confirmed live 2026-07-22: _build_intelligence_board_state
+        # (sport="all", no limit -- the maximally broad request by design)
+        # can run past 10 minutes for a single date. It used to be called
+        # inline at the top of _background_loop, so that entire duration
+        # also blocked the SAME loop's legacy queue processing -- the thing
+        # that keeps the real, currently-served board fresh. Tracks the
+        # one background drain thread so _drain_one_watched_board_date_async
+        # can run it off the main loop without ever risking two overlapping
+        # canonical builds.
+        self._board_state_drain_thread: threading.Thread | None = None
         self._candidate_pools: OrderedDict[str, dict[str, Any]] = OrderedDict()
         self._source_fingerprints: OrderedDict[str, tuple[float, str]] = OrderedDict()
         self._latest_key: str | None = None
@@ -1816,13 +1826,13 @@ class IntelligenceStateService:
                 # "canonical_miss" -- the read side (_load_canonical_board_response)
                 # already checked either flag correctly; only this write
                 # gate was inconsistent with it.
-                # Deliberately called outside self._condition -- it
-                # takes/releases the same lock internally just to pop one
-                # date, then does the real work unlocked, mirroring how
-                # payload_to_process is popped locked and processed unlocked
-                # below. self._lock is a plain (non-reentrant) threading.Lock,
-                # so nesting `with self._condition` calls would deadlock.
-                self._drain_one_watched_board_date()
+                # Runs off the main loop entirely (see
+                # _drain_one_watched_board_date_async/_board_state_drain_thread) --
+                # confirmed live 2026-07-22 that _build_intelligence_board_state
+                # can run past 10 minutes for a single date, and calling it
+                # inline here used to block this same loop's legacy queue
+                # processing below for that whole duration.
+                self._drain_one_watched_board_date_async()
             payload_to_process: dict[str, Any] | None = None
             with self._condition:
                 self._sync_persisted_queue_locked()
@@ -2064,18 +2074,28 @@ class IntelligenceStateService:
             self._condition.notify_all()
         return normalized_date
 
+    def _drain_one_watched_board_date_async(self) -> None:
+        # Never block _background_loop's own legacy queue processing on
+        # this -- see the _board_state_drain_thread comment in __init__.
+        # Skips launching a second drain while one is already running
+        # rather than queueing up overlapping canonical builds; the next
+        # loop iteration will try again, and _watched_board_dates isn't
+        # touched by this check so nothing queued is lost in the meantime.
+        with self._condition:
+            existing_thread = self._board_state_drain_thread
+            if existing_thread is not None and existing_thread.is_alive():
+                return
+            thread = threading.Thread(
+                target=self._drain_one_watched_board_date,
+                name="syndicate-board-state-drain",
+                daemon=True,
+            )
+            self._board_state_drain_thread = thread
+            thread.start()
+
     def _drain_one_watched_board_date(self) -> None:
         selected_date: str | None = None
         with self._condition:
-            # Temporary diagnostic for the 2026-07-22 canonical-store
-            # validation window -- _drain_one_watched_board_date is
-            # otherwise silent when the queue is empty, making it
-            # impossible to distinguish "nothing queued yet"/"sync isn't
-            # picking up cross-process writes" from "queued but drain
-            # itself is failing silently" purely from BOARD_STATE_WRITTEN/
-            # BOARD_STATE_DRAIN_FAILED logs. Safe to remove once the
-            # cross-process pickup is confirmed working end-to-end.
-            print(f"[intelligence_state] BOARD_STATE_DRAIN_TICK watched_board_dates={list(self._watched_board_dates)}", flush=True)
             if self._watched_board_dates:
                 selected_date, _ = self._watched_board_dates.popitem(last=False)
                 # Persist the pop immediately -- otherwise the next

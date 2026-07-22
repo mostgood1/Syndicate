@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -1120,6 +1121,50 @@ class IntelligenceStateTests(unittest.TestCase):
                 self.assertEqual(list(service._watched_board_dates), [])
                 persisted_payload = json.loads(state_path.read_text(encoding="utf-8"))
                 self.assertEqual(persisted_payload.get("watched_board_dates"), {})
+
+    def test_drain_one_watched_board_date_async_runs_sync_version_off_the_main_thread(self) -> None:
+        # Confirmed live 2026-07-22: _build_intelligence_board_state
+        # (sport="all", no limit) ran past 10 minutes for a single date.
+        # Calling it inline in _background_loop blocked that same loop's
+        # legacy queue processing -- the thing that keeps the real,
+        # currently-served board fresh -- for that whole duration. This
+        # must run off the main thread so no duration, however long, can
+        # ever block anything else.
+        service = IntelligenceStateService()
+        call_completed = threading.Event()
+
+        def fake_drain() -> None:
+            call_completed.set()
+
+        with patch.object(service, "_drain_one_watched_board_date", side_effect=fake_drain) as mocked_drain:
+            main_thread = threading.current_thread()
+            service._drain_one_watched_board_date_async()
+            self.assertTrue(call_completed.wait(timeout=2.0), "async drain never ran")
+
+        mocked_drain.assert_called_once()
+        self.assertIsNotNone(service._board_state_drain_thread)
+        self.assertNotEqual(service._board_state_drain_thread, main_thread)
+
+    def test_drain_one_watched_board_date_async_skips_when_already_running(self) -> None:
+        service = IntelligenceStateService()
+        drain_may_finish = threading.Event()
+        drain_started = threading.Event()
+
+        def slow_drain() -> None:
+            drain_started.set()
+            drain_may_finish.wait(timeout=2.0)
+
+        with patch.object(service, "_drain_one_watched_board_date", side_effect=slow_drain) as mocked_drain:
+            service._drain_one_watched_board_date_async()
+            self.assertTrue(drain_started.wait(timeout=2.0), "first drain never started")
+            # A second call while the first is still running (blocked on
+            # drain_may_finish) must not launch a second thread -- only one
+            # canonical build should ever be in flight at a time.
+            service._drain_one_watched_board_date_async()
+            drain_may_finish.set()
+            service._board_state_drain_thread.join(timeout=2.0)
+
+        mocked_drain.assert_called_once()
 
     def test_board_publication_response_skips_full_intelligence_pipeline(self) -> None:
         service = IntelligenceStateService()
@@ -2705,7 +2750,7 @@ class IntelligenceStateTests(unittest.TestCase):
             service._stop.set()
 
         with patch.object(intelligence_state_module, "canonical_board_state_enabled", return_value=True):
-            with patch.object(service, "_drain_one_watched_board_date") as mocked_drain:
+            with patch.object(service, "_drain_one_watched_board_date_async") as mocked_drain:
                 with patch.object(service, "_sync_persisted_queue_locked", side_effect=stop_after_one_iteration):
                     service._background_loop()
 
@@ -2725,7 +2770,7 @@ class IntelligenceStateTests(unittest.TestCase):
 
         with patch.object(intelligence_state_module, "canonical_board_state_enabled", return_value=False):
             with patch.object(intelligence_state_module, "canonical_board_state_shadow_compare_enabled", return_value=True):
-                with patch.object(service, "_drain_one_watched_board_date") as mocked_drain:
+                with patch.object(service, "_drain_one_watched_board_date_async") as mocked_drain:
                     with patch.object(service, "_sync_persisted_queue_locked", side_effect=stop_after_one_iteration):
                         service._background_loop()
 
@@ -2740,7 +2785,7 @@ class IntelligenceStateTests(unittest.TestCase):
 
         with patch.object(intelligence_state_module, "canonical_board_state_enabled", return_value=False):
             with patch.object(intelligence_state_module, "canonical_board_state_shadow_compare_enabled", return_value=False):
-                with patch.object(service, "_drain_one_watched_board_date") as mocked_drain:
+                with patch.object(service, "_drain_one_watched_board_date_async") as mocked_drain:
                     with patch.object(service, "_sync_persisted_queue_locked", side_effect=stop_after_one_iteration):
                         service._background_loop()
 
