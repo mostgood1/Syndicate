@@ -2067,6 +2067,15 @@ class IntelligenceStateService:
     def _drain_one_watched_board_date(self) -> None:
         selected_date: str | None = None
         with self._condition:
+            # Temporary diagnostic for the 2026-07-22 canonical-store
+            # validation window -- _drain_one_watched_board_date is
+            # otherwise silent when the queue is empty, making it
+            # impossible to distinguish "nothing queued yet"/"sync isn't
+            # picking up cross-process writes" from "queued but drain
+            # itself is failing silently" purely from BOARD_STATE_WRITTEN/
+            # BOARD_STATE_DRAIN_FAILED logs. Safe to remove once the
+            # cross-process pickup is confirmed working end-to-end.
+            print(f"[intelligence_state] BOARD_STATE_DRAIN_TICK watched_board_dates={list(self._watched_board_dates)}", flush=True)
             if self._watched_board_dates:
                 selected_date, _ = self._watched_board_dates.popitem(last=False)
                 # Persist the pop immediately -- otherwise the next
