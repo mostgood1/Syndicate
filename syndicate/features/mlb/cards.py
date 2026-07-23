@@ -4889,9 +4889,9 @@ def _mlb_market_board_rows_for_game(*, game_pk: Any, markets: dict[str, Any]) ->
             else:
                 away_odds = odds
         if away_odds is not None:
-            odds_rows.append({"game_id": game_pk, "market": "moneyline_away", "period": "full_game", "entity": None, "side": "away", "odds": away_odds})
+            odds_rows.append({"game_id": game_pk, "market": "moneyline_away", "period": "full_game", "entity": None, "side": "away", "odds": away_odds, "market_type": "game"})
         if home_odds is not None:
-            odds_rows.append({"game_id": game_pk, "market": "moneyline_home", "period": "full_game", "entity": None, "side": "home", "odds": home_odds})
+            odds_rows.append({"game_id": game_pk, "market": "moneyline_home", "period": "full_game", "entity": None, "side": "home", "odds": home_odds, "market_type": "game"})
         if model_prob is not None and selection in ("home", "away"):
             sim_rows.append(
                 {
@@ -4911,11 +4911,88 @@ def _mlb_market_board_rows_for_game(*, game_pk: Any, markets: dict[str, Any]) ->
         under_odds = totals.get("under_odds")
         model_prob = totals.get("model_prob")
         if over_odds is not None:
-            odds_rows.append({"game_id": game_pk, "market": "total", "period": "full_game", "entity": None, "side": "over", "line": line, "odds": over_odds})
+            odds_rows.append({"game_id": game_pk, "market": "total", "period": "full_game", "entity": None, "side": "over", "line": line, "odds": over_odds, "market_type": "game"})
         if under_odds is not None:
-            odds_rows.append({"game_id": game_pk, "market": "total", "period": "full_game", "entity": None, "side": "under", "line": line, "odds": under_odds})
+            odds_rows.append({"game_id": game_pk, "market": "total", "period": "full_game", "entity": None, "side": "under", "line": line, "odds": under_odds, "market_type": "game"})
         if model_prob is not None:
             sim_rows.append({"game_id": game_pk, "market": "total", "period": "full_game", "entity": None, "sim_projection": model_prob, "sim_source": "mlb_recommendation_engine"})
+
+    return odds_rows, sim_rows
+
+
+def _mlb_prop_display_market(row: dict[str, Any], *, is_pitcher: bool) -> str:
+    if is_pitcher:
+        prop = str(row.get("prop") or "").strip()
+        raw = f"pitcher_{prop}" if prop else str(row.get("market") or "pitcher_props")
+    else:
+        raw = str(row.get("market") or row.get("prop") or "hitter_props").strip()
+    tokens = []
+    for token in raw.replace("_", " ").split():
+        upper = token.upper()
+        tokens.append("RBI" if upper in {"RBI", "RBIS"} else token.capitalize())
+    return " ".join(tokens) or raw.title()
+
+
+def _mlb_market_board_prop_rows_for_game(*, game_pk: Any, markets: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Raw odds + sim rows for pitcher/hitter props.
+
+    Unlike moneyline/total, every prop row here comes from the SAME
+    recommendation-engine entry -- there is no separate raw-odds source
+    wired in yet for props, only the "official" and "candidate" ("extra")
+    tiers the engine already picked -- so every prop row will show as
+    "matched" for now. This still correctly demonstrates the contract
+    (entity attribution, market/period identity) and sets it up for when a
+    genuine full props odds feed is plugged in as an independent odds
+    source: unmatched/needs-resim states will start actually firing once
+    the odds side isn't always the same row as the sim side.
+    """
+    odds_rows: list[dict[str, Any]] = []
+    sim_rows: list[dict[str, Any]] = []
+
+    prop_lists = (
+        (markets.get("pitcherProps"), True),
+        (markets.get("extraPitcherProps"), True),
+        (markets.get("hitterProps"), False),
+        (markets.get("extraHitterProps"), False),
+    )
+    for rows, is_pitcher in prop_lists:
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            entity = str((row.get("pitcher_name") if is_pitcher else row.get("player_name")) or "").strip()
+            selection = str(row.get("selection") or "").strip().lower()
+            if not entity or selection not in ("over", "under"):
+                continue
+            market_label = _mlb_prop_display_market(row, is_pitcher=is_pitcher)
+            line = row.get("market_line") if row.get("market_line") is not None else row.get("line")
+            odds = row.get("odds") or row.get("price")
+            edge = row.get("edge")
+
+            odds_rows.append(
+                {
+                    "game_id": game_pk,
+                    "market": market_label,
+                    "period": "full_game",
+                    "entity": entity,
+                    "side": selection,
+                    "line": line,
+                    "odds": odds,
+                    "market_type": "prop",
+                }
+            )
+            if edge is not None:
+                sim_rows.append(
+                    {
+                        "game_id": game_pk,
+                        "market": market_label,
+                        "period": "full_game",
+                        "entity": entity,
+                        "sim_projection": edge,
+                        "sim_source": "mlb_recommendation_engine",
+                    }
+                )
 
     return odds_rows, sim_rows
 
@@ -4947,6 +5024,9 @@ def build_mlb_market_board(selected_date: str) -> dict[str, Any]:
         markets = game.get("markets") if isinstance(game.get("markets"), dict) else {}
 
         odds_rows, sim_rows = _mlb_market_board_rows_for_game(game_pk=game_pk, markets=markets)
+        prop_odds_rows, prop_sim_rows = _mlb_market_board_prop_rows_for_game(game_pk=game_pk, markets=markets)
+        odds_rows = odds_rows + prop_odds_rows
+        sim_rows = sim_rows + prop_sim_rows
         inventory = join_odds_to_sim(odds_rows, sim_rows)
         for row in inventory:
             row["market"] = _MLB_MARKET_BOARD_DISPLAY_LABELS.get(row.get("market"), row.get("market"))

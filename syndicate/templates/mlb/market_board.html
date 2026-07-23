@@ -37,7 +37,7 @@
   <body>
     <div class="board-header">
       <h1>MLB Market Board</h1>
-      <div class="sub">Every quoted moneyline &amp; total line, joined against the model where available — not just the recommendation engine's picks.</div>
+      <div class="sub">Every quoted moneyline, total, and player prop line, joined against the model where available — not just the recommendation engine's picks.</div>
     </div>
     <div class="board-nav">
       <a href="/mlb/market-board?date={{ prev_date }}">&larr; {{ prev_date }}</a>
@@ -63,6 +63,7 @@
           <table class="market-table">
             <thead>
               <tr>
+                <th>Player</th>
                 <th>Market</th>
                 <th>Side</th>
                 <th>Line</th>
@@ -74,13 +75,14 @@
             <tbody>
               {% for row in game.rows %}
                 <tr>
+                  <td>{{ row.entity if row.entity else '-' }}</td>
                   <td>{{ row.market }}</td>
                   <td class="pick-side">{{ row.side | title if row.side else '-' }}</td>
                   <td>{{ row.line if row.line is not none else '-' }}</td>
                   <td>{{ row.odds if row.odds is not none else '-' }}</td>
                   <td>
                     {% if row.sim_projection is not none %}
-                      {% if row.market == 'Moneyline' %}
+                      {% if row.market == 'Moneyline' or row.market_type == 'prop' %}
                         {{ '%.1f' | format(row.sim_projection * 100) }}%
                       {% else %}
                         {{ row.sim_projection }}
@@ -103,7 +105,7 @@
             </tbody>
           </table>
         {% else %}
-          <div class="no-rows">No moneyline or total lines available for this game yet.</div>
+          <div class="no-rows">No moneyline, total, or prop lines available for this game yet.</div>
         {% endif %}
       </div>
     {% endfor %}
