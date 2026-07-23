@@ -3703,43 +3703,16 @@ def _run_refresh_via_cli(
         # full-mode Export stage below still rebuilds game_cards again as
         # part of its own try/except, so a failure here is not fatal to the
         # rest of the refresh.
-        _debug_payload: dict[str, object] = {
-            "date": date_str,
-            "snapshot_rows": state.get("snapshot_rows"),
-            "source_root": str(source_root),
-            "processed_root": str(processed_root),
-        }
         try:
-            game_cards_rows, game_cards_path = _build_local_game_cards_artifact(
+            game_cards_rows, _ = _build_local_game_cards_artifact(
                 source_root=source_root,
                 processed_root=processed_root,
                 date_str=date_str,
                 log_file=log_file,
             )
             state["game_cards_rows"] = int(game_cards_rows)
-            _debug_payload["rows"] = game_cards_rows
-            _debug_payload["path"] = str(game_cards_path) if game_cards_path else None
         except Exception:
             _append_log(log_file, f"Fast-mode game_cards rebuild failed for {date_str}: {traceback.format_exc()}")
-            _debug_payload["exception"] = traceback.format_exc()
-        finally:
-            # Temporary observability (2026-07-23): _append_log's --log-file
-            # isn't reachable via any ops endpoint for this sport, and the
-            # outer refresh_odds_sources.py wrapper never forwards this
-            # script's own state dict in its JSON summary -- there was no
-            # way to confirm whether this rebuild is actually being reached
-            # in production, or what it decided, while diagnosing why the
-            # stale-slate fix (1816cfe1) wasn't taking visible effect.
-            # Written to an allowlisted hot-artifact path so it's readable
-            # via /api/ops/artifacts/export.
-            try:
-                debug_dir = source_root / "source_artifacts" / "data" / "market"
-                debug_dir.mkdir(parents=True, exist_ok=True)
-                (debug_dir / f"game_cards_rebuild_debug_{date_str}.json").write_text(
-                    json.dumps(_debug_payload, default=str), encoding="utf-8"
-                )
-            except Exception:
-                pass
 
     pred_ready = False
     if refresh_mode == "full" and not state.get("error") and int(state["snapshot_rows"] or 0) > 0 and (do_edges or do_export):
@@ -5218,30 +5191,6 @@ def main() -> int:
                 started_at=started_at,
                 input_hash=refresh_input_hash,
             )
-        # Temporary observability (2026-07-23): see the matching comment
-        # around the game_cards debug write above -- confirms whether
-        # _run_refresh_via_cli is even reached, or short-circuited by the
-        # existing-refresh-state/artifact-bundle reuse checks above.
-        try:
-            debug_root = source_root if source_root is not None else artifact_root_path
-            if debug_root is not None:
-                debug_dir = debug_root / "source_artifacts" / "data" / "market"
-                debug_dir.mkdir(parents=True, exist_ok=True)
-                (debug_dir / f"main_state_decision_debug_{target_date}.json").write_text(
-                    json.dumps(
-                        {
-                            "date": str(target_date),
-                            "force_refresh": bool(args.force_refresh),
-                            "reused_state": state is not None,
-                            "source_root": str(source_root),
-                            "artifact_root": str(artifact_root_path),
-                        },
-                        default=str,
-                    ),
-                    encoding="utf-8",
-                )
-        except Exception:
-            pass
         if state is None:
             if source_root is None:
                 state = {
