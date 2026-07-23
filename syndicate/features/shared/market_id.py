@@ -79,7 +79,17 @@ def attach_market_id(
     payload = dict(row)
     inferred_event_id = event_id if event_id is not None else payload.get("event_id") or payload.get("matchup") or payload.get("game_id")
     inferred_market_type = market_type if market_type is not None else payload.get("market_type") or payload.get("market") or payload.get("selection") or payload.get("period")
-    inferred_entity = entity if entity is not None else payload.get("entity") or payload.get("player_name") or payload.get("player") or payload.get("team") or payload.get("selection")
+    is_prop_candidate = str(payload.get("candidate_type") or "").strip().lower() == "prop"
+    if entity is not None:
+        inferred_entity = entity
+    else:
+        inferred_entity = payload.get("entity") or payload.get("player_name") or payload.get("player")
+        # Props identify their subject by player, never by team -- falling back to
+        # team here previously mislabeled entity-less prop rows as e.g. "ATL"
+        # instead of leaving them blank, which also produced spurious duplicate
+        # candidates for the same player prop (2026-07-23).
+        if not inferred_entity and not is_prop_candidate:
+            inferred_entity = payload.get("team") or payload.get("selection")
     inferred_line = line if line is not None else payload.get("line") or payload.get("point") or payload.get("spread") or payload.get("total")
     payload.setdefault("event_id", inferred_event_id)
     payload.setdefault("market_type", inferred_market_type)

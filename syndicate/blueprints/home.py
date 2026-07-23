@@ -1326,6 +1326,18 @@ def _finalize_home_prop_rows(rows: list[dict[str, Any]], *, slug: str, context_l
 
         market_label = _display_prop_market_label(item.get("market") or item.get("name"))
         player_name, display_name = _display_prop_title_parts(item.get("name"), market_label)
+        team_label = str(item.get("team") or away_label or "").strip()
+        if player_name and team_label and player_name.strip().lower() == team_label.lower():
+            # Diagnostic only (2026-07-23): catches the upstream row-builder that
+            # emits the team abbreviation into "name" instead of a player, which
+            # produces mis-attributed prop candidates and blank Projected values.
+            _LOGGER.warning(
+                "home_prop_row_name_equals_team slug=%s market=%s team=%s game_pk=%s",
+                slug,
+                market_label,
+                team_label,
+                game_pk,
+            )
         item["name"] = display_name
         item["market_display"] = market_label
         item["player_name"] = player_name

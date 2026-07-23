@@ -102,6 +102,13 @@ def normalize_odds_entry(*, row: Mapping[str, Any], sport: str, market_key: str,
     model_probability = _candidate_model_probability(row)
     market_probability = _candidate_market_probability(row)
     rank_score = _rank_score(edge, confidence, market_probability, model_probability)
+    is_prop_candidate = str(row.get("candidate_type") or "").strip().lower() == "prop"
+    # Props identify their subject by player, never by team -- falling back to
+    # team/name/title/label here previously mislabeled entity-less prop rows
+    # with the team abbreviation instead of leaving them blank (2026-07-23).
+    inferred_entity = entity or row.get("entity") or row.get("player_name") or row.get("player")
+    if not inferred_entity and not is_prop_candidate:
+        inferred_entity = row.get("team") or row.get("name") or row.get("title") or row.get("label")
 
     return {
         "schema_version": SCHEMA_VERSION,
@@ -110,7 +117,7 @@ def normalize_odds_entry(*, row: Mapping[str, Any], sport: str, market_key: str,
         "market_id": str(market_id or row.get("market_id") or market_key or "").strip(),
         "event_id": str(event_id or row.get("event_id") or row.get("event_key") or row.get("game_id") or row.get("game_pk") or "").strip() or None,
         "market_type": str(market_type or row.get("market_type") or row.get("market") or row.get("selection") or "").strip() or None,
-        "entity": str(entity or row.get("entity") or row.get("player_name") or row.get("player") or row.get("team") or row.get("name") or row.get("title") or row.get("label") or "").strip() or None,
+        "entity": str(inferred_entity or "").strip() or None,
         "selection": str(selection or row.get("selection") or "").strip() or None,
         "line": line if line is not None else _safe_float(row.get("line")),
         "odds": odds if odds is not None else _safe_float(row.get("odds")),

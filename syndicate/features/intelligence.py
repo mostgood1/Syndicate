@@ -4705,6 +4705,71 @@ def _apply_candidate_tier_penalty(candidate: dict[str, Any]) -> dict[str, Any]:
     return candidate
 
 
+def _prop_dupe_line_token(value: Any) -> str:
+    if value in (None, "", "-"):
+        return ""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return _safe_text(value, "").strip().lower()
+    if number.is_integer():
+        return str(int(number))
+    return f"{number:.4f}".rstrip("0").rstrip(".")
+
+
+def _prop_candidate_has_player_identity(candidate: Mapping[str, Any]) -> bool:
+    team_tokens = {
+        _safe_text(candidate.get("team"), "").strip().lower(),
+        _safe_text(candidate.get("home_team"), "").strip().lower(),
+        _safe_text(candidate.get("away_team"), "").strip().lower(),
+    }
+    team_tokens.discard("")
+    for field in ("entity", "player_name", "player"):
+        value = _safe_text(candidate.get(field), "").strip().lower()
+        if value and value not in team_tokens:
+            return True
+    return False
+
+
+def _drop_entityless_prop_duplicates(candidates: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    # 2026-07-23: two pipelines can independently produce a candidate for the
+    # same underlying player prop -- one correctly attributed to the player,
+    # the other with the player identity missing/blank (root cause traced to
+    # a row-builder that leaves player_name blank rather than always
+    # resolving it). Rather than serve both as a visible duplicate, or guess
+    # which is "more correct", prefer whichever sibling actually carries a
+    # player identity for the same sport/matchup/market/line and drop the
+    # rest. Deliberately does not key on game_pk: the entity-less duplicate
+    # is often missing it entirely.
+    groups: dict[tuple[str, str, str, str], list[dict[str, Any]]] = {}
+    for candidate in candidates:
+        if _safe_text(candidate.get("candidate_type"), "") != "prop":
+            continue
+        key = (
+            _safe_text(candidate.get("sport_slug"), "sport"),
+            _safe_text(candidate.get("matchup"), "matchup"),
+            _safe_text(candidate.get("market"), "market"),
+            _prop_dupe_line_token(candidate.get("line")),
+        )
+        groups.setdefault(key, []).append(candidate)
+
+    dropped_ids: set[int] = set()
+    for group in groups.values():
+        if len(group) < 2:
+            continue
+        if not any(_prop_candidate_has_player_identity(c) for c in group):
+            continue
+        for candidate in group:
+            if not _prop_candidate_has_player_identity(candidate):
+                dropped_ids.add(id(candidate))
+
+    if not dropped_ids:
+        return candidates, []
+    kept = [c for c in candidates if id(c) not in dropped_ids]
+    dropped = [c for c in candidates if id(c) in dropped_ids]
+    return kept, dropped
+
+
 def _primary_query_candidates(
     overview: list[dict[str, Any]],
     preferences: dict[str, Any],
@@ -4882,6 +4947,17 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
     for removed_candidate in classification_pruned + dedupe_pruned:
         _log_json_event(logging.INFO, "collect_candidates_pruned", pipeline="collect_candidates", **removed_candidate)
     _log_candidate_stage(pipeline_name="collect_candidates", stage="post_dedupe_and_classify", before=[], after=deduped)
+
+    deduped, entityless_prop_duplicates = _drop_entityless_prop_duplicates(deduped)
+    for removed_candidate in entityless_prop_duplicates:
+        _log_json_event(
+            logging.INFO,
+            "collect_candidates_pruned",
+            pipeline="collect_candidates",
+            **_collect_candidate_trace(removed_candidate, reason="entityless_prop_duplicate", stage="entityless_prop_duplicate_filter"),
+        )
+    _log_candidate_stage(pipeline_name="collect_candidates", stage="entityless_prop_duplicate_filter", before=[], after=deduped)
+
     return deduped
 
 
