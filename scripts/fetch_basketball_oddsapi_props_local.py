@@ -165,7 +165,19 @@ def _discover_event_markets(*, api_key: str, sport_key: str, event_id: str, regi
         return []
 
 
-def fetch_player_props_current(*, api_key: str, league: str, date_str: str, regions: str, bookmakers: str | None, markets: list[str] | None) -> pd.DataFrame:
+def fetch_player_props_current(*, api_key: str, league: str, date_str: str, regions: str, bookmakers: str | None, markets: list[str] | None) -> pd.DataFrame | None:
+    """Returns an empty DataFrame when the fetch itself was inconclusive
+    (network/API failure, malformed response) -- the caller may reasonably
+    fall back to a recent prior snapshot in that case, same as before.
+    Returns None specifically when the events list was fetched successfully
+    and confirms zero real events for date_str -- e.g. an all-star break, or
+    any other genuine no-games day. The caller must NOT paper over that with
+    a different date's real schedule: confirmed live 2026-07-23, doing so
+    left an all-star-break date permanently serving a byte-for-byte-matching
+    prior day's slate (same commence_times, same matchups), since nothing
+    downstream could tell "no games" apart from "fetch failed, reuse
+    whatever's newest" before this distinction existed.
+    """
     sport_key = SPORT_KEYS[str(league).strip().lower()]
     target_date = pd.to_datetime(date_str).date()
     desired_markets = list(markets or DEFAULT_MARKETS)
@@ -187,7 +199,7 @@ def fetch_player_props_current(*, api_key: str, league: str, date_str: str, regi
         except Exception:
             continue
     if not day_events:
-        return pd.DataFrame()
+        return None
 
     rows: list[dict[str, object]] = []
     snapshot_ts = pd.Timestamp.utcnow().isoformat()
@@ -298,6 +310,23 @@ def main(argv: list[str] | None = None) -> int:
         markets=(market_list or None),
     )
 
+    if df is None:
+        # Confirmed: the events list was fetched successfully and genuinely
+        # has zero events for this date (an all-star break, a schedule gap,
+        # etc.) -- never preserve an existing file or fall back to a
+        # different date's snapshot here. Reusing a different day's real
+        # schedule as a stand-in for a confirmed no-games day is actively
+        # wrong, not a reasonable placeholder (confirmed live 2026-07-23: an
+        # all-star-break date permanently inherited a prior day's full
+        # slate this way). Write a genuine empty result so downstream
+        # consumers correctly see "no games" instead.
+        try:
+            pd.DataFrame(columns=["event_id", "commence_time", "home_team", "away_team"]).to_csv(out_path, index=False)
+        except Exception:
+            pass
+        print(f"No events scheduled for {args.date}; wrote empty snapshot at {out_path}")
+        return 0
+
     existing_has_rows = False
     if out_path.exists():
         try:
@@ -305,7 +334,7 @@ def main(argv: list[str] | None = None) -> int:
         except Exception:
             existing_has_rows = False
 
-    if df is None or df.empty:
+    if df.empty:
         if existing_has_rows:
             print(f"WARNING: No player props fetched for {args.date}; preserving existing snapshot at {out_path}")
             return 0

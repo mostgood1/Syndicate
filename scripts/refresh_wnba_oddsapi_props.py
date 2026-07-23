@@ -905,11 +905,52 @@ def _refresh_step_input_hash(*, source_root: Path, processed_root: Path, date_st
     )
 
 
+def _invalidate_stale_processed_snapshot_alias_if_needed(*, alias_path: Path, date_str: str, log_file: Path | None) -> None:
+    # A fresh raw fetch for date_str came back empty -- historically this
+    # left any EXISTING alias in place untouched, treating an empty fetch as
+    # possibly transient (a network blip). But that has no expiry: once an
+    # alias's rows are for a date that will never have games (a schedule
+    # revision, an all-star break, etc.), every fetch for that date comes
+    # back empty forever, and the stale alias is served as "this date's real
+    # schedule" indefinitely. Confirmed live 2026-07-23: an All-Star-break
+    # date was still serving 6 games byte-for-byte matching a real prior
+    # slate's commence_times, driving a full phantom rebuild every refresh
+    # cycle. Only invalidate when the alias's own rows demonstrably belong
+    # to a DIFFERENT calendar date than date_str (via central_date_from_iso,
+    # the same check _build_local_game_cards_artifact already trusts) --
+    # never delete on ambiguity (missing commence_time column, parse
+    # failure, read error), only on a confirmed date mismatch.
+    if not alias_path.exists() or not alias_path.is_file():
+        return
+    try:
+        with alias_path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            if reader.fieldnames is None or "commence_time" not in reader.fieldnames:
+                return
+            saw_row = False
+            saw_match = False
+            for index, row in enumerate(reader):
+                if index >= 20:
+                    break
+                saw_row = True
+                game_date = central_date_from_iso(row.get("commence_time"))
+                if game_date is not None and game_date.isoformat() == date_str:
+                    saw_match = True
+                    break
+        if saw_row and not saw_match:
+            alias_path.unlink()
+            if log_file is not None:
+                _append_log(log_file, f"Invalidated stale processed OddsAPI props snapshot alias (rows belong to a different date than {date_str}): {alias_path}")
+    except Exception:
+        return
+
+
 def _materialize_processed_snapshot_alias(*, processed_root: Path, date_str: str, snapshot_path: Path, log_file: Path | None = None) -> tuple[Path, int, str | None]:
     alias_path = processed_root / f"oddsapi_player_props_{date_str}.csv"
     try:
         if not snapshot_path.exists() or not snapshot_path.is_file() or snapshot_path.stat().st_size <= 0:
-            return alias_path, 0, None
+            _invalidate_stale_processed_snapshot_alias_if_needed(alias_path=alias_path, date_str=date_str, log_file=log_file)
+            return alias_path, (int(_count_csv_rows_quick(alias_path)) if alias_path.exists() else 0), None
         alias_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(snapshot_path, alias_path)
         rows = int(_count_csv_rows_quick(alias_path))
