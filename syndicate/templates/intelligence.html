@@ -507,7 +507,7 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 12.5px;
-    min-width: 640px;
+    min-width: 880px;
   }
 
   table.board-blotter th {
@@ -1602,7 +1602,7 @@
       <div class="board-blotter-wrap">
         <table class="board-blotter">
           <thead>
-            <tr><th>Lane</th><th>Matchup</th><th>Pick</th><th>Win%</th><th>Edge</th><th>Move</th><th></th></tr>
+            <tr><th>Lane</th><th>Matchup</th><th>Pick</th><th>Odds</th><th>Projected</th><th>Live</th><th>Win%</th><th>Edge</th><th>Move</th><th></th></tr>
           </thead>
           <tbody>
             ${sorted.map((item) => {
@@ -1617,6 +1617,13 @@
               const title = displayTitle(item);
               const propText = propLine(item) || "";
               const oddsText = String(item.odds ?? item.odds_current ?? "");
+              const oddsDisplay = displayOdds(item);
+              const projectedDisplay = displayProjection(item);
+              // Live proj. is only ever meaningful once a bet is actually
+              // live -- a pregame row showing a stale/blank live-projection
+              // field is worse than showing nothing, since there's no
+              // "current" value to report yet.
+              const liveDisplay = itemState === "live" ? displayLiveProjection(item) : null;
               const rowAttrs = `data-syndicate-name="${escapeHtml(title)}" data-syndicate-market="${escapeHtml(item.market || item.market_label || "")}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}" data-syndicate-odds="${escapeHtml(oddsText)}" data-syndicate-prop-line="${escapeHtml(propText)}"`;
               return `
                 <tr ${rowAttrs}>
@@ -1626,6 +1633,9 @@
                     <div class="board-blotter__meta">${escapeHtml(sport)}${matchup ? " &middot; " + escapeHtml(matchup) : ""}</div>
                   </td>
                   <td>${escapeHtml(propText || "-")}</td>
+                  <td>${oddsDisplay ? escapeHtml(oddsDisplay) : "&mdash;"}</td>
+                  <td>${projectedDisplay ? escapeHtml(projectedDisplay) : "&mdash;"}</td>
+                  <td>${liveDisplay ? escapeHtml(liveDisplay) : "&mdash;"}</td>
                   <td>${confidence !== null ? Math.round(confidence * 100) + "%" : "&mdash;"}</td>
                   <td class="board-blotter__edge board-blotter__edge--${tier}">${(edge * 100).toFixed(1)}%</td>
                   <td>${movementHtml || "&mdash;"}</td>
@@ -1634,7 +1644,7 @@
                     <button type="button" class="board-action-button board-action-button--slip" data-slip-action="toggle">🎫</button>
                   </td>
                 </tr>
-                ${reasoning ? `<tr class="board-blotter__reason-row" ${rowAttrs}><td></td><td colspan="6">${escapeHtml(reasoning)}</td></tr>` : ""}
+                ${reasoning ? `<tr class="board-blotter__reason-row" ${rowAttrs}><td></td><td colspan="9">${escapeHtml(reasoning)}</td></tr>` : ""}
               `;
             }).join("")}
           </tbody>

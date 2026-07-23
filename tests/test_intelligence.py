@@ -5722,6 +5722,21 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(mocked_state_response.call_args.kwargs.get("allow_latest_fallback"), False)
         mocked_queue.assert_not_called()
 
+    def test_intelligence_blotter_view_includes_odds_projected_and_live_columns(self) -> None:
+        # The blotter (table) view showed Lane/Matchup/Pick/Win%/Edge/Move
+        # only -- no odds, no projected value, and no current-live value
+        # for a live bet, even though the card view already surfaced all
+        # three via cardFacts(). renderBlotter is pure client-side JS with
+        # no server-rendered table markup to assert against directly, so
+        # this checks the template's JS source for the header cells and
+        # the live-only gating comment as a guard against silently
+        # dropping them again in a future edit -- the real behavioral
+        # verification was done via Playwright against a running server.
+        template_path = Path(__file__).resolve().parents[1] / "syndicate" / "templates" / "intelligence.html"
+        source = template_path.read_text(encoding="utf-8")
+        self.assertIn("<th>Odds</th><th>Projected</th><th>Live</th>", source)
+        self.assertIn('itemState === "live" ? displayLiveProjection(item) : null', source)
+
     def test_intelligence_page_renders_game_cards_container(self) -> None:
         # Mini per-game cards (grouping opportunities by underlying game so
         # a user can select one game's picks instead of scrolling the whole
