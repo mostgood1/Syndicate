@@ -1912,6 +1912,22 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
         if log_file is not None:
             _append_log(log_file, message)
 
+    def _no_data(reason: str) -> tuple[int, Path | None]:
+        # Real bug found 2026-07-23: every early "nothing to build from"
+        # return in this function used to just return (0, None) without
+        # touching out_path, leaving a stale game_cards file from a PRIOR
+        # successful run (e.g. a real slate from days ago) sitting there
+        # forever whenever today's build has no usable input at all -- as
+        # opposed to the one branch (processed game_odds fallback) that
+        # already cleaned up correctly when its OWN input existed but every
+        # row got filtered out. A missing/empty input is exactly as much a
+        # "nothing real for today" signal as an input full of stale rows,
+        # and must clear the same stale output.
+        _log(reason)
+        if out_path.exists() and out_path.is_file():
+            out_path.unlink()
+        return 0, None
+
     def _prediction_matchups() -> set[tuple[str, str]]:
         predictions_path = processed_root / f"predictions_{date_str}.csv"
         if not predictions_path.exists() or not predictions_path.is_file() or _count_csv_rows_quick(predictions_path) <= 0:
@@ -2033,8 +2049,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
         # Fallback to processed game_odds when raw team odds snapshots are unavailable.
         game_odds_path = source_root / "data" / "processed" / f"game_odds_{date_str}.csv"
         if not game_odds_path.exists() or not game_odds_path.is_file() or _count_csv_rows_quick(game_odds_path) <= 0:
-            _log(f"Local game_cards build skipped for {date_str}: no raw team odds snapshot found")
-            return 0, None
+            return _no_data(f"Local game_cards build skipped for {date_str}: no raw team odds snapshot found")
 
         allowed_matchups: set[tuple[str, str]] = set()
         props_market_rows_by_matchup: dict[tuple[str, str], list[dict[str, object]]] = {}
@@ -2143,10 +2158,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
             )
 
         if not rows_out:
-            if out_path.exists() and out_path.is_file():
-                out_path.unlink()
-            _log(f"Local game_cards build skipped for {date_str}: processed game_odds had no usable rows")
-            return 0, None
+            return _no_data(f"Local game_cards build skipped for {date_str}: processed game_odds had no usable rows")
 
         _write_game_cards_csv_rows(out_path, rows_out)
         _append_log(log_file, f"Built local game_cards from game_odds fallback: {out_path} (rows={len(rows_out)})")
@@ -2161,16 +2173,14 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
             raw_frame = pd.read_csv(raw_path)
         _log_frame_memory("wnba_game_cards_raw_read", raw_frame, path=str(raw_path))
     except Exception as exc:
-        _log(f"Failed to read raw team odds snapshot {raw_path}: {exc}")
-        return 0, None
+        return _no_data(f"Failed to read raw team odds snapshot {raw_path}: {exc}")
 
     if raw_frame.empty:
-        return 0, None
+        return _no_data(f"Local game_cards build skipped for {date_str}: raw team odds snapshot was empty")
 
     required_columns = {"event_id", "commence_time", "market", "outcome_name", "point", "price", "home_team", "away_team"}
     if not required_columns.issubset(set(str(column) for column in raw_frame.columns)):
-        _log(f"Local game_cards build skipped for {date_str}: raw team odds snapshot missing required columns")
-        return 0, None
+        return _no_data(f"Local game_cards build skipped for {date_str}: raw team odds snapshot missing required columns")
 
     working = raw_frame.copy()
     _log_frame_memory("wnba_game_cards_copied", working, path=str(raw_path))
@@ -2178,7 +2188,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
     working = working[working["commence_time"].apply(_commence_time_matches_slate_date)].copy()
     _log_frame_memory("wnba_game_cards_filtered", working, path=str(raw_path))
     if working.empty:
-        return 0, None
+        return _no_data(f"Local game_cards build skipped for {date_str}: no rows in raw team odds snapshot matched the slate date")
 
     rows_out: list[dict[str, object]] = []
     grouped = working.groupby(["event_id", "commence_time", "home_team", "away_team"], dropna=False, sort=True)
@@ -2210,7 +2220,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
         )
 
     if not rows_out:
-        return 0, None
+        return _no_data(f"Local game_cards build skipped for {date_str}: no groupable rows in raw team odds snapshot")
 
     _write_game_cards_csv_rows(out_path, rows_out)
     return len(rows_out), out_path

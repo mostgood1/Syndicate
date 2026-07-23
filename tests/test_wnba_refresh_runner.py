@@ -278,6 +278,48 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(float(row["away_spread"]), 4.5)
         self.assertEqual(float(row["total"]), 164.5)
 
+    def test_build_local_game_cards_artifact_clears_stale_output_when_no_input_exists_at_all(self) -> None:
+        # Real bug found 2026-07-23: every early "nothing to build from"
+        # return in this function used to just return (0, None) without
+        # ever touching a pre-existing game_cards output file -- confirmed
+        # live via a debug artifact showing the function correctly computed
+        # rows=0 for an All-Star-break date with genuinely no snapshot/
+        # game_odds input at all, yet the stale game_cards file from a
+        # prior real slate day kept being served unchanged, because this
+        # particular "no input" branch never reached the cleanup logic
+        # (unlike the one branch, game_odds-exists-but-every-row-filtered,
+        # that already deleted stale output correctly).
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir) / "source"
+            processed_root = source_root / "data" / "processed"
+            raw_root = source_root / "data" / "raw"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            raw_root.mkdir(parents=True, exist_ok=True)
+            date_str = "2026-07-23"
+
+            stale_path = processed_root / f"game_cards_{date_str}.csv"
+            stale_path.write_text(
+                "date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri\n"
+                "2026-07-23,abc,Los Angeles Sparks,Phoenix Mercury,2026-07-22T19:00:00Z,-118.1,-62.5,-1.44,1.44,178.5,oddsapi_consensus,LAS,PHX\n",
+                encoding="utf-8",
+            )
+
+            # No odds_wnba_current, no odds_wnba_player_props, no game_odds --
+            # genuinely nothing to build from, exactly like an All-Star-break
+            # date with zero real games.
+            rows, out_path = module._build_local_game_cards_artifact(
+                source_root=source_root,
+                processed_root=processed_root,
+                date_str=date_str,
+                log_file=None,
+            )
+
+        self.assertEqual(rows, 0)
+        self.assertIsNone(out_path)
+        self.assertFalse(stale_path.exists())
+
     def test_build_local_game_cards_artifact_uses_raw_team_odds_snapshot(self) -> None:
         module = self._load_module()
 
