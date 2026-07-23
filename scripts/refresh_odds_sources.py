@@ -1758,8 +1758,16 @@ _FORCE_REFRESH_CAPABLE_SCRIPT_NAMES = {
     "refresh_wnba_oddsapi_props.py",
 }
 
+# Only refresh_wnba_oddsapi_props.py accepts --only-matchups today (Phase 1
+# of the single-game sim scoping initiative -- WNBA went first since it's
+# architecturally closest to ready; other sports don't define this flag and
+# would error on an unrecognized argument).
+_ONLY_MATCHUPS_CAPABLE_SCRIPT_NAMES = {
+    "refresh_wnba_oddsapi_props.py",
+}
 
-def _step_command_with_mode(step: RefreshStep, mode: str, *, force_refresh: bool = False) -> tuple[str, ...]:
+
+def _step_command_with_mode(step: RefreshStep, mode: str, *, force_refresh: bool = False, only_matchups: str = "") -> tuple[str, ...]:
     normalized_mode = str(mode or "full").strip().lower() or "full"
     command = list(step.command)
     if normalized_mode != "full":
@@ -1777,6 +1785,12 @@ def _step_command_with_mode(step: RefreshStep, mode: str, *, force_refresh: bool
     # scripts don't define the flag and would error on an unrecognized argument.
     if force_refresh and any(str(part).endswith(tuple(_FORCE_REFRESH_CAPABLE_SCRIPT_NAMES)) for part in command):
         command.append("--force-refresh")
+    # Gated behind force_refresh too: without --force-refresh, refresh_wnba_
+    # oddsapi_props.py's own cache-reuse gate skips the predictions run
+    # entirely before --only-matchups would ever matter.
+    normalized_only_matchups = str(only_matchups or "").strip()
+    if force_refresh and normalized_only_matchups and any(str(part).endswith(tuple(_ONLY_MATCHUPS_CAPABLE_SCRIPT_NAMES)) for part in command):
+        command.extend(["--only-matchups", normalized_only_matchups])
     return tuple(command)
 
 
@@ -1954,7 +1968,12 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
                 name=step.name,
                 phases=step.phases,
                 cwd=step.cwd,
-                command=_step_command_with_mode(step, refresh_mode, force_refresh=_sport_force_refresh_scope(args, sport)),
+                command=_step_command_with_mode(
+                    step,
+                    refresh_mode,
+                    force_refresh=_sport_force_refresh_scope(args, sport),
+                    only_matchups=(str(getattr(args, "wnba_only_matchups", "") or "").strip() if sport == "wnba" else ""),
+                ),
                 env_updates=step.env_updates,
                 description=step.description,
             ),
@@ -2387,6 +2406,13 @@ def main() -> int:
         default="",
         help="Comma-separated sport slugs to scope --force-refresh to (e.g. an NBA-only injury change). "
         "Omit to force-refresh every force-refresh-capable sport in --sports, matching prior behavior.",
+    )
+    parser.add_argument(
+        "--wnba-only-matchups",
+        default="",
+        help="Comma-separated HOME-AWAY tricode pairs (e.g. LVA-NYL,SEA-CHI) forwarded to "
+        "refresh_wnba_oddsapi_props.py's --only-matchups when --force-refresh applies to wnba. "
+        "Omit to resimulate WNBA's whole slate as today.",
     )
     parser.add_argument("--continue-on-error", action="store_true", default=True, help="Continue across sports even when one refresh fails.")
     parser.add_argument("--no-continue-on-error", action="store_false", dest="continue_on_error")

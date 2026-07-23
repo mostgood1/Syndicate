@@ -3526,6 +3526,7 @@ def _run_refresh_via_cli(
     do_export: bool,
     do_push: bool,
     smart_sim_overwrite: bool = False,
+    only_matchups: set[tuple[str, str]] | None = None,
     log_file: Path,
     started_at: str | None = None,
     mode: str = "full",
@@ -3657,6 +3658,7 @@ def _run_refresh_via_cli(
                         smart_sim_pbp=_env_bool("REFRESH_PREDICT_PROPS_SMART_SIM_PBP", True),
                         smart_sim_workers=max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS", 1)),
                         smart_sim_overwrite=bool(smart_sim_overwrite),
+                        only_matchups=only_matchups,
                         log_file=log_file,
                         heartbeat_cb=_touch_progress,
                         heartbeat_every_s=5.0,
@@ -4979,6 +4981,24 @@ def _export_recommendations_artifact(*, source_root: Path, date_str: str, proces
     return str(destination)
 
 
+def _parse_only_matchups_arg(raw: str) -> set[tuple[str, str]] | None:
+    """Comma-separated HOME-AWAY tricode pairs, e.g. "LVA-NYL,SEA-CHI". Team
+    tricodes are always 2-4 uppercase letters with no hyphens, so a single
+    "-" split is unambiguous. Malformed tokens are dropped (not fatal); an
+    all-empty/all-malformed result returns None, matching the "unscoped --
+    resim per today's default behavior" semantics of omitting the flag."""
+    pairs: set[tuple[str, str]] = set()
+    for token in str(raw or "").split(","):
+        token = token.strip().upper()
+        if not token or "-" not in token:
+            continue
+        home, _, away = token.partition("-")
+        home, away = home.strip(), away.strip()
+        if home and away:
+            pairs.add((home, away))
+    return pairs or None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the WNBA OddsAPI props refresh job through a Syndicate-owned entrypoint.")
     parser.add_argument("--date", required=True)
@@ -5005,6 +5025,20 @@ def main() -> int:
     # existing scoping mechanism work; pass this explicitly for the real
     # "rebuild everything" case instead of overloading --force-refresh.
     parser.add_argument("--smart-sim-overwrite", action="store_true")
+    # The scoping mechanism the comment above references: forces just these
+    # matchups' smart-sim artifacts to be invalidated and rebuilt, leaving
+    # every other game's existing artifact untouched (unlike
+    # --smart-sim-overwrite, which nukes the whole date's artifacts first).
+    # If both flags are passed, --smart-sim-overwrite wins for every game
+    # (no special-casing needed -- see _smart_sim_run_date_local's
+    # force_this_game = bool(overwrite) or is_targeted).
+    parser.add_argument(
+        "--only-matchups",
+        default="",
+        help="Comma-separated HOME-AWAY tricode pairs (e.g. LVA-NYL,SEA-CHI) to force-resim just "
+             "these matchups' smart-sim artifacts. Omit to resimulate the whole slate per today's "
+             "default skip-if-exists behavior (same as today).",
+    )
     parser.add_argument("--days-ahead", type=int, default=0)
     parser.add_argument("--started-at")
     parser.add_argument("--mode", choices=("fast", "full"), default="full")
@@ -5066,6 +5100,7 @@ def main() -> int:
                 do_export=bool(args.do_export),
                 do_push=bool(args.do_push),
                 smart_sim_overwrite=bool(args.smart_sim_overwrite),
+                only_matchups=_parse_only_matchups_arg(args.only_matchups),
                 log_file=Path(args.log_file).resolve(),
                 started_at=started_at,
                 mode=str(args.mode or "full"),

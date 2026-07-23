@@ -1521,6 +1521,62 @@ class OpsRefreshApiTests(unittest.TestCase):
             self.assertIn("--force-refresh", called_command)
             self.assertNotIn("--force-refresh-sports", called_command)
 
+    def test_launch_refresh_run_includes_wnba_only_matchups_when_force_refresh_and_scoped(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            with patch.dict(os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ), patch("syndicate.features.shared.ops_refresh.subprocess.Popen") as mocked_popen:
+                mocked_popen.return_value.pid = 2471
+                from syndicate.features.shared import ops_refresh
+
+                result = ops_refresh.launch_refresh_run(
+                    sports="wnba", phase="live", dry_run=True, force_refresh=True, wnba_only_matchups="LVA-NYL"
+                )
+
+            self.assertTrue(result["ok"])
+            called_command = mocked_popen.call_args.args[0]
+            self.assertIn("--wnba-only-matchups", called_command)
+            self.assertIn("LVA-NYL", called_command)
+
+    def test_launch_refresh_run_omits_wnba_only_matchups_when_not_provided(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            with patch.dict(os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ), patch("syndicate.features.shared.ops_refresh.subprocess.Popen") as mocked_popen:
+                mocked_popen.return_value.pid = 2472
+                from syndicate.features.shared import ops_refresh
+
+                result = ops_refresh.launch_refresh_run(sports="wnba", phase="live", dry_run=True, force_refresh=True)
+
+            self.assertTrue(result["ok"])
+            called_command = mocked_popen.call_args.args[0]
+            self.assertNotIn("--wnba-only-matchups", called_command)
+
+    def test_launch_refresh_run_omits_wnba_only_matchups_when_force_refresh_false(self) -> None:
+        # Without --force-refresh, refresh_wnba_oddsapi_props.py's own
+        # cache-reuse gate skips the run before scoping would ever matter --
+        # this pairing is structural, not left to caller discipline.
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            with patch.dict(os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ), patch("syndicate.features.shared.ops_refresh.subprocess.Popen") as mocked_popen:
+                mocked_popen.return_value.pid = 2473
+                from syndicate.features.shared import ops_refresh
+
+                result = ops_refresh.launch_refresh_run(
+                    sports="wnba", phase="live", dry_run=True, force_refresh=False, wnba_only_matchups="LVA-NYL"
+                )
+
+            self.assertTrue(result["ok"])
+            called_command = mocked_popen.call_args.args[0]
+            self.assertNotIn("--wnba-only-matchups", called_command)
+
     def test_launch_refresh_run_uses_render_live_refresh_defaults_when_args_are_omitted(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             repo_root = Path(tmp_dir)

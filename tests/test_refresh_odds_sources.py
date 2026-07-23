@@ -583,6 +583,83 @@ class RefreshOddsSourcesTests(unittest.TestCase):
 
         self.assertNotIn("--force-refresh", command)
 
+    def test_step_command_with_mode_appends_only_matchups_when_force_refresh_and_scoped(self) -> None:
+        module = self._load_module()
+        step = module.RefreshStep(
+            name="wnba_oddsapi_props_job",
+            phases=("pregame", "live"),
+            cwd=Path("."),
+            command=("python", "scripts/refresh_wnba_oddsapi_props.py", "--date", "2026-07-13"),
+            env_updates=None,
+            description="test step",
+        )
+
+        command = module._step_command_with_mode(step, "full", force_refresh=True, only_matchups="LVA-NYL,SEA-CHI")
+
+        self.assertIn("--only-matchups", command)
+        self.assertIn("LVA-NYL,SEA-CHI", command)
+
+    def test_step_command_with_mode_omits_only_matchups_when_force_refresh_false(self) -> None:
+        # --only-matchups without --force-refresh would be silently
+        # ineffective (refresh_wnba_oddsapi_props.py's own cache-reuse gate
+        # skips the run first), so it must never be appended standalone.
+        module = self._load_module()
+        step = module.RefreshStep(
+            name="wnba_oddsapi_props_job",
+            phases=("pregame", "live"),
+            cwd=Path("."),
+            command=("python", "scripts/refresh_wnba_oddsapi_props.py", "--date", "2026-07-13"),
+            env_updates=None,
+            description="test step",
+        )
+
+        command = module._step_command_with_mode(step, "full", force_refresh=False, only_matchups="LVA-NYL")
+
+        self.assertNotIn("--only-matchups", command)
+
+    def test_step_command_with_mode_omits_only_matchups_when_unscoped(self) -> None:
+        module = self._load_module()
+        step = module.RefreshStep(
+            name="wnba_oddsapi_props_job",
+            phases=("pregame", "live"),
+            cwd=Path("."),
+            command=("python", "scripts/refresh_wnba_oddsapi_props.py", "--date", "2026-07-13"),
+            env_updates=None,
+            description="test step",
+        )
+
+        command = module._step_command_with_mode(step, "full", force_refresh=True, only_matchups="")
+
+        self.assertNotIn("--only-matchups", command)
+
+    def test_step_command_with_mode_does_not_add_only_matchups_for_nba(self) -> None:
+        # Only refresh_wnba_oddsapi_props.py accepts --only-matchups today;
+        # NBA's script would error on an unrecognized argument.
+        module = self._load_module()
+        step = module.RefreshStep(
+            name="nba_oddsapi_props_job",
+            phases=("pregame", "live"),
+            cwd=Path("."),
+            command=("python", "scripts/refresh_nba_oddsapi_props.py", "--date", "2026-07-13"),
+            env_updates=None,
+            description="test step",
+        )
+
+        command = module._step_command_with_mode(step, "full", force_refresh=True, only_matchups="LVA-NYL")
+
+        self.assertNotIn("--only-matchups", command)
+
+    def test_wnba_only_matchups_argument_is_accepted_by_the_parser(self) -> None:
+        module = self._load_module()
+        with patch.object(
+            module.sys,
+            "argv",
+            ["refresh_odds_sources.py", "--date", "2026-07-13", "--force-refresh", "--wnba-only-matchups", "LVA-NYL", "--list"],
+        ), patch("builtins.print"):
+            rc = module.main()
+
+        self.assertEqual(rc, 0)
+
     def test_force_refresh_argument_is_accepted_by_the_parser(self) -> None:
         # Exercise the real argparse parser via main()'s early --list branch
         # (returns 0 without needing the full pipeline). An unrecognized

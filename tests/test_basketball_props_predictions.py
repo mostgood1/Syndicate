@@ -280,6 +280,49 @@ class BasketballPropsPredictionsTests(unittest.TestCase):
             self.assertEqual(Path.cwd(), previous_cwd)
             self.assertTrue(log_path.exists())
 
+    def test_export_props_predictions_local_threads_only_matchups_to_smart_sim_helper(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source_root = root / "source"
+            (source_root / "src").mkdir(parents=True, exist_ok=True)
+            out_path = root / "props_predictions_2026-05-22.csv"
+            log_path = root / "refresh.log"
+            helper_calls: list[dict[str, object]] = []
+
+            def _fake_smart_sim_helper(**kwargs):
+                helper_calls.append(dict(kwargs))
+                Path(kwargs["out_path"]).write_text("player\nA\n", encoding="utf-8")
+                return 1, kwargs["out_path"]
+
+            with patch.object(
+                predictions_module.basketball_props_smart_sim,
+                "export_props_predictions_with_smart_sim_local",
+                side_effect=_fake_smart_sim_helper,
+            ), patch.object(
+                predictions_module,
+                "finalize_props_predictions_local",
+                return_value=(1, out_path),
+            ):
+                export_props_predictions_local(
+                    source_root=source_root,
+                    date_str="2026-05-22",
+                    out_path=out_path,
+                    calib_window=7,
+                    calibrate_player=True,
+                    player_calib_window=30,
+                    player_min_pairs=6,
+                    player_shrink_k=8,
+                    use_smart_sim=True,
+                    smart_sim_n_sims=150,
+                    smart_sim_pbp=True,
+                    smart_sim_workers=1,
+                    only_matchups={("LVA", "NYL")},
+                    log_file=log_path,
+                )
+
+            self.assertEqual(len(helper_calls), 1)
+            self.assertEqual(helper_calls[0]["only_matchups"], {("LVA", "NYL")})
+
     def test_export_props_predictions_local_passes_finalize_args(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)

@@ -986,6 +986,7 @@ def launch_refresh_run(
     launch_mode: str | None = None,
     force_refresh: bool = False,
     force_refresh_sports: str | None = None,
+    wnba_only_matchups: str | None = None,
 ) -> dict[str, Any]:
     _assert_no_active_refresh_run()
     selected_date = date or _today_date()
@@ -1048,6 +1049,14 @@ def launch_refresh_run(
             # (force-refresh applies to every force-refresh-capable sport in
             # the launch), so this is purely additive.
             refresh_command.extend(["--force-refresh-sports", force_refresh_sports_text])
+        wnba_only_matchups_text = str(wnba_only_matchups or "").strip()
+        if wnba_only_matchups_text:
+            # Nested under force_refresh deliberately: without --force-refresh,
+            # refresh_wnba_oddsapi_props.py's own cache-reuse gate skips the
+            # predictions run entirely before --wnba-only-matchups would ever
+            # matter, so this pairing should be structural rather than left to
+            # caller discipline.
+            refresh_command.extend(["--wnba-only-matchups", wnba_only_matchups_text])
     if season is not None:
         refresh_command.extend(["--season", str(season)])
     if week is not None:

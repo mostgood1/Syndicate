@@ -4425,7 +4425,7 @@ def _smart_sim_worker_run_local(job: dict) -> dict:
         return {"status": "failed", "home": home_tri, "away": away_tri, "out_path": out_path_s, "error": str(exc)}
 
 
-def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str: str, n_sims: int, seed: int | None, max_games: int | None, overwrite: bool, pbp: bool = True, workers: int | None = None, roster_mode: str = "historical", out_prefix: str = "smart_sim", league_code: str = "nba") -> dict:
+def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str: str, n_sims: int, seed: int | None, max_games: int | None, overwrite: bool, pbp: bool = True, workers: int | None = None, roster_mode: str = "historical", out_prefix: str = "smart_sim", league_code: str = "nba", only_matchups: set[tuple[str, str]] | None = None) -> dict:
     import pandas as pd
     import numpy as np
     from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -4721,12 +4721,23 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
         if not home_tri or not away_tri:
             continue
         out_path = processed_root / f"{out_prefix_s}_{date_str}_{home_tri}_{away_tri}.json"
-        if overwrite and out_path.exists():
+        # only_matchups is a force-invalidate list, not an MLB-style
+        # skip-list: unlike MLB's sim (which resims everything by default,
+        # so --only-game-pks exists to narrow), this loop already skips any
+        # game with an adequate existing artifact by default (overwrite=
+        # False). Untargeted games need no new logic -- that existing
+        # skip-if-adequate/resim-if-inadequate behavior already is the
+        # "fails open" behavior MLB's fix had to add. A targeted matchup
+        # forces its (possibly-adequate) existing artifact to be dropped and
+        # rebuilt, same as overwrite=True but scoped to just this game.
+        is_targeted = only_matchups is not None and (home_tri, away_tri) in only_matchups
+        force_this_game = bool(overwrite) or is_targeted
+        if force_this_game and out_path.exists():
             try:
                 out_path.unlink()
             except Exception:
                 pass
-        if out_path.exists() and (not overwrite):
+        if out_path.exists() and (not force_this_game):
             if _smart_sim_file_has_players_local(out_path):
                 skipped += 1
                 continue
@@ -4911,8 +4922,8 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
             pd.DataFrame(failures).to_csv(failure_path, index=False)
         except Exception:
             pass
-        return {"date": date_str, "wrote": int(wrote), "skipped": int(skipped), "failures": int(len(failures)), "failures_file": str(failure_path)}
-    return {"date": date_str, "wrote": int(wrote), "skipped": int(skipped), "failures": 0}
+        return {"date": date_str, "wrote": int(wrote), "skipped": int(skipped), "failures": int(len(failures)), "failures_file": str(failure_path), "scoped_matchups": sorted(only_matchups) if only_matchups else None}
+    return {"date": date_str, "wrote": int(wrote), "skipped": int(skipped), "failures": 0, "scoped_matchups": sorted(only_matchups) if only_matchups else None}
 
 
 def _apply_basic_slate_filter(*, preds, processed_root: Path, date_str: str):
@@ -5133,6 +5144,7 @@ def export_props_predictions_with_smart_sim_local(
     smart_sim_pbp: bool,
     smart_sim_workers: int,
     smart_sim_overwrite: bool = False,
+    only_matchups: set[tuple[str, str]] | None = None,
 ) -> tuple[int, Path]:
     import pandas as pd
 
@@ -5165,6 +5177,7 @@ def export_props_predictions_with_smart_sim_local(
         roster_mode=roster_mode,
         out_prefix="smart_sim",
         league_code=league_code,
+        only_matchups=only_matchups,
     )
     print(
         f"SMART_SIM_RETURNED date={date_str} workers={int(smart_sim_workers)} n_sims={int(smart_sim_n_sims)}",
