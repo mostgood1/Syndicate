@@ -28,6 +28,7 @@ from syndicate.features.nba.sources import processed_path
 from syndicate.features.nba.sources import live_snapshot_path
 from syndicate.features.shared.basketball_live_artifacts import build_live_lines_payload_from_artifacts
 from syndicate.features.shared.basketball_live_artifacts import build_live_player_lens_payload_from_artifacts
+from syndicate.features.shared.basketball_market_board import build_basketball_market_board
 from syndicate.features.shared.basketball_live_artifacts import resolve_event_ids_from_games
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.shared.source_roots import preferred_source_roots
@@ -2553,6 +2554,16 @@ def build_cards_api_payload(selected_date: str, *, allow_stored_date_fallback: b
     return build_game_board_api_payload(
         build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     )
+
+
+def build_nba_market_board(selected_date: str) -> dict[str, Any]:
+    """Layer 1 market/odds inventory for NBA (Phase 3c), reusing the same
+    row-builder as WNBA's -- see shared.basketball_market_board for why
+    one implementation serves both sports.
+    """
+    payload = build_cards_api_payload(selected_date)
+    games = payload.get("games") if isinstance(payload.get("games"), list) else []
+    return build_basketball_market_board(sport_slug="nba", selected_date=selected_date, games=games)
 
 
 def build_cards_sim_detail_payload(selected_date: str, away_tri: str, home_tri: str) -> dict[str, Any]:

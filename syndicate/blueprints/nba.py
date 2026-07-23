@@ -17,6 +17,7 @@ from syndicate.features.nba.archive import build_archive_api_payload
 from syndicate.features.nba.archive import build_archive_page_context
 from syndicate.features.nba.cards import build_cards_page_context
 from syndicate.features.nba.cards import build_cards_api_payload
+from syndicate.features.nba.cards import build_nba_market_board
 from syndicate.features.nba.cards import build_cards_sim_detail_payload
 from syndicate.features.nba.cards import build_live_lens_tuning_payload
 from syndicate.features.nba.cards import build_live_player_boxscore_payload
@@ -148,6 +149,32 @@ def cards():
     if client == "board":
         return render_template("shared/game_cards_board.html", **context)
     return render_template("nba/cards_source.html", asset_version=_cards_source_asset_version(), **context)
+
+
+@nba_bp.get("/market-board")
+def market_board():
+    # Layer 1 (see ~/.claude/plans/expressive-wiggling-engelbart.md, Phase
+    # 3c): every quoted moneyline/spread/total/prop line per game, not just
+    # the ones the recommendation engine chose to surface.
+    selected_date = _selected_date()
+    board = build_nba_market_board(selected_date)
+    parsed_date = date.fromisoformat(selected_date)
+    return render_template(
+        "shared/basketball_market_board.html",
+        sport_label="NBA",
+        selected_date=selected_date,
+        board=board,
+        prev_date=(parsed_date - timedelta(days=1)).isoformat(),
+        next_date=(parsed_date + timedelta(days=1)).isoformat(),
+        cards_href=f"/nba/cards?date={selected_date}",
+        show_home_link=False,
+    )
+
+
+@nba_bp.get("/api/market-board")
+def api_market_board():
+    selected_date = _selected_date()
+    return jsonify(build_nba_market_board(selected_date))
 
 
 def _live_lens_cards_shell_context(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, object]:

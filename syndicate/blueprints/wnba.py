@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import deque
 from datetime import date
+from datetime import timedelta
 import os
 from pathlib import Path
 import threading
@@ -17,6 +18,7 @@ from syndicate.features.shared.game_board_contract import build_game_board_api_p
 from syndicate.features.wnba.archive import build_archive_api_payload
 from syndicate.features.wnba.archive import build_archive_page_context
 from syndicate.features.wnba.cards import build_cards_page_context
+from syndicate.features.wnba.cards import build_wnba_market_board
 from syndicate.features.wnba.cards import build_source_cards_payload
 from syndicate.features.wnba.cards import build_source_cards_sim_detail_payload
 from syndicate.features.wnba.cards import _public_scoreboard_source_cards_payload
@@ -339,6 +341,32 @@ def cards():
         asset_version=_cards_source_asset_version(),
         cards_payload_path="/wnba/api/source/cards",
     )
+
+
+@wnba_bp.get("/market-board")
+def market_board():
+    # Layer 1 (see ~/.claude/plans/expressive-wiggling-engelbart.md, Phase
+    # 3b): every quoted moneyline/spread/total/prop line per game, not just
+    # the ones the recommendation engine chose to surface.
+    selected_date = _selected_date()
+    board = build_wnba_market_board(selected_date)
+    parsed_date = date.fromisoformat(selected_date)
+    return render_template(
+        "shared/basketball_market_board.html",
+        sport_label="WNBA",
+        selected_date=selected_date,
+        board=board,
+        prev_date=(parsed_date - timedelta(days=1)).isoformat(),
+        next_date=(parsed_date + timedelta(days=1)).isoformat(),
+        cards_href=f"/wnba/cards?date={selected_date}",
+        show_home_link=False,
+    )
+
+
+@wnba_bp.get("/api/market-board")
+def api_market_board():
+    selected_date = _selected_date()
+    return jsonify(build_wnba_market_board(selected_date))
 
 
 def _live_lens_cards_shell_context(selected_date: str) -> dict[str, object]:

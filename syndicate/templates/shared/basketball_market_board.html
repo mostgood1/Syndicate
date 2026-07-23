@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ sport_label }} Market Board — {{ selected_date }}</title>
+    <style>
+      :root { color-scheme: dark; }
+      body { margin: 0; padding: 24px; background: #0b0e14; color: #e6e8ee; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+      .board-header { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 6px; }
+      .board-header h1 { font-size: 1.4rem; margin: 0; }
+      .board-header .sub { color: #8b93a7; font-size: 0.9rem; }
+      .board-nav { display: flex; gap: 10px; align-items: center; margin-bottom: 20px; }
+      .board-nav a { color: #7dd3fc; text-decoration: none; font-size: 0.9rem; }
+      .board-nav a:hover { text-decoration: underline; }
+      .board-nav input[type="date"] { background: #161b26; color: #e6e8ee; border: 1px solid #2a3142; border-radius: 6px; padding: 4px 8px; }
+      .empty-note { color: #8b93a7; padding: 24px; text-align: center; border: 1px dashed #2a3142; border-radius: 8px; }
+      .game-card { background: #12151f; border: 1px solid #232838; border-radius: 10px; margin-bottom: 18px; overflow: hidden; }
+      .game-card__head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #161b26; border-bottom: 1px solid #232838; }
+      .game-card__matchup { font-weight: 600; font-size: 1.05rem; }
+      .game-card__state { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; padding: 3px 8px; border-radius: 999px; }
+      .state-live { background: #422006; color: #fdba74; }
+      .state-pregame { background: #1e293b; color: #93c5fd; }
+      .state-final { background: #1f2937; color: #9ca3af; }
+      table.market-table { width: 100%; border-collapse: collapse; }
+      table.market-table th { text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: #8b93a7; padding: 8px 16px; border-bottom: 1px solid #232838; }
+      table.market-table td { padding: 10px 16px; border-bottom: 1px solid #1a1f2b; font-size: 0.92rem; }
+      table.market-table tr:last-child td { border-bottom: none; }
+      .pick-side { font-weight: 500; }
+      .badge { display: inline-block; font-size: 0.74rem; padding: 2px 8px; border-radius: 999px; }
+      .badge-matched { background: #052e1a; color: #4ade80; }
+      .badge-no-coverage { background: #1f2937; color: #9ca3af; }
+      .badge-needs-resim { background: #450a0a; color: #f87171; }
+      .no-rows { color: #6b7280; font-style: italic; padding: 16px; }
+    </style>
+  </head>
+  <body>
+    <div class="board-header">
+      <h1>{{ sport_label }} Market Board</h1>
+      <div class="sub">Every quoted moneyline, spread, total, and player prop line, joined against the model where available — not just the recommendation engine's picks.</div>
+    </div>
+    <div class="board-nav">
+      <a href="{{ route_prefix }}?date={{ prev_date }}">&larr; {{ prev_date }}</a>
+      <form method="get" style="display:inline-flex; gap:6px; align-items:center;">
+        <input type="date" name="date" value="{{ selected_date }}" onchange="this.form.submit()" />
+      </form>
+      <a href="{{ route_prefix }}?date={{ next_date }}">{{ next_date }} &rarr;</a>
+      <span style="color:#4b5568;">|</span>
+      <a href="{{ cards_href }}">Back to Cards</a>
+    </div>
+
+    {% if not board.games %}
+      <div class="empty-note">No {{ sport_label }} games found for {{ selected_date }}.</div>
+    {% endif %}
+
+    {% for game in board.games %}
+      <div class="game-card">
+        <div class="game-card__head">
+          <div class="game-card__matchup">{{ game.matchup }}</div>
+          <div class="game-card__state state-{{ game.game_state }}">{{ game.game_state }}</div>
+        </div>
+        {% if game.rows %}
+          <table class="market-table">
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th>Market</th>
+                <th>Side</th>
+                <th>Line</th>
+                <th>Odds</th>
+                <th>Model</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in game.rows %}
+                <tr>
+                  <td>{{ row.entity if row.entity else '-' }}</td>
+                  <td>{{ row.market }}</td>
+                  <td class="pick-side">{{ row.side | title if row.side else '-' }}</td>
+                  <td>{{ row.line if row.line is not none else '-' }}</td>
+                  <td>{{ row.odds if row.odds is not none else '-' }}</td>
+                  <td>
+                    {% if row.sim_projection is not none %}
+                      {% if row.market == 'Moneyline' or row.market == 'Spread' or row.market_type == 'prop' %}
+                        {{ '%.1f' | format(row.sim_projection * 100) }}%
+                      {% else %}
+                        {{ row.sim_projection }}
+                      {% endif %}
+                    {% else %}
+                      -
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if row.join_status == 'matched' %}
+                      <span class="badge badge-matched">Model view</span>
+                    {% elif row.join_status == 'unmatched_needs_resim' %}
+                      <span class="badge badge-needs-resim" title="{{ row.join_note }}">Stale — resim pending</span>
+                    {% else %}
+                      <span class="badge badge-no-coverage">No model view</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div class="no-rows">No moneyline, spread, total, or prop lines available for this game yet.</div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </body>
+</html>

@@ -26,6 +26,7 @@ from syndicate.features.shared.basketball_live_artifacts import build_live_playe
 from syndicate.features.shared.basketball_live_artifacts import _canonical_game_id
 from syndicate.features.shared.basketball_live_artifacts import resolve_event_ids_from_games
 from syndicate.features.shared.game_board_contract import _sim_payload
+from syndicate.features.shared.basketball_market_board import build_basketball_market_board
 from syndicate.features.shared.memory_observability import log_runtime_memory
 from syndicate.features.shared.refresh_state_store import data_root as _refresh_state_data_root
 from syndicate.features.shared.refresh_state_store import read_json_file as _keyvalue_read_json_file
@@ -2613,6 +2614,18 @@ def _clear_build_cards_page_context_cache() -> None:
 
 
 build_cards_page_context.cache_clear = _clear_build_cards_page_context_cache  # type: ignore[attr-defined]
+
+
+def build_wnba_market_board(selected_date: str) -> dict[str, Any]:
+    """Layer 1 market/odds inventory for WNBA (Phase 3b), reusing the same
+    row-builder as NBA's -- see shared.basketball_market_board for why one
+    implementation serves both sports. `build_cards_page_context` already
+    runs games through `apply_game_board_contract`, so `context["games"]`
+    is the same normalized shape NBA's `build_cards_api_payload` returns.
+    """
+    context = build_cards_page_context(selected_date)
+    games = context.get("games") if isinstance(context.get("games"), list) else []
+    return build_basketball_market_board(sport_slug="wnba", selected_date=selected_date, games=games)
 
 
 def _build_cards_page_context_uncached(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
