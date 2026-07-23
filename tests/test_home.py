@@ -766,6 +766,52 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         self.assertEqual(moneyline_by_pick.get("Away ML"), "Boston Celtics")
         self.assertEqual(moneyline_by_pick.get("Home ML"), "New York Knicks")
 
+    def test_live_game_candidates_show_current_combined_score_in_live_column(self) -> None:
+        # The board's Live column was empty for every Moneyline/Spread/Total
+        # candidate built from the plain "betting" dict -- none of those
+        # call sites ever passed live_projection, so it always fell back to
+        # "-" regardless of whether the game was actually in progress.
+        game = self._sample_game(
+            shared_is_live=True,
+            status={"in_progress": True},
+            away={"name": "Boston Celtics", "score": 3},
+            home={"name": "New York Knicks", "score": 5},
+            betting={"away_ml": -120, "home_ml": 105, "p_away_win": 0.55, "p_home_win": 0.45},
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "nba"}, game, fallback_epoch=0.0)
+        moneyline_candidates = [c for c in candidates if c["market"] == "Moneyline"]
+        self.assertTrue(moneyline_candidates)
+        for candidate in moneyline_candidates:
+            self.assertTrue(candidate["is_live"])
+            self.assertNotEqual(candidate["live_projection"], "-")
+            self.assertEqual(float(candidate["live_projection"]), 8.0)
+
+    def test_pregame_candidates_leave_live_column_blank(self) -> None:
+        game = self._sample_game(
+            away={"name": "Boston Celtics", "score": None},
+            home={"name": "New York Knicks", "score": None},
+            betting={"away_ml": -120, "home_ml": 105, "p_away_win": 0.55, "p_home_win": 0.45},
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "nba"}, game, fallback_epoch=0.0)
+        moneyline_candidates = [c for c in candidates if c["market"] == "Moneyline"]
+        self.assertTrue(moneyline_candidates)
+        for candidate in moneyline_candidates:
+            self.assertFalse(candidate["is_live"])
+            self.assertEqual(candidate["live_projection"], "-")
+
+    def test_live_game_without_scores_leaves_live_column_blank_not_zero(self) -> None:
+        game = self._sample_game(
+            shared_is_live=True,
+            status={"in_progress": True},
+            betting={"away_ml": -120, "home_ml": 105, "p_away_win": 0.55, "p_home_win": 0.45},
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "nba"}, game, fallback_epoch=0.0)
+        moneyline_candidates = [c for c in candidates if c["market"] == "Moneyline"]
+        self.assertTrue(moneyline_candidates)
+        for candidate in moneyline_candidates:
+            self.assertTrue(candidate["is_live"])
+            self.assertEqual(candidate["live_projection"], "-")
+
     def test_spread_candidates_get_team_projected_and_confidence(self) -> None:
         game = self._sample_game(
             betting={

@@ -1847,6 +1847,35 @@ def _board_candidate_rows(selected_date: str, *, limit: int = 12) -> list[dict[s
     return rows
 
 
+def _game_current_combined_score(game: dict[str, Any]) -> float | None:
+    # The board's Live column was empty for every Moneyline/Spread/Total
+    # candidate built from the plain "betting" dict (the common case) --
+    # none of those call sites ever passed live_projection, so
+    # _append_game_bet_candidate always fell back to its "-" default
+    # regardless of whether the game was actually live. This is the one
+    # signal that's meaningful across all three market types (current
+    # combined score, directly comparable to a Total line): try the
+    # normalized away/home score fields first, then live_state's away_pts/
+    # home_pts (same shape WNBA/NBA live-state builders already use), then
+    # flat away_score/home_score as a last resort.
+    away = game.get("away") if isinstance(game.get("away"), dict) else {}
+    home = game.get("home") if isinstance(game.get("home"), dict) else {}
+    live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+    away_score = _numeric_value(away.get("score"))
+    if away_score is None:
+        away_score = _numeric_value(live_state.get("away_pts"))
+    if away_score is None:
+        away_score = _numeric_value(game.get("away_score"))
+    home_score = _numeric_value(home.get("score"))
+    if home_score is None:
+        home_score = _numeric_value(live_state.get("home_pts"))
+    if home_score is None:
+        home_score = _numeric_value(game.get("home_score"))
+    if away_score is None or home_score is None:
+        return None
+    return away_score + home_score
+
+
 def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[str, Any], game: dict[str, Any], market: str, pick: str, line: Any = None, odds: Any = None, edge: Any = None, confidence: Any = None, projected: Any = None, live_projection: Any = None, detail: str | None = None, fallback_epoch: float, live_odds_game_ids: set[str] | None = None, team: Any = None, sim_context: str | None = None) -> None:
     pick_text = _safe_text(pick, "-")
     if pick_text == "-":
@@ -1856,7 +1885,6 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
     edge_text = _pct_text(edge) if edge is not None and _numeric_value(edge) is not None else _safe_text(edge, "-") if edge is not None else "-"
     confidence_text = _pct_text(confidence) if confidence is not None and _numeric_value(confidence) is not None else _safe_text(confidence, "-") if confidence is not None else "-"
     projected_text = _prop_metric_text(projected) if projected is not None else "-"
-    live_projection_text = _prop_metric_text(live_projection) if live_projection is not None else "-"
     team_text = _safe_text(team, "-") if team is not None else "-"
     game_state = _game_status_state(game)
     # Used to be _is_liveish(game.get("status"), game.get("detail")) --
@@ -1878,6 +1906,9 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
     # correctly stayed pregame. game_state/shared_is_live are the real signal.
     fallback_live = bool(game.get("shared_is_live") or game_state == "live")
     is_live = _live_odds_backed_live_flag(_game_identifier(game), live_odds_game_ids, fallback_live)
+    if live_projection is None and is_live:
+        live_projection = _game_current_combined_score(game)
+    live_projection_text = _prop_metric_text(live_projection) if live_projection is not None else "-"
     edge_value = _pct_number(edge_text)
     confidence_value = _pct_number(confidence_text)
     updated_epoch = _game_row_updated_epoch(game, fallback_epoch)
