@@ -1906,7 +1906,20 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
     # correctly stayed pregame. game_state/shared_is_live are the real signal.
     fallback_live = bool(game.get("shared_is_live") or game_state == "live")
     is_live = _live_odds_backed_live_flag(_game_identifier(game), live_odds_game_ids, fallback_live)
-    if live_projection is None and is_live:
+    # Real regression found 2026-07-23: this function also builds per-game
+    # PLAYER PROP candidates (market == f"Hitter {prop_type}"/f"Pitcher
+    # {prop_type}", mixed in alongside genuine Moneyline/Spread/Total by the
+    # gameLens loop below), none of which pass an explicit live_projection --
+    # the combined-score fallback was applying the GAME's total score to
+    # every hitter/pitcher prop candidate for that game regardless of stat
+    # type, so completely different props (total bases, hits, for different
+    # players) all showed the identical number. The combined score is only
+    # meaningful for genuine game-level markets. Mirrors the same "Hitter "/
+    # "Pitcher " prefix check intelligence.py's _is_game_level_market already
+    # uses to distinguish these.
+    market_text_lower = _safe_text(market, "").strip().lower()
+    is_game_level_market = not (market_text_lower.startswith("hitter ") or market_text_lower.startswith("pitcher "))
+    if live_projection is None and is_live and is_game_level_market:
         live_projection = _game_current_combined_score(game)
     live_projection_text = _prop_metric_text(live_projection) if live_projection is not None else "-"
     edge_value = _pct_number(edge_text)

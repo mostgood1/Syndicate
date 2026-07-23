@@ -812,6 +812,34 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
             self.assertTrue(candidate["is_live"])
             self.assertEqual(candidate["live_projection"], "-")
 
+    def test_live_player_prop_candidates_do_not_get_game_combined_score_as_live_projection(self) -> None:
+        # Real regression found 2026-07-23: _game_bet_candidates_from_game's
+        # game_market_recommendations loop also surfaces per-game PLAYER
+        # PROP rows (market label "Hitter X"/"Pitcher X"), mixed in
+        # alongside genuine game-level markets, through the SAME
+        # _append_game_bet_candidate call that fills in live_projection with
+        # the game's combined score when none was passed explicitly. That
+        # combined score is meaningless for a player prop -- confirmed live,
+        # completely different hitter props (total bases, hits, for
+        # different players) for the same game all showed the identical
+        # combined-score number.
+        game = self._sample_game(
+            shared_is_live=True,
+            status={"in_progress": True},
+            away={"name": "Boston Celtics", "score": 5},
+            home={"name": "New York Knicks", "score": 3},
+            game_market_recommendations=[
+                {"market_label": "Hitter Total Bases", "selection": "Over 1.5", "line": 1.5},
+                {"market_label": "Pitcher Strikeouts", "selection": "Under 7.5", "line": 7.5},
+            ],
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "mlb"}, game, fallback_epoch=0.0)
+        prop_candidates = [c for c in candidates if c["market"] in ("Hitter Total Bases", "Pitcher Strikeouts")]
+        self.assertEqual(len(prop_candidates), 2)
+        for candidate in prop_candidates:
+            self.assertTrue(candidate["is_live"])
+            self.assertEqual(candidate["live_projection"], "-")
+
     def test_spread_candidates_get_team_projected_and_confidence(self) -> None:
         game = self._sample_game(
             betting={
