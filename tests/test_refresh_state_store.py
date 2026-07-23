@@ -158,6 +158,35 @@ class RefreshStateStoreTests(unittest.TestCase):
 
             self.assertEqual(history_paths, [manifest_path.resolve()])
 
+    def test_known_refresh_lanes_tracked_on_keyvalue_backend(self) -> None:
+        # Per-service refresh-run lanes: "latest" manifest files aren't
+        # necessarily materialized on any single service's local disk under
+        # the keyvalue backend, so a raw filesystem glob can't discover
+        # lanes written by a different service. This explicit index (mirrors
+        # the existing refresh-history index) is what makes cross-service
+        # lane discovery possible.
+        fake_client = _FakeKeyValueClient()
+        with patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue",
+                "SYNDICATE_REFRESH_STATE_URL": "redis://example",
+            },
+            clear=False,
+        ), patch("syndicate.features.shared.refresh_state_store._get_keyvalue_client", return_value=fake_client):
+            self.assertEqual(refresh_state_store.known_refresh_lanes(), [])
+
+            refresh_state_store.record_known_refresh_lane("refresh-worker")
+            refresh_state_store.record_known_refresh_lane("live-odds-worker")
+            refresh_state_store.record_known_refresh_lane("refresh-worker")  # duplicate, should not repeat
+
+            self.assertEqual(refresh_state_store.known_refresh_lanes(), ["refresh-worker", "live-odds-worker"])
+
+    def test_known_refresh_lanes_is_noop_on_filesystem_backend(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_REFRESH_STATE_BACKEND": "filesystem"}, clear=False):
+            refresh_state_store.record_known_refresh_lane("refresh-worker")
+            self.assertEqual(refresh_state_store.known_refresh_lanes(), [])
+
     def test_refresh_state_hash_round_trips_and_reuses_identical_inputs(self) -> None:
         with TemporaryDirectory() as tmp_dir, patch.dict(
             os.environ,

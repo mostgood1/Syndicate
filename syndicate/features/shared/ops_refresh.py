@@ -28,6 +28,8 @@ from typing import Any
 
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.shared.refresh_state_store import list_refresh_status_manifest_paths
+from syndicate.features.shared.refresh_state_store import known_refresh_lanes
+from syndicate.features.shared.refresh_state_store import record_known_refresh_lane
 from syndicate.features.shared.refresh_state_store import data_root
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import path_exists
@@ -480,18 +482,26 @@ def _refresh_manifest_filename(lane_key: str) -> str:
 def list_latest_refresh_manifests_by_lane() -> dict[str, dict[str, Any]]:
     latest_dir = _reports_root() / "refresh_status" / "latest"
     result: dict[str, dict[str, Any]] = {}
-    if not latest_dir.exists():
-        return result
-    for path in sorted(latest_dir.glob("refresh_status_latest*.json")):
-        prefix = "refresh_status_latest__"
-        if path.stem == "refresh_status_latest":
-            lane_key = _LEGACY_REFRESH_LANE_KEY
-        elif path.stem.startswith(prefix):
-            lane_key = path.stem[len(prefix):]
-        else:
-            continue
-        manifest = read_json_file(path)
-        if isinstance(manifest, dict):
+    lane_keys: set[str] = {_LEGACY_REFRESH_LANE_KEY, *known_refresh_lanes()}
+    # known_refresh_lanes() is only populated on the keyvalue backend (an
+    # explicit Redis-backed index, mirroring _history_index_key()'s existing
+    # pattern) -- a raw filesystem glob can't discover lanes written by a
+    # DIFFERENT service, since each service has its own separate persistent
+    # disk and "latest" manifest files aren't necessarily materialized
+    # locally at all under that backend. The glob below still covers local
+    # dev/tests (filesystem backend), where every lane's file genuinely does
+    # live on the one shared disk being read.
+    if latest_dir.exists():
+        for path in sorted(latest_dir.glob("refresh_status_latest*.json")):
+            prefix = "refresh_status_latest__"
+            if path.stem == "refresh_status_latest":
+                lane_keys.add(_LEGACY_REFRESH_LANE_KEY)
+            elif path.stem.startswith(prefix):
+                lane_keys.add(path.stem[len(prefix):])
+    for lane_key in lane_keys:
+        manifest_path = latest_dir / _refresh_manifest_filename(lane_key)
+        manifest = read_json_file(manifest_path)
+        if isinstance(manifest, dict) and manifest:
             result[lane_key] = manifest
     return result
 
@@ -1110,6 +1120,7 @@ def launch_refresh_run(
     # not the calling service's own lane, or refresh-worker would never find
     # what it queued.
     effective_lane = _refresh_lane_key(_REFRESH_WORKER_LANE_KEY if _is_external_runner_mode(launch_mode) else lane)
+    record_known_refresh_lane(effective_lane)
     _assert_no_active_refresh_run(lane=effective_lane)
     selected_date = date or _today_date()
     skip_mirror_value = _env_bool("SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR") if skip_mirror is None else bool(skip_mirror)

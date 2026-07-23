@@ -109,6 +109,53 @@ def _history_index_key() -> str:
     return f"{_state_namespace()}:refresh-state-history"
 
 
+def _known_refresh_lanes_key() -> str:
+    return f"{_state_namespace()}:refresh-state-known-lanes"
+
+
+def record_known_refresh_lane(lane_key: str) -> None:
+    # With the keyvalue backend, "latest" manifest files aren't necessarily
+    # materialized on any single service's local disk -- a raw filesystem
+    # glob over refresh_status/latest/ (as list_latest_refresh_manifests_by_lane
+    # used to do) finds nothing there. Mirrors _record_refresh_status_history's
+    # existing index-key pattern so per-lane discovery works the same way.
+    lane_key = str(lane_key or "").strip()
+    if not lane_key or _state_backend_kind() != "keyvalue":
+        return
+
+    def _write_lanes(client):
+        raw_lanes = client.get(_known_refresh_lanes_key())
+        try:
+            existing_lanes = json.loads(raw_lanes) if raw_lanes else []
+        except Exception:
+            existing_lanes = []
+        if not isinstance(existing_lanes, list):
+            existing_lanes = []
+        if lane_key in existing_lanes:
+            return
+        client.set(_known_refresh_lanes_key(), json.dumps([*existing_lanes, lane_key]))
+
+    _execute_keyvalue_operation(_write_lanes)
+
+
+def known_refresh_lanes() -> list[str]:
+    if _state_backend_kind() != "keyvalue":
+        return []
+
+    def _read_lanes(client):
+        raw_lanes = client.get(_known_refresh_lanes_key())
+        try:
+            lanes = json.loads(raw_lanes) if raw_lanes else []
+        except Exception:
+            return []
+        return lanes if isinstance(lanes, list) else []
+
+    try:
+        return _execute_keyvalue_operation(_read_lanes)
+    except Exception:
+        return []
+
+
 def assert_refresh_state_backend_ready(*, process_name: str | None = None) -> str:
     backend_name = _refresh_state_backend_name()
     print(f"REFRESH_STATE_BACKEND = {backend_name}")

@@ -2302,6 +2302,49 @@ class RefreshRunPerServiceLaneTests(unittest.TestCase):
             self.assertEqual(by_lane["refresh-worker"]["state"], "running")
             self.assertEqual(by_lane["live-odds-worker"]["state"], "finished")
 
+    def test_list_latest_refresh_manifests_by_lane_uses_keyvalue_index_when_disk_has_nothing(self) -> None:
+        # Reproduces the real production bug found while verifying this fix:
+        # under the keyvalue backend, "latest" manifest files written by a
+        # DIFFERENT service are never materialized on THIS service's local
+        # disk at all -- a raw filesystem glob (the original implementation)
+        # finds nothing, even though the manifests genuinely exist in the
+        # shared Redis-backed store. list_latest_refresh_manifests_by_lane
+        # must fall back to the explicit known-lanes index in that case.
+        from unittest.mock import MagicMock
+        from syndicate.features.shared import refresh_state_store as state_store
+
+        fake_client = MagicMock()
+        fake_store: dict[str, str] = {}
+
+        def _get(key: str) -> str | None:
+            return fake_store.get(key)
+
+        def _set(key: str, value: str) -> bool:
+            fake_store[key] = str(value)
+            return True
+
+        fake_client.get.side_effect = _get
+        fake_client.set.side_effect = _set
+
+        with TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            os.environ["SYNDICATE_REPORTS_ROOT"] = str(reports_root)
+            os.environ["SYNDICATE_REFRESH_STATE_BACKEND"] = "keyvalue"
+            os.environ["SYNDICATE_REFRESH_STATE_URL"] = "redis://example"
+            with patch.object(state_store, "_get_keyvalue_client", return_value=fake_client):
+                # No local files are ever created here -- everything lives
+                # only in the fake Redis store, exactly like a real
+                # cross-service scenario.
+                self.ops_refresh.record_known_refresh_lane("refresh-worker")
+                self.ops_refresh.write_json_file(
+                    reports_root / "refresh_status" / "latest" / "refresh_status_latest__refresh-worker.json",
+                    {"state": "running", "date": "2026-07-23"},
+                )
+
+                by_lane = self.ops_refresh.list_latest_refresh_manifests_by_lane()
+
+        self.assertEqual(by_lane.get("refresh-worker", {}).get("state"), "running")
+
     def test_load_latest_refresh_status_exposes_by_lane_and_keeps_legacy_key(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             reports_root = Path(tmp_dir) / "reports"
