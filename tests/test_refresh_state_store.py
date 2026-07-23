@@ -27,6 +27,9 @@ class _FakeKeyValueClient:
     def exists(self, key: str) -> int:
         return 1 if key in self.store else 0
 
+    def delete(self, key: str) -> int:
+        return 1 if self.store.pop(key, None) is not None else 0
+
 
 class RefreshStateStoreTests(unittest.TestCase):
     def tearDown(self) -> None:
@@ -139,6 +142,48 @@ class RefreshStateStoreTests(unittest.TestCase):
             self.assertEqual(refresh_state_store.read_text_file(stderr_path), "worker stderr")
             self.assertTrue(refresh_state_store.path_exists(manifest_path))
             self.assertGreater(refresh_state_store.path_size(stderr_path), 0)
+
+    def test_delete_text_file_removes_keyvalue_entry(self) -> None:
+        # Real bug found 2026-07-23: write_text_file had no delete
+        # counterpart on the keyvalue backend at all -- every caller that
+        # deletes a stale artifact's filesystem copy (e.g. WNBA's
+        # game_cards_{date}.csv, cleared on a genuinely empty slate) left
+        # the keyvalue-stored copy from that same write untouched, so a
+        # deployment using the keyvalue backend kept serving stale content
+        # indefinitely even after the filesystem file was correctly gone.
+        fake_client = _FakeKeyValueClient()
+        with TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue",
+                "SYNDICATE_REFRESH_STATE_URL": "redis://example",
+            },
+            clear=False,
+        ), patch("syndicate.features.shared.refresh_state_store._get_keyvalue_client", return_value=fake_client):
+            text_path = Path(tmp_dir) / "reports" / "wnba_source" / "data" / "processed" / "game_cards_2026-07-23.csv"
+
+            refresh_state_store.write_text_file(text_path, "stale content")
+            self.assertTrue(refresh_state_store.path_exists(text_path))
+
+            refresh_state_store.delete_text_file(text_path)
+
+            self.assertFalse(refresh_state_store.path_exists(text_path))
+            self.assertIsNone(refresh_state_store.read_text_file(text_path))
+
+    def test_delete_text_file_removes_filesystem_copy_on_filesystem_backend(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            text_path = Path(tmp_dir) / "game_cards_2026-07-23.csv"
+            text_path.parent.mkdir(parents=True, exist_ok=True)
+            text_path.write_text("stale content", encoding="utf-8")
+
+            refresh_state_store.delete_text_file(text_path)
+
+            self.assertFalse(text_path.exists())
+
+    def test_delete_text_file_is_a_noop_when_nothing_exists(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            text_path = Path(tmp_dir) / "does_not_exist.csv"
+            refresh_state_store.delete_text_file(text_path)
 
     def test_keyvalue_backend_tracks_refresh_history_paths(self) -> None:
         fake_client = _FakeKeyValueClient()

@@ -368,6 +368,29 @@ def write_text_file(path: Path, payload: str) -> None:
     _atomic_write_text(path, payload)
 
 
+def delete_text_file(path: Path) -> None:
+    # write_text_file has no counterpart on the keyvalue backend -- every
+    # caller that writes a stale-content-must-not-persist artifact (e.g.
+    # WNBA's game_cards_{date}.csv, deleted on a genuinely empty slate) only
+    # ever unlinked the filesystem copy, leaving the keyvalue-stored copy
+    # (written by the same call site) stale forever on any deployment using
+    # the keyvalue backend. Confirmed live 2026-07-23: game_cards's
+    # filesystem file was correctly cleared, but the served board kept
+    # showing the same stale slate because the read path resolves through
+    # the keyvalue store first.
+    if _state_backend_kind() == "keyvalue":
+        try:
+            _execute_keyvalue_operation(lambda client: client.delete(_state_key_for_path(path)))
+        except Exception:
+            pass
+        return
+    try:
+        if path.exists():
+            path.unlink()
+    except Exception:
+        pass
+
+
 def path_exists(path: Path) -> bool:
     if _state_backend_kind() == "keyvalue":
         try:

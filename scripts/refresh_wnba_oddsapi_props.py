@@ -36,6 +36,7 @@ from syndicate.features.shared.memory_observability import log_runtime_memory
 from syndicate.features.shared.refresh_state_store import build_input_hash
 from syndicate.features.shared.refresh_state_store import path_fingerprint
 from syndicate.features.shared.refresh_state_store import _atomic_write_text
+from syndicate.features.shared.refresh_state_store import delete_text_file as _keyvalue_delete_text_file
 from syndicate.features.shared.refresh_state_store import path_exists as _keyvalue_path_exists
 from syndicate.features.shared.refresh_state_store import read_json_file as _keyvalue_read_json_file
 from syndicate.features.shared.refresh_state_store import read_text_file as _keyvalue_read_text_file
@@ -1926,6 +1927,16 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
         _log(reason)
         if out_path.exists() and out_path.is_file():
             out_path.unlink()
+        # write_text_file (used below and in _write_game_cards_csv_rows) also
+        # writes this same path's content into the keyvalue backend when
+        # that backend is active -- out_path.unlink() above only ever
+        # touched the filesystem copy, leaving a stale keyvalue-stored copy
+        # that the read path (wnba/cards.py's build_cards_page_context)
+        # resolves through first, still stale, on any deployment using the
+        # keyvalue backend. Confirmed live 2026-07-23: the filesystem file
+        # was correctly cleared by this function, but the served board kept
+        # showing the same stale slate until this was also cleared.
+        _keyvalue_delete_text_file(out_path)
         return 0, None
 
     def _prediction_matchups() -> set[tuple[str, str]]:
