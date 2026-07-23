@@ -4090,8 +4090,79 @@ def _mlb_candidate_live_state(candidate: dict[str, Any], actual_payload: dict[st
     return state
 
 
+def _mlb_live_lens_report_cached(context_label: str, cache: dict[str, dict[str, Any] | None]) -> dict[str, Any] | None:
+    if context_label in cache:
+        return cache[context_label]
+    path = _mlb_repo_artifact_path("data", "live_lens", f"live_lens_report_{context_label.replace('-', '_')}.json")
+    payload = mlb_load_json_file(path)
+    cache[context_label] = payload if isinstance(payload, dict) else None
+    return cache[context_label]
+
+
+def _mlb_live_lens_prop_rows_for_game(context_label: str, game_pk: int, cache: dict[str, dict[str, Any] | None]) -> list[dict[str, Any]]:
+    report = _mlb_live_lens_report_cached(context_label, cache)
+    games = report.get("games") if isinstance(report, dict) else None
+    if not isinstance(games, list):
+        return []
+    for game in games:
+        if not isinstance(game, dict) or _safe_int(game.get("gamePk")) != game_pk:
+            continue
+        # trackedProps is the single curated row per prop ("tier": "official");
+        # props/liveProps duplicate the same data across more prop types but
+        # aren't guaranteed present, so fall back to them if trackedProps is
+        # empty (e.g. before the first live tick has run for this game).
+        rows = game.get("trackedProps")
+        if isinstance(rows, list) and rows:
+            return [row for row in rows if isinstance(row, dict)]
+        rows = game.get("props")
+        return [row for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
+    return []
+
+
+def _mlb_hydrate_live_prop_projection(candidate: dict[str, Any], live_rows: list[dict[str, Any]]) -> None:
+    # Root cause of a real production bug: MLB prop candidates (both the
+    # top-props-artifact pipeline and the daily-update-narrative pipeline)
+    # only ever carry a PREGAME projection -- neither reads the live_lens
+    # report's already-computed live projection (actual K's so far, live
+    # rest-of-game projection), even once is_live flips true. That report is
+    # refreshed on its own live tick and already has the right numbers; this
+    # just attaches them to whichever candidate matches by player+market+line.
+    if not live_rows:
+        return
+    candidate_name = _normalized_market_text(
+        _safe_text(candidate.get("entity"), _safe_text(candidate.get("player_name"), _safe_text(candidate.get("name"), "")))
+    )
+    if not candidate_name:
+        return
+    candidate_line = _numeric_hint(candidate.get("line"))
+    candidate_market = _normalized_market_text(str(_safe_text(candidate.get("market"), "")).replace("Pitcher", "").replace("pitcher", ""))
+    matched_row: dict[str, Any] | None = None
+    for row in live_rows:
+        row_name = _normalized_market_text(_safe_text(row.get("playerName"), ""))
+        names_overlap = bool(row_name) and (row_name in candidate_name or candidate_name in row_name)
+        if not names_overlap:
+            continue
+        row_market = _normalized_market_text(_safe_text(row.get("marketLabel"), ""))
+        if candidate_market and row_market and candidate_market not in row_market and row_market not in candidate_market:
+            continue
+        row_line = _numeric_hint(row.get("line"))
+        if candidate_line is not None and row_line is not None and abs(row_line - candidate_line) > 0.01:
+            continue
+        matched_row = row
+        break
+    if matched_row is None:
+        return
+    live_projection_value = _numeric_hint(matched_row.get("liveProjection"))
+    if live_projection_value is not None:
+        candidate["live_projection"] = f"{live_projection_value:.1f}"
+    actual_value = _numeric_hint(matched_row.get("actual"))
+    if actual_value is not None:
+        candidate["actual"] = f"{actual_value:.1f}"
+
+
 def _apply_live_state_context_to_candidates(candidates: list[dict[str, Any]]) -> None:
     mlb_actual_cache: dict[int, dict[str, Any] | None] = {}
+    mlb_live_lens_cache: dict[str, dict[str, Any] | None] = {}
     for candidate in candidates:
         if not isinstance(candidate, Mapping):
             continue
@@ -4104,11 +4175,12 @@ def _apply_live_state_context_to_candidates(candidates: list[dict[str, Any]]) ->
             continue
         actual_payload = _mlb_actual_payload_for_candidate(context_label, int(game_pk), mlb_actual_cache)
         live_state = _mlb_candidate_live_state(candidate, actual_payload)
-        if not live_state:
-            continue
         for key, value in live_state.items():
             if value not in {None, ""}:
                 candidate[key] = value
+        if bool(candidate.get("is_live")) and _safe_text(candidate.get("candidate_type"), "") == "prop":
+            live_rows = _mlb_live_lens_prop_rows_for_game(context_label, int(game_pk), mlb_live_lens_cache)
+            _mlb_hydrate_live_prop_projection(candidate, live_rows)
 
 
 def _candidate_market_focuses(candidate: dict[str, Any]) -> set[str]:

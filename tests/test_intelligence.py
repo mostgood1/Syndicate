@@ -5928,3 +5928,124 @@ class ScoreCandidatesPipelineTaggingTests(unittest.TestCase):
         mocked_trace.assert_called_once()
         _, kwargs = mocked_trace.call_args
         self.assertIsNone(kwargs.get("pipeline"))
+
+
+class MlbLivePropProjectionHydrationTests(unittest.TestCase):
+    # Real production bug found 2026-07-23: a user placed a live bet on Chris
+    # Sale's strikeout UNDER after he'd already recorded 3 live K's, but the
+    # board's card still showed a pregame-only projection with no live
+    # update ("LIVE PROJ 0" / "-"), even though is_live correctly flipped
+    # true. Traced to _apply_live_state_context_to_candidates: it flips
+    # is_live from the raw MLB game feed but never reads the ALREADY-CORRECT
+    # live projection sitting in the live_lens report (produced by the same
+    # live tick, refreshed independently). These tests cover the fix that
+    # attaches it by matching player + market + line.
+    def _live_actual_payload(self) -> dict:
+        return {"gameData": {"status": {"abstractGameState": "Live", "detailedState": "In Progress"}}}
+
+    def _sale_candidate(self, **overrides: object) -> dict:
+        candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "prop",
+            "context_label": "2026-07-23",
+            "game_pk": 824893,
+            "entity": "Chris Sale",
+            "market": "Pitcher Strikeouts",
+            "line": "7.5",
+            "live_projection": "-",
+        }
+        candidate.update(overrides)
+        return candidate
+
+    def _live_lens_report(self, **row_overrides: object) -> dict:
+        row = {
+            "playerName": "Chris Sale",
+            "marketLabel": "Strikeouts",
+            "line": 7.5,
+            "actual": 3.0,
+            "liveProjection": 6.854,
+        }
+        row.update(row_overrides)
+        return {"games": [{"gamePk": 824893, "trackedProps": [row]}]}
+
+    def test_apply_live_state_hydrates_live_projection_from_live_lens_report(self) -> None:
+        from syndicate.features.intelligence import _apply_live_state_context_to_candidates
+
+        candidate = self._sale_candidate()
+        with patch(
+            "syndicate.features.intelligence._mlb_actual_payload_for_candidate",
+            return_value=self._live_actual_payload(),
+        ), patch(
+            "syndicate.features.intelligence.mlb_load_json_file",
+            return_value=self._live_lens_report(),
+        ):
+            _apply_live_state_context_to_candidates([candidate])
+
+        self.assertTrue(candidate.get("is_live"))
+        self.assertEqual(candidate.get("live_projection"), "6.9")
+        self.assertEqual(candidate.get("actual"), "3.0")
+
+    def test_apply_live_state_does_not_hydrate_when_not_live(self) -> None:
+        from syndicate.features.intelligence import _apply_live_state_context_to_candidates
+
+        candidate = self._sale_candidate()
+        with patch(
+            "syndicate.features.intelligence._mlb_actual_payload_for_candidate",
+            return_value={"gameData": {"status": {"abstractGameState": "Preview", "detailedState": "Scheduled"}}},
+        ), patch(
+            "syndicate.features.intelligence.mlb_load_json_file",
+            return_value=self._live_lens_report(),
+        ) as mocked_load:
+            _apply_live_state_context_to_candidates([candidate])
+
+        self.assertFalse(candidate.get("is_live"))
+        self.assertEqual(candidate.get("live_projection"), "-")
+        mocked_load.assert_not_called()
+
+    def test_apply_live_state_leaves_placeholder_when_no_matching_row(self) -> None:
+        from syndicate.features.intelligence import _apply_live_state_context_to_candidates
+
+        candidate = self._sale_candidate(entity="Someone Else")
+        with patch(
+            "syndicate.features.intelligence._mlb_actual_payload_for_candidate",
+            return_value=self._live_actual_payload(),
+        ), patch(
+            "syndicate.features.intelligence.mlb_load_json_file",
+            return_value=self._live_lens_report(),
+        ):
+            _apply_live_state_context_to_candidates([candidate])
+
+        self.assertTrue(candidate.get("is_live"))
+        self.assertEqual(candidate.get("live_projection"), "-")
+
+    def test_apply_live_state_matches_regardless_of_pitcher_market_label_case(self) -> None:
+        from syndicate.features.intelligence import _apply_live_state_context_to_candidates
+
+        candidate = self._sale_candidate(market="pitcher strikeouts")
+        with patch(
+            "syndicate.features.intelligence._mlb_actual_payload_for_candidate",
+            return_value=self._live_actual_payload(),
+        ), patch(
+            "syndicate.features.intelligence.mlb_load_json_file",
+            return_value=self._live_lens_report(),
+        ):
+            _apply_live_state_context_to_candidates([candidate])
+
+        self.assertEqual(candidate.get("live_projection"), "6.9")
+
+    def test_apply_live_state_does_not_hydrate_non_prop_candidates(self) -> None:
+        from syndicate.features.intelligence import _apply_live_state_context_to_candidates
+
+        candidate = self._sale_candidate(candidate_type="game")
+        with patch(
+            "syndicate.features.intelligence._mlb_actual_payload_for_candidate",
+            return_value=self._live_actual_payload(),
+        ), patch(
+            "syndicate.features.intelligence.mlb_load_json_file",
+            return_value=self._live_lens_report(),
+        ) as mocked_load:
+            _apply_live_state_context_to_candidates([candidate])
+
+        self.assertTrue(candidate.get("is_live"))
+        self.assertEqual(candidate.get("live_projection"), "-")
+        mocked_load.assert_not_called()
