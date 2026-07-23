@@ -25,6 +25,7 @@ from syndicate.blueprints.home import _game_bet_candidates_from_game
 from syndicate.features.intelligence_board import build_intelligence_board_contract
 from syndicate.features.intelligence import _advanced_signals_from_item
 from syndicate.features.intelligence import _advanced_input_rows_for_sport
+from syndicate.features.intelligence import _score_candidates
 from syndicate.features.intelligence import _advanced_signals_from_item
 from syndicate.features.intelligence import _build_parlays
 from syndicate.features.intelligence import _balanced_recommendation_order
@@ -5899,3 +5900,31 @@ class GameLevelMarketClassificationTests(unittest.TestCase):
         self.assertTrue(any("total bases" in market.lower() for market in prop_markets), prop_markets)
         self.assertNotIn("Hitter Total bases", game_markets)
         self.assertTrue(any(market == "Moneyline" for market in game_markets), game_markets)
+
+
+class ScoreCandidatesPipelineTaggingTests(unittest.TestCase):
+    # _score_candidates is called from three distinct places
+    # (collect_all_recommendations, collect_candidates_with_fallback_merge,
+    # run_intelligence_query), all emitting an identically-shaped
+    # "candidate_scoring" INTEL_TRACE event with no way to tell them apart --
+    # confirmed live 2026-07-23 while investigating why WNBA's pregame
+    # candidates were missing from the served board: two same-shaped,
+    # same-timing "candidate_scoring" traces couldn't be attributed to a
+    # specific call site, stalling the investigation. Purely additive/
+    # observability-only; asserts the pipeline tag round-trips into the
+    # emitted trace, not any behavior change.
+    def test_pipeline_kwarg_is_included_in_emitted_trace(self) -> None:
+        with patch("syndicate.features.intelligence._intel_trace_timed") as mocked_trace:
+            _score_candidates([], {}, {}, pipeline="collect_all_recommendations")
+
+        mocked_trace.assert_called_once()
+        _, kwargs = mocked_trace.call_args
+        self.assertEqual(kwargs.get("pipeline"), "collect_all_recommendations")
+
+    def test_pipeline_kwarg_defaults_to_none_when_omitted(self) -> None:
+        with patch("syndicate.features.intelligence._intel_trace_timed") as mocked_trace:
+            _score_candidates([], {}, {})
+
+        mocked_trace.assert_called_once()
+        _, kwargs = mocked_trace.call_args
+        self.assertIsNone(kwargs.get("pipeline"))

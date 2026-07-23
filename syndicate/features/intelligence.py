@@ -6579,6 +6579,8 @@ def _score_candidates(
     candidates: list[dict[str, Any]],
     advanced_by_sport: dict[str, list[dict[str, Any]]],
     preferences: dict[str, Any],
+    *,
+    pipeline: str | None = None,
 ) -> list[dict[str, Any]]:
     score_started_at = time.perf_counter()
     scored_candidates: list[dict[str, Any]] = []
@@ -6609,6 +6611,7 @@ def _score_candidates(
     _intel_trace_timed(
         "candidate_scoring",
         score_started_at,
+        pipeline=pipeline,
         input_count=len(candidates),
         output_count=len(scored_candidates),
         state_invalid_filtered=state_invalid_filtered,
@@ -6689,7 +6692,7 @@ def collect_all_recommendations(*, selected_date: str | None = None, force_refre
     _intel_trace_timed("candidate_collection", candidate_started_at, pipeline="collect_all_recommendations", candidate_count=len(candidates))
     scoring_started_at = time.perf_counter()
     candidates = _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
-    candidates = _score_candidates(candidates, advanced_by_sport, preferences)
+    candidates = _score_candidates(candidates, advanced_by_sport, preferences, pipeline="collect_all_recommendations")
     _intel_trace_timed("scoring", scoring_started_at, pipeline="collect_all_recommendations", candidate_count=len(candidates))
     ranking_started_at = time.perf_counter()
     filtered_candidates = filter_candidates(candidates, sport=_safe_text(preferences.get("sport"), "") or None)
@@ -6799,7 +6802,7 @@ def collect_candidates_with_fallback_merge(
                 for sport_row in overview
                 if isinstance(sport_row, dict)
             }
-        scored_candidates = _score_candidates(raw_candidates, advanced_by_sport, preferences)
+        scored_candidates = _score_candidates(raw_candidates, advanced_by_sport, preferences, pipeline="collect_candidates_with_fallback_merge")
         raw_candidates = filter_candidates(scored_candidates, sport=None)
 
     if apply_thin_pool_merge and 0 < len(raw_candidates) < _THIN_CANDIDATE_POOL_THRESHOLD:
@@ -7079,7 +7082,7 @@ def run_intelligence_query(
     candidates = _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
     _log_candidate_stage(pipeline_name="run_intelligence_query", stage="_enrich_candidates_with_odds_history", before=pre_enrich_candidates, after=candidates)
     pre_score_candidates = [dict(candidate) for candidate in candidates if isinstance(candidate, Mapping)]
-    candidates = _score_candidates(candidates, advanced_by_sport, preferences)
+    candidates = _score_candidates(candidates, advanced_by_sport, preferences, pipeline="run_intelligence_query")
     _log_candidate_stage(pipeline_name="run_intelligence_query", stage="_score_candidates", before=pre_score_candidates, after=candidates)
     _intel_trace_timed("scoring", scoring_started_at, pipeline="run_intelligence_query", candidate_count=len(candidates))
     ranking_started_at = time.perf_counter()
