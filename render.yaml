@@ -61,7 +61,7 @@ services:
       # independent "one run at a time" lane instead. Starts false (zero
       # behavior change); flip true on all 3 services together once reviewed.
       - key: SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES
-        value: "false"
+        value: "true"
       - key: SYNDICATE_REFRESH_LANE
         value: web
       - key: SYNDICATE_REQUIRE_HOSTED_STORAGE
@@ -232,7 +232,7 @@ services:
       # globally-shared mutex almost every cycle. Starts false; flip true on
       # all 3 services together once reviewed.
       - key: SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES
-        value: "false"
+        value: "true"
       - key: SYNDICATE_REFRESH_LANE
         value: refresh-worker
       - key: SYNDICATE_REQUIRE_HOSTED_STORAGE
@@ -439,7 +439,7 @@ services:
       # globally-shared mutex almost every cycle. Starts false; flip true on
       # all 3 services together once reviewed.
       - key: SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES
-        value: "false"
+        value: "true"
       - key: SYNDICATE_REFRESH_LANE
         value: live-odds-worker
       - key: SYNDICATE_REQUIRE_HOSTED_STORAGE
