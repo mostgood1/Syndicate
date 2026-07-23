@@ -20,6 +20,7 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
+from syndicate.features.shared.market_inventory import join_odds_to_sim
 from syndicate.features.shared.team_branding import read_team_branding_snapshot
 from syndicate.features.shared.team_branding import team_branding_index_by_abbreviation
 from syndicate.features.mlb.ladders_common import build_module_links
@@ -4838,3 +4839,133 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
     if cache_key is not None and games:
         _today_cache_put(cache_key, result)
     return deepcopy(result)
+
+
+# --- Layer 1 market/odds inventory (Phase 2 pilot) ---------------------
+#
+# Distinct from the recommendation-engine-filtered `games`/`markets` payload
+# above: this shows every quoted line for a game (moneyline both sides,
+# total both sides), not just the side/market the recommendation engine
+# chose to surface, joined against whatever model projection already
+# exists for it via the shared Layer 1 contract
+# (syndicate.features.shared.market_inventory). See
+# ~/.claude/plans/expressive-wiggling-engelbart.md for the full rollout;
+# this is Phase 2's MLB game-market pilot -- props and other sports are a
+# later phase.
+
+_MLB_MARKET_BOARD_DISPLAY_LABELS = {
+    "moneyline_home": "Moneyline",
+    "moneyline_away": "Moneyline",
+    "total": "Total",
+}
+
+
+def _mlb_market_board_rows_for_game(*, game_pk: Any, markets: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Raw odds + sim rows for one game's moneyline/total markets.
+
+    Moneyline needs a synthetic per-side market key ("moneyline_home" /
+    "moneyline_away") for the join step -- unlike a prop's single projected
+    value, which applies equally to its Over and Under quote, a
+    moneyline's home/away win probabilities are two genuinely different
+    numbers that must each match their own side's odds. Relabeled back to
+    "Moneyline" for display once the join is done.
+    """
+    odds_rows: list[dict[str, Any]] = []
+    sim_rows: list[dict[str, Any]] = []
+
+    moneyline = markets.get("ml") if isinstance(markets.get("ml"), dict) else None
+    if isinstance(moneyline, dict) and moneyline:
+        selection = str(moneyline.get("selection") or "").strip().lower()
+        away_odds = moneyline.get("away_odds")
+        home_odds = moneyline.get("home_odds")
+        model_prob = moneyline.get("model_prob")
+        odds = moneyline.get("odds")
+        if selection in ("home", "away") and odds is not None and home_odds is None and away_odds is None:
+            # Recommendation-shaped payload: only the picked side's odds
+            # are present (see _mlb_game_market_recommendation_rows in
+            # home.py for the same shape handled on the candidate side).
+            if selection == "home":
+                home_odds = odds
+            else:
+                away_odds = odds
+        if away_odds is not None:
+            odds_rows.append({"game_id": game_pk, "market": "moneyline_away", "period": "full_game", "entity": None, "side": "away", "odds": away_odds})
+        if home_odds is not None:
+            odds_rows.append({"game_id": game_pk, "market": "moneyline_home", "period": "full_game", "entity": None, "side": "home", "odds": home_odds})
+        if model_prob is not None and selection in ("home", "away"):
+            sim_rows.append(
+                {
+                    "game_id": game_pk,
+                    "market": f"moneyline_{selection}",
+                    "period": "full_game",
+                    "entity": None,
+                    "sim_projection": model_prob,
+                    "sim_source": "mlb_recommendation_engine",
+                }
+            )
+
+    totals = markets.get("totals") if isinstance(markets.get("totals"), dict) else None
+    if isinstance(totals, dict) and totals:
+        line = totals.get("line")
+        over_odds = totals.get("over_odds")
+        under_odds = totals.get("under_odds")
+        model_prob = totals.get("model_prob")
+        if over_odds is not None:
+            odds_rows.append({"game_id": game_pk, "market": "total", "period": "full_game", "entity": None, "side": "over", "line": line, "odds": over_odds})
+        if under_odds is not None:
+            odds_rows.append({"game_id": game_pk, "market": "total", "period": "full_game", "entity": None, "side": "under", "line": line, "odds": under_odds})
+        if model_prob is not None:
+            sim_rows.append({"game_id": game_pk, "market": "total", "period": "full_game", "entity": None, "sim_projection": model_prob, "sim_source": "mlb_recommendation_engine"})
+
+    return odds_rows, sim_rows
+
+
+def build_mlb_market_board(selected_date: str) -> dict[str, Any]:
+    """Layer 1 market/odds inventory for MLB game markets (moneyline,
+    total), one entry per game, sportsbook-style -- every quoted line,
+    correctly attributed, regardless of whether the recommendation engine
+    had an edge on it.
+
+    Reuses the same assembled game data the existing /mlb/cards page
+    renders (source_cards_api_payload/build_cards_page_context) -- this is
+    not a new data source, just a new way of presenting what is already
+    there.
+    """
+    context = build_cards_page_context(selected_date)
+    payload = source_cards_api_payload(dict(context))
+    games = payload.get("games") if isinstance(payload.get("games"), list) else []
+
+    board_games: list[dict[str, Any]] = []
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        game_pk = game.get("gamePk") or game.get("game_pk")
+        away = game.get("away") if isinstance(game.get("away"), dict) else {}
+        home = game.get("home") if isinstance(game.get("home"), dict) else {}
+        away_abbr = str(away.get("abbr") or "AWY").strip().upper()
+        home_abbr = str(home.get("abbr") or "HME").strip().upper()
+        markets = game.get("markets") if isinstance(game.get("markets"), dict) else {}
+
+        odds_rows, sim_rows = _mlb_market_board_rows_for_game(game_pk=game_pk, markets=markets)
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+        for row in inventory:
+            row["market"] = _MLB_MARKET_BOARD_DISPLAY_LABELS.get(row.get("market"), row.get("market"))
+
+        status = game.get("status") if isinstance(game.get("status"), dict) else {}
+        board_games.append(
+            {
+                "gamePk": game_pk,
+                "matchup": f"{away_abbr} @ {home_abbr}",
+                "away_abbr": away_abbr,
+                "home_abbr": home_abbr,
+                "game_state": str(status.get("abstract") or "").strip().lower() or "pregame",
+                "detail": game.get("detail"),
+                "startTime": game.get("startTime"),
+                "rows": inventory,
+            }
+        )
+
+    return {
+        "date": selected_date,
+        "games": board_games,
+    }

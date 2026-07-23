@@ -12,6 +12,7 @@ from syndicate.features.mlb.betting_card import build_betting_card_page_context
 from syndicate.features.mlb.betting_card import build_season_betting_card_day_payload
 from syndicate.features.mlb.betting_card import build_season_betting_card_manifest_payload
 from syndicate.features.mlb.cards import build_cards_page_context
+from syndicate.features.mlb.cards import build_mlb_market_board
 from syndicate.features.mlb.cards import source_card_detail_payload
 from syndicate.features.mlb.cards import source_cards_api_payload
 from syndicate.features.mlb.daily_archive import build_daily_archive_api_payload
@@ -315,6 +316,32 @@ def root_cards():
 def cards():
     selected_date = _iso_or_today(request.args.get("date")) if request.args.get("date") else central_today_iso()
     return _render_cards_page(selected_date)
+
+
+@mlb_bp.get("/market-board")
+def market_board():
+    # Layer 1 pilot (see ~/.claude/plans/expressive-wiggling-engelbart.md,
+    # Phase 2): every quoted moneyline/total line per game, not just the
+    # ones the recommendation engine chose to surface -- sportsbook-style,
+    # with a "Model" badge where a projection exists to compare against.
+    selected_date = _iso_or_today(request.args.get("date")) if request.args.get("date") else central_today_iso()
+    board = build_mlb_market_board(selected_date)
+    parsed_date = datetime.strptime(selected_date, "%Y-%m-%d").date()
+    return render_template(
+        "mlb/market_board.html",
+        selected_date=selected_date,
+        board=board,
+        prev_date=(parsed_date - timedelta(days=1)).isoformat(),
+        next_date=(parsed_date + timedelta(days=1)).isoformat(),
+        cards_href=f"/mlb/cards?date={selected_date}",
+        show_home_link=False,
+    )
+
+
+@mlb_bp.get("/api/market-board")
+def api_market_board():
+    selected_date = _iso_or_today(request.args.get("date")) if request.args.get("date") else central_today_iso()
+    return jsonify(build_mlb_market_board(selected_date))
 
 
 def _render_cards_page(selected_date: str):
