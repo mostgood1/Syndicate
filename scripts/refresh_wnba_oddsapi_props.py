@@ -3645,6 +3645,32 @@ def _run_refresh_via_cli(
     if alias_error and int(state["snapshot_rows"] or 0) > 0:
         state["error"] = f"snapshot alias write failed: {alias_error}"
 
+    if int(state["snapshot_rows"] or 0) > 0 and not state.get("error"):
+        # 2026-07-23: game_cards used to only get rebuilt inside the
+        # full-mode Export stage, gated behind _ensure_source_game_inputs's
+        # multi-year schedule bootstrap (documented ~80 minutes on a stale
+        # history file) even though _build_local_game_cards_artifact itself
+        # only reads the odds snapshot just fetched above -- it needs no
+        # schedule history at all. That meant a stale/phantom game_cards
+        # artifact (e.g. still listing yesterday's games) could only ever
+        # be corrected by triggering the expensive full-mode path, and the
+        # default fast-mode refresh never fixed it even once the day's real
+        # slate was known. Rebuild it here, unconditionally in both modes,
+        # right after the snapshot that is its actual input. Best-effort: the
+        # full-mode Export stage below still rebuilds game_cards again as
+        # part of its own try/except, so a failure here is not fatal to the
+        # rest of the refresh.
+        try:
+            game_cards_rows, _ = _build_local_game_cards_artifact(
+                source_root=source_root,
+                processed_root=processed_root,
+                date_str=date_str,
+                log_file=log_file,
+            )
+            state["game_cards_rows"] = int(game_cards_rows)
+        except Exception:
+            _append_log(log_file, f"Fast-mode game_cards rebuild failed for {date_str}: {traceback.format_exc()}")
+
     pred_ready = False
     if refresh_mode == "full" and not state.get("error") and int(state["snapshot_rows"] or 0) > 0 and (do_edges or do_export):
         state["phase"] = "predictions"
