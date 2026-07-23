@@ -1815,6 +1815,69 @@ class LiveRefreshLoopTests(unittest.TestCase):
         mocked_by_game.assert_not_called()
         self.assertIsNone(live_refresh_loop._last_wnba_lineup_injury_changed_matchups())
 
+    def test_weekly_sports_refresh_tick_owner_here_defaults_true(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertTrue(live_refresh_loop._weekly_sports_refresh_tick_owner_here())
+
+    def test_weekly_sports_refresh_tick_owner_here_respects_env_override(self) -> None:
+        with patch.dict(os.environ, {"WEEKLY_SPORTS_REFRESH_TICK_OWNER": "false"}, clear=False):
+            self.assertFalse(live_refresh_loop._weekly_sports_refresh_tick_owner_here())
+
+    def test_run_tick_excludes_weekly_sports_when_not_owner(self) -> None:
+        # Mirrors test_run_tick_excludes_mlb_when_not_owner: without this
+        # ownership split, live-odds-worker's tick and refresh-worker's
+        # weekly-sports autorun would both target the identical in-season
+        # nfl/ncaaf/ncaab artifacts -- a real write race once those sports
+        # are back in season, not just wasted duplicate work like MLB's case.
+        with patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
+                "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false",
+                "WEEKLY_SPORTS_REFRESH_TICK_OWNER": "false",
+            },
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-09-21"), patch.object(
+            live_refresh_loop, "_should_force_sim_rerun", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_active_sports_for_date", return_value="mlb,nfl,ncaaf,ncaab"
+        ), patch.object(
+            live_refresh_loop, "launch_refresh_run", return_value={"ok": True, "pid": 4242}
+        ) as mocked_launch:
+            payload = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertTrue(payload["ok"])
+        mocked_launch.assert_called_once()
+        self.assertEqual(mocked_launch.call_args.kwargs["sports"], "mlb")
+
+    def test_run_tick_includes_weekly_sports_by_default(self) -> None:
+        # Regression: with no ownership override configured, behavior is
+        # unchanged -- no explicit sports list is built for this reason, and
+        # launch_refresh_run resolves the full active-season set itself.
+        with patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
+                "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false",
+            },
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-09-21"), patch.object(
+            live_refresh_loop, "_should_force_sim_rerun", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_active_sports_for_date", return_value="mlb,nfl,ncaaf,ncaab"
+        ), patch.object(
+            live_refresh_loop, "launch_refresh_run", return_value={"ok": True, "pid": 4242}
+        ) as mocked_launch:
+            payload = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertTrue(payload["ok"])
+        mocked_launch.assert_called_once()
+        self.assertIsNone(mocked_launch.call_args.kwargs["sports"])
+
 
 if __name__ == "__main__":
     unittest.main()

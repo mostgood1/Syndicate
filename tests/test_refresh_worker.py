@@ -686,6 +686,41 @@ class RefreshWorkerTests(unittest.TestCase):
         with patch.dict(module.os.environ, {}, clear=True):
             self.assertEqual(module._default_poll_seconds(), 30.0)
 
+    def test_default_latest_manifest_path_uses_refresh_worker_lane_when_enabled(self) -> None:
+        # This poll loop only ever runs on refresh-worker and is the only
+        # process that claims queued/external-runner contracts, so its
+        # manifest must always be refresh-worker's own lane -- matching the
+        # same hardcoded lane launch_refresh_run resolves external-runner
+        # launches to, regardless of which service enqueued the job.
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(
+                module.os.environ,
+                {
+                    "SYNDICATE_REPORTS_ROOT": tmp_dir,
+                    "SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES": "true",
+                },
+                clear=False,
+            ):
+                path = module._default_latest_manifest_path()
+        self.assertEqual(path.name, "refresh_status_latest__refresh-worker.json")
+
+    def test_default_latest_manifest_path_is_legacy_when_lanes_disabled(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(
+                module.os.environ,
+                {"SYNDICATE_REPORTS_ROOT": tmp_dir},
+                clear=False,
+            ):
+                module.os.environ.pop("SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES", None)
+                path = module._default_latest_manifest_path()
+        self.assertEqual(path.name, "refresh_status_latest.json")
+
 
 if __name__ == "__main__":
     unittest.main()

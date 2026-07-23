@@ -874,8 +874,9 @@ def api_ops_full_refresh_run() -> Any:
 
 @ops_bp.post("/api/ops/odds-refresh/cancel")
 def api_ops_odds_refresh_cancel() -> Any:
+    lane = str(request.args.get("lane") or _request_data().get("lane") or "").strip() or None
     try:
-        result = cancel_latest_refresh_run()
+        result = cancel_latest_refresh_run(lane=lane)
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
@@ -887,8 +888,9 @@ def api_ops_odds_refresh_cancel() -> Any:
 def api_ops_odds_refresh_logs() -> Any:
     stream = request.args.get("stream") or "stderr"
     raw = _coerce_bool(request.args.get("raw"))
+    lane = str(request.args.get("lane") or "").strip() or None
     try:
-        payload = load_latest_refresh_log(stream=stream)
+        payload = load_latest_refresh_log(stream=stream, lane=lane)
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
@@ -1027,7 +1029,8 @@ def page_ops_odds_refresh_run() -> Any:
 
 @ops_bp.post("/ops/odds-refresh/cancel")
 def page_ops_odds_refresh_cancel() -> Any:
-    result = cancel_latest_refresh_run()
+    lane = str(request.form.get("lane") or request.args.get("lane") or "").strip() or None
+    result = cancel_latest_refresh_run(lane=lane)
     args = {"canceled": "1"}
     admin_token = _request_admin_token()
     if admin_token:

@@ -1879,6 +1879,26 @@ def _mlb_refresh_tick_owner_here() -> bool:
 	return raw in ("1", "true", "yes", "y", "on")
 
 
+_WEEKLY_SPORTS_TICK_EXCLUDABLE = ("nfl", "ncaaf", "ncaab")
+
+
+def _weekly_sports_refresh_tick_owner_here() -> bool:
+	# Mirrors _mlb_refresh_tick_owner_here's pattern exactly, for the same
+	# reason: without this split, this tick's own launch and refresh-worker's
+	# weekly-sports autorun (_launch_autorun_weekly_sports_refresh in
+	# run_refresh_worker.py) would both target the identical in-season
+	# nfl/ncaaf/ncaab artifacts -- including at least one file that isn't even
+	# date-partitioned -- the moment those sports are back in season. Unlike
+	# MLB (where only a redundant decision was at stake, made safe by the
+	# refresh-run lock), this is a REAL write race once football season
+	# starts, not just wasted duplicate work. Defaults true so a service with
+	# no explicit opinion keeps today's behavior.
+	raw = str(os.environ.get("WEEKLY_SPORTS_REFRESH_TICK_OWNER") or "").strip().lower()
+	if not raw:
+		return True
+	return raw in ("1", "true", "yes", "y", "on")
+
+
 def _run_mlb_sim_tick() -> dict[str, Any]:
 	"""Self-contained MLB sim/look-ahead/evening-sim decision+launch pass.
 
@@ -2032,11 +2052,19 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 	# every other configured sport anyway and defer only WNBA specifically.
 	skip_launch = False
 	launch_sports = _live_refresh_loop_sports()
-	if launch_sports is None and not _mlb_refresh_tick_owner_here():
+	mlb_owned_elsewhere = not _mlb_refresh_tick_owner_here()
+	weekly_sports_owned_elsewhere = not _weekly_sports_refresh_tick_owner_here()
+	if launch_sports is None and (mlb_owned_elsewhere or weekly_sports_owned_elsewhere):
 		# No explicit sports override configured -- launch_refresh_run would
 		# otherwise resolve the full active-season set itself (including
-		# "mlb"), duplicating refresh-worker's own purpose-built MLB autorun.
-		launch_sports = ",".join(sport for sport in _live_refresh_loop_effective_sports(selected_date) if sport != "mlb")
+		# "mlb" and/or nfl/ncaaf/ncaab), duplicating refresh-worker's own
+		# purpose-built autoruns for whichever of those it owns.
+		excluded_sports = set()
+		if mlb_owned_elsewhere:
+			excluded_sports.add("mlb")
+		if weekly_sports_owned_elsewhere:
+			excluded_sports.update(_WEEKLY_SPORTS_TICK_EXCLUDABLE)
+		launch_sports = ",".join(sport for sport in _live_refresh_loop_effective_sports(selected_date) if sport not in excluded_sports)
 	wnba_forced_through = False
 	if sim_blocks_refresh:
 		effective_sports = _live_refresh_loop_effective_sports(selected_date)
@@ -2061,7 +2089,9 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 		sports_to_launch = [
 			sport
 			for sport in effective_sports
-			if (sport != "wnba" or wnba_forced_through) and (sport != "mlb" or _mlb_refresh_tick_owner_here())
+			if (sport != "wnba" or wnba_forced_through)
+			and (sport != "mlb" or _mlb_refresh_tick_owner_here())
+			and (sport not in _WEEKLY_SPORTS_TICK_EXCLUDABLE or _weekly_sports_refresh_tick_owner_here())
 		]
 		if sports_to_launch:
 			launch_sports = ",".join(sports_to_launch)

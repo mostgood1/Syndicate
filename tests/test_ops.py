@@ -2221,3 +2221,107 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
         self.assertIn("/ops/odds-refresh?admin_token=secret-token", html)
+
+
+class RefreshRunPerServiceLaneTests(unittest.TestCase):
+    # Root cause of the soccer/WNBA starvation bug: _assert_no_active_refresh_run
+    # used to enforce ONE mutex shared across all 3 Render services, even
+    # though only same-container runs pose any real OOM risk. These tests
+    # cover the per-service-lane redesign that fixes it.
+    def setUp(self) -> None:
+        from syndicate.features.shared import ops_refresh
+
+        self.ops_refresh = ops_refresh
+        self._env_patch = patch.dict(os.environ, {}, clear=False)
+        self._env_patch.start()
+        for key in ("SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES", "SYNDICATE_REFRESH_LANE", "RENDER_SERVICE_ID", "RENDER_SERVICE_NAME"):
+            os.environ.pop(key, None)
+
+    def tearDown(self) -> None:
+        self._env_patch.stop()
+
+    def test_lane_key_defaults_to_legacy_when_flag_disabled(self) -> None:
+        os.environ["RENDER_SERVICE_ID"] = "srv-some-service"
+        self.assertEqual(self.ops_refresh._refresh_lane_key(), "global")
+        self.assertEqual(self.ops_refresh._refresh_lane_key("refresh-worker"), "global")
+
+    def test_lane_key_resolves_service_identity_when_enabled(self) -> None:
+        os.environ["SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES"] = "true"
+        os.environ["RENDER_SERVICE_ID"] = "srv-some-service"
+        self.assertEqual(self.ops_refresh._refresh_lane_key(), "srv-some-service")
+
+    def test_lane_key_prefers_explicit_syndicate_refresh_lane_env_over_service_identity(self) -> None:
+        os.environ["SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES"] = "true"
+        os.environ["RENDER_SERVICE_ID"] = "srv-some-service"
+        os.environ["SYNDICATE_REFRESH_LANE"] = "refresh-worker"
+        self.assertEqual(self.ops_refresh._refresh_lane_key(), "refresh-worker")
+
+    def test_lane_key_explicit_override_wins_over_everything(self) -> None:
+        os.environ["SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES"] = "true"
+        os.environ["SYNDICATE_REFRESH_LANE"] = "live-odds-worker"
+        self.assertEqual(self.ops_refresh._refresh_lane_key("refresh-worker"), "refresh-worker")
+
+    def test_lane_key_falls_back_to_local_outside_render(self) -> None:
+        os.environ["SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES"] = "true"
+        self.assertEqual(self.ops_refresh._refresh_lane_key(), "local")
+
+    def test_manifest_filename_legacy_vs_lane(self) -> None:
+        self.assertEqual(self.ops_refresh._refresh_manifest_filename("global"), "refresh_status_latest.json")
+        self.assertEqual(self.ops_refresh._refresh_manifest_filename("refresh-worker"), "refresh_status_latest__refresh-worker.json")
+
+    def test_assert_no_active_refresh_run_blocks_only_within_same_lane(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            latest_dir = reports_root / "refresh_status" / "latest"
+            latest_dir.mkdir(parents=True, exist_ok=True)
+            os.environ["SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES"] = "true"
+            os.environ["SYNDICATE_REPORTS_ROOT"] = str(reports_root)
+            # Lane "worker-a" has an active (self-pid, so genuinely alive) run.
+            (latest_dir / "refresh_status_latest__worker-a.json").write_text(
+                json.dumps({"state": "running", "pid": os.getpid(), "launcherServiceId": "worker-a", "generatedAt": datetime.now(timezone.utc).isoformat()}),
+                encoding="utf-8",
+            )
+            with self.assertRaises(ValueError):
+                self.ops_refresh._assert_no_active_refresh_run(lane="worker-a")
+            # A different lane, even though "worker-a" is active, must not be blocked.
+            self.ops_refresh._assert_no_active_refresh_run(lane="worker-b")
+
+    def test_list_latest_refresh_manifests_by_lane(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            latest_dir = reports_root / "refresh_status" / "latest"
+            latest_dir.mkdir(parents=True, exist_ok=True)
+            os.environ["SYNDICATE_REPORTS_ROOT"] = str(reports_root)
+            (latest_dir / "refresh_status_latest.json").write_text(json.dumps({"state": "finished", "date": "2026-07-23"}), encoding="utf-8")
+            (latest_dir / "refresh_status_latest__refresh-worker.json").write_text(json.dumps({"state": "running", "date": "2026-07-23"}), encoding="utf-8")
+            (latest_dir / "refresh_status_latest__live-odds-worker.json").write_text(json.dumps({"state": "finished", "date": "2026-07-23"}), encoding="utf-8")
+
+            by_lane = self.ops_refresh.list_latest_refresh_manifests_by_lane()
+
+            self.assertEqual(set(by_lane.keys()), {"global", "refresh-worker", "live-odds-worker"})
+            self.assertEqual(by_lane["refresh-worker"]["state"], "running")
+            self.assertEqual(by_lane["live-odds-worker"]["state"], "finished")
+
+    def test_load_latest_refresh_status_exposes_by_lane_and_keeps_legacy_key(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            latest_dir = reports_root / "refresh_status" / "latest"
+            latest_dir.mkdir(parents=True, exist_ok=True)
+            (reports_root / "daily_update" / "latest").mkdir(parents=True, exist_ok=True)
+            os.environ["SYNDICATE_REPORTS_ROOT"] = str(reports_root)
+            older = datetime(2026, 7, 23, 10, 0, 0, tzinfo=timezone.utc).isoformat()
+            newer = datetime(2026, 7, 23, 12, 0, 0, tzinfo=timezone.utc).isoformat()
+            (latest_dir / "refresh_status_latest__refresh-worker.json").write_text(
+                json.dumps({"state": "finished", "date": "2026-07-23", "generatedAt": older}), encoding="utf-8"
+            )
+            (latest_dir / "refresh_status_latest__live-odds-worker.json").write_text(
+                json.dumps({"state": "running", "date": "2026-07-23", "generatedAt": newer}), encoding="utf-8"
+            )
+
+            status = self.ops_refresh.load_latest_refresh_status()
+
+            self.assertIn("refresh_status_by_lane", status)
+            self.assertEqual(set(status["refresh_status_by_lane"].keys()), {"refresh-worker", "live-odds-worker"})
+            # Legacy singular key stays populated for backward compatibility --
+            # from whichever lane was most recently updated.
+            self.assertEqual(status["refresh_status"]["manifest"]["state"], "running")

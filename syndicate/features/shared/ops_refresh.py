@@ -362,6 +362,7 @@ def _load_recent_refresh_history(*, limit: int = 6) -> list[dict[str, Any]]:
                 "sports": manifest.get("oddsSports") or "all",
                 "dry_run": bool(manifest.get("dryRun")),
                 "runtime": runtime,
+                "lane": manifest.get("lane"),
             }
         )
         if len(history) >= limit:
@@ -369,8 +370,9 @@ def _load_recent_refresh_history(*, limit: int = 6) -> list[dict[str, Any]]:
     return history
 
 
-def _latest_refresh_manifest_context() -> dict[str, Any]:
-    refresh_manifest_path = _reports_root() / "refresh_status" / "latest" / "refresh_status_latest.json"
+def _latest_refresh_manifest_context(lane: str | None = None) -> dict[str, Any]:
+    lane_key = _refresh_lane_key(lane)
+    refresh_manifest_path = _reports_root() / "refresh_status" / "latest" / _refresh_manifest_filename(lane_key)
     manifest_raw, manifest_read_ok = read_json_file_result(refresh_manifest_path)
     manifest = manifest_raw if isinstance(manifest_raw, dict) else {}
     artifacts_dir_raw = str(manifest.get("artifactsDir") or "").strip()
@@ -391,6 +393,7 @@ def _latest_refresh_manifest_context() -> dict[str, Any]:
                 f"manifest runStamp {manifest_stamp} does not match run summary runStamp {run_summary_stamp}."
             )
     return {
+        "lane": lane_key,
         "manifest_path": refresh_manifest_path,
         "manifest": manifest,
         "manifest_read_ok": manifest_read_ok,
@@ -429,6 +432,68 @@ def _ensure_refresh_context_consistent(context: dict[str, Any]) -> None:
 
 def _this_service_identity() -> str:
     return str(os.environ.get("RENDER_SERVICE_ID") or os.environ.get("RENDER_SERVICE_NAME") or "").strip()
+
+
+_LEGACY_REFRESH_LANE_KEY = "global"
+_REFRESH_WORKER_LANE_KEY = "refresh-worker"
+
+
+def _per_service_refresh_lanes_enabled() -> bool:
+    raw = str(os.environ.get("SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _refresh_lane_key(explicit_lane: str | None = None) -> str:
+    # Root cause of the soccer/WNBA starvation bug: _assert_no_active_refresh_run
+    # used to enforce ONE mutex shared across all 3 Render services (web,
+    # refresh-worker, live-odds-worker), even though only same-container runs
+    # pose any real OOM risk. refresh-worker's frequent MLB-only autorun kept
+    # winning that global mutex, starving out live-odds-worker's own tick --
+    # the only path that ever refreshes WNBA/soccer/everything else. Each
+    # service now gets its own independent manifest ("lane") instead.
+    #
+    # Defaults OFF (SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES unset/false) so
+    # this is a zero-behavior-change merge -- every caller collapses onto the
+    # same legacy single manifest path until the flag is flipped.
+    if not _per_service_refresh_lanes_enabled():
+        return _LEGACY_REFRESH_LANE_KEY
+    if explicit_lane:
+        return str(explicit_lane).strip() or _LEGACY_REFRESH_LANE_KEY
+    # SYNDICATE_REFRESH_LANE is a stable, human-readable override (set per
+    # service in render.yaml) preferred over the opaque RENDER_SERVICE_ID/NAME
+    # fallback -- it lets code hardcode a known lane name (e.g. the
+    # external-runner queue below, which always belongs to refresh-worker
+    # regardless of which service actually calls launch_refresh_run).
+    configured = str(os.environ.get("SYNDICATE_REFRESH_LANE") or "").strip()
+    if configured:
+        return configured
+    identity = _this_service_identity()
+    return identity or "local"
+
+
+def _refresh_manifest_filename(lane_key: str) -> str:
+    if lane_key == _LEGACY_REFRESH_LANE_KEY:
+        return "refresh_status_latest.json"
+    return f"refresh_status_latest__{lane_key}.json"
+
+
+def list_latest_refresh_manifests_by_lane() -> dict[str, dict[str, Any]]:
+    latest_dir = _reports_root() / "refresh_status" / "latest"
+    result: dict[str, dict[str, Any]] = {}
+    if not latest_dir.exists():
+        return result
+    for path in sorted(latest_dir.glob("refresh_status_latest*.json")):
+        prefix = "refresh_status_latest__"
+        if path.stem == "refresh_status_latest":
+            lane_key = _LEGACY_REFRESH_LANE_KEY
+        elif path.stem.startswith(prefix):
+            lane_key = path.stem[len(prefix):]
+        else:
+            continue
+        manifest = read_json_file(path)
+        if isinstance(manifest, dict):
+            result[lane_key] = manifest
+    return result
 
 
 def _refresh_run_max_runtime_seconds() -> int:
@@ -527,8 +592,8 @@ def _assert_refresh_manifest_read_ok(context: dict[str, Any]) -> None:
         raise ValueError("Cannot confirm refresh-run state (manifest read failed) -- refusing to launch a new run until state is confirmed.")
 
 
-def _assert_no_active_refresh_run() -> None:
-    context = _latest_refresh_manifest_context()
+def _assert_no_active_refresh_run(lane: str | None = None) -> None:
+    context = _latest_refresh_manifest_context(lane)
     _assert_refresh_manifest_read_ok(context)
     _ensure_refresh_context_consistent(context)
     manifest: dict[str, Any] = context["manifest"] if isinstance(context.get("manifest"), dict) else {}
@@ -537,8 +602,8 @@ def _assert_no_active_refresh_run() -> None:
     pid_raw = manifest.get("pid")
     pid = int(pid_raw) if isinstance(pid_raw, int) or (isinstance(pid_raw, str) and str(pid_raw).strip().isdigit()) else None
     if state == "running" and not _refresh_run_still_active(manifest, run_summary=run_summary):
-        _update_latest_state(state="failed", exit_code=1, finished_at=_utc_now())
-        context = _latest_refresh_manifest_context()
+        _update_latest_state(state="failed", exit_code=1, finished_at=_utc_now(), lane=lane)
+        context = _latest_refresh_manifest_context(lane)
         _assert_refresh_manifest_read_ok(context)
         manifest = context["manifest"] if isinstance(context.get("manifest"), dict) else {}
         run_summary = context["run_summary"] if isinstance(context.get("run_summary"), dict) else {}
@@ -574,8 +639,8 @@ def _assert_no_active_refresh_run() -> None:
     if state in {"pending_external", "running"} and queue_state in {"queued", "running"}:
         terminal_state, exit_code, finished_at = _terminal_refresh_state()
         if terminal_state is not None:
-            _update_latest_state(state=terminal_state, exit_code=exit_code, finished_at=finished_at)
-            context = _latest_refresh_manifest_context()
+            _update_latest_state(state=terminal_state, exit_code=exit_code, finished_at=finished_at, lane=lane)
+            context = _latest_refresh_manifest_context(lane)
             manifest = context["manifest"] if isinstance(context.get("manifest"), dict) else {}
             state = str(manifest.get("state") or "").strip().lower()
             external_runner = manifest.get("externalRunner") if isinstance(manifest.get("externalRunner"), dict) else {}
@@ -587,7 +652,7 @@ def _assert_no_active_refresh_run() -> None:
         raise ValueError("A refresh run is already queued for the external runner. Cancel it before starting a new run.")
 
 
-def is_refresh_run_active() -> bool:
+def is_refresh_run_active(lane: str | None = None) -> bool:
     # Read-only check (no state mutation, unlike _assert_no_active_refresh_run):
     # is an odds-refresh run currently in flight? Used by the MLB daily-sim
     # gate to avoid stacking a second heavy pipeline (1000-sim run + the
@@ -598,8 +663,14 @@ def is_refresh_run_active() -> bool:
     # just mean occasional stacking as before, so this stays conservative
     # rather than replicating the full stale-pid/external-runner reconciliation
     # logic above.
+    #
+    # lane defaults to this service's own lane (via _refresh_lane_key), which
+    # is correct here without any special-casing: this is only ever called
+    # from the MLB sim decision path, which itself only runs on whichever
+    # service owns the MLB sim tick (refresh-worker today) -- so the default
+    # already resolves to the right lane to check for same-container stacking.
     try:
-        context = _latest_refresh_manifest_context()
+        context = _latest_refresh_manifest_context(lane)
     except Exception:
         return False
     manifest = context.get("manifest") if isinstance(context, dict) else None
@@ -617,8 +688,8 @@ def is_refresh_run_active() -> bool:
         return False
 
 
-def _update_latest_state(*, state: str, exit_code: int | None = None, canceled_at: str | None = None, finished_at: str | None = None) -> dict[str, Any]:
-    context = _latest_refresh_manifest_context()
+def _update_latest_state(*, state: str, exit_code: int | None = None, canceled_at: str | None = None, finished_at: str | None = None, lane: str | None = None) -> dict[str, Any]:
+    context = _latest_refresh_manifest_context(lane)
     _ensure_refresh_context_consistent(context)
     manifest_path: Path = context["manifest_path"]
     manifest: dict[str, Any] = context["manifest"]
@@ -646,20 +717,20 @@ def _update_latest_state(*, state: str, exit_code: int | None = None, canceled_a
     return manifest
 
 
-def cancel_latest_refresh_run() -> dict[str, Any]:
-    context = _latest_refresh_manifest_context()
+def cancel_latest_refresh_run(lane: str | None = None) -> dict[str, Any]:
+    context = _latest_refresh_manifest_context(lane)
     _ensure_refresh_context_consistent(context)
     manifest: dict[str, Any] = context["manifest"]
     manifest_state = str(manifest.get("state") or "").strip().lower()
     pid_raw = manifest.get("pid")
     pid = int(pid_raw) if isinstance(pid_raw, int) or (isinstance(pid_raw, str) and str(pid_raw).strip().isdigit()) else None
     if pid is None and manifest_state == "pending_external":
-        updated = _update_latest_state(state="canceled", exit_code=0, canceled_at=_utc_now())
+        updated = _update_latest_state(state="canceled", exit_code=0, canceled_at=_utc_now(), lane=lane)
         return {"ok": True, "pid": None, "state": updated.get("state"), "detail": "Queued external refresh run canceled."}
     if pid is None:
         raise ValueError("No running refresh PID is recorded in the latest manifest.")
     if not _pid_is_running(pid):
-        updated = _update_latest_state(state="failed", canceled_at=_utc_now())
+        updated = _update_latest_state(state="failed", canceled_at=_utc_now(), lane=lane)
         return {"ok": False, "pid": pid, "state": updated.get("state"), "detail": "Recorded PID is not running."}
 
     canceled = False
@@ -692,7 +763,7 @@ def cancel_latest_refresh_run() -> dict[str, Any]:
         stderr_text = "Refresh process is still running after cancel attempt."
 
     new_state = "canceled" if canceled else "failed"
-    updated = _update_latest_state(state=new_state, exit_code=0 if canceled else 1, canceled_at=_utc_now())
+    updated = _update_latest_state(state=new_state, exit_code=0 if canceled else 1, canceled_at=_utc_now(), lane=lane)
     return {
         "ok": canceled,
         "pid": pid,
@@ -701,9 +772,9 @@ def cancel_latest_refresh_run() -> dict[str, Any]:
     }
 
 
-def load_latest_refresh_log(*, stream: str = "stderr") -> dict[str, Any]:
+def load_latest_refresh_log(*, stream: str = "stderr", lane: str | None = None) -> dict[str, Any]:
     stream_key = str(stream or "stderr").strip().lower()
-    context = _latest_refresh_manifest_context()
+    context = _latest_refresh_manifest_context(lane)
     _ensure_refresh_context_consistent(context)
     manifest: dict[str, Any] = context["manifest"]
     artifacts_dir: Path | None = context["artifacts_dir"]
@@ -783,10 +854,7 @@ def build_refresh_plan(
     return summary if isinstance(summary, dict) else {"ok": False, "error": "Unable to build refresh plan."}
 
 
-def load_latest_refresh_status() -> dict[str, Any]:
-    current_reports_root = _reports_root()
-    refresh_latest_dir = current_reports_root / "refresh_status" / "latest"
-    refresh_manifest_path = refresh_latest_dir / "refresh_status_latest.json"
+def _build_refresh_status_detail(*, refresh_latest_dir: Path, refresh_manifest_path: Path) -> dict[str, Any]:
     refresh_manifest = read_json_file(refresh_manifest_path)
 
     refresh_artifacts: dict[str, Any] = {}
@@ -824,6 +892,57 @@ def load_latest_refresh_status() -> dict[str, Any]:
             "payload": read_json_file(queued_job_status_path),
         }
     runtime_state = _derive_refresh_runtime_state(refresh_manifest, refresh_artifacts)
+    return {
+        "manifest_path": str(refresh_manifest_path),
+        "manifest_exists": path_exists(refresh_manifest_path),
+        "manifest": refresh_manifest,
+        "artifacts": refresh_artifacts,
+        "required_artifact_failures": required_artifact_failures,
+        "optional_artifact_failures": optional_artifact_failures,
+        "refresh_contract": refresh_contract,
+        "mirror_manifests": _load_mirror_manifest_summaries_from_current_data_root(),
+        "runtime": runtime_state,
+        "history": _load_recent_refresh_history(),
+    }
+
+
+def _most_recently_updated_lane(by_lane: dict[str, dict[str, Any]]) -> str | None:
+    best_lane: str | None = None
+    best_epoch = -1.0
+    for lane_key, manifest in by_lane.items():
+        generated_at = str((manifest or {}).get("generatedAt") or "").strip()
+        if not generated_at:
+            continue
+        try:
+            parsed = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+        except Exception:
+            continue
+        epoch = parsed.timestamp()
+        if epoch > best_epoch:
+            best_epoch = epoch
+            best_lane = lane_key
+    return best_lane
+
+
+def load_latest_refresh_status() -> dict[str, Any]:
+    current_reports_root = _reports_root()
+    refresh_latest_dir = current_reports_root / "refresh_status" / "latest"
+
+    by_lane_manifests = list_latest_refresh_manifests_by_lane()
+    primary_lane = _most_recently_updated_lane(by_lane_manifests) if by_lane_manifests else None
+    primary_manifest_path = (
+        refresh_latest_dir / _refresh_manifest_filename(primary_lane)
+        if primary_lane is not None
+        else refresh_latest_dir / "refresh_status_latest.json"
+    )
+    refresh_status_detail = _build_refresh_status_detail(refresh_latest_dir=refresh_latest_dir, refresh_manifest_path=primary_manifest_path)
+    refresh_status_by_lane = {
+        lane_key: _build_refresh_status_detail(
+            refresh_latest_dir=refresh_latest_dir,
+            refresh_manifest_path=refresh_latest_dir / _refresh_manifest_filename(lane_key),
+        )
+        for lane_key in by_lane_manifests
+    }
 
     daily_update_latest_dir = current_reports_root / "daily_update" / "latest"
     daily_update_manifest_candidates = [
@@ -865,18 +984,12 @@ def load_latest_refresh_status() -> dict[str, Any]:
 
     return {
         "reports_root": str(current_reports_root),
-        "refresh_status": {
-            "manifest_path": str(refresh_manifest_path),
-            "manifest_exists": path_exists(refresh_manifest_path),
-            "manifest": refresh_manifest,
-            "artifacts": refresh_artifacts,
-            "required_artifact_failures": required_artifact_failures,
-            "optional_artifact_failures": optional_artifact_failures,
-            "refresh_contract": refresh_contract,
-            "mirror_manifests": _load_mirror_manifest_summaries_from_current_data_root(),
-            "runtime": runtime_state,
-            "history": _load_recent_refresh_history(),
-        },
+        "refresh_status": refresh_status_detail,
+        # Per-lane detail (populated once SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES
+        # is enabled and each service has written its own manifest) -- additive,
+        # existing consumers of "refresh_status" above keep working unchanged,
+        # reading whichever lane was most recently updated.
+        "refresh_status_by_lane": refresh_status_by_lane,
         "daily_update": {
             "manifest_path": str(daily_update_manifest_path),
             "manifest_exists": path_exists(daily_update_manifest_path),
@@ -987,15 +1100,23 @@ def launch_refresh_run(
     force_refresh: bool = False,
     force_refresh_sports: str | None = None,
     wnba_only_matchups: str | None = None,
+    lane: str | None = None,
 ) -> dict[str, Any]:
-    _assert_no_active_refresh_run()
+    launch_mode = _resolve_launch_mode(launch_mode)
+    # The queued/external-runner path is always claimed and executed by
+    # refresh-worker's own poll loop (scripts/run_refresh_worker.py), regardless
+    # of which service's process actually calls launch_refresh_run to enqueue
+    # it -- so it must always resolve to refresh-worker's lane specifically,
+    # not the calling service's own lane, or refresh-worker would never find
+    # what it queued.
+    effective_lane = _refresh_lane_key(_REFRESH_WORKER_LANE_KEY if _is_external_runner_mode(launch_mode) else lane)
+    _assert_no_active_refresh_run(lane=effective_lane)
     selected_date = date or _today_date()
     skip_mirror_value = _env_bool("SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR") if skip_mirror is None else bool(skip_mirror)
     effective_skip_mirror = _effective_skip_mirror(skip_mirror=bool(skip_mirror_value), mirror_only=bool(mirror_only))
     # Default to in-season sports for the target date rather than running all sports.
     effective_sports = _coerce_slug_list(sports) if sports else _active_sports_for_date(selected_date)
     run_stamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    launch_mode = _resolve_launch_mode(launch_mode)
     current_reports_root = _reports_root()
     refresh_status_root = current_reports_root / "refresh_status"
     refresh_status_run_dir = refresh_status_root / selected_date / run_stamp
@@ -1010,7 +1131,7 @@ def launch_refresh_run(
     odds_refresh_stderr_path = artifacts_dir / "odds_refresh.stderr.txt"
     refresh_and_gate_run_path = artifacts_dir / "refresh_and_gate_run.json"
     refresh_status_manifest_path = refresh_status_run_dir / "refresh_status_manifest.json"
-    refresh_status_latest_path = refresh_status_latest_dir / "refresh_status_latest.json"
+    refresh_status_latest_path = refresh_status_latest_dir / _refresh_manifest_filename(effective_lane)
 
     refresh_mode = str(mode or _env_text("SYNDICATE_LIVE_ODDS_REFRESH_MODE") or "fast").strip().lower() or "fast"
     phase_text = str(phase or _env_text("SYNDICATE_LIVE_ODDS_REFRESH_PHASE") or "all").strip() or "all"
@@ -1141,6 +1262,7 @@ def launch_refresh_run(
         "launchMode": launch_mode,
         "launchOwner": "external_runner" if _is_external_runner_mode(launch_mode) else "web_process",
         "launcherServiceId": _this_service_identity() or None,
+        "lane": effective_lane,
         "dryRun": bool(dry_run),
         "state": "pending_external" if _is_external_runner_mode(launch_mode) else "running",
         "externalRunner": external_runner,
@@ -1164,6 +1286,7 @@ def launch_refresh_run(
             "launch_owner": "external_runner",
             "external_runner": external_runner,
             "state": "pending_external",
+            "lane": effective_lane,
         }
 
     # Always launch detached and fire-and-forget: every caller (HTTP job-start
@@ -1216,4 +1339,5 @@ def launch_refresh_run(
         "launch_mode": launch_mode,
         "launch_owner": "web_process",
         "state": "running",
+        "lane": effective_lane,
     }

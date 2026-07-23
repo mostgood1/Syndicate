@@ -459,7 +459,7 @@
                 {% set item_runtime = item.get('runtime') or {} %}
                 <div class="ops-artifact-item">
                   <div class="ops-artifact-top">
-                    <strong>{{ item.get('date') }} · {{ item.get('run_stamp') }}</strong>
+                    <strong>{{ item.get('date') }} · {{ item.get('run_stamp') }}{% if item.get('lane') %} · {{ item.get('lane') }}{% endif %}</strong>
                     <span class="ops-badge {% if item_runtime.get('state') == 'finished' %}ops-badge--ok{% elif item_runtime.get('state') == 'running' %}ops-badge--running{% else %}ops-badge--error{% endif %}">{{ item_runtime.get('state') or 'unknown' }}</span>
                   </div>
                   <div class="ops-note">{{ item_runtime.get('detail') }}</div>
@@ -473,6 +473,38 @@
             </div>
           {% endif %}
         </div>
+
+        {% set refresh_status_by_lane = status_payload.get('refresh_status_by_lane') or {} %}
+        {% if refresh_status_by_lane %}
+          <div class="ops-card">
+            <div class="section-label">Per-Lane Status</div>
+            <h3 class="ops-section-title">Independent refresh lanes (one active run each)</h3>
+            <div class="ops-history-list">
+              {% for lane_key, lane_status in refresh_status_by_lane.items() %}
+                {% set lane_manifest = lane_status.get('manifest') or {} %}
+                {% set lane_runtime = lane_status.get('runtime') or {} %}
+                <div class="ops-artifact-item">
+                  <div class="ops-artifact-top">
+                    <strong>{{ lane_key }}</strong>
+                    <span class="ops-badge {% if lane_runtime.get('state') == 'finished' %}ops-badge--ok{% elif lane_runtime.get('state') == 'running' %}ops-badge--running{% else %}ops-badge--error{% endif %}">{{ lane_runtime.get('state') or 'unknown' }}</span>
+                  </div>
+                  <div class="ops-note">{{ lane_runtime.get('detail') }}</div>
+                  <div class="ops-note">Sports: {{ lane_manifest.get('oddsSports') or 'Unavailable' }} · Phase: {{ lane_manifest.get('oddsPhase') or 'Unavailable' }} · Date: {{ lane_manifest.get('date') or 'Unavailable' }}</div>
+                  <div class="ops-path">{{ lane_status.get('manifest_path') }}</div>
+                  <form class="ops-form" method="post" action="/ops/odds-refresh/cancel">
+                    {% if request.args.get('admin_token') %}
+                      <input type="hidden" name="admin_token" value="{{ request.args.get('admin_token') }}" />
+                    {% endif %}
+                    <input type="hidden" name="lane" value="{{ lane_key }}" />
+                    <div class="action-row action-row--compact">
+                      <button class="cards-nav-pill" type="submit">Cancel this lane</button>
+                    </div>
+                  </form>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
 
         <div class="ops-card">
           <div class="section-label">Plan Result</div>

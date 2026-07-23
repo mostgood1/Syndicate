@@ -17,6 +17,9 @@ if str(REPO_ROOT) not in sys.path:
 
 from syndicate.features.shared.ops_refresh import launch_refresh_run
 from syndicate.features.shared.ops_refresh import _active_sports_for_date
+from syndicate.features.shared.ops_refresh import _REFRESH_WORKER_LANE_KEY
+from syndicate.features.shared.ops_refresh import _refresh_lane_key
+from syndicate.features.shared.ops_refresh import _refresh_manifest_filename
 from pipeline.intelligence_state import start_intelligence_state_background_loop
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.shared.live_refresh_loop import _run_mlb_sim_tick
@@ -39,7 +42,13 @@ def _refresh_state_store() -> dict[str, Any]:
 
 
 def _default_latest_manifest_path() -> Path:
-    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "refresh_status_latest.json"
+    # This poll loop only ever runs on refresh-worker, and it's the only
+    # process that claims queued/external-runner contracts -- so its manifest
+    # must always be refresh-worker's own lane (matching the same hardcoded
+    # lane launch_refresh_run resolves external-runner launches to), regardless
+    # of which service actually enqueued the job.
+    lane_key = _refresh_lane_key(_REFRESH_WORKER_LANE_KEY)
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / _refresh_manifest_filename(lane_key)
 
 
 def _default_worker_status_path() -> Path:

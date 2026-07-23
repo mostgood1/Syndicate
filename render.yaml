@@ -54,6 +54,16 @@ services:
         value: detached_subprocess
       - key: SYNDICATE_WEB_DYNO
         value: "true"
+      # Root-caused 2026-07-23: refresh-worker's frequent MLB-only autorun was
+      # winning a mutex SHARED GLOBALLY across all 3 services almost every
+      # cycle, starving out live-odds-worker's own tick -- the only path that
+      # ever refreshes WNBA/soccer/everything else. Each service gets its own
+      # independent "one run at a time" lane instead. Starts false (zero
+      # behavior change); flip true on all 3 services together once reviewed.
+      - key: SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES
+        value: "false"
+      - key: SYNDICATE_REFRESH_LANE
+        value: web
       - key: SYNDICATE_REQUIRE_HOSTED_STORAGE
         value: "true"
       - key: SYNDICATE_REFRESH_STATE_BACKEND
@@ -216,6 +226,15 @@ services:
         value: detached_subprocess
       - key: SYNDICATE_WEB_DYNO
         value: "false"
+      # See the matching comment on the syndicate web service above --
+      # per-service refresh-run lanes fix the soccer/WNBA starvation bug
+      # traced to refresh-worker's own frequent MLB-only autorun winning a
+      # globally-shared mutex almost every cycle. Starts false; flip true on
+      # all 3 services together once reviewed.
+      - key: SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES
+        value: "false"
+      - key: SYNDICATE_REFRESH_LANE
+        value: refresh-worker
       - key: SYNDICATE_REQUIRE_HOSTED_STORAGE
         value: "true"
       - key: SYNDICATE_REFRESH_STATE_BACKEND
@@ -343,6 +362,14 @@ services:
         value: "true"
       - key: WEEKLY_SPORTS_REFRESH_INTERVAL_SECONDS
         value: "21600"
+      # Same ownership-split pattern as SYNDICATE_MLB_REFRESH_TICK_OWNER below
+      # (mirrored on live-odds-worker, set to "false" there): without this,
+      # live-odds-worker's combined tick and this autorun would both target
+      # the identical in-season nfl/ncaaf/ncaab artifacts the moment those
+      # sports are back in season -- a real write race, not just wasted work,
+      # dormant only because they're all off-season right now.
+      - key: WEEKLY_SPORTS_REFRESH_TICK_OWNER
+        value: "true"
       # MLB daily sim / look-ahead / evening-next-day sim: relocated here
       # 2026-07-20 from live-odds-worker to isolate the 1000-sim Monte Carlo
       # job's memory footprint from that worker's odds-refresh + NBA/WNBA
@@ -406,6 +433,15 @@ services:
         value: detached_subprocess
       - key: SYNDICATE_WEB_DYNO
         value: "false"
+      # See the matching comment on the syndicate web service above --
+      # per-service refresh-run lanes fix the soccer/WNBA starvation bug
+      # traced to refresh-worker's own frequent MLB-only autorun winning a
+      # globally-shared mutex almost every cycle. Starts false; flip true on
+      # all 3 services together once reviewed.
+      - key: SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES
+        value: "false"
+      - key: SYNDICATE_REFRESH_LANE
+        value: live-odds-worker
       - key: SYNDICATE_REQUIRE_HOSTED_STORAGE
         value: "true"
       - key: SYNDICATE_REFRESH_STATE_BACKEND
@@ -521,6 +557,13 @@ services:
       # excluded from what this worker's tick launches, same ownership split
       # already made for the sim above.
       - key: SYNDICATE_MLB_REFRESH_TICK_OWNER
+        value: "false"
+      # Same ownership-split pattern as MLB above, for nfl/ncaaf/ncaab -- see
+      # the matching comment on refresh-worker's WEEKLY_SPORTS_REFRESH_TICK_OWNER
+      # (set "true" there). Without this, this worker's own tick and
+      # refresh-worker's weekly-sports autorun would both target the same
+      # in-season weekly-sport artifacts once football season starts.
+      - key: WEEKLY_SPORTS_REFRESH_TICK_OWNER
         value: "false"
       - key: SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER
         value: "false"
