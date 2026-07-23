@@ -61,7 +61,20 @@ def has_games_for_date(date_str: str) -> bool | None:
     if not selected_date:
         return None
 
-    if selected_date in _HAS_GAMES_CONFIRMED_TRUE_CACHE or selected_date in available_dates():
+    if selected_date in _HAS_GAMES_CONFIRMED_TRUE_CACHE:
+        return True
+    # Trusting "some per-date artifact exists" as proof of real games is
+    # safe for a PAST date -- it's immutable, and the artifact was built
+    # when the slate was genuinely being tracked. It is NOT safe for TODAY:
+    # this session traced a chain of stale same-day artifacts
+    # (game_cards_{date}.csv, recommendations_slate_{date}.json) that can
+    # persist from a prior real slate day's build even once today is
+    # confirmed empty (e.g. an All-Star break), which made this shortcut
+    # return True without ever checking the actual schedule -- the root
+    # cause of a board that kept showing a stale slate under today's date
+    # no matter how thoroughly the game_cards artifact itself got fixed.
+    # Always fall through to a real ESPN check for today specifically.
+    if selected_date != central_today_iso() and selected_date in available_dates():
         _HAS_GAMES_CONFIRMED_TRUE_CACHE.add(selected_date)
         return True
 
