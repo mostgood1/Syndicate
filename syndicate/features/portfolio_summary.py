@@ -1,11 +1,70 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from statistics import mean
 from typing import Any, Mapping
 
-from syndicate.features.prediction_ledger import get_performance_summary
+from syndicate.features.prediction_ledger import _breakdown_by_field
+from syndicate.features.prediction_ledger import _prediction_result
+from syndicate.features.prediction_ledger import _roi
+from syndicate.features.prediction_ledger import _settled_predictions
 from syndicate.features.prediction_ledger import load_all_predictions
 from syndicate.features.shared.timezone import central_today_iso
+
+
+def _is_user_placed_bet(prediction: Mapping[str, Any]) -> bool:
+    # data/prediction_ledger.json is shared by two unrelated writers: every
+    # board recommendation gets auto-recorded here for model-calibration
+    # purposes (run_intelligence_query's ENABLE_PREDICTION_TRACKING path,
+    # intelligence.py) regardless of whether a user ever saw or acted on
+    # it -- that's the source of the 1000+ "tracked plays" that used to
+    # show up here. A user-placed bet (POST /api/portfolio/bets, the bet
+    # slip's "Log to portfolio") always carries a real stake; the
+    # auto-tracking call site never passes one. Stake presence is the
+    # cleanest signal to separate "the model tracked this candidate" from
+    # "the user actually bet this" without touching the calibration
+    # feature at all.
+    return prediction.get("stake") is not None
+
+
+def _performance_summary_for(predictions: list[dict[str, Any]]) -> dict[str, Any]:
+    settled = _settled_predictions(predictions)
+    results = [_prediction_result(item) for item in settled]
+    decisive = [item for item in results if item is not None and str(item.get("outcome") or "").strip().lower() in {"win", "loss"}]
+
+    win_rate = None
+    if decisive:
+        wins = sum(1 for item in decisive if str(item.get("outcome") or "").strip().lower() == "win")
+        win_rate = wins / float(len(decisive))
+
+    def _coerce_float(value: Any) -> float | None:
+        if value is None or isinstance(value, bool):
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    total_pnl = sum(_coerce_float(item.get("pnl")) or 0.0 for item in settled)
+    edge_values = [_coerce_float(item.get("edge")) for item in predictions if _coerce_float(item.get("edge")) is not None]
+    average_edge = mean(edge_values) if edge_values else None
+    roi = _roi(predictions)
+    clv_values = [_coerce_float(item.get("clv")) for item in settled if _coerce_float(item.get("clv")) is not None]
+    average_clv = mean(clv_values) if clv_values else None
+
+    by_sport = _breakdown_by_field(predictions, "sport")
+
+    return {
+        "total_bets": len(predictions),
+        "settled_count": len(settled),
+        "decisive_count": len(decisive),
+        "win_rate": win_rate,
+        "roi": roi,
+        "total_pnl": total_pnl,
+        "avg_edge": average_edge,
+        "average_clv": average_clv,
+        "by_sport": by_sport,
+    }
 
 
 def _outcome(prediction: Mapping[str, Any]) -> str:
@@ -79,15 +138,15 @@ def _exposure_by_sport(predictions: list[dict[str, Any]]) -> list[dict[str, Any]
 
 
 def build_portfolio_summary(*, limit: int = 60) -> dict[str, Any]:
-    """Real, ledger-backed portfolio state -- not a fabricated bankroll.
-
-    prediction_ledger.py tracks recommendation quality (edge, confidence,
-    settlement outcome), not dollar stakes, so this reports open/settled
-    counts, win rate, ROI, and CLV in the ledger's own terms rather than
-    inventing a bankroll figure the data model doesn't actually carry.
-    """
-    predictions = load_all_predictions()
-    performance = get_performance_summary()
+    """Real, ledger-backed portfolio state -- only bets the user actually
+    placed via the board's bet slip (POST /api/portfolio/bets), not the
+    much larger pool of every candidate the board ever auto-tracked for
+    model calibration (see _is_user_placed_bet)."""
+    # Scoped to user-placed bets only (see _is_user_placed_bet) -- the
+    # underlying store also holds every auto-tracked board candidate used
+    # for model calibration, which this page must not blend in.
+    predictions = [item for item in load_all_predictions() if _is_user_placed_bet(item)]
+    performance = _performance_summary_for(predictions)
 
     today = central_today_iso()
     today_count = sum(1 for item in predictions if str(item.get("timestamp") or "").startswith(today))

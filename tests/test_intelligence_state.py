@@ -1503,7 +1503,6 @@ class IntelligenceStateTests(unittest.TestCase):
         # classes) no longer exists in this template.
         self.assertIn("Betting Board", html)
         self.assertIn("Board snapshot", html)
-        self.assertIn("board-hero", html)
         self.assertIn("board-toolbar", html)
         self.assertIn("board-empty", html)
         self.assertIn("/api/intelligence/query", html)

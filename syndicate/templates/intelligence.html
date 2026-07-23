@@ -13,29 +13,6 @@
     max-width: 1400px;
   }
 
-  .board-hero {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-    align-items: flex-start;
-    justify-content: space-between;
-    padding: 18px 20px;
-    margin-bottom: 16px;
-  }
-
-  .board-hero__copy {
-    display: grid;
-    gap: 6px;
-    min-width: 0;
-  }
-
-  .board-hero__lede {
-    margin: 0;
-    color: var(--cards-text-soft);
-    font-size: 13px;
-    max-width: 62ch;
-  }
-
   .board-toolbar {
     display: grid;
     gap: 12px;
@@ -566,10 +543,6 @@
   }
 
   @media (max-width: 720px) {
-    .board-hero {
-      flex-direction: column;
-    }
-
     .board-toolbar-row {
       flex-direction: column;
       align-items: stretch;
@@ -867,14 +840,6 @@
 </style>
 
 <main class="board-page">
-  <section class="cards-control-card board-hero">
-    <div class="board-hero__copy">
-      <span class="eyebrow">Betting Board</span>
-      <h1>Ranked bets across every tracked sport</h1>
-      <p class="board-hero__lede">Filter by sport and live/pregame lane, then track edges, odds/line movement, and portfolio exposure in one board.</p>
-    </div>
-    <a class="cards-nav-pill" href="/intelligence/status">Data coverage</a>
-  </section>
 
   <script id="initial-intelligence-response" type="application/json">{{ initial_intelligence_response | default({}) | tojson }}</script>
 
@@ -891,6 +856,7 @@
       <div style="display:flex; gap:8px; align-items:center;">
         <div id="board-freshness-chip" class="board-chip" hidden></div>
         <div id="board-refresh-status" class="board-refresh-status" role="status" aria-live="polite"></div>
+        <a class="cards-nav-pill" href="/intelligence/status">Data coverage</a>
       </div>
     </div>
     <div class="board-toolbar-row">

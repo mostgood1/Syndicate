@@ -78,13 +78,38 @@ class PortfolioSummaryStakeAndParlayTests(unittest.TestCase):
         self.assertNotIn("nba", exposure)
         self.assertEqual(exposure.get("wnba"), 30.0)
 
-    def test_exposure_by_sport_defaults_to_one_unit_when_stake_missing(self) -> None:
+    def test_stakeless_records_are_excluded_entirely_not_defaulted(self) -> None:
+        # A record with no stake is the auto-tracking path
+        # (run_intelligence_query's ENABLE_PREDICTION_TRACKING, every board
+        # candidate regardless of user action) -- not a real position, so
+        # it must not appear in the portfolio at all, not even defaulted
+        # to a 1-unit position.
         record_prediction(sport="mlb", market="Total", selection="Over 8.5", odds=-110, ledger_path=self.ledger_path)
 
         summary = build_portfolio_summary()
-        exposure = {row["sport"]: row["stake"] for row in summary["exposure_by_sport"]}
 
-        self.assertEqual(exposure.get("mlb"), 1.0)
+        self.assertEqual(summary["total_tracked"], 0)
+        self.assertEqual(summary["positions"], [])
+        self.assertEqual(summary["exposure_by_sport"], [])
+
+    def test_portfolio_only_shows_user_placed_bets_not_auto_tracked_candidates(self) -> None:
+        # Real bug: the ledger is shared with run_intelligence_query's
+        # auto-tracking (every board candidate, every refresh cycle) --
+        # confirmed live 2026-07-22, the Portfolio page showed 1440+
+        # "tracked plays" that were never actually bet. Mixing both kinds
+        # in one ledger and confirming only the stake-bearing one surfaces
+        # is the direct regression test for that fix.
+        for _ in range(5):
+            record_prediction(sport="mlb", market="Moneyline", selection="Yankees ML", odds=-150, edge=0.03, ledger_path=self.ledger_path)
+        record_prediction(
+            sport="wnba", market="Spread", selection="Liberty -4.5", odds=-110, stake=25.0, ledger_path=self.ledger_path
+        )
+
+        summary = build_portfolio_summary()
+
+        self.assertEqual(summary["total_tracked"], 1)
+        self.assertEqual(len(summary["positions"]), 1)
+        self.assertEqual(summary["positions"][0]["selection"], "Liberty -4.5")
 
 
 if __name__ == "__main__":

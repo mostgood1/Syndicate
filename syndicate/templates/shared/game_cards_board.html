@@ -24,18 +24,6 @@
     {% include 'shared/_board_header.html' %}
   {% endif %}
 
-  {% if show_intro is not defined or show_intro %}
-    {% with route_label=route_path, title=intro_title, status='Feature module', body=intro_body %}
-      {% include 'shared/_module_intro.html' %}
-    {% endwith %}
-  {% endif %}
-
-  {% if show_source_summary is not defined or show_source_summary %}
-    {% with source_title=source_title, source_date=date, source_path=source_path, stats=header_stats %}
-      {% include 'shared/_source_summary.html' %}
-    {% endwith %}
-  {% endif %}
-
   {% with action=(control_action or route_path), prev_href=(controls_prev_href or (route_path ~ '?date=' ~ prev_date)), next_href=(controls_next_href or (route_path ~ '?date=' ~ next_date)), control_label=control_label, control_type=control_type, control_name=control_name, date_value=(control_value or date), links=module_links, hidden_fields=hidden_fields, cards_control_links=cards_control_links, show_home_link=false %}
     {% include 'shared/_date_controls.html' %}
   {% endwith %}

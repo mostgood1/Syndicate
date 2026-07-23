@@ -13,23 +13,6 @@
     max-width: 1220px;
   }
 
-  .portfolio-hero {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-    align-items: flex-start;
-    justify-content: space-between;
-    padding: 18px 20px;
-    margin-bottom: 16px;
-  }
-
-  .portfolio-hero__lede {
-    margin: 6px 0 0;
-    color: var(--cards-text-soft);
-    font-size: 13px;
-    max-width: 68ch;
-  }
-
   .portfolio-tiles {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -236,15 +219,6 @@
 {% set summary = portfolio_summary or {} %}
 
 <main class="portfolio-page">
-  <section class="cards-control-card portfolio-hero">
-    <div>
-      <span class="eyebrow">Portfolio &amp; ledger</span>
-      <h1>Tracked plays and outcomes</h1>
-      <p class="portfolio-hero__lede">Every recommendation the board has recorded, plus grading once results settle. Reported in the ledger's own terms -- edge, win rate, ROI, and CLV -- not a fabricated dollar bankroll the data model doesn't carry.</p>
-    </div>
-    <a class="cards-nav-pill" href="/intelligence">Back to board</a>
-  </section>
-
   {% if (summary.settled_count or 0) == 0 %}
     <div class="portfolio-note">Awaiting grading -- {{ summary.total_tracked or 0 }} tracked play{{ '' if (summary.total_tracked or 0) == 1 else 's' }}, 0 settled yet. Win rate, ROI, and CLV populate once reconciliation grades results.</div>
   {% endif %}
