@@ -33,6 +33,7 @@ from syndicate.features.shared.source_roots import preferred_source_roots
 from syndicate.features.shared.team_branding import read_team_branding_snapshot
 from syndicate.features.shared.team_branding import team_branding_index_by_abbreviation
 from syndicate.features.shared.refresh_state_store import read_text_file as _keyvalue_read_text_file
+from syndicate.features.shared.refresh_state_store import write_text_file as _keyvalue_write_text_file
 from syndicate.features.wnba.sources import available_dates
 from syndicate.features.wnba.sources import build_module_links
 from syndicate.features.wnba.sources import format_moneyline
@@ -132,10 +133,20 @@ def _live_snapshot_artifact_path(kind: str, selected_date: str) -> Path:
 
 
 def _read_jsonl_snapshot_payload(path: Path) -> dict[str, Any] | None:
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except Exception:
+    # Keyvalue-aware (not path.read_text()) -- see _write_jsonl_snapshot_payload
+    # below for why: this is the same class of bug that left the Betting
+    # Board's odds-history "Move" column blank. live_player_lens/
+    # live_player_boxscore/live_lines/live_pbp_stats are computed by
+    # live-odds-worker and read by whichever process handles the request
+    # (often a different service, separate disk on Render), so a plain
+    # local-disk read here only ever saw whatever THIS process itself had
+    # already written -- confirmed live 2026-07-22: WNBA live player props
+    # stayed sparse/empty because build_live_player_lens_payload's local
+    # cache read never saw live-odds-worker's computed snapshot.
+    text = _keyvalue_read_text_file(path)
+    if text is None:
         return None
+    lines = text.splitlines()
     for line in reversed(lines):
         raw = str(line or "").strip()
         if not raw:
@@ -194,8 +205,15 @@ def _write_jsonl_snapshot_payload(path: Path, payload: dict[str, Any]) -> bool:
     if not isinstance(payload, dict):
         return False
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"payload": payload}, ensure_ascii=False) + "\n", encoding="utf-8")
+        # Keyvalue-aware write (not path.write_text()) -- on Render,
+        # live-odds-worker computes this snapshot and the syndicate web
+        # service (a separate disk) is often what actually serves the
+        # request that reads it back via _read_jsonl_snapshot_payload
+        # above. A local-only write here was invisible cross-service no
+        # matter how many times live-odds-worker computed a fresh
+        # snapshot -- the same root cause already fixed for the board's
+        # odds-history "Move" column.
+        _keyvalue_write_text_file(path, json.dumps({"payload": payload}, ensure_ascii=False) + "\n")
         return True
     except Exception:
         return False

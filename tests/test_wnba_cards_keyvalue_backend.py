@@ -78,6 +78,36 @@ class WnbaCardsKeyvalueBackendTests(unittest.TestCase):
 
         self.assertEqual(result, payload)
 
+    def test_live_snapshot_artifact_round_trips_through_keyvalue(self) -> None:
+        # Regression: live_player_lens/live_player_boxscore/live_lines/
+        # live_pbp_stats snapshots (build_live_player_lens_payload and
+        # friends) were written via plain path.write_text() and read via
+        # plain path.read_text() -- invisible cross-service under the
+        # keyvalue backend, the same root cause already fixed for
+        # game_cards.csv/live_state.jsonl above. Confirmed live 2026-07-22
+        # as the reason WNBA live player props stayed sparse/empty: the web
+        # service could never see the snapshot live-odds-worker computed.
+        fake_client = _FakeKeyValueClient()
+        with TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ, self._keyvalue_env(Path(tmp_dir)), clear=False
+        ), patch("syndicate.features.shared.refresh_state_store._get_keyvalue_client", return_value=fake_client):
+            date_str = "2026-07-13"
+            path = wnba_cards._live_snapshot_artifact_path("live_player_lens", date_str)
+            payload = {"games": [{"event_id": "401857064", "players": [{"name": "A'ja Wilson", "market": "points", "line": 22.5}]}]}
+
+            written = wnba_cards._write_jsonl_snapshot_payload(path, payload)
+            self.assertTrue(written)
+            self.assertTrue(fake_client.store, "expected the live-snapshot write to reach the keyvalue store")
+
+            result = wnba_cards._read_jsonl_snapshot_payload(path)
+
+        # _read_jsonl_snapshot_payload normalizes each game's status fields
+        # (adding default status/in_progress/final/etc.) -- that's expected,
+        # unrelated behavior; this only checks the round trip preserved the
+        # actual snapshot content through the keyvalue store.
+        self.assertEqual(result["games"][0]["event_id"], "401857064")
+        self.assertEqual(result["games"][0]["players"], payload["games"][0]["players"])
+
 
 if __name__ == "__main__":
     unittest.main()
