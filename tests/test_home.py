@@ -16,6 +16,7 @@ from syndicate.blueprints.home import get_active_games
 from syndicate.blueprints.home import _sport_availability_reason
 from syndicate.blueprints.home import _prefer_today_or_latest
 from syndicate.blueprints.home import _game_bet_candidates_from_game
+from syndicate.blueprints.home import _mlb_game_market_recommendation_rows
 from syndicate.blueprints.home import _game_status_state
 from syndicate.blueprints.home import _prop_item_from_rank_card
 from syndicate.blueprints.home import _team_for_side_hint
@@ -896,6 +897,39 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         )
         candidates = _game_bet_candidates_from_game({"slug": "mlb"}, game, fallback_epoch=0.0)
         self.assertEqual(candidates[0]["team"], "New York Knicks")
+
+    def test_mlb_markets_ml_and_totals_translate_into_game_market_recommendations(self) -> None:
+        # Real gap found 2026-07-23: MLB's own cards.py builds moneyline/totals
+        # picks under game["markets"]["ml"/"totals"] for its own hub-page tiles
+        # -- a different shape than the game_market_recommendations list every
+        # other sport's cards.py emits, and the only shape
+        # _game_bet_candidates_from_game reads. Without translating this shape,
+        # MLB pregame Moneyline/Total candidates never reached the board at
+        # all; only in-game period-lens markets (e.g. "f7 moneyline") for a
+        # currently-live game ever showed up as MLB "game" candidates.
+        game = self._sample_game(
+            markets={
+                "ml": {"selection": "home", "model_prob": 0.57, "odds": -135},
+                "totals": {"selection": "over", "market_line": 8.5, "model_prob": 0.52, "odds": -110},
+            }
+        )
+        rows = _mlb_game_market_recommendation_rows(game)
+        self.assertEqual(len(rows), 2)
+        game["game_market_recommendations"] = rows
+        candidates = _game_bet_candidates_from_game({"slug": "mlb", "hub_href": "/mlb/hub"}, game, fallback_epoch=0.0)
+        moneyline = next(c for c in candidates if c["market"] == "Moneyline")
+        total = next(c for c in candidates if c["market"] == "Total")
+        self.assertEqual(moneyline["pick"], "Home ML")
+        self.assertEqual(moneyline["team"], "New York Knicks")
+        self.assertEqual(moneyline["odds"], "-135")
+        self.assertNotEqual(moneyline["confidence"], "-")
+        self.assertEqual(total["pick"], "Over 8.5")
+        self.assertEqual(total["line"], "8.5")
+        self.assertNotEqual(total["confidence"], "-")
+
+    def test_mlb_markets_with_no_selection_produce_no_rows(self) -> None:
+        game = self._sample_game(markets={"ml": {}, "totals": {"selection": "over"}})
+        self.assertEqual(_mlb_game_market_recommendation_rows(game), [])
 
     def test_prop_item_from_rank_card_derives_team_from_matchup_labels(self) -> None:
         card = {

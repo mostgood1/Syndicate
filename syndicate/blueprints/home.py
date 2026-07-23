@@ -2626,6 +2626,52 @@ def _apply_mlb_live_scores(games: list[dict[str, Any]], selected_date: str) -> l
     return enriched
 
 
+def _mlb_game_market_recommendation_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
+    # MLB's own cards.py builds its moneyline/totals picks under
+    # game["markets"]["ml"/"totals"] (a shape private to the MLB hub page's
+    # own tiles, see mlb/cards.py's _market_tiles) -- a completely different
+    # shape than the game_market_recommendations list every OTHER sport's
+    # cards.py emits, which is the only shape _game_bet_candidates_from_game
+    # actually knows how to read. Without this translation, MLB pregame
+    # Moneyline/Total candidates never reached the board at all (confirmed
+    # 2026-07-23: the board's only MLB "game" candidates were in-game
+    # period-lens markets like "f7 moneyline", and only for whichever single
+    # game happened to be live -- every pregame MLB game showed zero).
+    markets = game.get("markets") if isinstance(game.get("markets"), dict) else {}
+    rows: list[dict[str, Any]] = []
+    moneyline = markets.get("ml") if isinstance(markets.get("ml"), dict) else None
+    if isinstance(moneyline, dict):
+        side = str(moneyline.get("selection") or "").strip().lower()
+        pick_label = {"home": "Home ML", "away": "Away ML"}.get(side)
+        if pick_label:
+            rows.append(
+                {
+                    "market_label": "Moneyline",
+                    "display_pick": pick_label,
+                    "selection": side,
+                    "odds": moneyline.get("odds") or moneyline.get("price"),
+                    "confidence": moneyline.get("model_prob"),
+                    "summary": moneyline.get("reason") or moneyline.get("summary"),
+                }
+            )
+    totals = markets.get("totals") if isinstance(markets.get("totals"), dict) else None
+    if isinstance(totals, dict):
+        selection = str(totals.get("selection") or "").strip().title()
+        line = totals.get("market_line") if totals.get("market_line") is not None else totals.get("line")
+        if selection and line is not None:
+            rows.append(
+                {
+                    "market_label": "Total",
+                    "display_pick": f"{selection} {line}".strip(),
+                    "line": line,
+                    "odds": totals.get("odds") or totals.get("price"),
+                    "confidence": totals.get("model_prob"),
+                    "summary": totals.get("reason") or totals.get("summary"),
+                }
+            )
+    return rows
+
+
 def _apply_nba_live_scores(games: list[dict[str, Any]], selected_date: str) -> list[dict[str, Any]]:
     try:
         from syndicate.features.nba.cards import _games_from_live_state_fallback
@@ -3973,6 +4019,11 @@ class _MLBDataProvider(_HomeSportDataProviderBase):
 
         payload = build_cards_page_context(context.context_label)
         games = list(payload.get("games") or [])
+        for game in games:
+            if isinstance(game, dict) and not game.get("game_market_recommendations"):
+                rows = _mlb_game_market_recommendation_rows(game)
+                if rows:
+                    game["game_market_recommendations"] = rows
         return _apply_mlb_live_scores(games, context.context_label) if is_active_today else games
 
     def pregame_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
