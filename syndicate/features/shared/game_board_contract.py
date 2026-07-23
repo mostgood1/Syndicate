@@ -509,7 +509,19 @@ def _normalize_game(game: dict[str, Any]) -> dict[str, Any]:
     normalized["shared_total_rows"] = _build_total_rows(period_rows)
     normalized["shared_box_sections"] = _build_box_sections(normalized)
     normalized["shared_prop_rows"] = _build_prop_rows(normalized)
-    normalized["shared_top_play_rows"] = _build_top_play_rows(normalized)
+    # Real bug found 2026-07-23: this used to unconditionally overwrite
+    # shared_top_play_rows with the generic panels-derived version, even
+    # when the sport's own cards.py already built a real one from
+    # structured data. NFL's cards.py builds genuine EV/odds/confidence
+    # rows here (_top_play_rows in nfl/cards.py) that were silently
+    # discarded on every request, replaced by free-text scraped off
+    # display panels -- the only escape hatch was the card_variant ==
+    # "mlb_main" early-return above, which NFL doesn't use. Preserve a
+    # non-empty incoming list instead of clobbering it, mirroring the
+    # market_tiles .setdefault(...) pattern just above.
+    existing_top_play_rows = normalized.get("shared_top_play_rows")
+    if not (isinstance(existing_top_play_rows, list) and existing_top_play_rows):
+        normalized["shared_top_play_rows"] = _build_top_play_rows(normalized)
     if normalized["shared_is_live"] and not normalized.get("market_tiles") and period_rows:
         normalized["market_tiles"] = [
             {

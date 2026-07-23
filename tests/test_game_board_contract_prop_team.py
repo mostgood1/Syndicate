@@ -6,6 +6,41 @@ from syndicate.features.shared.game_board_contract import _normalize_game
 
 
 class GameBoardContractPropTeamTests(unittest.TestCase):
+    def test_preserves_a_sports_own_shared_top_play_rows_instead_of_clobbering(self) -> None:
+        # Real bug found 2026-07-23: this used to unconditionally overwrite
+        # shared_top_play_rows with the generic panels-derived version, even
+        # when the sport's own cards.py already built a real one from
+        # structured data. NFL's cards.py builds genuine EV/odds/confidence
+        # rows here, which were silently discarded on every request and
+        # replaced by free-text scraped off display panels -- the only
+        # escape hatch was the card_variant == "mlb_main" early-return,
+        # which NFL doesn't use (card_variant: "shared_default").
+        real_rows = [{"heading": "Moneyline", "name": "NYJ ML", "detail": "Confident | Odds -110", "value": "+4.2%"}]
+        game = {
+            "card_variant": "shared_default",
+            "away": {"abbr": "NYJ"},
+            "home": {"abbr": "BUF"},
+            "shared_top_play_rows": real_rows,
+        }
+
+        normalized = _normalize_game(game)
+
+        self.assertEqual(normalized.get("shared_top_play_rows"), real_rows)
+
+    def test_computes_generic_top_play_rows_when_sport_provides_none(self) -> None:
+        game = {
+            "card_variant": "shared_default",
+            "away": {"abbr": "NYJ"},
+            "home": {"abbr": "BUF"},
+            "panels": [{"title": "Highlights", "items": ["Something happened"]}],
+        }
+
+        normalized = _normalize_game(game)
+
+        rows = normalized.get("shared_top_play_rows")
+        self.assertTrue(rows)
+        self.assertEqual(rows[0]["name"], "Something happened")
+
     def test_shared_prop_rows_carry_team_abbreviation(self) -> None:
         # _build_prop_rows iterates ("away", away_abbr) / ("home", home_abbr)
         # -- it already knows which team each prop row belongs to, but never
