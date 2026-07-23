@@ -21,6 +21,7 @@ import hashlib
 import json
 import logging
 import os
+import uuid
 from pathlib import Path
 from typing import Any, NamedTuple
 from urllib import error as urllib_error
@@ -340,12 +341,32 @@ def _pull_hot_artifacts_request(url: str, token: str, *, timeout_seconds: int) -
         target_path = root / Path(normalized)
         try:
             target_path.parent.mkdir(parents=True, exist_ok=True)
-            temp_path = target_path.parent / f"{target_path.name}.{os.getpid()}.pull.tmp"
+            # Keyed by pid alone, this collided whenever two pulls for the
+            # same artifact ran concurrently in the same process (the
+            # intelligence_state background loop's periodic tick and an
+            # on-demand request both bypassing the cache around the same
+            # moment, e.g.) -- both computed the identical temp_path, the
+            # first os.replace() consumed it, and the second's os.replace()
+            # then failed with ENOENT ('src' -> 'dst', the exact shape seen
+            # in production PULL_WRITE_FAILED errors for soccer's MLS
+            # recommendations/live_state artifacts). A uuid4 suffix makes
+            # every write's temp file unique regardless of what's calling
+            # concurrently, without needing to know why.
+            temp_path = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.pull.tmp"
             temp_path.write_text(str(content), encoding="utf-8")
             os.replace(temp_path, target_path)
             written += 1
         except Exception as exc:
             print(f"[artifact_publisher] PULL_WRITE_FAILED path={normalized} error={exc}", flush=True)
+            # temp_path is only ever unique to this one write attempt (see
+            # above), so if it still exists here the failure happened after
+            # it was written but before/during os.replace() -- clean it up
+            # rather than leaving it orphaned on disk forever.
+            try:
+                if "temp_path" in locals() and temp_path.exists():
+                    temp_path.unlink()
+            except Exception:
+                pass
             continue
 
     print(f"[artifact_publisher] PULL_OK url={url} artifacts_received={len(artifacts)} written={written}", flush=True)

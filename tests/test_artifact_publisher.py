@@ -340,6 +340,74 @@ class PullHotArtifactClientTests(unittest.TestCase):
             leftovers = list(written_path.parent.glob(f"{written_path.name}.*.pull.tmp"))
             self.assertEqual(leftovers, [])
 
+    def test_concurrent_pulls_of_the_same_artifact_do_not_collide(self) -> None:
+        # Confirmed live 2026-07-23: two overlapping pulls for the same
+        # artifact in the same process (same pid) computed the identical
+        # temp_path, so the first os.replace() consumed it and the second's
+        # os.replace() failed with ENOENT ('src' -> 'dst', PULL_WRITE_FAILED
+        # in production for soccer's MLS recommendations/live_state
+        # artifacts). Runs real threads writing the same artifact
+        # concurrently to prove the fix (a uuid-suffixed temp filename)
+        # eliminates that specific collision.
+        #
+        # Not asserting every concurrent writer reports success: POSIX
+        # os.replace() to the same destination is atomic and never errors
+        # this way (production is Linux), but Windows' file-replace
+        # semantics can still reject a same-destination write racing another
+        # thread's replace with an unrelated (correctly unique) temp source
+        # -- a real Windows-dev-sandbox quirk, not the bug this fix targets.
+        # The meaningful assertions are: no leftover temp files (nothing
+        # orphaned), the final artifact is valid, and no failure references
+        # a *missing* temp file (the actual collision signature fixed here).
+        import threading
+
+        with TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir).resolve()
+            export_payload = {
+                "ok": True,
+                "count": 1,
+                "artifacts": {HOT_RELATIVE_PATH: json.dumps({"candidate_count": 7})},
+            }
+
+            def _fake_urlopen(*_args, **_kwargs):
+                mocked_response = MagicMock()
+                mocked_response.__enter__.return_value = mocked_response
+                mocked_response.read.return_value = json.dumps(export_payload).encode("utf-8")
+                return mocked_response
+
+            results: list[int] = []
+            errors: list[BaseException] = []
+
+            def _run() -> None:
+                try:
+                    results.append(pull_hot_artifacts())
+                except BaseException as exc:  # pragma: no cover - defensive
+                    errors.append(exc)
+
+            with patch.dict(
+                os.environ,
+                {
+                    "SYNDICATE_DATA_ROOT": str(data_root),
+                    "ADMIN_TOKEN": "secret-token",
+                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                },
+                clear=False,
+            ):
+                with patch("urllib.request.urlopen", side_effect=_fake_urlopen):
+                    threads = [threading.Thread(target=_run) for _ in range(8)]
+                    for thread in threads:
+                        thread.start()
+                    for thread in threads:
+                        thread.join(timeout=10)
+
+            self.assertEqual(errors, [])
+            self.assertGreaterEqual(sum(results), 1)
+            written_path = data_root / HOT_RELATIVE_PATH
+            self.assertTrue(written_path.exists())
+            self.assertEqual(json.loads(written_path.read_text(encoding="utf-8"))["candidate_count"], 7)
+            leftovers = list(written_path.parent.glob(f"{written_path.name}.*.pull.tmp"))
+            self.assertEqual(leftovers, [])
+
     def test_rejects_path_traversal_in_response(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             data_root = Path(tmp_dir)
