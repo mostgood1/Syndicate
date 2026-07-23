@@ -5722,6 +5722,29 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(mocked_state_response.call_args.kwargs.get("allow_latest_fallback"), False)
         mocked_queue.assert_not_called()
 
+    def test_intelligence_page_renders_game_cards_container(self) -> None:
+        # Mini per-game cards (grouping opportunities by underlying game so
+        # a user can select one game's picks instead of scrolling the whole
+        # board) are pure client-side JS driven by this container -- this
+        # just confirms the page still wires the mount point up.
+        cached_response = {
+            "ok": True,
+            "selected_date": "2026-06-04",
+            "top_opportunities": [{"name": "Play 1"}],
+            "analysis": {"recommendations": [{"name": "Play 1"}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+            "response": {"recommendations": [{"name": "Play 1"}], "top_opportunities": [{"name": "Play 1"}]},
+        }
+
+        with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", new=None):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=None):
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=cached_response):
+                    with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh"):
+                        response = self.client.get("/intelligence?date=2026-06-04")
+
+        body = response.get_data(as_text=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="board-game-cards"', body)
+
     def test_intelligence_page_defaults_to_today_without_manifest_scan(self) -> None:
         cached_response = {
             "ok": True,

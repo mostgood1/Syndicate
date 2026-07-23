@@ -176,6 +176,60 @@
     color: var(--cards-text-dim);
   }
 
+  .game-card-strip {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .game-mini-card {
+    min-width: 150px;
+    flex: 0 0 auto;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--cards-line);
+    background: rgba(10, 21, 34, 0.9);
+    cursor: pointer;
+    text-align: left;
+    appearance: none;
+    font: inherit;
+    color: inherit;
+  }
+
+  .game-mini-card[aria-pressed="true"] {
+    border-color: var(--cards-accent, #4ecdc4);
+    background: rgba(78, 205, 196, 0.1);
+  }
+
+  .game-mini-card__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--cards-text-dim);
+  }
+
+  .game-mini-card__head .live-dot {
+    color: #6bd88f;
+  }
+
+  .game-mini-card__matchup {
+    margin-top: 4px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--cards-text);
+  }
+
+  .game-mini-card__meta {
+    margin-top: 3px;
+    font-size: 10.5px;
+    color: var(--cards-text-dim);
+  }
+
   .board-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -850,6 +904,10 @@
 
   <div id="board-summary-strip" class="board-summary-strip" hidden></div>
 
+  <section>
+    <div id="board-game-cards"></div>
+  </section>
+
   <div class="board-layout">
     <div class="board-main">
       <section>
@@ -932,6 +990,7 @@
     marketFamily: urlParams.get("market_family") || "all",
     minEdge: Number(urlParams.get("min_edge") || 0) || 0,
     view: urlParams.get("view") === "blotter" ? "blotter" : "cards",
+    game: urlParams.get("game") || "all",
   };
 
   const initialResponseScript = document.getElementById("initial-intelligence-response");
@@ -980,6 +1039,7 @@
     if (state.marketFamily && state.marketFamily !== "all") url.searchParams.set("market_family", state.marketFamily); else url.searchParams.delete("market_family");
     if (state.minEdge > 0) url.searchParams.set("min_edge", String(state.minEdge)); else url.searchParams.delete("min_edge");
     if (state.view && state.view !== "cards") url.searchParams.set("view", state.view); else url.searchParams.delete("view");
+    if (state.game && state.game !== "all") url.searchParams.set("game", state.game); else url.searchParams.delete("game");
     window.history.replaceState({}, "", url.toString());
   }
 
@@ -1127,6 +1187,21 @@
 
   function displayMatchup(item) {
     return String(item.matchup || item.event_matchup || "").trim() || null;
+  }
+
+  // Groups opportunities into their underlying game for the mini game-card
+  // selector. Prefers a real identifier (game_id/gamePk/event_id) since two
+  // different games can otherwise share matchup text (e.g. a doubleheader,
+  // or the same two teams playing on both the prop and game candidate
+  // paths) -- falls back to sport+matchup text only when no id is present.
+  function gameKey(item) {
+    const sportSlug = String(item.sport_slug || item.sport || "").trim().toLowerCase();
+    const id = item.game_id || item.gamePk || item.event_id;
+    if (id !== undefined && id !== null && String(id).trim()) {
+      return `${sportSlug}|${String(id).trim()}`;
+    }
+    const matchup = displayMatchup(item);
+    return matchup ? `${sportSlug}|${matchup}` : null;
   }
 
   function displayLine(item) {
@@ -1284,6 +1359,7 @@
       if (state.gameState === "live" && itemState !== "live") return false;
       if (state.gameState === "pregame" && itemState !== "pregame") return false;
     }
+    if (state.game !== "all" && gameKey(item) !== state.game) return false;
     return true;
   }
 
@@ -1387,6 +1463,79 @@
         </div>
       </article>
     `;
+  }
+
+  // One mini card per underlying game (not per opportunity) so a user can
+  // scan today's slate and jump straight to a specific matchup's
+  // opportunities, instead of scrolling the full board looking for it.
+  // Derived from the sport-filtered pool (not the fully-filtered render
+  // list) so the strip always shows every game for the active sport tab,
+  // including ones a stricter min-edge/market filter would otherwise hide
+  // entirely -- picking a game should widen focus, not require first
+  // finding it past filters that already exclude it.
+  function deriveGameCards(items) {
+    const sportPool = items.filter((item) => {
+      if (state.sport === "all") return true;
+      return String(item.sport_slug || item.sport || "").trim().toLowerCase() === state.sport;
+    });
+    const groups = new Map();
+    for (const item of sportPool) {
+      const key = gameKey(item);
+      if (!key) continue;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key,
+          sport: String(item.sport || item.sport_slug || "").trim().toUpperCase(),
+          matchup: displayMatchup(item) || "Matchup",
+          count: 0,
+          hasLive: false,
+          allFinal: true,
+        });
+      }
+      const group = groups.get(key);
+      group.count += 1;
+      const itemState = recommendationState(item);
+      if (itemState === "live") group.hasLive = true;
+      if (itemState !== "final") group.allFinal = false;
+    }
+    return Array.from(groups.values()).sort((a, b) => {
+      if (a.hasLive !== b.hasLive) return a.hasLive ? -1 : 1;
+      return b.count - a.count;
+    });
+  }
+
+  function renderGameCards(items) {
+    const container = document.getElementById("board-game-cards");
+    if (!container) return;
+    const games = deriveGameCards(items);
+    if (!games.length) {
+      container.innerHTML = "";
+      return;
+    }
+    container.innerHTML = `
+      <h2 class="board-section-title">Games</h2>
+      <div class="game-card-strip">
+        ${games.map((game) => {
+          const isSelected = state.game === game.key;
+          const stateLabel = game.hasLive ? '<span class="live-dot">&#9679; live</span>' : game.allFinal ? "final" : "pregame";
+          return `
+            <button type="button" class="game-mini-card" data-game-key="${escapeHtml(game.key)}" aria-pressed="${isSelected}">
+              <div class="game-mini-card__head"><span>${escapeHtml(game.sport)}</span><span>${stateLabel}</span></div>
+              <div class="game-mini-card__matchup">${escapeHtml(game.matchup)}</div>
+              <div class="game-mini-card__meta">${game.count} opportunit${game.count === 1 ? "y" : "ies"}</div>
+            </button>
+          `;
+        }).join("")}
+      </div>
+    `;
+    container.querySelectorAll("[data-game-key]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const key = button.getAttribute("data-game-key");
+        state.game = state.game === key ? "all" : key;
+        syncUrlState();
+        renderBoardBody();
+      });
+    });
   }
 
   function renderTopStrip(items) {
@@ -1511,6 +1660,7 @@
 
   function renderBoardBody() {
     const clientFiltered = lastRenderItems.filter(matchesFilters).filter(matchesClientFilters);
+    renderGameCards(lastRenderItems);
     renderTopStrip(clientFiltered);
     if (state.view === "blotter") {
       renderBlotter(clientFiltered);
