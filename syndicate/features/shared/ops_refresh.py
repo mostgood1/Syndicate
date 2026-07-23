@@ -436,6 +436,17 @@ def _this_service_identity() -> str:
     return str(os.environ.get("RENDER_SERVICE_ID") or os.environ.get("RENDER_SERVICE_NAME") or "").strip()
 
 
+def _this_instance_identity() -> str:
+    # RENDER_SERVICE_ID/NAME are stable across a redeploy (same service,
+    # fresh container) -- RENDER_INSTANCE_ID changes every time. Found via a
+    # real production bug: after a redeploy, a stale "running" manifest from
+    # the previous container generation still matched on service identity,
+    # so _refresh_run_still_active fell into the same-service pid-liveness
+    # branch and checked a pid number that could easily be reoccupied by an
+    # unrelated process in the fresh container, blocking the next launch.
+    return str(os.environ.get("RENDER_INSTANCE_ID") or "").strip()
+
+
 _LEGACY_REFRESH_LANE_KEY = "global"
 _REFRESH_WORKER_LANE_KEY = "refresh-worker"
 
@@ -581,7 +592,22 @@ def _refresh_run_still_active(manifest: dict[str, Any], *, run_summary: dict[str
         age_seconds = (datetime.now(timezone.utc) - generated_dt).total_seconds()
         return age_seconds < _refresh_run_max_runtime_seconds()
 
-    # Same service (or identity unknown, e.g. local dev without
+    if same_service:
+        # RENDER_SERVICE_ID stays the SAME across a redeploy (fresh
+        # container, same service) -- RENDER_INSTANCE_ID does not. A pointer
+        # recorded by a previous instance can never still be running here:
+        # its whole process tree is gone. Checking pid liveness/cmdline
+        # instead (as the code below does) is unsafe in this specific case --
+        # low pid numbers get reoccupied fast in a fresh container, and
+        # _process_matches_expected_command fails OPEN (assumes a match) when
+        # the command can't be read, so a coincidentally-alive pid at the
+        # same number silently looked like the original run in production.
+        launcher_instance_id = str(manifest.get("launcherInstanceId") or "").strip()
+        this_instance_id = _this_instance_identity()
+        if launcher_instance_id and this_instance_id and launcher_instance_id != this_instance_id:
+            return False
+
+    # Same service and instance (or identity unknown, e.g. local dev without
     # RENDER_SERVICE_ID) -- a real, verifiable liveness check is possible.
     if not _pid_is_running(pid):
         return False
@@ -1273,6 +1299,7 @@ def launch_refresh_run(
         "launchMode": launch_mode,
         "launchOwner": "external_runner" if _is_external_runner_mode(launch_mode) else "web_process",
         "launcherServiceId": _this_service_identity() or None,
+        "launcherInstanceId": _this_instance_identity() or None,
         "lane": effective_lane,
         "dryRun": bool(dry_run),
         "state": "pending_external" if _is_external_runner_mode(launch_mode) else "running",

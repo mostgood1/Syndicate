@@ -1852,6 +1852,50 @@ class OpsRefreshApiTests(unittest.TestCase):
             mismatched_run_summary = {"launcherCommand": ["python", "some_other_script.py"]}
             self.assertFalse(ops_refresh._refresh_run_still_active(manifest, run_summary=mismatched_run_summary))
 
+    def test_refresh_run_still_active_treats_different_instance_as_dead_even_with_matching_pid(self) -> None:
+        # Real production bug found while verifying the per-service-lane
+        # rebuild: RENDER_SERVICE_ID stays the SAME across a redeploy (same
+        # service, fresh container), but the recorded pid can be reoccupied
+        # by an unrelated process in the new container. Without checking
+        # instance identity, a stale "running" pointer from a PREVIOUS
+        # container generation kept blocking the next launch after every
+        # redeploy, since _process_matches_expected_command fails OPEN
+        # (assumes a match) whenever the command can't be read.
+        from syndicate.features.shared import ops_refresh
+
+        with patch.dict(
+            os.environ,
+            {"RENDER_SERVICE_ID": "srv-live-odds-worker", "RENDER_INSTANCE_ID": "instance-new"},
+            clear=False,
+        ), patch("syndicate.features.shared.ops_refresh._pid_is_running", return_value=True), patch(
+            "syndicate.features.shared.ops_refresh._process_cmdline", return_value=["python", "run_refresh_odds_job.py"]
+        ):
+            manifest = {
+                "pid": 999,
+                "launcherServiceId": "srv-live-odds-worker",
+                "launcherInstanceId": "instance-old",
+            }
+            run_summary = {"launcherCommand": ["python", "run_refresh_odds_job.py"]}
+            self.assertFalse(ops_refresh._refresh_run_still_active(manifest, run_summary=run_summary))
+
+    def test_refresh_run_still_active_still_checks_pid_when_instance_matches(self) -> None:
+        from syndicate.features.shared import ops_refresh
+
+        with patch.dict(
+            os.environ,
+            {"RENDER_SERVICE_ID": "srv-live-odds-worker", "RENDER_INSTANCE_ID": "instance-current"},
+            clear=False,
+        ), patch("syndicate.features.shared.ops_refresh._pid_is_running", return_value=True), patch(
+            "syndicate.features.shared.ops_refresh._process_cmdline", return_value=["python", "run_refresh_odds_job.py"]
+        ):
+            manifest = {
+                "pid": 999,
+                "launcherServiceId": "srv-live-odds-worker",
+                "launcherInstanceId": "instance-current",
+            }
+            run_summary = {"launcherCommand": ["python", "run_refresh_odds_job.py"]}
+            self.assertTrue(ops_refresh._refresh_run_still_active(manifest, run_summary=run_summary))
+
     def test_launch_refresh_run_records_launcher_service_id(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             repo_root = Path(tmp_dir)
@@ -1859,7 +1903,11 @@ class OpsRefreshApiTests(unittest.TestCase):
 
             with patch.dict(
                 os.environ,
-                {"SYNDICATE_REPORTS_ROOT": str(reports_root), "RENDER_SERVICE_ID": "srv-live-odds-worker"},
+                {
+                    "SYNDICATE_REPORTS_ROOT": str(reports_root),
+                    "RENDER_SERVICE_ID": "srv-live-odds-worker",
+                    "RENDER_INSTANCE_ID": "instance-abc",
+                },
                 clear=False,
             ), patch("syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root), patch(
                 "syndicate.features.shared.ops_refresh._assert_no_active_refresh_run"
@@ -1873,6 +1921,7 @@ class OpsRefreshApiTests(unittest.TestCase):
 
             manifest = json.loads((reports_root / "refresh_status" / "latest" / "refresh_status_latest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest.get("launcherServiceId"), "srv-live-odds-worker")
+            self.assertEqual(manifest.get("launcherInstanceId"), "instance-abc")
 
     def test_assert_no_active_refresh_run_fails_closed_when_manifest_read_fails(self) -> None:
         # A transient keyvalue-backend read failure must never be treated the
