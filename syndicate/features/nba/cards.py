@@ -2563,7 +2563,21 @@ def build_nba_market_board(selected_date: str) -> dict[str, Any]:
     """
     payload = build_cards_api_payload(selected_date)
     games = payload.get("games") if isinstance(payload.get("games"), list) else []
-    return build_basketball_market_board(sport_slug="nba", selected_date=selected_date, games=games)
+    event_ids = [event_id for event_id in (str(g.get("event_id") or g.get("gamePk") or "").strip() for g in games if isinstance(g, dict)) if event_id]
+    live_player_lens_payload = None
+    if event_ids:
+        # Lazy import: nba.live_lens imports FROM this module at load time
+        # (build_cards_page_context/build_live_player_lens_payload etc.),
+        # so a top-level import here would be circular.
+        from syndicate.features.nba.live_lens import read_latest_live_player_lens_payload
+
+        live_player_lens_payload = read_latest_live_player_lens_payload(selected_date, event_ids)
+    return build_basketball_market_board(
+        sport_slug="nba",
+        selected_date=selected_date,
+        games=games,
+        live_player_lens_payload=live_player_lens_payload,
+    )
 
 
 def build_cards_sim_detail_payload(selected_date: str, away_tri: str, home_tri: str) -> dict[str, Any]:

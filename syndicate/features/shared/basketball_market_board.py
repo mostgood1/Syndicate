@@ -174,12 +174,83 @@ def basketball_market_board_rows_for_game(
     return odds_rows, sim_rows
 
 
-def build_basketball_market_board(*, sport_slug: str, selected_date: str, games: list[dict[str, Any]]) -> dict[str, Any]:
+def _canonical_player_key(value: Any) -> str:
+    return str(value or "").strip().casefold()
+
+
+def _live_prop_key(player: Any, market_label: Any) -> tuple[str, str]:
+    return (_canonical_player_key(player), str(market_label or "").strip().casefold())
+
+
+def live_rows_by_event_id(live_player_lens_payload: dict[str, Any] | None) -> dict[str, list[dict[str, Any]]]:
+    """Reshape a `/api/live_player_lens`-style payload
+    (`{"games": [{"event_id", "rows": [...]}]}`) into `{event_id: rows}`
+    for O(1) lookup while building the board."""
+    result: dict[str, list[dict[str, Any]]] = {}
+    if not isinstance(live_player_lens_payload, dict):
+        return result
+    games = live_player_lens_payload.get("games")
+    if not isinstance(games, list):
+        return result
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        event_id = str(game.get("event_id") or "").strip()
+        rows = game.get("rows")
+        if event_id and isinstance(rows, list):
+            result[event_id] = rows
+    return result
+
+
+def hydrate_live_prop_rows(inventory: list[dict[str, Any]], live_rows: list[dict[str, Any]] | None) -> None:
+    """Overlay live_projection/live_actual onto this game's already-joined
+    prop rows in place, matched by (player, stat). NBA/WNBA's
+    live_player_lens rows already carry a stable per-event stat code
+    (unlike MLB's market/line fuzzy match), so an exact (player, display
+    label) match is enough -- no need to fuzzy-match names or lines.
+    """
+    if not live_rows:
+        return
+    live_index: dict[tuple[str, str], dict[str, Any]] = {}
+    for row in live_rows:
+        if not isinstance(row, dict):
+            continue
+        player = row.get("player")
+        if not player:
+            continue
+        stat_label = _prop_display_market(row.get("stat"))
+        live_index[_live_prop_key(player, stat_label)] = row
+
+    for row in inventory:
+        if row.get("market_type") != "prop":
+            continue
+        match = live_index.get(_live_prop_key(row.get("entity"), row.get("market")))
+        if match is None:
+            continue
+        live_projection = match.get("live_projection")
+        if live_projection is None:
+            live_projection = match.get("liveProjection")
+        actual = match.get("actual")
+        if live_projection is not None:
+            row["live_projection"] = live_projection
+        if actual is not None:
+            row["live_actual"] = actual
+
+
+def build_basketball_market_board(
+    *,
+    sport_slug: str,
+    selected_date: str,
+    games: list[dict[str, Any]],
+    live_player_lens_payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    live_by_event = live_rows_by_event_id(live_player_lens_payload)
     board_games: list[dict[str, Any]] = []
     for game in games:
         if not isinstance(game, dict):
             continue
         game_pk = game.get("gamePk") or game.get("game_id")
+        event_id = str(game.get("event_id") or game_pk or "").strip()
         away = game.get("away") if isinstance(game.get("away"), dict) else {}
         home = game.get("home") if isinstance(game.get("home"), dict) else {}
         away_abbr = str(away.get("abbr") or game.get("away_tri") or "AWY").strip().upper()
@@ -191,10 +262,13 @@ def build_basketball_market_board(*, sport_slug: str, selected_date: str, games:
         inventory = join_odds_to_sim(odds_rows, sim_rows)
         for row in inventory:
             row["market"] = _DISPLAY_LABELS.get(row.get("market"), row.get("market"))
+        if event_id in live_by_event:
+            hydrate_live_prop_rows(inventory, live_by_event[event_id])
 
         board_games.append(
             {
                 "gamePk": game_pk,
+                "event_id": event_id,
                 "matchup": f"{away_abbr} @ {home_abbr}",
                 "away_abbr": away_abbr,
                 "home_abbr": home_abbr,

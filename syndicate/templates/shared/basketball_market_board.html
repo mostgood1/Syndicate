@@ -69,6 +69,7 @@
                 <th>Line</th>
                 <th>Odds</th>
                 <th>Model</th>
+                <th>Live</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -87,6 +88,13 @@
                       {% else %}
                         {{ row.sim_projection }}
                       {% endif %}
+                    {% else %}
+                      -
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if row.live_projection is not none or row.live_actual is not none %}
+                      {{ row.live_projection if row.live_projection is not none else '-' }}{% if row.live_actual is not none %} (actual {{ row.live_actual }}){% endif %}
                     {% else %}
                       -
                     {% endif %}

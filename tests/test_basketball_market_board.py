@@ -5,6 +5,8 @@ import unittest
 from syndicate.features.shared.basketball_market_board import basketball_game_state
 from syndicate.features.shared.basketball_market_board import basketball_market_board_rows_for_game
 from syndicate.features.shared.basketball_market_board import build_basketball_market_board
+from syndicate.features.shared.basketball_market_board import hydrate_live_prop_rows
+from syndicate.features.shared.basketball_market_board import live_rows_by_event_id
 from syndicate.features.shared.market_inventory import JOIN_STATUS_MATCHED
 from syndicate.features.shared.market_inventory import JOIN_STATUS_NO_SIM_COVERAGE
 from syndicate.features.shared.market_inventory import join_odds_to_sim
@@ -181,6 +183,95 @@ class BuildBasketballMarketBoardTests(unittest.TestCase):
         self.assertEqual(len(rows), 2)
         for row in rows:
             self.assertEqual(row["join_status"], JOIN_STATUS_NO_SIM_COVERAGE)
+
+
+class LiveRowsByEventIdTests(unittest.TestCase):
+    def test_reshapes_games_list_into_event_id_keyed_dict(self) -> None:
+        payload = {
+            "games": [
+                {"event_id": "401585001", "rows": [{"player": "A", "stat": "pts"}]},
+                {"event_id": "401585002", "rows": [{"player": "B", "stat": "reb"}]},
+            ]
+        }
+        result = live_rows_by_event_id(payload)
+        self.assertEqual(set(result), {"401585001", "401585002"})
+        self.assertEqual(result["401585001"][0]["player"], "A")
+
+    def test_non_dict_or_missing_games_produces_empty_result(self) -> None:
+        self.assertEqual(live_rows_by_event_id(None), {})
+        self.assertEqual(live_rows_by_event_id({}), {})
+        self.assertEqual(live_rows_by_event_id({"games": "not-a-list"}), {})
+
+
+class HydrateLivePropRowsTests(unittest.TestCase):
+    def test_overlays_live_projection_and_actual_matched_by_player_and_stat(self) -> None:
+        # Real captured shape (basketball_live_artifacts.py): live rows
+        # carry player/stat/live_projection/actual with a stable event_id,
+        # so an exact (player, stat) match is enough -- no fuzzy matching
+        # needed the way MLB's market/line join requires.
+        inventory = [
+            {"market_type": "prop", "entity": "Miles McBride", "market": "Threes", "join_status": JOIN_STATUS_MATCHED},
+            {"market_type": "game", "entity": None, "market": "Moneyline", "join_status": JOIN_STATUS_MATCHED},
+        ]
+        live_rows = [{"player": "Miles McBride", "stat": "threes", "live_projection": 2.4, "actual": 1}]
+        hydrate_live_prop_rows(inventory, live_rows)
+
+        self.assertEqual(inventory[0]["live_projection"], 2.4)
+        self.assertEqual(inventory[0]["live_actual"], 1)
+        # Game-market rows (entity=None) never match a player-keyed live row.
+        self.assertNotIn("live_projection", inventory[1])
+
+    def test_falls_back_to_camelcase_live_projection_key(self) -> None:
+        inventory = [{"market_type": "prop", "entity": "Someone", "market": "Points", "join_status": JOIN_STATUS_MATCHED}]
+        live_rows = [{"player": "Someone", "stat": "pts", "liveProjection": 14.2}]
+        hydrate_live_prop_rows(inventory, live_rows)
+        self.assertEqual(inventory[0]["live_projection"], 14.2)
+
+    def test_no_live_rows_is_a_no_op(self) -> None:
+        inventory = [{"market_type": "prop", "entity": "Someone", "market": "Points", "join_status": JOIN_STATUS_MATCHED}]
+        hydrate_live_prop_rows(inventory, None)
+        hydrate_live_prop_rows(inventory, [])
+        self.assertNotIn("live_projection", inventory[0])
+
+    def test_unmatched_player_or_stat_leaves_row_untouched(self) -> None:
+        inventory = [{"market_type": "prop", "entity": "Someone", "market": "Points", "join_status": JOIN_STATUS_MATCHED}]
+        live_rows = [{"player": "A Different Player", "stat": "pts", "live_projection": 14.2}]
+        hydrate_live_prop_rows(inventory, live_rows)
+        self.assertNotIn("live_projection", inventory[0])
+
+
+class BuildBasketballMarketBoardLiveHydrationTests(unittest.TestCase):
+    def test_board_overlays_live_projection_for_a_live_game(self) -> None:
+        games = [
+            {
+                "gamePk": "1",
+                "event_id": "401585001",
+                "away": {"abbr": "SAS"},
+                "home": {"abbr": "NYK"},
+                "status": "Live",
+                "prop_recommendations": {
+                    "away": [{"player": "Miles McBride", "market": "threes", "side": "over", "line": 0.5, "price": -105.0, "p_win": 1.0}],
+                    "home": [],
+                },
+            }
+        ]
+        live_player_lens_payload = {
+            "games": [{"event_id": "401585001", "rows": [{"player": "Miles McBride", "stat": "threes", "live_projection": 2.0, "actual": 1}]}]
+        }
+        board = build_basketball_market_board(
+            sport_slug="nba",
+            selected_date="2026-07-23",
+            games=games,
+            live_player_lens_payload=live_player_lens_payload,
+        )
+        prop_row = board["games"][0]["rows"][0]
+        self.assertEqual(prop_row["live_projection"], 2.0)
+        self.assertEqual(prop_row["live_actual"], 1)
+
+    def test_board_without_live_payload_has_no_live_fields(self) -> None:
+        games = [{"gamePk": "1", "event_id": "1", "away": {"abbr": "SAS"}, "home": {"abbr": "NYK"}, "status": "Scheduled"}]
+        board = build_basketball_market_board(sport_slug="nba", selected_date="2026-07-23", games=games)
+        self.assertEqual(board["games"][0]["rows"], [])
 
 
 if __name__ == "__main__":

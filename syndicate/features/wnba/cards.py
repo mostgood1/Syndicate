@@ -2625,7 +2625,14 @@ def build_wnba_market_board(selected_date: str) -> dict[str, Any]:
     """
     context = build_cards_page_context(selected_date)
     games = context.get("games") if isinstance(context.get("games"), list) else []
-    return build_basketball_market_board(sport_slug="wnba", selected_date=selected_date, games=games)
+    event_ids = [event_id for event_id in (str(g.get("event_id") or g.get("gamePk") or "").strip() for g in games if isinstance(g, dict)) if event_id]
+    live_player_lens_payload = build_live_player_lens_payload(selected_date, event_ids) if event_ids else None
+    return build_basketball_market_board(
+        sport_slug="wnba",
+        selected_date=selected_date,
+        games=games,
+        live_player_lens_payload=live_player_lens_payload,
+    )
 
 
 def _build_cards_page_context_uncached(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
