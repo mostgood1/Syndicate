@@ -53,15 +53,23 @@ def _strict_artifact_path(filename: str, subdir: tuple[str, ...]) -> Path:
     raise FileNotFoundError(f"Missing WNBA artifact: {missing_path}")
 
 
-@lru_cache(maxsize=128)
+_HAS_GAMES_CONFIRMED_TRUE_CACHE: set[str] = set()
+
+
 def has_games_for_date(date_str: str) -> bool | None:
     selected_date = str(date_str or "").strip()
     if not selected_date:
         return None
 
-    if selected_date in available_dates():
+    if selected_date in _HAS_GAMES_CONFIRMED_TRUE_CACHE or selected_date in available_dates():
+        _HAS_GAMES_CONFIRMED_TRUE_CACHE.add(selected_date)
         return True
 
+    # No lru_cache here: a False/None verdict is only ever a snapshot of one
+    # ESPN scoreboard call and can flip true later the same day (games not
+    # yet listed, or a transient request failure) -- caching it would
+    # silently freeze "no games today" for the rest of the process's life.
+    # A confirmed True is stable and safe to remember above.
     score_date = selected_date.replace("-", "")
     url = f"https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard?dates={score_date}"
     request = urllib_request.Request(url, headers={"User-Agent": "Syndicate-WNBA/1.0"})
@@ -74,7 +82,10 @@ def has_games_for_date(date_str: str) -> bool | None:
     events = payload.get("events") if isinstance(payload, dict) else []
     if not isinstance(events, list):
         return None
-    return bool(events)
+    result = bool(events)
+    if result:
+        _HAS_GAMES_CONFIRMED_TRUE_CACHE.add(selected_date)
+    return result
 
 
 def processed_path(filename: str) -> Path:

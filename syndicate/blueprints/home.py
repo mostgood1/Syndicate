@@ -4992,8 +4992,19 @@ def _build_sport_overview(
             props_bar["summary"] = "Mirror the standalone MLB pregame props structure by keeping pitcher and hitter top-props lanes distinct on the main Syndicate page."
             props_bar["opportunity_tags"] = ["Pitcher top props", "Hitter top props", "Pregame props"]
     if slug == "wnba":
+        # A real, uncached live-state read for this exact date is the
+        # authoritative signal for whether WNBA is active right now -- both
+        # "no games" checks below (has_games_for_date()'s ESPN-scoreboard
+        # fallback, and get_wnba_overview()'s own copy of the same check) can
+        # return a stale or transiently-wrong negative, and has_games_for_date
+        # used to cache that forever. Confirmed live 2026-07-22: a false
+        # negative here alone zeroed out every WNBA board candidate for the
+        # rest of the process's life despite games actively being live.
+        wnba_live_now = _wnba_has_live_games(context_label)
         wnba_has_games_today = wnba_has_games_for_date(context_label)
         wnba_no_games_today = wnba_has_games_today is False or (wnba_has_games_today is None and context_label not in wnba_available_date_set)
+        if wnba_no_games_today and wnba_live_now:
+            wnba_no_games_today = False
         if wnba_no_games_today:
             active_today = False
             game_items = []
@@ -5005,7 +5016,7 @@ def _build_sport_overview(
             source_path = ""
         else:
             wnba_overview = get_wnba_overview(context_label)
-            if wnba_overview.get("status") == "no_games":
+            if wnba_overview.get("status") == "no_games" and not wnba_live_now:
                 active_today = False
                 game_items = []
                 game_count = 0

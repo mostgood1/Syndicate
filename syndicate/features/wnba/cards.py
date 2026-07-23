@@ -1860,9 +1860,25 @@ def build_source_cards_sim_detail_payload(selected_date: str, away_tri: str, hom
     }
 
 
+def _wnba_live_state_has_games(selected_date: str) -> bool:
+    try:
+        payload = build_live_state_payload(selected_date, ttl=12, allow_stored_date_fallback=False)
+    except Exception:
+        return False
+    rows = payload.get("games") if isinstance(payload, dict) else None
+    return bool(rows)
+
+
 def get_wnba_overview(selected_date: str) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
-    if has_games_for_date(requested_date) is False:
+    # has_games_for_date() falls back to an ESPN scoreboard lookup keyed by
+    # date string, which can miss/lag right around a game's start (or a
+    # transient request hiccup) -- a real live-state read for this exact
+    # date is uncached and always wins when it disagrees, since it reflects
+    # games that are unambiguously happening right now. Confirmed live
+    # 2026-07-22: this false negative alone zeroed out every WNBA board
+    # candidate for the rest of the process's life.
+    if has_games_for_date(requested_date) is False and not _wnba_live_state_has_games(requested_date):
         return {
             "status": "no_games",
             "date": requested_date,
