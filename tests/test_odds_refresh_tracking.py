@@ -9,6 +9,7 @@ from unittest.mock import patch
 from syndicate.features.shared.odds_refresh_tracking import sync_post_refresh_tracking_for_source_root
 from syndicate.features.shared.odds_refresh_tracking import refresh_impacted_recommendations_for_tracking
 from syndicate.features.shared.odds_lifecycle import load_odds_lifecycle_events
+from tests.test_refresh_state_store import _FakeKeyValueClient
 
 
 class OddsRefreshTrackingTests(unittest.TestCase):
@@ -407,6 +408,55 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertEqual(events[-1]["event_type"], "update")
             self.assertEqual(events[-1]["line"], 7.0)
             self.assertEqual(events[-1]["sport"], "nhl")
+
+    def test_odds_history_sync_is_readable_cross_service_via_keyvalue_backend(self) -> None:
+        # Real bug found in production: the odds-history shard write here
+        # used _write_json (plain local-disk _atomic_write_text), but the
+        # board reads these same paths through
+        # odds_control_plane.load_odds_history_payload_for_sport, which
+        # calls refresh_state_store.read_json_file -- keyvalue-store-only
+        # when SYNDICATE_REFRESH_STATE_BACKEND=keyvalue (the production
+        # config on both `syndicate` and `refresh-worker`). A write that
+        # only ever touched local disk was invisible to that read no
+        # matter how many refresh runs completed -- the actual root cause
+        # of the Betting Board's "Move" column staying blank board-wide.
+        # This confirms the write now goes through the same keyvalue-aware
+        # path the board's own reader uses, so a fake keyvalue client
+        # actually receives the write.
+        fake_client = _FakeKeyValueClient()
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict(
+            "os.environ",
+            {
+                "SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports"),
+                "SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue",
+                "SYNDICATE_REFRESH_STATE_URL": "redis://example",
+            },
+            clear=False,
+        ), patch("syndicate.features.shared.refresh_state_store._get_keyvalue_client", return_value=fake_client):
+            root = Path(tmpdir)
+            team_root = root / "data" / "odds" / "team" / "date=2026-06-07"
+            team_root.mkdir(parents=True)
+            (team_root / "oddsapi.csv").write_text(
+                "home_team,away_team,bookmaker,market,selection,line,price\n"
+                "Home,Away,draftkings,total,over,6.5,-110\n",
+                encoding="utf-8",
+            )
+
+            result = sync_post_refresh_tracking_for_source_root(sport="nhl", source_root=root, date_str="2026-06-07")
+
+            self.assertTrue(result["ok"])
+            shared_history_path = Path(result["artifacts"]["odds_history"]["shared_history_path"])
+
+            # The write must have actually gone into the fake keyvalue
+            # store, not just local disk -- proving cross-service reads
+            # (via refresh_state_store.read_json_file) will see it.
+            self.assertTrue(fake_client.store, "expected the odds-history write to reach the keyvalue store")
+            from syndicate.features.shared.refresh_state_store import read_json_file
+
+            payload = read_json_file(shared_history_path)
+            self.assertIsInstance(payload, dict)
+            self.assertEqual(payload.get("sport"), "nhl")
+            self.assertIn("markets", payload)
 
     def test_write_json_writes_atomically(self) -> None:
         # This writes the odds-history artifacts that feed the Betting

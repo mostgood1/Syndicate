@@ -16,6 +16,8 @@ from syndicate.features.shared.odds_framework import normalize_odds_entry
 from syndicate.features.shared.odds_lifecycle import append_odds_lifecycle_events
 from syndicate.features.shared.odds_lifecycle import odds_lifecycle_path
 from syndicate.features.shared.refresh_state_store import _atomic_write_text
+from syndicate.features.shared.refresh_state_store import read_json_file as _keyvalue_read_json_file
+from syndicate.features.shared.refresh_state_store import write_json_file as _keyvalue_write_json_file
 from syndicate.features.shared.recommendation_engine import build_recommendation_output
 from syndicate.features.shared.week_calendar import shard_key_for_week
 from syndicate.features.shared.week_calendar import week_for_date
@@ -707,19 +709,28 @@ def _shard_key_for_row(row: Mapping[str, Any], *, sport: str, date_str: str, sou
 
 
 def _load_shard_existing_markets(*, source_root: Path, tracking_root: Path, slug: str, shard_key: str) -> dict[str, dict[str, Any]]:
+    # Read through the same keyvalue-aware helper the write side below
+    # (and the board's own odds_control_plane.load_odds_history_payload_for_sport)
+    # uses -- reading candidate_path.read_text() directly only ever sees
+    # this process's own local disk, which is exactly the gap that left
+    # the Betting Board's "Move" column blank in production: every write
+    # here went straight to local disk (_atomic_write_text) while the
+    # board reads through Redis when SYNDICATE_REFRESH_STATE_BACKEND=keyvalue
+    # is active, so the board never saw any of this history no matter how
+    # many times a refresh run wrote it.
+    shared_path = _shared_odds_history_path(slug, shard_key)
     artifact_path = _odds_history_artifact_path(source_root, slug, shard_key)
     tracking_path = _odds_history_path(tracking_root, shard_key)
     existing: dict[str, Any] = {}
-    for candidate_path in (artifact_path, tracking_path):
+    for candidate_path in (shared_path, artifact_path, tracking_path):
         _trace_log("before_odds_history_existing_read", sport=slug, shard_key=shard_key, **_trace_path_payload(candidate_path))
         try:
-            if candidate_path.exists():
-                read_started = time.perf_counter()
-                payload = json.loads(candidate_path.read_text(encoding="utf-8"))
-                if isinstance(payload, dict):
-                    existing = payload
-                    _trace_log("after_odds_history_existing_read", sport=slug, shard_key=shard_key, **_trace_path_payload(candidate_path, rows=int(len(payload) if hasattr(payload, "__len__") else 0)), elapsed_ms=round((time.perf_counter() - read_started) * 1000, 3), hit=True)
-                    break
+            read_started = time.perf_counter()
+            payload = _keyvalue_read_json_file(candidate_path)
+            if isinstance(payload, dict):
+                existing = payload
+                _trace_log("after_odds_history_existing_read", sport=slug, shard_key=shard_key, **_trace_path_payload(candidate_path, rows=int(len(payload) if hasattr(payload, "__len__") else 0)), elapsed_ms=round((time.perf_counter() - read_started) * 1000, 3), hit=True)
+                break
         except Exception:
             _trace_log("after_odds_history_existing_read", sport=slug, shard_key=shard_key, **_trace_path_payload(candidate_path), error=True)
             continue
@@ -995,9 +1006,14 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
         }
         payload.update(shard_markets)
         _trace_log("before_write_odds_history_json", sport=slug, shard_key=shard_key, history_path=str(history_path), shared_history_path=str(shared_history_path), artifact_history_path=str(artifact_history_path), markets=len(shard_markets), entries_appended=shard_entries_appended[shard_key])
-        _write_json(history_path, payload)
-        _write_json(shared_history_path, payload)
-        _write_json(artifact_history_path, payload)
+        # Keyvalue-aware write (not _write_json's plain local-disk
+        # _atomic_write_text) -- see the comment in
+        # _load_shard_existing_markets above for why: the board reads these
+        # exact paths through Redis in production, so a local-only write
+        # here was invisible to it no matter how many refresh runs completed.
+        _keyvalue_write_json_file(history_path, payload)
+        _keyvalue_write_json_file(shared_history_path, payload)
+        _keyvalue_write_json_file(artifact_history_path, payload)
         _trace_log("after_write_odds_history_json", sport=slug, shard_key=shard_key, history_path=str(history_path), shared_history_path=str(shared_history_path), artifact_history_path=str(artifact_history_path), markets=len(shard_markets), entries_appended=shard_entries_appended[shard_key])
         shard_results[shard_key] = {
             "history_path": str(history_path),
