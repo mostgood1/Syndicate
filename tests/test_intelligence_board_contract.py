@@ -323,8 +323,17 @@ class IntelligenceBoardContractTests(unittest.TestCase):
         self.assertEqual(contract["recommendation_count"], 2)
         self.assertEqual(contract["lane_counts"]["live"], 1)
         self.assertEqual(contract["lane_counts"]["pregame"], 1)
-        self.assertEqual(contract["cards"][0]["team"], "Las Vegas Aces")
-        self.assertEqual(contract["cards"][1]["team"], "Boston Celtics")
+        # cards.sort ranks purely by (publication_priority, coverage_score,
+        # simulated_edge, confidence) -- no is_live component, deliberately,
+        # to avoid the crowd-out bug already fixed twice elsewhere this
+        # session (a weak live pick outranking a stronger pregame one).
+        # Tatum's edge (0.071) beats Wilson's expected_value-derived edge
+        # (0.052), so Boston Celtics is correctly first regardless of which
+        # one is live. This assertion was previously backwards -- it never
+        # matched cards.sort's actual (and correct) behavior; confirmed via
+        # git archaeology that the sort key never had an is_live term.
+        self.assertEqual(contract["cards"][0]["team"], "Boston Celtics")
+        self.assertEqual(contract["cards"][1]["team"], "Las Vegas Aces")
 
     def test_build_intelligence_board_contract_emits_trace_bundle(self) -> None:
         contract = build_intelligence_board_contract(
