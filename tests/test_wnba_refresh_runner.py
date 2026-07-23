@@ -1310,6 +1310,60 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(int(state["game_cards_rows"]), 1)
         mock_ensure_inputs.assert_not_called()
 
+    def test_run_refresh_via_cli_rebuilds_game_cards_even_when_snapshot_has_zero_rows(self) -> None:
+        # Real gap found 2026-07-23: the fast-mode rebuild added above was
+        # gated on snapshot_rows > 0, which skips the rebuild on exactly the
+        # day that most needs it -- a genuinely empty snapshot (e.g. an
+        # All-Star-break date with zero real games). _build_local_game_cards_artifact
+        # already deletes its output when nothing valid remains, so this
+        # guard was actively preventing the stale-slate fix (1816cfe1) from
+        # ever taking effect: the rebuild that would have hit the fixed
+        # game_odds-fallback branch never ran on a zero-row snapshot day.
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            raw_root = source_root / "data" / "raw"
+            processed_root = source_root / "data" / "processed"
+            raw_root.mkdir(parents=True, exist_ok=True)
+            processed_root.mkdir(parents=True, exist_ok=True)
+            game_cards_calls = []
+
+            def _fake_run(args, log_file, **kwargs):
+                if "--out" in args:
+                    out_idx = args.index("--out") + 1
+                    out_path = Path(args[out_idx])
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                    # Header only -- zero data rows, exactly like a real
+                    # All-Star-break/off-day OddsAPI response.
+                    out_path.write_text("snapshot_ts,event_id\n", encoding="utf-8")
+                return 0
+
+            def _fake_game_cards_artifact(*, source_root, processed_root, date_str, log_file):
+                game_cards_calls.append(date_str)
+                return 0, None
+
+            with patch.object(module, "_run_to_file", side_effect=_fake_run), patch.object(
+                module, "_build_local_game_cards_artifact", side_effect=_fake_game_cards_artifact
+            ), patch.object(module, "_ensure_source_game_inputs") as mock_ensure_inputs:
+                state = module._run_refresh_via_cli(
+                    source_root=source_root,
+                    date_str="2026-07-23",
+                    regions="us",
+                    bookmakers="",
+                    markets="",
+                    do_edges=False,
+                    do_export=False,
+                    do_push=False,
+                    log_file=tmp_root / "refresh.log",
+                    mode="fast",
+                )
+
+        self.assertEqual(int(state["snapshot_rows"]), 0)
+        self.assertEqual(game_cards_calls, ["2026-07-23"])
+        mock_ensure_inputs.assert_not_called()
+
     def test_run_refresh_via_cli_allows_missing_edges_when_recs_and_game_cards_exist(self) -> None:
         module = self._load_module()
 

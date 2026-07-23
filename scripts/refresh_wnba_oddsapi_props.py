@@ -3656,7 +3656,7 @@ def _run_refresh_via_cli(
     if alias_error and int(state["snapshot_rows"] or 0) > 0:
         state["error"] = f"snapshot alias write failed: {alias_error}"
 
-    if int(state["snapshot_rows"] or 0) > 0 and not state.get("error"):
+    if not state.get("error"):
         # 2026-07-23: game_cards used to only get rebuilt inside the
         # full-mode Export stage, gated behind _ensure_source_game_inputs's
         # multi-year schedule bootstrap (documented ~80 minutes on a stale
@@ -3667,6 +3667,17 @@ def _run_refresh_via_cli(
         # be corrected by triggering the expensive full-mode path, and the
         # default fast-mode refresh never fixed it even once the day's real
         # slate was known. Rebuild it here, unconditionally in both modes,
+        #
+        # Deliberately NOT gated on snapshot_rows > 0: a genuinely empty
+        # snapshot (e.g. an All-Star-break date with zero real games) is
+        # exactly the case that needs the stale file cleared --
+        # _build_local_game_cards_artifact already deletes its output when
+        # nothing valid remains (see the "if not rows_out" branches), so
+        # skipping the call here on an empty snapshot was actively
+        # preventing the one case that most needed a rebuild. Confirmed
+        # live: this guard was the reason the game_odds date-validation fix
+        # (1816cfe1) never took effect for an actual All-Star-break date --
+        # the rebuild that would have hit the fixed branch never ran.
         # right after the snapshot that is its actual input. Best-effort: the
         # full-mode Export stage below still rebuilds game_cards again as
         # part of its own try/except, so a failure here is not fatal to the
