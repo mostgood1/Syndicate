@@ -286,49 +286,22 @@ def _frontend_portfolio(recommendations: list[dict[str, Any]]) -> dict[str, Any]
 
 
 def _balanced_recommendation_order(recommendations: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    ranked = sorted(
-        [dict(candidate) for candidate in recommendations if isinstance(candidate, Mapping)],
-        key=lambda item: (
-            _numeric_hint(item.get("publication_priority") if item.get("publication_priority") is not None else (3 if _safe_text(item.get("coverage_tier"), "").upper() == "A" else 2 if _safe_text(item.get("coverage_tier"), "").upper() == "B" else 1 if _safe_text(item.get("coverage_tier"), "").upper() == "C" else 0)) or 0.0,
-            _numeric_hint(item.get("adjusted_score") or item.get("score") or item.get("source_summary_score") or item.get("edge")) or 0.0,
-            _numeric_hint(item.get("expected_value") or item.get("ev_current") or item.get("ev")) or 0.0,
-            _numeric_hint(item.get("confidence")) or 0.0,
-        ),
-        reverse=True,
-    )
-    if len(ranked) < 2:
-        return ranked
+    # Used to be its own independent reimplementation of sport-balanced
+    # ordering, hand-duplicated from intelligence.py's version and already
+    # drifted from it (no market-diversity round-robin here, a different
+    # ranking-key formula, and -- worse -- build_response below immediately
+    # re-sorted this function's own output with a THIRD, flat ordering that
+    # discarded the balance just computed). A single request could produce
+    # three different orderings of the same candidates across `picks` vs.
+    # `recommendations`/`top_opportunities` vs. `board_contract.cards` in
+    # the same JSON response. Delegates to intelligence.py's version so
+    # there is exactly one implementation; kept as a lazy import to avoid
+    # the circular edge (intelligence.py imports build_response from this
+    # module at load time), mirroring the existing lazy _build_parlays
+    # import in build_response below.
+    from syndicate.features.intelligence import _balanced_recommendation_order as _legacy_balanced_recommendation_order
 
-    sport_buckets: dict[str, list[dict[str, Any]]] = {}
-    for candidate in ranked:
-        sport_key = _safe_text(candidate.get("sport_slug") or candidate.get("sport"), "sport").lower()
-        sport_buckets.setdefault(sport_key, []).append(candidate)
-
-    if len(sport_buckets) < 2:
-        return ranked
-
-    sport_order = sorted(
-        sport_buckets,
-        key=lambda sport_key: _numeric_hint(sport_buckets[sport_key][0].get("adjusted_score") or sport_buckets[sport_key][0].get("score") or sport_buckets[sport_key][0].get("source_summary_score") or sport_buckets[sport_key][0].get("edge"))
-        or 0.0,
-        reverse=True,
-    )
-    balanced: list[dict[str, Any]] = []
-    index = 0
-    while len(balanced) < len(ranked):
-        advanced = False
-        for sport_key in sport_order:
-            bucket = sport_buckets.get(sport_key) or []
-            if index >= len(bucket):
-                continue
-            balanced.append(bucket[index])
-            advanced = True
-            if len(balanced) >= len(ranked):
-                break
-        if not advanced:
-            break
-        index += 1
-    return balanced or ranked
+    return _legacy_balanced_recommendation_order([dict(candidate) for candidate in recommendations if isinstance(candidate, Mapping)])
 
 
 def build_response(*, recommendations: list[dict[str, Any]], parlays: list[dict[str, Any]] | None = None) -> dict[str, Any]:
@@ -396,15 +369,13 @@ def build_response(*, recommendations: list[dict[str, Any]], parlays: list[dict[
 
     ordered_recommendations = _balanced_recommendation_order(visible_recommendations)
     pick_payloads = [Pick.model_validate(_frontend_pick(candidate)).model_dump() for candidate in ordered_recommendations]
+    # Used to re-sort with a third, flat priority/score key here, discarding
+    # the sport-balanced order just computed above (and that pick_payloads,
+    # built from the same ordered_recommendations one line up, was never
+    # subjected to) -- recommendations/top_opportunities and picks ended up
+    # in genuinely different orders in the same response. Both must derive
+    # from the one balanced order.
     recommendation_payloads = [_frontend_recommendation(candidate) for candidate in ordered_recommendations]
-    recommendation_payloads.sort(
-        key=lambda item: (
-            _numeric_hint(item.get("publication_priority") if item.get("publication_priority") is not None else (3 if _safe_text(item.get("coverage_tier"), "").upper() == "A" else 2 if _safe_text(item.get("coverage_tier"), "").upper() == "B" else 1 if _safe_text(item.get("coverage_tier"), "").upper() == "C" else 0)) or 0.0,
-            _numeric_hint(item.get("adjusted_score") or item.get("score") or item.get("edge")) or 0.0,
-            _numeric_hint(item.get("confidence")) or 0.0,
-        ),
-        reverse=True,
-    )
     movement_deltas = [value for value in (_safe_float(item.get("edge_delta")) for item in pick_payloads) if value is not None]
     movement_edge_delta = round(sum(movement_deltas) / len(movement_deltas), 4) if movement_deltas else None
     if movement_edge_delta is None:
