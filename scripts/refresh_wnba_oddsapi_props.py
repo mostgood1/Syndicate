@@ -2068,6 +2068,17 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
             for row in reader:
                 if not isinstance(row, dict):
                     continue
+                # Real bug found 2026-07-23: this fallback never checked
+                # commence_time at all, unlike the raw-props-snapshot path
+                # above it -- if game_odds_{date}.csv was ever seeded/carried
+                # over with a PRIOR day's real games, this happily promoted
+                # them straight through as today's slate. Confirmed live: an
+                # All-Star-break date with zero real WNBA games kept showing
+                # the prior day's real 6-game slate, every field (including
+                # commence_time) pointing at the wrong day, because nothing
+                # here ever validated the date.
+                if not _commence_time_matches_slate_date(row.get("commence_time")):
+                    continue
                 home_name = str(row.get("home_team") or "").strip()
                 away_name = str(row.get("visitor_team") or row.get("away_team") or "").strip()
                 if not home_name or not away_name:

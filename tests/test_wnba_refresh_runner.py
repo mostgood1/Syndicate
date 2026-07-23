@@ -470,6 +470,44 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertAlmostEqual(float(row.get("away_spread")), 10.5)
         self.assertAlmostEqual(float(row.get("total")), 197.5)
 
+    def test_build_local_game_cards_artifact_rejects_prior_day_rows_in_game_odds_fallback(self) -> None:
+        # Real bug found 2026-07-23: the game_odds fallback branch never
+        # validated commence_time against the requested date at all, unlike
+        # the raw-props-snapshot path above it. Confirmed live: an
+        # All-Star-break date with zero real WNBA games kept showing the
+        # prior day's real 6-game slate because game_odds_{date}.csv had
+        # been seeded/carried over with yesterday's games, and this fallback
+        # promoted them straight through as "today's" slate with no check.
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir) / "source"
+            processed_root = source_root / "data" / "processed"
+            raw_root = source_root / "data" / "raw"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            raw_root.mkdir(parents=True, exist_ok=True)
+            date_str = "2026-07-23"
+
+            # game_odds carries a real game from the PRIOR day (2026-07-22
+            # evening, Central) under today's filename -- no raw props
+            # snapshot exists at all, so this must fall through to the
+            # game_odds path and reject it rather than promote it.
+            (processed_root / f"game_odds_{date_str}.csv").write_text(
+                "date,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker\n"
+                "2026-07-22,Las Vegas Aces,Washington Mystics,2026-07-22T23:30:00Z,-140,120,-4.5,4.5,164.5,oddsapi_consensus\n",
+                encoding="utf-8",
+            )
+
+            rows, out_path = module._build_local_game_cards_artifact(
+                source_root=source_root,
+                processed_root=processed_root,
+                date_str=date_str,
+                log_file=Path(tmp_dir) / "refresh.log",
+            )
+
+        self.assertEqual(rows, 0)
+        self.assertIsNone(out_path)
+
     def test_build_local_game_cards_artifact_writes_and_reads_through_keyvalue_backend(self) -> None:
         # Regression: game_cards.csv must be written to BOTH the keyvalue
         # store (this same script's own re-read, for top-by-game building,
