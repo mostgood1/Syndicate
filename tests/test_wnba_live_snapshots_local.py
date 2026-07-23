@@ -53,6 +53,51 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual([game.get("event_id") for game in payload.get("games") or []], ["evt-2"])
         self.assertEqual(((payload.get("games") or [{}])[0]).get("players"), [{"player": "Two"}])
 
+    def test_build_live_state_payload_caches_within_ttl_window(self) -> None:
+        # Confirmed live 2026-07-23: every caller in one refresh-worker tick
+        # (WNBAProvider.games/live_props, get_wnba_overview, ...) invoked the
+        # uncached fallback branch independently, each re-parsing the full
+        # slate and making a fresh ESPN HTTP call, ballooning RSS until the
+        # process got OOM-killed. This locks in that repeated calls with the
+        # same arguments inside the ttl window reuse one computed result.
+        import syndicate.features.wnba.cards as cards_module
+
+        cards_module.build_live_state_payload.cache_clear()
+        call_count = 0
+
+        def _fake_uncached(selected_date: str, ttl: int = 12, *, allow_stored_date_fallback: bool = True) -> dict[str, object]:
+            nonlocal call_count
+            call_count += 1
+            return {"date": selected_date, "games": [], "calls": call_count}
+
+        with patch.object(cards_module, "_build_live_state_payload_uncached", side_effect=_fake_uncached):
+            first = cards_module.build_live_state_payload("2026-07-22", ttl=12)
+            second = cards_module.build_live_state_payload("2026-07-22", ttl=12)
+
+        self.assertEqual(call_count, 1)
+        self.assertEqual(first, second)
+        self.assertEqual(first.get("calls"), 1)
+        cards_module.build_live_state_payload.cache_clear()
+
+    def test_build_live_state_payload_recomputes_after_cache_clear(self) -> None:
+        import syndicate.features.wnba.cards as cards_module
+
+        cards_module.build_live_state_payload.cache_clear()
+        call_count = 0
+
+        def _fake_uncached(selected_date: str, ttl: int = 12, *, allow_stored_date_fallback: bool = True) -> dict[str, object]:
+            nonlocal call_count
+            call_count += 1
+            return {"date": selected_date, "games": [], "calls": call_count}
+
+        with patch.object(cards_module, "_build_live_state_payload_uncached", side_effect=_fake_uncached):
+            cards_module.build_live_state_payload("2026-07-22", ttl=12)
+            cards_module.build_live_state_payload.cache_clear()
+            cards_module.build_live_state_payload("2026-07-22", ttl=12)
+
+        self.assertEqual(call_count, 2)
+        cards_module.build_live_state_payload.cache_clear()
+
     def test_live_player_boxscore_payload_retries_resolved_event_ids(self) -> None:
         def _snapshot_payload(kind: str, selected_date: str, event_ids: list[str]) -> dict[str, object] | None:
             if kind != "live_player_boxscore":

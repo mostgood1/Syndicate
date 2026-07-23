@@ -596,7 +596,11 @@ def _wnba_live_state_games(selected_date: str) -> list[dict[str, Any]]:
 
 
 def _wnba_has_live_games(selected_date: str) -> bool:
-    return len(_wnba_live_state_games(selected_date)) > 0
+    # Must check in_progress specifically, not just "a live-state row exists"
+    # -- a stale/leftover snapshot for a long-since-final game on some other
+    # date would otherwise read as "live" forever, which is exactly the kind
+    # of stale-signal false positive this function exists to rule out.
+    return any(bool((game.get("status") or {}).get("in_progress")) for game in _wnba_live_state_games(selected_date))
 
 
 def _mlb_schedule_fallback_games(selected_date: str) -> list[dict[str, Any]]:

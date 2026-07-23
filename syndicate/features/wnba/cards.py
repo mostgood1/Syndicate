@@ -1732,7 +1732,34 @@ def _hydrate_source_game_with_live_lines(
     return merged
 
 
+# Same rationale as build_live_state_payload's cache below: called multiple
+# times per refresh-worker cycle (get_wnba_overview, the /wnba blueprint
+# route, ops artifact-count checks) and re-parses the full artifact bundle
+# from disk every time with no caching at all. 12s matches the freshness
+# window already used elsewhere in this module for live display data.
+_SOURCE_CARDS_PAYLOAD_TTL_SECONDS = 12
+_BUILD_SOURCE_CARDS_PAYLOAD_CACHE: dict[tuple[str, bool], tuple[float, dict[str, Any]]] = {}
+
+
 def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
+    cache_key = (str(selected_date), bool(allow_stored_date_fallback))
+    now = time.monotonic()
+    cached = _BUILD_SOURCE_CARDS_PAYLOAD_CACHE.get(cache_key)
+    if cached is not None and (now - cached[0]) < _SOURCE_CARDS_PAYLOAD_TTL_SECONDS:
+        return cached[1]
+    result = _build_source_cards_payload_uncached(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
+    _BUILD_SOURCE_CARDS_PAYLOAD_CACHE[cache_key] = (now, result)
+    return result
+
+
+def _clear_build_source_cards_payload_cache() -> None:
+    _BUILD_SOURCE_CARDS_PAYLOAD_CACHE.clear()
+
+
+build_source_cards_payload.cache_clear = _clear_build_source_cards_payload_cache  # type: ignore[attr-defined]
+
+
+def _build_source_cards_payload_uncached(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
     resolved_date = _resolved_source_cards_date(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     log_runtime_memory("build_source_cards_payload_start", selected_date=selected_date, resolved_date=resolved_date)
@@ -2548,7 +2575,36 @@ def _wnba_live_cache_bucket(selected_date: str) -> int:
     return int(time.time() // _WNBA_LIVE_CACHE_TTL_SECONDS)
 
 
+# Same rationale as build_live_state_payload/build_source_cards_payload
+# above: this is the single most-called of the three (home.py's
+# WNBAProvider.games(), build_live_state_payload's render-web-dyno branch,
+# build_live_player_lens_payload, _default_live_event_ids, ...) and was
+# fully uncached -- re-reading and re-parsing the day's artifact bundle from
+# disk on every call, every one of which happens within the same
+# refresh-worker tick.
+_CARDS_PAGE_CONTEXT_TTL_SECONDS = 12
+_BUILD_CARDS_PAGE_CONTEXT_CACHE: dict[tuple[str, bool], tuple[float, dict[str, Any]]] = {}
+
+
 def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
+    cache_key = (str(selected_date), bool(allow_stored_date_fallback))
+    now = time.monotonic()
+    cached = _BUILD_CARDS_PAGE_CONTEXT_CACHE.get(cache_key)
+    if cached is not None and (now - cached[0]) < _CARDS_PAGE_CONTEXT_TTL_SECONDS:
+        return cached[1]
+    result = _build_cards_page_context_uncached(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
+    _BUILD_CARDS_PAGE_CONTEXT_CACHE[cache_key] = (now, result)
+    return result
+
+
+def _clear_build_cards_page_context_cache() -> None:
+    _BUILD_CARDS_PAGE_CONTEXT_CACHE.clear()
+
+
+build_cards_page_context.cache_clear = _clear_build_cards_page_context_cache  # type: ignore[attr-defined]
+
+
+def _build_cards_page_context_uncached(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
     schedule_has_games = has_games_for_date(requested_date)
     if schedule_has_games is False and not allow_stored_date_fallback:
@@ -4673,7 +4729,39 @@ def _live_state_matchup_key(row: dict[str, Any]) -> tuple[str, str]:
     )
 
 
+_BUILD_LIVE_STATE_PAYLOAD_CACHE: dict[tuple[str, bool], tuple[float, dict[str, Any]]] = {}
+
+
 def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
+    # Every caller in one refresh-worker tick (WNBAProvider.games/live_props,
+    # _wnba_live_state_games, get_wnba_overview, ...) invokes this
+    # independently, and the non-render-web-dyno branch below has no caching
+    # at all -- it re-parses the full day's slate AND makes a fresh live
+    # ESPN scoreboard HTTP call on every single call. Confirmed live
+    # 2026-07-23: refresh-worker's RSS climbed ~500MB->1.9GB (92% of its
+    # 2048MB cap) within about a minute of repeated rebuilds for one WNBA
+    # slate, got OOM-killed, and restarted with its candidate pool wiped.
+    # ttl already expresses "how fresh does this need to be" per caller; make
+    # it actually gate a shared, process-local cache instead of just being
+    # logged and threaded into the output payload.
+    cache_key = (str(selected_date), bool(allow_stored_date_fallback))
+    now = time.monotonic()
+    cached = _BUILD_LIVE_STATE_PAYLOAD_CACHE.get(cache_key)
+    if cached is not None and (now - cached[0]) < max(int(ttl), 1):
+        return cached[1]
+    result = _build_live_state_payload_uncached(selected_date, ttl, allow_stored_date_fallback=allow_stored_date_fallback)
+    _BUILD_LIVE_STATE_PAYLOAD_CACHE[cache_key] = (now, result)
+    return result
+
+
+def _clear_build_live_state_payload_cache() -> None:
+    _BUILD_LIVE_STATE_PAYLOAD_CACHE.clear()
+
+
+build_live_state_payload.cache_clear = _clear_build_live_state_payload_cache  # type: ignore[attr-defined]
+
+
+def _build_live_state_payload_uncached(selected_date: str, ttl: int = 12, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
     is_today = str(selected_date).strip() == central_today_iso()
     log_runtime_memory("build_live_state_payload_start", selected_date=selected_date, ttl=int(ttl))
 
@@ -4995,7 +5083,36 @@ def build_live_player_boxscore_payload(
     }))
 
 
+_BUILD_LIVE_PLAYER_LENS_PAYLOAD_CACHE: dict[tuple[str, tuple[str, ...], bool], tuple[float, dict[str, Any]]] = {}
+
+
 def build_live_player_lens_payload(
+    selected_date: str,
+    event_ids: list[str],
+    ttl: int = 20,
+    *,
+    allow_stored_date_fallback: bool = True,
+) -> dict[str, Any]:
+    # Same rationale as build_live_state_payload/build_cards_page_context
+    # above -- called repeatedly per refresh-worker tick with no caching.
+    cache_key = (str(selected_date), tuple(sorted(str(e).strip() for e in (event_ids or []))), bool(allow_stored_date_fallback))
+    now = time.monotonic()
+    cached = _BUILD_LIVE_PLAYER_LENS_PAYLOAD_CACHE.get(cache_key)
+    if cached is not None and (now - cached[0]) < max(int(ttl), 1):
+        return cached[1]
+    result = _build_live_player_lens_payload_uncached(selected_date, event_ids, ttl, allow_stored_date_fallback=allow_stored_date_fallback)
+    _BUILD_LIVE_PLAYER_LENS_PAYLOAD_CACHE[cache_key] = (now, result)
+    return result
+
+
+def _clear_build_live_player_lens_payload_cache() -> None:
+    _BUILD_LIVE_PLAYER_LENS_PAYLOAD_CACHE.clear()
+
+
+build_live_player_lens_payload.cache_clear = _clear_build_live_player_lens_payload_cache  # type: ignore[attr-defined]
+
+
+def _build_live_player_lens_payload_uncached(
     selected_date: str,
     event_ids: list[str],
     ttl: int = 20,
