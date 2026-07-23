@@ -5985,6 +5985,31 @@ class MlbLivePropProjectionHydrationTests(unittest.TestCase):
         self.assertEqual(candidate.get("live_projection"), "6.9")
         self.assertEqual(candidate.get("actual"), "3.0")
 
+    def test_live_lens_report_path_uses_the_correct_resolver(self) -> None:
+        # Real production bug: the hydration above was originally wired to
+        # _mlb_repo_artifact_path (used elsewhere in this file only for
+        # cosmetic advanced_context display), which resolves via
+        # default_mlb_source_root() -- returns SYNDICATE_MLB_SOURCE_ROOT
+        # verbatim with no "source_artifacts" segment once that env var is
+        # set (true in every deployed environment), so the real file was
+        # silently never found and hydration always no-opped. This locks in
+        # the fix: the cache helper must call the same
+        # live_lens_report_path/_resolve_data_path_with_reconcile resolver
+        # every other working MLB artifact reader in this file uses.
+        from syndicate.features.intelligence import _mlb_live_lens_report_cached
+
+        with patch(
+            "syndicate.features.intelligence.mlb_live_lens_report_path",
+            return_value=Path("/resolved/via/correct/helper/live_lens_report_2026_07_23.json"),
+        ) as mocked_path_resolver, patch(
+            "syndicate.features.intelligence.mlb_load_json_file",
+            return_value={"games": []},
+        ) as mocked_load:
+            _mlb_live_lens_report_cached("2026-07-23", {})
+
+        mocked_path_resolver.assert_called_once_with("2026-07-23")
+        mocked_load.assert_called_once_with(Path("/resolved/via/correct/helper/live_lens_report_2026_07_23.json"))
+
     def test_apply_live_state_does_not_hydrate_when_not_live(self) -> None:
         from syndicate.features.intelligence import _apply_live_state_context_to_candidates
 
@@ -6049,3 +6074,62 @@ class MlbLivePropProjectionHydrationTests(unittest.TestCase):
         self.assertTrue(candidate.get("is_live"))
         self.assertEqual(candidate.get("live_projection"), "-")
         mocked_load.assert_not_called()
+
+
+class RepoArtifactPathFallbackTests(unittest.TestCase):
+    # _mlb_repo_artifact_path/_wnba_repo_artifact_path used to resolve via
+    # preferred_source_roots (no "source_artifacts" segment once the
+    # SYNDICATE_*_SOURCE_ROOT env var is set, true in every deployed
+    # environment) -- confirmed broken for MLB's live_lens report (which
+    # lives under source_artifacts). But not every artifact uses that
+    # convention (confirmed: MLB's statcast player-features file does not),
+    # so the fix checks both candidate locations and prefers whichever
+    # actually has the file, rather than assuming either one unconditionally.
+    def test_prefers_source_artifacts_location_when_it_exists(self) -> None:
+        from syndicate.features.intelligence import _mlb_repo_artifact_path
+
+        with TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir) / "mlb_source"
+            source_artifacts_file = root / "source_artifacts" / "data" / "live_lens" / "report.json"
+            source_artifacts_file.parent.mkdir(parents=True, exist_ok=True)
+            source_artifacts_file.write_text("{}", encoding="utf-8")
+            with patch.dict(os.environ, {"SYNDICATE_MLB_SOURCE_ROOT": str(root)}, clear=False):
+                result = _mlb_repo_artifact_path("data", "live_lens", "report.json")
+
+        self.assertEqual(result.resolve(), source_artifacts_file.resolve())
+
+    def test_falls_back_to_plain_root_when_only_that_exists(self) -> None:
+        from syndicate.features.intelligence import _mlb_repo_artifact_path
+
+        with TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir) / "mlb_source"
+            plain_file = root / "data" / "statcast" / "features" / "player_features_latest.json"
+            plain_file.parent.mkdir(parents=True, exist_ok=True)
+            plain_file.write_text("{}", encoding="utf-8")
+            with patch.dict(os.environ, {"SYNDICATE_MLB_SOURCE_ROOT": str(root)}, clear=False):
+                result = _mlb_repo_artifact_path("data", "statcast", "features", "player_features_latest.json")
+
+        self.assertEqual(result.resolve(), plain_file.resolve())
+
+    def test_defaults_to_source_artifacts_candidate_when_neither_exists(self) -> None:
+        from syndicate.features.intelligence import _mlb_repo_artifact_path
+
+        with TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir) / "mlb_source"
+            with patch.dict(os.environ, {"SYNDICATE_MLB_SOURCE_ROOT": str(root)}, clear=False):
+                result = _mlb_repo_artifact_path("data", "live_lens", "report.json")
+
+        self.assertEqual(result.resolve(), (root / "source_artifacts" / "data" / "live_lens" / "report.json").resolve())
+
+    def test_wnba_repo_artifact_path_checks_both_locations_too(self) -> None:
+        from syndicate.features.intelligence import _wnba_repo_artifact_path
+
+        with TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir) / "wnba_source"
+            plain_file = root / "data" / "processed" / "live_snapshots" / "live_pbp_stats_2026-07-23.jsonl"
+            plain_file.parent.mkdir(parents=True, exist_ok=True)
+            plain_file.write_text("", encoding="utf-8")
+            with patch.dict(os.environ, {"SYNDICATE_WNBA_SOURCE_ROOT": str(root)}, clear=False):
+                result = _wnba_repo_artifact_path("live_snapshots", "live_pbp_stats_2026-07-23.jsonl")
+
+        self.assertEqual(result.resolve(), plain_file.resolve())

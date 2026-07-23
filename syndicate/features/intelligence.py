@@ -49,7 +49,7 @@ from syndicate.blueprints.home import _game_bet_candidates_from_game
 from syndicate.features.mlb.sources import daily_artifact_path as mlb_daily_artifact_path
 from syndicate.features.mlb.sources import daily_snapshot_oddsapi_pitcher_props_path as mlb_daily_snapshot_oddsapi_pitcher_props_path
 from syndicate.features.mlb.sources import daily_top_props_path as mlb_daily_top_props_path
-from syndicate.features.mlb.sources import default_mlb_source_root
+from syndicate.features.mlb.sources import live_lens_report_path as mlb_live_lens_report_path
 from syndicate.features.mlb.sources import load_json_file as mlb_load_json_file
 from syndicate.features.nba.sources import live_snapshot_path as nba_live_snapshot_path
 from syndicate.features.nba.sources import processed_path as nba_processed_path
@@ -61,7 +61,6 @@ from syndicate.features.nhl.sources import processed_path as nhl_processed_path
 from syndicate.features.nhl.sources import props_lines_snapshot_path as nhl_props_lines_snapshot_path
 from syndicate.features.nhl.sources import recommendation_path as nhl_recommendation_path
 from syndicate.features.nhl.sources import scoreboard_snapshot_path as nhl_scoreboard_snapshot_path
-from syndicate.features.wnba.sources import default_wnba_source_root
 from syndicate.features.intelligence_analysis_views import build_analysis_views as _runtime_build_analysis_views
 from syndicate.features.bankroll_manager import compute_bet_size as _compute_bet_size
 from syndicate.features.bankroll_manager import build_portfolio as _build_portfolio
@@ -75,6 +74,7 @@ from syndicate.features.shared.intelligence_contracts import UniversalCandidate
 from syndicate.features.shared.recommendation_engine import filter_candidates as _shared_filter_candidates
 from syndicate.features.shared.recommendation_engine import rank_recommendations as _shared_rank_recommendations
 from syndicate.features.shared.ops_refresh import load_latest_refresh_status
+from syndicate.features.shared.source_roots import preferred_artifact_roots
 from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport as _canonical_load_odds_history_payload_for_sport
 from syndicate.features.shared.odds_control_plane import resolve_current_shard_key
 from syndicate.features.shared.refresh_state_store import reports_root
@@ -2544,12 +2544,34 @@ def _artifact_specs_for_sport(sport: dict[str, Any]) -> list[tuple[str, Path]]:
     return []
 
 
+def _first_existing_artifact_path(*, env_var: str, local_dir_name: str, parts: tuple[str, ...]) -> Path:
+    # Real production bug (2026-07-23): default_mlb_source_root()/
+    # default_wnba_source_root() resolve via preferred_source_roots(), which
+    # returns SYNDICATE_*_SOURCE_ROOT verbatim -- no "source_artifacts"
+    # segment -- once that env var is set (true in every deployed
+    # environment). Some generated artifacts (confirmed: MLB's live_lens
+    # report) live under a "source_artifacts" subdirectory there instead;
+    # others (confirmed: MLB's statcast player-features file) live at the
+    # plain root. Rather than guess which convention a given artifact uses,
+    # check every candidate root preferred_artifact_roots returns (source_
+    # artifacts-first, same resolver MLB/WNBA's OWN working artifact readers
+    # already use -- e.g. daily_top_props_path, current_odds_root_for_sport)
+    # and use whichever one actually has the file, falling back to the
+    # highest-priority candidate if none exist yet.
+    candidates = preferred_artifact_roots(__file__, env_var=env_var, local_dir_name=local_dir_name)
+    resolved = [root.joinpath(*parts) for root in candidates] or [Path(*parts)]
+    for candidate_path in resolved:
+        if candidate_path.exists():
+            return candidate_path
+    return resolved[0]
+
+
 def _mlb_repo_artifact_path(*parts: str) -> Path:
-    return default_mlb_source_root().joinpath(*parts)
+    return _first_existing_artifact_path(env_var="SYNDICATE_MLB_SOURCE_ROOT", local_dir_name="mlb_source", parts=parts)
 
 
 def _wnba_repo_artifact_path(*parts: str) -> Path:
-    return default_wnba_source_root().joinpath("data", "processed", *parts)
+    return _first_existing_artifact_path(env_var="SYNDICATE_WNBA_SOURCE_ROOT", local_dir_name="wnba_source", parts=("data", "processed", *parts))
 
 
 def _shard_key_from_context_label(slug: str, context_label: str) -> str:
@@ -4093,7 +4115,16 @@ def _mlb_candidate_live_state(candidate: dict[str, Any], actual_payload: dict[st
 def _mlb_live_lens_report_cached(context_label: str, cache: dict[str, dict[str, Any] | None]) -> dict[str, Any] | None:
     if context_label in cache:
         return cache[context_label]
-    path = _mlb_repo_artifact_path("data", "live_lens", f"live_lens_report_{context_label.replace('-', '_')}.json")
+    # _mlb_repo_artifact_path (used elsewhere in this file only for cosmetic
+    # advanced_context path display) resolves via default_mlb_source_root(),
+    # which returns SYNDICATE_MLB_SOURCE_ROOT verbatim with no "source_artifacts"
+    # segment -- wrong once that env var is set (true in every deployed
+    # environment). live_lens_report_path resolves the same way every other
+    # working MLB artifact reader in this file does (daily_top_props_path,
+    # etc.), via _resolve_data_path_with_reconcile's artifact-roots-first
+    # search. Confirmed live: the wrong path silently returned None here,
+    # which is exactly why the live-projection hydration below never fired.
+    path = mlb_live_lens_report_path(context_label)
     payload = mlb_load_json_file(path)
     cache[context_label] = payload if isinstance(payload, dict) else None
     return cache[context_label]
