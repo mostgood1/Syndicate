@@ -501,8 +501,19 @@ def _nearest_available_cards_date(selected_date: str) -> str | None:
 def _resolved_source_cards_date(selected_date: str, *, allow_stored_date_fallback: bool = False) -> str:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
     if has_games_for_date(requested_date) is False:
-        if not allow_stored_date_fallback:
-            return requested_date
+        # The schedule is authoritative: if it confirms zero games for this
+        # date, never substitute a different date's real slate under this
+        # date's request -- that's not "recovering from a missing
+        # artifact" (this function's actual purpose, for a date the
+        # schedule says SHOULD have games but whose game_cards artifact
+        # hasn't landed yet), it's presenting a genuinely empty day as if
+        # it had games. Deliberately NOT gated on allow_stored_date_fallback
+        # -- every API caller in wnba.py passes True unconditionally, which
+        # let this fall through to the earlier-date fallback below
+        # regardless of what the schedule said. Confirmed live 2026-07-23:
+        # an All-Star-break date with zero real games kept serving the
+        # prior day's real 6-game slate this way.
+        return requested_date
     resolved_date = requested_date
     bundle = _artifact_bundle(resolved_date)
     if bundle["rows"]:
