@@ -481,6 +481,71 @@ def _wnba_lineup_injury_fingerprint(date_str: str) -> str | None:
 	return _basketball_lineup_injury_fingerprint("wnba", date_str)
 
 
+def _read_csv_rows_lenient(path: Path) -> list[dict[str, str]]:
+	try:
+		if not path.exists() or not path.is_file():
+			return []
+		with path.open("r", encoding="utf-8", newline="") as handle:
+			return list(csv.DictReader(handle))
+	except Exception:
+		return []
+
+
+def _row_team_tricode(row: dict[str, str]) -> str:
+	# injuries.csv uses "team" or "team_tri"; league_status_{date}.csv uses
+	# "team" (confirmed against the real column names both files' own
+	# readers expect -- basketball_props_smart_sim.py's
+	# _smart_sim_injuries_excluded_map_for_date_local, lines ~4056/4140/4172).
+	# Neither is guaranteed to already be a 3-letter tricode (league_status's
+	# reader explicitly normalizes it), so route through the same
+	# to_tricode helper the sim engine uses rather than assume the raw value.
+	from syndicate.features.shared.basketball_props_smart_sim import _to_tricode_local
+
+	raw = str(row.get("team_tri") or row.get("team") or "").strip()
+	if not raw:
+		return ""
+	return str(_to_tricode_local(raw) or "").strip().upper()
+
+
+def _wnba_lineup_injury_fingerprint_by_game(date_str: str) -> dict[tuple[str, str], str]:
+	# Per-matchup analog of _wnba_lineup_injury_fingerprint above -- that one
+	# hashes the WHOLE injuries.csv + league_status_{date}.csv as one
+	# sport-wide blob (told you THAT something changed, never WHICH game,
+	# same limitation _mlb_sim_input_fingerprint_by_game replaced for MLB).
+	# Slices both sources down to one matchup's rows by team tricode --
+	# each WNBA team plays at most one game/day, so (home, away) is a
+	# sufficient key with zero ScheduleEvent schema changes (unlike MLB,
+	# which needed home_team_id/away_team_id added for its numeric-team_id-
+	# keyed lineups file).
+	try:
+		events = fetch_schedule_for_date("wnba", date_str)
+	except Exception:
+		events = []
+	matchups = {
+		(str(event.home or "").strip().upper(), str(event.away or "").strip().upper())
+		for event in events
+		if str(event.home or "").strip() and str(event.away or "").strip()
+	}
+	if not matchups:
+		return {}
+
+	base = data_root() / "wnba_source"
+	injuries_rows = _read_csv_rows_lenient(base / "data" / "raw" / "injuries.csv") + _read_csv_rows_lenient(
+		base / "source_artifacts" / "data" / "raw" / "injuries.csv"
+	)
+	status_rows = _read_csv_rows_lenient(base / "data" / "processed" / f"league_status_{date_str}.csv") + _read_csv_rows_lenient(
+		base / "source_artifacts" / "data" / "processed" / f"league_status_{date_str}.csv"
+	)
+
+	fingerprints: dict[tuple[str, str], str] = {}
+	for home, away in matchups:
+		team_set = {home, away}
+		injuries_slice = [row for row in injuries_rows if _row_team_tricode(row) in team_set]
+		status_slice = [row for row in status_rows if _row_team_tricode(row) in team_set]
+		fingerprints[(home, away)] = _hash_json_value({"injuries": injuries_slice, "status": status_slice})
+	return fingerprints
+
+
 _LINEUP_INJURY_FETCH_PACKAGES = {
 	"nba": "nba_betting",
 	"wnba": "wnba_betting",
@@ -524,9 +589,48 @@ def _any_gated_sport_event_within_force_window(date_str: str, *, now_epoch: floa
 # a side effect; a caller that only cares about the bool never needs this.
 _LAST_LINEUP_INJURY_CHANGED_SPORTS: set[str] = set()
 
+# WNBA-only per-matchup counterpart, isolated from the sport-level channel
+# above deliberately -- generalizing this to also cover NBA would be a
+# bigger, riskier diff than an isolated side channel a WNBA-blind code path
+# can't be affected by, and this file already caused two incidents tonight
+# (an OOM crash and a WNBA-candidates-zeroed bug). None means "unscoped" --
+# no prior per-matchup record to diff against, the diff failed, or wnba
+# didn't change at all this tick -- which correctly means "resim the whole
+# slate," matching the fails-open posture used throughout.
+_LAST_WNBA_LINEUP_INJURY_CHANGED_MATCHUPS: set[tuple[str, str]] | None = None
+
+
+def _last_wnba_lineup_injury_changed_matchups() -> set[tuple[str, str]] | None:
+	return set(_LAST_WNBA_LINEUP_INJURY_CHANGED_MATCHUPS) if _LAST_WNBA_LINEUP_INJURY_CHANGED_MATCHUPS is not None else None
+
+
+def _last_wnba_matchup_lineup_check_path() -> Path:
+	return _meta_dir() / "last_wnba_matchup_lineup_check.json"
+
+
+def _read_last_wnba_matchup_lineup_check() -> dict[str, Any]:
+	payload = read_json_file(_last_wnba_matchup_lineup_check_path())
+	return payload if isinstance(payload, dict) else {}
+
+
+def _record_wnba_matchup_lineup_check(epoch: float, date_str: str, fingerprints: dict[tuple[str, str], str]) -> None:
+	# Tuple keys serialized as "HOME-AWAY" strings -- same hyphen convention
+	# as the --only-matchups/--wnba-only-matchups CLI flags (Phase 1), and
+	# JSON can't hold tuple keys anyway.
+	write_json_file(
+		_last_wnba_matchup_lineup_check_path(),
+		{
+			"epoch": epoch,
+			"date": date_str,
+			"fingerprints": {f"{home}-{away}": value for (home, away), value in fingerprints.items()},
+			"recordedAt": _utc_now(),
+		},
+	)
+
 
 def _should_force_sim_rerun(*, now_epoch: float, date_str: str) -> bool:
 	global _LAST_LINEUP_INJURY_CHANGED_SPORTS
+	global _LAST_WNBA_LINEUP_INJURY_CHANGED_MATCHUPS
 	interval = _lineup_check_interval_seconds()
 	last = _read_last_lineup_check()
 	last_epoch = float(last.get("epoch") or 0.0)
@@ -559,6 +663,50 @@ def _should_force_sim_rerun(*, now_epoch: float, date_str: str) -> bool:
 		if not is_new_date and current_fingerprints.get(sport) != stored_fingerprints.get(sport)
 	}
 	_LAST_LINEUP_INJURY_CHANGED_SPORTS = changed_sports
+
+	# WNBA per-matchup narrowing: only worth computing when the sport-level
+	# hash above actually moved (also naturally skips this on every
+	# unchanged tick, keeping the added cost near-zero). Exception-swallowed
+	# so a failure here can never break the plain-bool contract this
+	# function has always had.
+	_LAST_WNBA_LINEUP_INJURY_CHANGED_MATCHUPS = None
+	if "wnba" in changed_sports:
+		try:
+			current_matchup_fp = _wnba_lineup_injury_fingerprint_by_game(date_str)
+			last_matchup_record = _read_last_wnba_matchup_lineup_check()
+			stored_matchup_fp_raw = (
+				last_matchup_record.get("fingerprints") if str(last_matchup_record.get("date") or "") == date_str else None
+			)
+			if not isinstance(stored_matchup_fp_raw, dict):
+				# No prior per-matchup record for today (first time seen,
+				# date rollover, or pre-migration gap) -- don't know WHICH
+				# game(s) changed, so stay unscoped (whole-slate resim),
+				# same posture MLB's _mlb_daily_sim_decision takes when
+				# stored_fingerprints isn't a dict.
+				_LAST_WNBA_LINEUP_INJURY_CHANGED_MATCHUPS = None
+			else:
+				stored_matchup_fp = {
+					tuple(key.split("-", 1)): value for key, value in stored_matchup_fp_raw.items() if "-" in key
+				}
+				_LAST_WNBA_LINEUP_INJURY_CHANGED_MATCHUPS = {
+					matchup
+					for matchup, current_hash in current_matchup_fp.items()
+					if stored_matchup_fp.get(matchup) != current_hash
+				}
+			_record_wnba_matchup_lineup_check(now_epoch, date_str, current_matchup_fp)
+			# Staged rollout (see the WNBA single-game sim scoping plan): this
+			# is observation-only for now -- logged so production behavior
+			# can be watched over a real slate before _run_live_refresh_tick
+			# is wired to actually pass this through to launch_refresh_run.
+			print(
+				f"[live_refresh_loop] WNBA_MATCHUP_FINGERPRINT_DIFF "
+				f"changed={sorted(_LAST_WNBA_LINEUP_INJURY_CHANGED_MATCHUPS) if _LAST_WNBA_LINEUP_INJURY_CHANGED_MATCHUPS is not None else None} "
+				f"total_matchups={len(current_matchup_fp)}",
+				flush=True,
+			)
+		except Exception:
+			_LAST_WNBA_LINEUP_INJURY_CHANGED_MATCHUPS = None
+
 	_record_lineup_check(now_epoch, date_str, current_fingerprints)
 	if genuinely_changed_sports:
 		_record_lineup_injury_change_epochs(genuinely_changed_sports, now_epoch=now_epoch)

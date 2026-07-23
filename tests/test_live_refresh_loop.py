@@ -19,6 +19,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
         live_refresh_loop._LIVE_REFRESH_LOOP_THREAD = None
         live_refresh_loop._release_process_lock()
         live_refresh_loop._LAST_LINEUP_INJURY_CHANGED_SPORTS = set()
+        live_refresh_loop._LAST_WNBA_LINEUP_INJURY_CHANGED_MATCHUPS = None
 
     def test_run_tick_launches_live_refresh_with_expected_defaults(self) -> None:
         with patch.dict(
@@ -1643,6 +1644,176 @@ class LiveRefreshLoopTests(unittest.TestCase):
         # the uptime recycle broke out -- proving the stop event was never
         # what ended the loop.
         self.assertEqual(mocked_is_set.call_count, 1)
+
+
+    # -- WNBA per-matchup sim scoping (Phase 2 of the single-game sim -------
+    # scoping initiative -- MLB went first via bc614d77, WNBA is the same
+    # idea applied via an isolated, WNBA-only side channel so a WNBA-blind
+    # code path (NBA, the ~18 existing plain-bool mocks of
+    # _should_force_sim_rerun) can't be affected by it.
+
+    def _write_wnba_injury_sources(self, data_root: Path, date_str: str, *, injuries_rows: list[dict], status_rows: list[dict]) -> None:
+        raw_dir = data_root / "wnba_source" / "data" / "raw"
+        processed_dir = data_root / "wnba_source" / "data" / "processed"
+        raw_dir.mkdir(parents=True, exist_ok=True)
+        processed_dir.mkdir(parents=True, exist_ok=True)
+        with (raw_dir / "injuries.csv").open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=["team", "player", "status"])
+            writer.writeheader()
+            writer.writerows(injuries_rows)
+        with (processed_dir / f"league_status_{date_str}.csv").open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=["team", "player_name", "playing_today"])
+            writer.writeheader()
+            writer.writerows(status_rows)
+
+    def test_wnba_lineup_injury_fingerprint_by_game_isolates_changed_matchup(self) -> None:
+        events = [
+            live_refresh_loop.ScheduleEvent(sport="wnba", event_id="1", home="LVA", away="NYL", start_time_utc=None),
+            live_refresh_loop.ScheduleEvent(sport="wnba", event_id="2", home="SEA", away="CHI", start_time_utc=None),
+        ]
+        with TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir)
+            self._write_wnba_injury_sources(
+                data_root,
+                "2026-07-22",
+                injuries_rows=[{"team": "LVA", "player": "A. Wilson", "status": "OUT"}],
+                status_rows=[{"team": "SEA", "player_name": "J. Doe", "playing_today": "true"}],
+            )
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": str(data_root)}, clear=False), patch.object(
+                live_refresh_loop, "fetch_schedule_for_date", return_value=events
+            ):
+                before = live_refresh_loop._wnba_lineup_injury_fingerprint_by_game("2026-07-22")
+
+            # Only LVA's injury row changes -- SEA-CHI's inputs are untouched.
+            self._write_wnba_injury_sources(
+                data_root,
+                "2026-07-22",
+                injuries_rows=[{"team": "LVA", "player": "A. Wilson", "status": "DOUBTFUL"}],
+                status_rows=[{"team": "SEA", "player_name": "J. Doe", "playing_today": "true"}],
+            )
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": str(data_root)}, clear=False), patch.object(
+                live_refresh_loop, "fetch_schedule_for_date", return_value=events
+            ):
+                after = live_refresh_loop._wnba_lineup_injury_fingerprint_by_game("2026-07-22")
+
+        self.assertNotEqual(before[("LVA", "NYL")], after[("LVA", "NYL")])
+        self.assertEqual(before[("SEA", "CHI")], after[("SEA", "CHI")])
+
+    def test_wnba_lineup_injury_fingerprint_by_game_degrades_gracefully_with_no_schedule(self) -> None:
+        with patch.object(live_refresh_loop, "fetch_schedule_for_date", return_value=[]):
+            fingerprints = live_refresh_loop._wnba_lineup_injury_fingerprint_by_game("2026-07-22")
+
+        self.assertEqual(fingerprints, {})
+
+    def test_wnba_lineup_injury_fingerprint_by_game_degrades_gracefully_on_fetch_error(self) -> None:
+        with patch.object(live_refresh_loop, "fetch_schedule_for_date", side_effect=RuntimeError("boom")):
+            fingerprints = live_refresh_loop._wnba_lineup_injury_fingerprint_by_game("2026-07-22")
+
+        self.assertEqual(fingerprints, {})
+
+    def test_should_force_sim_rerun_records_wnba_changed_matchups_on_fingerprint_change(self) -> None:
+        with patch.object(live_refresh_loop, "_lineup_check_interval_seconds", return_value=0), patch.object(
+            live_refresh_loop, "_read_last_lineup_check", return_value={"epoch": 1000.0, "date": "2026-07-22", "fingerprints": {"nba": "n1", "wnba": "w-old"}}
+        ), patch.object(live_refresh_loop, "_any_gated_sport_event_within_force_window", return_value=False), patch.object(
+            live_refresh_loop, "_fetch_injuries", return_value=None
+        ), patch.object(
+            live_refresh_loop, "_nba_lineup_injury_fingerprint", return_value="n1"
+        ), patch.object(
+            live_refresh_loop, "_wnba_lineup_injury_fingerprint", return_value="w-new"
+        ), patch.object(
+            live_refresh_loop,
+            "_wnba_lineup_injury_fingerprint_by_game",
+            return_value={("LVA", "NYL"): "changed", ("SEA", "CHI"): "same"},
+        ), patch.object(
+            live_refresh_loop,
+            "_read_last_wnba_matchup_lineup_check",
+            return_value={"date": "2026-07-22", "fingerprints": {"LVA-NYL": "old", "SEA-CHI": "same"}},
+        ), patch.object(
+            live_refresh_loop, "_record_wnba_matchup_lineup_check"
+        ) as mocked_record_matchup, patch.object(
+            live_refresh_loop, "_record_lineup_check"
+        ), patch.object(
+            live_refresh_loop, "_record_lineup_injury_change_epochs"
+        ):
+            result = live_refresh_loop._should_force_sim_rerun(now_epoch=2000.0, date_str="2026-07-22")
+
+        self.assertTrue(result)
+        self.assertEqual(live_refresh_loop._last_wnba_lineup_injury_changed_matchups(), {("LVA", "NYL")})
+        mocked_record_matchup.assert_called_once_with(2000.0, "2026-07-22", {("LVA", "NYL"): "changed", ("SEA", "CHI"): "same"})
+
+    def test_should_force_sim_rerun_returns_none_matchups_on_first_ever_record(self) -> None:
+        with patch.object(live_refresh_loop, "_lineup_check_interval_seconds", return_value=0), patch.object(
+            live_refresh_loop, "_read_last_lineup_check", return_value={"epoch": 1000.0, "date": "2026-07-22", "fingerprints": {"nba": "n1", "wnba": "w-old"}}
+        ), patch.object(live_refresh_loop, "_any_gated_sport_event_within_force_window", return_value=False), patch.object(
+            live_refresh_loop, "_fetch_injuries", return_value=None
+        ), patch.object(
+            live_refresh_loop, "_nba_lineup_injury_fingerprint", return_value="n1"
+        ), patch.object(
+            live_refresh_loop, "_wnba_lineup_injury_fingerprint", return_value="w-new"
+        ), patch.object(
+            live_refresh_loop,
+            "_wnba_lineup_injury_fingerprint_by_game",
+            return_value={("LVA", "NYL"): "changed"},
+        ), patch.object(
+            live_refresh_loop, "_read_last_wnba_matchup_lineup_check", return_value={}
+        ), patch.object(
+            live_refresh_loop, "_record_wnba_matchup_lineup_check"
+        ), patch.object(
+            live_refresh_loop, "_record_lineup_check"
+        ), patch.object(
+            live_refresh_loop, "_record_lineup_injury_change_epochs"
+        ):
+            result = live_refresh_loop._should_force_sim_rerun(now_epoch=2000.0, date_str="2026-07-22")
+
+        self.assertTrue(result)
+        self.assertIsNone(live_refresh_loop._last_wnba_lineup_injury_changed_matchups())
+
+    def test_should_force_sim_rerun_wnba_matchup_tracking_failure_does_not_break_sport_bool(self) -> None:
+        with patch.object(live_refresh_loop, "_lineup_check_interval_seconds", return_value=0), patch.object(
+            live_refresh_loop, "_read_last_lineup_check", return_value={"epoch": 1000.0, "date": "2026-07-22", "fingerprints": {"nba": "n1", "wnba": "w-old"}}
+        ), patch.object(live_refresh_loop, "_any_gated_sport_event_within_force_window", return_value=False), patch.object(
+            live_refresh_loop, "_fetch_injuries", return_value=None
+        ), patch.object(
+            live_refresh_loop, "_nba_lineup_injury_fingerprint", return_value="n1"
+        ), patch.object(
+            live_refresh_loop, "_wnba_lineup_injury_fingerprint", return_value="w-new"
+        ), patch.object(
+            live_refresh_loop,
+            "_wnba_lineup_injury_fingerprint_by_game",
+            side_effect=RuntimeError("boom"),
+        ), patch.object(
+            live_refresh_loop, "_record_lineup_check"
+        ), patch.object(
+            live_refresh_loop, "_record_lineup_injury_change_epochs"
+        ):
+            result = live_refresh_loop._should_force_sim_rerun(now_epoch=2000.0, date_str="2026-07-22")
+
+        # The existing plain-bool contract (~18 tests mock this directly)
+        # must survive a failure in the new WNBA-only per-matchup code.
+        self.assertTrue(result)
+        self.assertIsNone(live_refresh_loop._last_wnba_lineup_injury_changed_matchups())
+
+    def test_should_force_sim_rerun_skips_wnba_matchup_tracking_when_wnba_unchanged(self) -> None:
+        with patch.object(live_refresh_loop, "_lineup_check_interval_seconds", return_value=0), patch.object(
+            live_refresh_loop, "_read_last_lineup_check", return_value={"epoch": 1000.0, "date": "2026-07-22", "fingerprints": {"nba": "n-old", "wnba": "w-same"}}
+        ), patch.object(live_refresh_loop, "_any_gated_sport_event_within_force_window", return_value=False), patch.object(
+            live_refresh_loop, "_fetch_injuries", return_value=None
+        ), patch.object(
+            live_refresh_loop, "_nba_lineup_injury_fingerprint", return_value="n-new"
+        ), patch.object(
+            live_refresh_loop, "_wnba_lineup_injury_fingerprint", return_value="w-same"
+        ), patch.object(
+            live_refresh_loop, "_wnba_lineup_injury_fingerprint_by_game"
+        ) as mocked_by_game, patch.object(
+            live_refresh_loop, "_record_lineup_check"
+        ), patch.object(
+            live_refresh_loop, "_record_lineup_injury_change_epochs"
+        ):
+            result = live_refresh_loop._should_force_sim_rerun(now_epoch=2000.0, date_str="2026-07-22")
+
+        self.assertTrue(result)
+        mocked_by_game.assert_not_called()
+        self.assertIsNone(live_refresh_loop._last_wnba_lineup_injury_changed_matchups())
 
 
 if __name__ == "__main__":
