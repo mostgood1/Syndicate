@@ -33,6 +33,8 @@ from syndicate.features.intelligence import _candidate_advanced_signal_score
 from syndicate.features.intelligence import _candidate_live_claim_is_stale
 from syndicate.features.intelligence import _basketball_source_summary_score
 from syndicate.features.intelligence import _candidate_market_fit
+from syndicate.features.intelligence import _game_candidates_for_sport
+from syndicate.features.intelligence import _is_game_level_market
 from syndicate.features.intelligence import collect_candidates
 from syndicate.features.intelligence import classify_candidate
 from syndicate.features.intelligence import is_valid_candidate
@@ -5847,3 +5849,53 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                 second_fingerprint = service._source_state_fingerprint("2026-06-07")
 
         self.assertNotEqual(first_fingerprint, second_fingerprint)
+
+
+class GameLevelMarketClassificationTests(unittest.TestCase):
+    def test_hitter_and_pitcher_prop_markets_are_never_game_level(self) -> None:
+        # Real bug found in production 2026-07-22: "total" in
+        # _GAME_LEVEL_MARKET_KEYWORDS matched as a bare substring, so
+        # "Hitter Total bases" / "Pitcher Total outs" (MLB's per-player
+        # prop rows, market = f"{market_prefix} {market_label}") got
+        # classified as candidate_type="game" -- every single "game"
+        # candidate on the live board was actually a mislabeled player
+        # prop, while genuine team-level Moneyline/Spread/Total candidates
+        # never appeared measurably at all.
+        self.assertFalse(_is_game_level_market("Hitter Total bases"))
+        self.assertFalse(_is_game_level_market("Pitcher Total outs"))
+        self.assertFalse(_is_game_level_market("hitter total bases"))
+
+    def test_real_game_level_markets_still_classify_correctly(self) -> None:
+        self.assertTrue(_is_game_level_market("Moneyline"))
+        self.assertTrue(_is_game_level_market("Total"))
+        self.assertTrue(_is_game_level_market("Spread"))
+        self.assertTrue(_is_game_level_market("Live Total"))
+        self.assertTrue(_is_game_level_market("ats"))
+        self.assertTrue(_is_game_level_market(""))
+
+    def test_game_candidates_for_sport_labels_hitter_props_as_prop_not_game(self) -> None:
+        sport = {
+            "slug": "mlb",
+            "dashboard_games": [
+                {
+                    "matchup": "NYY @ BOS",
+                    "markets": {
+                        "hitterProps": [
+                            {"player_name": "Aaron Judge", "market_label": "Total bases", "selection": "OVER", "market_line": 1.5, "model_prob": 0.58},
+                        ],
+                    },
+                    "betting": {"away_ml": -150, "home_ml": 130, "p_away_win": 0.6, "p_home_win": 0.4},
+                }
+            ],
+        }
+
+        candidates = _game_candidates_for_sport(sport)
+        by_type = {}
+        for candidate in candidates:
+            by_type.setdefault(candidate["candidate_type"], []).append(candidate)
+
+        prop_markets = [c["market"] for c in by_type.get("prop", [])]
+        game_markets = [c["market"] for c in by_type.get("game", [])]
+        self.assertTrue(any("total bases" in market.lower() for market in prop_markets), prop_markets)
+        self.assertNotIn("Hitter Total bases", game_markets)
+        self.assertTrue(any(market == "Moneyline" for market in game_markets), game_markets)

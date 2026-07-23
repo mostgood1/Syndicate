@@ -3838,6 +3838,16 @@ def _is_game_level_market(market_text: Any) -> bool:
         return True
     if lowered == "ats":
         return True
+    # "Hitter Total bases" / "Pitcher Total outs" (MLB's per-player prop
+    # rows -- market = f"{market_prefix} {market_label}") legitimately
+    # contain "total" as a real word, indistinguishable from the
+    # team-level "Total" market by keyword alone. Confirmed live
+    # 2026-07-22: every "game"-type candidate on the board was actually
+    # "hitter total bases", a mislabeled player prop, while genuine
+    # Moneyline/Spread/Total game candidates never appeared at all. Any
+    # Hitter/Pitcher-prefixed market is always a player prop.
+    if lowered.startswith("hitter ") or lowered.startswith("pitcher "):
+        return False
     return any(keyword in lowered for keyword in _GAME_LEVEL_MARKET_KEYWORDS)
 
 
