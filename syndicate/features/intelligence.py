@@ -7086,13 +7086,19 @@ def _balanced_recommendation_order(recommendations: list[dict[str, Any]]) -> lis
         reverse=True,
     )
     for sport_key, bucket in sport_buckets.items():
-        bucket.sort(
-            key=lambda recommendation: (
-                1 if bool(recommendation.get("is_live")) else 0,
-                *_candidate_betting_rank_key(recommendation),
-            ),
-            reverse=True,
-        )
+        # Used to sort by is_live first, betting quality second -- every
+        # live candidate, no matter how weak, outranked every pregame
+        # candidate, no matter how strong, within a sport bucket. Since
+        # _balanced_market_order below (and the outer round-robin across
+        # sport buckets) only ever draws from the FRONT of each bucket up to
+        # however many slots the board actually shows, a sport with several
+        # live candidates could crowd out its own genuinely better pregame
+        # candidates entirely -- confirmed live 2026-07-23 while
+        # investigating why WNBA's pregame candidates were missing from the
+        # served board. Betting quality (edge/confidence/score) is the only
+        # thing that should decide order here, matching how ranking works
+        # everywhere else in this module (e.g. _greedy_low_correlation_selection).
+        bucket.sort(key=_candidate_betting_rank_key, reverse=True)
         sport_buckets[sport_key] = _balanced_market_order(bucket)
 
     if len(sport_buckets) < 2:

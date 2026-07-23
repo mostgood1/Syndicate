@@ -1591,6 +1591,40 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(any(item.get("sport_slug") == "wnba" for item in ordered[:3]))
         self.assertTrue(any(item.get("is_live") for item in ordered[:3]))
 
+    def test_balanced_recommendation_order_does_not_let_a_weak_live_candidate_outrank_a_strong_pregame_one(self) -> None:
+        # Real bug found 2026-07-23: within a sport bucket, candidates used to
+        # sort by is_live FIRST and betting quality second, so every live
+        # candidate outranked every pregame candidate regardless of edge --
+        # a weak live pick with near-zero edge would sort ahead of a much
+        # stronger pregame pick in the same sport. Confirmed live while
+        # investigating why WNBA's pregame candidates were missing from the
+        # served board. Betting quality alone should decide order here.
+        candidates = [
+            {
+                "sport_slug": "mlb",
+                "sport": "MLB",
+                "name": "Weak live pick",
+                "score": 0.05,
+                "edge": 0.01,
+                "confidence": 0.51,
+                "is_live": True,
+            },
+            {
+                "sport_slug": "mlb",
+                "sport": "MLB",
+                "name": "Strong pregame pick",
+                "score": 0.9,
+                "edge": 0.25,
+                "confidence": 0.9,
+                "is_live": False,
+            },
+        ]
+
+        ordered = _balanced_recommendation_order(candidates)
+
+        self.assertEqual(ordered[0].get("name"), "Strong pregame pick")
+        self.assertEqual(ordered[1].get("name"), "Weak live pick")
+
     def test_score_candidate_applies_shared_formula(self) -> None:
         candidate = {
             "sport_slug": "mlb",
