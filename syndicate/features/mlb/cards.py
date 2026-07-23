@@ -20,6 +20,7 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
+from syndicate.features.shared.market_inventory import JOIN_STATUS_NEEDS_RESIM
 from syndicate.features.shared.market_inventory import join_odds_to_sim
 from syndicate.features.shared.team_branding import read_team_branding_snapshot
 from syndicate.features.shared.team_branding import team_branding_index_by_abbreviation
@@ -5049,3 +5050,26 @@ def build_mlb_market_board(selected_date: str) -> dict[str, Any]:
         "date": selected_date,
         "games": board_games,
     }
+
+
+def mlb_needs_resim_game_pks(selected_date: str) -> list[str]:
+    """Game PKs where the market board's odds<->sim join detected a
+    needs-resim mismatch (Phase 4 of the Layer 1 plan): an odds row's
+    entity doesn't match current sim coverage for that market/period, but
+    a DIFFERENT entity does -- e.g. a probable-pitcher swap the sim hasn't
+    re-run against yet. Consumed by live_refresh_loop.py's
+    _mlb_daily_sim_decision as an additional, directly-observed resim
+    trigger alongside its existing lineup/odds/override fingerprint diff.
+    """
+    board = build_mlb_market_board(selected_date)
+    games = board.get("games") if isinstance(board.get("games"), list) else []
+    game_pks: set[str] = set()
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        rows = game.get("rows") if isinstance(game.get("rows"), list) else []
+        if any(isinstance(row, dict) and row.get("join_status") == JOIN_STATUS_NEEDS_RESIM for row in rows):
+            game_pk = str(game.get("gamePk") or "").strip()
+            if game_pk:
+                game_pks.add(game_pk)
+    return sorted(game_pks)

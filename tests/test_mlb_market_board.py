@@ -6,7 +6,9 @@ from unittest.mock import patch
 from syndicate.features.mlb.cards import _mlb_market_board_prop_rows_for_game
 from syndicate.features.mlb.cards import _mlb_market_board_rows_for_game
 from syndicate.features.mlb.cards import build_mlb_market_board
+from syndicate.features.mlb.cards import mlb_needs_resim_game_pks
 from syndicate.features.shared.market_inventory import JOIN_STATUS_MATCHED
+from syndicate.features.shared.market_inventory import JOIN_STATUS_NEEDS_RESIM
 from syndicate.features.shared.market_inventory import JOIN_STATUS_NO_SIM_COVERAGE
 from syndicate.features.shared.market_inventory import join_odds_to_sim
 
@@ -257,6 +259,44 @@ class BuildMlbMarketBoardTests(unittest.TestCase):
         self.assertEqual(by_market_type["prop"]["market"], "Pitcher Outs")
         self.assertEqual(by_market_type["prop"]["entity"], "Michael McGreevy")
         self.assertEqual(by_market_type["prop"]["join_status"], JOIN_STATUS_MATCHED)
+
+
+class MlbNeedsResimGamePksTests(unittest.TestCase):
+    def test_returns_game_pks_with_at_least_one_needs_resim_row(self) -> None:
+        fake_board = {
+            "date": "2026-07-23",
+            "games": [
+                {"gamePk": 111, "rows": [{"join_status": JOIN_STATUS_MATCHED}]},
+                {
+                    "gamePk": 222,
+                    "rows": [
+                        {"join_status": JOIN_STATUS_MATCHED},
+                        {"join_status": JOIN_STATUS_NEEDS_RESIM, "join_note": "Sim projected a different pitcher"},
+                    ],
+                },
+            ],
+        }
+        with patch("syndicate.features.mlb.cards.build_mlb_market_board", return_value=fake_board):
+            result = mlb_needs_resim_game_pks("2026-07-23")
+        self.assertEqual(result, ["222"])
+
+    def test_no_needs_resim_rows_returns_empty_list(self) -> None:
+        fake_board = {"date": "2026-07-23", "games": [{"gamePk": 111, "rows": [{"join_status": JOIN_STATUS_MATCHED}]}]}
+        with patch("syndicate.features.mlb.cards.build_mlb_market_board", return_value=fake_board):
+            result = mlb_needs_resim_game_pks("2026-07-23")
+        self.assertEqual(result, [])
+
+    def test_multiple_games_with_mismatches_are_sorted(self) -> None:
+        fake_board = {
+            "date": "2026-07-23",
+            "games": [
+                {"gamePk": 300, "rows": [{"join_status": JOIN_STATUS_NEEDS_RESIM}]},
+                {"gamePk": 100, "rows": [{"join_status": JOIN_STATUS_NEEDS_RESIM}]},
+            ],
+        }
+        with patch("syndicate.features.mlb.cards.build_mlb_market_board", return_value=fake_board):
+            result = mlb_needs_resim_game_pks("2026-07-23")
+        self.assertEqual(result, ["100", "300"])
 
 
 if __name__ == "__main__":

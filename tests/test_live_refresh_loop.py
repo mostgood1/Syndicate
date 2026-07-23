@@ -853,6 +853,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
         ), patch.object(
             live_refresh_loop, "_mlb_sim_input_fingerprint_by_game", return_value={"100": "aaa", "200": "CHANGED", "300": "ccc"}
         ), patch.object(
+            live_refresh_loop, "_mlb_join_mismatch_game_pks", return_value=[]
+        ), patch.object(
             live_refresh_loop, "_record_mlb_sim_check"
         ) as mocked_record:
             mocked_summary_path.return_value.exists.return_value = True
@@ -879,6 +881,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
             live_refresh_loop, "_read_last_mlb_sim_check", return_value={}
         ), patch.object(
             live_refresh_loop, "_mlb_sim_input_fingerprint_by_game", return_value={"100": "aaa", "200": "bbb"}
+        ), patch.object(
+            live_refresh_loop, "_mlb_join_mismatch_game_pks", return_value=[]
         ), patch.object(live_refresh_loop, "_record_mlb_sim_check"):
             mocked_summary_path.return_value.exists.return_value = True
             decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=2000.0, date_str="2026-07-19")
@@ -903,12 +907,112 @@ class LiveRefreshLoopTests(unittest.TestCase):
             live_refresh_loop, "_read_last_mlb_sim_check", return_value={"epoch": 1000.0, "date": "2026-07-19", "fingerprint": "old-style-string"}
         ), patch.object(
             live_refresh_loop, "_mlb_sim_input_fingerprint_by_game", return_value={"100": "aaa"}
+        ), patch.object(
+            live_refresh_loop, "_mlb_join_mismatch_game_pks", return_value=[]
         ), patch.object(live_refresh_loop, "_record_mlb_sim_check"):
             mocked_summary_path.return_value.exists.return_value = True
             decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=2000.0, date_str="2026-07-19")
 
         self.assertEqual(decision["reason"], "fingerprint_change")
         self.assertEqual(decision["game_pks"], ["100"])
+
+    def test_mlb_daily_sim_decision_join_mismatch_forces_resim_without_fingerprint_change(self) -> None:
+        # Phase 4 of the Layer 1 plan: the market board's odds<->sim join
+        # can detect a needs-resim mismatch (e.g. a probable-pitcher swap)
+        # even when the lineups/odds/overrides fingerprint hash hasn't
+        # changed -- this must still force a resim for that game.
+        events = [
+            live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None),
+            live_refresh_loop.ScheduleEvent(sport="mlb", event_id="200", home="C", away="D", start_time_utc=None),
+        ]
+        with patch.dict(os.environ, {"SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER": "true"}, clear=False), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(live_refresh_loop, "is_refresh_run_active", return_value=False), patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=events
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path, patch.object(
+            live_refresh_loop, "events_starting_within", return_value=[]
+        ), patch.object(
+            live_refresh_loop, "_read_last_mlb_sim_check", return_value={"epoch": 1000.0, "date": "2026-07-19", "fingerprints": {"100": "aaa", "200": "bbb"}}
+        ), patch.object(
+            live_refresh_loop, "_mlb_sim_input_fingerprint_by_game", return_value={"100": "aaa", "200": "bbb"}
+        ), patch.object(
+            live_refresh_loop, "_mlb_join_mismatch_game_pks", return_value=["200"]
+        ), patch.object(
+            live_refresh_loop, "_record_mlb_sim_check"
+        ) as mocked_record:
+            mocked_summary_path.return_value.exists.return_value = True
+            decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=2000.0, date_str="2026-07-19")
+
+        self.assertTrue(decision["force"])
+        self.assertEqual(decision["reason"], "join_mismatch_needs_resim")
+        self.assertEqual(decision["game_pks"], ["200"])
+        self.assertEqual(decision["join_mismatch_game_pks"], ["200"])
+        mocked_record.assert_called_once_with(2000.0, "2026-07-19", {"100": "aaa", "200": "bbb"}, launched=True)
+
+    def test_mlb_daily_sim_decision_merges_fingerprint_and_join_mismatch_game_pks(self) -> None:
+        events = [
+            live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None),
+            live_refresh_loop.ScheduleEvent(sport="mlb", event_id="200", home="C", away="D", start_time_utc=None),
+            live_refresh_loop.ScheduleEvent(sport="mlb", event_id="300", home="E", away="F", start_time_utc=None),
+        ]
+        with patch.dict(os.environ, {"SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER": "true"}, clear=False), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(live_refresh_loop, "is_refresh_run_active", return_value=False), patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=events
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path, patch.object(
+            live_refresh_loop, "events_starting_within", return_value=[]
+        ), patch.object(
+            live_refresh_loop, "_read_last_mlb_sim_check", return_value={"epoch": 1000.0, "date": "2026-07-19", "fingerprints": {"100": "aaa", "200": "bbb", "300": "ccc"}}
+        ), patch.object(
+            live_refresh_loop, "_mlb_sim_input_fingerprint_by_game", return_value={"100": "aaa", "200": "CHANGED", "300": "ccc"}
+        ), patch.object(
+            live_refresh_loop, "_mlb_join_mismatch_game_pks", return_value=["300"]
+        ), patch.object(live_refresh_loop, "_record_mlb_sim_check"):
+            mocked_summary_path.return_value.exists.return_value = True
+            decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=2000.0, date_str="2026-07-19")
+
+        self.assertEqual(decision["reason"], "fingerprint_change")
+        self.assertEqual(decision["game_pks"], ["200", "300"])
+        self.assertEqual(decision["join_mismatch_game_pks"], ["300"])
+
+    def test_mlb_daily_sim_decision_no_change_when_neither_fingerprint_nor_join_mismatch(self) -> None:
+        events = [live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None)]
+        with patch.dict(os.environ, {"SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER": "true"}, clear=False), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(live_refresh_loop, "is_refresh_run_active", return_value=False), patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=events
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path, patch.object(
+            live_refresh_loop, "events_starting_within", return_value=[]
+        ), patch.object(
+            live_refresh_loop, "_read_last_mlb_sim_check", return_value={"epoch": 1000.0, "date": "2026-07-19", "fingerprints": {"100": "aaa"}}
+        ), patch.object(
+            live_refresh_loop, "_mlb_sim_input_fingerprint_by_game", return_value={"100": "aaa"}
+        ), patch.object(
+            live_refresh_loop, "_mlb_join_mismatch_game_pks", return_value=[]
+        ), patch.object(
+            live_refresh_loop, "_record_mlb_sim_check"
+        ) as mocked_record:
+            mocked_summary_path.return_value.exists.return_value = True
+            decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=2000.0, date_str="2026-07-19")
+
+        self.assertFalse(decision["force"])
+        self.assertEqual(decision["reason"], "no_change")
+        mocked_record.assert_called_once_with(2000.0, "2026-07-19", {"100": "aaa"}, launched=False)
+
+    def test_mlb_join_mismatch_game_pks_swallows_exceptions(self) -> None:
+        # Defensive: this is an additive enhancement on top of the
+        # already-working fingerprint trigger -- any failure inside it
+        # (missing artifact, bad data shape, etc.) must never propagate and
+        # break the existing mechanism.
+        with patch("syndicate.features.mlb.cards.mlb_needs_resim_game_pks", side_effect=RuntimeError("boom")):
+            result = live_refresh_loop._mlb_join_mismatch_game_pks("2026-07-19")
+        self.assertEqual(result, [])
 
     def test_mlb_daily_sim_decision_tip_off_window_returns_only_starting_soon_game_pks(self) -> None:
         all_events = [

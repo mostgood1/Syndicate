@@ -905,6 +905,22 @@ def _mlb_sim_input_fingerprint_by_game(date_str: str, events: list[ScheduleEvent
 	return fingerprints
 
 
+def _mlb_join_mismatch_game_pks(date_str: str) -> list[str]:
+	# Phase 4 of the Layer 1 plan: the market board's odds<->sim join
+	# (market_inventory.join_odds_to_sim) already detects a needs-resim
+	# mismatch directly from the current odds/sim data itself -- a probable
+	# pitcher swap the fingerprint diff below might not catch if the
+	# lineups/overrides artifacts lag behind the odds feed. This is purely
+	# additive on top of that existing mechanism, so any failure here must
+	# never break the fingerprint-based trigger that already works.
+	try:
+		from syndicate.features.mlb.cards import mlb_needs_resim_game_pks
+
+		return mlb_needs_resim_game_pks(date_str)
+	except Exception:
+		return []
+
+
 def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any]:
 	if not _mlb_daily_sim_enabled():
 		return {"force": False, "reason": "disabled"}
@@ -965,9 +981,16 @@ def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any
 	else:
 		changed_game_pks = sorted(game_pk for game_pk, current_hash in current_fingerprints.items() if stored_fingerprints.get(game_pk) != current_hash)
 
-	if changed_game_pks:
+	join_mismatch_game_pks = _mlb_join_mismatch_game_pks(date_str)
+
+	if changed_game_pks or join_mismatch_game_pks:
 		_record_mlb_sim_check(now_epoch, date_str, current_fingerprints, launched=True)
-		return {"force": True, "reason": "fingerprint_change", "game_pks": changed_game_pks}
+		merged_game_pks = sorted(set(changed_game_pks) | set(join_mismatch_game_pks))
+		reason = "fingerprint_change" if changed_game_pks else "join_mismatch_needs_resim"
+		result: dict[str, Any] = {"force": True, "reason": reason, "game_pks": merged_game_pks}
+		if join_mismatch_game_pks:
+			result["join_mismatch_game_pks"] = join_mismatch_game_pks
+		return result
 
 	_record_mlb_sim_check(now_epoch, date_str, current_fingerprints, launched=False)
 	return {"force": False, "reason": "no_change"}
