@@ -1701,6 +1701,33 @@ def _mlb_live_total_text(actual_payload: dict[str, Any] | None) -> str | None:
     return _score_value(float(away_runs) + float(home_runs))
 
 
+_PROP_PICK_SELECTION_PREFIX_RE = re.compile(r"^(?:over|under)\s+(.+)$", re.IGNORECASE)
+
+
+def _player_name_from_prop_pick_text(pick_text: str) -> str | None:
+    # game["shared_top_play_rows"] (game_board_contract.py's _build_top_play_rows)
+    # is a generic display-panel highlights list -- title becomes "market",
+    # each item's free text becomes "pick" -- with no dedicated player field
+    # at all. For MLB hitter/pitcher stat panels that text is consistently
+    # "OVER/UNDER <Player Name>" (confirmed live 2026-07-23: every one of
+    # these rows sampled matched), so the player identity is present, just
+    # never extracted into a structured field. Without this, every hitter/
+    # pitcher candidate built from this path showed a blank entity and a
+    # blank Projected value, and (worse) looked identical to a genuinely
+    # entity-less duplicate from another pipeline.
+    match = _PROP_PICK_SELECTION_PREFIX_RE.match(str(pick_text or "").strip())
+    if not match:
+        return None
+    name = match.group(1).strip()
+    if not name or re.fullmatch(r"[\d.,+-]+", name):
+        # Other callers use this same "Over <line>" convention for the pick
+        # text (e.g. game_market_recommendations rows), where the remainder
+        # is a numeric line, not a player name -- never mistake one for the
+        # other.
+        return None
+    return name
+
+
 def _market_label_from_pick_text(text: str) -> str:
     lowered = text.lower()
     if "total" in lowered or lowered.startswith("over") or lowered.startswith("under"):
@@ -1934,6 +1961,7 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
     if live_projection is None and is_live and is_game_level_market:
         live_projection = _game_current_combined_score(game)
     live_projection_text = _prop_metric_text(live_projection) if live_projection is not None else "-"
+    player_name = None if is_game_level_market else _player_name_from_prop_pick_text(pick_text)
     edge_value = _pct_number(edge_text)
     confidence_value = _pct_number(confidence_text)
     updated_epoch = _game_row_updated_epoch(game, fallback_epoch)
@@ -1953,6 +1981,8 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
             "market": _safe_text(market, _market_label_from_pick_text(pick_text)),
             "pick": pick_text,
             "team": team_text,
+            "entity": player_name,
+            "player_name": player_name,
             "is_live": is_live,
             "is_final": game_state == "final",
             "game_state": game_state or None,

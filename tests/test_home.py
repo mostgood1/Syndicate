@@ -931,6 +931,45 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         game = self._sample_game(markets={"ml": {}, "totals": {"selection": "over"}})
         self.assertEqual(_mlb_game_market_recommendation_rows(game), [])
 
+    def test_shared_top_play_rows_extracts_player_name_for_hitter_pitcher_markets(self) -> None:
+        # Real gap found 2026-07-23: game["shared_top_play_rows"] (a generic
+        # display-panel highlights list, game_board_contract.py's
+        # _build_top_play_rows) has no dedicated player field at all -- the
+        # panel title becomes "market" and each item's free text becomes
+        # "pick". For MLB hitter/pitcher stat panels that text is
+        # consistently "OVER/UNDER <Player Name>", confirmed live against
+        # production: every "hitter hits"/"hitter rbi"/etc. candidate on the
+        # board showed a blank entity and a blank Projected value because
+        # the player name was never extracted out of the pick text.
+        game = self._sample_game(
+            shared_top_play_rows=[
+                {"heading": "Hitter Hits", "name": "OVER Brooks Lee"},
+                {"heading": "Pitcher Strikeouts", "name": "UNDER Gerrit Cole"},
+            ]
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "mlb"}, game, fallback_epoch=0.0)
+        hits = next(c for c in candidates if c["market"] == "Hitter Hits")
+        strikeouts = next(c for c in candidates if c["market"] == "Pitcher Strikeouts")
+        self.assertEqual(hits["entity"], "Brooks Lee")
+        self.assertEqual(hits["player_name"], "Brooks Lee")
+        self.assertEqual(strikeouts["entity"], "Gerrit Cole")
+
+    def test_shared_top_play_rows_leaves_entity_blank_for_game_level_markets(self) -> None:
+        game = self._sample_game(shared_top_play_rows=[{"heading": "Top Plays", "name": "OVER 8.5"}])
+        candidates = _game_bet_candidates_from_game({"slug": "mlb"}, game, fallback_epoch=0.0)
+        self.assertIsNone(candidates[0]["entity"])
+
+    def test_game_market_recommendation_over_line_pick_is_not_mistaken_for_a_player_name(self) -> None:
+        # Regression guard: game_market_recommendations rows use the same
+        # "Over <value>" pick-text convention, except the remainder is a
+        # numeric line, not a player name -- must never collide with the
+        # extraction added for shared_top_play_rows above.
+        game = self._sample_game(
+            game_market_recommendations=[{"market_label": "Hitter Total Bases", "selection": "Over 1.5", "line": 1.5}]
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "mlb"}, game, fallback_epoch=0.0)
+        self.assertIsNone(candidates[0]["entity"])
+
     def test_prop_item_from_rank_card_derives_team_from_matchup_labels(self) -> None:
         card = {
             "title": "Jayson Tatum Over 28.5",
