@@ -3682,14 +3682,24 @@ def _run_refresh_via_cli(
         # full-mode Export stage below still rebuilds game_cards again as
         # part of its own try/except, so a failure here is not fatal to the
         # rest of the refresh.
+        print(
+            f"[refresh_wnba_oddsapi_props] GAME_CARDS_REBUILD_ATTEMPT date={date_str} "
+            f"snapshot_rows={state.get('snapshot_rows')} source_root={source_root}",
+            flush=True,
+        )
         try:
-            game_cards_rows, _ = _build_local_game_cards_artifact(
+            game_cards_rows, game_cards_path = _build_local_game_cards_artifact(
                 source_root=source_root,
                 processed_root=processed_root,
                 date_str=date_str,
                 log_file=log_file,
             )
             state["game_cards_rows"] = int(game_cards_rows)
+            print(
+                f"[refresh_wnba_oddsapi_props] GAME_CARDS_REBUILD_RESULT date={date_str} "
+                f"rows={game_cards_rows} path={game_cards_path}",
+                flush=True,
+            )
         except Exception:
             _append_log(log_file, f"Fast-mode game_cards rebuild failed for {date_str}: {traceback.format_exc()}")
 
@@ -5170,6 +5180,11 @@ def main() -> int:
                 started_at=started_at,
                 input_hash=refresh_input_hash,
             )
+        print(
+            f"[refresh_wnba_oddsapi_props] MAIN_STATE_DECISION date={target_date} force_refresh={bool(args.force_refresh)} "
+            f"reused_state={'yes' if state is not None else 'no'} source_root={source_root} artifact_root={artifact_root_path}",
+            flush=True,
+        )
         if state is None:
             if source_root is None:
                 state = {
