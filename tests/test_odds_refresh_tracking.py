@@ -231,6 +231,51 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertIn("hitter_props", result["artifacts"])
             self.assertTrue((root / "tracking" / "odds_mlb_game_lines_opening_2026-06-07.csv").exists())
 
+    def test_sync_mlb_tracking_writes_prop_odds_history_entries(self) -> None:
+        # 2026-07-24 fix: oddsapi_hitter_props/oddsapi_pitcher_props are
+        # nested two levels deep (player_name -> market_name -> {line,
+        # over_odds, under_odds}) -- the generic odds-history row reader
+        # only understands one level of dynamic nesting, so these files were
+        # being scanned but silently produced zero rows, leaving MLB player
+        # props with no odds-history/movement tracking at all despite the
+        # CSV-based props tracking (asserted below, already worked) reading
+        # the exact same file correctly via _flatten_mlb_props.
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False):
+            root = Path(tmpdir)
+            snapshot_root = root / "source_artifacts" / "data" / "daily" / "snapshots" / "2026-06-07"
+            snapshot_root.mkdir(parents=True)
+            (snapshot_root / "oddsapi_game_lines_2026_06_07.json").write_text(
+                json.dumps({"retrieved_at": "2026-06-07T12:00:00Z", "games": []}), encoding="utf-8"
+            )
+            (snapshot_root / "oddsapi_pitcher_props_2026_06_07.json").write_text(
+                json.dumps(
+                    {
+                        "retrieved_at": "2026-06-07T12:00:00Z",
+                        "pitcher_props": {
+                            "shane drohan": {
+                                "strikeouts": {"line": 5.5, "over_odds": "-125", "under_odds": "-102"},
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = sync_post_refresh_tracking_for_source_root(sport="mlb", source_root=root, date_str="2026-06-07")
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["artifacts"]["odds_history"]["markets_tracked"], 2)
+
+            history_path = root / "tracking" / "odds_history" / "2026-06-07.json"
+            payload = json.loads(history_path.read_text(encoding="utf-8"))
+            markets = payload["markets"]
+            prop_key = next(
+                (key for key in markets if "player_name=shane drohan" in key and "market=strikeouts" in key and "selection=over" in key),
+                None,
+            )
+            self.assertIsNotNone(prop_key, f"no prop market key found among {list(markets)}")
+            self.assertEqual(markets[prop_key]["last_line"], 5.5)
+
     def test_sync_mlb_tracking_shards_by_commence_time_not_invocation_date(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False):
             root = Path(tmpdir)

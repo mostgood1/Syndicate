@@ -6,9 +6,11 @@ from unittest.mock import patch
 from syndicate.features.mlb.cards import _mlb_headshot_url
 from syndicate.features.mlb.cards import _mlb_hydrate_market_board_line_movement
 from syndicate.features.mlb.cards import _mlb_hydrate_market_board_live_projection
+from syndicate.features.mlb.cards import _mlb_hydrate_market_board_prop_movement
 from syndicate.features.mlb.cards import _mlb_live_lens_prop_rows_for_game
 from syndicate.features.mlb.cards import _mlb_market_board_prop_rows_for_game
 from syndicate.features.mlb.cards import _mlb_market_board_rows_for_game
+from syndicate.features.mlb.cards import _mlb_odds_history_entries_for_player
 from syndicate.features.mlb.cards import _mlb_odds_history_entries_for_teams
 from syndicate.features.mlb.cards import _mlb_player_id_lookup_for_game
 from syndicate.features.mlb.cards import _normalize_live_name
@@ -770,6 +772,78 @@ class MlbHydrateMarketBoardLineMovementTests(unittest.TestCase):
         entries = [{"last_line": None, "previous_line": None}, {"last_line": 8.5, "previous_line": 9.0, "delta": -0.5, "movement": "down"}]
         _mlb_hydrate_market_board_line_movement(row, entries)
         self.assertEqual(row["line_last"], 8.5)
+
+
+class MlbOddsHistoryEntriesForPlayerTests(unittest.TestCase):
+    def test_matches_player_and_fuzzy_market_label_across_both_sides(self) -> None:
+        odds_history = {
+            "markets": {
+                "player_name=shane drohan|market=strikeouts|selection=over": {"last_line": 5.5, "last_odds": -125},
+                "player_name=shane drohan|market=strikeouts|selection=under": {"last_line": 5.5, "last_odds": -102},
+                "player_name=shane drohan|market=outs|selection=over": {"last_line": 17.5, "last_odds": -130},
+            }
+        }
+        entries = _mlb_odds_history_entries_for_player(odds_history, "Shane Drohan", "Pitcher Strikeouts")
+        self.assertEqual(len(entries), 2)
+        sides = {entry["_side"] for entry in entries}
+        self.assertEqual(sides, {"over", "under"})
+
+    def test_no_match_for_different_player_returns_empty(self) -> None:
+        odds_history = {"markets": {"player_name=shane drohan|market=strikeouts|selection=over": {"last_line": 5.5}}}
+        self.assertEqual(_mlb_odds_history_entries_for_player(odds_history, "Someone Else", "Strikeouts"), [])
+
+    def test_missing_player_or_market_returns_empty(self) -> None:
+        odds_history = {"markets": {"player_name=shane drohan|market=strikeouts|selection=over": {"last_line": 5.5}}}
+        self.assertEqual(_mlb_odds_history_entries_for_player(odds_history, "", "Strikeouts"), [])
+        self.assertEqual(_mlb_odds_history_entries_for_player(odds_history, "Shane Drohan", ""), [])
+
+
+class MlbHydrateMarketBoardPropMovementTests(unittest.TestCase):
+    def test_hydrates_line_and_odds_movement_for_matching_side(self) -> None:
+        row: dict[str, object] = {"side": "over"}
+        entries = [
+            {
+                "_side": "over",
+                "last_line": 5.5,
+                "previous_line": 4.5,
+                "delta": 1.0,
+                "movement": "up",
+                "last_odds": -125,
+                "history": [{"last_odds": -110}, {"last_odds": -125}],
+            },
+            {"_side": "under", "last_line": 5.5, "previous_line": 4.5, "last_odds": -102, "history": []},
+        ]
+        _mlb_hydrate_market_board_prop_movement(row, entries)
+        self.assertEqual(row["line_last"], 5.5)
+        self.assertEqual(row["line_previous"], 4.5)
+        self.assertEqual(row["line_delta"], 1.0)
+        self.assertEqual(row["line_trend"], "up")
+        self.assertEqual(row["odds_last"], -125)
+        self.assertEqual(row["odds_previous"], -110)
+        self.assertAlmostEqual(row["odds_delta"], -15.0)
+        self.assertEqual(row["odds_trend"], "down")
+
+    def test_only_matches_entry_for_the_rows_own_side(self) -> None:
+        row: dict[str, object] = {"side": "under"}
+        entries = [
+            {"_side": "over", "last_line": 5.5, "previous_line": 4.5, "last_odds": -125, "history": []},
+            {"_side": "under", "last_line": 5.5, "previous_line": 4.5, "last_odds": -102, "history": []},
+        ]
+        _mlb_hydrate_market_board_prop_movement(row, entries)
+        self.assertEqual(row["odds_last"], -102)
+
+    def test_no_entries_does_not_hydrate(self) -> None:
+        row: dict[str, object] = {"side": "over"}
+        _mlb_hydrate_market_board_prop_movement(row, [])
+        self.assertEqual(row, {"side": "over"})
+
+    def test_odds_delta_flat_when_no_prior_history(self) -> None:
+        row: dict[str, object] = {"side": "over"}
+        entries = [{"_side": "over", "last_line": 5.5, "previous_line": 4.5, "last_odds": -125, "history": [{"last_odds": -125}]}]
+        _mlb_hydrate_market_board_prop_movement(row, entries)
+        self.assertIsNone(row["odds_previous"])
+        self.assertIsNone(row["odds_delta"])
+        self.assertEqual(row["odds_trend"], "flat")
 
 
 class BuildMlbMarketBoardLineMovementWiringTests(unittest.TestCase):

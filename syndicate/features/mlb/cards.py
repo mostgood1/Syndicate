@@ -5330,6 +5330,94 @@ def _mlb_hydrate_market_board_line_movement(row: dict[str, Any], entries: list[d
     row["line_trend"] = entry.get("movement") or "flat"
 
 
+def _mlb_odds_history_entries_for_player(
+    odds_history: dict[str, Any], player_name: str, market_label: str
+) -> list[dict[str, Any]]:
+    """Every bookmaker's tracked-line-movement entry for this player's prop
+    market, across both sides. Unlike game markets (_mlb_odds_history_entries_for_teams,
+    matched by exact team-name equality), a prop's stored market key carries
+    the raw stat slug (e.g. "strikeouts") rather than the board's display
+    label ("Pitcher Strikeouts") -- reuses _mlb_prop_display_market_from_stat
+    (the same function that produced the board's own label) to convert each
+    stored stat key to its display label and compares for exact equality.
+    Deliberately NOT a substring match: "outs" is a real, distinct stat, but
+    it's also literally a substring of "strikeouts", so a naive containment
+    check would wrongly attach a Pitcher Outs entry to a Strikeouts row.
+    Each returned entry carries its own "_side" (over/under) so the caller
+    can pick the one matching its row.
+    """
+    markets = odds_history.get("markets") if isinstance(odds_history.get("markets"), dict) else {}
+    player_key = _normalize_live_name(player_name)
+    market_key_text = str(market_label or "").strip().lower()
+    if not isinstance(markets, dict) or not markets or not player_key or not market_key_text:
+        return []
+    entries: list[dict[str, Any]] = []
+    for market_key, state in markets.items():
+        if not isinstance(state, dict):
+            continue
+        parsed = _mlb_parse_odds_history_market_key(market_key)
+        row_player = _normalize_live_name(parsed.get("player_name") or "")
+        if not row_player or row_player != player_key:
+            continue
+        row_market = str(parsed.get("market") or "").strip()
+        if not row_market:
+            continue
+        candidate_labels = {
+            _mlb_prop_display_market_from_stat(row_market, is_pitcher=True).strip().lower(),
+            _mlb_prop_display_market_from_stat(row_market, is_pitcher=False).strip().lower(),
+        }
+        if market_key_text not in candidate_labels:
+            continue
+        entries.append({**state, "_side": parsed.get("selection")})
+    return entries
+
+
+def _mlb_hydrate_market_board_prop_movement(row: dict[str, Any], entries: list[dict[str, Any]]) -> None:
+    if not entries:
+        return
+    row_side = str(row.get("side") or "").strip().lower()
+    candidates = [entry for entry in entries if not row_side or str(entry.get("_side") or "").strip().lower() == row_side]
+    entry = next((candidate for candidate in candidates if candidate.get("last_line") is not None or candidate.get("previous_line") is not None), None)
+    if entry is None:
+        return
+    last_line = entry.get("last_line")
+    previous_line = entry.get("previous_line")
+    row["line_last"] = last_line
+    row["line_previous"] = previous_line
+    delta = entry.get("delta")
+    if delta is None and last_line is not None and previous_line is not None:
+        try:
+            delta = float(last_line) - float(previous_line)
+        except (TypeError, ValueError):
+            delta = None
+    row["line_delta"] = delta
+    row["line_trend"] = entry.get("movement") or "flat"
+
+    # Odds/price movement is a separate dimension from the line above (a
+    # prop's number and its juice can each move independently). Unlike
+    # previous_line, market_state never tracks a "previous_odds" field
+    # directly -- only the single current "last_odds" -- so the prior value
+    # comes from the second-to-last history entry instead.
+    history = entry.get("history") if isinstance(entry.get("history"), list) else []
+    last_odds = entry.get("last_odds")
+    previous_odds = None
+    if len(history) >= 2:
+        try:
+            previous_odds = float((history[-2] or {}).get("last_odds"))
+        except (TypeError, ValueError):
+            previous_odds = None
+    row["odds_last"] = last_odds
+    row["odds_previous"] = previous_odds
+    odds_delta = None
+    if last_odds is not None and previous_odds is not None:
+        try:
+            odds_delta = float(last_odds) - float(previous_odds)
+        except (TypeError, ValueError):
+            odds_delta = None
+    row["odds_delta"] = odds_delta
+    row["odds_trend"] = "flat" if odds_delta in (None, 0) else ("up" if odds_delta > 0 else "down")
+
+
 def _mlb_player_id_lookup_for_game(selected_date: str, game_pk: Any) -> dict[str, int]:
     """Maps normalized player name -> MLBAM player ID for every batter and
     starting pitcher in this game's actual lineup, via the roster-snapshot
@@ -5431,6 +5519,9 @@ def build_mlb_market_board(selected_date: str) -> dict[str, Any]:
                     player_id = player_id_lookup.get(_normalize_live_name(entity_name))
                     if player_id:
                         row["headshot_url"] = _mlb_headshot_url(player_id)
+                    if odds_history:
+                        entries = _mlb_odds_history_entries_for_player(odds_history, entity_name, str(row.get("market") or ""))
+                        _mlb_hydrate_market_board_prop_movement(row, entries)
             elif row.get("market_type") == "game" and odds_history:
                 history_market_type = _MLB_MARKET_BOARD_TO_ODDS_HISTORY_MARKET.get(raw_market_key or "")
                 if history_market_type:

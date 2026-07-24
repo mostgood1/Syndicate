@@ -668,6 +668,15 @@ def _odds_history_snapshot_paths(*, sport: str, source_root: Path, date_str: str
     return []
 
 
+def _mlb_props_root_key_for_path(path: Path) -> str | None:
+    name = path.name
+    if name.startswith("oddsapi_hitter_props_"):
+        return "hitter_props"
+    if name.startswith("oddsapi_pitcher_props_"):
+        return "pitcher_props"
+    return None
+
+
 def _parse_game_date_token(value: Any) -> date | None:
     text = str(value or "").strip()
     if not text:
@@ -807,7 +816,24 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
         candidate_snapshot_ts = _odds_history_candidate_snapshot_ts(candidate)
         _trace_log("before_odds_history_candidate_read", sport=slug, path=str(candidate), suffix=suffix, size_bytes=_trace_file_size(candidate))
         candidate_read_started = time.perf_counter()
-        if suffix == ".csv":
+        mlb_props_root_key = _mlb_props_root_key_for_path(candidate) if slug == "mlb" else None
+        if mlb_props_root_key:
+            # oddsapi_hitter_props/oddsapi_pitcher_props are nested TWO
+            # levels deep (player_name -> market_name -> {line, over_odds,
+            # under_odds}), unlike every other odds snapshot this generic
+            # reader handles (one level: container_key -> {market_name:
+            # value}). _market_rows_from_mapping's recursion only descends
+            # through known container-key names, so the dynamic player-name
+            # level stops it before it ever reaches the market/line data --
+            # confirmed live 2026-07-24: these 2 files were being scanned
+            # (files_scanned counted them) but produced zero usable rows,
+            # leaving MLB prop odds with no history tracked at all. Reuse
+            # _flatten_mlb_props (already correct -- it's what feeds the
+            # separate CSV props-tracking snapshot) instead of trying to
+            # teach the generic parser a second nesting level that no other
+            # sport's shape needs.
+            rows = _flatten_mlb_props(candidate, mlb_props_root_key).to_dict("records")
+        elif suffix == ".csv":
             rows = _odds_history_rows_from_csv(candidate)
         elif suffix == ".jsonl":
             rows = _odds_history_rows_from_jsonl(candidate)

@@ -317,6 +317,19 @@
     return `${row.line_previous} → ${row.line_last} ${arrow}`;
   }
 
+  // Odds/price movement (odds_last/odds_previous/odds_delta/odds_trend) --
+  // a separate dimension from the line above (a prop's number and its
+  // juice can each move independently). Currently populated for MLB props
+  // only (_mlb_hydrate_market_board_prop_movement).
+  function formatOddsMovement(row) {
+    if (row.odds_last === null || row.odds_last === undefined) return null;
+    const arrow = trendArrow(row.odds_trend);
+    if (row.odds_previous === null || row.odds_previous === undefined) {
+      return `${row.odds_last} ${arrow}`;
+    }
+    return `${row.odds_previous} → ${row.odds_last} ${arrow}`;
+  }
+
   // live_projection/live_actual come from the live-lens report as raw
   // projected/actual stat values (e.g. rest-of-game projected total bases,
   // current in-game count) -- not 0-1 fractions like sim_projection, so
@@ -343,6 +356,7 @@
     const liveProjectionValue = formatLiveValue(row.live_projection);
     const liveActualValue = formatLiveValue(row.live_actual);
     const lineMovementValue = formatLineMovement(row);
+    const oddsMovementValue = formatOddsMovement(row);
     // For a prop row the title is already the player's name, so the prop
     // line needs the market too ("Over 17.5 · Pitcher Outs"); for a
     // game-level row (entity=None) the title already IS the market
@@ -372,6 +386,7 @@
           <div><div class="board-card__fact-label">Odds</div><div class="board-card__fact-value">${oddsText ? escapeHtml(oddsText) : "&mdash;"}</div></div>
           ${projectedValue !== null ? `<div><div class="board-card__fact-label">Projected</div><div class="board-card__fact-value">${escapeHtml(projectedValue)}</div></div>` : ""}
           ${lineMovementValue !== null ? `<div><div class="board-card__fact-label">Line move</div><div class="board-card__fact-value">${escapeHtml(lineMovementValue)}</div></div>` : ""}
+          ${oddsMovementValue !== null ? `<div><div class="board-card__fact-label">Odds move</div><div class="board-card__fact-value">${escapeHtml(oddsMovementValue)}</div></div>` : ""}
           ${liveProjectionValue !== null ? `<div><div class="board-card__fact-label">Live proj.</div><div class="board-card__fact-value">${escapeHtml(liveProjectionValue)}</div></div>` : ""}
           ${liveActualValue !== null ? `<div><div class="board-card__fact-label">Live actual</div><div class="board-card__fact-value">${escapeHtml(liveActualValue)}</div></div>` : ""}
         </div>
@@ -425,6 +440,7 @@
       liveActualValue !== null ? `actual ${liveActualValue}` : "",
     ].filter(Boolean).join(" / ");
     const lineMovementValue = formatLineMovement(row);
+    const oddsMovementValue = formatOddsMovement(row);
     const title = row.entity || row.market || "Market";
     const sideLabel = titleCase(row.side);
     const propLine = row.entity
@@ -446,6 +462,7 @@
         <td>${oddsText ? escapeHtml(oddsText) : "&mdash;"}</td>
         <td>${projectedValue !== null ? escapeHtml(projectedValue) : "&mdash;"}</td>
         <td>${lineMovementValue !== null ? escapeHtml(lineMovementValue) : "&mdash;"}</td>
+        <td>${oddsMovementValue !== null ? escapeHtml(oddsMovementValue) : "&mdash;"}</td>
         <td>${modelValue ? escapeHtml(modelValue) : "&mdash;"}</td>
         <td>${liveText ? escapeHtml(liveText) : "&mdash;"}</td>
         <td>${badgeForJoinStatus(row.join_status, row.join_note)}</td>
@@ -478,7 +495,7 @@
       <div class="board-blotter-wrap">
         <table class="board-blotter">
           <thead>
-            <tr><th>State</th><th>Player / Market</th><th>Pick</th><th>Odds</th><th>Projected</th><th>Line move</th><th>Model</th><th>Live</th><th>Status</th><th></th></tr>
+            <tr><th>State</th><th>Player / Market</th><th>Pick</th><th>Odds</th><th>Projected</th><th>Line move</th><th>Odds move</th><th>Model</th><th>Live</th><th>Status</th><th></th></tr>
           </thead>
           <tbody>${rows.join("")}</tbody>
         </table>
