@@ -1,2 +1,0 @@
-EXIT_CODE=1
-LOG=c:\Users\tempadmin\OneDrive\Coding\Syndicate\reports\daily_update\tmp_wrapper_run_20260530_003617.log

@@ -10,7 +10,7 @@ from syndicate.features.ncaaf.sources import coach_continuity_snapshot_path
 
 
 def _default_report_path() -> Path:
-    return Path(__file__).resolve().parents[1] / "ncaaf_coach_continuity_generation_report.md"
+    return Path(__file__).resolve().parents[1] / "docs" / "reports" / "ncaaf_coach_continuity_generation_report.md"
 
 
 def main() -> int:
@@ -38,6 +38,7 @@ def main() -> int:
         source_snapshot_date=result.source_snapshot_date,
     )
     report_path = args.report_path or _default_report_path()
+    report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(report_text, encoding="utf-8")
     print(report_text)
     return 0 if not result.validation_issues else 1

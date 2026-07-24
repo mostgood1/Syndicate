@@ -10,7 +10,7 @@ from syndicate.features.ncaaf.sources import player_identity_snapshot_path
 
 
 def _default_report_path() -> Path:
-    return Path(__file__).resolve().parents[1] / "ncaaf_cfbd_integration_report.md"
+    return Path(__file__).resolve().parents[1] / "docs" / "reports" / "ncaaf_cfbd_integration_report.md"
 
 
 def main() -> int:
@@ -42,6 +42,7 @@ def main() -> int:
         registry_mode="provided" if args.registry_path else "provisional_cfbd_team_catalog",
     )
     report_path = args.report_path or _default_report_path()
+    report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(report_text, encoding="utf-8")
     print(report_text)
     return 0 if not result.validation_issues else 1

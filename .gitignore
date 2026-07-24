@@ -1,5 +1,8 @@
 .venv/
 __pycache__/
+.env
+.env.*
+!.env.example
 *.py[cod]
 .pytest_cache/
 .mypy_cache/
@@ -10,6 +13,7 @@ tmp_*.log
 tmp_*.json
 tmp_*.py
 tmp_*.txt
+tmp_*.xml
 .tmp_*.json
 *.tmp
 scratch_*.log
