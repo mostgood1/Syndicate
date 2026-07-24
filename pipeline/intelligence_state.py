@@ -1600,7 +1600,16 @@ class IntelligenceStateService:
                     "metadata": dict(manifest.get("metadata") or {}) if isinstance(manifest.get("metadata"), dict) else {},
                     "candidate_count": len(candidate_pools.get(sport_slug, [])),
                     "candidates": candidate_pools.get(sport_slug, []),
-                    "odds_history": self._load_odds_history_payload_for_sport(sport_slug, manifest_shard_keys.get(sport_slug, resolve_current_shard_key(sport_slug, selected_date))),
+                    # Pointer, not payload (see manifest.py's publish_sport_manifest
+                    # for the same contract): nothing downstream ever read a full
+                    # embedded odds_history copy here -- individual candidates
+                    # already carry their own market-scoped odds_history slice
+                    # (set above, from the same shard load at line ~1552). This
+                    # used to load and embed the ENTIRE sport odds-history
+                    # payload a second time, which then got cached up to
+                    # _max_snapshots deep and JSON-round-tripped on every read --
+                    # the dominant memory driver once odds-history grew ~100x.
+                    "odds_history_shard_key": manifest_shard_keys.get(sport_slug),
                 }
                 for sport_slug, manifest in manifests.items()
                 if sport_slug in candidate_pools

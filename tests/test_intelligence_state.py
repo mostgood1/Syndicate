@@ -2619,6 +2619,66 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(pool["global_pool"][0]["name"], "MLB Play")
         self.assertEqual(pool["candidates"], pool["global_pool"])
 
+    def test_build_candidate_pool_does_not_embed_full_odds_history_payload(self) -> None:
+        # Confirmed in production as the dominant memory driver once
+        # odds-history grew ~100x: this used to load AND embed the entire
+        # sport odds-history payload a THIRD time per sport purely to stash
+        # it wholesale on the pool -- nothing downstream ever read it back.
+        # The other two loads are still legitimate and distinct: one feeds
+        # odds_history_by_sport into candidate generation
+        # (_odds_history_payloads_by_sport, keyed off context_label), the
+        # other attaches small per-candidate odds_history slices after
+        # candidates exist (keyed off the manifest/selected_date shard) --
+        # so 2 calls per sport is the correct post-fix count, not 1.
+        service = IntelligenceStateService()
+        status = {
+            "selected_date": "2026-06-10",
+            "tracked_summary": {"tracked_ok": 1, "tracked_total": 1},
+            "advanced_summary": {"tracked_ok": 1, "tracked_total": 1},
+            "readiness_gate": {"ok": True},
+            "sports": [
+                {
+                    "slug": "mlb",
+                    "name": "MLB",
+                    "context_label": "2026-06-10",
+                    "data_health": "ready",
+                    "active_today": True,
+                    "tracked_ready": True,
+                    "advanced_ready": True,
+                    "advanced_gate": {"ready": True},
+                    "data_warnings": [],
+                    "artifacts": [],
+                    "advanced_inputs": [],
+                },
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            manifests_root = reports_root / "manifests"
+            manifests_root.mkdir(parents=True, exist_ok=True)
+            (manifests_root / "mlb.json").write_text(
+                '{"sport":"mlb","last_updated":"2026-06-10T10:00:00Z","artifact_paths":["reports/intelligence/mlb.json"],"status":"complete"}',
+                encoding="utf-8",
+            )
+
+            with patch("pipeline.intelligence_state.reports_root", return_value=reports_root):
+                with patch("pipeline.intelligence_state.build_intelligence_status", return_value=status):
+                    with patch(
+                        "syndicate.features.intelligence.collect_all_recommendations",
+                        return_value=[{"name": "MLB Play", "sport": "MLB", "market": "Hits", "score": 91.0}],
+                    ):
+                        with patch(
+                            "pipeline.intelligence_state.load_odds_history_payload_for_sport",
+                            return_value={"markets": {}},
+                        ) as mocked_loader:
+                            pool = service._build_candidate_pool("2026-06-10", "fingerprint-1")
+
+        self.assertEqual(mocked_loader.call_count, 2)
+        mlb_pool = pool["candidate_pools"]["mlb"]
+        self.assertNotIn("odds_history", mlb_pool)
+        self.assertIn("odds_history_shard_key", mlb_pool)
+
     def test_every_configured_sport_ships_a_committed_baseline_manifest(self) -> None:
         # Real bug found in production: reports/manifests/soccer.json was
         # never committed (unlike the other 6 sport manifests), so on a
