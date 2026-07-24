@@ -7,7 +7,9 @@ from syndicate.features.shared.basketball_market_board import basketball_market_
 from syndicate.features.shared.basketball_market_board import build_basketball_market_board
 from syndicate.features.shared.basketball_market_board import hydrate_live_prop_rows
 from syndicate.features.shared.basketball_market_board import live_rows_by_event_id
+from syndicate.features.shared.basketball_market_board import parse_raw_basketball_player_props_rows
 from syndicate.features.shared.market_inventory import JOIN_STATUS_MATCHED
+from syndicate.features.shared.market_inventory import JOIN_STATUS_NEEDS_RESIM
 from syndicate.features.shared.market_inventory import JOIN_STATUS_NO_SIM_COVERAGE
 from syndicate.features.shared.market_inventory import join_odds_to_sim
 
@@ -100,7 +102,10 @@ class BasketballMarketBoardRowsTests(unittest.TestCase):
         odds_rows, sim_rows = basketball_market_board_rows_for_game(game_pk=1, betting={}, prop_recommendations=prop_recommendations)
         self.assertEqual(len(odds_rows), 1)
         self.assertEqual(odds_rows[0]["entity"], "Miles McBride")
-        self.assertEqual(odds_rows[0]["market"], "Threes")
+        # "market" is the disambiguated join key (see _prop_join_market_key)
+        # -- build_basketball_market_board strips the "::<player>" suffix
+        # back to "Threes" for display.
+        self.assertEqual(odds_rows[0]["market"], "Threes::miles mcbride")
         self.assertEqual(odds_rows[0]["side"], "over")
         self.assertEqual(odds_rows[0]["market_type"], "prop")
         self.assertEqual(len(sim_rows), 1)
@@ -272,6 +277,85 @@ class BuildBasketballMarketBoardLiveHydrationTests(unittest.TestCase):
         games = [{"gamePk": "1", "event_id": "1", "away": {"abbr": "SAS"}, "home": {"abbr": "NYK"}, "status": "Scheduled"}]
         board = build_basketball_market_board(sport_slug="nba", selected_date="2026-07-23", games=games)
         self.assertEqual(board["games"][0]["rows"], [])
+
+
+class ParseRawBasketballPlayerPropsRowsTests(unittest.TestCase):
+    def test_aggregates_flat_rows_into_line_over_under_shape(self) -> None:
+        # Real documented shape (scripts/fetch_basketball_oddsapi_props_local.py):
+        # one row per bookmaker/market/Over-or-Under outcome.
+        rows = [
+            {"player_name": "Miles McBride", "market": "player_points", "outcome_name": "Over", "point": 12.5, "price": -110, "bookmaker": "draftkings"},
+            {"player_name": "Miles McBride", "market": "player_points", "outcome_name": "Under", "point": 12.5, "price": -110, "bookmaker": "draftkings"},
+            {"player_name": "Miles McBride", "market": "player_threes", "outcome_name": "Over", "point": 2.5, "price": -120, "bookmaker": "fanduel"},
+        ]
+        result = parse_raw_basketball_player_props_rows(rows)
+        self.assertIn("miles mcbride", result)
+        self.assertEqual(result["miles mcbride"]["points"], {"line": 12.5, "over_odds": -110, "under_odds": -110})
+        self.assertEqual(result["miles mcbride"]["threes"]["over_odds"], -120)
+        self.assertIsNone(result["miles mcbride"]["threes"]["under_odds"])
+
+    def test_second_bookmaker_for_same_stat_does_not_override_first(self) -> None:
+        rows = [
+            {"player_name": "A Player", "market": "player_points", "outcome_name": "Over", "point": 20.5, "price": -115},
+            {"player_name": "A Player", "market": "player_points", "outcome_name": "Over", "point": 20.5, "price": -105},
+        ]
+        result = parse_raw_basketball_player_props_rows(rows)
+        self.assertEqual(result["a player"]["points"]["over_odds"], -115)
+
+    def test_rows_missing_player_or_invalid_outcome_are_skipped(self) -> None:
+        rows = [
+            {"player_name": "", "market": "player_points", "outcome_name": "Over", "point": 1, "price": -110},
+            {"player_name": "Someone", "market": "player_points", "outcome_name": "Push", "point": 1, "price": -110},
+        ]
+        result = parse_raw_basketball_player_props_rows(rows)
+        self.assertEqual(result, {})
+
+
+class BasketballMarketBoardRawPropsFeedTests(unittest.TestCase):
+    def test_raw_feed_covers_both_sides_for_a_player_with_existing_recommendation(self) -> None:
+        prop_recommendations = {"away": [{"player": "Miles McBride", "market": "threes", "side": "over", "line": 2.5, "price": -105.0, "p_win": 0.6}], "home": []}
+        raw_player_props = {"miles mcbride": {"threes": {"line": 2.5, "over_odds": -120, "under_odds": -110}, "points": {"line": 12.5, "over_odds": -110, "under_odds": -110}}}
+        odds_rows, sim_rows = basketball_market_board_rows_for_game(
+            game_pk=1, betting={}, prop_recommendations=prop_recommendations, raw_player_props=raw_player_props
+        )
+        threes_rows = [row for row in odds_rows if row["market"].startswith("Threes::")]
+        self.assertEqual(len(threes_rows), 2)
+        self.assertEqual({row["side"] for row in threes_rows}, {"over", "under"})
+        points_rows = [row for row in odds_rows if row["market"].startswith("Points::")]
+        self.assertEqual(len(points_rows), 2)
+
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+        matched = [row for row in inventory if row["market"].startswith("Threes::") and row["join_status"] == JOIN_STATUS_MATCHED]
+        self.assertTrue(matched)
+        no_cov = [row for row in inventory if row["market"].startswith("Points::") and row["join_status"] == JOIN_STATUS_NO_SIM_COVERAGE]
+        self.assertTrue(no_cov)
+
+    def test_recommendation_falls_back_when_raw_feed_lacks_that_stat(self) -> None:
+        prop_recommendations = {"away": [{"player": "Miles McBride", "market": "threes", "side": "over", "line": 2.5, "price": -105.0, "p_win": 0.6}], "home": []}
+        odds_rows, sim_rows = basketball_market_board_rows_for_game(game_pk=1, betting={}, prop_recommendations=prop_recommendations, raw_player_props={})
+        self.assertEqual(len(odds_rows), 1)
+        self.assertEqual(odds_rows[0]["side"], "over")
+
+    def test_player_with_no_recommendation_coverage_is_not_surfaced(self) -> None:
+        raw_player_props = {"unrelated player": {"points": {"line": 10.5, "over_odds": -110, "under_odds": -110}}}
+        odds_rows, sim_rows = basketball_market_board_rows_for_game(game_pk=1, betting={}, prop_recommendations={}, raw_player_props=raw_player_props)
+        self.assertEqual(odds_rows, [])
+        self.assertEqual(sim_rows, [])
+
+    def test_two_different_players_sharing_a_stat_never_produce_needs_resim(self) -> None:
+        # Real bug found for MLB this session (56 false positives on real
+        # production data) confirmed to apply equally here: two different
+        # players both having a Points prop must never be mistaken for the
+        # same slot having a different occupant.
+        prop_recommendations = {
+            "away": [{"player": "Player A", "market": "pts", "side": "over", "line": 10.5, "price": -110.0, "p_win": 0.55}],
+            "home": [{"player": "Player B", "market": "pts", "side": "over", "line": 15.5, "price": -105.0, "p_win": 0.52}],
+        }
+        odds_rows, sim_rows = basketball_market_board_rows_for_game(game_pk=1, betting={}, prop_recommendations=prop_recommendations)
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+        statuses = {row["join_status"] for row in inventory}
+        self.assertNotIn(JOIN_STATUS_NEEDS_RESIM, statuses)
+        self.assertTrue(all(status == JOIN_STATUS_MATCHED for status in statuses))
 
 
 if __name__ == "__main__":

@@ -27,6 +27,7 @@ from syndicate.features.shared.basketball_live_artifacts import _canonical_game_
 from syndicate.features.shared.basketball_live_artifacts import resolve_event_ids_from_games
 from syndicate.features.shared.game_board_contract import _sim_payload
 from syndicate.features.shared.basketball_market_board import build_basketball_market_board
+from syndicate.features.shared.basketball_market_board import parse_raw_basketball_player_props_rows
 from syndicate.features.shared.memory_observability import log_runtime_memory
 from syndicate.features.shared.refresh_state_store import data_root as _refresh_state_data_root
 from syndicate.features.shared.refresh_state_store import read_json_file as _keyvalue_read_json_file
@@ -47,6 +48,7 @@ from syndicate.features.wnba.sources import market_label
 from syndicate.features.wnba.sources import parse_iso_date
 from syndicate.features.wnba.sources import processed_root
 from syndicate.features.wnba.sources import processed_path
+from syndicate.features.wnba.sources import processed_path_or_default
 from syndicate.features.wnba.sources import _source_roots as _wnba_source_roots
 from syndicate.features.shared.source_roots import repo_root_from as _repo_root_from
 from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
@@ -2616,6 +2618,22 @@ def _clear_build_cards_page_context_cache() -> None:
 build_cards_page_context.cache_clear = _clear_build_cards_page_context_cache  # type: ignore[attr-defined]
 
 
+def _wnba_raw_player_props_for_date(selected_date: str) -> dict[str, dict[str, dict[str, Any]]]:
+    # scripts/fetch_basketball_oddsapi_props_local.py's raw feed, aliased
+    # to this path by refresh_wnba_oddsapi_props.py -- confirmed via direct
+    # research 2026-07-23 to carry every real quoted player prop, not just
+    # the recommendation engine's own picks.
+    path = processed_path_or_default(f"oddsapi_player_props_{selected_date}.csv")
+    try:
+        if not path.exists():
+            return {}
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+    except OSError:
+        return {}
+    return parse_raw_basketball_player_props_rows(rows)
+
+
 def build_wnba_market_board(selected_date: str) -> dict[str, Any]:
     """Layer 1 market/odds inventory for WNBA (Phase 3b), reusing the same
     row-builder as NBA's -- see shared.basketball_market_board for why one
@@ -2630,6 +2648,7 @@ def build_wnba_market_board(selected_date: str) -> dict[str, Any]:
     return build_basketball_market_board(
         sport_slug="wnba",
         selected_date=selected_date,
+        raw_player_props=_wnba_raw_player_props_for_date(selected_date),
         games=games,
         live_player_lens_payload=live_player_lens_payload,
     )

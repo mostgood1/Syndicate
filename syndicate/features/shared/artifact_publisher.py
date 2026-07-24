@@ -55,6 +55,16 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "*_source/source_artifacts/data/processed/season_betting_card_manifest_*.json",
     "*_source/source_artifacts/data/processed/live_player_lens_tuning_*.csv",
     "*_source/source_artifacts/current_week.json",
+    # NBA/WNBA's raw (unfiltered, pre-recommendation-engine) OddsAPI player
+    # props feed (scripts/fetch_basketball_oddsapi_props_local.py's flat
+    # per-outcome rows). Confirmed via direct research 2026-07-23: this was
+    # written worker-side but never allowlisted, so the market board's
+    # Layer 1 join only ever saw the recommendation engine's own curated
+    # picks -- the same gap MLB's oddsapi_pitcher_props/oddsapi_hitter_props
+    # (already allowlisted above via the market/*.json pattern) had before
+    # this session's market board work started reading it directly.
+    "*_source/source_artifacts/data/processed/oddsapi_player_props_*.csv",
+    "*_source/data/processed/oddsapi_player_props_*.csv",
     # Same set again, one directory shallower: some sports (confirmed for WNBA)
     # write their processed artifacts straight to "<sport>_source/data/processed/"
     # rather than nesting under a "source_artifacts" nested root, so the patterns

@@ -29,6 +29,7 @@ from syndicate.features.nba.sources import live_snapshot_path
 from syndicate.features.shared.basketball_live_artifacts import build_live_lines_payload_from_artifacts
 from syndicate.features.shared.basketball_live_artifacts import build_live_player_lens_payload_from_artifacts
 from syndicate.features.shared.basketball_market_board import build_basketball_market_board
+from syndicate.features.shared.basketball_market_board import parse_raw_basketball_player_props_rows
 from syndicate.features.shared.basketball_live_artifacts import resolve_event_ids_from_games
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.shared.source_roots import preferred_source_roots
@@ -2556,6 +2557,22 @@ def build_cards_api_payload(selected_date: str, *, allow_stored_date_fallback: b
     )
 
 
+def _nba_raw_player_props_for_date(selected_date: str) -> dict[str, dict[str, dict[str, Any]]]:
+    # scripts/fetch_basketball_oddsapi_props_local.py's raw feed, aliased
+    # to this path by refresh_nba_oddsapi_props.py -- confirmed via direct
+    # research 2026-07-23 to carry every real quoted player prop, not just
+    # the recommendation engine's own picks.
+    path = processed_path(f"oddsapi_player_props_{selected_date}.csv")
+    try:
+        if not path.exists():
+            return {}
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+    except OSError:
+        return {}
+    return parse_raw_basketball_player_props_rows(rows)
+
+
 def build_nba_market_board(selected_date: str) -> dict[str, Any]:
     """Layer 1 market/odds inventory for NBA (Phase 3c), reusing the same
     row-builder as WNBA's -- see shared.basketball_market_board for why
@@ -2577,6 +2594,7 @@ def build_nba_market_board(selected_date: str) -> dict[str, Any]:
         selected_date=selected_date,
         games=games,
         live_player_lens_payload=live_player_lens_payload,
+        raw_player_props=_nba_raw_player_props_for_date(selected_date),
     )
 
 

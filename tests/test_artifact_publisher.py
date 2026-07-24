@@ -70,6 +70,14 @@ class HotArtifactAllowlistTests(unittest.TestCase):
             is_hot_artifact_relative_path("mlb_source/source_artifacts/data/daily/snapshots/2026-07-16/raw/feed.csv")
         )
 
+    def test_accepts_nba_wnba_raw_player_props_csv(self) -> None:
+        # Confirmed via direct research 2026-07-23: this raw OddsAPI feed
+        # was written worker-side but never allowlisted, so it never
+        # reached the web dyno -- the market board's Layer 1 join only ever
+        # saw the recommendation engine's own curated picks.
+        self.assertTrue(is_hot_artifact_relative_path("nba_source/source_artifacts/data/processed/oddsapi_player_props_2026-07-23.csv"))
+        self.assertTrue(is_hot_artifact_relative_path("wnba_source/data/processed/oddsapi_player_props_2026-07-23.csv"))
+
     def test_rejects_worker_only_calibration_and_manifest_files(self) -> None:
         self.assertFalse(is_hot_artifact_relative_path("nfl_source/calibration_active.json"))
         self.assertFalse(is_hot_artifact_relative_path("nfl_source/prob_calibration.json"))
