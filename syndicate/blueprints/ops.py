@@ -747,6 +747,44 @@ def api_ops_intelligence_candidate_trace() -> Any:
     except Exception as exc:
         fallback_merge_trace["error"] = f"{type(exc).__name__}: {exc}"
 
+    # Read-path trace: compute above is proven healthy (161 candidates), but
+    # the served page still shows empty -- meaning refresh-worker's persisted
+    # snapshot isn't being found by this same process's read functions. Read
+    # the exact same paths/keys the real serving code reads, plus what
+    # reports_root() resolves to here, to see whether this is a path/key
+    # mismatch between the writer (refresh-worker) and this reader (web).
+    read_path_trace: dict[str, Any] = {}
+    try:
+        from syndicate.features.shared.refresh_state_store import reports_root as _reports_root
+        from syndicate.features.shared.refresh_state_store import read_json_file as _read_json_file
+        from syndicate.features.shared.refresh_state_store import _state_key_for_path
+        from pipeline.intelligence_state import STATE_PATH as _STATE_PATH
+        from pipeline.intelligence_state import BOARD_SNAPSHOT_PATH as _BOARD_SNAPSHOT_PATH
+
+        read_path_trace["reports_root"] = str(_reports_root())
+        read_path_trace["state_path"] = str(_STATE_PATH)
+        read_path_trace["board_snapshot_path"] = str(_BOARD_SNAPSHOT_PATH)
+        read_path_trace["state_path_redis_key"] = _state_key_for_path(_STATE_PATH)
+        read_path_trace["board_snapshot_path_redis_key"] = _state_key_for_path(_BOARD_SNAPSHOT_PATH)
+
+        board_snapshot_raw = _read_json_file(_BOARD_SNAPSHOT_PATH)
+        read_path_trace["board_snapshot_read_is_dict"] = isinstance(board_snapshot_raw, dict)
+        if isinstance(board_snapshot_raw, dict):
+            read_path_trace["board_snapshot_read_keys"] = list(board_snapshot_raw.keys())
+            read_path_trace["board_snapshot_read_latest_key"] = board_snapshot_raw.get("latest_key")
+            candidates_field = board_snapshot_raw.get("candidates") or board_snapshot_raw.get("top_opportunities")
+            read_path_trace["board_snapshot_read_candidate_count"] = len(candidates_field) if isinstance(candidates_field, list) else None
+
+        state_raw = _read_json_file(_STATE_PATH)
+        read_path_trace["state_read_is_dict"] = isinstance(state_raw, dict)
+        if isinstance(state_raw, dict):
+            read_path_trace["state_read_latest_key"] = state_raw.get("latest_key")
+            snapshots = state_raw.get("snapshots")
+            read_path_trace["state_read_snapshot_keys"] = list(snapshots.keys()) if isinstance(snapshots, dict) else None
+            read_path_trace["state_read_updated_at"] = state_raw.get("updated_at")
+    except Exception as exc:
+        read_path_trace["error"] = f"{type(exc).__name__}: {exc}"
+
     result: dict[str, Any] = {
         "ok": True,
         "date": date,
@@ -755,6 +793,7 @@ def api_ops_intelligence_candidate_trace() -> Any:
         "full_pool_check": full_pool_check,
         "app_context_pool_check": app_context_pool_check,
         "fallback_merge_trace": fallback_merge_trace,
+        "read_path_trace": read_path_trace,
         "sports": [],
     }
     for sport in overview:
