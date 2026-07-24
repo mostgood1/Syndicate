@@ -714,6 +714,39 @@ def api_ops_intelligence_candidate_trace() -> Any:
         include_games=True,
     )
 
+    # Stage-by-stage trace of collect_candidates_with_fallback_merge -- the
+    # function _build_candidate_pool actually calls (not the plain
+    # collect_candidates checked below), so this is the only way to see
+    # where a count drops to 0 specifically inside _score_candidates /
+    # filter_candidates(sport=None) / the thin-pool merge, none of which the
+    # per-sport collect_candidates() checks below exercise.
+    fallback_merge_trace: dict[str, Any] = {}
+    try:
+        from syndicate.features.intelligence import collect_candidates as _cc
+        from syndicate.features.intelligence import _score_candidates as _sc
+        from syndicate.features.intelligence import _tracked_repo_files as _trf
+        from syndicate.features.intelligence import _advanced_input_rows_for_sport as _airfs
+        from syndicate.features.shared.recommendation_engine import filter_candidates as _fc
+        from syndicate.features.intelligence import _THIN_CANDIDATE_POOL_THRESHOLD as _thin_threshold
+
+        raw = _cc(overview, preferences, None)
+        fallback_merge_trace["1_collect_candidates_count"] = len(raw)
+        if raw:
+            tracked = _trf()
+            advanced_by_sport = {
+                str(sport_row.get("slug") or "sport").strip().lower(): _airfs(sport_row, tracked)
+                for sport_row in overview
+                if isinstance(sport_row, dict)
+            }
+            scored = _sc(raw, advanced_by_sport, preferences, pipeline="ops_trace")
+            fallback_merge_trace["2_scored_count"] = len(scored)
+            filtered = _fc(scored, sport=None)
+            fallback_merge_trace["3_filter_candidates_count"] = len(filtered)
+            fallback_merge_trace["4_thin_pool_threshold"] = _thin_threshold
+            fallback_merge_trace["5_would_trigger_thin_merge"] = 0 < len(filtered) < _thin_threshold
+    except Exception as exc:
+        fallback_merge_trace["error"] = f"{type(exc).__name__}: {exc}"
+
     result: dict[str, Any] = {
         "ok": True,
         "date": date,
@@ -721,6 +754,7 @@ def api_ops_intelligence_candidate_trace() -> Any:
         "manifest_check": manifest_check,
         "full_pool_check": full_pool_check,
         "app_context_pool_check": app_context_pool_check,
+        "fallback_merge_trace": fallback_merge_trace,
         "sports": [],
     }
     for sport in overview:
