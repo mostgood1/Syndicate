@@ -266,6 +266,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
                 os.environ,
                 {
                     "SYNDICATE_DATA_ROOT": tmp_dir,
+                    "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports_root"),
                     "ADMIN_TOKEN": "secret-token",
                     "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
                 },
@@ -309,6 +310,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
                 os.environ,
                 {
                     "SYNDICATE_DATA_ROOT": tmp_dir,
+                    "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports_root"),
                     "ADMIN_TOKEN": "secret-token",
                     "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
                 },
@@ -339,6 +341,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
                 os.environ,
                 {
                     "SYNDICATE_DATA_ROOT": str(data_root),
+                    "SYNDICATE_REPORTS_ROOT": str(data_root / "reports_root"),
                     "ADMIN_TOKEN": "secret-token",
                     "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
                 },
@@ -359,6 +362,61 @@ class PullHotArtifactClientTests(unittest.TestCase):
             self.assertFalse((data_root / "reports" / "intelligence" / "evaluation_ledger_chunks" / "part_1.json").exists())
             leftovers = list(written_path.parent.glob(f"{written_path.name}.*.pull.tmp"))
             self.assertEqual(leftovers, [])
+
+    def test_second_pull_sends_since_watermark_from_first_pulls_start(self) -> None:
+        # The dominant fix for repeated 8.6-28.9MB export responses every
+        # ~30s: a second pull should ask the server to skip anything
+        # unchanged since the first pull's own start time, not re-request
+        # everything again.
+        empty_response = MagicMock()
+        empty_response.__enter__.return_value = empty_response
+        empty_response.read.return_value = json.dumps({"ok": True, "count": 0, "artifacts": {}}).encode("utf-8")
+
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(
+                os.environ,
+                {
+                    "SYNDICATE_DATA_ROOT": tmp_dir,
+                    "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports_root"),
+                    "ADMIN_TOKEN": "secret-token",
+                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                },
+                clear=False,
+            ):
+                with patch("urllib.request.urlopen", return_value=empty_response) as mocked_urlopen:
+                    pull_hot_artifacts(date_str="2026-07-24")
+                    first_call_url = mocked_urlopen.call_args.args[0].full_url
+                    self.assertNotIn("since=", first_call_url)
+
+                    pull_hot_artifacts(date_str="2026-07-24")
+                    second_call_url = mocked_urlopen.call_args.args[0].full_url
+                    self.assertIn("since=", second_call_url)
+
+    def test_failed_pull_does_not_advance_watermark(self) -> None:
+        # A transient network blip must not permanently skip files modified
+        # during the failed window -- the next pull should still ask for
+        # everything since the last SUCCESSFUL pull, not the failed one's
+        # start time.
+        with TemporaryDirectory() as tmp_dir:
+            env = {
+                "SYNDICATE_DATA_ROOT": tmp_dir,
+                "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports_root"),
+                "ADMIN_TOKEN": "secret-token",
+                "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                with patch("urllib.request.urlopen", side_effect=URLError("boom")):
+                    written = pull_hot_artifacts(date_str="2026-07-24")
+                self.assertEqual(written, 0)
+
+                empty_response = MagicMock()
+                empty_response.__enter__.return_value = empty_response
+                empty_response.read.return_value = json.dumps({"ok": True, "count": 0, "artifacts": {}}).encode("utf-8")
+                with patch("urllib.request.urlopen", return_value=empty_response) as mocked_urlopen:
+                    pull_hot_artifacts(date_str="2026-07-24")
+                    # No watermark was recorded after the failure, so this
+                    # next pull still has nothing to advance from.
+                    self.assertNotIn("since=", mocked_urlopen.call_args.args[0].full_url)
 
     def test_concurrent_pulls_of_the_same_artifact_do_not_collide(self) -> None:
         # Confirmed live 2026-07-23: two overlapping pulls for the same
@@ -605,6 +663,43 @@ class ArtifactExportEndpointTests(unittest.TestCase):
                 "mlb_source/source_artifacts/data/statcast/2026.csv", payload["artifacts"]
             )
             self.assertEqual(payload["count"], len(payload["artifacts"]))
+
+    def test_export_since_param_excludes_files_unmodified_since_watermark(self) -> None:
+        # Mirrors sweep_changed_hot_artifacts' own mtime check on the push
+        # side (artifact_publisher.py) -- confirmed as the fix for this
+        # endpoint serving 8.6-28.9MB responses every ~30s to a single
+        # caller, almost all of it unchanged since that caller's own last
+        # successful pull.
+        with TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir)
+            old_path = data_root / HOT_RELATIVE_PATH
+            old_path.parent.mkdir(parents=True, exist_ok=True)
+            old_path.write_text(json.dumps({"candidate_count": 5}), encoding="utf-8")
+            old_epoch = time.time() - 3600
+            os.utime(old_path, (old_epoch, old_epoch))
+
+            fresh_relative = "wnba_source/source_artifacts/data/processed/recommendations_slate_2026-07-24.json"
+            fresh_path = data_root / fresh_relative
+            fresh_path.parent.mkdir(parents=True, exist_ok=True)
+            fresh_path.write_text(json.dumps({"candidate_count": 9}), encoding="utf-8")
+
+            since_epoch = time.time() - 60
+
+            with patch.dict(
+                os.environ,
+                {"ADMIN_TOKEN": "secret-token", "SYNDICATE_DATA_ROOT": str(data_root)},
+                clear=False,
+            ):
+                response = self.client.get(
+                    f"/api/ops/artifacts/export?since={since_epoch}",
+                    headers={"Authorization": "Bearer secret-token"},
+                )
+
+            self.assertEqual(response.status_code, 200)
+            payload = response.get_json()
+            self.assertTrue(payload["ok"])
+            self.assertNotIn(HOT_RELATIVE_PATH, payload["artifacts"])
+            self.assertIn(fresh_relative, payload["artifacts"])
 
 
 if __name__ == "__main__":

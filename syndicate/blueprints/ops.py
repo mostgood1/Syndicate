@@ -314,9 +314,24 @@ def api_ops_artifacts_export() -> Any:
     # Optional filters (both stay allowlist-scoped):
     #   ?path=<relative_path>     exact single artifact
     #   ?pattern=<fnmatchglob>    subset of the hot-artifact set
+    #   ?since=<epoch_seconds>    skip files not modified since this time --
+    #     mirrors sweep_changed_hot_artifacts' own mtime-watermark check on
+    #     the push side (artifact_publisher.py), so the pull side (which had
+    #     none) can skip re-fetching files the caller already has. Confirmed
+    #     in production: this endpoint was serving 8.6-28.9MB responses every
+    #     ~30s to a single caller (the intelligence-state background loop's
+    #     hot-artifact pull), the overwhelming majority of it unchanged since
+    #     the caller's own last successful pull.
     # Exporting everything at once can exceed Render's proxy timeout (502),
     # so callers debugging a single artifact should always pass ?path=.
     root = data_root()
+    since_raw = str(request.args.get("since") or "").strip()
+    since_epoch: float | None = None
+    if since_raw:
+        try:
+            since_epoch = float(since_raw)
+        except ValueError:
+            since_epoch = None
     exact_path = str(request.args.get("path") or "").strip().replace("\\", "/")
     if exact_path:
         if exact_path.startswith("/") or ".." in exact_path.split("/"):
@@ -327,6 +342,8 @@ def api_ops_artifacts_export() -> Any:
         if not target.is_file():
             return jsonify({"ok": True, "count": 0, "artifacts": {}})
         try:
+            if since_epoch is not None and target.stat().st_mtime < since_epoch:
+                return jsonify({"ok": True, "count": 0, "artifacts": {}})
             return jsonify({"ok": True, "count": 1, "artifacts": {exact_path: target.read_text(encoding="utf-8")}})
         except Exception as exc:
             return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
@@ -343,6 +360,8 @@ def api_ops_artifacts_export() -> Any:
             if subset_pattern and not fnmatch.fnmatch(relative_path, subset_pattern):
                 continue
             try:
+                if since_epoch is not None and path.stat().st_mtime < since_epoch:
+                    continue
                 artifacts[relative_path] = path.read_text(encoding="utf-8")
             except Exception:
                 continue

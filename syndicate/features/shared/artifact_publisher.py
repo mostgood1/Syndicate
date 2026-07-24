@@ -21,6 +21,7 @@ import hashlib
 import json
 import logging
 import os
+import time
 import uuid
 from pathlib import Path
 from typing import Any, NamedTuple
@@ -198,6 +199,42 @@ def _admin_token() -> str:
     return _env("ADMIN_TOKEN") or _env("SYNDICATE_ADMIN_TOKEN")
 
 
+def _hot_artifact_pull_watermark_path() -> Path:
+    from syndicate.features.shared.refresh_state_store import reports_root
+
+    return reports_root() / "refresh_status" / "latest" / "hot_artifact_pull_watermark.json"
+
+
+def _hot_artifact_pull_since_epoch(*, pull_started_epoch: float) -> float | None:
+    # Mirrors live_refresh_loop.py's _hot_artifact_publish_since_epoch on the
+    # push side: floor = the start of the last successful pull, not each
+    # call's own start time, so a slow or delayed cycle still catches
+    # everything written since the last time this actually completed. No
+    # prior watermark (fresh deploy/backend) means pull everything once,
+    # same as today's behavior, rather than guessing a cutoff.
+    from syndicate.features.shared.refresh_state_store import read_json_file
+
+    payload = read_json_file(_hot_artifact_pull_watermark_path())
+    try:
+        stored = float(payload.get("epoch")) if isinstance(payload, dict) and payload.get("epoch") is not None else None
+    except (TypeError, ValueError):
+        stored = None
+    if stored is None or stored <= 0.0:
+        return None
+    return stored
+
+
+def _record_hot_artifact_pull_watermark(epoch: float) -> None:
+    from syndicate.features.shared.refresh_state_store import write_json_file
+
+    try:
+        write_json_file(_hot_artifact_pull_watermark_path(), {"epoch": epoch})
+    except Exception:
+        # Must never raise (module-wide constraint) -- worst case, the next
+        # pull just doesn't advance the watermark and re-fetches everything.
+        pass
+
+
 def publish_hot_artifact(path: Path, *, timeout_seconds: int = 10) -> bool:
     """Best-effort push of a single allowlisted artifact to the web service.
 
@@ -318,19 +355,31 @@ def publish_changed_hot_artifacts(since_epoch_seconds: float) -> int:
     return sweep_changed_hot_artifacts(since_epoch_seconds).published_count
 
 
-def _export_url(pattern: str | None = None) -> str:
+def _export_url(pattern: str | None = None, *, since_epoch: float | None = None) -> str:
     base = _env("SYNDICATE_WEB_PUBLISH_URL")
     if not base:
         return ""
     url = base.rstrip("/") + "/api/ops/artifacts/export"
+    params: list[str] = []
     if pattern:
         from urllib.parse import quote
 
-        url += f"?pattern={quote(pattern, safe='')}"
+        params.append(f"pattern={quote(pattern, safe='')}")
+    if since_epoch is not None:
+        params.append(f"since={since_epoch}")
+    if params:
+        url += "?" + "&".join(params)
     return url
 
 
-def _pull_hot_artifacts_request(url: str, token: str, *, timeout_seconds: int) -> int:
+def _pull_hot_artifacts_request(url: str, token: str, *, timeout_seconds: int) -> tuple[bool, int]:
+    """Returns (succeeded, files_written). succeeded distinguishes a genuine
+    request failure from a successful-but-empty response (e.g. nothing
+    changed since the caller's own watermark) -- pull_hot_artifacts only
+    advances its persisted watermark when every sub-request succeeded, so a
+    transient network blip doesn't permanently skip files modified during
+    the failed window.
+    """
     request_obj = urllib_request.Request(
         url,
         method="GET",
@@ -341,15 +390,15 @@ def _pull_hot_artifacts_request(url: str, token: str, *, timeout_seconds: int) -
             payload = json.loads(response.read().decode("utf-8"))
     except (urllib_error.URLError, TimeoutError, OSError) as exc:
         print(f"[artifact_publisher] PULL_FAILED url={url} error={exc}", flush=True)
-        return 0
+        return False, 0
     except Exception as exc:  # pragma: no cover - defensive, must never raise
         print(f"[artifact_publisher] PULL_UNEXPECTED_ERROR url={url} error={exc}", flush=True)
-        return 0
+        return False, 0
 
     artifacts = payload.get("artifacts") if isinstance(payload, dict) else None
     if not isinstance(artifacts, dict):
         print(f"[artifact_publisher] PULL_EMPTY_RESPONSE url={url}", flush=True)
-        return 0
+        return False, 0
 
     root = _data_root()
     written = 0
@@ -391,7 +440,7 @@ def _pull_hot_artifacts_request(url: str, token: str, *, timeout_seconds: int) -
             continue
 
     print(f"[artifact_publisher] PULL_OK url={url} artifacts_received={len(artifacts)} written={written}", flush=True)
-    return written
+    return True, written
 
 
 def pull_hot_artifacts(*, date_str: str | None = None, timeout_seconds: int = 30) -> int:
@@ -440,16 +489,37 @@ def pull_hot_artifacts(*, date_str: str | None = None, timeout_seconds: int = 30
     avoid. Two separate, smaller requests (one per format) each stay
     close to the original per-request size that was already confirmed
     safe, and a failure on one doesn't cost the other.
+
+    2026-07-24: every call re-fetched full content for every matching file,
+    every ~30s (this function's only caller ticks on that interval) --
+    confirmed as the dominant contributor to two 8.6MB/28.9MB responses
+    every cycle once odds-history-driven artifact growth made the matched
+    set large, which itself fed sustained near-ceiling memory on a 2GB web
+    instance. Now passes a persisted since= watermark (floor = the start of
+    the last successful pull) so the export endpoint only returns files
+    modified since then; the watermark only advances when every sub-request
+    for this call succeeds, so a partial failure re-fetches that same
+    window next time instead of silently skipping it.
     """
     token = _admin_token()
     if not token or not _env("SYNDICATE_WEB_PUBLISH_URL"):
         print(f"[artifact_publisher] PULL_SKIP_NOT_CONFIGURED url_set={bool(_env('SYNDICATE_WEB_PUBLISH_URL'))} token_set={bool(token)}", flush=True)
         return 0
+    pull_started_epoch = time.time()
+    since_epoch = _hot_artifact_pull_since_epoch(pull_started_epoch=pull_started_epoch)
     if not date_str:
-        return _pull_hot_artifacts_request(_export_url(None), token, timeout_seconds=timeout_seconds)
+        succeeded, written = _pull_hot_artifacts_request(_export_url(None, since_epoch=since_epoch), token, timeout_seconds=timeout_seconds)
+        if succeeded:
+            _record_hot_artifact_pull_watermark(pull_started_epoch)
+        return written
     written = 0
+    all_succeeded = True
     for pattern in _date_glob_patterns(date_str):
-        written += _pull_hot_artifacts_request(_export_url(pattern), token, timeout_seconds=timeout_seconds)
+        succeeded, sub_written = _pull_hot_artifacts_request(_export_url(pattern, since_epoch=since_epoch), token, timeout_seconds=timeout_seconds)
+        written += sub_written
+        all_succeeded = all_succeeded and succeeded
+    if all_succeeded:
+        _record_hot_artifact_pull_watermark(pull_started_epoch)
     return written
 
 
