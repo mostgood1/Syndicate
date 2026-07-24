@@ -1,43 +1,43 @@
 {
   "provenance": {
-    "n_games": 108,
+    "n_games": 1312,
     "season": "20252026",
-    "date_from": "2026-01-05",
-    "date_to": "2026-01-18",
+    "date_from": "2025-10-07",
+    "date_to": "2026-04-16",
     "game_type": 2,
     "source": "nhl_statsweb_landing",
     "excluded_games": 0
   },
   "metrics": {
-    "goals_per_game": 6.4537,
-    "home_goals_per_game": 3.537,
-    "away_goals_per_game": 2.9167,
-    "shots_per_game": 56.0833,
-    "shooting_pct": 0.1151,
+    "goals_per_game": 6.2538,
+    "home_goals_per_game": 3.1921,
+    "away_goals_per_game": 3.0617,
+    "shots_per_game": 55.6646,
+    "shooting_pct": 0.1123,
     "period_goal_share": [
-      0.2742,
-      0.3815,
-      0.3443
+      0.2924,
+      0.3478,
+      0.3598
     ],
-    "pp_goal_share": 0.1994,
-    "empty_net_share": 0.0574,
-    "home_win_pct": 0.5741,
-    "ot_rate": 0.2407,
-    "shootout_rate": 0.0556
+    "pp_goal_share": 0.1944,
+    "empty_net_share": 0.0611,
+    "home_win_pct": 0.5221,
+    "ot_rate": 0.2485,
+    "shootout_rate": 0.0907
   },
   "calibration_targets": {
-    "goals_per_game": 6.4537,
-    "home_goals_per_game": 3.537,
-    "away_goals_per_game": 2.9167,
-    "shots_per_game": 56.0833,
-    "shooting_pct": 0.1151,
-    "period1_share": 0.2742,
-    "period2_share": 0.3815,
-    "period3_share": 0.3443,
-    "pp_goal_share": 0.1994,
-    "empty_net_share": 0.0574,
-    "home_win_pct": 0.5741,
-    "ot_rate": 0.2407,
-    "shootout_rate": 0.0556
+    "goals_per_game": 6.2538,
+    "home_goals_per_game": 3.1921,
+    "away_goals_per_game": 3.0617,
+    "shots_per_game": 55.6646,
+    "shooting_pct": 0.1123,
+    "period1_share": 0.2924,
+    "period2_share": 0.3478,
+    "period3_share": 0.3598,
+    "pp_goal_share": 0.1944,
+    "empty_net_share": 0.0611,
+    "home_win_pct": 0.5221,
+    "ot_rate": 0.2485,
+    "shootout_rate": 0.0907
   }
 }

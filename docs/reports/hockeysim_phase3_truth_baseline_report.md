@@ -1,64 +1,67 @@
 # hockeysim Phase 3 — NHL truth baseline
 
-**What this is:** the first real-data truth baseline for the Syndicate-owned NHL engine, built from
-actual NHL StatsWeb (`api-web.nhle.com/v1`) finished-game feeds. It replaces guesswork with measured
-targets that the calibration lane scores the engine + projection profile against.
+**What this is:** the real-data truth baseline for the Syndicate-owned NHL engine, built from actual
+NHL StatsWeb (`api-web.nhle.com/v1`) finished-game feeds. It replaces guesswork with measured
+targets that the calibration lane (Phase 3b) scores the engine + projection profile against.
 
 ## Method
 
 - Source: `/v1/gamecenter/{id}/landing` per finished game (score, SOG, per-period goals with
   strength / empty-net flags, OT/SO markers); game list from `/v1/score/{date}`.
 - Loader: `historical_truth/nhl_statsweb_loader.py` — fetches + **caches every landing payload** to
-  `data/nhl_source/data/truth/raw/` (gitignored, ~1.7 MB) so the baseline is reproducible offline.
-- Aggregation: `historical_truth/snapshot_builder.py`.
+  `data/nhl_source/data/truth/raw/` (gitignored, ~15 MB for a full season) so the baseline is
+  reproducible offline.
+- Aggregation: `historical_truth/snapshot_builder.py` (regular season only, `game_type == 2`).
 - Rebuild (offline, from cache): `py -3 scripts/build_hockeysim_truth_baseline.py`
-  Refresh (network): `... --refresh --from 2026-01-05 --to 2026-01-18`
+  Refresh (network): `... --refresh --from 2025-10-01 --to 2026-04-30`
 - Derived snapshot (committed): `reports/hockeysim/truth_baseline_20252026.json`.
 
-## Baseline (2025-26 regular season, 108 games, 2026-01-05 … 2026-01-18)
+## Baseline — full 2025-26 regular season (1312 games, 2025-10-07 … 2026-04-16)
 
 | metric | truth | note |
 |---|---|---|
-| goals / game | **6.45** | total, both teams |
-| home goals / game | **3.54** | |
-| away goals / game | **2.92** | home scores 54.8% of goals |
-| shots / game | **56.1** | ~28 / team |
-| shooting % | **11.5%** | goals / SOG (all situations) |
-| period goal share | **P1 0.274 / P2 0.382 / P3 0.344** | regulation goals only |
-| power-play goal share | **19.9%** | |
-| empty-net goal share | **5.7%** | |
-| home win % | **57.4%** | reg + OT + SO |
-| OT rate | **24.1%** | |
-| shootout rate | **5.6%** | |
+| goals / game | **6.25** | total, both teams |
+| home goals / game | **3.19** | |
+| away goals / game | **3.06** | home scores only **51.0%** of goals |
+| shots / game | **55.7** | ~28 / team |
+| shooting % | **11.2%** | goals / SOG (all situations) |
+| period goal share | **P1 0.292 / P2 0.348 / P3 0.360** | regulation goals only; P3 highest |
+| power-play goal share | **19.4%** | |
+| empty-net goal share | **6.1%** | |
+| home win % | **52.2%** | reg + OT + SO |
+| OT rate | **24.9%** | |
+| shootout rate | **9.1%** | |
 
-## Calibration findings (truth vs. current defaults)
+## Why a full season mattered (the key lesson)
 
-These are the deltas the Phase-3b evaluator + profile overrides will close. **No constants have been
-changed yet** — this report records the gap; calibration is applied as audited
-`NHL_PROJECTION_PROFILE` / `SimConfig` field overrides in the next step.
+An initial **108-game** (two-week) sample was misleading on exactly the quantities being calibrated:
 
-1. **Baseline goals slightly low.** Projection baseline `3.05 g/60/team` → 6.10 total vs **6.45**
-   truth (−0.35). Bump the projection baseline (or the engine shot→goal conversion) ~+5.7%.
-2. **Period shares miscalibrated.** Defaults `(0.31, 0.34, 0.35)` vs truth **(0.274, 0.382, 0.344)**
-   — P1 is materially *lower* and P2 *higher* than assumed (the classic long-change second-period
-   effect). Update `ProjectionProfile.period_shares`.
-3. **Home-ice edge understated.** Truth home share **54.8%** of goals (3.54 / 2.92) vs the projection's
-   `1.05 / 0.95` → 52.5%. Widen the home/away multiplier toward ~`1.06 / 0.92`, or validate against a
-   larger sample first.
-4. **Sane as-is:** PP share (~20%), empty-net (~5.7%), OT (~24%), shootout (~5.6%) all match NHL norms
-   and the engine's special-teams / OT knobs — no change indicated.
+| metric | 108-game window | full season (1312) | error if frozen early |
+|---|---|---|---|
+| home goals/game | 3.54 | **3.19** | home ice overstated ~2.3x |
+| away goals/game | 2.92 | **3.06** | |
+| home goal share | 54.8% | **51.0%** | |
+| home win % | 57.4% | **52.2%** | |
+| shootout rate | 5.6% | **9.1%** | thin-tail underestimate |
+| period-1 share | 0.274 | **0.292** | |
+
+Calibrating on the two-week window would have set `home_ice ≈ 1.10` — nearly double the real edge.
+The full-season sample brings it to `1.021`. **Real home-ice advantage in scoring is small (~51% of
+goals);** the noisy short window inflated it. This is why the truth layer + a full-season sample come
+*before* freezing any constant.
+
+## Applied calibration (Phase 3b)
+
+Overrides derived from this baseline and applied to `projection.NHL_PROJECTION_PROFILE` (see
+`hockeysim_phase3b_calibration_report.md`): baseline `3.05 → 3.1269` g/60, home/away
+`1.05/0.95 → 1.0209/0.9791`, period shares `(0.31,0.34,0.35) → (0.2924,0.3478,0.3598)`. Accept score
+0.727 → **0.989** (full validation set) / **0.9999** (directly-tuned metrics). PP / empty-net / OT /
+shootout are governed by the engine `SimConfig` and already match truth — no change indicated.
 
 ## Caveats
 
-- 108 games is a two-week window — good for pace/shape, thinner for tail rates (shootout 5.6%). Widen
-  to a full season before freezing the profile.
 - Shooting % and home/away goal counts include OT + shootout-decider goals (from the final score);
-  period shares are regulation-only. This is intentional (period λ model regulation).
+  period shares are regulation-only (period λ model regulation).
 - Playoffs excluded (`game_type == 2` only) — playoff hockey is systematically tighter.
-
-## Next (Phase 3b)
-
-`calibration/` package: `benchmark_contracts` (targets + tolerances from
-`to_calibration_snapshot()`), `evaluation_metrics` (extract the same metrics from a batch of engine
-sim outputs), `simulator_evaluator` (0–1 accept score = `max(0, 1 − mean(norm abs error))`),
-`calibration_report_generator`. Then apply the four findings above as profile overrides and re-score.
+- `home_win_pct` is emergent (a Poisson consequence of the calibrated goal means), not a directly
+  tuned lever; it lands at 0.518 vs 0.522 truth, close but not forced.

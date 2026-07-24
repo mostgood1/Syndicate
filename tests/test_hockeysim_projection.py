@@ -100,7 +100,9 @@ def test_strength_multiplier_is_clamped():
     away = HockeyTeamFeatures(name="Away", xgf_per_60=1.0, xga_per_60=9.0)
     proj = project_game(home, away, profile=prof)
     ceiling = prof.league_baseline_goals_per_60 * prof.strength_mult_clip_high * prof.home_ice_attack_mult
-    assert proj.proj_home_goals <= ceiling + 1e-6
+    # +1e-3 tolerance absorbs the 4-dp rounding of proj_home_goals; without the clamp this value
+    # would be ~8x the baseline, so the assertion still meaningfully proves the clamp fired.
+    assert proj.proj_home_goals <= ceiling + 1e-3
 
 
 def test_falls_back_to_goals_per_60_when_xg_absent():

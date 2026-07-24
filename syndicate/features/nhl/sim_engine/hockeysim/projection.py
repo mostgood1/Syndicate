@@ -40,15 +40,22 @@ class ProjectionProfile:
     """
 
     # League baseline goals per team per 60 (regulation pace anchor).
-    league_baseline_goals_per_60: float = 3.05
+    # Truth-calibrated to 3.1269 (was 3.05, vendor Poisson default) — 2025-26 regular season,
+    # 1312 games (goals/game 6.2538 -> /2). See docs/reports/hockeysim_phase3_truth_baseline_report.md.
+    league_baseline_goals_per_60: float = 3.1269
     # League mean xGF/60 used to normalize team xG into a relative strength multiplier.
     # (xGA/60 shares the same league mean since every goal-for is some team's goal-against.)
-    league_xg_per_60: float = 3.05
-    # Multiplicative home-ice / road adjustment on expected goals (vendor Poisson defaults).
-    home_ice_attack_mult: float = 1.05
-    away_ice_attack_mult: float = 0.95
+    # Held equal to the baseline so a league-average team projects to the baseline pace.
+    league_xg_per_60: float = 3.1269
+    # Multiplicative home-ice / road adjustment on expected goals.
+    # Truth-calibrated to 1.0209 / 0.9791 (was 1.05 / 0.95) — real home goal share is only 51.0%
+    # (home 3.1921 / away 3.0617 per game); the vendor 1.05/0.95 overstated home ice. A 108-game
+    # window had claimed 54.8%, so this required the full-season sample.
+    home_ice_attack_mult: float = 1.0209
+    away_ice_attack_mult: float = 0.9791
     # Per-period share of a team's regulation goals: (P1, P2, P3). Renormalized if not summing 1.
-    period_shares: Tuple[float, float, float] = (0.31, 0.34, 0.35)
+    # Truth-calibrated to (0.2924, 0.3478, 0.3598) (was (0.31, 0.34, 0.35)) — P1 lower, P3 highest.
+    period_shares: Tuple[float, float, float] = (0.2924, 0.3478, 0.3598)
     # Shrinkage of team attack/defense multipliers toward the league mean (1.0). 0 = raw ratio.
     regression: float = 0.25
     # Clamp on the combined attack*defense strength multiplier to avoid extreme allocations.
