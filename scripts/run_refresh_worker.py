@@ -577,11 +577,30 @@ def _mark_throttled_worker_status(*, worker_status_path: Path, latest_manifest_p
     )
 
 
+def _diag_log_all_process_memory(stage: str) -> None:
+    # Temporary boot-crash diagnostic: the worker has been OOM-killed (2GB
+    # limit) within seconds-to-minutes of boot even with the MLB daily-sim
+    # subprocess trigger disabled, so the cause is either a boot-time cost in
+    # this process itself or a surviving detached subprocess (sim jobs are
+    # launched with start_new_session=True specifically so they outlive a
+    # worker restart -- see _launch_mlb_daily_sim) that isn't visible in this
+    # process's own memory. log_all_process_memory enumerates every process
+    # in the container (via /proc, falling back to psutil) with RSS, so this
+    # settles it directly instead of guessing further. Remove once resolved.
+    try:
+        from syndicate.features.shared.memory_observability import log_all_process_memory
+
+        log_all_process_memory(stage)
+    except Exception as exc:
+        print(f"[refresh_worker] DIAG_MEMORY_LOG_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
+
+
 def main() -> int:
     store = _refresh_state_store()
     assert_refresh_state_backend_ready = store["assert_refresh_state_backend_ready"]
     read_json_file = store["read_json_file"]
     print("[refresh_worker] BOOTED", flush=True)
+    _diag_log_all_process_memory("boot")
     assert_refresh_state_backend_ready(process_name="refresh-worker")
     if str(os.environ.get("SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP") or "").strip().lower() in {"1", "true", "yes", "on"}:
         print("[refresh_worker] INTELLIGENCE_LOOP_ENABLED calling start_intelligence_state_background_loop()", flush=True)
@@ -624,6 +643,7 @@ def main() -> int:
                 print(f"[refresh_worker] MLB_SIM_TICK {json.dumps(mlb_sim_meta, sort_keys=True, default=str)}", flush=True)
         except Exception as exc:
             print(f"[refresh_worker] MLB_SIM_TICK_ERROR {type(exc).__name__}: {exc}", flush=True)
+        _diag_log_all_process_memory("post_mlb_sim_tick")
 
         refresh_cycle = {"claimed_count": 0, "reclaimed_count": 0, "skipped_due_to_cap": 0}
         if _recover_stuck_claim(latest_manifest_path, timeout_minutes=stuck_claim_timeout_minutes):
