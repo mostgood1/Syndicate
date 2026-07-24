@@ -829,6 +829,21 @@ def _log_stage_timing(stage_name: str, duration_ms: float) -> None:
     logger.info(json.dumps({"stage": stage_name, "duration_ms": round(duration_ms, 3)}, sort_keys=True, default=str))
 
 
+def _diag_log_all_process_memory(stage: str) -> None:
+    # Temporary boot-crash diagnostic (see matching helper in
+    # scripts/run_refresh_worker.py): confirmed the refresh-worker's OOM
+    # crashes happen inside this background thread's own candidate-collection
+    # work, not the main tick loop -- that thread's own diagnostic samples
+    # stayed flat (~150-235MB) right up to each crash, meaning the spike
+    # happens somewhere in _build_candidate_pool. Remove once resolved.
+    try:
+        from syndicate.features.shared.memory_observability import log_all_process_memory
+
+        log_all_process_memory(stage)
+    except Exception as exc:
+        print(f"[intelligence_state] DIAG_MEMORY_LOG_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
+
+
 def _profile_stage(stage_name: str, callback, *args, **kwargs):
     started_at = time.perf_counter()
     try:
@@ -1474,12 +1489,14 @@ class IntelligenceStateService:
         # here so this computation has fresh data instead of silently
         # reading nothing every time. Best-effort/never-raises by design, so
         # a network blip just means this cycle reads stale local data.
+        _diag_log_all_process_memory("build_candidate_pool_start")
         try:
             from syndicate.features.shared.artifact_publisher import pull_hot_artifacts
 
             pull_hot_artifacts(date_str=selected_date)
         except Exception as exc:
             print(f"[intelligence_state] PULL_HOT_ARTIFACTS_FAILED error={exc}", flush=True)
+        _diag_log_all_process_memory("post_pull_hot_artifacts")
 
         overview = None
         if self._app is not None:
@@ -1494,6 +1511,7 @@ class IntelligenceStateService:
                 overview = overview.get("sports") if isinstance(overview.get("sports"), list) else []
             if not isinstance(overview, list):
                 overview = []
+        _diag_log_all_process_memory("post_build_overview")
         preferences = _query_preferences(
             "top edges today",
             mode="recommendation",
@@ -1520,6 +1538,7 @@ class IntelligenceStateService:
             selected_date=selected_date,
             apply_edge_filter=_env_bool("SYNDICATE_BOARD_APPLY_EDGE_FILTER", default=True),
         )
+        _diag_log_all_process_memory("post_collect_candidates_with_fallback_merge")
 
         raw_candidates = [candidate for candidate in raw_candidates if isinstance(candidate, Mapping)]
         candidate_build_started_at = time.perf_counter()
@@ -1544,6 +1563,7 @@ class IntelligenceStateService:
             )
             candidate_entries.append(candidate_entry)
         _log_stage_timing("candidate_building", (time.perf_counter() - candidate_build_started_at) * 1000.0)
+        _diag_log_all_process_memory("post_candidate_building")
 
         manifests = self._available_sport_manifests(selected_date)
         candidate_pools: OrderedDict[str, list[dict[str, Any]]] = OrderedDict()
@@ -1617,6 +1637,7 @@ class IntelligenceStateService:
             "global_pool": global_pool,
             "candidates": global_pool,
         }
+        _diag_log_all_process_memory("post_pool_assembled")
         if pool["candidate_count"] > 0:
             # 2026-07-20: only cache non-empty pools. This cache has no
             # staleness check on the read side (see _build_candidate_pool
