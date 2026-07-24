@@ -1915,7 +1915,58 @@ def _game_current_combined_score(game: dict[str, Any]) -> float | None:
     return away_score + home_score
 
 
-def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[str, Any], game: dict[str, Any], market: str, pick: str, line: Any = None, odds: Any = None, edge: Any = None, confidence: Any = None, projected: Any = None, live_projection: Any = None, detail: str | None = None, fallback_epoch: float, live_odds_game_ids: set[str] | None = None, team: Any = None, sim_context: str | None = None) -> None:
+# Maps a recommendation prop row's canonical `prop` key to the stat-specific
+# `*_mean` field that holds its real projected value. Necessary because a
+# hitter prop row carries several means (e.g. batter_hits has ab_mean, pa_mean
+# AND h_mean) -- grabbing the first `*_mean` would show plate appearances,
+# not hits. Mirrors the pitcher/hitter market specs in
+# syndicate/features/mlb/cards.py (ALL_*_MARKET_SPECS mean_key).
+_MLB_PROP_MEAN_KEY_BY_PROP = {
+    "outs": "outs_mean",
+    "strikeouts": "so_mean",
+    "hits_allowed": "hits_mean",
+    "walks_allowed": "walks_mean",
+    "earned_runs": "er_mean",
+    "pitches": "pitches_mean",
+    "batter_hits": "h_mean",
+    "batter_total_bases": "tb_mean",
+    "batter_runs_scored": "r_mean",
+    "batter_rbis": "rbi_mean",
+    "batter_home_runs": "hr_mean",
+}
+
+
+def _mlb_prop_projected_value(prop_row: dict[str, Any]) -> float | None:
+    # The real projected stat count (e.g. 20.7 outs) lives under the row's
+    # stat-specific `*_mean` key -- the generic projection/mean/model keys the
+    # game-bet builder normally reads are absent on these recommendation-engine
+    # prop rows, which is why the board showed a blank projection. Prefer the
+    # market-specific key; fall back to a lone `*_mean` only when unambiguous.
+    stat_key = str(prop_row.get("prop") or "").strip().lower()
+    mean_key = _MLB_PROP_MEAN_KEY_BY_PROP.get(stat_key)
+    if mean_key is not None:
+        value = _numeric_value(prop_row.get(mean_key))
+        if value is not None:
+            return value
+    mean_keys = [
+        key
+        for key in prop_row
+        if isinstance(key, str) and key.endswith("_mean") and key != "mean_support"
+    ]
+    if len(mean_keys) == 1:
+        return _numeric_value(prop_row.get(mean_keys[0]))
+    return None
+
+
+def _mlb_prop_player_id(prop_row: dict[str, Any]) -> int | None:
+    for key in ("pitcher_id", "batter_id", "player_id"):
+        value = _int_or_none(prop_row.get(key))
+        if value is not None:
+            return value
+    return None
+
+
+def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[str, Any], game: dict[str, Any], market: str, pick: str, line: Any = None, odds: Any = None, edge: Any = None, confidence: Any = None, projected: Any = None, live_projection: Any = None, detail: str | None = None, fallback_epoch: float, live_odds_game_ids: set[str] | None = None, team: Any = None, sim_context: str | None = None, player_id: Any = None, headshot_url: str | None = None) -> None:
     pick_text = _safe_text(pick, "-")
     if pick_text == "-":
         return
@@ -1983,6 +2034,8 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
             "team": team_text,
             "entity": player_name,
             "player_name": player_name,
+            "player_id": _int_or_none(player_id),
+            "headshot_url": (str(headshot_url).strip() or None) if headshot_url else None,
             "is_live": is_live,
             "is_final": game_state == "final",
             "game_state": game_state or None,
@@ -2112,6 +2165,10 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
                 team=_team_for_side_hint(game, market.get("selection") or pick) if market_key != "total" else None,
             )
     if _safe_text(sport.get("slug"), "").lower() == "mlb":
+        try:
+            from syndicate.features.mlb.cards import _mlb_headshot_url
+        except Exception:
+            _mlb_headshot_url = lambda _pid: None  # noqa: E731 - safe no-op fallback
         markets = game.get("markets") if isinstance(game.get("markets"), dict) else {}
         for prop_key, market_prefix, name_key in [
             ("pitcherProps", "Pitcher", "pitcher_name"),
@@ -2135,8 +2192,14 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
                     confidence = prop.get("selected_side_model_prob")
                     if confidence is None and selection:
                         confidence = prop.get("model_prob_over") if selection == "OVER" else prop.get("model_prob_under")
-                projected = _first_present_text(prop.get("projection"), prop.get("mean"), prop.get("modelMean"), prop.get("sim_mean"), prop.get("projected"), prop.get("baseline"))
+                # Prefer the row's stat-specific sim mean (e.g. outs_mean) --
+                # the generic keys below are absent on these recommendation
+                # prop rows, so without this the projection column stays blank.
+                projected = _mlb_prop_projected_value(prop)
+                if projected is None:
+                    projected = _first_present_text(prop.get("projection"), prop.get("mean"), prop.get("modelMean"), prop.get("sim_mean"), prop.get("projected"), prop.get("baseline"))
                 live_projection = _first_present_text(prop.get("live_projection"), prop.get("liveProjection"), prop.get("live_proj"), prop.get("projected_live"))
+                prop_player_id = _mlb_prop_player_id(prop)
                 _append_game_bet_candidate(
                     candidates,
                     sport=sport,
@@ -2153,6 +2216,8 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
                     fallback_epoch=fallback_epoch,
                     live_odds_game_ids=live_odds_game_ids,
                     team=_team_for_side_hint(game, prop.get("team_side") or prop.get("teamSide")),
+                    player_id=prop_player_id,
+                    headshot_url=_mlb_headshot_url(prop_player_id) if prop_player_id else None,
                 )
     filtered = [row for row in candidates if row.get("edge") not in {"-", None} or row.get("confidence") not in {"-", None}]
     return sorted(filtered or candidates, key=lambda row: row.get("score", 0.0), reverse=True)
