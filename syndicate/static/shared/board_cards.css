@@ -203,6 +203,24 @@ body.syndicate-body .cards-shell {
   color: var(--cards-text-dim);
 }
 
+.game-mini-card__team {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--cards-text);
+}
+
+.game-mini-card__team--leader {
+  font-weight: 700;
+}
+
+.game-mini-card__team-score {
+  font-variant-numeric: tabular-nums;
+}
+
 .board-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));

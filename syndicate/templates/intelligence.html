@@ -702,6 +702,57 @@
     `;
   }
 
+  // Scoreboard hydration for the mini game cards: /api/board/game-chips
+  // returns per-game team abbrs, live scores, and a status token
+  // ("TOP 7", "Q3 6:12", "7:10P CT") from the same artifact-backed
+  // provider payloads the home page reads. Keyed two ways so a chip can be
+  // matched to an opportunity group by real game id first, matchup text
+  // second (candidates and chips come from different pipelines and don't
+  // always share ids).
+  let gameChipsById = new Map();
+  let gameChipsByMatchup = new Map();
+
+  async function loadGameChips() {
+    try {
+      const dateParam = state.date ? `date=${encodeURIComponent(state.date)}&` : "";
+      const res = await fetch(`/api/board/game-chips?${dateParam}sports=mlb,nba,wnba,nhl,nfl,ncaaf,ncaab`, { cache: "no-store" });
+      if (!res.ok) return;
+      const json = await res.json();
+      const chips = Array.isArray(json.chips) ? json.chips : [];
+      const byId = new Map();
+      const byMatchup = new Map();
+      for (const chip of chips) {
+        const sport = String(chip.sport || "").toLowerCase();
+        const key = String(chip.game_key || "").trim();
+        if (key) byId.set(`${sport}|${key}`, chip);
+        const matchup = String(chip.matchup || "").trim().toLowerCase();
+        if (matchup) byMatchup.set(`${sport}|${matchup}`, chip);
+      }
+      gameChipsById = byId;
+      gameChipsByMatchup = byMatchup;
+      renderBoardBody();
+    } catch (err) { /* scoreboard hydration is best-effort */ }
+  }
+
+  function chipForGame(group) {
+    if (gameChipsById.has(group.key)) return gameChipsById.get(group.key);
+    const sport = String(group.sport || "").toLowerCase();
+    const matchup = String(group.matchup || "").trim().toLowerCase();
+    return gameChipsByMatchup.get(`${sport}|${matchup}`) || null;
+  }
+
+  function chipTeamRow(side, chip) {
+    const team = chip[side] || {};
+    const isLeader = chip.leader === side;
+    const score = team.score == null || team.score === "" ? "–" : team.score;
+    return `
+      <div class="game-mini-card__team${isLeader ? " game-mini-card__team--leader" : ""}">
+        <span class="game-mini-card__team-abbr">${escapeHtml(team.abbr || "")}</span>
+        <span class="game-mini-card__team-score">${escapeHtml(String(score))}</span>
+      </div>
+    `;
+  }
+
   // One mini card per underlying game (not per opportunity) so a user can
   // scan today's slate and jump straight to a specific matchup's
   // opportunities, instead of scrolling the full board looking for it.
@@ -754,6 +805,23 @@
       <div class="game-card-strip">
         ${games.map((game) => {
           const isSelected = state.game === game.key;
+          const chip = chipForGame(game);
+          if (chip) {
+            const isLive = chip.state === "live";
+            const stateLabel = isLive
+              ? '<span class="live-dot">&#9679; LIVE</span>'
+              : chip.state === "final" ? "FINAL" : "PREGAME";
+            const headLeft = chip.status_token && chip.state !== "final"
+              ? `${escapeHtml(game.sport)} · ${escapeHtml(chip.status_token)}`
+              : escapeHtml(game.sport);
+            return `
+              <button type="button" class="game-mini-card" data-game-key="${escapeHtml(game.key)}" aria-pressed="${isSelected}" title="${game.count} opportunit${game.count === 1 ? "y" : "ies"}">
+                <div class="game-mini-card__head"><span>${headLeft}</span><span>${stateLabel}</span></div>
+                ${chipTeamRow("away", chip)}
+                ${chipTeamRow("home", chip)}
+              </button>
+            `;
+          }
           const stateLabel = game.hasLive ? '<span class="live-dot">&#9679; live</span>' : game.allFinal ? "final" : "pregame";
           return `
             <button type="button" class="game-mini-card" data-game-key="${escapeHtml(game.key)}" aria-pressed="${isSelected}">
@@ -1144,6 +1212,7 @@
     event.preventDefault();
     state.date = document.getElementById("board-date").value || state.date;
     syncUrlState();
+    void loadGameChips();
     void loadIntelligence({ forceRefresh: true });
   });
 
@@ -1161,10 +1230,11 @@
   } else {
     void loadIntelligence({});
   }
+  void loadGameChips();
 
   window.SyndicatePolling.startFromPolicy(
     {},
-    { onTick: () => loadIntelligence({ background: true }) },
+    { onTick: () => { void loadGameChips(); return loadIntelligence({ background: true }); } },
     { enabled: true, intervalMs: 60000, refreshOnVisible: true, refreshOnFocus: true, skipWhenHidden: true, preventOverlap: true }
   );
 })();

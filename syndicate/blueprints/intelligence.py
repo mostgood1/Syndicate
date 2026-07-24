@@ -29,6 +29,7 @@ from syndicate.features.intelligence import _attach_intelligence_response_aliase
 from syndicate.features.intelligence_board import build_intelligence_board_contract
 from syndicate.features.intelligence_board import _recommendation_lane
 from syndicate.features.shared.artifact_manifests import load_artifact_manifests
+from syndicate.features.shared.game_chip_scoreboard import build_game_chips
 from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
@@ -1752,6 +1753,26 @@ def intelligence_status_api():
     _LOGGER.info("BETTING_BOARD_REFRESH_DATE", extra={"selected_date": selected_date, "candidate_count": _response_candidate_count(state_snapshot), "source": "status_api"})
     _LOGGER.info("BETTING_BOARD_REFRESH_COMPLETE", extra={"selected_date": selected_date, "candidate_count": _response_candidate_count(state_snapshot), "source": "status_api"})
     return _no_cache_response(jsonify(response_payload))
+
+
+_GAME_CHIP_DEFAULT_SPORTS = ["mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab"]
+
+
+@intelligence_bp.get("/api/board/game-chips")
+def board_game_chips_api():
+    # Shared scoreboard hydration for the Layer 1 and Layer 2 mini game
+    # cards: team abbreviations, live scores, and an inning/quarter/clock or
+    # scheduled-start status token per game. Read-only over the same
+    # artifact-backed provider payloads the home page rails use.
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    sports_raw = str(request.args.get("sports") or "").strip()
+    sports = [part.strip().lower() for part in sports_raw.split(",") if part.strip()] or list(_GAME_CHIP_DEFAULT_SPORTS)
+    try:
+        chips = build_game_chips(selected_date, sports)
+    except Exception:
+        _LOGGER.exception("BOARD_GAME_CHIPS_FAILURE")
+        chips = []
+    return _no_cache_response(jsonify({"ok": True, "date": selected_date, "chips": chips}))
 
 
 @intelligence_bp.get("/intelligence/status")

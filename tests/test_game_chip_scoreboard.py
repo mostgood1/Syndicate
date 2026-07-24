@@ -1,0 +1,182 @@
+from __future__ import annotations
+
+import unittest
+from unittest.mock import patch
+
+from syndicate.features.shared.game_chip_scoreboard import build_game_chip
+from syndicate.features.shared.game_chip_scoreboard import build_game_chips
+
+
+class GameChipBuilderTests(unittest.TestCase):
+    def test_mlb_live_chip_with_inning_token_and_leader(self) -> None:
+        game = {
+            "gamePk": 823759,
+            "away": {"abbr": "NYY", "score": 4},
+            "home": {"abbr": "BOS", "score": 2},
+            "status": {"abstract": "Live", "detailed": "In Progress - Top 7th"},
+        }
+
+        chip = build_game_chip("mlb", game)
+
+        self.assertEqual(chip["state"], "live")
+        self.assertEqual(chip["status_token"], "TOP 7")
+        self.assertEqual(chip["away"], {"abbr": "NYY", "score": "4"})
+        self.assertEqual(chip["home"], {"abbr": "BOS", "score": "2"})
+        self.assertEqual(chip["leader"], "away")
+        self.assertEqual(chip["game_key"], "823759")
+
+    def test_mlb_live_chip_from_live_state_half_and_inning_fields(self) -> None:
+        game = {
+            "gamePk": 1,
+            "away": {"abbr": "SD", "score": 1},
+            "home": {"abbr": "LAD", "score": 3},
+            "live_state": {"in_progress": True, "half": "Bottom", "inning": 4},
+        }
+
+        chip = build_game_chip("mlb", game)
+
+        self.assertEqual(chip["state"], "live")
+        self.assertEqual(chip["status_token"], "BOT 4")
+        self.assertEqual(chip["leader"], "home")
+
+    def test_wnba_live_chip_with_period_and_clock(self) -> None:
+        game = {
+            "game_id": "401736290",
+            "away": {"abbr": "LV", "score": 61},
+            "home": {"abbr": "NY", "score": 64},
+            "live_state": {"in_progress": True, "period": 3, "clock": "6:12"},
+        }
+
+        chip = build_game_chip("wnba", game)
+
+        self.assertEqual(chip["state"], "live")
+        self.assertEqual(chip["status_token"], "Q3 6:12")
+        self.assertEqual(chip["leader"], "home")
+
+    def test_pregame_chip_has_scheduled_token_and_no_scores(self) -> None:
+        game = {
+            "gamePk": 2,
+            "away": {"abbr": "CHC", "score": 0},
+            "home": {"abbr": "ATL", "score": 0},
+            "status": {"abstract": "Scheduled", "detailed": "Scheduled"},
+            # 23:10 UTC == 6:10 PM Central during daylight saving time.
+            "scheduled_start_utc": "2026-07-24T23:10:00Z",
+        }
+
+        chip = build_game_chip("mlb", game)
+
+        self.assertEqual(chip["state"], "pregame")
+        self.assertEqual(chip["status_token"], "6:10P CT")
+        self.assertIsNone(chip["away"]["score"])
+        self.assertIsNone(chip["home"]["score"])
+        self.assertIsNone(chip["leader"])
+
+    def test_pregame_chip_falls_back_to_display_start_time(self) -> None:
+        # MLB's cards payload has no ISO timestamp -- only a pre-formatted
+        # local "startTime" like "3:10 PM".
+        game = {
+            "gamePk": 6,
+            "away": {"abbr": "COL"},
+            "home": {"abbr": "MIL"},
+            "status": {"abstract": "Preview", "detailed": "Pre-Game"},
+            "gameDate": "2026-07-24",
+            "startTime": "3:10 PM",
+        }
+
+        chip = build_game_chip("mlb", game)
+
+        self.assertEqual(chip["state"], "pregame")
+        self.assertEqual(chip["status_token"], "3:10P CT")
+
+    def test_final_chip_reports_final_token(self) -> None:
+        game = {
+            "gamePk": 3,
+            "away": {"abbr": "SEA", "score": 5},
+            "home": {"abbr": "MIN", "score": 7},
+            "status": {"abstract": "Final", "detailed": "Final"},
+        }
+
+        chip = build_game_chip("mlb", game)
+
+        self.assertEqual(chip["state"], "final")
+        self.assertEqual(chip["status_token"], "FINAL")
+        self.assertEqual(chip["leader"], "home")
+
+    def test_nhl_style_game_state_fields(self) -> None:
+        game = {
+            "gamePk": 4,
+            "away": {"abbr": "COL"},
+            "home": {"abbr": "MIL"},
+            "score": {"away": 2, "home": 1},
+            "gameState": "LIVE",
+            "period": 2,
+            "clock": "12:34",
+        }
+
+        chip = build_game_chip("nhl", game)
+
+        self.assertEqual(chip["state"], "live")
+        self.assertEqual(chip["status_token"], "P2 12:34")
+        self.assertEqual(chip["leader"], "away")
+
+
+class BuildGameChipsTests(unittest.TestCase):
+    def test_build_game_chips_reads_registered_providers(self) -> None:
+        class _FakeContext:
+            context_label = "2026-07-24"
+
+        class _FakeProvider:
+            slug = "mlb"
+
+            def resolve_context(self, *, requested_date=None, season=None, week=None):
+                return _FakeContext()
+
+            def is_active(self, *, today_value, context_label):
+                return True
+
+            def games(self, context, *, is_active_today):
+                return [
+                    {
+                        "gamePk": 5,
+                        "away": {"abbr": "NYY", "score": 4},
+                        "home": {"abbr": "BOS", "score": 2},
+                        "status": {"abstract": "Live", "detailed": "In Progress - Top 7th"},
+                    }
+                ]
+
+        with patch(
+            "syndicate.features.shared.sport_data_provider.get_sport_data_provider",
+            side_effect=lambda slug: _FakeProvider() if slug == "mlb" else None,
+        ):
+            with patch("syndicate.features.shared.game_chip_scoreboard._cache", {}):
+                chips = build_game_chips("2026-07-24", ["mlb", "nba"])
+
+        self.assertEqual(len(chips), 1)
+        self.assertEqual(chips[0]["sport"], "mlb")
+        self.assertEqual(chips[0]["status_token"], "TOP 7")
+
+    def test_build_game_chips_survives_provider_failure(self) -> None:
+        class _BrokenProvider:
+            slug = "mlb"
+
+            def resolve_context(self, *, requested_date=None, season=None, week=None):
+                raise RuntimeError("boom")
+
+            def is_active(self, *, today_value, context_label):
+                return True
+
+            def games(self, context, *, is_active_today):
+                return []
+
+        with patch(
+            "syndicate.features.shared.sport_data_provider.get_sport_data_provider",
+            return_value=_BrokenProvider(),
+        ):
+            with patch("syndicate.features.shared.game_chip_scoreboard._cache", {}):
+                chips = build_game_chips("2026-07-24", ["mlb"])
+
+        self.assertEqual(chips, [])
+
+
+if __name__ == "__main__":
+    unittest.main()

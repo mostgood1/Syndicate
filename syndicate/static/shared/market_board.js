@@ -59,6 +59,54 @@
 
   let boardGames = [];
 
+  // Scoreboard hydration for the mini game cards (same shared endpoint the
+  // Layer 2 Betting Board polls): team abbrs, live scores, and a status
+  // token ("TOP 7", "Q3 6:12", "7:10P CT") per game, keyed by game id with
+  // a matchup-text fallback.
+  let gameChipsById = new Map();
+  let gameChipsByMatchup = new Map();
+
+  async function loadGameChips() {
+    if (!sportSlug) return;
+    try {
+      const dateParam = selectedDate ? `date=${encodeURIComponent(selectedDate)}&` : "";
+      const res = await fetch(`/api/board/game-chips?${dateParam}sports=${encodeURIComponent(sportSlug)}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const json = await res.json();
+      const chips = Array.isArray(json.chips) ? json.chips : [];
+      const byId = new Map();
+      const byMatchup = new Map();
+      for (const chip of chips) {
+        const key = String(chip.game_key || "").trim();
+        if (key) byId.set(key, chip);
+        const matchup = String(chip.matchup || "").trim().toLowerCase();
+        if (matchup) byMatchup.set(matchup, chip);
+      }
+      gameChipsById = byId;
+      gameChipsByMatchup = byMatchup;
+      renderGameCards();
+    } catch (error) { /* scoreboard hydration is best-effort */ }
+  }
+
+  function chipForGame(game) {
+    const key = gameKeyFor(game);
+    if (key && gameChipsById.has(key)) return gameChipsById.get(key);
+    const matchup = String(game.matchup || "").trim().toLowerCase();
+    return gameChipsByMatchup.get(matchup) || null;
+  }
+
+  function chipTeamRow(side, chip) {
+    const team = chip[side] || {};
+    const isLeader = chip.leader === side;
+    const score = team.score == null || team.score === "" ? "–" : team.score;
+    return `
+      <div class="game-mini-card__team${isLeader ? " game-mini-card__team--leader" : ""}">
+        <span class="game-mini-card__team-abbr">${escapeHtml(team.abbr || "")}</span>
+        <span class="game-mini-card__team-score">${escapeHtml(String(score))}</span>
+      </div>
+    `;
+  }
+
   function escapeHtml(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, (char) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -264,6 +312,22 @@
           const normalized = normalizeGameState(game.game_state);
           const isSelected = state.game === key;
           const rowCount = Array.isArray(game.rows) ? game.rows.length : 0;
+          const chip = chipForGame(game);
+          if (chip) {
+            const stateLabel = chip.state === "live"
+              ? '<span class="live-dot">&#9679; LIVE</span>'
+              : chip.state === "final" ? "FINAL" : "PREGAME";
+            const headLeft = chip.status_token && chip.state !== "final"
+              ? `${escapeHtml(sportSlug.toUpperCase())} · ${escapeHtml(chip.status_token)}`
+              : escapeHtml(sportSlug.toUpperCase());
+            return `
+              <button type="button" class="game-mini-card" data-game-key="${escapeHtml(key)}" aria-pressed="${isSelected}" title="${rowCount} line${rowCount === 1 ? "" : "s"}">
+                <div class="game-mini-card__head"><span>${headLeft}</span><span>${stateLabel}</span></div>
+                ${chipTeamRow("away", chip)}
+                ${chipTeamRow("home", chip)}
+              </button>
+            `;
+          }
           const stateLabel = normalized === "live" ? '<span class="live-dot">&#9679; live</span>' : gameStateLabel(normalized).toLowerCase();
           return `
             <button type="button" class="game-mini-card" data-game-key="${escapeHtml(key)}" aria-pressed="${isSelected}">
@@ -538,4 +602,8 @@
 
   window.SyndicateBetSlip.init();
   void loadBoard();
+  void loadGameChips();
+  // Same 60s cadence the Layer 2 board uses for its chips -- scores and
+  // inning/clock tokens go stale much faster than the odds rows themselves.
+  setInterval(() => { if (!document.hidden) void loadGameChips(); }, 60000);
 })();
