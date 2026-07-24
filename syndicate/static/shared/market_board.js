@@ -284,6 +284,34 @@
     container.innerHTML = parts.map((part) => `<span class="board-chip">${escapeHtml(part)}</span>`).join("");
   }
 
+  function trendArrow(trend) {
+    if (trend === "up") return "↑";
+    if (trend === "down") return "↓";
+    return "→";
+  }
+
+  // Line movement (line_last/line_previous/line_delta/line_trend) comes
+  // from the odds-history control-plane artifact -- present for pregame
+  // AND live game markets alike (moneyline/total), not just live ones.
+  function formatLineMovement(row) {
+    if (row.line_last === null || row.line_last === undefined) return null;
+    const arrow = trendArrow(row.line_trend);
+    if (row.line_previous === null || row.line_previous === undefined) {
+      return `${row.line_last} ${arrow}`;
+    }
+    return `${row.line_previous} → ${row.line_last} ${arrow}`;
+  }
+
+  // live_projection/live_actual come from the live-lens report as raw
+  // projected/actual stat values (e.g. rest-of-game projected total bases,
+  // current in-game count) -- not 0-1 fractions like sim_projection, so
+  // they're rendered as-is rather than through formatModelValue.
+  function formatLiveValue(value) {
+    if (value === null || value === undefined) return null;
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric.toFixed(1).replace(/\.0$/, "") : String(value);
+  }
+
   function renderRowCard(row, matchup) {
     const tier = tierForJoinStatus(row.join_status);
     const title = row.entity || row.market || "Market";
@@ -291,6 +319,9 @@
     const lineText = row.line !== null && row.line !== undefined ? String(row.line) : "";
     const oddsText = row.odds !== null && row.odds !== undefined ? String(row.odds) : "";
     const modelValue = formatModelValue(row);
+    const liveProjectionValue = formatLiveValue(row.live_projection);
+    const liveActualValue = formatLiveValue(row.live_actual);
+    const lineMovementValue = formatLineMovement(row);
     // For a prop row the title is already the player's name, so the prop
     // line needs the market too ("Over 17.5 · Pitcher Outs"); for a
     // game-level row (entity=None) the title already IS the market
@@ -299,19 +330,28 @@
       ? [[sideLabel, lineText].filter(Boolean).join(" "), row.market].filter(Boolean).join(" · ")
       : [sideLabel, lineText].filter(Boolean).join(" ");
     const slipName = [title, sideLabel, lineText].filter(Boolean).join(" ");
+    const headshot = row.headshot_url
+      ? `<img class="board-card__headshot" src="${escapeHtml(row.headshot_url)}" alt="" loading="lazy" />`
+      : "";
 
     return `
       <article class="board-card board-card--tier-${tier}" data-syndicate-name="${escapeHtml(slipName)}" data-syndicate-market="${escapeHtml(row.market || "")}" data-syndicate-sport="${escapeHtml(sportSlug.toUpperCase())}" data-syndicate-odds="${escapeHtml(oddsText)}" data-syndicate-prop-line="${escapeHtml(propLine)}">
         <div class="board-card__head">
-          <div>
-            <div class="board-card__title">${escapeHtml(title)}</div>
-            <div class="board-card__subtitle">${escapeHtml(matchup)}</div>
+          <div class="board-card__title-row">
+            ${headshot}
+            <div>
+              <div class="board-card__title">${escapeHtml(title)}</div>
+              <div class="board-card__subtitle">${escapeHtml(matchup)}</div>
+            </div>
           </div>
           <div class="board-card__edge">${modelValue ? escapeHtml(modelValue) : "&mdash;"}</div>
         </div>
         <div class="board-card__prop-line">${propLine ? escapeHtml(propLine) : "No market detail available."}</div>
         <div class="board-card__facts">
           <div><div class="board-card__fact-label">Odds</div><div class="board-card__fact-value">${oddsText ? escapeHtml(oddsText) : "&mdash;"}</div></div>
+          ${lineMovementValue !== null ? `<div><div class="board-card__fact-label">Line move</div><div class="board-card__fact-value">${escapeHtml(lineMovementValue)}</div></div>` : ""}
+          ${liveProjectionValue !== null ? `<div><div class="board-card__fact-label">Live proj.</div><div class="board-card__fact-value">${escapeHtml(liveProjectionValue)}</div></div>` : ""}
+          ${liveActualValue !== null ? `<div><div class="board-card__fact-label">Live actual</div><div class="board-card__fact-value">${escapeHtml(liveActualValue)}</div></div>` : ""}
         </div>
         <div class="board-card__badges">${badgeForJoinStatus(row.join_status, row.join_note)}</div>
         ${row.join_status === "unmatched_needs_resim" && row.join_note ? `
@@ -333,10 +373,16 @@
     const rows = (Array.isArray(game.rows) ? game.rows : []).filter((row) => matchesFilters(row, game));
     if (!rows.length) return "";
     const normalized = normalizeGameState(game.game_state);
+    const awayLogo = game.away_logo
+      ? `<img class="board-game-group__logo" src="${escapeHtml(game.away_logo)}" alt="" loading="lazy" />`
+      : "";
+    const homeLogo = game.home_logo
+      ? `<img class="board-game-group__logo" src="${escapeHtml(game.home_logo)}" alt="" loading="lazy" />`
+      : "";
     return `
       <section class="board-game-group">
         <div class="board-card__head" style="margin-bottom:10px;">
-          <div class="board-card__title">${escapeHtml(game.matchup || "")}</div>
+          <div class="board-card__title">${awayLogo}${escapeHtml(game.matchup || "")}${homeLogo}</div>
           <span class="board-badge board-badge--${gameStateBadgeClass(normalized)}">${escapeHtml(gameStateLabel(normalized))}</span>
         </div>
         <div class="board-grid">${rows.map((row) => renderRowCard(row, game.matchup || "")).join("")}</div>
@@ -349,6 +395,13 @@
     const oddsText = row.odds !== null && row.odds !== undefined ? String(row.odds) : "";
     const lineText = row.line !== null && row.line !== undefined ? String(row.line) : "";
     const modelValue = formatModelValue(row);
+    const liveProjectionValue = formatLiveValue(row.live_projection);
+    const liveActualValue = formatLiveValue(row.live_actual);
+    const liveText = [
+      liveProjectionValue !== null ? `proj ${liveProjectionValue}` : "",
+      liveActualValue !== null ? `actual ${liveActualValue}` : "",
+    ].filter(Boolean).join(" / ");
+    const lineMovementValue = formatLineMovement(row);
     const title = row.entity || row.market || "Market";
     const sideLabel = titleCase(row.side);
     const propLine = row.entity
@@ -356,16 +409,21 @@
       : [sideLabel, lineText].filter(Boolean).join(" ");
     const slipName = [title, sideLabel, lineText].filter(Boolean).join(" ");
     const rowAttrs = `data-syndicate-name="${escapeHtml(slipName)}" data-syndicate-market="${escapeHtml(row.market || "")}" data-syndicate-sport="${escapeHtml(sportSlug.toUpperCase())}" data-syndicate-odds="${escapeHtml(oddsText)}" data-syndicate-prop-line="${escapeHtml(propLine)}"`;
+    const headshot = row.headshot_url
+      ? `<img class="board-blotter__headshot" src="${escapeHtml(row.headshot_url)}" alt="" loading="lazy" />`
+      : "";
     return `
       <tr ${rowAttrs}>
         <td><span class="board-badge board-badge--${gameStateBadgeClass(normalized)}">${escapeHtml(gameStateLabel(normalized))}</span></td>
         <td>
-          <div class="board-blotter__primary">${escapeHtml(title)}</div>
+          <div class="board-blotter__primary">${headshot}${escapeHtml(title)}</div>
           <div class="board-blotter__meta">${escapeHtml(game.matchup || "")}</div>
         </td>
         <td>${escapeHtml(propLine || "-")}</td>
         <td>${oddsText ? escapeHtml(oddsText) : "&mdash;"}</td>
+        <td>${lineMovementValue !== null ? escapeHtml(lineMovementValue) : "&mdash;"}</td>
         <td>${modelValue ? escapeHtml(modelValue) : "&mdash;"}</td>
+        <td>${liveText ? escapeHtml(liveText) : "&mdash;"}</td>
         <td>${badgeForJoinStatus(row.join_status, row.join_note)}</td>
         <td>
           <button type="button" class="board-action-button board-action-button--slip" data-slip-action="toggle">&#127917;</button>
@@ -396,7 +454,7 @@
       <div class="board-blotter-wrap">
         <table class="board-blotter">
           <thead>
-            <tr><th>State</th><th>Player / Market</th><th>Pick</th><th>Odds</th><th>Model</th><th>Status</th><th></th></tr>
+            <tr><th>State</th><th>Player / Market</th><th>Pick</th><th>Odds</th><th>Line move</th><th>Model</th><th>Live</th><th>Status</th><th></th></tr>
           </thead>
           <tbody>${rows.join("")}</tbody>
         </table>

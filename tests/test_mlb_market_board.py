@@ -3,8 +3,15 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
+from syndicate.features.mlb.cards import _mlb_headshot_url
+from syndicate.features.mlb.cards import _mlb_hydrate_market_board_line_movement
+from syndicate.features.mlb.cards import _mlb_hydrate_market_board_live_projection
+from syndicate.features.mlb.cards import _mlb_live_lens_prop_rows_for_game
 from syndicate.features.mlb.cards import _mlb_market_board_prop_rows_for_game
 from syndicate.features.mlb.cards import _mlb_market_board_rows_for_game
+from syndicate.features.mlb.cards import _mlb_odds_history_entries_for_teams
+from syndicate.features.mlb.cards import _mlb_player_id_lookup_for_game
+from syndicate.features.mlb.cards import _normalize_live_name
 from syndicate.features.mlb.cards import build_mlb_market_board
 from syndicate.features.mlb.cards import mlb_needs_resim_game_pks
 from syndicate.features.shared.market_inventory import JOIN_STATUS_MATCHED
@@ -428,6 +435,362 @@ class BuildMlbMarketBoardTests(unittest.TestCase):
         self.assertEqual({row["side"] for row in rows}, {"over", "under"})
         self.assertEqual(rows[0]["market"], "Pitcher Outs")
         self.assertEqual(rows[0]["entity"], "Michael McGreevy")
+
+
+class BuildMlbMarketBoardLiveHydrationTests(unittest.TestCase):
+    """Live-projection/live-actual-stat-count, team logos, and player
+    headshots -- the fields the user asked for so a mid-game prop's current
+    count ("prop is HRR, mid-game player has 2, it shows 2") is readable
+    directly on the market board, not just in the curated Layer 2 view.
+    """
+
+    def test_team_logos_are_attached_from_existing_game_data(self) -> None:
+        # No new lookup needed -- away/home dicts already carry a "logo"
+        # URL from the same source the /mlb/cards page uses.
+        fake_games = [
+            {
+                "gamePk": 1,
+                "away": {"abbr": "AZ", "logo": "https://www.mlbstatic.com/team-logos/109.svg"},
+                "home": {"abbr": "STL", "logo": "https://www.mlbstatic.com/team-logos/138.svg"},
+                "status": {"abstract": "Preview"},
+                "markets": {},
+            }
+        ]
+        with patch("syndicate.features.mlb.cards.build_cards_page_context", return_value={"games": fake_games}), patch(
+            "syndicate.features.mlb.cards.source_cards_api_payload", return_value={"games": fake_games}
+        ):
+            board = build_mlb_market_board("2026-07-24")
+
+        game = board["games"][0]
+        self.assertEqual(game["away_logo"], "https://www.mlbstatic.com/team-logos/109.svg")
+        self.assertEqual(game["home_logo"], "https://www.mlbstatic.com/team-logos/138.svg")
+
+    def test_live_prop_row_is_hydrated_with_live_projection_and_actual(self) -> None:
+        fake_games = [
+            {
+                "gamePk": 1,
+                "away": {"abbr": "AZ"},
+                "home": {"abbr": "STL"},
+                "status": {"abstract": "Live"},
+                "markets": {
+                    "hitterProps": [
+                        {
+                            "player_name": "Riley Greene",
+                            "market": "hitter_total_bases",
+                            "prop": "batter_total_bases",
+                            "selection": "over",
+                            "market_line": 1.5,
+                            "odds": "-105",
+                            "edge": 0.05,
+                        }
+                    ]
+                },
+            }
+        ]
+        fake_live_lens_report = {
+            "games": [
+                {
+                    "gamePk": 1,
+                    "trackedProps": [
+                        {
+                            "playerName": "Riley Greene",
+                            "marketLabel": "Hitter Total Bases",
+                            "line": 1.5,
+                            "liveProjection": 2.3,
+                            "actual": 2,
+                        }
+                    ],
+                }
+            ]
+        }
+        with patch("syndicate.features.mlb.cards.build_cards_page_context", return_value={"games": fake_games}), patch(
+            "syndicate.features.mlb.cards.source_cards_api_payload", return_value={"games": fake_games}
+        ), patch("syndicate.features.mlb.cards._mlb_live_lens_report", return_value=fake_live_lens_report):
+            board = build_mlb_market_board("2026-07-24")
+
+        row = board["games"][0]["rows"][0]
+        self.assertEqual(row["live_projection"], 2.3)
+        self.assertEqual(row["live_actual"], 2)
+
+    def test_pregame_prop_row_is_not_hydrated_with_live_lens_data(self) -> None:
+        # Live-lens rows only exist once a game has actually started -- a
+        # pregame game must never call into the (possibly stale) report.
+        fake_games = [
+            {
+                "gamePk": 1,
+                "away": {"abbr": "AZ"},
+                "home": {"abbr": "STL"},
+                "status": {"abstract": "Preview"},
+                "markets": {
+                    "hitterProps": [
+                        {
+                            "player_name": "Riley Greene",
+                            "market": "hitter_total_bases",
+                            "prop": "batter_total_bases",
+                            "selection": "over",
+                            "market_line": 1.5,
+                            "odds": "-105",
+                            "edge": 0.05,
+                        }
+                    ]
+                },
+            }
+        ]
+        with patch("syndicate.features.mlb.cards.build_cards_page_context", return_value={"games": fake_games}), patch(
+            "syndicate.features.mlb.cards.source_cards_api_payload", return_value={"games": fake_games}
+        ), patch("syndicate.features.mlb.cards._mlb_live_lens_prop_rows_for_game") as mock_live_rows:
+            board = build_mlb_market_board("2026-07-24")
+
+        mock_live_rows.assert_not_called()
+        row = board["games"][0]["rows"][0]
+        self.assertNotIn("live_projection", row)
+        self.assertNotIn("live_actual", row)
+
+    def test_prop_row_entity_is_hydrated_with_headshot_via_roster_id_lookup(self) -> None:
+        fake_games = [
+            {
+                "gamePk": 1,
+                "away": {"abbr": "AZ"},
+                "home": {"abbr": "STL"},
+                "status": {"abstract": "Preview"},
+                "markets": {
+                    "hitterProps": [
+                        {
+                            "player_name": "Riley Greene",
+                            "market": "hitter_total_bases",
+                            "prop": "batter_total_bases",
+                            "selection": "over",
+                            "market_line": 1.5,
+                            "odds": "-105",
+                            "edge": 0.05,
+                        }
+                    ]
+                },
+            }
+        ]
+        with patch("syndicate.features.mlb.cards.build_cards_page_context", return_value={"games": fake_games}), patch(
+            "syndicate.features.mlb.cards.source_cards_api_payload", return_value={"games": fake_games}
+        ), patch(
+            "syndicate.features.mlb.cards._mlb_player_id_lookup_for_game", return_value={"riley greene": 691026}
+        ):
+            board = build_mlb_market_board("2026-07-24")
+
+        row = board["games"][0]["rows"][0]
+        self.assertEqual(row["headshot_url"], _mlb_headshot_url(691026))
+
+    def test_game_market_rows_are_not_hydrated_with_headshots(self) -> None:
+        # Game-level rows (entity=None, e.g. Moneyline) have no player to
+        # attribute a headshot to.
+        fake_games = [
+            {
+                "gamePk": 1,
+                "away": {"abbr": "KC"},
+                "home": {"abbr": "DET"},
+                "status": {"abstract": "Preview"},
+                "markets": {"ml": {"selection": "home", "model_prob": 0.695, "odds": "-229"}},
+            }
+        ]
+        with patch("syndicate.features.mlb.cards.build_cards_page_context", return_value={"games": fake_games}), patch(
+            "syndicate.features.mlb.cards.source_cards_api_payload", return_value={"games": fake_games}
+        ), patch(
+            "syndicate.features.mlb.cards._mlb_player_id_lookup_for_game", return_value={"someone": 123}
+        ):
+            board = build_mlb_market_board("2026-07-24")
+
+        row = board["games"][0]["rows"][0]
+        self.assertNotIn("headshot_url", row)
+
+
+class MlbLiveLensPropRowsForGameTests(unittest.TestCase):
+    def test_returns_tracked_props_for_matching_game_pk(self) -> None:
+        report = {"games": [{"gamePk": 5, "trackedProps": [{"playerName": "A"}]}, {"gamePk": 6, "trackedProps": [{"playerName": "B"}]}]}
+        rows = _mlb_live_lens_prop_rows_for_game(report, 5)
+        self.assertEqual(rows, [{"playerName": "A"}])
+
+    def test_falls_back_to_props_key_when_tracked_props_missing(self) -> None:
+        report = {"games": [{"gamePk": 5, "props": [{"playerName": "A"}]}]}
+        rows = _mlb_live_lens_prop_rows_for_game(report, 5)
+        self.assertEqual(rows, [{"playerName": "A"}])
+
+    def test_no_matching_game_returns_empty_list(self) -> None:
+        report = {"games": [{"gamePk": 5, "trackedProps": [{"playerName": "A"}]}]}
+        self.assertEqual(_mlb_live_lens_prop_rows_for_game(report, 999), [])
+
+
+class MlbHydrateMarketBoardLiveProjectionTests(unittest.TestCase):
+    def test_fuzzy_name_and_market_and_line_match_hydrates_row(self) -> None:
+        row = {"entity": "Riley Greene", "market": "Hitter Total Bases", "line": 1.5}
+        live_rows = [{"playerName": "Riley Greene", "marketLabel": "Hitter Total Bases", "line": 1.5, "liveProjection": 2.3, "actual": 2}]
+        _mlb_hydrate_market_board_live_projection(row, live_rows)
+        self.assertEqual(row["live_projection"], 2.3)
+        self.assertEqual(row["live_actual"], 2)
+
+    def test_mismatched_line_does_not_hydrate(self) -> None:
+        row = {"entity": "Riley Greene", "market": "Hitter Total Bases", "line": 1.5}
+        live_rows = [{"playerName": "Riley Greene", "marketLabel": "Hitter Total Bases", "line": 2.5, "liveProjection": 2.3, "actual": 2}]
+        _mlb_hydrate_market_board_live_projection(row, live_rows)
+        self.assertNotIn("live_projection", row)
+
+    def test_no_entity_does_not_hydrate(self) -> None:
+        row = {"entity": None, "market": "Moneyline", "line": None}
+        live_rows = [{"playerName": "Riley Greene", "marketLabel": "Hitter Total Bases", "line": 1.5, "liveProjection": 2.3, "actual": 2}]
+        _mlb_hydrate_market_board_live_projection(row, live_rows)
+        self.assertNotIn("live_projection", row)
+
+
+class MlbPlayerIdLookupForGameTests(unittest.TestCase):
+    def test_builds_name_to_id_lookup_from_roster_snapshot(self) -> None:
+        fake_roster_payload = {
+            "away": {
+                "lineup": {"batters": [{"id": 691026, "name": "Riley Greene"}]},
+                "pitcher": {"id": 592866, "name": "Away Starter"},
+            },
+            "home": {
+                "lineup": {"batters": [{"id": 700000, "name": "Home Batter"}]},
+                "pitcher": {"id": 800000, "name": "Home Starter"},
+            },
+        }
+        with patch("syndicate.features.mlb.cards._hr_load_roster_game_payload", return_value=fake_roster_payload), patch(
+            "syndicate.features.mlb.cards._hr_lineup_batters",
+            side_effect=lambda side_doc: side_doc.get("lineup", {}).get("batters", []),
+        ), patch(
+            "syndicate.features.mlb.cards._hr_profile_player_id", side_effect=lambda profile: profile.get("id")
+        ), patch(
+            "syndicate.features.mlb.cards._hr_profile_player_name", side_effect=lambda profile: profile.get("name")
+        ), patch(
+            "syndicate.features.mlb.cards._hr_side_pitcher_profile",
+            side_effect=lambda side_doc: side_doc.get("pitcher"),
+        ):
+            lookup = _mlb_player_id_lookup_for_game("2026-07-24", 1)
+
+        self.assertEqual(lookup[_normalize_live_name("Riley Greene")], 691026)
+        self.assertEqual(lookup[_normalize_live_name("Away Starter")], 592866)
+        self.assertEqual(lookup[_normalize_live_name("Home Batter")], 700000)
+        self.assertEqual(lookup[_normalize_live_name("Home Starter")], 800000)
+
+    def test_no_roster_payload_returns_empty_lookup(self) -> None:
+        with patch("syndicate.features.mlb.cards._hr_load_roster_game_payload", return_value=None):
+            self.assertEqual(_mlb_player_id_lookup_for_game("2026-07-24", 1), {})
+
+
+class MlbOddsHistoryEntriesForTeamsTests(unittest.TestCase):
+    def test_exact_team_and_market_type_match(self) -> None:
+        odds_history = {
+            "markets": {
+                "event_id=abc|home_team=Detroit Tigers|away_team=Kansas City Royals|market=h2h|bookmaker=fanduel": {
+                    "last_line": -229.0,
+                    "previous_line": -210.0,
+                    "delta": -19.0,
+                    "movement": "down",
+                },
+                "event_id=abc|home_team=Detroit Tigers|away_team=Kansas City Royals|market=totals|bookmaker=fanduel": {
+                    "last_line": 8.5,
+                },
+            }
+        }
+        entries = _mlb_odds_history_entries_for_teams(odds_history, "Kansas City Royals", "Detroit Tigers", "h2h")
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["last_line"], -229.0)
+
+    def test_no_match_returns_empty_list(self) -> None:
+        odds_history = {"markets": {"event_id=abc|home_team=Detroit Tigers|away_team=Kansas City Royals|market=h2h|bookmaker=fanduel": {"last_line": -229.0}}}
+        self.assertEqual(_mlb_odds_history_entries_for_teams(odds_history, "Arizona Diamondbacks", "St. Louis Cardinals", "h2h"), [])
+
+    def test_missing_team_names_returns_empty_list(self) -> None:
+        odds_history = {"markets": {"event_id=abc|home_team=Detroit Tigers|away_team=Kansas City Royals|market=h2h|bookmaker=fanduel": {"last_line": -229.0}}}
+        self.assertEqual(_mlb_odds_history_entries_for_teams(odds_history, "", "", "h2h"), [])
+
+
+class MlbHydrateMarketBoardLineMovementTests(unittest.TestCase):
+    def test_hydrates_last_previous_and_delta_from_first_entry_with_data(self) -> None:
+        row: dict[str, object] = {}
+        entries = [{"last_line": 8.5, "previous_line": 9.0, "delta": -0.5, "movement": "down"}]
+        _mlb_hydrate_market_board_line_movement(row, entries)
+        self.assertEqual(row["line_last"], 8.5)
+        self.assertEqual(row["line_previous"], 9.0)
+        self.assertEqual(row["line_delta"], -0.5)
+        self.assertEqual(row["line_trend"], "down")
+
+    def test_computes_delta_when_missing(self) -> None:
+        row: dict[str, object] = {}
+        entries = [{"last_line": 8.5, "previous_line": 9.0, "delta": None, "movement": "flat"}]
+        _mlb_hydrate_market_board_line_movement(row, entries)
+        self.assertAlmostEqual(row["line_delta"], -0.5)
+
+    def test_no_entries_does_not_hydrate(self) -> None:
+        row: dict[str, object] = {}
+        _mlb_hydrate_market_board_line_movement(row, [])
+        self.assertEqual(row, {})
+
+    def test_entry_with_no_line_data_is_skipped(self) -> None:
+        row: dict[str, object] = {}
+        entries = [{"last_line": None, "previous_line": None}, {"last_line": 8.5, "previous_line": 9.0, "delta": -0.5, "movement": "down"}]
+        _mlb_hydrate_market_board_line_movement(row, entries)
+        self.assertEqual(row["line_last"], 8.5)
+
+
+class BuildMlbMarketBoardLineMovementWiringTests(unittest.TestCase):
+    def test_game_market_row_is_hydrated_with_line_movement(self) -> None:
+        fake_games = [
+            {
+                "gamePk": 1,
+                "away": {"abbr": "KC", "name": "Kansas City Royals"},
+                "home": {"abbr": "DET", "name": "Detroit Tigers"},
+                "status": {"abstract": "Preview"},
+                "markets": {"ml": {"selection": "home", "model_prob": 0.695, "odds": "-229"}},
+            }
+        ]
+        fake_odds_history = {
+            "markets": {
+                "event_id=abc|home_team=Detroit Tigers|away_team=Kansas City Royals|market=h2h|bookmaker=fanduel": {
+                    "last_line": -229.0,
+                    "previous_line": -200.0,
+                    "delta": -29.0,
+                    "movement": "down",
+                }
+            }
+        }
+        with patch("syndicate.features.mlb.cards.build_cards_page_context", return_value={"games": fake_games}), patch(
+            "syndicate.features.mlb.cards.source_cards_api_payload", return_value={"games": fake_games}
+        ), patch("syndicate.features.mlb.cards._mlb_odds_history_payload", return_value=fake_odds_history):
+            board = build_mlb_market_board("2026-07-23")
+
+        row = board["games"][0]["rows"][0]
+        self.assertEqual(row["line_last"], -229.0)
+        self.assertEqual(row["line_trend"], "down")
+
+    def test_prop_row_is_not_hydrated_with_line_movement(self) -> None:
+        fake_games = [
+            {
+                "gamePk": 1,
+                "away": {"abbr": "AZ", "name": "Arizona Diamondbacks"},
+                "home": {"abbr": "STL", "name": "St. Louis Cardinals"},
+                "status": {"abstract": "Preview"},
+                "markets": {
+                    "hitterProps": [
+                        {
+                            "player_name": "Riley Greene",
+                            "market": "hitter_total_bases",
+                            "prop": "batter_total_bases",
+                            "selection": "over",
+                            "market_line": 1.5,
+                            "odds": "-105",
+                            "edge": 0.05,
+                        }
+                    ]
+                },
+            }
+        ]
+        with patch("syndicate.features.mlb.cards.build_cards_page_context", return_value={"games": fake_games}), patch(
+            "syndicate.features.mlb.cards.source_cards_api_payload", return_value={"games": fake_games}
+        ), patch(
+            "syndicate.features.mlb.cards._mlb_odds_history_entries_for_teams"
+        ) as mock_entries:
+            board = build_mlb_market_board("2026-07-23")
+
+        mock_entries.assert_not_called()
+        row = board["games"][0]["rows"][0]
+        self.assertNotIn("line_last", row)
 
 
 class MlbNeedsResimGamePksTests(unittest.TestCase):

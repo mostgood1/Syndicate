@@ -24,6 +24,11 @@ from syndicate.features.shared.market_inventory import JOIN_STATUS_NEEDS_RESIM
 from syndicate.features.shared.market_inventory import join_odds_to_sim
 from syndicate.features.shared.team_branding import read_team_branding_snapshot
 from syndicate.features.shared.team_branding import team_branding_index_by_abbreviation
+from syndicate.features.mlb.hr_targets import _load_roster_game_payload as _hr_load_roster_game_payload
+from syndicate.features.mlb.hr_targets import _lineup_batters as _hr_lineup_batters
+from syndicate.features.mlb.hr_targets import _profile_player_id as _hr_profile_player_id
+from syndicate.features.mlb.hr_targets import _profile_player_name as _hr_profile_player_name
+from syndicate.features.mlb.hr_targets import _side_pitcher_profile as _hr_side_pitcher_profile
 from syndicate.features.mlb.ladders_common import build_module_links
 from syndicate.features.mlb.sources import default_mlb_source_root
 from syndicate.features.mlb.sources import available_daily_summary_dates
@@ -5138,6 +5143,194 @@ def _mlb_market_board_prop_rows_for_game(
     return odds_rows, sim_rows
 
 
+def _mlb_live_lens_report(selected_date: str) -> dict[str, Any]:
+    report = load_json_file(live_lens_report_path(selected_date))
+    return report if isinstance(report, dict) else {}
+
+
+def _mlb_live_lens_prop_rows_for_game(live_lens_report: dict[str, Any], game_pk: Any) -> list[dict[str, Any]]:
+    try:
+        game_pk_int = int(game_pk)
+    except (TypeError, ValueError):
+        return []
+    games = live_lens_report.get("games") if isinstance(live_lens_report.get("games"), list) else []
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        try:
+            row_game_pk = int(game.get("gamePk") or 0)
+        except (TypeError, ValueError):
+            continue
+        if row_game_pk != game_pk_int:
+            continue
+        # trackedProps is the single curated row per prop; props duplicates
+        # the same data across more prop types but isn't guaranteed present
+        # (e.g. before the first live tick has run for this game) -- same
+        # fallback order as intelligence.py's Layer 2 equivalent.
+        rows = game.get("trackedProps")
+        if isinstance(rows, list) and rows:
+            return [row for row in rows if isinstance(row, dict)]
+        rows = game.get("props")
+        return [row for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
+    return []
+
+
+def _mlb_hydrate_market_board_live_projection(row: dict[str, Any], live_rows: list[dict[str, Any]]) -> None:
+    """Overlays live_projection/live_actual onto a market-board prop row --
+    the "current live stat count" the user asked for is exactly the
+    `actual` field here (e.g. a HR+R+RBI prop's actual in-game count so
+    far). Mirrors intelligence.py's _mlb_hydrate_live_prop_projection (same
+    fuzzy player-name + market-label + line match against the same
+    live-lens trackedProps rows) -- reimplemented rather than imported
+    directly to avoid a cross-module dependency on the very large
+    intelligence.py module.
+    """
+    if not live_rows or not row.get("entity"):
+        return
+    candidate_name = _normalize_live_name(row.get("entity"))
+    if not candidate_name:
+        return
+    candidate_line = row.get("line")
+    candidate_market = str(row.get("market") or "").strip().lower()
+    matched_row: dict[str, Any] | None = None
+    for live_row in live_rows:
+        row_name = _normalize_live_name(live_row.get("playerName"))
+        if not row_name or (row_name not in candidate_name and candidate_name not in row_name):
+            continue
+        row_market = str(live_row.get("marketLabel") or live_row.get("market") or "").strip().lower()
+        if candidate_market and row_market and candidate_market not in row_market and row_market not in candidate_market:
+            continue
+        row_line = live_row.get("line")
+        if candidate_line is not None and row_line is not None:
+            try:
+                if abs(float(row_line) - float(candidate_line)) > 0.01:
+                    continue
+            except (TypeError, ValueError):
+                pass
+        matched_row = live_row
+        break
+    if matched_row is None:
+        return
+    live_projection = matched_row.get("liveProjection")
+    if live_projection is not None:
+        row["live_projection"] = live_projection
+    actual = matched_row.get("actual")
+    if actual is not None:
+        row["live_actual"] = actual
+
+
+# Maps this module's own raw (pre-display-relabel) game-market keys (see
+# _mlb_market_board_rows_for_game) to the odds-history artifact's market
+# vocabulary (OddsAPI-style "h2h"/"totals").
+_MLB_MARKET_BOARD_TO_ODDS_HISTORY_MARKET = {
+    "moneyline_home": "h2h",
+    "moneyline_away": "h2h",
+    "total": "totals",
+}
+
+
+def _mlb_odds_history_payload(selected_date: str) -> dict[str, Any]:
+    shard_key = resolve_current_shard_key("mlb", selected_date)
+    payload = load_odds_history_payload_for_sport("mlb", shard_key)
+    return payload if isinstance(payload, dict) else {}
+
+
+def _mlb_parse_odds_history_market_key(market_key: Any) -> dict[str, str]:
+    parsed: dict[str, str] = {}
+    for part in str(market_key or "").split("|"):
+        if "=" not in part:
+            continue
+        key, value = part.split("=", 1)
+        parsed[key.strip().lower()] = value.strip().lower()
+    return parsed
+
+
+def _mlb_odds_history_entries_for_teams(
+    odds_history: dict[str, Any], away_team: str, home_team: str, history_market_type: str
+) -> list[dict[str, Any]]:
+    """Every bookmaker's tracked-line-movement entry for this exact game +
+    market type. Unlike the fuzzy player/market-label matching used for
+    live-lens props, the odds-history market key carries full team names
+    exactly as the market board's own game data does (game["away"]["name"]),
+    so this is a direct equality match, not a fuzzy one.
+    """
+    markets = odds_history.get("markets") if isinstance(odds_history.get("markets"), dict) else {}
+    away_key = str(away_team or "").strip().lower()
+    home_key = str(home_team or "").strip().lower()
+    if not isinstance(markets, dict) or not markets or not away_key or not home_key:
+        return []
+    entries: list[dict[str, Any]] = []
+    for market_key, state in markets.items():
+        if not isinstance(state, dict):
+            continue
+        parsed = _mlb_parse_odds_history_market_key(market_key)
+        if parsed.get("market") != history_market_type:
+            continue
+        if parsed.get("away_team") != away_key or parsed.get("home_team") != home_key:
+            continue
+        entries.append(state)
+    return entries
+
+
+def _mlb_hydrate_market_board_line_movement(row: dict[str, Any], entries: list[dict[str, Any]]) -> None:
+    if not entries:
+        return
+    # Multiple bookmakers can carry this same market -- the first tracked
+    # entry with any line data is used rather than trying to average across
+    # books, matching the "one representative number" approach the rest of
+    # the board already takes for odds/lines.
+    entry = next((candidate for candidate in entries if candidate.get("last_line") is not None or candidate.get("previous_line") is not None), None)
+    if entry is None:
+        return
+    last_line = entry.get("last_line")
+    previous_line = entry.get("previous_line")
+    row["line_last"] = last_line
+    row["line_previous"] = previous_line
+    delta = entry.get("delta")
+    if delta is None and last_line is not None and previous_line is not None:
+        try:
+            delta = float(last_line) - float(previous_line)
+        except (TypeError, ValueError):
+            delta = None
+    row["line_delta"] = delta
+    row["line_trend"] = entry.get("movement") or "flat"
+
+
+def _mlb_player_id_lookup_for_game(selected_date: str, game_pk: Any) -> dict[str, int]:
+    """Maps normalized player name -> MLBAM player ID for every batter and
+    starting pitcher in this game's actual lineup, via the roster-snapshot
+    artifact (data/daily/snapshots/<date>/roster_objs/...,
+    hr_targets._load_roster_game_payload) -- a genuinely complete
+    per-player ID source (every rostered player, not just recommended
+    ones), unlike game["probable"][side]["id"] which is frequently None in
+    practice (confirmed against real production data 2026-07-24).
+    """
+    try:
+        game_pk_int = int(game_pk)
+    except (TypeError, ValueError):
+        return {}
+    roster_payload = _hr_load_roster_game_payload(selected_date, game_pk_int)
+    if not roster_payload:
+        return {}
+    lookup: dict[str, int] = {}
+    for side in ("away", "home"):
+        side_doc = roster_payload.get(side)
+        if not isinstance(side_doc, dict):
+            continue
+        for batter in _hr_lineup_batters(side_doc):
+            player_id = _hr_profile_player_id(batter)
+            name = _hr_profile_player_name(batter)
+            if player_id and name:
+                lookup[_normalize_live_name(name)] = player_id
+        pitcher_profile = _hr_side_pitcher_profile(side_doc)
+        if pitcher_profile:
+            player_id = _hr_profile_player_id(pitcher_profile)
+            name = _hr_profile_player_name(pitcher_profile)
+            if player_id and name:
+                lookup[_normalize_live_name(name)] = player_id
+    return lookup
+
+
 def build_mlb_market_board(selected_date: str) -> dict[str, Any]:
     """Layer 1 market/odds inventory for MLB game markets (moneyline,
     total), one entry per game, sportsbook-style -- every quoted line,
@@ -5154,6 +5347,8 @@ def build_mlb_market_board(selected_date: str) -> dict[str, Any]:
     games = payload.get("games") if isinstance(payload.get("games"), list) else []
     raw_pitcher_market_lines = _pitcher_snapshot_market_lines(selected_date)
     raw_hitter_market_lines = _hitter_snapshot_market_lines(selected_date)
+    live_lens_report = _mlb_live_lens_report(selected_date)
+    odds_history = _mlb_odds_history_payload(selected_date)
 
     board_games: list[dict[str, Any]] = []
     for game in games:
@@ -5178,8 +5373,15 @@ def build_mlb_market_board(selected_date: str) -> dict[str, Any]:
         odds_rows = odds_rows + prop_odds_rows
         sim_rows = sim_rows + prop_sim_rows
         inventory = join_odds_to_sim(odds_rows, sim_rows)
+
+        status = game.get("status") if isinstance(game.get("status"), dict) else {}
+        game_state = str(status.get("abstract") or "").strip().lower() or "pregame"
+        live_lens_rows = _mlb_live_lens_prop_rows_for_game(live_lens_report, game_pk) if game_state == "live" else []
+        player_id_lookup = _mlb_player_id_lookup_for_game(selected_date, game_pk)
+
         for row in inventory:
             market = row.get("market")
+            raw_market_key = market if isinstance(market, str) else None
             if row.get("market_type") == "prop" and isinstance(market, str) and "::" in market:
                 # Prop rows carry a disambiguated join key (see
                 # _mlb_prop_join_market_key) so needs-resim detection can't
@@ -5187,15 +5389,29 @@ def build_mlb_market_board(selected_date: str) -> dict[str, Any]:
                 # strip it back to the clean label for display.
                 market = market.split("::", 1)[0]
             row["market"] = _MLB_MARKET_BOARD_DISPLAY_LABELS.get(market, market)
+            if row.get("market_type") == "prop":
+                if live_lens_rows:
+                    _mlb_hydrate_market_board_live_projection(row, live_lens_rows)
+                entity_name = row.get("entity")
+                if entity_name:
+                    player_id = player_id_lookup.get(_normalize_live_name(entity_name))
+                    if player_id:
+                        row["headshot_url"] = _mlb_headshot_url(player_id)
+            elif row.get("market_type") == "game" and odds_history:
+                history_market_type = _MLB_MARKET_BOARD_TO_ODDS_HISTORY_MARKET.get(raw_market_key or "")
+                if history_market_type:
+                    entries = _mlb_odds_history_entries_for_teams(odds_history, away.get("name"), home.get("name"), history_market_type)
+                    _mlb_hydrate_market_board_line_movement(row, entries)
 
-        status = game.get("status") if isinstance(game.get("status"), dict) else {}
         board_games.append(
             {
                 "gamePk": game_pk,
                 "matchup": f"{away_abbr} @ {home_abbr}",
                 "away_abbr": away_abbr,
                 "home_abbr": home_abbr,
-                "game_state": str(status.get("abstract") or "").strip().lower() or "pregame",
+                "away_logo": away.get("logo"),
+                "home_logo": home.get("logo"),
+                "game_state": game_state,
                 "detail": game.get("detail"),
                 "startTime": game.get("startTime"),
                 "rows": inventory,
