@@ -5,6 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+from syndicate.features.intelligence import _build_odds_history_player_index
 from syndicate.features.intelligence import _candidate_odds_history_context
 from syndicate.features.intelligence import _enrich_candidates_with_odds_history
 from syndicate.features.intelligence import _load_odds_history_payload_for_sport
@@ -77,7 +78,7 @@ class IntelligenceOddsHistoryTests(unittest.TestCase):
         }
 
         enriched = _enrich_candidates_with_odds_history([candidate], {"nhl": odds_history})[0]
-        movement_context = _candidate_odds_history_context(enriched, odds_history)
+        movement_context = _candidate_odds_history_context(enriched, _build_odds_history_player_index(odds_history))
         self.assertEqual(movement_context["trend"], "up")
         self.assertEqual(movement_context["delta"], 0.5)
         self.assertEqual(movement_context["recent_movement_trend"], "up")

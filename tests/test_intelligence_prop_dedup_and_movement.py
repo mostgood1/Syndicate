@@ -132,5 +132,68 @@ class OddsHistoryMatchScoreCrossMarketGuardTests(unittest.TestCase):
         self.assertGreater(score, 0.0)
 
 
+class OddsHistoryPlayerIndexTests(unittest.TestCase):
+    """2026-07-24 fix: _candidate_odds_history_state used to linear-scan
+    every market for every candidate. Fine when MLB only had ~33 game-level
+    entries, but once MLB prop odds-history started being written
+    (same-day fix), that payload grew past 3,000 entries and the resulting
+    O(candidates * markets) scan made one production compute cycle take
+    147s instead of ~1.3s, directly contributing to a worker timeout and
+    an empty board. _build_odds_history_player_index buckets by player so
+    a prop candidate only ever scans its own player's handful of entries.
+    """
+
+    def _big_odds_history(self, *, real_player: str, other_player_count: int) -> dict:
+        markets = {
+            "event_id=abc|home_team=Milwaukee Brewers|away_team=Colorado Rockies|market=h2h|bookmaker=draftkings": {"last_line": -258.0},
+        }
+        for i in range(other_player_count):
+            markets[f"player_name=filler player {i}|market=strikeouts|selection=over"] = {"last_line": 3.5}
+        markets[f"player_name={real_player}|market=strikeouts|selection=over"] = {"last_line": 3.5, "last_odds": 106.0}
+        return {"markets": markets}
+
+    def test_prop_candidate_only_scans_its_own_player_bucket(self) -> None:
+        odds_history = self._big_odds_history(real_player="tomoyuki sugano", other_player_count=2000)
+        index = intelligence._build_odds_history_player_index(odds_history)
+        by_player, unattributed = index
+        # 2000 filler players + the real one = 2001 buckets; the game-level
+        # entry is the only thing in the unattributed pool.
+        self.assertEqual(len(by_player), 2001)
+        self.assertEqual(len(unattributed), 1)
+
+        candidate = {
+            "candidate_type": "prop",
+            "player_name": "Tomoyuki Sugano",
+            "matchup": "COL @ MIL",
+            "market": "strikeouts",
+            "pick": "Over 3.5",
+            "name": "Over 3.5",
+            "line": "3.5",
+        }
+        market_key, state = intelligence._candidate_odds_history_state(candidate, index)
+        self.assertIsNotNone(state)
+        self.assertIn("tomoyuki sugano", market_key.lower())
+
+    def test_game_candidate_still_matches_via_unattributed_pool(self) -> None:
+        odds_history = self._big_odds_history(real_player="tomoyuki sugano", other_player_count=50)
+        index = intelligence._build_odds_history_player_index(odds_history)
+        game_candidate = {
+            "candidate_type": "game",
+            "matchup": "COL @ MIL",
+            "market": "Moneyline",
+            "pick": "Home ML",
+            "name": "Home ML",
+            "line": "-258",
+        }
+        market_key, state = intelligence._candidate_odds_history_state(game_candidate, index)
+        self.assertIsNotNone(state)
+        self.assertIn("h2h", market_key)
+
+    def test_empty_odds_history_returns_empty_index(self) -> None:
+        by_player, unattributed = intelligence._build_odds_history_player_index(None)
+        self.assertEqual(by_player, {})
+        self.assertEqual(unattributed, [])
+
+
 if __name__ == "__main__":
     unittest.main()

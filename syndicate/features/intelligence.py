@@ -2719,20 +2719,62 @@ def _candidate_odds_history_match_score(candidate: dict[str, Any], market_key: A
     return score
 
 
-def _candidate_odds_history_state(candidate: dict[str, Any], odds_history: dict[str, Any] | None) -> tuple[str, dict[str, Any] | None]:
-    markets = (odds_history or {}).get("markets") if isinstance(odds_history, dict) else {}
-    if not isinstance(markets, dict) or not markets:
+def _build_odds_history_player_index(
+    odds_history: dict[str, Any] | None,
+) -> tuple[dict[str, list[tuple[str, dict[str, Any]]]], list[tuple[str, dict[str, Any]]]]:
+    """Splits a sport's odds-history markets into per-player buckets (keyed
+    by the market key's own player_name/player_key field) plus a small
+    remainder list of unattributed (game-level: moneyline/spread/total)
+    entries. _candidate_odds_history_state used to linear-scan every market
+    for every candidate -- fine when MLB only had ~33 game-level entries,
+    but confirmed live 2026-07-24: once MLB prop odds-history started being
+    written (a same-day fix), that payload grew to 3,366+ entries, and the
+    O(candidates * markets) scan made one compute cycle take 147s instead
+    of ~1.3s, directly contributing to a production worker timeout / empty
+    board incident. A prop candidate only ever needs its own player's
+    handful of entries, so bucketing by player_name turns that scan into a
+    small, O(1)-lookup pool instead.
+    """
+    by_player: dict[str, list[tuple[str, dict[str, Any]]]] = {}
+    unattributed: list[tuple[str, dict[str, Any]]] = []
+    markets = (odds_history or {}).get("markets") if isinstance(odds_history, dict) else None
+    if not isinstance(markets, dict):
+        return by_player, unattributed
+    for market_key, state in markets.items():
+        if not isinstance(state, dict):
+            continue
+        parsed = _parse_odds_history_market_key(market_key)
+        player = _normalized_market_text(parsed.get("player_name") or parsed.get("player_key") or "")
+        if player:
+            by_player.setdefault(player, []).append((str(market_key), state))
+        else:
+            unattributed.append((str(market_key), state))
+    return by_player, unattributed
+
+
+def _candidate_odds_history_state(
+    candidate: dict[str, Any], odds_history_index: tuple[dict[str, list[tuple[str, dict[str, Any]]]], list[tuple[str, dict[str, Any]]]]
+) -> tuple[str, dict[str, Any] | None]:
+    by_player, unattributed = odds_history_index
+    if not by_player and not unattributed:
+        return "", None
+
+    subject_key = _normalized_market_text(_safe_text(candidate.get("player_name"), "")) or _normalized_market_text(
+        _safe_text(_candidate_subject_key(candidate), "")
+    )
+    pool = list(unattributed)
+    if subject_key and subject_key in by_player:
+        pool.extend(by_player[subject_key])
+    if not pool:
         return "", None
 
     best_key = ""
     best_state: dict[str, Any] | None = None
     best_score = 0.0
-    for market_key, state in markets.items():
-        if not isinstance(state, dict):
-            continue
+    for market_key, state in pool:
         score = _candidate_odds_history_match_score(candidate, market_key, state)
         if score > best_score:
-            best_key = str(market_key)
+            best_key = market_key
             best_score = score
             best_state = state
 
@@ -2741,8 +2783,11 @@ def _candidate_odds_history_state(candidate: dict[str, Any], odds_history: dict[
     return best_key, best_state
 
 
-def _candidate_odds_history_context(candidate: dict[str, Any], odds_history: dict[str, Any] | None) -> dict[str, Any] | None:
-    market_key, history_state = _candidate_odds_history_state(candidate, odds_history)
+def _candidate_odds_history_context(
+    candidate: dict[str, Any],
+    odds_history_index: tuple[dict[str, list[tuple[str, dict[str, Any]]]], list[tuple[str, dict[str, Any]]]],
+) -> dict[str, Any] | None:
+    market_key, history_state = _candidate_odds_history_state(candidate, odds_history_index)
     market_data = candidate.get("market_data") if isinstance(candidate.get("market_data"), dict) else {}
     movement_history = market_data.get("movement_history") if isinstance(market_data.get("movement_history"), list) else []
     opening_line = _numeric_hint(market_data.get("opening_line"))
@@ -2946,14 +2991,20 @@ def _merge_duplicate_prop_candidates(candidates: list[dict[str, Any]]) -> list[d
 
 def _enrich_candidates_with_odds_history(candidates: list[dict[str, Any]], odds_history_by_sport: dict[str, dict[str, Any]] | None) -> list[dict[str, Any]]:
     enriched: list[dict[str, Any]] = []
+    # Indexed once per sport rather than re-scanning the full odds-history
+    # payload for every candidate -- see _build_odds_history_player_index's
+    # docstring for the production incident this was built to fix.
+    index_by_sport: dict[str, tuple[dict[str, list[tuple[str, dict[str, Any]]]], list[tuple[str, dict[str, Any]]]]] = {}
     for candidate in candidates:
         if not isinstance(candidate, Mapping):
             continue
         payload = dict(candidate)
         payload = _attach_market_data(payload)
         sport_slug = _safe_text(payload.get("sport_slug"), "sport").lower()
-        odds_history = (odds_history_by_sport or {}).get(sport_slug) if isinstance(odds_history_by_sport, dict) else None
-        movement_context = _candidate_odds_history_context(payload, odds_history)
+        if sport_slug not in index_by_sport:
+            odds_history = (odds_history_by_sport or {}).get(sport_slug) if isinstance(odds_history_by_sport, dict) else None
+            index_by_sport[sport_slug] = _build_odds_history_player_index(odds_history)
+        movement_context = _candidate_odds_history_context(payload, index_by_sport[sport_slug])
         if movement_context:
             market_data = payload.get("market_data") if isinstance(payload.get("market_data"), dict) else {}
             if movement_context.get("history") and not market_data.get("movement_history"):
