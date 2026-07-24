@@ -1430,7 +1430,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
     def test_look_ahead_decision_launches_when_idle_with_scheduled_games(self) -> None:
         with patch.dict(
             os.environ, {"SYNDICATE_LOOK_AHEAD_ENABLED": "true"}, clear=False
-        ), patch.object(live_refresh_loop, "_read_last_look_ahead_check", return_value={}), patch.object(
+        ), patch.object(live_refresh_loop, "_read_last_look_ahead_check", return_value=({}, True)), patch.object(
             live_refresh_loop, "_record_look_ahead_check"
         ) as mocked_record, patch.object(
             live_refresh_loop, "fetch_schedule_for_date", return_value=[{"id": "401857071"}]
@@ -1445,7 +1445,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
     def test_look_ahead_decision_skips_when_no_games_scheduled(self) -> None:
         with patch.dict(
             os.environ, {"SYNDICATE_LOOK_AHEAD_ENABLED": "true"}, clear=False
-        ), patch.object(live_refresh_loop, "_read_last_look_ahead_check", return_value={}), patch.object(
+        ), patch.object(live_refresh_loop, "_read_last_look_ahead_check", return_value=({}, True)), patch.object(
             live_refresh_loop, "_record_look_ahead_check"
         ) as mocked_record, patch.object(
             live_refresh_loop, "fetch_schedule_for_date", return_value=[]
@@ -1462,12 +1462,31 @@ class LiveRefreshLoopTests(unittest.TestCase):
         ), patch.object(
             live_refresh_loop,
             "_read_last_look_ahead_check",
-            return_value={"epoch": 1000.0, "date": "2026-07-16", "launched": True},
+            return_value=({"epoch": 1000.0, "date": "2026-07-16", "launched": True}, True),
         ), patch.object(live_refresh_loop, "fetch_schedule_for_date") as mocked_fetch:
             decision = live_refresh_loop._look_ahead_decision(now_epoch=1500.0, selected_date="2026-07-15", any_live=False)
 
         self.assertFalse(decision["launch"])
         self.assertEqual(decision["reason"], "within_check_interval")
+        mocked_fetch.assert_not_called()
+
+    def test_look_ahead_decision_fails_closed_when_state_read_fails(self) -> None:
+        # 2026-07-24 fix: a keyvalue-store read failure must never be
+        # silently treated as "never checked before" -- that exact defeat of
+        # this interval gate let 8 look-ahead relaunches fire for the same
+        # target date in 5 hours, some only 6-30 minutes apart, stacking
+        # overlapping refresh_odds_sources.py runs that corrupted each
+        # other's writes and left that date with zero completed sim/odds
+        # rows all day.
+        with patch.dict(
+            os.environ, {"SYNDICATE_LOOK_AHEAD_ENABLED": "true"}, clear=False
+        ), patch.object(live_refresh_loop, "_read_last_look_ahead_check", return_value=({}, False)), patch.object(
+            live_refresh_loop, "fetch_schedule_for_date"
+        ) as mocked_fetch:
+            decision = live_refresh_loop._look_ahead_decision(now_epoch=1000.0, selected_date="2026-07-15", any_live=False)
+
+        self.assertFalse(decision["launch"])
+        self.assertEqual(decision["reason"], "state_read_failed")
         mocked_fetch.assert_not_called()
 
     def test_launch_look_ahead_refresh_calls_launch_refresh_run_with_pregame_phase(self) -> None:
@@ -1516,7 +1535,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
 
         with patch.dict(
             os.environ, {"SYNDICATE_LOOK_AHEAD_ENABLED": "true"}, clear=False
-        ), patch.object(live_refresh_loop, "_read_last_look_ahead_check_day2", return_value={}), patch.object(
+        ), patch.object(live_refresh_loop, "_read_last_look_ahead_check_day2", return_value=({}, True)), patch.object(
             live_refresh_loop, "_record_look_ahead_check_day2"
         ) as mocked_record, patch.object(
             live_refresh_loop, "fetch_schedule_for_date", side_effect=fake_schedule
@@ -1545,7 +1564,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-15"), patch.object(
             live_refresh_loop, "_any_tracked_sport_game_live", return_value=False
         ), patch.object(
-            live_refresh_loop, "_read_last_look_ahead_check", return_value={}
+            live_refresh_loop, "_read_last_look_ahead_check", return_value=({}, True)
         ), patch.object(
             live_refresh_loop, "_record_look_ahead_check"
         ), patch.object(
@@ -1575,7 +1594,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
         ), patch.object(
             live_refresh_loop, "_record_pregame_launch"
         ), patch.object(
-            live_refresh_loop, "_read_last_look_ahead_check", return_value={}
+            live_refresh_loop, "_read_last_look_ahead_check", return_value=({}, True)
         ), patch.object(
             live_refresh_loop, "_record_look_ahead_check"
         ), patch.object(

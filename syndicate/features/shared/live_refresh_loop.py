@@ -22,6 +22,7 @@ from syndicate.features.shared.schedule_adapter import fetch_schedule_for_date
 from syndicate.features.shared.schedule_adapter import ScheduleEvent
 from syndicate.features.shared.refresh_state_store import data_root
 from syndicate.features.shared.refresh_state_store import read_json_file
+from syndicate.features.shared.refresh_state_store import read_json_file_result
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
 from syndicate.features.shared.refresh_state_store import write_text_file
@@ -1386,9 +1387,19 @@ def _last_look_ahead_check_path() -> Path:
 	return _meta_dir() / "last_look_ahead_check.json"
 
 
-def _read_last_look_ahead_check() -> dict[str, Any]:
-	payload = read_json_file(_last_look_ahead_check_path())
-	return payload if isinstance(payload, dict) else {}
+def _read_last_look_ahead_check() -> tuple[dict[str, Any], bool]:
+	# Returns (payload, read_ok). Must use read_json_file_result (not plain
+	# read_json_file) so a transient keyvalue-backend read failure is
+	# distinguishable from "never checked before" -- confirmed in production
+	# 2026-07-24: the plain-read version let this interval gate get silently
+	# defeated, producing 8 look-ahead relaunches for the same target date in
+	# 5 hours (several only 6-30 minutes apart, well under the configured
+	# 3600s interval), which stacked overlapping refresh_odds_sources.py runs
+	# for that date and left it with zero completed sim/odds rows all day.
+	# Mirrors _assert_refresh_manifest_read_ok's existing fail-closed pattern
+	# for the same class of bug in the sibling concurrency guard.
+	payload, ok = read_json_file_result(_last_look_ahead_check_path())
+	return (payload if isinstance(payload, dict) else {}), ok
 
 
 def _record_look_ahead_check(epoch: float, date_str: str, *, launched: bool) -> None:
@@ -1420,7 +1431,11 @@ def _look_ahead_decision(*, now_epoch: float, selected_date: str, any_live: bool
 		# Never compete with a live tick for the container's resources.
 		return {"launch": False, "reason": "sport_currently_live"}
 	target_date = _look_ahead_target_date(selected_date)
-	last = _read_last_look_ahead_check()
+	last, read_ok = _read_last_look_ahead_check()
+	if not read_ok:
+		# Fail closed: a keyvalue-store read failure must never be treated as
+		# "never checked before" -- see _read_last_look_ahead_check's comment.
+		return {"launch": False, "reason": "state_read_failed", "date": target_date}
 	last_epoch = float(last.get("epoch") or 0.0)
 	last_date = str(last.get("date") or "")
 	interval = _look_ahead_interval_seconds()
@@ -1452,9 +1467,10 @@ def _last_look_ahead_check_day2_path() -> Path:
 	return _meta_dir() / "last_look_ahead_check_day2.json"
 
 
-def _read_last_look_ahead_check_day2() -> dict[str, Any]:
-	payload = read_json_file(_last_look_ahead_check_day2_path())
-	return payload if isinstance(payload, dict) else {}
+def _read_last_look_ahead_check_day2() -> tuple[dict[str, Any], bool]:
+	# See _read_last_look_ahead_check's comment -- same fail-closed fix.
+	payload, ok = read_json_file_result(_last_look_ahead_check_day2_path())
+	return (payload if isinstance(payload, dict) else {}), ok
 
 
 def _record_look_ahead_check_day2(epoch: float, date_str: str, *, launched: bool) -> None:
@@ -1470,7 +1486,9 @@ def _look_ahead_decision_day2(*, now_epoch: float, selected_date: str, any_live:
 	if any_live:
 		return {"launch": False, "reason": "sport_currently_live"}
 	target_date = _look_ahead_target_date_day2(selected_date)
-	last = _read_last_look_ahead_check_day2()
+	last, read_ok = _read_last_look_ahead_check_day2()
+	if not read_ok:
+		return {"launch": False, "reason": "state_read_failed", "date": target_date}
 	last_epoch = float(last.get("epoch") or 0.0)
 	last_date = str(last.get("date") or "")
 	interval = _look_ahead_interval_seconds()
