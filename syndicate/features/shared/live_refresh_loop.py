@@ -853,12 +853,19 @@ def _mlb_recent_sim_attempt_within_backoff(date_str: str) -> bool:
 	# the same full, unscoped (all games) 1000-sim job -- which can itself
 	# take long enough to contribute to another OOM before finishing. That's
 	# a self-reinforcing crash loop with zero cooldown between attempts.
-	# _write_active_pointer already persists a started_at the instant a run
-	# launches (before any heavy work), independent of whether the process
-	# is later confirmed dead -- reuse it here purely to rate-limit repeat
-	# attempts, not to detect liveness (that's _mlb_daily_sim_process_still_running's job).
+	# This reads a marker dedicated to backoff tracking, NOT the active-run
+	# pointer (_mlb_sim_active_pointer_path): _mlb_daily_sim_process_still_running
+	# runs before this check on every call and clears that pointer to {} the
+	# moment it confirms the previous process is dead (correct for its own
+	# purpose -- don't let a stale pointer block future runs forever) -- but
+	# that means by the time a crashed run reaches this branch, the active
+	# pointer has *already* been wiped by the very liveness check that ran
+	# moments earlier, making a backoff read of it always empty in exactly
+	# the crash-loop case this function exists to catch. The last-attempt
+	# marker is written at the same moment as the active pointer but nothing
+	# else ever clears it, so it survives that liveness check intact.
 	try:
-		meta = read_json_file(_mlb_sim_active_pointer_path())
+		meta = read_json_file(_mlb_sim_last_attempt_marker_path())
 	except Exception:
 		return False
 	if not isinstance(meta, dict) or not meta:
@@ -1130,6 +1137,20 @@ def _mlb_sim_active_pointer_path() -> Path:
 	return _mlb_sim_runs_state_dir() / "_active.json"
 
 
+def _mlb_sim_last_attempt_marker_path() -> Path:
+	# Deliberately separate from _mlb_sim_active_pointer_path -- see the
+	# comment in _mlb_recent_sim_attempt_within_backoff for why the active
+	# pointer can't be reused for this.
+	return _mlb_sim_runs_state_dir() / "_last_attempt.json"
+
+
+def _write_last_attempt_marker(meta: dict[str, Any]) -> None:
+	try:
+		write_json_file(_mlb_sim_last_attempt_marker_path(), meta)
+	except Exception:
+		pass
+
+
 def _write_active_pointer(meta: dict[str, Any]) -> None:
 	try:
 		write_json_file(_mlb_sim_active_pointer_path(), meta)
@@ -1374,6 +1395,7 @@ def _launch_mlb_daily_sim(date_str: str, decision: dict[str, Any]) -> dict[str, 
 		except Exception:
 			pass
 		_write_active_pointer(dict(_MLB_SIM_RUN_META))
+		_write_last_attempt_marker(dict(_MLB_SIM_RUN_META))
 		print(f"[live_refresh_loop] MLB_DAILY_SIM_TRIGGERED date={date_str} reason={decision.get('reason')} pid={process.pid} run_stamp={run_stamp}", flush=True)
 		return {"ok": True, "pid": process.pid, "command": command, "reason": decision.get("reason"), "run_stamp": run_stamp}
 	except Exception as exc:
