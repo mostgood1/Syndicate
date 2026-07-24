@@ -11,7 +11,7 @@
 <main class="board-page">
   <form id="board-toolbar" class="cards-control-card board-toolbar" method="get">
     <div class="board-toolbar-row">
-      <div class="board-card__title">{{ sport_label }} Market Board</div>
+      <div class="board-tabs cards-tabs" id="board-sport-tabs" role="tablist" aria-label="Sport"></div>
       <div style="display:flex; gap:10px; align-items:center;">
         <a class="cards-nav-pill" href="?date={{ prev_date }}">&larr; {{ prev_date }}</a>
         <input id="board-date" name="date" type="date" class="board-date-input" value="{{ selected_date }}" />
@@ -20,16 +20,26 @@
       </div>
     </div>
     <div class="board-toolbar-row">
-      <div style="color: var(--cards-text-soft); font-size: 12px;">
-        Every quoted moneyline, total, and player prop line, joined against the model where available &mdash; not
-        just the recommendation engine's picks.
-      </div>
+      <div class="board-tabs cards-tabs" id="board-state-tabs" role="tablist" aria-label="Game state filter"></div>
       <div style="display:flex; gap:8px; align-items:center;">
         <div id="board-refresh-status" class="board-refresh-status" role="status" aria-live="polite"></div>
         <a class="cards-nav-pill" href="{{ cards_href }}">Back to Cards</a>
       </div>
     </div>
+    <div class="board-toolbar-row">
+      <div class="board-tabs cards-tabs" id="board-market-tabs" role="tablist" aria-label="Market family filter"></div>
+      <div class="board-tabs cards-tabs" id="board-view-tabs" role="tablist" aria-label="Board view"></div>
+    </div>
+    <div class="board-toolbar-row">
+      <div class="board-tabs cards-tabs" id="board-prop-type-tabs" role="group" aria-label="Prop type filter (select any number)"></div>
+    </div>
   </form>
+
+  <div id="board-summary-strip" class="board-summary-strip" hidden></div>
+
+  <section>
+    <div id="board-game-cards"></div>
+  </section>
 
   <div class="board-layout">
     <div class="board-main">
@@ -49,5 +59,10 @@
 
 {% block extra_scripts %}
 <script src="{{ url_for('static', filename='shared/bet_slip.js') }}"></script>
-<script src="{{ url_for('static', filename='shared/market_board.js') }}" data-api-endpoint="{{ api_endpoint }}" data-sport-slug="{{ sport_slug }}"></script>
+<script
+  src="{{ url_for('static', filename='shared/market_board.js') }}"
+  data-api-endpoint="{{ api_endpoint }}"
+  data-sport-slug="{{ sport_slug }}"
+  data-selected-date="{{ selected_date }}"
+></script>
 {% endblock %}
