@@ -15,13 +15,31 @@ Public API:
 """
 from __future__ import annotations
 
+from .adapters import (
+    american_to_decimal,
+    american_to_implied,
+    build_game_prediction,
+    ev_per_unit,
+    game_seed,
+)
 from .calibration_profile import NHL_CALIBRATION_PROFILE, build_nhl_sim_config
+from .contracts import (
+    HockeyEvaluationRecord,
+    HockeyGameFeatures,
+    HockeyGamePrediction,
+    HockeyMarketLines,
+    HockeyPlayerFeatures,
+    HockeyPropProjection,
+    HockeyTeamFeatures,
+)
 from .engine import GameSimulator, PeriodSimulator, PossessionSimulator, SimConfig
+from .game_market_sim import simulate_from_period_lambdas, simulate_from_totals_diff
 from .models import PlayerRates, RateModels, TeamRates
 from .runtime import run_hockeysim_game
 from .state import Event, GameState, PlayerState, TeamState
 
 __all__ = [
+    # engine + runtime
     "run_hockeysim_game",
     "NHL_CALIBRATION_PROFILE",
     "build_nhl_sim_config",
@@ -36,4 +54,21 @@ __all__ = [
     "TeamState",
     "PlayerState",
     "Event",
+    # game-market sim
+    "simulate_from_period_lambdas",
+    "simulate_from_totals_diff",
+    # contracts
+    "HockeyTeamFeatures",
+    "HockeyPlayerFeatures",
+    "HockeyMarketLines",
+    "HockeyGameFeatures",
+    "HockeyGamePrediction",
+    "HockeyPropProjection",
+    "HockeyEvaluationRecord",
+    # adapter
+    "build_game_prediction",
+    "game_seed",
+    "american_to_decimal",
+    "american_to_implied",
+    "ev_per_unit",
 ]
