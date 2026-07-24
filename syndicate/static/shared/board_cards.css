@@ -258,6 +258,13 @@ body.syndicate-body .cards-shell {
   gap: 10px;
 }
 
+.board-card__head-id {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
 .board-card__title {
   font-size: 14px;
   font-weight: 700;
