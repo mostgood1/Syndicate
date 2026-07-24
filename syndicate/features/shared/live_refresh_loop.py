@@ -841,6 +841,41 @@ def _mlb_daily_summary_path(date_str: str) -> Path:
 	return data_root() / "mlb_source" / "source_artifacts" / "data" / "daily" / f"daily_summary_{date_slug}.json"
 
 
+_MLB_SIM_ATTEMPT_BACKOFF_SECONDS = 180
+
+
+def _mlb_recent_sim_attempt_within_backoff(date_str: str) -> bool:
+	# _mlb_daily_sim_decision's "first_appearance" branch only checks whether
+	# the summary artifact exists -- that file is written when a sim run
+	# *finishes*, not when it starts. If the container gets OOM-killed (or
+	# otherwise dies) mid-run, the summary never gets written, so every
+	# restart sees the same missing-summary state and immediately relaunches
+	# the same full, unscoped (all games) 1000-sim job -- which can itself
+	# take long enough to contribute to another OOM before finishing. That's
+	# a self-reinforcing crash loop with zero cooldown between attempts.
+	# _write_active_pointer already persists a started_at the instant a run
+	# launches (before any heavy work), independent of whether the process
+	# is later confirmed dead -- reuse it here purely to rate-limit repeat
+	# attempts, not to detect liveness (that's _mlb_daily_sim_process_still_running's job).
+	try:
+		meta = read_json_file(_mlb_sim_active_pointer_path())
+	except Exception:
+		return False
+	if not isinstance(meta, dict) or not meta:
+		return False
+	if str(meta.get("date") or "") != date_str:
+		return False
+	started_at = str(meta.get("started_at") or "")
+	try:
+		started_dt = datetime.fromisoformat(started_at.replace("Z", "+00:00")) if started_at else None
+	except Exception:
+		started_dt = None
+	if started_dt is None:
+		return False
+	age_seconds = (datetime.now(timezone.utc) - started_dt).total_seconds()
+	return 0.0 <= age_seconds < _MLB_SIM_ATTEMPT_BACKOFF_SECONDS
+
+
 def _read_json_file_lenient(path: Path) -> Any | None:
 	try:
 		if not path.exists() or not path.is_file():
@@ -952,6 +987,8 @@ def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any
 		return {"force": False, "reason": "no_games_scheduled"}
 
 	if not _mlb_daily_summary_path(date_str).exists():
+		if _mlb_recent_sim_attempt_within_backoff(date_str):
+			return {"force": False, "reason": "recent_attempt_backoff"}
 		return {"force": True, "reason": "first_appearance"}
 
 	window_minutes = _event_sim_force_window_minutes()

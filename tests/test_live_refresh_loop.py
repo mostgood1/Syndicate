@@ -1093,7 +1093,9 @@ class LiveRefreshLoopTests(unittest.TestCase):
             live_refresh_loop, "fetch_schedule_for_date", return_value=events
         ), patch.object(
             live_refresh_loop, "_mlb_daily_summary_path"
-        ) as mocked_summary_path:
+        ) as mocked_summary_path, patch.object(
+            live_refresh_loop, "_mlb_recent_sim_attempt_within_backoff", return_value=False
+        ):
             mocked_summary_path.return_value.exists.return_value = False
             decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=2000.0, date_str="2026-07-19")
 
