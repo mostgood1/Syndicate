@@ -54,7 +54,7 @@
     marketFamily: "all",
     propTypes: new Set(), // empty == no filter (show every market type)
     game: "all",
-    view: "cards",
+    view: "blotter",
   };
 
   let boardGames = [];

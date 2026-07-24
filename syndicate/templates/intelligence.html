@@ -150,7 +150,7 @@
     gameState: urlParams.get("game_state") || "all",
     marketFamily: urlParams.get("market_family") || "all",
     minEdge: Number(urlParams.get("min_edge") || 0) || 0,
-    view: urlParams.get("view") === "blotter" ? "blotter" : "cards",
+    view: urlParams.get("view") === "cards" ? "cards" : "blotter",
     game: urlParams.get("game") || "all",
   };
 
@@ -199,7 +199,7 @@
     if (state.gameState && state.gameState !== "all") url.searchParams.set("game_state", state.gameState); else url.searchParams.delete("game_state");
     if (state.marketFamily && state.marketFamily !== "all") url.searchParams.set("market_family", state.marketFamily); else url.searchParams.delete("market_family");
     if (state.minEdge > 0) url.searchParams.set("min_edge", String(state.minEdge)); else url.searchParams.delete("min_edge");
-    if (state.view && state.view !== "cards") url.searchParams.set("view", state.view); else url.searchParams.delete("view");
+    if (state.view && state.view !== "blotter") url.searchParams.set("view", state.view); else url.searchParams.delete("view");
     if (state.game && state.game !== "all") url.searchParams.set("game", state.game); else url.searchParams.delete("game");
     window.history.replaceState({}, "", url.toString());
   }
