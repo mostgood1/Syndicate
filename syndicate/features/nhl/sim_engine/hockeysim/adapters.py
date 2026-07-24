@@ -66,6 +66,20 @@ def _p_at_least_one(lam: float) -> float:
     return 1.0 - math.exp(-max(0.0, float(lam)))
 
 
+def _finite(value: object, default: float = 0.0) -> float:
+    """Coerce a sim probability to a finite float (NaN/inf -> default).
+
+    ``simulate_from_period_lambdas`` returns NaN for over/under when no totals line is supplied;
+    the emitted artifact row must never carry NaN (breaks CSV/JSON + downstream grading), so an
+    ungraded market degrades to 0.0. The totals-line fallback policy lives in the producer, not here.
+    """
+    try:
+        f = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+    return f if math.isfinite(f) else default
+
+
 def build_game_prediction(
     game: HockeyGameFeatures,
     *,
@@ -105,12 +119,12 @@ def build_game_prediction(
     if total_line is not None and float(total_line).is_integer():
         p_push = _poisson_pmf(int(total_line), model_total)
 
-    p_over = float(probs.get("over") or 0.0)
-    p_under = float(probs.get("under") or 0.0)
-    p_home_ml = float(probs.get("home_ml") or 0.0)
-    p_away_ml = float(probs.get("away_ml") or 0.0)
-    p_home_pl = float(probs.get("home_puckline_-1.5") or 0.0)
-    p_away_pl = float(probs.get("away_puckline_+1.5") or 0.0)
+    p_over = _finite(probs.get("over"))
+    p_under = _finite(probs.get("under"))
+    p_home_ml = _finite(probs.get("home_ml"))
+    p_away_ml = _finite(probs.get("away_ml"))
+    p_home_pl = _finite(probs.get("home_puckline_-1.5"))
+    p_away_pl = _finite(probs.get("away_puckline_+1.5"))
 
     ev: Dict[str, float] = {}
     for key, prob, odds in (

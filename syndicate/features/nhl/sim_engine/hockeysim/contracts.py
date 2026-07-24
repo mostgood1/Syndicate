@@ -25,6 +25,13 @@ class HockeyTeamFeatures:
     blocks_per_60: float = 12.0
     penalties_per_60: float = 3.0
     faceoff_win_pct: float = 0.5
+    # Expected-goals rates (5v5+all-situations blend) consumed by the projection layer
+    # (``projection.project_game``). Optional: when absent the projection falls back to
+    # ``goals_per_60`` for offense and the league baseline for defense.
+    xgf_per_60: Optional[float] = None
+    xga_per_60: Optional[float] = None
+    # Optional Elo rating (used to blend a rating-based win prob into the projection seed).
+    elo_rating: Optional[float] = None
     # Per-period expected goals [P1, P2, P3] consumed by the fast game-market sim.
     period_goal_lambdas: Tuple[float, float, float] = (0.9, 0.95, 1.05)
     # Special-teams context (pp/pk pct + committed/drawn per game).

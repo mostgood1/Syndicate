@@ -1,0 +1,333 @@
+"""Feature loaders: Syndicate NHL data -> frozen ``hockeysim`` contracts -> projected lambdas.
+
+Mirrors ``soccersim.features.loaders`` / football ``features/loaders.py``. Reads the
+Syndicate-owned NHL artifact mirror (``data/nhl_source/data/processed`` + the odds games mirror)
+and ``syndicate.local_nhl_odds`` team maps, assembles :class:`HockeyGameFeatures`, and runs the
+:mod:`hockeysim.projection` layer so every game carries per-period goal lambdas the game-market
+adapter consumes.
+
+Reader discipline (soccersim ``sources.py`` lesson): per-date artifacts are **not** cached (a
+gunicorn worker would otherwise serve a stale slate forever); only the process-wide root
+resolution is memoized. All readers degrade gracefully — a missing file yields league-average
+features, never an exception, matching the "degraded/empty state, not on-request backfill" rule.
+"""
+from __future__ import annotations
+
+import csv
+import os
+from functools import lru_cache
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+from syndicate.local_nhl_odds import TEAM_NAME_TO_ABBR, _team_abbr
+
+from ..contracts import HockeyGameFeatures, HockeyMarketLines, HockeyPlayerFeatures, HockeyTeamFeatures
+from ..projection import NHL_PROJECTION_PROFILE, ProjectionProfile, apply_projection
+
+# ---------------------------------------------------------------------------
+# Root + path resolution
+# ---------------------------------------------------------------------------
+
+# loaders.py -> features -> hockeysim -> sim_engine -> nhl -> features -> syndicate -> <repo root>
+_REPO_ROOT = Path(__file__).resolve().parents[6]
+
+
+@lru_cache(maxsize=4)
+def nhl_source_root() -> Path:
+    """Resolve the NHL artifact mirror root.
+
+    Honors ``SYNDICATE_ARTIFACT_ROOT_NHL`` (a published bundle) then falls back to the in-repo
+    ``data/nhl_source`` mirror. Cached because the root is process-stable (unlike per-date files).
+    """
+    env = os.getenv("SYNDICATE_ARTIFACT_ROOT_NHL")
+    if env:
+        p = Path(env)
+        if p.exists():
+            return p
+    return _REPO_ROOT / "data" / "nhl_source"
+
+
+def _processed_dir(root: Optional[Path] = None) -> Path:
+    return (root or nhl_source_root()) / "data" / "processed"
+
+
+def _odds_games_dir(root: Optional[Path] = None) -> Path:
+    return (root or nhl_source_root()) / "data" / "odds" / "games"
+
+
+def _read_csv_rows(path: Path) -> List[Dict[str, str]]:
+    """Read a CSV into a list of dict rows; ``[]`` if absent/empty/unreadable."""
+    try:
+        if not path.exists() or path.stat().st_size == 0:
+            return []
+        with path.open("r", encoding="utf-8-sig", newline="") as fh:
+            return [dict(r) for r in csv.DictReader(fh)]
+    except (OSError, csv.Error, UnicodeDecodeError):
+        return []
+
+
+def _season_code_for_date(date: str) -> str:
+    """NHL season code ``YYYY-YYYY+1`` from a ``YYYY-MM-DD`` date (season flips ~July)."""
+    try:
+        year = int(str(date)[:4])
+        month = int(str(date)[5:7])
+    except (ValueError, IndexError):
+        return ""
+    # NHL season starts in October; Jan-Jun belongs to the season that began the prior year.
+    start_year = year if month >= 7 else year - 1
+    return f"{start_year}-{start_year + 1}"
+
+
+def _to_float(value: object) -> Optional[float]:
+    try:
+        if value is None or str(value).strip() == "":
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _abbr(name: str) -> Optional[str]:
+    return _team_abbr(name)
+
+
+# ---------------------------------------------------------------------------
+# Data readers (all degrade to empty/None; never raise on missing data)
+# ---------------------------------------------------------------------------
+
+
+def load_team_xg_map(date: str, *, root: Optional[Path] = None) -> Dict[str, Dict[str, float]]:
+    """Load ``{ABBR: {"xgf60": float, "xga60": float}}`` for a date.
+
+    Re-homed from the vendor ``data/team_xg.py`` reader against the Syndicate mirror path. Looks
+    for ``team_xg_{season}.csv`` then ``team_xg_latest.csv`` under the processed dir. Returns an
+    empty map when unavailable so the projection falls back to league-average strength.
+    """
+    proc = _processed_dir(root)
+    season = _season_code_for_date(date)
+    candidates = [proc / f"team_xg_{season}.csv", proc / "team_xg_latest.csv"]
+    rows: List[Dict[str, str]] = []
+    for path in candidates:
+        rows = _read_csv_rows(path)
+        if rows:
+            break
+    if not rows:
+        return {}
+
+    out: Dict[str, Dict[str, float]] = {}
+    for row in rows:
+        lower = {k.lower(): v for k, v in row.items()}
+        ab = lower.get("abbr") or lower.get("team") or lower.get("team_abbr")
+        xf = _to_float(lower.get("xgf60") or lower.get("xgf_per60") or lower.get("xgf60_all"))
+        xa = _to_float(lower.get("xga60") or lower.get("xga_per60") or lower.get("xga60_all"))
+        key = _abbr(ab) or (str(ab).upper() if ab else None)
+        if not key or xf is None:
+            continue
+        entry = {"xgf60": xf}
+        if xa is not None:
+            entry["xga60"] = xa
+        out[key] = entry
+    return out
+
+
+def load_lineups(date: str, *, root: Optional[Path] = None) -> Dict[str, List[Dict[str, str]]]:
+    """Load ``lineups_{date}.csv`` grouped by team abbreviation."""
+    rows = _read_csv_rows(_processed_dir(root) / f"lineups_{date}.csv")
+    grouped: Dict[str, List[Dict[str, str]]] = {}
+    for row in rows:
+        key = _abbr(row.get("team")) or str(row.get("team") or "").upper()
+        if key:
+            grouped.setdefault(key, []).append(row)
+    return grouped
+
+
+def load_roster(date: str, *, root: Optional[Path] = None) -> Dict[str, List[Dict[str, str]]]:
+    """Load ``roster_snapshot_{date}.csv`` grouped by team abbreviation."""
+    rows = _read_csv_rows(_processed_dir(root) / f"roster_snapshot_{date}.csv")
+    grouped: Dict[str, List[Dict[str, str]]] = {}
+    for row in rows:
+        key = _abbr(row.get("team")) or str(row.get("team") or "").upper()
+        if key:
+            grouped.setdefault(key, []).append(row)
+    return grouped
+
+
+def load_starting_goalies(date: str, *, root: Optional[Path] = None) -> Dict[str, Dict[str, str]]:
+    """Load ``starting_goalies_{date}.csv`` keyed by team abbreviation."""
+    rows = _read_csv_rows(_processed_dir(root) / f"starting_goalies_{date}.csv")
+    out: Dict[str, Dict[str, str]] = {}
+    for row in rows:
+        key = _abbr(row.get("team")) or str(row.get("team") or "").upper()
+        if key:
+            out[key] = row
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Feature assembly (pure — inputs in, contracts out)
+# ---------------------------------------------------------------------------
+
+_POSITION_MAP = {
+    "C": "F", "L": "F", "R": "F", "LW": "F", "RW": "F", "F": "F", "W": "F",
+    "D": "D", "LD": "D", "RD": "D",
+    "G": "G",
+}
+
+
+def _canonical_position(raw: object) -> str:
+    token = str(raw or "").strip().upper()
+    return _POSITION_MAP.get(token, "F" if token and token != "G" else token or "F")
+
+
+def build_team_features(
+    name: str,
+    *,
+    abbrev: Optional[str] = None,
+    xg_map: Optional[Dict[str, Dict[str, float]]] = None,
+) -> HockeyTeamFeatures:
+    """Assemble one side's team-strength features, filling xGF/xGA from ``xg_map`` when present."""
+    ab = abbrev or _abbr(name)
+    xgf = xga = None
+    if xg_map and ab and ab in xg_map:
+        xgf = xg_map[ab].get("xgf60")
+        xga = xg_map[ab].get("xga60")
+    return HockeyTeamFeatures(name=name, abbrev=ab, xgf_per_60=xgf, xga_per_60=xga)
+
+
+def build_player_features(
+    team_rows: List[Dict[str, str]],
+    *,
+    starting_goalie: Optional[Dict[str, str]] = None,
+) -> Tuple[HockeyPlayerFeatures, ...]:
+    """Assemble a team's player features from lineup/roster rows (+ optional starting goalie)."""
+    goalie_name = str((starting_goalie or {}).get("goalie") or "").strip().lower()
+    players: List[HockeyPlayerFeatures] = []
+    for row in team_rows:
+        pid = row.get("player_id")
+        try:
+            pid_int = int(float(pid)) if pid not in (None, "") else 0
+        except (TypeError, ValueError):
+            pid_int = 0
+        position = _canonical_position(row.get("position"))
+        full_name = str(row.get("full_name") or "").strip()
+        is_starter = bool(goalie_name) and position == "G" and full_name.lower() == goalie_name
+        players.append(
+            HockeyPlayerFeatures(
+                player_id=pid_int,
+                full_name=full_name,
+                position=position,
+                proj_toi=_to_float(row.get("proj_toi")) or 0.0,
+                line_slot=(str(row.get("line_slot")).strip() or None) if row.get("line_slot") else None,
+                pp_unit=_safe_int(row.get("pp_unit")),
+                pk_unit=_safe_int(row.get("pk_unit")),
+                is_starting_goalie=is_starter,
+            )
+        )
+    return tuple(players)
+
+
+def _safe_int(value: object) -> Optional[int]:
+    try:
+        if value is None or str(value).strip() == "":
+            return None
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def build_game_features(
+    game_pk: str,
+    date: str,
+    home_name: str,
+    away_name: str,
+    *,
+    root: Optional[Path] = None,
+    market: Optional[HockeyMarketLines] = None,
+    xg_map: Optional[Dict[str, Dict[str, float]]] = None,
+    lineups: Optional[Dict[str, List[Dict[str, str]]]] = None,
+    goalies: Optional[Dict[str, Dict[str, str]]] = None,
+    profile: ProjectionProfile = NHL_PROJECTION_PROFILE,
+    project: bool = True,
+) -> HockeyGameFeatures:
+    """Assemble a fully-featured, projection-primed :class:`HockeyGameFeatures` for one game.
+
+    When ``project`` is true (default) the projection layer is run and each side's
+    ``period_goal_lambdas`` is set from it, so the game-market adapter needs no extra step.
+    Pre-loaded maps may be passed (slate loader shares them across games); otherwise they are
+    read per call. Unavailable inputs degrade to league-average / empty, never an exception.
+    """
+    if xg_map is None:
+        xg_map = load_team_xg_map(date, root=root)
+    if lineups is None:
+        lineups = load_lineups(date, root=root)
+    if goalies is None:
+        goalies = load_starting_goalies(date, root=root)
+
+    home = build_team_features(home_name, xg_map=xg_map)
+    away = build_team_features(away_name, xg_map=xg_map)
+
+    if project:
+        home, away, _proj = apply_projection(home, away, profile=profile)
+
+    home_ab = home.abbrev or _abbr(home_name)
+    away_ab = away.abbrev or _abbr(away_name)
+    home_players = build_player_features(
+        lineups.get(home_ab, []) if home_ab else [], starting_goalie=(goalies or {}).get(home_ab or "")
+    )
+    away_players = build_player_features(
+        lineups.get(away_ab, []) if away_ab else [], starting_goalie=(goalies or {}).get(away_ab or "")
+    )
+
+    return HockeyGameFeatures(
+        game_pk=str(game_pk),
+        date=str(date),
+        home=home,
+        away=away,
+        home_players=home_players,
+        away_players=away_players,
+        market=market or HockeyMarketLines(),
+    )
+
+
+def _load_scoreboard_games(date: str, root: Optional[Path] = None) -> List[Tuple[str, str, str]]:
+    """Return ``[(game_pk, home_name, away_name)]`` for a date from the odds games mirror."""
+    path = _odds_games_dir(root) / f"date={date}" / "scoreboard.csv"
+    rows = _read_csv_rows(path)
+    seen: Dict[str, Tuple[str, str, str]] = {}
+    for row in rows:
+        pk = str(row.get("gamePk") or row.get("game_pk") or "").strip()
+        home = str(row.get("home") or row.get("home_team") or "").strip()
+        away = str(row.get("away") or row.get("away_team") or "").strip()
+        if pk and home and away and pk not in seen:
+            seen[pk] = (pk, home, away)
+    return list(seen.values())
+
+
+def build_slate_features(
+    date: str,
+    *,
+    root: Optional[Path] = None,
+    profile: ProjectionProfile = NHL_PROJECTION_PROFILE,
+    project: bool = True,
+) -> List[HockeyGameFeatures]:
+    """Assemble projection-primed features for every game on a date's scoreboard.
+
+    Shared per-date maps (xG / lineups / goalies) are read once and reused across games.
+    Returns ``[]`` when no scoreboard is mirrored for the date.
+    """
+    games = _load_scoreboard_games(date, root=root)
+    if not games:
+        return []
+    xg_map = load_team_xg_map(date, root=root)
+    lineups = load_lineups(date, root=root)
+    goalies = load_starting_goalies(date, root=root)
+    out: List[HockeyGameFeatures] = []
+    for pk, home_name, away_name in games:
+        out.append(
+            build_game_features(
+                pk, date, home_name, away_name,
+                root=root, xg_map=xg_map, lineups=lineups, goalies=goalies,
+                profile=profile, project=project,
+            )
+        )
+    return out

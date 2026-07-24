@@ -36,6 +36,13 @@ from .engine import GameSimulator, PeriodSimulator, PossessionSimulator, SimConf
 from .game_market_sim import simulate_from_period_lambdas, simulate_from_totals_diff
 from .models import PlayerRates, RateModels, TeamRates
 from .player_props import build_prop_projections
+from .projection import (
+    NHL_PROJECTION_PROFILE,
+    GameProjection,
+    ProjectionProfile,
+    apply_projection,
+    project_game,
+)
 from .props_boxscore import aggregate_events_to_boxscores_fast
 from .runtime import run_hockeysim_game
 from .state import Event, GameState, PlayerState, TeamState
@@ -76,4 +83,10 @@ __all__ = [
     # props
     "build_prop_projections",
     "aggregate_events_to_boxscores_fast",
+    # projection (xG/Elo/Poisson game model)
+    "project_game",
+    "apply_projection",
+    "GameProjection",
+    "ProjectionProfile",
+    "NHL_PROJECTION_PROFILE",
 ]
