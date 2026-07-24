@@ -1942,6 +1942,44 @@ def _daily_sim_by_game(selected_date: str, game_pks: list[int]) -> dict[int, dic
     return out
 
 
+def _freshness_display(iso_timestamp: str | None) -> str | None:
+    # Server-side twin of cards_source.js formatTimestampShort (M/D h:mm in
+    # Central time) for the server-rendered card template, which has no
+    # client formatter of its own.
+    text = str(iso_timestamp or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return text
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=CENTRAL_TIMEZONE)
+    local_dt = parsed.astimezone(CENTRAL_TIMEZONE)
+    hour_minute = local_dt.strftime("%I:%M %p").lstrip("0")
+    return f"{local_dt.month}/{local_dt.day} {hour_minute}"
+
+
+def _daily_sim_updated_at_by_game(selected_date: str, game_pks: list[int]) -> dict[int, str]:
+    # Lineup/injury news triggers single-game resims (fingerprint_change in
+    # live_refresh_loop.py's daily-sim gate, --only-game-pks), so sim recency
+    # genuinely varies game to game. The per-game sim artifacts embed no
+    # generated-at timestamp of their own, so the artifact file's mtime --
+    # i.e. when the sim job last (re)wrote this game's output -- is the
+    # honest per-game "last simulated" signal.
+    out: dict[int, str] = {}
+    for game_pk in game_pks:
+        sim_path = daily_sim_artifact_path(selected_date, int(game_pk))
+        if sim_path is None:
+            continue
+        try:
+            mtime = Path(sim_path).stat().st_mtime
+        except OSError:
+            continue
+        out[int(game_pk)] = datetime.fromtimestamp(mtime, tz=CENTRAL_TIMEZONE).isoformat(timespec="seconds")
+    return out
+
+
 def _daily_actual_by_game(selected_date: str, game_pks: list[int]) -> dict[int, dict[str, Any]]:
     out: dict[int, dict[str, Any]] = {}
     today_iso = central_today_iso()
@@ -4748,7 +4786,33 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
             if isinstance(game.get("status"), dict) and str(game.get("status", {}).get("abstract") or "").strip().lower() == "live":
                 game["oddsRefreshedAt"] = refresh_ts
                 game["odds_refreshed_at"] = refresh_ts
+            elif not str(game.get("oddsRefreshedAt") or game.get("odds_refreshed_at") or "").strip():
+                # Pregame/final games on today's slate are refreshed by the
+                # same slate-wide odds loop as live ones -- surface the same
+                # timestamp so every card answers "when were these odds
+                # last pulled", not just the in-progress ones. Live-lens
+                # merged per-game values (checked above) still win.
+                game["oddsRefreshedAt"] = refresh_ts
+                game["odds_refreshed_at"] = refresh_ts
         latest_live_odds_refreshed_at = refresh_ts
+    # Per-game "last simulated" chip data: keyed off each game's own sim
+    # artifact so a single-game resim (lineup/injury fingerprint change)
+    # visibly bumps only that game's timestamp.
+    sim_updated_at_by_game = _daily_sim_updated_at_by_game(
+        resolved_date,
+        [int(game.get("gamePk") or game.get("game_pk") or 0) for game in games if isinstance(game, dict) and int(game.get("gamePk") or game.get("game_pk") or 0)],
+    )
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        sim_ts = sim_updated_at_by_game.get(int(game.get("gamePk") or game.get("game_pk") or 0))
+        if sim_ts:
+            game["simUpdatedAt"] = sim_ts
+            game["sim_updated_at"] = sim_ts
+            game["simUpdatedAtDisplay"] = _freshness_display(sim_ts)
+        odds_ts = str(game.get("oddsRefreshedAt") or game.get("odds_refreshed_at") or "").strip()
+        if odds_ts:
+            game["oddsRefreshedAtDisplay"] = _freshness_display(odds_ts)
     _attach_cards_pregame_starter_ladder_badges(games, selected_date=resolved_date)
     _attach_cards_stateful_starter_ladder_badges(
         games,

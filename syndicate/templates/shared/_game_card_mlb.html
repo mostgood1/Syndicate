@@ -47,6 +47,12 @@
       <div class="cards-live-line">{{ game.summary }}</div>
       <div class="cards-sim-line">{{ game.hero_note }}</div>
       <div class="cards-mini-copy">Probables: {{ starter_panel.title if starter_panel else game.summary }}</div>
+      {% if game.oddsRefreshedAtDisplay %}
+        <div class="cards-mini-copy">Odds updated {{ game.oddsRefreshedAtDisplay }}</div>
+      {% endif %}
+      {% if game.simUpdatedAtDisplay %}
+        <div class="cards-mini-copy">Sim updated {{ game.simUpdatedAtDisplay }}</div>
+      {% endif %}
     </div>
   </div>
 

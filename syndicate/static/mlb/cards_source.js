@@ -391,6 +391,13 @@
     return updatedAt ? `Odds updated ${formatTimestampShort(updatedAt)}` : "Odds updated -";
   }
 
+  // Per-game last-sim timestamp (single-game resims from lineup/injury news
+  // mean this varies card to card; sourced server-side from the game's own
+  // sim artifact).
+  function simUpdatedAt(card) {
+    return String(card?.simUpdatedAt || card?.sim_updated_at || "").trim();
+  }
+
   function cardFullGamePrediction(card) {
     const row = card?.predictions?.full && typeof card.predictions.full === "object" ? card.predictions.full : null;
     if (!row) return null;
@@ -1956,6 +1963,7 @@
           <div class="cards-sim-line" data-role="sim-line">Loading sim box...</div>
           <div class="cards-mini-copy">Probables: ${escapeHtml(starterText(card))}</div>
           ${trackedGameLinesUpdatedAt(card) ? `<div class="cards-mini-copy">Odds updated ${escapeHtml(formatTimestampShort(trackedGameLinesUpdatedAt(card)))}</div>` : ""}
+          ${simUpdatedAt(card) ? `<div class="cards-mini-copy">Sim updated ${escapeHtml(formatTimestampShort(simUpdatedAt(card)))}</div>` : ""}
         </div>
       </div>
 
