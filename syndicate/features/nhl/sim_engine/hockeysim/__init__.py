@@ -35,6 +35,12 @@ from .contracts import (
 from .engine import GameSimulator, PeriodSimulator, PossessionSimulator, SimConfig
 from .game_market_sim import simulate_from_period_lambdas, simulate_from_totals_diff
 from .models import PlayerRates, RateModels, TeamRates
+from .market_anchoring import (
+    anchor_expected_goals,
+    anchor_game_features,
+    devig_two_way_home_prob,
+    market_home_prob,
+)
 from .player_props import build_prop_projections
 from .projection import (
     NHL_PROJECTION_PROFILE,
@@ -89,4 +95,9 @@ __all__ = [
     "GameProjection",
     "ProjectionProfile",
     "NHL_PROJECTION_PROFILE",
+    # market anchoring (Phase 4)
+    "anchor_game_features",
+    "anchor_expected_goals",
+    "market_home_prob",
+    "devig_two_way_home_prob",
 ]

@@ -248,11 +248,15 @@ def build_game_features(
     goalies: Optional[Dict[str, Dict[str, str]]] = None,
     profile: ProjectionProfile = NHL_PROJECTION_PROFILE,
     project: bool = True,
+    anchor_to_market: bool = False,
+    anchor_weight: float = 0.35,
 ) -> HockeyGameFeatures:
     """Assemble a fully-featured, projection-primed :class:`HockeyGameFeatures` for one game.
 
     When ``project`` is true (default) the projection layer is run and each side's
     ``period_goal_lambdas`` is set from it, so the game-market adapter needs no extra step.
+    When ``anchor_to_market`` is true and a usable market moneyline is present, the projected
+    lambdas are then anchored toward the book (Phase 4, opt-in; no-op without odds).
     Pre-loaded maps may be passed (slate loader shares them across games); otherwise they are
     read per call. Unavailable inputs degrade to league-average / empty, never an exception.
     """
@@ -278,7 +282,7 @@ def build_game_features(
         lineups.get(away_ab, []) if away_ab else [], starting_goalie=(goalies or {}).get(away_ab or "")
     )
 
-    return HockeyGameFeatures(
+    game = HockeyGameFeatures(
         game_pk=str(game_pk),
         date=str(date),
         home=home,
@@ -287,6 +291,11 @@ def build_game_features(
         away_players=away_players,
         market=market or HockeyMarketLines(),
     )
+
+    if anchor_to_market and project:
+        from ..market_anchoring import anchor_game_features
+        game = anchor_game_features(game, weight=anchor_weight)
+    return game
 
 
 def _load_scoreboard_games(date: str, root: Optional[Path] = None) -> List[Tuple[str, str, str]]:
@@ -309,10 +318,13 @@ def build_slate_features(
     root: Optional[Path] = None,
     profile: ProjectionProfile = NHL_PROJECTION_PROFILE,
     project: bool = True,
+    anchor_to_market: bool = False,
+    anchor_weight: float = 0.35,
 ) -> List[HockeyGameFeatures]:
     """Assemble projection-primed features for every game on a date's scoreboard.
 
     Shared per-date maps (xG / lineups / goalies) are read once and reused across games.
+    ``anchor_to_market`` opts into Phase-4 market anchoring per game (no-op without odds).
     Returns ``[]`` when no scoreboard is mirrored for the date.
     """
     games = _load_scoreboard_games(date, root=root)
@@ -328,6 +340,7 @@ def build_slate_features(
                 pk, date, home_name, away_name,
                 root=root, xg_map=xg_map, lineups=lineups, goalies=goalies,
                 profile=profile, project=project,
+                anchor_to_market=anchor_to_market, anchor_weight=anchor_weight,
             )
         )
     return out
