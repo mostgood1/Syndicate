@@ -7072,9 +7072,26 @@ def rank_candidates(
     return custom_ranked
 
 
-def collect_all_recommendations(*, selected_date: str | None = None, force_refresh: bool = False, log_pipeline: bool = True) -> list[dict[str, Any]]:
+def collect_all_recommendations(
+    *,
+    selected_date: str | None = None,
+    force_refresh: bool = False,
+    log_pipeline: bool = True,
+    overview: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
     effective_date = _effective_date(selected_date or central_today_iso())
-    overview = build_intelligence_overview(selected_date=effective_date, force_refresh=force_refresh)
+    # overview: lets a caller that already built one (e.g.
+    # collect_candidates_with_fallback_merge's fallback/thin-pool-merge
+    # branches, which already have overview as a parameter) skip
+    # build_intelligence_overview's own per-sport artifact-status/existence
+    # checks entirely instead of silently re-running them -- confirmed via
+    # production diagnostic that this fallback path re-fetches on every
+    # candidate-collection cycle (not just as a rare fallback), doubling
+    # boot-time artifact-file I/O and contributing to container memory
+    # pressure (page cache, not process RSS) that was OOM-killing the
+    # refresh-worker within 1-2 minutes of boot.
+    if overview is None:
+        overview = build_intelligence_overview(selected_date=effective_date, force_refresh=force_refresh)
     odds_history_by_sport = _odds_history_payloads_by_sport(overview)
     tracked = _tracked_repo_files()
     preferences = _query_preferences(
@@ -7194,6 +7211,7 @@ def collect_candidates_with_fallback_merge(
                 selected_date=selected_date,
                 force_refresh=True,
                 log_pipeline=False,
+                overview=overview,
             )
         except TypeError:
             raw_candidates = []
@@ -7214,6 +7232,7 @@ def collect_candidates_with_fallback_merge(
                 selected_date=selected_date,
                 force_refresh=True,
                 log_pipeline=False,
+                overview=overview,
             )
         except TypeError:
             richer_candidates = []

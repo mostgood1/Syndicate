@@ -2716,7 +2716,7 @@ class IntelligenceStateTests(unittest.TestCase):
                 overview=[], preferences={}, odds_history_by_sport={}, selected_date="2026-06-10"
             )
 
-        mocked_richer.assert_called_once_with(selected_date="2026-06-10", force_refresh=True, log_pipeline=False)
+        mocked_richer.assert_called_once_with(selected_date="2026-06-10", force_refresh=True, log_pipeline=False, overview=[])
         self.assertEqual(result, richer_pool)
 
     def test_collect_candidates_with_fallback_merge_unions_thin_pool_with_richer_pool(self) -> None:
