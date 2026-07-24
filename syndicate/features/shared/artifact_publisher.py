@@ -134,16 +134,27 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "wnba_source/data/processed/boxscores_history.csv",
     "nhl_source/source_artifacts/data/raw/player_game_stats.csv",
     "nhl_source/data/raw/player_game_stats.csv",
-    # Soccer has no bookmaker odds ingestion (simulation-derived recommendations
-    # only) and no source_artifacts/data/processed nesting -- build_soccer_artifacts.py,
-    # poll_soccer_live_state.py, and build_soccer_schedule.py all write directly
-    # under soccer_source/<league>/api/, so the generic "*_source/..." patterns
-    # above never match soccer's files. Literal sport prefix, same as the
-    # mlb_source/wnba_source/nhl_source eval/boxscore entries above.
+    # Soccer has no source_artifacts/data/processed nesting -- build_soccer_artifacts.py,
+    # poll_soccer_live_state.py, build_soccer_schedule.py, fetch_soccer_oddsapi_odds_local.py,
+    # fetch_soccer_oddsapi_props_local.py, and build_soccer_picks.py all write directly
+    # under soccer_source/<league>/api/ (or soccer_source/<league>/props/), so the generic
+    # "*_source/..." patterns above never match soccer's files. Literal sport prefix, same
+    # as the mlb_source/wnba_source/nhl_source eval/boxscore entries above.
     "soccer_source/*/api/recommendations/recommendations_*.json",
     "soccer_source/*/api/live_state/live_state_*.json",
     "soccer_source/*/api/display_prediction_dates.json",
     "soccer_source/*/api/schedule/schedule_*.json",
+    # Raw bookmaker odds/props/picks (2026-07-24 market-board work): these
+    # three were never allowlisted even though the refresh dispatcher has
+    # scheduled fetch_soccer_oddsapi_odds_local.py/build_soccer_picks.py for a
+    # while -- confirmed live in production that the fetch step runs to
+    # completion (return_code=0) and presumably writes its file on whichever
+    # service happened to run it, but the market board (served by web) never
+    # saw a single row, because these three patterns were missing here and
+    # the file never got published/pulled to web's disk.
+    "soccer_source/*/api/odds/game_odds_current.csv",
+    "soccer_source/*/props/*.csv",
+    "soccer_source/*/api/picks/picks_*.csv",
     # Note: reports/intelligence/board_snapshot.json and intelligence_state.json are
     # intentionally excluded here. They're written through refresh_state_store's
     # write_json_file, which already goes over the shared keyvalue (Redis) backend on

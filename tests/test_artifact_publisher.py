@@ -78,6 +78,18 @@ class HotArtifactAllowlistTests(unittest.TestCase):
         self.assertTrue(is_hot_artifact_relative_path("nba_source/source_artifacts/data/processed/oddsapi_player_props_2026-07-23.csv"))
         self.assertTrue(is_hot_artifact_relative_path("wnba_source/data/processed/oddsapi_player_props_2026-07-23.csv"))
 
+    def test_accepts_soccer_raw_odds_props_and_picks(self) -> None:
+        # 2026-07-24 fix: the fetch/picks scripts have been scheduled in
+        # refresh_odds_sources.py for a while and run successfully (confirmed
+        # live in production, return_code=0), but these three patterns were
+        # never allowlisted, so the resulting files never reached the web
+        # dyno -- the market board's Layer 1 join saw zero rows regardless
+        # of league or date.
+        self.assertTrue(is_hot_artifact_relative_path("soccer_source/mls/api/odds/game_odds_current.csv"))
+        self.assertTrue(is_hot_artifact_relative_path("soccer_source/epl/api/odds/game_odds_current.csv"))
+        self.assertTrue(is_hot_artifact_relative_path("soccer_source/mls/props/2026-07-23.csv"))
+        self.assertTrue(is_hot_artifact_relative_path("soccer_source/mls/api/picks/picks_2026-07-23.csv"))
+
     def test_rejects_worker_only_calibration_and_manifest_files(self) -> None:
         self.assertFalse(is_hot_artifact_relative_path("nfl_source/calibration_active.json"))
         self.assertFalse(is_hot_artifact_relative_path("nfl_source/prob_calibration.json"))
