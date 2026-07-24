@@ -35,6 +35,8 @@ from .contracts import (
 from .engine import GameSimulator, PeriodSimulator, PossessionSimulator, SimConfig
 from .game_market_sim import simulate_from_period_lambdas, simulate_from_totals_diff
 from .models import PlayerRates, RateModels, TeamRates
+from .player_props import build_prop_projections
+from .props_boxscore import aggregate_events_to_boxscores_fast
 from .runtime import run_hockeysim_game
 from .state import Event, GameState, PlayerState, TeamState
 
@@ -71,4 +73,7 @@ __all__ = [
     "american_to_decimal",
     "american_to_implied",
     "ev_per_unit",
+    # props
+    "build_prop_projections",
+    "aggregate_events_to_boxscores_fast",
 ]
