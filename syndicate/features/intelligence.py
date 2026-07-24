@@ -4383,9 +4383,23 @@ def _mlb_hydrate_live_prop_projection(candidate: dict[str, Any], live_rows: list
         candidate["actual"] = f"{actual_value:.1f}"
 
 
-def _apply_live_state_context_to_candidates(candidates: list[dict[str, Any]]) -> None:
-    mlb_actual_cache: dict[int, dict[str, Any] | None] = {}
-    mlb_live_lens_cache: dict[str, dict[str, Any] | None] = {}
+def _apply_live_state_context_to_candidates(
+    candidates: list[dict[str, Any]],
+    *,
+    mlb_actual_cache: dict[int, dict[str, Any] | None] | None = None,
+    mlb_live_lens_cache: dict[str, dict[str, Any] | None] | None = None,
+) -> None:
+    # Callers that score many candidates in a loop (e.g. _score_candidates)
+    # must pass shared cache dicts through -- each unique game_pk's raw feed
+    # file and each context_label's live-lens report are otherwise reloaded
+    # and reparsed from disk on every single candidate instead of once per
+    # game, which is what made scoring ~200 candidates take 30-350s (and
+    # spike container memory) instead of the sub-second cost a handful of
+    # per-game file reads should be.
+    if mlb_actual_cache is None:
+        mlb_actual_cache = {}
+    if mlb_live_lens_cache is None:
+        mlb_live_lens_cache = {}
     for candidate in candidates:
         if not isinstance(candidate, Mapping):
             continue
@@ -6884,6 +6898,8 @@ def score_candidate(
     *,
     preferences: dict[str, Any] | None = None,
     advanced_context: list[dict[str, Any]] | None = None,
+    mlb_actual_cache: dict[int, dict[str, Any] | None] | None = None,
+    mlb_live_lens_cache: dict[str, dict[str, Any] | None] | None = None,
 ) -> dict[str, Any]:
     scored_candidate, rejection_reason = _classify_candidate_with_reason(candidate)
     if scored_candidate is None:
@@ -6916,7 +6932,11 @@ def score_candidate(
     else:
         scored_candidate["scoring_mode"] = "minimal"
 
-    _apply_live_state_context_to_candidates([scored_candidate])
+    _apply_live_state_context_to_candidates(
+        [scored_candidate],
+        mlb_actual_cache=mlb_actual_cache,
+        mlb_live_lens_cache=mlb_live_lens_cache,
+    )
     advanced_by_sport = {
         _safe_text(scored_candidate.get("sport_slug"), "sport").lower(): [dict(item) for item in (advanced_context or []) if isinstance(item, dict)]
     }
@@ -6962,11 +6982,18 @@ def _score_candidates(
     scored_candidates: list[dict[str, Any]] = []
     state_invalid_filtered = 0
     final_filtered = 0
+    # Shared across the whole batch (not per-candidate) so each unique MLB
+    # game_pk's raw feed file and each date's live-lens report get read from
+    # disk once per scoring pass instead of once per candidate.
+    mlb_actual_cache: dict[int, dict[str, Any] | None] = {}
+    mlb_live_lens_cache: dict[str, dict[str, Any] | None] = {}
     for candidate in candidates:
         scored_candidate = score_candidate(
             candidate,
             preferences=preferences,
             advanced_context=advanced_by_sport.get(_safe_text(candidate.get("sport_slug"), "sport").lower(), []),
+            mlb_actual_cache=mlb_actual_cache,
+            mlb_live_lens_cache=mlb_live_lens_cache,
         )
         if not is_valid_candidate(scored_candidate):
             continue
