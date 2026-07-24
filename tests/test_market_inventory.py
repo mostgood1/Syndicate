@@ -45,6 +45,39 @@ class JoinOddsToSimTests(unittest.TestCase):
         self.assertEqual(inventory[0]["sim_projection"], 1.3)
         self.assertTrue(inventory[0]["is_eligible"])
 
+    def test_prop_carries_projected_value_separately_from_sim_projection(self) -> None:
+        # 2026-07-24 fix: sim_projection is always a win-probability/edge
+        # (0-1 fraction, rendered as a percent board-wide) -- a prop's
+        # actual projected stat count (e.g. 4.8 strikeouts) needs its own
+        # field so it isn't mistaken for or overloaded onto that percent.
+        odds_rows = [
+            {"game_id": "823759", "market": "strikeouts", "period": "full_game", "entity": "Tomoyuki Sugano", "side": "over", "line": 3.5, "odds": 106},
+        ]
+        sim_rows = [
+            {
+                "game_id": "823759",
+                "market": "strikeouts",
+                "period": "full_game",
+                "entity": "Tomoyuki Sugano",
+                "sim_projection": 0.2778,
+                "projected_value": 4.821,
+                "sim_source": "mlb_recommendation_engine",
+            },
+        ]
+
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+
+        self.assertEqual(inventory[0]["sim_projection"], 0.2778)
+        self.assertEqual(inventory[0]["projected_value"], 4.821)
+
+    def test_projected_value_is_none_when_sim_row_omits_it(self) -> None:
+        odds_rows = [{"game_id": "1", "market": "moneyline", "period": "full_game", "entity": None, "side": "home", "odds": -150}]
+        sim_rows = [{"game_id": "1", "market": "moneyline", "period": "full_game", "entity": None, "sim_projection": 0.6}]
+
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+
+        self.assertIsNone(inventory[0]["projected_value"])
+
     def test_unmatched_market_with_no_sim_coverage_at_all(self) -> None:
         # A real quoted line the book offers, but nothing modeled this
         # market/period for ANY entity -- a genuine coverage gap, not a

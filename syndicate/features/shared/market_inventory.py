@@ -53,6 +53,13 @@ INVENTORY_ROW_FIELDS: frozenset[str] = frozenset(
         "odds",
         # Sim join result
         "sim_projection",
+        # The actual projected stat value for a prop (e.g. 4.8 strikeouts),
+        # distinct from sim_projection above -- sim_projection is always a
+        # 0-1 fraction (win probability/edge, rendered as a percent by the
+        # board) for every current market type, game or prop, while this is
+        # the model's raw projected count for props specifically. None for
+        # game-level markets, which have no equivalent "count" to project.
+        "projected_value",
         "sim_source",
         "join_status",  # "matched" | "unmatched_no_sim_coverage" | "unmatched_needs_resim"
         "join_note",
@@ -118,11 +125,13 @@ def join_odds_to_sim(odds_rows: list[dict[str, Any]], sim_rows: list[dict[str, A
         join_status: str
         join_note: str | None = None
         sim_projection: Any = None
+        projected_value: Any = None
         sim_source: Any = None
 
         if sim_match is not None:
             join_status = JOIN_STATUS_MATCHED
             sim_projection = sim_match.get("sim_projection")
+            projected_value = sim_match.get("projected_value")
             sim_source = sim_match.get("sim_source")
         else:
             market_period_key = _market_period_key(odds_row)
@@ -147,6 +156,7 @@ def join_odds_to_sim(odds_rows: list[dict[str, Any]], sim_rows: list[dict[str, A
         row.update(
             {
                 "sim_projection": sim_projection,
+                "projected_value": projected_value,
                 "sim_source": sim_source,
                 "join_status": join_status,
                 "join_note": join_note,

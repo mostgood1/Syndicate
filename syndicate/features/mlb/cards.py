@@ -4982,6 +4982,32 @@ def _mlb_prop_join_market_key(market_label: str, *, is_pitcher: bool, team_side:
     return f"{market_label}::{disambiguator}"
 
 
+def _row_stat_mean_value(row: dict[str, Any]) -> float | None:
+    """Pulls the actual projected stat count (e.g. 4.8 strikeouts) off a
+    recommendation-engine prop row, e.g. "so_mean" for a strikeouts prop,
+    "outs_mean" for a pitcher-outs prop -- each prop type stores its mean
+    under its own stat-prefixed key rather than one fixed field name (see
+    ALL_PITCHER_MARKET_SPECS/ALL_HITTER_MARKET_SPECS's mean_key in the
+    offline vendor pipeline). Confirmed live 2026-07-24: this value was
+    sitting right there in the same row the market board already reads
+    (e.g. "so_mean": 4.821 next to "edge": 0.278), just never extracted --
+    the board was instead showing edge/win-probability as if it were the
+    projection. Deliberately requires the key to literally end in "_mean"
+    (not just contain it) so "mean_support" -- an unrelated confidence
+    metric on the same row -- is never mistaken for the projection.
+    """
+    for key, value in row.items():
+        if not isinstance(key, str) or not key.endswith("_mean"):
+            continue
+        if isinstance(value, bool) or value is None:
+            continue
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
 def _mlb_market_board_prop_rows_for_game(
     *,
     game_pk: Any,
@@ -5050,6 +5076,7 @@ def _mlb_market_board_prop_rows_for_game(
             line = row.get("market_line") if row.get("market_line") is not None else row.get("line")
             odds = row.get("odds") or row.get("price")
             edge = row.get("edge")
+            mean_value = _row_stat_mean_value(row)
             normalized_entity = _normalize_live_name(entity)
             entity_is_pitcher[normalized_entity] = is_pitcher
             row_team_side = str(row.get("team_side") or "").strip().lower()
@@ -5062,6 +5089,7 @@ def _mlb_market_board_prop_rows_for_game(
                 "odds": odds,
                 "side": selection,
                 "edge": edge,
+                "mean": mean_value,
             }
 
     known_players: dict[str, str] = {}  # normalized -> display name
@@ -5094,6 +5122,12 @@ def _mlb_market_board_prop_rows_for_game(
                     "period": "full_game",
                     "entity": entity,
                     "sim_projection": info["edge"],
+                    # The actual projected stat count (e.g. 4.8 strikeouts),
+                    # distinct from sim_projection above (an edge/probability,
+                    # always rendered as a percent by the board) -- see
+                    # _row_stat_mean_value's docstring for why this needed its
+                    # own field rather than overloading sim_projection.
+                    "projected_value": info["mean"],
                     "sim_source": "mlb_recommendation_engine",
                 }
             )

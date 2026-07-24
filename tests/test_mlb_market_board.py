@@ -176,6 +176,49 @@ class MlbMarketBoardPropRowsTests(unittest.TestCase):
         entities = {row["entity"] for row in odds_rows}
         self.assertEqual(entities, {"Someone Else", "Another Player"})
 
+    def test_pitcher_prop_sim_row_carries_real_projected_stat_value(self) -> None:
+        # 2026-07-24 fix: the board was showing sim_projection (edge, a
+        # win-probability-shaped fraction rendered as a percent) as if it
+        # were the projection -- the real projected stat count was sitting
+        # right in the same raw row all along, under a stat-prefixed key
+        # ("so_mean" for strikeouts), just never read. Confirmed live: a
+        # Sugano strikeouts row carried both "edge": 0.278 and
+        # "so_mean": 4.821 in the same object.
+        markets = {
+            "pitcherProps": [
+                {
+                    "pitcher_name": "Tomoyuki Sugano",
+                    "market": "pitcher_props",
+                    "prop": "strikeouts",
+                    "selection": "over",
+                    "market_line": 3.5,
+                    "odds": "+106",
+                    "edge": 0.27777743335399874,
+                    "so_mean": 4.821,
+                    "mean_support": 1.321,
+                    "recommendation_tier": "official",
+                    "team_side": "away",
+                }
+            ]
+        }
+        odds_rows, sim_rows = _mlb_market_board_prop_rows_for_game(game_pk=1, markets=markets)
+
+        self.assertEqual(len(sim_rows), 1)
+        self.assertAlmostEqual(sim_rows[0]["sim_projection"], 0.27777743335399874)
+        self.assertAlmostEqual(sim_rows[0]["projected_value"], 4.821)
+
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+        self.assertAlmostEqual(inventory[0]["projected_value"], 4.821)
+
+    def test_projected_value_is_none_when_no_mean_field_present(self) -> None:
+        markets = {
+            "hitterProps": [
+                {"player_name": "Alec Burleson", "market": "hitter_hits", "selection": "over", "market_line": 1.5, "odds": "-110", "edge": 0.1}
+            ]
+        }
+        _odds_rows, sim_rows = _mlb_market_board_prop_rows_for_game(game_pk=1, markets=markets)
+        self.assertIsNone(sim_rows[0]["projected_value"])
+
     def test_rows_missing_entity_or_selection_are_skipped(self) -> None:
         markets = {
             "hitterProps": [

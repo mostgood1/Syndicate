@@ -334,6 +334,12 @@
     const lineText = row.line !== null && row.line !== undefined ? String(row.line) : "";
     const oddsText = row.odds !== null && row.odds !== undefined ? String(row.odds) : "";
     const modelValue = formatModelValue(row);
+    // The model's raw projected stat count (e.g. 4.8 strikeouts) -- distinct
+    // from modelValue above, which is always a win-probability/edge percent
+    // and says nothing about the actual projected number. Reuses
+    // formatLiveValue's plain-number formatting since projected_value is the
+    // same "raw stat count" shape as live_projection, just for pregame too.
+    const projectedValue = formatLiveValue(row.projected_value);
     const liveProjectionValue = formatLiveValue(row.live_projection);
     const liveActualValue = formatLiveValue(row.live_actual);
     const lineMovementValue = formatLineMovement(row);
@@ -364,6 +370,7 @@
         <div class="board-card__prop-line">${propLine ? escapeHtml(propLine) : "No market detail available."}</div>
         <div class="board-card__facts">
           <div><div class="board-card__fact-label">Odds</div><div class="board-card__fact-value">${oddsText ? escapeHtml(oddsText) : "&mdash;"}</div></div>
+          ${projectedValue !== null ? `<div><div class="board-card__fact-label">Projected</div><div class="board-card__fact-value">${escapeHtml(projectedValue)}</div></div>` : ""}
           ${lineMovementValue !== null ? `<div><div class="board-card__fact-label">Line move</div><div class="board-card__fact-value">${escapeHtml(lineMovementValue)}</div></div>` : ""}
           ${liveProjectionValue !== null ? `<div><div class="board-card__fact-label">Live proj.</div><div class="board-card__fact-value">${escapeHtml(liveProjectionValue)}</div></div>` : ""}
           ${liveActualValue !== null ? `<div><div class="board-card__fact-label">Live actual</div><div class="board-card__fact-value">${escapeHtml(liveActualValue)}</div></div>` : ""}
@@ -410,6 +417,7 @@
     const oddsText = row.odds !== null && row.odds !== undefined ? String(row.odds) : "";
     const lineText = row.line !== null && row.line !== undefined ? String(row.line) : "";
     const modelValue = formatModelValue(row);
+    const projectedValue = formatLiveValue(row.projected_value);
     const liveProjectionValue = formatLiveValue(row.live_projection);
     const liveActualValue = formatLiveValue(row.live_actual);
     const liveText = [
@@ -436,6 +444,7 @@
         </td>
         <td>${escapeHtml(propLine || "-")}</td>
         <td>${oddsText ? escapeHtml(oddsText) : "&mdash;"}</td>
+        <td>${projectedValue !== null ? escapeHtml(projectedValue) : "&mdash;"}</td>
         <td>${lineMovementValue !== null ? escapeHtml(lineMovementValue) : "&mdash;"}</td>
         <td>${modelValue ? escapeHtml(modelValue) : "&mdash;"}</td>
         <td>${liveText ? escapeHtml(liveText) : "&mdash;"}</td>
@@ -469,7 +478,7 @@
       <div class="board-blotter-wrap">
         <table class="board-blotter">
           <thead>
-            <tr><th>State</th><th>Player / Market</th><th>Pick</th><th>Odds</th><th>Line move</th><th>Model</th><th>Live</th><th>Status</th><th></th></tr>
+            <tr><th>State</th><th>Player / Market</th><th>Pick</th><th>Odds</th><th>Projected</th><th>Line move</th><th>Model</th><th>Live</th><th>Status</th><th></th></tr>
           </thead>
           <tbody>${rows.join("")}</tbody>
         </table>
