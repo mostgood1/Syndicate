@@ -32,70 +32,32 @@ class HomePageCommandCenterTests(unittest.TestCase):
         app.testing = True
         self.client = app.test_client()
 
-    def test_home_page_renders_daily_command_center(self) -> None:
-        light_sports = [
-            {
-                "slug": "mlb",
-                "name": "MLB",
-                "home_anchor": "mlb-home",
-                "data_health": "partial",
-                "freshness_label": "Stored slate",
-                "games_count": "4",
-                "props_count": "8",
-                "overview_stats": [],
-                "home_rails": {
-                    "compact": {"title": "Compact rail", "items": [], "links": [], "empty_summary": ""},
-                    "pregame": {"title": "Pregame props", "items": [], "links": [], "empty_summary": ""},
-                    "live": {"title": "Top Live Props", "items": [], "links": [], "empty_summary": "", "links": []},
-                },
-                "game_bar": {"opportunity_tags": []},
-                "props_bar": {"opportunity_tags": []},
-                "feature_links": [],
-            },
-            {
-                "slug": "wnba",
-                "name": "WNBA",
-                "home_anchor": "wnba-home",
-                "data_health": "partial",
-                "freshness_label": "Stored slate",
-                "games_count": "3",
-                "props_count": "6",
-                "overview_stats": [],
-                "home_rails": {
-                    "compact": {"title": "Compact rail", "items": [], "links": [], "empty_summary": ""},
-                    "pregame": {"title": "Pregame props", "items": [], "links": [], "empty_summary": ""},
-                    "live": {"title": "Top Live Props", "items": [], "links": [], "empty_summary": "", "links": []},
-                },
-                "game_bar": {"opportunity_tags": []},
-                "props_bar": {"opportunity_tags": []},
-                "feature_links": [],
-            },
-        ]
-
-        with patch("syndicate.blueprints.home._build_light_home_sports", return_value=light_sports):
+    def test_home_page_now_delegates_to_the_curated_betting_board(self) -> None:
+        # Nav/IA change 2026-07-24: "/" used to render home.html's per-sport
+        # dashboard directly (see the light_sports/render_template-kwargs
+        # assertions this test used to make) -- it now delegates straight
+        # to intelligence_home() so the curated Betting Board (Layer 2) is
+        # the homepage. The old dashboard-building helpers below
+        # (_build_light_home_sports, _build_home_dashboard, etc.) are
+        # deliberately left in place, just unreachable from this route.
+        with patch("syndicate.blueprints.intelligence.intelligence_home", return_value="ok") as mocked_intelligence_home:
             response = self.client.get("/")
 
         self.assertEqual(response.status_code, 200)
-        html = response.get_data(as_text=True)
-        self.assertNotIn('<form class="home-topbar__date-form"', html)
-        self.assertNotIn('<section class="home-decision-grid"', html)
-        self.assertIn("home-active-strip", html)
-        self.assertIn('id="mlb-home"', html)
-        self.assertIn('id="wnba-home"', html)
-        self.assertNotIn('id="nba-home"', html)
-
-    def test_home_page_defaults_to_current_local_date_and_active_payload(self) -> None:
-        with patch("syndicate.blueprints.home.central_today_iso", return_value="2026-06-21"):
-            with patch("syndicate.blueprints.home._build_light_home_sports", return_value=[] ) as mocked_light:
-                with patch("syndicate.blueprints.home.render_template", return_value="ok") as mocked_render:
-                    response = self.client.get("/")
-
-        self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_data(as_text=True), "ok")
-        mocked_light.assert_called_once_with("2026-06-21")
-        self.assertEqual(mocked_render.call_args.kwargs["selected_home_date"], "2026-06-21")
-        self.assertEqual(mocked_render.call_args.kwargs["sports"], [])
-        self.assertFalse(mocked_render.call_args.kwargs["show_command_center"])
+        mocked_intelligence_home.assert_called_once()
+
+    def test_market_board_hub_lists_every_sport_with_a_layer1_board(self) -> None:
+        response = self.client.get("/market-board")
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        for slug in ("mlb", "nba", "wnba"):
+            self.assertIn(f"/{slug}/market-board", html)
+
+    def test_market_board_hub_carries_date_query_param_into_tile_links(self) -> None:
+        response = self.client.get("/market-board?date=2026-07-23")
+        html = response.get_data(as_text=True)
+        self.assertIn("/mlb/market-board?date=2026-07-23", html)
 
     def test_home_payload_uses_light_shell_on_render_web_dyno(self) -> None:
         from syndicate.blueprints import home as home_module

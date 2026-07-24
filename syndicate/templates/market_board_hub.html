@@ -1,0 +1,42 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Market Board — Syndicate{% endblock %}
+
+{% block extra_head %}
+  <style>
+    .market-board-hub__intro { color: var(--cards-text-soft); margin: 0 0 20px; max-width: 640px; }
+    .market-board-hub__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+    .market-board-hub__tile {
+      display: block;
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid var(--cards-line);
+      background: var(--cards-surface);
+      box-shadow: var(--cards-shadow);
+      text-decoration: none;
+      color: var(--cards-text);
+      transition: border-color 0.15s ease, transform 0.15s ease;
+    }
+    .market-board-hub__tile:hover { border-color: var(--cards-line-strong); transform: translateY(-2px); }
+    .market-board-hub__tile h2 { margin: 0 0 8px; font-size: 1.15rem; color: var(--cards-accent-strong); }
+    .market-board-hub__tile p { margin: 0; color: var(--cards-text-soft); font-size: 0.9rem; }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <main class="cards-body market-board-hub">
+    <h1>Market Board</h1>
+    <p class="market-board-hub__intro">
+      Every quoted line for every game -- moneylines, totals, and player props -- joined against the model where
+      available, not just the recommendation engine's picks. Pick a sport to see its full inventory.
+    </p>
+    <div class="market-board-hub__grid">
+      {% for sport in sports %}
+        <a class="market-board-hub__tile" href="/{{ sport.slug }}/market-board{% if nav_date %}?date={{ nav_date }}{% endif %}">
+          <h2>{{ sport.name }}</h2>
+          <p>{{ sport.description }}</p>
+        </a>
+      {% endfor %}
+    </div>
+  </main>
+{% endblock %}

@@ -5493,24 +5493,36 @@ def _build_light_home_sports(selected_date: str | None = None) -> list[dict[str,
 
 @home_bp.get("/")
 def home():
-    selected_date = _home_selected_date(request.args.get("date"))
-    if _render_web_dyno():
-        sports = []
-    else:
-        sports = _build_light_home_sports(selected_date)
+    # Nav/IA change 2026-07-24: the curated Betting Board (Layer 2) is now
+    # the homepage -- "Betting Board" in nav instead points to the new
+    # Layer 1 market-board hub (see market_board_hub() below). The old
+    # per-sport dashboard this route used to render (home.html) is
+    # retired from nav; its code is left in place, just unreachable, per
+    # the user's explicit call not to delete it outright.
+    from syndicate.blueprints.intelligence import intelligence_home
+
+    return intelligence_home()
+
+
+_MARKET_BOARD_HUB_SPORTS: tuple[dict[str, str], ...] = (
+    {"slug": "mlb", "name": "MLB", "description": "Every quoted moneyline, total, and player prop -- live games today."},
+    {"slug": "nba", "name": "NBA", "description": "Full market inventory once the season resumes."},
+    {"slug": "wnba", "name": "WNBA", "description": "Full market inventory once the season resumes."},
+)
+
+
+@home_bp.get("/market-board")
+def market_board_hub():
+    # Nav/IA change 2026-07-24: "Betting Board" in nav now lands here
+    # rather than on a single sport's Layer 1 board directly -- Layer 1 is
+    # per-sport only today (no unified cross-sport inventory yet), so this
+    # is a lightweight picker until Phase 6 covers enough sports to justify
+    # something richer.
+    nav_date = _home_selected_date(request.args.get("date"))
     return render_template(
-        "home.html",
-        selected_home_date=selected_date,
-        sports=sports,
-        dashboard={
-            "summary_cards": [],
-            "live_watch": [],
-            "top_props": [],
-            "top_game_bets": [],
-            "sport_summaries": [],
-        },
-        command_center={},
-        show_command_center=False,
+        "market_board_hub.html",
+        sports=_MARKET_BOARD_HUB_SPORTS,
+        nav_date=nav_date,
     )
 
 

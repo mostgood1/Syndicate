@@ -6,7 +6,7 @@
     <nav class="standalone-app-header__nav" aria-label="Sports">
       <a class="standalone-app-header__link{% if active_sport_slug == 'home' %} standalone-app-header__link--active{% endif %}" href="/">Home</a>
       <a class="standalone-app-header__link" href="/syndicate">The Syndicate</a>
-      <a class="standalone-app-header__link" href="/intelligence">Betting Board</a>
+      <a class="standalone-app-header__link" href="/market-board">Betting Board</a>
       {% for sport in syndicate_sports %}
         <a class="standalone-app-header__link{% if sport.slug == active_sport_slug %} standalone-app-header__link--active{% endif %}" href="/{{ sport.slug }}">{{ sport.name }}</a>
       {% endfor %}
