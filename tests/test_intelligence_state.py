@@ -2375,6 +2375,71 @@ class IntelligenceStateTests(unittest.TestCase):
             self.assertEqual(int((written_daily_snapshot.get("response") or {}).get("candidate_count") or 0), 6)
             self.assertEqual(sorted((written_daily_snapshot.get("response") or {}).get("by_sport") or {}), ["wnba"])
 
+    def test_persist_locked_does_not_clobber_shared_state_when_local_snapshots_empty(self) -> None:
+        # A freshly booted process (a deploy, or gunicorn respawning a
+        # crashed/timed-out worker) starts with empty self._snapshots and
+        # calls _persist_locked() as part of start()'s boot-time enqueue.
+        # Confirmed in production: this wiped a perfectly good board the
+        # instant any worker restarted, because the write unconditionally
+        # serialized this process's own (empty) view over the shared
+        # STATE_PATH another process (refresh-worker) had just populated.
+        service = IntelligenceStateService()
+        # This process has nothing locally -- the scenario under test.
+        self.assertEqual(service._snapshots, {})
+        service._latest_key = None
+
+        existing_response = {
+            "ok": True,
+            "selected_date": "2026-07-24",
+            "candidate_count": 161,
+            "top_opportunities": [{"name": "Real Play", "sport": "mlb", "sport_slug": "mlb"}],
+            "by_sport": {"mlb": [{"name": "Real Play", "sport": "mlb", "sport_slug": "mlb"}]},
+            "analysis": {"recommendations": [], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+        }
+        existing_state_payload = {
+            "latest_key": "mlb-key",
+            "updated_at": "2026-07-24T20:11:59Z",
+            "watched_payloads": {},
+            "pending_keys": {},
+            "watched_board_dates": {},
+            "snapshots": {
+                "mlb-key": {
+                    "key": "mlb-key",
+                    "payload": {"question": "top edges today", "date": "2026-07-24"},
+                    "response": existing_response,
+                    "computed_at": "2026-07-24T20:11:59Z",
+                    "source_fingerprint": "fingerprint-mlb-1",
+                }
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            state_path = reports_root / "intelligence" / "query_state_cache.json"
+            board_snapshot_path = reports_root / "intelligence" / "board_snapshot.json"
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(json.dumps(existing_state_payload), encoding="utf-8")
+
+            with patch("pipeline.intelligence_state.reports_root", return_value=reports_root):
+                with patch.object(intelligence_state_module, "STATE_PATH", state_path):
+                    with patch.object(intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path):
+                        service._persist_locked()
+
+            written_state = refresh_state_store.read_json_file(state_path)
+            self.assertIsInstance(written_state, dict)
+            self.assertEqual(written_state.get("latest_key"), "mlb-key")
+            self.assertIn("mlb-key", written_state.get("snapshots") or {})
+            self.assertEqual(
+                (written_state.get("snapshots") or {}).get("mlb-key", {}).get("response", {}).get("candidate_count"),
+                161,
+            )
+
+            # The preserved snapshot should also still make it through to
+            # the board_snapshot pointer file -- not just STATE_PATH.
+            written_board_snapshot = refresh_state_store.read_json_file(board_snapshot_path)
+            self.assertIsInstance(written_board_snapshot, dict)
+            self.assertEqual(written_board_snapshot.get("latest_key"), "mlb-key")
+
     def test_available_sport_manifests_reads_shared_manifest_without_local_file(self) -> None:
         service = IntelligenceStateService()
         status = {

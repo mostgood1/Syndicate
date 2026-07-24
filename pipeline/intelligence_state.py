@@ -2456,22 +2456,54 @@ class IntelligenceStateService:
     def _persist_locked(self) -> None:
         print(f"[intelligence_state] PERSIST_LOCKED_BEGIN latest_key={self._latest_key} snapshot_count={len(self._snapshots)}", flush=True)
         latest_snapshot = self._snapshots.get(self._latest_key or "") if self._latest_key else None
+        latest_key_to_write = self._latest_key
+        snapshots_payload = {
+            key: {
+                "key": snapshot.key,
+                "payload": snapshot.payload,
+                "response": snapshot.response,
+                "computed_at": snapshot.computed_at,
+                "source_fingerprint": snapshot.source_fingerprint,
+            }
+            for key, snapshot in self._snapshots.items()
+        }
+        if not self._snapshots:
+            # This process's own in-memory view has no real computed
+            # snapshots -- e.g. a freshly booted worker (a deploy, or
+            # gunicorn respawning a crashed/timed-out worker) whose
+            # boot-time _load_persisted_state_locked() call raced with, or
+            # simply hasn't yet synced, a sibling process's (refresh-worker)
+            # already-persisted state. STATE_PATH is a single shared
+            # key/file across every process, so blindly writing an empty
+            # "snapshots"/"latest_key" here -- which start() does
+            # unconditionally on every boot to make its own boot-time queue
+            # enqueue durable -- was confirmed in production to wipe a
+            # perfectly good board the instant any worker restarted,
+            # independent of whether refresh-worker itself was healthy.
+            # Preserve whatever the shared store currently has instead of
+            # regressing it to empty; the queue-related fields below still
+            # get written from this process's own state either way.
+            existing = read_json_file(STATE_PATH)
+            existing_snapshots = existing.get("snapshots") if isinstance(existing, dict) else None
+            if isinstance(existing_snapshots, dict) and existing_snapshots:
+                snapshots_payload = existing_snapshots
+                latest_key_to_write = existing.get("latest_key")
+                existing_latest = snapshots_payload.get(latest_key_to_write) if latest_key_to_write else None
+                if isinstance(existing_latest, dict) and isinstance(existing_latest.get("response"), dict):
+                    latest_snapshot = IntelligenceSnapshot(
+                        key=str(existing_latest.get("key") or latest_key_to_write),
+                        payload=dict(existing_latest.get("payload") or {}),
+                        response=dict(existing_latest.get("response") or {}),
+                        computed_at=str(existing_latest.get("computed_at") or _utc_now()),
+                        source_fingerprint=str(existing_latest.get("source_fingerprint") or ""),
+                    )
         payload = {
-            "latest_key": self._latest_key,
+            "latest_key": latest_key_to_write,
             "updated_at": _utc_now(),
             "watched_payloads": dict(self._watched_payloads),
             "pending_keys": dict(self._pending_keys),
             "watched_board_dates": dict(self._watched_board_dates),
-            "snapshots": {
-                key: {
-                    "key": snapshot.key,
-                    "payload": snapshot.payload,
-                    "response": snapshot.response,
-                    "computed_at": snapshot.computed_at,
-                    "source_fingerprint": snapshot.source_fingerprint,
-                }
-                for key, snapshot in self._snapshots.items()
-            },
+            "snapshots": snapshots_payload,
         }
         write_json_file(STATE_PATH, payload)
         if latest_snapshot is not None:
