@@ -6,6 +6,13 @@ the projection layer so downstream engines/adapters receive per-period goal lamb
 """
 from __future__ import annotations
 
+from .coverage import (
+    GameDataCoverage,
+    SlateDataCoverage,
+    TeamDataCoverage,
+    build_game_coverage,
+    build_slate_coverage,
+)
 from .loaders import (
     build_game_features,
     build_player_features,
@@ -26,4 +33,10 @@ __all__ = [
     "build_player_features",
     "build_game_features",
     "build_slate_features",
+    # coverage / data-gap audit
+    "build_slate_coverage",
+    "build_game_coverage",
+    "SlateDataCoverage",
+    "GameDataCoverage",
+    "TeamDataCoverage",
 ]
