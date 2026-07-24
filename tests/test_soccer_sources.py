@@ -1,10 +1,66 @@
 from __future__ import annotations
 
+import json
+import tempfile
 import unittest
 from datetime import date
+from pathlib import Path
 from unittest.mock import patch
 
 from syndicate.features.soccer import sources
+
+
+class RecommendationsPayloadFreshnessTests(unittest.TestCase):
+    """2026-07-24 fix: recommendations_payload/picks_rows used to be
+    @lru_cache-wrapped, on the (wrong) assumption that a date's file is
+    written once and never changes. In reality build_soccer_artifacts.py
+    rewrites the SAME recommendations_{date}.json path repeatedly as a
+    match moves from pregame ("pre") through live ("in") to final ("post")
+    with the real score -- and since the web dyno's gunicorn workers never
+    auto-recycle (no --max-requests configured), the first read for a
+    given (league, date) used to get cached forever, serving a stale
+    pregame 0-0 snapshot days after the real game had finished. Confirmed
+    live in production: 2026-07-22's MLS matches all stayed
+    status_state="pre" with 0-0 scores for two days after ESPN's own
+    scoreboard showed real final results.
+    """
+
+    def test_second_read_reflects_file_rewritten_after_first_read(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rec_dir = root / "mls" / "api" / "recommendations"
+            rec_dir.mkdir(parents=True)
+            rec_path = rec_dir / "recommendations_2026-07-22.json"
+            rec_path.write_text(json.dumps({"matches": [{"event_id": "1", "status_state": "pre"}]}), encoding="utf-8")
+
+            with patch.object(sources, "_source_roots", return_value=[root]):
+                first = sources.recommendations_payload("mls", "2026-07-22")
+                self.assertEqual(first["matches"][0]["status_state"], "pre")
+
+                rec_path.write_text(
+                    json.dumps({"matches": [{"event_id": "1", "status_state": "post", "live_home_score": 2, "live_away_score": 1}]}),
+                    encoding="utf-8",
+                )
+                second = sources.recommendations_payload("mls", "2026-07-22")
+
+            self.assertEqual(second["matches"][0]["status_state"], "post")
+            self.assertEqual(second["matches"][0]["live_home_score"], 2)
+
+    def test_applies_to_every_league_not_just_mls(self) -> None:
+        for league in ("epl", "la_liga", "mls", "bundesliga"):
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                rec_dir = root / league / "api" / "recommendations"
+                rec_dir.mkdir(parents=True)
+                rec_path = rec_dir / "recommendations_2026-07-22.json"
+                rec_path.write_text(json.dumps({"matches": [{"event_id": "1", "status_state": "pre"}]}), encoding="utf-8")
+
+                with patch.object(sources, "_source_roots", return_value=[root]):
+                    sources.recommendations_payload(league, "2026-07-22")
+                    rec_path.write_text(json.dumps({"matches": [{"event_id": "1", "status_state": "post"}]}), encoding="utf-8")
+                    second = sources.recommendations_payload(league, "2026-07-22")
+
+                self.assertEqual(second["matches"][0]["status_state"], "post", league)
 
 
 class LeagueNormalizationTests(unittest.TestCase):

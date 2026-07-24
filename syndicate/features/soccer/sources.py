@@ -99,8 +99,20 @@ def recommendations_path(league: str, selected_date: str) -> Path:
     return _api_root(league) / "recommendations" / f"recommendations_{selected_date}.json"
 
 
-@lru_cache(maxsize=256)
 def recommendations_payload(league: str, selected_date: str) -> dict[str, Any] | None:
+    # Not cached (2026-07-24 fix): this file's own CONTENT changes over the
+    # course of a day/week as build_soccer_artifacts.py re-runs -- a match
+    # starts as status_state="pre", then "in", then "post" with the real
+    # final score, all under the same recommendations_{date}.json path. An
+    # @lru_cache here (as this used to have) permanently freezes whatever
+    # was first read for a given (league, date), and the web dyno's
+    # gunicorn workers never auto-recycle (no --max-requests configured),
+    # so once any request read a date's pregame snapshot, every later
+    # request -- even days after the real game finished -- kept serving
+    # that same stale "pre"/0-0 payload until the next full deploy.
+    # Confirmed live in production: 2026-07-22's MLS matches all stayed
+    # status_state="pre" with 0-0 scores days after the games had real
+    # final results on ESPN's own scoreboard.
     return load_json(recommendations_path(league, selected_date))
 
 
@@ -118,11 +130,11 @@ def picks_path(league: str, selected_date: str) -> Path:
     return _api_root(league) / "picks" / f"picks_{selected_date}.csv"
 
 
-@lru_cache(maxsize=256)
 def picks_rows(league: str, selected_date: str) -> tuple[dict[str, str], ...]:
-    # Same once-per-tick update cadence as recommendations_payload above
-    # (both written by the pregame-phase dispatcher steps), so cached the
-    # same way. Tuple (not list) so the cached value stays hashable/immutable.
+    # Not cached (2026-07-24 fix, same reasoning as recommendations_payload
+    # above): this file gets regenerated repeatedly as odds/scores update,
+    # and gunicorn workers never auto-recycle, so an @lru_cache here (as
+    # this used to have) would permanently freeze the first-ever read.
     path = picks_path(league, selected_date)
     if not path.exists():
         return ()
@@ -157,10 +169,9 @@ def props_odds_path(league: str, selected_date: str) -> Path:
 
 
 def props_odds_rows(league: str, selected_date: str) -> tuple[dict[str, str], ...]:
-    # Not cached, same reasoning as game_odds_rows -- a per-date file, but
-    # only whatever the props-fetch step captured this tick, not a fixed
-    # once-per-date artifact the rest of this module's @lru_cache pattern
-    # assumes.
+    # Not cached, same reasoning as game_odds_rows/recommendations_payload
+    # above -- whatever the props-fetch step captured most recently, not an
+    # immutable one-time artifact.
     path = props_odds_path(league, selected_date)
     if not path.exists():
         return ()
