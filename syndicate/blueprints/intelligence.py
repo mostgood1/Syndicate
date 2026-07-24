@@ -1328,6 +1328,60 @@ def intelligence_query_api():
                 _LOGGER.info("BETTING_BOARD_REFRESH_COMPLETE", extra={"selected_date": versioned_response.get("selected_date"), "candidate_count": _response_candidate_count(response_payload), "source": "query_api"})
                 return _no_cache_response(jsonify(versioned_response))
 
+            # No cached snapshot exists yet for this exact payload (e.g. a
+            # never-before-requested date, such as tomorrow's day-ahead
+            # slate) -- the hosted branch used to stop here and always hand
+            # back an empty placeholder, even though the same synchronous
+            # compute path the non-hosted branch below already uses is
+            # perfectly capable of answering this directly (it already
+            # threads the requested date all the way through
+            # build_intelligence_overview/collect_candidates, and it
+            # persists its result into the same per-payload-keyed snapshot
+            # store the cache read above just missed on, so this also warms
+            # the cache for every subsequent request). Try it before giving
+            # up -- only reached on a genuine cache miss, not on every
+            # request, since a populated cache always returns above.
+            try:
+                computed_response = _compute_intelligence_response(payload, source="compute_refresh")
+            except Exception:
+                computed_response = None
+                _LOGGER.exception("BETTING_BOARD_REFRESH_FAILURE")
+            # Unlike the cache-hit branch above, _compute_intelligence_response's
+            # return value is already the fully-versioned final response
+            # shape (it calls _versioned_query_response/_debug_state_fields
+            # internally, same as the non-hosted branch below relies on) --
+            # re-running it through that same wrapping a second time here
+            # was a bug in an earlier version of this fix, not a
+            # simplification; just add the queued-refresh markers directly.
+            # _response_has_board_content/_response_candidate_count expect
+            # the RAW (pre-versioning) shape -- top_opportunities/
+            # recommendations end up nested under "response" once versioned,
+            # so they'd always read 0 here. _compute_intelligence_response
+            # already computed and set a top-level "candidate_count" from
+            # that same raw shape before wrapping it; use that directly
+            # instead of re-deriving it from a shape that no longer has it.
+            if isinstance(computed_response, dict) and int(computed_response.get("candidate_count") or 0) > 0:
+                # "queued_refresh"/"execution_source"/"queued" live on the
+                # NESTED "response" sub-dict in every other branch of this
+                # endpoint (that's simply where _versioned_query_response
+                # puts whatever fields the raw payload carried) -- computed_
+                # response already carries its own "response" key from
+                # _compute_intelligence_response's internal wrap, so the
+                # markers have to go there too, not just on the outer dict,
+                # or callers reading payload["response"]["queued_refresh"]
+                # (the same place every other branch here puts it) see
+                # nothing.
+                versioned_response = dict(computed_response)
+                nested_response = dict(versioned_response.get("response") or {})
+                nested_response["queued_refresh"] = True
+                nested_response["execution_source"] = "compute_refresh"
+                nested_response.setdefault("queued", queued)
+                versioned_response["response"] = nested_response
+                LAST_RESULT = dict(nested_response.get("analysis") or nested_response)
+                _LOGGER.info("BETTING_BOARD_REFRESH_CANDIDATE_COUNT", extra={"selected_date": versioned_response.get("selected_date"), "candidate_count": versioned_response.get("candidate_count"), "source": "query_api"})
+                _LOGGER.info("BETTING_BOARD_REFRESH_COMPLETE", extra={"selected_date": versioned_response.get("selected_date"), "candidate_count": versioned_response.get("candidate_count"), "source": "query_api"})
+                return _no_cache_response(jsonify(versioned_response))
+
             response_payload = dict(_empty_default_intelligence_response())
             response_payload["queued_refresh"] = True
             response_payload["execution_source"] = execution_source

@@ -4385,7 +4385,7 @@ class _SoccerDataProvider(_HomeSportDataProviderBase):
         today = str(requested_date or central_today_iso())
         league = self._resolve_league(today)
         resolved_season = int(season) if season else default_season(league)
-        resolved_week = int(week) if week else default_week(league, resolved_season)
+        resolved_week = int(week) if week else default_week(league, resolved_season, reference_date=today)
         return SportContext(
             slug=self.slug,
             context_label=f"{league_display_name(league)} {resolved_season} Week {resolved_week}",

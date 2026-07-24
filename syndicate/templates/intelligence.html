@@ -18,6 +18,7 @@
     <div class="board-toolbar-row">
       <div class="board-tabs cards-tabs" id="board-sport-tabs" role="tablist" aria-label="Sport filter"></div>
       <div style="display:flex; gap:10px; align-items:center;">
+        <div class="board-tabs cards-tabs" id="board-day-tabs" role="tablist" aria-label="Day"></div>
         <input id="board-date" type="date" class="board-date-input" value="{{ initial_intelligence_selected_date | default('', true) }}" />
         <button type="submit" class="cards-submit-button">Refresh</button>
       </div>
@@ -109,6 +110,30 @@
     { value: "blotter", label: "Blotter" },
   ];
   const DEFAULT_QUESTION = "top edges today";
+
+  // The server's own resolved "today" (already Central-time-correct, same
+  // value the #board-date input defaults to) -- used as the anchor for
+  // "Tomorrow" instead of the browser's own local clock/timezone, which
+  // could disagree with which slate the backend actually considers today.
+  const TODAY_ISO = "{{ initial_intelligence_selected_date | default('', true) }}";
+  function isoDatePlusDays(isoDate, days) {
+    if (!isoDate) return "";
+    const parts = isoDate.split("-").map(Number);
+    if (parts.length !== 3 || parts.some((part) => Number.isNaN(part))) return "";
+    const date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+  }
+  const TOMORROW_ISO = isoDatePlusDays(TODAY_ISO, 1);
+  // Day-ahead lookahead (2026-07-24): "Tomorrow" surfaces whatever the
+  // day-ahead sim + OddsAPI lookahead process has already produced for the
+  // next date -- force_refresh:true on the query lets the backend
+  // synchronously compute a real board for a date it's never been asked
+  // for yet, instead of only ever serving whatever's already cached.
+  const DAY_TABS = [
+    { value: "today", label: "Today", date: TODAY_ISO },
+    { value: "tomorrow", label: "Tomorrow", date: TOMORROW_ISO },
+  ];
 
   let lastVersion = null;
   let lastResponseTimestamp = null;
@@ -204,6 +229,27 @@
     // client-side (matchesFilters, same as the market/min-edge tabs below
     // already do via matchesClientFilters) makes tab switches instant and
     // removes the dependence on that cold path entirely.
+    // Unlike the other tab groups below, a day change is NOT a client-side
+    // refinement over already-fetched data -- it's a genuinely different
+    // date's board, so this is the one tab group that triggers a real
+    // server round trip (forceRefresh), same as the free date-input submit
+    // just below it in the DOM.
+    const activeDayValue = state.date === TOMORROW_ISO ? "tomorrow" : (!state.date || state.date === TODAY_ISO ? "today" : null);
+    renderTabs("board-day-tabs", DAY_TABS, activeDayValue, (value) => {
+      const tab = DAY_TABS.find((candidate) => candidate.value === value);
+      if (!tab || !tab.date || tab.date === state.date) return;
+      state.date = tab.date;
+      const dateInput = document.getElementById("board-date");
+      if (dateInput) dateInput.value = tab.date;
+      syncUrlState();
+      // Re-render immediately (optimistic) so the clicked pill shows as
+      // active right away rather than waiting on the async fetch below --
+      // same fix as the Layer 1 market board's tab groups needed earlier
+      // this session (a click must re-invoke its own render, not just
+      // mutate state and wait for something else to redraw it).
+      renderFilterTabs();
+      void loadIntelligence({ forceRefresh: true });
+    });
     renderTabs("board-sport-tabs", SPORT_TABS, state.sport, (value) => {
       state.sport = value;
       syncUrlState();

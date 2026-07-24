@@ -153,6 +153,25 @@ class WeekResolutionTests(unittest.TestCase):
         with patch.object(sources, "schedule_payload", return_value={}):
             self.assertEqual(sources.default_week("epl", 2026), 1)
 
+    def test_default_week_reference_date_overrides_real_today(self) -> None:
+        # 2026-07-24 fix: requesting "tomorrow" (or any other date) from the
+        # Betting Board must resolve the WEEK CONTAINING THAT DATE, not
+        # whatever week real wall-clock today happens to fall in -- without
+        # this, a future date crossing a matchweek boundary silently
+        # returned the wrong week's games/props.
+        with patch.object(sources, "schedule_payload", return_value=self._payload()), \
+             patch("syndicate.features.soccer.sources.date_cls") as mock_date:
+            mock_date.today.return_value = date(2026, 7, 1)
+            mock_date.fromisoformat.side_effect = date.fromisoformat
+            self.assertEqual(sources.default_week("epl", 2026, reference_date="2026-08-10"), 2)
+
+    def test_default_week_invalid_reference_date_falls_back_to_today(self) -> None:
+        with patch.object(sources, "schedule_payload", return_value=self._payload()), \
+             patch("syndicate.features.soccer.sources.date_cls") as mock_date:
+            mock_date.today.return_value = date(2026, 8, 10)
+            mock_date.fromisoformat.side_effect = date.fromisoformat
+            self.assertEqual(sources.default_week("epl", 2026, reference_date="not-a-date"), 2)
+
     def test_week_label_includes_date_range_when_known(self) -> None:
         with patch.object(sources, "schedule_payload", return_value=self._payload()):
             self.assertEqual(sources.week_label("epl", 2026, 1), "Week 1 (2026-08-01 to 2026-08-07)")

@@ -365,11 +365,22 @@ def week_date_list(league: str, season: int, week: int) -> list[str]:
     return sorted(date_str for date_str in dates if date_str)
 
 
-def default_week(league: str, season: int) -> int:
+def default_week(league: str, season: int, *, reference_date: str | None = None) -> int:
     weeks = available_weeks(league, season)
     if not weeks:
         return 1
+    # reference_date lets a caller resolve "which week is this" for a date
+    # other than real wall-clock today (e.g. the Betting Board asking for
+    # tomorrow's slate) -- optional and defaults to the old behavior so
+    # every existing call site is unaffected. Confirmed 2026-07-24: without
+    # this, requesting a future date that crosses a matchweek boundary
+    # silently returned the WRONG week's games/props for soccer.
     today = date_cls.today()
+    if reference_date:
+        try:
+            today = date_cls.fromisoformat(str(reference_date)[:10])
+        except ValueError:
+            pass
     for week in weeks:
         entry = week_index_entry(league, season, week) or {}
         start = str(entry.get("start_date") or "")
