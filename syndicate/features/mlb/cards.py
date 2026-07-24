@@ -4921,35 +4921,109 @@ def _mlb_market_board_rows_for_game(*, game_pk: Any, markets: dict[str, Any]) ->
     return odds_rows, sim_rows
 
 
+def _mlb_prop_display_label(raw: str) -> str:
+    tokens = []
+    for token in str(raw or "").replace("_", " ").split():
+        upper = token.upper()
+        tokens.append("RBI" if upper in {"RBI", "RBIS"} else token.capitalize())
+    return " ".join(tokens) or str(raw or "").title()
+
+
 def _mlb_prop_display_market(row: dict[str, Any], *, is_pitcher: bool) -> str:
     if is_pitcher:
         prop = str(row.get("prop") or "").strip()
         raw = f"pitcher_{prop}" if prop else str(row.get("market") or "pitcher_props")
     else:
         raw = str(row.get("market") or row.get("prop") or "hitter_props").strip()
-    tokens = []
-    for token in raw.replace("_", " ").split():
-        upper = token.upper()
-        tokens.append("RBI" if upper in {"RBI", "RBIS"} else token.capitalize())
-    return " ".join(tokens) or raw.title()
+    return _mlb_prop_display_label(raw)
 
 
-def _mlb_market_board_prop_rows_for_game(*, game_pk: Any, markets: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Raw odds + sim rows for pitcher/hitter props.
+def _mlb_prop_display_market_from_stat(stat_key: str, *, is_pitcher: bool) -> str:
+    key = str(stat_key or "").strip().lower()
+    if is_pitcher:
+        raw = f"pitcher_{key}" if key else "pitcher_props"
+    else:
+        # Raw OddsAPI hitter markets use a "batter_" prefix (e.g.
+        # "batter_hits") -- recommendation-engine rows display the same
+        # stat as "Hitter X" (their own "market" field is "hitter_hits"),
+        # so swap the prefix to keep one label per stat regardless of
+        # which source actually produced the row.
+        raw = "hitter_" + key[len("batter_"):] if key.startswith("batter_") else (key or "hitter_props")
+    return _mlb_prop_display_label(raw)
 
-    Unlike moneyline/total, every prop row here comes from the SAME
-    recommendation-engine entry -- there is no separate raw-odds source
-    wired in yet for props, only the "official" and "candidate" ("extra")
-    tiers the engine already picked -- so every prop row will show as
-    "matched" for now. This still correctly demonstrates the contract
-    (entity attribution, market/period identity) and sets it up for when a
-    genuine full props odds feed is plugged in as an independent odds
-    source: unmatched/needs-resim states will start actually firing once
-    the odds side isn't always the same row as the sim side.
+
+def _mlb_prop_join_market_key(market_label: str, *, is_pitcher: bool, team_side: str | None, normalized_entity: str) -> str:
+    """The DISPLAY label ("Hitter RBI", "Pitcher Outs") is shared by every
+    player who has that stat -- multiple hitters (or, for a doubleheader-
+    style edge case, both starting pitchers) legitimately have a
+    simultaneous prop on the same stat. If that shared label were used
+    directly as the join key, market_inventory.join_odds_to_sim's
+    needs-resim check ("does a DIFFERENT entity have sim coverage for this
+    exact market?") would misfire constantly -- confirmed empirically:
+    real production data produced 56 false "needs resim" rows on one
+    slate purely because two different hitters both had RBI props, not
+    because of any actual lineup change.
+
+    Disambiguate the JOIN key (never the display label, which is relabeled
+    back after the join) so only a genuine same-slot swap can collide:
+    pitcher props key off team_side (home/away starter is a real singular
+    slot -- a different pitcher for the SAME side really is a starter
+    change), hitter props key off the player themselves (no reliable
+    lineup-slot data exists, so no cross-entity check is meaningful here;
+    every hitter gets their own slot, which still preserves correct
+    matched/unmatched_no_sim_coverage detection, just never needs_resim).
+    """
+    disambiguator = team_side if (is_pitcher and team_side in ("home", "away")) else normalized_entity
+    return f"{market_label}::{disambiguator}"
+
+
+def _mlb_market_board_prop_rows_for_game(
+    *,
+    game_pk: Any,
+    markets: dict[str, Any],
+    probable: dict[str, Any] | None = None,
+    raw_pitcher_market_lines: dict[str, dict[str, Any]] | None = None,
+    raw_hitter_market_lines: dict[str, dict[str, Any]] | None = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Odds + sim rows for pitcher/hitter props.
+
+    The sim signal (edge/p_win) always comes from the recommendation
+    engine's own picks -- there's no separate model output to join
+    against. The ODDS signal now prefers the raw OddsAPI props feed
+    (scripts/refresh_mlb_oddsapi.py's oddsapi_pitcher_props/
+    oddsapi_hitter_props snapshots) when available: a genuinely
+    independent, unfiltered source carrying every real quoted line (both
+    Over AND Under) rather than just the one side the recommendation
+    engine picked. That feed carries no game/team attribution of its own,
+    so attribution here piggybacks on names this game already knows about
+    -- the probable starting pitcher (reliable, since pitcher props are
+    almost always about the starter) and any player who already has at
+    least one recommended prop (covers hitters partially: a hitter with
+    genuinely zero recommendation-engine coverage today has no roster
+    signal to attribute them by, so they're not surfaced yet -- a real,
+    bounded limitation, not a silent cap). Recommendation-engine picks
+    whose exact stat isn't in the raw feed still get their own row, same
+    as before, so nothing that used to show up is lost.
+
+    "market" on every row here is the disambiguated JOIN key (see
+    _mlb_prop_join_market_key) -- build_mlb_market_board relabels it back
+    to the clean display label after join_odds_to_sim runs.
     """
     odds_rows: list[dict[str, Any]] = []
     sim_rows: list[dict[str, Any]] = []
+    raw_pitcher_market_lines = raw_pitcher_market_lines if isinstance(raw_pitcher_market_lines, dict) else {}
+    raw_hitter_market_lines = raw_hitter_market_lines if isinstance(raw_hitter_market_lines, dict) else {}
 
+    # Pass 1: gather every signal (recommendation picks + probable-pitcher
+    # side) before building any join keys -- team_side must be fully known
+    # per entity BEFORE either the sim_row or the raw-feed odds_row for
+    # that same entity is built, otherwise the two can disagree on which
+    # disambiguator to use and never join (confirmed: building sim_rows
+    # inline in the same loop that discovers team_side only from the
+    # recommendation row itself missed the probable-pitcher-derived side).
+    recommended_props_by_entity: dict[str, dict[str, dict[str, Any]]] = {}
+    entity_is_pitcher: dict[str, bool] = {}
+    entity_team_side: dict[str, str] = {}
     prop_lists = (
         (markets.get("pitcherProps"), True),
         (markets.get("extraPitcherProps"), True),
@@ -4966,34 +5040,100 @@ def _mlb_market_board_prop_rows_for_game(*, game_pk: Any, markets: dict[str, Any
             selection = str(row.get("selection") or "").strip().lower()
             if not entity or selection not in ("over", "under"):
                 continue
+            prop_key = str(row.get("prop") or "").strip().lower()
             market_label = _mlb_prop_display_market(row, is_pitcher=is_pitcher)
             line = row.get("market_line") if row.get("market_line") is not None else row.get("line")
             odds = row.get("odds") or row.get("price")
             edge = row.get("edge")
+            normalized_entity = _normalize_live_name(entity)
+            entity_is_pitcher[normalized_entity] = is_pitcher
+            row_team_side = str(row.get("team_side") or "").strip().lower()
+            if row_team_side in ("home", "away"):
+                entity_team_side.setdefault(normalized_entity, row_team_side)
 
+            recommended_props_by_entity.setdefault(entity, {})[prop_key] = {
+                "market_label": market_label,
+                "line": line,
+                "odds": odds,
+                "side": selection,
+                "edge": edge,
+            }
+
+    known_players: dict[str, str] = {}  # normalized -> display name
+    probable = probable if isinstance(probable, dict) else {}
+    for side in ("away", "home"):
+        entry = probable.get(side) if isinstance(probable.get(side), dict) else {}
+        display_name = str(entry.get("fullName") or entry.get("name") or "").strip()
+        if display_name:
+            normalized_display = _normalize_live_name(display_name)
+            known_players[normalized_display] = display_name
+            entity_is_pitcher.setdefault(normalized_display, True)
+            entity_team_side.setdefault(normalized_display, side)
+    for entity in recommended_props_by_entity:
+        known_players.setdefault(_normalize_live_name(entity), entity)
+
+    # Pass 2: now that team_side is fully resolved per entity, build the
+    # sim rows (recommendation edge) and the raw-feed odds rows (both
+    # sides, when attributable) using the SAME disambiguator.
+    for entity, props in recommended_props_by_entity.items():
+        normalized_entity = _normalize_live_name(entity)
+        is_pitcher = entity_is_pitcher.get(normalized_entity, False)
+        team_side = entity_team_side.get(normalized_entity)
+        for info in props.values():
+            if info["edge"] is None:
+                continue
+            sim_rows.append(
+                {
+                    "game_id": game_pk,
+                    "market": _mlb_prop_join_market_key(info["market_label"], is_pitcher=is_pitcher, team_side=team_side, normalized_entity=normalized_entity),
+                    "period": "full_game",
+                    "entity": entity,
+                    "sim_projection": info["edge"],
+                    "sim_source": "mlb_recommendation_engine",
+                }
+            )
+
+    covered_entity_props: set[tuple[str, str]] = set()
+    for normalized_entity, display_name in known_players.items():
+        is_pitcher = entity_is_pitcher.get(normalized_entity, False)
+        raw_lines = raw_pitcher_market_lines if is_pitcher else raw_hitter_market_lines
+        player_markets = _market_lines_for_live_name(raw_lines, display_name)
+        if not player_markets:
+            continue
+        team_side = entity_team_side.get(normalized_entity)
+        for stat_key, market in player_markets.items():
+            if not isinstance(market, dict):
+                continue
+            line = market.get("line")
+            over_odds = market.get("over_odds")
+            under_odds = market.get("under_odds")
+            market_label = _mlb_prop_display_market_from_stat(stat_key, is_pitcher=is_pitcher)
+            join_key = _mlb_prop_join_market_key(market_label, is_pitcher=is_pitcher, team_side=team_side, normalized_entity=normalized_entity)
+            if over_odds is not None:
+                odds_rows.append({"game_id": game_pk, "market": join_key, "period": "full_game", "entity": display_name, "side": "over", "line": line, "odds": over_odds, "market_type": "prop"})
+            if under_odds is not None:
+                odds_rows.append({"game_id": game_pk, "market": join_key, "period": "full_game", "entity": display_name, "side": "under", "line": line, "odds": under_odds, "market_type": "prop"})
+            covered_entity_props.add((normalized_entity, str(stat_key).strip().lower()))
+
+    for entity, props in recommended_props_by_entity.items():
+        normalized_entity = _normalize_live_name(entity)
+        is_pitcher = entity_is_pitcher.get(normalized_entity, False)
+        team_side = entity_team_side.get(normalized_entity)
+        for prop_key, info in props.items():
+            if (normalized_entity, prop_key) in covered_entity_props:
+                continue
             odds_rows.append(
                 {
                     "game_id": game_pk,
-                    "market": market_label,
+                    "market": _mlb_prop_join_market_key(info["market_label"], is_pitcher=is_pitcher, team_side=team_side, normalized_entity=normalized_entity),
                     "period": "full_game",
                     "entity": entity,
-                    "side": selection,
-                    "line": line,
-                    "odds": odds,
+                    "side": info["side"],
+                    "line": info["line"],
+                    "odds": info["odds"],
                     "market_type": "prop",
                 }
             )
-            if edge is not None:
-                sim_rows.append(
-                    {
-                        "game_id": game_pk,
-                        "market": market_label,
-                        "period": "full_game",
-                        "entity": entity,
-                        "sim_projection": edge,
-                        "sim_source": "mlb_recommendation_engine",
-                    }
-                )
 
     return odds_rows, sim_rows
 
@@ -5012,6 +5152,8 @@ def build_mlb_market_board(selected_date: str) -> dict[str, Any]:
     context = build_cards_page_context(selected_date)
     payload = source_cards_api_payload(dict(context))
     games = payload.get("games") if isinstance(payload.get("games"), list) else []
+    raw_pitcher_market_lines = _pitcher_snapshot_market_lines(selected_date)
+    raw_hitter_market_lines = _hitter_snapshot_market_lines(selected_date)
 
     board_games: list[dict[str, Any]] = []
     for game in games:
@@ -5023,14 +5165,28 @@ def build_mlb_market_board(selected_date: str) -> dict[str, Any]:
         away_abbr = str(away.get("abbr") or "AWY").strip().upper()
         home_abbr = str(home.get("abbr") or "HME").strip().upper()
         markets = game.get("markets") if isinstance(game.get("markets"), dict) else {}
+        probable = game.get("probable") if isinstance(game.get("probable"), dict) else {}
 
         odds_rows, sim_rows = _mlb_market_board_rows_for_game(game_pk=game_pk, markets=markets)
-        prop_odds_rows, prop_sim_rows = _mlb_market_board_prop_rows_for_game(game_pk=game_pk, markets=markets)
+        prop_odds_rows, prop_sim_rows = _mlb_market_board_prop_rows_for_game(
+            game_pk=game_pk,
+            markets=markets,
+            probable=probable,
+            raw_pitcher_market_lines=raw_pitcher_market_lines,
+            raw_hitter_market_lines=raw_hitter_market_lines,
+        )
         odds_rows = odds_rows + prop_odds_rows
         sim_rows = sim_rows + prop_sim_rows
         inventory = join_odds_to_sim(odds_rows, sim_rows)
         for row in inventory:
-            row["market"] = _MLB_MARKET_BOARD_DISPLAY_LABELS.get(row.get("market"), row.get("market"))
+            market = row.get("market")
+            if row.get("market_type") == "prop" and isinstance(market, str) and "::" in market:
+                # Prop rows carry a disambiguated join key (see
+                # _mlb_prop_join_market_key) so needs-resim detection can't
+                # misfire across different players who share a stat --
+                # strip it back to the clean label for display.
+                market = market.split("::", 1)[0]
+            row["market"] = _MLB_MARKET_BOARD_DISPLAY_LABELS.get(market, market)
 
         status = game.get("status") if isinstance(game.get("status"), dict) else {}
         board_games.append(
