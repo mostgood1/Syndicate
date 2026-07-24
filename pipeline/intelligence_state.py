@@ -1866,6 +1866,16 @@ class IntelligenceStateService:
         print("[intelligence_state] BACKGROUND_LOOP_START", flush=True)
         while not self._stop.is_set():
             iteration_started_at = time.time()
+            # Temporary diagnostic (see _diag_log_all_process_memory): every
+            # _build_candidate_pool checkpoint went silent for the full
+            # ~30s gap before the last several OOM crashes, meaning this
+            # loop may never be reaching that call at all on a fresh boot
+            # (e.g. sitting in the condition.wait() below with an empty
+            # _pending_keys). This unconditional print on every iteration
+            # -- to stdout, not the memory helper's stderr, in case that's
+            # a factor -- settles whether the thread is genuinely idle or
+            # actually working. Remove once resolved.
+            print(f"[intelligence_state] LOOP_ITERATION pending_keys={len(self._pending_keys)} watched_payloads={len(self._watched_payloads)}", flush=True)
             if canonical_board_state_enabled() or canonical_board_state_shadow_compare_enabled():
                 # Additive dual-write during the migration-step-2 validation
                 # window: drains _watched_board_dates and writes the new
