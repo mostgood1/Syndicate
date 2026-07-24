@@ -2108,7 +2108,37 @@ class IntelligenceStateService:
         except Exception:
             limit_value = None
 
+        # Root-caused 2026-07-24: this is the *actual* earliest expensive
+        # step, upstream of every _build_candidate_pool checkpoint and guard
+        # added earlier today. _source_state_fingerprint calls (via
+        # _load_cached_status_payload returning None on a fresh boot, before
+        # self._source_fingerprints has anything cached) the full, expensive
+        # build_intelligence_status() -- unconditionally, on every single
+        # call. Confirmed live: the crash consistently happens after
+        # "CALLING_COMPUTE_BOARD_PUBLICATION_RESPONSE" prints but before ANY
+        # _build_candidate_pool checkpoint ever fires, meaning this call is
+        # where the memory actually goes. Same guard pattern as
+        # _build_candidate_pool below.
+        print("[intelligence_state] CALLING_SOURCE_STATE_FINGERPRINT", flush=True)
+        _diag_log_all_process_memory("pre_source_state_fingerprint")
+        if _abort_build_candidate_pool_if_memory_critical("pre_source_state_fingerprint"):
+            return _decorate_response_with_state_meta(
+                {
+                    "ok": False,
+                    "error": "memory_guard_abort",
+                    "top_opportunities": [],
+                    "recommendations": [],
+                    "by_sport": {},
+                    "selected_date": selected_date,
+                    "candidate_count": 0,
+                },
+                None,
+                source="worker",
+                run_key=_payload_key(request_payload),
+                sla_seconds=self._interval_seconds,
+            ) or {}
         source_fingerprint = self._source_state_fingerprint(selected_date)
+        print("[intelligence_state] RETURNED_FROM_SOURCE_STATE_FINGERPRINT", flush=True)
         cache_key = _payload_key(request_payload)
         logger.info("BETTING_BOARD_PUBLISH_START", extra={"selected_date": selected_date, "question": question})
 
