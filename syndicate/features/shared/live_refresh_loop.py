@@ -1171,7 +1171,7 @@ def _mlb_sim_runs_state_dir() -> Path:
 	return reports_root() / "live_refresh_loop" / "mlb_sim_runs"
 
 
-def _persist_finished_mlb_sim_run() -> None:
+def _persist_finished_mlb_sim_run(*, state: str = "finished") -> None:
 	# The worker's own stdout/stderr is the only place a sim subprocess's
 	# traceback lives, and the web service has no way to see it directly (no
 	# shared disk, no Render log API). _launch_mlb_daily_sim captures the
@@ -1201,7 +1201,7 @@ def _persist_finished_mlb_sim_run() -> None:
 			write_text_file(sim_base / f"{date_str}_{run_stamp}.log", log_text[-40000:])
 		returncode = _MLB_SIM_PROCESS.returncode if _MLB_SIM_PROCESS is not None else None
 		status_payload = dict(meta)
-		status_payload["state"] = "finished"
+		status_payload["state"] = state
 		status_payload["exit_code"] = returncode
 		status_payload["finished_at"] = _utc_now()
 		write_json_file(sim_base / f"{date_str}_{run_stamp}_status.json", status_payload)
@@ -1212,6 +1212,47 @@ def _persist_finished_mlb_sim_run() -> None:
 		_MLB_SIM_LOG_HANDLE = None
 		_MLB_SIM_LOG_PATH = None
 		_MLB_SIM_RUN_META = None
+
+
+def _mlb_local_sim_run_is_stale() -> bool:
+	# Mirrors the age check _shared_mlb_sim_still_running already applies to
+	# the cross-container pointer -- confirmed missing here in production
+	# 2026-07-24/25: a worker-launched sim that hangs without exiting keeps
+	# .poll() returning None forever, so mlbDailySim reported
+	# "previous_run_still_active" on every tick for 27+ minutes straight with
+	# zero sim-job log output, permanently blocking that date's sim.
+	meta = _MLB_SIM_RUN_META
+	if not isinstance(meta, dict):
+		return False
+	started_at = str(meta.get("started_at") or "")
+	try:
+		started_dt = datetime.fromisoformat(started_at.replace("Z", "+00:00")) if started_at else None
+	except Exception:
+		started_dt = None
+	if started_dt is None:
+		return False
+	age_seconds = (datetime.now(timezone.utc) - started_dt).total_seconds()
+	return age_seconds > _MLB_SIM_MAX_RUNTIME_SECONDS
+
+
+def _kill_stale_mlb_sim_process() -> None:
+	global _MLB_SIM_PROCESS
+	process = _MLB_SIM_PROCESS
+	meta = _MLB_SIM_RUN_META
+	if process is not None:
+		try:
+			process.kill()
+			process.wait(timeout=5)
+		except Exception:
+			pass
+	if isinstance(meta, dict):
+		print(
+			f"[live_refresh_loop] MLB_DAILY_SIM_TIMEOUT date={meta.get('date')} pid={meta.get('pid')} "
+			f"run_stamp={meta.get('run_stamp')} max_runtime_seconds={_MLB_SIM_MAX_RUNTIME_SECONDS}",
+			flush=True,
+		)
+	_persist_finished_mlb_sim_run(state="timed_out")
+	_MLB_SIM_PROCESS = None
 
 
 def _mlb_daily_sim_process_still_running() -> bool:
@@ -1226,6 +1267,14 @@ def _mlb_daily_sim_process_still_running() -> bool:
 		if not still_running:
 			_persist_finished_mlb_sim_run()
 			_MLB_SIM_PROCESS = None
+			return False
+		# A live .poll() only proves the process hasn't exited -- it says
+		# nothing about whether it's still making progress. Apply the same
+		# _MLB_SIM_MAX_RUNTIME_SECONDS ceiling the shared-pointer fallback
+		# below already enforces, so a hung subprocess this worker launched
+		# itself can't block every future daily-sim tick forever.
+		if _mlb_local_sim_run_is_stale():
+			_kill_stale_mlb_sim_process()
 			return False
 		return True
 	# No local handle -- either this worker never launched a sim, or a

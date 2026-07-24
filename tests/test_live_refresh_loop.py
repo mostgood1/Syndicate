@@ -4,9 +4,10 @@ import csv
 import json
 import os
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from syndicate.app import create_app
 from syndicate.features.shared import live_refresh_loop
@@ -20,6 +21,55 @@ class LiveRefreshLoopTests(unittest.TestCase):
         live_refresh_loop._release_process_lock()
         live_refresh_loop._LAST_LINEUP_INJURY_CHANGED_SPORTS = set()
         live_refresh_loop._LAST_WNBA_LINEUP_INJURY_CHANGED_MATCHUPS = None
+        live_refresh_loop._MLB_SIM_PROCESS = None
+        live_refresh_loop._MLB_SIM_RUN_META = None
+        live_refresh_loop._MLB_SIM_LOG_HANDLE = None
+        live_refresh_loop._MLB_SIM_LOG_PATH = None
+
+    def test_mlb_sim_still_running_true_when_recent_and_polling_none(self) -> None:
+        # A live, recently-launched sim subprocess should still report
+        # "running" -- confirms the new staleness ceiling doesn't fire early.
+        fake_process = MagicMock()
+        fake_process.poll.return_value = None
+        live_refresh_loop._MLB_SIM_PROCESS = fake_process
+        live_refresh_loop._MLB_SIM_RUN_META = {
+            "date": "2026-07-25",
+            "run_stamp": "20260724_170613",
+            "pid": 156,
+            "started_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        }
+
+        self.assertTrue(live_refresh_loop._mlb_daily_sim_process_still_running())
+        fake_process.kill.assert_not_called()
+        self.assertIs(live_refresh_loop._MLB_SIM_PROCESS, fake_process)
+
+    def test_mlb_sim_still_running_false_when_hung_past_max_runtime(self) -> None:
+        # Reproduces the production incident: a worker-launched sim subprocess
+        # whose .poll() never stops returning None (hung, not exited) used to
+        # block every future daily-sim tick forever via the fast path, which
+        # -- unlike _shared_mlb_sim_still_running's cross-container fallback --
+        # had no _MLB_SIM_MAX_RUNTIME_SECONDS ceiling. This confirms the new
+        # ceiling now applies to that same-process fast path too.
+        fake_process = MagicMock()
+        fake_process.poll.return_value = None  # never exits on its own
+        live_refresh_loop._MLB_SIM_PROCESS = fake_process
+        stale_started_at = datetime.now(timezone.utc) - timedelta(
+            seconds=live_refresh_loop._MLB_SIM_MAX_RUNTIME_SECONDS + 60
+        )
+        live_refresh_loop._MLB_SIM_RUN_META = {
+            "date": "2026-07-25",
+            "run_stamp": "20260724_170613",
+            "pid": 156,
+            "started_at": stale_started_at.isoformat().replace("+00:00", "Z"),
+        }
+
+        with patch.object(live_refresh_loop, "_persist_finished_mlb_sim_run") as mocked_persist:
+            still_running = live_refresh_loop._mlb_daily_sim_process_still_running()
+
+        self.assertFalse(still_running)
+        fake_process.kill.assert_called_once()
+        mocked_persist.assert_called_once_with(state="timed_out")
+        self.assertIsNone(live_refresh_loop._MLB_SIM_PROCESS)
 
     def test_run_tick_launches_live_refresh_with_expected_defaults(self) -> None:
         with patch.dict(
