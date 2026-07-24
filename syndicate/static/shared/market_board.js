@@ -164,6 +164,12 @@
     return true;
   }
 
+  // Every tab group re-renders itself (via renderFilterTabs) after a click,
+  // not just the board body -- a single-select tab's onSelect used to only
+  // update state and re-filter the results, so a clicked tab (e.g. "Live"
+  // or "Player props") correctly filtered the board but never visually
+  // showed as selected, since renderTabs/renderMultiTabs were only invoked
+  // once at initial render. Real bug reported against the shipped page.
   function renderFilterTabs() {
     renderTabs("board-sport-tabs", SPORT_TABS, sportSlug, (value) => {
       if (value === sportSlug) return;
@@ -172,16 +178,18 @@
     });
     renderTabs("board-state-tabs", STATE_TABS, state.gameState, (value) => {
       state.gameState = value;
+      renderFilterTabs();
       renderGameCards();
       renderBoardBody();
     });
     renderTabs("board-market-tabs", MARKET_TABS, state.marketFamily, (value) => {
       state.marketFamily = value;
-      renderPropTypeTabs();
+      renderFilterTabs();
       renderBoardBody();
     });
     renderTabs("board-view-tabs", VIEW_TABS, state.view, (value) => {
       state.view = value;
+      renderFilterTabs();
       renderBoardBody();
     });
     renderPropTypeTabs();
@@ -209,6 +217,11 @@
     renderMultiTabs("board-prop-type-tabs", scopedTypes, state.propTypes, (value) => {
       if (state.propTypes.has(value)) state.propTypes.delete(value);
       else state.propTypes.add(value);
+      // Re-render the pills themselves (not just the filtered board) --
+      // otherwise a clicked pill filters correctly but never visually
+      // shows as selected, since renderMultiTabs was only called once at
+      // initial render.
+      renderPropTypeTabs();
       renderBoardBody();
     });
     if (changed) renderBoardBody();
