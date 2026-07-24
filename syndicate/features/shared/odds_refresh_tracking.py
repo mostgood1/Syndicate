@@ -1057,7 +1057,17 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             "history_limit": _ODDS_HISTORY_LIMIT,
             "markets": shard_markets,
         }
-        payload.update(shard_markets)
+        # Every market used to also be flattened onto the payload's own
+        # top level (payload.update(shard_markets)) -- an exact duplicate
+        # of what's already under "markets", roughly doubling this
+        # payload's size for every reader/cache that holds it. Confirmed
+        # every consumer (odds_lifecycle.py's _market_state_from_payload,
+        # mlb/cards.py, soccer/market_board.py,
+        # intelligence_state.py's _odds_history_market_states) reads
+        # payload["markets"] as the primary path; the top-level flattened
+        # keys were only ever a fallback for payloads predating the
+        # "markets" key existing, which this writer hasn't produced in a
+        # long time.
         _trace_log("before_write_odds_history_json", sport=slug, shard_key=shard_key, history_path=str(history_path), shared_history_path=str(shared_history_path), artifact_history_path=str(artifact_history_path), markets=len(shard_markets), entries_appended=shard_entries_appended[shard_key])
         # Keyvalue-aware write (not _write_json's plain local-disk
         # _atomic_write_text) -- see the comment in

@@ -44,6 +44,12 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             history_payload = json.loads(history_path.read_text(encoding="utf-8"))
             shared_history_payload = json.loads(shared_history_path.read_text(encoding="utf-8"))
             self.assertEqual(shared_history_payload["markets"].keys(), history_payload["markets"].keys())
+            # Every market used to also be flattened onto the payload's own
+            # top level (an exact duplicate of "markets", roughly doubling
+            # this payload's size) -- confirmed no reader needs that shape
+            # once "markets" is populated, so it should no longer appear.
+            non_metadata_top_level_keys = set(history_payload) - {"schema_version", "sport", "shard_key", "date", "updated_at", "history_limit", "markets"}
+            self.assertEqual(non_metadata_top_level_keys, set())
             market_key = next(key for key in history_payload["markets"] if "selection=over" in key)
             self.assertEqual(len(history_payload["markets"][market_key]["history"]), 1)
             first_state = history_payload["markets"][market_key]
