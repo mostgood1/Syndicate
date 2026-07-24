@@ -649,6 +649,53 @@ def api_ops_intelligence_candidate_trace() -> Any:
     # root-caused without relying on production log scraping.
     date = str(request.args.get("date") or "").strip() or None
     sport_filter = str(request.args.get("sport") or "").strip().lower() or None
+
+    if _coerce_bool(request.args.get("read_only")):
+        # Fast path: the full trace below runs collect/score/filter 3-4x and
+        # can exceed the gunicorn request timeout. This isolates just the
+        # cheap path/key resolution + raw persisted-state reads (no
+        # candidate computation at all) for quick iteration during an
+        # incident where only the read side is in question.
+        read_only_trace: dict[str, Any] = {}
+        try:
+            from syndicate.features.shared.refresh_state_store import reports_root as _reports_root
+            from syndicate.features.shared.refresh_state_store import read_json_file as _read_json_file
+            from syndicate.features.shared.refresh_state_store import _state_key_for_path
+            from pipeline.intelligence_state import STATE_PATH as _STATE_PATH
+            from pipeline.intelligence_state import BOARD_SNAPSHOT_PATH as _BOARD_SNAPSHOT_PATH
+
+            read_only_trace["reports_root"] = str(_reports_root())
+            read_only_trace["state_path"] = str(_STATE_PATH)
+            read_only_trace["board_snapshot_path"] = str(_BOARD_SNAPSHOT_PATH)
+            read_only_trace["state_path_redis_key"] = _state_key_for_path(_STATE_PATH)
+            read_only_trace["board_snapshot_path_redis_key"] = _state_key_for_path(_BOARD_SNAPSHOT_PATH)
+
+            board_snapshot_raw = _read_json_file(_BOARD_SNAPSHOT_PATH)
+            read_only_trace["board_snapshot_read_is_dict"] = isinstance(board_snapshot_raw, dict)
+            if isinstance(board_snapshot_raw, dict):
+                read_only_trace["board_snapshot_read_keys"] = list(board_snapshot_raw.keys())
+                read_only_trace["board_snapshot_read_latest_key"] = board_snapshot_raw.get("latest_key")
+                candidates_field = board_snapshot_raw.get("candidates") or board_snapshot_raw.get("top_opportunities")
+                read_only_trace["board_snapshot_read_candidate_count"] = len(candidates_field) if isinstance(candidates_field, list) else None
+                read_only_trace["board_snapshot_read_updated_at"] = board_snapshot_raw.get("updated_at") or board_snapshot_raw.get("generated_at")
+
+            state_raw = _read_json_file(_STATE_PATH)
+            read_only_trace["state_read_is_dict"] = isinstance(state_raw, dict)
+            if isinstance(state_raw, dict):
+                read_only_trace["state_read_latest_key"] = state_raw.get("latest_key")
+                snapshots = state_raw.get("snapshots")
+                read_only_trace["state_read_snapshot_keys"] = list(snapshots.keys()) if isinstance(snapshots, dict) else None
+                if isinstance(snapshots, dict) and state_raw.get("latest_key") in snapshots:
+                    latest_snap = snapshots[state_raw.get("latest_key")]
+                    resp = latest_snap.get("response") if isinstance(latest_snap, dict) else None
+                    top_opps = resp.get("top_opportunities") if isinstance(resp, dict) else None
+                    read_only_trace["state_read_latest_snapshot_candidate_count"] = len(top_opps) if isinstance(top_opps, list) else None
+                    read_only_trace["state_read_latest_snapshot_computed_at"] = latest_snap.get("computed_at") if isinstance(latest_snap, dict) else None
+                read_only_trace["state_read_updated_at"] = state_raw.get("updated_at")
+        except Exception as exc:
+            read_only_trace["error"] = f"{type(exc).__name__}: {exc}"
+        return jsonify({"ok": True, "date": date, "read_only_trace": read_only_trace})
+
     try:
         from syndicate.features.intelligence import build_intelligence_overview
         from syndicate.features.intelligence import _query_preferences
