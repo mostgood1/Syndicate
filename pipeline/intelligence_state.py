@@ -2035,8 +2035,10 @@ class IntelligenceStateService:
                 continue
             guard_acquired = False
             run_started_at = time.time()
+            print(f"[intelligence_state] LOOP_POPPED_PAYLOAD key={_payload_key(payload_to_process)}", flush=True)
             try:
                 guard_acquired = self._execution_guard.acquire(blocking=False)
+                print(f"[intelligence_state] GUARD_ACQUIRE_RESULT acquired={guard_acquired}", flush=True)
                 if not guard_acquired:
                     with self._condition:
                         self._pending_keys[_payload_key(payload_to_process)] = payload_to_process
@@ -2046,7 +2048,9 @@ class IntelligenceStateService:
                     continue
                 logger.info("WORKER RUN", extra={"payload_key": _payload_key(payload_to_process)})
                 logger.info("BACKGROUND_LOOP_PRE_BOARD_PUBLISH", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
+                print("[intelligence_state] CALLING_COMPUTE_BOARD_PUBLICATION_RESPONSE", flush=True)
                 state = self._compute_board_publication_response(payload_to_process)
+                print("[intelligence_state] RETURNED_FROM_COMPUTE_BOARD_PUBLICATION_RESPONSE", flush=True)
                 logger.info("BACKGROUND_LOOP_POST_BOARD_PUBLISH", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
                 logger.info("BACKGROUND_LOOP_PRE_PERSIST", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
                 written_state = write_latest_intelligence_state(state)
