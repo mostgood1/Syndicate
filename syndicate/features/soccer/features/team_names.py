@@ -65,6 +65,14 @@ _ALIASES: dict[str, str] = {
     "new york city": "new york city fc",
     "nycfc": "new york city fc",
     "ny red bulls": "new york red bulls",
+    # ESPN's own full club name for this team ("Red Bull New York") shares
+    # every token with the Odds API's "New York Red Bulls" but in a
+    # different order with a singular/plural mismatch ("bull" vs "bulls"),
+    # which scores too low on SequenceMatcher's character-sequence ratio to
+    # clear match_team_name's fuzzy threshold -- confirmed 2026-07-24 while
+    # wiring the market board's odds<->sim join (match_team_name returned
+    # None for this exact pair without this alias).
+    "red bull new york": "new york red bulls",
     "dc united": "d.c. united",
     "sporting kansas city": "sporting kc",
     "vancouver whitecaps": "vancouver whitecaps fc",

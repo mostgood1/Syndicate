@@ -37,6 +37,16 @@ class TeamNameTests(unittest.TestCase):
         self.assertEqual(match_team_name("Man Utd", candidates), "Manchester United")
         self.assertIsNone(match_team_name("Real Madrid", candidates))
 
+    def test_red_bull_new_york_matches_odds_api_new_york_red_bulls(self) -> None:
+        # ESPN's own full club name ("Red Bull New York") and the Odds
+        # API's market name ("New York Red Bulls") share every token but in
+        # a different order with a singular/plural mismatch -- confirmed
+        # 2026-07-24 that without an explicit alias, match_team_name's
+        # SequenceMatcher-based fuzzy fallback scores this pair too low to
+        # clear the default threshold and returns None.
+        candidates = ["New York Red Bulls", "Charlotte FC"]
+        self.assertEqual(match_team_name("Red Bull New York", candidates), "New York Red Bulls")
+
 
 class TeamRatingTests(unittest.TestCase):
     def test_ratings_are_relative_to_league_mean(self) -> None:

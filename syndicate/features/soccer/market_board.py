@@ -35,6 +35,7 @@ from typing import Any
 from syndicate.features.shared.market_inventory import join_odds_to_sim
 from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
 from syndicate.features.shared.odds_control_plane import resolve_current_shard_key
+from syndicate.features.soccer.features.team_names import match_team_name
 from syndicate.features.soccer.sources import available_dates
 from syndicate.features.soccer.sources import default_season
 from syndicate.features.soccer.sources import game_odds_rows
@@ -136,10 +137,61 @@ def _soccer_odds_history_key(row: dict[str, Any]) -> str:
     return "|".join(parts)
 
 
+def _soccer_odds_event_for_match(
+    *, home_team: str, away_team: str, game_odds_rows_all: list[dict[str, Any]]
+) -> tuple[str, str, str] | None:
+    """Resolve which event in the raw odds feed corresponds to this sim
+    match, and return (odds_event_id, odds_home_team, odds_away_team) --
+    all three exactly as they appear on the odds feed's own rows, not the
+    sim's.
+
+    The odds feed's own event_id is an Odds-API-internal hash (e.g.
+    "a86289ceba2168f9574ec8fccf0305b7"), completely unrelated to the sim's
+    ESPN-sourced numeric event_id (e.g. "761685") -- these were being
+    compared directly before this fix and could never match. Team names
+    also differ between the two sources (ESPN's "Red Bull New York" vs the
+    Odds API's "New York Red Bulls"), so the match is done via the same
+    fuzzy match_team_name() used elsewhere in this codebase for the same
+    cross-source problem (see build_soccer_picks.py's own home/away
+    matching, which is exact-string and has the identical gap -- this
+    match is a strict improvement, not a new approach).
+    """
+    events: dict[str, tuple[str, str]] = {}
+    for row in game_odds_rows_all:
+        row_event_id = str(row.get("event_id") or "").strip()
+        row_home = str(row.get("home_team") or "").strip()
+        row_away = str(row.get("away_team") or "").strip()
+        if row_event_id and row_home and row_away:
+            events.setdefault(row_event_id, (row_home, row_away))
+    if not events:
+        return None
+    home_names = [pair[0] for pair in events.values()]
+    matched_home = match_team_name(home_team, home_names)
+    if matched_home is None:
+        return None
+    candidate_event_ids = [event_id for event_id, pair in events.items() if pair[0] == matched_home]
+    away_names = [events[event_id][1] for event_id in candidate_event_ids]
+    matched_away = match_team_name(away_team, away_names)
+    if matched_away is None:
+        return None
+    for event_id in candidate_event_ids:
+        if events[event_id][1] == matched_away:
+            return event_id, matched_home, matched_away
+    return None
+
+
 def _soccer_market_board_game_rows_for_match(
-    *, event_id: str, game_odds_rows_all: list[dict[str, Any]]
+    *, game_id: str, odds_event_id: str, game_odds_rows_all: list[dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], dict[tuple[str, str], dict[str, Any]]]:
     """Raw game-market (h2h/totals/spreads) odds rows for one match.
+
+    The Odds API's outcome "side" for h2h/spreads is the literal team name
+    (or "Draw"), not the string "home"/"away"/"draw" -- normalized here
+    against THIS ROW'S OWN home_team/away_team columns (an exact-string
+    comparison is safe and correct at this level, since both sides come
+    from the same odds-feed row and therefore share the same naming
+    convention; the fuzzy cross-source match already happened one level up
+    in _soccer_odds_event_for_match to resolve odds_event_id itself).
 
     Multiple bookmakers quote the same market -- the first one encountered
     per (market, side) is kept (matching how build_mlb_market_board
@@ -150,17 +202,25 @@ def _soccer_market_board_game_rows_for_match(
     odds_rows: list[dict[str, Any]] = []
     picked_by_market_side: dict[tuple[str, str], dict[str, Any]] = {}
     for row in game_odds_rows_all:
-        if str(row.get("event_id") or "").strip() != event_id:
+        if str(row.get("event_id") or "").strip() != odds_event_id:
             continue
         market = str(row.get("market") or "").strip().lower()
-        side = str(row.get("side") or "").strip().lower()
+        raw_side = str(row.get("side") or "").strip()
+        row_home = str(row.get("home_team") or "").strip()
+        row_away = str(row.get("away_team") or "").strip()
         price = _safe_float(row.get("price"))
         if price is None:
             continue
         line = _safe_float(row.get("line"))
 
         if market == "h2h":
-            if side not in ("home", "draw", "away"):
+            if raw_side.lower() == "draw":
+                side = "draw"
+            elif raw_side == row_home:
+                side = "home"
+            elif raw_side == row_away:
+                side = "away"
+            else:
                 continue
             board_key = ("h2h", side)
             if board_key in picked_by_market_side:
@@ -168,7 +228,7 @@ def _soccer_market_board_game_rows_for_match(
             picked_by_market_side[board_key] = row
             odds_rows.append(
                 {
-                    "game_id": event_id,
+                    "game_id": game_id,
                     "market": f"moneyline_{side}",
                     "period": "full_game",
                     "entity": None,
@@ -178,6 +238,7 @@ def _soccer_market_board_game_rows_for_match(
                 }
             )
         elif market == "totals":
+            side = raw_side.lower()
             if side not in ("over", "under"):
                 continue
             board_key = ("totals", side)
@@ -186,7 +247,7 @@ def _soccer_market_board_game_rows_for_match(
             picked_by_market_side[board_key] = row
             odds_rows.append(
                 {
-                    "game_id": event_id,
+                    "game_id": game_id,
                     "market": "total",
                     "period": "full_game",
                     "entity": None,
@@ -197,7 +258,11 @@ def _soccer_market_board_game_rows_for_match(
                 }
             )
         elif market == "spreads":
-            if side not in ("home", "away"):
+            if raw_side == row_home:
+                side = "home"
+            elif raw_side == row_away:
+                side = "away"
+            else:
                 continue
             board_key = ("spreads", side)
             if board_key in picked_by_market_side:
@@ -205,7 +270,7 @@ def _soccer_market_board_game_rows_for_match(
             picked_by_market_side[board_key] = row
             odds_rows.append(
                 {
-                    "game_id": event_id,
+                    "game_id": game_id,
                     "market": "spread",
                     "period": "full_game",
                     "entity": None,
@@ -251,12 +316,12 @@ def _soccer_market_board_sim_rows_for_match(*, event_id: str, match: dict[str, A
 
 
 def _soccer_market_board_prop_rows_for_match(
-    *, event_id: str, match: dict[str, Any], props_rows_all: list[dict[str, Any]]
+    *, game_id: str, odds_event_id: str, match: dict[str, Any], props_rows_all: list[dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     odds_rows: list[dict[str, Any]] = []
     seen: set[tuple[str, str, str]] = set()
     for row in props_rows_all:
-        if str(row.get("event_id") or "").strip() != event_id:
+        if str(row.get("event_id") or "").strip() != odds_event_id:
             continue
         player = str(row.get("player") or "").strip()
         market_label = str(row.get("market") or "").strip()
@@ -272,7 +337,7 @@ def _soccer_market_board_prop_rows_for_match(
         if over_price is not None:
             odds_rows.append(
                 {
-                    "game_id": event_id,
+                    "game_id": game_id,
                     "market": market_label,
                     "period": "full_game",
                     "entity": player,
@@ -285,7 +350,7 @@ def _soccer_market_board_prop_rows_for_match(
         if under_price is not None:
             odds_rows.append(
                 {
-                    "game_id": event_id,
+                    "game_id": game_id,
                     "market": market_label,
                     "period": "full_game",
                     "entity": player,
@@ -295,6 +360,19 @@ def _soccer_market_board_prop_rows_for_match(
                     "market_type": "prop",
                 }
             )
+
+    # The sim's player names come from American Soccer Analysis, a
+    # different provider than the Odds API props feed -- join_odds_to_sim's
+    # entity matching is a bare .casefold() (see market_inventory.py), which
+    # does not strip accents/diacritics, so "Kevin Denkey" (one provider)
+    # and "Kévin Denkey" (the other) would silently fail to join even
+    # though they're the same player. Resolved the same way the game-level
+    # team-name mismatch was: if this sim player's normalized name matches
+    # one of THIS match's own quoted odds players, the sim row is labeled
+    # with the odds feed's own spelling so the join lines up exactly;
+    # otherwise the sim's own spelling is kept (harmless -- with no
+    # matching odds row it can never join to anything anyway).
+    odds_player_by_normalized = {_normalize_soccer_name(row["entity"]): row["entity"] for row in odds_rows}
 
     sim_rows: list[dict[str, Any]] = []
     top_props = match.get("top_props") if isinstance(match.get("top_props"), list) else []
@@ -310,14 +388,15 @@ def _soccer_market_board_prop_rows_for_match(
         player_name = str(prop_row.get("player_name") or "").strip()
         if not player_name:
             continue
+        entity_name = odds_player_by_normalized.get(_normalize_soccer_name(player_name), player_name)
         anytime_probability = prop_row.get("anytime_scorer_probability")
         if anytime_probability is not None:
             sim_rows.append(
                 {
-                    "game_id": event_id,
+                    "game_id": game_id,
                     "market": "Anytime Goalscorer",
                     "period": "full_game",
-                    "entity": player_name,
+                    "entity": entity_name,
                     "sim_projection": anytime_probability,
                     "sim_source": "soccersim",
                 }
@@ -389,13 +468,26 @@ def build_soccer_market_board(league: str, selected_date: str) -> dict[str, Any]
         status_state = str(match.get("status_state") or "pre").strip().lower()
         game_state = _GAME_STATE_BY_STATUS.get(status_state, "pregame")
 
-        game_odds, picked_game_rows = _soccer_market_board_game_rows_for_match(
-            event_id=event_id, game_odds_rows_all=game_odds_rows_all
+        # The odds feed's event_id/team-name spellings are foreign to the
+        # sim's (see _soccer_odds_event_for_match's docstring) -- resolve
+        # which odds-feed event (if any) is this match before filtering any
+        # raw odds/props rows by it.
+        resolved_odds_event = _soccer_odds_event_for_match(
+            home_team=home_team, away_team=away_team, game_odds_rows_all=game_odds_rows_all
         )
+        odds_event_id = resolved_odds_event[0] if resolved_odds_event else None
+
+        if odds_event_id:
+            game_odds, picked_game_rows = _soccer_market_board_game_rows_for_match(
+                game_id=event_id, odds_event_id=odds_event_id, game_odds_rows_all=game_odds_rows_all
+            )
+            prop_odds, prop_sim = _soccer_market_board_prop_rows_for_match(
+                game_id=event_id, odds_event_id=odds_event_id, match=match, props_rows_all=props_rows_all
+            )
+        else:
+            game_odds, picked_game_rows = [], {}
+            prop_odds, prop_sim = [], []
         game_sim = _soccer_market_board_sim_rows_for_match(event_id=event_id, match=match)
-        prop_odds, prop_sim = _soccer_market_board_prop_rows_for_match(
-            event_id=event_id, match=match, props_rows_all=props_rows_all
-        )
         inventory = join_odds_to_sim(game_odds + prop_odds, game_sim + prop_sim)
 
         for row in inventory:
