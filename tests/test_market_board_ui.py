@@ -60,6 +60,25 @@ class MarketBoardUiParityTests(unittest.TestCase):
         self.assertIn('data-api-endpoint="/wnba/api/market-board?date=2026-07-23"', html)
         self.assertIn('data-sport-slug="wnba"', html)
 
+    def test_soccer_mls_market_board_page_uses_shared_template_and_correct_endpoint(self) -> None:
+        # Soccer's route is league-scoped (/soccer/<league>/market-board),
+        # not a top-level /soccer/market-board like the other sports -- MLS
+        # prioritized first since it has games sooner than WNBA.
+        response = self.client.get("/soccer/mls/market-board?date=2026-07-23")
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('data-api-endpoint="/soccer/mls/api/market-board?date=2026-07-23"', html)
+        self.assertIn('data-sport-slug="mls"', html)
+        self.assertIn('data-selected-date="2026-07-23"', html)
+
+    def test_soccer_mls_api_market_board_returns_json(self) -> None:
+        response = self.client.get("/soccer/mls/api/market-board?date=2026-07-23")
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertEqual(payload["league"], "mls")
+        self.assertEqual(payload["date"], "2026-07-23")
+        self.assertIn("games", payload)
+
     def test_market_board_pages_carry_the_site_nav_shell(self) -> None:
         # Confirms these pages now extend shared/base.html (site nav/logo)
         # instead of being standalone documents, per the "feel exactly like

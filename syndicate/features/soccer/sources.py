@@ -133,6 +133,44 @@ def picks_rows(league: str, selected_date: str) -> tuple[dict[str, str], ...]:
         return ()
 
 
+def game_odds_path(league: str) -> Path:
+    return _api_root(league) / "odds" / "game_odds_current.csv"
+
+
+def game_odds_rows(league: str) -> tuple[dict[str, str], ...]:
+    # Not cached: unlike recommendations/picks (one file per date, written
+    # once per pregame tick), this is a single rolling "current odds" file
+    # per league that gets overwritten every refresh cycle -- same
+    # reasoning as live_state_payload above.
+    path = game_odds_path(league)
+    if not path.exists():
+        return ()
+    try:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            return tuple(dict(row) for row in csv.DictReader(handle))
+    except Exception:
+        return ()
+
+
+def props_odds_path(league: str, selected_date: str) -> Path:
+    return _api_root(league).parent / "props" / f"{selected_date}.csv"
+
+
+def props_odds_rows(league: str, selected_date: str) -> tuple[dict[str, str], ...]:
+    # Not cached, same reasoning as game_odds_rows -- a per-date file, but
+    # only whatever the props-fetch step captured this tick, not a fixed
+    # once-per-date artifact the rest of this module's @lru_cache pattern
+    # assumes.
+    path = props_odds_path(league, selected_date)
+    if not path.exists():
+        return ()
+    try:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            return tuple(dict(row) for row in csv.DictReader(handle))
+    except Exception:
+        return ()
+
+
 def date_index_path(league: str) -> Path:
     return _api_root(league) / "display_prediction_dates.json"
 

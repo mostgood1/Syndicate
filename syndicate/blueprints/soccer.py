@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 from flask import Blueprint, jsonify, redirect, render_template, request
 
 from syndicate.features.soccer.archive import build_archive_api_payload
@@ -8,6 +10,7 @@ from syndicate.features.soccer.cards import build_cards_page_context
 from syndicate.features.soccer.game_detail import build_game_detail_page_context
 from syndicate.features.soccer.live_lens import build_live_lens_api_payload
 from syndicate.features.soccer.live_lens import build_live_lens_page_context
+from syndicate.features.soccer.market_board import build_soccer_market_board
 from syndicate.features.soccer.props import build_props_page_context
 from syndicate.features.soccer.sources import DEFAULT_LEAGUE
 from syndicate.features.soccer.sources import LEAGUE_DISPLAY_NAMES
@@ -103,6 +106,35 @@ def api_cards(league: str):
     week = _selected_week(league, season)
     context = build_cards_page_context(league, week, season)
     return jsonify(build_game_board_api_payload(context))
+
+
+@soccer_bp.get("/<league>/market-board")
+def market_board(league: str):
+    # Layer 1 (see ~/.claude/plans/expressive-wiggling-engelbart.md): every
+    # quoted moneyline/total/spread/prop line for this league's slate on a
+    # given date, joined against SoccerSim's projections where coverage
+    # exists -- same shared card/bet-slip template MLB/NBA/WNBA use, with
+    # row data fetched client-side from /soccer/<league>/api/market-board.
+    league = normalize_league(league)
+    selected_date = (request.args.get("date") or "").strip() or central_today_iso()
+    parsed_date = datetime.strptime(selected_date, "%Y-%m-%d").date()
+    return render_template(
+        "shared/market_board.html",
+        sport_label=league_display_name(league),
+        sport_slug=league,
+        api_endpoint=f"/soccer/{league}/api/market-board?date={selected_date}",
+        selected_date=selected_date,
+        prev_date=(parsed_date - timedelta(days=1)).isoformat(),
+        next_date=(parsed_date + timedelta(days=1)).isoformat(),
+        cards_href=f"/soccer/{league}/cards",
+    )
+
+
+@soccer_bp.get("/<league>/api/market-board")
+def api_market_board(league: str):
+    league = normalize_league(league)
+    selected_date = (request.args.get("date") or "").strip() or central_today_iso()
+    return jsonify(build_soccer_market_board(league, selected_date))
 
 
 @soccer_bp.get("/<league>/game/<game_pk>")

@@ -5508,6 +5508,7 @@ _MARKET_BOARD_HUB_SPORTS: tuple[dict[str, str], ...] = (
     {"slug": "mlb", "name": "MLB", "description": "Every quoted moneyline, total, and player prop -- live games today."},
     {"slug": "nba", "name": "NBA", "description": "Full market inventory once the season resumes."},
     {"slug": "wnba", "name": "WNBA", "description": "Full market inventory once the season resumes."},
+    {"slug": "soccer/mls", "name": "MLS", "description": "Every quoted moneyline, total, spread, and player prop -- live games today."},
 )
 
 

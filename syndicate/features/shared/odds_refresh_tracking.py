@@ -215,9 +215,14 @@ def _line_number(value: Any) -> float | None:
     if value in (None, "", "-"):
         return None
     try:
-        return float(value)
+        number = float(value)
     except Exception:
         return None
+    # A pandas column that's blank for every row of a CSV (e.g. soccer's
+    # h2h rows never populate "line", only "price") reads back as NaN, not
+    # None/"" -- without this check NaN silently passed the guard above and
+    # got treated as a real captured line value.
+    return None if number != number else number
 
 
 def _movement_direction(delta: float | None) -> str:
@@ -397,7 +402,11 @@ def _odds_history_line_snapshot(row: Mapping[str, Any]) -> dict[str, Any] | None
 
 
 def _odds_history_market_key(row: Mapping[str, Any]) -> str | None:
-    market_id = str(row.get("market_id") or "").strip()
+    # Soccer's raw props feed (scripts/fetch_soccer_oddsapi_props_local.py)
+    # already writes a fully-formed disambiguated key under "market_key"
+    # (player+market+line) -- distinct column name from every other
+    # sport's "market_id", so it needs its own fallback here.
+    market_id = str(row.get("market_id") or row.get("market_key") or "").strip()
     if market_id:
         return market_id
     parts: list[str] = []
@@ -415,6 +424,11 @@ def _odds_history_market_key(row: Mapping[str, Any]) -> str | None:
         "team",
         "market",
         "selection",
+        # Soccer's raw game-odds CSV (scripts/fetch_soccer_oddsapi_odds_local.py)
+        # names its selection column "side" (home/draw/away, over/under)
+        # rather than "selection" -- without this, every side of the same
+        # market would collapse into one history entry.
+        "side",
         "book",
         "bookmaker",
     ):
@@ -640,6 +654,17 @@ def _odds_history_snapshot_paths(*, sport: str, source_root: Path, date_str: str
                     candidates.append(candidate)
         return candidates
 
+    if slug == "soccer":
+        # source_root is the multi-league bundle root (data/soccer_source);
+        # every league writes to its own subdirectory, so glob across
+        # whatever leagues are present rather than hardcoding a league list
+        # in this shared module.
+        if source_root.exists():
+            for league_dir in sorted(path for path in source_root.iterdir() if path.is_dir()):
+                add(league_dir.name, "api", "odds", "game_odds_current.csv")
+                add(league_dir.name, "props", f"{date_str}.csv")
+        return [path for path in candidates if path.exists() and path.is_file()]
+
     return []
 
 
@@ -670,6 +695,8 @@ def _row_game_date(row: Mapping[str, Any], *, sport: str) -> date | None:
         return _parse_game_date_token(row.get("game_time"))
     if slug == "ncaaf":
         return _parse_game_date_token(row.get("start_date") or row.get("start_date_api"))
+    if slug == "soccer":
+        return _parse_game_date_token(row.get("commence_time") or row.get("game_time"))
     return None
 
 
@@ -1456,6 +1483,36 @@ def _build_ncaab_snapshot(path: Path) -> pd.DataFrame:
     return out
 
 
+def _build_soccer_game_odds_snapshot(source_root: Path) -> pd.DataFrame:
+    frames: list[pd.DataFrame] = []
+    if source_root.exists():
+        for league_dir in sorted(path for path in source_root.iterdir() if path.is_dir()):
+            candidate = league_dir / "api" / "odds" / "game_odds_current.csv"
+            df = _read_csv(candidate)
+            if df.empty:
+                continue
+            fallback_ts = datetime.fromtimestamp(candidate.stat().st_mtime, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            df = df.copy()
+            df["snapshot_ts"] = _to_snapshot_ts(df, fallback_ts=fallback_ts)
+            frames.append(df)
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
+def _build_soccer_props_snapshot(source_root: Path, date_str: str) -> pd.DataFrame:
+    frames: list[pd.DataFrame] = []
+    if source_root.exists():
+        for league_dir in sorted(path for path in source_root.iterdir() if path.is_dir()):
+            candidate = league_dir / "props" / f"{date_str}.csv"
+            df = _read_csv(candidate)
+            if df.empty:
+                continue
+            fallback_ts = datetime.fromtimestamp(candidate.stat().st_mtime, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            df = df.copy()
+            df["snapshot_ts"] = _to_snapshot_ts(df, fallback_ts=fallback_ts)
+            frames.append(df)
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
 def _build_nfl_props_snapshot(path: Path) -> pd.DataFrame:
     df = _read_csv(path)
     if df.empty:
@@ -1830,6 +1887,36 @@ def sync_sport_post_refresh_tracking(*, sport: str, source_root: Path, date_str:
             "manifest_path": str(manifest_path),
             "predicted_totals_files": len(latest_predicted),
         }
+        results["artifacts"]["recommendations_refresh"] = refresh_impacted_recommendations_for_tracking(
+            sport=slug,
+            source_root=source_root,
+            date_str=date_str,
+            tracking_meta=results,
+        )
+        results["artifacts"]["odds_history"] = _sync_odds_history_for_refresh(sport=slug, source_root=source_root, date_str=date_str)
+        return results
+
+    if slug == "soccer":
+        game_odds_df = _build_soccer_game_odds_snapshot(source_root)
+        results["artifacts"]["game_odds"] = _sync_csv_tracking(
+            tracking_root=tracking_root,
+            prefix="odds_soccer_game_odds",
+            scope=date_str,
+            snapshot_df=game_odds_df,
+            key_cols=["event_id", "market", "side", "book"],
+            line_col="line",
+            price_cols=["price"],
+        )
+        props_df = _build_soccer_props_snapshot(source_root, date_str)
+        results["artifacts"]["player_props"] = _sync_csv_tracking(
+            tracking_root=tracking_root,
+            prefix="odds_soccer_player_props",
+            scope=date_str,
+            snapshot_df=props_df,
+            key_cols=["event_id", "player", "market", "book"],
+            line_col="line",
+            price_cols=["over_price", "under_price"],
+        )
         results["artifacts"]["recommendations_refresh"] = refresh_impacted_recommendations_for_tracking(
             sport=slug,
             source_root=source_root,

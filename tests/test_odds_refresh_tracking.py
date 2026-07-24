@@ -319,6 +319,45 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             manifest_path = Path(result["artifacts"]["source_manifest"]["manifest_path"])
             self.assertTrue(manifest_path.exists())
 
+    def test_sync_soccer_tracking_writes_odds_history_across_leagues(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False):
+            root = Path(tmpdir)
+            mls_odds_root = root / "mls" / "api" / "odds"
+            mls_odds_root.mkdir(parents=True)
+            (mls_odds_root / "game_odds_current.csv").write_text(
+                "league,event_id,home_team,away_team,commence_time,market,side,line,price,book\n"
+                "mls,1,Columbus Crew,New York City FC,2026-06-07T23:30:00Z,h2h,home,,210,fanduel\n"
+                "mls,1,Columbus Crew,New York City FC,2026-06-07T23:30:00Z,h2h,draw,,260,fanduel\n",
+                encoding="utf-8",
+            )
+            mls_props_root = root / "mls" / "props"
+            mls_props_root.mkdir(parents=True)
+            (mls_props_root / "2026-06-07.csv").write_text(
+                "league,player,market,market_key,line,over_price,under_price,book,event,event_id,game_time,home_team,away_team\n"
+                "mls,Diego Rossi,Anytime Goalscorer,player_goal_scorer_anytime,,250,,betmgm,x,1,2026-06-07T23:30:00Z,Columbus Crew,New York City FC\n",
+                encoding="utf-8",
+            )
+
+            result = sync_post_refresh_tracking_for_source_root(sport="soccer", source_root=root, date_str="2026-06-07")
+
+            self.assertTrue(result["ok"])
+            self.assertFalse(result["artifacts"]["game_odds"].get("skipped", True))
+            self.assertFalse(result["artifacts"]["player_props"].get("skipped", True))
+            shared_history_path = Path(result["artifacts"]["odds_history"]["shared_history_path"])
+            self.assertTrue(shared_history_path.exists())
+            history_payload = json.loads(shared_history_path.read_text(encoding="utf-8"))
+            market_key = "event_id=1|home_team=Columbus Crew|away_team=New York City FC|market=h2h|side=home|book=fanduel"
+            self.assertIn(market_key, history_payload["markets"])
+            self.assertEqual(history_payload["markets"][market_key]["last_line"], 210.0)
+
+    def test_sync_soccer_tracking_with_no_files_is_a_graceful_noop(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False):
+            root = Path(tmpdir)
+            result = sync_post_refresh_tracking_for_source_root(sport="soccer", source_root=root, date_str="2026-06-07")
+            self.assertTrue(result["ok"])
+            self.assertTrue(result["artifacts"]["game_odds"].get("skipped"))
+            self.assertTrue(result["artifacts"]["player_props"].get("skipped"))
+
     def test_refresh_impacted_recommendations_updates_only_matching_rows(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

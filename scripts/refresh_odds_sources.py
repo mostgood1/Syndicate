@@ -1038,6 +1038,23 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
     for league in league_slugs:
         steps.append(
             RefreshStep(
+                name=f"soccer_{league}_props",
+                phases=("pregame",),
+                cwd=REPO_ROOT,
+                command=(
+                    python_exe,
+                    "scripts/fetch_soccer_oddsapi_props_local.py",
+                    "--league",
+                    league,
+                    "--out",
+                    str(soccer_root / league / "props" / f"{args.date}.csv"),
+                ),
+                description=f"Capture {league} player-prop odds (anytime scorer, shots, etc.) from The Odds API.",
+            )
+        )
+    for league in league_slugs:
+        steps.append(
+            RefreshStep(
                 name=f"soccer_{league}_picks",
                 phases=("pregame",),
                 cwd=REPO_ROOT,
@@ -2052,7 +2069,7 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
         return _finalize_sport_result(sport_result)
 
     _log_memory("sport_step_post_append_before_post_refresh_check", sport=sport, execution_mode=execution_mode, sport_ok=bool(sport_result.get("ok")))
-    if execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaab", "ncaaf"} and sport_result["ok"]:
+    if execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaab", "ncaaf", "soccer"} and sport_result["ok"]:
         _log_memory("sport_step_post_append_enter_post_refresh_branch", sport=sport, execution_mode=execution_mode)
         _log_memory("sport_step_post_append_before_post_refresh_root", sport=sport, execution_mode=execution_mode)
         post_refresh_root = _post_refresh_root(spec)
