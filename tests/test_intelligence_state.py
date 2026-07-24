@@ -5,6 +5,7 @@ import os
 import tempfile
 import threading
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 import time
@@ -1545,6 +1546,35 @@ class IntelligenceStateTests(unittest.TestCase):
                         response = client.get("/intelligence?date=2026-06-17")
 
         self.assertEqual(response.status_code, 200)
+        mocked_queue.assert_called_once()
+
+    def test_intelligence_home_shows_last_good_board_while_stale_same_date_refresh_queues(self) -> None:
+        # A same-date pregame board that's simply old (e.g. a redeploy's
+        # cold-start compute hasn't finished yet) should still render --
+        # showing nothing while that catches up is worse UX than a slightly
+        # stale board, and a refresh is queued regardless.
+        aged_last_updated = (datetime.now(timezone.utc) - timedelta(seconds=600)).isoformat().replace("+00:00", "Z")
+        aged_response = {
+            "ok": True,
+            "selected_date": "2026-06-17",
+            "last_updated": aged_last_updated,
+            "top_opportunities": [{"name": "Aged But Real Play"}],
+            "by_sport": {},
+            "analysis": {"recommendations": [{"name": "Aged But Real Play"}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+        }
+
+        app = create_app()
+        app.testing = True
+
+        with app.test_client() as client:
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_board_snapshot_response", return_value=dict(aged_response)):
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=None):
+                    with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                        response = client.get("/intelligence?date=2026-06-17")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("Aged But Real Play", html)
         mocked_queue.assert_called_once()
 
     def test_intelligence_home_forces_state_reload_before_cache_selection(self) -> None:

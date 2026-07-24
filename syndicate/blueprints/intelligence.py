@@ -603,6 +603,25 @@ def _response_needs_refresh(request_payload: dict[str, object], response_payload
     return _board_response_needs_refresh(request_payload, response_payload)
 
 
+def _response_unsafe_to_display(request_payload: dict[str, object], response_payload: dict[str, object] | None) -> bool:
+    # Narrower than _response_needs_refresh: that answers "should a fresh
+    # compute be triggered" (age, live-hydration completeness, date match --
+    # all reasonable reasons to refresh in the background). This answers a
+    # different question -- "would showing this response actively mislead
+    # the viewer" -- so intelligence_home can serve a merely-aged, same-date
+    # pregame board (strictly better than an empty page while a post-deploy
+    # compute cycle catches up, which can take several minutes before any
+    # fresh state has been persisted) while still refusing to show a
+    # different date's picks as if they were today's, or a live game's
+    # odds/state without proper hydration (which can be badly wrong
+    # mid-game, not just stale).
+    if _response_contains_unhydrated_live_items(response_payload):
+        return True
+    request_date = str(request_payload.get("date") or request_payload.get("selected_date") or "").strip()
+    response_date = _response_selected_date(response_payload)
+    return bool(request_date and response_date and request_date != response_date)
+
+
 def _load_canonical_board_response(payload: dict[str, object]) -> tuple[dict[str, object] | None, str]:
     # Migration step 3 (intelligence-state rebuild plan): tried first in
     # _cached_intelligence_response_with_source below, behind
@@ -1259,26 +1278,35 @@ def intelligence_home():
         cached_loader = _cached_intelligence_response_with_source
         if hasattr(cached_loader, "call_count"):
             cached_response, _ = cached_loader(payload, force_refresh=False)
-            cached_response_is_usable = isinstance(cached_response, dict) and _response_has_content(cached_response) and not _response_needs_refresh(payload, cached_response)
-            if cached_response_is_usable:
+            # A stale-but-present, same-date response is still shown below --
+            # only its staleness triggers a background refresh here. Showing
+            # nothing while that refresh runs (which can take several minutes
+            # right after a deploy, before any fresh state has been
+            # persisted) is strictly worse than showing the last real board.
+            if _response_needs_refresh(payload, cached_response):
+                _safe_queue_intelligence_state_refresh(dict(payload))
+            if isinstance(cached_response, dict) and _response_has_content(cached_response) and not _response_unsafe_to_display(payload, cached_response):
                 initial_response = dict(cached_response)
             else:
-                _safe_queue_intelligence_state_refresh(dict(payload))
                 initial_response = _empty_default_intelligence_response()
         else:
             board_snapshot_response = read_latest_intelligence_board_snapshot_response(payload, force_refresh=True)
             state_response = read_latest_intelligence_state_response(payload, force_refresh=False, allow_latest_fallback=False)
+            refresh_queued = False
             for response_candidate in (state_response, board_snapshot_response):
                 if not isinstance(response_candidate, dict):
                     continue
                 if not _response_has_board_content(response_candidate):
                     continue
-                if _response_needs_refresh(payload, response_candidate):
-                    continue
-                initial_response = dict(response_candidate)
-                break
+                if not refresh_queued and _response_needs_refresh(payload, response_candidate):
+                    _safe_queue_intelligence_state_refresh(dict(payload))
+                    refresh_queued = True
+                if not _response_unsafe_to_display(payload, response_candidate):
+                    initial_response = dict(response_candidate)
+                    break
             if not initial_response:
-                _safe_queue_intelligence_state_refresh(dict(payload))
+                if not refresh_queued:
+                    _safe_queue_intelligence_state_refresh(dict(payload))
                 initial_response = _empty_default_intelligence_response()
     except Exception:
         initial_response = _empty_default_intelligence_response()
