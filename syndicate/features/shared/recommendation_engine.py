@@ -100,6 +100,29 @@ def _coerce_float(value: Any) -> float | None:
         return None
 
 
+def _line_odds_movement_summary(market_features: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    # Board display needs the line move (e.g. 3.5 -> 4.5) and the odds/price
+    # move (e.g. -110 -> -120) reported as two separate, explicit
+    # direction+amount pairs -- market_features already tracks both
+    # dimensions (opening/latest line, opening/latest price) but only ever
+    # computed a delta for the line side, and nothing surfaced either one to
+    # the board in a stable, sport-agnostic shape. Kept as its own small
+    # summary rather than exposing all of market_features to the frontend,
+    # since that dict's schema is meant for internal scoring, not display.
+    if not isinstance(market_features, Mapping):
+        return None
+    return {
+        "opening_line": market_features.get("opening_line"),
+        "latest_line": market_features.get("latest_line"),
+        "line_delta": market_features.get("movement_delta"),
+        "line_direction": market_features.get("movement_direction") or "flat",
+        "opening_price": market_features.get("opening_price"),
+        "latest_price": market_features.get("latest_price"),
+        "price_delta": market_features.get("price_delta"),
+        "price_direction": market_features.get("price_direction") or "flat",
+    }
+
+
 def _coerce_probability(value: Any) -> float | None:
     numeric = _coerce_float(value)
     if numeric is None:
@@ -978,6 +1001,7 @@ def filter_candidates(
                 "market_profile": market_profile,
                 "sport_profile": sport_profile,
                 "market_features": market_features,
+                "line_odds_movement": _line_odds_movement_summary(market_features),
             }
         )
         filtered.append(_standardize_recommendation_fields(enriched, edge=edge, fair_probability=fair_probability, implied_probability=implied_probability))
@@ -1167,6 +1191,7 @@ def rank_recommendations(
                 "performance_multiplier": round(performance_multiplier, 4),
                 "core_adjusted_score": round(core_adjusted_score, 3),
                 "market_features": market_features,
+                "line_odds_movement": _line_odds_movement_summary(market_features),
                 "movement_signal": market_dynamics.get("movement_signal"),
                 "clv_signal": market_dynamics.get("clv_signal"),
                 "volatility": market_dynamics.get("volatility"),

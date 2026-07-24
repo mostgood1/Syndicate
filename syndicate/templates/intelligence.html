@@ -434,12 +434,47 @@
     return `${diffDay}d ago`;
   }
 
-  // Line/odds movement: reads the structured movement object
-  // (previous_line/last_line/delta/trend/percent_change/history) computed
-  // server-side by _enrich_candidates_with_odds_history --  not made-up
-  // field names the backend never emitted (the earlier version of this
-  // page checked odds_open/line_open/delta_display, none of which existed).
+  function _movementArrow(direction) {
+    return direction === "positive" || direction === "up" ? "▲" : direction === "negative" || direction === "down" ? "▼" : "→";
+  }
+
+  function _movementArrowClass(direction) {
+    return direction === "positive" || direction === "up" ? "up" : direction === "negative" || direction === "down" ? "down" : "flat";
+  }
+
+  // Line and odds/price are two independent things that can each move on
+  // their own (a total's number 3.5 -> 4.5, and separately its juice -110
+  // -> -120) -- reports one only when it actually has a nonzero delta, so a
+  // pregame row with a single snapshot of each just shows nothing rather
+  // than a misleading "flat" for both.
+  function _formatMovementSegment(label, opening, latest, delta) {
+    if (delta === null || delta === undefined || delta === 0) return null;
+    const deltaText = `${delta > 0 ? "+" : ""}${Number.isInteger(delta) ? delta : delta.toFixed(2)}`;
+    const hasRange = opening !== null && opening !== undefined && latest !== null && latest !== undefined && opening !== latest;
+    return `${label} ${hasRange ? `${opening} → ${latest} ` : ""}${deltaText}`;
+  }
+
+  // Line/odds movement: prefers line_odds_movement (opening/latest line AND
+  // opening/latest price, computed server-side from the market-features
+  // pipeline's own per-market history -- see build_market_history_view in
+  // odds_lifecycle.py) so line moves and odds/price moves are reported as
+  // two separate, explicit direction+amount values instead of one combined
+  // number. Falls back to the older fuzzy-matched `movement` object (from
+  // _enrich_candidates_with_odds_history) for candidates not yet routed
+  // through that pipeline, e.g. game-type candidates.
   function renderMovement(item) {
+    const structured = item.line_odds_movement && typeof item.line_odds_movement === "object" ? item.line_odds_movement : null;
+    if (structured) {
+      const lineDelta = numericValue(structured.line_delta);
+      const priceDelta = numericValue(structured.price_delta);
+      const lineText = _formatMovementSegment("Line", numericValue(structured.opening_line), numericValue(structured.latest_line), lineDelta);
+      const priceText = _formatMovementSegment("Odds", numericValue(structured.opening_price), numericValue(structured.latest_price), priceDelta);
+      const segments = [lineText, priceText].filter(Boolean);
+      if (segments.length) {
+        const primaryDirection = lineText ? structured.line_direction : structured.price_direction;
+        return `<span class="board-card__movement-arrow--${_movementArrowClass(primaryDirection)}">${_movementArrow(primaryDirection)}</span> ${escapeHtml(segments.join(" · "))}`;
+      }
+    }
     const movement = item.movement && typeof item.movement === "object" ? item.movement : {};
     const trend = String(movement.trend || "flat").toLowerCase();
     const delta = numericValue(movement.delta);

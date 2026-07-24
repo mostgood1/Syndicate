@@ -95,6 +95,59 @@ class OddsLifecycleShardMergeTests(unittest.TestCase):
             self.assertEqual(features["opening_line"], -3.0)
             self.assertEqual(features["closing_line"], -3.5)
 
+    def test_price_delta_and_direction_tracked_independently_from_line(self) -> None:
+        # 2026-07-24 fix: opening_price/latest_price were already recorded
+        # but no delta was ever computed from them -- a line move (3.5 ->
+        # 4.5) and an odds/juice move (-110 -> -120) are two independent
+        # things a market can do, and callers had no way to report the
+        # price side separately from the line side.
+        with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(
+            "os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports")}, clear=False
+        ):
+            reports_root = Path(tmp_dir) / "reports"
+            candidate = {
+                "sport": "mlb",
+                "event_id": "Away@Home",
+                "market_type": "spread",
+                "entity": "Home",
+                "line": -3.5,
+                "date": "2026-06-08",
+            }
+            market_id = _candidate_market_id(candidate, sport="mlb")
+            _write_shard(
+                reports_root,
+                sport="mlb",
+                shard_key="2026-06-07",
+                market_id=market_id,
+                history=[{"current_line": -3.5, "odds": -110, "captured_at": "2026-06-07T10:00:00Z", "event_type": "open"}],
+            )
+            _write_shard(
+                reports_root,
+                sport="mlb",
+                shard_key="2026-06-08",
+                market_id=market_id,
+                history=[{"current_line": -3.5, "odds": -120, "captured_at": "2026-06-08T18:00:00Z", "event_type": "close"}],
+            )
+
+            view = build_market_history_view(candidate, sport="mlb")
+            self.assertEqual(view["opening_price"], -110.0)
+            self.assertEqual(view["latest_price"], -120.0)
+            self.assertEqual(view["price_delta"], -10.0)
+            self.assertEqual(view["price_direction"], "negative")
+            # The line never moved in this fixture -- must stay flat/zero
+            # independent of the price move.
+            self.assertEqual(view["movement_delta"], 0.0)
+            self.assertEqual(view["movement_direction"], "flat")
+
+    def test_no_history_fallback_still_reports_flat_price_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(
+            "os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports")}, clear=False
+        ):
+            candidate = {"sport": "mlb", "line": 3.5, "odds": 106}
+            view = build_market_history_view(candidate, sport="mlb")
+            self.assertEqual(view["price_delta"], None)
+            self.assertEqual(view["price_direction"], "flat")
+
 
 if __name__ == "__main__":
     unittest.main()

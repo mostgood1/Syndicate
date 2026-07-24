@@ -450,6 +450,8 @@ def build_market_history_view(candidate: Mapping[str, Any] | None = None, *, spo
             "movement_delta": None,
             "movement_direction": "flat",
             "movement_velocity": None,
+            "price_delta": None,
+            "price_direction": "flat",
             "volatility": 0,
             "clv": None,
             "closing_edge": None,
@@ -489,6 +491,24 @@ def build_market_history_view(candidate: Mapping[str, Any] | None = None, *, spo
             movement_direction = "positive"
         elif movement_delta < 0:
             movement_direction = "negative"
+
+    # Line and price/odds are two independent dimensions a market can move
+    # on -- a total's number (3.5 -> 4.5) and its juice (-110 -> -120) can
+    # each shift on their own. Only the line side had a delta/direction
+    # tracked here; price had opening/latest values recorded but no delta
+    # ever computed from them, so callers had no way to report "odds moved
+    # by X" separately from "the line moved by X". Mirrors movement_delta/
+    # movement_direction's pattern exactly.
+    price_delta = None
+    if opening_price is not None and latest_price is not None:
+        price_delta = round(latest_price - opening_price, 4)
+
+    price_direction = "flat"
+    if price_delta is not None:
+        if price_delta > 0:
+            price_direction = "positive"
+        elif price_delta < 0:
+            price_direction = "negative"
 
     movement_velocity = None
     if movement_delta is not None:
@@ -553,6 +573,8 @@ def build_market_history_view(candidate: Mapping[str, Any] | None = None, *, spo
         "movement_delta": movement_delta,
         "movement_direction": movement_direction,
         "movement_velocity": movement_velocity,
+        "price_delta": price_delta,
+        "price_direction": price_direction,
         "volatility": volatility,
         "clv": clv,
         "closing_edge": closing_edge,

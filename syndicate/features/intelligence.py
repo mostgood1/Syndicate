@@ -2649,6 +2649,9 @@ def _candidate_selection_text(candidate: dict[str, Any]) -> str:
     return _normalized_market_text(_safe_text(candidate.get("pick"), _safe_text(candidate.get("name"), "")))
 
 
+_GAME_ONLY_ODDS_HISTORY_MARKET_TYPES = {"h2h", "spreads", "totals", "moneyline", "spread", "total"}
+
+
 def _candidate_odds_history_match_score(candidate: dict[str, Any], market_key: Any, state: Mapping[str, Any]) -> float:
     parsed_key = _parse_odds_history_market_key(market_key)
     if not parsed_key:
@@ -2669,6 +2672,23 @@ def _candidate_odds_history_match_score(candidate: dict[str, Any], market_key: A
     entry_market = _safe_text(parsed_key.get("market"), "")
     entry_selection = _safe_text(parsed_key.get("selection"), "")
     entry_book = _safe_text(parsed_key.get("bookmaker") or parsed_key.get("book"), "")
+
+    # A player-prop candidate must never adopt a GAME-level market's odds
+    # history (h2h/spreads/totals) just because it happens to share the same
+    # matchup text -- confirmed live 2026-07-24: a Tomoyuki Sugano
+    # strikeouts-prop candidate was showing the Milwaukee Brewers
+    # MONEYLINE's price movement as its own "Move" value, because the
+    # matchup-text-overlap scoring below (+2.0 per matching field) alone
+    # cleared the >0.0 acceptance threshold in _candidate_odds_history_state
+    # even though nothing about the market or the player actually
+    # corresponded. Game-level candidates are unaffected: their own market
+    # text never textually overlaps entry_market either (display label
+    # "Moneyline" vs raw API type "h2h"), so that comparison was always a
+    # soft bonus, not a hard requirement -- only props need this extra gate,
+    # since only props have a real player identity to check against.
+    if _safe_text(candidate.get("candidate_type"), "") == "prop" and entry_market.strip().lower() in _GAME_ONLY_ODDS_HISTORY_MARKET_TYPES:
+        if not candidate_subject or candidate_subject not in entry_event:
+            return 0.0
 
     for value in (candidate_matchup, candidate_subject, candidate_team, candidate_selection):
         if not value or not entry_event:
@@ -2801,6 +2821,127 @@ def _candidate_odds_history_context(candidate: dict[str, Any], odds_history: dic
         "last_updated": last_updated,
         "history": history,
     }
+
+
+def _prop_merge_dedup_key(candidate: dict[str, Any]) -> tuple[str, str, str, float | None, int] | None:
+    if _safe_text(candidate.get("candidate_type"), "") != "prop":
+        return None
+    sport_slug = _safe_text(candidate.get("sport_slug"), "").lower()
+    subject = _normalized_market_text(_safe_text(candidate.get("player_name"), "")) or _normalized_market_text(
+        _safe_text(_candidate_subject_key(candidate), "")
+    )
+    if not subject:
+        return None
+    # Deliberately bypasses _candidate_market_key/_candidate_market_focuses
+    # here: those prefer an already-set candidate["market_key"] field
+    # verbatim (e.g. "pitcher strikeouts") over the canonical alias-mapped
+    # key (e.g. "strikeouts"), which is exactly what let two duplicate
+    # candidates for the same market compare unequal. Calling
+    # _market_key_from_text directly always canonicalizes through
+    # _MARKET_FOCUS_ALIASES, so "strikeouts" and "pitcher strikeouts" match.
+    market = _market_key_from_text(candidate.get("market"), allow_fallback=True)
+    if not market:
+        return None
+    line = _numeric_hint(candidate.get("line"))
+    line_bucket = round(line * 2.0) / 2.0 if line is not None else None
+    direction = _candidate_selection_direction(candidate)
+    return (sport_slug, subject, market, line_bucket, direction)
+
+
+def _prop_candidate_completeness_score(candidate: dict[str, Any]) -> float:
+    score = 0.0
+    if _numeric_hint(candidate.get("projected")) is not None:
+        score += 3.0
+    score += min(len(_safe_text(candidate.get("detail"), "")) / 100.0, 3.0)
+    market_data = candidate.get("market_data") if isinstance(candidate.get("market_data"), dict) else {}
+    movement = market_data.get("movement") if isinstance(market_data.get("movement"), dict) else {}
+    if movement.get("history"):
+        score += 1.0
+    if _safe_text(candidate.get("headshot_url"), ""):
+        score += 0.5
+    return score
+
+
+_PROP_MERGE_BACKFILL_FIELDS = (
+    "projected",
+    "sim_projection",
+    "headshot_url",
+    "display_pills",
+    "hero_live_box",
+    "hero_sim_box",
+)
+
+# Unlike the backfill-if-blank fields above, a short-but-present detail/
+# writeup/summary from the "winning" candidate must not block adopting a
+# duplicate's longer, more informative text -- e.g. "Over 4+ Strikeouts |
+# Pitcher top props" (non-blank, but says nothing a reader couldn't already
+# see elsewhere on the row) versus a full model-reasoning paragraph. Always
+# keep whichever is longer rather than only filling in when blank.
+_PROP_MERGE_PREFER_LONGER_TEXT_FIELDS = ("detail", "writeup", "summary")
+
+
+def _field_is_blank(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return not value.strip() or value.strip() == "-"
+    if isinstance(value, (list, dict)):
+        return not value
+    return False
+
+
+def _merge_duplicate_prop_candidates(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    # 2026-07-24 fix: the identical prop bet (same player/market/line/side)
+    # can be independently produced by more than one upstream pipeline --
+    # e.g. MLB's "top props" artifact (home_rails.pregame, has projected/odds
+    # but a short generic detail) and a game's own game_market_recommendations
+    # list (has a rich narrative writeup but no projected value) both cover
+    # the same prop under slightly different pick/market text, and neither
+    # pipeline dedupes against the other. Confirmed live 2026-07-24 (a
+    # Tomoyuki Sugano strikeouts candidate shown twice: "Over 4+" with
+    # Projected 4.9 and no reasoning, and "OVER Tomoyuki Sugano" with a full
+    # reasoning paragraph but Projected blank). Merge instead of dropping one
+    # wholesale: keep the more complete candidate as the base and backfill
+    # any of its blank fields from the dropped duplicate, so nothing
+    # (projection, reasoning, headshot, etc.) is lost either way.
+    groups: dict[tuple, list[int]] = {}
+    for index, candidate in enumerate(candidates):
+        if not isinstance(candidate, dict):
+            continue
+        key = _prop_merge_dedup_key(candidate)
+        if key is None:
+            continue
+        groups.setdefault(key, []).append(index)
+
+    merged_at: dict[int, dict[str, Any]] = {}
+    dropped: set[int] = set()
+    for indices in groups.values():
+        if len(indices) < 2:
+            continue
+        ordered = sorted(indices, key=lambda i: _prop_candidate_completeness_score(candidates[i]), reverse=True)
+        primary_index = ordered[0]
+        merged = dict(candidates[primary_index])
+        for other_index in ordered[1:]:
+            other = candidates[other_index]
+            for field in _PROP_MERGE_BACKFILL_FIELDS:
+                if _field_is_blank(merged.get(field)) and not _field_is_blank(other.get(field)):
+                    merged[field] = other.get(field)
+            for field in _PROP_MERGE_PREFER_LONGER_TEXT_FIELDS:
+                other_text = _safe_text(other.get(field), "")
+                merged_text = _safe_text(merged.get(field), "")
+                if len(other_text) > len(merged_text):
+                    merged[field] = other.get(field)
+            dropped.add(other_index)
+        merged_at[primary_index] = merged
+
+    if not dropped:
+        return candidates
+    result: list[dict[str, Any]] = []
+    for index, candidate in enumerate(candidates):
+        if index in dropped:
+            continue
+        result.append(merged_at.get(index, candidate))
+    return result
 
 
 def _enrich_candidates_with_odds_history(candidates: list[dict[str, Any]], odds_history_by_sport: dict[str, dict[str, Any]] | None) -> list[dict[str, Any]]:
@@ -4865,6 +5006,11 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
             generated=len(sport_candidates),
             markets=sport_market_counts,
         )
+
+    before_merge_count = len(candidates)
+    candidates = _merge_duplicate_prop_candidates(candidates)
+    if len(candidates) != before_merge_count:
+        _log_candidate_stage(pipeline_name="collect_candidates", stage="prop_duplicate_merge", before=[], after=candidates)
 
     stage_started_at = time.perf_counter()
     odds_history_by_sport = _odds_history_payloads_by_sport(overview)
