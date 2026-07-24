@@ -938,9 +938,19 @@ def filter_candidates(
     policy_spec = _policy_spec(policy or select_policy(history_rows, sport=sport))
     filtered: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
+    # _market_profile rescans history_rows and recomputes build_reliability_profile
+    # from scratch -- with dozens of candidates sharing a handful of distinct
+    # markets, computing it fresh per-candidate instead of once per market was
+    # confirmed in production as the dominant cost of a 48.5s ranking pass over
+    # only 161 candidates. Same bug shape as the odds-history O(candidates x
+    # markets) regression fixed in 29649d18, just in this sibling code path.
+    market_profile_cache: dict[str, dict[str, Any]] = {}
     for candidate in candidate_rows:
         market = _market(candidate)
-        market_profile = _market_profile(history_rows, sport=sport, market=market)
+        market_profile = market_profile_cache.get(market)
+        if market_profile is None:
+            market_profile = _market_profile(history_rows, sport=sport, market=market)
+            market_profile_cache[market] = market_profile
         market_features = build_market_features(candidate, sport=sport)
         live_pricing = _repriced_probabilities(candidate)
         edge_data = calculate_edge(candidate, implied_probability=live_pricing["implied_probability"])
@@ -1070,9 +1080,16 @@ def rank_recommendations(
     history_rows = [dict(record) for record in (evaluation_records or _load_records_from_ledger(ledger_path)) if isinstance(record, Mapping)]
     sport_profile = build_reliability_profile(records=history_rows, sport=sport)
     scored: list[dict[str, Any]] = []
+    # Same per-market memoization as filter_candidates above -- avoids
+    # recomputing build_reliability_profile from scratch for every candidate
+    # that shares a market.
+    market_profile_cache: dict[str, dict[str, Any]] = {}
     for candidate in filtered_candidates:
         market = str(candidate.get("market") or "market").strip().lower() or "market"
-        market_profile = _market_profile(history_rows, sport=sport, market=market)
+        market_profile = market_profile_cache.get(market)
+        if market_profile is None:
+            market_profile = _market_profile(history_rows, sport=sport, market=market)
+            market_profile_cache[market] = market_profile
         market_features = _copy_mapping(candidate.get("market_features"))
         if not market_features:
             market_features = build_market_features(candidate, sport=sport)

@@ -4,7 +4,9 @@ import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
+from syndicate.features.shared import recommendation_engine
 from syndicate.features.shared.intelligence_evaluation import build_artifact_metadata
 from syndicate.features.shared.recommendation_engine import calculate_edge
 from syndicate.features.shared.recommendation_engine import build_policy_optimization_summary
@@ -15,6 +17,51 @@ from syndicate.features.shared.recommendation_engine import select_policy
 
 
 class RecommendationEngineTests(unittest.TestCase):
+    def test_filter_candidates_reliability_profile_calls_scale_with_markets_not_candidates(self) -> None:
+        # Reproduces a production incident: filter_candidates recomputed
+        # build_reliability_profile from scratch for every candidate instead
+        # of once per distinct market, causing a 48.5s ranking pass over only
+        # 161 candidates. With a fixed set of distinct markets, the call
+        # count should stay constant as candidate volume grows -- before the
+        # fix it scaled linearly (1 sport-level call + 2 per-candidate calls).
+        def build_candidates(count: int) -> list[dict]:
+            return [
+                {
+                    "name": f"Player {i} Over 5.5 Strikeouts",
+                    "event_id": f"game-{i}",
+                    "market": "strikeouts" if i % 2 == 0 else "moneyline",
+                    "selection": f"Player {i}",
+                    "odds": "+100",
+                    "score": 80.0,
+                    "confidence": "60%",
+                    "model_probability": 0.55,
+                }
+                for i in range(count)
+            ]
+
+        historical_records = [
+            {
+                "result": "win",
+                "pnl": 0.5,
+                "stake": 1.0,
+                "implied_probability": 0.5,
+                "recommendation": {"market": "strikeouts", "selection": "irrelevant", "line": None, "odds": "+100"},
+                "artifact_metadata": {"sport": "mlb"},
+            }
+        ]
+
+        call_counts: dict[int, int] = {}
+        for count in (10, 40):
+            with patch(
+                "syndicate.features.shared.recommendation_engine.build_reliability_profile",
+                wraps=recommendation_engine.build_reliability_profile,
+            ) as mocked_profile:
+                filter_candidates(build_candidates(count), sport="mlb", evaluation_records=historical_records)
+            call_counts[count] = mocked_profile.call_count
+
+        self.assertEqual(call_counts[10], call_counts[40])
+        self.assertEqual(call_counts[10], 3)  # 1 sport-level + 2 distinct markets (strikeouts, moneyline)
+
     def test_filter_candidates_suppresses_poor_market_history(self) -> None:
         candidates = [
             {
