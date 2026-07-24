@@ -155,19 +155,21 @@ def cards():
 def market_board():
     # Layer 1 (see ~/.claude/plans/expressive-wiggling-engelbart.md, Phase
     # 3c): every quoted moneyline/spread/total/prop line per game, not just
-    # the ones the recommendation engine chose to surface.
+    # the ones the recommendation engine chose to surface. UI-parity pass
+    # 2026-07-24: shared card/bet-slip template (shared/market_board.html)
+    # instead of the bespoke basketball-only page -- row data is fetched
+    # client-side from /nba/api/market-board.
     selected_date = _selected_date()
-    board = build_nba_market_board(selected_date)
     parsed_date = date.fromisoformat(selected_date)
     return render_template(
-        "shared/basketball_market_board.html",
+        "shared/market_board.html",
         sport_label="NBA",
+        sport_slug="nba",
+        api_endpoint=f"/nba/api/market-board?date={selected_date}",
         selected_date=selected_date,
-        board=board,
         prev_date=(parsed_date - timedelta(days=1)).isoformat(),
         next_date=(parsed_date + timedelta(days=1)).isoformat(),
         cards_href=f"/nba/cards?date={selected_date}",
-        show_home_link=False,
     )
 
 

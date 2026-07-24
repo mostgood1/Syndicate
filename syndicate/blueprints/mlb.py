@@ -320,21 +320,24 @@ def cards():
 
 @mlb_bp.get("/market-board")
 def market_board():
-    # Layer 1 pilot (see ~/.claude/plans/expressive-wiggling-engelbart.md,
-    # Phase 2): every quoted moneyline/total line per game, not just the
-    # ones the recommendation engine chose to surface -- sportsbook-style,
-    # with a "Model" badge where a projection exists to compare against.
+    # Layer 1 (see ~/.claude/plans/expressive-wiggling-engelbart.md): every
+    # quoted moneyline/total/prop line per game, not just the ones the
+    # recommendation engine chose to surface -- sportsbook-style, with a
+    # "Model view" badge where a projection exists to compare against.
+    # UI-parity pass 2026-07-24: same shared card/bet-slip template NBA/WNBA
+    # use (shared/market_board.html) instead of a bespoke MLB-only page --
+    # row data is fetched client-side from /mlb/api/market-board.
     selected_date = _iso_or_today(request.args.get("date")) if request.args.get("date") else central_today_iso()
-    board = build_mlb_market_board(selected_date)
     parsed_date = datetime.strptime(selected_date, "%Y-%m-%d").date()
     return render_template(
-        "mlb/market_board.html",
+        "shared/market_board.html",
+        sport_label="MLB",
+        sport_slug="mlb",
+        api_endpoint=f"/mlb/api/market-board?date={selected_date}",
         selected_date=selected_date,
-        board=board,
         prev_date=(parsed_date - timedelta(days=1)).isoformat(),
         next_date=(parsed_date + timedelta(days=1)).isoformat(),
         cards_href=f"/mlb/cards?date={selected_date}",
-        show_home_link=False,
     )
 
 

@@ -1,0 +1,852 @@
+/* Shared card/badge/bet-slip visual language, extracted 2026-07-24 from
+   intelligence.html (the curated Betting Board) so the Layer 1 market
+   board can look and feel identical rather than maintaining a second,
+   drifting copy. Anything under .board-*/.bet-slip__* here is generic --
+   no page-specific coupling -- see syndicate/static/shared/bet_slip.js
+   for the matching generic bet-slip/portfolio JS. */
+
+body.syndicate-body .cards-shell {
+  max-width: 1400px;
+}
+
+.board-toolbar {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.board-toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.board-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.board-date-input {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--cards-line-strong);
+  background: rgba(7, 19, 29, 0.9);
+  color: var(--cards-text);
+  font-size: 12px;
+}
+
+.board-refresh-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--cards-line);
+  color: var(--cards-text-soft);
+}
+
+.board-refresh-status::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--cards-accent-strong);
+}
+
+.board-refresh-status[aria-busy="true"]::before {
+  background: #f1c40f;
+}
+
+.board-summary-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--cards-line);
+  background: rgba(8, 18, 30, 0.72);
+  margin-bottom: 16px;
+}
+
+.board-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--cards-line);
+  color: var(--cards-text-soft);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.board-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: 18px;
+  align-items: start;
+}
+
+.board-main,
+.board-rail {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+
+/* Grid items default to a content-based min-width (not 0), so a wide
+   child (the blotter table, the horizontally-scrolling opportunities
+   strip) was forcing these bare <section> wrappers -- and the whole
+   page body -- wider than the viewport instead of scrolling within
+   their own overflow-x:auto containers. */
+.board-main > section,
+.board-rail > section {
+  min-width: 0;
+}
+
+.board-section-title {
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+
+.board-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.board-strip-card {
+  min-width: 168px;
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--cards-line);
+  background: rgba(10, 21, 34, 0.9);
+}
+
+.board-strip-card__title {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.board-strip-card__edge {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.board-strip-card__pick {
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--cards-text-dim);
+}
+
+.game-card-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.game-mini-card {
+  min-width: 150px;
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--cards-line);
+  background: rgba(10, 21, 34, 0.9);
+  cursor: pointer;
+  text-align: left;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+}
+
+.game-mini-card[aria-pressed="true"] {
+  border-color: var(--cards-accent, #4ecdc4);
+  background: rgba(78, 205, 196, 0.1);
+}
+
+.game-mini-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cards-text-dim);
+}
+
+.game-mini-card__head .live-dot {
+  color: #6bd88f;
+}
+
+.game-mini-card__matchup {
+  margin-top: 4px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--cards-text);
+}
+
+.game-mini-card__meta {
+  margin-top: 3px;
+  font-size: 10.5px;
+  color: var(--cards-text-dim);
+}
+
+.board-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+
+/* Layer 1 market-board addition: one section per game, each with its own
+   header + board-grid of that game's rows. */
+.board-game-group + .board-game-group {
+  margin-top: 22px;
+}
+
+.board-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--cards-line);
+  background: linear-gradient(180deg, rgba(13, 27, 43, 0.94), rgba(7, 16, 26, 0.98));
+  box-shadow: var(--cards-shadow);
+}
+
+.board-card--tier-high { border-color: rgba(46, 204, 113, 0.5); }
+.board-card--tier-medium { border-color: rgba(241, 196, 15, 0.5); }
+.board-card--tier-low { border-color: var(--cards-line); }
+/* "alert" tier: Layer 1 market-board addition for unmatched_needs_resim
+   rows (the sim modeled a different entity for this market/slot -- e.g. a
+   probable-pitcher swap the model hasn't re-run against yet). */
+.board-card--tier-alert { border-color: rgba(231, 76, 60, 0.55); }
+
+.board-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.board-card__title {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.board-card__subtitle {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--cards-text-dim);
+}
+
+.board-card__edge {
+  font-size: 15px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.board-card--tier-high .board-card__edge { color: #2ecc71; }
+.board-card--tier-medium .board-card__edge { color: #f1c40f; }
+.board-card--tier-low .board-card__edge { color: var(--cards-text-dim); }
+.board-card--tier-alert .board-card__edge { color: #e74c3c; }
+
+.board-card__prop-line {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cards-accent-strong);
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(78, 205, 196, 0.08);
+  border: 1px solid rgba(78, 205, 196, 0.2);
+}
+
+.board-card__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 6px 10px;
+  font-size: 12px;
+}
+
+.board-card__fact-label {
+  color: var(--cards-text-dim);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.board-card__fact-value {
+  color: var(--cards-text);
+  font-weight: 700;
+}
+
+.board-card__movement {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--cards-line);
+}
+
+.board-card__movement-arrow--up { color: #2ecc71; }
+.board-card__movement-arrow--down { color: #e74c3c; }
+.board-card__movement-arrow--flat { color: var(--cards-text-dim); }
+
+.board-card__bar-track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.board-card__bar-fill {
+  height: 100%;
+  width: var(--fill-pct, 0%);
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.board-card--tier-high .board-card__bar-fill { color: #2ecc71; }
+.board-card--tier-medium .board-card__bar-fill { color: #f1c40f; }
+.board-card--tier-low .board-card__bar-fill { color: var(--cards-text-dim); }
+.board-card--tier-alert .board-card__bar-fill { color: #e74c3c; }
+
+.board-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.board-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--cards-text-soft);
+  border: 1px solid var(--cards-line);
+}
+
+.board-badge--live { background: rgba(59, 130, 246, 0.16); color: #d7e9ff; border-color: rgba(59, 130, 246, 0.38); }
+.board-badge--pregame { background: rgba(168, 85, 247, 0.16); color: #efe0ff; border-color: rgba(168, 85, 247, 0.38); }
+.board-badge--confidence { background: rgba(46, 204, 113, 0.16); color: #d6ffe4; border-color: rgba(46, 204, 113, 0.38); }
+/* Layer 1 market-board additions: join_status badges (matched/no
+   coverage/needs resim), distinct from the Layer 2 live/pregame/
+   confidence badges above but sharing the same .board-badge base. */
+.board-badge--matched { background: rgba(46, 204, 113, 0.16); color: #d6ffe4; border-color: rgba(46, 204, 113, 0.38); }
+.board-badge--no-coverage { background: rgba(255, 255, 255, 0.06); color: var(--cards-text-dim); border-color: var(--cards-line); }
+.board-badge--alert { background: rgba(231, 76, 60, 0.16); color: #ffd4d4; border-color: rgba(231, 76, 60, 0.38); }
+
+.board-card__reasoning {
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--cards-line);
+  padding: 4px 10px;
+}
+
+.board-card__reasoning summary {
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cards-text-soft);
+  padding: 6px 0;
+  list-style: none;
+}
+
+.board-card__reasoning summary::-webkit-details-marker {
+  display: none;
+}
+
+.board-card__reasoning summary::before {
+  content: "▸ ";
+}
+
+.board-card__reasoning[open] summary::before {
+  content: "▾ ";
+}
+
+.board-card__reasoning p {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--cards-text-soft);
+}
+
+.board-card__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.board-card__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.board-action-button {
+  appearance: none;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.board-action-button--add {
+  border: none;
+  background: rgba(37, 99, 235, 0.18);
+  color: #dbeafe;
+}
+
+.board-action-button--remove {
+  border: 1px solid var(--cards-line-strong);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--cards-text);
+}
+
+.board-card__updated {
+  font-size: 10px;
+  color: var(--cards-text-dim);
+}
+
+.board-empty,
+.board-error {
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid var(--cards-line);
+  background: rgba(8, 18, 30, 0.72);
+  color: var(--cards-text-soft);
+}
+
+.board-error {
+  border-color: rgba(231, 76, 60, 0.4);
+  background: rgba(60, 20, 20, 0.5);
+  color: #ffd4d4;
+}
+
+.board-skeleton-card {
+  height: 110px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  animation: board-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes board-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.9; }
+}
+
+.board-portfolio-card,
+.board-parlay-card {
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--cards-line);
+  background: rgba(8, 18, 30, 0.72);
+}
+
+.board-portfolio-card__row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.board-parlay-card + .board-parlay-card {
+  margin-top: 10px;
+}
+
+.board-parlay-card__leg {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--cards-line);
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.board-blotter-wrap {
+  border: 1px solid var(--cards-line);
+  border-radius: 16px;
+  overflow-x: auto;
+  background: rgba(8, 18, 30, 0.72);
+}
+
+table.board-blotter {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  min-width: 880px;
+}
+
+table.board-blotter th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cards-text-dim);
+  border-bottom: 1px solid var(--cards-line-strong);
+  background: rgba(15, 30, 47, 0.9);
+}
+
+table.board-blotter td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--cards-line);
+  color: var(--cards-text-soft);
+  vertical-align: middle;
+}
+
+table.board-blotter tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.board-blotter__primary {
+  color: var(--cards-text);
+  font-weight: 600;
+}
+
+.board-blotter__meta {
+  font-size: 11px;
+  color: var(--cards-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.board-blotter__edge {
+  font-weight: 700;
+}
+
+.board-blotter__edge--high { color: #2ecc71; }
+.board-blotter__edge--medium { color: #f1c40f; }
+.board-blotter__edge--low { color: var(--cards-text-dim); }
+
+.board-blotter__reason-row td {
+  padding: 0 12px 12px;
+  color: var(--cards-text-soft);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+@media (max-width: 1080px) {
+  .board-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .board-toolbar-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .board-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.board-action-button--slip {
+  border: 1px solid rgba(46, 204, 113, 0.38);
+  background: rgba(46, 204, 113, 0.14);
+  color: #d6ffe4;
+}
+
+.board-action-button--slip[data-in-slip="true"] {
+  background: rgba(46, 204, 113, 0.32);
+}
+
+#bet-slip-panel {
+  display: flex;
+  flex-direction: column;
+  background: rgba(8, 18, 30, 0.72);
+  border: 1px solid var(--cards-line);
+  border-radius: 16px;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.bet-slip__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--cards-line);
+}
+
+#bet-slip-panel[data-empty="true"] .bet-slip__header {
+  cursor: default;
+  border-bottom: none;
+}
+
+#bet-slip-panel[data-collapsed="true"] .bet-slip__header {
+  border-bottom: none;
+}
+
+.bet-slip__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--cards-text);
+}
+
+.bet-slip__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(46, 204, 113, 0.28);
+  color: #d6ffe4;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.bet-slip__toggle {
+  color: var(--cards-text-soft);
+  font-size: 12px;
+  transform: rotate(0deg);
+  transition: transform 0.15s ease;
+}
+
+#bet-slip-panel[data-collapsed="true"] .bet-slip__toggle {
+  transform: rotate(180deg);
+}
+
+.bet-slip__body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#bet-slip-panel[data-collapsed="true"] .bet-slip__body {
+  display: none;
+}
+
+.bet-slip__legs {
+  max-height: 360px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+}
+
+.bet-slip__leg {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--cards-line);
+}
+
+.bet-slip__leg-name {
+  font-weight: 700;
+  color: var(--cards-text);
+  font-size: 12px;
+  grid-column: 1;
+}
+
+.bet-slip__leg-remove {
+  grid-column: 2;
+  justify-self: end;
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--cards-text-dim);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.bet-slip__leg-remove:hover {
+  color: #ff8f8f;
+}
+
+.bet-slip__leg-meta {
+  grid-column: 1 / -1;
+  color: var(--cards-text-soft);
+  font-size: 11px;
+}
+
+.bet-slip__leg-stake {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.bet-slip__leg-stake label {
+  color: var(--cards-text-dim);
+  font-size: 11px;
+}
+
+.bet-slip__leg-stake input {
+  width: 72px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--cards-line-strong);
+  border-radius: 6px;
+  color: var(--cards-text);
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.bet-slip__leg-payout {
+  margin-left: auto;
+  color: #d6ffe4;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.bet-slip__empty {
+  padding: 18px 14px;
+  color: var(--cards-text-soft);
+  font-size: 12px;
+  text-align: center;
+}
+
+.bet-slip__mode {
+  display: flex;
+  gap: 6px;
+  padding: 10px 14px 0;
+}
+
+.bet-slip__mode-btn {
+  flex: 1;
+  appearance: none;
+  border-radius: 8px;
+  border: 1px solid var(--cards-line-strong);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--cards-text-soft);
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.bet-slip__mode-btn[aria-pressed="true"] {
+  background: rgba(46, 204, 113, 0.2);
+  border-color: rgba(46, 204, 113, 0.6);
+  color: var(--cards-text);
+}
+
+.bet-slip__leg--parlay {
+  grid-template-columns: 1fr auto;
+}
+
+.bet-slip__parlay-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 14px 0;
+  flex-wrap: wrap;
+}
+
+.bet-slip__parlay-odds {
+  color: var(--cards-text);
+  font-size: 12px;
+}
+
+.bet-slip__parlay-summary label {
+  color: var(--cards-text-dim);
+  font-size: 11px;
+}
+
+.bet-slip__parlay-summary input {
+  width: 72px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--cards-line-strong);
+  border-radius: 6px;
+  color: var(--cards-text);
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.bet-slip__totals {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--cards-line);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.bet-slip__totals-label {
+  color: var(--cards-text-dim);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.bet-slip__totals-value {
+  color: var(--cards-text);
+  font-weight: 800;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bet-slip__actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px 14px;
+}
+
+.bet-slip__actions button {
+  flex: 1;
+  appearance: none;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.bet-slip__commit {
+  border: none;
+  background: rgba(46, 204, 113, 0.85);
+  color: #04170c;
+}
+
+.bet-slip__commit:disabled {
+  background: rgba(46, 204, 113, 0.25);
+  color: var(--cards-text-dim);
+  cursor: not-allowed;
+}
+
+.bet-slip__clear {
+  border: 1px solid var(--cards-line-strong);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--cards-text-soft);
+}

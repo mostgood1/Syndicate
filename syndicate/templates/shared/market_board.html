@@ -1,0 +1,53 @@
+{% extends "shared/base.html" %}
+
+{% block title %}{{ sport_label }} Market Board — {{ selected_date }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/dense_cards.css') }}" />
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/board_cards.css') }}" />
+{% endblock %}
+
+{% block content %}
+<main class="board-page">
+  <form id="board-toolbar" class="cards-control-card board-toolbar" method="get">
+    <div class="board-toolbar-row">
+      <div class="board-card__title">{{ sport_label }} Market Board</div>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <a class="cards-nav-pill" href="?date={{ prev_date }}">&larr; {{ prev_date }}</a>
+        <input id="board-date" name="date" type="date" class="board-date-input" value="{{ selected_date }}" />
+        <a class="cards-nav-pill" href="?date={{ next_date }}">{{ next_date }} &rarr;</a>
+        <button type="submit" class="cards-submit-button">Refresh</button>
+      </div>
+    </div>
+    <div class="board-toolbar-row">
+      <div style="color: var(--cards-text-soft); font-size: 12px;">
+        Every quoted moneyline, total, and player prop line, joined against the model where available &mdash; not
+        just the recommendation engine's picks.
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <div id="board-refresh-status" class="board-refresh-status" role="status" aria-live="polite"></div>
+        <a class="cards-nav-pill" href="{{ cards_href }}">Back to Cards</a>
+      </div>
+    </div>
+  </form>
+
+  <div class="board-layout">
+    <div class="board-main">
+      <section>
+        <div id="board-game-groups"></div>
+      </section>
+    </div>
+    <aside class="board-rail">
+      <section>
+        <h2 class="board-section-title">Bet slip</h2>
+        <div id="bet-slip-panel"></div>
+      </section>
+    </aside>
+  </div>
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='shared/bet_slip.js') }}"></script>
+<script src="{{ url_for('static', filename='shared/market_board.js') }}" data-api-endpoint="{{ api_endpoint }}" data-sport-slug="{{ sport_slug }}"></script>
+{% endblock %}
