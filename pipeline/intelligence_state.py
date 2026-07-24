@@ -829,6 +829,36 @@ def _log_stage_timing(stage_name: str, duration_ms: float) -> None:
     logger.info(json.dumps({"stage": stage_name, "duration_ms": round(duration_ms, 3)}, sort_keys=True, default=str))
 
 
+_DIAG_MEMORY_DUMP_MAX_RECORDS = 60
+
+
+def _diag_memory_dump_path() -> Path:
+    return reports_root() / "live_refresh_loop" / "memory_diagnostics.json"
+
+
+def _diag_dump_checkpoint_to_disk(stage: str, payload: dict[str, Any]) -> None:
+    # Confirmed live: this background thread's print/stderr output does not
+    # reliably reach Render's log collector before a SIGKILL once memory
+    # pressure gets severe -- checkpoints that definitely executed (proven by
+    # the container-level memory delta between them) never showed up in the
+    # platform logs. Routes through write_json_file/read_json_file (the same
+    # SYNDICATE_REFRESH_STATE_BACKEND=keyvalue-routed helpers every other
+    # cross-service artifact in this file already uses) instead of the local
+    # filesystem specifically so this is readable from the web service too,
+    # via a dedicated ops endpoint -- refresh-worker has no HTTP server of
+    # its own to expose it directly. Bounded ring buffer (last N records);
+    # remove this whole mechanism once resolved.
+    try:
+        path = _diag_memory_dump_path()
+        existing = read_json_file(path)
+        records = list(existing.get("records") or []) if isinstance(existing, dict) else []
+        records.append({"stage": stage, "wall_clock": time.time(), "pid": os.getpid(), **payload})
+        records = records[-_DIAG_MEMORY_DUMP_MAX_RECORDS:]
+        write_json_file(path, {"records": records})
+    except Exception as exc:
+        print(f"[intelligence_state] DIAG_MEMORY_DUMP_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
+
+
 def _diag_log_all_process_memory(stage: str) -> None:
     # Temporary boot-crash diagnostic (see matching helper in
     # scripts/run_refresh_worker.py): confirmed the refresh-worker's OOM
@@ -839,9 +869,47 @@ def _diag_log_all_process_memory(stage: str) -> None:
     try:
         from syndicate.features.shared.memory_observability import log_all_process_memory
 
-        log_all_process_memory(stage)
+        payload = log_all_process_memory(stage)
+        _diag_dump_checkpoint_to_disk(stage, payload)
     except Exception as exc:
         print(f"[intelligence_state] DIAG_MEMORY_LOG_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
+
+
+# The container's hard limit is 2GB. Confirmed via live production diagnostics
+# that a single stage transition inside _build_candidate_pool can add
+# 350-450MB in well under a minute (page cache + heap combined, cgroup-
+# accounted) -- and that stdout/stderr from this background thread doesn't
+# reliably reach the platform's log collector before a SIGKILL under that
+# much memory pressure, so print-based diagnostics alone couldn't pinpoint
+# which exact stage. Rather than keep guessing, treat this as a circuit
+# breaker: check real, cheap (single cgroup file read, not full process
+# enumeration) headroom before each expensive stage and bail out to an
+# empty-but-valid pool (never cached -- see the `if pool["candidate_count"]
+# > 0` cache guard below) the moment it's not safe, instead of letting the
+# OS kill the whole process. A skipped cycle is far cheaper than a crash
+# loop: the process stays warm and the next cycle gets a fresh attempt
+# after this one's allocations are released.
+_MIN_SAFE_MEMORY_HEADROOM_BYTES = 900 * 1024 * 1024
+
+
+def _abort_build_candidate_pool_if_memory_critical(stage: str) -> bool:
+    try:
+        from syndicate.features.shared.memory_observability import memory_headroom_snapshot
+
+        snapshot = memory_headroom_snapshot(_MIN_SAFE_MEMORY_HEADROOM_BYTES)
+    except Exception as exc:
+        print(f"[intelligence_state] MEMORY_GUARD_CHECK_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
+        return False
+    if snapshot is None or snapshot.get("sufficient", True):
+        return False
+    print(f"[intelligence_state] MEMORY_GUARD_ABORT stage={stage} snapshot={snapshot}", flush=True)
+    try:
+        import gc
+
+        gc.collect()
+    except Exception:
+        pass
+    return True
 
 
 def _profile_stage(stage_name: str, callback, *args, **kwargs):
@@ -1474,6 +1542,21 @@ class IntelligenceStateService:
 
         return candidate_payload
 
+    @staticmethod
+    def _empty_candidate_pool(selected_date: str | None, source_fingerprint: str) -> dict[str, Any]:
+        # Deliberately not cached by the caller (candidate_count == 0 skips
+        # the `if pool["candidate_count"] > 0` cache-write below), so a
+        # memory-guard abort never poisons a later, healthier cycle.
+        return {
+            "selected_date": selected_date,
+            "source_fingerprint": source_fingerprint,
+            "overview": [],
+            "candidate_count": 0,
+            "candidate_pools": {},
+            "global_pool": [],
+            "candidates": [],
+        }
+
     def _build_candidate_pool(self, selected_date: str | None, source_fingerprint: str) -> dict[str, Any]:
         cache_key = self._candidate_pool_key(selected_date, source_fingerprint)
         with self._condition:
@@ -1490,6 +1573,8 @@ class IntelligenceStateService:
         # reading nothing every time. Best-effort/never-raises by design, so
         # a network blip just means this cycle reads stale local data.
         _diag_log_all_process_memory("build_candidate_pool_start")
+        if _abort_build_candidate_pool_if_memory_critical("build_candidate_pool_start"):
+            return self._empty_candidate_pool(selected_date, source_fingerprint)
         try:
             from syndicate.features.shared.artifact_publisher import pull_hot_artifacts
 
@@ -1497,6 +1582,8 @@ class IntelligenceStateService:
         except Exception as exc:
             print(f"[intelligence_state] PULL_HOT_ARTIFACTS_FAILED error={exc}", flush=True)
         _diag_log_all_process_memory("post_pull_hot_artifacts")
+        if _abort_build_candidate_pool_if_memory_critical("post_pull_hot_artifacts"):
+            return self._empty_candidate_pool(selected_date, source_fingerprint)
 
         overview = None
         if self._app is not None:
@@ -1512,6 +1599,8 @@ class IntelligenceStateService:
             if not isinstance(overview, list):
                 overview = []
         _diag_log_all_process_memory("post_build_overview")
+        if _abort_build_candidate_pool_if_memory_critical("post_build_overview"):
+            return self._empty_candidate_pool(selected_date, source_fingerprint)
         preferences = _query_preferences(
             "top edges today",
             mode="recommendation",
@@ -1539,6 +1628,8 @@ class IntelligenceStateService:
             apply_edge_filter=_env_bool("SYNDICATE_BOARD_APPLY_EDGE_FILTER", default=True),
         )
         _diag_log_all_process_memory("post_collect_candidates_with_fallback_merge")
+        if _abort_build_candidate_pool_if_memory_critical("post_collect_candidates_with_fallback_merge"):
+            return self._empty_candidate_pool(selected_date, source_fingerprint)
 
         raw_candidates = [candidate for candidate in raw_candidates if isinstance(candidate, Mapping)]
         candidate_build_started_at = time.perf_counter()
@@ -1564,11 +1655,15 @@ class IntelligenceStateService:
             candidate_entries.append(candidate_entry)
         _log_stage_timing("candidate_building", (time.perf_counter() - candidate_build_started_at) * 1000.0)
         _diag_log_all_process_memory("post_candidate_building")
+        if _abort_build_candidate_pool_if_memory_critical("post_candidate_building"):
+            return self._empty_candidate_pool(selected_date, source_fingerprint)
 
         manifests = self._available_sport_manifests(selected_date)
         candidate_pools: OrderedDict[str, list[dict[str, Any]]] = OrderedDict()
         manifest_shard_keys = {sport_slug: resolve_current_shard_key(sport_slug, selected_date) for sport_slug in manifests}
         for sport_slug, manifest in manifests.items():
+            if _abort_build_candidate_pool_if_memory_critical(f"manifest_loop_sport={sport_slug}"):
+                return self._empty_candidate_pool(selected_date, source_fingerprint)
             odds_history_payload = self._load_odds_history_payload_for_sport(sport_slug, manifest_shard_keys[sport_slug])
             odds_history_markets = self._odds_history_market_states(odds_history_payload)
             sport_candidates: list[dict[str, Any]] = []

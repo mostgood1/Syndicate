@@ -260,6 +260,25 @@ def api_ops_memory() -> Any:
     return jsonify({"ok": True, "memory": get_all_process_memory_snapshot()})
 
 
+@ops_bp.get("/api/ops/intelligence/memory-diagnostics")
+def api_ops_intelligence_memory_diagnostics() -> Any:
+    # /api/ops/memory above only ever reports the CALLING service's own
+    # process -- no help for diagnosing refresh-worker's OOM crashes from
+    # here, since refresh-worker runs no HTTP server at all. Temporary
+    # diagnostic (2026-07-24 OOM incident): pipeline/intelligence_state.py's
+    # _build_candidate_pool checkpoints write here via write_json_file/
+    # read_json_file, which route through the same SYNDICATE_REFRESH_STATE_BACKEND=keyvalue
+    # store both this web service and refresh-worker share -- confirmed
+    # necessary because that background thread's own stdout/stderr doesn't
+    # reliably reach the platform log collector before a SIGKILL once memory
+    # pressure gets severe. Remove this endpoint once resolved.
+    from pipeline.intelligence_state import _diag_memory_dump_path
+
+    payload = read_json_file(_diag_memory_dump_path())
+    records = list(payload.get("records") or []) if isinstance(payload, dict) else []
+    return jsonify({"ok": True, "record_count": len(records), "records": records})
+
+
 @ops_bp.post("/api/ops/bootstrap/run")
 def api_ops_bootstrap_run() -> Any:
     try:

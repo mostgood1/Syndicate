@@ -2619,6 +2619,30 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(pool["global_pool"][0]["name"], "MLB Play")
         self.assertEqual(pool["candidates"], pool["global_pool"])
 
+    def test_build_candidate_pool_aborts_early_when_memory_critical(self) -> None:
+        # Production confirmed: this background thread's memory can spike
+        # 350-450MB within a single stage transition, fast enough that the
+        # container hits its 2GB OOM limit before print-based diagnostics
+        # even reach the log collector. The guard checks real cgroup
+        # headroom before each expensive stage and bails to an empty (never
+        # cached) pool the moment it's unsafe, rather than letting the OS
+        # kill the whole process.
+        service = IntelligenceStateService()
+        with patch(
+            "syndicate.features.shared.memory_observability.memory_headroom_snapshot",
+            return_value={"current_mb": 1700.0, "max_mb": 2048.0, "headroom_mb": 348.0, "min_required_mb": 900.0, "sufficient": False},
+        ), patch("syndicate.features.shared.artifact_publisher.pull_hot_artifacts") as mocked_pull:
+            pool = service._build_candidate_pool("2026-06-10", "fingerprint-1")
+
+        self.assertEqual(pool["candidate_count"], 0)
+        self.assertEqual(pool["candidate_pools"], {})
+        self.assertEqual(pool["global_pool"], [])
+        # Aborted at the very first checkpoint, before any real work started.
+        mocked_pull.assert_not_called()
+        # Never cached -- a later, healthier cycle must not be poisoned by this one.
+        cache_key = service._candidate_pool_key("2026-06-10", "fingerprint-1")
+        self.assertNotIn(cache_key, service._candidate_pools)
+
     def test_build_candidate_pool_does_not_embed_full_odds_history_payload(self) -> None:
         # Confirmed in production as the dominant memory driver once
         # odds-history grew ~100x: this used to load AND embed the entire
