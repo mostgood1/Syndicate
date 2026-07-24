@@ -5508,8 +5508,26 @@ _MARKET_BOARD_HUB_SPORTS: tuple[dict[str, str], ...] = (
     {"slug": "mlb", "name": "MLB", "description": "Every quoted moneyline, total, and player prop -- live games today."},
     {"slug": "nba", "name": "NBA", "description": "Full market inventory once the season resumes."},
     {"slug": "wnba", "name": "WNBA", "description": "Full market inventory once the season resumes."},
-    {"slug": "soccer/mls", "name": "MLS", "description": "Every quoted moneyline, total, spread, and player prop -- live games today."},
 )
+
+
+def _market_board_hub_soccer_sports(nav_date: str) -> list[dict[str, str]]:
+    # Every soccer league gets its own board (same generic /soccer/<league>/
+    # market-board route works for all 10) -- only the ones actually in
+    # season for this date are shown, same gating _active_sports_for_date()
+    # already uses for the refresh dispatcher.
+    from syndicate.features.soccer.sources import active_leagues_for_date
+    from syndicate.features.soccer.sources import league_display_name
+
+    active = active_leagues_for_date(nav_date)
+    return [
+        {
+            "slug": f"soccer/{league}",
+            "name": league_display_name(league),
+            "description": "Every quoted moneyline, total, spread, and player prop for this league's current game week.",
+        }
+        for league in sorted(active)
+    ]
 
 
 @home_bp.get("/market-board")
@@ -5520,9 +5538,10 @@ def market_board_hub():
     # is a lightweight picker until Phase 6 covers enough sports to justify
     # something richer.
     nav_date = _home_selected_date(request.args.get("date"))
+    sports = list(_MARKET_BOARD_HUB_SPORTS) + _market_board_hub_soccer_sports(nav_date)
     return render_template(
         "market_board_hub.html",
-        sports=_MARKET_BOARD_HUB_SPORTS,
+        sports=sports,
         nav_date=nav_date,
     )
 

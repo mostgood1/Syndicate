@@ -15,11 +15,24 @@
   const sportSlug = scriptEl ? (scriptEl.getAttribute("data-sport-slug") || "").toLowerCase() : "";
   const selectedDate = scriptEl ? (scriptEl.getAttribute("data-selected-date") || "") : "";
 
+  // Soccer's board is league-scoped (/soccer/<league>/market-board), not a
+  // top-level /<sport>/market-board like the others -- each tab below
+  // carries its own explicit destination path rather than assuming
+  // `/${value}/market-board`. The "Soccer" tab defaults to MLS (this
+  // repo's current priority league); sportSlug on a soccer board page is
+  // the bare league code (e.g. "mls"), so SOCCER_LEAGUE_SLUGS lets the
+  // active-tab check recognize any of them as "the Soccer tab."
+  const SOCCER_LEAGUE_SLUGS = new Set([
+    "epl", "la_liga", "bundesliga", "serie_a", "ligue_1", "mls",
+    "eredivisie", "primeira_liga", "championship", "belgian_pro_league",
+  ]);
   const SPORT_TABS = [
-    { value: "mlb", label: "MLB" },
-    { value: "nba", label: "NBA" },
-    { value: "wnba", label: "WNBA" },
+    { value: "mlb", label: "MLB", path: "/mlb/market-board" },
+    { value: "nba", label: "NBA", path: "/nba/market-board" },
+    { value: "wnba", label: "WNBA", path: "/wnba/market-board" },
+    { value: "soccer", label: "Soccer (MLS)", path: "/soccer/mls/market-board" },
   ];
+  const activeSportTabValue = SOCCER_LEAGUE_SLUGS.has(sportSlug) ? "soccer" : sportSlug;
   const STATE_TABS = [
     { value: "all", label: "All states" },
     { value: "live", label: "Live" },
@@ -171,10 +184,12 @@
   // showed as selected, since renderTabs/renderMultiTabs were only invoked
   // once at initial render. Real bug reported against the shipped page.
   function renderFilterTabs() {
-    renderTabs("board-sport-tabs", SPORT_TABS, sportSlug, (value) => {
-      if (value === sportSlug) return;
+    renderTabs("board-sport-tabs", SPORT_TABS, activeSportTabValue, (value) => {
+      if (value === activeSportTabValue) return;
+      const tab = SPORT_TABS.find((candidate) => candidate.value === value);
+      if (!tab) return;
       const query = selectedDate ? `?date=${encodeURIComponent(selectedDate)}` : "";
-      window.location.href = `/${value}/market-board${query}`;
+      window.location.href = `${tab.path}${query}`;
     });
     renderTabs("board-state-tabs", STATE_TABS, state.gameState, (value) => {
       state.gameState = value;

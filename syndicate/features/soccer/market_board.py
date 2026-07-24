@@ -4,23 +4,38 @@ raw odds rows joined against SoccerSim's projections via the shared
 market_inventory.join_odds_to_sim contract, so every quoted line shows up
 regardless of whether SoccerSim has coverage for it.
 
+Soccer's board is WEEK-scoped, not single-date-scoped like MLB/NBA/WNBA
+(2026-07-24 fix -- soccer's own cards/props pages already think in game
+weeks, and its raw odds feed is a single rolling "current odds" file that
+captures every upcoming event across the whole week at once, days ahead of
+kickoff, not one day at a time). A single `selected_date`'s own
+recommendations_{date}.json snapshot can legitimately be empty/stale even
+when an adjacent date's snapshot already has real data for that same
+match (confirmed in production: recommendations_2026-07-23.json had 0
+matches while recommendations_2026-07-22.json's own snapshot already
+covered both 07-22 and 07-23 kickoffs) -- so matches are aggregated across
+every available snapshot date in a window around selected_date, not read
+from a single file.
+
 Kept as its own module rather than folded into cards.py: cards.py's
-existing context-building is week-scoped (a whole slate of fixtures), while
-this board is date-scoped like MLB/NBA/WNBA's -- reusing
-recommendations_payload(league, date) directly (already per-date, already
-carries win_probability/total_distribution/top_props per match) avoids
-having to re-derive a single date's matches from the week-oriented schedule
-path at all.
+week-scoped context-building already re-derives week/season from a
+schedule artifact for its own (different) rendering needs; this module
+only needs recommendations_payload's per-match sim fields
+(win_probability/total_distribution/top_props), which is simpler to
+aggregate directly across dates than to route through cards.py's
+week-object machinery.
 """
 
 from __future__ import annotations
 
+from datetime import date, timedelta
 import unicodedata
 from typing import Any
 
 from syndicate.features.shared.market_inventory import join_odds_to_sim
 from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
 from syndicate.features.shared.odds_control_plane import resolve_current_shard_key
+from syndicate.features.soccer.sources import available_dates
 from syndicate.features.soccer.sources import default_season
 from syndicate.features.soccer.sources import game_odds_rows
 from syndicate.features.soccer.sources import normalize_league
@@ -28,6 +43,54 @@ from syndicate.features.soccer.sources import props_odds_rows
 from syndicate.features.soccer.sources import recommendations_payload
 from syndicate.features.soccer.sources import roster_rows
 from syndicate.features.soccer.sources import team_by_name
+
+
+# How many days around the selected date to aggregate matches/props from --
+# wide enough to comfortably cover a full MLS game week (typically 3-4
+# match days) plus some lookahead for "odds days ahead of kickoff", without
+# scanning a league's entire season history on every board request.
+_WEEK_LOOKBACK_DAYS = 3
+_WEEK_LOOKAHEAD_DAYS = 10
+
+
+def _soccer_relevant_dates(league: str, selected_date: str) -> list[str]:
+    try:
+        base = date.fromisoformat(selected_date)
+    except ValueError:
+        return [selected_date]
+    window = {
+        (base + timedelta(days=offset)).isoformat()
+        for offset in range(-_WEEK_LOOKBACK_DAYS, _WEEK_LOOKAHEAD_DAYS + 1)
+    }
+    available = set(available_dates(league))
+    relevant = sorted(window & available)
+    return relevant or [selected_date]
+
+
+def _soccer_week_matches(league: str, selected_date: str) -> list[dict[str, Any]]:
+    """Every match known across recommendations snapshots near
+    selected_date, deduped by event_id. Dates are scanned oldest-to-newest
+    so a later (fresher) snapshot's version of a match overwrites an
+    earlier one rather than the reverse.
+    """
+    matches_by_event: dict[str, dict[str, Any]] = {}
+    for date_str in _soccer_relevant_dates(league, selected_date):
+        payload = recommendations_payload(league, date_str) or {}
+        matches = payload.get("matches") if isinstance(payload.get("matches"), list) else []
+        for match in matches:
+            if not isinstance(match, dict):
+                continue
+            event_id = str(match.get("event_id") or match.get("match_id") or "").strip()
+            if event_id:
+                matches_by_event[event_id] = match
+    return list(matches_by_event.values())
+
+
+def _soccer_week_props_rows(league: str, selected_date: str) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for date_str in _soccer_relevant_dates(league, selected_date):
+        rows.extend(dict(row) for row in props_odds_rows(league, date_str))
+    return rows
 
 
 _GAME_STATE_BY_STATUS = {"pre": "pregame", "in": "live", "post": "final"}
@@ -299,15 +362,16 @@ def _soccer_hydrate_market_board_line_movement(row: dict[str, Any], entry: dict[
 
 
 def build_soccer_market_board(league: str, selected_date: str) -> dict[str, Any]:
-    """Layer 1 market/odds inventory for one soccer league on one date --
-    game markets (moneyline/total/spread) and player props, joined against
-    SoccerSim's per-match projections, sportsbook-style.
+    """Layer 1 market/odds inventory for one soccer league's current game
+    week (see module docstring for why this is week- rather than
+    single-date-scoped) -- game markets (moneyline/total/spread) and player
+    props, joined against SoccerSim's per-match projections, sportsbook-
+    style.
     """
     league = normalize_league(league)
-    payload = recommendations_payload(league, selected_date) or {}
-    matches = payload.get("matches") if isinstance(payload.get("matches"), list) else []
+    matches = _soccer_week_matches(league, selected_date)
     game_odds_rows_all = [dict(row) for row in game_odds_rows(league)]
-    props_rows_all = [dict(row) for row in props_odds_rows(league, selected_date)]
+    props_rows_all = _soccer_week_props_rows(league, selected_date)
     headshot_lookup = _soccer_headshot_lookup(league)
     odds_history = _soccer_odds_history_payload(selected_date)
     odds_history_markets = odds_history.get("markets") if isinstance(odds_history.get("markets"), dict) else {}

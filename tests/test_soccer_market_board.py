@@ -11,6 +11,8 @@ from syndicate.features.soccer.market_board import _soccer_market_board_game_row
 from syndicate.features.soccer.market_board import _soccer_market_board_prop_rows_for_match
 from syndicate.features.soccer.market_board import _soccer_market_board_sim_rows_for_match
 from syndicate.features.soccer.market_board import _soccer_odds_history_key
+from syndicate.features.soccer.market_board import _soccer_relevant_dates
+from syndicate.features.soccer.market_board import _soccer_week_matches
 from syndicate.features.soccer.market_board import build_soccer_market_board
 from syndicate.features.shared.market_inventory import join_odds_to_sim
 
@@ -143,6 +145,64 @@ class SoccerHydrateMarketBoardLineMovementTests(unittest.TestCase):
         self.assertEqual(row, {})
 
 
+class SoccerWeekScopingTests(unittest.TestCase):
+    """2026-07-24 fix: soccer's raw odds feed is a single rolling file that
+    covers the whole game week days ahead of kickoff, and a single date's
+    recommendations snapshot can legitimately be empty even when an
+    adjacent date's snapshot already has the same match -- confirmed in
+    production (recommendations_2026-07-23.json had 0 matches while
+    recommendations_2026-07-22.json's own snapshot already covered both
+    07-22 and 07-23 kickoffs). The board must aggregate across nearby
+    dates, not read a single date's file.
+    """
+
+    def test_relevant_dates_window_intersects_available_dates(self) -> None:
+        with patch(
+            "syndicate.features.soccer.market_board.available_dates",
+            return_value=["2026-07-19", "2026-07-22", "2026-07-23", "2026-07-25", "2027-01-01"],
+        ):
+            relevant = _soccer_relevant_dates("mls", "2026-07-22")
+        self.assertEqual(relevant, ["2026-07-19", "2026-07-22", "2026-07-23", "2026-07-25"])
+
+    def test_no_available_dates_falls_back_to_selected_date(self) -> None:
+        with patch("syndicate.features.soccer.market_board.available_dates", return_value=[]):
+            relevant = _soccer_relevant_dates("mls", "2026-07-22")
+        self.assertEqual(relevant, ["2026-07-22"])
+
+    def test_match_only_present_in_adjacent_date_snapshot_is_still_found(self) -> None:
+        # The exact production bug: querying with selected_date="2026-07-23"
+        # (an empty snapshot) must still surface a match whose only real
+        # data lives in the 2026-07-22 snapshot.
+        def fake_recommendations(league, date_str):
+            if date_str == "2026-07-22":
+                return {"matches": [{"event_id": "1", "kickoff": "2026-07-23T00:00Z", "status_state": "pre"}]}
+            return {"matches": []}
+
+        with patch("syndicate.features.soccer.market_board.available_dates", return_value=["2026-07-22", "2026-07-23"]), patch(
+            "syndicate.features.soccer.market_board.recommendations_payload", side_effect=fake_recommendations
+        ):
+            matches = _soccer_week_matches("mls", "2026-07-23")
+
+        self.assertEqual(len(matches), 1)
+        self.assertEqual(matches[0]["event_id"], "1")
+
+    def test_same_event_in_multiple_dates_dedupes_preferring_later_date(self) -> None:
+        def fake_recommendations(league, date_str):
+            if date_str == "2026-07-22":
+                return {"matches": [{"event_id": "1", "status_state": "pre"}]}
+            if date_str == "2026-07-23":
+                return {"matches": [{"event_id": "1", "status_state": "in"}]}
+            return {"matches": []}
+
+        with patch("syndicate.features.soccer.market_board.available_dates", return_value=["2026-07-22", "2026-07-23"]), patch(
+            "syndicate.features.soccer.market_board.recommendations_payload", side_effect=fake_recommendations
+        ):
+            matches = _soccer_week_matches("mls", "2026-07-22")
+
+        self.assertEqual(len(matches), 1)
+        self.assertEqual(matches[0]["status_state"], "in")
+
+
 class BuildSoccerMarketBoardTests(unittest.TestCase):
     def test_full_board_join_hydration_and_relabeling(self) -> None:
         fake_recommendations = {"matches": [_FAKE_MATCH]}
@@ -157,7 +217,9 @@ class BuildSoccerMarketBoardTests(unittest.TestCase):
             }
         }
         fake_headshots = {"diego rossi": "https://a.espncdn.com/i/headshots/soccer/players/full/12345.png"}
-        with patch("syndicate.features.soccer.market_board.recommendations_payload", return_value=fake_recommendations), patch(
+        with patch("syndicate.features.soccer.market_board.available_dates", return_value=["2026-07-22"]), patch(
+            "syndicate.features.soccer.market_board.recommendations_payload", return_value=fake_recommendations
+        ), patch(
             "syndicate.features.soccer.market_board.game_odds_rows", return_value=tuple(_FAKE_GAME_ODDS_ROWS)
         ), patch("syndicate.features.soccer.market_board.props_odds_rows", return_value=tuple(_FAKE_PROPS_ROWS)), patch(
             "syndicate.features.soccer.market_board._soccer_headshot_lookup", return_value=fake_headshots
@@ -184,7 +246,9 @@ class BuildSoccerMarketBoardTests(unittest.TestCase):
         self.assertEqual(rossi_prop["join_status"], JOIN_STATUS_MATCHED)
 
     def test_empty_matches_produces_empty_board(self) -> None:
-        with patch("syndicate.features.soccer.market_board.recommendations_payload", return_value={}), patch(
+        with patch("syndicate.features.soccer.market_board.available_dates", return_value=["2026-07-22"]), patch(
+            "syndicate.features.soccer.market_board.recommendations_payload", return_value={}
+        ), patch(
             "syndicate.features.soccer.market_board.game_odds_rows", return_value=()
         ), patch("syndicate.features.soccer.market_board.props_odds_rows", return_value=()):
             board = build_soccer_market_board("mls", "2026-07-22")
