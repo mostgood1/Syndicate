@@ -68,6 +68,8 @@ Conventions:
 | **49** | Triage 22 pre-existing failures in `tests/test_ops.py`. Verified by stashing all local changes and re-running: 22 failed / 73 passed at baseline. Prior notes recorded "2 plus a flaky third" — real drift is an order of magnitude worse. |
 | **50** | `/api/ops/artifacts/export` 502s on broad patterns — it walks every `HOT_ARTIFACT_PATTERNS` glob and accumulates file contents into one in-memory dict before responding. An ops read should not be able to destabilise the 2GB web service. |
 | **51** | `hasSampleData` is inverted on the MLB cards payload — `mlb/cards.py:2373-2374` sets it and `hasArtifactData` to the same expression (`not using_sample_data`), so the two can never disagree and the name means the opposite of what it says. |
+| **53** | **Prop ladder odds for all sports** (split out of #16). No `*_alternate` player market is fetched in any sport, so `_finalize_prop_market`'s `alternates` array is always empty and MLB's ladder surfaces have no book prices to compare the sim against. See #16 for the cost model and why this should ride #15's cadence tiering rather than get its own scheduler. |
+| **54** | **The OddsAPI quota store loses its observations.** Read 20 observations at 19:17 on 2026-07-25, then `observation_count: 0` and `latest: null` after the 19:38 deploy, and it has not repopulated. Zero-with-null-latest means the key is *absent*, not stale, so this is not the read-modify-write race in `record_oddsapi_quota` (that would leave 1, never 0). Other keyvalue state (`last_mlb_sim_check`) survives deploys fine, so it is specific to this key. Check `_state_namespace()` stability across deploys and whether detached fetcher subprocesses inherit `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` — a subprocess without it writes to the local filesystem, which the web service cannot read. **Blocks trusting any burn number, so it blocks #15 and the 5M downgrade.** |
 | **24** | Look-ahead interval violations (~28min instead of 60). |
 | **12** | Phase 4: smaller per-sport artifacts. |
 | **29** | Cross-type duplicate candidates. |
@@ -125,7 +127,35 @@ Two candidate cuts, both needing a product call rather than a code judgement:
 **(a)** drop the 8 `alternate_*` markets ≈ **120 credits/sweep** — but they
 currently compete to be the primary lane, so the displayed line could change;
 **(b)** drop the 6 `first7` markets ≈ **90 credits/sweep** — but the F7 tab
-would lose its lines, and it already has no sim projection. ·
+would lose its lines, and it already has no sim projection.
+
+**Props half of the audit (2026-07-25) — and a real gap: prop ladders are
+never fetched.** MLB requests 7 base hitter markets (`batter_hits`,
+`batter_total_bases`, `batter_home_runs`, …) and the pitcher equivalents.
+**No `*_alternate` player market is requested anywhere, in any sport.** OddsAPI
+serves prop ladders only through those alternate markets, so:
+
+- `_finalize_prop_market` computes `primary` + `alternates`, but with one lane
+  per prop the `alternates` array is **always empty**. The ladder plumbing
+  already exists and is being fed nothing.
+- MLB already ships ladder *surfaces* — `/mlb/hitter-ladders`,
+  `/mlb/pitcher-ladders`, `/mlb/k-ladder-targets` — built from the **sim**.
+  Without book ladders there is nothing to price them against, so no edge can
+  be computed anywhere off the primary line.
+
+**Efficient way to get them.** OddsAPI bills 1 credit per market per region per
+request, so batching markets into one request saves nothing — only market
+*count* matters. Levers, in order:
+1. Fetch alternates only for markets that have a ladder surface, not all 7+.
+   (~+1 credit/market/event; +7 markets on a 15-game MLB slate ≈ +105/sweep.)
+2. Run ladders on a **slower cadence** than base props — ladder shape moves far
+   less than the primary line. This is the same mechanism as #15's tiering, so
+   do it as part of that rather than as a separate scheduler.
+3. Alternates are per-event only, like segments, so they cannot ride #17's
+   slate endpoint.
+4. Fund it from the cuts above: (a)+(b) free ~210 credits/sweep, more than the
+   ~105 ladders would cost — so ladders can be **net credit-negative** if paired
+   with the trims rather than added on top. ·
 **19** cap soccer props (~2,400/sweep) · **20** verify refresh runs can't stack
 (partly addressed by #25's fail-closed marker) · **21** keep 10×-billed historical
 endpoints out of prod · **22** stop retrying 4xx in vendor clients
