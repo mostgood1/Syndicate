@@ -101,16 +101,25 @@ class NhlRefreshRunnerTests(unittest.TestCase):
                 (artifact_root / "data" / "props" / "player_props_lines" / f"date={date_str}" / "oddsapi.csv").write_text("player\nProp Skater\n", encoding="utf-8")
                 (artifact_root / "data" / "props" / "player_props_lines" / f"date={date_str}" / "oddsapi.parquet").write_text("parquet", encoding="utf-8")
 
+            # Post-cutover: owned generation writes the processed + live-lens artifacts into the bundle
+            # (previously copied from the vendor source_root, now produced by hockeysim/live loops).
+            def _fake_run_owned_generation(*, artifact_root, target_dates, props_n_sims, warnings):
+                for d in target_dates:
+                    processed = artifact_root / "data" / "processed"
+                    processed.mkdir(parents=True, exist_ok=True)
+                    (processed / f"recommendations_{d}.csv").write_text("market\nML\n", encoding="utf-8")
+                    (processed / f"props_recommendations_{d}.csv").write_text("player\nSkater\n", encoding="utf-8")
+                    (processed / f"live_lens_signals_{d}.jsonl").write_text('{"kind":"signal"}\n', encoding="utf-8")
+                    (processed / "live_lens_tuning_override.json").write_text('{"alpha":1.1}\n', encoding="utf-8")
+
             argv = [
                 "refresh_nhl_oddsapi.py",
                 "--date",
                 "2026-05-22",
-                "--source-root",
-                str(source_root),
                 "--artifact-root",
                 str(artifact_root),
             ]
-            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_run_source_generation_multi", return_value=None), patch.object(module, "_missing_required_artifacts", return_value=[]), patch.object(module, "_lineup_quality_issues", return_value=[]), patch("sys.argv", argv):
+            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_run_owned_generation", side_effect=_fake_run_owned_generation), patch.object(module, "_missing_required_artifacts", return_value=[]), patch.object(module, "_lineup_quality_issues", return_value=[]), patch("sys.argv", argv):
                 rc = module.main()
 
             self.assertEqual(rc, 0)
@@ -142,24 +151,23 @@ class NhlRefreshRunnerTests(unittest.TestCase):
                 (artifact_root / "data" / "props" / "player_props_lines" / f"date={date_str}").mkdir(parents=True, exist_ok=True)
                 (artifact_root / "data" / "props" / "player_props_lines" / f"date={date_str}" / "oddsapi.csv").write_text("player\nProp Skater\n", encoding="utf-8")
 
-            def _fake_run_source_generation(*, source_root, artifact_root, date_str, props_boxscore_n_sims, days_ahead):
+            def _fake_run_owned_generation(*, artifact_root, target_dates, props_n_sims, warnings):
                 processed_root = artifact_root / "data" / "processed"
                 processed_root.mkdir(parents=True, exist_ok=True)
-                (processed_root / f"props_boxscores_sim_{date_str}.csv").write_text("player\nSkater\n", encoding="utf-8")
-                (processed_root / f"props_boxscores_sim_hist_{date_str}.csv").write_text("player\nSkater\n", encoding="utf-8")
-                (processed_root / f"predictions_sim_{date_str}.csv").write_text("game_id\n1\n", encoding="utf-8")
-                (processed_root / f"recommendations_sim_{date_str}.csv").write_text("game_id\n1\n", encoding="utf-8")
+                for date_str in target_dates:
+                    (processed_root / f"props_boxscores_sim_{date_str}.csv").write_text("player\nSkater\n", encoding="utf-8")
+                    (processed_root / f"props_boxscores_sim_hist_{date_str}.csv").write_text("player\nSkater\n", encoding="utf-8")
+                    (processed_root / f"predictions_sim_{date_str}.csv").write_text("game_id\n1\n", encoding="utf-8")
+                    (processed_root / f"recommendations_sim_{date_str}.csv").write_text("game_id\n1\n", encoding="utf-8")
 
             argv = [
                 "refresh_nhl_oddsapi.py",
                 "--date",
                 "2026-05-22",
-                "--source-root",
-                str(source_root),
                 "--artifact-root",
                 str(artifact_root),
             ]
-            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_run_source_generation_multi", side_effect=_fake_run_source_generation), patch.object(module, "_missing_required_artifacts", return_value=[]), patch.object(module, "_lineup_quality_issues", return_value=[]), patch("sys.argv", argv):
+            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_run_owned_generation", side_effect=_fake_run_owned_generation), patch.object(module, "_missing_required_artifacts", return_value=[]), patch.object(module, "_lineup_quality_issues", return_value=[]), patch("sys.argv", argv):
                 rc = module.main()
 
             self.assertEqual(rc, 0)

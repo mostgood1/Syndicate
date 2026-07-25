@@ -242,18 +242,22 @@ def _materialize_artifact_bundle(*, source_root: Path | None, artifact_root: Pat
     odds_team_root = artifact_root / "data" / "odds" / "team" / f"date={date_str}"
     props_root = artifact_root / "data" / "props" / "player_props_lines" / f"date={date_str}"
 
+    # Input fingerprint drives should_recompute. Post-cutover the real inputs live under
+    # artifact_root (owned collection + hockeysim generation); source_root is retired/None but kept
+    # in the list for backward compatibility if ever supplied.
     input_paths: list[Path] = []
-    if source_root is not None:
-        source_processed_root = source_root / "data" / "processed"
-        input_paths.extend(source_processed_root / template.format(date=date_str) for template in PROCESSED_FILES)
-        input_paths.extend(source_processed_root / template.format(date=date_str) for template in LIVE_LENS_FILES)
+    hash_roots = [artifact_root] + ([source_root] if source_root is not None else [])
+    for base in hash_roots:
+        base_processed = base / "data" / "processed"
+        input_paths.extend(base_processed / template.format(date=date_str) for template in PROCESSED_FILES)
+        input_paths.extend(base_processed / template.format(date=date_str) for template in LIVE_LENS_FILES)
         input_paths.extend(
             [
-                source_root / "data" / "odds" / "games" / f"date={date_str}" / "scoreboard.csv",
-                source_root / "data" / "odds" / "team" / f"date={date_str}" / "oddsapi.csv",
-                source_root / "data" / "odds" / "team" / f"date={date_str}" / "oddsapi.parquet",
-                source_root / "data" / "props" / "player_props_lines" / f"date={date_str}" / "oddsapi.csv",
-                source_root / "data" / "props" / "player_props_lines" / f"date={date_str}" / "oddsapi.parquet",
+                base / "data" / "odds" / "games" / f"date={date_str}" / "scoreboard.csv",
+                base / "data" / "odds" / "team" / f"date={date_str}" / "oddsapi.csv",
+                base / "data" / "odds" / "team" / f"date={date_str}" / "oddsapi.parquet",
+                base / "data" / "props" / "player_props_lines" / f"date={date_str}" / "oddsapi.csv",
+                base / "data" / "props" / "player_props_lines" / f"date={date_str}" / "oddsapi.parquet",
             ]
         )
     input_hash = build_input_hash({"step": "nhl_artifact_bundle", "date": date_str, "inputs": [path_fingerprint(path) for path in input_paths]})
