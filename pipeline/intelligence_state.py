@@ -171,6 +171,57 @@ def _selected_date_from_payload(payload: dict[str, Any] | None) -> str | None:
     current = dict(payload or {})
     return str(current.get("date") or current.get("selected_date") or "").strip() or None
 
+
+def _watched_payload_eviction_reason(payload: dict[str, Any] | None, today_iso: str) -> str | None:
+    """Why this watched payload should be dropped from the replay queue
+    instead of being recomputed forever, or None to keep it.
+
+    _watched_payloads survives restarts through the shared store, and
+    _background_loop re-queues any entry whose snapshot is stale -- so an
+    entry that can never produce a useful result is not merely useless, it
+    recomputes every interval and clobbers self._latest_key with its empty
+    response for every other caller.
+
+    Two such entries exist:
+
+    - "limit": no real caller sends one anymore (see intelligence.html's
+      intelligenceQueryPayload); a leftover from an old queued request
+      (e.g. scripts/run_refresh_odds_job.py's since-fixed hardcoded
+      limit:10) replays a truncated response indefinitely. See
+      _snapshot_limit_matches.
+    - an older "date": recomputes against artifacts that have since rolled
+      over and yields zero candidates. This took down the entire Layer 2
+      board on 2026-07-25, where every sport reported context_label
+      2026-07-24 and generated=0 in ~0.004ms -- an instant no-data bail --
+      while MLB had 15 games and a fresh sim that same day.
+
+    Strictly-older only: a payload with no date is the legitimate "today"
+    default (see get_latest_intelligence_cached_response), and a
+    future-dated one is a real look-ahead request.
+    """
+    current = dict(payload or {})
+    if current.get("limit") is not None:
+        return "stale_limit"
+    payload_date = _selected_date_from_payload(current)
+    if payload_date and _is_iso_date_only(payload_date) and payload_date < today_iso:
+        return f"stale_date:{payload_date}"
+    return None
+
+
+def _is_iso_date_only(value: str | None) -> bool:
+    """True only for a bare YYYY-MM-DD. The length check matters: on 3.11
+    date.fromisoformat also accepts fuller ISO forms, and callers here rely
+    on the value being lexicographically comparable to central_today_iso().
+    """
+    text = str(value or "").strip()
+    if len(text) != 10:
+        return False
+    try:
+        date.fromisoformat(text)
+    except ValueError:
+        return False
+    return True
+
 def _requested_sport_from_payload(payload: dict[str, Any] | None) -> str | None:
     current = dict(payload or {})
     return str(current.get("sport") or current.get("selected_sport") or current.get("sport_slug") or "").strip().lower() or None
@@ -2076,32 +2127,34 @@ class IntelligenceStateService:
             with self._condition:
                 self._sync_persisted_queue_locked()
                 if not self._pending_keys:
-                    stale_limited_keys: list[str] = []
+                    evictable_keys: dict[str, str] = {}
+                    today_iso = central_today_iso()
                     for key, watched_payload in list(self._watched_payloads.items()):
-                        # No real caller sends an explicit "limit" anymore
-                        # (see intelligence.html's intelligenceQueryPayload) --
-                        # a payload with one left over from an old queued
-                        # request (e.g. scripts/run_refresh_odds_job.py's
-                        # since-fixed hardcoded limit:10) would otherwise sit
-                        # in _watched_payloads forever and get recomputed
-                        # every time its snapshot goes stale, repeatedly
-                        # clobbering self._latest_key with a truncated
-                        # response for every other caller (see
-                        # _snapshot_limit_matches). Drop it instead of
-                        # replaying it indefinitely.
-                        if dict(watched_payload or {}).get("limit") is not None:
-                            stale_limited_keys.append(key)
+                        # See _watched_payload_eviction_reason for why an
+                        # entry can be unreplayable, and why letting one sit
+                        # here is actively harmful rather than merely wasteful.
+                        eviction_reason = _watched_payload_eviction_reason(watched_payload, today_iso)
+                        if eviction_reason is not None:
+                            evictable_keys[key] = eviction_reason
                             continue
                         snapshot = self._snapshots.get(key)
                         if snapshot is None or self._is_stale(snapshot):
                             self._pending_keys[key] = watched_payload
-                    for key in stale_limited_keys:
+                    for key in evictable_keys:
                         self._watched_payloads.pop(key, None)
                         self._snapshots.pop(key, None)
                         self._pending_keys.pop(key, None)
                         if self._latest_key == key:
                             self._latest_key = None
-                    if stale_limited_keys:
+                    if evictable_keys:
+                        # print, not logger.info -- logger output does not reach
+                        # Render's log collector, which is how the stale-date
+                        # replay stayed invisible for a full day.
+                        print(
+                            f"[intelligence_state] EVICTED_WATCHED_PAYLOADS today={today_iso} "
+                            f"{json.dumps(evictable_keys, sort_keys=True)}",
+                            flush=True,
+                        )
                         self._persist_locked()
                     self._trim_ordered_dict(self._pending_keys, self._max_snapshots)
                 if self._pending_keys:

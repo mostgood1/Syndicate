@@ -3247,3 +3247,71 @@ class IntelligenceStateTests(unittest.TestCase):
                 )
 
         mocked_log_exception.assert_called_once()
+
+
+class WatchedPayloadEvictionTests(unittest.TestCase):
+    """Layer 2 went fully empty on 2026-07-25 because _watched_payloads
+    survives restarts and _background_loop re-queues any stale-snapshot
+    entry forever. A payload still dated 2026-07-24 recomputed against
+    rolled-over artifacts, produced zero candidates, and clobbered
+    _latest_key with that empty response -- every sport reported
+    context_label 2026-07-24 and generated=0 in ~0.004ms while MLB had 15
+    games and a fresh sim that day.
+    """
+
+    def _reason(self, payload, today="2026-07-25"):
+        return intelligence_state_module._watched_payload_eviction_reason(payload, today)
+
+    def test_evicts_payload_dated_before_today(self) -> None:
+        self.assertEqual(
+            self._reason({"question": "top edges today", "date": "2026-07-24"}),
+            "stale_date:2026-07-24",
+        )
+
+    def test_evicts_via_selected_date_alias(self) -> None:
+        self.assertEqual(
+            self._reason({"question": "top edges today", "selected_date": "2026-07-01"}),
+            "stale_date:2026-07-01",
+        )
+
+    def test_keeps_todays_payload(self) -> None:
+        self.assertIsNone(self._reason({"question": "top edges today", "date": "2026-07-25"}))
+
+    def test_keeps_future_dated_lookahead_payload(self) -> None:
+        # A future date is a real look-ahead request, not a stale replay.
+        self.assertIsNone(self._reason({"question": "top edges today", "date": "2026-07-26"}))
+
+    def test_keeps_undated_payload(self) -> None:
+        # The undated payload is the legitimate "today" default that
+        # get_latest_intelligence_cached_response constructs.
+        self.assertIsNone(self._reason({"question": "top edges today"}))
+
+    def test_keeps_payload_with_unparseable_date(self) -> None:
+        # Never evict on a value we cannot order against today -- dropping a
+        # payload is destructive, so ambiguity must fail safe toward keeping.
+        self.assertIsNone(self._reason({"question": "q", "date": "garbage"}))
+
+    def test_keeps_payload_with_datetime_shaped_date(self) -> None:
+        # date.fromisoformat accepts fuller ISO forms on 3.11, but the value
+        # would no longer be lexicographically comparable to a bare
+        # YYYY-MM-DD, so the length guard must reject it.
+        self.assertIsNone(self._reason({"question": "q", "date": "2026-07-24T00:00:00"}))
+
+    def test_still_evicts_stale_limit_payload(self) -> None:
+        # Pre-existing behavior this refactor must not regress.
+        self.assertEqual(self._reason({"question": "q", "limit": 10}), "stale_limit")
+
+    def test_limit_eviction_wins_over_date_for_a_payload_with_both(self) -> None:
+        self.assertEqual(self._reason({"question": "q", "limit": 10, "date": "2026-07-24"}), "stale_limit")
+
+    def test_handles_none_payload(self) -> None:
+        self.assertIsNone(self._reason(None))
+
+    def test_is_iso_date_only_guards(self) -> None:
+        checker = intelligence_state_module._is_iso_date_only
+        self.assertTrue(checker("2026-07-25"))
+        self.assertFalse(checker("2026-7-25"))
+        self.assertFalse(checker("2026-07-25T00:00:00"))
+        self.assertFalse(checker("2026-13-45"))
+        self.assertFalse(checker(""))
+        self.assertFalse(checker(None))
