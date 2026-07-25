@@ -68,6 +68,8 @@ Conventions:
 | **49** | Triage 22 pre-existing failures in `tests/test_ops.py`. Verified by stashing all local changes and re-running: 22 failed / 73 passed at baseline. Prior notes recorded "2 plus a flaky third" — real drift is an order of magnitude worse. |
 | **50** | `/api/ops/artifacts/export` 502s on broad patterns — it walks every `HOT_ARTIFACT_PATTERNS` glob and accumulates file contents into one in-memory dict before responding. An ops read should not be able to destabilise the 2GB web service. |
 | **51** | `hasSampleData` is inverted on the MLB cards payload — `mlb/cards.py:2373-2374` sets it and `hasArtifactData` to the same expression (`not using_sample_data`), so the two can never disagree and the name means the opposite of what it says. |
+| **55** | 🔴 **MLB sim and the intelligence board build collide on worker boot — OOM crash loop.** Live incident 2026-07-25. Once the evening slate is inside its tip-off window the sim fires ~5s after *every* boot, concurrently with the intelligence board build the same worker runs; together they exceed 2GB, so the instance OOMs, restarts, and repeats about once a minute. The launch-time memory gate does not catch it because it measures at ~250MB, before either pipeline grows — the same flaw already documented for the join-mismatch build. **Currently mitigated by `SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER=false` on refresh-worker (and in render.yaml), so MLB sims are OFF.** Fix: make the sim defer while the intelligence pipeline is mid-computation — the inverse of the existing `_mlb_daily_sim_process_still_running` guard, which already protects the odds refresh from the sim but not the sim from the pipeline. Re-enable only after that lands. |
+| **56** | 🔴 **Web dies from health-check starvation, not memory.** Same incident, *different* failure: `"HTTP health check failed (timed out after 5 seconds)"`, `oomKilled: false`. `WEB_CONCURRENCY=2` × `GUNICORN_THREADS=1` gives the whole service **two concurrent requests**, and because `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false` on web, intelligence persistence runs on the **request path** ([intelligence_state.py:2678](pipeline/intelligence_state.py:2678)) — so slow requests are routine, not exceptional. Two of them starve `/healthz` and Render kills the instance. render.yaml now sets `GUNICORN_THREADS=4`, **but that is not live** — Render only reads render.yaml on a blueprint sync. Threads not workers: each worker is a whole process on 2GB, and this is I/O-bound waiting. Real fix is to stop persisting on the request path. |
 | **53** | **Prop ladder odds for all sports** (split out of #16). No `*_alternate` player market is fetched in any sport, so `_finalize_prop_market`'s `alternates` array is always empty and MLB's ladder surfaces have no book prices to compare the sim against. See #16 for the cost model and why this should ride #15's cadence tiering rather than get its own scheduler. |
 | **54** | **The OddsAPI quota store lost its observations — mitigated, root cause not proven.** Read 20 observations at 19:17 on 2026-07-25, then `observation_count: 0` with `latest: null` after the 19:38 deploy. Two hypotheses were **disproven**: `_state_namespace()` is env-derived and stable across deploys, and detached fetcher subprocesses *do* reach the shared keyvalue store (the 20 observations were written by worker-side fetchers and read from the web service, which only works through the shared backend). Remaining explanation is eviction: the key held up to 500 full observation dicts, making this telemetry the largest entry in a Redis instance that also holds sim pointers, refresh manifests and board state. Fixed by making the payload O(1) — baseline + latest + counters, no history — which both removes it as an eviction target and cuts recovery from 500 observations to 2. **If observations vanish again, the eviction theory is wrong and the next suspect is the shared store's own lifecycle.** |
 | **24** | Look-ahead interval violations (~28min instead of 60). |
@@ -269,6 +271,18 @@ rows (~71% of the board have no sim projection at all — separate from #44) ·
   neither. Put new periodic work on live-odds-worker. Lane ownership follows the
   `SYNDICATE_*_TICK_OWNER` env pattern.
 - **Local pytest pollutes `reports/`.** `git checkout -- reports/` before committing.
+- **A Render env-var change via the API does NOT restart the service.** The
+  running process keeps the old value, so the change is inert until you trigger
+  a deploy/restart. Cost real time during the 2026-07-25 incident: a mitigation
+  was set at 20:16, reported as applied, and the disabled subsystem kept running
+  until a restart at 20:26. **Always verify the observable** (here: does
+  `MLB_DAILY_SIM_TRIGGERED` stop appearing?) rather than inferring from a quiet
+  gap in failures.
+- **Do not judge a production fix from a short quiet window.** Three times in one
+  session a result was called early — Layer 2 "still broken" 6 minutes before it
+  recovered, a burn rate quoted off a 4-minute sample that a 14-minute sample cut
+  by 3.6×, and an OOM loop called mitigated during a 90-second gap before the
+  mitigation had even landed. Wait for the mechanism to be observable.
 - **The web service times out on boot during a rollout.** Expect ~60–90s of 502s
   on every web deploy while gunicorn restarts; `/healthz` returns 200 again before
   the heavier routes do. Don't diagnose a "crash" from 502s inside that window —
