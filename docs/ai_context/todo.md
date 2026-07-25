@@ -19,7 +19,7 @@ Conventions:
 
 | # | Item | Notes |
 |---|---|---|
-| **25** | Phase 0 fail-closed refresh guard + atomic writes | Fixes candidate swings, look-ahead interval violations (#24) and duplicate sweeps (#20) at once. Same bug family as #43. |
+| **25** | Phase 0 fail-closed refresh guard + atomic writes | **Phase 0 shipped** — see Done. Remaining: the look-ahead's own interval marker (#24) has not been audited for the same fail-open pattern, and several non-artifact writers still use the unsafe `path.with_suffix(".tmp")` shape (`fetch_soccer_*`, `fetch_soccer_history_local`, the `backtest_*` scripts). |
 | **15** | Tier odds refresh cadence by volatility | Biggest quota lever. **Target is 5M.** The plan currently reads 15M (`remaining` 13,920,988 + `used` 1,079,012 = 15,000,000, measured 2026-07-25T18:17Z) — but that 15M is *remediation for a real prior overage*, not headroom, and the goal is to cut burn enough to **downgrade back to 5M and stay there**. Tier: game lines 60s, props 5–10min, alternates/innings 15–30min. Use `/api/ops/oddsapi/quota` to verify the reduction actually lands under 5M rather than assuming it. |
 
 ## In progress
@@ -127,6 +127,23 @@ rows (~71% of the board have no sim projection at all — separate from #44) ·
 - **46** `sim_run_status` was unresolvable without grepping worker logs for a run
   stamp — `f6a013e3`. Now falls back to `_active.json` → `_last_attempt.json` and
   always reports `sim_run_resolution`.
+- **25 (Phase 0)** Fail-closed refresh guard + atomic artifact writes.
+  - *Atomic writes*: `syndicate/features/shared/atomic_artifact_write.py`, wired
+    into 11 call sites across 7 producers (NBA/WNBA props, basketball props, NFL
+    props, soccer picks/rosters). `df.to_csv(path)` truncates then streams, so a
+    reader arriving mid-write silently gets fewer rows — one of the
+    candidate-swing symptoms. Temp files carry pid+uuid and sit in the
+    destination directory: the `path.with_suffix(".tmp")` shape used elsewhere
+    gives two concurrent writers the *same* temp path, and a temp on another
+    filesystem makes `os.replace` non-atomic.
+  - *Fail-closed launch marker*: `_record_odds_refresh_launch` moved to before
+    `launch_refresh_run` instead of after it. It spawns a detached subprocess
+    and then does more work, so a raise after the spawn left a sweep running
+    with no marker — and the next tick started a second one (#20). Recording
+    first makes a failed launch cost one skipped interval instead of a duplicate
+    sweep; a missed refresh self-corrects, a duplicate burns credits and can
+    stack two heavy pipelines in a 2GB container.
+  - 16 tests.
 - **41** Regression coverage for scoped resims truncating the MLB daily summary
   (`dcda6243` shipped the fix untested). `tests/test_mlb_scoped_resim_summary.py`,
   8 tests in two layers: a behavioural consumer contract on
@@ -164,5 +181,7 @@ rows (~71% of the board have no sim projection at all — separate from #44) ·
   `SYNDICATE_*_TICK_OWNER` env pattern.
 - **Local pytest pollutes `reports/`.** `git checkout -- reports/` before committing.
 - **Two known-failing tests** in `tests/test_live_refresh_loop.py`
-  (`test_create_app_starts_shared_live_refresh_loop*`) plus a rotating flaky third.
-  Baseline before blaming your change.
+  (`test_create_app_starts_shared_live_refresh_loop*`). The "rotating flaky third"
+  is **`test_mlb_has_live_game_reads_live_lens_counts`** — identified 2026-07-25:
+  it passes in isolation and in most full runs, so it is order/timing dependent,
+  not a real failure. Baseline before blaming your change.

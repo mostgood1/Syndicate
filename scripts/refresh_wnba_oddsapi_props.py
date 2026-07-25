@@ -46,6 +46,13 @@ from syndicate.features.shared.refresh_state_store import write_json_file as _ke
 from syndicate.features.shared.refresh_state_store import write_text_file as _keyvalue_write_text_file
 from syndicate.features.shared.timezone import central_date_from_iso
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from syndicate.features.shared.atomic_artifact_write import atomic_write_csv
+
+
 
 def _json_ready(value):
     if isinstance(value, Path):
@@ -2618,7 +2625,7 @@ def _seed_game_odds_from_raw_history(*, source_root: Path, date_str: str, log_fi
         return False
 
     processed_path.parent.mkdir(parents=True, exist_ok=True)
-    out.to_csv(processed_path, index=False)
+    atomic_write_csv(processed_path, out)
     _append_log(log_file, f"Seeded fallback game odds slate from raw history: {processed_path} (rows={len(out)})")
     return True
 
@@ -2753,7 +2760,7 @@ def _seed_game_odds_from_props_snapshot(*, source_root: Path, date_str: str, log
         if out.empty:
             continue
         processed_path.parent.mkdir(parents=True, exist_ok=True)
-        out.to_csv(processed_path, index=False)
+        atomic_write_csv(processed_path, out)
         priced = int(pd.to_numeric(out.get("total"), errors="coerce").notna().sum()) if "total" in out.columns else 0
         _append_log(log_file, f"Seeded game odds slate from props snapshot: {processed_path} (rows={len(out)}, priced={priced})")
         return True
@@ -3475,7 +3482,7 @@ def _repair_predictions_slate_from_game_odds_if_needed(*, processed_root: Path, 
     if out_df.empty:
         return False
     pred_path.parent.mkdir(parents=True, exist_ok=True)
-    out_df.to_csv(pred_path, index=False)
+    atomic_write_csv(pred_path, out_df)
     _append_log(log_file, f"Rebuilt predictions slate from local game odds for {date_str}: {pred_path} (rows={len(out_df)})")
     return _count_csv_rows_quick(pred_path) > 0
 
@@ -4277,8 +4284,7 @@ def _build_local_optional_player_recon_artifacts(*, processed_root: Path, date_s
                 if builder is None:
                     continue
                 df = builder(date_str)
-                out_path.parent.mkdir(parents=True, exist_ok=True)
-                df.to_csv(out_path, index=False)
+                atomic_write_csv(out_path, df)
                 copied[copied_key] = str(out_path)
             except Exception:
                 continue

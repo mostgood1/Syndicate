@@ -11,6 +11,14 @@ import numpy as np
 import pandas as pd
 import requests
 from requests.exceptions import HTTPError
+import sys
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from syndicate.features.shared.atomic_artifact_write import atomic_write_csv
+
 
 
 DEFAULT_PLAYER_MARKETS = [
@@ -371,7 +379,7 @@ def main(argv: list[str] | None = None) -> int:
         except Exception:
             pass
 
-    out_df.to_csv(out_path, index=False)
+    atomic_write_csv(out_path, out_df)
     print(f"Wrote {out_path} with {len(out_df)} rows.")
     return 0
 

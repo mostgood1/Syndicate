@@ -2541,6 +2541,38 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 	if not skip_launch:
 		if effective_phase == "pregame":
 			_record_pregame_launch(tick_started_epoch, selected_date)
+		# Fail-closed (#25): record the ATTEMPT before launching, not the
+		# success after. These markers are what the interval gates read to
+		# decide "did we already refresh recently", and they used to be
+		# written inside the try below, after launch_refresh_run returned.
+		#
+		# launch_refresh_run spawns a detached subprocess and then does more
+		# work (state writes, manifest bookkeeping). If it raises AFTER the
+		# spawn -- or the container is killed in that window -- the sweep is
+		# genuinely running but no marker exists, so the next tick sees "no
+		# recent launch" and starts a SECOND one. That is two concurrent
+		# OddsAPI sweeps (#20) burning credits against a budget already over
+		# target, and it is the same shape as the look-ahead firing at ~28min
+		# instead of 60 (#24).
+		#
+		# Recording first inverts the failure: a launch that dies costs one
+		# skipped interval instead of a duplicate sweep. A missed refresh is
+		# self-correcting on the next tick; a duplicate is not -- it burns
+		# credits and can stack two heavy pipelines in a 2GB container.
+		# _record_pregame_launch above already had it right.
+		_record_odds_refresh_launch(tick_started_epoch)
+		try:
+			# launch_sports is None when unconfigured (launch_refresh_run then
+			# resolves the full season-active-for-date set itself) -- resolve
+			# the same way here rather than assuming an unset launch_sports
+			# means WNBA wasn't included.
+			launched_sports = launch_sports.split(",") if launch_sports else _live_refresh_loop_effective_sports(selected_date)
+			if "wnba" in launched_sports:
+				_record_wnba_odds_refresh_launch(tick_started_epoch)
+		except Exception as exc:
+			# Resolving the sport list must never be the reason a refresh
+			# doesn't launch; the WNBA marker is only a gate input.
+			print(f"[live_refresh_loop] WNBA_LAUNCH_MARKER_SKIPPED error={type(exc).__name__}: {exc}", flush=True)
 		try:
 			result = launch_refresh_run(
 				date=meta["date"],
@@ -2558,14 +2590,6 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			)
 			meta["ok"] = True
 			meta["result"] = result
-			_record_odds_refresh_launch(tick_started_epoch)
-			# launch_sports is None when unconfigured (launch_refresh_run then
-			# resolves the full season-active-for-date set itself) -- resolve
-			# the same way here rather than assuming an unset launch_sports
-			# means WNBA wasn't included.
-			launched_sports = launch_sports.split(",") if launch_sports else _live_refresh_loop_effective_sports(selected_date)
-			if "wnba" in launched_sports:
-				_record_wnba_odds_refresh_launch(tick_started_epoch)
 			if force_sim_rerun:
 				print(f"[live_refresh_loop] LINEUP_INJURY_CHANGE_RESIM_TRIGGERED date={meta['date']} phase={meta['phase']}", flush=True)
 		except ValueError as exc:

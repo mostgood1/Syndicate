@@ -2189,3 +2189,60 @@ class SoccerJoinMismatchResimTriggerTests(unittest.TestCase):
             self.assertEqual(
                 live_refresh_loop._soccer_join_mismatch_leagues(now_epoch=1000.0, date_str="2026-07-25"), []
             )
+
+
+class FailClosedRefreshLaunchMarkerTests(unittest.TestCase):
+    """#25: the odds-refresh launch marker used to be written AFTER
+    launch_refresh_run returned, inside the try. launch_refresh_run spawns a
+    detached subprocess and then does more work, so a raise after the spawn
+    left a sweep genuinely running with no marker recorded -- and the next
+    tick, seeing no recent launch, started a second one. Two concurrent
+    OddsAPI sweeps (#20), against a budget already over target.
+    """
+
+    def setUp(self) -> None:
+        self._tmp = TemporaryDirectory(ignore_cleanup_errors=True)
+        os.environ["SYNDICATE_REPORTS_ROOT"] = str(Path(self._tmp.name))
+        self.addCleanup(self._tmp.cleanup)
+        self.addCleanup(lambda: os.environ.pop("SYNDICATE_REPORTS_ROOT", None))
+
+    def test_marker_is_recorded_even_when_the_launch_raises(self) -> None:
+        recorded: list[float] = []
+        with patch.object(live_refresh_loop, "_record_odds_refresh_launch", side_effect=recorded.append), patch.object(
+            live_refresh_loop, "launch_refresh_run", side_effect=RuntimeError("spawned, then died")
+        ), patch.object(live_refresh_loop, "_should_force_sim_rerun", return_value=False), patch.object(
+            live_refresh_loop, "_soccer_join_mismatch_leagues", return_value=[]
+        ), patch.object(live_refresh_loop, "_run_mlb_sim_tick", return_value={}):
+            meta = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertEqual(len(recorded), 1, "a failed launch must still consume the interval")
+        self.assertFalse(meta.get("ok"))
+
+    def test_marker_is_recorded_before_the_launch_is_attempted(self) -> None:
+        order: list[str] = []
+        with patch.object(
+            live_refresh_loop, "_record_odds_refresh_launch", side_effect=lambda *_a, **_k: order.append("marker")
+        ), patch.object(
+            live_refresh_loop, "launch_refresh_run", side_effect=lambda **_k: order.append("launch") or {"ok": True}
+        ), patch.object(live_refresh_loop, "_should_force_sim_rerun", return_value=False), patch.object(
+            live_refresh_loop, "_soccer_join_mismatch_leagues", return_value=[]
+        ), patch.object(live_refresh_loop, "_run_mlb_sim_tick", return_value={}):
+            live_refresh_loop._run_live_refresh_tick()
+
+        self.assertEqual(order[:2], ["marker", "launch"])
+
+    def test_sport_resolution_failure_does_not_block_the_launch(self) -> None:
+        # The WNBA marker is only a gate input; resolving the sport list must
+        # never be the reason a refresh doesn't happen.
+        launched: list[str] = []
+        with patch.object(live_refresh_loop, "_record_odds_refresh_launch"), patch.object(
+            live_refresh_loop, "_live_refresh_loop_effective_sports", side_effect=RuntimeError("boom")
+        ), patch.object(live_refresh_loop, "_live_refresh_loop_sports", return_value=""), patch.object(
+            live_refresh_loop, "launch_refresh_run", side_effect=lambda **_k: launched.append("x") or {"ok": True}
+        ), patch.object(live_refresh_loop, "_should_force_sim_rerun", return_value=False), patch.object(
+            live_refresh_loop, "_soccer_join_mismatch_leagues", return_value=[]
+        ), patch.object(live_refresh_loop, "_run_mlb_sim_tick", return_value={}):
+            meta = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertEqual(len(launched), 1)
+        self.assertTrue(meta.get("ok"))

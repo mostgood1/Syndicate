@@ -12,6 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from syndicate.features.shared.atomic_artifact_write import atomic_write_csv
 from syndicate.features.shared.oddsapi_quota import record_oddsapi_quota
 
 
@@ -341,7 +342,7 @@ def main(argv: list[str] | None = None) -> int:
         # slate this way). Write a genuine empty result so downstream
         # consumers correctly see "no games" instead.
         try:
-            pd.DataFrame(columns=["event_id", "commence_time", "home_team", "away_team"]).to_csv(out_path, index=False)
+            atomic_write_csv(out_path, pd.DataFrame(columns=["event_id", "commence_time", "home_team", "away_team"]))
         except Exception:
             pass
         print(f"No events scheduled for {args.date}; wrote empty snapshot at {out_path}")
@@ -374,7 +375,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR: No player props fetched for {args.date} and no prior snapshot exists to preserve")
         return 2
 
-    df.to_csv(out_path, index=False)
+    atomic_write_csv(out_path, df)
     print(f"Wrote {out_path} with {len(df)} rows.")
     return 0
 

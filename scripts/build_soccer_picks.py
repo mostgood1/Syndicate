@@ -31,6 +31,13 @@ from typing import Any
 
 import pandas as pd
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from syndicate.features.shared.atomic_artifact_write import atomic_write_csv
+
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
@@ -235,7 +242,7 @@ def _write_picks_for_date(league: str, iso_date: str, *, source_root: Path, out_
     df = build_picks(league, iso_date, source_root=source_root, out_root=out_root)
     out_path = out_root / league / "api" / "picks" / f"picks_{iso_date}.csv"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(out_path, index=False)
+    atomic_write_csv(out_path, df)
     print(f"wrote {len(df)} picks to {out_path}")
     return len(df)
 

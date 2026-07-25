@@ -33,6 +33,13 @@ from syndicate.features.soccer.sources import all_teams
 from syndicate.features.soccer.sources import roster_rows
 from syndicate.features.soccer.sources import sparse_roster_teams
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from syndicate.features.shared.atomic_artifact_write import atomic_write_csv
+
+
 
 def _fetch_roster_with_retries(league: str, team_id: str, *, attempts: int = 3, retry_delay: float = 2.0) -> list[dict]:
     """A safety net for genuine request-level flakiness, not a fix for the
@@ -82,7 +89,7 @@ def build_rosters(league: str, season: int, *, out_root: Path, sleep_seconds: fl
     frame = pd.DataFrame(rows)
     out_path = out_root / league / "api" / "rosters" / f"rosters_{season}.csv"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    frame.to_csv(out_path, index=False)
+    atomic_write_csv(out_path, frame)
     print(f"wrote {out_path} ({len(frame)} players across {len(teams)} teams)")
 
     # roster_rows/sparse_roster_teams read the file back from disk (not the
