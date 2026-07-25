@@ -2417,3 +2417,92 @@ class RefreshRunPerServiceLaneTests(unittest.TestCase):
             # Legacy singular key stays populated for backward compatibility --
             # from whichever lane was most recently updated.
             self.assertEqual(status["refresh_status"]["manifest"]["state"], "running")
+
+class OpsLiveRefreshStateSimRunResolutionTests(unittest.TestCase):
+    """The endpoint used to require BOTH sim_date and sim_run, and silently
+    omitted sim_run_status when only one was passed -- which reads exactly
+    like "no sim is running". The run stamp is only ever printed to the
+    worker log, so callers had no way to supply it without grepping Render.
+    """
+
+    def setUp(self) -> None:
+        app = create_app()
+        app.testing = True
+        self.client = app.test_client()
+        # ignore_cleanup_errors: create_app() starts the intelligence-state
+        # background loop, which keeps writing into this reports root while
+        # teardown runs -- without it, cleanup intermittently dies on
+        # "directory is not empty" and fails an otherwise-passing test.
+        self._tmp = TemporaryDirectory(ignore_cleanup_errors=True)
+        self.reports_root = Path(self._tmp.name) / "reports"
+        self.sim_base = self.reports_root / "live_refresh_loop" / "mlb_sim_runs"
+        self.sim_base.mkdir(parents=True, exist_ok=True)
+        os.environ["SYNDICATE_REPORTS_ROOT"] = str(self.reports_root)
+        self._prior_admin_token = os.environ.get("ADMIN_TOKEN")
+        os.environ["ADMIN_TOKEN"] = "test-token"
+        self.addCleanup(self._tmp.cleanup)
+        self.addCleanup(lambda: os.environ.pop("SYNDICATE_REPORTS_ROOT", None))
+        self.addCleanup(self._restore_admin_token)
+
+    def _restore_admin_token(self) -> None:
+        if self._prior_admin_token is None:
+            os.environ.pop("ADMIN_TOKEN", None)
+        else:
+            os.environ["ADMIN_TOKEN"] = self._prior_admin_token
+
+    def _write(self, name: str, payload: dict) -> None:
+        (self.sim_base / name).write_text(json.dumps(payload), encoding="utf-8")
+
+    def _get(self, query: str = "") -> dict:
+        response = self.client.get(
+            f"/api/ops/live-refresh/state{query}", headers={"X-Admin-Token": "test-token"}
+        )
+        self.assertEqual(response.status_code, 200)
+        return response.get_json()["state"]
+
+    def test_resolves_running_sim_from_active_pointer_without_run_stamp(self) -> None:
+        self._write("_active.json", {"date": "2026-07-25", "run_stamp": "20260725_162656", "pid": 110})
+        self._write("2026-07-25_20260725_162656_status.json", {"state": "running", "reason": "fingerprint_change"})
+
+        state = self._get("?sim_date=2026-07-25")
+
+        self.assertEqual(state["sim_run_resolution"]["source"], "active_pointer")
+        self.assertEqual(state["sim_run_resolution"]["run_stamp"], "20260725_162656")
+        self.assertEqual(state["sim_run_status"]["state"], "running")
+
+    def test_falls_back_to_last_attempt_when_active_pointer_cleared(self) -> None:
+        # _clear_active_pointer writes {} rather than deleting -- an empty dict
+        # must fall through to the launch-time marker, not be treated as a hit.
+        self._write("_active.json", {})
+        self._write("_last_attempt.json", {"date": "2026-07-25", "run_stamp": "20260725_150000"})
+        self._write("2026-07-25_20260725_150000_status.json", {"state": "finished", "returncode": 0})
+
+        state = self._get()
+
+        self.assertEqual(state["sim_run_resolution"]["source"], "last_attempt")
+        self.assertEqual(state["sim_run_status"]["state"], "finished")
+
+    def test_explicit_run_stamp_wins_over_pointers(self) -> None:
+        self._write("_active.json", {"date": "2026-07-25", "run_stamp": "20260725_162656"})
+        self._write("2026-07-25_20260725_111111_status.json", {"state": "finished"})
+
+        state = self._get("?sim_date=2026-07-25&sim_run=20260725_111111")
+
+        self.assertEqual(state["sim_run_resolution"]["source"], "request")
+        self.assertEqual(state["sim_run_resolution"]["run_stamp"], "20260725_111111")
+        self.assertEqual(state["sim_run_status"]["state"], "finished")
+
+    def test_does_not_answer_with_a_different_date_than_requested(self) -> None:
+        self._write("_active.json", {"date": "2026-07-25", "run_stamp": "20260725_162656"})
+        self._write("2026-07-25_20260725_162656_status.json", {"state": "running"})
+
+        state = self._get("?sim_date=2026-07-24")
+
+        self.assertIsNone(state["sim_run_resolution"]["run_stamp"])
+        self.assertNotIn("sim_run_status", state)
+
+    def test_reports_unresolved_when_no_pointers_exist(self) -> None:
+        state = self._get()
+
+        self.assertEqual(state["sim_run_resolution"], {"run_stamp": None, "date": None, "source": None})
+        self.assertNotIn("sim_run_status", state)

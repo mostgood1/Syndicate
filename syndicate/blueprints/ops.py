@@ -395,6 +395,7 @@ def api_ops_live_refresh_state() -> Any:
     # disk -- this is the only way to see WHY the worker's MLB daily-sim /
     # look-ahead gates did or didn't fire on a given tick.
     from syndicate.features.shared.refresh_state_store import read_json_file as _state_read_json
+    from syndicate.features.shared.refresh_state_store import read_text_file as _state_read_text
     from syndicate.features.shared.refresh_state_store import reports_root as _state_reports_root
 
     base = _state_reports_root() / "live_refresh_loop"
@@ -404,12 +405,42 @@ def api_ops_live_refresh_state() -> Any:
         "last_mlb_sim_check": _state_read_json(base / "last_mlb_sim_check.json"),
         "last_look_ahead_check": _state_read_json(base / "last_look_ahead_check.json"),
     }
+    sim_base = base / "mlb_sim_runs"
     run_stamp = str(request.args.get("sim_run") or "").strip()
     sim_date = str(request.args.get("sim_date") or "").strip()
-    if run_stamp and sim_date:
-        from syndicate.features.shared.refresh_state_store import read_text_file as _state_read_text
 
-        sim_base = base / "mlb_sim_runs"
+    # Resolving sim_run used to be the caller's problem: both params were
+    # required, and passing only sim_date returned a payload with
+    # "sim_run_status" simply ABSENT -- indistinguishable from "no sim is
+    # running". The run stamp is minted inside _launch_mlb_daily_sim and only
+    # ever printed to the worker log, so the one documented way to inspect a
+    # sim required grepping Render's logs first. Fall back to the shared
+    # pointers instead, and always report which run was resolved and from
+    # where so an empty status is never ambiguous again.
+    resolution = {"run_stamp": run_stamp or None, "date": sim_date or None, "source": "request" if run_stamp else None}
+    if not run_stamp:
+        # _active.json is the live run; it is reset to {} on completion, so an
+        # empty/missing payload means "nothing running" and we fall through to
+        # _last_attempt.json, which is written at launch and never cleared and
+        # therefore still identifies the most recent finished run.
+        for pointer_name, source in (("_active.json", "active_pointer"), ("_last_attempt.json", "last_attempt")):
+            pointer = _state_read_json(sim_base / pointer_name)
+            if not isinstance(pointer, dict):
+                continue
+            candidate_stamp = str(pointer.get("run_stamp") or "").strip()
+            if not candidate_stamp:
+                continue
+            candidate_date = str(pointer.get("date") or "").strip()
+            if sim_date and candidate_date and candidate_date != sim_date:
+                # Caller asked about a specific date; don't answer with another one.
+                continue
+            run_stamp = candidate_stamp
+            sim_date = sim_date or candidate_date
+            resolution = {"run_stamp": run_stamp, "date": sim_date or None, "source": source}
+            break
+
+    state["sim_run_resolution"] = resolution
+    if run_stamp and sim_date:
         state["sim_run_status"] = _state_read_json(sim_base / f"{sim_date}_{run_stamp}_status.json")
         log_text = _state_read_text(sim_base / f"{sim_date}_{run_stamp}.log")
         if log_text:
