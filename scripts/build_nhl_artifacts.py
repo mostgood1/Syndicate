@@ -6,12 +6,12 @@ Syndicate-owned inputs: the mirrored slate/roster/lineup/goalie artifacts + coll
 (``syndicate.local_nhl_odds`` collector output).
 
 Pipeline per game: build_slate_features (projection-primed) -> inject consensus market lines ->
-(optional) market-anchor -> build_game_prediction -> write predictions_{date}.csv. Player props go
-through the boxscore engine (build_prop_projections) joined to collected prop lines.
+(optional) market-anchor -> build_game_prediction. Emits predictions_{date}.csv,
+recommendations_sim_{date}.csv (leaning pick per market), and props_recommendations_{date}.csv
+(boxscore engine joined to collected prop lines).
 
 Usage:
-    py -3 scripts/build_nhl_artifacts.py --date 2026-06-14
-    py -3 scripts/build_nhl_artifacts.py --date 2026-06-14 --props
+    py -3 scripts/build_nhl_artifacts.py --date 2026-06-14 --props --recommendations
     py -3 scripts/build_nhl_artifacts.py --date 2026-06-14 --no-anchor --out-dir /tmp/out
 """
 from __future__ import annotations
@@ -33,8 +33,12 @@ from syndicate.features.nhl.sim_engine.hockeysim.artifacts import (  # noqa: E40
     prop_recommendation_row,
     write_predictions_csv,
     write_props_recommendations_csv,
+    write_recommendations_sim_csv,
 )
-from syndicate.features.nhl.sim_engine.hockeysim.contracts import HockeyMarketLines  # noqa: E402
+from syndicate.features.nhl.sim_engine.hockeysim.contracts import (  # noqa: E402
+    HockeyGamePrediction,
+    HockeyMarketLines,
+)
 from syndicate.features.nhl.sim_engine.hockeysim.market_anchoring import anchor_game_features  # noqa: E402
 from syndicate.features.nhl.sim_engine.hockeysim.player_props import build_prop_projections  # noqa: E402
 from syndicate.features.nhl.sim_engine.hockeysim.features.loaders import (  # noqa: E402
@@ -52,19 +56,13 @@ from syndicate.features.nhl.sim_engine.hockeysim.features.props_lines import (  
 )
 
 
-def build_predictions_for_date(
-    date: str,
-    *,
-    root: Optional[Path] = None,
-    anchor: bool = True,
-    anchor_weight: float = 0.35,
-    out_dir: Optional[Path] = None,
-) -> Tuple[Path, int]:
-    """Produce predictions_{date}.csv for a slate. Returns (path, game_count)."""
+def _predictions_and_markets(
+    date: str, *, root: Optional[Path], anchor: bool, anchor_weight: float,
+) -> Tuple[List[HockeyGamePrediction], Dict[str, HockeyMarketLines]]:
+    """Build every game's prediction for a slate (market-injected, optionally anchored)."""
     games = build_slate_features(date, root=root)
     lines = load_market_lines(date, root=root)
-
-    predictions = []
+    predictions: List[HockeyGamePrediction] = []
     markets: Dict[str, HockeyMarketLines] = {}
     for g in games:
         market = market_for_game(lines, g.home.name, g.away.name)
@@ -74,9 +72,28 @@ def build_predictions_for_date(
                 g = anchor_game_features(g, weight=anchor_weight)
         markets[g.game_pk] = g.market
         predictions.append(build_game_prediction(g))
+    return predictions, markets
 
+
+def build_predictions_for_date(
+    date: str, *, root: Optional[Path] = None, anchor: bool = True,
+    anchor_weight: float = 0.35, out_dir: Optional[Path] = None,
+) -> Tuple[Path, int]:
+    """Produce predictions_{date}.csv for a slate. Returns (path, game_count)."""
+    predictions, markets = _predictions_and_markets(date, root=root, anchor=anchor, anchor_weight=anchor_weight)
     out_path = (out_dir or _processed_dir(root)) / f"predictions_{date}.csv"
     n = write_predictions_csv(out_path, predictions, markets)
+    return out_path, n
+
+
+def build_recommendations_for_date(
+    date: str, *, root: Optional[Path] = None, anchor: bool = True,
+    anchor_weight: float = 0.35, out_dir: Optional[Path] = None,
+) -> Tuple[Path, int]:
+    """Produce recommendations_sim_{date}.csv (leaning pick per market). Returns (path, row_count)."""
+    predictions, markets = _predictions_and_markets(date, root=root, anchor=anchor, anchor_weight=anchor_weight)
+    out_path = (out_dir or _processed_dir(root)) / f"recommendations_sim_{date}.csv"
+    n = write_recommendations_sim_csv(out_path, predictions, markets)
     return out_path, n
 
 
@@ -91,11 +108,7 @@ def _poisson_p_over(line: float, lam: float) -> float:
 
 
 def build_props_for_date(
-    date: str,
-    *,
-    root: Optional[Path] = None,
-    n_sims: int = 400,
-    out_dir: Optional[Path] = None,
+    date: str, *, root: Optional[Path] = None, n_sims: int = 400, out_dir: Optional[Path] = None,
 ) -> Tuple[Path, int]:
     """Produce props_recommendations_{date}.csv for a slate. Returns (path, row_count)."""
     games = build_slate_features(date, root=root)
@@ -156,6 +169,7 @@ def main() -> int:
     ap.add_argument("--root", default=None, help="artifact root (default data/nhl_source)")
     ap.add_argument("--no-anchor", action="store_true", help="disable market anchoring")
     ap.add_argument("--anchor-weight", type=float, default=0.35)
+    ap.add_argument("--recommendations", action="store_true", help="also build recommendations_sim")
     ap.add_argument("--props", action="store_true", help="also build props_recommendations")
     ap.add_argument("--props-n-sims", type=int, default=400)
     ap.add_argument("--out-dir", default=None, help="output dir (default <root>/data/processed)")
@@ -163,14 +177,19 @@ def main() -> int:
 
     root = Path(args.root) if args.root else None
     out_dir = Path(args.out_dir) if args.out_dir else None
+    anchor = not args.no_anchor
     path, n = build_predictions_for_date(
-        args.date, root=root, anchor=not args.no_anchor,
-        anchor_weight=args.anchor_weight, out_dir=out_dir,
+        args.date, root=root, anchor=anchor, anchor_weight=args.anchor_weight, out_dir=out_dir,
     )
     if n == 0:
         print(f"No games for {args.date} (no mirrored scoreboard). Nothing written.")
         return 1
     print(f"Wrote {n} game predictions -> {path}")
+    if args.recommendations:
+        rpath, rn = build_recommendations_for_date(
+            args.date, root=root, anchor=anchor, anchor_weight=args.anchor_weight, out_dir=out_dir,
+        )
+        print(f"Wrote {rn} game recommendations -> {rpath}")
     if args.props:
         ppath, pn = build_props_for_date(args.date, root=root, n_sims=args.props_n_sims, out_dir=out_dir)
         print(f"Wrote {pn} props recommendations -> {ppath}")

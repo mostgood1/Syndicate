@@ -553,6 +553,35 @@ def _source_cli_generation_enabled() -> bool:
     return value in {"1", "true", "yes", "on"}
 
 
+def _run_owned_generation(*, artifact_root: Path, target_dates: list[str], props_n_sims: int, warnings: list[str]) -> None:
+    """Syndicate-owned NHL generation (Phase 5 cutover) — replaces the vendor CLI subprocess.
+
+    Collects rosters/lineups/starting-goalies from the NHL API, then runs the hockeysim engine to
+    write predictions / recommendations_sim / props_recommendations into the artifact bundle. Each
+    stage is independently guarded so one failure degrades that artifact rather than the whole run.
+    """
+    scripts_dir = str(Path(__file__).resolve().parent)
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    from syndicate.features.nhl.sim_engine.hockeysim.ingestion import collect_slate_inputs
+    import build_nhl_artifacts as _producer
+
+    for target_date in target_dates:
+        try:
+            collect_slate_inputs(target_date, root=artifact_root)
+        except Exception as exc:
+            warnings.append(f"owned lineup/goalie collection failed {target_date}: {exc}")
+        try:
+            _producer.build_predictions_for_date(target_date, root=artifact_root)
+            _producer.build_recommendations_for_date(target_date, root=artifact_root)
+        except Exception as exc:
+            warnings.append(f"owned game generation failed {target_date}: {exc}")
+        try:
+            _producer.build_props_for_date(target_date, root=artifact_root, n_sims=props_n_sims)
+        except Exception as exc:
+            warnings.append(f"owned props generation failed {target_date}: {exc}")
+
+
 def main() -> int:
     print("=== NHL RUNNER HIT ===", flush=True)
     parser = argparse.ArgumentParser(description="Refresh NHL OddsAPI snapshots through a Syndicate-owned runner.")
@@ -566,8 +595,11 @@ def main() -> int:
     parser.add_argument("--mode", choices=("fast", "full"), default="full")
     args = parser.parse_args()
 
-    default_source_root = _default_source_root()
-    source_root = Path(args.source_root).resolve() if args.source_root else default_source_root
+    # Phase 5 direct cutover: the vendor `nhl_betting` subprocess is fully retired. Both generation
+    # (predictions/recommendations/props) and collection (rosters/lineups/goalies) are now
+    # Syndicate-owned (hockeysim + local_nhl_odds). source_root stays None so the materialize step
+    # uses only artifact_root. --source-root is accepted but ignored (kept for CLI compatibility).
+    source_root = None
     artifact_root = Path(args.artifact_root).resolve()
     target_dates = _date_window(date_str=args.date, days_ahead=int(args.days_ahead or 0))
     warnings: list[str] = []
@@ -581,19 +613,13 @@ def main() -> int:
                 team_markets=str(args.team_markets or "h2h,spreads,totals"),
                 props_source=str(args.props_source or "oddsapi"),
             )
-        if mode == "full" and source_root is not None and _source_cli_generation_enabled():
-            try:
-                _run_source_generation_multi(
-                    source_root=source_root,
-                    artifact_root=artifact_root,
-                    date_str=args.date,
-                    props_boxscore_n_sims=int(args.props_boxscore_n_sims),
-                    days_ahead=int(args.days_ahead or 0),
-                )
-            except Exception as exc:
-                warnings.append(f"source generation skipped: {exc}")
-        elif source_root is not None and mode == "full":
-            warnings.append("source generation disabled by default (set SYNDICATE_NHL_SOURCE_CLI_GENERATION=1 to enable)")
+        if mode == "full":
+            _run_owned_generation(
+                artifact_root=artifact_root,
+                target_dates=target_dates,
+                props_n_sims=int(args.props_boxscore_n_sims),
+                warnings=warnings,
+            )
     except Exception as exc:
         print(json.dumps({"ok": False, "date": args.date, "error": str(exc)}))
         return 1

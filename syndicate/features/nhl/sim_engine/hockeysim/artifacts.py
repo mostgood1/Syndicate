@@ -171,3 +171,66 @@ def write_props_recommendations_csv(path: Path, rows: List[Dict[str, object]]) -
         for row in rows:
             writer.writerow({c: row.get(c) for c in PROPS_RECOMMENDATIONS_COLUMNS})
     return len(rows)
+
+
+# ---------------------------------------------------------------------------
+# Game recommendations (recommendations_sim_{date}.csv) — one leaning pick per market
+# ---------------------------------------------------------------------------
+
+RECOMMENDATIONS_SIM_COLUMNS: List[str] = [
+    "market", "side", "price", "ev", "prob", "conf", "home", "away", "totals_line",
+]
+
+
+def recommendation_sim_rows(
+    pred: HockeyGamePrediction, market: Optional[HockeyMarketLines] = None
+) -> List[Dict[str, object]]:
+    """The model's leaning pick per market (ML / TOTAL / PL) — ``conf`` = prob − 0.5."""
+    m = market or HockeyMarketLines()
+    ev = pred.ev or {}
+    rows: List[Dict[str, object]] = []
+
+    def _row(market_name, side, price, ev_val, prob):
+        rows.append({
+            "market": market_name, "side": side, "price": price,
+            "ev": _fmt(ev_val), "prob": _fmt(prob), "conf": _fmt(max(0.0, float(prob) - 0.5)),
+            "home": pred.home, "away": pred.away, "totals_line": pred.totals_line_used,
+        })
+
+    # Moneyline: pick the higher-probability side.
+    if pred.p_home_ml >= pred.p_away_ml:
+        _row("ML", pred.home, m.home_ml_odds, ev.get("home_ml"), pred.p_home_ml)
+    else:
+        _row("ML", pred.away, m.away_ml_odds, ev.get("away_ml"), pred.p_away_ml)
+
+    # Total: Over vs Under.
+    if pred.p_over >= pred.p_under:
+        _row("TOTAL", "Over", m.over_odds, ev.get("over"), pred.p_over)
+    else:
+        _row("TOTAL", "Under", m.under_odds, ev.get("under"), pred.p_under)
+
+    # Puck line: home -1.5 vs away +1.5.
+    if pred.p_home_pl_minus_1_5 >= pred.p_away_pl_plus_1_5:
+        _row("PL", f"{pred.home} -1.5", m.home_pl_odds, ev.get("home_pl_-1.5"), pred.p_home_pl_minus_1_5)
+    else:
+        _row("PL", f"{pred.away} +1.5", m.away_pl_odds, ev.get("away_pl_+1.5"), pred.p_away_pl_plus_1_5)
+    return rows
+
+
+def write_recommendations_sim_csv(
+    path: Path,
+    predictions: Iterable[HockeyGamePrediction],
+    markets: Optional[Dict[str, HockeyMarketLines]] = None,
+) -> int:
+    """Write recommendations_sim_{date}.csv (leaning pick per market per game)."""
+    markets = markets or {}
+    rows: List[Dict[str, object]] = []
+    for p in predictions:
+        rows.extend(recommendation_sim_rows(p, markets.get(p.game_pk)))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=RECOMMENDATIONS_SIM_COLUMNS)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({c: row.get(c) for c in RECOMMENDATIONS_SIM_COLUMNS})
+    return len(rows)
