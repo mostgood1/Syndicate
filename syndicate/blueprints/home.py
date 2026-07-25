@@ -5060,9 +5060,29 @@ def _build_sport_overview(
     *,
     force_refresh: bool = False,
     preserve_requested_date: bool = False,
+    skip_game_hydration: bool = False,
 ) -> dict[str, Any]:
+    # Root-caused 2026-07-24 OOM incident: this function backs the home
+    # page's display cards (game_bar/props_bar/dashboard_games/home_rails,
+    # including today's headshot/live-scoreboard/freshness additions), but
+    # is also called from pipeline/intelligence_state.py's worker-side
+    # candidate-collection path via build_intelligence_overview ->
+    # build_intelligence_status -> _source_state_fingerprint, which only
+    # ever reads plain sport metadata (slug/context_label/data_health) off
+    # the returned dict -- never game_bar/dashboard_games/home_rails. That
+    # path was paying the full cost of _load_home_game_items/
+    # _load_home_games/_load_home_prop_items (pregame AND live lanes) on
+    # every single cycle, confirmed via production diagnostics to be large
+    # enough to exceed the container's 2GB memory limit within one call.
+    # skip_game_hydration=True substitutes empty game/prop lists instead of
+    # calling those loaders -- the rest of this function already handles
+    # empty lists correctly (the exact same shape as "no games today").
+    # Keyed into the cache separately from the normal (skip=False) result so
+    # the two can never serve stale/wrong data to each other.
     slug = str(sport.get("slug") or "").strip().lower()
     cache_key = _sport_cache_key(slug, today_value)
+    if skip_game_hydration:
+        cache_key = f"{cache_key}:skip_hydration"
     now = time.monotonic()
     cached = _HOME_OVERVIEW_CACHE.get(cache_key)
     if cached and not force_refresh and (now - cached[0]) < _HOME_OVERVIEW_TTL_SEC:
@@ -5197,7 +5217,14 @@ def _build_sport_overview(
             props_bar["title"] = "Pitcher + hitter top props"
             props_bar["summary"] = "Mirror the standalone MLB pregame props structure by keeping pitcher and hitter top-props lanes distinct on the main Syndicate page."
             props_bar["opportunity_tags"] = ["Pitcher top props", "Hitter top props", "Pregame props"]
-    if slug == "wnba":
+    if skip_game_hydration:
+        active_today = False
+        game_items = []
+        game_count = 0
+        home_games = []
+        pregame_prop_items = []
+        live_prop_items = []
+    elif slug == "wnba":
         # A real, uncached live-state read for this exact date is the
         # authoritative signal for whether WNBA is active right now -- both
         # "no games" checks below (has_games_for_date()'s ESPN-scoreboard

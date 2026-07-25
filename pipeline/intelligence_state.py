@@ -1299,11 +1299,19 @@ class IntelligenceStateService:
 
         status = self._load_cached_status_payload(selected_date)
         if status is None:
+            # skip_game_hydration=True: this status build only feeds
+            # _source_state_fingerprint_from_status below, which reads each
+            # sport's artifacts/advanced_inputs (computed separately inside
+            # build_intelligence_status's own loop) -- never
+            # dashboard_games/home_rails from the raw overview, so it's safe
+            # to skip that expensive game/prop hydration here. Root-caused
+            # 2026-07-24: this unconditional call was confirmed live to
+            # single-handedly exceed the refresh-worker's 2GB memory limit.
             if self._app is not None:
                 with self._app.app_context():
-                    status = _profile_stage("data_ingestion", build_intelligence_status, selected_date=selected_date, force_refresh=False)
+                    status = _profile_stage("data_ingestion", build_intelligence_status, selected_date=selected_date, force_refresh=False, skip_game_hydration=True)
             else:
-                status = _profile_stage("data_ingestion", build_intelligence_status, selected_date=selected_date, force_refresh=False)
+                status = _profile_stage("data_ingestion", build_intelligence_status, selected_date=selected_date, force_refresh=False, skip_game_hydration=True)
 
         status_fingerprint = self._source_state_fingerprint_from_status(status if isinstance(status, dict) else {}, selected_date)
         fingerprint = hashlib.sha256(f"{cache_key}:{status_fingerprint}".encode("utf-8")).hexdigest()

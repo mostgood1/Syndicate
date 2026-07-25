@@ -2398,7 +2398,18 @@ def _query_preferences(
     }
 
 
-def build_intelligence_overview(*, selected_date: str | None = None, force_refresh: bool = False) -> list[dict[str, Any]]:
+def build_intelligence_overview(
+    *,
+    selected_date: str | None = None,
+    force_refresh: bool = False,
+    skip_game_hydration: bool = False,
+) -> list[dict[str, Any]]:
+    # skip_game_hydration: CANDIDATE GENERATION (_collect_candidates) reads
+    # dashboard_games/home_rails directly off each sport dict returned here
+    # -- never pass True for any overview that feeds candidate collection,
+    # only for callers that need pure metadata (slug/context_label/
+    # data_health), e.g. _source_state_fingerprint's change-detection hash.
+    # See _build_sport_overview's own comment for the full story.
     effective_date = _effective_date(selected_date)
     sports = _configured_syndicate_sports()
     overview = [
@@ -2407,6 +2418,7 @@ def build_intelligence_overview(*, selected_date: str | None = None, force_refre
             effective_date,
             force_refresh=force_refresh,
             preserve_requested_date=selected_date is not None,
+            skip_game_hydration=skip_game_hydration,
         )
         for sport in sports
         if isinstance(sport, dict)
@@ -3572,10 +3584,15 @@ def _advanced_input_specs_for_sport(sport: dict[str, Any]) -> list[dict[str, Any
     return []
 
 
-def build_intelligence_status(*, selected_date: str | None = None, force_refresh: bool = False) -> dict[str, Any]:
+def build_intelligence_status(
+    *,
+    selected_date: str | None = None,
+    force_refresh: bool = False,
+    skip_game_hydration: bool = False,
+) -> dict[str, Any]:
     if force_refresh:
         _tracked_repo_files.cache_clear()
-    overview = build_intelligence_overview(selected_date=selected_date, force_refresh=force_refresh)
+    overview = build_intelligence_overview(selected_date=selected_date, force_refresh=force_refresh, skip_game_hydration=skip_game_hydration)
     tracked = _tracked_repo_files()
     try:
         refresh_status = load_latest_refresh_status()

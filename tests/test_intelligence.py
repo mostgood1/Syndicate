@@ -971,6 +971,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
             "2026-06-17",
             force_refresh=True,
             preserve_requested_date=True,
+            skip_game_hydration=False,
         )
 
     def test_build_intelligence_overview_falls_back_without_app_context(self) -> None:
