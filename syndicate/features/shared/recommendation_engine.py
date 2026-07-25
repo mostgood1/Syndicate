@@ -945,13 +945,20 @@ def filter_candidates(
     # only 161 candidates. Same bug shape as the odds-history O(candidates x
     # markets) regression fixed in 29649d18, just in this sibling code path.
     market_profile_cache: dict[str, dict[str, Any]] = {}
+    # build_market_features re-reads and re-parses the sport's whole
+    # odds-history shard payload (thousands of entries) from disk on every
+    # call with no caching of its own. Confirmed in production 2026-07-24:
+    # this was the dominant cost of a 300s+ scoring pass over ~270 MLB
+    # candidates -- the same shard gets read from scratch once (or twice,
+    # with the 1-day lookback) per candidate instead of once per cycle.
+    odds_payload_cache: dict[tuple[str, str], dict[str, Any] | None] = {}
     for candidate in candidate_rows:
         market = _market(candidate)
         market_profile = market_profile_cache.get(market)
         if market_profile is None:
             market_profile = _market_profile(history_rows, sport=sport, market=market)
             market_profile_cache[market] = market_profile
-        market_features = build_market_features(candidate, sport=sport)
+        market_features = build_market_features(candidate, sport=sport, payload_cache=odds_payload_cache)
         live_pricing = _repriced_probabilities(candidate)
         edge_data = calculate_edge(candidate, implied_probability=live_pricing["implied_probability"])
         fair_probability = edge_data["fair_probability"]
@@ -1084,6 +1091,10 @@ def rank_recommendations(
     # recomputing build_reliability_profile from scratch for every candidate
     # that shares a market.
     market_profile_cache: dict[str, dict[str, Any]] = {}
+    # Same odds-history payload memoization as filter_candidates above --
+    # only relevant when a candidate reaches this loop without market_features
+    # already attached (filter_candidates normally sets it on every row).
+    odds_payload_cache: dict[tuple[str, str], dict[str, Any] | None] = {}
     for candidate in filtered_candidates:
         market = str(candidate.get("market") or "market").strip().lower() or "market"
         market_profile = market_profile_cache.get(market)
@@ -1092,7 +1103,7 @@ def rank_recommendations(
             market_profile_cache[market] = market_profile
         market_features = _copy_mapping(candidate.get("market_features"))
         if not market_features:
-            market_features = build_market_features(candidate, sport=sport)
+            market_features = build_market_features(candidate, sport=sport, payload_cache=odds_payload_cache)
         fair_probability = float(candidate.get("fair_probability") or 0.5)
         model_probability = _coerce_probability(candidate.get("model_probability")) or _probability_from_simulation_payload(candidate) or fair_probability
         live_pricing = _repriced_probabilities(candidate, model_probability=model_probability)

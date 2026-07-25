@@ -67,12 +67,12 @@ def _market_state_from_payload(payload: Mapping[str, Any] | None, *, market_id: 
     return None
 
 
-def _resolve_market_state_across_shards(*, sport: str, market_id: str | None, shard_key: str, shard_lookback: int) -> dict[str, Any] | None:
+def _resolve_market_state_across_shards(*, sport: str, market_id: str | None, shard_key: str, shard_lookback: int, payload_cache: dict[tuple[str, str], dict[str, Any] | None] | None = None) -> dict[str, Any] | None:
     shard_keys = [shard_key] + odds_history_lookback_shard_keys(sport, shard_key, shard_lookback)
     merged_history: list[dict[str, Any]] = []
     found = False
     for key in shard_keys:
-        state = _market_state_from_payload(load_odds_history_payload_for_sport(sport, key), market_id=market_id)
+        state = _market_state_from_payload(load_odds_history_payload_for_sport(sport, key, cache=payload_cache), market_id=market_id)
         if state is None:
             continue
         history = state.get("history")
@@ -415,7 +415,7 @@ def _implied_probability_from_american_odds(value: Any) -> float | None:
     return absolute / (absolute + 100.0)
 
 
-def build_market_history_view(candidate: Mapping[str, Any] | None = None, *, sport: str | None = None, market_state: Mapping[str, Any] | None = None, lookback_days: int = 7, end_date: str | None = None, shard_key: str | None = None, shard_lookback: int | None = None) -> dict[str, Any]:
+def build_market_history_view(candidate: Mapping[str, Any] | None = None, *, sport: str | None = None, market_state: Mapping[str, Any] | None = None, lookback_days: int = 7, end_date: str | None = None, shard_key: str | None = None, shard_lookback: int | None = None, payload_cache: dict[tuple[str, str], dict[str, Any] | None] | None = None) -> dict[str, Any]:
     candidate_row = dict(candidate) if isinstance(candidate, Mapping) else {}
     resolved_sport = str(sport or candidate_row.get("sport") or candidate_row.get("sport_slug") or "").strip().lower() or None
     market_id = _candidate_market_id(candidate_row, sport=resolved_sport)
@@ -427,6 +427,7 @@ def build_market_history_view(candidate: Mapping[str, Any] | None = None, *, spo
                 market_id=market_id,
                 shard_key=resolved_shard_key,
                 shard_lookback=shard_lookback if shard_lookback is not None else _odds_history_shard_lookback(),
+                payload_cache=payload_cache,
             )
 
     if market_state is None:
@@ -593,8 +594,8 @@ def build_market_history_view(candidate: Mapping[str, Any] | None = None, *, spo
     }
 
 
-def build_market_features(candidate: Mapping[str, Any], *, sport: str | None = None, market_state: Mapping[str, Any] | None = None, lookback_days: int = 7, end_date: str | None = None, shard_key: str | None = None, shard_lookback: int | None = None) -> dict[str, Any]:
-    features = build_market_history_view(candidate, sport=sport, market_state=market_state, lookback_days=lookback_days, end_date=end_date, shard_key=shard_key, shard_lookback=shard_lookback)
+def build_market_features(candidate: Mapping[str, Any], *, sport: str | None = None, market_state: Mapping[str, Any] | None = None, lookback_days: int = 7, end_date: str | None = None, shard_key: str | None = None, shard_lookback: int | None = None, payload_cache: dict[tuple[str, str], dict[str, Any] | None] | None = None) -> dict[str, Any]:
+    features = build_market_history_view(candidate, sport=sport, market_state=market_state, lookback_days=lookback_days, end_date=end_date, shard_key=shard_key, shard_lookback=shard_lookback, payload_cache=payload_cache)
     candidate_row = dict(candidate)
     features["candidate_line"] = _coerce_float(candidate_row.get("line") or candidate_row.get("current_line") or candidate_row.get("projected"))
     features["candidate_price"] = _coerce_float(candidate_row.get("odds") or candidate_row.get("current_odds") or candidate_row.get("market_probability"))

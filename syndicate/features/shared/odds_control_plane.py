@@ -82,12 +82,19 @@ def odds_history_paths_for_sport(sport_slug: str, shard_key: str) -> list[Path]:
     return paths
 
 
-def load_odds_history_payload_for_sport(sport_slug: str, shard_key: str) -> dict[str, Any] | None:
+def load_odds_history_payload_for_sport(sport_slug: str, shard_key: str, *, cache: dict[tuple[str, str], dict[str, Any] | None] | None = None) -> dict[str, Any] | None:
+    cache_key = (str(sport_slug or "").strip().lower(), str(shard_key or ""))
+    if cache is not None and cache_key in cache:
+        return cache[cache_key]
+    payload: dict[str, Any] | None = None
     for path in odds_history_paths_for_sport(sport_slug, shard_key):
-        payload = read_json_file(path)
-        if isinstance(payload, dict):
-            return payload
-    return None
+        candidate_payload = read_json_file(path)
+        if isinstance(candidate_payload, dict):
+            payload = candidate_payload
+            break
+    if cache is not None:
+        cache[cache_key] = payload
+    return payload
 
 
 def odds_history_path_status_for_sport(sport_slug: str, shard_key: str) -> dict[str, Any]:
