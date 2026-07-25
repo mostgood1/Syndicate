@@ -789,13 +789,13 @@ def _mlb_sim_check_interval_seconds() -> int:
 	return max(60, value)
 
 
-def _mlb_sim_timeout_seconds() -> int:
-	raw = str(os.environ.get("SYNDICATE_MLB_SIM_TIMEOUT_SECONDS") or "").strip()
-	try:
-		value = int(raw or 2700)
-	except Exception:
-		value = 2700
-	return max(60, value)
+# SYNDICATE_MLB_SIM_TIMEOUT_SECONDS is read where it is actually enforced --
+# scripts/run_mlb_daily_sim_job.py's _timeout_seconds(), which passes it to
+# subprocess.run() and kills a hung sim. A duplicate reader used to live here
+# and was never called by anything, which made the var look wired up when
+# nothing enforced it; the only real ceiling was the stale-pointer
+# _MLB_SIM_MAX_RUNTIME_SECONDS below, and that is a different concept (when to
+# stop trusting a "running" record, not when to kill the child).
 
 
 def _mlb_sim_count() -> int:

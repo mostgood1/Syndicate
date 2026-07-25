@@ -14,6 +14,7 @@ scripts/run_queued_refresh_job.py.
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 import tempfile
@@ -40,6 +41,25 @@ def _utc_now() -> str:
 # keeps a multi-hundred-MB workflow log from being pulled into RAM (and then
 # pushed through the keyvalue-backed state store) just to surface a traceback.
 _MAX_CAPTURED_LOG_BYTES = 512 * 1024
+
+
+# Default matches live_refresh_loop.py's _MLB_SIM_MAX_RUNTIME_SECONDS (90 min)
+# so leaving the env var unset preserves the effective ceiling that was in
+# place before this was wired up. The two are related but not the same thing:
+# this one KILLS a hung child, that one decides when a "running" pointer stops
+# being trusted. Keeping this <= that value means a timed-out run is reaped
+# here and reported honestly, rather than lingering until the pointer expires.
+_DEFAULT_SIM_TIMEOUT_SECONDS = 90 * 60
+
+
+def _timeout_seconds() -> int:
+    raw = str(os.environ.get("SYNDICATE_MLB_SIM_TIMEOUT_SECONDS") or "").strip()
+    try:
+        if raw:
+            return max(60, int(raw))
+    except Exception:
+        pass
+    return _DEFAULT_SIM_TIMEOUT_SECONDS
 
 
 def _read_log_tail(path: Path, max_bytes: int = _MAX_CAPTURED_LOG_BYTES) -> str:
@@ -115,6 +135,8 @@ def main() -> int:
     capture_path: Path | None = None
     print(f"MLB_DAILY_SIM_START date={args.date} season={args.season} sims={args.sims} workers={args.workers} reason={args.reason}", flush=True)
 
+    timeout_seconds = _timeout_seconds()
+    timed_out = False
     try:
         # Stream the child's output straight to a temp file instead of
         # capture_output=True. The ui-daily workflow runs 3 profiles x every
@@ -130,15 +152,25 @@ def main() -> int:
                 cwd=str(vendor_cwd),
                 stdout=out_fh,
                 stderr=subprocess.STDOUT,
-                # No timeout here: the launch side kills a stale run via
-                # _MLB_SIM_MAX_RUNTIME_SECONDS (live_refresh_loop.py). Note
-                # SYNDICATE_MLB_SIM_TIMEOUT_SECONDS is NOT what enforces it --
-                # _mlb_sim_timeout_seconds() is defined but never called, so
-                # the real ceiling is that hardcoded 90 minutes.
-                timeout=None,
+                timeout=timeout_seconds,
             )
         return_code = int(result.returncode)
         combined_output = _read_log_tail(capture_path)
+    except subprocess.TimeoutExpired:
+        # subprocess.run has already killed the child by the time this
+        # surfaces. Previously nothing enforced this at all: the comment here
+        # claimed the launch side applied SYNDICATE_MLB_SIM_TIMEOUT_SECONDS,
+        # but live_refresh_loop.py's reader for that var was never called by
+        # anything (since removed) -- the only real ceiling was that module's
+        # hardcoded 90-minute _MLB_SIM_MAX_RUNTIME_SECONDS, which is
+        # stale-POINTER detection (when to stop trusting a "running" record),
+        # not a kill. A genuinely hung sim therefore held the container for
+        # 90 minutes before anything noticed.
+        timed_out = True
+        return_code = 124
+        tail = _read_log_tail(capture_path) if capture_path is not None else ""
+        combined_output = f"TimeoutExpired: killed after {timeout_seconds}s (SYNDICATE_MLB_SIM_TIMEOUT_SECONDS)\n{tail}"
+        print(f"MLB_DAILY_SIM_TIMEOUT date={args.date} timeout_seconds={timeout_seconds}", flush=True)
     except Exception as exc:
         return_code = 1
         combined_output = f"{type(exc).__name__}: {exc}"
@@ -166,6 +198,8 @@ def main() -> int:
     status_payload = {
         "ok": ok,
         "returnCode": return_code,
+        "timedOut": bool(timed_out),
+        "timeoutSeconds": int(timeout_seconds),
         "date": str(args.date),
         "season": str(args.season),
         "sims": int(args.sims),
