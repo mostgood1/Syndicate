@@ -2064,6 +2064,7 @@ class IntelligenceStateService:
             if payload_to_process is None:
                 continue
             guard_acquired = False
+            run_failed = False
             run_started_at = time.time()
             print(f"[intelligence_state] LOOP_POPPED_PAYLOAD key={_payload_key(payload_to_process)}", flush=True)
             try:
@@ -2097,6 +2098,26 @@ class IntelligenceStateService:
                 else:
                     response = dict(written_state)
             except Exception as exc:
+                # Root-caused 2026-07-25: this handler swallowed the only
+                # evidence that anything went wrong. It logged nothing at
+                # all, then built a hardcoded zero-candidate response which
+                # the code below unconditionally installs as self._latest_key
+                # -- so a throw anywhere in _compute_board_publication_response
+                # silently replaced a good, fully-computed board with an empty
+                # one, every single cycle, and the only externally visible
+                # symptom was "board shows 0 candidates". Confirmed live: the
+                # checkpoint prints showed pool/serialize/rank all succeeding
+                # with 67-71 candidates, then BUILDING_LIVE_PIPELINE_SUMMARY,
+                # then nothing -- no BOARD_PUBLICATION_RESPONSE_READY, no
+                # error -- straight to the persist of an empty snapshot.
+                print(f"[intelligence_state] BOARD_PUBLICATION_FAILED {type(exc).__name__}: {exc}", flush=True)
+                try:
+                    import traceback
+
+                    print(f"[intelligence_state] BOARD_PUBLICATION_TRACEBACK {traceback.format_exc()}", flush=True)
+                except Exception:
+                    pass
+                run_failed = True
                 response = {
                     "ok": False,
                     "error": f"{type(exc).__name__}: {exc}",
@@ -2113,9 +2134,38 @@ class IntelligenceStateService:
                 source_fingerprint=str(response.get("source_fingerprint") or response.get("latestSourceFingerprint") or "") if isinstance(response, dict) else "",
             )
             with self._condition:
-                self._snapshots[snapshot.key] = snapshot
-                self._snapshots.move_to_end(snapshot.key)
-                self._latest_key = snapshot.key
+                # A run that raised (see the except above) produces a
+                # hardcoded zero-candidate response. Publishing that -- both
+                # by replacing this key's previous good snapshot and by
+                # taking over self._latest_key, which every board read
+                # resolves through -- is what silently replaced a fully
+                # computed 67-candidate board with an empty one on every
+                # cycle. Keep serving the last good result instead; the next
+                # cycle retries from scratch either way. Same "don't regress
+                # published state on a transient failure" rule already
+                # applied to the rollover decision in
+                # _compute_board_publication_response and to the
+                # candidate-pool cache in _build_candidate_pool.
+                previous_snapshot = self._snapshots.get(snapshot.key)
+                previous_count = _intelligence_state_candidate_count(previous_snapshot.response) if previous_snapshot is not None and isinstance(previous_snapshot.response, dict) else 0
+                if run_failed and previous_count > 0:
+                    print(
+                        f"[intelligence_state] SNAPSHOT_UPDATE_SKIPPED_AFTER_FAILURE key={snapshot.key} kept_candidate_count={previous_count}",
+                        flush=True,
+                    )
+                else:
+                    self._snapshots[snapshot.key] = snapshot
+                    self._snapshots.move_to_end(snapshot.key)
+                    existing_latest = self._snapshots.get(self._latest_key or "") if self._latest_key else None
+                    existing_latest_count = _intelligence_state_candidate_count(existing_latest.response) if existing_latest is not None and isinstance(existing_latest.response, dict) else 0
+                    snapshot_count = _intelligence_state_candidate_count(response) if isinstance(response, dict) else 0
+                    if snapshot_count > 0 or existing_latest_count <= 0 or self._latest_key == snapshot.key:
+                        self._latest_key = snapshot.key
+                    else:
+                        print(
+                            f"[intelligence_state] LATEST_KEY_PROMOTION_SKIPPED key={snapshot.key} snapshot_count={snapshot_count} existing_latest_count={existing_latest_count}",
+                            flush=True,
+                        )
                 self._last_run_key = snapshot.key
                 self._last_run_started_at = run_started_at
                 self._last_run_finished_at = time.time()
