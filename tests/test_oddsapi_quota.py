@@ -42,7 +42,8 @@ class ParseQuotaHeadersTests(unittest.TestCase):
 class RecordAndReadQuotaTests(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = TemporaryDirectory(ignore_cleanup_errors=True)
-        os.environ["SYNDICATE_REPORTS_ROOT"] = str(Path(self._tmp.name))
+        self.reports_root = Path(self._tmp.name)
+        os.environ["SYNDICATE_REPORTS_ROOT"] = str(self.reports_root)
         self.addCleanup(self._tmp.cleanup)
         self.addCleanup(lambda: os.environ.pop("SYNDICATE_REPORTS_ROOT", None))
 
@@ -103,10 +104,65 @@ class RecordAndReadQuotaTests(unittest.TestCase):
         ):
             self.assertIsNone(record_oddsapi_quota({"x-requests-used": "1"}, sport="mlb"))
 
-    def test_observations_are_bounded(self) -> None:
+    def test_stored_payload_stays_small_regardless_of_call_volume(self) -> None:
+        # #54: this used to store the last 500 observations, making it the
+        # largest key in a Redis instance that also holds sim pointers,
+        # refresh manifests and board state -- and on 2026-07-25 the key went
+        # from 20 observations to absent across a deploy. Telemetry must not
+        # be the biggest thing in a store critical operations depend on.
         for index in range(520):
+            record_oddsapi_quota({"x-requests-used": str(index), "x-requests-last": "1"}, sport="mlb")
+
+        raw = json.loads((self.reports_root / "odds_control_plane" / "oddsapi_quota.json").read_text(encoding="utf-8"))
+
+        self.assertNotIn("observations", raw)
+        self.assertEqual(raw["observation_count"], 520)
+        self.assertLess(len(json.dumps(raw)), 2000, "payload must stay O(1), not grow with call count")
+
+    def test_counts_every_call_even_though_it_stores_two(self) -> None:
+        for index in range(5):
             record_oddsapi_quota({"x-requests-used": str(index)}, sport="mlb")
-        self.assertLessEqual(read_oddsapi_quota()["observation_count"], 500)
+        self.assertEqual(read_oddsapi_quota()["observation_count"], 5)
+
+    def test_baseline_rolls_forward_when_the_counter_resets(self) -> None:
+        # `used` going down is a billing-period rollover; measuring against
+        # the old baseline would report a negative burn.
+        record_oddsapi_quota({"x-requests-used": "900000"}, sport="mlb")
+        record_oddsapi_quota({"x-requests-used": "12"}, sport="mlb")
+        record_oddsapi_quota({"x-requests-used": "40"}, sport="mlb")
+        self.assertEqual(read_oddsapi_quota()["credits_burned_in_window"], 28)
+
+    def test_reports_burn_even_when_no_rate_can_be_derived(self) -> None:
+        # "600 credits burned, rate unknown" is more useful than reporting
+        # nothing because the two samples landed in the same clock tick.
+        with patch("syndicate.features.shared.oddsapi_quota._utc_now_iso", return_value="2026-07-25T18:00:00.000+00:00"):
+            record_oddsapi_quota({"x-requests-used": "1000"}, sport="mlb")
+            record_oddsapi_quota({"x-requests-used": "1600"}, sport="mlb")
+        state = read_oddsapi_quota()
+        self.assertEqual(state["credits_burned_in_window"], 600)
+        self.assertIsNone(state["credits_per_hour"])
+
+    def test_reads_the_pre_54_observations_schema(self) -> None:
+        # A partially rolled-out deploy should report a slightly stale window
+        # rather than nothing at all.
+        path = self.reports_root / "odds_control_plane" / "oddsapi_quota.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(
+                {
+                    "latest": {"used": 1600, "observedAt": "2026-07-25T18:10:00+00:00", "sport": "mlb"},
+                    "observations": [
+                        {"used": 1000, "observedAt": "2026-07-25T18:00:00+00:00", "sport": "mlb", "last_cost": 5},
+                        {"used": 1600, "observedAt": "2026-07-25T18:10:00+00:00", "sport": "mlb", "last_cost": 5},
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        state = read_oddsapi_quota()
+        self.assertEqual(state["credits_burned_in_window"], 600)
+        self.assertEqual(state["window_seconds"], 600)
+        self.assertEqual(state["by_sport"]["mlb"]["calls"], 2)
 
     def test_read_on_empty_store_is_safe(self) -> None:
         state = read_oddsapi_quota()
