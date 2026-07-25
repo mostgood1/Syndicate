@@ -59,6 +59,21 @@ def _state_namespace() -> str:
     return value or "syndicate"
 
 
+# Root-caused 2026-07-25: redis.Redis.from_url with no socket_timeout/
+# socket_connect_timeout blocks indefinitely (Python's default "no timeout"
+# socket behavior) on a stalled or half-open connection -- confirmed live as
+# the source of multi-minute silent stalls appearing at different, seemingly
+# random points in the board-publication cycle, since this one shared client
+# (lru_cache(maxsize=1)) backs every read_json_file/write_json_file call in
+# the keyvalue-backed pipeline. read_json_file_result already wraps its
+# _execute_keyvalue_operation call in a broad except Exception, so a fast
+# TimeoutError here is already handled gracefully by every caller -- the fix
+# is bounding how long a single stuck operation can block before that
+# exception handling ever gets a chance to run.
+_KEYVALUE_SOCKET_TIMEOUT_SECONDS = 5.0
+_KEYVALUE_SOCKET_CONNECT_TIMEOUT_SECONDS = 5.0
+
+
 @lru_cache(maxsize=1)
 def _get_keyvalue_client() -> Any:
     url = str(os.environ.get("SYNDICATE_REFRESH_STATE_URL") or os.environ.get("REDIS_URL") or "").strip()
@@ -68,7 +83,12 @@ def _get_keyvalue_client() -> Any:
         import redis
     except ImportError as exc:
         raise RuntimeError("redis package is required when SYNDICATE_REFRESH_STATE_BACKEND uses keyvalue.") from exc
-    return redis.Redis.from_url(url, decode_responses=True)
+    return redis.Redis.from_url(
+        url,
+        decode_responses=True,
+        socket_timeout=_KEYVALUE_SOCKET_TIMEOUT_SECONDS,
+        socket_connect_timeout=_KEYVALUE_SOCKET_CONNECT_TIMEOUT_SECONDS,
+    )
 
 
 def _execute_keyvalue_operation(operation):
@@ -84,7 +104,13 @@ def _execute_keyvalue_operation(operation):
             return operation(client)
         except Exception as exc:
             last_error = exc
-            if redis is not None and isinstance(exc, redis.exceptions.ConnectionError):
+            # TimeoutError is a RedisError subclass, not a ConnectionError
+            # subclass -- a stalled socket that now fails fast via the
+            # timeout above needs its own retry branch, or the one retry
+            # this function already had for genuine connection drops would
+            # never apply to it.
+            is_retryable = redis is not None and isinstance(exc, (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError))
+            if is_retryable:
                 _get_keyvalue_client.cache_clear()
                 continue
             break
