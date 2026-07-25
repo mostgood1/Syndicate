@@ -105,8 +105,21 @@ services:
         value: "false"
       - key: WEB_CONCURRENCY
         value: "2"
+      # 2 workers x 1 thread meant only TWO concurrent requests for the whole
+      # service, and Render's health check gives /healthz 5 seconds. On
+      # 2026-07-25 that combination killed the web instance repeatedly:
+      # "HTTP health check failed (timed out after 5 seconds)" -- not an OOM,
+      # just starvation. Two slow requests were enough to make /healthz
+      # unanswerable, and this service also persists intelligence state on the
+      # REQUEST path (SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP is
+      # false here, see pipeline/intelligence_state.py), so slow requests are
+      # routine rather than exceptional.
+      #
+      # Threads, not workers: each extra gunicorn worker is a whole extra
+      # process on a 2GB instance, whereas threads cost almost nothing and
+      # this starvation is I/O-bound waiting, not CPU saturation.
       - key: GUNICORN_THREADS
-        value: "1"
+        value: "4"
       - key: GUNICORN_TIMEOUT
         value: "60"
       - key: GUNICORN_GRACEFUL_TIMEOUT
@@ -378,8 +391,22 @@ services:
       # otherwise idle capacity already being paid for. See
       # scripts/run_refresh_worker.py's call to
       # syndicate.features.shared.live_refresh_loop._run_mlb_sim_tick().
+      # DISABLED 2026-07-25 to stop a live OOM crash loop, and left disabled
+      # here deliberately so a blueprint re-apply cannot silently restart it.
+      #
+      # The sim fires ~5s after every boot once the evening slate is inside
+      # its tip-off window, concurrently with the intelligence board build
+      # this same worker runs. Together they exceed the 2GB container, so the
+      # instance OOMs, restarts, and does it again -- roughly once a minute,
+      # forever. The launch-time memory gate does not catch it because it
+      # measures at ~250MB, before either pipeline has grown.
+      #
+      # Re-enabling needs the sim to defer while the intelligence pipeline is
+      # mid-computation (the inverse of the existing
+      # _mlb_daily_sim_process_still_running guard). Tracked as #55 in
+      # docs/ai_context/todo.md. Flip to "true" only after that lands.
       - key: SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER
-        value: "true"
+        value: "false"
       - key: SYNDICATE_EVENT_SIM_FORCE_WINDOW_MINUTES
         value: "30"
       - key: SYNDICATE_MLB_SIM_CHECK_INTERVAL_SECONDS
