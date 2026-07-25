@@ -401,7 +401,7 @@ def build_simulation_contract_from_context(
     }
 
 
-def build_simulation_engine_context_from_candidate(candidate: Mapping[str, Any]) -> dict[str, Any]:
+def build_simulation_engine_context_from_candidate(candidate: Mapping[str, Any], *, odds_payload_cache: dict[tuple[str, str], dict[str, Any] | None] | None = None) -> dict[str, Any]:
     row = _copy_mapping(candidate)
     market_data = _copy_mapping(row.get("market_data"))
     market_features = _copy_mapping(row.get("market_features"))
@@ -410,6 +410,7 @@ def build_simulation_engine_context_from_candidate(candidate: Mapping[str, Any])
             row,
             sport=_safe_text(row.get("sport") or row.get("sport_slug") or "", "").lower() or None,
             end_date=_safe_text(row.get("date") or row.get("game_date") or row.get("selected_date") or "", "") or None,
+            payload_cache=odds_payload_cache,
         )
     return {
         "sport": _safe_text(row.get("sport") or row.get("sport_slug") or "", ""),

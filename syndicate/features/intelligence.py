@@ -5194,6 +5194,16 @@ def _apply_advanced_context_to_candidates(
     advanced_by_sport: dict[str, list[dict[str, Any]]],
     preferences: dict[str, Any],
 ) -> None:
+    # build_simulation_engine_context_from_candidate falls back to its own
+    # build_market_features() call when a candidate doesn't already carry
+    # market_features -- true for every candidate here, since this runs
+    # during scoring, before filter_candidates (recommendation_engine.py)
+    # attaches market_features. Without a shared cache that re-reads and
+    # re-parses the sport's whole odds-history shard payload from disk once
+    # per candidate, same bug shape as the filter_candidates/rank_recommendations
+    # fix -- confirmed in production 2026-07-24 as a major contributor to this
+    # loop's ~1.3s/candidate cost, on top of the simulation itself.
+    odds_payload_cache: dict[tuple[str, str], dict[str, Any] | None] = {}
     for candidate in candidates:
         sport_slug = _safe_text(candidate.get("sport_slug"), "sport").lower()
         advanced_context = advanced_by_sport.get(sport_slug, [])
@@ -5225,7 +5235,7 @@ def _apply_advanced_context_to_candidates(
             candidate.update(coverage_profile)
             if candidate.get("coverage_adjusted_confidence") is not None:
                 candidate["confidence"] = candidate.get("coverage_adjusted_confidence")
-        simulation_context = build_simulation_engine_context_from_candidate(candidate)
+        simulation_context = build_simulation_engine_context_from_candidate(candidate, odds_payload_cache=odds_payload_cache)
         candidate["simulation"] = _SIMULATION_ENGINE.run_simulation(simulation_context)
         candidate["advanced_signals"] = inferred_signals + existing_signals
         signal_contributions, signal_contributions_top_positive, signal_contributions_top_negative = _candidate_signal_contributions(candidate)

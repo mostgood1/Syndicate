@@ -15,8 +15,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from dataclasses import field
 from math import sqrt
-import random
 from typing import Any, Mapping
+
+import numpy as np
 
 
 def _copy_mapping(value: Any) -> dict[str, Any]:
@@ -241,15 +242,6 @@ def _baseline_std_dev(stat_name: str, projection_value: float | None, context: M
     return max(1.0, abs(base_value) * 0.15)
 
 
-def _simulate_normal(rng: random.Random, mean_value: float, std_dev: float, *, floor: float | None = None, ceiling: float | None = None) -> float:
-    value = rng.normalvariate(mean_value, max(0.01, std_dev))
-    if floor is not None:
-        value = max(floor, value)
-    if ceiling is not None:
-        value = min(ceiling, value)
-    return value
-
-
 @dataclass(frozen=True)
 class SimulationResult:
     outcome_distribution: dict[str, float]
@@ -276,12 +268,28 @@ class SimulationResult:
 
 @dataclass(frozen=True)
 class SimulationEngine:
-    default_iterations: int = 1000
+    # Vectorization (see run_monte_carlo below) already made 1000 iterations
+    # cheap in CPU time; this trim is for the memory side of the same
+    # headroom problem -- fewer floats retained per candidate's player-stat
+    # distributions before they get summarized and discarded. Standard error
+    # only grows by sqrt(1000/400) =~ 1.58x, an acceptable tradeoff for a
+    # betting-edge estimate.
+    default_iterations: int = 400
 
     def run_monte_carlo(self, game_context: Mapping[str, Any], iterations: int = 1000) -> SimulationResult:
         context = _copy_mapping(game_context)
         iteration_count = max(1, _safe_int(iterations) or self.default_iterations)
-        rng = random.Random(_safe_int(context.get("seed")) or None)
+        # numpy's vectorized normal() draws all iterations in one C-level call
+        # instead of iteration_count separate Python-level random.normalvariate()
+        # calls -- confirmed in production 2026-07-24 as a multi-hundred-second
+        # contributor per board-publication cycle once called once per candidate
+        # (up to ~270 candidates), since a prop candidate pays this cost twice
+        # (once for the game margin, once more per player stat). Output is
+        # statistically equivalent (same means/std-devs/floor clamps/thresholds),
+        # not bit-identical to the old random.Random sequence -- existing tests
+        # only assert distribution shape/keys/comparative relationships, never
+        # exact simulated values, so this is safe.
+        rng = np.random.default_rng(_safe_int(context.get("seed")))
 
         team_projections = _copy_mapping(context.get("team_projections"))
         player_projections = _coerce_sequence(context.get("player_projections"))
@@ -305,11 +313,6 @@ class SimulationEngine:
 
         edge = _coerce_float(context.get("edge")) or 0.0
         win_probability = _clamp(base_probability + _clamp(edge, -0.12, 0.12), 0.01, 0.99)
-
-        win_scores: list[float] = []
-        loss_scores: list[float] = []
-        push_scores: list[float] = []
-        outcome_counts = {"win": 0, "loss": 0, "push": 0}
 
         team_std_dev = {
             "home": _baseline_std_dev("team_score", home_projection, context) * advanced_std_dev_scale,
@@ -339,37 +342,32 @@ class SimulationEngine:
             adjusted_std_dev *= max(0.5, min(2.0, combined_scale))
 
             stat_bucket = player_stat_values.setdefault(player_name, {})
-            stat_bucket.setdefault(stat_name, [])
             player_stat_meta[player_name] = {"player": player_name, "stat": stat_name}
-            for _ in range(iteration_count):
-                simulated_value = _simulate_normal(rng, adjusted_mean, adjusted_std_dev, floor=0.0)
-                stat_bucket[stat_name].append(round(simulated_value, 4))
+            simulated_values = rng.normal(adjusted_mean, max(0.01, adjusted_std_dev), size=iteration_count)
+            np.clip(simulated_values, 0.0, None, out=simulated_values)
+            stat_bucket[stat_name] = [round(float(value), 4) for value in simulated_values]
 
-        for _ in range(iteration_count):
-            home_score = _simulate_normal(
-                rng,
-                (home_projection if home_projection is not None else _coerce_float(context.get("line")) or 0.0) + margin_bias,
-                team_std_dev["home"],
-                floor=0.0,
-            )
-            away_score = _simulate_normal(
-                rng,
-                away_projection if away_projection is not None else _coerce_float(context.get("line_opp")) or 0.0,
-                team_std_dev["away"],
-                floor=0.0,
-            )
-            margin = home_score - away_score
-            push_threshold = _coerce_float(context.get("push_threshold")) or 0.5
+        home_mean = (home_projection if home_projection is not None else _coerce_float(context.get("line")) or 0.0) + margin_bias
+        away_mean = away_projection if away_projection is not None else _coerce_float(context.get("line_opp")) or 0.0
+        home_scores = rng.normal(home_mean, max(0.01, team_std_dev["home"]), size=iteration_count)
+        np.clip(home_scores, 0.0, None, out=home_scores)
+        away_scores = rng.normal(away_mean, max(0.01, team_std_dev["away"]), size=iteration_count)
+        np.clip(away_scores, 0.0, None, out=away_scores)
+        margins = home_scores - away_scores
+        push_threshold = _coerce_float(context.get("push_threshold")) or 0.5
 
-            if margin > push_threshold:
-                outcome_counts["win"] += 1
-                win_scores.append(margin)
-            elif margin < -push_threshold:
-                outcome_counts["loss"] += 1
-                loss_scores.append(margin)
-            else:
-                outcome_counts["push"] += 1
-                push_scores.append(margin)
+        win_mask = margins > push_threshold
+        loss_mask = margins < -push_threshold
+        push_mask = ~(win_mask | loss_mask)
+
+        outcome_counts = {
+            "win": int(np.count_nonzero(win_mask)),
+            "loss": int(np.count_nonzero(loss_mask)),
+            "push": int(np.count_nonzero(push_mask)),
+        }
+        win_scores = margins[win_mask].tolist()
+        loss_scores = margins[loss_mask].tolist()
+        push_scores = margins[push_mask].tolist()
 
         outcome_distribution = {
             key: round(count / float(iteration_count), 4)
