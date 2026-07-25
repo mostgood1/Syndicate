@@ -5527,7 +5527,39 @@ def build_mlb_market_board(selected_date: str) -> dict[str, Any]:
     renders (source_cards_api_payload/build_cards_page_context) -- this is
     not a new data source, just a new way of presenting what is already
     there.
+
+    Cached on the same wall-clock-TTL + artifact-signature key the rest of
+    this module uses. Added 2026-07-25 after this call OOM-killed the 2GB
+    refresh-worker: live_refresh_loop's MLB sim gate reaches it every tick
+    via mlb_needs_resim_game_pks (join-mismatch detection), which meant a
+    full board assembly -- cards page context, pitcher/hitter snapshot
+    market lines, live-lens report, odds history, then a per-game inventory
+    loop -- ran on the worker's main loop concurrently with the intelligence
+    pipeline's own candidate-pool build in a background thread. The two
+    together exceeded the container. Nothing about that gate needs a freshly
+    assembled board every 30 seconds.
     """
+    today_iso = central_today_iso()
+    cache_key = None
+    if selected_date == today_iso:
+        # Deliberately keyed on the daily-summary signature ONLY, not also on
+        # live_lens_report_path's the way the sibling caches in this module
+        # are. Measured 2026-07-25: that file is stable while idle but is
+        # rewritten by this very build (via _mlb_live_lens_report), so
+        # including it makes every call invalidate the entry it just wrote --
+        # a cache that can never hit. The daily summary is written by the sim,
+        # not by this function, so it is a safe invalidation input. Staleness
+        # is otherwise bounded by _today_cache_bucket()'s 60s TTL, which is
+        # far tighter than the every-30s rebuild this replaces.
+        cache_key = (
+            "mlb_market_board",
+            selected_date,
+            _today_cache_bucket(),
+            _path_cache_signature(daily_artifact_path(selected_date)),
+        )
+        cached_board = _today_cache_get(cache_key)
+        if cached_board is not None:
+            return cached_board
     context = build_cards_page_context(selected_date)
     payload = source_cards_api_payload(dict(context))
     games = payload.get("games") if isinstance(payload.get("games"), list) else []
@@ -5607,10 +5639,13 @@ def build_mlb_market_board(selected_date: str) -> dict[str, Any]:
             }
         )
 
-    return {
+    board = {
         "date": selected_date,
         "games": board_games,
     }
+    if cache_key is not None:
+        _today_cache_put(cache_key, board)
+    return board
 
 
 def mlb_needs_resim_game_pks(selected_date: str) -> list[str]:
