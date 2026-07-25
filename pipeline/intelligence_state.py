@@ -2174,6 +2174,17 @@ class IntelligenceStateService:
 
         candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
         candidate_pool_count = int(candidate_pool.get("candidate_count") or 0)
+        # 2026-07-25: everything below this point (through the final return)
+        # was only ever traced via logger.info/_log_stage_timing -- confirmed
+        # those calls never reach Render's log collector for this process
+        # (zero occurrences across hours of pulled logs, unlike the plain
+        # print() checkpoints elsewhere in this file, which always show up).
+        # That made this whole stretch invisible: _build_candidate_pool's own
+        # post_pool_assembled print was firing, but nothing downstream of it
+        # ever printed again, so a hang or slow spot here was indistinguishable
+        # from one anywhere else in the function. Bounding it with plain
+        # prints to find out which part it actually is.
+        print(f"[intelligence_state] CANDIDATE_POOL_READY count={candidate_pool_count}", flush=True)
         if candidate_pool_count <= 0 and selected_date == central_today_iso():
             rollover_date = _next_supported_intelligence_date(selected_date)
             if rollover_date and rollover_date != selected_date:
@@ -2202,8 +2213,10 @@ class IntelligenceStateService:
 
         logger.info("BETTING_BOARD_PUBLISH_DATE", extra={"requested_date": str(payload.get("date") or payload.get("selected_date") or "").strip() or None, "selected_date": selected_date, "candidate_count": candidate_pool_count})
         candidates = [self._serialize_candidate(candidate) for candidate in candidate_pool.get("candidates") if isinstance(candidate, Mapping)]
+        print(f"[intelligence_state] CANDIDATES_SERIALIZED count={len(candidates)}", flush=True)
 
         ranked_candidates = _profile_stage("candidate_scoring", _balanced_recommendation_order, candidates)
+        print(f"[intelligence_state] CANDIDATES_RANKED count={len(ranked_candidates)}", flush=True)
         if ranked_candidates:
             top_candidates = [dict(candidate) for candidate in ranked_candidates if isinstance(candidate, Mapping)]
         elif candidates:
@@ -2249,7 +2262,9 @@ class IntelligenceStateService:
             "snapshot_generated_at": response_last_updated,
             "candidate_count": response_candidate_count,
         }
+        print("[intelligence_state] BUILDING_BOARD_CONTRACT", flush=True)
         response["board_contract"] = build_intelligence_board_contract(response)
+        print("[intelligence_state] BUILDING_LIVE_PIPELINE_SUMMARY", flush=True)
         response["live_pipeline"] = self._live_pipeline_summary(
             candidate_pool=candidate_pool,
             candidates=candidates,
@@ -2262,6 +2277,7 @@ class IntelligenceStateService:
         response = _decorate_response_with_state_meta(dict(response), None, source="worker", run_key=cache_key, sla_seconds=self._interval_seconds) or dict(response)
         _log_stage_timing("board_publication", (time.perf_counter() - request_started_at) * 1000.0)
         logger.info("BETTING_BOARD_PUBLISH_COMPLETE", extra={"selected_date": selected_date, "candidate_count": response_candidate_count, "snapshot_generated_at": response_last_updated})
+        print(f"[intelligence_state] BOARD_PUBLICATION_RESPONSE_READY candidate_count={response_candidate_count}", flush=True)
         return response
 
     def _build_intelligence_board_state(self, selected_date: str | None) -> dict[str, Any]:
