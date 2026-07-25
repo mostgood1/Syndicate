@@ -20,7 +20,7 @@ Conventions:
 | # | Item | Notes |
 |---|---|---|
 | **25** | Phase 0 fail-closed refresh guard + atomic writes | Fixes candidate swings, look-ahead interval violations (#24) and duplicate sweeps (#20) at once. Same bug family as #43. |
-| **15** | Tier odds refresh cadence by volatility | ⚠️ **The premise needs rechecking — see the measurement below.** First live reading from #14 (2026-07-25T18:17Z): `remaining` **13,920,988** + `used` **1,079,012** = exactly **15,000,000**, which reads as a **15M quota, not 5M**. If that holds, "6.3M/month vs a 5M budget" is not an overrun at all and this whole workstream drops in priority. Confirm the billing-period boundary and get a real burn rate from `/api/ops/oddsapi/quota` before doing any cadence work. |
+| **15** | Tier odds refresh cadence by volatility | Biggest quota lever. **Target is 5M.** The plan currently reads 15M (`remaining` 13,920,988 + `used` 1,079,012 = 15,000,000, measured 2026-07-25T18:17Z) — but that 15M is *remediation for a real prior overage*, not headroom, and the goal is to cut burn enough to **downgrade back to 5M and stay there**. Tier: game lines 60s, props 5–10min, alternates/innings 15–30min. Use `/api/ops/oddsapi/quota` to verify the reduction actually lands under 5M rather than assuming it. |
 
 ## In progress
 
@@ -69,13 +69,14 @@ Conventions:
 
 ## OddsAPI budget (after #14/#15)
 
-> ⚠️ **Recheck the premise for this entire section before working any of it.**
-> The first live quota reading (2026-07-25) suggests a **15M** quota with ~1.08M
-> used, not the 5M these items were scoped against. #16–#22 are all
-> credit-conservation work justified by an assumed overrun. If there is no
-> overrun, most of them are optimisations rather than fixes, and #19 (cap soccer
-> props) in particular is what currently gates enabling #44b. Get a burn rate
-> from `/api/ops/oddsapi/quota` first.
+> **These are required work, not optimisations. The target is 5M.**
+> The plan currently reads 15M, but it was bumped to 15M *because of a real
+> prior overage* — it is remediation, and the objective is to cut burn enough to
+> **downgrade back to 5M**. Do not read the current 13.9M remaining as headroom.
+> Measure each reduction against `/api/ops/oddsapi/quota` so the downgrade is
+> made on evidence rather than on a projection that has already been wrong once.
+> #19 (cap soccer props, ~2,400 credits/sweep) also gates enabling #44b, which
+> forces cache-bypassed soccer refreshes and should stay dark until burn fits 5M.
 
 **16** audit which of the 27 MLB game markets the board renders · **17** MLB core
 game lines → slate endpoint (3 credits vs 45) · **18** NCAAF 4 regions → 1 (pure 4×
