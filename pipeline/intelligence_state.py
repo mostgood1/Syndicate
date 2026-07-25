@@ -419,13 +419,61 @@ def _pipeline_row_counts(rows: list[dict[str, Any]] | list[Mapping[str, Any]] | 
     }
 
 
+def _item_latest_timestamp(item: Mapping[str, Any] | None) -> datetime | None:
+    # Local port of syndicate.blueprints.intelligence._response_item_latest_timestamp.
+    # _latest_item_timestamp below called that name directly without ever
+    # importing it -- a NameError that only fires when the row list is
+    # non-empty, i.e. exactly when the board has live games/props to
+    # summarize. Confirmed live 2026-07-25 as the exception that failed
+    # every board publication and (via _background_loop's silent except)
+    # replaced a fully computed board with an empty one. Defined here rather
+    # than imported because syndicate.blueprints.intelligence imports this
+    # module, so importing it back would be circular.
+    current = dict(item or {})
+    candidates: list[str] = []
+    for key in ("last_updated", "updated_at", "computed_at", "latestComputedAt", "timestamp", "generated_at", "odds_refreshed_at"):
+        value = str(current.get(key) or "").strip()
+        if value:
+            candidates.append(value)
+
+    movement = current.get("movement") if isinstance(current.get("movement"), Mapping) else None
+    if isinstance(movement, Mapping):
+        for key in ("last_updated", "updated_at", "computed_at", "timestamp", "generated_at"):
+            value = str(movement.get(key) or "").strip()
+            if value:
+                candidates.append(value)
+
+    movement_history = current.get("movement_history") if isinstance(current.get("movement_history"), list) else None
+    if isinstance(movement_history, list) and movement_history:
+        tail = movement_history[-1] if isinstance(movement_history[-1], Mapping) else None
+        if isinstance(tail, Mapping):
+            for key in ("timestamp", "last_updated", "updated_at", "computed_at", "generated_at"):
+                value = str(tail.get(key) or "").strip()
+                if value:
+                    candidates.append(value)
+
+    parsed_values: list[datetime] = []
+    for raw_value in candidates:
+        normalized = raw_value.replace("Z", "+00:00")
+        try:
+            parsed = datetime.fromisoformat(normalized)
+        except Exception:
+            continue
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        parsed_values.append(parsed.astimezone(timezone.utc))
+    if not parsed_values:
+        return None
+    return max(parsed_values)
+
+
 def _latest_item_timestamp(rows: list[dict[str, Any]] | list[Mapping[str, Any]] | None) -> str | None:
     latest_timestamp = None
     latest_epoch = -1.0
     for row in rows or []:
         if not isinstance(row, Mapping):
             continue
-        timestamp_value = _response_item_latest_timestamp(dict(row))
+        timestamp_value = _item_latest_timestamp(row)
         if timestamp_value is None:
             continue
         try:
