@@ -5193,6 +5193,8 @@ def _apply_advanced_context_to_candidates(
     candidates: list[dict[str, Any]],
     advanced_by_sport: dict[str, list[dict[str, Any]]],
     preferences: dict[str, Any],
+    *,
+    odds_payload_cache: dict[tuple[str, str], dict[str, Any] | None] | None = None,
 ) -> None:
     # build_simulation_engine_context_from_candidate falls back to its own
     # build_market_features() call when a candidate doesn't already carry
@@ -5202,8 +5204,12 @@ def _apply_advanced_context_to_candidates(
     # re-parses the sport's whole odds-history shard payload from disk once
     # per candidate, same bug shape as the filter_candidates/rank_recommendations
     # fix -- confirmed in production 2026-07-24 as a major contributor to this
-    # loop's ~1.3s/candidate cost, on top of the simulation itself.
-    odds_payload_cache: dict[tuple[str, str], dict[str, Any] | None] = {}
+    # loop's ~1.3s/candidate cost, on top of the simulation itself. Caller
+    # (score_candidate, via _score_candidates) passes a batch-scoped cache --
+    # this function is invoked once PER CANDIDATE (a single-item list each
+    # time), so a cache created here would never be reused across candidates.
+    if odds_payload_cache is None:
+        odds_payload_cache = {}
     for candidate in candidates:
         sport_slug = _safe_text(candidate.get("sport_slug"), "sport").lower()
         advanced_context = advanced_by_sport.get(sport_slug, [])
@@ -6927,6 +6933,7 @@ def score_candidate(
     advanced_context: list[dict[str, Any]] | None = None,
     mlb_actual_cache: dict[int, dict[str, Any] | None] | None = None,
     mlb_live_lens_cache: dict[str, dict[str, Any] | None] | None = None,
+    odds_payload_cache: dict[tuple[str, str], dict[str, Any] | None] | None = None,
 ) -> dict[str, Any]:
     scored_candidate, rejection_reason = _classify_candidate_with_reason(candidate)
     if scored_candidate is None:
@@ -6967,7 +6974,7 @@ def score_candidate(
     advanced_by_sport = {
         _safe_text(scored_candidate.get("sport_slug"), "sport").lower(): [dict(item) for item in (advanced_context or []) if isinstance(item, dict)]
     }
-    _apply_advanced_context_to_candidates([scored_candidate], advanced_by_sport, preferences or {})
+    _apply_advanced_context_to_candidates([scored_candidate], advanced_by_sport, preferences or {}, odds_payload_cache=odds_payload_cache)
     readiness_bonus = 0.0
     if advanced_context and _safe_text(scored_candidate.get("sport_slug"), "").lower() == "mlb":
         readiness = scored_candidate.get("advanced_gate") if isinstance(scored_candidate.get("advanced_gate"), dict) else {}
@@ -7014,6 +7021,14 @@ def _score_candidates(
     # disk once per scoring pass instead of once per candidate.
     mlb_actual_cache: dict[int, dict[str, Any] | None] = {}
     mlb_live_lens_cache: dict[str, dict[str, Any] | None] = {}
+    # Same batch-scoped sharing for the odds-history shard payload
+    # score_candidate's simulation-context build reads per candidate --
+    # confirmed in production 2026-07-24 that scoping this cache one level
+    # too low (inside _apply_advanced_context_to_candidates, which
+    # score_candidate calls with a fresh single-item list every time) made it
+    # a no-op: a cache that's recreated before every single candidate never
+    # gets reused across candidates, so it must be created here instead.
+    odds_payload_cache: dict[tuple[str, str], dict[str, Any] | None] = {}
     for candidate in candidates:
         scored_candidate = score_candidate(
             candidate,
@@ -7021,6 +7036,7 @@ def _score_candidates(
             advanced_context=advanced_by_sport.get(_safe_text(candidate.get("sport_slug"), "sport").lower(), []),
             mlb_actual_cache=mlb_actual_cache,
             mlb_live_lens_cache=mlb_live_lens_cache,
+            odds_payload_cache=odds_payload_cache,
         )
         if not is_valid_candidate(scored_candidate):
             continue
