@@ -277,13 +277,17 @@ class PullHotArtifactClientTests(unittest.TestCase):
 
             self.assertEqual(mocked_urlopen.call_count, 2)
             requested_urls = {call.args[0].full_url for call in mocked_urlopen.call_args_list}
+            # Every request now carries a since= floor: "no watermark" used to
+            # mean an unbounded pull, which is what OOM-looped the worker on
+            # 2026-07-25. Assert the pattern scoping, ignore the epoch value.
             self.assertEqual(
-                requested_urls,
+                {url.split("&since=")[0] for url in requested_urls},
                 {
                     "https://syndicate.onrender.com/api/ops/artifacts/export?pattern=%2A2026-07-20%2A",
                     "https://syndicate.onrender.com/api/ops/artifacts/export?pattern=%2A2026_07_20%2A",
                 },
             )
+            self.assertTrue(all("since=" in url for url in requested_urls))
 
     def test_date_glob_patterns_cover_both_separator_styles(self) -> None:
         import fnmatch
@@ -320,7 +324,11 @@ class PullHotArtifactClientTests(unittest.TestCase):
                     pull_hot_artifacts()
 
             sent_request = mocked_urlopen.call_args.args[0]
-            self.assertEqual(sent_request.full_url, "https://syndicate.onrender.com/api/ops/artifacts/export")
+            self.assertEqual(
+                sent_request.full_url.split("?")[0],
+                "https://syndicate.onrender.com/api/ops/artifacts/export",
+            )
+            self.assertIn("since=", sent_request.full_url)
 
     def test_writes_allowlisted_artifacts_and_skips_the_rest(self) -> None:
         with TemporaryDirectory() as tmp_dir:
@@ -353,7 +361,11 @@ class PullHotArtifactClientTests(unittest.TestCase):
             self.assertEqual(written, 1)
             mocked_urlopen.assert_called_once()
             sent_request = mocked_urlopen.call_args.args[0]
-            self.assertEqual(sent_request.full_url, "https://syndicate.onrender.com/api/ops/artifacts/export")
+            self.assertEqual(
+                sent_request.full_url.split("?")[0],
+                "https://syndicate.onrender.com/api/ops/artifacts/export",
+            )
+            self.assertIn("since=", sent_request.full_url)
             self.assertEqual(sent_request.get_header("Authorization"), "Bearer secret-token")
 
             written_path = data_root / HOT_RELATIVE_PATH
@@ -386,7 +398,12 @@ class PullHotArtifactClientTests(unittest.TestCase):
                 with patch("urllib.request.urlopen", return_value=empty_response) as mocked_urlopen:
                     pull_hot_artifacts(date_str="2026-07-24")
                     first_call_url = mocked_urlopen.call_args.args[0].full_url
-                    self.assertNotIn("since=", first_call_url)
+                    # With no watermark the request now carries the bounded
+                    # window floor rather than no since= at all. "No
+                    # watermark" used to mean an unbounded pull, which is what
+                    # OOM-looped the refresh-worker on 2026-07-25.
+                    self.assertIn("since=", first_call_url)
+                    first_since = float(first_call_url.split("since=")[1])
 
                     pull_hot_artifacts(date_str="2026-07-24")
                     second_call_url = mocked_urlopen.call_args.args[0].full_url
@@ -415,8 +432,20 @@ class PullHotArtifactClientTests(unittest.TestCase):
                 with patch("urllib.request.urlopen", return_value=empty_response) as mocked_urlopen:
                     pull_hot_artifacts(date_str="2026-07-24")
                     # No watermark was recorded after the failure, so this
-                    # next pull still has nothing to advance from.
-                    self.assertNotIn("since=", mocked_urlopen.call_args.args[0].full_url)
+                    # next pull still has nothing to advance FROM -- it falls
+                    # back to the bounded window floor rather than to an
+                    # unbounded fetch, which is the whole point of the clamp.
+                    retry_url = mocked_urlopen.call_args.args[0].full_url
+                    self.assertIn("since=", retry_url)
+                    from syndicate.features.shared.artifact_publisher import _MAX_PULL_WINDOW_SECONDS
+                    import time as _time
+
+                    retry_since = float(retry_url.split("since=")[1])
+                    self.assertLessEqual(
+                        _time.time() - retry_since,
+                        _MAX_PULL_WINDOW_SECONDS + 60,
+                        "a failing pull must not be able to widen its own window without bound",
+                    )
 
     def test_concurrent_pulls_of_the_same_artifact_do_not_collide(self) -> None:
         # Confirmed live 2026-07-23: two overlapping pulls for the same
@@ -704,3 +733,57 @@ class ArtifactExportEndpointTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HotArtifactPullWindowClampTests(unittest.TestCase):
+    """2026-07-25 incident: refresh-worker OOM crash loop + cascading web 502s.
+
+    The pull window had two unbounded paths. No watermark meant "fetch
+    everything", so every deploy pulled the entire artifact set at boot. And
+    because the watermark only advances on a fully successful pull, a FAILING
+    pull left the window growing forever -- each failure made the next attempt
+    strictly heavier, so once the response exceeded what a 2GB container could
+    json.loads(), it could never get back under it.
+
+    Both sides hold the whole response in memory, so window size is peak
+    memory on two services at once.
+    """
+
+    def setUp(self) -> None:
+        from syndicate.features.shared.artifact_publisher import _MAX_PULL_WINDOW_SECONDS
+
+        self.max_window = _MAX_PULL_WINDOW_SECONDS
+        self.now = 1785000000.0
+
+    def _since(self, stored):
+        from syndicate.features.shared import artifact_publisher
+
+        payload = {} if stored is None else {"epoch": stored}
+        with patch("syndicate.features.shared.refresh_state_store.read_json_file", return_value=payload):
+            return artifact_publisher._hot_artifact_pull_since_epoch(pull_started_epoch=self.now)
+
+    def test_missing_watermark_is_bounded_not_unbounded(self) -> None:
+        self.assertEqual(self.now - self._since(None), self.max_window)
+
+    def test_zero_watermark_is_bounded(self) -> None:
+        self.assertEqual(self.now - self._since(0.0), self.max_window)
+
+    def test_stalled_watermark_cannot_widen_the_window_forever(self) -> None:
+        # The spiral: repeated failures freeze the watermark, so without a
+        # clamp each retry asks for a strictly larger window than the last.
+        ancient = self.now - (30 * 24 * 3600)
+        self.assertEqual(self.now - self._since(ancient), self.max_window)
+
+    def test_recent_watermark_is_preserved(self) -> None:
+        # The clamp must not throw away a healthy incremental window.
+        self.assertEqual(self.now - self._since(self.now - 600.0), 600.0)
+
+    def test_watermark_exactly_at_the_boundary_is_preserved(self) -> None:
+        self.assertEqual(self.now - self._since(self.now - self.max_window), self.max_window)
+
+    def test_unparseable_watermark_falls_back_to_the_bounded_floor(self) -> None:
+        from syndicate.features.shared import artifact_publisher
+
+        with patch("syndicate.features.shared.refresh_state_store.read_json_file", return_value={"epoch": "garbage"}):
+            since = artifact_publisher._hot_artifact_pull_since_epoch(pull_started_epoch=self.now)
+        self.assertEqual(self.now - since, self.max_window)

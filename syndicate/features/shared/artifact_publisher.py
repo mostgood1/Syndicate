@@ -205,13 +205,37 @@ def _hot_artifact_pull_watermark_path() -> Path:
     return reports_root() / "refresh_status" / "latest" / "hot_artifact_pull_watermark.json"
 
 
+# Hard ceiling on how far back a pull will ever reach.
+#
+# Without it this had two unbounded paths, and production hit both on
+# 2026-07-25 (refresh-worker OOM crash loop + cascading web 502s):
+#
+# 1. No watermark meant "pull everything". Every deploy boots a worker with
+#    no watermark, so every deploy pulled the entire artifact set at once.
+#    That is the single OOM seen after each deploy that day.
+# 2. The watermark only advances on a fully successful pull -- correct on its
+#    own, but it means a FAILING pull leaves the window to grow forever. Each
+#    failure makes the next attempt strictly heavier, so once the response
+#    crossed what a 2GB container could parse, it could never get back under
+#    it. That is a self-amplifying loop, not a transient.
+#
+# Both sides load the whole response in memory (the worker json.loads() it,
+# the web service builds the dict to serve it), so window size translates
+# directly into peak memory on two services at once.
+#
+# A bounded pull that succeeds beats an unbounded one that crashes: missing
+# an artifact older than this window degrades one cycle, whereas the loop
+# above pulls nothing at all and takes the worker down with it.
+_MAX_PULL_WINDOW_SECONDS = 2 * 3600
+
+
 def _hot_artifact_pull_since_epoch(*, pull_started_epoch: float) -> float | None:
     # Mirrors live_refresh_loop.py's _hot_artifact_publish_since_epoch on the
     # push side: floor = the start of the last successful pull, not each
     # call's own start time, so a slow or delayed cycle still catches
-    # everything written since the last time this actually completed. No
-    # prior watermark (fresh deploy/backend) means pull everything once,
-    # same as today's behavior, rather than guessing a cutoff.
+    # everything written since the last time this actually completed --
+    # clamped to _MAX_PULL_WINDOW_SECONDS so neither a missing watermark nor
+    # a stalled one can turn this into an unbounded fetch.
     from syndicate.features.shared.refresh_state_store import read_json_file
 
     payload = read_json_file(_hot_artifact_pull_watermark_path())
@@ -219,9 +243,10 @@ def _hot_artifact_pull_since_epoch(*, pull_started_epoch: float) -> float | None
         stored = float(payload.get("epoch")) if isinstance(payload, dict) and payload.get("epoch") is not None else None
     except (TypeError, ValueError):
         stored = None
+    window_floor = float(pull_started_epoch) - _MAX_PULL_WINDOW_SECONDS
     if stored is None or stored <= 0.0:
-        return None
-    return stored
+        return window_floor
+    return max(stored, window_floor)
 
 
 def _record_hot_artifact_pull_watermark(epoch: float) -> None:

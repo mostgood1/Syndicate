@@ -369,7 +369,22 @@ def api_ops_artifacts_export() -> Any:
 
     subset_pattern = str(request.args.get("pattern") or "").strip().replace("\\", "/")
     artifacts: dict[str, str] = {}
+    # Hard byte ceiling on one response (#50). This handler accumulates whole
+    # file contents into a dict and serialises it, so an unbounded matched set
+    # is unbounded memory on a 2GB web instance -- and the client
+    # (artifact_publisher) json.loads() the whole thing, so it is unbounded on
+    # the worker too. On 2026-07-25 that combination produced a refresh-worker
+    # OOM crash loop and cascading web 502s that took every route down.
+    #
+    # Truncation is REPORTED, never silent: the puller only advances its
+    # watermark on a complete response, so a caller that cannot see it was
+    # truncated would skip the remainder forever.
+    budget_bytes = _artifact_export_budget_bytes()
+    total_bytes = 0
+    truncated = False
     for pattern in HOT_ARTIFACT_PATTERNS:
+        if truncated:
+            break
         for path in root.glob(pattern):
             if not path.is_file():
                 continue
@@ -379,12 +394,37 @@ def api_ops_artifacts_export() -> Any:
             if subset_pattern and not fnmatch.fnmatch(relative_path, subset_pattern):
                 continue
             try:
-                if since_epoch is not None and path.stat().st_mtime < since_epoch:
+                stat = path.stat()
+                if since_epoch is not None and stat.st_mtime < since_epoch:
                     continue
+                if total_bytes + stat.st_size > budget_bytes and artifacts:
+                    # Stop before reading, not after -- reading it is the
+                    # memory we are trying not to spend.
+                    truncated = True
+                    break
                 artifacts[relative_path] = path.read_text(encoding="utf-8")
+                total_bytes += stat.st_size
             except Exception:
                 continue
-    return jsonify({"ok": True, "count": len(artifacts), "artifacts": artifacts})
+    return jsonify({
+        "ok": True,
+        "count": len(artifacts),
+        "truncated": truncated,
+        "bytes": total_bytes,
+        "artifacts": artifacts,
+    })
+
+
+def _artifact_export_budget_bytes() -> int:
+    # 24MB default: comfortably above a normal incremental pull (the
+    # watermark keeps those small) and far below what put a 2GB instance
+    # near its ceiling. Tunable without a deploy during an incident.
+    raw = str(os.environ.get("SYNDICATE_ARTIFACT_EXPORT_MAX_BYTES") or "").strip()
+    try:
+        value = int(raw or 24 * 1024 * 1024)
+    except ValueError:
+        value = 24 * 1024 * 1024
+    return max(1024 * 1024, value)
 
 
 @ops_bp.get("/api/ops/oddsapi/quota")
