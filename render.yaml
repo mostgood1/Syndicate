@@ -301,8 +301,22 @@ services:
         value: "30"
       - key: GUNICORN_KEEPALIVE
         value: "5"
+      # DISABLED 2026-07-25 to stop an OOM crash loop, and left disabled here
+      # so a blueprint re-apply cannot silently restart it. See #57.
+      #
+      # This is a CAPACITY problem, not a scheduling one. Once MLB games went
+      # live the board build alone exceeded the 2GB container: measured ~700MB
+      # idle spiking past 1479MB on pipeline ticks, and it OOM-looped every
+      # 15-30s with the MLB sim confirmed deferring and never launching. The
+      # #55 sim/pipeline alternation is correct and still needed, but it does
+      # not help when one side alone does not fit.
+      #
+      # Consequence while disabled: nothing recomputes the board on a worker.
+      # The web service persists intelligence state on its REQUEST path (its
+      # own copy of this flag is false), so the board still updates -- on
+      # request, slower, and under the health-check pressure of #56.
       - key: SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP
-        value: "true"
+        value: "false"
       - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
         value: "false"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS
