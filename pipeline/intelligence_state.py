@@ -1593,9 +1593,20 @@ class IntelligenceStateService:
             except RuntimeError:
                 overview = None
         if overview is None:
-            overview = _profile_stage("data_ingestion", build_intelligence_status, selected_date=selected_date)
-            if isinstance(overview, dict):
-                overview = overview.get("sports") if isinstance(overview.get("sports"), list) else []
+            # Was build_intelligence_status(...) with only .get("sports")
+            # ever used from its return -- confirmed root cause of today's
+            # OOM crashes: refresh-worker never has self._app set (see
+            # start_intelligence_state_background_loop() call in
+            # scripts/run_refresh_worker.py, no app passed), so this branch
+            # runs on every single cycle. build_intelligence_status wraps
+            # build_intelligence_overview and then does a second full
+            # per-sport pass (tracked/advanced summary counts, calling
+            # _advanced_input_rows_for_sport again, plus readiness_gate and
+            # a simulation-contract file read) -- all of it computed and
+            # immediately discarded here, since only the flat sports list
+            # was ever read. Calling build_intelligence_overview directly
+            # skips that entire redundant pass.
+            overview = _profile_stage("data_ingestion", build_intelligence_overview, selected_date=selected_date, force_refresh=True)
             if not isinstance(overview, list):
                 overview = []
         _diag_log_all_process_memory("post_build_overview")

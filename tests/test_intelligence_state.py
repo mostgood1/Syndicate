@@ -2603,7 +2603,11 @@ class IntelligenceStateTests(unittest.TestCase):
             )
 
             with patch("pipeline.intelligence_state.reports_root", return_value=reports_root):
-                with patch("pipeline.intelligence_state.build_intelligence_status", return_value=status):
+                # _build_candidate_pool's overview fallback now calls
+                # build_intelligence_overview directly instead of
+                # build_intelligence_status (only .get("sports") was ever
+                # read from the latter -- see the comment at that call site).
+                with patch("pipeline.intelligence_state.build_intelligence_overview", return_value=status["sports"]):
                     with patch(
                         "syndicate.features.intelligence.collect_all_recommendations",
                         return_value=[
@@ -2687,7 +2691,11 @@ class IntelligenceStateTests(unittest.TestCase):
             )
 
             with patch("pipeline.intelligence_state.reports_root", return_value=reports_root):
-                with patch("pipeline.intelligence_state.build_intelligence_status", return_value=status):
+                # See the matching comment in
+                # test_build_candidate_pool_skips_sports_without_manifests --
+                # _build_candidate_pool's overview fallback now calls
+                # build_intelligence_overview directly.
+                with patch("pipeline.intelligence_state.build_intelligence_overview", return_value=status["sports"]):
                     with patch(
                         "syndicate.features.intelligence.collect_all_recommendations",
                         return_value=[{"name": "MLB Play", "sport": "MLB", "market": "Hits", "score": 91.0}],
