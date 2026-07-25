@@ -1158,7 +1158,45 @@ def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any
 	else:
 		changed_game_pks = sorted(game_pk for game_pk, current_hash in current_fingerprints.items() if stored_fingerprints.get(game_pk) != current_hash)
 
-	join_mismatch_game_pks = _mlb_join_mismatch_game_pks(date_str)
+	# _mlb_join_mismatch_game_pks -> mlb_needs_resim_game_pks ->
+	# build_mlb_market_board is a FULL market board build. Confirmed live
+	# 2026-07-25: with the trigger enabled this ran on the worker's main loop
+	# every sim tick, concurrently with the intelligence pipeline's own
+	# _build_candidate_pool in its background thread, and OOM-killed the 2GB
+	# container in ~14 seconds -- 355MB to dead, with the sim subprocess never
+	# even launching. Two guards, cheapest first:
+	#
+	# 1. Short-circuit. If the fingerprint diff already found work, we are
+	#    simming this tick regardless; the join-mismatch signal can only add
+	#    games to a set we are already going to process. Deferring it to a
+	#    later tick costs at most one interval of latency on a secondary
+	#    trigger, and skips the expensive build entirely on exactly the ticks
+	#    where the container is about to get busy.
+	# 2. Memory gate. On a quiet slate (no fingerprint change) this still runs
+	#    every tick, so gate the build itself on real headroom rather than
+	#    only gating the sim launch further up -- that earlier gate measured
+	#    ~1.7GB free and passed, because the blowup is here, after it.
+	# NOTE: this is a PARTIAL mitigation, not the fix. Skipping the build when
+	# headroom is already low helps only when the container is visibly close
+	# to the limit; it cannot stop the failure actually observed, where the
+	# build itself allocated from 355MB to past 2048MB in ~14 seconds -- any
+	# pre-flight measurement passes comfortably right before that. The real
+	# fix is to stop doing a full market board build on the main loop at all
+	# (cache it, or derive the join-mismatch signal from an artifact the board
+	# build already persists). Tracked in #23; deliberately not attempted here
+	# because the obvious short-circuit (skip when changed_game_pks is already
+	# non-empty) silently drops join-mismatch games from the merged set, which
+	# test_mlb_daily_sim_decision_merges_fingerprint_and_join_mismatch_game_pks
+	# exists to prevent.
+	join_mismatch_game_pks = []
+	join_headroom = _mlb_sim_memory_headroom_snapshot()
+	if join_headroom is not None and not join_headroom.get("sufficient", True):
+		print(
+			f"[live_refresh_loop] MLB_JOIN_MISMATCH_CHECK_SKIPPED reason=insufficient_memory_headroom {json.dumps(join_headroom, sort_keys=True)}",
+			flush=True,
+		)
+	else:
+		join_mismatch_game_pks = _mlb_join_mismatch_game_pks(date_str)
 
 	if changed_game_pks or join_mismatch_game_pks:
 		_record_mlb_sim_check(now_epoch, date_str, current_fingerprints, launched=True)
