@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
+import syndicate.blueprints.home as home_module
 from syndicate.app import create_app
 from syndicate.blueprints.home import _build_game_watch_row
 from syndicate.blueprints.home import _home_prop_hero_metrics
@@ -1154,3 +1156,57 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HomeCacheBoundingTests(unittest.TestCase):
+    """The home overview/payload caches were plain dicts that were only ever
+    read from and written to -- nothing removed an entry, ever.
+
+    _HOME_OVERVIEW_TTL_SEC reads like a bound but is not one: it only decides
+    whether an entry may be SERVED. Expired entries stayed resident and fresh
+    ones were written alongside them, so the dicts grew for the life of the
+    process, keyed by (sport, date) plus a ":skip_hydration" variant -- each
+    value a fully hydrated sport overview. That is the retention shape behind
+    the 2026-07-25 worker OOM: ~700MB idle early, past 1479MB later the same
+    day.
+    """
+
+    def _cache(self, entries):
+        return OrderedDict(entries)
+
+    def test_expired_entries_are_reclaimed_not_just_ignored(self) -> None:
+        cache = self._cache([("stale", (0.0, {"a": 1})), ("fresh", (1000.0, {"b": 2}))])
+        home_module._prune_home_cache(cache, now=1000.0)
+        self.assertEqual(list(cache.keys()), ["fresh"])
+
+    def test_entry_count_is_capped(self) -> None:
+        cache = self._cache([(f"k{i}", (1000.0, {"i": i})) for i in range(100)])
+        home_module._prune_home_cache(cache, now=1000.0)
+        self.assertEqual(len(cache), home_module._HOME_CACHE_MAX_ENTRIES)
+
+    def test_eviction_is_oldest_first(self) -> None:
+        cache = self._cache([(f"k{i}", (1000.0, {"i": i})) for i in range(40)])
+        home_module._prune_home_cache(cache, now=1000.0)
+        self.assertNotIn("k0", cache)
+        self.assertIn("k39", cache)
+
+    def test_a_key_that_is_never_read_again_still_gets_reclaimed(self) -> None:
+        # The leak's actual shape: yesterday's date, or a sport that went out
+        # of season, is never requested again -- so a read-time-only sweep
+        # could never reclaim exactly the entries that leak.
+        cache = self._cache([("yesterday:mlb", (0.0, {"big": "payload"}))])
+        home_module._prune_home_cache(cache, now=5000.0)
+        self.assertEqual(len(cache), 0)
+
+    def test_fresh_entries_within_ttl_survive(self) -> None:
+        # Bounding must not defeat the cache: entries inside the TTL stay.
+        now = 1000.0
+        cache = self._cache([("a", (now, {"x": 1})), ("b", (now - 1.0, {"x": 2}))])
+        home_module._prune_home_cache(cache, now=now)
+        self.assertEqual(sorted(cache.keys()), ["a", "b"])
+
+    def test_player_id_index_cache_is_left_unbounded_on_purpose(self) -> None:
+        # Keyed by sport slug, populated only for nba/wnba, and intentionally
+        # permanent -- an ID lookup index, not hydrated game state.
+        self.assertIsInstance(home_module._BASKETBALL_PLAYER_ID_CACHE, dict)
+        self.assertNotIsInstance(home_module._BASKETBALL_PLAYER_ID_CACHE, OrderedDict)

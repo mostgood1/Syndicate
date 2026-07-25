@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import csv
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import wait as _futures_wait
 from datetime import date
@@ -65,9 +66,52 @@ home_bp = Blueprint("syndicate_home", __name__)
 _LOGGER = logging.getLogger(__name__)
 
 _HOME_OVERVIEW_TTL_SEC = 10.0
-_HOME_OVERVIEW_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
-_HOME_PAYLOAD_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+
+# These two were plain dicts that were only ever READ FROM and WRITTEN TO --
+# nothing ever removed an entry. The 10s TTL above reads like a bound but is
+# not one: it only decides whether a cached entry may be *served*. An expired
+# entry was left in place and a fresh one written alongside it, so the dicts
+# grew monotonically for the life of the process, keyed by (sport, date) plus
+# a ":skip_hydration" variant.
+#
+# Each retained value is a fully hydrated sport overview -- the same payload
+# _build_sport_overview's docstring describes as "large enough to exceed the
+# container's 2GB memory limit within one call". That is the shape seen in
+# production on 2026-07-25: a worker that idled ~700MB early and spiked past
+# 1479MB later in the day, degrading as it ran rather than failing outright.
+#
+# OrderedDict + explicit pruning so the TTL now actually reclaims, and a hard
+# ceiling caps the worst case. Sized generously: 7 sports x 2 hydration
+# variants is 14 live keys, so 32 leaves room for a date rollover in flight
+# without ever being unbounded.
+_HOME_CACHE_MAX_ENTRIES = 32
+_HOME_OVERVIEW_CACHE: "OrderedDict[str, tuple[float, dict[str, Any]]]" = OrderedDict()
+_HOME_PAYLOAD_CACHE: "OrderedDict[str, tuple[float, dict[str, Any]]]" = OrderedDict()
+
+# Deliberately NOT bounded: keyed by sport slug and only ever populated for
+# nba/wnba, so it tops out at two entries and is intentionally permanent (no
+# TTL) -- it is an ID lookup index, not hydrated game state.
 _BASKETBALL_PLAYER_ID_CACHE: dict[str, dict[tuple[str, str], int]] = {}
+
+
+def _prune_home_cache(
+    cache: "OrderedDict[str, tuple[float, dict[str, Any]]]",
+    *,
+    now: float,
+    ttl: float = _HOME_OVERVIEW_TTL_SEC,
+    max_entries: int = _HOME_CACHE_MAX_ENTRIES,
+) -> None:
+    """Drop expired entries, then oldest-first down to the ceiling.
+
+    Called on write rather than on read: a key that stops being requested
+    (yesterday's date, a sport that went out of season) would never be read
+    again, so a read-time-only sweep could never reclaim exactly the entries
+    that leak.
+    """
+    for key in [key for key, (stamp, _) in cache.items() if (now - stamp) >= ttl]:
+        cache.pop(key, None)
+    while len(cache) > max_entries:
+        cache.popitem(last=False)
 
 
 def _home_selected_date(selected_date: str | None = None) -> str:
@@ -5472,7 +5516,10 @@ def _build_sport_overview(
         )
     overview["data_warnings"] = data_warnings
     overview["data_health"] = "healthy" if not data_warnings else ("stale" if active_today and active_game_count <= 0 else "partial")
-    _HOME_OVERVIEW_CACHE[cache_key] = (time.monotonic(), overview)
+    stamped_at = time.monotonic()
+    _HOME_OVERVIEW_CACHE[cache_key] = (stamped_at, overview)
+    _HOME_OVERVIEW_CACHE.move_to_end(cache_key)
+    _prune_home_cache(_HOME_OVERVIEW_CACHE, now=stamped_at)
     return dict(overview)
 
 
@@ -5566,7 +5613,10 @@ def _home_payload(*, selected_date: str | None = None, cached_only: bool = False
         "html": render_template("shared/_home_dashboard.html", sports=overview, dashboard=dashboard),
         "polled_at": polled_at,
     }
-    _HOME_PAYLOAD_CACHE[cache_key] = (time.monotonic(), payload)
+    stamped_at = time.monotonic()
+    _HOME_PAYLOAD_CACHE[cache_key] = (stamped_at, payload)
+    _HOME_PAYLOAD_CACHE.move_to_end(cache_key)
+    _prune_home_cache(_HOME_PAYLOAD_CACHE, now=stamped_at)
     return dict(payload)
 
 
