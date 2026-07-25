@@ -69,14 +69,22 @@ Conventions:
 
 ## OddsAPI budget (after #14/#15)
 
-> **Measured burn, 2026-07-25T18:21Z** (first real reading, from #14):
-> 525 credits in a 235s window → **8,042 credits/hour → ~5.79M/30d, against a 5M
-> target.** Confirms the overage is real and the original ~6.3M estimate was
-> roughly right. Two caveats that both point the same way: the window is only
-> ~4 minutes (fragile extrapolation), and this was a *quiet* slate — WNBA-only
-> observations, MLB's slate largely done, NFL/NCAAF/NCAAB out of season. Busy-day
-> burn is very likely **higher** than 5.79M, so treat this as a floor.
-> Needs ≥14% reduction on a light day, more on a heavy one.
+> **Measured burn — DO NOT act on a short window.** Two readings, same day:
+>
+> | Window | Burned | /hour | Projected 30d |
+> |---|---|---|---|
+> | 235s (2 obs) | 525 | 8,042 | **5.79M** |
+> | 855s (7 obs) | 525 | 2,210 | **1.59M** |
+>
+> Same 525 credits — the later calls were free `/events` requests, so the short
+> window extrapolated one burst across a month and overstated by ~3.6×. Neither
+> number is trustworthy yet, and the swing itself is the lesson: **let the window
+> run for at least a full day before sizing anything against it.**
+>
+> Both readings are also unrepresentative: WNBA-only observations on an All-Star
+> day (one game), MLB's slate winding down, NFL/NCAAF/NCAAB out of season, and
+> only 3 of ~8 fetchers instrumented. Wire the rest (#14 remainder) and re-read
+> on a busy slate before deciding whether the 5M downgrade is safe.
 >
 > **These are required work, not optimisations. The target is 5M.**
 > The plan currently reads 15M, but it was bumped to 15M *because of a real
