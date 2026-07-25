@@ -5983,6 +5983,51 @@ def main() -> int:
     outputs: List[Dict[str, Any]] = []
     failures: List[Dict[str, Any]] = []
 
+    # (idx, summary_row) pairs, kept separately from `outputs` so a scoped
+    # (--only-game-pks) run can still contribute rows for the games it
+    # deliberately skipped. Before this existed, non-targeted games hit the
+    # `continue` in the preserve branch below BEFORE outputs.append(record),
+    # so summary["outputs"] came out containing only the targeted games --
+    # and syndicate/features/mlb/cards.py builds the entire MLB board from
+    # that key, so every lineup/injury-driven scoped resim silently dropped
+    # the rest of the slate off the board until the next full-slate run.
+    # Storing the summary ROW (small) rather than the whole sim record (which
+    # carries pbp + boxscore) keeps the memory cost of covering the full slate
+    # negligible, which matters on the 2GB worker.
+    summary_rows: List[Tuple[int, Dict[str, Any]]] = []
+
+    def _summary_segment_row(segment: Any) -> Dict[str, Any]:
+        seg = segment if isinstance(segment, dict) else {}
+        return {
+            "home_win_prob": seg.get("home_win_prob"),
+            "away_win_prob": seg.get("away_win_prob"),
+            "tie_prob": seg.get("tie_prob"),
+            "away_runs_mean": seg.get("away_runs_mean"),
+            "home_runs_mean": seg.get("home_runs_mean"),
+            "total_runs_dist": dict(seg.get("total_runs_dist") or {}),
+            "run_margin_dist": dict(seg.get("run_margin_dist") or {}),
+        }
+
+    def _daily_summary_row(o: Dict[str, Any]) -> Dict[str, Any]:
+        sim_obj = o.get("sim") or {}
+        segments = sim_obj.get("segments", {}) if isinstance(sim_obj, dict) else {}
+        return {
+            "game_pk": o.get("game_pk"),
+            "double_header": (o.get("schedule") or {}).get("double_header"),
+            "game_number": (o.get("schedule") or {}).get("game_number"),
+            "away": (o.get("away") or {}).get("abbreviation"),
+            "home": (o.get("home") or {}).get("abbreviation"),
+            "starter_names": o.get("starter_names"),
+            "full": _summary_segment_row(segments.get("full")),
+            "first1": _summary_segment_row(segments.get("first1")),
+            "first5": _summary_segment_row(segments.get("first5")),
+            "first3": _summary_segment_row(segments.get("first3")),
+            "hitter_hr_likelihood_all": sim_obj.get("hitter_hr_likelihood_all"),
+            "hitter_hr_likelihood_topn": sim_obj.get("hitter_hr_likelihood_topn"),
+            "hitter_props_likelihood_topn": sim_obj.get("hitter_props_likelihood_topn"),
+            "pitcher_props": sim_obj.get("pitcher_props"),
+        }
+
     # Lineups: persist confirmed lineups + projected (last-known) fallback.
     last_known_path = (
         _resolve_path_arg(
@@ -6810,6 +6855,21 @@ def main() -> int:
                         "roster_path": _relative_path_str(roster_path),
                     }
                 )
+                # Contribute this game's existing artifacts to the summary so a
+                # scoped run still emits a FULL-slate summary. Without this the
+                # board loses every non-targeted game (see summary_rows above).
+                try:
+                    preserved_record = _load_json_if_exists(sim_path)
+                    if isinstance(preserved_record, dict) and preserved_record:
+                        summary_rows.append((int(idx), _daily_summary_row(preserved_record)))
+                    else:
+                        print(
+                            f"[{idx+1}/{len(games)}] WARNING: preserved game:{pk_label} has no readable sim artifact at {sim_path}; it will be missing from the summary."
+                        )
+                except Exception as exc:
+                    print(
+                        f"[{idx+1}/{len(games)}] WARNING: could not load preserved sim artifact for game:{pk_label} ({type(exc).__name__}: {exc}); it will be missing from the summary."
+                    )
                 continue
             print(
                 f"[{idx+1}/{len(games)}] WARNING: gamePk={game_pk} not in --only-game-pks allowlist but no adequate existing artifacts found -- simulating anyway to avoid leaving a gap in today's slate."
@@ -7754,26 +7814,21 @@ def main() -> int:
             },
         }
         outputs.append(record)
+        summary_rows.append((int(idx), _daily_summary_row(record)))
 
         _write_json(sim_path, record)
 
-    # Summary index
-    def _summary_segment(segment: Any) -> Dict[str, Any]:
-        seg = segment if isinstance(segment, dict) else {}
-        return {
-            "home_win_prob": seg.get("home_win_prob"),
-            "away_win_prob": seg.get("away_win_prob"),
-            "tie_prob": seg.get("tie_prob"),
-            "away_runs_mean": seg.get("away_runs_mean"),
-            "home_runs_mean": seg.get("home_runs_mean"),
-            "total_runs_dist": dict(seg.get("total_runs_dist") or {}),
-            "run_margin_dist": dict(seg.get("run_margin_dist") or {}),
-        }
-
+    # Summary index. Row shaping now lives in _daily_summary_row /
+    # _summary_segment_row, defined before the game loop so the preserve
+    # branch can build rows for non-resimmed games too.
     summary = {
         "date": args.date,
         "season": args.season,
-        "games": len(outputs),
+        # Count of games represented in "outputs" below, which on a scoped run
+        # includes preserved (non-resimmed) games too -- len(outputs) would
+        # report only the resimmed subset.
+        "games": len(summary_rows),
+        "games_simulated": len(outputs),
         "preserved_started_games": preserved_started_games,
         "preserved_started_games_n": int(len(preserved_started_games)),
         "preserved_non_targeted_games": preserved_non_targeted_games,
@@ -7784,25 +7839,10 @@ def main() -> int:
         "failures": failures,
         "failures_n": int(len(failures)),
         "generated_at": datetime.now().isoformat(),
-        "outputs": [
-            {
-                "game_pk": o.get("game_pk"),
-                "double_header": (o.get("schedule") or {}).get("double_header"),
-                "game_number": (o.get("schedule") or {}).get("game_number"),
-                "away": o["away"]["abbreviation"],
-                "home": o["home"]["abbreviation"],
-                "starter_names": o.get("starter_names"),
-                "full": _summary_segment((o.get("sim") or {}).get("segments", {}).get("full")),
-                "first1": _summary_segment((o.get("sim") or {}).get("segments", {}).get("first1")),
-                "first5": _summary_segment((o.get("sim") or {}).get("segments", {}).get("first5")),
-                "first3": _summary_segment((o.get("sim") or {}).get("segments", {}).get("first3")),
-                "hitter_hr_likelihood_all": (o.get("sim") or {}).get("hitter_hr_likelihood_all"),
-                "hitter_hr_likelihood_topn": (o.get("sim") or {}).get("hitter_hr_likelihood_topn"),
-                "hitter_props_likelihood_topn": (o.get("sim") or {}).get("hitter_props_likelihood_topn"),
-                "pitcher_props": (o.get("sim") or {}).get("pitcher_props"),
-            }
-            for o in outputs
-        ],
+        # Ordered by the game's position in the slate, and INCLUDING games a
+        # scoped (--only-game-pks) run preserved rather than resimmed -- see
+        # summary_rows / the preserve branch above.
+        "outputs": [row for _, row in sorted(summary_rows, key=lambda pair: pair[0])],
     }
     print_statcast_batter_apply_diagnostics()
     summary_path = out_ROOT_DIR / f"daily_summary_{args.date.replace('-', '_')}.json"
