@@ -101,9 +101,31 @@ Conventions:
 > #19 (cap soccer props, ~2,400 credits/sweep) also gates enabling #44b, which
 > forces cache-bypassed soccer refreshes and should stay dark until burn fits 5M.
 
-**16** audit which of the 27 MLB game markets the board renders — *now the biggest
-remaining MLB lever: after #17 the per-event call still requests **24** segment
-markets per game, so a 15-game slate is ~360 credits/sweep from segments alone* ·
+**16** — **AUDIT DONE 2026-07-25, decision needed.** After #17 the per-event call
+still requests **24 segment markets per game** ≈ **360 credits/sweep** on a
+15-game slate, dwarfing the 42 that #17 saved. Findings:
+
+- All 27 markets *are* parsed by `_extract_game_lines`, so nothing is dropped
+  at parse time. The waste, if any, is further downstream.
+- **The Layer 1 market board renders only `full_game`.** Measured on the live
+  2026-07-25 board: 1,336 rows across 15 games, **zero** segment rows. The 24
+  segment markets never reach it.
+- Segments *do* reach the cards surface — `cards.py:1844` iterates
+  `full/first1/first3/first5/first7` and `static/mlb/cards_source.js:1030`
+  renders an "F7" tab.
+- **The sim produces `full/first1/first3/first5` but not `first7`** (see
+  `_daily_summary_row`), so the 6 first7 markets render book lines with no model
+  behind them — the MLB analogue of soccer's `no_sim_coverage`.
+- **Game-line alternates collapse to a single lane.** `_select_primary_game_*_lane`
+  keeps only the most-balanced lane per segment; unlike `_finalize_prop_market`,
+  which preserves an `alternates` array. So the 8 `alternate_*` markets only
+  influence *which* lane wins.
+
+Two candidate cuts, both needing a product call rather than a code judgement:
+**(a)** drop the 8 `alternate_*` markets ≈ **120 credits/sweep** — but they
+currently compete to be the primary lane, so the displayed line could change;
+**(b)** drop the 6 `first7` markets ≈ **90 credits/sweep** — but the F7 tab
+would lose its lines, and it already has no sim projection. ·
 **19** cap soccer props (~2,400/sweep) · **20** verify refresh runs can't stack
 (partly addressed by #25's fail-closed marker) · **21** keep 10×-billed historical
 endpoints out of prod · **22** stop retrying 4xx in vendor clients
@@ -217,6 +239,12 @@ rows (~71% of the board have no sim projection at all — separate from #44) ·
   neither. Put new periodic work on live-odds-worker. Lane ownership follows the
   `SYNDICATE_*_TICK_OWNER` env pattern.
 - **Local pytest pollutes `reports/`.** `git checkout -- reports/` before committing.
+- **The web service times out on boot during a rollout.** Expect ~60–90s of 502s
+  on every web deploy while gunicorn restarts; `/healthz` returns 200 again before
+  the heavier routes do. Don't diagnose a "crash" from 502s inside that window —
+  check `/deploys` for a rollout first. `/mlb/api/cards` is the heaviest route and
+  the last to come back; prefer `/mlb/api/market-board` or `/api/ops/version` for
+  health checks.
 - **Two known-failing tests** in `tests/test_live_refresh_loop.py`
   (`test_create_app_starts_shared_live_refresh_loop*`). The "rotating flaky third"
   is **`test_mlb_has_live_game_reads_live_lens_counts`** — identified 2026-07-25:
