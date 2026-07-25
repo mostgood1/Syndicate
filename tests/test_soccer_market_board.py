@@ -4,7 +4,13 @@ import unittest
 from unittest.mock import patch
 
 from syndicate.features.shared.market_inventory import JOIN_STATUS_MATCHED
+from syndicate.features.shared.market_inventory import JOIN_STATUS_NEEDS_RESIM
 from syndicate.features.shared.market_inventory import JOIN_STATUS_NO_SIM_COVERAGE
+from syndicate.features.soccer.market_board import _SOCCER_MARKET_BOARD_CACHE
+from syndicate.features.soccer.market_board import _SOCCER_MARKET_BOARD_CACHE_MAX_ENTRIES
+from syndicate.features.soccer.market_board import _soccer_market_board_cache_key
+from syndicate.features.soccer.market_board import clear_soccer_market_board_cache
+from syndicate.features.soccer.market_board import soccer_needs_resim_event_ids
 from syndicate.features.soccer.market_board import _normalize_soccer_name
 from syndicate.features.soccer.market_board import _soccer_hydrate_market_board_line_movement
 from syndicate.features.soccer.market_board import _soccer_market_board_game_rows_for_match
@@ -373,3 +379,101 @@ class BuildSoccerMarketBoardTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SoccerMarketBoardCacheTests(unittest.TestCase):
+    """build_soccer_market_board is reached from the live-refresh tick via
+    soccer_needs_resim_event_ids. An uncached full board assembly on a
+    worker's main loop is exactly what OOM-killed the 2GB refresh-worker on
+    2026-07-25 (see build_mlb_market_board's docstring), so the cache is a
+    load-bearing guard, not an optimisation.
+    """
+
+    def _patched_build(self, *, odds_rows, recommendations):
+        return patch("syndicate.features.soccer.market_board.available_dates", return_value=["2026-07-22"]), patch(
+            "syndicate.features.soccer.market_board.recommendations_payload", return_value=recommendations
+        ), patch(
+            "syndicate.features.soccer.market_board.game_odds_rows", return_value=tuple(odds_rows)
+        ), patch("syndicate.features.soccer.market_board.props_odds_rows", return_value=()), patch(
+            "syndicate.features.soccer.market_board.team_by_name", return_value=None
+        )
+
+    def test_second_call_reuses_cached_board_without_rebuilding(self) -> None:
+        fake_recommendations = {"matches": [_FAKE_MATCH]}
+        patches = self._patched_build(odds_rows=_FAKE_GAME_ODDS_ROWS, recommendations=fake_recommendations)
+        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+            first = build_soccer_market_board("mls", "2026-07-22")
+            with patch(
+                "syndicate.features.soccer.market_board._soccer_week_matches"
+            ) as week_matches:
+                second = build_soccer_market_board("mls", "2026-07-22")
+                week_matches.assert_not_called()
+        self.assertIs(first, second)
+
+    def test_cache_key_changes_when_odds_artifact_changes(self) -> None:
+        # The signature inputs must be files the build READS and never
+        # writes -- MLB's cache could never hit until that was fixed.
+        with patch("syndicate.features.soccer.market_board.available_dates", return_value=["2026-07-22"]), patch(
+            "syndicate.features.soccer.market_board._soccer_path_signature", side_effect=[11, 22]
+        ):
+            first_key = _soccer_market_board_cache_key("mls", "2026-07-22")
+        with patch("syndicate.features.soccer.market_board.available_dates", return_value=["2026-07-22"]), patch(
+            "syndicate.features.soccer.market_board._soccer_path_signature", side_effect=[99, 22]
+        ):
+            second_key = _soccer_market_board_cache_key("mls", "2026-07-22")
+        self.assertNotEqual(first_key, second_key)
+
+    def test_cache_is_scoped_per_league(self) -> None:
+        with patch("syndicate.features.soccer.market_board.available_dates", return_value=["2026-07-22"]):
+            self.assertNotEqual(
+                _soccer_market_board_cache_key("mls", "2026-07-22"),
+                _soccer_market_board_cache_key("epl", "2026-07-22"),
+            )
+
+    def test_cache_evicts_oldest_beyond_max_entries(self) -> None:
+        clear_soccer_market_board_cache()
+        for index in range(_SOCCER_MARKET_BOARD_CACHE_MAX_ENTRIES + 5):
+            _SOCCER_MARKET_BOARD_CACHE[("k", index)] = {"games": []}
+            while len(_SOCCER_MARKET_BOARD_CACHE) > _SOCCER_MARKET_BOARD_CACHE_MAX_ENTRIES:
+                _SOCCER_MARKET_BOARD_CACHE.popitem(last=False)
+        self.assertEqual(len(_SOCCER_MARKET_BOARD_CACHE), _SOCCER_MARKET_BOARD_CACHE_MAX_ENTRIES)
+
+
+class SoccerNeedsResimEventIdsTests(unittest.TestCase):
+    """Soccer's counterpart to mlb_needs_resim_game_pks. market_inventory
+    already computed unmatched_needs_resim for every sport, but only MLB
+    ever acted on it -- 428 MLS rows sat suppressed (is_eligible false) on
+    2026-07-25 with nothing able to clear them.
+    """
+
+    def test_returns_event_ids_with_a_needs_resim_row(self) -> None:
+        board = {
+            "games": [
+                {"gamePk": "111", "rows": [{"join_status": JOIN_STATUS_MATCHED}]},
+                {"gamePk": "222", "rows": [{"join_status": JOIN_STATUS_NEEDS_RESIM}]},
+                {"gamePk": "333", "rows": [{"join_status": JOIN_STATUS_NO_SIM_COVERAGE}]},
+            ]
+        }
+        with patch("syndicate.features.soccer.market_board.build_soccer_market_board", return_value=board):
+            self.assertEqual(soccer_needs_resim_event_ids("mls", "2026-07-22"), ["222"])
+
+    def test_deduplicates_and_sorts_event_ids(self) -> None:
+        board = {
+            "games": [
+                {"gamePk": "999", "rows": [{"join_status": JOIN_STATUS_NEEDS_RESIM}, {"join_status": JOIN_STATUS_NEEDS_RESIM}]},
+                {"gamePk": "111", "rows": [{"join_status": JOIN_STATUS_NEEDS_RESIM}]},
+            ]
+        }
+        with patch("syndicate.features.soccer.market_board.build_soccer_market_board", return_value=board):
+            self.assertEqual(soccer_needs_resim_event_ids("mls", "2026-07-22"), ["111", "999"])
+
+    def test_returns_empty_when_nothing_needs_resim(self) -> None:
+        board = {"games": [{"gamePk": "111", "rows": [{"join_status": JOIN_STATUS_MATCHED}]}]}
+        with patch("syndicate.features.soccer.market_board.build_soccer_market_board", return_value=board):
+            self.assertEqual(soccer_needs_resim_event_ids("mls", "2026-07-22"), [])
+
+    def test_tolerates_malformed_board_shapes(self) -> None:
+        # Runs on a worker tick; a shape surprise must not take the loop down.
+        for board in ({}, {"games": None}, {"games": ["not-a-dict"]}, {"games": [{"gamePk": "", "rows": [{"join_status": JOIN_STATUS_NEEDS_RESIM}]}]}):
+            with patch("syndicate.features.soccer.market_board.build_soccer_market_board", return_value=board):
+                self.assertEqual(soccer_needs_resim_event_ids("mls", "2026-07-22"), [])

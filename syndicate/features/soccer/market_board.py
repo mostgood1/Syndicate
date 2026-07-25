@@ -28,18 +28,24 @@ week-object machinery.
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from datetime import date, timedelta
+from pathlib import Path
+import time
 import unicodedata
 from typing import Any
 
 from syndicate.features.shared.market_inventory import join_odds_to_sim
+from syndicate.features.shared.market_inventory import JOIN_STATUS_NEEDS_RESIM
 from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
 from syndicate.features.shared.odds_control_plane import resolve_current_shard_key
 from syndicate.features.soccer.features.team_names import match_team_name
 from syndicate.features.soccer.sources import available_dates
 from syndicate.features.soccer.sources import default_season
+from syndicate.features.soccer.sources import game_odds_path
 from syndicate.features.soccer.sources import game_odds_rows
 from syndicate.features.soccer.sources import normalize_league
+from syndicate.features.soccer.sources import props_odds_path
 from syndicate.features.soccer.sources import props_odds_rows
 from syndicate.features.soccer.sources import recommendations_payload
 from syndicate.features.soccer.sources import roster_rows
@@ -440,14 +446,80 @@ def _soccer_hydrate_market_board_line_movement(row: dict[str, Any], entry: dict[
     row["line_trend"] = entry.get("movement") or "flat"
 
 
+_SOCCER_MARKET_BOARD_CACHE_TTL_SECONDS = 60
+_SOCCER_MARKET_BOARD_CACHE: "OrderedDict[tuple[Any, ...], dict[str, Any]]" = OrderedDict()
+_SOCCER_MARKET_BOARD_CACHE_MAX_ENTRIES = 32
+
+
+def _soccer_cache_bucket() -> int:
+    return int(time.time() // _SOCCER_MARKET_BOARD_CACHE_TTL_SECONDS)
+
+
+def clear_soccer_market_board_cache() -> None:
+    """Drop every cached board. Used by the autouse test fixture in
+    tests/conftest.py -- the key's artifact signatures are all 0 in a
+    checkout (the real CSVs don't exist), so without this two tests using
+    the same league/date within one 60s bucket would leak results.
+    """
+    _SOCCER_MARKET_BOARD_CACHE.clear()
+
+
+def _soccer_path_signature(path: Path | None) -> int:
+    # Mirrors mlb/cards.py's _path_cache_signature.
+    if path is None:
+        return 0
+    try:
+        if not path.exists() or not path.is_file():
+            return 0
+        stat = path.stat()
+        return int((stat.st_mtime_ns << 16) ^ int(stat.st_size))
+    except OSError:
+        return 0
+
+
+def _soccer_market_board_cache_key(league: str, selected_date: str) -> tuple[Any, ...]:
+    """Wall-clock-TTL + artifact-signature key for one league's board.
+
+    Keyed on the odds inputs the build READS and never writes -- the rolling
+    game_odds_current.csv plus each relevant date's props CSV. MLB learned
+    this the hard way (see build_mlb_market_board): including a file the
+    build itself rewrites makes every call invalidate the entry it just
+    wrote, producing a cache that can never hit.
+    """
+    props_signature = tuple(
+        _soccer_path_signature(props_odds_path(league, date_str))
+        for date_str in _soccer_relevant_dates(league, selected_date)
+    )
+    return (
+        "soccer_market_board",
+        league,
+        selected_date,
+        _soccer_cache_bucket(),
+        _soccer_path_signature(game_odds_path(league)),
+        props_signature,
+    )
+
+
 def build_soccer_market_board(league: str, selected_date: str) -> dict[str, Any]:
     """Layer 1 market/odds inventory for one soccer league's current game
     week (see module docstring for why this is week- rather than
     single-date-scoped) -- game markets (moneyline/total/spread) and player
     props, joined against SoccerSim's per-match projections, sportsbook-
     style.
+
+    Cached on a wall-clock TTL + artifact signature, for the same reason
+    build_mlb_market_board is: soccer_needs_resim_event_ids reaches this
+    from the live-refresh tick, and an uncached full board assembly on a
+    worker's main loop is exactly what OOM-killed the 2GB refresh-worker on
+    2026-07-25. A join-mismatch gate does not need a freshly assembled
+    board every tick.
     """
     league = normalize_league(league)
+    cache_key = _soccer_market_board_cache_key(league, selected_date)
+    cached_board = _SOCCER_MARKET_BOARD_CACHE.get(cache_key)
+    if cached_board is not None:
+        _SOCCER_MARKET_BOARD_CACHE.move_to_end(cache_key)
+        return cached_board
     matches = _soccer_week_matches(league, selected_date)
     game_odds_rows_all = [dict(row) for row in game_odds_rows(league)]
     props_rows_all = _soccer_week_props_rows(league, selected_date)
@@ -536,8 +608,40 @@ def build_soccer_market_board(league: str, selected_date: str) -> dict[str, Any]
             }
         )
 
-    return {
+    board = {
         "date": selected_date,
         "league": league,
         "games": board_games,
     }
+    _SOCCER_MARKET_BOARD_CACHE[cache_key] = board
+    _SOCCER_MARKET_BOARD_CACHE.move_to_end(cache_key)
+    while len(_SOCCER_MARKET_BOARD_CACHE) > _SOCCER_MARKET_BOARD_CACHE_MAX_ENTRIES:
+        _SOCCER_MARKET_BOARD_CACHE.popitem(last=False)
+    return board
+
+
+def soccer_needs_resim_event_ids(league: str, selected_date: str) -> list[str]:
+    """Event IDs where the market board's odds<->sim join found a
+    needs-resim mismatch: the book quotes an entity the sim did not project
+    for that market, while a DIFFERENT entity was projected -- e.g. a
+    lineup change SoccerSim has not re-run against yet.
+
+    Soccer's counterpart to mlb_needs_resim_game_pks. Detection of this
+    state was already shared (market_inventory computes it for every
+    sport), but only MLB ever acted on it, so soccer's mismatched props
+    stayed suppressed (is_eligible false) indefinitely -- 428 such rows on
+    the MLS board on 2026-07-25. Reads through build_soccer_market_board's
+    cache, so calling this on a tick is cheap between rebuilds.
+    """
+    board = build_soccer_market_board(league, selected_date)
+    games = board.get("games") if isinstance(board.get("games"), list) else []
+    event_ids: set[str] = set()
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        rows = game.get("rows") if isinstance(game.get("rows"), list) else []
+        if any(isinstance(row, dict) and row.get("join_status") == JOIN_STATUS_NEEDS_RESIM for row in rows):
+            event_id = str(game.get("gamePk") or "").strip()
+            if event_id:
+                event_ids.add(event_id)
+    return sorted(event_ids)

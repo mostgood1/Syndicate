@@ -25,8 +25,19 @@ def _clear_wall_clock_ttl_caches() -> None:
         build_cards_page_context,
         build_live_player_lens_payload,
     ]
+    # build_soccer_market_board's cache has the same hazard for the same
+    # reason: it is keyed on (league, selected_date) + a 60s wall-clock
+    # bucket + artifact signatures, and those signatures are all 0 in tests
+    # because the real CSVs don't exist in a checkout. Two tests building
+    # the same league/date with different patched rows would otherwise
+    # collide -- which the existing BuildSoccerMarketBoardTests do, both on
+    # ("mls", "2026-07-22").
+    from syndicate.features.soccer.market_board import clear_soccer_market_board_cache
+
     for cache_owner in caches:
         cache_owner.cache_clear()
+    clear_soccer_market_board_cache()
     yield
     for cache_owner in caches:
         cache_owner.cache_clear()
+    clear_soccer_market_board_cache()
