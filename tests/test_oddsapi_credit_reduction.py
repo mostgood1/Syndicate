@@ -218,3 +218,113 @@ class NcaafRegionDefaultTests(unittest.TestCase):
         # Restoring the old behaviour must be an env change, not a deploy.
         with patch.dict(os.environ, {"ODDS_API_REGIONS": "us,uk"}, clear=False):
             self.assertEqual(os.environ.get("ODDS_API_REGIONS", "us"), "us,uk")
+
+
+class StandardLineWinsWithAlternateLadderTests(unittest.TestCase):
+    """#16 decision: the displayed spread/total comes from the STANDARD
+    market, and the other quoted lanes are preserved as a ladder.
+
+    Before this, selection ran across standard and alternate_* lanes together
+    and picked whichever was priced closest to a coin flip -- so an alternate
+    could win and be shown as "the total". And game lines kept only that one
+    lane, discarding the rest, while props already preserved theirs via
+    _finalize_prop_market. The alternate_* markets were being paid for and
+    thrown away.
+    """
+
+    def _extract(self, markets):
+        return mlb_fetch._extract_game_lines(markets, home_team="Detroit Tigers", away_team="Kansas City Royals")
+
+    def _totals_market(self, key, line, over, under):
+        return {"key": key, "outcomes": [
+            {"name": "Over", "point": line, "price": over},
+            {"name": "Under", "point": line, "price": under},
+        ]}
+
+    def _spreads_market(self, key, home_line, home_price, away_price):
+        return {"key": key, "outcomes": [
+            {"name": "Detroit Tigers", "point": home_line, "price": home_price},
+            {"name": "Kansas City Royals", "point": -home_line, "price": away_price},
+        ]}
+
+    def test_standard_total_wins_even_when_an_alternate_is_better_balanced(self) -> None:
+        # The alternate here is a perfect coin flip and would have won before.
+        out = self._extract([
+            self._totals_market("totals_1st_5_innings", 4.5, -130, 110),
+            self._totals_market("alternate_totals_1st_5_innings", 5.5, -100, -100),
+        ])
+        self.assertEqual(out["segments"]["first5"]["totals"]["line"], 4.5)
+
+    def test_standard_spread_wins_even_when_an_alternate_is_better_balanced(self) -> None:
+        out = self._extract([
+            self._spreads_market("spreads_1st_5_innings", -1.5, 150, -170),
+            self._spreads_market("alternate_spreads_1st_5_innings", -0.5, -100, -100),
+        ])
+        self.assertEqual(out["segments"]["first5"]["spreads"]["home_line"], -1.5)
+
+    def test_alternates_are_preserved_as_a_ladder(self) -> None:
+        # Alternates are SEGMENT-scoped in this fetcher -- there is no
+        # full-game alternate_totals/alternate_spreads market requested at
+        # all, so the ladder lives on the segment buckets.
+        out = self._extract([
+            self._totals_market("totals_1st_5_innings", 4.5, -110, -110),
+            self._totals_market("alternate_totals_1st_5_innings", 3.5, 130, -150),
+            self._totals_market("alternate_totals_1st_5_innings", 5.5, -140, 120),
+        ])
+        segment = out["segments"]["first5"]["totals"]
+        self.assertEqual(segment["line"], 4.5)
+        self.assertEqual([lane["line"] for lane in segment["alternates"]], [3.5, 5.5])
+
+    def test_primary_line_is_not_duplicated_into_the_ladder(self) -> None:
+        out = self._extract([
+            self._totals_market("totals_1st_5_innings", 4.5, -110, -110),
+            self._totals_market("alternate_totals_1st_5_innings", 4.5, -105, -115),
+        ])
+        segment = out["segments"]["first5"]["totals"]
+        self.assertEqual(segment["line"], 4.5)
+        self.assertEqual(segment["alternates"], [])
+
+    def test_falls_back_to_alternates_when_no_standard_market_is_quoted(self) -> None:
+        # A book offering only alternates is better than showing no line.
+        out = self._extract([self._totals_market("alternate_totals_1st_5_innings", 5.5, -110, -110)])
+        self.assertEqual(out["segments"]["first5"]["totals"]["line"], 5.5)
+
+    def test_spread_ladder_is_sorted_by_line(self) -> None:
+        out = self._extract([
+            self._spreads_market("spreads_1st_5_innings", -1.5, -110, -110),
+            self._spreads_market("alternate_spreads_1st_5_innings", 1.5, -300, 250),
+            self._spreads_market("alternate_spreads_1st_5_innings", -2.5, 180, -220),
+        ])
+        segment = out["segments"]["first5"]["spreads"]
+        self.assertEqual(segment["home_line"], -1.5)
+        self.assertEqual([lane["home_line"] for lane in segment["alternates"]], [-2.5, 1.5])
+
+
+class First7MarketsRemovedTests(unittest.TestCase):
+    """#16 decision: F7 dropped. Six markets, ~90 credits/sweep, and the sim
+    never emitted a first7 projection, so the tab showed book lines with no
+    model behind them."""
+
+    def test_no_first7_market_is_requested(self) -> None:
+        requested = mlb_fetch._CORE_GAME_MARKET_KEYS + mlb_fetch._SEGMENT_GAME_MARKET_KEYS
+        self.assertFalse([key for key in requested if "1st_7_innings" in key])
+
+    def test_remaining_segments_are_still_requested(self) -> None:
+        requested = ",".join(mlb_fetch._SEGMENT_GAME_MARKET_KEYS)
+        for segment in ("1st_1_innings", "1st_3_innings", "1st_5_innings"):
+            self.assertIn(segment, requested)
+
+    def test_segment_output_no_longer_carries_first7(self) -> None:
+        out = mlb_fetch._extract_game_lines(
+            [{"key": "totals_1st_5_innings", "outcomes": [
+                {"name": "Over", "point": 4.5, "price": -110},
+                {"name": "Under", "point": 4.5, "price": -110},
+            ]}],
+            home_team="Detroit Tigers",
+            away_team="Kansas City Royals",
+        )
+        self.assertNotIn("first7", out.get("segments") or {})
+
+    def test_f7_tab_is_not_rendered(self) -> None:
+        source = (REPO_ROOT / "syndicate" / "static" / "mlb" / "cards_source.js").read_text(encoding="utf-8")
+        self.assertNotIn('{ key: "first7", label: "F7"', source)

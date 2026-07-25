@@ -225,7 +225,14 @@ def _game_total_lane_sort_key(row: dict[str, Any]) -> tuple[float, float, float,
 
 
 def _select_primary_game_total_lane(lanes: list[dict[str, Any]]) -> dict[str, Any]:
-    return min(lanes, key=_game_total_lane_sort_key) if lanes else {}
+    # The standard market's line wins outright (#16). Previously this picked
+    # whichever lane had the most balanced two-way pricing across BOTH the
+    # standard and alternate_* markets, so an alternate could win and be
+    # displayed as "the total" -- which is not what the board is claiming when
+    # it shows one number. Balance is still the tiebreak WITHIN each group.
+    standard = [lane for lane in lanes if str((lane or {}).get("_src") or "") == "standard"]
+    pool = standard or lanes
+    return min(pool, key=_game_total_lane_sort_key) if pool else {}
 
 
 def _game_spread_lane_sort_key(row: dict[str, Any]) -> tuple[float, float, float, float]:
@@ -241,7 +248,31 @@ def _game_spread_lane_sort_key(row: dict[str, Any]) -> tuple[float, float, float
 
 
 def _select_primary_game_spread_lane(lanes: list[dict[str, Any]]) -> dict[str, Any]:
-    return min(lanes, key=_game_spread_lane_sort_key) if lanes else {}
+    # See _select_primary_game_total_lane: the standard market's line wins, so
+    # MLB shows the actual runline rather than whichever alternate happened to
+    # be priced closest to a coin flip.
+    standard = [lane for lane in lanes if str((lane or {}).get("_src") or "") == "standard"]
+    pool = standard or lanes
+    return min(pool, key=_game_spread_lane_sort_key) if pool else {}
+
+
+def _game_line_alternates(lanes: list[dict[str, Any]], primary: dict[str, Any], *, line_key: str) -> list[dict[str, Any]]:
+    """Every other quoted lane, as a ladder, sorted by line.
+
+    Game lines used to keep only the primary and discard the rest, while props
+    already preserved theirs (see _finalize_prop_market). That asymmetry meant
+    the alternate_* markets were being paid for and thrown away, and no edge
+    could be computed anywhere off the primary number.
+    """
+    primary_line = (primary or {}).get(line_key)
+    out: list[dict[str, Any]] = []
+    for lane in lanes:
+        if not isinstance(lane, dict) or lane.get(line_key) is None:
+            continue
+        if primary_line is not None and _line_matches(lane.get(line_key), primary_line):
+            continue
+        out.append(lane)
+    return sorted(out, key=lambda item: float(item.get(line_key) or 0.0))
 
 
 def _finalize_prop_market(row: dict[str, Any], market_name: str | None = None) -> dict[str, Any]:
@@ -378,12 +409,6 @@ def _extract_game_lines(markets: Any, *, home_team: str, away_team: str) -> dict
         "alternate_spreads_1st_5_innings": ("first5", "spreads_alt"),
         "totals_1st_5_innings": ("first5", "totals"),
         "alternate_totals_1st_5_innings": ("first5", "totals_alt"),
-        "h2h_1st_7_innings": ("first7", "h2h"),
-        "h2h_3_way_1st_7_innings": ("first7", "h2h_3_way"),
-        "spreads_1st_7_innings": ("first7", "spreads"),
-        "alternate_spreads_1st_7_innings": ("first7", "spreads_alt"),
-        "totals_1st_7_innings": ("first7", "totals"),
-        "alternate_totals_1st_7_innings": ("first7", "totals_alt"),
     }
     out: dict[str, Any] = {
         "h2h": None,
@@ -394,13 +419,12 @@ def _extract_game_lines(markets: Any, *, home_team: str, away_team: str) -> dict
             "first1": {"h2h": None, "spreads": None, "totals": None},
             "first3": {"h2h": None, "spreads": None, "totals": None},
             "first5": {"h2h": None, "spreads": None, "totals": None},
-            "first7": {"h2h": None, "spreads": None, "totals": None},
         },
     }
     home = str(home_team or "").strip().lower()
     away = str(away_team or "").strip().lower()
-    spread_lanes = {key: {} for key in ("full", "first1", "first3", "first5", "first7")}
-    total_lanes = {key: {} for key in ("full", "first1", "first3", "first5", "first7")}
+    spread_lanes = {key: {} for key in ("full", "first1", "first3", "first5")}
+    total_lanes = {key: {} for key in ("full", "first1", "first3", "first5")}
     for market in _as_market_list(markets):
         key = str(market.get("key") or "").lower().strip()
         segment_spec = segment_market_map.get(key)
@@ -447,7 +471,13 @@ def _extract_game_lines(markets: Any, *, home_team: str, away_team: str) -> dict
                 except Exception:
                     continue
                 lane_key = f"{line_value:.3f}"
-                lane = total_lanes[segment_key].setdefault(lane_key, {"line": line_value, "over_odds": None, "under_odds": None})
+                lane = total_lanes[segment_key].setdefault(
+                    lane_key, {"line": line_value, "over_odds": None, "under_odds": None, "_src": "alternate"}
+                )
+                if market_key == "totals":
+                    # A line quoted by the standard market is THE line, even if
+                    # an alternate also quotes it.
+                    lane["_src"] = "standard"
                 if side.startswith("over") and lane.get("over_odds") is None:
                     lane["over_odds"] = _american_str(outcome.get("price"))
                 elif side.startswith("under") and lane.get("under_odds") is None:
@@ -463,13 +493,21 @@ def _extract_game_lines(markets: Any, *, home_team: str, away_team: str) -> dict
                     continue
                 if name == home:
                     lane_key = f"{point_value:.3f}"
-                    lane = spread_lanes[segment_key].setdefault(lane_key, {"home_line": point_value, "home_odds": None, "away_line": None, "away_odds": None})
+                    lane = spread_lanes[segment_key].setdefault(
+                        lane_key, {"home_line": point_value, "home_odds": None, "away_line": None, "away_odds": None, "_src": "alternate"}
+                    )
+                    if market_key == "spreads":
+                        lane["_src"] = "standard"
                     if lane.get("home_odds") is None:
                         lane["home_odds"] = _american_str(outcome.get("price"))
                 elif name == away:
                     home_line = -float(point_value)
                     lane_key = f"{home_line:.3f}"
-                    lane = spread_lanes[segment_key].setdefault(lane_key, {"home_line": home_line, "home_odds": None, "away_line": point_value, "away_odds": None})
+                    lane = spread_lanes[segment_key].setdefault(
+                        lane_key, {"home_line": home_line, "home_odds": None, "away_line": point_value, "away_odds": None, "_src": "alternate"}
+                    )
+                    if market_key == "spreads":
+                        lane["_src"] = "standard"
                     lane["away_line"] = point_value
                     if lane.get("away_odds") is None:
                         lane["away_odds"] = _american_str(outcome.get("price"))
@@ -477,6 +515,8 @@ def _extract_game_lines(markets: Any, *, home_team: str, away_team: str) -> dict
         lanes = [lane for lane in lane_map.values() if isinstance(lane, dict) and lane.get("line") is not None]
         primary = _select_primary_game_total_lane(lanes)
         if primary:
+            primary = dict(primary)
+            primary["alternates"] = _game_line_alternates(lanes, primary, line_key="line")
             out["segments"][segment_key]["totals"] = primary
             if segment_key == "full":
                 out["totals"] = primary
@@ -484,6 +524,8 @@ def _extract_game_lines(markets: Any, *, home_team: str, away_team: str) -> dict
         lanes = [lane for lane in lane_map.values() if isinstance(lane, dict) and (lane.get("home_line") is not None or lane.get("away_line") is not None)]
         primary = _select_primary_game_spread_lane(lanes)
         if primary:
+            primary = dict(primary)
+            primary["alternates"] = _game_line_alternates(lanes, primary, line_key="home_line")
             out["segments"][segment_key]["spreads"] = primary
             if segment_key == "full":
                 out["spreads"] = primary
@@ -628,11 +670,15 @@ def _prop_market_counts(props_by_name: dict[str, dict[str, dict[str, Any]]]) -> 
 # the per-event endpoint and stay there. Splitting them is #17.
 _CORE_GAME_MARKET_KEYS = ["h2h", "spreads", "totals"]
 
+# first7 dropped 2026-07-25 (#16): six markets, ~90 credits/sweep on a
+# 15-game slate, and the sim never produced a first7 projection at all --
+# _daily_summary_row emits full/first1/first3/first5 only -- so the F7 tab was
+# showing book lines with no model behind them. Removing the markets AND the
+# tab together, rather than leaving a tab that silently renders nothing.
 _SEGMENT_GAME_MARKET_KEYS = [
     "h2h_1st_1_innings", "h2h_3_way_1st_1_innings", "spreads_1st_1_innings", "alternate_spreads_1st_1_innings", "totals_1st_1_innings", "alternate_totals_1st_1_innings",
     "h2h_1st_3_innings", "h2h_3_way_1st_3_innings", "spreads_1st_3_innings", "alternate_spreads_1st_3_innings", "totals_1st_3_innings", "alternate_totals_1st_3_innings",
     "h2h_1st_5_innings", "h2h_3_way_1st_5_innings", "spreads_1st_5_innings", "alternate_spreads_1st_5_innings", "totals_1st_5_innings", "alternate_totals_1st_5_innings",
-    "h2h_1st_7_innings", "h2h_3_way_1st_7_innings", "spreads_1st_7_innings", "alternate_spreads_1st_7_innings", "totals_1st_7_innings", "alternate_totals_1st_7_innings",
 ]
 
 

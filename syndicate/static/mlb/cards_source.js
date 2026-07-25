@@ -1027,7 +1027,11 @@
       { key: "first1", label: "F1", innings: 1 },
       { key: "first3", label: "F3", innings: 3 },
       { key: "first5", label: "F5", innings: 5 },
-      { key: "first7", label: "F7", innings: 7 },
+      // F7 removed 2026-07-25 (#16): its six OddsAPI markets cost ~90
+      // credits/sweep and the sim never produced a first7 projection, so the
+      // tab only ever showed book lines with no model behind them. The
+      // markets are no longer fetched, so leaving the tab would render an
+      // empty segment rather than a useful one.
       { key: "full", label: "Full game", innings: 9 },
     ];
 
