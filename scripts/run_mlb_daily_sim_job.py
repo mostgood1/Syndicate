@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -32,6 +33,32 @@ from syndicate.features.shared.refresh_state_store import write_text_file
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+# The ops log only ever gets eyeballed for "how did this run end", and the
+# failure detail that matters lives at the tail. Capping what we read back
+# keeps a multi-hundred-MB workflow log from being pulled into RAM (and then
+# pushed through the keyvalue-backed state store) just to surface a traceback.
+_MAX_CAPTURED_LOG_BYTES = 512 * 1024
+
+
+def _read_log_tail(path: Path, max_bytes: int = _MAX_CAPTURED_LOG_BYTES) -> str:
+    try:
+        size = path.stat().st_size
+    except Exception:
+        return ""
+    try:
+        with path.open("rb") as handle:
+            if size > max_bytes:
+                handle.seek(size - max_bytes)
+            payload = handle.read()
+    except Exception as exc:
+        return f"<could not read sim log: {type(exc).__name__}: {exc}>"
+    text = payload.decode("utf-8", errors="replace")
+    if size > max_bytes:
+        skipped = size - max_bytes
+        return f"<truncated: showing last {max_bytes} of {size} bytes ({skipped} omitted)>\n{text}"
+    return text
 
 
 def _log_path(date_str: str, run_stamp: str) -> Path:
@@ -85,21 +112,42 @@ def main() -> int:
 
     started_at = _utc_now()
     started_epoch = time.time()
+    capture_path: Path | None = None
     print(f"MLB_DAILY_SIM_START date={args.date} season={args.season} sims={args.sims} workers={args.workers} reason={args.reason}", flush=True)
 
     try:
-        result = subprocess.run(
-            command,
-            cwd=str(vendor_cwd),
-            capture_output=True,
-            text=True,
-            timeout=None,  # caller (live_refresh_loop.py) enforces its own launch-side timeout via SYNDICATE_MLB_SIM_TIMEOUT_SECONDS
-        )
+        # Stream the child's output straight to a temp file instead of
+        # capture_output=True. The ui-daily workflow runs 3 profiles x every
+        # game in the slate with verbose per-game logging, and capture_output
+        # buffered ALL of it in this process's RAM for the entire run, then
+        # transiently doubled it building the combined string. On a 2GB
+        # container already running the sim itself that is pure overhead --
+        # and this wrapper only ever needs a tail of it for the ops log below.
+        with tempfile.NamedTemporaryFile(prefix="mlb_daily_sim_", suffix=".log", delete=False) as out_fh:
+            capture_path = Path(out_fh.name)
+            result = subprocess.run(
+                command,
+                cwd=str(vendor_cwd),
+                stdout=out_fh,
+                stderr=subprocess.STDOUT,
+                # No timeout here: the launch side kills a stale run via
+                # _MLB_SIM_MAX_RUNTIME_SECONDS (live_refresh_loop.py). Note
+                # SYNDICATE_MLB_SIM_TIMEOUT_SECONDS is NOT what enforces it --
+                # _mlb_sim_timeout_seconds() is defined but never called, so
+                # the real ceiling is that hardcoded 90 minutes.
+                timeout=None,
+            )
         return_code = int(result.returncode)
-        combined_output = (result.stdout or "") + "\n---stderr---\n" + (result.stderr or "")
+        combined_output = _read_log_tail(capture_path)
     except Exception as exc:
         return_code = 1
         combined_output = f"{type(exc).__name__}: {exc}"
+    finally:
+        try:
+            if capture_path is not None:
+                capture_path.unlink(missing_ok=True)
+        except Exception:
+            pass
 
     finished_at = _utc_now()
     ok = return_code == 0

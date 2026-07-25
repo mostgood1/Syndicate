@@ -841,7 +841,125 @@ def _mlb_daily_summary_path(date_str: str) -> Path:
 	return data_root() / "mlb_source" / "source_artifacts" / "data" / "daily" / f"daily_summary_{date_slug}.json"
 
 
+# ---------------------------------------------------------------------------
+# Cold-start batching. tip_off_window/fingerprint_change/join_mismatch already
+# scope their runs to the affected game(s) via --only-game-pks; the remaining
+# full-slate paths (first_appearance, and the one-time "no stored
+# fingerprints" case) deliberately passed no game_pks, meaning one process
+# simulated the entire ~15-game slate at _mlb_sim_count() sims each. That is
+# the run that OOM-killed the 2GB worker on 2026-07-25. Rather than introduce
+# a second mechanism, this splits the cold start into successive batches fed
+# through the SAME --only-game-pks path the scoped triggers already use.
+# ---------------------------------------------------------------------------
+
+# DEFAULT 0 = OFF, deliberately. The batching below is correct and tested, but
+# it cannot be turned on until vendor/mlb_bettingv2/tools/daily_update.py stops
+# truncating the daily summary on a scoped run: non-targeted games hit
+# `continue` at daily_update.py:6814 BEFORE `outputs.append(record)` (:7756),
+# so summary["outputs"] (:7787) ends up containing only the targeted games.
+# syndicate/features/mlb/cards.py:4629 builds the whole board from that key,
+# so every scoped resim currently drops the rest of the slate off the board --
+# which also looks like the real mechanism behind the long-standing
+# "board count swings 184 -> 10" flakiness. Batching the cold start would fire
+# that bug on every batch. Flip this to 4 (or set
+# SYNDICATE_MLB_SIM_MAX_GAMES_PER_RUN) only after preserved_non_targeted_games
+# is merged back into summary["outputs"].
+_MLB_SIM_MAX_GAMES_PER_RUN_DEFAULT = 0
+
+
+def _mlb_sim_max_games_per_run() -> int:
+	raw = str(os.environ.get("SYNDICATE_MLB_SIM_MAX_GAMES_PER_RUN") or "").strip()
+	try:
+		if raw:
+			# 0 (or negative) restores the old unscoped whole-slate behavior,
+			# kept as an escape hatch for a bigger container.
+			return max(0, int(raw))
+	except Exception:
+		pass
+	return _MLB_SIM_MAX_GAMES_PER_RUN_DEFAULT
+
+
+def _mlb_sim_coldstart_progress_path() -> Path:
+	return _meta_dir() / "mlb_sim_coldstart_progress.json"
+
+
+def _read_mlb_sim_coldstart_progress(date_str: str) -> list[str]:
+	payload = read_json_file(_mlb_sim_coldstart_progress_path())
+	if not isinstance(payload, dict) or str(payload.get("date") or "") != date_str:
+		return []
+	attempted = payload.get("attempted_game_pks")
+	if not isinstance(attempted, list):
+		return []
+	return [str(item).strip() for item in attempted if str(item or "").strip()]
+
+
+def _record_mlb_sim_coldstart_batch(date_str: str, attempted_game_pks: list[str]) -> None:
+	write_json_file(
+		_mlb_sim_coldstart_progress_path(),
+		{"date": date_str, "attempted_game_pks": sorted(set(attempted_game_pks)), "updatedAt": _utc_now()},
+	)
+
+
+def _next_mlb_sim_coldstart_batch(date_str: str, events: list[ScheduleEvent]) -> list[str]:
+	"""Next slice of the slate to cold-start sim, or [] to mean "whole slate"
+	when batching is disabled.
+
+	Tracks only what has been ATTEMPTED, never what succeeded -- the summary
+	artifact is written once at the end of a full run, so there is no
+	per-batch success signal to read here. A batch that dies mid-run is
+	therefore not retried immediately; once every game has been attempted the
+	progress resets and the next pass picks them up again. That keeps a
+	genuinely broken slate from spinning at full speed while still converging,
+	and the existing _mlb_recent_sim_attempt_within_backoff cooldown paces the
+	batches apart.
+	"""
+	batch_size = _mlb_sim_max_games_per_run()
+	if batch_size <= 0:
+		return []
+	all_game_pks = sorted({str(event.event_id).strip() for event in events if str(event.event_id or "").strip()})
+	if not all_game_pks or len(all_game_pks) <= batch_size:
+		return []
+	attempted = set(_read_mlb_sim_coldstart_progress(date_str))
+	remaining = [game_pk for game_pk in all_game_pks if game_pk not in attempted]
+	if not remaining:
+		# Full pass finished without producing a summary -- start over rather
+		# than wedging on a slate we can never mark complete.
+		attempted = set()
+		remaining = all_game_pks
+	batch = remaining[:batch_size]
+	_record_mlb_sim_coldstart_batch(date_str, sorted(attempted | set(batch)))
+	return batch
+
+
 _MLB_SIM_ATTEMPT_BACKOFF_SECONDS = 180
+
+# Confirmed live 2026-07-25: re-enabling SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER
+# on a container already sitting at ~1.1GB of its 2GB limit OOM-killed the
+# worker within ~40s of boot, three times in a row. The backoff above only
+# spaces the retries out; it does nothing to make the run fit. This is the
+# missing half: refuse to launch at all unless there is genuinely enough
+# headroom for the sim subprocess, measured from cgroups rather than assumed.
+# Same helper the intelligence-state pipeline and the odds-refresh gate use.
+_MLB_SIM_MIN_MEMORY_HEADROOM_BYTES_DEFAULT = 900 * 1024 * 1024
+
+
+def _mlb_sim_min_memory_headroom_bytes() -> int:
+	raw = str(os.environ.get("SYNDICATE_MLB_SIM_MIN_MEMORY_HEADROOM_MB") or "").strip()
+	try:
+		if raw:
+			return max(0, int(raw)) * 1024 * 1024
+	except Exception:
+		pass
+	return _MLB_SIM_MIN_MEMORY_HEADROOM_BYTES_DEFAULT
+
+
+def _mlb_sim_memory_headroom_snapshot() -> dict[str, Any] | None:
+	try:
+		from syndicate.features.shared.memory_observability import memory_headroom_snapshot
+
+		return memory_headroom_snapshot(_mlb_sim_min_memory_headroom_bytes())
+	except Exception:
+		return None
 
 
 def _mlb_recent_sim_attempt_within_backoff(date_str: str) -> bool:
@@ -986,6 +1104,17 @@ def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any
 			return {"force": False, "reason": "odds_refresh_active"}
 	except Exception:
 		pass
+	# Memory gate: every branch below can return force=True and spawn the sim
+	# subprocess, so check once here rather than at each return. A None
+	# snapshot means headroom couldn't be measured (e.g. local dev without
+	# cgroups) -- memory_headroom_snapshot's own contract says callers should
+	# treat that as "not sufficient", but doing so here would make the sim
+	# never run outside a container, so this only blocks on a measured
+	# shortfall and leaves unmeasurable environments alone.
+	headroom = _mlb_sim_memory_headroom_snapshot()
+	if headroom is not None and not headroom.get("sufficient", True):
+		print(f"[live_refresh_loop] MLB_DAILY_SIM_DEFERRED_LOW_MEMORY {json.dumps(headroom, sort_keys=True)}", flush=True)
+		return {"force": False, "reason": "insufficient_memory_headroom", "memory": headroom}
 	try:
 		events = fetch_schedule_for_date("mlb", date_str)
 	except Exception:
@@ -996,6 +1125,9 @@ def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any
 	if not _mlb_daily_summary_path(date_str).exists():
 		if _mlb_recent_sim_attempt_within_backoff(date_str):
 			return {"force": False, "reason": "recent_attempt_backoff"}
+		coldstart_batch = _next_mlb_sim_coldstart_batch(date_str, events)
+		if coldstart_batch:
+			return {"force": True, "reason": "first_appearance", "game_pks": coldstart_batch, "coldstart_batch": True}
 		return {"force": True, "reason": "first_appearance"}
 
 	window_minutes = _event_sim_force_window_minutes()
@@ -1358,9 +1490,13 @@ def _launch_mlb_daily_sim(date_str: str, decision: dict[str, Any]) -> dict[str, 
 	]
 	game_pks = decision.get("game_pks")
 	if isinstance(game_pks, (list, tuple, set)) and game_pks:
-		# Absent for first_appearance / evening-next-day (whole slate, matching
-		# today's behavior exactly); present for tip_off_window/fingerprint_change
-		# so only the actually-impacted game(s) get resimmed.
+		# Present for tip_off_window/fingerprint_change/join_mismatch so only
+		# the actually-impacted game(s) get resimmed, and (since 2026-07-25)
+		# for first_appearance too, where _next_mlb_sim_coldstart_batch feeds
+		# the slate through here a batch at a time instead of as one process
+		# covering every game -- that unscoped run is what OOM-killed the 2GB
+		# worker. Still absent for evening-next-day, and for first_appearance
+		# on a slate small enough to fit in one batch.
 		normalized_game_pks = sorted({str(game_pk).strip() for game_pk in game_pks if str(game_pk or "").strip()})
 		if normalized_game_pks:
 			command.extend(["--only-game-pks", ",".join(normalized_game_pks)])
