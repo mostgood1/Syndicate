@@ -21,6 +21,14 @@ from typing import Any
 
 import pandas as pd
 import requests
+import sys
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from syndicate.features.shared.oddsapi_quota import record_oddsapi_quota
+
 
 # Kept as an independent copy rather than imported from
 # fetch_soccer_oddsapi_props_local.py -- every OddsAPI fetcher script in this
@@ -101,6 +109,7 @@ def fetch_game_odds(api_key: str, *, sport_key: str, region: str, markets: list[
         params={"apiKey": api_key, "regions": region, "markets": ",".join(markets), "oddsFormat": "american"},
         timeout=20,
     )
+    record_oddsapi_quota(response.headers, sport="soccer", endpoint=url)
     response.raise_for_status()
     payload = response.json()
     return payload if isinstance(payload, list) else []

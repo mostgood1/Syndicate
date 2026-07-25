@@ -19,7 +19,7 @@ if str(REPO_ROOT) not in sys.path:
 from syndicate.features.shared.refresh_state_store import build_input_hash
 from syndicate.features.shared.refresh_state_store import record_refresh_state
 from syndicate.features.shared.refresh_state_store import should_recompute
-
+from syndicate.features.shared.oddsapi_quota import record_oddsapi_quota
 
 
 ENV_API_KEY_NAMES = (
@@ -98,6 +98,9 @@ class TheOddsApiClient:
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 payload = response.read().decode("utf-8")
+                # url carries apiKey in its query string -- record only the
+                # path, since the endpoint is persisted to the shared store.
+                record_oddsapi_quota(response.headers, sport="ncaab", endpoint=url.split("?", 1)[0])
         except urllib.error.HTTPError as exc:
             status_code = int(getattr(exc, "code", 0) or 0)
             if status_code in ignore_statuses:

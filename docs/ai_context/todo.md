@@ -178,7 +178,11 @@ rows (~71% of the board have no sim projection at all — separate from #44) ·
   Recorded *before* `raise_for_status`, since a failed call may still be billed and
   dropping it would bias measured burn downward. Reports `None` rather than `0`
   when there is only one observation: "not measured" must not look like
-  "not burning". **Still to wire**: NFL props/team odds, NHL, NCAAF, NCAAB.
+  "not burning". **All 9 OddsAPI call sites are now instrumented**: MLB,
+  basketball (NBA+WNBA attributed separately), soccer odds + props, NFL props +
+  team odds, NHL, NCAAF, NCAAB. NCAAF/NCAAB reach the API through `urlopen` with
+  the apiKey embedded in the URL, so those record only the path — the endpoint is
+  persisted to the shared store and must never carry a key.
 
 ---
 

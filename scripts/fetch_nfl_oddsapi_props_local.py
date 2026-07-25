@@ -18,6 +18,8 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from syndicate.features.shared.atomic_artifact_write import atomic_write_csv
+from syndicate.features.shared.oddsapi_quota import record_oddsapi_quota
+
 
 
 
@@ -174,6 +176,7 @@ def fetch_player_props(api_key: str, *, sport_key: str = "americanfootball_nfl",
         },
         timeout=20,
     )
+    record_oddsapi_quota(response.headers, sport="nfl", endpoint=url)
     response.raise_for_status()
     return response.json()
 

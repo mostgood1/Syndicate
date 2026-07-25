@@ -24,6 +24,7 @@ from syndicate.features.shared.refresh_state_store import build_input_hash
 from syndicate.features.shared.refresh_state_store import path_fingerprint
 from syndicate.features.shared.refresh_state_store import record_refresh_state
 from syndicate.features.shared.refresh_state_store import should_recompute
+from syndicate.features.shared.oddsapi_quota import record_oddsapi_quota
 
 
 PRED_FILES_GLOB = "college_football_schedule_*_predicted_totals_enhanced*.csv"
@@ -351,6 +352,9 @@ def _fetch_odds(*, api_key: str, sport: str, regions: str, markets: str, odds_fo
         with urlopen(url, timeout=15) as response:
             payload = response.read().decode("utf-8")
             status_code = getattr(response, "status", 200)
+            # url carries apiKey in its query string -- record only the path,
+            # since the endpoint is persisted to the shared state store.
+            record_oddsapi_quota(response.headers, sport="ncaaf", endpoint=url.split("?", 1)[0])
     except Exception as exc:
         raise RuntimeError(f"Odds API request failed: {exc}") from exc
     if status_code != 200:

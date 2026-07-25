@@ -12,6 +12,8 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import requests
 
+from syndicate.features.shared.oddsapi_quota import record_oddsapi_quota
+
 
 ODDS_API_BASE = "https://api.the-odds-api.com/v4"
 NHLE_BASE = (os.getenv("NHLE_BASE_URL", "https://api-web.nhle.com/v1") or "https://api-web.nhle.com/v1").rstrip("/")
@@ -167,6 +169,9 @@ class OddsApiClient:
         time.sleep(self.sleep)
         response = requests.get(f"{ODDS_API_BASE}{path}", params=params, timeout=self.timeout)
         headers = {str(key).lower(): str(value) for key, value in response.headers.items()}
+        # Recorded before raise_for_status: a failed call may still be billed,
+        # and dropping it would bias measured burn downward (#14).
+        record_oddsapi_quota(headers, sport="nhl", endpoint=path)
         try:
             response.raise_for_status()
         except requests.HTTPError:
