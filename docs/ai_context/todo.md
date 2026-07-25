@@ -19,7 +19,6 @@ Conventions:
 
 | # | Item | Notes |
 |---|---|---|
-| **41** | Regression test for scoped resim truncating the MLB daily summary | Code shipped (`dcda6243`); no test. Non-targeted games `continue` before `outputs.append`, and `cards.py:4629` builds the whole board from `summary["outputs"]`. Likely the "184→10" flakiness. |
 | **25** | Phase 0 fail-closed refresh guard + atomic writes | Fixes candidate swings, look-ahead interval violations (#24) and duplicate sweeps (#20) at once. Same bug family as #43. |
 | **15** | Tier odds refresh cadence by volatility | Biggest quota lever: MLB alone ≈ 585 credits/sweep × 60s ticks ≈ **6.3M/month against a 5M budget**. Game lines 60s, props 5–10min, alternates/innings 15–30min. **Blocked by #14** — do not tune on estimates. |
 
@@ -110,6 +109,17 @@ rows (~71% of the board have no sim projection at all — separate from #44) ·
 - **46** `sim_run_status` was unresolvable without grepping worker logs for a run
   stamp — `f6a013e3`. Now falls back to `_active.json` → `_last_attempt.json` and
   always reports `sim_run_resolution`.
+- **41** Regression coverage for scoped resims truncating the MLB daily summary
+  (`dcda6243` shipped the fix untested). `tests/test_mlb_scoped_resim_summary.py`,
+  8 tests in two layers: a behavioural consumer contract on
+  `_games_from_daily_summary` (the board is built from `summary["outputs"]` and
+  nothing else, so a truncated summary *is* a truncated board), plus a structural
+  guard on the vendored producer — necessary because the fix lives inside a
+  ~2000-line `main()` whose helpers are nested locals that cannot be imported.
+  **The guards were validated against `dcda6243^`: all five fail on the pre-fix
+  source and pass on the fixed one**, so they are not vacuous. If `daily_update.py`
+  is re-vendored and the guards fail, check the merge is still present before
+  loosening the assertions.
 - **14** OddsAPI quota instrumentation. `syndicate/features/shared/oddsapi_quota.py`
   records `x-requests-remaining` / `-used` / `-last` from MLB, basketball
   (NBA+WNBA, attributed separately) and soccer fetchers; read it at
