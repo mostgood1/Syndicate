@@ -33,6 +33,12 @@ Conventions:
     ~1.0 min/game vs ~6 min/game batched (each batch re-pays roster snapshots, a
     9.3MB statcast cache and an interpreter spawn). Do not reintroduce batching to
     "fix" an OOM without measuring peak memory first.
+  - ✅ *Validated by ~90 min of production monitoring 2026-07-25*: event-driven
+    per-game scoping genuinely narrows. After the cold-start run stored 15
+    per-game fingerprints, later `fingerprint_change` launches scoped to **6
+    games** (`20260725_183651`) and **9 games** (`20260725_185705`), both
+    `exit 0` — not the whole slate. The earlier all-15 run was the documented
+    "no stored fingerprints" branch, not a scoping failure.
   - ❌ Open: re-enable look-ahead with deference to an in-flight sim (reuse
     `_mlb_daily_sim_process_still_running`, mirroring the `any_live` guard).
   - ❌ Open: the 2700s timeout has still never been exercised (today ran 15m).
@@ -52,7 +58,7 @@ Conventions:
 
 | # | Item |
 |---|---|
-| **48** | MLB fingerprint churn: sim triggered every ~10 min all day 2026-07-24, matching `_mlb_sim_check_interval_seconds`' 600s default. `_mlb_sim_input_fingerprint_by_game` hashes `oddsapi_game_lines_<date>.json` alongside lineups, so any odds refresh can flip every game's hash. Plausible unfixed driver of the OOM saga; **not** addressed by the batching revert. 2026-07-25 was stable 80+ min — confirm before acting. |
+| **48** | MLB fingerprint churn. Sim triggered every ~10 min all day 2026-07-24, matching `_mlb_sim_check_interval_seconds`' 600s default. `_mlb_sim_input_fingerprint_by_game` hashes `oddsapi_game_lines_<date>.json` alongside lineups, so any odds refresh can flip a game's hash. **Now corroborated**: 2026-07-25 monitoring caught scoped resims of **6 and 9 games** roughly 20 min apart — scoping works (see #23), but 6–9 of 15 games changing that often is far more than real lineup news, so the odds component is very likely driving it. Each resim is compute *and* the refresh that feeds it is credits, so this ties into the 5M target. Consider excluding odds from the sim-input fingerprint, or hashing only lineup/probable fields. **Not** addressed by the batching revert. |
 | **42** | `source_cards_api_payload`'s cache can never hit — keyed on the file it rewrites. **Third instance of this pattern** (`build_mlb_market_board` fixed in `34c9427d`; avoided deliberately in `build_soccer_market_board`). Worth a rule, not three one-off fixes. |
 | **37** | `logger.info` never reaches Render's log collector — use `print(..., flush=True)`. This is why the `NameError` in #8 hid for hours, and why #43's stale-date replay stayed invisible for a day. |
 | **40** | Reconcile `render.yaml` drift. **Raised in priority**: a blueprint re-apply would flip the MLB sim trigger back **on** and drop the new soccer vars. Current deliberate overrides: `SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER=true`, `SYNDICATE_MLB_SIM_MAX_GAMES_PER_RUN=0`, `SYNDICATE_LOOK_AHEAD_ENABLED=false`, `SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_ENABLED=false`, `SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE=false`, `SYNDICATE_ENABLE_SOCCER_RESIM_TRIGGER`, `SYNDICATE_SOCCER_RESIM_TICK_OWNER`. |
