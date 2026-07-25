@@ -559,7 +559,19 @@ def _run_refresh(*, source_root: Path, week: int, api_key: str, debug: bool = Fa
     context = _prediction_context(source_root)
     season = int(context["season"])
     sport = os.environ.get("ODDS_API_SPORT", "americanfootball_ncaaf")
-    regions = os.environ.get("ODDS_API_REGIONS", "us,us2,eu,uk")
+    # OddsAPI bills PER REGION: a 4-region request costs 4x a 1-region one for
+    # the same markets. This defaulted to "us,us2,eu,uk", making NCAAF a 4x
+    # multiplier and the only sport in the platform not on US-only -- every
+    # other lane runs with SYNDICATE_LIVE_ODDS_REFRESH_REGIONS=us. Aligning it
+    # is #18, and it matters against a measured burn that has already forced a
+    # plan upgrade (see docs/ai_context/todo.md).
+    #
+    # The trade is real, not free: _build_lines_rows keeps every bookmaker the
+    # API returns with no US filter, so this drops the eu/uk books from each
+    # game's provider list. That is the same set every other sport already
+    # lives without. ODDS_API_REGIONS still overrides, so restoring the old
+    # behaviour is an env change rather than a deploy.
+    regions = os.environ.get("ODDS_API_REGIONS", "us")
     markets = os.environ.get("ODDS_API_MARKETS", "h2h,spreads,totals")
     odds_format = os.environ.get("ODDS_API_ODDS_FORMAT", "american")
     print(f"[info] Fetching OddsAPI sport={sport} season={season} week={week} regions={regions} markets={markets}")

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from collections import OrderedDict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -619,24 +620,125 @@ def _prop_market_counts(props_by_name: dict[str, dict[str, dict[str, Any]]]) -> 
     return {"players": int(players), "markets": {key: int(value) for key, value in sorted(markets.items())}}
 
 
+# OddsAPI bills per (market x region) PER REQUEST. The core three are served
+# by the slate endpoint (/sports/{sport}/odds), which returns every game on
+# the board in ONE request -- so they cost 3 credits for the whole slate
+# instead of 3 per game. The inning-segment markets below are "additional
+# markets" that the slate endpoint does not serve; those genuinely require
+# the per-event endpoint and stay there. Splitting them is #17.
+_CORE_GAME_MARKET_KEYS = ["h2h", "spreads", "totals"]
+
+_SEGMENT_GAME_MARKET_KEYS = [
+    "h2h_1st_1_innings", "h2h_3_way_1st_1_innings", "spreads_1st_1_innings", "alternate_spreads_1st_1_innings", "totals_1st_1_innings", "alternate_totals_1st_1_innings",
+    "h2h_1st_3_innings", "h2h_3_way_1st_3_innings", "spreads_1st_3_innings", "alternate_spreads_1st_3_innings", "totals_1st_3_innings", "alternate_totals_1st_3_innings",
+    "h2h_1st_5_innings", "h2h_3_way_1st_5_innings", "spreads_1st_5_innings", "alternate_spreads_1st_5_innings", "totals_1st_5_innings", "alternate_totals_1st_5_innings",
+    "h2h_1st_7_innings", "h2h_3_way_1st_7_innings", "spreads_1st_7_innings", "alternate_spreads_1st_7_innings", "totals_1st_7_innings", "alternate_totals_1st_7_innings",
+]
+
+
+def _fetch_live_slate_odds(api_key: str, *, markets_csv: str, regions: str, bookmakers: str | None) -> dict[str, dict[str, Any]]:
+    """Core game lines for the WHOLE slate in one request, keyed by event id.
+
+    Returns {} on any failure rather than raising: the caller falls back to
+    requesting the core markets per event, which is what it did before #17.
+    A cheaper path that can break the expensive one is not worth having.
+    """
+    params: dict[str, Any] = {
+        "apiKey": api_key,
+        "regions": str(regions or "us"),
+        "oddsFormat": "american",
+        "markets": str(markets_csv or "").strip(),
+    }
+    if bookmakers:
+        params["bookmakers"] = str(bookmakers)
+    try:
+        raw, _ = _http_get(f"{API_BASE}/sports/{SPORT}/odds", params)
+    except requests.HTTPError as exc:
+        status_code, error_code, message = _http_error_details(exc)
+        if _is_fatal_live_odds_error(status_code, error_code):
+            # Out of credits / bad key must still surface -- silently falling
+            # back to the 15x-more-expensive per-event path on an
+            # OUT_OF_USAGE_CREDITS response would be the worst possible
+            # reaction to running out of credits.
+            detail = str(message or error_code or f"HTTP {status_code or 'error'}").strip()
+            raise OddsApiLiveFetchError(f"OddsAPI slate odds request failed: {detail}") from exc
+        return {}
+    by_event: dict[str, dict[str, Any]] = {}
+    for event in _as_events_list(raw):
+        event_id = str(event.get("id") or "").strip()
+        if event_id:
+            by_event[event_id] = event
+    return by_event
+
+
+def _merge_event_odds_payloads(primary: dict[str, Any] | None, secondary: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Union two odds payloads for the same event, per bookmaker.
+
+    Needed because core and segment markets now arrive from two different
+    requests, while _best_bookmaker_game_lines scores ONE payload and picks
+    the single best bookmaker. Scoring them separately would pick a book for
+    core and a different book for segments, silently mixing prices from two
+    books into one game's lines.
+    """
+    if not isinstance(primary, dict):
+        return secondary if isinstance(secondary, dict) else None
+    if not isinstance(secondary, dict):
+        return primary
+
+    merged = dict(primary)
+    by_key: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
+    for payload in (primary, secondary):
+        for bookmaker in (payload.get("bookmakers") or []):
+            if not isinstance(bookmaker, dict):
+                continue
+            key = str(bookmaker.get("key") or bookmaker.get("title") or "").strip()
+            if not key:
+                continue
+            existing = by_key.get(key)
+            if existing is None:
+                by_key[key] = dict(bookmaker)
+                by_key[key]["markets"] = list(bookmaker.get("markets") or [])
+                continue
+            seen_markets = {str((m or {}).get("key") or "") for m in existing.get("markets") or []}
+            for market in bookmaker.get("markets") or []:
+                if not isinstance(market, dict):
+                    continue
+                if str(market.get("key") or "") in seen_markets:
+                    continue
+                existing.setdefault("markets", []).append(market)
+    merged["bookmakers"] = list(by_key.values())
+    return merged
+
+
 def fetch_live_game_lines_for_date(api_key: str, date_str: str, *, regions: str = "us", bookmakers: str | None = None, events: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     live_events = list(events or _fetch_live_events_for_date(api_key, date_str))
-    game_market_keys = [
-        "h2h", "spreads", "totals",
-        "h2h_1st_1_innings", "h2h_3_way_1st_1_innings", "spreads_1st_1_innings", "alternate_spreads_1st_1_innings", "totals_1st_1_innings", "alternate_totals_1st_1_innings",
-        "h2h_1st_3_innings", "h2h_3_way_1st_3_innings", "spreads_1st_3_innings", "alternate_spreads_1st_3_innings", "totals_1st_3_innings", "alternate_totals_1st_3_innings",
-        "h2h_1st_5_innings", "h2h_3_way_1st_5_innings", "spreads_1st_5_innings", "alternate_spreads_1st_5_innings", "totals_1st_5_innings", "alternate_totals_1st_5_innings",
-        "h2h_1st_7_innings", "h2h_3_way_1st_7_innings", "spreads_1st_7_innings", "alternate_spreads_1st_7_innings", "totals_1st_7_innings", "alternate_totals_1st_7_innings",
-    ]
+    game_market_keys = _CORE_GAME_MARKET_KEYS + _SEGMENT_GAME_MARKET_KEYS
+
+    # #17: pull the core three for the entire slate in one request. At 15
+    # games that is 3 credits instead of 45, and the saving scales with the
+    # slate rather than being a fixed win.
+    slate_by_event = _fetch_live_slate_odds(
+        api_key, markets_csv=",".join(_CORE_GAME_MARKET_KEYS), regions=regions, bookmakers=bookmakers
+    )
+    # Only drop core from the per-event request if the slate call actually
+    # returned something. An empty result means the cheap path failed, and a
+    # game with no h2h/totals/spreads is worse than a more expensive request.
+    slate_covered = bool(slate_by_event)
+    per_event_market_keys = _SEGMENT_GAME_MARKET_KEYS if slate_covered else game_market_keys
+
     games: list[dict[str, Any]] = []
     for event in live_events:
         event_id = str(event.get("id") or "").strip()
         if not event_id:
             continue
         try:
-            payload = _fetch_live_event_odds(api_key, event_id, markets_csv=",".join(game_market_keys), regions=regions, bookmakers=bookmakers)
+            payload = _fetch_live_event_odds(api_key, event_id, markets_csv=",".join(per_event_market_keys), regions=regions, bookmakers=bookmakers)
         except requests.HTTPError:
-            continue
+            payload = None
+        # Merge before scoring: _best_bookmaker_game_lines picks ONE bookmaker
+        # from a single payload, so scoring core and segments separately would
+        # mix two books' prices into one game.
+        payload = _merge_event_odds_payloads(slate_by_event.get(event_id), payload)
         if not isinstance(payload, dict):
             continue
         home_team = str(event.get("home_team") or payload.get("home_team") or "")

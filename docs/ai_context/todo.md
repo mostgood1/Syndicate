@@ -101,11 +101,12 @@ Conventions:
 > #19 (cap soccer props, ~2,400 credits/sweep) also gates enabling #44b, which
 > forces cache-bypassed soccer refreshes and should stay dark until burn fits 5M.
 
-**16** audit which of the 27 MLB game markets the board renders · **17** MLB core
-game lines → slate endpoint (3 credits vs 45) · **18** NCAAF 4 regions → 1 (pure 4×
-multiplier) · **19** cap soccer props (~2,400/sweep) · **20** verify refresh runs
-can't stack · **21** keep 10×-billed historical endpoints out of prod · **22** stop
-retrying 4xx in vendor clients
+**16** audit which of the 27 MLB game markets the board renders — *now the biggest
+remaining MLB lever: after #17 the per-event call still requests **24** segment
+markets per game, so a 15-game slate is ~360 credits/sweep from segments alone* ·
+**19** cap soccer props (~2,400/sweep) · **20** verify refresh runs can't stack
+(partly addressed by #25's fail-closed marker) · **21** keep 10×-billed historical
+endpoints out of prod · **22** stop retrying 4xx in vendor clients
 
 ## Feature work
 
@@ -141,6 +142,24 @@ rows (~71% of the board have no sim projection at all — separate from #44) ·
 - **46** `sim_run_status` was unresolvable without grepping worker logs for a run
   stamp — `f6a013e3`. Now falls back to `_active.json` → `_last_attempt.json` and
   always reports `sim_run_resolution`.
+- **17** MLB core game lines moved to the slate endpoint. `h2h/spreads/totals` now
+  cost **3 credits for the whole slate** instead of 3 per game (45 at 15 games).
+  Inning-segment markets are "additional markets" the slate endpoint does not
+  serve, so they stay per-event. Core and segment payloads are merged per
+  bookmaker *before* `_best_bookmaker_game_lines` scores them — scoring
+  separately would pick one book for core and another for segments and mix two
+  books' prices into one game. Falls back to the old per-event core request if
+  the slate call fails, but a fatal `OUT_OF_USAGE_CREDITS`/bad-key response
+  raises instead: silently falling back to the 15×-more-expensive path on
+  running out of credits is the worst possible response. First tests this
+  fetcher has ever had.
+- **18** NCAAF regions default `us,us2,eu,uk` → `us`. OddsAPI bills per region, so
+  four regions was a flat 4× and NCAAF was the only sport not on US-only (every
+  other lane runs `SYNDICATE_LIVE_ODDS_REFRESH_REGIONS=us`). Real trade: NCAAF
+  keeps every bookmaker the API returns with no US filter, so the eu/uk books
+  drop out of each game's provider list — the same set every other sport already
+  lives without. `ODDS_API_REGIONS` still overrides, so reverting is an env
+  change, not a deploy.
 - **25 (Phase 0)** Fail-closed refresh guard + atomic artifact writes.
   - *Atomic writes*: `syndicate/features/shared/atomic_artifact_write.py`, wired
     into 11 call sites across 7 producers (NBA/WNBA props, basketball props, NFL
