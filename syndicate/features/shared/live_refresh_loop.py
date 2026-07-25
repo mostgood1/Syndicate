@@ -2080,6 +2080,97 @@ def _odds_refresh_min_headroom_bytes() -> int:
 	return max(0, value) * 1024 * 1024
 
 
+def _soccer_resim_trigger_enabled() -> bool:
+	# Default OFF, same posture SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER takes.
+	# This puts a market-board build on the tick path, which is exactly the
+	# shape of call that OOM-killed the 2GB refresh-worker on 2026-07-25 --
+	# so it ships dark and gets turned on deliberately, per service.
+	return _env_bool("SYNDICATE_ENABLE_SOCCER_RESIM_TRIGGER", default=False)
+
+
+def _soccer_resim_tick_owner_here() -> bool:
+	# Which service owns this decision. Mirrors _mlb_sim_tick_owner_here /
+	# _mlb_refresh_tick_owner_here. Defaults true so a service with no
+	# explicit opinion keeps whatever the enable flag says; set false on
+	# refresh-worker so this lands on live-odds-worker instead -- refresh-
+	# worker already carries the MLB sim AND the intelligence pipeline,
+	# while live-odds-worker runs neither.
+	raw = str(os.environ.get("SYNDICATE_SOCCER_RESIM_TICK_OWNER") or "").strip().lower()
+	if not raw:
+		return True
+	return raw in ("1", "true", "yes", "y", "on")
+
+
+def _soccer_resim_check_interval_seconds() -> int:
+	raw = str(os.environ.get("SYNDICATE_SOCCER_RESIM_CHECK_INTERVAL_SECONDS") or "").strip()
+	try:
+		value = int(raw or 900)
+	except Exception:
+		value = 900
+	return max(120, value)
+
+
+def _last_soccer_resim_check_path() -> Path:
+	return _meta_dir() / "last_soccer_resim_check.json"
+
+
+def _soccer_join_mismatch_leagues(*, now_epoch: float, date_str: str) -> list[str]:
+	"""Soccer leagues whose market board has at least one odds<->sim
+	needs-resim mismatch, i.e. the book is quoting an entity SoccerSim did
+	not project for that market.
+
+	Returns [] for every "don't act" case (disabled, not this service's
+	lane, inside the check interval, insufficient memory, or any error) --
+	this runs on the main loop, so it must never be the reason a tick dies.
+	"""
+	if not _soccer_resim_trigger_enabled() or not _soccer_resim_tick_owner_here():
+		return []
+	last = read_json_file(_last_soccer_resim_check_path())
+	last = last if isinstance(last, dict) else {}
+	last_epoch = float(last.get("epoch") or 0.0)
+	last_date = str(last.get("date") or "")
+	if last_epoch > 0.0 and last_date == date_str and (now_epoch - last_epoch) < _soccer_resim_check_interval_seconds():
+		return []
+
+	# build_soccer_market_board is cached (60s TTL + artifact signature), but
+	# a cold key still assembles a full board per league, so gate on real
+	# measured headroom exactly as the MLB join-mismatch check does. None
+	# means "couldn't measure" and is treated as insufficient.
+	headroom = _mlb_sim_memory_headroom_snapshot()
+	if headroom is None or not headroom.get("sufficient", False):
+		print(
+			f"[live_refresh_loop] SOCCER_JOIN_MISMATCH_CHECK_SKIPPED reason=insufficient_memory_headroom "
+			f"{json.dumps(headroom, sort_keys=True) if headroom else '{}'}",
+			flush=True,
+		)
+		return []
+
+	try:
+		from syndicate.features.soccer.market_board import soccer_needs_resim_event_ids
+		from syndicate.features.soccer.sources import active_leagues_for_date
+
+		leagues_with_mismatch: list[str] = []
+		for league in active_leagues_for_date(date_str):
+			try:
+				if soccer_needs_resim_event_ids(league, date_str):
+					leagues_with_mismatch.append(str(league))
+			except Exception as exc:
+				print(
+					f"[live_refresh_loop] SOCCER_JOIN_MISMATCH_LEAGUE_ERROR league={league} "
+					f"error={type(exc).__name__}: {exc}",
+					flush=True,
+				)
+	except Exception as exc:
+		print(f"[live_refresh_loop] SOCCER_JOIN_MISMATCH_CHECK_ERROR error={type(exc).__name__}: {exc}", flush=True)
+		return []
+
+	write_json_file(
+		_last_soccer_resim_check_path(),
+		{"epoch": now_epoch, "date": date_str, "leagues": sorted(leagues_with_mismatch), "recordedAt": _utc_now()},
+	)
+	return sorted(leagues_with_mismatch)
+
+
 def _odds_refresh_memory_headroom_snapshot() -> dict[str, Any] | None:
 	# Unlike the time-based starvation override above (reverted 2026-07-18
 	# after it forced refreshes into an actually-resident sim and OOMed the
@@ -2320,6 +2411,25 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 	force_refresh_sports = (
 		",".join(sorted(_last_lineup_injury_changed_sports())) if force_sim_rerun else None
 	) or (",".join(sorted(_LINEUP_INJURY_FETCH_PACKAGES)) if force_sim_rerun else None)
+	# Soccer's join-mismatch resim. Deliberately expressed as "add soccer to
+	# the sports whose refresh bypasses its cache" rather than as a new
+	# subprocess launcher like _launch_mlb_daily_sim: soccer's sim rebuild is
+	# ALREADY a step inside the odds refresh (build_soccer_artifacts.py, via
+	# refresh_odds_sources.py's "Refresh {league}'s current-week simulation,
+	# props, and recommendation artifacts"), so forcing that refresh is
+	# sufficient to resim, and reusing this proven path avoids adding a
+	# second set of active pointers, status files, timeouts and backoff on a
+	# worker that has already been OOM-killed twice this month.
+	soccer_resim_leagues = _soccer_join_mismatch_leagues(now_epoch=tick_started_epoch, date_str=selected_date)
+	if soccer_resim_leagues:
+		force_sim_rerun = True
+		existing_sports = [piece for piece in str(force_refresh_sports or "").split(",") if piece]
+		force_refresh_sports = ",".join(sorted(set(existing_sports) | {"soccer"}))
+		print(
+			f"[live_refresh_loop] SOCCER_JOIN_MISMATCH_RESIM_TRIGGERED date={selected_date} "
+			f"leagues={','.join(soccer_resim_leagues)}",
+			flush=True,
+		)
 	effective_mode = "full" if force_sim_rerun else _live_refresh_loop_mode()
 	meta = {
 		"startedAt": _utc_now(),

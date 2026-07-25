@@ -2056,3 +2056,136 @@ class LiveRefreshLoopTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SoccerJoinMismatchResimTriggerTests(unittest.TestCase):
+    """Soccer had NO event-driven resim path of any kind: it is absent from
+    _LINEUP_INJURY_FETCH_PACKAGES, and only MLB consumed the shared
+    needs-resim join status. 428 MLS prop rows sat suppressed
+    (is_eligible false) on 2026-07-25 with nothing able to clear them.
+
+    This trigger reuses the existing force_refresh_sports path rather than
+    adding a second subprocess launcher, because soccer's sim rebuild is
+    already a step inside the odds refresh.
+    """
+
+    def setUp(self) -> None:
+        self._tmp = TemporaryDirectory(ignore_cleanup_errors=True)
+        self._reports_root = Path(self._tmp.name)
+        os.environ["SYNDICATE_REPORTS_ROOT"] = str(self._reports_root)
+        self.addCleanup(self._tmp.cleanup)
+        self.addCleanup(lambda: os.environ.pop("SYNDICATE_REPORTS_ROOT", None))
+        for key in (
+            "SYNDICATE_ENABLE_SOCCER_RESIM_TRIGGER",
+            "SYNDICATE_SOCCER_RESIM_TICK_OWNER",
+            "SYNDICATE_SOCCER_RESIM_CHECK_INTERVAL_SECONDS",
+        ):
+            os.environ.pop(key, None)
+            self.addCleanup(lambda k=key: os.environ.pop(k, None))
+
+    def _enable(self) -> None:
+        os.environ["SYNDICATE_ENABLE_SOCCER_RESIM_TRIGGER"] = "true"
+
+    def _headroom(self, sufficient: bool = True):
+        return patch.object(
+            live_refresh_loop, "_mlb_sim_memory_headroom_snapshot", return_value={"sufficient": sufficient}
+        )
+
+    def test_disabled_by_default_does_not_even_look(self) -> None:
+        # Ships dark: this puts a market-board build on the tick path, the
+        # same shape of call that OOM-killed the container on 2026-07-25.
+        with patch.object(live_refresh_loop, "_mlb_sim_memory_headroom_snapshot") as headroom:
+            self.assertEqual(
+                live_refresh_loop._soccer_join_mismatch_leagues(now_epoch=1000.0, date_str="2026-07-25"), []
+            )
+            headroom.assert_not_called()
+
+    def test_returns_leagues_with_a_needs_resim_mismatch(self) -> None:
+        self._enable()
+        with self._headroom(), patch(
+            "syndicate.features.soccer.sources.active_leagues_for_date", return_value=["mls", "epl"]
+        ), patch(
+            "syndicate.features.soccer.market_board.soccer_needs_resim_event_ids",
+            side_effect=lambda league, date_str: ["222"] if league == "mls" else [],
+        ):
+            self.assertEqual(
+                live_refresh_loop._soccer_join_mismatch_leagues(now_epoch=1000.0, date_str="2026-07-25"), ["mls"]
+            )
+
+    def test_skips_when_memory_headroom_insufficient(self) -> None:
+        self._enable()
+        with self._headroom(sufficient=False), patch(
+            "syndicate.features.soccer.market_board.soccer_needs_resim_event_ids"
+        ) as needs_resim:
+            self.assertEqual(
+                live_refresh_loop._soccer_join_mismatch_leagues(now_epoch=1000.0, date_str="2026-07-25"), []
+            )
+            needs_resim.assert_not_called()
+
+    def test_unmeasurable_headroom_is_treated_as_insufficient(self) -> None:
+        self._enable()
+        with patch.object(live_refresh_loop, "_mlb_sim_memory_headroom_snapshot", return_value=None), patch(
+            "syndicate.features.soccer.market_board.soccer_needs_resim_event_ids"
+        ) as needs_resim:
+            self.assertEqual(
+                live_refresh_loop._soccer_join_mismatch_leagues(now_epoch=1000.0, date_str="2026-07-25"), []
+            )
+            needs_resim.assert_not_called()
+
+    def test_respects_check_interval_between_ticks(self) -> None:
+        self._enable()
+        with self._headroom(), patch(
+            "syndicate.features.soccer.sources.active_leagues_for_date", return_value=["mls"]
+        ), patch(
+            "syndicate.features.soccer.market_board.soccer_needs_resim_event_ids", return_value=["222"]
+        ) as needs_resim:
+            first = live_refresh_loop._soccer_join_mismatch_leagues(now_epoch=1000.0, date_str="2026-07-25")
+            self.assertEqual(first, ["mls"])
+            # Well inside the 900s default -- must not rebuild boards again.
+            second = live_refresh_loop._soccer_join_mismatch_leagues(now_epoch=1060.0, date_str="2026-07-25")
+            self.assertEqual(second, [])
+            self.assertEqual(needs_resim.call_count, 1)
+
+    def test_rechecks_after_interval_elapses(self) -> None:
+        self._enable()
+        with self._headroom(), patch(
+            "syndicate.features.soccer.sources.active_leagues_for_date", return_value=["mls"]
+        ), patch("syndicate.features.soccer.market_board.soccer_needs_resim_event_ids", return_value=["222"]):
+            live_refresh_loop._soccer_join_mismatch_leagues(now_epoch=1000.0, date_str="2026-07-25")
+            self.assertEqual(
+                live_refresh_loop._soccer_join_mismatch_leagues(now_epoch=1000.0 + 901.0, date_str="2026-07-25"),
+                ["mls"],
+            )
+
+    def test_not_this_services_lane_returns_empty(self) -> None:
+        self._enable()
+        os.environ["SYNDICATE_SOCCER_RESIM_TICK_OWNER"] = "false"
+        with patch("syndicate.features.soccer.market_board.soccer_needs_resim_event_ids") as needs_resim:
+            self.assertEqual(
+                live_refresh_loop._soccer_join_mismatch_leagues(now_epoch=1000.0, date_str="2026-07-25"), []
+            )
+            needs_resim.assert_not_called()
+
+    def test_one_bad_league_does_not_lose_the_others(self) -> None:
+        self._enable()
+
+        def _flaky(league, date_str):
+            if league == "epl":
+                raise RuntimeError("boom")
+            return ["222"]
+
+        with self._headroom(), patch(
+            "syndicate.features.soccer.sources.active_leagues_for_date", return_value=["epl", "mls"]
+        ), patch("syndicate.features.soccer.market_board.soccer_needs_resim_event_ids", side_effect=_flaky):
+            self.assertEqual(
+                live_refresh_loop._soccer_join_mismatch_leagues(now_epoch=1000.0, date_str="2026-07-25"), ["mls"]
+            )
+
+    def test_never_raises_into_the_tick(self) -> None:
+        self._enable()
+        with self._headroom(), patch(
+            "syndicate.features.soccer.sources.active_leagues_for_date", side_effect=RuntimeError("boom")
+        ):
+            self.assertEqual(
+                live_refresh_loop._soccer_join_mismatch_leagues(now_epoch=1000.0, date_str="2026-07-25"), []
+            )
