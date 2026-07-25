@@ -3315,3 +3315,56 @@ class WatchedPayloadEvictionTests(unittest.TestCase):
         self.assertFalse(checker("2026-13-45"))
         self.assertFalse(checker(""))
         self.assertFalse(checker(None))
+
+
+class DeferToMlbSimTests(unittest.TestCase):
+    """#55: the MLB sim (~1.1GB) and this pipeline both live on
+    refresh-worker and together exceed the 2GB container. On 2026-07-25 that
+    was an OOM crash loop -- the sim fires ~5s after every boot inside the
+    tip-off window while the board build is already running, and the instance
+    died about once a minute until the sim trigger was disabled entirely.
+
+    The bound must be pipeline-yields-to-sim, not the reverse: the sim runs
+    ~15 minutes while this loop wakes every ~60s, so avoiding a simultaneous
+    START just moves the collision a minute later.
+    """
+
+    def test_defers_while_a_sim_subprocess_is_resident(self) -> None:
+        with patch(
+            "syndicate.features.shared.live_refresh_loop._mlb_daily_sim_process_still_running",
+            return_value=True,
+        ):
+            self.assertTrue(intelligence_state_module._mlb_sim_subprocess_running())
+
+    def test_does_not_defer_when_no_sim_is_running(self) -> None:
+        with patch(
+            "syndicate.features.shared.live_refresh_loop._mlb_daily_sim_process_still_running",
+            return_value=False,
+        ):
+            self.assertFalse(intelligence_state_module._mlb_sim_subprocess_running())
+
+    def test_can_be_disabled_by_env(self) -> None:
+        # Escape hatch: if deference ever starves the board, it must be
+        # switchable without a deploy.
+        with patch.dict(os.environ, {"SYNDICATE_INTELLIGENCE_DEFER_TO_MLB_SIM": "false"}, clear=False):
+            with patch(
+                "syndicate.features.shared.live_refresh_loop._mlb_daily_sim_process_still_running",
+                return_value=True,
+            ):
+                self.assertFalse(intelligence_state_module._mlb_sim_subprocess_running())
+
+    def test_enabled_by_default(self) -> None:
+        # This is the fix, so it must be on unless explicitly turned off.
+        for value in ("", None):
+            with patch.dict(os.environ, {} if value is None else {"SYNDICATE_INTELLIGENCE_DEFER_TO_MLB_SIM": ""}, clear=False):
+                os.environ.pop("SYNDICATE_INTELLIGENCE_DEFER_TO_MLB_SIM", None)
+                self.assertTrue(intelligence_state_module._defer_to_mlb_sim_enabled())
+
+    def test_a_broken_sim_check_never_stops_the_board(self) -> None:
+        # Instrumentation must not be able to break the thing it guards: if
+        # the check raises, the pipeline should run, not stall forever.
+        with patch(
+            "syndicate.features.shared.live_refresh_loop._mlb_daily_sim_process_still_running",
+            side_effect=RuntimeError("boom"),
+        ):
+            self.assertFalse(intelligence_state_module._mlb_sim_subprocess_running())

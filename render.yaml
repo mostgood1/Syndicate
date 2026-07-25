@@ -391,22 +391,21 @@ services:
       # otherwise idle capacity already being paid for. See
       # scripts/run_refresh_worker.py's call to
       # syndicate.features.shared.live_refresh_loop._run_mlb_sim_tick().
-      # DISABLED 2026-07-25 to stop a live OOM crash loop, and left disabled
-      # here deliberately so a blueprint re-apply cannot silently restart it.
+      # Re-enabled 2026-07-25 AFTER the #55 fix landed. It was disabled for
+      # part of that afternoon to stop an OOM crash loop: the sim fires ~5s
+      # after every boot once the evening slate is inside its tip-off window,
+      # concurrently with the intelligence board build this same worker runs,
+      # and together they exceed the 2GB container. The launch-time memory
+      # gate never caught it because it measures at ~250MB, before either
+      # pipeline grows.
       #
-      # The sim fires ~5s after every boot once the evening slate is inside
-      # its tip-off window, concurrently with the intelligence board build
-      # this same worker runs. Together they exceed the 2GB container, so the
-      # instance OOMs, restarts, and does it again -- roughly once a minute,
-      # forever. The launch-time memory gate does not catch it because it
-      # measures at ~250MB, before either pipeline has grown.
-      #
-      # Re-enabling needs the sim to defer while the intelligence pipeline is
-      # mid-computation (the inverse of the existing
-      # _mlb_daily_sim_process_still_running guard). Tracked as #55 in
-      # docs/ai_context/todo.md. Flip to "true" only after that lands.
+      # What makes this safe now is the other side of the bound: the
+      # intelligence loop yields while a sim subprocess is resident (see
+      # _mlb_sim_subprocess_running in pipeline/intelligence_state.py). If
+      # that is ever disabled via SYNDICATE_INTELLIGENCE_DEFER_TO_MLB_SIM,
+      # this must go back to "false" or the crash loop returns.
       - key: SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER
-        value: "false"
+        value: "true"
       - key: SYNDICATE_EVENT_SIM_FORCE_WINDOW_MINUTES
         value: "30"
       - key: SYNDICATE_MLB_SIM_CHECK_INTERVAL_SECONDS

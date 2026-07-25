@@ -172,6 +172,43 @@ def _selected_date_from_payload(payload: dict[str, Any] | None) -> str | None:
     return str(current.get("date") or current.get("selected_date") or "").strip() or None
 
 
+def _defer_to_mlb_sim_enabled() -> bool:
+    return _env_bool("SYNDICATE_INTELLIGENCE_DEFER_TO_MLB_SIM", default=True)
+
+
+def _mlb_sim_subprocess_running() -> bool:
+    """True while an MLB daily-sim subprocess is resident on this worker.
+
+    #55: the sim (~1.1GB) and this pipeline both run on refresh-worker, and
+    together they exceed the 2GB container. On 2026-07-25 that produced an
+    OOM crash loop -- the sim fires ~5s after every boot inside the tip-off
+    window, the board build is already running, and the instance dies about
+    once a minute.
+
+    Deferring the SIM to the pipeline would not have fixed it: the sim runs
+    ~15 minutes while this loop wakes every ~60s, so avoiding a simultaneous
+    START just moves the collision a minute later. The bound has to be this
+    way round -- the pipeline yields for as long as a sim is resident.
+
+    The cost is real and worth stating: the board can go up to a sim's
+    duration without recomputing. It serves last-known-good state meanwhile,
+    which is a degraded board rather than no board -- and the alternative
+    measured in production is a worker that OOMs before either finishes.
+
+    Mirrors the existing protection in the other direction: the odds refresh
+    already defers to a resident sim via the same helper.
+    """
+    if not _defer_to_mlb_sim_enabled():
+        return False
+    try:
+        from syndicate.features.shared.live_refresh_loop import _mlb_daily_sim_process_still_running
+
+        return bool(_mlb_daily_sim_process_still_running())
+    except Exception:
+        # Never let this check be the reason the board stops updating.
+        return False
+
+
 def _watched_payload_eviction_reason(payload: dict[str, Any] | None, today_iso: str) -> str | None:
     """Why this watched payload should be dropped from the replay queue
     instead of being recomputed forever, or None to keep it.
@@ -2168,6 +2205,17 @@ class IntelligenceStateService:
             run_failed = False
             run_started_at = time.time()
             print(f"[intelligence_state] LOOP_POPPED_PAYLOAD key={_payload_key(payload_to_process)}", flush=True)
+            # #55: yield the container to a resident MLB sim. Re-queue rather
+            # than drop -- this payload still needs computing, just not while
+            # 1.1GB of sim is resident in a 2GB container.
+            if _mlb_sim_subprocess_running():
+                print("[intelligence_state] DEFERRED_TO_MLB_SIM reason=sim_subprocess_resident", flush=True)
+                with self._condition:
+                    self._pending_keys[_payload_key(payload_to_process)] = payload_to_process
+                    self._pending_keys.move_to_end(_payload_key(payload_to_process))
+                    self._trim_ordered_dict(self._pending_keys, self._max_snapshots)
+                    self._condition.wait(timeout=float(self._interval_seconds))
+                continue
             try:
                 guard_acquired = self._execution_guard.acquire(blocking=False)
                 print(f"[intelligence_state] GUARD_ACQUIRE_RESULT acquired={guard_acquired}", flush=True)
