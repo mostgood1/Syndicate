@@ -1082,9 +1082,36 @@ def _mlb_join_mismatch_game_pks(date_str: str) -> list[str]:
 		return []
 
 
+def _intelligence_pipeline_busy() -> bool:
+	# #55, sim side. The pipeline yielding to a resident sim is only half the
+	# bound: at boot the pipeline starts FIRST and this gate fires ~5s later,
+	# so the pipeline never sees a sim and both run. Confirmed in production
+	# 2026-07-25 -- the worker OOM-looped with pipeline_defers=0.
+	#
+	# Imported lazily: pipeline.intelligence_state imports this module (also
+	# lazily) for the mirror-image check, so a module-level import either way
+	# would be a cycle.
+	if not _env_bool("SYNDICATE_MLB_SIM_DEFER_TO_INTELLIGENCE", default=True):
+		return False
+	try:
+		from pipeline.intelligence_state import intelligence_pipeline_busy
+
+		return bool(intelligence_pipeline_busy())
+	except Exception:
+		# Never let this check be the reason a slate goes unsimmed.
+		return False
+
+
 def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any]:
 	if not _mlb_daily_sim_enabled():
 		return {"force": False, "reason": "disabled"}
+	if _intelligence_pipeline_busy():
+		# Wait for the current board build to finish rather than stacking
+		# ~1.1GB of sim on top of it in a 2GB container. Costs at most one
+		# tick: the pipeline's run is finite, and once the sim IS running the
+		# pipeline defers to it in turn, so the two alternate instead of
+		# overlapping.
+		return {"force": False, "reason": "intelligence_pipeline_busy"}
 	if _mlb_daily_sim_process_still_running():
 		# A previously launched sim subprocess is still alive. Every other
 		# branch below (first_appearance, tip_off_window, fingerprint_change)

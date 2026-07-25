@@ -172,6 +172,32 @@ def _selected_date_from_payload(payload: dict[str, Any] | None) -> str | None:
     return str(current.get("date") or current.get("selected_date") or "").strip() or None
 
 
+def intelligence_pipeline_busy() -> bool:
+    """True while the board build is actively computing in THIS process.
+
+    The other half of #55. Deferring the pipeline to a resident sim is not
+    enough on its own: at boot the pipeline starts first and the sim fires
+    ~5s later, so the pipeline's own check sees no sim and both run anyway.
+    That is exactly what happened in production on 2026-07-25 --
+    `pipeline_defers=0` while the worker OOM-looped.
+
+    The two guards together produce strict alternation rather than overlap,
+    and neither can starve the other: each waits only for a finite run of the
+    other to end.
+
+    Reads the service's execution guard because that is the lock the
+    background loop actually holds while computing. The module-level
+    _INTELLIGENCE_EXECUTION_GUARD is a different, effectively unused lock --
+    nothing acquires it, so _intelligence_guard_is_busy() would always say
+    False and silently disable this protection.
+    """
+    guard = getattr(_INTELLIGENCE_STATE_SERVICE, "_execution_guard", None)
+    try:
+        return bool(guard is not None and guard.locked())
+    except Exception:
+        return False
+
+
 def _defer_to_mlb_sim_enabled() -> bool:
     return _env_bool("SYNDICATE_INTELLIGENCE_DEFER_TO_MLB_SIM", default=True)
 

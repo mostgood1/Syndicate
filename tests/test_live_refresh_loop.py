@@ -2246,3 +2246,67 @@ class FailClosedRefreshLaunchMarkerTests(unittest.TestCase):
 
         self.assertEqual(len(launched), 1)
         self.assertTrue(meta.get("ok"))
+
+
+class SimDefersToIntelligencePipelineTests(unittest.TestCase):
+    """#55, sim side. Deferring the PIPELINE to a resident sim is only half
+    the bound: at boot the pipeline starts first and the sim gate fires ~5s
+    later, so the pipeline never sees a sim and both run. Production
+    2026-07-25 showed exactly that -- the worker OOM-looped with
+    pipeline_defers=0 while sims were re-enabled.
+
+    Together the two guards alternate instead of overlapping, and neither
+    starves the other: each waits only for a finite run of the other.
+    """
+
+    def setUp(self) -> None:
+        os.environ["SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER"] = "true"
+        self.addCleanup(lambda: os.environ.pop("SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER", None))
+        os.environ.pop("SYNDICATE_MLB_SIM_DEFER_TO_INTELLIGENCE", None)
+        self.addCleanup(lambda: os.environ.pop("SYNDICATE_MLB_SIM_DEFER_TO_INTELLIGENCE", None))
+
+    def test_defers_while_the_board_build_is_computing(self) -> None:
+        with patch.object(live_refresh_loop, "_intelligence_pipeline_busy", return_value=True):
+            decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=1000.0, date_str="2026-07-25")
+        self.assertFalse(decision["force"])
+        self.assertEqual(decision["reason"], "intelligence_pipeline_busy")
+
+    def test_reads_the_lock_the_background_loop_actually_holds(self) -> None:
+        # The module-level _INTELLIGENCE_EXECUTION_GUARD is a different,
+        # effectively unused lock -- reading that one would always report
+        # "idle" and silently disable this protection.
+        import pipeline.intelligence_state as intelligence_state
+
+        # Asserts the TRANSITION, not an absolute initial state: a
+        # background loop from another test may legitimately hold this guard
+        # when the suite runs as a whole.
+        guard = intelligence_state._INTELLIGENCE_STATE_SERVICE._execution_guard
+        acquired = guard.acquire(blocking=False)
+        try:
+            if not acquired:
+                self.skipTest("intelligence guard already held by a live background loop")
+            self.assertTrue(intelligence_state.intelligence_pipeline_busy())
+        finally:
+            if acquired:
+                guard.release()
+        self.assertFalse(intelligence_state.intelligence_pipeline_busy())
+
+    def test_can_be_disabled_by_env(self) -> None:
+        os.environ["SYNDICATE_MLB_SIM_DEFER_TO_INTELLIGENCE"] = "false"
+        with patch.object(live_refresh_loop, "_env_bool", side_effect=lambda name, default=False: False if name == "SYNDICATE_MLB_SIM_DEFER_TO_INTELLIGENCE" else default):
+            self.assertFalse(live_refresh_loop._intelligence_pipeline_busy())
+
+    def test_a_broken_check_never_blocks_the_sim(self) -> None:
+        # A slate that never sims is its own failure; this guard must fail
+        # open, unlike the memory gates which fail closed.
+        with patch.dict("sys.modules", {"pipeline.intelligence_state": None}):
+            self.assertFalse(live_refresh_loop._intelligence_pipeline_busy())
+
+    def test_disabled_trigger_still_short_circuits_first(self) -> None:
+        # The cheap check stays first: a service with the trigger off should
+        # not be importing the intelligence pipeline every tick.
+        os.environ["SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER"] = "false"
+        with patch.object(live_refresh_loop, "_intelligence_pipeline_busy") as busy:
+            decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=1000.0, date_str="2026-07-25")
+            busy.assert_not_called()
+        self.assertEqual(decision["reason"], "disabled")

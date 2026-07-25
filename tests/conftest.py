@@ -41,3 +41,25 @@ def _clear_wall_clock_ttl_caches() -> None:
     for cache_owner in caches:
         cache_owner.cache_clear()
     clear_soccer_market_board_cache()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_intelligence_pipeline_busy_signal():
+    # _mlb_daily_sim_decision now defers while the intelligence board build is
+    # computing (#55), which it detects by reading the live service's
+    # execution guard. That guard is real, process-wide, ambient state: any
+    # test that calls create_app() starts the intelligence background loop,
+    # and if that loop happens to be mid-compute when an unrelated sim-gate
+    # test runs, the decision comes back "intelligence_pipeline_busy" instead
+    # of the reason under test. The failure is order-dependent -- the sim-gate
+    # tests pass in isolation and fail in a full run.
+    #
+    # Default the signal to "idle" so decision tests are deterministic. Tests
+    # that exercise the deference itself patch it to True explicitly, which
+    # overrides this.
+    from unittest.mock import patch as _patch
+
+    from syndicate.features.shared import live_refresh_loop
+
+    with _patch.object(live_refresh_loop, "_intelligence_pipeline_busy", return_value=False):
+        yield
