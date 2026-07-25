@@ -1035,9 +1035,20 @@ class IntelligenceStateService:
         }
 
     def _available_sport_manifests(self, selected_date: str | None) -> OrderedDict[str, dict[str, Any]]:
-        status = _profile_stage("data_ingestion", build_intelligence_status, selected_date=selected_date, force_refresh=False)
+        # Root-caused 2026-07-25: this only ever reads sport.get("slug") below,
+        # but was calling build_intelligence_status -- which, unlike this
+        # method's other overview call sites, was never given
+        # skip_game_hydration=True, so it ran a full home-page card hydration
+        # pass (both lanes, every sport) just to list sport slugs. Confirmed
+        # live: this was the dominant cost of the ~3-minute gap between
+        # _build_candidate_pool's post_candidate_building and
+        # post_pool_assembled checkpoints, called on every single manifest
+        # loop even after the source-fingerprint and simulation-context fixes
+        # landed. Same fix shape as _source_state_fingerprint's own
+        # build_intelligence_status calls.
+        overview = _profile_stage("data_ingestion", build_intelligence_overview, selected_date=selected_date, force_refresh=False, skip_game_hydration=True)
         manifests: OrderedDict[str, dict[str, Any]] = OrderedDict()
-        for sport in status.get("sports") if isinstance(status.get("sports"), list) else []:
+        for sport in overview if isinstance(overview, list) else []:
             if not isinstance(sport, dict):
                 continue
             sport_slug = str(sport.get("slug") or "").strip().lower()
