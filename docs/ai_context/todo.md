@@ -69,6 +69,15 @@ Conventions:
 
 ## OddsAPI budget (after #14/#15)
 
+> **Measured burn, 2026-07-25T18:21Z** (first real reading, from #14):
+> 525 credits in a 235s window → **8,042 credits/hour → ~5.79M/30d, against a 5M
+> target.** Confirms the overage is real and the original ~6.3M estimate was
+> roughly right. Two caveats that both point the same way: the window is only
+> ~4 minutes (fragile extrapolation), and this was a *quiet* slate — WNBA-only
+> observations, MLB's slate largely done, NFL/NCAAF/NCAAB out of season. Busy-day
+> burn is very likely **higher** than 5.79M, so treat this as a floor.
+> Needs ≥14% reduction on a light day, more on a heavy one.
+>
 > **These are required work, not optimisations. The target is 5M.**
 > The plan currently reads 15M, but it was bumped to 15M *because of a real
 > prior overage* — it is remediation, and the objective is to cut burn enough to
