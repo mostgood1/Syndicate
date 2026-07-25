@@ -14,12 +14,19 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from syndicate.features.shared.oddsapi_quota import record_oddsapi_quota
 import requests
 from requests.exceptions import HTTPError
 
@@ -149,6 +156,7 @@ def _pick_player_from_outcome(outcome: dict[str, Any]) -> str | None:
 def fetch_events(api_key: str, *, sport_key: str, region: str) -> list[dict[str, Any]]:
     url = f"{_get_base_url()}/sports/{sport_key}/events"
     response = requests.get(url, params={"apiKey": api_key, "regions": region}, timeout=20)
+    record_oddsapi_quota(response.headers, sport="soccer", endpoint=url)
     response.raise_for_status()
     return response.json()
 
@@ -173,6 +181,7 @@ def fetch_event_player_props(
             },
             timeout=20,
         )
+        record_oddsapi_quota(response.headers, sport="soccer", endpoint=url)
         response.raise_for_status()
         return response.json()
     except HTTPError as exc:

@@ -2,10 +2,17 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 from pathlib import Path
 
 import pandas as pd
 import requests
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from syndicate.features.shared.oddsapi_quota import record_oddsapi_quota
 
 
 API_BASE = "https://api.the-odds-api.com/v4"
@@ -85,8 +92,21 @@ def _bookmakers_csv(raw: str | None) -> str | None:
     return ",".join(values) if values else None
 
 
+def _quota_sport(url: str) -> str:
+    # One fetcher serves both basketball leagues, so attribute the credits to
+    # whichever one the URL is actually for -- lumping them together would
+    # make the per-sport burn breakdown useless for cadence tuning (#15).
+    text = str(url or "").lower()
+    if "basketball_wnba" in text:
+        return "wnba"
+    if "basketball_nba" in text:
+        return "nba"
+    return "basketball"
+
+
 def _get(url: str, params: dict[str, object]) -> requests.Response:
     response = requests.get(url, params=params, headers=_headers(), timeout=45)
+    record_oddsapi_quota(response.headers, sport=_quota_sport(url), endpoint=url)
     response.raise_for_status()
     return response
 

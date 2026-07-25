@@ -2,12 +2,19 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
 import requests
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from syndicate.features.shared.oddsapi_quota import record_oddsapi_quota
 
 
 API_BASE = "https://api.the-odds-api.com/v4"
@@ -78,6 +85,11 @@ def _read_json_if_exists(path: Path) -> dict[str, Any] | None:
 
 def _http_get(url: str, params: dict[str, Any], timeout: int = 30) -> tuple[Any, dict[str, str]]:
     response = requests.get(url, params=params, timeout=timeout)
+    # Recorded BEFORE raise_for_status: a 4xx/5xx still carries the quota
+    # headers, and a call that failed may well have been billed. Dropping
+    # those observations would bias measured burn downward -- exactly the
+    # direction that makes an over-budget account look fine.
+    record_oddsapi_quota(response.headers, sport="mlb", endpoint=url)
     response.raise_for_status()
     return response.json(), {str(key).lower(): str(value) for key, value in response.headers.items()}
 

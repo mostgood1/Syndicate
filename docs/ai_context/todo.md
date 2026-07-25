@@ -19,7 +19,6 @@ Conventions:
 
 | # | Item | Notes |
 |---|---|---|
-| **14** | Instrument OddsAPI quota headers (`x-requests-remaining` / `x-requests-used`) in Syndicate's own fetchers | Only vendor code reads them today, so there is **no ground truth on burn rate**. Blocks #15, and now also gates enabling #44b. |
 | **41** | Regression test for scoped resim truncating the MLB daily summary | Code shipped (`dcda6243`); no test. Non-targeted games `continue` before `outputs.append`, and `cards.py:4629` builds the whole board from `summary["outputs"]`. Likely the "184→10" flakiness. |
 | **25** | Phase 0 fail-closed refresh guard + atomic writes | Fixes candidate swings, look-ahead interval violations (#24) and duplicate sweeps (#20) at once. Same bug family as #43. |
 | **15** | Tier odds refresh cadence by volatility | Biggest quota lever: MLB alone ≈ 585 credits/sweep × 60s ticks ≈ **6.3M/month against a 5M budget**. Game lines 60s, props 5–10min, alternates/innings 15–30min. **Blocked by #14** — do not tune on estimates. |
@@ -38,12 +37,16 @@ Conventions:
   - ❌ Open: re-enable look-ahead with deference to an in-flight sim (reuse
     `_mlb_daily_sim_process_still_running`, mirroring the `any_live` guard).
   - ❌ Open: the 2700s timeout has still never been exercised (today ran 15m).
-- **#43 — Layer 2 curated board empty. PARTIALLY FIXED, still open.**
-  - ✅ Stale-dated payload replay fixed in `495b71db`; proven in production —
-    `context_label` moved from `2026-07-25`'s wrong `2026-07-24` to the correct date.
-  - ❌ **A second root cause remains**: with the date correct, candidate generation
-    still yields `candidate_count: 0` and `dashboard_games_count: 0` while MLB has
-    15 games and a fresh sim. Work backward from candidate generation.
+- **#43 — Layer 2 curated board empty. Root cause FIXED; board still thin.**
+  - ✅ *Validated in production 2026-07-25*: stale-dated payload replay fixed in
+    `495b71db`. `context_label` moved from `2026-07-24` to the correct
+    `2026-07-25`, `candidate_count` went 0 → 1, and `snapshot_generated_at` went
+    `null` → `2026-07-25T18:06:51Z`. Recovery took ~6 minutes after the worker
+    restart — do not judge this fix before the loop completes a full cycle.
+  - ❌ Open (**separate issue, not the replay bug**): 1 candidate off a 15-game MLB
+    slate, and `board_contract.pregame` / `.live` / `.top_overall` are all still 0.
+    The pipeline now runs on the right date but produces almost nothing. Work
+    backward from candidate generation; see also #47 (soccer absent entirely).
 - **#31 — NHL revamp Phase 5: local producers replace vendor subprocess.**
 
 ## Platform / correctness
@@ -107,6 +110,16 @@ rows (~71% of the board have no sim projection at all — separate from #44) ·
 - **46** `sim_run_status` was unresolvable without grepping worker logs for a run
   stamp — `f6a013e3`. Now falls back to `_active.json` → `_last_attempt.json` and
   always reports `sim_run_resolution`.
+- **14** OddsAPI quota instrumentation. `syndicate/features/shared/oddsapi_quota.py`
+  records `x-requests-remaining` / `-used` / `-last` from MLB, basketball
+  (NBA+WNBA, attributed separately) and soccer fetchers; read it at
+  **`GET /api/ops/oddsapi/quota`**. Records observations rather than accumulating,
+  because `used`/`remaining` are absolute server-side counters — so burn survives
+  the lost writes you get from three services racing on a non-atomic store.
+  Recorded *before* `raise_for_status`, since a failed call may still be billed and
+  dropping it would bias measured burn downward. Reports `None` rather than `0`
+  when there is only one observation: "not measured" must not look like
+  "not burning". **Still to wire**: NFL props/team odds, NHL, NCAAF, NCAAB.
 
 ---
 

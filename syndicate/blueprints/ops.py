@@ -387,6 +387,18 @@ def api_ops_artifacts_export() -> Any:
     return jsonify({"ok": True, "count": len(artifacts), "artifacts": artifacts})
 
 
+@ops_bp.get("/api/ops/oddsapi/quota")
+def api_ops_oddsapi_quota() -> Any:
+    # Ground truth for OddsAPI credit burn, straight from the counters the
+    # vendor bills against (x-requests-used / -remaining). Every cadence
+    # decision so far has been made against an ESTIMATE -- notably "MLB alone
+    # is ~585 credits/sweep at 60s ticks, so ~6.3M/month against a 5M
+    # budget". This is how that gets checked before #15 tunes anything.
+    from syndicate.features.shared.oddsapi_quota import read_oddsapi_quota
+
+    return jsonify({"ok": True, "quota": normalize_timestamped_payload(read_oddsapi_quota())})
+
+
 @ops_bp.get("/api/ops/live-refresh/state")
 def api_ops_live_refresh_state() -> Any:
     # Read-only view of the live-refresh loop's shared state (tick meta, gate
