@@ -531,8 +531,24 @@ services:
         value: "30"
       - key: GUNICORN_KEEPALIVE
         value: "5"
+      # Enabled 2026-07-25 (#57): the board build moved here from
+      # refresh-worker, where it no longer fits. Measured that day:
+      # refresh-worker peaks ~1674MB running the MLB sim alone, leaving ~374MB
+      # -- not enough for a build that needs ~700MB and spikes past 1479MB.
+      # This service runs neither the sim nor the pipeline today.
+      #
+      # Exactly ONE service may own this loop; refresh-worker's copy is
+      # "false" for that reason. Two owners would recompute the same state
+      # concurrently and reproduce the collision on a different box.
+      #
+      # UNVERIFIED ON A REAL WNBA SLATE. This box's own odds refresh can spawn
+      # WNBA SmartSim, and a code comment puts that at ~1.3-1.5GB -- but that
+      # figure is a comment, not a measurement, and 2026-07-25 was an All-Star
+      # day with one game (measured 412-652MB). The pipeline defers to an
+      # in-flight refresh to cover it (see _odds_refresh_in_flight); confirm
+      # against #59's Tuesday measurement before trusting this under load.
       - key: SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP
-        value: "false"
+        value: "true"
       - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
         value: "true"
       - key: SYNDICATE_BOOTSTRAP_WNBA_TODAY

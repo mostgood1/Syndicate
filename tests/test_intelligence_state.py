@@ -3368,3 +3368,36 @@ class DeferToMlbSimTests(unittest.TestCase):
             side_effect=RuntimeError("boom"),
         ):
             self.assertFalse(intelligence_state_module._mlb_sim_subprocess_running())
+
+
+class DeferToOddsRefreshTests(unittest.TestCase):
+    """#57: the board build is moving to live-odds-worker, whose own hazard
+    differs from refresh-worker's -- its odds refresh can spawn WNBA SmartSim
+    and is documented spiking to ~1.3-1.5GB in the same 2048MB container.
+    Stacking the board build on that would relocate the 2026-07-25 outage
+    rather than fix it.
+    """
+
+    def test_defers_while_an_odds_refresh_is_in_flight(self) -> None:
+        with patch("syndicate.features.shared.ops_refresh.is_refresh_run_active", return_value=True):
+            self.assertTrue(intelligence_state_module._odds_refresh_in_flight())
+
+    def test_does_not_defer_when_no_refresh_is_running(self) -> None:
+        with patch("syndicate.features.shared.ops_refresh.is_refresh_run_active", return_value=False):
+            self.assertFalse(intelligence_state_module._odds_refresh_in_flight())
+
+    def test_can_be_disabled_by_env(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_INTELLIGENCE_DEFER_TO_ODDS_REFRESH": "false"}, clear=False):
+            with patch("syndicate.features.shared.ops_refresh.is_refresh_run_active", return_value=True):
+                self.assertFalse(intelligence_state_module._odds_refresh_in_flight())
+
+    def test_enabled_by_default(self) -> None:
+        os.environ.pop("SYNDICATE_INTELLIGENCE_DEFER_TO_ODDS_REFRESH", None)
+        with patch("syndicate.features.shared.ops_refresh.is_refresh_run_active", return_value=True):
+            self.assertTrue(intelligence_state_module._odds_refresh_in_flight())
+
+    def test_a_broken_check_never_stalls_the_board(self) -> None:
+        # A false positive would stall the board indefinitely, which is worse
+        # than the occasional stacking that happens today anyway.
+        with patch("syndicate.features.shared.ops_refresh.is_refresh_run_active", side_effect=RuntimeError("boom")):
+            self.assertFalse(intelligence_state_module._odds_refresh_in_flight())

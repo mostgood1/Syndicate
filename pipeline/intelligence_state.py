@@ -235,6 +235,30 @@ def _mlb_sim_subprocess_running() -> bool:
         return False
 
 
+def _odds_refresh_in_flight() -> bool:
+    """True while this service has an odds-refresh run in flight.
+
+    #57: the board build is moving off refresh-worker (where it no longer
+    fits alongside the MLB sim) onto live-odds-worker. That box's own hazard
+    is different -- its odds refresh can spawn WNBA SmartSim and is
+    documented spiking to ~1.3-1.5GB in the same 2048MB container
+    (live_refresh_loop.py). Stacking the board build on top of that is the
+    same mistake that caused today's outage, just relocated.
+
+    is_refresh_run_active() is deliberately conservative: a false negative
+    means occasional stacking, which is what happens today anyway, while a
+    false positive would stall the board indefinitely.
+    """
+    if not _env_bool("SYNDICATE_INTELLIGENCE_DEFER_TO_ODDS_REFRESH", default=True):
+        return False
+    try:
+        from syndicate.features.shared.ops_refresh import is_refresh_run_active
+
+        return bool(is_refresh_run_active())
+    except Exception:
+        return False
+
+
 def _watched_payload_eviction_reason(payload: dict[str, Any] | None, today_iso: str) -> str | None:
     """Why this watched payload should be dropped from the replay queue
     instead of being recomputed forever, or None to keep it.
@@ -2234,8 +2258,18 @@ class IntelligenceStateService:
             # #55: yield the container to a resident MLB sim. Re-queue rather
             # than drop -- this payload still needs computing, just not while
             # 1.1GB of sim is resident in a 2GB container.
+            deferral_reason = None
             if _mlb_sim_subprocess_running():
-                print("[intelligence_state] DEFERRED_TO_MLB_SIM reason=sim_subprocess_resident", flush=True)
+                deferral_reason = "sim_subprocess_resident"
+            elif _odds_refresh_in_flight():
+                # Host-specific: matters on live-odds-worker, whose refresh can
+                # spawn WNBA SmartSim and spike to ~1.3-1.5GB (#57).
+                deferral_reason = "odds_refresh_in_flight"
+            if deferral_reason is not None:
+                # Deliberately NOT named DEFERRED_TO_MLB_SIM: this fires for
+                # the odds-refresh case too, and a sim-specific name would
+                # send whoever greps it on 2026-07-25's wrong trail again.
+                print(f"[intelligence_state] DEFERRED_BOARD_BUILD reason={deferral_reason}", flush=True)
                 with self._condition:
                     self._pending_keys[_payload_key(payload_to_process)] = payload_to_process
                     self._pending_keys.move_to_end(_payload_key(payload_to_process))

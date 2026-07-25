@@ -219,6 +219,31 @@ def main() -> int:
     log_all_process_memory("startup", worker="run_live_odds_refresh_worker", pid=os.getpid(), argv=list(sys.argv))
     log_runtime_memory("startup", worker="run_live_odds_refresh_worker", pid=os.getpid(), argv=list(sys.argv))
     assert_refresh_state_backend_ready(process_name="live-odds-worker")
+    # #57: the intelligence board build can now be hosted here instead of on
+    # refresh-worker, where it no longer fits alongside the MLB sim in 2GB.
+    # This service runs neither the sim nor the intelligence pipeline today,
+    # which is why it is the candidate.
+    #
+    # Gated by the same env var refresh-worker uses, so exactly one service
+    # owns the loop -- two owners would recompute the same state concurrently
+    # and put the collision back, just on a different box.
+    #
+    # The risk here is different from refresh-worker's: this service's own
+    # odds refresh can spawn WNBA SmartSim and is documented spiking to
+    # ~1.3-1.5GB. The pipeline defers to an in-flight refresh for that reason
+    # (see _odds_refresh_in_flight in pipeline/intelligence_state.py).
+    if str(os.environ.get("SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP") or "").strip().lower() in {"1", "true", "yes", "on"}:
+        print("[live_odds_worker] INTELLIGENCE_LOOP_ENABLED calling start_intelligence_state_background_loop()", flush=True)
+        try:
+            from pipeline.intelligence_state import start_intelligence_state_background_loop
+
+            loop_started = start_intelligence_state_background_loop()
+            print(f"[live_odds_worker] INTELLIGENCE_LOOP_START_RESULT started={loop_started}", flush=True)
+        except Exception as exc:
+            # Must not stop this worker doing its actual job.
+            print(f"[live_odds_worker] INTELLIGENCE_LOOP_START_FAILED {type(exc).__name__}: {exc}", flush=True)
+    else:
+        print("[live_odds_worker] INTELLIGENCE_LOOP_DISABLED", flush=True)
     parser = argparse.ArgumentParser(description="Run the Syndicate live odds refresh worker loop.")
     parser.add_argument("--run-once", action="store_true")
     args = parser.parse_args()
