@@ -13,7 +13,8 @@ import csv
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
-from .contracts import HockeyGamePrediction, HockeyMarketLines
+from .adapters import ev_per_unit
+from .contracts import HockeyGamePrediction, HockeyMarketLines, HockeyPropProjection
 
 # Exact predictions_{date}.csv column order the UI consumes (the vendor game-predictions contract).
 PREDICTIONS_COLUMNS: List[str] = [
@@ -94,4 +95,79 @@ def write_predictions_csv(
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
+    return len(rows)
+
+
+# ---------------------------------------------------------------------------
+# Player props (props_recommendations_{date}.csv)
+# ---------------------------------------------------------------------------
+
+PROPS_RECOMMENDATIONS_COLUMNS: List[str] = [
+    "date", "player", "team", "opp", "market", "line", "proj_lambda", "p_over",
+    "over_price", "under_price", "book", "side", "price", "ev", "ev_over",
+    "chosen_prob", "edge_score", "edge_drivers", "edge_reasons", "proj",
+]
+
+
+def prop_recommendation_row(
+    proj: HockeyPropProjection,
+    *,
+    over_price: Optional[int],
+    under_price: Optional[int],
+    book: str,
+) -> Optional[Dict[str, object]]:
+    """Build one props_recommendations row from a projection + a book's over/under prices.
+
+    Picks the higher-EV actionable side. Returns ``None`` when no side is playable (no prices, or
+    the projection has no over/under probabilities because it lacked a line).
+    """
+    if proj.p_over is None or proj.p_under is None:
+        return None
+    ev_over = ev_per_unit(proj.p_over, over_price) if over_price is not None else None
+    ev_under = ev_per_unit(proj.p_under, under_price) if under_price is not None else None
+    if ev_over is None and ev_under is None:
+        return None
+
+    take_over = (ev_under is None) or (ev_over is not None and ev_over >= ev_under)
+    side = "Over" if take_over else "Under"
+    chosen_prob = proj.p_over if take_over else proj.p_under
+    price = over_price if take_over else under_price
+    ev = ev_over if take_over else ev_under
+    edge_score = round(2.0 * float(chosen_prob) - 1.0, 6)
+
+    driver = f"model leans {side}"
+    if price is not None and int(price) <= -150:
+        driver += " · JUICE+"
+    return {
+        "date": proj.date,
+        "player": proj.player,
+        "team": proj.team,
+        "opp": proj.opp,
+        "market": proj.market,
+        "line": _fmt(proj.line),
+        "proj_lambda": _fmt(proj.proj_lambda),
+        "p_over": _fmt(proj.p_over),
+        "over_price": over_price,
+        "under_price": under_price,
+        "book": book,
+        "side": side,
+        "price": price,
+        "ev": _fmt(ev),
+        "ev_over": _fmt(ev_over),
+        "chosen_prob": _fmt(chosen_prob),
+        "edge_score": edge_score,
+        "edge_drivers": driver,
+        "edge_reasons": driver,
+        "proj": _fmt(proj.proj),
+    }
+
+
+def write_props_recommendations_csv(path: Path, rows: List[Dict[str, object]]) -> int:
+    """Write props_recommendations_{date}.csv from prebuilt rows. Returns the row count."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=PROPS_RECOMMENDATIONS_COLUMNS)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({c: row.get(c) for c in PROPS_RECOMMENDATIONS_COLUMNS})
     return len(rows)
