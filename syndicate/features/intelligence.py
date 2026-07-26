@@ -67,6 +67,7 @@ from syndicate.features.bankroll_manager import build_portfolio as _build_portfo
 from syndicate.features.market_data import attach_market_data as _attach_market_data
 from syndicate.features.simulation_engine import SimulationEngine
 from syndicate.features.prediction_ledger import _signal_weight
+from syndicate.features.shared.memory_observability import log_container_memory
 from syndicate.features.shared.intelligence_evaluation import adjust_confidence
 from syndicate.features.shared.intelligence_evaluation import build_feature_coverage_profile
 from syndicate.features.shared.intelligence_evaluation import build_reliability_profile
@@ -2440,17 +2441,58 @@ def build_intelligence_overview(
     # See _build_sport_overview's own comment for the full story.
     effective_date = _effective_date(selected_date)
     sports = _configured_syndicate_sports()
-    overview = [
-        _build_sport_overview(
-            sport,
-            effective_date,
-            force_refresh=force_refresh,
-            preserve_requested_date=selected_date is not None,
-            skip_game_hydration=skip_game_hydration,
+    # Built as an explicit loop rather than a list comprehension so that a
+    # crash inside one sport names that sport. This function OOM-killed
+    # refresh-worker every ~5 minutes for 16+ hours on 2026-07-26 and the logs
+    # could not say which sport was responsible: the per-sport
+    # `overview_counts` traces below are emitted in a SECOND pass, after the
+    # whole list is built, so a process that dies while building sport N logs
+    # nothing at all about sports 1..N. The last line before the OOM was the
+    # caller's `post_pull_hot_artifacts`, ~55 seconds and ~3.7GB earlier.
+    #
+    # Note the shape of the cost: every sport's fully hydrated overview is held
+    # simultaneously, so peak is the SUM across sports, not the max.
+    # BEGIN/END bracketing makes an unfinished sport visible; the memory sample
+    # makes a sport that merely grows-a-lot visible before it becomes fatal.
+    # print(..., flush=True) rather than logger.info deliberately -- see #37,
+    # logger.info never reaches Render's collector, which is a large part of
+    # why this stayed invisible.
+    overview: list[dict[str, Any]] = []
+    for sport in sports:
+        if not isinstance(sport, dict):
+            continue
+        sport_slug = _safe_text(sport.get("slug"), "sport").lower()
+        print(
+            f"[intelligence] OVERVIEW_SPORT_BEGIN sport={sport_slug} "
+            f"force_refresh={bool(force_refresh)} skip_game_hydration={bool(skip_game_hydration)}",
+            flush=True,
         )
-        for sport in sports
-        if isinstance(sport, dict)
-    ]
+        try:
+            sport_row = _build_sport_overview(
+                sport,
+                effective_date,
+                force_refresh=force_refresh,
+                preserve_requested_date=selected_date is not None,
+                skip_game_hydration=skip_game_hydration,
+            )
+        except Exception as exc:
+            print(
+                f"[intelligence] OVERVIEW_SPORT_FAILED sport={sport_slug} "
+                f"error={type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            raise
+        overview.append(sport_row)
+        try:
+            log_container_memory(
+                "overview_sport_end",
+                sport=sport_slug,
+                sports_done=len(overview),
+                sports_total=len([item for item in sports if isinstance(item, dict)]),
+            )
+        except Exception:
+            pass
+        print(f"[intelligence] OVERVIEW_SPORT_END sport={sport_slug}", flush=True)
     for sport_overview in overview:
         # Emitted for EVERY sport, not just WNBA. These four counts are the
         # only view of what candidate generation is handed -- _collect_candidates
