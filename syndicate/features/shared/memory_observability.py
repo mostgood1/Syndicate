@@ -192,31 +192,51 @@ def memory_headroom_snapshot(min_required_bytes: int) -> dict[str, Any] | None:
     max_bytes = _read_container_memory_max_bytes()
     if current_bytes is None or max_bytes is None or max_bytes <= 0:
         return None
-    headroom_bytes = max_bytes - current_bytes
     min_required = max(0, int(min_required_bytes))
+    raw_headroom_bytes = max_bytes - current_bytes
+
+    # #79 step 2. Headroom used to be max - memory.current, and cgroup v2's
+    # memory.current counts reclaimable page cache -- which the kernel drops
+    # on demand rather than OOM-killing over. The comment on
+    # _read_container_memory_max_bytes above has said so all along; the
+    # calculation just never acted on it.
+    #
+    # Measured on refresh-worker 2026-07-26T22:47Z, which had been refusing to
+    # build the board every cycle:
+    #   current 3228.3 / max 4096 -> headroom 867.7 against a 900 floor
+    #   anon           662.5   <- the only unreclaimable memory
+    #   inactive_file 2476.3   <- clean, evictable
+    #   shmem            0.0   <- so none of the cache is pinned
+    # Real headroom was 3393.7MB, not 867.7MB, and the board build (measured
+    # idling ~700MB, spiking past 1479MB) fits nearly three times over. This
+    # is also the "2.7GB plateau" the 2026-07-26 handoff left open: not a
+    # leak, page cache from the 1.24GB odds-events file (#76), which is
+    # exactly why tracemalloc could never see it.
+    #
+    # Only inactive_file and slab_reclaimable are treated as available.
+    # active_file is reclaimable too but under more pressure, and shmem is not
+    # reclaimable at all, so both stay counted as used -- this is deliberately
+    # the conservative reading of "reclaimable", not the largest one.
+    stat = _read_container_memory_stat()
+    reclaimable_bytes = 0
+    if stat:
+        reclaimable_bytes = max(0, stat.get("inactive_file", 0) + stat.get("slab_reclaimable", 0))
+    effective_headroom_bytes = raw_headroom_bytes + reclaimable_bytes
+
     snapshot: dict[str, Any] = {
         "current_mb": round(current_bytes / 1024 / 1024, 1),
         "max_mb": round(max_bytes / 1024 / 1024, 1),
-        "headroom_mb": round(headroom_bytes / 1024 / 1024, 1),
+        "headroom_mb": round(effective_headroom_bytes / 1024 / 1024, 1),
         "min_required_mb": round(min_required / 1024 / 1024, 1),
-        "sufficient": headroom_bytes >= min_required,
+        "sufficient": effective_headroom_bytes >= min_required,
     }
-    # #79, diagnostic only -- `sufficient` above is untouched. Attributes the
-    # gap between memory.current and the RSS of any actual process, which on
-    # refresh-worker is 2860MB of 3311MB and is what refuses the board build
-    # every cycle. If reclaimable_file dominates, the guard is measuring
-    # memory the kernel would evict rather than OOM on, and
-    # would_be_sufficient_excluding_file_cache shows what the corrected gate
-    # would have decided. If it does NOT dominate, the guard is right and this
-    # says so before anyone relaxes it.
-    stat = _read_container_memory_stat()
     if stat:
+        # Kept so a future reader can see both numbers rather than having to
+        # rediscover why they differ -- and so that if the gap ever stops
+        # being file cache, that is visible in the same line.
         snapshot["stat_mb"] = {key: round(value / 1024 / 1024, 1) for key, value in sorted(stat.items())}
-        reclaimable_bytes = stat.get("inactive_file", 0) + stat.get("slab_reclaimable", 0)
-        if reclaimable_bytes > 0:
-            snapshot["reclaimable_file_mb"] = round(reclaimable_bytes / 1024 / 1024, 1)
-            snapshot["headroom_excluding_file_cache_mb"] = round((headroom_bytes + reclaimable_bytes) / 1024 / 1024, 1)
-            snapshot["would_be_sufficient_excluding_file_cache"] = (headroom_bytes + reclaimable_bytes) >= min_required
+        snapshot["reclaimable_file_mb"] = round(reclaimable_bytes / 1024 / 1024, 1)
+        snapshot["headroom_including_file_cache_mb"] = round(raw_headroom_bytes / 1024 / 1024, 1)
     return snapshot
 
 

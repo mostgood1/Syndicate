@@ -3,6 +3,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -110,51 +112,99 @@ def test_memory_headroom_snapshot_reports_insufficient_and_sufficient(monkeypatc
     assert roomy is not None
     assert roomy["sufficient"] is True
 
-def test_memory_stat_breakdown_is_diagnostic_only_and_never_moves_the_gate(monkeypatch):
-    # #79. The board build refuses to start every cycle on refresh-worker
-    # because headroom is computed as max - memory.current, and cgroup v2's
-    # memory.current includes reclaimable page cache: 3309MB of 4096 used with
-    # only 451MB owned by any process.
+def test_reclaimable_page_cache_does_not_count_against_headroom(monkeypatch):
+    # #79. These are the real numbers off refresh-worker 2026-07-26T22:47Z,
+    # which had refused to build the board on every cycle for half an hour:
+    # 3228MB of 4096 "used", but 2476MB of that is inactive_file -- clean page
+    # cache the kernel drops on demand rather than OOM-killing over -- and
+    # only 662MB is anonymous. shmem is 0, so none of the cache is pinned.
     #
-    # This pins the shape of the reading that will settle whether the guard is
-    # measuring the wrong thing -- AND that adding it did not quietly relax the
-    # guard. `sufficient` must still be driven by max - current alone, even
-    # when the breakdown says almost all of it is evictable file cache.
-    monkeypatch.setattr(memory_observability, "_read_container_memory_current_bytes", lambda: int(3309 * BYTES_PER_MB))
+    # Old behaviour: headroom 867.7 < 900, refuse. New: 3393.7, proceed.
+    monkeypatch.setattr(memory_observability, "_read_container_memory_current_bytes", lambda: int(3228.3 * BYTES_PER_MB))
     monkeypatch.setattr(memory_observability, "_read_container_memory_max_bytes", lambda: int(4096 * BYTES_PER_MB))
     monkeypatch.setattr(
         memory_observability,
         "_read_container_memory_stat",
         lambda: {
-            "anon": int(451 * BYTES_PER_MB),
-            "file": int(2670 * BYTES_PER_MB),
-            "inactive_file": int(2622 * BYTES_PER_MB),
-            "active_file": int(48 * BYTES_PER_MB),
-            "slab_reclaimable": int(28 * BYTES_PER_MB),
+            "anon": int(662.5 * BYTES_PER_MB),
+            "file": int(2510.6 * BYTES_PER_MB),
+            "inactive_file": int(2476.3 * BYTES_PER_MB),
+            "active_file": int(34.3 * BYTES_PER_MB),
+            "slab_reclaimable": int(49.8 * BYTES_PER_MB),
+            "slab_unreclaimable": int(1.0 * BYTES_PER_MB),
+            "shmem": 0,
         },
     )
 
     snapshot = memory_observability.memory_headroom_snapshot(900 * BYTES_PER_MB)
     assert snapshot is not None
-    # The gate is unchanged: 4096 - 3309 = 787 < 900.
-    assert snapshot["headroom_mb"] == 787.0
+    assert snapshot["sufficient"] is True
+    # approx because the fixture truncates MB->bytes; the point is 3393 vs 868,
+    # not the tenth.
+    assert snapshot["headroom_mb"] == pytest.approx(3393.7, abs=0.2)
+    # Both numbers stay visible, so the difference never has to be rediscovered.
+    assert snapshot["headroom_including_file_cache_mb"] == pytest.approx(867.7, abs=0.2)
+    assert snapshot["reclaimable_file_mb"] == pytest.approx(2526.1, abs=0.2)
+
+
+def test_anonymous_memory_still_counts_against_headroom(monkeypatch):
+    # The other half of the guard, and the reason step 1 read memory.stat
+    # before step 2 changed anything: if the container is genuinely full of
+    # ANONYMOUS memory, nothing is reclaimable and the build must still be
+    # refused. Same totals as the test above, attributed the other way.
+    monkeypatch.setattr(memory_observability, "_read_container_memory_current_bytes", lambda: int(3228.3 * BYTES_PER_MB))
+    monkeypatch.setattr(memory_observability, "_read_container_memory_max_bytes", lambda: int(4096 * BYTES_PER_MB))
+    monkeypatch.setattr(
+        memory_observability,
+        "_read_container_memory_stat",
+        lambda: {
+            "anon": int(3200 * BYTES_PER_MB),
+            "file": int(28 * BYTES_PER_MB),
+            "inactive_file": int(20 * BYTES_PER_MB),
+            "slab_reclaimable": int(8 * BYTES_PER_MB),
+        },
+    )
+
+    snapshot = memory_observability.memory_headroom_snapshot(900 * BYTES_PER_MB)
+    assert snapshot is not None
     assert snapshot["sufficient"] is False
-    # ...while the diagnostic shows what a page-cache-aware gate would decide.
-    assert snapshot["stat_mb"]["inactive_file"] == 2622.0
-    assert snapshot["reclaimable_file_mb"] == 2650.0
-    assert snapshot["would_be_sufficient_excluding_file_cache"] is True
 
 
-def test_memory_stat_absent_leaves_the_snapshot_untouched(monkeypatch):
-    # cgroups may be missing entirely (local dev) or memory.stat unreadable.
-    # The snapshot must degrade to exactly its previous shape rather than
-    # carrying half-populated diagnostic keys.
-    monkeypatch.setattr(memory_observability, "_read_container_memory_current_bytes", lambda: int(100 * BYTES_PER_MB))
-    monkeypatch.setattr(memory_observability, "_read_container_memory_max_bytes", lambda: int(2048 * BYTES_PER_MB))
+def test_active_file_and_shmem_are_not_treated_as_reclaimable(monkeypatch):
+    # Deliberately the conservative reading of "reclaimable". active_file is
+    # evictable but only under real pressure, and shmem is not evictable at
+    # all -- counting either would overstate headroom on a container whose
+    # cache is hot or shared-memory backed.
+    monkeypatch.setattr(memory_observability, "_read_container_memory_current_bytes", lambda: int(3000 * BYTES_PER_MB))
+    monkeypatch.setattr(memory_observability, "_read_container_memory_max_bytes", lambda: int(4096 * BYTES_PER_MB))
+    monkeypatch.setattr(
+        memory_observability,
+        "_read_container_memory_stat",
+        lambda: {
+            "anon": int(500 * BYTES_PER_MB),
+            "active_file": int(1200 * BYTES_PER_MB),
+            "shmem": int(1300 * BYTES_PER_MB),
+            "inactive_file": 0,
+        },
+    )
+
+    snapshot = memory_observability.memory_headroom_snapshot(900 * BYTES_PER_MB)
+    assert snapshot is not None
+    # 4096 - 3000 = 1096, with nothing added back.
+    assert snapshot["headroom_mb"] == 1096.0
+    assert snapshot["reclaimable_file_mb"] == 0.0
+
+
+def test_memory_stat_absent_falls_back_to_the_conservative_calculation(monkeypatch):
+    # cgroups missing (local dev) or memory.stat unreadable must degrade to
+    # the OLD max - current behaviour, not to "assume it is all reclaimable".
+    # Failing safe here is what keeps an unreadable file from re-opening #75.
+    monkeypatch.setattr(memory_observability, "_read_container_memory_current_bytes", lambda: int(3228 * BYTES_PER_MB))
+    monkeypatch.setattr(memory_observability, "_read_container_memory_max_bytes", lambda: int(4096 * BYTES_PER_MB))
     monkeypatch.setattr(memory_observability, "_read_container_memory_stat", lambda: {})
 
     snapshot = memory_observability.memory_headroom_snapshot(900 * BYTES_PER_MB)
     assert snapshot is not None
-    assert snapshot["sufficient"] is True
+    assert snapshot["headroom_mb"] == 868.0
+    assert snapshot["sufficient"] is False
     assert "stat_mb" not in snapshot
-    assert "would_be_sufficient_excluding_file_cache" not in snapshot
