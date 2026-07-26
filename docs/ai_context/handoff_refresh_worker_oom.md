@@ -148,6 +148,56 @@ Two candidates remain inside that call: `_normalize_games` and
 it is the worker-gated one, and it was 99.8% of the payload's deep size in local
 profiling while being entirely absent from the production web response.
 
+### Narrowed further by elimination: it needs the odds history
+
+Production artifacts for today were pulled with the ops export endpoint
+(`GET /api/ops/artifacts/export?pattern=*mlb_source*<date>*`, admin token
+required) into a scratch root, and `build_cards_page_context` was run against
+them **on the worker branch** (`SYNDICATE_WEB_DYNO=false`), 15 games:
+
+| | |
+|---|---|
+| whole-call allocation peak | **79 MB** |
+| payload deep size | 4.92 MB |
+| `simulation_contract` | 4.92 MB (`games` 3.80, `context` 2.43 — shares structure) |
+| per-game mean inside the contract | 0.253 MB |
+| **`market_features` per game** | **0.003 MB** |
+
+79 MB with *real production inputs* is still ~47× short. The tell is
+`market_features` at 3 KB: it is empty because the one input the export
+endpoint cannot supply is missing. `HOT_ARTIFACT_PATTERNS` covers only
+`*_source/...` paths, so **`data/odds_events/*.jsonl` and
+`reports/odds_control_plane/odds_history/` are not exportable** — and those are
+exactly what `build_market_features` reads.
+
+### The suspected mechanism (instrumented in `72cbf81b`, not yet confirmed)
+
+`build_simulation_contract_from_context` normalizes each game in a loop
+([simulation_adapter.py:382](../../syndicate/features/shared/simulation_adapter.py)),
+and `_normalize_game_context` calls `build_market_features` with **no
+`payload_cache`** — unlike its sibling
+`build_simulation_engine_context_from_candidate`, which threads one. So per
+game:
+
+`build_market_features` → `build_market_history_view` → `_recent_history_rows`
+→ `load_recent_odds_events(days_back=7)` → `build_recent_market_history_index`
+
+`load_recent_odds_events`'s raw rows *are* cached (`_JSONL_ROWS_CACHE`, mtime
+keyed). **`build_recent_market_history_index` is not.** It runs per game, and
+per event it does `payload = dict(event)` and appends that copy under **every
+alias** — up to nine — then sorts every bucket
+([odds_lifecycle.py:253-267](../../syndicate/features/shared/odds_lifecycle.py)).
+Fifteen games means fifteen full indexes over seven days of odds events.
+
+This fits every symptom: worker-only (web skips `simulation_contract`),
+data-dependent and invisible locally (the local mirror has two `odds_events`
+files), grows through the day as events accumulate, and started at 00:02 UTC
+when a new day's file began filling.
+
+**It is still a hypothesis.** `72cbf81b` samples memory per game inside that
+loop: monotonic climb confirms it, flat says the cost is in `_normalize_games`
+instead and the suspect is wrong. Do not fix before reading that.
+
 ### The loaders are exonerated
 
 The whole chain from entry to `result_assembled` cost **21 MB** on one run and
