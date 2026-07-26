@@ -1230,10 +1230,62 @@ def _expand_persisted_state(state: dict[str, Any] | None) -> dict[str, Any] | No
     return expanded
 
 
+def _state_payload_timestamp(payload: Any) -> str:
+    if not isinstance(payload, dict):
+        return ""
+    for key in ("state_last_updated", "last_updated", "snapshot_generated_at"):
+        value = str(payload.get(key) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _read_state_payload(path: Path) -> dict[str, Any] | None:
+    """Read the board state from the keyvalue store or the published artifact.
+
+    #43. The write side diverts oversized payloads to the artifact transport
+    because the keyvalue store cannot carry them (15.5MB measured against an
+    8.4MB ceiling). This is the matching read: on the keyvalue backend
+    read_json_file consults the store ONLY, so without this the worker
+    publishes an artifact nobody reads.
+
+    Both sources are consulted and the FRESHER one wins, rather than preferring
+    either. Preferring the store would keep serving a small stale board over a
+    fresh large one -- which is the bug being fixed. Preferring the file would
+    do the reverse the moment the payload shrinks back under the ceiling and
+    the store resumes being authoritative.
+    """
+    keyvalue_payload = read_json_file(path)
+    disk_payload: dict[str, Any] | None = None
+    try:
+        if path.is_file():
+            candidate = json.loads(path.read_text(encoding="utf-8-sig"))
+            disk_payload = candidate if isinstance(candidate, dict) else None
+    except Exception as exc:  # noqa: BLE001
+        print(f"[intelligence_state] STATE_DISK_READ_FAILED path={path.name} error={type(exc).__name__}: {exc}", flush=True)
+
+    if disk_payload is None:
+        return keyvalue_payload
+    if keyvalue_payload is None:
+        print(f"[intelligence_state] STATE_READ_FROM_ARTIFACT path={path.name} reason=no_keyvalue_copy", flush=True)
+        return disk_payload
+
+    keyvalue_at = _state_payload_timestamp(keyvalue_payload)
+    disk_at = _state_payload_timestamp(disk_payload)
+    if disk_at > keyvalue_at:
+        print(
+            f"[intelligence_state] STATE_READ_FROM_ARTIFACT path={path.name} "
+            f"artifact_at={disk_at} keyvalue_at={keyvalue_at}",
+            flush=True,
+        )
+        return disk_payload
+    return keyvalue_payload
+
+
 def read_intelligence_state() -> dict[str, Any] | None:
     path = _intelligence_state_read_path("state", INTELLIGENCE_STATE_PATH)
     print("[INTELLIGENCE STATE READ]", {"path": str(path)})
-    payload = read_json_file(path)
+    payload = _read_state_payload(path)
     payload = _expand_persisted_state(payload if isinstance(payload, dict) else None)
     normalized = _normalize_intelligence_state_payload(payload if isinstance(payload, dict) else None)
     if not _is_intelligence_state_payload_valid(normalized):
