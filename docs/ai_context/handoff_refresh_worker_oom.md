@@ -203,14 +203,27 @@ pressure.
 It was offered and the decision was to go straight at the root cause instead.
 The loop was still running when this was written.
 
-**Update 2026-07-26 ~16:30 UTC — the env var is now set to `false` on
-refresh-worker, but it is NOT in effect.** A Render *restart*
-(`POST /v1/services/{id}/restart`) does not re-inject env vars: the worker came
-back up still printing `INTELLIGENCE_LOOP_ENABLED` and is still OOM-restarting
-(`BOOTED` at 16:18:42, 16:19:38, 16:21:00, 16:23:04, 16:26:26). Applying it
-needs a **deploy** (`POST /v1/services/{id}/deploys`), which is the outstanding
-step. Worth remembering generally: on this account, env changes do not create a
-deploy on their own and a restart will not pick them up.
+**Applied and confirmed 2026-07-26 16:42 UTC — the OOM loop has stopped.**
+Deploy `dep-d9j3g7b7uimc73ceb8o0` (commit `73ac270e`) brought the worker up
+printing `INTELLIGENCE_LOOP_DISABLED`. Since then: **one boot, none after it**,
+against a prior cadence of one every 1–3 minutes. Container memory sits flat at
+650–720 MB (16–18% of 4096) while `tools/daily_update` runs and `MLB_SIM_TICK`
+fires every 30 s — the worker is doing real work, not merely idle.
+
+Getting there took two attempts, and the failed one is the reusable lesson:
+**a Render *restart* does not re-inject env vars.** Setting the var and calling
+`POST /v1/services/{id}/restart` returned 200 and did restart the process, which
+came back still printing `INTELLIGENCE_LOOP_ENABLED` and still OOM-looping
+(`BOOTED` 16:18:42, 16:19:38, 16:21:00, 16:23:04, 16:26:26). An env change also
+does not create a deploy on its own here. Only `POST /v1/services/{id}/deploys`
+applies one. Use the **single-key** endpoint
+(`PUT /v1/services/{id}/env-vars/{KEY}`) to change one var — the full-list PUT
+replaces every var and would drop the deliberate overrides in `todo.md`.
+
+**What this costs, and what it does not fix.** The board now recomputes only on
+web's request path, which is slower and adds to #56's health-check pressure. The
+root cause is untouched: re-enabling this loop without fixing
+`build_cards_page_context` will reproduce the OOM exactly.
 
 ---
 
