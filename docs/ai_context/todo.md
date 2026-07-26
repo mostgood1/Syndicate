@@ -128,7 +128,25 @@ were resolved and nine already-closed rows removed from the open tables.
     threshold, or lane assignment defaults everything to `live`. Worth a look on
     a fresh slate; it is a tuning/lane question, not an empty board.
 
-- **#68 — Candidates drop to zero at `candidate_collection`.** *(Filed as #63;
+- **#68 — ANSWERED 2026-07-26T20:35:59Z on a live slate: 100% pruned as `missing_projection_or_odds`.**
+  The reading #68 was blocked on, taken off a healthy worker:
+  `post_state_filter 40 → pre_requested_market_filter 40 →
+  post_requested_market_filter 40 → post_dedupe_and_classify
+  {normalized_in: 40, classification_pruned: 40,
+  classification_reasons: {"missing_projection_or_odds": 40},
+  dedupe_pruned: 0, total_candidates: 0}`.
+  So the loss is **entirely** at classification, dedupe takes nothing, and of
+  the two surviving suspects it is `missing_projection_or_odds`, unanimously —
+  every candidate arrives with neither a model projection nor a market price.
+  **The open work is now upstream of classification:** find why 40 candidates
+  reach it with no projection and no odds. Do not re-instrument — #64's trace
+  is sufficient and gave this in one read.
+  Noted from the same window: `DEFERRED_BOARD_BUILD reason=sim_subprocess_resident`
+  repeats while the MLB sim runs, so board rebuilds legitimately pause during a
+  sim — that is the mutual-deferral guard, not a fault, and it is why cycles can
+  be 10+ minutes apart and cannot be forced.
+
+- ~~**#68 — Candidates drop to zero at `candidate_collection`.**~~ *(Filed as #63;
   renumbered 2026-07-26 — #63 was already the closed mutual-deferral test.)*
   Observed
   2026-07-26T02:36Z on refresh-worker: the stage counters read
