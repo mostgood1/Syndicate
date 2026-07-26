@@ -113,6 +113,31 @@ def _render_web_dyno() -> bool:
     )
 
 
+def _log_cards_context_memory(stage: str, **extra: Any) -> None:
+    # Stage-level memory samples inside build_cards_page_context (#75).
+    #
+    # Production measurement 2026-07-26 showed the *returned payload* is only
+    # ~2.3MB, so the deepcopies this function makes cannot be what reaches the
+    # worker's 4096MB limit -- the cost is in the loaders below, which are held
+    # live for the whole call. Local profiling put the peak at 91.5MB (78% of
+    # it feed/live payloads), which is 40x short of what production does, and
+    # local cannot reproduce that gap. These samples attribute it instead of
+    # guessing a fourth time. See docs/ai_context/handoff_refresh_worker_oom.md.
+    #
+    # Worker-only: this function also backs /mlb/api/cards, and a sample per
+    # stage per request would be pure noise on the web service (and #56 says
+    # that service has no headroom to spare).
+    if _render_web_dyno():
+        return
+    try:
+        from syndicate.features.shared.memory_observability import log_container_memory
+
+        log_container_memory(f"cards_context_{stage}", **extra)
+    except Exception:
+        # Instrumentation must never be the reason a board build fails.
+        pass
+
+
 def _attach_cards_board_contract(context: dict[str, Any]) -> dict[str, Any]:
     out = dict(context)
     out.setdefault("show_app_header", False)
@@ -4695,8 +4720,10 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         _path_cache_signature(summary_path),
         _path_cache_signature(live_lens_path),
     )
+    _log_cards_context_memory("begin", selected_date=selected_date, resolved_date=resolved_date)
     cached_context = _cards_context_cache_get(page_cache_key)
     if cached_context is not None:
+        _log_cards_context_memory("page_cache_hit", resolved_date=resolved_date)
         return deepcopy(cached_context)
     cache_key = None
     if selected_date == today_iso:
@@ -4720,11 +4747,23 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
 
     summary_path = daily_artifact_path(resolved_date)
     summary = load_json_file(summary_path)
+    _log_cards_context_memory("summary_loaded", resolved_date=resolved_date)
     betting_games = _cards_recommendation_payload_by_game(resolved_date)
+    _log_cards_context_memory("betting_games_loaded", betting_game_count=len(betting_games or {}))
     output_rows = summary.get("outputs") if isinstance((summary or {}).get("outputs"), list) else []
     game_pks = [int(row.get("game_pk") or 0) for row in output_rows if isinstance(row, dict) and int(row.get("game_pk") or 0)]
     sim_games = _daily_sim_by_game(resolved_date, game_pks)
+    _log_cards_context_memory("sim_games_loaded", game_pk_count=len(game_pks), sim_game_count=len(sim_games or {}))
+    # Measured as the dominant loader locally: 15 full StatsAPI feed/live
+    # payloads, ~3.2MB each, held live for the rest of the call. When
+    # resolved_date is today (always, on the worker) each one may also be
+    # re-fetched over the network.
     actual_games = _daily_actual_by_game(resolved_date, game_pks)
+    _log_cards_context_memory(
+        "actual_games_loaded",
+        actual_game_count=len(actual_games or {}),
+        is_today=bool(resolved_date == today_iso),
+    )
     rfi_targets = load_json_file(daily_rfi_targets_path(resolved_date))
     games = _games_from_daily_summary(
         summary,
@@ -4733,6 +4772,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         actual_games=actual_games,
         first1_signals_by_game=_rfi_targets_signal_index(rfi_targets),
     ) if summary else []
+    _log_cards_context_memory("games_built", game_count=len(games))
 
     if not games:
         live_lens_report = load_json_file(live_lens_path)
@@ -4893,10 +4933,12 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         "cards_script": "mlb/cards_source.js",
         "auto_expand_cards": True,
     }
+    _log_cards_context_memory("result_assembled", game_count=len(games))
     if not _render_web_dyno():
         result = apply_game_board_contract(result, sport="mlb", module="cards")
     else:
         result = _attach_cards_board_contract(result)
+    _log_cards_context_memory("board_contract_applied")
     result["refresh_policy"] = {
         "enabled": True,
         "intervalMs": 30000,
@@ -4910,6 +4952,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
     _cards_context_cache_put(page_cache_key, deepcopy(result))
     if cache_key is not None and games:
         _today_cache_put(cache_key, result)
+    _log_cards_context_memory("end", game_count=len(games))
     return deepcopy(result)
 
 
