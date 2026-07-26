@@ -103,7 +103,71 @@ next midnight.
 
 ---
 
+## Measured 2026-07-26: the payload is ~2 MB. The deepcopy is not the cause.
+
+The measurement below was the open question. It has been taken, against
+production, and it falsifies the deepcopy hypothesis.
+
+`GET https://syndicate-an21.onrender.com/mlb/api/cards` (15 games, today):
+
+| | |
+|---|---|
+| wire bytes | 1.07 MB |
+| parsed deep size | **2.33 MB** |
+| `games` | 1.152 MB — **49.4%** |
+| `cards` | same 1.152 MB — it aliases the same list, not a second copy |
+| everything else | ~0.04 MB |
+
+So the answer to "games versus everything else" is ~50/50 — and it does not
+matter, because the whole payload is 2.3 MB. A cold call makes three of them
+(`_cards_context_cache_put(deepcopy(...))`, `_today_cache_put(result)`,
+`return deepcopy(result)`, [cards.py:4910-4913](../../syndicate/features/mlb/cards.py))
+for **~7 MB**. The process dies at 4096 MB. The copies are ~0.2% of the budget.
+
+**The three "traps" in the section below are therefore traps around a 7 MB
+problem. Do not spend a session on them.** The `deepcopy` is still wasteful and
+`_MLBDataProvider.games()`'s mutation-after-copy is still a real hazard, but
+neither is this incident.
+
+### Where the memory actually goes: construction, not the payload
+
+Local profiling of `build_cards_page_context` (2026-06-14, 15 games — a date
+whose mirror has the full artifact set including `feed_live` and sims):
+
+| stage | live size | |
+|---|---|---|
+| `actual_games` — `_daily_actual_by_game`, full StatsAPI feed/live per game | **38.2 MB** | **78%** |
+| `sim_games` — `_daily_sim_by_game` | 6.7 MB | |
+| `summary` — daily_summary json | 3.7 MB | |
+| everything else | ~0.4 MB | |
+| sum held live | 49.1 MB | |
+| **whole-call allocation peak** | **91.5 MB** | |
+| returned payload | 2.0 MB | |
+
+`_daily_actual_by_game` ([cards.py:1985](../../syndicate/features/mlb/cards.py))
+is the dominant loader and the least justified: it holds 15 complete feed/live
+payloads (~3.2 MB each) live for the whole call so that consumers can read
+status, linescore, probable pitchers and boxscore slices off them. Worse, when
+`selected_date == today_iso` — always true on the worker — it *fetches a fresh
+feed/live over the network per game* (`_fetch_current_feed_live`,
+[cards.py:1991-1996](../../syndicate/features/mlb/cards.py)). That is a network
+call on a path the architecture says should be an artifact read.
+
+**Local is not the source of truth and this gap is not yet closed:** 91.5 MB
+locally versus 3.7 GB in production is ~40×. Local cannot reproduce the blowup,
+so the loader table above identifies the *shape* of the cost, not its magnitude.
+Do not act on the 40× by guessing — three guesses have already been wrong. The
+next step is stage-level `CONTAINER_MEMORY` samples *inside*
+`build_cards_page_context` on the worker, in the same style as the
+`OVERVIEW_SPORT_BEGIN`/`END` instrumentation from `ef9b5017`, so the 40× is
+attributed rather than theorised.
+
+---
+
 ## Constraints on the fix — each obvious approach has a trap
+
+**Superseded by the measurement above — kept because the mutation hazard in the
+first bullet is real regardless.**
 
 - **Removing the `deepcopy`** breaks callers: `_MLBDataProvider.games()` mutates
   the returned games three lines later
@@ -118,12 +182,13 @@ next midnight.
   `actual_games` / `first1_signals_by_game`, all currently assembled inside the
   page-context function.
 
-**Take this measurement first:** what fraction of the page context is `games`
-versus everything else. The fix differs completely depending on the answer, and
-it has not been measured. Do not guess at composition — three guesses were made
-during this session (a cProfile figure inflated ~15×, a `SYNDICATE_DATA_ROOT`
-change that made things worse, a `parsed_request` promotion that cost a net
-test) and all three were wrong.
+~~Take this measurement first~~ — taken, see above. Composition was 49% `games`
+of a 2.3 MB payload; the question turned out not to discriminate between fixes
+because every candidate was addressing megabytes. Three earlier guesses at
+composition were also wrong (a cProfile figure inflated ~15×, a
+`SYNDICATE_DATA_ROOT` change that made things worse, a `parsed_request`
+promotion that cost a net test) — that pattern is why the remaining 40× gap
+gets instrumented rather than reasoned about.
 
 ---
 
@@ -137,6 +202,15 @@ pressure.
 
 It was offered and the decision was to go straight at the root cause instead.
 The loop was still running when this was written.
+
+**Update 2026-07-26 ~16:30 UTC — the env var is now set to `false` on
+refresh-worker, but it is NOT in effect.** A Render *restart*
+(`POST /v1/services/{id}/restart`) does not re-inject env vars: the worker came
+back up still printing `INTELLIGENCE_LOOP_ENABLED` and is still OOM-restarting
+(`BOOTED` at 16:18:42, 16:19:38, 16:21:00, 16:23:04, 16:26:26). Applying it
+needs a **deploy** (`POST /v1/services/{id}/deploys`), which is the outstanding
+step. Worth remembering generally: on this account, env changes do not create a
+deploy on their own and a restart will not pick them up.
 
 ---
 
