@@ -1166,16 +1166,95 @@ def _intelligence_pipeline_busy() -> bool:
 		return False
 
 
+def _max_consecutive_pipeline_defers() -> int:
+	raw = str(os.environ.get("SYNDICATE_MLB_SIM_MAX_PIPELINE_DEFERS") or "").strip()
+	try:
+		value = int(raw or 5)
+	except ValueError:
+		value = 5
+	return max(1, value)
+
+
+def _last_pipeline_defer_state_path() -> Path:
+	return _meta_dir() / "last_mlb_sim_pipeline_defer.json"
+
+
+def _sim_pipeline_deferral_reason(*, now_epoch: float, date_str: str) -> str | None:
+	"""Should the sim yield to the board build right now, or has it waited
+	long enough that yielding has become starvation?
+
+	The original #55 comment claimed this "costs at most one tick: the
+	pipeline's run is finite". That was wrong in production and it is worth
+	being precise about why, because the same mistake was made twice today in
+	mirror image. An individual board build IS finite (~4 minutes, measured
+	01:23:21 -> 01:27:23). Its DUTY CYCLE is not: it re-queues on a 60s
+	interval, so it is busy far more often than it is idle. Finite-per-run
+	does not imply finite-in-aggregate, and an unbounded wait on a
+	near-continuous producer is equivalent to being switched off -- measured
+	as 30 of 30 consecutive gate decisions returning intelligence_pipeline_busy
+	with no sim launching at all.
+
+	So the wait is bounded exactly as the board build's wait on the odds
+	refresh is. Past the bound the question stops being "is the pipeline busy"
+	and becomes the one that matters: is there memory for both. At 4GB there
+	usually is -- sim ~1674MB plus board ~1479MB is ~3.2GB -- which is
+	precisely the headroom the upgrade bought.
+
+	Persisted rather than in-memory: this decision runs on the tick path and
+	the counter has to survive across ticks, and across the restarts that
+	deploys cause.
+	"""
+	if not _intelligence_pipeline_busy():
+		if _read_pipeline_defer_count(date_str) > 0:
+			_write_pipeline_defer_count(date_str, 0, now_epoch)
+		return None
+
+	defers = _read_pipeline_defer_count(date_str)
+	if defers < _max_consecutive_pipeline_defers():
+		_write_pipeline_defer_count(date_str, defers + 1, now_epoch)
+		return "intelligence_pipeline_busy"
+
+	headroom = _mlb_sim_memory_headroom_snapshot()
+	if headroom is not None and headroom.get("sufficient"):
+		print(
+			f"[live_refresh_loop] SIM_PROCEEDING_DESPITE_BUSY_PIPELINE defers={defers} "
+			f"{json.dumps(headroom, sort_keys=True)}",
+			flush=True,
+		)
+		_write_pipeline_defer_count(date_str, 0, now_epoch)
+		return None
+	# Genuinely no room. Keep deferring, but say so distinctly -- "waiting
+	# politely" and "cannot fit" are different problems and should not share
+	# one reason string.
+	return "intelligence_pipeline_busy_and_no_headroom"
+
+
+def _read_pipeline_defer_count(date_str: str) -> int:
+	payload = read_json_file(_last_pipeline_defer_state_path())
+	if not isinstance(payload, dict) or str(payload.get("date") or "") != date_str:
+		return 0
+	try:
+		return max(0, int(payload.get("count") or 0))
+	except (TypeError, ValueError):
+		return 0
+
+
+def _write_pipeline_defer_count(date_str: str, count: int, now_epoch: float) -> None:
+	try:
+		write_json_file(
+			_last_pipeline_defer_state_path(),
+			{"date": date_str, "count": int(count), "epoch": float(now_epoch), "recordedAt": _utc_now()},
+		)
+	except Exception:
+		pass
+
+
 def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any]:
 	if not _mlb_daily_sim_enabled():
 		return {"force": False, "reason": "disabled"}
-	if _intelligence_pipeline_busy():
-		# Wait for the current board build to finish rather than stacking
-		# ~1.1GB of sim on top of it in a 2GB container. Costs at most one
-		# tick: the pipeline's run is finite, and once the sim IS running the
-		# pipeline defers to it in turn, so the two alternate instead of
-		# overlapping.
-		return {"force": False, "reason": "intelligence_pipeline_busy"}
+	pipeline_deferral = _sim_pipeline_deferral_reason(now_epoch=now_epoch, date_str=date_str)
+	if pipeline_deferral is not None:
+		return {"force": False, "reason": pipeline_deferral}
 	if _mlb_daily_sim_process_still_running():
 		# A previously launched sim subprocess is still alive. Every other
 		# branch below (first_appearance, tip_off_window, fingerprint_change)

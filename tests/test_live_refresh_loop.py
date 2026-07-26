@@ -2381,3 +2381,84 @@ class MlbSimOddsFingerprintSliceTests(unittest.TestCase):
         with patch.object(live_refresh_loop, "_read_json_file_lenient", side_effect=[{"10": ["b"]}, {}, {}]):
             second = live_refresh_loop._mlb_sim_input_fingerprint_by_game("2026-07-25", events)
         self.assertNotEqual(first.get("1"), second.get("1"))
+
+
+class SimPipelineDeferralBoundTests(unittest.TestCase):
+    """The mirror image of the board build's odds-refresh starvation, and the
+    same mistake made twice in one day.
+
+    #55 claimed deferring the sim to the board build "costs at most one tick:
+    the pipeline's run is finite". An individual build IS finite (~4 minutes,
+    measured 01:23:21 -> 01:27:23). Its DUTY CYCLE is not -- it re-queues every
+    60s, so it is busy far more often than idle. Finite-per-run does not imply
+    finite-in-aggregate, and production showed 30 of 30 consecutive gate
+    decisions returning intelligence_pipeline_busy with no sim ever launching.
+    """
+
+    def setUp(self) -> None:
+        self._tmp = TemporaryDirectory(ignore_cleanup_errors=True)
+        os.environ["SYNDICATE_REPORTS_ROOT"] = str(Path(self._tmp.name))
+        self.addCleanup(self._tmp.cleanup)
+        self.addCleanup(lambda: os.environ.pop("SYNDICATE_REPORTS_ROOT", None))
+        self.addCleanup(lambda: os.environ.pop("SYNDICATE_MLB_SIM_MAX_PIPELINE_DEFERS", None))
+
+    def _reason(self, tick, *, busy, headroom=None):
+        with patch.object(live_refresh_loop, "_intelligence_pipeline_busy", return_value=busy), patch.object(
+            live_refresh_loop, "_mlb_sim_memory_headroom_snapshot", return_value=headroom
+        ):
+            return live_refresh_loop._sim_pipeline_deferral_reason(now_epoch=float(tick), date_str="2026-07-25")
+
+    def test_runs_when_the_pipeline_is_idle(self) -> None:
+        self.assertIsNone(self._reason(1, busy=False))
+
+    def test_defers_up_to_the_bound(self) -> None:
+        for tick in range(5):
+            self.assertEqual(self._reason(tick, busy=True), "intelligence_pipeline_busy")
+
+    def test_proceeds_past_the_bound_when_memory_allows(self) -> None:
+        # The anti-starvation branch. At 4GB there usually IS room -- sim
+        # ~1674MB plus board ~1479MB is ~3.2GB -- which is the headroom the
+        # upgrade bought.
+        for tick in range(5):
+            self._reason(tick, busy=True)
+        self.assertIsNone(self._reason(6, busy=True, headroom={"sufficient": True}))
+
+    def test_keeps_deferring_past_the_bound_when_memory_does_not_allow(self) -> None:
+        for tick in range(5):
+            self._reason(tick, busy=True)
+        self.assertEqual(
+            self._reason(6, busy=True, headroom={"sufficient": False}),
+            "intelligence_pipeline_busy_and_no_headroom",
+        )
+
+    def test_unmeasurable_headroom_counts_as_insufficient(self) -> None:
+        for tick in range(5):
+            self._reason(tick, busy=True)
+        self.assertEqual(
+            self._reason(6, busy=True, headroom=None),
+            "intelligence_pipeline_busy_and_no_headroom",
+        )
+
+    def test_counter_resets_once_the_sim_actually_runs(self) -> None:
+        # Otherwise the bound is crossed once and never re-armed, so the
+        # deferral silently stops protecting anything.
+        for tick in range(5):
+            self._reason(tick, busy=True)
+        self.assertIsNone(self._reason(6, busy=False))
+        self.assertEqual(self._reason(7, busy=True), "intelligence_pipeline_busy")
+
+    def test_counter_is_scoped_to_the_date(self) -> None:
+        for tick in range(5):
+            self._reason(tick, busy=True)
+        with patch.object(live_refresh_loop, "_intelligence_pipeline_busy", return_value=True), patch.object(
+            live_refresh_loop, "_mlb_sim_memory_headroom_snapshot", return_value={"sufficient": False}
+        ):
+            self.assertEqual(
+                live_refresh_loop._sim_pipeline_deferral_reason(now_epoch=9.0, date_str="2026-07-26"),
+                "intelligence_pipeline_busy",
+            )
+
+    def test_bound_is_env_tunable(self) -> None:
+        os.environ["SYNDICATE_MLB_SIM_MAX_PIPELINE_DEFERS"] = "1"
+        self.assertEqual(self._reason(1, busy=True), "intelligence_pipeline_busy")
+        self.assertIsNone(self._reason(2, busy=True, headroom={"sufficient": True}))
