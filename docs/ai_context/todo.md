@@ -69,6 +69,20 @@ Conventions:
     thing and the symptom never moved.
   - Still genuinely open underneath: **#47** (soccer absent from candidate
     generation entirely), which caps what the board can ever show.
+- **#61 — WITHDRAWN, not a bug.** Filed on a misreading: `board_contract`'s
+  `pregame`/`live`/`top_overall` keys exist only in the EMPTY fallback shape the
+  status endpoint returns when there is nothing to serve. The populated schema
+  uses `cards` + `lane_counts` + `active_lanes`, so checking the fallback keys
+  against a working payload reports 0/0/0 regardless. Verified 2026-07-26:
+  **24 real cards**, `lane_counts {live: 24}`, e.g. `Nolan McLean hits allowed
+  Over 4+, LAD @ NYM, conf 89.0%, edge 0.3662`. **When checking whether the board
+  is populated, read `board_contract.cards` / `lane_counts` — never the fallback
+  keys.**
+  - Genuinely open, and much smaller: `pregame_count` is 0 while MLB has 10
+    `preview` games. Either pregame candidates are not clearing an edge
+    threshold, or lane assignment defaults everything to `live`. Worth a look on
+    a fresh slate; it is a tuning/lane question, not an empty board.
+
 - **#31 — NHL revamp Phase 5: local producers replace vendor subprocess.**
 
 ## Platform / correctness
