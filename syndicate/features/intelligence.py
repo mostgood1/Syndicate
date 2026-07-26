@@ -5203,6 +5203,31 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
     _log_candidate_stage(pipeline_name="collect_candidates", stage="deduplication", before=classified_candidates, after=deduped)
     for removed_candidate in classification_pruned + dedupe_pruned:
         _log_json_event(logging.INFO, "collect_candidates_pruned", pipeline="collect_candidates", **removed_candidate)
+    # #64. This is the last stage before the pool and the ONLY one that was
+    # invisible in production. Every earlier stage emits an INTEL_TRACE (a
+    # print, which Render keeps); classification and dedupe reported only
+    # through _log_json_event at logging.INFO, and logger.info never reaches
+    # Render's collector (#37). So a build could take 16 candidates through
+    # every traced filter, drop all 16 here, and report candidate_count=0 with
+    # no visible reason -- exactly what happened on 2026-07-26, and it cost an
+    # hour of reading code to find a fact the logs should have stated.
+    #
+    # Reason counts, not per-candidate rows: the point is "which rule is
+    # rejecting them", answerable at a glance, without emitting one line per
+    # candidate on every cycle.
+    classification_reasons: dict[str, int] = {}
+    for removed_candidate in classification_pruned:
+        reason = str(removed_candidate.get("reason") or "unknown")
+        classification_reasons[reason] = classification_reasons.get(reason, 0) + 1
+    _intel_trace(
+        "candidate_generation",
+        stage="post_dedupe_and_classify",
+        total_candidates=len(deduped),
+        normalized_in=len(normalized_candidates),
+        classification_pruned=len(classification_pruned),
+        dedupe_pruned=len(dedupe_pruned),
+        classification_reasons=classification_reasons,
+    )
     _log_candidate_stage(pipeline_name="collect_candidates", stage="post_dedupe_and_classify", before=[], after=deduped)
 
     deduped, entityless_prop_duplicates = _drop_entityless_prop_duplicates(deduped)

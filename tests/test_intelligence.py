@@ -6322,3 +6322,68 @@ class DefaultSyndicateSportsTests(unittest.TestCase):
         for sport in _default_syndicate_sports():
             for field in ("slug", "name", "primary_href"):
                 self.assertTrue(str(sport.get(field) or "").strip(), f"{sport.get('slug')} missing {field}")
+
+
+class PostDedupeAndClassifyTraceTests(unittest.TestCase):
+    """#64. Classification and dedupe were the last stage before the candidate
+    pool and the only one invisible in production.
+
+    Every earlier stage emits an INTEL_TRACE, which is a print and so survives
+    Render's collector. Classification and dedupe reported only through
+    _log_json_event at logging.INFO, and logger.info never reaches that
+    collector (#37). So on 2026-07-26 a build carried 16 candidates through
+    every traced filter, dropped all 16 here, and reported candidate_count=0
+    with no visible reason -- an hour of reading code to recover a fact the
+    logs should have stated outright.
+    """
+
+    def test_trace_names_the_rule_that_rejected_candidates(self) -> None:
+        import io
+        from contextlib import redirect_stdout
+
+        from syndicate.features.intelligence import _intel_trace
+
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            _intel_trace(
+                "candidate_generation",
+                stage="post_dedupe_and_classify",
+                total_candidates=0,
+                normalized_in=16,
+                classification_pruned=16,
+                dedupe_pruned=0,
+                classification_reasons={"missing_projection_or_odds": 16},
+            )
+        emitted = buffer.getvalue()
+        self.assertIn("[INTEL_TRACE]", emitted)
+        payload = json.loads(emitted.split("[INTEL_TRACE]", 1)[1].strip())
+        # The three facts needed to diagnose a 16 -> 0 drop at a glance.
+        self.assertEqual(payload["stage"], "post_dedupe_and_classify")
+        self.assertEqual(payload["normalized_in"], 16)
+        self.assertEqual(payload["total_candidates"], 0)
+        self.assertEqual(payload["classification_reasons"], {"missing_projection_or_odds": 16})
+
+    def test_classification_rules_are_what_the_trace_can_report(self) -> None:
+        # Locks the reason strings the trace aggregates. missing_type is
+        # deliberately absent: normalize_candidate defaults type to "prop", so
+        # that branch is unreachable and a trace reporting it would mean
+        # normalize_candidate changed.
+        from syndicate.features.intelligence import _classify_candidate_with_reason
+
+        base = {"type": "prop", "selection": "Messi Over 0.5", "odds": "+120", "projection": 0.42}
+        self.assertIsNotNone(_classify_candidate_with_reason(base)[0])
+        self.assertEqual(_classify_candidate_with_reason({**base, "selection": ""})[1], "missing_selection")
+        self.assertEqual(
+            _classify_candidate_with_reason({k: v for k, v in base.items() if k not in ("odds", "projection")})[1],
+            "missing_projection_or_odds",
+        )
+
+    def test_either_odds_or_projection_is_enough(self) -> None:
+        # The rule is permissive, which is why "soccer props have no odds yet"
+        # is not on its own an explanation for the drop.
+        from syndicate.features.intelligence import _classify_candidate_with_reason
+
+        odds_only = {"type": "prop", "selection": "Messi Over 0.5", "odds": "+120"}
+        projection_only = {"type": "prop", "selection": "Messi Over 0.5", "projection": 0.42}
+        self.assertIsNotNone(_classify_candidate_with_reason(odds_only)[0])
+        self.assertIsNotNone(_classify_candidate_with_reason(projection_only)[0])
