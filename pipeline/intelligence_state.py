@@ -376,9 +376,77 @@ def _watched_payload_eviction_reason(payload: dict[str, Any] | None, today_iso: 
     if current.get("limit") is not None:
         return "stale_limit"
     payload_date = _selected_date_from_payload(current)
-    if payload_date and _is_iso_date_only(payload_date) and payload_date < today_iso:
-        return f"stale_date:{payload_date}"
+    if payload_date and _is_iso_date_only(payload_date):
+        if payload_date < today_iso:
+            return f"stale_date:{payload_date}"
+        # #65. Future dates were originally kept on the reasoning that one is
+        # "a real look-ahead request". That is only true when look-ahead is
+        # actually enabled, and it is off in production -- so a stray
+        # future-dated payload was being processed instead, and it is the
+        # reason the board served nothing all evening.
+        #
+        # What it does: after ~19:00 CT a payload dated TOMORROW gets built.
+        # Tomorrow has a schedule but no odds and no sim artifacts yet (soccer
+        # reported data_health=missing, MLB generated=0 off 15 dashboard
+        # games), so every candidate produced for it lacks both odds and
+        # projection and is correctly rejected by classify_candidate as
+        # missing_projection_or_odds. Generation looked healthy, 16 candidates
+        # survived every filter, and the pool still came out empty -- which is
+        # #64's symptom with this as its cause.
+        #
+        # Only evicted while look-ahead is disabled, so enabling it restores
+        # the original behaviour deliberately rather than by accident.
+        if payload_date > today_iso and not _look_ahead_board_builds_enabled():
+            return f"future_date:{payload_date}"
     return None
+
+
+def _empty_board_protection_window_seconds() -> int:
+    raw = str(os.environ.get("SYNDICATE_EMPTY_BOARD_PROTECTION_SECONDS") or "").strip()
+    try:
+        value = int(raw or 1800)
+    except ValueError:
+        value = 1800
+    return max(0, value)
+
+
+def _empty_write_would_clobber_good_board(incoming: dict[str, Any]) -> bool:
+    """True when writing this empty state would erase a populated board that
+    is still recent enough to trust.
+
+    Fails OPEN on any doubt -- if the existing state cannot be read or its age
+    cannot be established, the write proceeds. A guard that blocks writes on
+    ambiguity would be a much worse failure than the one it prevents: it could
+    freeze the board permanently.
+    """
+    window = _empty_board_protection_window_seconds()
+    if window <= 0:
+        return False
+    try:
+        selected_date = str(incoming.get("selected_date") or "").strip()
+        existing = read_json_file(_intelligence_state_daily_paths()["state"]) if selected_date else None
+        if not isinstance(existing, dict):
+            return False
+        if str(existing.get("selected_date") or "").strip() != selected_date:
+            # A different date's board is not this one's to protect.
+            return False
+        if int(existing.get("candidate_count") or 0) <= 0:
+            return False
+        # Reuses the module's existing helper rather than adding a second ISO
+        # parser: it already handles the naive-timestamp case these payloads
+        # sometimes carry.
+        age_seconds = _timestamp_age_seconds(existing.get("state_last_updated") or existing.get("last_updated"))
+        if age_seconds is None:
+            return False
+        return 0 <= age_seconds < window
+    except Exception:
+        return False
+
+
+def _look_ahead_board_builds_enabled() -> bool:
+    # Same flag the refresh loop's look-ahead uses, read here so the two
+    # cannot disagree about whether building a future date is intended.
+    return _env_bool("SYNDICATE_LOOK_AHEAD_ENABLED", default=False)
 
 
 def _is_iso_date_only(value: str | None) -> bool:
@@ -1092,6 +1160,27 @@ def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
         print("[intelligence_state] STATE_WRITE_SKIPPED_INVALID_PAYLOAD", flush=True)
         return None
     candidate_count = int(normalized.get("candidate_count") or 0)
+    if candidate_count <= 0 and _empty_write_would_clobber_good_board(normalized):
+        # Observed 2026-07-26: one cycle produced 84 candidates and a later
+        # cycle building TOMORROW's date produced 0 (every candidate rejected
+        # as missing_projection_or_odds, because tomorrow has a schedule but no
+        # odds or sim artifacts yet) and overwrote the good board with the
+        # empty one. Net effect: a working board replaced by nothing.
+        #
+        # This is the same failure class as #8, where an exception handler
+        # published a hardcoded empty board over a good one. #65 removes the
+        # cause by refusing to build future dates; this refuses the SYMPTOM, so
+        # any future source of an empty build cannot erase a populated board.
+        #
+        # Bounded by staleness on purpose: an empty board is legitimately
+        # correct at the end of a slate, so refusing forever would freeze a
+        # stale board instead. Past the window the empty write proceeds.
+        print(
+            f"[intelligence_state] STATE_WRITE_SKIPPED_EMPTY_OVER_GOOD "
+            f"date={normalized.get('selected_date')} incoming=0",
+            flush=True,
+        )
+        return None
     logger.info("INTELLIGENCE STATE PERSIST BEFORE", extra={"candidate_count": candidate_count})
     print(f"[intelligence_state] STATE_PERSIST_BEGIN candidate_count={candidate_count}", flush=True)
     daily_paths = _intelligence_state_daily_paths()

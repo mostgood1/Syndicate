@@ -3277,9 +3277,22 @@ class WatchedPayloadEvictionTests(unittest.TestCase):
     def test_keeps_todays_payload(self) -> None:
         self.assertIsNone(self._reason({"question": "top edges today", "date": "2026-07-25"}))
 
-    def test_keeps_future_dated_lookahead_payload(self) -> None:
-        # A future date is a real look-ahead request, not a stale replay.
-        self.assertIsNone(self._reason({"question": "top edges today", "date": "2026-07-26"}))
+    def test_evicts_future_dated_payload_while_look_ahead_is_disabled(self) -> None:
+        # This test previously asserted future dates are always KEPT, on the
+        # reasoning that one is "a real look-ahead request". That reasoning was
+        # wrong whenever look-ahead is disabled, which it is in production, and
+        # it is why the board built tomorrow's empty slate all evening (#65).
+        # The test encoded the bug, so it is corrected rather than deleted.
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("SYNDICATE_LOOK_AHEAD_ENABLED", None)
+            self.assertEqual(
+                self._reason({"question": "top edges today", "date": "2026-07-26"}),
+                "future_date:2026-07-26",
+            )
+
+    def test_keeps_future_dated_payload_when_look_ahead_is_enabled(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_LOOK_AHEAD_ENABLED": "true"}, clear=False):
+            self.assertIsNone(self._reason({"question": "top edges today", "date": "2026-07-26"}))
 
     def test_keeps_undated_payload(self) -> None:
         # The undated payload is the legitimate "today" default that
@@ -3546,3 +3559,134 @@ class CompactStateForPersistTests(unittest.TestCase):
         compact = intelligence_state_module._compact_state_for_persist(self._state())
         self.assertEqual(compact["board_contract"], {"schema": "intelligence_board_v1"})
         self.assertEqual(compact["candidate_count"], 222)
+
+
+class FutureDatedPayloadEvictionTests(unittest.TestCase):
+    """#65 -> #64. Future-dated payloads were originally kept on the reasoning
+    that one is "a real look-ahead request". That only holds when look-ahead is
+    actually enabled, and it is off in production.
+
+    Consequence: after ~19:00 CT a payload dated TOMORROW got built. Tomorrow
+    has a schedule but no odds and no sim artifacts (soccer reported
+    data_health=missing; MLB generated=0 off 15 dashboard games), so every
+    candidate produced for it lacked both odds and projection and was correctly
+    rejected as missing_projection_or_odds. Generation looked healthy, 16
+    candidates survived every filter, and the pool still came out empty.
+    """
+
+    def _reason(self, payload, today="2026-07-25"):
+        return intelligence_state_module._watched_payload_eviction_reason(payload, today)
+
+    def setUp(self) -> None:
+        self._prior = os.environ.get("SYNDICATE_LOOK_AHEAD_ENABLED")
+        os.environ.pop("SYNDICATE_LOOK_AHEAD_ENABLED", None)
+        self.addCleanup(self._restore)
+
+    def _restore(self) -> None:
+        if self._prior is None:
+            os.environ.pop("SYNDICATE_LOOK_AHEAD_ENABLED", None)
+        else:
+            os.environ["SYNDICATE_LOOK_AHEAD_ENABLED"] = self._prior
+
+    def test_evicts_tomorrow_when_look_ahead_is_disabled(self) -> None:
+        self.assertEqual(self._reason({"question": "q", "date": "2026-07-26"}), "future_date:2026-07-26")
+
+    def test_keeps_tomorrow_when_look_ahead_is_enabled(self) -> None:
+        # Enabling look-ahead restores the original behaviour deliberately
+        # rather than by accident.
+        with patch.dict(os.environ, {"SYNDICATE_LOOK_AHEAD_ENABLED": "true"}, clear=False):
+            self.assertIsNone(self._reason({"question": "q", "date": "2026-07-26"}))
+
+    def test_still_evicts_stale_dates(self) -> None:
+        self.assertEqual(self._reason({"question": "q", "date": "2026-07-24"}), "stale_date:2026-07-24")
+
+    def test_keeps_today(self) -> None:
+        self.assertIsNone(self._reason({"question": "q", "date": "2026-07-25"}))
+
+    def test_keeps_undated_payload(self) -> None:
+        # The undated payload is the legitimate "today" default.
+        self.assertIsNone(self._reason({"question": "q"}))
+
+    def test_distinguishes_stale_from_future_in_the_reason(self) -> None:
+        # Two different bugs; a shared reason string would hide which fired.
+        stale = self._reason({"question": "q", "date": "2026-07-01"})
+        future = self._reason({"question": "q", "date": "2026-08-01"})
+        self.assertTrue(stale.startswith("stale_date:"))
+        self.assertTrue(future.startswith("future_date:"))
+
+
+class EmptyOverGoodBoardGuardTests(unittest.TestCase):
+    """Observed 2026-07-26: one cycle produced 84 candidates and a later cycle
+    building TOMORROW's date produced 0 -- every candidate rejected as
+    missing_projection_or_odds, because tomorrow has a schedule but no odds or
+    sim artifacts yet -- and overwrote the good board with the empty one.
+
+    Same failure class as #8, where an exception handler published a hardcoded
+    empty board over a good one. #65 removes the cause by refusing future-dated
+    builds; this refuses the symptom, so any future source of an empty build
+    cannot erase a populated board.
+    """
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        os.environ["SYNDICATE_REPORTS_ROOT"] = str(Path(self._tmp.name))
+        self.addCleanup(self._tmp.cleanup)
+        self.addCleanup(lambda: os.environ.pop("SYNDICATE_REPORTS_ROOT", None))
+        self.addCleanup(lambda: os.environ.pop("SYNDICATE_EMPTY_BOARD_PROTECTION_SECONDS", None))
+        self.incoming = {"selected_date": "2026-07-25", "candidate_count": 0}
+
+    def _guard(self, existing):
+        with patch.object(intelligence_state_module, "read_json_file", return_value=existing):
+            return intelligence_state_module._empty_write_would_clobber_good_board(self.incoming)
+
+    def test_blocks_empty_write_over_a_recent_populated_board(self) -> None:
+        existing = {
+            "selected_date": "2026-07-25",
+            "candidate_count": 84,
+            "state_last_updated": intelligence_state_module._utc_now(),
+        }
+        self.assertTrue(self._guard(existing))
+
+    def test_allows_empty_write_once_the_good_board_is_stale(self) -> None:
+        # An empty board is legitimately correct at the end of a slate, so
+        # refusing forever would freeze a stale board instead of protecting it.
+        existing = {
+            "selected_date": "2026-07-25",
+            "candidate_count": 84,
+            "state_last_updated": "2026-07-25T00:00:00+00:00",
+        }
+        self.assertFalse(self._guard(existing))
+
+    def test_allows_when_existing_is_already_empty(self) -> None:
+        existing = {
+            "selected_date": "2026-07-25",
+            "candidate_count": 0,
+            "state_last_updated": intelligence_state_module._utc_now(),
+        }
+        self.assertFalse(self._guard(existing))
+
+    def test_does_not_protect_a_different_dates_board(self) -> None:
+        existing = {
+            "selected_date": "2026-07-26",
+            "candidate_count": 84,
+            "state_last_updated": intelligence_state_module._utc_now(),
+        }
+        self.assertFalse(self._guard(existing))
+
+    def test_allows_when_there_is_no_existing_state(self) -> None:
+        self.assertFalse(self._guard(None))
+
+    def test_fails_open_on_a_read_error(self) -> None:
+        # A guard that blocks writes on ambiguity is worse than the bug it
+        # prevents: it could freeze the board permanently.
+        with patch.object(intelligence_state_module, "read_json_file", side_effect=RuntimeError("boom")):
+            self.assertFalse(intelligence_state_module._empty_write_would_clobber_good_board(self.incoming))
+
+    def test_can_be_disabled_by_env(self) -> None:
+        os.environ["SYNDICATE_EMPTY_BOARD_PROTECTION_SECONDS"] = "0"
+        existing = {
+            "selected_date": "2026-07-25",
+            "candidate_count": 84,
+            "state_last_updated": intelligence_state_module._utc_now(),
+        }
+        self.assertFalse(self._guard(existing))
