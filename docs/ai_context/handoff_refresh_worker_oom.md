@@ -1,6 +1,54 @@
-# Handoff — refresh-worker OOM (open incident)
+# Handoff — refresh-worker OOM (RESOLVED 2026-07-26 19:06 UTC)
 
-Written 2026-07-26. **The incident is still live at the time of writing.**
+## Resolution
+
+**Root cause: `_load_jsonl_rows` read the entire odds-events file into memory
+before applying its row cap.** Production's `data/odds_events/2026-07-26.jsonl`
+was **1,238,217,572 bytes (1.24 GB)**. `path.read_text()` allocated that as one
+string, `.splitlines()` built a list of every line, every line was parsed, and
+*only then* was the result sliced to the last 2000 rows. The cap bounded what
+the caller received; it never bounded what the read cost.
+
+Fixed in `5181ed3d` by streaming the file into a `deque(maxlen=N)`. Measured on
+a 135 MB file: **734.6 MB peak → 2.9 MB peak, identical output, 251× less.**
+
+Confirmed live:
+
+| | |
+|---|---|
+| last OOM | 19:05:36, during the deploy, on the old code |
+| since `server_available` 19:06:37 | **no OOM, no restart** |
+| 1.24 GB file read post-fix | 19:09:09 — read it and survived |
+| MLB 15 games | completed |
+| soccer 17 games | completed |
+| memory | plateaus ~2.65–2.70 GB / 4096 (65–67%), oscillating, not ratcheting |
+| **`STATE_PERSIST_BEGIN candidate_count=7`** | 19:09:45 — **board rebuilt on a worker for the first time since 00:02 UTC** |
+
+Why it began at 00:02 UTC mid-slate, and why local never reproduced it: on a
+live slate the odds refresh appends to today's file continuously, so the mtime
+the `_JSONL_ROWS_CACHE` keys on changes constantly, every lookup misses, and the
+full re-read repeats — once per game, per board build. Local `odds_events` files
+are 17–97 KB.
+
+The comment above that cache asserted the opposite — *"a miss just means one
+full re-read of a file already capped to `_MAX_JSONL_ROWS_PER_FILE`"* — and
+believing it is most of why this stayed open for a day. Corrected in place.
+
+### Still open after this
+
+- **The odds-events file grows unbounded** — 1.24 GB in a single day. Reading it
+  is now cheap, but nothing prunes or rotates it. See **#76**.
+- **~2.7 GB plateau** leaves only 1.4 GB headroom on a 4 GiB container. Not
+  failing, but not comfortable. The climb happens during MLB games 0–11.
+- **#66 / #68** can now be re-validated — `candidate_count=7`, not zero.
+- The `cards_context_*` / `board_contract_*` / `sim_contract_*` / `ADV_CTX_SIZE`
+  / `ODDS_SHARD_SIZE` instrumentation is still deployed. Keep it until the
+  plateau above is understood, then prune with #38.
+
+---
+
+## The investigation (kept — the wrong turns are the useful part)
+
 Read this before touching `build_intelligence_overview`, `_build_sport_overview`,
 or `build_cards_page_context`.
 
