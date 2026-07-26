@@ -43,6 +43,12 @@ class GameBoardSimulationContractTests(unittest.TestCase):
                 },
                 sport="wnba",
                 module="cards",
+                # #75/#43: building the simulation contract is now opt-IN. It
+                # defaulted to on for every non-web caller, which meant the
+                # refresh-worker built it for every sport every cycle with no
+                # reader anywhere. This test is about the contract's CONTENT, so
+                # it asks for one explicitly; the default is covered below.
+                include_simulation_contract=True,
             )
 
         simulation_contract = context.get("simulation_contract")
@@ -53,6 +59,19 @@ class GameBoardSimulationContractTests(unittest.TestCase):
         self.assertEqual((simulation_contract.get("selection") or {}).get("kind"), "date")
         self.assertTrue((simulation_contract.get("freshness") or {}).get("is_current_day"))
         self.assertEqual(((simulation_contract.get("advanced") or {}).get("page") or {}).get("wnba_advanced_contract", {}).get("coverage", {}).get("games_with_intervals"), 1)
+
+    def test_apply_game_board_contract_omits_simulation_contract_by_default(self) -> None:
+        # #75/#43. The default flipped to OFF. Nothing in syndicate/ reads
+        # context["simulation_contract"] -- the only other reference reads it
+        # off the daily_update payload, a different structure -- and building it
+        # on the worker for every sport every cycle is what left no memory
+        # headroom for the board build to run beside an MLB sim.
+        context = apply_game_board_contract(
+            {"date": "2026-06-22", "games": []},
+            sport="wnba",
+            module="cards",
+        )
+        self.assertNotIn("simulation_contract", context)
 
     def test_apply_game_board_contract_skips_simulation_contract_on_render_web(self) -> None:
         with patch.dict(

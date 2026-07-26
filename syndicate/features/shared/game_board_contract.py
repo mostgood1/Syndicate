@@ -606,7 +606,24 @@ def apply_game_board_contract(
     out.setdefault("cards_stylesheet", f"{normalized_sport}/cards.css")
     should_include_simulation_contract = include_simulation_contract
     if should_include_simulation_contract is None:
-        should_include_simulation_contract = not _render_web_dyno()
+        # #75/#43. Default OFF. This used to default to "build it whenever we
+        # are not the web dyno", which meant the refresh-worker built it for
+        # every sport, every cycle -- and NOTHING reads it. The only other
+        # reference to a "simulation_contract" key in syndicate/ is
+        # ask_the_syndicate_adapter.py, which reads it off the daily_update
+        # payload, a different structure. The web dyno never built it, so no
+        # template can depend on it either.
+        #
+        # It is also the most expensive thing on the path: it was 99.8% of the
+        # page context's deep size locally, it is absent from the persisted
+        # board payload, and the OOM that took the worker down all day died
+        # inside build_simulation_contract_from_context. Post-fix the worker
+        # still plateaued at ~2.7GB, which left too little headroom for a board
+        # build to run alongside an MLB sim -- DEFERRED_BOARD_BUILD
+        # reason=sim_subprocess_resident_and_no_headroom, 16 cycles in a row.
+        #
+        # Callers that genuinely want it can still pass include_simulation_contract=True.
+        should_include_simulation_contract = False
     if should_include_simulation_contract:
         out["simulation_contract"] = build_simulation_contract_from_context(
             out,
