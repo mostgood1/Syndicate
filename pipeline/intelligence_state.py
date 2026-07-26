@@ -995,10 +995,82 @@ def _is_intelligence_state_payload_valid(state: dict[str, Any] | None) -> bool:
     return False
 
 
+# Marker left in place of response.analysis when it is byte-identical to the
+# top-level analysis, so _expand_persisted_state can restore it on read.
+_ANALYSIS_ALIAS_MARKER = {"__alias_of__": "analysis"}
+
+
+def _compact_state_for_persist(state: dict[str, Any]) -> dict[str, Any]:
+    """Shrink the state before it crosses the keyvalue boundary.
+
+    Root cause of #43. The board computed 222 candidates correctly every
+    cycle and then lost them here: this payload reached 8.9MB compact
+    (16.9MB on disk, 393k lines) and Redis answered a SET that size with
+    "Connection closed by server". The retry is sound -- it clears the
+    client cache and reconnects -- but a fresh connection cannot fix an
+    oversized value, so it failed twice and the whole build was discarded.
+    Nothing upstream was broken, which is why every other signal looked
+    healthy while candidate_count sat at 0.
+
+    Two reductions, both provably lossless for readers:
+
+    - response.analysis is BYTE-IDENTICAL to the top-level analysis
+      (verified against production state). Storing both doubled the largest
+      object in the payload. It is replaced with an alias marker and
+      restored on read, so consumers still see state["response"]["analysis"].
+    - analysis.evaluation_record.recommendations is 1.98MB and has NO
+      reader: nothing in syndicate/ or pipeline/ accesses it. The fields
+      that are consumed (artifact_metadata for date resolution, metrics,
+      history) are kilobytes and are kept. It is also handed wholesale into
+      ask_the_syndicate's LLM prompt pack, where 1.98MB of recommendations
+      would be actively harmful.
+
+    Together these take the payload from ~8.9MB to ~2.4MB.
+    """
+    compact = dict(state or {})
+    analysis = compact.get("analysis")
+
+    if isinstance(analysis, dict):
+        record = analysis.get("evaluation_record")
+        if isinstance(record, dict) and "recommendations" in record:
+            trimmed_record = {k: v for k, v in record.items() if k != "recommendations"}
+            analysis = {**analysis, "evaluation_record": trimmed_record}
+            compact["analysis"] = analysis
+
+    response = compact.get("response")
+    if isinstance(response, dict) and "analysis" in response:
+        same = json.dumps(response.get("analysis"), sort_keys=True, default=str) == json.dumps(
+            state.get("analysis"), sort_keys=True, default=str
+        )
+        # Only alias when they genuinely match. If they ever diverge, keeping
+        # the real value is correct -- a wrong board beats a small one.
+        compact["response"] = {
+            **response,
+            "analysis": dict(_ANALYSIS_ALIAS_MARKER) if same else response.get("analysis"),
+        }
+    return compact
+
+
+def _expand_persisted_state(state: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Restore response.analysis from its alias marker. Inverse of
+    _compact_state_for_persist, so every existing consumer is unaffected.
+    Tolerates un-aliased payloads written before this change.
+    """
+    if not isinstance(state, dict):
+        return state
+    response = state.get("response")
+    if not isinstance(response, dict):
+        return state
+    if response.get("analysis") != _ANALYSIS_ALIAS_MARKER:
+        return state
+    return {**state, "response": {**response, "analysis": state.get("analysis")}}
+
+
 def read_intelligence_state() -> dict[str, Any] | None:
     path = _intelligence_state_read_path("state", INTELLIGENCE_STATE_PATH)
     print("[INTELLIGENCE STATE READ]", {"path": str(path)})
     payload = read_json_file(path)
+    payload = _expand_persisted_state(payload if isinstance(payload, dict) else None)
     normalized = _normalize_intelligence_state_payload(payload if isinstance(payload, dict) else None)
     if not _is_intelligence_state_payload_valid(normalized):
         print("[INTELLIGENCE STATE READ]", {"path": str(path), "valid": False, "candidate_count": 0})
@@ -1026,8 +1098,12 @@ def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
     state_meta = dict(normalized.get("state_meta") or {})
     live_pipeline = dict(normalized.get("live_pipeline") or {})
     board_snapshot_payload = _intelligence_board_snapshot_payload(normalized)
-    write_json_file(INTELLIGENCE_STATE_PATH, normalized)
-    write_json_file(daily_paths["state"], normalized)
+    # #43: shrink before crossing the keyvalue boundary. Redis closed the
+    # connection on the full ~8.9MB payload, discarding a correctly computed
+    # board every cycle. See _compact_state_for_persist.
+    persisted = _compact_state_for_persist(normalized)
+    write_json_file(INTELLIGENCE_STATE_PATH, persisted)
+    write_json_file(daily_paths["state"], persisted)
     history_entry = _intelligence_state_history_entry(normalized)
     INTELLIGENCE_HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
     with INTELLIGENCE_HISTORY_PATH.open("a", encoding="utf-8") as history_file:

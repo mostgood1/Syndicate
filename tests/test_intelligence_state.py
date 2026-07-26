@@ -3471,3 +3471,78 @@ class BoardBuildDeferralBoundTests(unittest.TestCase):
     def test_broken_headroom_check_counts_as_insufficient(self) -> None:
         with patch("syndicate.features.shared.memory_observability.memory_headroom_snapshot", side_effect=RuntimeError("boom")):
             self.assertFalse(intelligence_state_module._board_build_has_memory_headroom())
+
+
+class CompactStateForPersistTests(unittest.TestCase):
+    """#43's root cause. The board computed 222 candidates correctly every
+    cycle, then lost them at write_latest_intelligence_state: the payload had
+    reached 8.9MB compact (16.9MB / 393k lines on disk) and Redis answered a
+    SET that size with "Connection closed by server". The retry logic is
+    sound -- it clears the client cache and reconnects -- but a fresh
+    connection cannot fix an oversized value, so it failed twice and the
+    build was discarded. Nothing upstream was broken, which is why every
+    other signal looked healthy while candidate_count stayed 0.
+    """
+
+    def _state(self):
+        analysis = {
+            "picks": [{"id": 1}],
+            "evaluation_record": {
+                "artifact_metadata": {"selected_date": "2026-07-25"},
+                "metrics": {"roi": 0.1},
+                "recommendations": [{"big": "x" * 200} for _ in range(50)],
+            },
+        }
+        return {
+            "candidate_count": 222,
+            "analysis": analysis,
+            "response": {"analysis": json.loads(json.dumps(analysis)), "top_opportunities": []},
+            "board_contract": {"schema": "intelligence_board_v1"},
+        }
+
+    def test_drops_the_duplicated_response_analysis(self) -> None:
+        compact = intelligence_state_module._compact_state_for_persist(self._state())
+        self.assertEqual(compact["response"]["analysis"], intelligence_state_module._ANALYSIS_ALIAS_MARKER)
+
+    def test_drops_the_unread_evaluation_recommendations(self) -> None:
+        # 1.98MB in production with no reader anywhere in syndicate/ or
+        # pipeline/. The fields that ARE consumed stay.
+        compact = intelligence_state_module._compact_state_for_persist(self._state())
+        record = compact["analysis"]["evaluation_record"]
+        self.assertNotIn("recommendations", record)
+        self.assertIn("artifact_metadata", record)
+        self.assertIn("metrics", record)
+
+    def test_round_trip_restores_response_analysis(self) -> None:
+        expanded = intelligence_state_module._expand_persisted_state(
+            intelligence_state_module._compact_state_for_persist(self._state())
+        )
+        self.assertEqual(expanded["response"]["analysis"], expanded["analysis"])
+        self.assertNotEqual(expanded["response"]["analysis"], intelligence_state_module._ANALYSIS_ALIAS_MARKER)
+
+    def test_keeps_response_analysis_when_it_genuinely_differs(self) -> None:
+        # A wrong board beats a small one: only alias when they truly match.
+        state = self._state()
+        state["response"]["analysis"] = {"picks": [{"id": 999}]}
+        compact = intelligence_state_module._compact_state_for_persist(state)
+        self.assertEqual(compact["response"]["analysis"], {"picks": [{"id": 999}]})
+
+    def test_materially_shrinks_the_payload(self) -> None:
+        state = self._state()
+        before = len(json.dumps(state, default=str))
+        after = len(json.dumps(intelligence_state_module._compact_state_for_persist(state), default=str))
+        self.assertLess(after, before * 0.5)
+
+    def test_expand_tolerates_pre_change_payloads(self) -> None:
+        # State written before this existed has a real dict there already.
+        legacy = {"analysis": {"a": 1}, "response": {"analysis": {"a": 1}}}
+        self.assertEqual(intelligence_state_module._expand_persisted_state(legacy), legacy)
+
+    def test_expand_handles_missing_response(self) -> None:
+        self.assertEqual(intelligence_state_module._expand_persisted_state({"analysis": {}}), {"analysis": {}})
+        self.assertIsNone(intelligence_state_module._expand_persisted_state(None))
+
+    def test_leaves_other_top_level_keys_untouched(self) -> None:
+        compact = intelligence_state_module._compact_state_for_persist(self._state())
+        self.assertEqual(compact["board_contract"], {"schema": "intelligence_board_v1"})
+        self.assertEqual(compact["candidate_count"], 222)
