@@ -94,6 +94,23 @@ def _normalize_player_projections(game: dict[str, Any]) -> list[dict[str, Any]]:
     return candidates
 
 
+def _log_advanced_context_size(bucket: str, key: str, value: Any) -> None:
+    # #75. See _advanced_context. Worker-only; never let instrumentation be the
+    # reason a board build fails.
+    try:
+        from syndicate.features.shared.game_board_contract import _render_web_dyno
+
+        if _render_web_dyno():
+            return
+        if isinstance(value, (list, tuple, dict, str)):
+            print(
+                f"ADV_CTX_SIZE bucket={bucket} key={key} type={type(value).__name__} len={len(value)}",
+                flush=True,
+            )
+    except Exception:
+        pass
+
+
 def _advanced_context(game: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
     page: dict[str, Any] = {}
     game_adv: dict[str, Any] = {}
@@ -137,11 +154,23 @@ def _advanced_context(game: dict[str, Any], context: dict[str, Any]) -> dict[str
         "status_badge",
     )
 
+    # #75. Production dies inside the FIRST game's _normalize_game_context,
+    # before build_market_features is reached (no ODDS_SHARD_SIZE line is ever
+    # emitted), so the cost is here or in _normalize_player_projections. This
+    # function deepcopies every key below, per game, and several of them --
+    # liveProps, trackedProps, archivedLiveProps, gameLens -- accumulate over a
+    # live game. Local cannot reproduce it because the pulled artifacts have no
+    # live games.
+    #
+    # Element counts only, logged BEFORE the copy: computing a byte size of the
+    # value would risk the same allocation that is killing the process.
     for key in context_keys:
         if key in context and context.get(key) is not None:
+            _log_advanced_context_size("page", key, context.get(key))
             page[key] = deepcopy(context.get(key))
     for key in game_keys:
         if key in game and game.get(key) is not None:
+            _log_advanced_context_size("game", key, game.get(key))
             game_adv[key] = deepcopy(game.get(key))
 
     return {
