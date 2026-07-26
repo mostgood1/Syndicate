@@ -241,7 +241,43 @@ were resolved and nine already-closed rows removed from the open tables.
   `{unknown: 16} kept=0`; **MLB byte-identical** at
   `{final: 13, live: 1, scheduled: 1} kept=17`.
 
-  🔴 **STILL OPEN, and it is the bigger half: MLB. The trace answered it.**
+  🔴 **MLB HALF — ROOT-CAUSED 2026-07-26T23:46Z. A once-daily artifact cannot
+  be pulled by a lookback-bounded pull.** The chain, each step measured:
+  1. `game_candidate_inputs` on the worker: MLB game blocks **all 0**.
+  2. `game["markets"]` is the only source of those blocks —
+     `_mlb_game_market_recommendation_rows` translates
+     `markets["ml"]/["totals"]` into the `game_market_recommendations` that
+     `_game_bet_candidates_from_game` reads.
+  3. `cards_context_betting_games_loaded {"betting_game_count": 0}`, on a cycle
+     where `sim_games 15/15`, `actual_games 15`, `games_built 15`. Everything
+     else is healthy; only the betting payload is missing.
+  4. `BETTING_PAYLOAD_READ date=2026-07-26 exists=False size=None
+     payload_type=NoneType games_count=0` — the file
+     `eval/seasons/2026/betting_day_payloads_retuned/season_betting_day_2026_07_26.json`
+     **is not on the worker's disk at all.** Not empty, not misshapen: absent.
+  5. It cannot arrive. `pull_hot_artifacts` filters by `since=` (observed
+     `since=1785108524` = 23:28:44Z, ~5 min before the pull, `artifacts_received=0`
+     on the `*2026_07_26*` pattern), and even an absent watermark floors at
+     **`_MAX_PULL_WINDOW_SECONDS = 2h`**
+     ([artifact_publisher.py:238](syndicate/features/shared/artifact_publisher.py:238)).
+     This payload is written **once, in the morning** (~05:09 CT). Anything
+     older than the window is permanently unreachable for a worker that does
+     not already have it — an incremental pull can repair a copy that is
+     *older* than web's, never one that is *missing*.
+  ⚠️ **`artifact_status` reports this same path as `artifact_exists: true` /
+  `data_health: "ready"`** — it is an any-of check across three paths and the
+  other two do exist. **Do not trust that signal for this file**; it is what
+  made the missing artifact look present all day.
+  **The 2h ceiling is correct and must not simply be raised** — it was added
+  after an unbounded pull OOM-crashed the worker and cascaded into web 502s on
+  2026-07-25, and both sides load the whole response in memory. The fix wants
+  to be a **narrow repair pull**: when a known-required artifact is missing,
+  one un-clamped request scoped to that filename (`*season_betting_day_2026_07_26*`,
+  `since=0`) returns a single file, so it carries none of the size risk the
+  ceiling exists to bound. `artifact_status` already knows the required paths
+  per sport, so the "what is missing" half exists.
+
+  *Superseded framing (the "stubs" reading — right symptom, wrong layer):*
   `game_candidate_inputs` on the first successful cycle:
   `mlb {betting: 0, gameLens: 0, gameMarkets: 0, game_market_recommendations: 0,
   markets: 0, shared_prop_rows: 0, shared_top_play_rows: 0}` — **every market
