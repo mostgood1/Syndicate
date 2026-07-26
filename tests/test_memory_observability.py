@@ -109,3 +109,52 @@ def test_memory_headroom_snapshot_reports_insufficient_and_sufficient(monkeypatc
     roomy = memory_observability.memory_headroom_snapshot(min_required_bytes)
     assert roomy is not None
     assert roomy["sufficient"] is True
+
+def test_memory_stat_breakdown_is_diagnostic_only_and_never_moves_the_gate(monkeypatch):
+    # #79. The board build refuses to start every cycle on refresh-worker
+    # because headroom is computed as max - memory.current, and cgroup v2's
+    # memory.current includes reclaimable page cache: 3309MB of 4096 used with
+    # only 451MB owned by any process.
+    #
+    # This pins the shape of the reading that will settle whether the guard is
+    # measuring the wrong thing -- AND that adding it did not quietly relax the
+    # guard. `sufficient` must still be driven by max - current alone, even
+    # when the breakdown says almost all of it is evictable file cache.
+    monkeypatch.setattr(memory_observability, "_read_container_memory_current_bytes", lambda: int(3309 * BYTES_PER_MB))
+    monkeypatch.setattr(memory_observability, "_read_container_memory_max_bytes", lambda: int(4096 * BYTES_PER_MB))
+    monkeypatch.setattr(
+        memory_observability,
+        "_read_container_memory_stat",
+        lambda: {
+            "anon": int(451 * BYTES_PER_MB),
+            "file": int(2670 * BYTES_PER_MB),
+            "inactive_file": int(2622 * BYTES_PER_MB),
+            "active_file": int(48 * BYTES_PER_MB),
+            "slab_reclaimable": int(28 * BYTES_PER_MB),
+        },
+    )
+
+    snapshot = memory_observability.memory_headroom_snapshot(900 * BYTES_PER_MB)
+    assert snapshot is not None
+    # The gate is unchanged: 4096 - 3309 = 787 < 900.
+    assert snapshot["headroom_mb"] == 787.0
+    assert snapshot["sufficient"] is False
+    # ...while the diagnostic shows what a page-cache-aware gate would decide.
+    assert snapshot["stat_mb"]["inactive_file"] == 2622.0
+    assert snapshot["reclaimable_file_mb"] == 2650.0
+    assert snapshot["would_be_sufficient_excluding_file_cache"] is True
+
+
+def test_memory_stat_absent_leaves_the_snapshot_untouched(monkeypatch):
+    # cgroups may be missing entirely (local dev) or memory.stat unreadable.
+    # The snapshot must degrade to exactly its previous shape rather than
+    # carrying half-populated diagnostic keys.
+    monkeypatch.setattr(memory_observability, "_read_container_memory_current_bytes", lambda: int(100 * BYTES_PER_MB))
+    monkeypatch.setattr(memory_observability, "_read_container_memory_max_bytes", lambda: int(2048 * BYTES_PER_MB))
+    monkeypatch.setattr(memory_observability, "_read_container_memory_stat", lambda: {})
+
+    snapshot = memory_observability.memory_headroom_snapshot(900 * BYTES_PER_MB)
+    assert snapshot is not None
+    assert snapshot["sufficient"] is True
+    assert "stat_mb" not in snapshot
+    assert "would_be_sufficient_excluding_file_cache" not in snapshot

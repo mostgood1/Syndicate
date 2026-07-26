@@ -117,6 +117,68 @@ def _read_container_memory_max_bytes() -> int | None:
     return None
 
 
+_MEMORY_STAT_KEYS_OF_INTEREST = (
+    "anon",
+    "file",
+    "inactive_file",
+    "active_file",
+    "inactive_anon",
+    "active_anon",
+    "slab",
+    "slab_reclaimable",
+    "slab_unreclaimable",
+    "shmem",
+    "sock",
+    "kernel_stack",
+)
+
+
+def _read_container_memory_stat() -> dict[str, int]:
+    """The cgroup's own `key value` breakdown of memory.current.
+
+    #79. The comment on _read_container_memory_max_bytes above already says
+    memory.current "includes reclaimable page cache and looks alarming even
+    when nothing is actually at risk" -- and memory_headroom_snapshot then
+    computes headroom as max - current anyway. On refresh-worker 2026-07-26
+    that reads 3309MB of 4096 with only 451MB accounted to any process, so the
+    board build refuses to start every cycle (#79) on 2860MB nobody owns.
+
+    This reads the breakdown so that gap can be attributed rather than
+    guessed at. Diagnostic only -- `sufficient` is deliberately still computed
+    from max - current, because if the unaccounted memory turns out to be
+    anonymous rather than file cache then the guard is correct as written and
+    relaxing it walks back into the 4GiB OOM (#75).
+    """
+    candidates = (
+        Path("/sys/fs/cgroup/memory.stat"),
+        Path("/sys/fs/cgroup/memory/memory.stat"),
+    )
+    for candidate in candidates:
+        try:
+            if not candidate.exists() or not candidate.is_file():
+                continue
+            values: dict[str, int] = {}
+            for line in candidate.read_text(encoding="utf-8", errors="ignore").splitlines():
+                parts = line.split()
+                if len(parts) != 2:
+                    continue
+                # cgroup v1 prefixes the hierarchical rollups with "total_";
+                # prefer the plain key but accept either so one reader covers
+                # both layouts.
+                key = parts[0][6:] if parts[0].startswith("total_") else parts[0]
+                if key not in _MEMORY_STAT_KEYS_OF_INTEREST or key in values:
+                    continue
+                try:
+                    values[key] = int(parts[1])
+                except ValueError:
+                    continue
+            if values:
+                return values
+        except Exception:
+            continue
+    return {}
+
+
 def memory_headroom_snapshot(min_required_bytes: int) -> dict[str, Any] | None:
     # Shared by any caller that wants to defer heavy in-process work rather
     # than guess from elapsed time or trigger type -- originally lived only in
@@ -132,13 +194,30 @@ def memory_headroom_snapshot(min_required_bytes: int) -> dict[str, Any] | None:
         return None
     headroom_bytes = max_bytes - current_bytes
     min_required = max(0, int(min_required_bytes))
-    return {
+    snapshot: dict[str, Any] = {
         "current_mb": round(current_bytes / 1024 / 1024, 1),
         "max_mb": round(max_bytes / 1024 / 1024, 1),
         "headroom_mb": round(headroom_bytes / 1024 / 1024, 1),
         "min_required_mb": round(min_required / 1024 / 1024, 1),
         "sufficient": headroom_bytes >= min_required,
     }
+    # #79, diagnostic only -- `sufficient` above is untouched. Attributes the
+    # gap between memory.current and the RSS of any actual process, which on
+    # refresh-worker is 2860MB of 3311MB and is what refuses the board build
+    # every cycle. If reclaimable_file dominates, the guard is measuring
+    # memory the kernel would evict rather than OOM on, and
+    # would_be_sufficient_excluding_file_cache shows what the corrected gate
+    # would have decided. If it does NOT dominate, the guard is right and this
+    # says so before anyone relaxes it.
+    stat = _read_container_memory_stat()
+    if stat:
+        snapshot["stat_mb"] = {key: round(value / 1024 / 1024, 1) for key, value in sorted(stat.items())}
+        reclaimable_bytes = stat.get("inactive_file", 0) + stat.get("slab_reclaimable", 0)
+        if reclaimable_bytes > 0:
+            snapshot["reclaimable_file_mb"] = round(reclaimable_bytes / 1024 / 1024, 1)
+            snapshot["headroom_excluding_file_cache_mb"] = round((headroom_bytes + reclaimable_bytes) / 1024 / 1024, 1)
+            snapshot["would_be_sufficient_excluding_file_cache"] = (headroom_bytes + reclaimable_bytes) >= min_required
+    return snapshot
 
 
 def _process_cmdline(value: Any) -> list[str]:
