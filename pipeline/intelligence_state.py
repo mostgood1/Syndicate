@@ -248,6 +248,9 @@ def _odds_refresh_in_flight() -> bool:
     is_refresh_run_active() is deliberately conservative: a false negative
     means occasional stacking, which is what happens today anyway, while a
     false positive would stall the board indefinitely.
+
+    NOTE: this signal alone must never gate the build -- see
+    _board_build_deferral_reason for why it starves without a bound.
     """
     if not _env_bool("SYNDICATE_INTELLIGENCE_DEFER_TO_ODDS_REFRESH", default=True):
         return False
@@ -257,6 +260,74 @@ def _odds_refresh_in_flight() -> bool:
         return bool(is_refresh_run_active())
     except Exception:
         return False
+
+
+# How many consecutive odds-refresh deferrals before the board build stops
+# waiting politely and checks whether it can actually run.
+_MAX_CONSECUTIVE_ODDS_REFRESH_DEFERS = 5
+
+
+def _board_build_deferral_reason(*, consecutive_odds_defers: int) -> str | None:
+    """Why this iteration should skip the board build, or None to run it.
+
+    The two hazards are NOT symmetric, and treating them as if they were is
+    what took the board down on 2026-07-25 after it moved to
+    live-odds-worker:
+
+    - An MLB sim is FINITE (~15 min) and occasional, so waiting for one
+      always terminates. Deferring to it needs no bound.
+    - An odds refresh on this host is effectively CONTINUOUS -- the tick runs
+      every 60s and a refresh regularly outruns it, which is why
+      "a refresh run is already active" appears on consecutive ticks. So
+      "defer while a refresh is in flight" degenerates into "never run":
+      measured 8 deferrals across 13 iterations with candidate_count 0 and
+      snapshot_generated_at never set.
+
+    So the odds-refresh wait is bounded. Past the bound the build stops
+    treating "a refresh exists" as disqualifying and asks the question that
+    actually matters -- is there memory for this right now -- because the
+    refresh's footprint varies enormously by sport and phase (a soccer odds
+    pull is nothing like a WNBA SmartSim leg).
+
+    Returning None means run. Starvation is now impossible from the
+    odds-refresh branch: either headroom is sufficient and it runs, or the
+    box genuinely cannot host it and that is a capacity fact worth logging
+    rather than hiding behind an unbounded wait.
+    """
+    if _mlb_sim_subprocess_running():
+        return "sim_subprocess_resident"
+    if not _odds_refresh_in_flight():
+        return None
+    if consecutive_odds_defers < _MAX_CONSECUTIVE_ODDS_REFRESH_DEFERS:
+        return "odds_refresh_in_flight"
+    if _board_build_has_memory_headroom():
+        return None
+    return "odds_refresh_in_flight_and_no_headroom"
+
+
+def _board_build_has_memory_headroom() -> bool:
+    """Real measured headroom, not a proxy. None/unmeasurable counts as
+    insufficient -- this is the branch that overrides a safety wait, so it
+    must not override on a guess.
+    """
+    try:
+        from syndicate.features.shared.memory_observability import memory_headroom_snapshot
+
+        snapshot = memory_headroom_snapshot(_board_build_min_headroom_bytes())
+        return bool(snapshot and snapshot.get("sufficient"))
+    except Exception:
+        return False
+
+
+def _board_build_min_headroom_bytes() -> int:
+    # 900MB: the build was measured idling ~700MB and spiking past 1479MB on
+    # a live slate, so anything under this is not a real window.
+    raw = str(os.environ.get("SYNDICATE_BOARD_BUILD_MIN_HEADROOM_MB") or "").strip()
+    try:
+        megabytes = int(raw or 900)
+    except ValueError:
+        megabytes = 900
+    return max(128, megabytes) * 1024 * 1024
 
 
 def _watched_payload_eviction_reason(payload: dict[str, Any] | None, today_iso: str) -> str | None:
@@ -2175,6 +2246,10 @@ class IntelligenceStateService:
         loop_started_at = time.time()
         logger.info("BACKGROUND_LOOP_START", extra={"elapsed_ms": 0.0})
         print("[intelligence_state] BACKGROUND_LOOP_START", flush=True)
+        # Bounds how long the odds-refresh hazard may hold off the build; see
+        # _board_build_deferral_reason. Local to the loop, so a restart starts
+        # the count fresh rather than inheriting a stale wait.
+        consecutive_odds_refresh_defers = 0
         while not self._stop.is_set():
             iteration_started_at = time.time()
             # Temporary diagnostic (see _diag_log_all_process_memory): every
@@ -2258,13 +2333,16 @@ class IntelligenceStateService:
             # #55: yield the container to a resident MLB sim. Re-queue rather
             # than drop -- this payload still needs computing, just not while
             # 1.1GB of sim is resident in a 2GB container.
-            deferral_reason = None
-            if _mlb_sim_subprocess_running():
-                deferral_reason = "sim_subprocess_resident"
-            elif _odds_refresh_in_flight():
-                # Host-specific: matters on live-odds-worker, whose refresh can
-                # spawn WNBA SmartSim and spike to ~1.3-1.5GB (#57).
-                deferral_reason = "odds_refresh_in_flight"
+            deferral_reason = _board_build_deferral_reason(
+                consecutive_odds_defers=consecutive_odds_refresh_defers
+            )
+            if deferral_reason == "odds_refresh_in_flight":
+                consecutive_odds_refresh_defers += 1
+            elif deferral_reason is None:
+                # Reset only on an actual run: a sim deferral must not clear
+                # the odds counter, or alternating hazards would hold it
+                # below the bound forever and reintroduce the starvation.
+                consecutive_odds_refresh_defers = 0
             if deferral_reason is not None:
                 # Deliberately NOT named DEFERRED_TO_MLB_SIM: this fires for
                 # the odds-refresh case too, and a sim-specific name would

@@ -3401,3 +3401,61 @@ class DeferToOddsRefreshTests(unittest.TestCase):
         # than the occasional stacking that happens today anyway.
         with patch("syndicate.features.shared.ops_refresh.is_refresh_run_active", side_effect=RuntimeError("boom")):
             self.assertFalse(intelligence_state_module._odds_refresh_in_flight())
+
+
+class BoardBuildDeferralBoundTests(unittest.TestCase):
+    """The two hazards are not symmetric, and treating them as if they were
+    took the board down on 2026-07-25 after it moved to live-odds-worker.
+
+    An MLB sim is finite (~15 min), so waiting for one always terminates. An
+    odds refresh on that host is effectively continuous -- the tick runs
+    every 60s and refreshes regularly outrun it -- so an unbounded
+    "defer while a refresh is in flight" degenerated into "never run":
+    8 deferrals across 13 iterations, candidate_count 0, and
+    snapshot_generated_at never set.
+    """
+
+    def _reason(self, *, sim, refresh, count, headroom=True):
+        with patch.object(intelligence_state_module, "_mlb_sim_subprocess_running", return_value=sim), patch.object(
+            intelligence_state_module, "_odds_refresh_in_flight", return_value=refresh
+        ), patch.object(intelligence_state_module, "_board_build_has_memory_headroom", return_value=headroom):
+            return intelligence_state_module._board_build_deferral_reason(consecutive_odds_defers=count)
+
+    def test_runs_when_nothing_is_in_the_way(self) -> None:
+        self.assertIsNone(self._reason(sim=False, refresh=False, count=0))
+
+    def test_sim_deferral_is_unbounded_because_a_sim_is_finite(self) -> None:
+        self.assertEqual(self._reason(sim=True, refresh=False, count=999), "sim_subprocess_resident")
+
+    def test_defers_to_an_odds_refresh_up_to_the_bound(self) -> None:
+        self.assertEqual(self._reason(sim=False, refresh=True, count=0), "odds_refresh_in_flight")
+        self.assertEqual(
+            self._reason(sim=False, refresh=True, count=intelligence_state_module._MAX_CONSECUTIVE_ODDS_REFRESH_DEFERS - 1),
+            "odds_refresh_in_flight",
+        )
+
+    def test_runs_past_the_bound_when_memory_actually_allows(self) -> None:
+        # The anti-starvation branch: a near-continuous refresh must not be
+        # able to hold the board off forever.
+        self.assertIsNone(
+            self._reason(sim=False, refresh=True, count=intelligence_state_module._MAX_CONSECUTIVE_ODDS_REFRESH_DEFERS, headroom=True)
+        )
+
+    def test_keeps_deferring_past_the_bound_when_memory_does_not_allow(self) -> None:
+        # Overriding a safety wait is only justified by real headroom.
+        self.assertEqual(
+            self._reason(sim=False, refresh=True, count=99, headroom=False),
+            "odds_refresh_in_flight_and_no_headroom",
+        )
+
+    def test_sim_takes_precedence_over_the_refresh_branch(self) -> None:
+        # A resident sim is the larger, better-evidenced hazard.
+        self.assertEqual(self._reason(sim=True, refresh=True, count=99), "sim_subprocess_resident")
+
+    def test_unmeasurable_headroom_counts_as_insufficient(self) -> None:
+        with patch("syndicate.features.shared.memory_observability.memory_headroom_snapshot", return_value=None):
+            self.assertFalse(intelligence_state_module._board_build_has_memory_headroom())
+
+    def test_broken_headroom_check_counts_as_insufficient(self) -> None:
+        with patch("syndicate.features.shared.memory_observability.memory_headroom_snapshot", side_effect=RuntimeError("boom")):
+            self.assertFalse(intelligence_state_module._board_build_has_memory_headroom())
