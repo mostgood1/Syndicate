@@ -7788,19 +7788,32 @@ def run_intelligence_query(
 
     readiness_gate = _build_readiness_gate(overview, tracked)
 
+    # Specific headlines outrank generic lane headlines. The live/pregame
+    # branches used to sit above these, so "the best points targets across NBA
+    # and WNBA" came back as "The Syndicate pregame board brief" -- the lane is
+    # not what the user asked about, and the question named a market.
+    #
+    # The lane wins far more often than it looks like it should, which is why
+    # this mattered: the router classifies a question like this as
+    # player_analysis and _pipeline_mode_for_query_type maps that to "pregame",
+    # which becomes timing="pregame" and flips intent to pregame_bets -- a
+    # timing the caller never sent. Rather than unpick that inference (it feeds
+    # routing elsewhere), let the more specific headline win, which is the
+    # behaviour these branches were clearly written for: comparison and market
+    # headlines name the actual subject, the lane ones are fallbacks.
     headline = "The Syndicate brief"
     if preferences["intent"] == "parlay":
         headline = "The Syndicate parlay builder"
-    elif preferences["intent"] == "live_bets":
-        headline = "The Syndicate live board brief"
-    elif preferences["intent"] == "pregame_bets":
-        headline = "The Syndicate pregame board brief"
     elif preferences.get("comparison_requested") and len(preferences.get("requested_subjects") or []) >= 2:
         compared = [" ".join(part.capitalize() for part in str(subject).split()) for subject in (preferences.get("requested_subjects") or [])[:2]]
         headline = f"The Syndicate comparison: {compared[0]} vs {compared[1]}"
     elif preferences.get("requested_markets"):
         first_market = _market_label((preferences.get("requested_markets") or [None])[0]).lower()
         headline = f"The Syndicate {first_market} board"
+    elif preferences["intent"] == "live_bets":
+        headline = "The Syndicate live board brief"
+    elif preferences["intent"] == "pregame_bets":
+        headline = "The Syndicate pregame board brief"
 
     summary = (
         f"Scanned {len(candidates)} board candidates across {len([sport_row for sport_row in overview if _sport_matches_preferences(sport_row, preferences)]) or len(overview)} sports. "
