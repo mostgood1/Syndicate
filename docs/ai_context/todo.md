@@ -42,16 +42,33 @@ Conventions:
   - ❌ Open: re-enable look-ahead with deference to an in-flight sim (reuse
     `_mlb_daily_sim_process_still_running`, mirroring the `any_live` guard).
   - ❌ Open: the 2700s timeout has still never been exercised (today ran 15m).
-- **#43 — Layer 2 curated board empty. Root cause FIXED; board still thin.**
-  - ✅ *Validated in production 2026-07-25*: stale-dated payload replay fixed in
-    `495b71db`. `context_label` moved from `2026-07-24` to the correct
-    `2026-07-25`, `candidate_count` went 0 → 1, and `snapshot_generated_at` went
-    `null` → `2026-07-25T18:06:51Z`. Recovery took ~6 minutes after the worker
-    restart — do not judge this fix before the loop completes a full cycle.
-  - ❌ Open (**separate issue, not the replay bug**): 1 candidate off a 15-game MLB
-    slate, and `board_contract.pregame` / `.live` / `.top_overall` are all still 0.
-    The pipeline now runs on the right date but produces almost nothing. Work
-    backward from candidate generation; see also #47 (soccer absent entirely).
+- **#43 — Layer 2 curated board empty. ROOT-CAUSED 2026-07-25, AWAITING VERIFICATION.**
+  - The board was **never broken**. It computed **222 candidates every cycle** and
+    lost them at the final write: the state payload reached 8.9MB compact
+    (16.9MB / 393k lines on disk) and Redis answers a `SET` that size with
+    `Connection closed by server`. The retry is correct — it clears the cached
+    client and reconnects — which is precisely why this hid for hours: a fresh
+    connection cannot fix an oversized *value*, so it failed twice, the exception
+    was caught and logged, and the loop carried on looking healthy.
+  - ✅ Fixed in `b9925b30`: `response.analysis` was byte-identical to top-level
+    `analysis` (now aliased on write, restored on read), and
+    `evaluation_record.recommendations` is 1.98MB with no reader anywhere in
+    `syndicate/` or `pipeline/`. **8.90MB → 4.37MB**, verified lossless against
+    the real production payload.
+  - ❌ **NOT closed.** Closure requires `candidate_count > 0` **with a snapshot
+    timestamp** on `/api/intelligence/status`. Do NOT close on "the loop is
+    iterating" or "builds completed" — both were green for hours while the board
+    was empty. That is the whole lesson of this item.
+  - ⚠️ 4.37MB is **untested, not known-good**. All that is established is that
+    8.9MB fails. If it still fails, the next reductions are
+    `response.evaluation_record` (2.21MB) and `candidate_pool` (0.84MB), or move
+    the bulk through the artifact publish/pull path. See **#60**.
+  - Three earlier explanations were each real bugs that did **not** fix this: the
+    stale-dated payload replay (`495b71db`), the wrong host (#57), and a
+    self-inflicted starving deferral guard (`296402e6`). Each changed a real
+    thing and the symptom never moved.
+  - Still genuinely open underneath: **#47** (soccer absent from candidate
+    generation entirely), which caps what the board can ever show.
 - **#31 — NHL revamp Phase 5: local producers replace vendor subprocess.**
 
 ## Platform / correctness
