@@ -281,8 +281,13 @@ def _odds_refresh_in_flight() -> bool:
 # waiting politely and checks whether it can actually run.
 _MAX_CONSECUTIVE_ODDS_REFRESH_DEFERS = 5
 
+# Bounds the wait on a RESIDENT SIM. Separate constant from the odds one
+# because the two hazards have different durations: a sim run is long
+# (~15 min) but chains, so a slightly larger bound still bounds it.
+_MAX_CONSECUTIVE_SIM_DEFERS = 5
 
-def _board_build_deferral_reason(*, consecutive_odds_defers: int) -> str | None:
+
+def _board_build_deferral_reason(*, consecutive_odds_defers: int, consecutive_sim_defers: int = 0) -> str | None:
     """Why this iteration should skip the board build, or None to run it.
 
     The two hazards are NOT symmetric, and treating them as if they were is
@@ -310,7 +315,32 @@ def _board_build_deferral_reason(*, consecutive_odds_defers: int) -> str | None:
     rather than hiding behind an unbounded wait.
     """
     if _mlb_sim_subprocess_running():
-        return "sim_subprocess_resident"
+        # BOUNDED, after getting this wrong three times. The original comment
+        # here claimed a sim is "finite (~15 min) and occasional, so waiting
+        # for one always terminates". The first half is true and the second is
+        # not: live_refresh_loop.py's own comment states that "sims chain
+        # back-to-back for hours on a live slate", so a resident sim is a
+        # near-continuous condition, not an occasional one.
+        #
+        # Measured consequence: DEFERRED_BOARD_BUILD reason=
+        # sim_subprocess_resident on 17 consecutive cycles with no
+        # CANDIDATE_POOL_READY at all -- the board build simply stopped
+        # running, which is the third time this session that an unbounded wait
+        # on a near-continuous producer was mistaken for a safe one.
+        #
+        # Same bound as the other two: past the limit, ask the question that
+        # matters. At 4GB there is room -- sim ~1674MB plus board ~1479MB is
+        # ~3.2GB of 4096MB -- which is exactly the headroom the upgrade bought,
+        # so the answer is usually yes.
+        if consecutive_sim_defers < _MAX_CONSECUTIVE_SIM_DEFERS:
+            return "sim_subprocess_resident"
+        if _board_build_has_memory_headroom():
+            print(
+                f"[intelligence_state] BOARD_BUILD_PROCEEDING_DESPITE_SIM defers={consecutive_sim_defers}",
+                flush=True,
+            )
+            return None
+        return "sim_subprocess_resident_and_no_headroom"
     if not _odds_refresh_in_flight():
         return None
     if consecutive_odds_defers < _MAX_CONSECUTIVE_ODDS_REFRESH_DEFERS:
@@ -2430,6 +2460,7 @@ class IntelligenceStateService:
         # _board_build_deferral_reason. Local to the loop, so a restart starts
         # the count fresh rather than inheriting a stale wait.
         consecutive_odds_refresh_defers = 0
+        consecutive_sim_defers = 0
         while not self._stop.is_set():
             iteration_started_at = time.time()
             # Temporary diagnostic (see _diag_log_all_process_memory): every
@@ -2537,15 +2568,19 @@ class IntelligenceStateService:
             # than drop -- this payload still needs computing, just not while
             # 1.1GB of sim is resident in a 2GB container.
             deferral_reason = _board_build_deferral_reason(
-                consecutive_odds_defers=consecutive_odds_refresh_defers
+                consecutive_odds_defers=consecutive_odds_refresh_defers,
+                consecutive_sim_defers=consecutive_sim_defers,
             )
-            if deferral_reason == "odds_refresh_in_flight":
+            if deferral_reason == "sim_subprocess_resident":
+                consecutive_sim_defers += 1
+            elif deferral_reason == "odds_refresh_in_flight":
                 consecutive_odds_refresh_defers += 1
             elif deferral_reason is None:
                 # Reset only on an actual run: a sim deferral must not clear
                 # the odds counter, or alternating hazards would hold it
                 # below the bound forever and reintroduce the starvation.
                 consecutive_odds_refresh_defers = 0
+                consecutive_sim_defers = 0
             if deferral_reason is not None:
                 # Deliberately NOT named DEFERRED_TO_MLB_SIM: this fires for
                 # the odds-refresh case too, and a sim-specific name would

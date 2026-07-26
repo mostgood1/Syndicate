@@ -3735,3 +3735,79 @@ class UnbuildablePayloadSkippedAtPointOfUseTests(unittest.TestCase):
         self.assertIsNotNone(reason({"question": "q", "date": "2026-07-26"}, "2026-07-25"))
         self.assertIsNotNone(reason({"question": "q", "date": "2026-07-24"}, "2026-07-25"))
         self.assertIsNone(reason({"question": "q", "date": "2026-07-25"}, "2026-07-25"))
+
+
+class NoDeferralCanStarveTests(unittest.TestCase):
+    """#63, written after getting this wrong THREE times in one session.
+
+    Every deferral in this system waits on a producer that is near-continuous
+    in aggregate even though each individual run is finite:
+
+      1. board build waits on the odds refresh -- refresh outruns the 60s tick
+      2. sim waits on the board build           -- build re-queues every 60s
+      3. board build waits on a resident sim    -- "sims chain back-to-back
+                                                   for hours on a live slate"
+
+    Each time, per-side reasoning said "the other side's run is finite, so
+    waiting terminates", and each time the DUTY CYCLE made that false. This
+    test asserts the property that actually matters: with the counterpart
+    permanently busy, every deferral must still eventually yield None.
+    """
+
+    ALWAYS_BUSY_HAZARDS = ("_mlb_sim_subprocess_running", "_odds_refresh_in_flight")
+
+    def test_every_hazard_eventually_lets_the_board_build_run(self) -> None:
+        for hazard in self.ALWAYS_BUSY_HAZARDS:
+            with self.subTest(hazard=hazard):
+                patches = {name: (name == hazard) for name in self.ALWAYS_BUSY_HAZARDS}
+                with patch.object(intelligence_state_module, "_mlb_sim_subprocess_running", return_value=patches["_mlb_sim_subprocess_running"]), patch.object(
+                    intelligence_state_module, "_odds_refresh_in_flight", return_value=patches["_odds_refresh_in_flight"]
+                ), patch.object(intelligence_state_module, "_board_build_has_memory_headroom", return_value=True):
+                    ran = False
+                    odds_defers = sim_defers = 0
+                    # Generous ceiling: the point is that it terminates at all.
+                    for _ in range(50):
+                        reason = intelligence_state_module._board_build_deferral_reason(
+                            consecutive_odds_defers=odds_defers, consecutive_sim_defers=sim_defers
+                        )
+                        if reason is None:
+                            ran = True
+                            break
+                        if reason == "sim_subprocess_resident":
+                            sim_defers += 1
+                        elif reason == "odds_refresh_in_flight":
+                            odds_defers += 1
+                        else:
+                            self.fail(f"unbounded deferral reason with headroom available: {reason}")
+                    self.assertTrue(ran, f"{hazard} being permanently busy starves the board build")
+
+    def test_both_hazards_busy_still_terminates(self) -> None:
+        # The realistic live-slate case: a sim resident AND a refresh running.
+        with patch.object(intelligence_state_module, "_mlb_sim_subprocess_running", return_value=True), patch.object(
+            intelligence_state_module, "_odds_refresh_in_flight", return_value=True
+        ), patch.object(intelligence_state_module, "_board_build_has_memory_headroom", return_value=True):
+            odds_defers = sim_defers = 0
+            for _ in range(50):
+                reason = intelligence_state_module._board_build_deferral_reason(
+                    consecutive_odds_defers=odds_defers, consecutive_sim_defers=sim_defers
+                )
+                if reason is None:
+                    break
+                if reason == "sim_subprocess_resident":
+                    sim_defers += 1
+                elif reason == "odds_refresh_in_flight":
+                    odds_defers += 1
+            else:
+                self.fail("board build starved with both hazards permanently busy")
+
+    def test_no_headroom_is_the_only_reason_a_deferral_may_persist(self) -> None:
+        # Refusing forever is legitimate ONLY when the box genuinely cannot fit
+        # the work -- and that must report a distinct reason so it is never
+        # mistaken for politeness.
+        with patch.object(intelligence_state_module, "_mlb_sim_subprocess_running", return_value=True), patch.object(
+            intelligence_state_module, "_odds_refresh_in_flight", return_value=False
+        ), patch.object(intelligence_state_module, "_board_build_has_memory_headroom", return_value=False):
+            reason = intelligence_state_module._board_build_deferral_reason(
+                consecutive_odds_defers=0, consecutive_sim_defers=99
+            )
+        self.assertIn("no_headroom", reason)
