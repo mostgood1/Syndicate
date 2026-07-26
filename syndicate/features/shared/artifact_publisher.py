@@ -132,6 +132,29 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "*_source/data/manager/probable_pitcher_overrides.json",
     "*_source/data/park/park_factors.json",
     "*_source/data/umpire/umpire_factors*.json",
+    # #68. The per-date betting-card payload. It lives UNDER data/eval/seasons,
+    # which the comment above excludes as bulk/historical -- correctly for that
+    # tree in general, and wrongly for this one file, which is a small
+    # per-date artifact that merely happens to be stored there (measured:
+    # 5.4KB for a full slate, one per day, same category as
+    # daily_summary_*.json two blocks up).
+    #
+    # Excluding it had a large consequence. mlb/cards.py's
+    # _betting_payload_by_game reads exactly this file, and it is the ONLY
+    # source of game["markets"] -- which _mlb_game_market_recommendation_rows
+    # turns into the game_market_recommendations that
+    # _game_bet_candidates_from_game reads. Measured on refresh-worker
+    # 2026-07-26: BETTING_PAYLOAD_READ exists=False, betting_game_count 0,
+    # every MLB market block 0, MLB contributing nothing to the board, while
+    # web served the same games with a full 7-key markets dict. Not
+    # allowlisted meant neither the push nor the pull could ever move it, so
+    # the worker could not converge no matter how long it ran.
+    #
+    # Deliberately narrow: scoped to the betting_day_payloads_* directory and
+    # the season_betting_day_* filename, so data/eval/seasons/** at large --
+    # statcast, caches, season rollups -- stays excluded as before.
+    "*_source/source_artifacts/data/eval/seasons/*/betting_day_payloads_*/season_betting_day_*.json",
+    "*_source/data/eval/seasons/*/betting_day_payloads_*/season_betting_day_*.json",
     # Ask the Syndicate focused-evidence inputs (syndicate/blueprints/
     # ask_the_syndicate_data.py). These are live web-side reads: the Ask
     # endpoint builds last-10 game-log tables from the boxscore histories and
@@ -389,13 +412,20 @@ def publish_changed_hot_artifacts(since_epoch_seconds: float) -> int:
     return sweep_changed_hot_artifacts(since_epoch_seconds).published_count
 
 
-def _export_url(pattern: str | None = None, *, since_epoch: float | None = None) -> str:
+def _export_url(pattern: str | None = None, *, since_epoch: float | None = None, exact_path: str | None = None) -> str:
     base = _env("SYNDICATE_WEB_PUBLISH_URL")
     if not base:
         return ""
     url = base.rstrip("/") + "/api/ops/artifacts/export"
     params: list[str] = []
-    if pattern:
+    if exact_path:
+        from urllib.parse import quote
+
+        # ?path= is the endpoint's single-artifact form: it skips the glob
+        # entirely and returns one file, so a repair fetch costs one stat and
+        # one read rather than a scan of the matched set.
+        params.append(f"path={quote(exact_path, safe='')}")
+    elif pattern:
         from urllib.parse import quote
 
         params.append(f"pattern={quote(pattern, safe='')}")
@@ -554,7 +584,72 @@ def pull_hot_artifacts(*, date_str: str | None = None, timeout_seconds: int = 30
         all_succeeded = all_succeeded and succeeded
     if all_succeeded:
         _record_hot_artifact_pull_watermark(pull_started_epoch)
+    # Repair pass, AFTER the watermark is recorded and deliberately not part of
+    # all_succeeded. It fetches only artifacts this worker is missing outright,
+    # one exact ?path= request each and no since= filter, so it is the one
+    # thing the incremental pull structurally cannot do for itself. Costs
+    # nothing on a healthy worker: the list is empty once the files exist, so
+    # no request is made at all. If web is missing them too it retries each
+    # cycle -- one small request, and the log line says so rather than
+    # pretending the board is merely quiet.
+    for relative_path in _missing_required_artifact_relative_paths(date_str):
+        repair_succeeded, repair_written = _pull_hot_artifacts_request(
+            _export_url(exact_path=relative_path), token, timeout_seconds=timeout_seconds
+        )
+        written += repair_written
+        print(
+            f"[artifact_publisher] PULL_REPAIR_MISSING path={relative_path} "
+            f"ok={repair_succeeded} written={repair_written}",
+            flush=True,
+        )
     return written
+
+
+def _required_daily_artifact_paths(date_str: str) -> list[Path]:
+    """Absolute paths to board-critical artifacts that are written ONCE a day.
+
+    #68. The incremental pull can repair a copy that is OLDER than web's; it
+    can never repair one that is MISSING, because `since=` filters on web's
+    mtime and a once-a-morning artifact stops being newer than the watermark
+    within minutes. That is fine for the continuously-rewritten artifacts this
+    module was designed around, and permanently wrong for these.
+
+    Kept as an explicit, tiny list rather than derived from
+    _artifact_specs_for_sport: that lives in syndicate.features.intelligence,
+    which imports most of the app, and this module is called from the pull
+    path on every cycle.
+    """
+    paths: list[Path] = []
+    try:
+        from syndicate.features.mlb.sources import season_betting_card_day_path
+
+        season = int(str(date_str).strip()[:4])
+        paths.append(season_betting_card_day_path(season, str(date_str).strip()))
+    except Exception:
+        # Must never raise -- a repair that cannot be computed just means the
+        # normal incremental pull is all this cycle gets.
+        pass
+    return paths
+
+
+def _missing_required_artifact_relative_paths(date_str: str) -> list[str]:
+    relative_paths: list[str] = []
+    try:
+        root = _data_root().resolve()
+    except Exception:
+        return relative_paths
+    for path in _required_daily_artifact_paths(date_str):
+        try:
+            if path.is_file():
+                continue
+            relative = path.resolve().relative_to(root).as_posix()
+        except Exception:
+            continue
+        # The same allowlist the writer enforces. Asking for something outside
+        # it would just be refused, and silently: worth failing here instead.
+        if is_hot_artifact_relative_path(relative):
+            relative_paths.append(relative)
+    return relative_paths
 
 
 def _date_glob_patterns(date_str: str) -> list[str]:

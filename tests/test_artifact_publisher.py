@@ -20,6 +20,35 @@ from syndicate.features.shared.artifact_publisher import pull_hot_artifacts
 HOT_RELATIVE_PATH = "wnba_source/source_artifacts/data/processed/recommendations_slate_2026-07-13.json"
 
 
+def _write_required_daily_artifact(data_root: str, date_str: str) -> Path:
+    """Create the once-daily betting-card payload inside a test data root.
+
+    #68 added a repair pass to pull_hot_artifacts: any board-critical artifact
+    that is written once a day and is MISSING gets one extra exact-path fetch,
+    because the since= watermark can never reach it. In a TemporaryDirectory
+    every such artifact is missing, so tests that count requests for unrelated
+    reasons would otherwise see that extra call. Creating the file keeps each
+    of those tests about the thing it is actually asserting; the repair pass
+    has its own tests.
+    """
+    season = int(date_str[:4])
+    target = (
+        Path(data_root)
+        / "mlb_source"
+        / "source_artifacts"
+        / "data"
+        / "eval"
+        / "seasons"
+        / str(season)
+        / "betting_day_payloads_retuned"
+        / f"season_betting_day_{season}_{date_str.replace('-', '_')[5:]}.json"
+    )
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps({"games": {}}), encoding="utf-8")
+    return target
+
+
+
 class HotArtifactAllowlistTests(unittest.TestCase):
     def test_accepts_known_hot_artifact_shapes(self) -> None:
         self.assertTrue(
@@ -258,6 +287,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
         # doubles the combined result size); two smaller requests each stay
         # close to the original, already-safe per-request size.
         with TemporaryDirectory() as tmp_dir:
+            _write_required_daily_artifact(tmp_dir, "2026-07-20")
             mocked_response = MagicMock()
             mocked_response.__enter__.return_value = mocked_response
             mocked_response.read.return_value = json.dumps({"ok": True, "count": 0, "artifacts": {}}).encode("utf-8")
@@ -385,6 +415,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
         empty_response.read.return_value = json.dumps({"ok": True, "count": 0, "artifacts": {}}).encode("utf-8")
 
         with TemporaryDirectory() as tmp_dir:
+            _write_required_daily_artifact(tmp_dir, "2026-07-24")
             with patch.dict(
                 os.environ,
                 {
@@ -415,6 +446,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
         # everything since the last SUCCESSFUL pull, not the failed one's
         # start time.
         with TemporaryDirectory() as tmp_dir:
+            _write_required_daily_artifact(tmp_dir, "2026-07-24")
             env = {
                 "SYNDICATE_DATA_ROOT": tmp_dir,
                 "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports_root"),
@@ -787,3 +819,92 @@ class HotArtifactPullWindowClampTests(unittest.TestCase):
         with patch("syndicate.features.shared.refresh_state_store.read_json_file", return_value={"epoch": "garbage"}):
             since = artifact_publisher._hot_artifact_pull_since_epoch(pull_started_epoch=self.now)
         self.assertEqual(self.now - since, self.max_window)
+
+
+class MissingRequiredArtifactRepairTests(unittest.TestCase):
+    """#68. The pull could not converge on a once-a-day artifact.
+
+    Two independent blockers, both measured in production 2026-07-26:
+    the betting-card payload was not allowlisted at all, so neither the push
+    nor the pull could move it; and even allowlisted, `since=` filters on
+    web's mtime, so a file written once in the morning stops being eligible
+    within minutes and a worker that never had it never gets it. Consequence:
+    BETTING_PAYLOAD_READ exists=False -> betting_game_count 0 -> every MLB
+    market block 0 -> MLB contributed nothing to the board all day.
+    """
+
+    def test_betting_day_payload_is_allowlisted_without_opening_the_eval_tree(self) -> None:
+        self.assertTrue(
+            is_hot_artifact_relative_path(
+                "mlb_source/source_artifacts/data/eval/seasons/2026/"
+                "betting_day_payloads_retuned/season_betting_day_2026_07_26.json"
+            )
+        )
+        self.assertTrue(
+            is_hot_artifact_relative_path(
+                "mlb_source/data/eval/seasons/2026/"
+                "betting_day_payloads_retuned/season_betting_day_2026_07_26.json"
+            )
+        )
+        # data/eval/seasons/** is bulk/historical and stays excluded -- that
+        # exclusion is correct and this must not widen it.
+        for blocked in (
+            "mlb_source/source_artifacts/data/eval/seasons/2026/statcast_cache/pitches_2026_07_26.json",
+            "mlb_source/source_artifacts/data/eval/seasons/2026/season_rollup.json",
+            "mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned/notes.txt",
+        ):
+            self.assertFalse(is_hot_artifact_relative_path(blocked), blocked)
+
+    def _run_pull(self, tmp_dir: str, date_str: str) -> list[str]:
+        mocked_response = MagicMock()
+        mocked_response.__enter__.return_value = mocked_response
+        mocked_response.read.return_value = json.dumps({"ok": True, "count": 0, "artifacts": {}}).encode("utf-8")
+        with patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_DATA_ROOT": tmp_dir,
+                "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports_root"),
+                "ADMIN_TOKEN": "secret-token",
+                "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+            },
+            clear=False,
+        ):
+            with patch("urllib.request.urlopen", return_value=mocked_response) as mocked_urlopen:
+                pull_hot_artifacts(date_str=date_str)
+        return [call.args[0].full_url for call in mocked_urlopen.call_args_list]
+
+    def test_missing_artifact_triggers_one_exact_path_request_with_no_since(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            urls = self._run_pull(tmp_dir, "2026-07-26")
+
+        repair_urls = [url for url in urls if "path=" in url]
+        self.assertEqual(len(repair_urls), 1, urls)
+        repair_url = repair_urls[0]
+        # ?path= is the endpoint's single-artifact form: one stat and one read,
+        # no glob over the matched set. That is what makes ignoring the
+        # watermark safe here -- the ceiling exists to bound response SIZE, and
+        # this response is one small file.
+        self.assertIn("season_betting_day_2026_07_26.json", repair_url)
+        self.assertNotIn("since=", repair_url)
+        self.assertNotIn("pattern=", repair_url)
+
+    def test_no_repair_request_when_the_artifact_is_already_present(self) -> None:
+        # Costs nothing on a healthy worker.
+        with TemporaryDirectory() as tmp_dir:
+            _write_required_daily_artifact(tmp_dir, "2026-07-26")
+            urls = self._run_pull(tmp_dir, "2026-07-26")
+
+        self.assertEqual([url for url in urls if "path=" in url], [])
+        self.assertEqual(len(urls), 2, urls)
+
+    def test_repair_runs_after_the_normal_date_scoped_pull(self) -> None:
+        # Ordering matters: the incremental pull may itself supply the file, in
+        # which case there is nothing to repair. It also means a repair failure
+        # cannot stop the watermark advancing for the pull that did succeed.
+        with TemporaryDirectory() as tmp_dir:
+            urls = self._run_pull(tmp_dir, "2026-07-26")
+
+        self.assertEqual(len(urls), 3, urls)
+        self.assertNotIn("path=", urls[0])
+        self.assertNotIn("path=", urls[1])
+        self.assertIn("path=", urls[2])
