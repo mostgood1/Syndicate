@@ -4,7 +4,7 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-25.
+Last reconciled: 2026-07-26 (end of the 2026-07-25 session).
 
 Conventions:
 - IDs are stable and never reused. New work appends at the next free number.
@@ -108,7 +108,7 @@ Conventions:
 | # | Item |
 |---|---|
 | **62** | **A re-pricing path that refreshes edges without a full Monte Carlo.** Behind #48. `run_mlb_daily_sim_job.py` only takes `--only-game-pks`, and `daily_update.py`'s only skip mechanism is `--preserve-started` (games past Preview), so there is no way to react to a price move except re-simulating. #48 removed prices from the sim fingerprint because the sim summary row is pure model output — win probabilities, run distributions, HR/prop likelihoods, **no odds and no edges** — and the market board joins odds at *read* time. That is correct for the board, but any artifact that *does* bake prices at sim time now goes stale until a lineup/line/tip-off trigger. Architectural, #27/#28 territory. |
-| **66** | 🔴 **The curated board's candidate pool returns 0 for today, and `_build_candidate_pool` is the last unexamined link.** The one real remaining cause of an empty board. Builds now run cleanly every ~2 min (no starvation, no OOM, no write rejection, 2.6GB free) and every one logs `CANDIDATE_POOL_READY count=0`. The pipeline demonstrably *can* produce candidates — a measured cycle took **130 normalized → 84 through classification**. So the machinery works and something in `_build_candidate_pool` yields nothing for today. **Method that worked all night: instrument, deploy, read — the `post_dedupe_and_classify` trace answered #64 on its first cycle.** Do that here rather than reasoning about it. |
+| **66** | 🟡 **Board shows no opportunities — but MUCH narrower than it looked, and partly correct behaviour.** Measured 2026-07-26T04:41Z for date 2026-07-25: **MLB 15 games, 80 rows, 80 matched with BOTH price and projection — and all 15 games `final`.** So an empty *actionable* MLB board late at night is **right, not a bug**, and several hours were spent treating correct behaviour as a defect. MLS: 30 games, 2023 rows, but only **163 matched** (1432 `no_sim_coverage`, 428 `needs_resim` — see #52/#44b). `_build_candidate_pool` returning 0 is still unexplained *for a live slate*, and that is the only open part. **Retest on a live slate (weekday afternoon/evening), not after midnight**, now that soccer reports `live` correctly (#67). If it is still 0 with games actually in progress, instrument `_build_candidate_pool` — the last uninstrumented link. |
 | **65** | ⚠️ **MISDIAGNOSED — corrected 2026-07-26.** Filed as "a future-dated payload is being queued and built". **There is no such payload.** `_compute_board_publication_response` rolls itself over: when today's pool is 0 it calls `_next_supported_intelligence_date` and *probes* tomorrow, committing only if tomorrow scores higher. So `context_label: 2026-07-26` in the traces is **expected rollover-probe behaviour, not a bug** — and it appears after ~19:00 CDT because UTC has already rolled over, so tomorrow's date legitimately exists in the per-sport artifact date lists. Two guards were shipped against the queue path (`08014007`, `34e2df35`) and **neither ever fired** (`future_evicted=0` throughout), because the queue was never involved. They are harmless and correct in principle for genuinely stale payloads, but they are not a fix for anything observed. The rollover is a *consequence* of #66, not a cause. **Lesson: `2026-07-26` traces at 21:00 CT are normal — do not chase them.** |
 | **63** | **Test the mutual-deferral invariant: neither side can be starved.** The MLB sim and the board build now defer to each other, and the starvation property was broken **twice** on 2026-07-25 by reasoning about one direction at a time — the odds-refresh deferral starved the board (8 defers / 13 iterations, `candidate_count` 0), then the pipeline deferral starved the sim (30/30 gate decisions `intelligence_pipeline_busy`, zero launches). Both now have per-side bounds, but **nothing asserts the joint property**, and per-side unit tests structurally cannot see it. Root cause of both mistakes: treating *finite-per-run* as *finite-in-aggregate*. |
 | **42** | `source_cards_api_payload`'s cache can never hit — keyed on the file it rewrites. **Third instance of this pattern** (`build_mlb_market_board` fixed in `34c9427d`; avoided deliberately in `build_soccer_market_board`). Worth a rule, not three one-off fixes. |
@@ -233,6 +233,8 @@ rows (~71% of the board have no sim projection at all — separate from #44) ·
 
 ## Done
 
+**Closed 2026-07-25/26 session** — #14 (OddsAPI quota instrumentation) · #16 (MLB market audit) · #17 (slate endpoint, 45→3 credits) · #18 (NCAAF 4 regions→1) · #25 Phase 0 (fail-closed guard + atomic artifact writes) · #40 (render.yaml drift, incl. pinning `plan: pro` so a blueprint sync cannot undo the paid upgrade) · #41 (scoped-resim regression test) · #43 (board lost on write: 16.9MB payload → Redis `Connection closed by server`; trimmed to 4.37MB losslessly) · #44a/#44b (soccer resim detection + trigger, shipped dark) · #46 (`sim_run_status` self-resolution) · #47 (soccer added to the worker's sport list — it was configured in `app.py` all along but the worker uses the *fallback* list) · #48 (odds prices removed from the sim fingerprint; ~10-min resim churn eliminated) · #49 (test_ops triage) · #50 (artifact-export ceiling) · #54 (quota store made O(1)) · #55 (sim ↔ board-build alternation, **both** directions) · #57 (board build moved to the 4GB refresh-worker) · #60 (keyvalue payload ceiling — oversized writes now fail loudly instead of as an unrelated `ConnectionError`) · #63 (mutual-deferral starvation invariant test) · **#67 (soccer game state derived from the clock, not a frozen `status_state` — finished games looked bettable and live games did not look live)** · plus a Central-date sweep across 14 call sites with a ratchet test (`tests/test_slate_date_timezone_discipline.py`) so the class cannot return.
+
 - **1** sim fast-path runtime ceiling · **2** memoize `build_reliability_profile` ·
   **3** deploy+restart for stuck 7-25 sim · **4** last-known-good board while stale ·
   **5** mini card live scoreboard · **6** last odds refresh + sim run on cards ·
@@ -316,6 +318,18 @@ rows (~71% of the board have no sim projection at all — separate from #44) ·
 ---
 
 ## Operational notes worth not rediscovering
+
+- **A Render env-var change via the API does NOT restart the service.** The running process keeps the old
+  value until a deploy/restart. Cost real time twice: a mitigation set at 20:16 stayed inert until 20:26, and a
+  "fix verified" claim was made against a service still on the previous commit. **Always confirm the deploy is
+  `live` on the target commit before crediting a fix.**
+- **`TZ=America/Chicago` IS set on Render**, so `date.today()` already returns Central there. A Central-vs-UTC
+  sweep is still correct hardening, but do not assume it explains an evening-only symptom — verify against the
+  running deploy first.
+- **Deferral guards must be bounded.** Three separate starvations shipped this session because
+  *finite-per-run* was treated as *finite-in-aggregate*: the odds refresh, the board build and the MLB sim are
+  each near-continuous even though every individual run ends. Per-side unit tests passed every time; only the
+  joint invariant test (#63) catches it.
 
 - **Render auto-deploy is OFF.** Pushing to `main` ships nothing; deploys must be
   triggered per service via the Render API. Confirmed 2026-07-25.
