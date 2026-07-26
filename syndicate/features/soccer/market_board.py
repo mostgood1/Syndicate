@@ -29,7 +29,7 @@ week-object machinery.
 from __future__ import annotations
 
 from collections import OrderedDict
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 import time
 import unicodedata
@@ -101,6 +101,52 @@ def _soccer_week_props_rows(league: str, selected_date: str) -> list[dict[str, A
 
 
 _GAME_STATE_BY_STATUS = {"pre": "pregame", "in": "live", "post": "final"}
+
+# A soccer match occupies roughly 2h from kickoff: 90 minutes plus halftime and
+# stoppage. Beyond this it is over regardless of what any artifact claims.
+_SOCCER_MATCH_DURATION_SECONDS = 2 * 3600 + 30 * 60
+
+
+def _parse_kickoff_utc(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _resolve_soccer_game_state(status_state: str, kickoff: Any) -> str:
+    """Game state derived from the CLOCK, not from a value frozen in an artifact.
+
+    `status_state` is written into the recommendations artifact when it is
+    generated and never recomputed, so a match that kicked off hours ago still
+    reports "pre". Measured 2026-07-25 at 23:47 CT: all 30 MLS matches on the
+    board reported `pregame`, including 15 that kicked off on 07-22 and had been
+    over for three days -- while that evening's genuinely in-progress matches
+    were reported as upcoming too. Finished games looked bettable and live games
+    did not look live.
+
+    The artifact is still trusted when it has moved FORWARD ("in"/"post"): that
+    is real observed status and strictly better than a clock estimate. Only the
+    default "pre" is second-guessed, and only against a kickoff time that has
+    demonstrably passed. MLB does not need this because its states come from the
+    live-lens report rather than being baked in.
+    """
+    mapped = _GAME_STATE_BY_STATUS.get(status_state, "pregame")
+    if mapped != "pregame":
+        return mapped
+    kickoff_dt = _parse_kickoff_utc(kickoff)
+    if kickoff_dt is None:
+        return mapped
+    elapsed = (datetime.now(timezone.utc) - kickoff_dt).total_seconds()
+    if elapsed < 0:
+        return "pregame"
+    if elapsed <= _SOCCER_MATCH_DURATION_SECONDS:
+        return "live"
+    return "final"
 
 # Only markets where SoccerSim exposes a genuine 0-1 probability (not a raw
 # projected count) are wired to sim_projection -- the board's frontend
@@ -538,7 +584,7 @@ def build_soccer_market_board(league: str, selected_date: str) -> dict[str, Any]
         home_team = str(matchup.get("home_team") or "").strip()
         away_team = str(matchup.get("away_team") or "").strip()
         status_state = str(match.get("status_state") or "pre").strip().lower()
-        game_state = _GAME_STATE_BY_STATUS.get(status_state, "pregame")
+        game_state = _resolve_soccer_game_state(status_state, match.get("kickoff"))
 
         # The odds feed's event_id/team-name spellings are foreign to the
         # sim's (see _soccer_odds_event_for_match's docstring) -- resolve

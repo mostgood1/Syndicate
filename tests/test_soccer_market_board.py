@@ -477,3 +477,60 @@ class SoccerNeedsResimEventIdsTests(unittest.TestCase):
         for board in ({}, {"games": None}, {"games": ["not-a-dict"]}, {"games": [{"gamePk": "", "rows": [{"join_status": JOIN_STATUS_NEEDS_RESIM}]}]}):
             with patch("syndicate.features.soccer.market_board.build_soccer_market_board", return_value=board):
                 self.assertEqual(soccer_needs_resim_event_ids("mls", "2026-07-22"), [])
+
+
+class SoccerGameStateFromClockTests(unittest.TestCase):
+    """status_state is frozen into the recommendations artifact when it is
+    generated and never recomputed.
+
+    Measured 2026-07-25 at 23:47 CT: all 30 MLS matches on the board reported
+    `pregame`, including 15 that kicked off on 07-22 and had been over for three
+    days -- while that evening's genuinely in-progress matches were reported as
+    upcoming as well. Finished games looked bettable and live games did not look
+    live. MLB is unaffected because its states come from the live-lens report
+    rather than being baked in.
+    """
+
+    def _state(self, status_state, offset_hours=None, kickoff="__offset__"):
+        from datetime import datetime, timedelta, timezone
+
+        from syndicate.features.soccer.market_board import _resolve_soccer_game_state
+
+        if kickoff == "__offset__":
+            stamp = datetime.now(timezone.utc) + timedelta(hours=offset_hours)
+            kickoff = stamp.strftime("%Y-%m-%dT%H:%M") + "Z"
+        return _resolve_soccer_game_state(status_state, kickoff)
+
+    def test_future_kickoff_is_pregame(self) -> None:
+        self.assertEqual(self._state("pre", offset_hours=3), "pregame")
+
+    def test_match_in_progress_is_live(self) -> None:
+        # The reported bug: an active match showing as upcoming.
+        self.assertEqual(self._state("pre", offset_hours=-0.75), "live")
+
+    def test_match_still_live_late_in_the_second_half(self) -> None:
+        self.assertEqual(self._state("pre", offset_hours=-2), "live")
+
+    def test_match_past_its_duration_is_final(self) -> None:
+        self.assertEqual(self._state("pre", offset_hours=-5), "final")
+
+    def test_days_old_match_is_final_not_pregame(self) -> None:
+        # 15 of the 30 MLS matches were in exactly this state.
+        self.assertEqual(self._state("pre", offset_hours=-72), "final")
+
+    def test_artifact_status_wins_when_it_has_moved_forward(self) -> None:
+        # "in"/"post" is real observed status and beats a clock estimate; only
+        # the default "pre" is second-guessed.
+        self.assertEqual(self._state("in", offset_hours=-72), "live")
+        self.assertEqual(self._state("post", offset_hours=3), "final")
+
+    def test_missing_or_unparseable_kickoff_falls_back_to_the_artifact(self) -> None:
+        # No clock to reason from, so do not invent one.
+        self.assertEqual(self._state("pre", kickoff=None), "pregame")
+        self.assertEqual(self._state("pre", kickoff="garbage"), "pregame")
+
+    def test_naive_kickoff_is_treated_as_utc(self) -> None:
+        from datetime import datetime, timedelta, timezone
+
+        naive = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M")
+        self.assertEqual(self._state("pre", kickoff=naive), "live")
