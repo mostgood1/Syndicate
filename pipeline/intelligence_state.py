@@ -1326,7 +1326,12 @@ def _write_state_payload(path: Path, persisted: dict[str, Any]) -> None:
         from syndicate.features.shared.refresh_state_store import _atomic_write_text
 
         path.parent.mkdir(parents=True, exist_ok=True)
-        _atomic_write_text(path, json.dumps(persisted, indent=2))
+        # Compact, NOT indent=2. Measured against the publish endpoint: 14.70MB
+        # publishes in 1.5s, 19.61MB drops the connection. This payload is
+        # ~15.5MB compact, so indenting it (~+70%) would push the artifact over
+        # the transport limit -- failing for precisely the payload the fallback
+        # exists to carry. Nothing reads this file by eye.
+        _atomic_write_text(path, json.dumps(persisted, separators=(",", ":")))
         published = publish_hot_artifact(path)
         print(
             f"[intelligence_state] STATE_PUBLISHED_AS_ARTIFACT path={path.name} published={published}",
