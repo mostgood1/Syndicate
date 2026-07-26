@@ -70,30 +70,12 @@ def _market_state_from_payload(payload: Mapping[str, Any] | None, *, market_id: 
     return None
 
 
-def _log_shard_sizes(sport: str, shard_keys: Sequence[str]) -> None:
-    # #75. Production died inside the FIRST game's _normalize_game_context with
-    # no per-game sample emitted, so this is a single call consuming ~3.6GB --
-    # not accumulation across the slate. The only unbounded thing one such call
-    # touches is these shard files, and nothing caps their size. Log the size
-    # BEFORE parsing, because the parse is what does not survive.
-    try:
-        from syndicate.features.shared.odds_control_plane import odds_history_paths_for_sport
-
-        for key in shard_keys:
-            for path in odds_history_paths_for_sport(sport, key):
-                if path.exists():
-                    print(
-                        f"ODDS_SHARD_SIZE sport={sport} shard={key} bytes={path.stat().st_size} path={path}",
-                        flush=True,
-                    )
-                    break
-    except Exception:
-        pass
-
-
 def _resolve_market_state_across_shards(*, sport: str, market_id: str | None, shard_key: str, shard_lookback: int, payload_cache: dict[tuple[str, str], dict[str, Any] | None] | None = None) -> dict[str, Any] | None:
+    # #75: an ODDS_SHARD_SIZE probe lived here briefly and was removed. It was
+    # also misleading -- it only printed for files that exist, so its silence
+    # read as "this code never runs" when it actually meant "no shard files".
+    # The real cost was the odds_events read in _load_jsonl_rows, not here.
     shard_keys = [shard_key] + odds_history_lookback_shard_keys(sport, shard_key, shard_lookback)
-    _log_shard_sizes(sport, shard_keys)
     merged_history: list[dict[str, Any]] = []
     found = False
     for key in shard_keys:
