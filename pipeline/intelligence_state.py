@@ -40,6 +40,7 @@ from syndicate.features.shared.odds_control_plane import load_odds_history_paylo
 from syndicate.features.shared.odds_control_plane import odds_history_roots_for_sport
 from syndicate.features.shared.odds_control_plane import odds_history_paths_for_sport
 from syndicate.features.shared.odds_control_plane import resolve_current_shard_key
+from syndicate.features.shared.refresh_state_store import KeyValuePayloadTooLarge
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
@@ -1242,6 +1243,49 @@ def read_intelligence_state() -> dict[str, Any] | None:
     return normalized
 
 
+def _write_state_payload(path: Path, persisted: dict[str, Any]) -> None:
+    """Write the board state, falling back to the artifact transport when it is
+    too large for the keyvalue store.
+
+    #43. The keyvalue store is a coordination channel and cannot carry this:
+    production measured 15,532,051 bytes for 150 candidates against an
+    8,388,608 ceiling, and the ceiling cannot simply be raised -- the store
+    closes the connection above roughly 9MB, which is what made this present as
+    an unrelated ConnectionError for hours. Deduplication did not close the gap
+    either: the payload is five near-copies of the candidate list, and they are
+    differently enriched (`recommendations` carries 7 fields the others lack and
+    4 whose values differ), so they cannot be aliased losslessly.
+
+    So the bulk goes the way the architecture already says bulk should go --
+    worker writes an artifact, web reads it. That path routinely moves tens of
+    megabytes and has no ceiling problem.
+
+    The keyvalue write is still attempted first, so every payload small enough
+    keeps its existing, faster path and nothing changes for quiet slates.
+    """
+    try:
+        write_json_file(path, persisted)
+        return
+    except KeyValuePayloadTooLarge as exc:
+        print(f"[intelligence_state] STATE_TOO_LARGE_FOR_KEYVALUE path={path.name} falling_back_to_artifact: {exc}", flush=True)
+
+    try:
+        from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+        from syndicate.features.shared.refresh_state_store import _atomic_write_text
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _atomic_write_text(path, json.dumps(persisted, indent=2))
+        published = publish_hot_artifact(path)
+        print(
+            f"[intelligence_state] STATE_PUBLISHED_AS_ARTIFACT path={path.name} published={published}",
+            flush=True,
+        )
+    except Exception as exc:  # noqa: BLE001
+        # Never re-raise: the caller's whole cycle is discarded on an exception
+        # here, which is precisely the failure mode #43 is about.
+        print(f"[intelligence_state] STATE_ARTIFACT_FALLBACK_FAILED path={path.name} error={type(exc).__name__}: {exc}", flush=True)
+
+
 def write_intelligence_state(state: dict[str, Any]) -> dict[str, Any] | None:
     return write_latest_intelligence_state(state)
 
@@ -1286,8 +1330,8 @@ def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
     # connection on the full ~8.9MB payload, discarding a correctly computed
     # board every cycle. See _compact_state_for_persist.
     persisted = _compact_state_for_persist(normalized)
-    write_json_file(INTELLIGENCE_STATE_PATH, persisted)
-    write_json_file(daily_paths["state"], persisted)
+    _write_state_payload(INTELLIGENCE_STATE_PATH, persisted)
+    _write_state_payload(daily_paths["state"], persisted)
     history_entry = _intelligence_state_history_entry(normalized)
     INTELLIGENCE_HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
     with INTELLIGENCE_HISTORY_PATH.open("a", encoding="utf-8") as history_file:

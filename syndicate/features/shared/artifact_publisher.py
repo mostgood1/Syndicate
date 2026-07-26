@@ -84,6 +84,15 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "*_source/data/processed/season_betting_card_manifest_*.json",
     "*_source/data/processed/live_player_lens_tuning_*.csv",
     "*_source/current_week.json",
+    # #43. The intelligence board state, moved off the keyvalue store. It is
+    # data, not coordination state: measured at 15.5MB for 150 candidates
+    # against an 8MB ceiling the store cannot be raised past (~9MB closes the
+    # connection). Deduplication could not close that -- the payload is five
+    # near-copies of the candidate list and they are enriched differently, so
+    # they are not aliasable. This path already moves tens of MB routinely and
+    # matches the stated architecture: workers write artifacts, web reads them.
+    "reports/intelligence/intelligence_state.json",
+    "reports/intelligence/intelligence_state_*.json",
     # MLB's vendored daily sim (vendor/mlb_bettingv2/tools/daily_update.py,
     # triggered from live_refresh_loop.py's MLB daily-sim gate) writes under
     # data/daily/, data/manager/, data/park/, data/umpire/ -- none of which
