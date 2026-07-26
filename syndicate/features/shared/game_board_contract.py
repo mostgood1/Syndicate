@@ -541,6 +541,29 @@ def _normalize_games(games: list[dict[str, Any]], *, sport: str | None = None) -
     return [normalize_publication_game(_normalize_game(game), sport=sport) for game in games if isinstance(game, dict)]
 
 
+def _log_board_contract_memory(stage: str, **extra: Any) -> None:
+    # #75. Stage samples inside build_cards_page_context proved the refresh-worker
+    # OOM happens *inside this function*: the worker logged
+    # cards_context_result_assembled and was then oomKilled at 4Gi before
+    # cards_context_board_contract_applied, twice, at the same statement.
+    #
+    # Two candidates live in here -- _normalize_games and
+    # build_simulation_contract_from_context -- and these three samples say
+    # which. Note simulation_contract is built only when NOT a web dyno, which
+    # is why /mlb/api/cards serves a 2.3MB payload from web while the worker
+    # dies building the same board.
+    #
+    # Worker-only, for the same reason as the cards_context_* samples.
+    if _render_web_dyno():
+        return
+    try:
+        from syndicate.features.shared.memory_observability import log_container_memory
+
+        log_container_memory(f"board_contract_{stage}", **extra)
+    except Exception:
+        pass
+
+
 def apply_game_board_contract(
     context: dict[str, Any],
     *,
@@ -555,7 +578,9 @@ def apply_game_board_contract(
     out = dict(context)
     normalized_sport = str(sport or "sport").strip().lower() or "sport"
     games = out.get("games") if isinstance(out.get("games"), list) else []
+    _log_board_contract_memory("begin", sport=normalized_sport, game_count=len(games))
     out["games"] = _normalize_games(games, sport=normalized_sport)
+    _log_board_contract_memory("games_normalized", sport=normalized_sport, game_count=len(games))
     out.setdefault("show_app_header", False)
     out.setdefault(
         "show_standalone_cards_header",
@@ -588,6 +613,7 @@ def apply_game_board_contract(
             sport=normalized_sport,
             selection=out.get("control_value") or out.get("date") or out.get("requested_date"),
         )
+        _log_board_contract_memory("simulation_contract_built", sport=normalized_sport)
     else:
         out.pop("simulation_contract", None)
     resolved_surface = str(surface or f"{normalized_sport}_dense_board_v1").strip() or f"{normalized_sport}_dense_board_v1"
