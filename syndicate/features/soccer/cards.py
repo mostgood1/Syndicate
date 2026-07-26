@@ -160,6 +160,14 @@ def _unsimulated_game(fixture: dict[str, Any], *, league: str, week: int, season
             "secondary_color": _team_secondary_color(home_team, league),
         },
         "card_variant": "soccer_main",
+        # #77. Explicit marker so the intelligence layer can exclude these
+        # without pattern-matching the prose below. Confirmed in production
+        # 2026-07-26: every one of these placeholders was being promoted onto
+        # the Layer 2 board as a LIVE pick whose `pick`/`selection` text was
+        # the "Run scripts/build_soccer_artifacts.py ..." operator instruction
+        # from `items` -- with null odds/line/edge and "-" for team, player and
+        # projection. This is a page-level empty state, never a bettable row.
+        "is_unsimulated_placeholder": True,
         "status": _status_label(status_state, fixture.get("date")),
         "detail": date_str or league_display_name(league),
         "summary": f"{away_team} at {home_team} is on the schedule for Week {week} but has not been simulated yet.",

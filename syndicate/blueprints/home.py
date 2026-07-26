@@ -2101,6 +2101,22 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
 
 
 def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], *, fallback_epoch: float, live_odds_game_ids: set[str] | None = None) -> list[dict[str, Any]]:
+    # #77. A "not yet simulated" placeholder is a page-level empty state, not a
+    # bettable game, and must never become a candidate. Gated here rather than
+    # at either caller because both _game_candidates_for_sport and
+    # _collect_candidates walk dashboard_games, and this is the one function
+    # they share.
+    #
+    # Confirmed in production 2026-07-26: soccer placeholders reached the
+    # Layer 2 board flagged live, with the operator instruction
+    # "Run scripts/build_soccer_artifacts.py --league mls --date ..." rendered
+    # as the pick, and null odds/line/edge behind it.
+    #
+    # Keyed on the explicit marker the producer sets, deliberately not on the
+    # placeholder prose -- matching that text would break the moment the copy
+    # is reworded, and would silently start passing these through again.
+    if bool(game.get("is_unsimulated_placeholder")):
+        return []
     candidates: list[dict[str, Any]] = []
     game_sim_context = _game_sim_vs_line_reasoning(game)
     game_recs = game.get("game_market_recommendations") if isinstance(game.get("game_market_recommendations"), list) else []
