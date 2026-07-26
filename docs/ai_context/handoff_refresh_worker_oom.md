@@ -103,6 +103,66 @@ next midnight.
 
 ---
 
+## LOCATED 2026-07-26 17:04 UTC: the OOM is inside `apply_game_board_contract`
+
+This is the finding. Everything below it is the evidence trail that led here.
+
+The stage samples from `73ac270e` caught it twice in production. Both runs:
+
+```
+cards_context_begin              802.4 MB          197.3 MB
+cards_context_summary_loaded     802.6  (+0.2)     200.0  (+2.7)
+cards_context_betting_games      804.1  (+1.5)     203.2  (+3.2)
+cards_context_sim_games_loaded   810.6  (+6.5)     212.9  (+9.7)
+cards_context_actual_games       819.4  (+8.8)     221.5  (+8.6)   15 games, is_today
+cards_context_games_built        819.7  (+0.2)     222.0  (+0.5)
+cards_context_result_assembled   823.7  (+4.0)     243.5  (+21.5)
+cards_context_board_contract_applied   ← NEVER PRINTS. Process is gone.
+```
+
+Render events confirm the cause both times:
+`server_failed {"evicted": false, "oomKilled": {"memoryLimit": "4Gi"}}` at
+17:04:36 and 17:05:06 — 17 s and 42 s after `result_assembled`, matching the
+original "dies ~55 s later" observation.
+
+The only statement between those two samples is
+[cards.py:4936](../../syndicate/features/mlb/cards.py):
+
+```python
+if not _render_web_dyno():
+    result = apply_game_board_contract(result, sport="mlb", module="cards")
+```
+
+**Note the branch.** `apply_game_board_contract` runs only when *not* a web
+dyno, and inside it
+[game_board_contract.py:582-590](../../syndicate/features/shared/game_board_contract.py)
+gates `simulation_contract` on `not _render_web_dyno()` as well. The web service
+takes `_attach_cards_board_contract` instead. **That is why `/mlb/api/cards`
+serves a healthy 2.3 MB from web while the worker dies building the same
+board** — they are not running the same code. Any future measurement taken from
+the web API is measuring the wrong branch.
+
+Two candidates remain inside that call: `_normalize_games` and
+`build_simulation_contract_from_context`. `dde838ab` adds three
+`board_contract_*` samples to split them. `simulation_contract` is the suspect —
+it is the worker-gated one, and it was 99.8% of the payload's deep size in local
+profiling while being entirely absent from the production web response.
+
+### The loaders are exonerated
+
+The whole chain from entry to `result_assembled` cost **21 MB** on one run and
+**46 MB** on the other. `_daily_actual_by_game` — the loader local profiling
+blamed for 78% of the cost — contributed **8.8 MB and 8.6 MB**.
+
+So the local stage table below is *wrong about production*, and instructively
+so: it was taken against 2026-06-14, a completed slate whose feed/live payloads
+carry full play-by-play. Production was mid-afternoon with games in progress and
+much smaller feeds. **Local reproduced the wrong shape of the same function.**
+That is the fourth wrong guess this incident has produced, and the first one
+caught before anything was built on it.
+
+---
+
 ## Measured 2026-07-26: the payload is ~2 MB. The deepcopy is not the cause.
 
 The measurement below was the open question. It has been taken, against
@@ -203,12 +263,20 @@ pressure.
 It was offered and the decision was to go straight at the root cause instead.
 The loop was still running when this was written.
 
-**Applied and confirmed 2026-07-26 16:42 UTC — the OOM loop has stopped.**
+**Applied 2026-07-26 16:42 UTC. It helps a lot. It does NOT stop the OOM.**
 Deploy `dep-d9j3g7b7uimc73ceb8o0` (commit `73ac270e`) brought the worker up
-printing `INTELLIGENCE_LOOP_DISABLED`. Since then: **one boot, none after it**,
-against a prior cadence of one every 1–3 minutes. Container memory sits flat at
-650–720 MB (16–18% of 4096) while `tools/daily_update` runs and `MLB_SIM_TICK`
-fires every 30 s — the worker is doing real work, not merely idle.
+printing `INTELLIGENCE_LOOP_DISABLED`, and the OOM cadence went from one every
+1–3 minutes to **none for 22 minutes** — then two, at 17:04:36 and 17:05:06.
+
+**So the intelligence-state loop is not the only caller of this path.** With the
+loop provably disabled, something else on refresh-worker still reaches
+`build_cards_page_context` for today's date and still dies in it. Finding that
+caller is open work; the `cards_context_begin` samples are the hook, since they
+fire on every entry regardless of caller.
+
+Between the OOMs the worker does real work — `tools/daily_update` ran to
+completion (the first one to survive since the incident began), `MLB_SIM_TICK`
+fires every 30 s, and memory sits at 650–720 MB (16–18% of 4096).
 
 Getting there took two attempts, and the failed one is the reusable lesson:
 **a Render *restart* does not re-inject env vars.** Setting the var and calling
