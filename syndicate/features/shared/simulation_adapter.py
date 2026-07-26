@@ -12,6 +12,21 @@ from syndicate.features.shared.timezone import central_today_iso
 AdapterLoader = Callable[[Any], dict[str, Any]]
 
 
+def _log_sim_contract_memory(stage: str, **extra: Any) -> None:
+    # #75. Worker-only, same guard and reasoning as the cards_context_* and
+    # board_contract_* samples. See docs/ai_context/handoff_refresh_worker_oom.md.
+    from syndicate.features.shared.game_board_contract import _render_web_dyno
+
+    if _render_web_dyno():
+        return
+    try:
+        from syndicate.features.shared.memory_observability import log_container_memory
+
+        log_container_memory(f"sim_contract_{stage}", **extra)
+    except Exception:
+        pass
+
+
 def _copy_mapping(value: Any) -> dict[str, Any]:
     return dict(value) if isinstance(value, Mapping) else {}
 
@@ -379,7 +394,18 @@ def build_simulation_contract_from_context(
     sport_key = _safe_text(sport, _safe_text(normalized_context.get("active_sport_slug") or normalized_context.get("sport") or normalized_context.get("sport_slug"), "")).lower()
     selection_value = selection if selection is not None else normalized_context.get("control_value") or normalized_context.get("date") or normalized_context.get("requested_date")
     selection_kind = _selection_kind(sport_key)
-    normalized_games = [_normalize_game_context(game, context=normalized_context, sport=sport_key) for game in _coerce_list(normalized_context.get("games")) if isinstance(game, Mapping)]
+    # #75. Sampled per game because this loop is the suspected OOM: each
+    # _normalize_game_context calls build_market_features with NO payload_cache
+    # (unlike build_simulation_engine_context_from_candidate below, which
+    # threads one), so every game re-enters _recent_history_rows ->
+    # build_recent_market_history_index, which is not memoised and copies every
+    # event under up to 9 aliases before sorting each bucket. If that is what
+    # this is, memory climbs monotonically game by game here.
+    source_games = [game for game in _coerce_list(normalized_context.get("games")) if isinstance(game, Mapping)]
+    normalized_games = []
+    for index, game in enumerate(source_games):
+        normalized_games.append(_normalize_game_context(game, context=normalized_context, sport=sport_key))
+        _log_sim_contract_memory("game_normalized", sport=sport_key, game_index=index, game_total=len(source_games))
     resolved_selection = _safe_text(normalized_context.get("date") or normalized_context.get("requested_date") or selection_value, "")
 
     return {
