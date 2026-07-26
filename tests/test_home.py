@@ -1131,6 +1131,44 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         game = self._sample_game(status={}, summary="Second quarter under way", detail="")
         self.assertEqual(_game_status_state(game), "live")
 
+    def test_shared_game_state_live_false_beats_the_shared_is_live_flag(self) -> None:
+        # Reported by the user 2026-07-26 and confirmed from production: the
+        # Layer 2 board published yesterday's finished MLS fixtures as LIVE
+        # picks. The payload contradicted itself inside one object --
+        # shared_is_live: true alongside
+        # shared_game_state: {"live": false, "clock": "", "period": null} --
+        # and the loose derived flag beat the structured state.
+        #
+        # Field shape copied from the real payload: soccer carries `status` as
+        # a display STRING, which _game_status_text does not read at all, so
+        # `detail` is what makes the text non-empty. Getting that wrong makes
+        # this function return "" early and the test pass for the wrong reason.
+        game = self._sample_game(
+            status="Sat, Jul 25 · 7:30 PM CT",
+            detail="2026-07-26",
+            shared_is_live=True,
+            shared_game_state={"live": False, "final": False, "clock": "", "period": None},
+            summary="",
+        )
+        self.assertNotEqual(_game_status_state(game), "live")
+
+    def test_shared_is_live_still_decides_when_nothing_contradicts_it(self) -> None:
+        # The fix must only bite where a structured source actually disagrees.
+        # With no in_progress and no shared_game_state, shared_is_live is still
+        # the signal -- several sports rely on exactly that.
+        game = self._sample_game(status="", detail="2026-07-26", shared_is_live=True, summary="")
+        self.assertEqual(_game_status_state(game), "live")
+
+    def test_shared_game_state_final_is_terminal(self) -> None:
+        game = self._sample_game(
+            status="Sat, Jul 25 · 7:30 PM CT",
+            detail="2026-07-26",
+            shared_is_live=True,
+            shared_game_state={"live": False, "final": True},
+            summary="",
+        )
+        self.assertEqual(_game_status_state(game), "final")
+
     def test_game_status_state_still_detects_live_from_structured_in_progress(self) -> None:
         game = self._sample_game(
             status={"in_progress": True, "final": False, "status": "In Progress"},

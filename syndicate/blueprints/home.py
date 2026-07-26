@@ -419,18 +419,36 @@ def _game_status_state(game: dict[str, Any]) -> str:
         return ""
     status = game.get("status") if isinstance(game.get("status"), dict) else {}
     live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+    # The board contract's own structured state. Soccer carries `status` as a
+    # display STRING ("Sat, Jul 25 - 7:30 PM CT"), so the `status` dict above is
+    # empty for it and live_state is absent entirely -- leaving the loose
+    # `shared_is_live` boolean as the only signal, which is how yesterday's
+    # finished MLS fixtures reached the Layer 2 board flagged live on
+    # 2026-07-26. Their shared_game_state said {"live": false, "clock": "",
+    # "period": null} in the same payload, so the payload contradicted itself
+    # and the wrong half won.
+    shared_state = game.get("shared_game_state") if isinstance(game.get("shared_game_state"), dict) else {}
     in_progress = status.get("in_progress")
     if in_progress is None:
         in_progress = live_state.get("in_progress")
+    if in_progress is None and isinstance(shared_state.get("live"), bool):
+        in_progress = shared_state.get("live")
     if (
         bool(status.get("final"))
         or bool(status.get("is_final"))
         or bool(live_state.get("final"))
+        or bool(shared_state.get("final"))
         or _looks_terminal_status_text(status_text)
         or any(token in status_text for token in ("final", "closed", "postponed", "suspended", "canceled", "cancelled"))
     ):
         return "final"
-    if bool(game.get("shared_is_live")) or bool(in_progress):
+    # `shared_is_live` is a derived convenience flag; an explicit in_progress
+    # is evidence. When they disagree, the evidence wins -- same principle as
+    # the in_progress=False case documented below, which was already fixed once
+    # for WNBA and then reintroduced through this flag for soccer. Note this
+    # only changes behaviour where a structured source actually contradicts:
+    # with no in_progress anywhere, shared_is_live still decides.
+    if bool(in_progress) or (bool(game.get("shared_is_live")) and in_progress is not False):
         return "live"
     # Only fall back to the loose live-token text heuristic when this
     # game's own structured status/live_state says nothing at all about
@@ -2038,7 +2056,13 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
     # candidate that was force-flipped live while the same game's Spread
     # candidate (built from the plain "betting" dict, no "Live" prefix)
     # correctly stayed pregame. game_state/shared_is_live are the real signal.
-    fallback_live = bool(game.get("shared_is_live") or game_state == "live")
+    # Was `shared_is_live or game_state == "live"`, which re-introduced the
+    # exact bug _game_status_state was just taught to resolve: that function
+    # already folds shared_is_live in, and now refuses it when a structured
+    # in_progress/live says otherwise -- so OR-ing the raw flag back in here
+    # let the contradicted value win anyway. Confirmed 2026-07-26: yesterday's
+    # finished MLS fixtures published as LIVE picks off this line.
+    fallback_live = game_state == "live"
     is_live = _live_odds_backed_live_flag(_game_identifier(game), live_odds_game_ids, fallback_live)
     # Real regression found 2026-07-23: this function also builds per-game
     # PLAYER PROP candidates (market == f"Hitter {prop_type}"/f"Pitcher
