@@ -1837,8 +1837,40 @@ def _cards_recommendation_payload_by_game(selected_date: str) -> dict[int, dict[
 
 def _betting_payload_by_game(selected_date: str) -> dict[int, dict[str, Any]]:
     season = _season_for_date(selected_date)
-    payload = load_json_file(season_betting_card_day_path(season, selected_date))
+    betting_path = season_betting_card_day_path(season, selected_date)
+    payload = load_json_file(betting_path)
     games = payload.get("games") if isinstance((payload or {}).get("games"), dict) else {}
+    # #68 MLB half. This file is the ONLY source of game["markets"], which
+    # _mlb_game_market_recommendation_rows translates into the
+    # game_market_recommendations that _game_bet_candidates_from_game reads --
+    # so betting_game_count 0 means MLB contributes no game candidates at all,
+    # no matter how healthy everything else looks. On refresh-worker
+    # 2026-07-26T23:34Z: summary loaded, sim_games 15/15, actual_games 15,
+    # games_built 15, and betting_game_count 0.
+    #
+    # Existence is already reported (artifact_status says exists / "ready" for
+    # this same path) and is not the question -- the question is whether the
+    # file the worker HAS is empty, differently shaped, or just old. The
+    # suspect is the since= watermark on pull_hot_artifacts: it only re-pulls
+    # what web modified since the last successful pull, so a worker copy that
+    # is WRONG rather than merely older can never be repaired by it.
+    #
+    # Cheap (one line per cards-context build, and that build is already
+    # heavily sampled) and self-deleting once #68's MLB half closes.
+    try:
+        stat_result = betting_path.stat()
+        size_bytes: Any = stat_result.st_size
+        mtime: Any = round(stat_result.st_mtime, 1)
+    except OSError:
+        size_bytes = None
+        mtime = None
+    print(
+        "[mlb_cards] BETTING_PAYLOAD_READ "
+        f"date={selected_date} exists={size_bytes is not None} size={size_bytes} mtime={mtime} "
+        f"payload_type={type(payload).__name__} payload_keys={sorted(payload.keys())[:8] if isinstance(payload, dict) else None} "
+        f"games_type={type((payload or {}).get('games')).__name__} games_count={len(games)}",
+        flush=True,
+    )
     out: dict[int, dict[str, Any]] = {}
     for game_key, game_payload in games.items():
         if not isinstance(game_payload, dict):
