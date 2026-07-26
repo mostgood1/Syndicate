@@ -37,6 +37,7 @@ work takes the next free number (see the counter at the top of `todo.md`).
 | **54** | Quota store made O(1) |
 | **55** | Sim ↔ board-build alternation, **both** directions |
 | **29** | Cross-type duplicate candidates — every pick rendered twice |
+| **73** | Ranking signals computed but never applied to the order |
 | **58** | Basketball quarter sim vectorised — 215ms → 2.9ms/game (73×) |
 | **57** | Board build stays on refresh-worker, upgraded to pro/4GB |
 | **60** | Keyvalue payload ceiling — oversized writes fail loudly |
@@ -46,6 +47,42 @@ work takes the next free number (see the counter at the top of `todo.md`).
 | — | Central-date sweep, 14 call sites + ratchet test (`tests/test_slate_date_timezone_discipline.py`) |
 
 ### Detail worth keeping
+
+- **73 — ranking signals computed but never applied.** A "highest confidence"
+  query and a "highest upside" query returned **byte-identical** orderings. The
+  risk profile parsed correctly and reached `preferences`; nothing consulted it.
+  Four separate signals, all fully implemented and all inert:
+  - `_risk_profile_score_adjustment` and `_market_specific_score_adjustment`
+    were **dead code** — defined, never called from anywhere. So `score` was
+    `edge x confidence - tier_penalty` and nothing else. Both are no-ops by
+    construction outside their trigger (`balanced` profile / no requested
+    markets), so wiring them only moves rankings for queries that actually
+    expressed a preference.
+  - `advanced_ready` appeared nowhere in the board sort, and in the scorer only
+    as a ≤0.05 nudge to confidence — far too small to act as the gate its name
+    implies. A candidate with missing model inputs could outrank a ready one on
+    raw edge.
+  - `source_summary_score` (the qualitative read of a basketball prop's
+    recent-form writeup) was computed, surfaced in the analysis table and chart
+    series, and never ranked on.
+  - **`score` itself was absent from the board sort**, which ordered on raw
+    `simulated_edge` — a single component outvoting the composite that contains
+    it. Fixing the scorer alone changed nothing a user could see; ordering is
+    decided in *two* places (`score_candidate` and
+    `build_intelligence_board_contract`) and both had to change.
+  - ⚠️ **Where a signal goes matters as much as whether it is used.** Folding
+    `source_summary_score` into `score` at its native ±3.0 weight regressed
+    `test_intelligence_query_prioritizes_ready_advanced_inputs` — a qualitative
+    text signal overrode a data-readiness one. Picking a smaller weight would
+    have been fitting a magic number to the tests, so it went last in the sort
+    as a pure tiebreaker instead, where it only speaks when the quantitative
+    signals are genuinely equal.
+  - `tests/test_intelligence_ranking_signals.py`, 16 tests, **8 fail against the
+    pre-fix source**. Deliberately split: the adjustment-maths tests pass both
+    before and after (that function was always correct), so a separate class
+    pins that `score_candidate` actually *calls* it — without which the whole
+    fix could be reverted and everything else would still pass.
+  - Subset went 9 failed / 11 passed → 7 failed / 13 passed, no regressions.
 
 - **29 — cross-type duplicate candidates.** Every pick reached the board twice:
   once as the full candidate (~100 keys, `recommendation_id`, confidence as a

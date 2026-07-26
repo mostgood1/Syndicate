@@ -369,6 +369,25 @@ def build_intelligence_board_contract(response: Mapping[str, Any] | None) -> dic
         key=lambda card: (
             int(_number(card.get("publication_priority")) or 0),
             _number(card.get("coverage_score")) or 0.0,
+            # A candidate whose advanced inputs are missing or unpublished is
+            # less trustworthy than one whose inputs are ready, regardless of
+            # how large its raw edge looks -- that is the whole point of the
+            # readiness gate. It was expressed nowhere in this ordering, and in
+            # the scorer only as a <=0.05 nudge to confidence, far too small to
+            # act as a gate. Sorting on it above `score` is what actually makes
+            # "prioritise ready advanced inputs" true.
+            bool(card.get("advanced_ready")),
+            # `score` is the pipeline's composite judgement -- edge x confidence
+            # minus the tier penalty, plus the risk-profile and market-focus
+            # adjustments. It was absent from this sort entirely, so every
+            # scoring decision the pipeline made was discarded at presentation
+            # time and the board ranked on raw simulated_edge instead. That is
+            # why a "highest confidence" query and a "highest upside" query
+            # returned identical orderings even once the scorer told them apart.
+            # It sits above simulated_edge and confidence deliberately: both are
+            # components already folded into score, so consulting them first let
+            # a single raw component outvote the composite.
+            _number(card.get("score")) or 0.0,
             _number(card.get("simulated_edge")) or 0.0,
             # confidence can be a display-formatted percent string (e.g.
             # "63.0%", from MLB HR Targets fallback candidates --
@@ -378,6 +397,24 @@ def build_intelligence_board_contract(response: Mapping[str, Any] | None) -> dic
             # above) already strips "%" and tolerates "-"/empty by returning
             # None.
             _number(card.get("confidence")) or 0.0,
+            # source_summary_score is the qualitative read of a basketball
+            # prop's recent-form writeup (does the text argue FOR or AGAINST
+            # the pick), clamped to [-3.0, 3.0] and, until now, computed and
+            # displayed but never ranked on -- so two props identical on edge
+            # and confidence ordered arbitrarily even when one writeup argued
+            # against itself.
+            #
+            # It goes last, as a tiebreaker, on purpose. Folding it into
+            # `score` instead was tried and regressed
+            # test_intelligence_query_prioritizes_ready_advanced_inputs: at full
+            # weight a WNBA summary outranked an advanced-ready NBA candidate,
+            # i.e. a qualitative text signal overrode a data-readiness one.
+            # Picking a smaller weight would just be fitting a magic number to
+            # the tests. As a tiebreaker it only speaks when the quantitative
+            # signals above are genuinely equal, which is the case it exists
+            # for. 0.0 for non-basketball and non-prop candidates by
+            # construction, so it is inert everywhere else.
+            _number(card.get("source_summary_score")) or 0.0,
         ),
         reverse=True,
     )

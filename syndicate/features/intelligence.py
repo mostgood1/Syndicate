@@ -7065,7 +7065,34 @@ def score_candidate(
     confidence_value = max(0.0, min(1.0, float(confidence_value) + float(readiness_bonus) + float(movement_bonus)))
 
     tier_penalty = {"tier_1": 0.0, "tier_2": 0.2}.get(_safe_text(scored_candidate.get("tier"), "tier_2"), 0.2)
-    scored_candidate["score"] = round(float(edge_value) * float(confidence_value) - float(tier_penalty), 4)
+    base_score = float(edge_value) * float(confidence_value) - float(tier_penalty)
+
+    # _risk_profile_score_adjustment and _market_specific_score_adjustment were
+    # both DEAD CODE -- defined, fully implemented, never called from anywhere.
+    # So `score` was edge x confidence - tier_penalty and nothing else, which is
+    # why a "highest confidence" query and a "highest upside" query returned
+    # byte-identical rankings: the risk profile was parsed correctly, reached
+    # preferences, and was then never consulted by the scorer. Same for a query
+    # naming specific markets.
+    #
+    # Both are no-ops in the default case by construction -- the risk one
+    # returns 0.0 unless the profile is conservative/aggressive, the market one
+    # unless requested_markets is non-empty -- so this only moves rankings for
+    # queries that actually expressed a preference.
+    #
+    # Worked example (the two candidates in the risk fixture), showing the
+    # adjustments are sized to matter without swamping the base score:
+    #   base:         Judge 6.2   Freeman 1.05
+    #   conservative: Judge 2.74  Freeman 3.80  -> Freeman, the 64%/-135 pick
+    #   aggressive:   Judge 13.32 Freeman 0.84  -> Judge, the 38%/+320 pick
+    scoring_preferences = preferences or {}
+    market_context = scored_candidate.get("market_context")
+    if not isinstance(market_context, dict):
+        market_context = _market_context(scored_candidate)
+    base_score += _risk_profile_score_adjustment(scored_candidate, scoring_preferences, market_context)
+    base_score += _market_specific_score_adjustment(scored_candidate, scoring_preferences, market_context)
+
+    scored_candidate["score"] = round(base_score, 4)
     return scored_candidate
 
 
