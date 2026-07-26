@@ -83,6 +83,24 @@ Conventions:
     threshold, or lane assignment defaults everything to `live`. Worth a look on
     a fresh slate; it is a tuning/lane question, not an empty board.
 
+- **#63 — Candidates drop to zero at `candidate_collection`.** Observed
+  2026-07-26T02:36Z on refresh-worker: the stage counters read
+  `post_state_filter 16 → pre_requested_market_filter 16 →
+  post_requested_market_filter 16`, then
+  `candidate_collection {candidate_count: 0, pipeline: "collect_all_recommendations"}`
+  in 39ms, and everything downstream is 0 (`scoring input_count 0`,
+  `board_input cards 0`). So the loss is between the last market filter and
+  collection.
+  - ⚠️ **Do not diagnose this on a dead slate.** It was seen at 21:37 local with
+    the MLB slate finished (`mlb: 0` generated) and soccer candidates possibly
+    for completed matches, so "0 recommendations" may be entirely correct. The
+    same end-of-day confound is what made #61 look like a catastrophe.
+    Re-check against a live morning slate first.
+  - Note there are TWO collection pipelines and they behave differently:
+    `collect_candidates_with_fallback_merge` was measured at 240 in / 240 out
+    earlier the same evening, while `collect_all_recommendations` is the one
+    reporting 0. Establish which one feeds the board before changing either.
+
 - **#31 — NHL revamp Phase 5: local producers replace vendor subprocess.**
 
 ## Platform / correctness
