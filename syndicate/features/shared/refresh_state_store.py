@@ -375,11 +375,101 @@ def read_text_file(path: Path) -> str | None:
         return None
 
 
+class KeyValuePayloadTooLarge(ValueError):
+    """A keyvalue write was refused because the value is too big to trust.
+
+    Deliberately its own type so callers can distinguish "this payload is
+    wrong" from a transient ConnectionError, which is exactly the confusion
+    that hid #43.
+    """
+
+
+def _keyvalue_warn_bytes() -> int:
+    return _positive_int_env("SYNDICATE_KEYVALUE_WARN_BYTES", 1 * 1024 * 1024)
+
+
+def _keyvalue_max_bytes() -> int:
+    # 8MB. Chosen between two measured points, not guessed: the intelligence
+    # state at 8.9MB reproducibly gets "Connection closed by server", and the
+    # same payload after #43's trim is 4.37MB and must keep working. A ceiling
+    # below the legitimate payload would break the board this rule exists to
+    # protect, so it sits above 4.37MB and below the known-failing size.
+    return _positive_int_env("SYNDICATE_KEYVALUE_MAX_BYTES", 8 * 1024 * 1024)
+
+
+def _positive_int_env(name: str, default: int) -> int:
+    raw = str(os.environ.get(name) or "").strip()
+    try:
+        value = int(raw) if raw else default
+    except ValueError:
+        value = default
+    return max(1024, value)
+
+
+def _guard_keyvalue_payload_size(path: Path, serialized: str) -> None:
+    """Make an oversized keyvalue write loud instead of mysterious.
+
+    #60. Three separate 2026-07-25 outages were one bug -- an unbounded
+    payload crossing this boundary -- and every one of them presented as
+    something else: an empty board (#43), a missing metric (#54), a memory
+    leak (#50). The size was never the hard part; the silence was. #43 in
+    particular threw ConnectionError from deep inside redis, got caught by a
+    generic handler, and left a healthy-looking loop discarding a correctly
+    computed 222-candidate board every cycle for hours.
+
+    So: warn while a value is merely growing, and refuse it before it reaches
+    the size that produces an opaque connection reset. A refusal that names
+    the key, the size and the caller is recoverable in minutes. The
+    alternative is what today cost.
+    """
+    size_bytes = len(serialized.encode("utf-8", errors="replace"))
+    warn_bytes = _keyvalue_warn_bytes()
+    if size_bytes < warn_bytes:
+        return
+
+    key = _state_key_for_path(path)
+    max_bytes = _keyvalue_max_bytes()
+    # Only walked on the rare warn/reject path, so the cost is irrelevant --
+    # and knowing WHICH writer is responsible is most of the diagnosis.
+    try:
+        import traceback
+
+        # Filter this module out rather than slicing a fixed number of frames:
+        # a fixed slice empties the whole list on a shallow stack, which is
+        # how this field came back blank the first time it was tested. The
+        # caller is the single most useful thing in this log line.
+        frames = [f for f in traceback.extract_stack() if "refresh_state_store" not in f.filename]
+        caller = " <- ".join(f"{Path(f.filename).name}:{f.lineno}" for f in reversed(frames[-3:])) or "unknown"
+    except Exception:
+        caller = "unknown"
+
+    if size_bytes >= max_bytes:
+        print(
+            f"[refresh_state_store] KEYVALUE_WRITE_REJECTED key={key} "
+            f"size_bytes={size_bytes} max_bytes={max_bytes} caller={caller}",
+            flush=True,
+        )
+        raise KeyValuePayloadTooLarge(
+            f"Refusing keyvalue write for {key}: {size_bytes} bytes exceeds {max_bytes}. "
+            "Shrink the payload (see docs/ai_context/todo.md #60) rather than raising the ceiling -- "
+            "the store closes the connection above roughly 9MB, which surfaces as an unrelated ConnectionError."
+        )
+
+    print(
+        f"[refresh_state_store] KEYVALUE_WRITE_LARGE key={key} "
+        f"size_bytes={size_bytes} warn_bytes={warn_bytes} max_bytes={max_bytes} caller={caller}",
+        flush=True,
+    )
+
+
 def write_json_file(path: Path, payload: dict[str, Any]) -> None:
     normalized_payload = normalize_timestamped_payload(payload)
     if _state_backend_kind() == "keyvalue":
+        serialized = json.dumps(normalized_payload, indent=2)
+        _guard_keyvalue_payload_size(path, serialized)
+
         def _write_json(client):
-            client.set(_state_key_for_path(path), json.dumps(normalized_payload, indent=2))
+            client.set(_state_key_for_path(path), serialized)
             _record_refresh_status_history(path)
 
         _execute_keyvalue_operation(_write_json)
@@ -389,7 +479,9 @@ def write_json_file(path: Path, payload: dict[str, Any]) -> None:
 
 def write_text_file(path: Path, payload: str) -> None:
     if _state_backend_kind() == "keyvalue":
-        _execute_keyvalue_operation(lambda client: client.set(_state_key_for_path(path), str(payload or "")))
+        serialized = str(payload or "")
+        _guard_keyvalue_payload_size(path, serialized)
+        _execute_keyvalue_operation(lambda client: client.set(_state_key_for_path(path), serialized))
         return
     _atomic_write_text(path, payload)
 

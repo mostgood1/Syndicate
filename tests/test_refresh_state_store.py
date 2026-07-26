@@ -436,3 +436,81 @@ class RefreshStateStoreTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class KeyValuePayloadCeilingTests(unittest.TestCase):
+    """#60. Three separate outages on 2026-07-25 were one bug -- an unbounded
+    payload crossing this boundary -- and each presented as something else: an
+    empty board (#43), a missing metric (#54), a memory leak (#50).
+
+    #43 is the reason this exists. An 8.9MB intelligence state threw
+    ConnectionError from deep inside redis, a generic handler caught it, and a
+    healthy-looking loop discarded a correctly computed 222-candidate board
+    every cycle for hours. The size was never the hard part; the silence was.
+    """
+
+    def _guard(self, size_bytes: int):
+        return refresh_state_store._guard_keyvalue_payload_size(
+            Path("/data/reports/intelligence/intelligence_state.json"), "x" * size_bytes
+        )
+
+    def test_small_payloads_are_silent(self) -> None:
+        with patch("builtins.print") as printed:
+            self._guard(1024)
+            printed.assert_not_called()
+
+    def test_growing_payloads_warn_but_are_allowed(self) -> None:
+        # Visibility before it becomes an outage -- the write still happens.
+        with patch("builtins.print") as printed:
+            self._guard(2 * 1024 * 1024)
+            self.assertTrue(printed.called)
+            self.assertIn("KEYVALUE_WRITE_LARGE", str(printed.call_args))
+
+    def test_oversized_payloads_are_refused_with_a_named_error(self) -> None:
+        # A dedicated type so callers can tell "this payload is wrong" from a
+        # transient ConnectionError -- exactly the confusion that hid #43.
+        with self.assertRaises(refresh_state_store.KeyValuePayloadTooLarge):
+            self._guard(9 * 1024 * 1024)
+
+    def test_the_real_post_fix_state_size_still_writes(self) -> None:
+        # 4.37MB is #43's payload after its trim. A ceiling below this would
+        # break the board this rule exists to protect.
+        with patch("builtins.print"):
+            self._guard(int(4.37 * 1024 * 1024))
+
+    def test_rejection_names_key_size_and_caller(self) -> None:
+        # The whole point: a refusal you can act on in minutes.
+        with patch("builtins.print") as printed:
+            with self.assertRaises(refresh_state_store.KeyValuePayloadTooLarge):
+                self._guard(9 * 1024 * 1024)
+            logged = str(printed.call_args)
+        self.assertIn("KEYVALUE_WRITE_REJECTED", logged)
+        self.assertIn("intelligence_state.json", logged)
+        self.assertIn("size_bytes=", logged)
+        self.assertIn("caller=", logged)
+        self.assertNotIn("caller=unknown", logged)
+
+    def test_thresholds_are_env_tunable(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_KEYVALUE_MAX_BYTES": str(2 * 1024 * 1024)}, clear=False):
+            with patch("builtins.print"):
+                with self.assertRaises(refresh_state_store.KeyValuePayloadTooLarge):
+                    self._guard(3 * 1024 * 1024)
+
+    def test_write_json_file_enforces_the_ceiling(self) -> None:
+        client = _FakeKeyValueClient()
+        with patch.object(refresh_state_store, "_state_backend_kind", return_value="keyvalue"), patch.object(
+            refresh_state_store, "_get_keyvalue_client", return_value=client
+        ), patch("builtins.print"):
+            with self.assertRaises(refresh_state_store.KeyValuePayloadTooLarge):
+                refresh_state_store.write_json_file(
+                    Path("/data/reports/intelligence/intelligence_state.json"),
+                    {"blob": "x" * (9 * 1024 * 1024)},
+                )
+            self.assertEqual(client.store, {}, "nothing should be written when the payload is refused")
+
+    def test_filesystem_backend_is_unaffected(self) -> None:
+        # Large files on disk are fine; only the shared store has this limit.
+        with TemporaryDirectory() as tmp:
+            target = Path(tmp) / "big.json"
+            with patch.object(refresh_state_store, "_state_backend_kind", return_value="filesystem"):
+                refresh_state_store.write_json_file(target, {"blob": "x" * (9 * 1024 * 1024)})
+            self.assertTrue(target.exists())
