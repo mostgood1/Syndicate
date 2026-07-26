@@ -3378,9 +3378,12 @@ class DeferToOddsRefreshTests(unittest.TestCase):
     rather than fix it.
     """
 
-    def test_defers_while_an_odds_refresh_is_in_flight(self) -> None:
-        with patch("syndicate.features.shared.ops_refresh.is_refresh_run_active", return_value=True):
-            self.assertTrue(intelligence_state_module._odds_refresh_in_flight())
+    def test_defers_while_an_odds_refresh_is_in_flight_when_enabled(self) -> None:
+        # Explicitly enabled: the default is now off (see
+        # test_disabled_by_default_after_the_4gb_upgrade).
+        with patch.dict(os.environ, {"SYNDICATE_INTELLIGENCE_DEFER_TO_ODDS_REFRESH": "true"}, clear=False):
+            with patch("syndicate.features.shared.ops_refresh.is_refresh_run_active", return_value=True):
+                self.assertTrue(intelligence_state_module._odds_refresh_in_flight())
 
     def test_does_not_defer_when_no_refresh_is_running(self) -> None:
         with patch("syndicate.features.shared.ops_refresh.is_refresh_run_active", return_value=False):
@@ -3391,10 +3394,19 @@ class DeferToOddsRefreshTests(unittest.TestCase):
             with patch("syndicate.features.shared.ops_refresh.is_refresh_run_active", return_value=True):
                 self.assertFalse(intelligence_state_module._odds_refresh_in_flight())
 
-    def test_enabled_by_default(self) -> None:
+    def test_disabled_by_default_after_the_4gb_upgrade(self) -> None:
+        # This branch existed only to survive the board build sharing a 2GB
+        # box with its own odds refresh, and it starved the board completely
+        # before it was bounded. At 4GB the arithmetic no longer justifies it
+        # (~1479MB board + ~532MB refresh tree ~= 2.0GB). Kept, but off.
         os.environ.pop("SYNDICATE_INTELLIGENCE_DEFER_TO_ODDS_REFRESH", None)
         with patch("syndicate.features.shared.ops_refresh.is_refresh_run_active", return_value=True):
-            self.assertTrue(intelligence_state_module._odds_refresh_in_flight())
+            self.assertFalse(intelligence_state_module._odds_refresh_in_flight())
+
+    def test_can_be_re_enabled_by_env(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_INTELLIGENCE_DEFER_TO_ODDS_REFRESH": "true"}, clear=False):
+            with patch("syndicate.features.shared.ops_refresh.is_refresh_run_active", return_value=True):
+                self.assertTrue(intelligence_state_module._odds_refresh_in_flight())
 
     def test_a_broken_check_never_stalls_the_board(self) -> None:
         # A false positive would stall the board indefinitely, which is worse

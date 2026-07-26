@@ -215,7 +215,13 @@ services:
   - type: worker
     name: refresh-worker
     env: python
-    plan: standard
+    # pro (4GB), upgraded 2026-07-25. Do NOT drop back to standard (2GB):
+    # this service hosts the MLB sim, measured at 1674MB peak running alone,
+    # which leaves ~374MB of a 2GB box for the worker, an odds-refresh tree
+    # (~532MB) and the intelligence board build (~700MB idle, 1479MB peak).
+    # It was OOM-killed 19 times on 2026-07-25 at standard; the other two
+    # services were killed zero times.
+    plan: pro
     autoDeploy: false
     buildCommand: pip install -r requirements.txt
     startCommand: python scripts/run_refresh_worker.py
@@ -316,7 +322,7 @@ services:
       # own copy of this flag is false), so the board still updates -- on
       # request, slower, and under the health-check pressure of #56.
       - key: SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP
-        value: "false"
+        value: "true"
       - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
         value: "false"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS
@@ -548,7 +554,7 @@ services:
       # in-flight refresh to cover it (see _odds_refresh_in_flight); confirm
       # against #59's Tuesday measurement before trusting this under load.
       - key: SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP
-        value: "true"
+        value: "false"
       - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
         value: "true"
       - key: SYNDICATE_BOOTSTRAP_WNBA_TODAY

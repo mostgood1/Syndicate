@@ -252,7 +252,22 @@ def _odds_refresh_in_flight() -> bool:
     NOTE: this signal alone must never gate the build -- see
     _board_build_deferral_reason for why it starves without a bound.
     """
-    if not _env_bool("SYNDICATE_INTELLIGENCE_DEFER_TO_ODDS_REFRESH", default=True):
+    # Defaults OFF as of the 2026-07-25 refresh-worker upgrade to 4GB. This
+    # branch only ever existed because the board build had been pushed onto a
+    # 2GB live-odds-worker alongside its odds refresh, and it caused more harm
+    # than it prevented: the refresh there is effectively continuous, so the
+    # deferral starved the board completely (8 defers / 13 iterations, zero
+    # candidates) until it was bounded.
+    #
+    # At 4GB the arithmetic no longer justifies it: board build ~1479MB peak
+    # plus an odds-refresh tree ~532MB is ~2.0GB, comfortably inside the
+    # container. The SIM deferral (#55) stays on, because sim ~1674MB plus
+    # board ~1479MB is ~3.2GB before the refresh tree and genuinely does not
+    # fit.
+    #
+    # Kept rather than deleted, with its bound intact, so it can be switched
+    # back on if the board build ever has to share a 2GB box again.
+    if not _env_bool("SYNDICATE_INTELLIGENCE_DEFER_TO_ODDS_REFRESH", default=False):
         return False
     try:
         from syndicate.features.shared.ops_refresh import is_refresh_run_active
