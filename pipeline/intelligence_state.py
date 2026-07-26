@@ -1086,6 +1086,33 @@ def _is_intelligence_state_payload_valid(state: dict[str, Any] | None) -> bool:
 _ANALYSIS_ALIAS_MARKER = {"__alias_of__": "analysis"}
 
 
+def _alias_marker(target: str) -> dict[str, str]:
+    return {"__alias_of__": target}
+
+
+# #43/#66. The same generalisation, applied to the candidate list rather than
+# analysis. Production composition of a rejected 26,397,826-byte payload:
+#
+#   board_contract         3,592,276   (of which cards 3,591,228)
+#   by_sport               3,527,200
+#   top_opportunities      3,527,179
+#   recommendations        3,527,179
+#   top_live_opportunities 3,314,088
+#
+# i.e. the candidate list stored about five times over. Verified against a real
+# persisted payload: top_live_opportunities is BYTE-IDENTICAL to
+# recommendations, and every board_contract.cards row appears verbatim in
+# recommendations with an identical field set. response.top_opportunities and
+# response.top_live_opportunities duplicate their top-level twins the same way.
+#
+# top_opportunities and by_sport are NOT byte-identical (they were 88,057 and
+# 88,076 against recommendations' 89,534 on the sample) so they are deliberately
+# left alone -- the equality guard below would skip them anyway. A wrong board
+# beats a small one.
+_CANDIDATE_ALIAS_TOP_LEVEL = ("top_live_opportunities",)
+_CANDIDATE_ALIAS_RESPONSE = ("top_opportunities", "top_live_opportunities", "recommendations")
+
+
 def _compact_state_for_persist(state: dict[str, Any]) -> dict[str, Any]:
     """Shrink the state before it crosses the keyvalue boundary.
 
@@ -1134,6 +1161,39 @@ def _compact_state_for_persist(state: dict[str, Any]) -> dict[str, Any]:
             **response,
             "analysis": dict(_ANALYSIS_ALIAS_MARKER) if same else response.get("analysis"),
         }
+
+    # #43/#66: collapse the duplicate candidate lists. Same equality guard as
+    # above -- alias only what provably matches, byte for byte.
+    recommendations_blob = json.dumps(state.get("recommendations"), sort_keys=True, default=str)
+
+    # An alias marker is ~26 bytes, so aliasing a small or empty list makes the
+    # payload BIGGER. Measured: every quiet-slate payload on disk grew by 33
+    # bytes before this guard, because an empty top_live_opportunities matches
+    # an empty recommendations. Only collapse duplicates worth collapsing.
+    _ALIAS_MIN_BYTES = 4096
+    recommendations_worth_aliasing = len(recommendations_blob) >= _ALIAS_MIN_BYTES
+
+    def _matches_recommendations(value: Any) -> bool:
+        if not recommendations_worth_aliasing:
+            return False
+        return json.dumps(value, sort_keys=True, default=str) == recommendations_blob
+
+    for key in _CANDIDATE_ALIAS_TOP_LEVEL:
+        if key in compact and _matches_recommendations(compact.get(key)):
+            compact[key] = _alias_marker("recommendations")
+
+    nested = compact.get("response")
+    if isinstance(nested, dict):
+        updated = dict(nested)
+        for key in _CANDIDATE_ALIAS_RESPONSE:
+            if key in updated and _matches_recommendations(updated.get(key)):
+                updated[key] = _alias_marker("recommendations")
+        compact["response"] = updated
+
+    board_contract = compact.get("board_contract")
+    if isinstance(board_contract, dict) and _matches_recommendations(board_contract.get("cards")):
+        compact["board_contract"] = {**board_contract, "cards": _alias_marker("recommendations")}
+
     return compact
 
 
@@ -1144,12 +1204,29 @@ def _expand_persisted_state(state: dict[str, Any] | None) -> dict[str, Any] | No
     """
     if not isinstance(state, dict):
         return state
-    response = state.get("response")
-    if not isinstance(response, dict):
-        return state
-    if response.get("analysis") != _ANALYSIS_ALIAS_MARKER:
-        return state
-    return {**state, "response": {**response, "analysis": state.get("analysis")}}
+    expanded = dict(state)
+    recommendations = expanded.get("recommendations")
+    marker = _alias_marker("recommendations")
+
+    for key in _CANDIDATE_ALIAS_TOP_LEVEL:
+        if expanded.get(key) == marker:
+            expanded[key] = recommendations
+
+    board_contract = expanded.get("board_contract")
+    if isinstance(board_contract, dict) and board_contract.get("cards") == marker:
+        expanded["board_contract"] = {**board_contract, "cards": recommendations}
+
+    response = expanded.get("response")
+    if isinstance(response, dict):
+        restored = dict(response)
+        if restored.get("analysis") == _ANALYSIS_ALIAS_MARKER:
+            restored["analysis"] = expanded.get("analysis")
+        for key in _CANDIDATE_ALIAS_RESPONSE:
+            if restored.get(key) == marker:
+                restored[key] = recommendations
+        expanded["response"] = restored
+
+    return expanded
 
 
 def read_intelligence_state() -> dict[str, Any] | None:

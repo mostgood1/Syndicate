@@ -504,7 +504,12 @@ def _guard_keyvalue_payload_size(path: Path, serialized: str, payload: Any = Non
 def write_json_file(path: Path, payload: dict[str, Any]) -> None:
     normalized_payload = normalize_timestamped_payload(payload)
     if _state_backend_kind() == "keyvalue":
-        serialized = json.dumps(normalized_payload, indent=2)
+        # #43: no human reads the keyvalue value, so indent=2 was spending a
+        # third of a ceiling-constrained budget on whitespace. The rejected
+        # production payload was 26,397,826 bytes indented against an 8MB
+        # ceiling; its top-level keys summed to ~17.5MB compact. Disk writes
+        # below keep indentation -- those are read by people.
+        serialized = json.dumps(normalized_payload, separators=(",", ":"))
         _guard_keyvalue_payload_size(path, serialized, normalized_payload)
 
         def _write_json(client):
