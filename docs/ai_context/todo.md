@@ -128,7 +128,20 @@ were resolved and nine already-closed rows removed from the open tables.
     threshold, or lane assignment defaults everything to `live`. Worth a look on
     a fresh slate; it is a tuning/lane question, not an empty board.
 
-- **#68 — ANSWERED 2026-07-26T20:35:59Z on a live slate: 100% pruned as `missing_projection_or_odds`.**
+- **#68 — ⚠️ THE READING BELOW IS PROBABLY THE ROLLOVER PROBE, NOT TODAY'S BOARD. Not answered.**
+  Corrected 2026-07-26T20:53Z, minutes after writing it. The pass emitting
+  those counts logged `context_label: "2026-07-27"` — it is building
+  **tomorrow**. Tomorrow has a schedule but no odds and no sim artifacts, so
+  100% `missing_projection_or_odds` is **correct behaviour there**, not a
+  defect. #65 already says so and closes with "do not chase them"; I chased
+  them anyway because I read the prune counts without checking the context
+  label on the same cycle. **Always check `context_label` before drawing a
+  conclusion from a candidate trace.**
+  The real question is unchanged and upstream of this: **why is TODAY's pool 0**,
+  which is what triggers the rollover probe in the first place. To answer it,
+  isolate a trace whose `context_label` is today's date.
+
+- *Superseded reading (tomorrow's date, kept as the worked example):*
   The reading #68 was blocked on, taken off a healthy worker:
   `post_state_filter 40 → pre_requested_market_filter 40 →
   post_requested_market_filter 40 → post_dedupe_and_classify
