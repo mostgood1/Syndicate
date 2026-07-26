@@ -406,7 +406,45 @@ def _positive_int_env(name: str, default: int) -> int:
     return max(1024, value)
 
 
-def _guard_keyvalue_payload_size(path: Path, serialized: str) -> None:
+def _log_payload_composition(key: str, payload: Any, *, top_n: int = 10) -> None:
+    """Say WHICH keys make an oversized payload oversized.
+
+    #43/#66. The rejection line names the total, and that total turned out to
+    be 37.8MB against an 8MB ceiling -- 8.6x the 4.37MB the last reduction was
+    verified at. #43's listed next cuts (evaluation_record 2.21MB,
+    candidate_pool 0.84MB) come to ~3MB against a ~29.5MB overage, so they
+    cannot close it and the composition has to be measured rather than
+    assumed. Only ever runs on the reject path.
+    """
+    try:
+        if not isinstance(payload, dict):
+            return
+
+        def _size(value: Any) -> int:
+            try:
+                return len(json.dumps(value, default=str))
+            except Exception:
+                return -1
+
+        rows = sorted(((k, _size(v)) for k, v in payload.items()), key=lambda r: -r[1])
+        summary = " ".join(f"{k}={size}" for k, size in rows[:top_n])
+        print(f"[refresh_state_store] KEYVALUE_PAYLOAD_COMPOSITION key={key} {summary}", flush=True)
+
+        # One level into the biggest key -- that is usually where the real
+        # offender is, and a second deploy to find it is a wasted cycle.
+        if rows and isinstance(payload.get(rows[0][0]), dict):
+            biggest = rows[0][0]
+            nested = sorted(((k, _size(v)) for k, v in payload[biggest].items()), key=lambda r: -r[1])
+            nested_summary = " ".join(f"{k}={size}" for k, size in nested[:top_n])
+            print(
+                f"[refresh_state_store] KEYVALUE_PAYLOAD_COMPOSITION key={key} under={biggest} {nested_summary}",
+                flush=True,
+            )
+    except Exception:
+        pass
+
+
+def _guard_keyvalue_payload_size(path: Path, serialized: str, payload: Any = None) -> None:
     """Make an oversized keyvalue write loud instead of mysterious.
 
     #60. Three separate 2026-07-25 outages were one bug -- an unbounded
@@ -449,6 +487,7 @@ def _guard_keyvalue_payload_size(path: Path, serialized: str) -> None:
             f"size_bytes={size_bytes} max_bytes={max_bytes} caller={caller}",
             flush=True,
         )
+        _log_payload_composition(key, payload)
         raise KeyValuePayloadTooLarge(
             f"Refusing keyvalue write for {key}: {size_bytes} bytes exceeds {max_bytes}. "
             "Shrink the payload (see docs/ai_context/todo.md #60) rather than raising the ceiling -- "
@@ -466,7 +505,7 @@ def write_json_file(path: Path, payload: dict[str, Any]) -> None:
     normalized_payload = normalize_timestamped_payload(payload)
     if _state_backend_kind() == "keyvalue":
         serialized = json.dumps(normalized_payload, indent=2)
-        _guard_keyvalue_payload_size(path, serialized)
+        _guard_keyvalue_payload_size(path, serialized, normalized_payload)
 
         def _write_json(client):
             client.set(_state_key_for_path(path), serialized)
