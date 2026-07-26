@@ -1195,35 +1195,54 @@ def _simulate_quarters_local(*, processed_root: Path, inp: GameInputsLocal, leag
             h_sig_q = float(h_sig_q) * float(duration_scale)
             a_sig_q = float(a_sig_q) * float(duration_scale)
         quarters.append(QuarterResultLocal(q=quarter_idx, home_pts_mu=h_mu_q, home_pts_sigma=h_sig_q, away_pts_mu=a_mu_q, away_pts_sigma=a_sig_q, corr=corr_q))
-    total_samples = []
-    margin_samples = []
-    log_list_memory("basketball_props_smart_sim.total_samples_initial", total_samples)
-    log_list_memory("basketball_props_smart_sim.margin_samples_initial", margin_samples)
-    for _ in range(min(5000, max(1000, n_samples))):
-        h_sum = 0.0
-        a_sum = 0.0
-        for quarter in quarters:
-            try:
-                cov = np.array([
-                    [quarter.home_pts_sigma ** 2, quarter.corr * quarter.home_pts_sigma * quarter.away_pts_sigma],
-                    [quarter.corr * quarter.home_pts_sigma * quarter.away_pts_sigma, quarter.away_pts_sigma ** 2],
-                ])
-                chol = np.linalg.cholesky(cov)
-                z = np.random.normal(size=(2,))
-                v = chol @ z
-                h_val = max(0.0, quarter.home_pts_mu + v[0])
-                a_val = max(0.0, quarter.away_pts_mu + v[1])
-            except Exception:
-                h_val = np.random.normal(loc=quarter.home_pts_mu, scale=quarter.home_pts_sigma)
-                a_val = np.random.normal(loc=quarter.away_pts_mu, scale=quarter.away_pts_sigma)
-            h_sum += h_val
-            a_sum += a_val
-        total_samples.append(h_sum + a_sum)
-        margin_samples.append(h_sum - a_sum)
-    log_list_memory("basketball_props_smart_sim.total_samples_final", total_samples)
-    log_list_memory("basketball_props_smart_sim.margin_samples_final", margin_samples)
-    total_samples_arr = np.array(total_samples)
-    margin_samples_arr = np.array(margin_samples)
+    # Vectorised over samples (#58). The covariance and its Cholesky factor
+    # depend only on the quarter's sigmas and correlation -- nothing inside the
+    # sample loop varied them -- so both are computed once per quarter (4x)
+    # rather than once per sample per quarter (4 * n_draws, ~20k per game).
+    #
+    # Hoisting the try/except to per-quarter is equivalent for the same reason:
+    # cov is sample-invariant, so cholesky either succeeds for every sample of a
+    # quarter or fails for every sample of it. The fallback deliberately keeps
+    # the original's behaviour of drawing *independent* normals with no clamping
+    # at zero, which differs from the correlated path -- that asymmetry predates
+    # this change and is left alone.
+    #
+    # Draw order changes (per-quarter batches instead of interleaved per-sample
+    # draws), so a given global RNG state no longer produces the same numbers.
+    # Nothing depended on that: this function takes no cfg and no rng, never
+    # seeds, and the only test that touches it patches it out entirely.
+    n_draws = int(min(5000, max(1000, n_samples)))
+    home_sums = np.zeros(n_draws, dtype=float)
+    away_sums = np.zeros(n_draws, dtype=float)
+    # These now measure the pre-allocated accumulators rather than empty lists.
+    # That is the allocation actually worth watching, and it keeps #59's call
+    # sites and their names intact.
+    log_list_memory("basketball_props_smart_sim.total_samples_initial", home_sums)
+    log_list_memory("basketball_props_smart_sim.margin_samples_initial", away_sums)
+    for quarter in quarters:
+        h_sigma = float(quarter.home_pts_sigma)
+        a_sigma = float(quarter.away_pts_sigma)
+        try:
+            covariance = float(quarter.corr) * h_sigma * a_sigma
+            cov = np.array([
+                [h_sigma ** 2, covariance],
+                [covariance, a_sigma ** 2],
+            ])
+            chol = np.linalg.cholesky(cov)
+            # Per sample the original computed v = chol @ z for a column z.
+            # Batched, with one z per row, that is Z @ chol.T.
+            deviations = np.random.normal(size=(n_draws, 2)) @ chol.T
+            h_vals = np.maximum(0.0, float(quarter.home_pts_mu) + deviations[:, 0])
+            a_vals = np.maximum(0.0, float(quarter.away_pts_mu) + deviations[:, 1])
+        except Exception:
+            h_vals = np.random.normal(loc=quarter.home_pts_mu, scale=h_sigma, size=n_draws)
+            a_vals = np.random.normal(loc=quarter.away_pts_mu, scale=a_sigma, size=n_draws)
+        home_sums += h_vals
+        away_sums += a_vals
+    total_samples_arr = home_sums + away_sums
+    margin_samples_arr = home_sums - away_sums
+    log_list_memory("basketball_props_smart_sim.total_samples_final", total_samples_arr)
+    log_list_memory("basketball_props_smart_sim.margin_samples_final", margin_samples_arr)
     final_total_mu = float(np.mean(total_samples_arr))
     final_total_sigma = float(np.std(total_samples_arr))
     final_margin_mu = float(np.mean(margin_samples_arr))

@@ -36,6 +36,7 @@ work takes the next free number (see the counter at the top of `todo.md`).
 | **50** | Artifact-export ceiling |
 | **54** | Quota store made O(1) |
 | **55** | Sim ↔ board-build alternation, **both** directions |
+| **58** | Basketball quarter sim vectorised — 215ms → 2.9ms/game (73×) |
 | **57** | Board build stays on refresh-worker, upgraded to pro/4GB |
 | **60** | Keyvalue payload ceiling — oversized writes fail loudly |
 | **63** | Mutual-deferral starvation invariant test |
@@ -44,6 +45,36 @@ work takes the next free number (see the counter at the top of `todo.md`).
 | — | Central-date sweep, 14 call sites + ratchet test (`tests/test_slate_date_timezone_discipline.py`) |
 
 ### Detail worth keeping
+
+- **58 — basketball quarter sim vectorised.** `_simulate_quarters_local` looped
+  over samples in Python and, *inside* that, over the four quarters, rebuilding a
+  2×2 covariance and running `np.linalg.cholesky` every iteration — ~20,000
+  decompositions per game of a matrix that depends only on the quarter. Hoisted
+  the covariance and its factor to once per quarter (4×) and replaced the scalar
+  `size=(2,)` draws with one `size=(n_draws, 2)` batch per quarter, using
+  `Z @ chol.T` for the batched form of `chol @ z`.
+  **Measured 215.0 ms → 2.9 ms per game (73×)** at 5,000 samples / 4 quarters.
+  - Hoisting the `try`/`except` from per-sample to per-quarter is equivalent
+    *because the covariance is sample-invariant*: cholesky either succeeds for
+    every sample of a quarter or fails for every one. That is the load-bearing
+    argument for the refactor; if a future change makes the covariance vary
+    within a quarter, this stops being safe.
+  - **Draw order changed**, so a given global RNG state no longer yields the same
+    numbers. Nothing depended on it: the function takes no `cfg` and no `rng`,
+    never seeds, and the only test that referenced it patched it out entirely.
+    Distributions verified equivalent against the pre-fix loop.
+  - The fallback path still draws *independent* normals with **no clamping at
+    zero**, unlike the correlated path which clamps. That asymmetry predates #58
+    and was deliberately left alone — it is a real inconsistency if anyone ever
+    hits it, but changing it would have been a behaviour change smuggled into a
+    performance fix.
+  - `tests/test_basketball_props_quarter_sim.py`, 9 tests. The four structural
+    guards were **validated against the pre-fix source: all four fail there and
+    pass on the fix**, so they are not vacuous. A distribution-only test would
+    have passed against the slow version, which is why the guards count
+    decompositions and draw shapes rather than checking moments.
+  - ⚠️ **CPU only.** The accumulators went from two 5,000-float Python lists to
+    two float64 arrays. Do not read this as progress on #59's memory question.
 
 - **64 — Make the candidate pool's last stage visible** (`a1638c39`).
   *Recorded retroactively 2026-07-26: this shipped on 2026-07-25 and was never
