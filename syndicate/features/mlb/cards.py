@@ -629,7 +629,9 @@ def _season_for_date(selected_date: str) -> int:
     try:
         return int(str(selected_date).split("-", 1)[0])
     except Exception:
-        return date.today().year
+        # central_today(), not date.today(): the process timezone would put this
+        # in the wrong YEAR for the five hours after 19:00 CT on 31 December.
+        return central_today().year
 
 
 def _panel_items_from_hr_targets(output: dict[str, Any], *, limit: int = 3) -> list[str]:

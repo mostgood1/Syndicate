@@ -10,6 +10,7 @@ from syndicate.features.mlb.sources import daily_top_props_path
 from syndicate.features.mlb.sources import default_mlb_source_root
 from syndicate.features.mlb.sources import load_json_file
 from syndicate.features.mlb.sources import live_lens_report_path
+from syndicate.features.shared.timezone import central_today_iso
 
 
 _DATE_TOKEN_RE = re.compile(r"(\d{4})_(\d{2})_(\d{2})")
@@ -73,7 +74,7 @@ def _top_prop_lane_counts(selected_date: str) -> dict[str, int]:
 
 def _cards_launch_date(archive_dates: list[str]) -> str:
     if not archive_dates:
-        return _latest_date("data/daily/daily_summary_*.json") or date.today().isoformat()
+        return _latest_date("data/daily/daily_summary_*.json") or central_today_iso()
 
     for selected_date in reversed(archive_dates):
         top_prop_counts = _top_prop_lane_counts(selected_date)
@@ -87,7 +88,7 @@ def _cards_launch_date(archive_dates: list[str]) -> str:
 
 def build_hub_context() -> dict[str, Any]:
     archive_dates = available_daily_summary_dates()
-    today_date = date.today().isoformat()
+    today_date = central_today_iso()
     latest_archive_date = archive_dates[-1] if archive_dates else (_latest_date("data/daily/daily_summary_*.json") or today_date)
     cards_date = _cards_launch_date(archive_dates)
     season = _season_from_date(cards_date)

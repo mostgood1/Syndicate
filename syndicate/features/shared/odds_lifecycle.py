@@ -14,6 +14,8 @@ from syndicate.features.shared.odds_control_plane import load_odds_history_paylo
 from syndicate.features.shared.odds_control_plane import odds_history_lookback_shard_keys
 from syndicate.features.shared.odds_control_plane import resolve_current_shard_key
 from syndicate.features.shared.refresh_state_store import data_root
+from syndicate.features.shared.timezone import central_today_iso
+from syndicate.features.shared.timezone import central_today
 
 
 _ODDS_HISTORY_SHARD_LOOKBACK_DEFAULT = 1
@@ -49,7 +51,7 @@ def _resolve_shard_key_for_candidate(candidate_row: Mapping[str, Any], *, sport:
         return resolve_current_shard_key(sport, candidate_date[:10])
     if end_date:
         return resolve_current_shard_key(sport, str(end_date)[:10])
-    return resolve_current_shard_key(sport, date.today().isoformat())
+    return resolve_current_shard_key(sport, central_today_iso())
 
 
 def _market_state_from_payload(payload: Mapping[str, Any] | None, *, market_id: str | None) -> Mapping[str, Any] | None:
@@ -220,7 +222,7 @@ def _load_jsonl_rows(path: Path) -> list[dict[str, Any]]:
 
 def load_recent_odds_events(*, days_back: int = 7, end_date: str | None = None, root: Path | None = None) -> list[dict[str, Any]]:
     lookback = max(int(days_back or 0), 1)
-    end_token = _parse_date_token(end_date) or date.today()
+    end_token = _parse_date_token(end_date) or central_today()
     odds_root = root or odds_lifecycle_root()
     rows: list[dict[str, Any]] = []
     for offset in range(lookback):

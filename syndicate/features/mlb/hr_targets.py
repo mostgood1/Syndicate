@@ -12,6 +12,7 @@ from syndicate.features.mlb.sources import daily_artifact_path
 from syndicate.features.mlb.sources import daily_snapshot_oddsapi_hitter_props_path
 from syndicate.features.mlb.sources import default_mlb_source_root
 from syndicate.features.mlb.sources import load_json_file
+from syndicate.features.shared.timezone import central_today
 
 
 def _statcast_features_path() -> Path:
@@ -38,7 +39,7 @@ def _parse_iso_date(value: str) -> date:
     try:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except Exception:
-        return date.today()
+        return central_today()
 
 
 def _format_pct(value: Any) -> str:

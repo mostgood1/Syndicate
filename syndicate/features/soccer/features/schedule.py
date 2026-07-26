@@ -19,6 +19,7 @@ from datetime import date
 from datetime import datetime
 from datetime import timedelta
 from typing import Any
+from syndicate.features.shared.timezone import central_today
 
 # MLS runs a single calendar-year season (Feb-Dec); the rest of the leagues
 # this pipeline covers run the European Aug-May calendar, labeled by the
@@ -35,7 +36,7 @@ def season_date_range(league: str, season: int) -> tuple[date, date]:
 
 
 def default_season(league: str, *, today: date | None = None) -> int:
-    today = today or date.today()
+    today = today or central_today()
     if str(league).strip().lower() in _CALENDAR_YEAR_LEAGUES:
         return today.year
     # European calendar: Jan-Jun belongs to the season that started the

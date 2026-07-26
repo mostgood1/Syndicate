@@ -72,13 +72,13 @@ def _iso_or_today(value: str | None) -> str:
     text = str(value or "").strip()
     if text:
         return text
-    return date.today().isoformat()
+    return central_today_iso()
 
 
 def _latest_available_cards_date() -> str:
     context = build_hub_context()
     launch_date = str(context.get("launch_date") or "").strip()
-    return launch_date or date.today().isoformat()
+    return launch_date or central_today_iso()
 
 
 def _query_bool(value: str | None, *, default: bool = False) -> bool:

@@ -151,7 +151,7 @@ def available_dates() -> list[str]:
 
 
 def default_date() -> str:
-    return date.today().isoformat()
+    return central_today_iso()
 
 
 def format_price(value: Any) -> str:

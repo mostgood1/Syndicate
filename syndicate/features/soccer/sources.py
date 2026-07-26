@@ -375,7 +375,17 @@ def default_week(league: str, season: int, *, reference_date: str | None = None)
     # every existing call site is unaffected. Confirmed 2026-07-24: without
     # this, requesting a future date that crosses a matchweek boundary
     # silently returned the WRONG week's games/props for soccer.
-    today = date_cls.today()
+    # central_today_iso(), NOT date_cls.today(). date.today() resolves against
+    # the PROCESS timezone, so it silently becomes UTC wherever TZ is not
+    # applied -- and after 19:00 CDT that is already tomorrow. This function
+    # then failed the containment check for the current matchweek and fell
+    # through to the "first week starting on or after today" branch below,
+    # which returns NEXT week. Live MLS games were being pinned a week ahead
+    # while they were in progress.
+    #
+    # This file already imports and uses central_today_iso() elsewhere; only
+    # this call site was left on the ambiguous form.
+    today = date_cls.fromisoformat(central_today_iso())
     if reference_date:
         try:
             today = date_cls.fromisoformat(str(reference_date)[:10])
