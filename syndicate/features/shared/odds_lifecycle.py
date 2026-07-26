@@ -267,6 +267,14 @@ def build_recent_market_history_index(events: Sequence[Mapping[str, Any]]) -> di
     return index
 
 
+# #75: caching this index was tried and reverted. It looked like the twin of
+# _JSONL_ROWS_CACHE -- build_recent_market_history_index runs once per game,
+# copies every event under up to nine aliases and sorts each bucket -- but
+# measured against production artifacts it bought nothing (identical peak) and
+# cost ~7MB of retained memory holding the index. _MAX_JSONL_ROWS_PER_FILE caps
+# this path at 2000 rows/day, so the whole 7-day set is ~14k events and
+# rebuilding it 15 times is noise. The uncapped path was the odds-history
+# shards; see the payload_cache threading in simulation_adapter.py.
 def _recent_history_rows(candidate: Mapping[str, Any], *, sport: str | None = None, lookback_days: int = 7, end_date: str | None = None) -> list[dict[str, Any]]:
     recent_events = load_recent_odds_events(days_back=lookback_days, end_date=end_date)
     if not recent_events:

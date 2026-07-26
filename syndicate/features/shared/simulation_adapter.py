@@ -151,7 +151,7 @@ def _advanced_context(game: dict[str, Any], context: dict[str, Any]) -> dict[str
     }
 
 
-def _normalize_game_context(game: dict[str, Any], *, context: dict[str, Any] | None = None, sport: str | None = None) -> dict[str, Any]:
+def _normalize_game_context(game: dict[str, Any], *, context: dict[str, Any] | None = None, sport: str | None = None, odds_payload_cache: dict[tuple[str, str], dict[str, Any] | None] | None = None) -> dict[str, Any]:
     page_context = _copy_mapping(context)
     sim = _copy_mapping(game.get("sim"))
     betting = _copy_mapping(game.get("betting"))
@@ -189,6 +189,11 @@ def _normalize_game_context(game: dict[str, Any], *, context: dict[str, Any] | N
             "",
         )
         or None,
+        # #75. Without this every game re-loads and re-parses the same odds
+        # history shards from disk: this function is called once per game, and
+        # build_simulation_engine_context_from_candidate below already threads a
+        # cache for exactly this reason. The omission here was the asymmetry.
+        payload_cache=odds_payload_cache,
     )
 
     engine_context = {
@@ -361,7 +366,8 @@ def build_unified_simulation_adapter(
             allow_stored_date_fallback=allow_stored_date_fallback,
         )
     )
-    normalized_games = [_normalize_game_context(game, context=context, sport=sport_key) for game in _coerce_list(context.get("games")) if isinstance(game, Mapping)]
+    odds_payload_cache: dict[tuple[str, str], dict[str, Any] | None] = {}
+    normalized_games = [_normalize_game_context(game, context=context, sport=sport_key, odds_payload_cache=odds_payload_cache) for game in _coerce_list(context.get("games")) if isinstance(game, Mapping)]
     selection_kind = _selection_kind(sport_key)
     resolved_selection = _safe_text(context.get("date") or context.get("requested_date") or selection, "")
 
@@ -402,9 +408,12 @@ def build_simulation_contract_from_context(
     # event under up to 9 aliases before sorting each bucket. If that is what
     # this is, memory climbs monotonically game by game here.
     source_games = [game for game in _coerce_list(normalized_context.get("games")) if isinstance(game, Mapping)]
+    odds_payload_cache: dict[tuple[str, str], dict[str, Any] | None] = {}
     normalized_games = []
     for index, game in enumerate(source_games):
-        normalized_games.append(_normalize_game_context(game, context=normalized_context, sport=sport_key))
+        normalized_games.append(
+            _normalize_game_context(game, context=normalized_context, sport=sport_key, odds_payload_cache=odds_payload_cache)
+        )
         _log_sim_contract_memory("game_normalized", sport=sport_key, game_index=index, game_total=len(source_games))
     resolved_selection = _safe_text(normalized_context.get("date") or normalized_context.get("requested_date") or selection_value, "")
 
