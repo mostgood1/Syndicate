@@ -86,6 +86,23 @@ from syndicate.features.intelligence_parlay_correlation import parlay_pair_penal
 from syndicate.features.intelligence_reasoning import build_analysis_brief as _runtime_build_analysis_brief
 from syndicate.features.correlation_engine import compute_correlation as _compute_candidate_correlation
 def _default_syndicate_sports() -> list[dict[str, Any]]:
+    # #47. This is NOT a cosmetic default -- it is the list the WORKER
+    # actually uses. _configured_syndicate_sports falls back here whenever
+    # current_app raises (no Flask app context), and the intelligence loop
+    # runs on refresh-worker outside any request context, so every candidate
+    # the curated board is built from comes from this list rather than from
+    # app.config["SYNDICATE_SPORTS"].
+    #
+    # Soccer was configured in syndicate/app.py all along and still never
+    # appeared in Layer 2. Production traces settle why: candidate generation
+    # ran for mlb, nba, wnba, nfl, ncaaf, ncaab, nhl -- this list, in this
+    # exact order. app.py's order is mlb, nba, nhl, nfl, wnba, ncaaf, ncaab,
+    # soccer, so the worker was provably taking the fallback.
+    #
+    # Keep this in sync with app.py's SYNDICATE_SPORTS slugs. A sport missing
+    # here is invisible to the board no matter what the web app is configured
+    # with, and it fails silently -- there is no error, the sport simply never
+    # generates candidates.
     return [
         {"slug": "mlb", "name": "MLB", "primary_href": "/mlb", "primary_label": "Open MLB cards"},
         {"slug": "nba", "name": "NBA", "primary_href": "/nba", "primary_label": "Open NBA cards"},
@@ -94,6 +111,7 @@ def _default_syndicate_sports() -> list[dict[str, Any]]:
         {"slug": "ncaaf", "name": "NCAAF", "primary_href": "/ncaaf", "primary_label": "Open NCAAF cards"},
         {"slug": "ncaab", "name": "NCAAB", "primary_href": "/ncaab", "primary_label": "Open NCAAB cards"},
         {"slug": "nhl", "name": "NHL", "primary_href": "/nhl", "primary_label": "Open NHL cards"},
+        {"slug": "soccer", "name": "Soccer", "primary_href": "/soccer", "primary_label": "Open Soccer cards"},
     ]
 
 def _configured_syndicate_sports() -> list[dict[str, Any]]:
@@ -2424,20 +2442,31 @@ def build_intelligence_overview(
         if isinstance(sport, dict)
     ]
     for sport_overview in overview:
-        if _safe_text(sport_overview.get("slug"), "").lower() == "wnba":
-            home_rails = sport_overview.get("home_rails") if isinstance(sport_overview.get("home_rails"), dict) else {}
-            pregame_items = home_rails.get("pregame", {}).get("items") if isinstance(home_rails.get("pregame"), dict) else []
-            live_items = home_rails.get("live", {}).get("items") if isinstance(home_rails.get("live"), dict) else []
-            dashboard_games = sport_overview.get("dashboard_games") if isinstance(sport_overview.get("dashboard_games"), list) else []
-            _intel_trace(
-                "overview_counts",
-                sport="wnba",
-                context_label=_safe_text(sport_overview.get("context_label"), effective_date),
-                pregame_count=len(pregame_items),
-                live_count=len(live_items),
-                dashboard_games_count=len(dashboard_games),
-                data_health=_safe_text(sport_overview.get("data_health"), "unknown"),
-            )
+        # Emitted for EVERY sport, not just WNBA. These four counts are the
+        # only view of what candidate generation is handed -- _collect_candidates
+        # reads dashboard_games and home_rails straight off these dicts, so a
+        # sport with zero here can never produce a candidate no matter what
+        # the downstream filters do.
+        #
+        # This was wnba-only, which actively misled a 2026-07-25 investigation
+        # into an almost-empty board: the single visible "dashboard_games_count:
+        # 0" line was WNBA's, on an All-Star day with one game, and was briefly
+        # read as evidence about MLB. Scoping diagnostics to one sport makes the
+        # other six look like whatever the instrumented one happens to be doing.
+        slug = _safe_text(sport_overview.get("slug"), "sport").lower()
+        home_rails = sport_overview.get("home_rails") if isinstance(sport_overview.get("home_rails"), dict) else {}
+        pregame_items = home_rails.get("pregame", {}).get("items") if isinstance(home_rails.get("pregame"), dict) else []
+        live_items = home_rails.get("live", {}).get("items") if isinstance(home_rails.get("live"), dict) else []
+        dashboard_games = sport_overview.get("dashboard_games") if isinstance(sport_overview.get("dashboard_games"), list) else []
+        _intel_trace(
+            "overview_counts",
+            sport=slug,
+            context_label=_safe_text(sport_overview.get("context_label"), effective_date),
+            pregame_count=len(pregame_items),
+            live_count=len(live_items),
+            dashboard_games_count=len(dashboard_games),
+            data_health=_safe_text(sport_overview.get("data_health"), "unknown"),
+        )
     return overview
 
 

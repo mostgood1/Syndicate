@@ -6206,3 +6206,119 @@ class RepoArtifactPathFallbackTests(unittest.TestCase):
                 result = _wnba_repo_artifact_path("live_snapshots", "live_pbp_stats_2026-07-23.jsonl")
 
         self.assertEqual(result.resolve(), plain_file.resolve())
+
+class OverviewCountsTraceCoverageTests(unittest.TestCase):
+    """The overview_counts trace is the only visibility into what candidate
+    generation is actually handed: _collect_candidates reads dashboard_games
+    and home_rails straight off these dicts, so a sport with zero here cannot
+    produce a candidate regardless of downstream filters.
+
+    It used to emit for WNBA only, which misled a 2026-07-25 investigation
+    into an almost-empty board -- the single visible "dashboard_games_count:
+    0" was WNBA's on a one-game All-Star day, and was briefly read as
+    evidence about MLB.
+    """
+
+    def test_emits_one_trace_per_configured_sport(self) -> None:
+        from syndicate.features import intelligence as intelligence_module
+
+        sports = [
+            {"slug": "mlb", "name": "MLB"},
+            {"slug": "wnba", "name": "WNBA"},
+            {"slug": "nhl", "name": "NHL"},
+        ]
+
+        def _fake_overview(sport, effective_date, **kwargs):
+            return {
+                "slug": sport["slug"],
+                "context_label": effective_date,
+                "data_health": "healthy",
+                "dashboard_games": [{"g": 1}] if sport["slug"] == "mlb" else [],
+                "home_rails": {"pregame": {"items": [{"p": 1}, {"p": 2}]}, "live": {"items": []}},
+            }
+
+        traced: list[dict] = []
+        with patch.object(intelligence_module, "_configured_syndicate_sports", return_value=sports), patch.object(
+            intelligence_module, "_build_sport_overview", side_effect=_fake_overview
+        ), patch.object(
+            intelligence_module, "_intel_trace", side_effect=lambda event, **kw: traced.append({"event": event, **kw})
+        ):
+            intelligence_module.build_intelligence_overview(selected_date="2026-07-25")
+
+        counts = [t for t in traced if t.get("event") == "overview_counts"]
+        self.assertEqual({t["sport"] for t in counts}, {"mlb", "wnba", "nhl"})
+
+    def test_reports_the_counts_candidate_generation_depends_on(self) -> None:
+        from syndicate.features import intelligence as intelligence_module
+
+        def _fake_overview(sport, effective_date, **kwargs):
+            return {
+                "slug": "mlb",
+                "context_label": effective_date,
+                "data_health": "healthy",
+                "dashboard_games": [{"g": 1}, {"g": 2}, {"g": 3}],
+                "home_rails": {"pregame": {"items": [{"p": 1}]}, "live": {"items": [{"l": 1}, {"l": 2}]}},
+            }
+
+        traced: list[dict] = []
+        with patch.object(intelligence_module, "_configured_syndicate_sports", return_value=[{"slug": "mlb"}]), patch.object(
+            intelligence_module, "_build_sport_overview", side_effect=_fake_overview
+        ), patch.object(
+            intelligence_module, "_intel_trace", side_effect=lambda event, **kw: traced.append({"event": event, **kw})
+        ):
+            intelligence_module.build_intelligence_overview(selected_date="2026-07-25")
+
+        row = next(t for t in traced if t.get("event") == "overview_counts")
+        self.assertEqual(row["dashboard_games_count"], 3)
+        self.assertEqual(row["pregame_count"], 1)
+        self.assertEqual(row["live_count"], 2)
+
+
+class DefaultSyndicateSportsTests(unittest.TestCase):
+    """#47. _default_syndicate_sports is not a cosmetic fallback -- it is the
+    list the WORKER uses. _configured_syndicate_sports falls back to it
+    whenever current_app raises, and the intelligence loop runs on
+    refresh-worker outside any Flask app context, so every candidate the
+    curated board is built from comes from here.
+
+    Soccer was configured in app.py all along and still never reached Layer 2.
+    Production traces settled it: candidate generation ran for mlb, nba, wnba,
+    nfl, ncaaf, ncaab, nhl -- the fallback list, in its exact order, not
+    app.py's different order.
+
+    A sport missing here is invisible to the board regardless of app config,
+    and it fails SILENTLY: no error, the sport just never generates
+    candidates. Hence this test.
+    """
+
+    def _app_config_slugs(self) -> set[str]:
+        import re
+        from pathlib import Path
+
+        source = Path(__file__).resolve().parent.parent.joinpath("syndicate", "app.py").read_text(encoding="utf-8")
+        start = source.index('app.config["SYNDICATE_SPORTS"] = [')
+        block = source[start : source.index("\n        ]", start)]
+        return set(re.findall(r'"slug":\s*"([a-z]+)"', block))
+
+    def test_worker_fallback_covers_every_configured_sport(self) -> None:
+        from syndicate.features.intelligence import _default_syndicate_sports
+
+        fallback = {sport["slug"] for sport in _default_syndicate_sports()}
+        missing = self._app_config_slugs() - fallback
+        self.assertEqual(
+            missing,
+            set(),
+            f"these sports are configured in app.py but invisible to the worker's candidate generation: {sorted(missing)}",
+        )
+
+    def test_soccer_is_present(self) -> None:
+        from syndicate.features.intelligence import _default_syndicate_sports
+
+        self.assertIn("soccer", {sport["slug"] for sport in _default_syndicate_sports()})
+
+    def test_every_entry_has_the_fields_the_overview_needs(self) -> None:
+        from syndicate.features.intelligence import _default_syndicate_sports
+
+        for sport in _default_syndicate_sports():
+            for field in ("slug", "name", "primary_href"):
+                self.assertTrue(str(sport.get(field) or "").strip(), f"{sport.get('slug')} missing {field}")
