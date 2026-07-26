@@ -36,6 +36,7 @@ work takes the next free number (see the counter at the top of `todo.md`).
 | **50** | Artifact-export ceiling |
 | **54** | Quota store made O(1) |
 | **55** | Sim ↔ board-build alternation, **both** directions |
+| **29** | Cross-type duplicate candidates — every pick rendered twice |
 | **58** | Basketball quarter sim vectorised — 215ms → 2.9ms/game (73×) |
 | **57** | Board build stays on refresh-worker, upgraded to pro/4GB |
 | **60** | Keyvalue payload ceiling — oversized writes fail loudly |
@@ -45,6 +46,32 @@ work takes the next free number (see the counter at the top of `todo.md`).
 | — | Central-date sweep, 14 call sites + ratchet test (`tests/test_slate_date_timezone_discipline.py`) |
 
 ### Detail worth keeping
+
+- **29 — cross-type duplicate candidates.** Every pick reached the board twice:
+  once as the full candidate (~100 keys, `recommendation_id`, confidence as a
+  `"38%"` string) and once as a reduced blotter/ranked row (~35 keys, no
+  `recommendation_id`, no `line`, confidence as `38.0`).
+  `_recommendation_sources` concatenates several response keys, so both landed
+  in one list. **Two independent defects, and fixing either alone changed
+  nothing** — which is why this survived so long:
+  - The dedup key joined id/name/market parts with `if part`, dropping empty
+    components instead of holding position, so the two shapes produced keys of
+    different *arity* (`"<recid>|over 0.5|hitter home runs"` vs
+    `"over 0.5|hitter home runs"`) and could never collide.
+  - `_recommendation_sources` had two early returns handing back the raw list,
+    skipping the dedup entirely whenever an upstream key was already populated
+    — the common case.
+  - **The generalisable rule: a field only ONE representation carries is
+    unusable as a hard key component.** True of `recommendation_id`, and
+    equally true of `line` — an intermediate fix that put `line` in the tuple
+    failed identically (`'0.5'` vs `''`). `line` is now a wildcard: missing on
+    either side still matches, two different lines still stay distinct.
+  - The same broken key existed in **two copies** (`intelligence_board.py` and
+    `pipeline/intelligence_state.py`); both now call one shared
+    `dedupe_recommendation_items`, so they cannot drift apart again.
+  - `tests/test_intelligence_board_dedupe.py`, 14 tests. Validated against both
+    the original key and the intermediate line-in-tuple attempt: both return 2
+    where the fix returns 1, so the guards are not vacuous.
 
 - **58 — basketball quarter sim vectorised.** `_simulate_quarters_local` looped
   over samples in Python and, *inside* that, over the four quarters, rebuilding a

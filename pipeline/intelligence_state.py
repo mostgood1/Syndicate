@@ -32,6 +32,7 @@ from syndicate.features.intelligence import _query_preferences
 from syndicate.features.intelligence import rank_global_recommendations
 from syndicate.features.intelligence import _shard_key_from_context_label
 from syndicate.features.intelligence_board import build_intelligence_board_contract
+from syndicate.features.intelligence_board import dedupe_recommendation_items
 from syndicate.features.intelligence.signals.normalization import _numeric_hint
 from syndicate.features.intelligence.signals.normalization import _safe_text
 from syndicate.features.shared.market_id import attach_market_id
@@ -622,26 +623,13 @@ def _board_contract_cards(state: dict[str, Any] | None) -> list[dict[str, Any]]:
     if not sources:
         _collect(current.get("boardContract") if isinstance(current.get("boardContract"), Mapping) else None)
 
-    deduped: list[dict[str, Any]] = []
-    seen_keys: set[str] = set()
-    for item in sources:
-        key = "|".join(
-            part
-            for part in (
-                str(item.get("recommendation_id") or "").strip().lower(),
-                str(item.get("candidate_id") or "").strip().lower(),
-                str(item.get("prediction_id") or "").strip().lower(),
-                str(item.get("name") or item.get("player_name") or item.get("selection") or item.get("pick") or "").strip().lower(),
-                str(item.get("market") or item.get("market_key") or "").strip().lower(),
-            )
-            if part
-        )
-        if key and key in seen_keys:
-            continue
-        if key:
-            seen_keys.add(key)
-        deduped.append(dict(item))
-    return deduped
+    # #29. This had its own copy of the same broken dedup key as
+    # intelligence_board._recommendation_sources -- id/name/market parts joined
+    # with `if part`, so empty components collapsed the key instead of holding
+    # position and the full candidate (carries recommendation_id) could never
+    # match the reduced blotter row (does not). One shared implementation now,
+    # so the two cannot drift apart again.
+    return [dict(item) for item in dedupe_recommendation_items(sources)]
 
 
 def _promote_board_contract_cards(state: dict[str, Any] | None) -> dict[str, Any]:

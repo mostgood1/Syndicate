@@ -176,7 +176,6 @@ were resolved and nine already-closed rows removed from the open tables.
 | **53** | **Prop ladder odds for all sports** (split out of #16). No `*_alternate` player market is fetched in any sport, so `_finalize_prop_market`'s `alternates` array is always empty and MLB's ladder surfaces have no book prices to compare the sim against. See #16 for the cost model and why this should ride #15's cadence tiering rather than get its own scheduler. |
 | **24** | Look-ahead interval violations (~28min instead of 60). |
 | **12** | Phase 4: smaller per-sport artifacts. |
-| **29** | Cross-type duplicate candidates. |
 | **30** | WNBA schedule-bootstrap cost. |
 
 ## OddsAPI budget (after #14/#15)

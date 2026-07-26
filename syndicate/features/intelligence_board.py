@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 import re
 
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from syndicate.features.shared.intelligence_evaluation import build_feature_coverage_profile
 
@@ -232,23 +232,112 @@ def _recommendation_card(item: Mapping[str, Any]) -> dict[str, Any]:
     return card
 
 
+def _dedupe_line_token(value: Any) -> str:
+    if value in (None, "", "-"):
+        return ""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return str(value).strip().lower()
+    return str(int(number)) if number.is_integer() else str(number)
+
+
+def dedupe_recommendation_items(items: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    """Collapse the same underlying pick arriving in different shapes (#29).
+
+    A pick reaches the board twice: as the full candidate (~100 keys, carries
+    recommendation_id, confidence as a "38%" string) and as a reduced
+    blotter/ranked row (~35 keys, no recommendation_id, confidence as 38.0).
+    `_recommendation_sources` concatenates several response keys, so both land
+    in one list and the board rendered each pick twice.
+
+    The previous key joined id/name/market parts with `if part`, which DROPPED
+    empty components instead of holding their position -- so the two shapes
+    produced keys of different arity ("<recid>|over 0.5|hitter home runs" vs
+    "over 0.5|hitter home runs") and could never collide however obviously
+    identical the pick was. Keying on identifiers that only ONE representation
+    carries cannot dedupe across representations. The same broken key existed
+    in a second copy in pipeline/intelligence_state.py; both now call this.
+
+    Two passes, both needed:
+      1. An explicit id match is authoritative when both sides carry one.
+      2. Otherwise the semantic identity every shape can express.
+
+    `line` is handled separately and deliberately, because putting it in the
+    tuple reproduces the original bug one field over: the reduced row often has
+    no line, so the tuples differed only by '0.5' vs '', and nothing matched.
+    Any field only one representation carries is unusable as a hard key
+    component. So the core identity excludes the line, and the line is compared
+    as a wildcard: a missing line on either side still matches, while two
+    genuinely different lines on the same player+market+selection stay distinct.
+    The core mirrors the identity used by collect_candidates and
+    _drop_entityless_prop_duplicates in syndicate/features/intelligence.py, so
+    they agree on what "the same pick" means, and selection is included so Over
+    and Under never collapse into each other.
+    """
+    deduped: list[Mapping[str, Any]] = []
+    seen_ids: set[str] = set()
+    seen_lines_by_core: dict[tuple[str, ...], set[str]] = {}
+    for item in items:
+        if not isinstance(item, Mapping):
+            continue
+        explicit_ids = [
+            value
+            for value in (
+                _safe_text(item.get("recommendation_id"), default="").strip().lower(),
+                _safe_text(item.get("candidate_id"), default="").strip().lower(),
+                _safe_text(item.get("prediction_id"), default="").strip().lower(),
+            )
+            if value
+        ]
+        if any(value in seen_ids for value in explicit_ids):
+            continue
+
+        selection = _safe_text(item.get("selection"), item.get("pick"), default="").strip().lower()
+        core = (
+            _safe_text(item.get("sport_slug"), item.get("sport"), default="").strip().lower(),
+            _safe_text(item.get("matchup"), default="").strip().lower(),
+            _safe_text(item.get("market"), item.get("market_label"), item.get("market_key"), default="").strip().lower(),
+            _safe_text(item.get("player_name"), item.get("name"), default=selection).strip().lower(),
+            selection,
+        )
+        line_token = _dedupe_line_token(item.get("line"))
+        if any(core):
+            seen_line_tokens = seen_lines_by_core.get(core)
+            if seen_line_tokens is not None and (
+                not line_token or "" in seen_line_tokens or line_token in seen_line_tokens
+            ):
+                continue
+            seen_lines_by_core.setdefault(core, set()).add(line_token)
+
+        seen_ids.update(explicit_ids)
+        deduped.append(item)
+    return deduped
+
+
 def _recommendation_sources(payload: Mapping[str, Any] | None) -> list[Mapping[str, Any]]:
     current = _copy_mapping(payload)
     sources: list[Mapping[str, Any]] = []
 
+    # Both early returns used to hand back `sources` raw, skipping the dedup at
+    # the bottom of this function entirely -- so whenever an upstream key was
+    # already populated (the common case: response["recommendations"] carrying
+    # both the full candidates and the reduced blotter rows), every duplicate
+    # went straight through no matter how the dedup key was written. Fixing the
+    # key alone did nothing until these returns went through it too (#29).
     board = current.get("board") if isinstance(current.get("board"), Mapping) else None
     if isinstance(board, Mapping):
         top_overall = board.get("top_overall")
         if isinstance(top_overall, list):
             sources.extend(item for item in top_overall if isinstance(item, Mapping))
         if sources:
-            return sources
+            return dedupe_recommendation_items(sources)
 
     direct_recommendations = current.get("recommendations")
     if isinstance(direct_recommendations, list):
         sources.extend(item for item in direct_recommendations if isinstance(item, Mapping))
         if sources:
-            return sources
+            return dedupe_recommendation_items(sources)
 
     response = current.get("response") if isinstance(current.get("response"), Mapping) else None
     if isinstance(response, Mapping):
@@ -269,26 +358,7 @@ def _recommendation_sources(payload: Mapping[str, Any] | None) -> list[Mapping[s
     if isinstance(top_opportunities, list):
         sources.extend(item for item in top_opportunities if isinstance(item, Mapping))
 
-    deduped: list[Mapping[str, Any]] = []
-    seen_keys: set[str] = set()
-    for item in sources:
-        key = "|".join(
-            part
-            for part in (
-                _safe_text(item.get("recommendation_id"), default=""),
-                _safe_text(item.get("candidate_id"), default=""),
-                _safe_text(item.get("prediction_id"), default=""),
-                _safe_text(item.get("name"), item.get("player_name"), item.get("selection"), default=""),
-                _safe_text(item.get("market"), item.get("market_label"), default=""),
-            )
-            if part
-        )
-        if key and key in seen_keys:
-            continue
-        if key:
-            seen_keys.add(key)
-        deduped.append(item)
-    return deduped
+    return dedupe_recommendation_items(sources)
 
 
 def build_intelligence_board_contract(response: Mapping[str, Any] | None) -> dict[str, Any]:
