@@ -3690,3 +3690,48 @@ class EmptyOverGoodBoardGuardTests(unittest.TestCase):
             "state_last_updated": intelligence_state_module._utc_now(),
         }
         self.assertFalse(self._guard(existing))
+
+
+class UnbuildablePayloadSkippedAtPointOfUseTests(unittest.TestCase):
+    """The #65 eviction shipped and then never fired once in production.
+
+    Cause: the eviction sweep lives inside `if not self._pending_keys`, so it
+    only runs when the queue is EMPTY. Production is never empty -- observed
+    pending_keys=3, watched_payloads=4 -- so the tomorrow-dated payload was
+    popped straight past the sweep meant to remove it and built anyway.
+    A queue-maintenance guard cannot protect a queue that always has a backlog;
+    the check has to sit at the point of use.
+    """
+
+    def test_eviction_sweep_is_gated_on_an_empty_queue(self) -> None:
+        # Documents WHY the point-of-use check is needed. If this ever stops
+        # being true the second guard is redundant rather than load-bearing.
+        import inspect
+
+        source = inspect.getsource(intelligence_state_module.IntelligenceStateService._background_loop)
+        sweep_index = source.index("if not self._pending_keys:")
+        evict_index = source.index("evictable_keys")
+        self.assertLess(sweep_index, evict_index, "eviction sweep is no longer inside the empty-queue branch")
+
+    def test_point_of_use_check_runs_regardless_of_backlog(self) -> None:
+        # The popped payload is checked directly, so a backlog cannot bypass it.
+        import inspect
+
+        source = inspect.getsource(intelligence_state_module.IntelligenceStateService._background_loop)
+        pop_index = source.index("self._pending_keys.popitem(last=False)")
+        guard_index = source.index("SKIPPED_UNBUILDABLE_PAYLOAD")
+        self.assertLess(pop_index, guard_index, "unbuildable check must come after the pop")
+        # And it must drop from both maps, or _sync_persisted_queue_locked
+        # re-reads the payload next iteration and this becomes a hot loop.
+        guard_block = source[guard_index : guard_index + 700]
+        self.assertIn("self._watched_payloads.pop", guard_block)
+        self.assertIn("self._pending_keys.pop", guard_block)
+        self.assertIn("self._persist_locked()", guard_block)
+
+    def test_future_and_stale_payloads_are_both_unbuildable(self) -> None:
+        os.environ.pop("SYNDICATE_LOOK_AHEAD_ENABLED", None)
+        self.addCleanup(lambda: os.environ.pop("SYNDICATE_LOOK_AHEAD_ENABLED", None))
+        reason = intelligence_state_module._watched_payload_eviction_reason
+        self.assertIsNotNone(reason({"question": "q", "date": "2026-07-26"}, "2026-07-25"))
+        self.assertIsNotNone(reason({"question": "q", "date": "2026-07-24"}, "2026-07-25"))
+        self.assertIsNone(reason({"question": "q", "date": "2026-07-25"}, "2026-07-25"))

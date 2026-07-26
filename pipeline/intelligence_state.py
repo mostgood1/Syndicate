@@ -2506,6 +2506,29 @@ class IntelligenceStateService:
                     continue
             if payload_to_process is None:
                 continue
+            # Checked at the point of USE, not only during queue maintenance.
+            # The eviction sweep above sits inside `if not self._pending_keys`,
+            # so it only runs when the queue is EMPTY -- and production is
+            # never empty (observed pending_keys=3, watched_payloads=4). That
+            # is why the #65 future-date eviction shipped and then never fired
+            # once: the payload was popped straight past the sweep that was
+            # supposed to remove it. Guarding here cannot be bypassed by a
+            # backlog.
+            unbuildable = _watched_payload_eviction_reason(payload_to_process, central_today_iso())
+            if unbuildable is not None:
+                key = _payload_key(payload_to_process)
+                print(f"[intelligence_state] SKIPPED_UNBUILDABLE_PAYLOAD reason={unbuildable} key={key}", flush=True)
+                with self._condition:
+                    # Drop it from BOTH maps, or _sync_persisted_queue_locked
+                    # re-reads it from the shared store next iteration and this
+                    # becomes a hot loop that never computes anything.
+                    self._watched_payloads.pop(key, None)
+                    self._pending_keys.pop(key, None)
+                    self._snapshots.pop(key, None)
+                    if self._latest_key == key:
+                        self._latest_key = None
+                    self._persist_locked()
+                continue
             guard_acquired = False
             run_failed = False
             run_started_at = time.time()
