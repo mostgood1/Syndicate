@@ -468,6 +468,15 @@ class OpsRefreshApiTests(unittest.TestCase):
                 json.dumps({"date": "2026-05-22", "trace": {"inputFingerprintCount": 3, "artifactPathCount": 2}}),
                 encoding="utf-8",
             )
+            # This test asserts simulation_contract_exists is True but never
+            # wrote the file, so it could only ever fail. The other daily_update
+            # artifacts it checks are all seeded above; this one was simply
+            # missed, and the assertion is legitimate -- load_latest_refresh_status
+            # does read it from the env-configured reports root.
+            (daily_latest / "unified_daily_update_latest_simulation_contract.json").write_text(
+                json.dumps({"date": "2026-05-22", "scope": "daily_update", "simulatedSports": ["mlb"]}),
+                encoding="utf-8",
+            )
             (mirror_manifest_dir / "mirror_refresh_latest.json").write_text(
                 json.dumps({"sport": "mlb", "date": "2026-05-22", "copiedArtifactCount": 3}),
                 encoding="utf-8",

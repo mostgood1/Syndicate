@@ -1427,6 +1427,21 @@ def _compact_step_result_view(step_result: dict[str, Any] | None) -> dict[str, A
         "started_at": step_result.get("started_at"),
         "finished_at": step_result.get("finished_at"),
     }
+    # command/cwd are kept despite this being the "compact" view. Dropping them
+    # left build_refresh_plan -- whose entire purpose is to report what WOULD
+    # run -- describing steps by name only, and made 22 tests in
+    # tests/test_ops.py fail against a contract the code had quietly stopped
+    # honouring. They also cost almost nothing here: the bulky fields
+    # (stdout/stderr) are already blanked by the caller above, so a command
+    # list is a few hundred bytes against payloads this exists to keep small.
+    #
+    # Operationally this is the field you want first when a refresh
+    # misbehaves -- which sport ran which script with which flags -- and
+    # recovering it otherwise means grepping worker logs for STEP_START.
+    if step_result.get("command"):
+        compact["command"] = list(step_result.get("command") or [])
+    if step_result.get("cwd"):
+        compact["cwd"] = step_result.get("cwd")
     if not bool(step_result.get("ok")):
         stderr_tail = step_result.get("stderr_tail")
         if not (isinstance(stderr_tail, str) and stderr_tail.strip()):

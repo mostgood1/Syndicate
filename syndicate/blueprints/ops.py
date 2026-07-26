@@ -1104,6 +1104,20 @@ def api_ops_odds_refresh_run() -> Any:
 @ops_bp.post("/api/ops/full-refresh/run")
 def api_ops_full_refresh_run() -> Any:
     payload = _request_data()
+    # Default to manifest_only, and only here. A full refresh is the heaviest
+    # thing this API can start, and without an explicit launch_mode it falls
+    # through to SYNDICATE_REFRESH_LAUNCH_MODE, which render.yaml sets to
+    # detached_subprocess on the WEB service -- so a POST here would spawn the
+    # whole refresh tree inside the request-serving container. That breaks the
+    # load-bearing rule in CLAUDE.md (the web service does no heavy
+    # computation, workers write artifacts and web reads them), and it is the
+    # same starvation that produced #56's health-check kills on 2026-07-25.
+    #
+    # manifest_only records the intent for a worker to execute, which is what
+    # the ops trigger is for. An explicit launch_mode in the request still
+    # wins, so a worker calling this can still run it directly.
+    payload = dict(payload or {})
+    payload.setdefault("launch_mode", "manifest_only")
     try:
         job_id, job = _start_refresh_job(payload, mode="full")
     except ValueError as exc:
