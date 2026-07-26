@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections import deque
 from datetime import date
 from datetime import datetime
 from datetime import timedelta
@@ -193,10 +194,21 @@ def odds_lifecycle_path(date_str: str) -> Path:
 # load_recent_odds_events queries at most a handful of distinct date files per
 # call (days_back defaults to 7); this process has been up for days at a time
 # in production, so without a bound this cache would itself become another
-# unbounded, ever-growing structure -- exactly the failure mode being fixed
-# here. Once full, drop the whole cache rather than tracking real LRU: a miss
-# just means one full re-read of a file already capped to
-# _MAX_JSONL_ROWS_PER_FILE, not the unbounded read this cache exists to avoid.
+# unbounded, ever-growing structure. Once full, drop the whole cache rather
+# than tracking real LRU.
+#
+# #75: the sentence that used to end this comment -- "a miss just means one
+# full re-read of a file already capped to _MAX_JSONL_ROWS_PER_FILE" -- was
+# FALSE, and believing it is most of why the refresh-worker OOM stayed open for
+# a day. The cap was applied to the *result*, after read_text() had already
+# pulled the whole file into a string, splitlines() had built a list of every
+# line, and json.loads had parsed every one of them. The cap bounded what the
+# caller got, never what the read cost.
+#
+# It matters most exactly when it hurts most: on a live slate the odds refresh
+# appends to today's file continuously, so the mtime below changes constantly,
+# every lookup misses, and the full re-read happens again -- once per game, per
+# board build. The read is now streamed and bounded to the same last-N rows.
 _JSONL_ROWS_CACHE_MAX_ENTRIES = 32
 _JSONL_ROWS_CACHE: dict[str, tuple[float, list[dict[str, Any]]]] = {}
 
@@ -213,19 +225,27 @@ def _load_jsonl_rows(path: Path) -> list[dict[str, Any]]:
         cached = _JSONL_ROWS_CACHE.get(cache_key)
         if cached is not None and cached[0] == mtime:
             return cached[1]
-    rows: list[dict[str, Any]] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            payload = json.loads(line)
-        except Exception:
-            continue
-        if isinstance(payload, dict):
-            rows.append(payload)
-    if len(rows) > _MAX_JSONL_ROWS_PER_FILE:
-        rows = rows[-_MAX_JSONL_ROWS_PER_FILE:]
+    try:
+        size_bytes = path.stat().st_size
+    except Exception:
+        size_bytes = -1
+    if size_bytes > 8_000_000:
+        print(f"ODDS_JSONL_LARGE path={path} bytes={size_bytes}", flush=True)
+    # deque(maxlen=...) keeps the last N parsed rows with the same semantics as
+    # the old rows[-N:] slice, but never holds more than N at once.
+    bounded: deque[dict[str, Any]] = deque(maxlen=_MAX_JSONL_ROWS_PER_FILE)
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except Exception:
+                continue
+            if isinstance(payload, dict):
+                bounded.append(payload)
+    rows = list(bounded)
     if mtime is not None:
         # This file only changes when the odds-refresh subprocess appends new
         # lifecycle events -- read-only callers (live lens snapshot building,
