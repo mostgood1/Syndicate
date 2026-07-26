@@ -4165,6 +4165,40 @@ def _is_game_level_market(market_text: Any) -> bool:
 
 def _game_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
     dashboard_games = sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []
+    # #68. The worker generated ONE candidate for all of MLB on 2026-07-26
+    # while the identical function run over production's own /mlb/api/cards
+    # payload produced 38 -- 22 from a single live game, all priced and edged
+    # ("OVER Bryce Eldridge, Hitter Hits, odds 280, edge 39.2%"). Same code,
+    # so the worker's dashboard_games must be arriving without the market
+    # blocks _game_bet_candidates_from_game reads. Which one is missing cannot
+    # be established from outside the worker: web and the worker read separate
+    # Render disks, and every artifact_status trace on that path reports the
+    # sim/live-lens artifacts rather than the per-game market payload.
+    #
+    # Bounded deliberately -- two games per sport, presence and size only, no
+    # payload contents -- because the last round of per-game diagnostics on
+    # this path buried the INTEL_TRACE rows it was meant to support.
+    for game in dashboard_games[:2]:
+        if not isinstance(game, dict):
+            continue
+        _intel_trace(
+            "game_candidate_inputs",
+            sport=_safe_text(sport.get("slug"), "sport").lower(),
+            game_state=_safe_text(game.get("game_state"), ""),
+            is_live=bool(game.get("is_live")),
+            blocks={
+                key: (len(value) if isinstance(value, (list, dict)) else 0)
+                for key, value in (
+                    ("game_market_recommendations", game.get("game_market_recommendations")),
+                    ("gameMarkets", game.get("gameMarkets")),
+                    ("betting", game.get("betting")),
+                    ("gameLens", game.get("gameLens")),
+                    ("markets", game.get("markets")),
+                    ("shared_top_play_rows", game.get("shared_top_play_rows")),
+                    ("shared_prop_rows", game.get("shared_prop_rows")),
+                )
+            },
+        )
     candidates: list[dict[str, Any]] = []
     for game in dashboard_games:
         if not isinstance(game, dict):
@@ -4906,6 +4940,36 @@ def _candidate_has_usable_projection(candidate: dict[str, Any]) -> bool:
     return False
 
 
+def _candidate_value_is_present(value: Any) -> bool:
+    """Whether a normalized candidate field actually carries a value.
+
+    #68. This existed as `value is not None and _safe_text(value, "") not in
+    {"", "-"}`, and `_safe_text` is truthiness-based (`str(value or "")`), so
+    **numeric zero read as missing**: `_safe_text(0.0, "")` is `""`. A
+    candidate whose projection is 0.0 was therefore rejected as
+    `missing_projection_or_odds`.
+
+    That is not hypothetical. A live game-level candidate with no explicit
+    live_projection gets `_game_current_combined_score(game)` instead
+    ([home.py](../../blueprints/home.py) `_append_game_bet_candidate`), which
+    is **0 for every scoreless live game** -- and normalize_candidate takes the
+    first *present* field in its scan order, so that 0 also shadows any real
+    model_probability/fair_probability/edge further down the list. Measured
+    against production 2026-07-26: all 32 live MLS game candidates were pruned
+    this way, and `_candidate_has_usable_projection` -- the predicate three
+    functions up, which does the isinstance check correctly -- returned True
+    for every one of them. Two predicates for one question, disagreeing.
+
+    Keeps rejecting None, "" and "-", so a genuinely absent field is still
+    absent.
+    """
+    if value is None or isinstance(value, bool):
+        return False
+    if isinstance(value, (int, float)):
+        return True
+    return _safe_text(value, "") not in {"", "-"}
+
+
 def _classify_candidate_with_reason(candidate: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
     # Single source of truth for candidate validity: classify_candidate() and
     # _candidate_classification_removal_reason() used to be two independently
@@ -4917,8 +4981,8 @@ def _classify_candidate_with_reason(candidate: dict[str, Any]) -> tuple[dict[str
         return None, "missing_selection"
     if not _safe_text(normalized.get("type"), ""):
         return None, "missing_type"
-    has_projection = normalized.get("projection") is not None and _safe_text(normalized.get("projection"), "") not in {"", "-"}
-    has_odds = normalized.get("odds") is not None and _safe_text(normalized.get("odds"), "") not in {"", "-"}
+    has_projection = _candidate_value_is_present(normalized.get("projection"))
+    has_odds = _candidate_value_is_present(normalized.get("odds"))
     if not (has_projection or has_odds):
         return None, "missing_projection_or_odds"
     source_strength = _numeric_hint(normalized.get("source_strength"))

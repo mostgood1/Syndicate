@@ -56,9 +56,14 @@ were resolved and nine already-closed rows removed from the open tables.
 
 ## Do first
 
+> **START HERE: #68**, in "In progress" below. It was answered on a live slate
+> 2026-07-26T21:29Z and the remaining question is field-level and small. #78 —
+> which used to be the start-here item — is **withdrawn**; the row is kept
+> because the correction in it is what stops the next session repeating it.
+
 | # | Item | Notes |
 |---|---|---|
-| **78** | 🔴 **START HERE. The board builds TOMORROW's date on every cycle, which is why it is empty.** Observed 2026-07-26T21:17Z — **16:17 Central, mid-afternoon** — every `overview_counts` in the cycle, including the cheap fingerprint pass, logged `context_label: "2026-07-27"`. Not the end-of-day rollover probe (that was my earlier misread, see #68): the selected date itself is tomorrow, on every cycle. Downstream follows cleanly and is NOT independently broken — tomorrow has a schedule (17 games, 8 pregame) but no odds and no sim artifacts, so `classification_pruned: 40 {"missing_projection_or_odds": 40}` → `candidate_count=0` → nothing publishes → the stale placeholder board survives. **So the empty board is a date-selection defect, not a candidate-generation one.** #65 is directly implicated: it added a guard to refuse future-dated payloads for exactly this reason ("tomorrow has a schedule but no odds and no sim artifacts yet… it is the reason the board served nothing all evening"), and that guard is not firing here. The queued payload key stayed `c34bbdc455597af0…` throughout, so this looks like one persistently-queued future-dated payload the eviction is not catching. **Next:** trace where the selected date resolves to 2026-07-27 at 16:17 CT, and why `_is_stale_or_future_payload` does not evict that payload. ⚠️ **Read `context_label` on the same cycle before drawing ANY conclusion from a candidate trace** — a prune reading is meaningless without it, which is the mistake that cost a full cycle of investigation today. |
+| **78** | ⚠️ **WITHDRAWN 2026-07-26T21:35Z — NOT a date-selection defect. The date selection is correct.** Traced end-to-end on refresh-worker (`dc9fbe81`) across two consecutive cycles, 21:23:26Z and 21:29:50Z — 16:23 and 16:29 Central, a live slate. **Each cycle builds TODAY first, and only then probes tomorrow**, exactly as `_compute_board_publication_response`'s rollover is written: <br><br>`overview_counts context_label 2026-07-26` (mlb dashboard_games 3 / pregame 1; soccer 17 / pregame 8) → per-sport generation `mlb 1 {prop:1}`, `soccer 40 {game:8, prop:32}`, every other sport 0 → **41** → `post_odds_enrichment 41` → `post_state_filter 41` → `post_requested_market_filter 41` → `post_dedupe_and_classify {classification_pruned: 41, classification_reasons: {"missing_projection_or_odds": 41}, dedupe_pruned: 0, total_candidates: 0}` → `CANDIDATE_POOL_READY count=0`. *Then* `_source_state_fingerprint(2026-07-27)`, `artifact_status` for 2026-07-27, and a second pool build for 2026-07-27 → 40 → all pruned → 0. `rollover_count (0) > candidate_pool_count (0)` is false, **so the rollover does not commit** — and `/api/intelligence/status` confirms it: `selected_date: "2026-07-26"`, i.e. today. <br><br>**Where the misreading came from, and the fix for it:** the tomorrow-dated traces are the *second* half of every cycle and there are more of them, so a tail of the logs shows only those. #65 already said this ("`2026-07-26` traces at 21:00 CT are normal — do not chase them"), and this is the **second** time that warning was read and the trap fell for anyway. Checking `context_label` is not sufficient, because the rollover probe emits its own `context_label`. **The only reliable discriminator is ordering: the FIRST `overview_counts` burst of a cycle is today; everything after `CANDIDATE_POOL_READY` is the probe.** That is far too subtle to keep relying on — `CANDIDATE_POOL_READY` does not print the date, and the rollover decision is `logger.info("BETTING_BOARD_PUBLISH_DATE")` only, which per #37 never reaches Render. **A one-line `print` naming requested date / selected date / rollover-committed would have ended both investigations in one read; it is the highest-value thing to ship on this path.** <br><br>The real defect is #68, unchanged and now answered on a live slate — see there. <br><br>*Original filing, kept because the downstream numbers in it are accurate:* Observed 2026-07-26T21:17Z — **16:17 Central, mid-afternoon** — every `overview_counts` in the cycle, including the cheap fingerprint pass, logged `context_label: "2026-07-27"`. Not the end-of-day rollover probe (that was my earlier misread, see #68): the selected date itself is tomorrow, on every cycle. Downstream follows cleanly and is NOT independently broken — tomorrow has a schedule (17 games, 8 pregame) but no odds and no sim artifacts, so `classification_pruned: 40 {"missing_projection_or_odds": 40}` → `candidate_count=0` → nothing publishes → the stale placeholder board survives. **So the empty board is a date-selection defect, not a candidate-generation one.** #65 is directly implicated: it added a guard to refuse future-dated payloads for exactly this reason ("tomorrow has a schedule but no odds and no sim artifacts yet… it is the reason the board served nothing all evening"), and that guard is not firing here. The queued payload key stayed `c34bbdc455597af0…` throughout, so this looks like one persistently-queued future-dated payload the eviction is not catching. **Next:** trace where the selected date resolves to 2026-07-27 at 16:17 CT, and why `_is_stale_or_future_payload` does not evict that payload. ⚠️ **Read `context_label` on the same cycle before drawing ANY conclusion from a candidate trace** — a prune reading is meaningless without it, which is the mistake that cost a full cycle of investigation today. |
 | **25** | Phase 0 fail-closed refresh guard + atomic writes | **Phase 0 shipped** — see Done. Remaining: the look-ahead's own interval marker (#24) has not been audited for the same fail-open pattern, and several non-artifact writers still use the unsafe collision-prone temp shape. **Enumerated 2026-07-26 — it is six files, not the three previously listed, and the `backtest_*` scripts are NOT among them** (that entry was wrong): [fetch_soccer_history_local.py:44](scripts/fetch_soccer_history_local.py:44), [fetch_soccer_oddsapi_odds_local.py:82](scripts/fetch_soccer_oddsapi_odds_local.py:82), [fetch_soccer_oddsapi_props_local.py:105](scripts/fetch_soccer_oddsapi_props_local.py:105), [fetch_nfl_oddsapi_props_local.py:74](scripts/fetch_nfl_oddsapi_props_local.py:74), [fetch_mlb_oddsapi_local.py:72](scripts/fetch_mlb_oddsapi_local.py:72), [refresh_ncaaf_oddsapi.py:529](scripts/refresh_ncaaf_oddsapi.py:529). All use `path.with_suffix(path.suffix + ".tmp")`, so two concurrent writers of the same file collide on one temp path. `atomic_artifact_write.py` already exists; this is mechanical. |
 | **15** | **Confirm burn stays under 5M across a full in-season day, then DOWNGRADE the plan** — do *not* tier the cadence. Rewritten 2026-07-26 after measuring instead of estimating. Real billing data: `used` 1,188,488 of a 15M plan = **7.9% period-to-date**, tracking to **~1.42M/month** against the 5M target — already under by ~3.5x. The live rate was 245.7 credits/hr (30d ≈ 177k). The `~585 credits/sweep x 60s ticks ≈ 6.3M/mo` figure that drove this whole workstream was an **estimate and is ~36x too high**; most calls bill *zero* (MLB measured at **393 calls for 179 credits** — event-list calls are free, only market requests bill). Cadence tiering would make props stale for 5–30 min to solve a problem the data says does not exist. **Caveats before acting:** the reading was 02:36 UTC — the quietest hour, MLB ending, one WNBA All-Star game, no football — so an in-season NFL/NCAAF Saturday is the real test; and #54's O(1) quota store keeps only baseline+latest, so there is no full-day curve (the OddsAPI `used` counter is the trustworthy number, not the local store). Some of this headroom is #17/#18, landed 2026-07-25. Keep #19 and #21 from the original scope — they cut waste without costing freshness. |
 
@@ -129,18 +134,86 @@ were resolved and nine already-closed rows removed from the open tables.
     threshold, or lane assignment defaults everything to `live`. Worth a look on
     a fresh slate; it is a tuning/lane question, not an empty board.
 
-- **#68 — ⚠️ THE READING BELOW IS PROBABLY THE ROLLOVER PROBE, NOT TODAY'S BOARD. Not answered.**
-  Corrected 2026-07-26T20:53Z, minutes after writing it. The pass emitting
-  those counts logged `context_label: "2026-07-27"` — it is building
-  **tomorrow**. Tomorrow has a schedule but no odds and no sim artifacts, so
-  100% `missing_projection_or_odds` is **correct behaviour there**, not a
-  defect. #65 already says so and closes with "do not chase them"; I chased
-  them anyway because I read the prune counts without checking the context
-  label on the same cycle. **Always check `context_label` before drawing a
-  conclusion from a candidate trace.**
-  The real question is unchanged and upstream of this: **why is TODAY's pool 0**,
-  which is what triggers the rollover probe in the first place. To answer it,
-  isolate a trace whose `context_label` is today's date.
+- **#68 — 🔴 ANSWERED ON A LIVE SLATE 2026-07-26T21:29Z. Today's pool is 0 because
+  classification prunes 100% of it as `missing_projection_or_odds`.**
+  The reading #68 was blocked on, taken with `context_label: "2026-07-26"` —
+  today — at 16:29 Central with **3 MLB games in progress and 1 pregame**
+  (`/mlb/api/cards?date=2026-07-26`: 15 games, 11 final, 3 live, 1 preview). So
+  this is **not** the dead-slate confound that invalidated the 02:36Z and
+  21:17Z readings.
+  `post_odds_enrichment 41 → post_state_filter 41 → pre/post_requested_market_filter 41 →
+  post_dedupe_and_classify {normalized_in: 41, classification_pruned: 41,
+  classification_reasons: {"missing_projection_or_odds": 41}, dedupe_pruned: 0,
+  total_candidates: 0}`.
+  Two facts the earlier readings did not have:
+  - **The 41 are `mlb 1 {prop:1}` + `soccer 40 {game:8, prop:32}`, and nothing
+    else.** Six sports generate zero. So the board is not losing a large pool at
+    classification — it never had one. On 3 live + 1 pregame MLB games, MLB
+    contributes **one** candidate. That starvation is upstream of everything
+    #68 has been looking at.
+  - **#77's producer gate is live and working** (`70ad2c9f` is an ancestor of
+    the deployed `dc9fbe81`), so these 40 soccer rows are *not* the
+    `is_unsimulated_placeholder` ones — those are already excluded. They are
+    real fixtures that still arrive with neither a price nor a projection,
+    i.e. #52's `no_sim_coverage` population.
+  **Root-caused field-level and HALF FIXED. Two real defects, both measured by
+  running the local candidate-generation and classification code over
+  *production's own* card payloads** (`/mlb/api/cards`, `/soccer/mls/api/cards`)
+  — production data, local code, no deploy. That combination is what every
+  previous reading of this got wrong in one direction or the other.
+
+  - **(a) A projection of exactly zero read as "no projection."**
+    `_classify_candidate_with_reason` tested presence with
+    `_safe_text(value, "") not in {"", "-"}`, and `_safe_text` is
+    truthiness-based (`str(value or "")`), so `_safe_text(0.0, "")` is `""`.
+    Not a corner case: `_append_game_bet_candidate` gives a **live** game-level
+    candidate with no explicit `live_projection` the game's current combined
+    score, which is **0 for every scoreless live game**, and
+    `normalize_candidate` takes the first *present* field in its scan order —
+    so that 0 also shadowed the real `model_probability` behind it. **All 32
+    live MLS game candidates were pruned this way**, while
+    `_candidate_has_usable_projection` — the predicate three functions up in
+    the same file, which does the isinstance check correctly — returned True
+    for every one. Two predicates for one question, disagreeing. Fixed with a
+    shared `_candidate_value_is_present`; `None`/`""`/`"-"` still reject.
+  - **(b) `shared_top_play_rows` was manufacturing picks out of a display
+    panel — and (a) was the only thing hiding it.** `_build_top_play_rows`
+    ([game_board_contract.py:375](syndicate/features/shared/game_board_contract.py:375))
+    builds `{heading: panel title, name: panel item text}` from free-text
+    panel items — no price, line or market, unlike `_build_prop_rows` directly
+    below it. `_game_bet_candidates_from_game` scraped a price and an edge out
+    of that prose and emitted a candidate **even when it found neither**.
+    Production carried **56 such rows per MLS slate**, with picks reading
+    *"Projected score: New England Revolution 1.4 - CF Montréal 2.1"*,
+    *"Margin: 0.80 (home perspective)"*, *"Shots: … 10.1 | … 14.8"* and,
+    literally, ***"Simulations: 400"***. ⚠️ **Fixing (a) alone would have
+    published all 56 as live picks** — #77 again, one slate later. #77 fixed
+    the placeholder half of exactly this and left the narrative half live.
+    Now gated on the row expressing a **side** (over/under) or carrying a
+    scraped price/edge — structural, not a prose blocklist, and it keeps MLB's
+    real `"OVER Brooks Lee"` / `"UNDER Gerrit Cole"` panels (the 2026-07-23
+    tests in `test_home.py` pin those and both pass).
+
+  **Measured on one fetch of each payload** (two fetches disagree — games go
+  final between them, which is what made an early 42-vs-38 look like a
+  regression): MLS 16 games → 56 narrative rows dropped, **8 real Moneyline
+  candidates survive and now classify KEPT instead of all-pruned**. MLB 38
+  candidates, **identical before and after** — neither fix touches it.
+
+  🔴 **STILL OPEN, and it is the bigger half: MLB.** The worker generated
+  **1** candidate for all of MLB, while the identical
+  `_game_bet_candidates_from_game` over production's `/mlb/api/cards` payload
+  produces **38** — 22 from a single live game, all priced and edged
+  (`OVER Bryce Eldridge, Hitter Hits, odds 280, edge 39.2%, projected 1.2`).
+  Same code, so the worker's `dashboard_games` must arrive **without the market
+  blocks that function reads**. Established by elimination, not observed: web
+  and refresh-worker read separate Render disks, and no existing trace reports
+  the per-game market payload. `dc9fbe81` was checked and **exonerated** —
+  `build_simulation_contract_from_context` copies its input
+  (`_copy_mapping`) and `_normalize_game_context` returns a new dict, so
+  removing it cannot have stripped `games`. A bounded
+  `game_candidate_inputs` trace (two games per sport, presence and size only)
+  is committed and answers this in one cycle **once deployed**.
 
 - *Superseded reading (tomorrow's date, kept as the worked example):*
   The reading #68 was blocked on, taken off a healthy worker:
@@ -366,6 +439,33 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
   payload O(1) removed it as an eviction target, which is why it stopped
   happening — not evidence of why it started. **If observations vanish again the
   theory is wrong**, and the next suspect is the shared store's own lifecycle.
+- **Every board cycle emits TWO dated traces, and the second one is tomorrow.**
+  `_compute_board_publication_response` builds today, prints
+  `CANDIDATE_POOL_READY`, and then — only if today's pool is 0 — probes tomorrow
+  with a second fingerprint pass and a second full pool build. The probe emits
+  its own `overview_counts`, `artifact_status` and `candidate_generation`
+  traces, so **`context_label` alone cannot tell you which half you are
+  reading**, and a `tail` of the logs shows only the tomorrow half. The
+  discriminator is ordering: **the first `overview_counts` burst of a cycle is
+  today; everything after `CANDIDATE_POOL_READY` is the probe.** This trap has
+  now cost three separate investigations (#65, #68, #78) — twice *after* #65
+  documented it. It stays expensive because the date is not printed: the
+  rollover decision is `logger.info("BETTING_BOARD_PUBLISH_DATE")` only, and per
+  #37 that never reaches Render. Print it.
+- **Run the real code over production's own payloads before instrumenting.**
+  `/mlb/api/cards` and `/soccer/mls/api/cards` are public and carry the exact
+  game dicts candidate generation consumes, so `_game_bet_candidates_from_game`
+  and `_classify_candidate_with_reason` can be run against them locally — real
+  data, real code, no deploy, no waiting for a cycle. That is how #68's two
+  defects were found and how both fixes were measured, after three sessions of
+  local mirrors and production logs each answering only half the question.
+  Fetch **once** and A/B in-process: the endpoint is live, games go final
+  between two fetches, and the counts move under you.
+- **A truthiness test is not a presence test.** `_safe_text(value, "")` is
+  `str(value or "").strip()`, so `0`, `0.0` and `False` all come back `""`.
+  #68's board-emptying bug was exactly this on a numeric field, and the same
+  shape is still in `normalize_candidate`'s odds handling. Check any
+  `_safe_text(x, "") not in {"", "-"}` that guards a number.
 - **"Empty board" is a symptom with at least two distinct root causes** (from #8
   and #43) — a `NameError` in one case, an oversized Redis write in the other.
   Do not treat it as a solved class, and do not assume a past fix covers a new

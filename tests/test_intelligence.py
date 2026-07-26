@@ -6446,3 +6446,44 @@ class PostDedupeAndClassifyTraceTests(unittest.TestCase):
         projection_only = {"type": "prop", "selection": "Messi Over 0.5", "projection": 0.42}
         self.assertIsNotNone(_classify_candidate_with_reason(odds_only)[0])
         self.assertIsNotNone(_classify_candidate_with_reason(projection_only)[0])
+
+    def test_a_projection_of_zero_is_a_projection(self) -> None:
+        # #68. The presence test was `_safe_text(value, "") not in {"", "-"}`,
+        # and _safe_text is truthiness-based -- `str(0.0 or "")` is "" -- so a
+        # projection of exactly zero was reported as MISSING.
+        #
+        # Not a corner case. _append_game_bet_candidate gives a live
+        # game-level candidate with no explicit live_projection the game's
+        # current combined score, which is 0 for every scoreless live game,
+        # and normalize_candidate takes the first *present* field in its scan
+        # order -- so that 0 also shadowed the real model_probability behind
+        # it. Measured against production 2026-07-26: all 32 live MLS game
+        # candidates were pruned as missing_projection_or_odds this way.
+        from syndicate.features.intelligence import (
+            _candidate_has_usable_projection,
+            _classify_candidate_with_reason,
+        )
+
+        zero_projection = {"type": "game", "selection": "Home ML", "projection": 0.0}
+        self.assertIsNotNone(_classify_candidate_with_reason(zero_projection)[0])
+
+        scoreless_live = {
+            "type": "game",
+            "selection": "Home ML",
+            "market": "Moneyline",
+            "projected": "-",
+            "live_projection": "0",
+            "model_probability": 0.49,
+            "odds": "-",
+        }
+        self.assertIsNone(_classify_candidate_with_reason(scoreless_live)[1])
+        # The other predicate in the same module always got this right; the two
+        # disagreeing is what made the board look candidate-starved.
+        self.assertTrue(_candidate_has_usable_projection(scoreless_live))
+
+        # A genuinely absent projection is still absent.
+        for empty in (None, "", "-"):
+            self.assertEqual(
+                _classify_candidate_with_reason({"type": "game", "selection": "Home ML", "projection": empty})[1],
+                "missing_projection_or_odds",
+            )

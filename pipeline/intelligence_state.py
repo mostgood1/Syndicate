@@ -2925,10 +2925,25 @@ class IntelligenceStateService:
         # ever printed again, so a hang or slow spot here was indistinguishable
         # from one anywhere else in the function. Bounding it with plain
         # prints to find out which part it actually is.
-        print(f"[intelligence_state] CANDIDATE_POOL_READY count={candidate_pool_count}", flush=True)
+        print(f"[intelligence_state] CANDIDATE_POOL_READY date={selected_date} count={candidate_pool_count}", flush=True)
         if candidate_pool_count <= 0 and selected_date == central_today_iso():
             rollover_date = _next_supported_intelligence_date(selected_date)
             if rollover_date and rollover_date != selected_date:
+                # print, not logger.info: BETTING_BOARD_PUBLISH_DATE below
+                # records the same decision but never reaches Render's log
+                # collector (#37), so from production logs there has been no
+                # way to tell today's build from the probe that follows it.
+                # Both halves emit their own overview_counts/artifact_status/
+                # candidate_generation traces carrying context_label, so the
+                # label cannot discriminate them and a tail of the logs shows
+                # only the probe. That ambiguity has now been misread into
+                # three separate investigations (#65, #68, #78). These two
+                # prints bracket the probe explicitly so the next reader does
+                # not have to infer it from ordering.
+                print(
+                    f"[intelligence_state] ROLLOVER_PROBE_BEGIN today={selected_date} probing={rollover_date}",
+                    flush=True,
+                )
                 rollover_fingerprint = self._source_state_fingerprint(rollover_date)
                 rollover_pool = self._build_candidate_pool(rollover_date, rollover_fingerprint)
                 rollover_count = int(rollover_pool.get("candidate_count") or 0)
@@ -2943,6 +2958,12 @@ class IntelligenceStateService:
                 # cycle. Confirmed in production: today had real WNBA/MLB
                 # games the whole time; a single zero reading rolled the
                 # board over to a permanently-empty tomorrow.
+                print(
+                    f"[intelligence_state] ROLLOVER_PROBE_END probed={rollover_date} "
+                    f"probe_count={rollover_count} today_count={candidate_pool_count} "
+                    f"committed={rollover_count > candidate_pool_count}",
+                    flush=True,
+                )
                 if rollover_count > candidate_pool_count:
                     logger.info("BETTING_BOARD_PUBLISH_DATE", extra={"requested_date": selected_date, "selected_date": rollover_date, "rollover": True})
                     selected_date = rollover_date
@@ -3018,7 +3039,11 @@ class IntelligenceStateService:
         response = _decorate_response_with_state_meta(dict(response), None, source="worker", run_key=cache_key, sla_seconds=self._interval_seconds) or dict(response)
         _log_stage_timing("board_publication", (time.perf_counter() - request_started_at) * 1000.0)
         logger.info("BETTING_BOARD_PUBLISH_COMPLETE", extra={"selected_date": selected_date, "candidate_count": response_candidate_count, "snapshot_generated_at": response_last_updated})
-        print(f"[intelligence_state] BOARD_PUBLICATION_RESPONSE_READY candidate_count={response_candidate_count}", flush=True)
+        print(
+            f"[intelligence_state] BOARD_PUBLICATION_RESPONSE_READY "
+            f"selected_date={selected_date} candidate_count={response_candidate_count}",
+            flush=True,
+        )
         return response
 
     def _build_intelligence_board_state(self, selected_date: str | None) -> dict[str, Any]:

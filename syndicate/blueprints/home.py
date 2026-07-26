@@ -2183,6 +2183,45 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
             continue
         edge_match = re.search(r"([+-]?\d+(?:\.\d+)?)%", name)
         odds_match = re.search(r"at\s+([+-]?\d+(?:\.\d+)?)", name, re.IGNORECASE)
+        # #77/#68. shared_top_play_rows is a DISPLAY panel, and only some of
+        # its rows are bets. This loop scrapes a price and an edge out of the
+        # row's prose, and when it finds neither it still emitted a candidate
+        # -- so narrative rows became picks. Confirmed against production
+        # 2026-07-26 by running this function over /soccer/mls/api/cards:
+        # every one of the 32 MLS game candidates came from here, with picks
+        # reading "Projected score: New England Revolution 1.4 - CF Montreal
+        # 2.1", "Margin: 0.80 (home perspective)", "Shots: ... 10.1 | ... 14.8"
+        # and, literally, "Simulations: 400".
+        #
+        # Those 32 are currently pruned, but only by accident: they carry
+        # live_projection "0" (the combined score of a scoreless live game),
+        # and classify_candidate's presence test is truthiness-based so 0 reads
+        # as absent. Fixing that test -- which is a real bug, see
+        # _classify_candidate_with_reason -- would publish all of this as live
+        # picks. #77 fixed the placeholder half of exactly this and left the
+        # narrative half live.
+        #
+        # There is nothing structural to test: _build_top_play_rows
+        # ([game_board_contract.py](../features/shared/game_board_contract.py))
+        # builds each row as {heading: panel title, name: panel item text,
+        # detail: panel body} out of a display panel's free-text items -- no
+        # price, no line, no market, unlike _build_prop_rows right below it,
+        # which carries pick/market/line/odds/confidence/projected. So every
+        # candidate from here is scraped, and the only honest test is whether
+        # the text describes a wager at all.
+        #
+        # A wager needs a SIDE. MLB's panels read "OVER Brooks Lee" /
+        # "UNDER Gerrit Cole" / "OVER 8.5" and are real (see the 2026-07-23
+        # tests below); MLS's read "Projected score: ...", "Margin: 0.80 (home
+        # perspective)", "Shots: ... 10.1 | ... 14.8" and "Simulations: 400",
+        # and are not. A scraped price or edge counts too, for moneyline-style
+        # rows that name a price instead of a side.
+        #
+        # Deliberately a side/price/edge test rather than a prose blocklist:
+        # the same "match the copy and it breaks on a reword" trap #77 called
+        # out applies here.
+        if odds_match is None and edge_match is None and not re.search(r"\b(?:over|under)\b", name, re.IGNORECASE):
+            continue
         _append_game_bet_candidate(
             candidates,
             sport=sport,
