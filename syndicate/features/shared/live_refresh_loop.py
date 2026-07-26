@@ -1018,6 +1018,67 @@ def _hash_json_value(value: Any) -> str:
 	return hashlib.sha256(encoded).hexdigest()
 
 
+def _mlb_sim_fingerprint_includes_odds_prices() -> bool:
+	# Escape hatch to restore the pre-#48 behaviour if some artifact turns out
+	# to bake prices at sim time after all.
+	return _env_bool("SYNDICATE_MLB_SIM_FINGERPRINT_INCLUDE_ODDS_PRICES", default=False)
+
+
+def _mlb_sim_odds_fingerprint_slice(rows: list[dict[str, Any]]) -> list[Any]:
+	"""Reduce a game's odds rows to what a RESIM should react to.
+
+	#48. The gate hashed these rows verbatim and so fired on essentially every
+	odds refresh -- measured triggering roughly every 10 minutes all day on
+	2026-07-24, exactly matching _mlb_sim_check_interval_seconds, which is the
+	signature of "the hash flips every time we look".
+
+	The key question is what a simulation's inputs actually ARE, and the
+	answer is in daily_update.py's own summary row: game_pk, teams,
+	starter_names, per-segment win probabilities, run distributions, HR and
+	prop likelihoods. No odds. No prices. No edges. Prices are joined to sim
+	output at READ time by the market board (join_odds_to_sim), so a price
+	move is already reflected on the board without re-running anything.
+
+	So a price move cannot change a single value the sim produces, and three
+	things are excluded here, none of them a simulation input:
+
+	- prices (*_odds). Removed outright rather than rounded. Bucketing was
+	  tried first and is only probabilistic -- a -125 -> -128 tick still
+	  crosses a bucket boundary -- which treats a design question as a tuning
+	  knob. Exclusion makes the behaviour deterministic and testable.
+	- bookmaker identity. _best_bookmaker_game_lines picks a book by market
+	  coverage, so the winner rotates as books post and pull markets. A book
+	  swap quoting the same lines is not news to the sim.
+	- row ordering. Rows came off the artifact in file order, which is not
+	  guaranteed stable, so an identical set of odds in a different order
+	  flipped the hash by itself.
+
+	LINE values (spread/total points) are KEPT and exact. A total moving
+	8.5 -> 9 changes what is being bet and legitimately warrants a resim, and
+	it is also what the prop/target artifacts key off.
+	"""
+	include_prices = _mlb_sim_fingerprint_includes_odds_prices()
+	reduced: list[Any] = []
+	for row in rows:
+		if not isinstance(row, dict):
+			continue
+		markets = row.get("markets") if isinstance(row.get("markets"), dict) else {}
+		markets_slice: dict[str, Any] = {}
+		for market_name, market in sorted(markets.items()):
+			if not isinstance(market, dict):
+				continue
+			entry: dict[str, Any] = {}
+			for field, value in sorted(market.items()):
+				if field.endswith("_odds") and not include_prices:
+					continue
+				entry[field] = value
+			markets_slice[str(market_name)] = entry
+		reduced.append(markets_slice)
+	# Deterministic order so an unchanged set of odds always hashes the same.
+	reduced.sort(key=lambda item: json.dumps(item, sort_keys=True, default=str))
+	return reduced
+
+
 def _mlb_sim_input_fingerprint_by_game(date_str: str, events: list[ScheduleEvent]) -> dict[str, str]:
 	# Was a single whole-file-hash blob covering all 3 sources at once (see
 	# git history) -- told you THAT something changed, never WHICH game, so
@@ -1060,7 +1121,10 @@ def _mlb_sim_input_fingerprint_by_game(date_str: str, events: list[ScheduleEvent
 			# but never under-inclusive, and still scoped to one game rather
 			# than today's whole-slate behavior.
 			lineup_slice = {"__whole_file__": lineups_doc}
-		odds_slice = odds_by_pair.get((event.home, event.away), [])
+		# Reduced rather than verbatim (#48): see
+		# _mlb_sim_odds_fingerprint_slice for why hashing raw odds rows made
+		# this fire on nearly every refresh.
+		odds_slice = _mlb_sim_odds_fingerprint_slice(odds_by_pair.get((event.home, event.away), []))
 		override_slice = overrides_for_date.get(game_pk, {})
 		fingerprints[game_pk] = _hash_json_value({"lineups": lineup_slice, "odds": odds_slice, "overrides": override_slice})
 	return fingerprints

@@ -2310,3 +2310,74 @@ class SimDefersToIntelligencePipelineTests(unittest.TestCase):
             decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=1000.0, date_str="2026-07-25")
             busy.assert_not_called()
         self.assertEqual(decision["reason"], "disabled")
+
+
+class MlbSimOddsFingerprintSliceTests(unittest.TestCase):
+    """#48. The sim gate hashed odds rows verbatim and so fired on nearly
+    every odds refresh -- measured triggering roughly every 10 minutes all day
+    on 2026-07-24, exactly matching _mlb_sim_check_interval_seconds, which is
+    the signature of a hash that flips every time it is read.
+
+    What a simulation's inputs actually are is settled by daily_update.py's
+    own summary row: teams, starter_names, win probabilities, run
+    distributions, HR/prop likelihoods. No odds, no prices, no edges. Prices
+    are joined to sim output at READ time by the market board, so a price move
+    already shows on the board without re-running anything.
+    """
+
+    def _row(self, *, book="fanatics", h2h_home="+105", total_line=8.5, over="-110"):
+        return {
+            "bookmaker": book,
+            "home_team": "BOS",
+            "away_team": "NYY",
+            "event_id": "abc",
+            "commence_time": "2026-07-25T17:10:00Z",
+            "markets": {
+                "h2h": {"home_odds": h2h_home, "away_odds": "-125"},
+                "totals": {"line": total_line, "over_odds": over, "under_odds": "-110"},
+            },
+        }
+
+    def _hash(self, rows):
+        return json.dumps(live_refresh_loop._mlb_sim_odds_fingerprint_slice(rows), sort_keys=True)
+
+    def test_price_moves_do_not_trigger_a_resim(self) -> None:
+        # Any size, not just small ones: a price cannot change a value the sim
+        # produces. Bucketing was tried first and is only probabilistic -- a
+        # -125 -> -128 tick still crosses a bucket boundary.
+        self.assertEqual(self._hash([self._row()]), self._hash([self._row(h2h_home="+108", over="-112")]))
+        self.assertEqual(self._hash([self._row()]), self._hash([self._row(h2h_home="+400", over="-600")]))
+
+    def test_line_moves_do_trigger_a_resim(self) -> None:
+        # A total moving 8.5 -> 9 changes what is being bet, and is what the
+        # prop/target artifacts key off.
+        self.assertNotEqual(self._hash([self._row()]), self._hash([self._row(total_line=9.0)]))
+
+    def test_bookmaker_rotation_does_not_trigger_a_resim(self) -> None:
+        # _best_bookmaker_game_lines picks a book by market coverage, so the
+        # winner rotates as books post and pull markets.
+        self.assertEqual(self._hash([self._row()]), self._hash([self._row(book="draftkings")]))
+
+    def test_row_order_does_not_trigger_a_resim(self) -> None:
+        # Rows came off the artifact in file order, which is not guaranteed
+        # stable, so an identical set of odds flipped the hash by itself.
+        rows = [self._row(), self._row(book="betmgm")]
+        self.assertEqual(self._hash(rows), self._hash(list(reversed(rows))))
+
+    def test_env_escape_hatch_restores_price_sensitivity(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_MLB_SIM_FINGERPRINT_INCLUDE_ODDS_PRICES": "true"}, clear=False):
+            self.assertNotEqual(self._hash([self._row()]), self._hash([self._row(h2h_home="+108")]))
+
+    def test_tolerates_malformed_rows(self) -> None:
+        # Runs on the tick path; a shape surprise must not take the gate down.
+        for rows in ([], [None], ["nope"], [{"markets": None}], [{"markets": {"h2h": "bad"}}]):
+            live_refresh_loop._mlb_sim_odds_fingerprint_slice(rows)
+
+    def test_lineup_changes_still_trigger_a_resim(self) -> None:
+        # The whole point is preserving real triggers while dropping noise.
+        events = [live_refresh_loop.ScheduleEvent(sport="mlb", event_id="1", home="BOS", away="NYY", start_time_utc=None)]
+        with patch.object(live_refresh_loop, "_read_json_file_lenient", side_effect=[{"10": ["a"]}, {}, {}]):
+            first = live_refresh_loop._mlb_sim_input_fingerprint_by_game("2026-07-25", events)
+        with patch.object(live_refresh_loop, "_read_json_file_lenient", side_effect=[{"10": ["b"]}, {}, {}]):
+            second = live_refresh_loop._mlb_sim_input_fingerprint_by_game("2026-07-25", events)
+        self.assertNotEqual(first.get("1"), second.get("1"))
