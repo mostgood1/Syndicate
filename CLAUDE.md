@@ -12,7 +12,11 @@ The phased migration plan lives in `docs/syndicate_world_class_implementation_pl
 
 **`docs/ai_context/todo.md` is the canonical cross-session TODO list.** Read it
 before starting work and update it before finishing; don't keep a parallel list in
-session-local task tools without reconciling it back. It carries the current
+session-local task tools without reconciling it back. Closed items are archived to
+`docs/ai_context/todo_closed.md` — that file is a record only, so read `todo.md`
+first and treat its "Operational notes" as the place lessons live. Item IDs are
+stable and never reused; check both files before taking a number, and before
+finishing run the #71 check that shipped work actually reached one of them. It carries the current
 priority order, what has been *validated* against production versus merely
 believed, and a set of operational facts that are expensive to rediscover — among
 them: **Render auto-deploy is OFF** (pushing to `main` ships nothing on its own),

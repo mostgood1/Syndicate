@@ -4,7 +4,11 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-26 (end of the 2026-07-25 session).
+Last reconciled: 2026-07-26 (bookkeeping pass — see "Reconciliation 2026-07-26").
+
+> **Next free ID: 72.** IDs are never reused. Closed items move to
+> [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
+> free, and see #71 for the check that catches shipped work missing from both.
 
 Conventions:
 - IDs are stable and never reused. New work appends at the next free number.
@@ -12,6 +16,41 @@ Conventions:
   named. An item that merely *looks* fixed is not validated.
 - Prefer measurement over inference. Several items below exist because a
   plausible inference was trusted where a measurement was available.
+- **A closed item lives in Done and nowhere else.** Nine items were listed as both
+  open and closed before 2026-07-26; the open copies were stale but read as live
+  work. When you close something, delete the open row — don't leave it.
+
+### Reconciliation 2026-07-26
+
+Bookkeeping only. No code or behaviour changed by this pass; two ID collisions
+were resolved and nine already-closed rows removed from the open tables.
+
+- **#63 was two different items.** The mutual-deferral invariant test is the
+  original #63 and is closed. The "candidates drop to zero at
+  `candidate_collection`" item (filed 2026-07-26, newer) is renumbered **#68**.
+- **#53 was two different items.** Prop-ladder odds keeps #53 (it is
+  cross-referenced from the #16 audit body). The "last simmed" per-league
+  rollout is renumbered **#69**.
+- **Removed from the open tables as already closed:** #40, #47, #49, #50, #54,
+  #55, #57, #60, #63. Knowledge that was only recorded in those rows has been
+  moved to Operational notes rather than deleted — check there before assuming
+  something was lost.
+- **#43 is still open**, despite appearing in the closed line. The write-size fix
+  shipped; the item's own closure criterion (`candidate_count > 0` with a
+  snapshot timestamp) has not been met. Left in progress deliberately.
+- **New: #70** (render.yaml comment/value inversion, found during this pass) and
+  **#71** (nothing checks that shipped work reaches this list).
+- **#64 was missing entirely** — neither open nor closed. It shipped 2026-07-25
+  as `a1638c39` and was found by diffing commit messages against the list. Now
+  recorded in `todo_closed.md`. It matters beyond bookkeeping: #64 *is* the
+  `_build_candidate_pool` instrumentation that #66 was still asking for, so this
+  gap could have caused a session to rebuild existing work.
+- **Closed items moved to [`todo_closed.md`](todo_closed.md).** The Done section
+  was 106 of 438 lines. Lessons were **not** archived with them — anything that
+  should still change a future session's behaviour was promoted into Operational
+  notes, because that section gets read and the archive does not.
+- **Corrected a stale operational note**: "three 2GB services" has been wrong
+  since #57 upgraded refresh-worker to pro/4GB.
 
 ---
 
@@ -19,7 +58,7 @@ Conventions:
 
 | # | Item | Notes |
 |---|---|---|
-| **25** | Phase 0 fail-closed refresh guard + atomic writes | **Phase 0 shipped** — see Done. Remaining: the look-ahead's own interval marker (#24) has not been audited for the same fail-open pattern, and several non-artifact writers still use the unsafe `path.with_suffix(".tmp")` shape (`fetch_soccer_*`, `fetch_soccer_history_local`, the `backtest_*` scripts). |
+| **25** | Phase 0 fail-closed refresh guard + atomic writes | **Phase 0 shipped** — see Done. Remaining: the look-ahead's own interval marker (#24) has not been audited for the same fail-open pattern, and several non-artifact writers still use the unsafe collision-prone temp shape. **Enumerated 2026-07-26 — it is six files, not the three previously listed, and the `backtest_*` scripts are NOT among them** (that entry was wrong): [fetch_soccer_history_local.py:44](scripts/fetch_soccer_history_local.py:44), [fetch_soccer_oddsapi_odds_local.py:82](scripts/fetch_soccer_oddsapi_odds_local.py:82), [fetch_soccer_oddsapi_props_local.py:105](scripts/fetch_soccer_oddsapi_props_local.py:105), [fetch_nfl_oddsapi_props_local.py:74](scripts/fetch_nfl_oddsapi_props_local.py:74), [fetch_mlb_oddsapi_local.py:72](scripts/fetch_mlb_oddsapi_local.py:72), [refresh_ncaaf_oddsapi.py:529](scripts/refresh_ncaaf_oddsapi.py:529). All use `path.with_suffix(path.suffix + ".tmp")`, so two concurrent writers of the same file collide on one temp path. `atomic_artifact_write.py` already exists; this is mechanical. |
 | **15** | **Confirm burn stays under 5M across a full in-season day, then DOWNGRADE the plan** — do *not* tier the cadence. Rewritten 2026-07-26 after measuring instead of estimating. Real billing data: `used` 1,188,488 of a 15M plan = **7.9% period-to-date**, tracking to **~1.42M/month** against the 5M target — already under by ~3.5x. The live rate was 245.7 credits/hr (30d ≈ 177k). The `~585 credits/sweep x 60s ticks ≈ 6.3M/mo` figure that drove this whole workstream was an **estimate and is ~36x too high**; most calls bill *zero* (MLB measured at **393 calls for 179 credits** — event-list calls are free, only market requests bill). Cadence tiering would make props stale for 5–30 min to solve a problem the data says does not exist. **Caveats before acting:** the reading was 02:36 UTC — the quietest hour, MLB ending, one WNBA All-Star game, no football — so an in-season NFL/NCAAF Saturday is the real test; and #54's O(1) quota store keeps only baseline+latest, so there is no full-day curve (the OddsAPI `used` counter is the trustworthy number, not the local store). Some of this headroom is #17/#18, landed 2026-07-25. Keep #19 and #21 from the original scope — they cut waste without costing freshness. |
 
 ## In progress
@@ -62,13 +101,19 @@ Conventions:
   - ⚠️ 4.37MB is **untested, not known-good**. All that is established is that
     8.9MB fails. If it still fails, the next reductions are
     `response.evaluation_record` (2.21MB) and `candidate_pool` (0.84MB), or move
-    the bulk through the artifact publish/pull path. See **#60**.
+    the bulk through the artifact publish/pull path. **#60 is closed**, so an
+    oversized write now fails loudly with key/size/caller instead of surfacing
+    as a generic `ConnectionError` — if 4.37MB is still too big you will see it
+    named in the logs rather than having to infer it.
   - Three earlier explanations were each real bugs that did **not** fix this: the
     stale-dated payload replay (`495b71db`), the wrong host (#57), and a
     self-inflicted starving deferral guard (`296402e6`). Each changed a real
     thing and the symptom never moved.
-  - Still genuinely open underneath: **#47** (soccer absent from candidate
-    generation entirely), which caps what the board can ever show.
+  - ~~Still genuinely open underneath: **#47**~~ — **closed 2026-07-25.** Soccer
+    was added to the worker's sport list (it was configured in `app.py` all
+    along; the worker reads the *fallback* list). This is no longer a cap on
+    what the board can show. The live cap is **#52** (1432 MLS rows with no sim
+    coverage), not #47.
 - **#61 — WITHDRAWN, not a bug.** Filed on a misreading: `board_contract`'s
   `pregame`/`live`/`top_overall` keys exist only in the EMPTY fallback shape the
   status endpoint returns when there is nothing to serve. The populated schema
@@ -83,7 +128,9 @@ Conventions:
     threshold, or lane assignment defaults everything to `live`. Worth a look on
     a fresh slate; it is a tuning/lane question, not an empty board.
 
-- **#63 — Candidates drop to zero at `candidate_collection`.** Observed
+- **#68 — Candidates drop to zero at `candidate_collection`.** *(Filed as #63;
+  renumbered 2026-07-26 — #63 was already the closed mutual-deferral test.)*
+  Observed
   2026-07-26T02:36Z on refresh-worker: the stage counters read
   `post_state_filter 16 → pre_requested_market_filter 16 →
   post_requested_market_filter 16`, then
@@ -100,6 +147,13 @@ Conventions:
     `collect_candidates_with_fallback_merge` was measured at 240 in / 240 out
     earlier the same evening, while `collect_all_recommendations` is the one
     reporting 0. Establish which one feeds the board before changing either.
+  - ✅ **The instrument for this already exists — do not rebuild it.** #64
+    (`a1638c39`, 2026-07-25) added an `INTEL_TRACE` across classification and
+    dedupe emitting candidates-in, removals per stage, and a **count per
+    rejection reason**. It ships a reading, not a diagnosis: the surviving
+    suspects are `missing_selection` and `missing_projection_or_odds`. **The open
+    work is taking that reading on a live slate**, then fixing whichever rule the
+    counts implicate. This item is blocked on a slate, not on code.
 
 - **#31 — NHL revamp Phase 5: local producers replace vendor subprocess.**
 
@@ -108,26 +162,19 @@ Conventions:
 | # | Item |
 |---|---|
 | **62** | **A re-pricing path that refreshes edges without a full Monte Carlo.** Behind #48. `run_mlb_daily_sim_job.py` only takes `--only-game-pks`, and `daily_update.py`'s only skip mechanism is `--preserve-started` (games past Preview), so there is no way to react to a price move except re-simulating. #48 removed prices from the sim fingerprint because the sim summary row is pure model output — win probabilities, run distributions, HR/prop likelihoods, **no odds and no edges** — and the market board joins odds at *read* time. That is correct for the board, but any artifact that *does* bake prices at sim time now goes stale until a lineup/line/tip-off trigger. Architectural, #27/#28 territory. |
-| **66** | 🟡 **Board shows no opportunities — but MUCH narrower than it looked, and partly correct behaviour.** Measured 2026-07-26T04:41Z for date 2026-07-25: **MLB 15 games, 80 rows, 80 matched with BOTH price and projection — and all 15 games `final`.** So an empty *actionable* MLB board late at night is **right, not a bug**, and several hours were spent treating correct behaviour as a defect. MLS: 30 games, 2023 rows, but only **163 matched** (1432 `no_sim_coverage`, 428 `needs_resim` — see #52/#44b). `_build_candidate_pool` returning 0 is still unexplained *for a live slate*, and that is the only open part. **Retest on a live slate (weekday afternoon/evening), not after midnight**, now that soccer reports `live` correctly (#67). If it is still 0 with games actually in progress, instrument `_build_candidate_pool` — the last uninstrumented link. |
+| **66** | 🟡 **Board shows no opportunities — but MUCH narrower than it looked, and partly correct behaviour.** Measured 2026-07-26T04:41Z for date 2026-07-25: **MLB 15 games, 80 rows, 80 matched with BOTH price and projection — and all 15 games `final`.** So an empty *actionable* MLB board late at night is **right, not a bug**, and several hours were spent treating correct behaviour as a defect. MLS: 30 games, 2023 rows, but only **163 matched** (1432 `no_sim_coverage`, 428 `needs_resim` — see #52/#44b). `_build_candidate_pool` returning 0 is still unexplained *for a live slate*, and that is the only open part. **Retest on a live slate (weekday afternoon/evening), not after midnight**, now that soccer reports `live` correctly (#67). ~~If it is still 0, instrument `_build_candidate_pool` — the last uninstrumented link.~~ **Corrected 2026-07-26: that instrumentation already shipped** as #64 (`a1638c39`) — classification and dedupe now emit an `INTEL_TRACE` with a count per rejection reason. So the next step is not to build an instrument, it is to **read one**: get a live slate and look at which reason dominates (`missing_selection` vs `missing_projection_or_odds`). See #68. |
 | **65** | ⚠️ **MISDIAGNOSED — corrected 2026-07-26.** Filed as "a future-dated payload is being queued and built". **There is no such payload.** `_compute_board_publication_response` rolls itself over: when today's pool is 0 it calls `_next_supported_intelligence_date` and *probes* tomorrow, committing only if tomorrow scores higher. So `context_label: 2026-07-26` in the traces is **expected rollover-probe behaviour, not a bug** — and it appears after ~19:00 CDT because UTC has already rolled over, so tomorrow's date legitimately exists in the per-sport artifact date lists. Two guards were shipped against the queue path (`08014007`, `34e2df35`) and **neither ever fired** (`future_evicted=0` throughout), because the queue was never involved. They are harmless and correct in principle for genuinely stale payloads, but they are not a fix for anything observed. The rollover is a *consequence* of #66, not a cause. **Lesson: `2026-07-26` traces at 21:00 CT are normal — do not chase them.** |
-| **63** | **Test the mutual-deferral invariant: neither side can be starved.** The MLB sim and the board build now defer to each other, and the starvation property was broken **twice** on 2026-07-25 by reasoning about one direction at a time — the odds-refresh deferral starved the board (8 defers / 13 iterations, `candidate_count` 0), then the pipeline deferral starved the sim (30/30 gate decisions `intelligence_pipeline_busy`, zero launches). Both now have per-side bounds, but **nothing asserts the joint property**, and per-side unit tests structurally cannot see it. Root cause of both mistakes: treating *finite-per-run* as *finite-in-aggregate*. |
 | **42** | `source_cards_api_payload`'s cache can never hit — keyed on the file it rewrites. **Third instance of this pattern** (`build_mlb_market_board` fixed in `34c9427d`; avoided deliberately in `build_soccer_market_board`). Worth a rule, not three one-off fixes. |
 | **37** | `logger.info` never reaches Render's log collector — use `print(..., flush=True)`. This is why the `NameError` in #8 hid for hours, and why #43's stale-date replay stayed invisible for a day. |
-| **40** | Reconcile `render.yaml` drift. **Raised in priority**: a blueprint re-apply would flip the MLB sim trigger back **on** and drop the new soccer vars. Current deliberate overrides: `SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER=true`, `SYNDICATE_MLB_SIM_MAX_GAMES_PER_RUN=0`, `SYNDICATE_LOOK_AHEAD_ENABLED=false`, `SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_ENABLED=false`, `SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE=false`, `SYNDICATE_ENABLE_SOCCER_RESIM_TRIGGER`, `SYNDICATE_SOCCER_RESIM_TICK_OWNER`. |
+| **71** | 🟢 **Nothing checks that shipped work reaches this list.** #64 (`a1638c39`, the candidate-pool trace) shipped 2026-07-25 and appeared in **neither** the open nor the closed sections — it was found only by diffing commit messages against the list. Audited 2026-07-26 across 200 commits: **#64 is the only instance**, so this is rare, not systemic, and does not need a cleanup project. It needs a 10-second check at session end. Run it before reconciling: <br><br>`git log --format=%s -80 \| grep -oE '#[0-9]{1,2}\b' \| sort -u` <br><br>…and confirm every ID appears in `todo.md` or `todo_closed.md`. Worth promoting to a script if it ever catches a second one. **Why it matters beyond bookkeeping:** #64 shipped the exact instrumentation #66 still describes as "the last uninstrumented link", so a session could have rebuilt work that already existed. |
+| **70** | 🟡 **`render.yaml`'s comments state the opposite of their own values for the intelligence loop.** Found 2026-07-26 while reconciling. Service blocks: web 18–214, refresh-worker 215–454, live-odds-worker 455+. [render.yaml:324](render.yaml:324) sets `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=true` on **refresh-worker** under a comment reading *"DISABLED 2026-07-25 … left disabled here so a blueprint re-apply cannot silently restart it"*; [render.yaml:556](render.yaml:556) sets it `=false` on **live-odds-worker** under a comment reading *"Enabled 2026-07-25 (#57): the board build moved here … refresh-worker's copy is 'false' for that reason."* The **values are correct** — they match #57's actual resolution, the pro/4GB upgrade at [render.yaml:218](render.yaml:218) that made refresh-worker viable again — and both **comments are stale** from the superseded intermediate mitigation. Dangerous because render.yaml is the blueprint-sync source and these comments are the only rationale a future session sees: read literally, they instruct you to invert a working config. #40 reconciled the values; nobody reconciled the prose. |
 | **39** | Make canonical board-state dual-write safe, then re-enable (disabled; doubled boot memory). |
-| **38** | Prune diagnostic `print` scaffolding from `intelligence_state`. |
-| **47** | Add soccer to the Layer 2 intelligence sport list — it is absent from candidate generation entirely (`mlb, nba, wnba, nfl, ncaaf, ncaab, nhl`), so MLS contributes nothing to the curated board even with #43 fixed. |
-| **49** | Triage 22 pre-existing failures in `tests/test_ops.py`. Verified by stashing all local changes and re-running: 22 failed / 73 passed at baseline. Prior notes recorded "2 plus a flaky third" — real drift is an order of magnitude worse. |
-| **50** | `/api/ops/artifacts/export` 502s on broad patterns — it walks every `HOT_ARTIFACT_PATTERNS` glob and accumulates file contents into one in-memory dict before responding. An ops read should not be able to destabilise the 2GB web service. |
-| **51** | `hasSampleData` is inverted on the MLB cards payload — `mlb/cards.py:2373-2374` sets it and `hasArtifactData` to the same expression (`not using_sample_data`), so the two can never disagree and the name means the opposite of what it says. |
-| **58** | **WNBA's SmartSim was never vectorised, unlike MLB's.** MLB's Monte Carlo got a ~1000× vectorisation; `basketball_props_smart_sim.py` still runs `for _ in range(min(5000, max(1000, n_samples)))` and, *inside* that, a per-quarter loop that allocates a fresh 2×2 covariance array and runs `np.linalg.cholesky` **every iteration** — ~20,000 array allocations and decompositions per game, recomputing a decomposition that only depends on the quarter. Only 3 `np.random` calls in the whole file and all draw scalars. Hoisting the Cholesky out of the sample loop and drawing `size=(n_samples, 2)` once is the obvious fix. **Note this explains CPU, not RAM** — the accumulators are two 5,000-float lists. Do not assume it resolves #57. |
-| **59** | **Measure WNBA's real peak memory on a live slate (next games Tuesday).** Decides #57: whether live-odds-worker can host the board build. The 1.3–1.5GB figure everything is currently reasoning from is a **code comment from a past incident, not a measurement** — what was actually measured 2026-07-25 was 412–652MB, on an All-Star day with one game, so it proves nothing about a real slate. The instrumentation already exists: `basketball_props_smart_sim.py` has 9 `log_list_memory` call sites emitting to stderr, which produced **zero** lines today (consistent with WNBA being idle, not with broken instrumentation). Watch `ALL_PROCESS_MEMORY` peaks on live-odds-worker through a full WNBA slate. If the real peak is ~650MB, hosting the board there is safe and is the cheapest fix available. |
-| **60** | 🔴 **Enforce a size ceiling at the keyvalue write boundary.** Three separate outages on 2026-07-25 were the same bug wearing different clothes — an unbounded payload crossing into the shared keyvalue store: **#43** wrote an 8.9MB state blob as one Redis value and got `Connection closed by server`, silently discarding a correctly-computed 222-candidate board every cycle for hours; **#54** made a telemetry key the largest entry in the store and it was evicted; **#50** built an unbounded artifact bundle in memory and 502'd the web service, which then OOM-looped the worker parsing it. Each was fixed individually. The pattern needs a rule instead of a fourth fix. Add a ceiling in `refresh_state_store.write_json_file` (and `write_text_file`): measure the serialized size, and above a threshold **fail loudly** — `print(..., flush=True)` with the key, size and caller — rather than attempting the write. Silence is the actual defect here: every one of the three failed quietly and presented as something else entirely, costing hours of misdirected diagnosis. A rejected write that names itself is recoverable; one that closes the connection and gets caught by a generic handler is not. Consider a companion read-side warning when a value approaches the ceiling, so growth is visible before it becomes an outage. |
-| **57** | 🔴 **The intelligence board build alone no longer fits in a 2GB worker during a live slate.** The real problem behind the 2026-07-25 outage; #55 fixed a genuine collision but was never the root cause. With MLB games live, the pipeline measured **~700MB idle spiking past 1479MB**, and refresh-worker OOM-looped every 15–30s **with the sim confirmed deferring and never launching** (`"mlbDailySim": {"launched": false, "reason": "intelligence_pipeline_busy"}`). Currently mitigated by `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false` on refresh-worker — the board now only recomputes on web's request path, so it is slower and adds to #56's pressure. **Option analysis:** moving it to live-odds-worker is **NOT viable** — its median is a misleading 515MB, but its WNBA refresh leg is documented spiking to **1.3–1.5GB** in the same 2048MB container ([live_refresh_loop.py:1958](syndicate/features/shared/live_refresh_loop.py:1958)), and today's low readings are an All-Star day with one WNBA game. That leaves: reduce the pipeline's footprint, or give a worker more memory. Measure a candidate host's **peak**, never its median. |
-| **55** | ✅ *Fixed 2026-07-25* — **MLB sim and the intelligence board build collide on worker boot.** Live incident 2026-07-25. Once the evening slate is inside its tip-off window the sim fires ~5s after *every* boot, concurrently with the intelligence board build the same worker runs; together they exceed 2GB, so the instance OOMs, restarts, and repeats about once a minute. The launch-time memory gate does not catch it because it measures at ~250MB, before either pipeline grows — the same flaw already documented for the join-mismatch build. **Currently mitigated by `SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER=false` on refresh-worker (and in render.yaml), so MLB sims are OFF.** Fix: make the sim defer while the intelligence pipeline is mid-computation — the inverse of the existing `_mlb_daily_sim_process_still_running` guard, which already protects the odds refresh from the sim but not the sim from the pipeline. Re-enable only after that lands. |
+| **38** | Prune diagnostic `print` scaffolding from `intelligence_state`. **Do not do this while #43/#66/#68 are open** — those prints are the only instrumentation on the path being diagnosed. |
+| **51** | `hasSampleData` is inverted — and it is **two sites, not one** (corrected 2026-07-26). [mlb/cards.py:2375-2376](syndicate/features/mlb/cards.py:2375) and the *shared* contract at [game_board_contract.py:622-623](syndicate/features/shared/game_board_contract.py:622) both set `hasSampleData` and `hasArtifactData` to the same expression (`not using_sample_data`), so the two can never disagree and the name means the opposite of what it says. The shared-contract copy means every sport on `game_board_v1` inherits it, not just MLB. Note `tests/test_archives.py:203-204` and `:1261-1262` assert both are true, so the tests currently lock in the wrong semantics and must change with the fix. |
+| **58** | **WNBA's SmartSim was never vectorised, unlike MLB's.** MLB's Monte Carlo got a ~1000× vectorisation; `basketball_props_smart_sim.py` still runs `for _ in range(min(5000, max(1000, n_samples)))` and, *inside* that, a per-quarter loop that allocates a fresh 2×2 covariance array and runs `np.linalg.cholesky` **every iteration** — ~20,000 array allocations and decompositions per game, recomputing a decomposition that only depends on the quarter. Only 3 `np.random` calls in the whole file and all draw scalars. Hoisting the Cholesky out of the sample loop and drawing `size=(n_samples, 2)` once is the obvious fix. **Note this explains CPU, not RAM** — the accumulators are two 5,000-float lists. Do not assume it resolves #59. |
+| **59** | **Measure WNBA's real peak memory on a live slate (next games Tuesday).** *Reframed 2026-07-26: this no longer "decides #57" — #57 was closed by upgrading refresh-worker to pro/4GB, so the board build is no longer looking for a host.* What still matters is that **live-odds-worker's own headroom is unverified**: it runs the WNBA refresh leg in a 2048MB container, and [render.yaml:550-555](render.yaml:550) explicitly flags that as `UNVERIFIED ON A REAL WNBA SLATE`. The 1.3–1.5GB figure everything is reasoning from is a **code comment from a past incident, not a measurement** ([live_refresh_loop.py:1958](syndicate/features/shared/live_refresh_loop.py:1958)); what was actually measured 2026-07-25 was 412–652MB, on an All-Star day with one game, so it proves nothing. The instrumentation already exists: `basketball_props_smart_sim.py` has 9 `log_list_memory` call sites emitting to stderr, which produced **zero** lines that day (consistent with WNBA being idle, not with broken instrumentation). Watch `ALL_PROCESS_MEMORY` peaks on live-odds-worker through a full WNBA slate. **Measure peak, never median** — a median of 515MB hid a documented 1.3–1.5GB spike and nearly drove a bad placement decision. |
 | **56** | 🔴 **Web dies from health-check starvation, not memory.** Same incident, *different* failure: `"HTTP health check failed (timed out after 5 seconds)"`, `oomKilled: false`. `WEB_CONCURRENCY=2` × `GUNICORN_THREADS=1` gives the whole service **two concurrent requests**, and because `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false` on web, intelligence persistence runs on the **request path** ([intelligence_state.py:2678](pipeline/intelligence_state.py:2678)) — so slow requests are routine, not exceptional. Two of them starve `/healthz` and Render kills the instance. render.yaml now sets `GUNICORN_THREADS=4`, **but that is not live** — Render only reads render.yaml on a blueprint sync. Threads not workers: each worker is a whole process on 2GB, and this is I/O-bound waiting. Real fix is to stop persisting on the request path. |
 | **53** | **Prop ladder odds for all sports** (split out of #16). No `*_alternate` player market is fetched in any sport, so `_finalize_prop_market`'s `alternates` array is always empty and MLB's ladder surfaces have no book prices to compare the sim against. See #16 for the cost model and why this should ride #15's cadence tiering rather than get its own scheduler. |
-| **54** | **The OddsAPI quota store lost its observations — mitigated, root cause not proven.** Read 20 observations at 19:17 on 2026-07-25, then `observation_count: 0` with `latest: null` after the 19:38 deploy. Two hypotheses were **disproven**: `_state_namespace()` is env-derived and stable across deploys, and detached fetcher subprocesses *do* reach the shared keyvalue store (the 20 observations were written by worker-side fetchers and read from the web service, which only works through the shared backend). Remaining explanation is eviction: the key held up to 500 full observation dicts, making this telemetry the largest entry in a Redis instance that also holds sim pointers, refresh manifests and board state. Fixed by making the payload O(1) — baseline + latest + counters, no history — which both removes it as an eviction target and cuts recovery from 500 observations to 2. **If observations vanish again, the eviction theory is wrong and the next suspect is the shared store's own lifecycle.** |
 | **24** | Look-ahead interval violations (~28min instead of 60). |
 | **12** | Phase 4: smaller per-sport artifacts. |
 | **29** | Cross-type duplicate candidates. |
@@ -228,96 +275,66 @@ missing from the market board (`/wnba/api/source/cards` shows 1 game,
 `/wnba/api/market-board` shows 0; sims may be infeasible for All-Star rosters but
 it should still appear and pull lines) · **52** MLS: 1432 `unmatched_no_sim_coverage`
 rows (~71% of the board have no sim projection at all — separate from #44) ·
-**53** "last simmed" per-league rollout — MLB has `simUpdatedAtDisplay` from
+**69** "last simmed" per-league rollout — MLB has `simUpdatedAtDisplay` from
 `9b5806c6`; needs other sports plus the *reason* (lineup vs injury vs tip-off).
+*(Filed as a second #53; renumbered 2026-07-26 — #53 is prop-ladder odds.)*
 
 ## Done
 
-**Closed 2026-07-25/26 session** — #14 (OddsAPI quota instrumentation) · #16 (MLB market audit) · #17 (slate endpoint, 45→3 credits) · #18 (NCAAF 4 regions→1) · #25 Phase 0 (fail-closed guard + atomic artifact writes) · #40 (render.yaml drift, incl. pinning `plan: pro` so a blueprint sync cannot undo the paid upgrade) · #41 (scoped-resim regression test) · #43 (board lost on write: 16.9MB payload → Redis `Connection closed by server`; trimmed to 4.37MB losslessly) · #44a/#44b (soccer resim detection + trigger, shipped dark) · #46 (`sim_run_status` self-resolution) · #47 (soccer added to the worker's sport list — it was configured in `app.py` all along but the worker uses the *fallback* list) · #48 (odds prices removed from the sim fingerprint; ~10-min resim churn eliminated) · #49 (test_ops triage) · #50 (artifact-export ceiling) · #54 (quota store made O(1)) · #55 (sim ↔ board-build alternation, **both** directions) · #57 (board build moved to the 4GB refresh-worker) · #60 (keyvalue payload ceiling — oversized writes now fail loudly instead of as an unrelated `ConnectionError`) · #63 (mutual-deferral starvation invariant test) · **#67 (soccer game state derived from the clock, not a frozen `status_state` — finished games looked bettable and live games did not look live)** · plus a Central-date sweep across 14 call sites with a ratchet test (`tests/test_slate_date_timezone_discipline.py`) so the class cannot return.
+**Closed items live in [`todo_closed.md`](todo_closed.md)** — 22 items from the
+2026-07-25/26 session plus everything before it. That file is a *record*; every
+lesson from a closed item that should still change what a future session does was
+kept here instead, under Operational notes. If you need to open the archive to
+avoid repeating a mistake, the lesson is filed in the wrong place — promote it.
 
-- **1** sim fast-path runtime ceiling · **2** memoize `build_reliability_profile` ·
-  **3** deploy+restart for stuck 7-25 sim · **4** last-known-good board while stale ·
-  **5** mini card live scoreboard · **6** last odds refresh + sim run on cards ·
-  **7** Layer 2 blotter fixes · **9–11** odds-history Phases 1–3 · **13**
-  per-candidate live-state cache defeat
-- **8** Empty production board (the `NameError`). ⚠️ *The fix was correct, but the
-  same symptom recurred 2026-07-25 via an unrelated cause (#43). "Empty board" is a
-  symptom with at least two distinct root causes — do not treat it as a solved class.*
-- **44a** Soccer market board uncached + no resim detection — `12742e6c`. Adds
-  `soccer_needs_resim_event_ids` plus a TTL+artifact-signature cache keyed on
-  artifacts the build reads and never writes.
-- **44b** Soccer had **no event-driven resim path at all** — `b9f70d3a`. Ships
-  **dark**. ⚠️ **Do not enable before #14**: it forces an odds refresh with cache
-  bypass, and soccer props are ~2,400 credits/sweep (#19) against a budget already
-  projected to overrun. Enable via `SYNDICATE_ENABLE_SOCCER_RESIM_TRIGGER=true` on
-  live-odds-worker plus `SYNDICATE_SOCCER_RESIM_TICK_OWNER=false` on refresh-worker.
-- **46** `sim_run_status` was unresolvable without grepping worker logs for a run
-  stamp — `f6a013e3`. Now falls back to `_active.json` → `_last_attempt.json` and
-  always reports `sim_run_resolution`.
-- **17** MLB core game lines moved to the slate endpoint. `h2h/spreads/totals` now
-  cost **3 credits for the whole slate** instead of 3 per game (45 at 15 games).
-  Inning-segment markets are "additional markets" the slate endpoint does not
-  serve, so they stay per-event. Core and segment payloads are merged per
-  bookmaker *before* `_best_bookmaker_game_lines` scores them — scoring
-  separately would pick one book for core and another for segments and mix two
-  books' prices into one game. Falls back to the old per-event core request if
-  the slate call fails, but a fatal `OUT_OF_USAGE_CREDITS`/bad-key response
-  raises instead: silently falling back to the 15×-more-expensive path on
-  running out of credits is the worst possible response. First tests this
-  fetcher has ever had.
-- **18** NCAAF regions default `us,us2,eu,uk` → `us`. OddsAPI bills per region, so
-  four regions was a flat 4× and NCAAF was the only sport not on US-only (every
-  other lane runs `SYNDICATE_LIVE_ODDS_REFRESH_REGIONS=us`). Real trade: NCAAF
-  keeps every bookmaker the API returns with no US filter, so the eu/uk books
-  drop out of each game's provider list — the same set every other sport already
-  lives without. `ODDS_API_REGIONS` still overrides, so reverting is an env
-  change, not a deploy.
-- **25 (Phase 0)** Fail-closed refresh guard + atomic artifact writes.
-  - *Atomic writes*: `syndicate/features/shared/atomic_artifact_write.py`, wired
-    into 11 call sites across 7 producers (NBA/WNBA props, basketball props, NFL
-    props, soccer picks/rosters). `df.to_csv(path)` truncates then streams, so a
-    reader arriving mid-write silently gets fewer rows — one of the
-    candidate-swing symptoms. Temp files carry pid+uuid and sit in the
-    destination directory: the `path.with_suffix(".tmp")` shape used elsewhere
-    gives two concurrent writers the *same* temp path, and a temp on another
-    filesystem makes `os.replace` non-atomic.
-  - *Fail-closed launch marker*: `_record_odds_refresh_launch` moved to before
-    `launch_refresh_run` instead of after it. It spawns a detached subprocess
-    and then does more work, so a raise after the spawn left a sweep running
-    with no marker — and the next tick started a second one (#20). Recording
-    first makes a failed launch cost one skipped interval instead of a duplicate
-    sweep; a missed refresh self-corrects, a duplicate burns credits and can
-    stack two heavy pipelines in a 2GB container.
-  - 16 tests.
-- **41** Regression coverage for scoped resims truncating the MLB daily summary
-  (`dcda6243` shipped the fix untested). `tests/test_mlb_scoped_resim_summary.py`,
-  8 tests in two layers: a behavioural consumer contract on
-  `_games_from_daily_summary` (the board is built from `summary["outputs"]` and
-  nothing else, so a truncated summary *is* a truncated board), plus a structural
-  guard on the vendored producer — necessary because the fix lives inside a
-  ~2000-line `main()` whose helpers are nested locals that cannot be imported.
-  **The guards were validated against `dcda6243^`: all five fail on the pre-fix
-  source and pass on the fixed one**, so they are not vacuous. If `daily_update.py`
-  is re-vendored and the guards fail, check the merge is still present before
-  loosening the assertions.
-- **14** OddsAPI quota instrumentation. `syndicate/features/shared/oddsapi_quota.py`
-  records `x-requests-remaining` / `-used` / `-last` from MLB, basketball
-  (NBA+WNBA, attributed separately) and soccer fetchers; read it at
-  **`GET /api/ops/oddsapi/quota`**. Records observations rather than accumulating,
-  because `used`/`remaining` are absolute server-side counters — so burn survives
-  the lost writes you get from three services racing on a non-atomic store.
-  Recorded *before* `raise_for_status`, since a failed call may still be billed and
-  dropping it would bias measured burn downward. Reports `None` rather than `0`
-  when there is only one observation: "not measured" must not look like
-  "not burning". **All 9 OddsAPI call sites are now instrumented**: MLB,
-  basketball (NBA+WNBA attributed separately), soccer odds + props, NFL props +
-  team odds, NHL, NCAAF, NCAAB. NCAAF/NCAAB reach the API through `urlopen` with
-  the apiKey embedded in the URL, so those record only the path — the endpoint is
-  persisted to the shared store and must never carry a key.
+> **#43 is NOT closed**, despite having appeared in the closed line until
+> 2026-07-26. The write-size fix shipped and is real, but the item's own stated
+> criterion — `candidate_count > 0` **with a snapshot timestamp** — was never met,
+> and the item simultaneously sat in "In progress" saying exactly that. Listing a
+> fix as closed while its verification is outstanding is how #8's "empty board"
+> came back under a second root cause.
 
 ---
 
 ## Operational notes worth not rediscovering
+
+- **Unbounded payloads crossing into the shared keyvalue store caused three
+  outages in one day** (#43, #54, #50) — the same bug in different clothes, each
+  fixed individually before the pattern was seen. #60 now enforces a ceiling in
+  `refresh_state_store.write_json_file` / `write_text_file` that **fails loudly**
+  with key, size and caller. **Silence was the actual defect**: each failure
+  presented as something else entirely and cost hours. A rejected write that
+  names itself is recoverable; one that closes the connection and gets swallowed
+  by a generic handler is not. Do not add a new write path to that store without
+  a bound.
+- **Measure a candidate host's peak, never its median.** live-odds-worker's
+  median of 515MB nearly justified putting the board build on a box whose WNBA
+  leg is documented spiking to 1.3–1.5GB. Related: a *code comment* is not a
+  measurement — the 1.3–1.5GB figure itself has never been verified (#59).
+- **Deliberate `render.yaml` overrides — a blueprint re-apply must not undo
+  these** (from #40, now closed): `SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER=true`,
+  `SYNDICATE_MLB_SIM_MAX_GAMES_PER_RUN=0`, `SYNDICATE_LOOK_AHEAD_ENABLED=false`,
+  `SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_ENABLED=false`,
+  `SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE=false`,
+  `SYNDICATE_ENABLE_SOCCER_RESIM_TRIGGER`, `SYNDICATE_SOCCER_RESIM_TICK_OWNER`,
+  plus `plan: pro` on refresh-worker (pinned so a sync cannot undo the paid
+  upgrade). ⚠️ **The comments around the intelligence-loop vars currently
+  contradict their values — see #70 before trusting the prose in that file.**
+- **Exactly ONE service may own the intelligence-state background loop.** Today
+  that is refresh-worker (`true`); web and live-odds-worker are `false`. Two
+  owners would recompute the same state concurrently and reproduce the 2026-07-25
+  collision on a different box.
+- **A launch-time memory gate cannot see a collision** (from #55). It measures at
+  ~250MB, *before* either pipeline grows. Any future gate of this shape has the
+  same blind spot — gate on what the run will peak at, not what it starts at.
+- **The quota store's eviction theory was never proven** (from #54). Making the
+  payload O(1) removed it as an eviction target, which is why it stopped
+  happening — not evidence of why it started. **If observations vanish again the
+  theory is wrong**, and the next suspect is the shared store's own lifecycle.
+- **"Empty board" is a symptom with at least two distinct root causes** (from #8
+  and #43) — a `NameError` in one case, an oversized Redis write in the other.
+  Do not treat it as a solved class, and do not assume a past fix covers a new
+  occurrence.
 
 - **A Render env-var change via the API does NOT restart the service.** The running process keeps the old
   value until a deploy/restart. Cost real time twice: a mitigation set at 20:16 stayed inert until 20:26, and a
@@ -336,10 +353,15 @@ rows (~71% of the board have no sim projection at all — separate from #44) ·
 - **Deploying kills an in-flight MLB sim.** Check before deploying:
   `curl -s -H "X-Admin-Token: $ADMIN_TOKEN" "$BASE/api/ops/live-refresh/state?sim_date=$(date +%F)"`
   and look at `sim_run_status.state`. A full slate takes ~15 min.
-- **Three 2GB services exist** — web, refresh-worker, live-odds-worker. refresh-worker
-  carries the MLB sim *and* the intelligence pipeline; live-odds-worker carries
-  neither. Put new periodic work on live-odds-worker. Lane ownership follows the
-  `SYNDICATE_*_TICK_OWNER` env pattern.
+- **Three services exist, and they are NOT all the same size** (corrected
+  2026-07-26 — this note said "three 2GB services" after #57 had already changed
+  it): **web 2GB** (`standard`), **refresh-worker 4GB** (`pro`, upgraded
+  2026-07-25 — the #57 fix, and pinned so a blueprint sync cannot undo it),
+  **live-odds-worker 2GB** (`standard`). refresh-worker carries the MLB sim *and*
+  the intelligence pipeline; live-odds-worker carries neither, but its WNBA
+  refresh leg has unmeasured headroom (#59), so it is **not** free real estate.
+  Put new periodic work on live-odds-worker only after checking #59. Lane
+  ownership follows the `SYNDICATE_*_TICK_OWNER` env pattern.
 - **Local pytest pollutes `reports/`.** `git checkout -- reports/` before committing.
 - **A Render env-var change via the API does NOT restart the service.** The
   running process keeps the old value, so the change is inert until you trigger

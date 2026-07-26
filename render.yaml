@@ -307,20 +307,25 @@ services:
         value: "30"
       - key: GUNICORN_KEEPALIVE
         value: "5"
-      # DISABLED 2026-07-25 to stop an OOM crash loop, and left disabled here
-      # so a blueprint re-apply cannot silently restart it. See #57.
+      # ENABLED here. This service owns the intelligence-state background loop.
       #
-      # This is a CAPACITY problem, not a scheduling one. Once MLB games went
-      # live the board build alone exceeded the 2GB container: measured ~700MB
-      # idle spiking past 1479MB on pipeline ticks, and it OOM-looped every
-      # 15-30s with the MLB sim confirmed deferring and never launching. The
-      # #55 sim/pipeline alternation is correct and still needed, but it does
-      # not help when one side alone does not fit.
+      # History, because the comment that used to sit here said the opposite and
+      # survived the fix (see #70): this was DISABLED on 2026-07-25 to stop an
+      # OOM crash loop. That was a CAPACITY problem, not a scheduling one -- once
+      # MLB games went live the board build alone exceeded the then-2GB
+      # container, measured ~700MB idle spiking past 1479MB on pipeline ticks,
+      # OOM-looping every 15-30s with the MLB sim confirmed deferring and never
+      # launching. The #55 sim/pipeline alternation is correct and still needed,
+      # but it does not help when one side alone does not fit.
       #
-      # Consequence while disabled: nothing recomputes the board on a worker.
-      # The web service persists intelligence state on its REQUEST path (its
-      # own copy of this flag is false), so the board still updates -- on
-      # request, slower, and under the health-check pressure of #56.
+      # RESOLVED by capacity, not by placement: this service was upgraded to
+      # pro/4GB (see the `plan` pin above), which is why the loop lives here
+      # again. Moving it to live-odds-worker was evaluated and rejected -- that
+      # box runs the WNBA refresh leg in 2048MB.
+      #
+      # Exactly ONE service may own this loop. web and live-odds-worker are both
+      # "false" for that reason; two owners would recompute the same state
+      # concurrently and reproduce the collision on a different box.
       - key: SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP
         value: "true"
       - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
@@ -537,22 +542,24 @@ services:
         value: "30"
       - key: GUNICORN_KEEPALIVE
         value: "5"
-      # Enabled 2026-07-25 (#57): the board build moved here from
-      # refresh-worker, where it no longer fits. Measured that day:
-      # refresh-worker peaks ~1674MB running the MLB sim alone, leaving ~374MB
-      # -- not enough for a build that needs ~700MB and spikes past 1479MB.
-      # This service runs neither the sim nor the pipeline today.
+      # DISABLED here. refresh-worker owns the intelligence-state background
+      # loop; exactly ONE service may, or two owners would recompute the same
+      # state concurrently and reproduce the 2026-07-25 collision on another box.
       #
-      # Exactly ONE service may own this loop; refresh-worker's copy is
-      # "false" for that reason. Two owners would recompute the same state
-      # concurrently and reproduce the collision on a different box.
+      # History, because the comment that used to sit here said the opposite and
+      # survived the fix (see #70): hosting the board build on THIS service was
+      # briefly the plan on 2026-07-25, when refresh-worker was still 2GB and
+      # peaked ~1674MB running the MLB sim alone. It was rejected and never
+      # shipped -- refresh-worker was upgraded to pro/4GB instead, which fixed
+      # the capacity problem at its source.
       #
-      # UNVERIFIED ON A REAL WNBA SLATE. This box's own odds refresh can spawn
-      # WNBA SmartSim, and a code comment puts that at ~1.3-1.5GB -- but that
-      # figure is a comment, not a measurement, and 2026-07-25 was an All-Star
-      # day with one game (measured 412-652MB). The pipeline defers to an
-      # in-flight refresh to cover it (see _odds_refresh_in_flight); confirm
-      # against #59's Tuesday measurement before trusting this under load.
+      # Why it was rejected, and why this must stay "false" even though this box
+      # runs neither the sim nor the pipeline: its own odds refresh can spawn
+      # WNBA SmartSim in this 2048MB container, and a code comment puts that at
+      # ~1.3-1.5GB. That figure is UNVERIFIED -- it is a comment, not a
+      # measurement, and 2026-07-25 was an All-Star day with one game (measured
+      # 412-652MB), so it proves nothing either way. See #59; do not treat this
+      # box as having spare headroom until that measurement exists.
       - key: SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP
         value: "false"
       - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
