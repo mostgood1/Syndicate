@@ -170,7 +170,49 @@ endpoint cannot supply is missing. `HOT_ARTIFACT_PATTERNS` covers only
 `reports/odds_control_plane/odds_history/` are not exportable** — and those are
 exactly what `build_market_features` reads.
 
-### The suspected mechanism (instrumented in `72cbf81b`, not yet confirmed)
+### FIX SHIPPED `5d2dd951`: one odds-history cache shared across the board's games
+
+`_normalize_game_context` called `build_market_features` with `cache=None`,
+while `build_simulation_engine_context_from_candidate` — three functions below
+it in the same file — already threaded one. That asymmetry was the bug.
+
+Each call loads the odds-history shard for the game's date **plus a lookback
+shard** (`SYNDICATE_ODDS_HISTORY_SHARD_LOOKBACK`, default 1 → 2 files per game),
+and unlike the odds_events path **these files have no row cap**. Measured
+against production artifacts with 8 MB shards:
+
+| | reads | payload |
+|---|---|---|
+| before | **30** full JSON parses | 4.923 MB |
+| after | **2** | 4.923 MB |
+
+Byte-identical output, 15× fewer parses of the same two files.
+
+**Why this was so hard to see, and the methodology lesson:** `tracemalloc` peak
+does not move at all (80.7 → 81.2 MB), because each parse is freed before the
+next one starts. The comment on `_JSONL_ROWS_CACHE` in the same file already
+documents exactly this: *"CPython's allocator doesn't reliably return that churn
+to the OS, so RSS ratchets upward across a single pass even though each
+individual call's retained memory is bounded."* Production measures cgroup
+`memory.current`, which is RSS-like. **Every local measurement in this incident
+used `tracemalloc`, which is structurally blind to the failure mode** — that,
+not thin local data, is the larger part of why local kept reporting ~80 MB
+against production's 3.7 GB. Measure RSS when chasing this.
+
+**Not yet proven to fix the OOM.** It provably removes the duplicate work;
+whether that work was the whole 3.7 GB is what the deployed `board_contract_*`
+and `sim_contract_*` samples will say. Keep them until a clean run is observed.
+
+### Falsified along the way: caching the recent-market-history index
+
+`build_recent_market_history_index` runs once per game, copies every event under
+up to nine aliases and sorts each bucket — it looked like the same bug. Caching
+it measured **flat** and cost ~7 MB retained, because `_MAX_JSONL_ROWS_PER_FILE`
+already caps that path at 2000 rows/day (~14k events for the 7-day lookback).
+Reverted; the reasoning is left in a comment at `_recent_history_rows` so it is
+not retried.
+
+### The earlier suspicion (superseded by the above)
 
 `build_simulation_contract_from_context` normalizes each game in a loop
 ([simulation_adapter.py:382](../../syndicate/features/shared/simulation_adapter.py)),
