@@ -185,7 +185,17 @@ def _attach_intelligence_response_aliases(response: dict[str, Any]) -> dict[str,
         if score in {None, ""}:
             score = payload.get("adjusted_score") or payload.get("expected_value") or payload.get("ev_current") or 0.0
         payload["selection"] = selection
-        payload["name"] = selection
+        # Do NOT overwrite an existing name with the selection. This helper adds
+        # aliases; clobbering here destroyed the only human-readable label on the
+        # item. Candidates built from a rail item carry name="Aaron Judge Over 0.5
+        # Home Runs" and pick="Over 0.5", so the old line rendered them as bare
+        # "Over 0.5" with no player -- while candidates built from an artifact
+        # were unaffected, because their selection already IS the full label.
+        # That inconsistency is why only some surfaces looked broken.
+        # `selection` and `pick` both still carry the selection for consumers
+        # that want it, and blueprints/intelligence.py:928 already falls back
+        # name -> display_name -> selection, so nothing loses access to either.
+        payload["name"] = payload.get("name") or selection
         payload["pick"] = selection
         payload["market"] = market
         payload["score"] = score

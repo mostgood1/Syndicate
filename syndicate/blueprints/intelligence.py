@@ -781,6 +781,21 @@ def _compute_intelligence_response(payload: dict[str, object], *, source: str = 
         state_payload = dict(computed_response)
         state_payload["candidate_count"] = len(state_payload.get("recommendations") or [])
         response = dict(state_payload)
+        # _compute_response returns board state, which has never carried
+        # parsed_request -- so the query API stopped reporting how it interpreted
+        # the question (risk profile, requested sports/subjects, parlay shape).
+        # _parsed_request_for_question exists precisely for this and was dead
+        # code: defined, never called. Real consumer impact, not just tests --
+        # ask_the_syndicate_adapter.py:171 reads parsed_request off this result
+        # and was silently getting {}.
+        #
+        # Set before the "response" copy below, so the nested alias carries it
+        # too; callers read either shape.
+        if not isinstance(response.get("parsed_request"), dict):
+            response["parsed_request"] = _parsed_request_for_question(
+                str(payload.get("question") or "").strip(),
+                payload,
+            )
         response.setdefault("ok", True)
         response.setdefault("response", dict(response))
         response.setdefault(

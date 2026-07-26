@@ -872,6 +872,62 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self._intel_state_tempdir = TemporaryDirectory()
         temp_reports_dir = Path(self._intel_state_tempdir.name) / "intelligence"
         temp_reports_dir.mkdir(parents=True, exist_ok=True)
+
+        # 1b. Same isolation problem again, for the per-sport artifact roots.
+        #     The redirects below cover pipeline.intelligence_state.* and (further
+        #     down) the evaluation ledger, but nothing pointed the *sport source
+        #     roots* away from this repo's real data/<sport>_source/ trees. So the
+        #     query pipeline walked genuine production artifacts: e.g.
+        #     test_mlb_live_prop_rows_do_not_fall_back_to_top_props_when_live_payload_has_no_props
+        #     asserted an empty list and got real rows back
+        #     ("game_pk": 823860, "TB @ MIA"). Each SYNDICATE_<SPORT>_SOURCE_ROOT
+        #     *replaces* the search path rather than prepending to it (see
+        #     mlb/sources.py::_source_roots -- SYNDICATE_DATA_ROOT would NOT work
+        #     here, it keeps the repo path as a fallback), so pointing all eight at
+        #     one empty directory is what actually isolates them.
+        empty_source_root = Path(self._intel_state_tempdir.name) / "empty_source_root"
+        empty_source_root.mkdir(parents=True, exist_ok=True)
+        #     Do NOT add SYNDICATE_DATA_ROOT here. It was tried and measurably
+        #     made things worse on both axes: the MLB real-data leak above came
+        #     back (0.20s pass -> failing again) and the two slow query tests got
+        #     slower (2.61s -> 3.05s, 3.14s -> 4.21s). Setting it changes which
+        #     branch the artifact-root resolvers take, and they still keep a repo
+        #     fallback -- only the per-sport vars actually replace the path.
+        self._source_root_env_patcher = patch.dict(
+            os.environ,
+            {
+                f"SYNDICATE_{sport}_SOURCE_ROOT": str(empty_source_root)
+                for sport in ("MLB", "WNBA", "NBA", "NHL", "NFL", "NCAAF", "NCAAB", "SOCCER")
+            },
+        )
+        self._source_root_env_patcher.start()
+
+        # 1c. Do not persist intelligence state during tests. Profiling
+        #     test_intelligence_query_ranks_basketball_candidates_using_source_summary
+        #     put ~86% of its runtime inside IntelligenceStateService._persist_locked
+        #     -> refresh_state_store.write_json_file -> json.dumps: 210 dumps and
+        #     8.4M _iterencode calls for ONE request, because a force_refresh query
+        #     serialises the whole multi-megabyte state blob (the same payload #43
+        #     is about) on every call. Nothing in this file asserts on persisted
+        #     content -- the only references to the state paths are the redirects
+        #     right below -- so the write is pure cost here.
+        self._persist_patcher = patch.object(IntelligenceStateService, "_persist_locked", return_value=None)
+        self._persist_patcher.start()
+
+        # 1d. Same story for the prediction ledger. intelligence.py:7706 calls
+        #     record_prediction() on every query, and its path resolves through
+        #     data_root() to this machine's real data/prediction_ledger.json --
+        #     2.5MB, read and rewritten twice per test. Profiling put it at 1.46s
+        #     of a 2.6s test, the largest single cost left after 1c. Patched at
+        #     the call site rather than by redirecting data_root, because setting
+        #     SYNDICATE_DATA_ROOT breaks the artifact isolation above (see 1b).
+        #     No test in this file references record_prediction.
+        self._record_prediction_patcher = patch(
+            "syndicate.features.intelligence.record_prediction",
+            return_value=None,
+        )
+        self._record_prediction_patcher.start()
+
         self._intel_state_path_patchers = [
             patch("pipeline.intelligence_state.STATE_PATH", temp_reports_dir / "query_state_cache.json"),
             patch("pipeline.intelligence_state.BOARD_SNAPSHOT_PATH", temp_reports_dir / "board_snapshot.json"),
@@ -1072,6 +1128,9 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self._correlation_patcher.stop()
         for path_patcher in self._intel_state_path_patchers:
             path_patcher.stop()
+        self._persist_patcher.stop()
+        self._record_prediction_patcher.stop()
+        self._source_root_env_patcher.stop()
         self._intel_state_tempdir.cleanup()
         for loop_patcher in self._background_loop_patchers:
             loop_patcher.stop()
