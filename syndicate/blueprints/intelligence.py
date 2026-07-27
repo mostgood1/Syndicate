@@ -1901,9 +1901,13 @@ def _steam_format_line(value: Any) -> str | None:
 
 
 def _steam_event_subject(event: dict[str, Any]) -> str:
+    # Confirmed live 2026-07-27: production's raw prop rows carry
+    # player_name lowercase ("willy adames", not "Willy Adames") -- display
+    # only, mlb_normalize_player_name's headshot-lookup key is already
+    # case-insensitive so this doesn't touch matching.
     name = str(event.get("player_name") or "").strip()
     if name:
-        return name
+        return name.title()
     fallback = str(event.get("player_id") or event.get("game_id") or "").strip()
     return fallback or "Market"
 
