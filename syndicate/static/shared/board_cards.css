@@ -500,6 +500,14 @@ body.syndicate-body .cards-shell {
 .board-badge--no-coverage { background: rgba(255, 255, 255, 0.06); color: var(--cards-text-dim); border-color: var(--cards-line); }
 .board-badge--alert { background: rgba(231, 76, 60, 0.16); color: #ffd4d4; border-color: rgba(231, 76, 60, 0.38); }
 
+/* Which side (Over/Under, home/away) the sim's own probability actually
+   favors for a two-sided market (row.model_side === row.side) -- distinct
+   from the join_status badges above, which only say whether a model read
+   exists at all, not which side it points to. */
+.board-badge--model-favored { background: rgba(241, 196, 15, 0.16); color: #fff2c2; border-color: rgba(241, 196, 15, 0.4); }
+.board-card__edge--favored { color: #f1c40f; }
+.board-blotter__model-cell--favored { color: #f1c40f; font-weight: 700; }
+
 .board-card__reasoning {
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.03);

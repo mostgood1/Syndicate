@@ -135,6 +135,54 @@ class JoinOddsToSimTests(unittest.TestCase):
         self.assertEqual(len(inventory), 1)
         self.assertEqual(inventory[0]["join_status"], JOIN_STATUS_NO_SIM_COVERAGE)
 
+    def test_model_prob_over_gives_over_and_under_complementary_probabilities(self) -> None:
+        # 2026-07-27 fix: a sim row that carries model_prob_over (rather
+        # than a flat sim_projection) must give the Over and Under quotes
+        # for the SAME market genuinely different, complementary numbers --
+        # not the same value copied onto both, which is impossible for real
+        # win probabilities.
+        odds_rows = [
+            {"game_id": "1", "market": "Pitcher Outs::home", "period": "full_game", "entity": "Someone", "side": "over", "line": 17.5, "odds": -145},
+            {"game_id": "1", "market": "Pitcher Outs::home", "period": "full_game", "entity": "Someone", "side": "under", "line": 17.5, "odds": -105},
+        ]
+        sim_rows = [
+            {"game_id": "1", "market": "Pitcher Outs::home", "period": "full_game", "entity": "Someone", "model_prob_over": 0.62, "sim_source": "mlb_sim"},
+        ]
+
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+        by_side = {row["side"]: row for row in inventory}
+
+        self.assertAlmostEqual(by_side["over"]["sim_projection"], 0.62)
+        self.assertAlmostEqual(by_side["under"]["sim_projection"], 0.38)
+        self.assertAlmostEqual(by_side["over"]["sim_projection"] + by_side["under"]["sim_projection"], 1.0)
+        self.assertEqual(by_side["over"]["join_status"], JOIN_STATUS_MATCHED)
+        self.assertEqual(by_side["under"]["join_status"], JOIN_STATUS_MATCHED)
+
+    def test_model_prob_over_stamps_model_side_on_both_sibling_rows(self) -> None:
+        odds_rows = [
+            {"game_id": "1", "market": "total", "period": "full_game", "entity": None, "side": "over", "line": 8.5, "odds": -110},
+            {"game_id": "1", "market": "total", "period": "full_game", "entity": None, "side": "under", "line": 8.5, "odds": -110},
+        ]
+        sim_rows = [
+            {"game_id": "1", "market": "total", "period": "full_game", "entity": None, "model_prob_over": 0.3, "sim_source": "mlb_sim"},
+        ]
+
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+
+        self.assertTrue(all(row["model_side"] == "under" for row in inventory))
+
+    def test_sim_row_without_model_prob_over_leaves_model_side_none_by_default(self) -> None:
+        # Byte-for-byte prior behavior when a sim row doesn't opt into the
+        # new mechanism (every other sport, and MLB's own reco-fallback
+        # path, still work this way).
+        odds_rows = [{"game_id": "1", "market": "moneyline", "period": "full_game", "entity": None, "side": "home", "odds": -150}]
+        sim_rows = [{"game_id": "1", "market": "moneyline", "period": "full_game", "entity": None, "sim_projection": 0.6}]
+
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+
+        self.assertEqual(inventory[0]["sim_projection"], 0.6)
+        self.assertIsNone(inventory[0]["model_side"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -14,12 +14,28 @@ from syndicate.features.mlb.cards import _mlb_odds_history_entries_for_player
 from syndicate.features.mlb.cards import _mlb_odds_history_entries_for_teams
 from syndicate.features.mlb.cards import _mlb_player_id_lookup_for_game
 from syndicate.features.mlb.cards import _normalize_live_name
+from syndicate.features.mlb.cards import _source_predictions
 from syndicate.features.mlb.cards import build_mlb_market_board
 from syndicate.features.mlb.cards import mlb_needs_resim_game_pks
 from syndicate.features.shared.market_inventory import JOIN_STATUS_MATCHED
 from syndicate.features.shared.market_inventory import JOIN_STATUS_NEEDS_RESIM
 from syndicate.features.shared.market_inventory import JOIN_STATUS_NO_SIM_COVERAGE
 from syndicate.features.shared.market_inventory import join_odds_to_sim
+
+
+class MlbSourcePredictionsTests(unittest.TestCase):
+    def test_total_runs_dist_is_surfaced_for_the_market_board(self) -> None:
+        # 2026-07-27 fix: total_runs_dist was already hydrated onto the
+        # segment by _hydrate_output_segments_from_sim but never copied
+        # through here, so the market board (which reads
+        # game["predictions"]["full"]["total_runs_dist"]) could never see it.
+        output = {"full": {"away_win_prob": 0.4, "home_win_prob": 0.6, "total_runs_dist": {"7": 0.3, "8": 0.7}}}
+        predictions = _source_predictions(output)
+        self.assertEqual(predictions["full"]["total_runs_dist"], {"7": 0.3, "8": 0.7})
+
+    def test_total_runs_dist_defaults_to_none_when_absent(self) -> None:
+        predictions = _source_predictions({"full": {"away_win_prob": 0.4}})
+        self.assertIsNone(predictions["full"]["total_runs_dist"])
 
 
 class MlbMarketBoardRowsTests(unittest.TestCase):
@@ -69,6 +85,51 @@ class MlbMarketBoardRowsTests(unittest.TestCase):
         odds_rows, sim_rows = _mlb_market_board_rows_for_game(game_pk=1, markets={})
         self.assertEqual(odds_rows, [])
         self.assertEqual(sim_rows, [])
+
+    def test_moneyline_populates_both_sides_from_sim_without_any_reco_pick(self) -> None:
+        # 2026-07-27 fix: markets["ml"]["model_prob"] only exists for games
+        # the reco engine flagged -- home_win_prob/away_win_prob are the
+        # always-on full-sim values (_source_predictions), unconditional on
+        # any pick, and must populate BOTH sides even with a bare odds quote.
+        markets = {"ml": {"away_odds": "+250", "home_odds": "-350"}}
+        odds_rows, sim_rows = _mlb_market_board_rows_for_game(
+            game_pk=1, markets=markets, home_win_prob=0.78, away_win_prob=0.22
+        )
+        self.assertEqual(len(sim_rows), 2)
+
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+        by_side = {row["side"]: row for row in inventory}
+        self.assertEqual(by_side["home"]["join_status"], JOIN_STATUS_MATCHED)
+        self.assertEqual(by_side["away"]["join_status"], JOIN_STATUS_MATCHED)
+        self.assertAlmostEqual(by_side["home"]["sim_projection"], 0.78)
+        self.assertAlmostEqual(by_side["away"]["sim_projection"], 0.22)
+        self.assertEqual(by_side["home"]["model_side"], "home")
+        self.assertEqual(by_side["away"]["model_side"], "home")
+
+    def test_totals_prices_over_and_under_from_dist_without_any_reco_pick(self) -> None:
+        markets = {"totals": {"line": 8.5, "over_odds": "-120", "under_odds": "-110"}}
+        total_runs_dist = {"7": 0.2, "8": 0.2, "9": 0.3, "10": 0.3}  # P(over 8.5) = 0.6
+        odds_rows, sim_rows = _mlb_market_board_rows_for_game(game_pk=1, markets=markets, total_runs_dist=total_runs_dist)
+        self.assertEqual(len(sim_rows), 1)
+        self.assertIn("model_prob_over", sim_rows[0])
+
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+        by_side = {row["side"]: row for row in inventory}
+        self.assertAlmostEqual(by_side["over"]["sim_projection"], 0.6)
+        self.assertAlmostEqual(by_side["under"]["sim_projection"], 0.4)
+        self.assertEqual(by_side["over"]["join_status"], JOIN_STATUS_MATCHED)
+        self.assertEqual(by_side["under"]["join_status"], JOIN_STATUS_MATCHED)
+
+    def test_totals_falls_back_to_shared_model_prob_when_no_dist_supplied(self) -> None:
+        # Prior behavior preserved exactly when the caller doesn't have sim
+        # distribution data handy (e.g. an older caller, or genuinely none).
+        markets = {"totals": {"line": 8.5, "over_odds": "-115", "under_odds": "-105", "model_prob": 0.55}}
+        odds_rows, sim_rows = _mlb_market_board_rows_for_game(game_pk=1, markets=markets)
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+        self.assertEqual(len(inventory), 2)
+        for row in inventory:
+            self.assertEqual(row["join_status"], JOIN_STATUS_MATCHED)
+            self.assertAlmostEqual(row["sim_projection"], 0.55)
 
 
 class MlbMarketBoardPropRowsTests(unittest.TestCase):
@@ -240,6 +301,79 @@ class MlbMarketBoardRawPropsFeedTests(unittest.TestCase):
     shape this session: Michael McGreevy had both "outs" (already
     recommended) and "hits_allowed" (not recommended at all) quoted live.
     """
+
+    def test_raw_feed_prop_with_no_reco_pick_still_gets_model_coverage_from_dist(self) -> None:
+        # 2026-07-27 fix: this is the core "Projected is blank for a lot of
+        # these" gap -- a market-quoted stat the reco engine never picked
+        # must still get a real Model read when the sim's own distribution
+        # covers this exact player+stat.
+        probable = {"home": {"fullName": "Michael McGreevy"}}
+        raw_pitcher_lines = {"michael mcgreevy": {"hits_allowed": {"line": 4.5, "over_odds": "-120", "under_odds": "-130"}}}
+        odds_rows, sim_rows = _mlb_market_board_prop_rows_for_game(
+            game_pk=1,
+            markets={},
+            probable=probable,
+            raw_pitcher_market_lines=raw_pitcher_lines,
+            pitcher_props={"12345": {"hits_dist": {"3": 0.1, "4": 0.2, "5": 0.3, "6": 0.4}, "hits_mean": 4.9}},
+            player_id_lookup={"michael mcgreevy": 12345},
+        )
+        self.assertEqual(len(sim_rows), 1)
+        self.assertAlmostEqual(sim_rows[0]["model_prob_over"], 0.7)
+        self.assertAlmostEqual(sim_rows[0]["projected_value"], 4.9)
+
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+        by_side = {row["side"]: row for row in inventory}
+        self.assertEqual(by_side["over"]["join_status"], JOIN_STATUS_MATCHED)
+        self.assertEqual(by_side["under"]["join_status"], JOIN_STATUS_MATCHED)
+        self.assertAlmostEqual(by_side["over"]["sim_projection"], 0.7)
+        self.assertAlmostEqual(by_side["under"]["sim_projection"], 0.3)
+        self.assertAlmostEqual(by_side["over"]["projected_value"], 4.9)
+
+    def test_recommended_pitcher_prop_prefers_dist_over_edge_when_both_resolve(self) -> None:
+        markets = {
+            "pitcherProps": [
+                {
+                    "pitcher_name": "Michael McGreevy",
+                    "market": "pitcher_props",
+                    "prop": "outs",
+                    "selection": "over",
+                    "market_line": 17.5,
+                    "odds": "-145",
+                    "edge": 0.12,
+                    "team_side": "home",
+                }
+            ]
+        }
+        odds_rows, sim_rows = _mlb_market_board_prop_rows_for_game(
+            game_pk=1,
+            markets=markets,
+            pitcher_props={"12345": {"outs_dist": {"16": 0.1, "17": 0.2, "18": 0.3, "19": 0.4}, "outs_mean": 18.0}},
+            player_id_lookup={"michael mcgreevy": 12345},
+        )
+        self.assertEqual(len(sim_rows), 1)
+        # P(outs > 17.5) = P(18) + P(19) = 0.7 -- NOT the reco engine's 0.12 edge.
+        self.assertAlmostEqual(sim_rows[0]["model_prob_over"], 0.7)
+        self.assertAlmostEqual(sim_rows[0]["projected_value"], 18.0)
+        self.assertNotIn("sim_projection", sim_rows[0])
+
+    def test_hitter_prop_dist_projection_resolves_via_name_match(self) -> None:
+        # Hitter models aren't reliably id-keyed (see _mlb_prop_model_row's
+        # docstring) -- resolved by normalized name instead, same as the
+        # live-prop rail's own hitter matching.
+        markets = {
+            "hitterProps": [
+                {"player_name": "Alec Burleson", "market": "hitter_hits", "prop": "batter_hits", "selection": "under", "market_line": 1.5, "odds": "+110", "edge": 0.2}
+            ]
+        }
+        odds_rows, sim_rows = _mlb_market_board_prop_rows_for_game(
+            game_pk=1,
+            markets=markets,
+            hitter_props={"665750": {"name": "Alec Burleson", "hits_dist": {"0": 0.3, "1": 0.3, "2": 0.25, "3": 0.15}, "h_mean": 1.25}},
+        )
+        self.assertEqual(len(sim_rows), 1)
+        # P(hits > 1.5) = P(2) + P(3) = 0.4
+        self.assertAlmostEqual(sim_rows[0]["model_prob_over"], 0.4)
+        self.assertAlmostEqual(sim_rows[0]["projected_value"], 1.25)
 
     def test_probable_pitcher_gets_both_sides_for_a_stat_not_recommended(self) -> None:
         markets = {"pitcherProps": [{"pitcher_name": "Michael McGreevy", "prop": "outs", "selection": "over", "market_line": 17.5, "odds": "-145", "edge": 0.12}]}

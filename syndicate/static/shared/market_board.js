@@ -169,6 +169,16 @@
     return `${(numeric * 100).toFixed(1)}%`;
   }
 
+  // model_side ("over"/"under"/"home"/"away") is the side the sim's own
+  // probability actually favors for this market -- the SAME value on both
+  // sibling rows of a two-sided market (e.g. both the Over and Under quote
+  // for one prop), set by the backend join (market_inventory.join_odds_to_sim).
+  // A row is "favored" when its own side matches that flag, so only one of
+  // the two sibling rows gets the badge.
+  function rowIsModelFavored(row) {
+    return Boolean(row.model_side) && Boolean(row.side) && row.model_side === row.side;
+  }
+
   function gameKeyFor(game) {
     return String(game.gamePk == null ? "" : game.gamePk);
   }
@@ -443,7 +453,7 @@
               <div class="board-card__subtitle">${escapeHtml(matchup)}</div>
             </div>
           </div>
-          <div class="board-card__edge">${modelValue ? escapeHtml(modelValue) : "&mdash;"}</div>
+          <div class="board-card__edge${rowIsModelFavored(row) ? " board-card__edge--favored" : ""}">${modelValue ? escapeHtml(modelValue) : "&mdash;"}</div>
         </div>
         <div class="board-card__prop-line">${propLine ? escapeHtml(propLine) : "No market detail available."}</div>
         <div class="board-card__facts">
@@ -454,7 +464,7 @@
           ${liveProjectionValue !== null ? `<div><div class="board-card__fact-label">Live proj.</div><div class="board-card__fact-value">${escapeHtml(liveProjectionValue)}</div></div>` : ""}
           ${liveActualValue !== null ? `<div><div class="board-card__fact-label">Live actual</div><div class="board-card__fact-value">${escapeHtml(liveActualValue)}</div></div>` : ""}
         </div>
-        <div class="board-card__badges">${badgeForJoinStatus(row.join_status, row.join_note)}</div>
+        <div class="board-card__badges">${badgeForJoinStatus(row.join_status, row.join_note)}${rowIsModelFavored(row) ? '<span class="board-badge board-badge--model-favored">Model likes this side</span>' : ""}</div>
         ${row.join_status === "unmatched_needs_resim" && row.join_note ? `
           <details class="board-card__reasoning">
             <summary>Why this status</summary>
@@ -527,7 +537,7 @@
         <td>${projectedValue !== null ? escapeHtml(projectedValue) : "&mdash;"}</td>
         <td>${lineMovementValue !== null ? escapeHtml(lineMovementValue) : "&mdash;"}</td>
         <td>${oddsMovementValue !== null ? escapeHtml(oddsMovementValue) : "&mdash;"}</td>
-        <td>${modelValue ? escapeHtml(modelValue) : "&mdash;"}</td>
+        <td class="${rowIsModelFavored(row) ? "board-blotter__model-cell--favored" : ""}">${modelValue ? escapeHtml(modelValue) : "&mdash;"}${rowIsModelFavored(row) ? ' <span class="board-badge board-badge--model-favored" title="The sim favors this side">Model</span>' : ""}</td>
         <td>${liveText ? escapeHtml(liveText) : "&mdash;"}</td>
         <td>${badgeForJoinStatus(row.join_status, row.join_note)}</td>
         <td>

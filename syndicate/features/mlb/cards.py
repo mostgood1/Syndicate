@@ -1284,6 +1284,12 @@ def _source_predictions(output: dict[str, Any]) -> dict[str, Any]:
             "away_win_prob": section.get("away_win_prob"),
             "home_win_prob": section.get("home_win_prob"),
             "tie_prob": section.get("tie_prob"),
+            # Already hydrated onto `section` by
+            # _hydrate_output_segments_from_sim, just never surfaced here --
+            # the market board needs it to price the Over/Under total line
+            # from the sim's own distribution rather than a reco-gated
+            # single model_prob (see build_mlb_market_board).
+            "total_runs_dist": section.get("total_runs_dist"),
         }
     return predictions
 
@@ -3087,6 +3093,34 @@ def _bounded_live_pitcher_projection(actual_value: float | None, model_mean: flo
     return round(float(actual) + max(float(mean) - float(actual), 0.0) * remaining_fraction, 3)
 
 
+# Pitcher prop stat -> sim distribution/mean field names, keyed by the same
+# bare stat strings the raw OddsAPI pitcher-props snapshot and the
+# recommendation engine's own "prop" field both already use (see
+# scripts/fetch_mlb_oddsapi_local.py's PITCHER_MARKET_TO_PROP_KEY). Single
+# source of truth for both the live-prop rail below and the market board's
+# dist-based model probability (_mlb_market_board_prop_rows_for_game).
+_MLB_PITCHER_PROP_DIST_CONFIG: dict[str, dict[str, str]] = {
+    "strikeouts": {"label": "Strikeouts", "dist_key": "so_dist", "mean_key": "so_mean"},
+    "outs": {"label": "Outs Recorded", "dist_key": "outs_dist", "mean_key": "outs_mean"},
+    "hits_allowed": {"label": "Hits Allowed", "dist_key": "hits_dist", "mean_key": "hits_mean"},
+    "earned_runs": {"label": "Earned Runs", "dist_key": "earned_runs_dist", "mean_key": "er_mean"},
+    "walks_allowed": {"label": "Walks Allowed", "dist_key": "walks_dist", "mean_key": "walks_mean"},
+}
+
+# Hitter prop stat -> sim distribution/mean field names, keyed by the raw
+# OddsAPI market key ("batter_hits" etc, see _LIVE_HITTER_MARKET_KEYS) --
+# both the raw hitter-props snapshot and the recommendation engine's own
+# "prop"/"market" field already use this same "batter_x" naming. Single
+# source of truth for the live-prop rail below and the market board.
+_MLB_HITTER_PROP_DIST_CONFIG: dict[str, dict[str, str]] = {
+    "batter_hits": {"label": "Hits", "dist_key": "hits_dist", "mean_key": "h_mean"},
+    "batter_runs_scored": {"label": "Runs", "dist_key": "runs_dist", "mean_key": "r_mean"},
+    "batter_rbis": {"label": "RBIs", "dist_key": "rbi_dist", "mean_key": "rbi_mean"},
+    "batter_total_bases": {"label": "Total Bases", "dist_key": "total_bases_dist", "mean_key": "tb_mean"},
+    "batter_home_runs": {"label": "Home Runs", "dist_key": "home_runs_dist", "mean_key": "hr_mean"},
+}
+
+
 def _current_live_pitcher_prop_rows(selected_date: str, sim_payload: dict[str, Any] | None, actual_payload: dict[str, Any] | None) -> list[dict[str, Any]]:
     if not isinstance(sim_payload, dict) or not isinstance(actual_payload, dict):
         return []
@@ -3101,13 +3135,7 @@ def _current_live_pitcher_prop_rows(selected_date: str, sim_payload: dict[str, A
     progress_fraction = _live_progress_fraction(actual_payload)
     current_batting_side = _current_batting_side(actual_payload)
     current_pitcher_side = "away" if current_batting_side == "home" else "home" if current_batting_side == "away" else None
-    config = {
-        "strikeouts": {"label": "Strikeouts", "dist_key": "so_dist", "mean_key": "so_mean"},
-        "outs": {"label": "Outs Recorded", "dist_key": "outs_dist", "mean_key": "outs_mean"},
-        "hits_allowed": {"label": "Hits Allowed", "dist_key": "hits_dist", "mean_key": "hits_mean"},
-        "earned_runs": {"label": "Earned Runs", "dist_key": "earned_runs_dist", "mean_key": "er_mean"},
-        "walks_allowed": {"label": "Walks Allowed", "dist_key": "walks_dist", "mean_key": "walks_mean"},
-    }
+    config = _MLB_PITCHER_PROP_DIST_CONFIG
     out: list[dict[str, Any]] = []
     for side in ("away", "home"):
         probable = probable_pitchers.get(side) if isinstance(probable_pitchers, dict) else None
@@ -3491,20 +3519,9 @@ def _synth_live_hitter_prop_rows(
             line_value = _safe_float(market.get("line"))
             if line_value is None:
                 continue
-            dist_key = {
-                "hits": "hits_dist",
-                "runs_scored": "runs_dist",
-                "rbis": "rbi_dist",
-                "total_bases": "total_bases_dist",
-                "home_runs": "home_runs_dist",
-            }.get(prop_key)
-            mean_key = {
-                "hits": "h_mean",
-                "runs_scored": "r_mean",
-                "rbis": "rbi_mean",
-                "total_bases": "tb_mean",
-                "home_runs": "hr_mean",
-            }.get(prop_key)
+            hitter_dist_config = _MLB_HITTER_PROP_DIST_CONFIG.get(market_key) or {}
+            dist_key = hitter_dist_config.get("dist_key")
+            mean_key = hitter_dist_config.get("mean_key")
             model_prob_over = _dist_prob_over_line(model_row.get(dist_key), float(line_value)) if dist_key else None
             model_mean = _safe_float(model_row.get(mean_key)) if mean_key else None
             actual_value = _actual_hitter_stat_value(actual_row, prop_key)
@@ -5007,7 +5024,14 @@ _MLB_MARKET_BOARD_DISPLAY_LABELS = {
 }
 
 
-def _mlb_market_board_rows_for_game(*, game_pk: Any, markets: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def _mlb_market_board_rows_for_game(
+    *,
+    game_pk: Any,
+    markets: dict[str, Any],
+    home_win_prob: Any = None,
+    away_win_prob: Any = None,
+    total_runs_dist: Any = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Raw odds + sim rows for one game's moneyline/total markets.
 
     Moneyline needs a synthetic per-side market key ("moneyline_home" /
@@ -5016,9 +5040,19 @@ def _mlb_market_board_rows_for_game(*, game_pk: Any, markets: dict[str, Any]) ->
     moneyline's home/away win probabilities are two genuinely different
     numbers that must each match their own side's odds. Relabeled back to
     "Moneyline" for display once the join is done.
+
+    home_win_prob/away_win_prob/total_runs_dist are the full-sim values
+    (see _source_predictions), unconditional on any recommendation-engine
+    pick -- when supplied, they take priority over markets["ml"/"totals"]'s
+    own model_prob, which only exists for games the reco engine flagged.
+    Callers that don't have sim data handy (or older tests) can omit them
+    and get the prior reco-gated-only behavior unchanged.
     """
     odds_rows: list[dict[str, Any]] = []
     sim_rows: list[dict[str, Any]] = []
+
+    sim_home_prob = _safe_float(home_win_prob)
+    sim_away_prob = _safe_float(away_win_prob)
 
     moneyline = markets.get("ml") if isinstance(markets.get("ml"), dict) else None
     if isinstance(moneyline, dict) and moneyline:
@@ -5039,7 +5073,11 @@ def _mlb_market_board_rows_for_game(*, game_pk: Any, markets: dict[str, Any]) ->
             odds_rows.append({"game_id": game_pk, "market": "moneyline_away", "period": "full_game", "entity": None, "side": "away", "odds": away_odds, "market_type": "game"})
         if home_odds is not None:
             odds_rows.append({"game_id": game_pk, "market": "moneyline_home", "period": "full_game", "entity": None, "side": "home", "odds": home_odds, "market_type": "game"})
-        if model_prob is not None and selection in ("home", "away"):
+        if sim_home_prob is not None and sim_away_prob is not None:
+            model_side = "home" if sim_home_prob >= sim_away_prob else "away"
+            sim_rows.append({"game_id": game_pk, "market": "moneyline_home", "period": "full_game", "entity": None, "sim_projection": sim_home_prob, "model_side": model_side, "sim_source": "mlb_sim"})
+            sim_rows.append({"game_id": game_pk, "market": "moneyline_away", "period": "full_game", "entity": None, "sim_projection": sim_away_prob, "model_side": model_side, "sim_source": "mlb_sim"})
+        elif model_prob is not None and selection in ("home", "away"):
             sim_rows.append(
                 {
                     "game_id": game_pk,
@@ -5054,14 +5092,22 @@ def _mlb_market_board_rows_for_game(*, game_pk: Any, markets: dict[str, Any]) ->
     totals = markets.get("totals") if isinstance(markets.get("totals"), dict) else None
     if isinstance(totals, dict) and totals:
         line = totals.get("line")
+        line_value = _safe_float(line)
         over_odds = totals.get("over_odds")
         under_odds = totals.get("under_odds")
         model_prob = totals.get("model_prob")
+        model_prob_over = _dist_prob_over_line(total_runs_dist, line_value) if line_value is not None else None
         if over_odds is not None:
             odds_rows.append({"game_id": game_pk, "market": "total", "period": "full_game", "entity": None, "side": "over", "line": line, "odds": over_odds, "market_type": "game"})
         if under_odds is not None:
             odds_rows.append({"game_id": game_pk, "market": "total", "period": "full_game", "entity": None, "side": "under", "line": line, "odds": under_odds, "market_type": "game"})
-        if model_prob is not None:
+        if model_prob_over is not None:
+            # One sim row covers both the Over and Under odds rows above
+            # (same join key, no side component) -- join_odds_to_sim derives
+            # each side's complementary probability from model_prob_over
+            # using the ODDS row's own side.
+            sim_rows.append({"game_id": game_pk, "market": "total", "period": "full_game", "entity": None, "model_prob_over": model_prob_over, "sim_source": "mlb_sim"})
+        elif model_prob is not None:
             sim_rows.append({"game_id": game_pk, "market": "total", "period": "full_game", "entity": None, "sim_projection": model_prob, "sim_source": "mlb_recommendation_engine"})
 
     return odds_rows, sim_rows
@@ -5149,6 +5195,72 @@ def _row_stat_mean_value(row: dict[str, Any]) -> float | None:
     return None
 
 
+def _mlb_prop_dist_config_for_stat(prop_key: str, *, is_pitcher: bool) -> dict[str, str] | None:
+    config = _MLB_PITCHER_PROP_DIST_CONFIG if is_pitcher else _MLB_HITTER_PROP_DIST_CONFIG
+    return config.get(str(prop_key or "").strip().lower())
+
+
+def _mlb_prop_model_row(
+    *,
+    normalized_entity: str,
+    is_pitcher: bool,
+    pitcher_props: dict[str, Any] | None,
+    hitter_props: dict[str, Any] | None,
+    player_id_lookup: dict[str, int] | None,
+) -> dict[str, Any] | None:
+    """Resolves this entity's sim model row -- pitchers via id (pitcher_props
+    is keyed by player id, same as _current_live_pitcher_prop_rows), hitters
+    via name match (hitter_props isn't reliably id-keyed, same fallback its
+    live-prop twin already uses, cards.py's _bounded_live_hitter loop)."""
+    if is_pitcher:
+        if not isinstance(pitcher_props, dict) or not player_id_lookup:
+            return None
+        player_id = player_id_lookup.get(normalized_entity)
+        if player_id is None:
+            return None
+        model_row = pitcher_props.get(str(player_id))
+        return model_row if isinstance(model_row, dict) else None
+    if not isinstance(hitter_props, dict):
+        return None
+    for model_row in hitter_props.values():
+        if isinstance(model_row, dict) and _normalize_live_name(model_row.get("name")) == normalized_entity:
+            return model_row
+    return None
+
+
+def _mlb_prop_dist_projection(
+    *,
+    normalized_entity: str,
+    is_pitcher: bool,
+    prop_key: str,
+    line_value: float | None,
+    pitcher_props: dict[str, Any] | None,
+    hitter_props: dict[str, Any] | None,
+    player_id_lookup: dict[str, int] | None,
+) -> tuple[float | None, float | None]:
+    """(model_prob_over, projected_mean) computed straight from the sim's own
+    distribution for this player+stat+line -- (None, None) when no sim
+    coverage resolves, so callers can fall back to the recommendation
+    engine's edge/mean instead of losing the row entirely."""
+    if line_value is None:
+        return None, None
+    dist_config = _mlb_prop_dist_config_for_stat(prop_key, is_pitcher=is_pitcher)
+    if not dist_config:
+        return None, None
+    model_row = _mlb_prop_model_row(
+        normalized_entity=normalized_entity,
+        is_pitcher=is_pitcher,
+        pitcher_props=pitcher_props,
+        hitter_props=hitter_props,
+        player_id_lookup=player_id_lookup,
+    )
+    if model_row is None:
+        return None, None
+    model_prob_over = _dist_prob_over_line(model_row.get(dist_config.get("dist_key")), float(line_value))
+    projected_mean = _safe_float(model_row.get(dist_config.get("mean_key")))
+    return model_prob_over, projected_mean
+
+
 def _mlb_market_board_prop_rows_for_game(
     *,
     game_pk: Any,
@@ -5156,12 +5268,20 @@ def _mlb_market_board_prop_rows_for_game(
     probable: dict[str, Any] | None = None,
     raw_pitcher_market_lines: dict[str, dict[str, Any]] | None = None,
     raw_hitter_market_lines: dict[str, dict[str, Any]] | None = None,
+    pitcher_props: dict[str, Any] | None = None,
+    hitter_props: dict[str, Any] | None = None,
+    player_id_lookup: dict[str, int] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Odds + sim rows for pitcher/hitter props.
 
-    The sim signal (edge/p_win) always comes from the recommendation
-    engine's own picks -- there's no separate model output to join
-    against. The ODDS signal now prefers the raw OddsAPI props feed
+    The sim signal is the sim's own per-player distribution
+    (pitcher_props/hitter_props, see _mlb_prop_dist_projection) whenever it
+    resolves for a market-quoted stat -- independent of whether the
+    recommendation engine happened to pick that stat. When it doesn't
+    resolve (no pitcher_props/hitter_props/player_id_lookup supplied, or
+    genuinely no sim coverage for that player+stat), a recommended prop
+    still falls back to the recommendation engine's own edge value, same as
+    before. The ODDS signal prefers the raw OddsAPI props feed
     (scripts/refresh_mlb_oddsapi.py's oddsapi_pitcher_props/
     oddsapi_hitter_props snapshots) when available: a genuinely
     independent, unfiltered source carrying every real quoted line (both
@@ -5253,25 +5373,42 @@ def _mlb_market_board_prop_rows_for_game(
         normalized_entity = _normalize_live_name(entity)
         is_pitcher = entity_is_pitcher.get(normalized_entity, False)
         team_side = entity_team_side.get(normalized_entity)
-        for info in props.values():
+        for prop_key, info in props.items():
             if info["edge"] is None:
                 continue
-            sim_rows.append(
-                {
-                    "game_id": game_pk,
-                    "market": _mlb_prop_join_market_key(info["market_label"], is_pitcher=is_pitcher, team_side=team_side, normalized_entity=normalized_entity),
-                    "period": "full_game",
-                    "entity": entity,
-                    "sim_projection": info["edge"],
-                    # The actual projected stat count (e.g. 4.8 strikeouts),
-                    # distinct from sim_projection above (an edge/probability,
-                    # always rendered as a percent by the board) -- see
-                    # _row_stat_mean_value's docstring for why this needed its
-                    # own field rather than overloading sim_projection.
-                    "projected_value": info["mean"],
-                    "sim_source": "mlb_recommendation_engine",
-                }
+            model_prob_over, dist_mean = _mlb_prop_dist_projection(
+                normalized_entity=normalized_entity,
+                is_pitcher=is_pitcher,
+                prop_key=prop_key,
+                line_value=_safe_float(info["line"]),
+                pitcher_props=pitcher_props,
+                hitter_props=hitter_props,
+                player_id_lookup=player_id_lookup,
             )
+            sim_row: dict[str, Any] = {
+                "game_id": game_pk,
+                "market": _mlb_prop_join_market_key(info["market_label"], is_pitcher=is_pitcher, team_side=team_side, normalized_entity=normalized_entity),
+                "period": "full_game",
+                "entity": entity,
+                # The actual projected stat count (e.g. 4.8 strikeouts),
+                # distinct from sim_projection/model_prob_over below (a
+                # probability, always rendered as a percent) -- see
+                # _row_stat_mean_value's docstring for why this needed its
+                # own field. Prefers the sim distribution's own mean when it
+                # resolves, otherwise the recommendation row's mean field.
+                "projected_value": dist_mean if dist_mean is not None else info["mean"],
+            }
+            if model_prob_over is not None:
+                sim_row["model_prob_over"] = model_prob_over
+                sim_row["sim_source"] = "mlb_sim"
+            else:
+                # No sim distribution resolved for this player+stat (e.g. no
+                # pitcher_props/hitter_props supplied, or genuinely no sim
+                # coverage) -- fall back to the reco engine's own edge value
+                # so the row still shows SOME model read rather than none.
+                sim_row["sim_projection"] = info["edge"]
+                sim_row["sim_source"] = "mlb_recommendation_engine"
+            sim_rows.append(sim_row)
 
     covered_entity_props: set[tuple[str, str]] = set()
     for normalized_entity, display_name in known_players.items():
@@ -5294,6 +5431,36 @@ def _mlb_market_board_prop_rows_for_game(
             if under_odds is not None:
                 odds_rows.append({"game_id": game_pk, "market": join_key, "period": "full_game", "entity": display_name, "side": "under", "line": line, "odds": under_odds, "market_type": "prop"})
             covered_entity_props.add((normalized_entity, str(stat_key).strip().lower()))
+
+            prop_key = str(stat_key or "").strip().lower()
+            already_recommended = prop_key in recommended_props_by_entity.get(display_name, {})
+            if not already_recommended:
+                # This market-quoted stat has no recommendation-engine pick
+                # (Pass 2 above never touches it) -- without this, it would
+                # show "No model view" even when the sim has full
+                # distribution coverage for this exact player+stat. Resolve
+                # it fresh from the sim, independent of any pick.
+                model_prob_over, dist_mean = _mlb_prop_dist_projection(
+                    normalized_entity=normalized_entity,
+                    is_pitcher=is_pitcher,
+                    prop_key=prop_key,
+                    line_value=_safe_float(line),
+                    pitcher_props=pitcher_props,
+                    hitter_props=hitter_props,
+                    player_id_lookup=player_id_lookup,
+                )
+                if model_prob_over is not None:
+                    sim_rows.append(
+                        {
+                            "game_id": game_pk,
+                            "market": join_key,
+                            "period": "full_game",
+                            "entity": display_name,
+                            "model_prob_over": model_prob_over,
+                            "projected_value": dist_mean,
+                            "sim_source": "mlb_sim",
+                        }
+                    )
 
     for entity, props in recommended_props_by_entity.items():
         normalized_entity = _normalize_live_name(entity)
@@ -5656,14 +5823,36 @@ def build_mlb_market_board(selected_date: str) -> dict[str, Any]:
         home_abbr = str(home.get("abbr") or "HME").strip().upper()
         markets = game.get("markets") if isinstance(game.get("markets"), dict) else {}
         probable = game.get("probable") if isinstance(game.get("probable"), dict) else {}
+        predictions_full = (game.get("predictions") or {}).get("full") if isinstance(game.get("predictions"), dict) else {}
+        predictions_full = predictions_full if isinstance(predictions_full, dict) else {}
+        player_id_lookup = _mlb_player_id_lookup_for_game(selected_date, game_pk)
+        # Loaded per-game (not batched for the whole slate) so only one
+        # game's sim payload -- pitcher_props/hitter_props distributions
+        # included -- is ever held in memory at a time here; this function's
+        # own docstring documents a prior full-slate OOM on the 2GB
+        # refresh-worker, and its 60s cache bucket already bounds how often
+        # this runs at all.
+        game_pk_int = _safe_int(game_pk)
+        sim_section = _sim_section_from_payload(_daily_sim_by_game(selected_date, [game_pk_int]).get(game_pk_int)) if game_pk_int is not None else {}
+        pitcher_props = sim_section.get("pitcher_props") if isinstance(sim_section.get("pitcher_props"), dict) else None
+        hitter_props = sim_section.get("hitter_props") if isinstance(sim_section.get("hitter_props"), dict) else None
 
-        odds_rows, sim_rows = _mlb_market_board_rows_for_game(game_pk=game_pk, markets=markets)
+        odds_rows, sim_rows = _mlb_market_board_rows_for_game(
+            game_pk=game_pk,
+            markets=markets,
+            home_win_prob=predictions_full.get("home_win_prob"),
+            away_win_prob=predictions_full.get("away_win_prob"),
+            total_runs_dist=predictions_full.get("total_runs_dist"),
+        )
         prop_odds_rows, prop_sim_rows = _mlb_market_board_prop_rows_for_game(
             game_pk=game_pk,
             markets=markets,
             probable=probable,
             raw_pitcher_market_lines=raw_pitcher_market_lines,
             raw_hitter_market_lines=raw_hitter_market_lines,
+            pitcher_props=pitcher_props,
+            hitter_props=hitter_props,
+            player_id_lookup=player_id_lookup,
         )
         odds_rows = odds_rows + prop_odds_rows
         sim_rows = sim_rows + prop_sim_rows
@@ -5672,7 +5861,6 @@ def build_mlb_market_board(selected_date: str) -> dict[str, Any]:
         status = game.get("status") if isinstance(game.get("status"), dict) else {}
         game_state = str(status.get("abstract") or "").strip().lower() or "pregame"
         live_lens_rows = _mlb_live_lens_prop_rows_for_game(live_lens_report, game_pk) if game_state == "live" else []
-        player_id_lookup = _mlb_player_id_lookup_for_game(selected_date, game_pk)
 
         for row in inventory:
             market = row.get("market")

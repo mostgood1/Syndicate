@@ -12,9 +12,15 @@ does not replace or duplicate it.
 Row identity for the odds<->sim join is (game_id, market, period, entity),
 with entity=None for game-level markets (moneyline/spread/total) and the
 player's name for props. A sim row's projection is joined onto every odds
-row that shares that identity, regardless of side (both the home-ML and
-away-ML odds rows for a game join to the same win-probability sim row; both
-the Over and Under quote for a player prop join to the same projection).
+row that shares that identity, regardless of side -- e.g. both the home-ML
+and away-ML odds rows for a game join to the same win-probability sim row.
+A two-sided market where Over and Under quote against the SAME sim row
+(one prop, one total) can still get genuinely complementary probabilities:
+if the sim row carries `model_prob_over` (P(outcome > line)) instead of a
+flat `sim_projection`, the join derives each side's value from the ODDS
+row's own `side` (Over gets `model_prob_over`, Under gets its complement)
+and stamps `model_side` with whichever side the sim actually favors, so a
+consumer can badge the correct row without any join-key changes.
 
 The join result itself is the player/game-status-awareness signal: an odds
 row that can't be matched to a current sim row for the SAME entity, when a
@@ -53,6 +59,13 @@ INVENTORY_ROW_FIELDS: frozenset[str] = frozenset(
         "odds",
         # Sim join result
         "sim_projection",
+        # Which side ("over"/"under"/"home"/"away") the sim's own
+        # probability actually favors for this market -- same value on
+        # both sibling rows of a two-sided market (e.g. both the Over and
+        # Under quote for one prop), so a consumer can badge whichever
+        # row's own `side` matches. None when the sim row didn't supply a
+        # side-aware probability (see model_prob_over below).
+        "model_side",
         # The actual projected stat value for a prop (e.g. 4.8 strikeouts),
         # distinct from sim_projection above -- sim_projection is always a
         # 0-1 fraction (win probability/edge, rendered as a percent by the
@@ -125,12 +138,26 @@ def join_odds_to_sim(odds_rows: list[dict[str, Any]], sim_rows: list[dict[str, A
         join_status: str
         join_note: str | None = None
         sim_projection: Any = None
+        model_side: Any = None
         projected_value: Any = None
         sim_source: Any = None
 
         if sim_match is not None:
             join_status = JOIN_STATUS_MATCHED
-            sim_projection = sim_match.get("sim_projection")
+            model_prob_over = sim_match.get("model_prob_over")
+            if isinstance(model_prob_over, (int, float)) and odds_row.get("side") in ("over", "under"):
+                # A side-aware sim row (e.g. a two-sided prop/total) carries
+                # ONE probability of the "over" outcome; the matching Over
+                # and Under odds rows share this same sim row (same join
+                # key, no side component -- see module docstring), so the
+                # complementary value for each is derived here from the
+                # ODDS row's own side rather than baked into the sim row.
+                probability_over = max(0.0, min(1.0, float(model_prob_over)))
+                sim_projection = probability_over if odds_row.get("side") == "over" else 1.0 - probability_over
+                model_side = "over" if probability_over >= 0.5 else "under"
+            else:
+                sim_projection = sim_match.get("sim_projection")
+                model_side = sim_match.get("model_side")
             projected_value = sim_match.get("projected_value")
             sim_source = sim_match.get("sim_source")
         else:
@@ -156,6 +183,7 @@ def join_odds_to_sim(odds_rows: list[dict[str, Any]], sim_rows: list[dict[str, A
         row.update(
             {
                 "sim_projection": sim_projection,
+                "model_side": model_side,
                 "projected_value": projected_value,
                 "sim_source": sim_source,
                 "join_status": join_status,
