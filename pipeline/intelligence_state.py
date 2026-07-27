@@ -2860,7 +2860,29 @@ class IntelligenceStateService:
             # self.queue_refresh() internally, which acquires the condition
             # itself -- self._lock is a plain, non-reentrant threading.Lock,
             # so nesting the two would deadlock this thread against itself.
-            self._ensure_default_board_window_watched()
+            #
+            # #95 follow-up. This call was UNGUARDED for its first several
+            # hours in production -- confirmed live 2026-07-27: self._latest_key
+            # sat frozen at one specific pre-fix computed_at for roughly an
+            # hour, through several redeploys and with no in-flight sim or
+            # odds-refresh deferral bound explaining it. An uncaught
+            # exception here (this call was only ever exercised against
+            # mocks in tests, never real production data/timing) would
+            # silently kill this entire background thread on every restart
+            # -- explaining why nothing ever recomputed no matter how long
+            # the wait. Every other per-iteration step in this loop already
+            # follows "a failure here must never kill the loop" (see
+            # _persist_locked's own docstring); this call was the one gap.
+            try:
+                self._ensure_default_board_window_watched()
+            except Exception as exc:
+                print(f"[intelligence_state] BOARD_WINDOW_WATCH_FAILED {type(exc).__name__}: {exc}", flush=True)
+                try:
+                    import traceback
+
+                    print(f"[intelligence_state] BOARD_WINDOW_WATCH_TRACEBACK {traceback.format_exc()}", flush=True)
+                except Exception:
+                    pass
             if canonical_board_state_enabled() or canonical_board_state_shadow_compare_enabled():
                 # Additive dual-write during the migration-step-2 validation
                 # window: drains _watched_board_dates and writes the new

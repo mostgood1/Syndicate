@@ -4441,3 +4441,74 @@ class ReadCombinedIntelligenceResponseTests(unittest.TestCase):
         self.assertEqual(result["candidate_count"], 0)
         self.assertEqual(result["dates_covered"], ["2030-07-01"])
         self.assertIsInstance(result["ranked_all"], list)
+
+
+class BoardWindowWatchFailureDoesNotKillTheLoopTests(unittest.TestCase):
+    """#95 follow-up. _ensure_default_board_window_watched sat UNGUARDED at
+    the top of _background_loop's while body for its first several hours in
+    production -- confirmed live 2026-07-27: self._latest_key sat frozen at
+    one specific pre-fix computed_at for roughly an hour, through several
+    redeploys, with nothing (no in-flight sim, no odds-refresh deferral --
+    both bounded at 5 consecutive defers) explaining it. The only remaining
+    explanation: an uncaught exception there (only ever exercised against
+    mocks in unit tests, never real production data/timing) silently killed
+    the entire background thread on every restart. This test proves the
+    loop survives and still processes its pending queue when that call
+    raises -- it fails against pre-fix code because the loop simply dies
+    partway through the first iteration instead of reaching the pop/process
+    step below.
+    """
+
+    def test_background_loop_survives_board_window_watch_exception(self) -> None:
+        service = IntelligenceStateService()
+        service._interval_seconds = 0
+
+        payload = {"question": "top edges today", "date": "2026-07-27", "sport": "mlb"}
+        normalized = service._normalize_payload(payload)
+        queued_key = _payload_key(normalized)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            state_path = temp_root / "query_state_cache.json"
+            board_snapshot_path = temp_root / "board_snapshot.json"
+            persisted_state = {
+                "latest_key": None,
+                "updated_at": "2026-07-27T20:00:00Z",
+                "watched_payloads": {queued_key: normalized},
+                "pending_keys": {queued_key: normalized},
+                "snapshots": {},
+            }
+            refresh_state_store.write_json_file(state_path, persisted_state)
+
+            board_state = {
+                "ok": True,
+                "top_opportunities": [{"name": "Play 1"}],
+                "recommendations": [{"name": "Play 1"}],
+                "by_sport": {"mlb": [{"name": "Play 1"}]},
+                "board_contract": {"schema": "intelligence_board_v1", "cards": [{"name": "Play 1"}]},
+                "analysis": None,
+                "portfolio": {},
+                "parlays": [],
+                "selected_date": "2026-07-27",
+                "state_last_updated": "2026-07-27T20:00:00Z",
+                "last_updated": "2026-07-27T20:00:00Z",
+                "snapshot_generated_at": "2026-07-27T20:00:00Z",
+                "candidate_count": 1,
+            }
+
+            def fake_write_latest_intelligence_state(state: dict[str, object]) -> dict[str, object]:
+                service._stop.set()
+                return dict(state)
+
+            with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(
+                intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path
+            ), patch.object(
+                service, "_ensure_default_board_window_watched", side_effect=RuntimeError("simulated production failure")
+            ):
+                with patch.object(service, "_compute_board_publication_response", return_value=dict(board_state)) as mocked_compute:
+                    with patch("pipeline.intelligence_state.write_latest_intelligence_state", side_effect=fake_write_latest_intelligence_state):
+                        service._background_loop()
+
+        mocked_compute.assert_called_once_with(normalized)
+        self.assertIn(queued_key, service._snapshots)
+        self.assertEqual(service._latest_key, queued_key)
