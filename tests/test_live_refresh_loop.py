@@ -15,6 +15,18 @@ from scripts import run_live_odds_refresh_worker
 
 
 class LiveRefreshLoopTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # The #15 per-sport pregame cadence filter consults real liveness
+        # checkers and the repo's real sweep markers; inside these tick tests
+        # that state is whatever the machine happens to have. Interval 0
+        # disables the filter globally (the filter has its own test class,
+        # PregameSportCadenceTests, where its inputs are controlled).
+        self._cadence_env = patch.dict(
+            os.environ, {"SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS": "0"}, clear=False
+        )
+        self._cadence_env.start()
+        self.addCleanup(self._cadence_env.stop)
+
     def tearDown(self) -> None:
         live_refresh_loop._LIVE_REFRESH_LOOP_STOP.set()
         live_refresh_loop._LIVE_REFRESH_LOOP_THREAD = None
@@ -2523,3 +2535,88 @@ class OffHoursOddsGateTests(unittest.TestCase):
 
     def test_zero_ceiling_disables_the_gate(self) -> None:
         self.assertFalse(self._gate(any_live=False, last_epoch=9_999.0, ceiling=0))
+
+
+class PregameSportCadenceTests(unittest.TestCase):
+    """#15 Phase 1. Per-sport pregame sweep intervals (2026-07-27 rules):
+    daily sports drift-sample every 2h pregame -- full sweeps, so the midday
+    prop samples ride along -- and soccer, a weekly sport, gets 2-3 points a
+    day (8h). A sport's own liveness is the only cadence signal that belongs
+    to it: before this, WNBA re-swept every 60s for the whole of an MLB slate.
+    """
+
+    def _filter(self, sports, *, now_epoch=100_000.0, force=(), markers=None, live=()):
+        checkers = {
+            sport: (lambda s: (lambda _d: s in live))(sport)
+            for sport in ("mlb", "wnba", "soccer", "nba", "nhl")
+        }
+        with patch.object(live_refresh_loop, "_LIVE_STATUS_CHECKERS", checkers):
+            with patch.object(
+                live_refresh_loop,
+                "_read_pregame_sport_sweep_epochs",
+                return_value=dict(markers or {}),
+            ):
+                return live_refresh_loop._apply_pregame_sport_cadence(
+                    sports, now_epoch=now_epoch, force_sports=set(force)
+                )
+
+    def test_defaults_encode_the_agreed_rules(self) -> None:
+        self.assertEqual(live_refresh_loop._pregame_sweep_interval_seconds("mlb"), 7200)
+        self.assertEqual(live_refresh_loop._pregame_sweep_interval_seconds("wnba"), 7200)
+        self.assertEqual(live_refresh_loop._pregame_sweep_interval_seconds("soccer"), 28800)
+
+    def test_a_sport_mid_interval_and_not_live_is_skipped(self) -> None:
+        kept, skipped = self._filter(
+            ["mlb", "wnba"], markers={"mlb": 99_000.0, "wnba": 99_000.0}
+        )
+        self.assertEqual(kept, [])
+        self.assertEqual(sorted(skipped), ["mlb", "wnba"])
+
+    def test_a_live_sport_is_never_skipped(self) -> None:
+        kept, skipped = self._filter(
+            ["mlb", "wnba"], markers={"mlb": 99_999.0, "wnba": 99_999.0}, live={"mlb"}
+        )
+        self.assertEqual(kept, ["mlb"])
+        self.assertEqual(skipped, ["wnba"])
+
+    def test_soccer_waits_out_its_longer_weekly_interval(self) -> None:
+        # 3h after its last sweep: a daily sport is due again, soccer is not.
+        kept, skipped = self._filter(
+            ["mlb", "soccer"],
+            now_epoch=100_000.0,
+            markers={"mlb": 100_000.0 - 3 * 3600, "soccer": 100_000.0 - 3 * 3600},
+        )
+        self.assertEqual(kept, ["mlb"])
+        self.assertEqual(skipped, ["soccer"])
+
+    def test_event_triggered_sports_bypass_the_interval(self) -> None:
+        # A lineup or injury change IS the movement worth sampling.
+        kept, skipped = self._filter(
+            ["mlb", "wnba"], markers={"mlb": 99_999.0, "wnba": 99_999.0}, force={"wnba"}
+        )
+        self.assertEqual(kept, ["wnba"])
+        self.assertEqual(skipped, ["mlb"])
+
+    def test_no_marker_fails_open_to_a_sweep(self) -> None:
+        kept, skipped = self._filter(["mlb"], markers={})
+        self.assertEqual(kept, ["mlb"])
+        self.assertEqual(skipped, [])
+
+    def test_unknown_sport_and_failing_checker_fail_open(self) -> None:
+        def broken(_date):
+            raise RuntimeError("no signal")
+
+        with patch.object(live_refresh_loop, "_LIVE_STATUS_CHECKERS", {"mlb": broken}):
+            with patch.object(
+                live_refresh_loop, "_read_pregame_sport_sweep_epochs", return_value={"mlb": 99_999.0, "ncaab": 99_999.0}
+            ):
+                kept, skipped = live_refresh_loop._apply_pregame_sport_cadence(
+                    ["mlb", "ncaab"], now_epoch=100_000.0, force_sports=set()
+                )
+        self.assertEqual(kept, ["mlb", "ncaab"])
+        self.assertEqual(skipped, [])
+
+    def test_zero_interval_disables_the_filter_for_that_sport(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_MLB": "0"}, clear=False):
+            kept, skipped = self._filter(["mlb"], markers={"mlb": 99_999.0})
+        self.assertEqual(kept, ["mlb"])

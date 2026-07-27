@@ -2416,6 +2416,110 @@ def _off_hours_gate_blocks_launch(*, now_epoch: float, any_live: bool | None) ->
 	return (now_epoch - last_epoch) < ceiling
 
 
+# #15 Phase 1: per-sport pregame sweep intervals. Defaults encode the
+# per-sport rules agreed 2026-07-27: daily sports drift-sample every 2h
+# pregame (full sweeps, so the midday PROP samples ride along); soccer is a
+# weekly sport whose pre-matchday drift is worth 2-3 points a day, so 8h.
+# On matchday soccer's games go live and the live cadence takes over; the
+# proper matchday ramp (T-75/T-10 per game) is Phase 3.
+_PREGAME_SWEEP_INTERVAL_DEFAULTS = {"soccer": 8 * 3600}
+_PREGAME_SWEEP_INTERVAL_FALLBACK = 2 * 3600
+
+
+def _pregame_sweep_interval_seconds(sport: str) -> int:
+	sport = str(sport or "").strip().lower()
+	raw = str(os.environ.get(f"SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_{sport.upper()}") or "").strip()
+	if not raw:
+		raw = str(os.environ.get("SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS") or "").strip()
+	try:
+		value = int(raw) if raw else int(_PREGAME_SWEEP_INTERVAL_DEFAULTS.get(sport, _PREGAME_SWEEP_INTERVAL_FALLBACK))
+	except Exception:
+		value = int(_PREGAME_SWEEP_INTERVAL_DEFAULTS.get(sport, _PREGAME_SWEEP_INTERVAL_FALLBACK))
+	return max(0, value)
+
+
+def _pregame_sport_sweep_epochs_path() -> Path:
+	return _meta_dir() / "last_pregame_sweep_by_sport.json"
+
+
+def _read_pregame_sport_sweep_epochs() -> dict[str, float]:
+	payload = read_json_file(_pregame_sport_sweep_epochs_path())
+	out: dict[str, float] = {}
+	if isinstance(payload, dict):
+		for sport, epoch in payload.items():
+			try:
+				out[str(sport).strip().lower()] = float(epoch)
+			except (TypeError, ValueError):
+				continue
+	return out
+
+
+def _record_pregame_sport_sweep_epochs(epoch: float, sports: list[str]) -> None:
+	try:
+		existing = _read_pregame_sport_sweep_epochs()
+		for sport in sports:
+			existing[str(sport).strip().lower()] = float(epoch)
+		write_json_file(_pregame_sport_sweep_epochs_path(), existing)
+	except Exception as exc:
+		# A missing marker only ever fails open to an extra sweep.
+		print(f"[live_refresh_loop] PREGAME_SWEEP_MARKER_WRITE_FAILED error={type(exc).__name__}: {exc}", flush=True)
+
+
+def _apply_pregame_sport_cadence(
+	sports: list[str],
+	*,
+	now_epoch: float,
+	force_sports: set[str],
+) -> tuple[list[str], list[str]]:
+	"""(kept, skipped): drop sports mid-interval whose own games are not live.
+
+	Per-SPORT, not per-phase, deliberately: the loop's phase is global, so
+	before this filter a sport with no live game rode whatever cadence any
+	OTHER sport's live window set -- WNBA re-swept every 60s for the whole of
+	an MLB slate. A sport's own liveness is the only cadence signal that
+	belongs to it.
+
+	Fail-open rules, in order: an event-triggered sport (force_sports --
+	lineup/injury change, join-mismatch resim) always sweeps; a sport whose
+	liveness cannot be established sweeps; a sport with no checker sweeps; a
+	sport with no marker sweeps. Only "definitively not live AND swept within
+	its own interval" is dropped.
+	"""
+	date_str = central_today_iso()
+	markers = _read_pregame_sport_sweep_epochs()
+	kept: list[str] = []
+	skipped: list[str] = []
+	for sport in sports:
+		normalized = str(sport).strip().lower()
+		if not normalized:
+			continue
+		if normalized in force_sports:
+			kept.append(normalized)
+			continue
+		interval = _pregame_sweep_interval_seconds(normalized)
+		if interval <= 0:
+			kept.append(normalized)
+			continue
+		checker = _LIVE_STATUS_CHECKERS.get(normalized)
+		if checker is None:
+			kept.append(normalized)
+			continue
+		try:
+			sport_live = bool(checker(date_str))
+		except Exception:
+			kept.append(normalized)
+			continue
+		if sport_live:
+			kept.append(normalized)
+			continue
+		last_epoch = markers.get(normalized, 0.0)
+		if last_epoch <= 0.0 or (now_epoch - last_epoch) >= interval:
+			kept.append(normalized)
+			continue
+		skipped.append(normalized)
+	return kept, skipped
+
+
 def _pregame_relaunch_blocked(*, now_epoch: float, date_str: str) -> bool:
 	cooldown = _pregame_relaunch_cooldown_seconds()
 	if cooldown <= 0:
@@ -2765,6 +2869,56 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 		)
 		skip_launch = True
 	if not skip_launch:
+		# #15 Phase 1: per-sport pregame cadence. A sport whose OWN games are
+		# not live doesn't need the tick cadence -- its lines drift, they
+		# don't move -- and before this filter every non-live sport rode
+		# whatever cadence the loop was on, including MLB's 60s LIVE cadence
+		# for the whole of a 14h slate. Each sport now sweeps pregame at most
+		# once per its configured interval (default 2h; soccer 8h, i.e. the
+		# 2-3/day a weekly sport's drift actually shows), full cadence
+		# resuming the moment that sport itself is live.
+		#
+		# Deliberately full sweeps, not lines-only: the 2h drift points are
+		# also the midday PROP samples the movement/CLV surfaces need
+		# (decided 2026-07-27). Market tiering is Phase 2; per-game
+		# T-75/T-10 ramp-and-close capture is Phase 3 and outranks it.
+		#
+		# Event triggers bypass the interval by design: a lineup or injury
+		# change IS the movement worth sampling, so force_refresh_sports
+		# sweeps regardless of how recent the last drift point was.
+		try:
+			resolved_launch_sports = (
+				[piece for piece in str(launch_sports).split(",") if piece]
+				if launch_sports
+				else list(_live_refresh_loop_effective_sports(selected_date))
+			)
+			force_sports = {piece for piece in str(force_refresh_sports or "").split(",") if piece}
+			kept_sports, cadence_skipped = _apply_pregame_sport_cadence(
+				resolved_launch_sports,
+				now_epoch=tick_started_epoch,
+				force_sports=force_sports,
+			)
+			if cadence_skipped:
+				meta["pregameCadenceSkipped"] = cadence_skipped
+				print(
+					f"[live_refresh_loop] PREGAME_CADENCE_SKIPPED sports={','.join(sorted(cadence_skipped))}",
+					flush=True,
+				)
+				if not kept_sports:
+					meta["ok"] = False
+					meta["skipped"] = True
+					meta["error"] = "pregame cadence: every sport swept within its own interval; nothing due"
+					skip_launch = True
+				else:
+					launch_sports = ",".join(kept_sports)
+			# Nothing dropped: leave launch_sports EXACTLY as it was --
+			# None means launch_refresh_run resolves the active set itself,
+			# and that contract must survive this filter untouched.
+		except Exception as exc:
+			# The filter must never be the reason odds stop refreshing --
+			# fail open to the unfiltered launch.
+			print(f"[live_refresh_loop] PREGAME_CADENCE_FILTER_FAILED error={type(exc).__name__}: {exc}", flush=True)
+	if not skip_launch:
 		if effective_phase == "pregame":
 			_record_pregame_launch(tick_started_epoch, selected_date)
 		# Fail-closed (#25): record the ATTEMPT before launching, not the
@@ -2795,6 +2949,12 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			launched_sports = launch_sports.split(",") if launch_sports else _live_refresh_loop_effective_sports(selected_date)
 			if "wnba" in launched_sports:
 				_record_wnba_odds_refresh_launch(tick_started_epoch)
+			# #15 Phase 1: per-sport sweep markers, recorded for every sport
+			# in the launch (live included -- the filter only consults a
+			# marker when the sport is NOT live, and a marker refreshed
+			# during live play just means the first post-slate pregame sweep
+			# waits one interval, with the slate-end data still fresh).
+			_record_pregame_sport_sweep_epochs(tick_started_epoch, list(launched_sports))
 		except Exception as exc:
 			# Resolving the sport list must never be the reason a refresh
 			# doesn't launch; the WNBA marker is only a gate input.
