@@ -2929,9 +2929,35 @@ class IntelligenceStateService:
                         "by_sport": {},
                         "analysis": None,
                     }
+                # #93. _compute_board_publication_response's rollover path
+                # (see its own comment: "committed" when today's candidate
+                # pool is transiently empty and tomorrow's beats it) mutates
+                # ITS OWN LOCAL request_payload/selected_date to the rollover
+                # date, but returns that as `response` -- it never told this
+                # caller. Storing under _payload_key(payload_to_process)
+                # unconditionally means a payload that asked for "today"
+                # gets ITS OWN key overwritten with tomorrow's content the
+                # instant rollover fires, corrupting the one slot every
+                # plain "today" request reads. Confirmed live 2026-07-27:
+                # this is what actually served a WNBA-only, 2026-07-28
+                # response for an explicit date=2026-07-27 request, even
+                # after the read-side date guards below were fixed and
+                # deployed -- those correctly refused to serve it, but had
+                # nothing valid left to fall back to, since every rollover
+                # cycle kept clobbering the only "today" snapshot that
+                # existed. Re-deriving the storage key from the response's
+                # own selected_date keeps a rolled-over response reachable
+                # (still stored, under tomorrow's real key, and still
+                # eligible to become self._latest_key below) without ever
+                # overwriting a different date's slot.
+                response_date = str(response.get("selected_date") or "").strip() if isinstance(response, dict) else ""
+                request_date = str(payload_to_process.get("date") or payload_to_process.get("selected_date") or "").strip()
+                effective_payload = dict(payload_to_process)
+                if response_date and response_date != request_date:
+                    effective_payload["date"] = response_date
                 snapshot = IntelligenceSnapshot(
-                    key=_payload_key(payload_to_process),
-                    payload=dict(payload_to_process),
+                    key=_payload_key(effective_payload),
+                    payload=effective_payload,
                     response=response,
                     computed_at=_utc_now(),
                     source_fingerprint=str(response.get("source_fingerprint") or response.get("latestSourceFingerprint") or "") if isinstance(response, dict) else "",

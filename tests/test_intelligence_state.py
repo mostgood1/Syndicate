@@ -1403,6 +1403,73 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertIn(queued_key, service._snapshots)
         self.assertEqual(service._latest_key, queued_key)
 
+    def test_background_loop_stores_rolled_over_response_under_its_own_date_not_the_requested_one(self) -> None:
+        # #93. _compute_board_publication_response's rollover path (see
+        # test_board_publication_rolls_over_when_next_day_has_more_candidates)
+        # returns a response for a DIFFERENT date than the payload it was
+        # asked to compute, but never told this caller. Before this fix, the
+        # snapshot always got filed under _payload_key(payload_to_process)
+        # -- the ORIGINAL "today" request -- so a rolled-over response
+        # silently overwrote the one slot every plain "today" request reads
+        # with tomorrow's content. Confirmed live 2026-07-27: this is what
+        # kept serving a WNBA-only, 2026-07-28 response for an explicit
+        # date=2026-07-27 request even after the read-side date guards were
+        # deployed -- those correctly refused to serve it, but nothing
+        # valid was ever left to fall back to, since every rollover cycle
+        # clobbered the only "today" snapshot in existence.
+        service = IntelligenceStateService()
+        service._interval_seconds = 0
+
+        today = "2026-07-27"
+        tomorrow = "2026-07-28"
+        payload = {"question": "top edges today", "date": today}
+        normalized = service._normalize_payload(payload)
+        today_key = _payload_key(normalized)
+        tomorrow_key = _payload_key({**normalized, "date": tomorrow})
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            state_path = temp_root / "query_state_cache.json"
+            board_snapshot_path = temp_root / "board_snapshot.json"
+            persisted_state = {
+                "latest_key": None,
+                "updated_at": "2026-07-27T20:00:00Z",
+                "watched_payloads": {today_key: normalized},
+                "pending_keys": {today_key: normalized},
+                "snapshots": {},
+            }
+            refresh_state_store.write_json_file(state_path, persisted_state)
+
+            with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path):
+                rolled_over_response = {
+                    "ok": True,
+                    "top_opportunities": [{"sport": "WNBA"}],
+                    "recommendations": [{"sport": "WNBA"}],
+                    "by_sport": {"wnba": [{"sport": "WNBA"}]},
+                    "board_contract": {"schema": "intelligence_board_v1", "cards": [{"sport": "WNBA"}]},
+                    "analysis": None,
+                    "portfolio": {},
+                    "parlays": [],
+                    "selected_date": tomorrow,
+                    "state_last_updated": "2026-07-27T20:00:00Z",
+                    "last_updated": "2026-07-27T20:00:00Z",
+                    "snapshot_generated_at": "2026-07-27T20:00:00Z",
+                    "candidate_count": 1,
+                }
+
+                def fake_write_latest_intelligence_state(state: dict[str, object]) -> dict[str, object]:
+                    service._stop.set()
+                    return dict(state)
+
+                with patch.object(service, "_compute_board_publication_response", return_value=dict(rolled_over_response)):
+                    with patch("pipeline.intelligence_state.write_latest_intelligence_state", side_effect=fake_write_latest_intelligence_state):
+                        service._background_loop()
+
+        self.assertNotIn(today_key, service._snapshots)
+        self.assertIn(tomorrow_key, service._snapshots)
+        self.assertEqual(service._latest_key, tomorrow_key)
+        self.assertEqual(service._snapshots[tomorrow_key].payload.get("date"), tomorrow)
+
     def test_state_compute_promotes_candidate_pool_when_ranking_returns_empty(self) -> None:
         service = IntelligenceStateService()
 
