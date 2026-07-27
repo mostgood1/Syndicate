@@ -95,3 +95,30 @@ reports/intelligence/evaluation_ledger_chunks/
 reports/intelligence/archive/
 reports/intelligence/board_snapshot*.json
 reports/intelligence/query_state_cache.json
+
+# 2026-07-27: a background session committed the entire working tree
+# (0250ac82) instead of its assigned narrow fix, sweeping up months of
+# local test-run and dev-session scratch state. Reverted that content in the
+# follow-up cleanup commit; these patterns keep it from reaccumulating.
+# NOT reports/intelligence/intelligence_state.json itself (undated) -- that
+# one is the real #43 artifact-transport file, deliberately synced
+# worker->web, and stays tracked.
+reports/intelligence/intelligence_state_2*.json
+reports/intelligence/intelligence_state_history_2*.jsonl
+reports/intelligence/live_pipeline_last_successful.json
+reports/live_refresh_loop/mlb_sim_runs/
+reports/live_refresh_loop/last_*.json
+reports/live_refresh_loop/memory_diagnostics.json
+reports/live_refresh_loop/mlb_sim_coldstart_progress.json
+reports/schedule_adapter/
+reports/odds_control_plane/odds_history/
+reports/refresh_status/latest/hot_artifact_pull_watermark.json
+
+# Test-run pollution: #72 already removed the production prediction-ledger
+# write path, so any growth here is local pytest runs, not real usage
+# (measured: ~14.5KB per test, quadratic -- see tests/conftest.py). The NHL/
+# MLB/soccer odds-lifecycle tests independently leak into the real repo's
+# data/odds_events/<date>.jsonl the same way; both got swept into 0250ac82
+# by accident.
+data/prediction_ledger.json
+data/odds_events/
