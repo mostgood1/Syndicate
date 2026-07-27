@@ -1914,21 +1914,37 @@ def _steam_event_subject(event: dict[str, Any]) -> str:
 
 def _steam_event_market_text(event: dict[str, Any]) -> str:
     # market_type is a raw stat slug ("batter_runs_scored") -- humanize it
-    # rather than exposing OddsAPI's own vocabulary. selection (over/under)
-    # and line are separate fields on props (_flatten_mlb_props), absent on
-    # game markets (h2h/totals/spreads), so both are optional here.
+    # rather than exposing OddsAPI's own vocabulary.
     market = str(event.get("market_type") or "").strip().replace("_", " ").strip()
-    market = market[:1].upper() + market[1:] if market else "Market"
+    return market[:1].upper() + market[1:] if market else "Market"
+
+
+def _steam_event_line_text(event: dict[str, Any]) -> str:
+    # selection (over/under) and line are separate fields on props
+    # (_flatten_mlb_props), absent on game markets (h2h/totals/spreads), so
+    # both are optional -- the card's third line is blank rather than
+    # showing a bare "Line" placeholder when neither is there.
     selection = str(event.get("selection") or "").strip().capitalize()
     line = _steam_format_line(event.get("line"))
-    bits = [market]
     if selection and line:
-        bits.append(f"{selection} {line}")
-    elif selection:
-        bits.append(selection)
-    elif line:
-        bits.append(line)
-    return " · ".join(bits)
+        return f"{selection} {line}"
+    return selection or line or ""
+
+
+def _steam_event_significance(event: dict[str, Any]) -> tuple[int, float]:
+    # User-directed ranking (2026-07-27): a move that actually shifted the
+    # line outranks every odds-only move regardless of size -- a real line
+    # move is the harder, more informative signal (the book adjusted the
+    # number, not just repriced around it). Within each tier, biggest
+    # magnitude first.
+    steam = event.get("steam") if isinstance(event.get("steam"), dict) else {}
+    line_delta = steam.get("line_delta")
+    has_line_move = isinstance(line_delta, (int, float)) and line_delta != 0
+    if has_line_move:
+        return (1, abs(line_delta))
+    odds_delta = steam.get("odds_delta")
+    magnitude = abs(odds_delta) if isinstance(odds_delta, (int, float)) else 0.0
+    return (0, magnitude)
 
 
 def _steam_event_movement_text(event: dict[str, Any]) -> str:
@@ -1970,7 +1986,13 @@ def board_steam_api():
     except Exception:
         _LOGGER.exception("BOARD_STEAM_READ_FAILURE")
         events = []
-    recent = list(reversed(events))[:limit]
+    # Ranked by significance (real line move first, then magnitude), not
+    # recency -- the whole bounded 200-event set is in play, not just the
+    # newest `limit`, since a big move from a few cycles ago should still
+    # outrank a tiny move that happened a minute later. The timestamp on
+    # each card is what tells the viewer how fresh it is.
+    ranked = sorted(events, key=_steam_event_significance, reverse=True)
+    recent = ranked[:limit]
     # Headshots need a real MLBAM player ID, which the raw OddsAPI prop rows
     # never carry (only a display name) -- resolved via the day's roster
     # snapshots (hr_targets.mlb_player_id_lookup_for_date), same source
@@ -1981,6 +2003,10 @@ def board_steam_api():
     for event in recent:
         subject = _steam_event_subject(event)
         market_text = _steam_event_market_text(event)
+        line_text = _steam_event_line_text(event)
+        event["subject"] = subject
+        event["market_text"] = market_text
+        event["line_text"] = line_text
         event["label"] = f"{subject} — {market_text}" if subject != "Market" else market_text
         event["movement_text"] = _steam_event_movement_text(event)
         event["headshot_url"] = None

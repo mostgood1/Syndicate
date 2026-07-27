@@ -773,7 +773,7 @@
   async function loadSteam() {
     try {
       const dateParam = state.date ? `date=${encodeURIComponent(state.date)}&` : "";
-      const res = await fetch(`/api/board/steam?${dateParam}limit=6`, { cache: "no-store" });
+      const res = await fetch(`/api/board/steam?${dateParam}limit=12`, { cache: "no-store" });
       if (!res.ok) return;
       const json = await res.json();
       lastSteamEvents = Array.isArray(json.events) ? json.events : [];
@@ -936,13 +936,17 @@
       container.innerHTML = `
         <h2 class="board-section-title">📡 Steam</h2>
         <div class="board-strip">
-          ${lastSteamEvents.slice(0, 6).map((event) => `
+          ${lastSteamEvents.slice(0, 12).map((event) => `
             <div class="board-strip-card board-strip-card--steam" title="${escapeHtml((event.capture_phase || "").toString())}">
-              <div class="board-strip-card__head">
+              <div class="board-strip-card__row">
                 ${steamAvatarHtml(event)}
-                <div class="board-strip-card__title">${escapeHtml(event.label || "Market movement")}</div>
+                <div class="board-strip-card__info">
+                  <div class="board-strip-card__name">${escapeHtml(event.subject || event.label || "Market")}</div>
+                  <div class="board-strip-card__prop">${escapeHtml(event.market_text || "")}</div>
+                  <div class="board-strip-card__lineval">${escapeHtml(event.line_text || "")}</div>
+                </div>
+                <div class="board-strip-card__move">${escapeHtml(steamDeltaText(event))}</div>
               </div>
-              <div class="board-strip-card__edge">${escapeHtml(steamDeltaText(event))}</div>
               <div class="board-strip-card__pick">${escapeHtml(formatTimestamp(event.timestamp))}${event.is_live ? " · live" : ""}</div>
             </div>
           `).join("")}
