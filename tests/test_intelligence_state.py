@@ -1018,6 +1018,48 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(response["board_contract"]["recommendation_count"], 3)
         self.assertEqual(response["board_contract"]["schema"], "intelligence_board_v1")
 
+    def test_compute_response_never_rolls_over_for_an_explicit_date(self) -> None:
+        # #94 follow-up. Confirmed live 2026-07-27: an explicit date=today
+        # web request (force_refresh -> _compute_intelligence_response ->
+        # this function) got silently served WNBA-only, tomorrow-dated
+        # content on a single transient empty read for today. See the
+        # matching fix/test for _compute_board_publication_response --
+        # this is the OTHER copy of the same rollover trigger, used by the
+        # synchronous/query compute path rather than the background loop.
+        service = IntelligenceStateService()
+        today = "2026-06-15"
+        tomorrow = "2026-06-16"
+
+        def fake_build_pool(selected_date: str, source_fingerprint: str) -> dict:
+            count = 0 if selected_date == today else 3
+            candidates = [
+                {"name": f"Play {i}", "sport_slug": "mlb", "market": "Hits", "score": 5.0, "confidence": 0.5, "updated_at": "2026-06-16T12:00:00Z"}
+                for i in range(count)
+            ]
+            return {
+                "selected_date": selected_date,
+                "source_fingerprint": source_fingerprint,
+                "candidate_count": count,
+                "candidate_pools": {},
+                "global_pool": candidates,
+                "candidates": candidates,
+            }
+
+        analysis_result = {"ok": True, "headline": "The Syndicate brief", "recommendations": [], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []}
+
+        with patch.object(intelligence_state_module, "central_today_iso", return_value=today):
+            with patch.object(intelligence_state_module, "_next_supported_intelligence_date", return_value=tomorrow):
+                with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-1"):
+                    with patch.object(service, "_build_candidate_pool", side_effect=fake_build_pool) as mocked_pool:
+                        with patch("pipeline.intelligence_state.run_routed_intelligence_pipeline", return_value=dict(analysis_result)):
+                            response = service._compute_response({"question": "top edges today", "date": today, "limit": 5}, force_refresh=True)
+
+        self.assertEqual(response["candidate_count"], 0)
+        self.assertEqual(response["selected_date"], today)
+        called_dates = [call.args[0] for call in mocked_pool.call_args_list]
+        self.assertEqual(called_dates, [today])
+        self.assertNotIn(tomorrow, called_dates)
+
     def test_state_compute_persists_board_snapshot_artifact(self) -> None:
         service = IntelligenceStateService()
 
@@ -1288,40 +1330,22 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertTrue(response["state_last_updated"])
         self.assertEqual(response["state_last_updated"], response["snapshot_generated_at"])
 
-    def test_board_publication_does_not_roll_over_when_next_day_is_also_empty(self) -> None:
-        # A transient zero for today (e.g. an artifact-pull hiccup on one
-        # cycle) must not permanently pin the published board to tomorrow's
-        # date when tomorrow is *also* empty -- tomorrow is guaranteed to be
-        # empty for most of today, since it hasn't started yet, and nothing
-        # ever re-checks today once rolled over. Confirmed in production:
-        # today had real games the whole time; a single zero reading rolled
-        # the board over to a permanently-empty tomorrow.
-        service = IntelligenceStateService()
-        today = "2026-06-15"
-        tomorrow = "2026-06-16"
-
-        def fake_build_pool(selected_date: str, source_fingerprint: str) -> dict:
-            return {
-                "selected_date": selected_date,
-                "source_fingerprint": source_fingerprint,
-                "candidate_count": 0,
-                "candidate_pools": {},
-                "global_pool": [],
-                "candidates": [],
-            }
-
-        with patch.object(intelligence_state_module, "central_today_iso", return_value=today):
-            with patch.object(intelligence_state_module, "_next_supported_intelligence_date", return_value=tomorrow):
-                with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-1"):
-                    with patch.object(service, "_build_candidate_pool", side_effect=fake_build_pool) as mocked_pool:
-                        response = service._compute_board_publication_response({"question": "top edges today", "date": today, "limit": 5})
-
-        self.assertEqual(response["candidate_count"], 0)
-        self.assertEqual(response["selected_date"], today)
-        called_dates = [call.args[0] for call in mocked_pool.call_args_list]
-        self.assertIn(tomorrow, called_dates)
-
-    def test_board_publication_rolls_over_when_next_day_has_more_candidates(self) -> None:
+    def test_board_publication_never_rolls_over_for_a_dateless_payload_either(self) -> None:
+        # #94 follow-up. Superseded scenario: this file used to have two
+        # tests asserting rollover DID fire, both driven by a payload that
+        # explicitly set "date": today. That was never actually the
+        # "dateless default" case its own docstrings claimed to cover --
+        # with no "date" key at all, selected_date resolves to None (see
+        # _compute_board_publication_response's own resolution line), and
+        # None can never equal central_today_iso()'s string return, so the
+        # rollover trigger's condition was structurally unreachable for a
+        # truly dateless payload even before this session's fix. Confirmed
+        # live 2026-07-27 that the trigger DID fire for an EXPLICIT
+        # date=today request instead (see
+        # test_board_publication_never_rolls_over_for_an_explicit_date) --
+        # that was the real, reachable bug. This test documents that a
+        # genuinely dateless payload was -- and remains -- a no-op for this
+        # trigger, so no caller can ever hit it.
         service = IntelligenceStateService()
         today = "2026-06-15"
         tomorrow = "2026-06-16"
@@ -1344,11 +1368,58 @@ class IntelligenceStateTests(unittest.TestCase):
         with patch.object(intelligence_state_module, "central_today_iso", return_value=today):
             with patch.object(intelligence_state_module, "_next_supported_intelligence_date", return_value=tomorrow):
                 with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-1"):
-                    with patch.object(service, "_build_candidate_pool", side_effect=fake_build_pool):
+                    with patch.object(service, "_build_candidate_pool", side_effect=fake_build_pool) as mocked_pool:
+                        response = service._compute_board_publication_response({"question": "top edges today", "limit": 5})
+
+        # selected_date=None resolves against fake_build_pool as "not today"
+        # (None != today), so the pool itself is non-empty here -- rollover
+        # is never even consulted, and only one build call happens.
+        self.assertEqual(response["candidate_count"], 3)
+        self.assertIsNone(response["selected_date"])
+        called_dates = [call.args[0] for call in mocked_pool.call_args_list]
+        self.assertEqual(called_dates, [None])
+
+    def test_board_publication_never_rolls_over_for_an_explicit_date(self) -> None:
+        # #94 follow-up. Confirmed live 2026-07-27: an EXPLICIT date=today
+        # request (typed by the caller, e.g. via the API) got silently
+        # substituted with tomorrow's WNBA-only content on a single
+        # transient empty read for today -- rollover used to fire for ANY
+        # payload whose date resolved to today, whether the caller typed
+        # that date on purpose or it was the dateless default. An explicit
+        # request must get exactly what it asked for, even if that's
+        # honestly empty; only a genuinely dateless payload may roll over.
+        service = IntelligenceStateService()
+        today = "2026-06-15"
+        tomorrow = "2026-06-16"
+
+        def fake_build_pool(selected_date: str, source_fingerprint: str) -> dict:
+            count = 0 if selected_date == today else 3
+            candidates = [
+                {"name": f"Play {i}", "sport_slug": "mlb", "market": "Hits", "score": 5.0, "confidence": 0.5, "updated_at": "2026-06-16T12:00:00Z"}
+                for i in range(count)
+            ]
+            return {
+                "selected_date": selected_date,
+                "source_fingerprint": source_fingerprint,
+                "candidate_count": count,
+                "candidate_pools": {},
+                "global_pool": candidates,
+                "candidates": candidates,
+            }
+
+        with patch.object(intelligence_state_module, "central_today_iso", return_value=today):
+            with patch.object(intelligence_state_module, "_next_supported_intelligence_date", return_value=tomorrow):
+                with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-1"):
+                    with patch.object(service, "_build_candidate_pool", side_effect=fake_build_pool) as mocked_pool:
                         response = service._compute_board_publication_response({"question": "top edges today", "date": today, "limit": 5})
 
-        self.assertEqual(response["candidate_count"], 3)
-        self.assertEqual(response["selected_date"], tomorrow)
+        self.assertEqual(response["candidate_count"], 0)
+        self.assertEqual(response["selected_date"], today)
+        # today's pool is the ONLY one built -- tomorrow's richer pool is
+        # never even probed, since rollover never triggers for this payload.
+        called_dates = [call.args[0] for call in mocked_pool.call_args_list]
+        self.assertEqual(called_dates, [today])
+        self.assertNotIn(tomorrow, called_dates)
 
     def test_background_loop_consumes_persisted_queue_payloads(self) -> None:
         service = IntelligenceStateService()

@@ -3149,6 +3149,14 @@ class IntelligenceStateService:
     def _compute_board_publication_response(self, payload: dict[str, Any]) -> dict[str, Any]:
         request_started_at = time.perf_counter()
         request_payload = dict(payload)
+        # #94 follow-up. See the matching comment/fix in _compute_response --
+        # captured before selected_date resolves below, used to gate the
+        # rollover trigger. Every payload _ensure_default_board_window_watched
+        # queues now carries an explicit date (today's own included), so
+        # this trigger firing for one of them is exactly the "internally
+        # substitutes tomorrow for an explicit today request" bug confirmed
+        # live 2026-07-27.
+        payload_had_explicit_date = bool(str(payload.get("date") or payload.get("selected_date") or "").strip())
         question = str(request_payload.get("question") or "").strip() or "top edges today"
         selected_date = str(request_payload.get("date") or request_payload.get("selected_date") or "").strip() or None
         requested_sport = str(request_payload.get("sport") or "all").strip().lower() or "all"
@@ -3205,7 +3213,7 @@ class IntelligenceStateService:
         # from one anywhere else in the function. Bounding it with plain
         # prints to find out which part it actually is.
         print(f"[intelligence_state] CANDIDATE_POOL_READY date={selected_date} count={candidate_pool_count}", flush=True)
-        if candidate_pool_count <= 0 and selected_date == central_today_iso():
+        if candidate_pool_count <= 0 and selected_date == central_today_iso() and not payload_had_explicit_date:
             rollover_date = _next_supported_intelligence_date(selected_date)
             if rollover_date and rollover_date != selected_date:
                 # print, not logger.info: BETTING_BOARD_PUBLISH_DATE below
@@ -3426,6 +3434,22 @@ class IntelligenceStateService:
     def _compute_response(self, payload: dict[str, Any], *, force_refresh: bool = False) -> dict[str, Any]:
         request_started_at = time.perf_counter()
         request_payload = dict(payload)
+        # #94 follow-up. Captured before selected_date is resolved below, and
+        # BEFORE this dict is mutated by a rollover -- see its use at the
+        # rollover trigger. Confirmed live 2026-07-27: an EXPLICIT
+        # date=2026-07-27 request (via force_refresh) got served WNBA-only,
+        # 2026-07-28 content, because the rollover trigger only checked
+        # "does the resolved date equal today", never "did the caller ask
+        # for a specific date on purpose" -- so a single transient empty
+        # read for today (plausible under the heavy concurrent MLB-sim load
+        # this evening) silently substituted tomorrow's slate for an
+        # explicit request, not just the dateless default. Under the #94
+        # board-window redesign this trigger is now fully obsolete for any
+        # caller that carries a date -- today and tomorrow are already
+        # independently tracked and computed by _ensure_default_board_window_watched,
+        # so there is no longer a legitimate reason for "today"'s own cycle
+        # to internally substitute tomorrow's content.
+        payload_had_explicit_date = bool(str(payload.get("date") or payload.get("selected_date") or "").strip())
         question = str(request_payload.get("question") or "").strip() or "top edges today"
         selected_date = str(request_payload.get("date") or request_payload.get("selected_date") or "").strip() or None
         requested_sport = str(request_payload.get("sport") or "all").strip().lower() or "all"
@@ -3464,7 +3488,7 @@ class IntelligenceStateService:
 
             candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
             candidate_pool_count = int(candidate_pool.get("candidate_count") or 0)
-            if candidate_pool_count <= 0 and selected_date == central_today_iso():
+            if candidate_pool_count <= 0 and selected_date == central_today_iso() and not payload_had_explicit_date:
                 rollover_date = _next_supported_intelligence_date(selected_date)
                 if rollover_date and rollover_date != selected_date:
                     rollover_fingerprint = self._source_state_fingerprint(rollover_date)
