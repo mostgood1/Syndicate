@@ -2813,114 +2813,125 @@ class IntelligenceStateService:
                     self._trim_ordered_dict(self._pending_keys, self._max_snapshots)
                     self._condition.wait(timeout=float(self._interval_seconds))
                 continue
+            # #81. Everything from guard acquisition to the end of this
+            # iteration runs under a finally that releases the guard. The
+            # release used to be a plain statement AFTER the persist: when
+            # _persist_locked raised KeyValuePayloadTooLarge on 2026-07-27,
+            # the thread died AND kept the guard, so intelligence_pipeline_busy()
+            # read locked() forever and the MLB sim launcher deferred against
+            # a pipeline that no longer existed. The persist itself no longer
+            # raises (c342f0d0), but the class survives anywhere in the
+            # snapshot-install stretch -- a finally is the structural fix.
             try:
-                guard_acquired = self._execution_guard.acquire(blocking=False)
-                print(f"[intelligence_state] GUARD_ACQUIRE_RESULT acquired={guard_acquired}", flush=True)
-                if not guard_acquired:
-                    with self._condition:
-                        self._pending_keys[_payload_key(payload_to_process)] = payload_to_process
-                        self._pending_keys.move_to_end(_payload_key(payload_to_process))
-                        self._trim_ordered_dict(self._pending_keys, self._max_snapshots)
-                        self._condition.wait(timeout=min(1.0, float(self._interval_seconds)))
-                    continue
-                logger.info("WORKER RUN", extra={"payload_key": _payload_key(payload_to_process)})
-                logger.info("BACKGROUND_LOOP_PRE_BOARD_PUBLISH", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
-                print("[intelligence_state] CALLING_COMPUTE_BOARD_PUBLICATION_RESPONSE", flush=True)
-                state = self._compute_board_publication_response(payload_to_process)
-                print("[intelligence_state] RETURNED_FROM_COMPUTE_BOARD_PUBLICATION_RESPONSE", flush=True)
-                logger.info("BACKGROUND_LOOP_POST_BOARD_PUBLISH", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
-                logger.info("BACKGROUND_LOOP_PRE_PERSIST", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
-                written_state = write_latest_intelligence_state(state)
-                logger.info("BACKGROUND_LOOP_POST_PERSIST", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
-                if written_state is None:
+                try:
+                    guard_acquired = self._execution_guard.acquire(blocking=False)
+                    print(f"[intelligence_state] GUARD_ACQUIRE_RESULT acquired={guard_acquired}", flush=True)
+                    if not guard_acquired:
+                        with self._condition:
+                            self._pending_keys[_payload_key(payload_to_process)] = payload_to_process
+                            self._pending_keys.move_to_end(_payload_key(payload_to_process))
+                            self._trim_ordered_dict(self._pending_keys, self._max_snapshots)
+                            self._condition.wait(timeout=min(1.0, float(self._interval_seconds)))
+                        continue
+                    logger.info("WORKER RUN", extra={"payload_key": _payload_key(payload_to_process)})
+                    logger.info("BACKGROUND_LOOP_PRE_BOARD_PUBLISH", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
+                    print("[intelligence_state] CALLING_COMPUTE_BOARD_PUBLICATION_RESPONSE", flush=True)
+                    state = self._compute_board_publication_response(payload_to_process)
+                    print("[intelligence_state] RETURNED_FROM_COMPUTE_BOARD_PUBLICATION_RESPONSE", flush=True)
+                    logger.info("BACKGROUND_LOOP_POST_BOARD_PUBLISH", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
+                    logger.info("BACKGROUND_LOOP_PRE_PERSIST", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
+                    written_state = write_latest_intelligence_state(state)
+                    logger.info("BACKGROUND_LOOP_POST_PERSIST", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
+                    if written_state is None:
+                        response = {
+                            "ok": False,
+                            "error": "invalid worker state",
+                            "response": {},
+                            "top_opportunities": [],
+                            "by_sport": {},
+                            "analysis": None,
+                        }
+                    else:
+                        response = dict(written_state)
+                except Exception as exc:
+                    # Root-caused 2026-07-25: this handler swallowed the only
+                    # evidence that anything went wrong. It logged nothing at
+                    # all, then built a hardcoded zero-candidate response which
+                    # the code below unconditionally installs as self._latest_key
+                    # -- so a throw anywhere in _compute_board_publication_response
+                    # silently replaced a good, fully-computed board with an empty
+                    # one, every single cycle, and the only externally visible
+                    # symptom was "board shows 0 candidates". Confirmed live: the
+                    # checkpoint prints showed pool/serialize/rank all succeeding
+                    # with 67-71 candidates, then BUILDING_LIVE_PIPELINE_SUMMARY,
+                    # then nothing -- no BOARD_PUBLICATION_RESPONSE_READY, no
+                    # error -- straight to the persist of an empty snapshot.
+                    print(f"[intelligence_state] BOARD_PUBLICATION_FAILED {type(exc).__name__}: {exc}", flush=True)
+                    try:
+                        import traceback
+
+                        print(f"[intelligence_state] BOARD_PUBLICATION_TRACEBACK {traceback.format_exc()}", flush=True)
+                    except Exception:
+                        pass
+                    run_failed = True
                     response = {
                         "ok": False,
-                        "error": "invalid worker state",
+                        "error": f"{type(exc).__name__}: {exc}",
                         "response": {},
                         "top_opportunities": [],
                         "by_sport": {},
                         "analysis": None,
                     }
-                else:
-                    response = dict(written_state)
-            except Exception as exc:
-                # Root-caused 2026-07-25: this handler swallowed the only
-                # evidence that anything went wrong. It logged nothing at
-                # all, then built a hardcoded zero-candidate response which
-                # the code below unconditionally installs as self._latest_key
-                # -- so a throw anywhere in _compute_board_publication_response
-                # silently replaced a good, fully-computed board with an empty
-                # one, every single cycle, and the only externally visible
-                # symptom was "board shows 0 candidates". Confirmed live: the
-                # checkpoint prints showed pool/serialize/rank all succeeding
-                # with 67-71 candidates, then BUILDING_LIVE_PIPELINE_SUMMARY,
-                # then nothing -- no BOARD_PUBLICATION_RESPONSE_READY, no
-                # error -- straight to the persist of an empty snapshot.
-                print(f"[intelligence_state] BOARD_PUBLICATION_FAILED {type(exc).__name__}: {exc}", flush=True)
-                try:
-                    import traceback
-
-                    print(f"[intelligence_state] BOARD_PUBLICATION_TRACEBACK {traceback.format_exc()}", flush=True)
-                except Exception:
-                    pass
-                run_failed = True
-                response = {
-                    "ok": False,
-                    "error": f"{type(exc).__name__}: {exc}",
-                    "response": {},
-                    "top_opportunities": [],
-                    "by_sport": {},
-                    "analysis": None,
-                }
-            snapshot = IntelligenceSnapshot(
-                key=_payload_key(payload_to_process),
-                payload=dict(payload_to_process),
-                response=response,
-                computed_at=_utc_now(),
-                source_fingerprint=str(response.get("source_fingerprint") or response.get("latestSourceFingerprint") or "") if isinstance(response, dict) else "",
-            )
-            with self._condition:
-                # A run that raised (see the except above) produces a
-                # hardcoded zero-candidate response. Publishing that -- both
-                # by replacing this key's previous good snapshot and by
-                # taking over self._latest_key, which every board read
-                # resolves through -- is what silently replaced a fully
-                # computed 67-candidate board with an empty one on every
-                # cycle. Keep serving the last good result instead; the next
-                # cycle retries from scratch either way. Same "don't regress
-                # published state on a transient failure" rule already
-                # applied to the rollover decision in
-                # _compute_board_publication_response and to the
-                # candidate-pool cache in _build_candidate_pool.
-                previous_snapshot = self._snapshots.get(snapshot.key)
-                previous_count = _intelligence_state_candidate_count(previous_snapshot.response) if previous_snapshot is not None and isinstance(previous_snapshot.response, dict) else 0
-                if run_failed and previous_count > 0:
-                    print(
-                        f"[intelligence_state] SNAPSHOT_UPDATE_SKIPPED_AFTER_FAILURE key={snapshot.key} kept_candidate_count={previous_count}",
-                        flush=True,
-                    )
-                else:
-                    self._snapshots[snapshot.key] = snapshot
-                    self._snapshots.move_to_end(snapshot.key)
-                    existing_latest = self._snapshots.get(self._latest_key or "") if self._latest_key else None
-                    existing_latest_count = _intelligence_state_candidate_count(existing_latest.response) if existing_latest is not None and isinstance(existing_latest.response, dict) else 0
-                    snapshot_count = _intelligence_state_candidate_count(response) if isinstance(response, dict) else 0
-                    if snapshot_count > 0 or existing_latest_count <= 0 or self._latest_key == snapshot.key:
-                        self._latest_key = snapshot.key
-                    else:
+                snapshot = IntelligenceSnapshot(
+                    key=_payload_key(payload_to_process),
+                    payload=dict(payload_to_process),
+                    response=response,
+                    computed_at=_utc_now(),
+                    source_fingerprint=str(response.get("source_fingerprint") or response.get("latestSourceFingerprint") or "") if isinstance(response, dict) else "",
+                )
+                with self._condition:
+                    # A run that raised (see the except above) produces a
+                    # hardcoded zero-candidate response. Publishing that -- both
+                    # by replacing this key's previous good snapshot and by
+                    # taking over self._latest_key, which every board read
+                    # resolves through -- is what silently replaced a fully
+                    # computed 67-candidate board with an empty one on every
+                    # cycle. Keep serving the last good result instead; the next
+                    # cycle retries from scratch either way. Same "don't regress
+                    # published state on a transient failure" rule already
+                    # applied to the rollover decision in
+                    # _compute_board_publication_response and to the
+                    # candidate-pool cache in _build_candidate_pool.
+                    previous_snapshot = self._snapshots.get(snapshot.key)
+                    previous_count = _intelligence_state_candidate_count(previous_snapshot.response) if previous_snapshot is not None and isinstance(previous_snapshot.response, dict) else 0
+                    if run_failed and previous_count > 0:
                         print(
-                            f"[intelligence_state] LATEST_KEY_PROMOTION_SKIPPED key={snapshot.key} snapshot_count={snapshot_count} existing_latest_count={existing_latest_count}",
+                            f"[intelligence_state] SNAPSHOT_UPDATE_SKIPPED_AFTER_FAILURE key={snapshot.key} kept_candidate_count={previous_count}",
                             flush=True,
                         )
-                self._last_run_key = snapshot.key
-                self._last_run_started_at = run_started_at
-                self._last_run_finished_at = time.time()
-                self._trim_ordered_dict(self._snapshots, self._max_snapshots)
-                self._persist_locked()
-                self._condition.notify_all()
-                self._condition.wait(timeout=self._interval_seconds)
-            if guard_acquired:
-                self._execution_guard.release()
+                    else:
+                        self._snapshots[snapshot.key] = snapshot
+                        self._snapshots.move_to_end(snapshot.key)
+                        existing_latest = self._snapshots.get(self._latest_key or "") if self._latest_key else None
+                        existing_latest_count = _intelligence_state_candidate_count(existing_latest.response) if existing_latest is not None and isinstance(existing_latest.response, dict) else 0
+                        snapshot_count = _intelligence_state_candidate_count(response) if isinstance(response, dict) else 0
+                        if snapshot_count > 0 or existing_latest_count <= 0 or self._latest_key == snapshot.key:
+                            self._latest_key = snapshot.key
+                        else:
+                            print(
+                                f"[intelligence_state] LATEST_KEY_PROMOTION_SKIPPED key={snapshot.key} snapshot_count={snapshot_count} existing_latest_count={existing_latest_count}",
+                                flush=True,
+                            )
+                    self._last_run_key = snapshot.key
+                    self._last_run_started_at = run_started_at
+                    self._last_run_finished_at = time.time()
+                    self._trim_ordered_dict(self._snapshots, self._max_snapshots)
+                    self._persist_locked()
+                    self._condition.notify_all()
+                    self._condition.wait(timeout=self._interval_seconds)
+            finally:
+                if guard_acquired:
+                    self._execution_guard.release()
 
     def _compute_board_publication_response(self, payload: dict[str, Any]) -> dict[str, Any]:
         request_started_at = time.perf_counter()

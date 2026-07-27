@@ -287,6 +287,14 @@ Five defects, in order of how load-bearing they were.
   user's direction; if the same gap matters for a future special-event game,
   file it fresh against that game.
 
+- **70 — render.yaml comments contradicted their values.** Closed 2026-07-27 on
+  inspection: the comments were **already corrected** in `5b89aef3` (2026-07-26,
+  the same reconciliation commit that filed the item) — both intelligence-loop
+  blocks now tell the accurate post-#57 story and match their values. The open
+  row outlived its own fix by a day; nobody re-checked the file before carrying
+  the item forward. Verified directly against render.yaml lines ~318–330 and
+  ~550–562 before closing.
+
 ---
 
 ## Closed earlier

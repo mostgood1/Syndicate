@@ -143,5 +143,46 @@ class PersistNeverKillsTheCallerTests(unittest.TestCase):
             service._persist_locked()  # must not raise
 
 
+
+class GuardReleaseTests(unittest.TestCase):
+    """#81. The execution guard must release even when the loop thread dies.
+
+    Observed 2026-07-27T01:04Z: _persist_locked raised, the thread died, and
+    the guard stayed held -- intelligence_pipeline_busy() read locked()
+    forever and the MLB sim launcher deferred against a pipeline that no
+    longer existed. The persist no longer raises, but the finally is the
+    structural fix for the whole snapshot-install stretch.
+    """
+
+    def test_guard_releases_when_the_install_stretch_raises(self) -> None:
+        import threading
+
+        service = IntelligenceStateService()
+        service._snapshots = OrderedDict()
+        service._latest_key = None
+        service._interval_seconds = 0.05
+        payload = {"question": "top edges today", "sport": "all", "date": "2026-07-26"}
+        service._pending_keys = OrderedDict({"k": payload})
+        service._watched_payloads = OrderedDict()
+        service._watched_board_dates = OrderedDict()
+
+        with patch.object(service, "_sync_persisted_queue_locked"):
+            with patch.object(intelligence_state, "_board_build_deferral_reason", return_value=None):
+                with patch.object(service, "_compute_board_publication_response", return_value={"ok": True, "candidate_count": 1}):
+                    with patch.object(intelligence_state, "write_latest_intelligence_state", side_effect=lambda state: dict(state)):
+                        # Kill the thread INSIDE the post-compute install
+                        # stretch -- exactly where the production death lived.
+                        with patch.object(service, "_trim_ordered_dict", side_effect=RuntimeError("install stretch dies")):
+                            thread = threading.Thread(target=service._background_loop, daemon=True)
+                            thread.start()
+                            thread.join(timeout=10.0)
+
+        self.assertFalse(thread.is_alive(), "thread should have died from the injected error")
+        self.assertFalse(
+            service._execution_guard.locked(),
+            "the guard must be released by the finally even though the thread died -- "
+            "a held guard starves the MLB sim forever (#81's observed harm)",
+        )
+
 if __name__ == "__main__":
     unittest.main()
