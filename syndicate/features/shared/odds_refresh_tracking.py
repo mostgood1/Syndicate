@@ -157,6 +157,117 @@ def _is_final_status_row(row: Mapping[str, Any], normalized_entry: Mapping[str, 
     return any(marker in text for marker in ("final", "closed", "close", "finale", "completed", "finished"))
 
 
+# #83 steam detector. The market is the best-aggregated news feed this system
+# will ever have access to: by the time news is public, sharp money has moved
+# the line, and this pipeline already observes every move. "Steam" = a
+# significant move between two observations close together in time -- the
+# after-image of information arriving. Detection is free (every input already
+# exists where deltas are computed); the ACTUATOR is deliberately just a flag,
+# a bounded per-date record and a print, because the cheap reaction (re-price
+# without a full Monte Carlo) is #62 and does not exist yet, and a false
+# trigger that forces a re-sim blocks the board via the mutual-deferral guard.
+_STEAM_DEFAULT_LINE_MOVE = 0.5
+_STEAM_DEFAULT_ODDS_MOVE = 15.0
+_STEAM_DEFAULT_WINDOW_SECONDS = 45 * 60
+# ramp/closing get a lower odds bar: late money is the most informed money.
+_STEAM_LATE_PHASE_ODDS_MOVE = 10.0
+_STEAM_EVENTS_KEEP = 200
+
+
+def _steam_thresholds(capture_phase: str | None) -> tuple[float, float, float]:
+    def _env_float(name: str, fallback: float) -> float:
+        raw = str(os.environ.get(name) or "").strip()
+        try:
+            return float(raw) if raw else fallback
+        except ValueError:
+            return fallback
+
+    line_move = _env_float("SYNDICATE_STEAM_LINE_MOVE", _STEAM_DEFAULT_LINE_MOVE)
+    odds_move = _env_float("SYNDICATE_STEAM_ODDS_MOVE", _STEAM_DEFAULT_ODDS_MOVE)
+    window_seconds = _env_float("SYNDICATE_STEAM_WINDOW_SECONDS", float(_STEAM_DEFAULT_WINDOW_SECONDS))
+    if capture_phase in ("ramp", "closing"):
+        odds_move = min(odds_move, _env_float("SYNDICATE_STEAM_LATE_ODDS_MOVE", _STEAM_LATE_PHASE_ODDS_MOVE))
+    return line_move, odds_move, window_seconds
+
+
+def _steam_signal(
+    *,
+    previous_line: float | None,
+    current_line: float | None,
+    previous_odds: float | None,
+    current_odds: float | None,
+    previous_ts: str | None,
+    observed_ts: str,
+    capture_phase: str | None,
+) -> dict[str, Any] | None:
+    """Steam metadata for this observation, or None.
+
+    Requires BOTH a big-enough move and a small-enough gap between the two
+    observations: the same 0.5-line change spread over four drift hours is
+    ordinary drift, not steam. No previous observation, no timestamps, or an
+    unparseable gap all fail open to None -- a detector this cheap must never
+    invent a signal.
+    """
+    if previous_ts is None:
+        return None
+    try:
+        prev = datetime.fromisoformat(str(previous_ts).replace("Z", "+00:00"))
+        curr = datetime.fromisoformat(str(observed_ts).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if prev.tzinfo is None or curr.tzinfo is None:
+        return None
+    gap_seconds = (curr - prev).total_seconds()
+    line_move, odds_move, window_seconds = _steam_thresholds(capture_phase)
+    if gap_seconds <= 0 or gap_seconds > window_seconds:
+        return None
+    line_delta = None
+    if previous_line is not None and current_line is not None:
+        line_delta = current_line - previous_line
+    odds_delta = None
+    if previous_odds is not None and current_odds is not None:
+        odds_delta = current_odds - previous_odds
+    line_hit = line_delta is not None and abs(line_delta) >= line_move
+    odds_hit = odds_delta is not None and abs(odds_delta) >= odds_move
+    if not (line_hit or odds_hit):
+        return None
+    return {
+        "line_delta": round(line_delta, 3) if line_delta is not None else None,
+        "odds_delta": round(odds_delta, 1) if odds_delta is not None else None,
+        "window_seconds": round(gap_seconds, 1),
+        "capture_phase": capture_phase,
+    }
+
+
+def _steam_events_path(date_str: str) -> Path:
+    from syndicate.features.shared.refresh_state_store import reports_root
+
+    return reports_root() / "steam" / f"steam_events_{date_str}.json"
+
+
+def _record_steam_events(date_str: str, events: list[dict[str, Any]]) -> None:
+    """Bounded per-date steam record. Never raises; capped at
+    _STEAM_EVENTS_KEEP newest -- the consumers (board display, Ask the
+    Syndicate annotation, an eventual #62 re-price trigger) only ever care
+    about recent steam.
+    """
+    if not events:
+        return
+    try:
+        from syndicate.features.shared.refresh_state_store import read_json_file as _read
+        from syndicate.features.shared.refresh_state_store import write_json_file as _write
+
+        path = _steam_events_path(date_str)
+        payload = _read(path)
+        existing = payload.get("events") if isinstance(payload, dict) else None
+        merged = (existing if isinstance(existing, list) else []) + events
+        _write(path, {"date": date_str, "events": merged[-_STEAM_EVENTS_KEEP:]})
+        print(f"STEAM_DETECTED date={date_str} new={len(events)} total_kept={min(len(merged), _STEAM_EVENTS_KEEP)}", flush=True)
+    except Exception as exc:
+        print(f"STEAM_RECORD_FAILED error={type(exc).__name__}: {exc}", flush=True)
+
+
+
 # #82 Phase 3. Boundaries of the pregame capture phases, chosen with the
 # T-window sweep scheduler in live_refresh_loop.py: the ramp window opens just
 # beyond the T-75m post-lineup sweep and the closing window just beyond the
@@ -840,6 +951,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
     files_scanned = 0
     seen_current_snapshots: set[tuple[str, float, float | None]] = set()
     lifecycle_events: list[dict[str, Any]] = []
+    steam_events: list[dict[str, Any]] = []
     shards: dict[str, dict[str, dict[str, Any]]] = {}
     shard_seen_market_keys: dict[str, set[str]] = {}
     shard_seen_live_market_keys: dict[str, set[str]] = {}
@@ -986,19 +1098,33 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             elif previous_market_type is not None and str(normalized_entry.get("market_type") or "").strip().lower() != previous_market_type:
                 event_type = "update"
 
-            lifecycle_events.append(
-                _market_lifecycle_event(
-                    row=row,
-                    normalized_entry=normalized_entry,
-                    event_type=event_type,
-                    sport=slug,
-                    timestamp=now,
-                    market_key=market_key,
-                    current_line=current_line,
-                    current_odds=_primary_odds_value(row),
-                    is_live=is_live_row,
-                )
+            lifecycle_event = _market_lifecycle_event(
+                row=row,
+                normalized_entry=normalized_entry,
+                event_type=event_type,
+                sport=slug,
+                timestamp=now,
+                market_key=market_key,
+                current_line=current_line,
+                current_odds=_primary_odds_value(row),
+                is_live=is_live_row,
             )
+            # #83. Steam rides the lifecycle event (downstream consumers see
+            # it wherever they already read movement) AND a bounded per-date
+            # record for surfaces that want only the steam.
+            steam = _steam_signal(
+                previous_line=previous_line,
+                current_line=current_line,
+                previous_odds=previous_odds,
+                current_odds=current_odds,
+                previous_ts=previous_snapshot_ts,
+                observed_ts=now,
+                capture_phase=lifecycle_event.get("capture_phase"),
+            )
+            if steam is not None:
+                lifecycle_event["steam"] = steam
+                steam_events.append({**lifecycle_event})
+            lifecycle_events.append(lifecycle_event)
 
             history.append(
                 {
@@ -1067,6 +1193,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
                 )
             )
 
+    _record_steam_events(date_str, steam_events)
     if lifecycle_events:
         _trace_log("before_append_odds_lifecycle_events", sport=slug, date=date_str, events=len(lifecycle_events), path=str(odds_lifecycle_path(date_str)))
         append_odds_lifecycle_events(date_str, lifecycle_events)

@@ -155,6 +155,10 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # statcast, caches, season rollups -- stays excluded as before.
     "*_source/source_artifacts/data/eval/seasons/*/betting_day_payloads_*/season_betting_day_*.json",
     "*_source/data/eval/seasons/*/betting_day_payloads_*/season_betting_day_*.json",
+    # #84. NWS park weather, one small per-date JSON written worker-side by
+    # scripts/fetch_mlb_weather.py; the board and (once joined, #84's open
+    # half) the sim read it.
+    "*_source/source_artifacts/data/weather/weather_*.json",
     # Ask the Syndicate focused-evidence inputs (syndicate/blueprints/
     # ask_the_syndicate_data.py). These are live web-side reads: the Ask
     # endpoint builds last-10 game-log tables from the boxscore histories and

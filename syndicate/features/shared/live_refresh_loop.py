@@ -2416,6 +2416,59 @@ def _off_hours_gate_blocks_launch(*, now_epoch: float, any_live: bool | None) ->
 	return (now_epoch - last_epoch) < ceiling
 
 
+def _weather_fetch_interval_seconds() -> int:
+	raw = str(os.environ.get("SYNDICATE_MLB_WEATHER_INTERVAL_SECONDS") or "").strip()
+	try:
+		value = int(raw or 3600)
+	except Exception:
+		value = 3600
+	return max(0, value)
+
+
+def _maybe_launch_weather_fetch(*, now_epoch: float, date_str: str) -> dict[str, Any] | None:
+	"""#84. At most one NWS park-weather fetch per interval (default hourly).
+
+	Detached like the other subprocess jobs so a slow NWS response cannot
+	stall the tick. Gated on MLB being an effective sport for the date; 0
+	disables. Fail-open on marker problems means at worst an extra hourly
+	fetch against a free, keyless API.
+	"""
+	interval = _weather_fetch_interval_seconds()
+	if interval <= 0:
+		return None
+	try:
+		if "mlb" not in _live_refresh_loop_effective_sports(date_str):
+			return None
+	except Exception:
+		return None
+	marker_path = _meta_dir() / "last_weather_fetch.json"
+	try:
+		payload = read_json_file(marker_path)
+		last_epoch = float(payload.get("epoch") or 0.0) if isinstance(payload, dict) else 0.0
+	except Exception:
+		last_epoch = 0.0
+	if last_epoch > 0.0 and (now_epoch - last_epoch) < interval:
+		return None
+	try:
+		write_json_file(marker_path, {"epoch": now_epoch, "date": date_str})
+	except Exception:
+		pass
+	log_path = _meta_dir() / "weather_fetch.log"
+	try:
+		with open(log_path, "ab") as log_handle:
+			process = subprocess.Popen(
+				[sys.executable, str(REPO_ROOT / "scripts" / "fetch_mlb_weather.py"), "--date", date_str],
+				stdout=log_handle,
+				stderr=subprocess.STDOUT,
+				cwd=str(REPO_ROOT),
+			)
+		print(f"[live_refresh_loop] WEATHER_FETCH_LAUNCHED date={date_str} pid={process.pid}", flush=True)
+		return {"launched": True, "pid": process.pid}
+	except Exception as exc:
+		print(f"[live_refresh_loop] WEATHER_FETCH_LAUNCH_FAILED error={type(exc).__name__}: {exc}", flush=True)
+		return {"launched": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
 # #82 Phase 3: per-game T-window sweeps. CLV's closing line is the last
 # pregame price, and a slate-wide cadence structurally misses it for the
 # first game of a day and for one-game slates (WNBA's normal case) -- nothing
@@ -2931,6 +2984,9 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 	}
 
 	meta.update(_run_mlb_sim_tick())
+	weather_launch = _maybe_launch_weather_fetch(now_epoch=tick_started_epoch, date_str=selected_date)
+	if weather_launch is not None:
+		meta["weatherFetch"] = weather_launch
 	sim_process_running = _mlb_daily_sim_process_still_running()
 	memory_headroom_snapshot = _odds_refresh_memory_headroom_snapshot() if sim_process_running else None
 	if memory_headroom_snapshot is not None:

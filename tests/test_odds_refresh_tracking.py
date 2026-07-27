@@ -640,3 +640,71 @@ class CapturePhaseTests(unittest.TestCase):
             is_live=False,
         )
         self.assertEqual(event["capture_phase"], "closing")
+
+
+class SteamDetectorTests(unittest.TestCase):
+    """#83. The market is the best-aggregated news feed available: sharp money
+    moves lines before news is actionable, and this pipeline already observes
+    every move. Steam = a big move across a SMALL time gap. The actuator is
+    deliberately just a flag + bounded record until #62's cheap re-price
+    exists -- a false trigger that forced a re-sim would block the board.
+    """
+
+    def _signal(self, **overrides):
+        from syndicate.features.shared.odds_refresh_tracking import _steam_signal
+
+        kwargs = dict(
+            previous_line=8.5,
+            current_line=8.5,
+            previous_odds=-110.0,
+            current_odds=-110.0,
+            previous_ts="2026-07-27T18:00:00+00:00",
+            observed_ts="2026-07-27T18:10:00+00:00",
+            capture_phase="drift",
+        )
+        kwargs.update(overrides)
+        return _steam_signal(**kwargs)
+
+    def test_a_half_point_line_move_in_ten_minutes_is_steam(self) -> None:
+        steam = self._signal(current_line=9.0)
+        self.assertIsNotNone(steam)
+        self.assertEqual(steam["line_delta"], 0.5)
+        self.assertEqual(steam["window_seconds"], 600.0)
+
+    def test_the_same_move_across_four_hours_is_drift_not_steam(self) -> None:
+        self.assertIsNone(self._signal(current_line=9.0, observed_ts="2026-07-27T22:00:00+00:00"))
+
+    def test_a_fifteen_cent_price_move_is_steam_even_with_the_line_pinned(self) -> None:
+        steam = self._signal(current_odds=-125.0)
+        self.assertIsNotNone(steam)
+        self.assertEqual(steam["odds_delta"], -15.0)
+
+    def test_late_phases_lower_the_price_bar(self) -> None:
+        # 12 cents: under the 15-cent drift bar, over the 10-cent late bar.
+        # Late money is the most informed money.
+        self.assertIsNone(self._signal(current_odds=-122.0, capture_phase="drift"))
+        self.assertIsNotNone(self._signal(current_odds=-122.0, capture_phase="closing"))
+
+    def test_small_moves_are_not_steam(self) -> None:
+        self.assertIsNone(self._signal(current_line=8.0 + 0.5, previous_line=8.25))
+        self.assertIsNone(self._signal(current_odds=-115.0))
+
+    def test_no_prior_observation_fails_open_to_none(self) -> None:
+        self.assertIsNone(self._signal(previous_ts=None, current_line=12.0))
+        self.assertIsNone(self._signal(previous_ts="garbage", current_line=12.0))
+
+    def test_record_is_bounded_and_never_raises(self) -> None:
+        import json as _json
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch as _patch
+
+        from syndicate.features.shared import odds_refresh_tracking as tracking
+
+        with TemporaryDirectory() as tmp_dir:
+            path = Path(tmp_dir) / "steam_events_2026-07-27.json"
+            with _patch.object(tracking, "_steam_events_path", return_value=path):
+                events = [{"market_id": f"m{i}", "steam": {"line_delta": 1.0}} for i in range(250)]
+                tracking._record_steam_events("2026-07-27", events)
+                payload = _json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(len(payload["events"]), tracking._STEAM_EVENTS_KEEP)
+        self.assertEqual(payload["events"][-1]["market_id"], "m249")
