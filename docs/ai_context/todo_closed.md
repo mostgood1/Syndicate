@@ -269,6 +269,17 @@ Five defects, in order of how load-bearing they were.
 - **80 — admin-token rotation.** Removed from the list at the user's request
   2026-07-27. ID retired, not reused.
 
+- **72 — the per-query prediction-ledger write, deleted 2026-07-27**
+  (`569c4e9f`). `record_prediction` ran for every recommendation of every
+  intelligence query and rewrote the whole multi-MB
+  `data/prediction_ledger.json` on the request path, while its only automated
+  reader reported `prediction_ledger_count: 0`. Removed on the user's decision
+  that the ledger is obsolete. **Kept:** the `/api/portfolio/bets` write (user
+  bets, genuinely read by `/portfolio`) and portfolio_summary's stake-presence
+  check (old ledgers still carry stakeless auto-rows). Also deleted the test
+  fixture that existed solely to patch this write out — it was 1.46s of a 2.6s
+  test. Verified post-deploy: board rebuilt fresh (`01:49:46Z`, 27 candidates).
+
 ---
 
 ## Closed earlier
