@@ -6,7 +6,7 @@ list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-07-27 (see "Reconciliation 2026-07-27").
 
-> **Next free ID: 98.** IDs are never reused. Closed items move to
+> **Next free ID: 99.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
 
@@ -508,6 +508,71 @@ now genuinely met rather than merely believed.
     gitignore pattern, even in directories believed fully ignored.
   - Full `test_intelligence_state.py` + `test_intelligence_contracts.py`:
     203 passed, 0 failed.
+- **New: #98** (filed, open) — user reported the board showing MLB live-only
+  (0 pregame) with WNBA gone entirely, right after #97 shipped. Two separate
+  findings:
+  - **WNBA vanishing is correct, not a bug.** Checked `/api/board/game-chips`
+    ground truth: WNBA's only game today (SPO @ COOP) is already `final`. No
+    live/pregame WNBA game exists today, so it correctly has nothing to show
+    — this is the #94 redesign's date-scoping working as intended, not a
+    regression.
+  - 🔴 **MLB pregame is a real, confirmed gap — reopens the "genuinely open"
+    half of #68's 2026-07-26 note** ("`pregame_count` is 0 while MLB has 10
+    `preview` games... worth a look on a fresh slate," never chased at the
+    time). Ground truth right now: 8 MLB games genuinely still pregame, 3
+    live, 1 final — but the board serves `candidate_count: 3`, all live, zero
+    pregame. A parallel session's log pull (`INTEL_TRACE post_dedupe_and_classify`)
+    confirmed this is real, not a thin slate: `normalized_in: 16,
+    classification_pruned: 8 {missing_projection_or_odds: 8}, dedupe_pruned: 5`
+    — the same failure shape as #68's earlier live-candidate truthiness bug
+    (`_safe_text(0.0, "") == ""`, so a legitimate zero projection read as
+    "absent"), but that fix only touched `_append_game_bet_candidate`'s
+    live-game path (`_candidate_value_is_present` in
+    `_classify_candidate_with_reason`) — never the pregame path.
+    **Narrowed but not root-caused tonight**: `_mlb_candidate_live_state`
+    (`syndicate/features/intelligence.py:4424`) correctly excludes `"warmup"`
+    from `is_live` (confirmed real production data: BAL @ DET, a genuine
+    pregame/warmup game, reports `status.abstract: "Live"` /
+    `status.detailed: "Warmup"` from MLB's own API — an easy trap for anyone
+    checking `abstract` alone) — **but this function is applied downstream,
+    in `_apply_live_state_context_to_candidates`, which mutates an ALREADY-BUILT
+    candidate list.** It cannot be gating whether a pregame candidate gets
+    created in the first place. Also ruled out "pregame candidates never get
+    a projection" as a blanket explanation: `predictions` on the same BAL @
+    DET game carries real, non-zero `win_prob`/`runs_mean` values at the
+    `full`/`first1`/`first3`/`first5` level. **Next concrete step**: find the
+    actual MLB-specific pregame candidate-builder in
+    `syndicate/features/intelligence.py` (reads `predictions`+`markets`+
+    `status.abstract` directly — MLB does not go through the generic
+    `_game_bet_candidates_from_game` path in `home.py`, which reads
+    `game_market_recommendations`/`betting`/`gameMarkets` keys that do not
+    exist on the real `/mlb/api/cards` payload) and check whether its output
+    field names for a pregame candidate's projection actually match what
+    `normalize_candidate`'s field-scan order expects — a name mismatch would
+    explain real, non-zero predictions still classifying as
+    `missing_projection_or_odds`, without needing another truthiness bug.
+    Same methodology #68 used successfully: real production payload
+    (`/mlb/api/cards?date=<today>`), local code, no deploy, no waiting for a
+    cycle — and check `context_label` on every trace line, since a
+    look-ahead probe for tomorrow fires right after most low/empty-today
+    cycles and is easy to misread as a bad "today" number (see #24/#65's
+    history on this exact confusion).
+  - ⚠️ **Also: a production OOM incident, self-inflicted while diagnosing
+    the above.** `/api/ops/intelligence/candidate-trace` (the NON-read-only
+    variant) directly calls `build_intelligence_overview`/
+    `_build_candidate_pool` inside a web-service Flask route — a deliberate
+    debug exception to this repo's "web does no heavy computation" rule (see
+    its own code comment), meant to replicate refresh-worker's path on
+    demand. Calling it with `sport=mlb` under tonight's heavy concurrent
+    MLB-sim load OOM-killed the web service (`srv-d88ahvrbc2fs73eodu30`,
+    2Gi limit — refresh-worker runs the same class of work on 4Gi).
+    Self-recovered in ~19s (Render's supervisor auto-restarted it); no
+    lasting damage, only the web service was hit. **Do not call this
+    endpoint's non-read-only form against production under load again** —
+    use `read_only=true` (cheap, no compute, just reads the persisted
+    state/board_snapshot files) for anything that doesn't specifically need
+    a fresh synchronous candidate-pool build, and prefer asking for a
+    refresh-worker log pull over triggering one of these on web at all.
 
 ### Reconciliation 2026-07-26
 
