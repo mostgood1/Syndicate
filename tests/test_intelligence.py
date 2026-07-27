@@ -2498,7 +2498,11 @@ class IntelligenceBlueprintTests(unittest.TestCase):
 
         self.assertTrue(any("calibration" in str(flag).lower() for flag in risk_flags))
         self.assertTrue(any("reliability" in str(flag).lower() for flag in risk_flags))
-        self.assertGreaterEqual(recommendation.get("confidence") or 0.0, 0.0)
+        # Served confidence is always a display-formatted percent string
+        # ("63%"), same convention as odds/edge on every other served field
+        # -- parse it rather than comparing a str to a float directly.
+        confidence_text = str(recommendation.get("confidence") or "0").strip().rstrip("%")
+        self.assertGreaterEqual(float(confidence_text or 0.0), 0.0)
 
     def test_intelligence_query_api_force_refresh_returns_live_response(self) -> None:
         state_response = {
@@ -3171,6 +3175,13 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                 "odds": "-",
                 "projected": "-",
                 "confidence": "24.1%",
+                # HR-target candidates have no book price to project against;
+                # model_probability is the recognized projection-scan field
+                # that carries their real signal (see the matching comment in
+                # _mlb_home_run_candidates_from_artifact) -- without it this
+                # fixture is pruned at classification as
+                # missing_projection_or_odds before it ever reaches the board.
+                "model_probability": 0.241,
                 "edge": "-",
                 "score": 91.0,
                 "href": "/mlb/hr-targets?date=2026-06-05",
@@ -3214,6 +3225,43 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(result.get("recommendations"))
         self.assertEqual((result.get("recommendations") or [])[0].get("sport_slug"), "mlb")
         self.assertEqual(((result.get("analysis_views") or {}).get("table") or {}).get("rows")[0].get("player"), "Aaron Judge")
+
+    def test_mlb_home_run_artifact_candidates_survive_classification(self) -> None:
+        # Direct unit coverage of the real builder (the test above mocks it
+        # out entirely). Regression: odds and projected are always "-" for
+        # this candidate type -- there's no book line to project against --
+        # and until model_probability was wired from hr_probability, nothing
+        # in normalize_candidate's projection scan recognized that, so
+        # _classify_candidate_with_reason pruned every HR-target candidate
+        # this function has ever produced as missing_projection_or_odds.
+        # The mocked-artifact test above could not have caught this; it
+        # never calls the real function or the real classifier.
+        from syndicate.features.intelligence import (
+            _classify_candidate_with_reason,
+            _mlb_home_run_candidates_from_artifact,
+        )
+
+        artifact_payload = {
+            "rows": [
+                {
+                    "player_name": "Aaron Judge",
+                    "team": "NYY",
+                    "matchup": "NYY at BOS",
+                    "p_hr_1plus": 0.241,
+                    "hr_support_raw_score": 67,
+                    "hr_target_reasons": ["Favorable handedness split"],
+                }
+            ]
+        }
+        with patch("syndicate.features.intelligence.mlb_load_json_file", return_value=artifact_payload):
+            candidates = _mlb_home_run_candidates_from_artifact({"slug": "mlb", "context_label": "2026-06-05"})
+
+        self.assertEqual(len(candidates), 1)
+        candidate = candidates[0]
+        self.assertEqual(candidate.get("model_probability"), 0.241)
+        classified, reason = _classify_candidate_with_reason(candidate)
+        self.assertIsNone(reason)
+        self.assertIsNotNone(classified)
 
     def test_intelligence_query_builds_nba_analysis_views(self) -> None:
         advanced_rows = [

@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
-from scripts.fetch_mlb_weather import STADIUM_COORDS, parse_wind_mph, trim_hourly_periods
+from scripts.fetch_mlb_weather import STADIUM_COORDS, _todays_home_teams, parse_wind_mph, trim_hourly_periods
 
 
 class MlbWeatherTests(unittest.TestCase):
@@ -35,6 +39,34 @@ class MlbWeatherTests(unittest.TestCase):
         self.assertEqual(rows[1]["temp_f"], 72)
         self.assertEqual(rows[1]["wind_mph"], 15.0)
         self.assertEqual(rows[1]["wind_dir"], "SW")
+
+    def test_todays_home_teams_reads_the_date_suffixed_snapshot_filename(self) -> None:
+        # Regression for 2026-07-27: this used to look for a bare
+        # "oddsapi_game_lines.json" under daily/snapshots/<date>/, but the
+        # writer and its daily-snapshot mirror both use the date-suffixed
+        # oddsapi_game_lines_<date_slug>.json in either directory -- the old
+        # filename never matched anything, so home teams (and therefore
+        # every park's weather) came back empty on every run regardless of
+        # whether the odds pipeline had actually produced game data.
+        with TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            snapshot_dir = root / "data" / "daily" / "snapshots" / "2026-07-27"
+            snapshot_dir.mkdir(parents=True)
+            (snapshot_dir / "oddsapi_game_lines_2026_07_27.json").write_text(
+                json.dumps({"games": [{"home_team": "New York Yankees"}, {"home_team": "Boston Red Sox"}]}),
+                encoding="utf-8",
+            )
+            with patch("syndicate.features.mlb.sources._artifact_roots", return_value=[root]):
+                teams = _todays_home_teams("2026-07-27")
+        self.assertEqual(teams, ["Boston Red Sox", "New York Yankees"])
+
+    def test_todays_home_teams_returns_empty_without_a_snapshot(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            with patch("syndicate.features.mlb.sources._artifact_roots", return_value=[root]):
+                with patch("scripts.fetch_mlb_weather.data_root", return_value=root):
+                    teams = _todays_home_teams("2026-07-27")
+        self.assertEqual(teams, [])
 
 
 if __name__ == "__main__":

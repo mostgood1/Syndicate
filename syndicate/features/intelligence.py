@@ -224,6 +224,20 @@ def _attach_intelligence_response_aliases(response: dict[str, Any]) -> dict[str,
         if payload.get("market_fit_score") is None:
             market_fit = payload.get("market_fit") if isinstance(payload.get("market_fit"), dict) else {}
             payload["market_fit_score"] = market_fit.get("market_fit_score")
+        if payload.get("advanced_readiness") is None:
+            payload["advanced_readiness"] = _readiness_label(payload.get("advanced_gate") or {})
+        if payload.get("advanced_ready") is None:
+            payload["advanced_ready"] = bool((payload.get("advanced_gate") or {}).get("ready"))
+        if payload.get("missing_advanced_inputs") is None:
+            payload["missing_advanced_inputs"] = [
+                {
+                    "label": _safe_text(item.get("label"), "Advanced input"),
+                    "path": _safe_text(item.get("path"), "-"),
+                    "missing_reason": _safe_text(item.get("missing_reason"), "missing"),
+                }
+                for item in ((payload.get("advanced_gate") or {}).get("missing_inputs") or [])[:3]
+                if isinstance(item, dict)
+            ]
         return payload
 
     def _normalize_opportunity_list(key: str) -> None:
@@ -3933,6 +3947,17 @@ def _mlb_home_run_candidates_from_artifact(sport: dict[str, Any]) -> list[dict[s
                 "odds": "-",
                 "projected": "-",
                 "confidence": f"{hr_probability * 100.0:.1f}%" if hr_probability is not None else "-",
+                # These candidates have no book odds/line to project against
+                # (the HR board isn't priced) -- their real strength signal
+                # is the model's own hit probability. normalize_candidate's
+                # projection scan never looked at hr_probability, only at
+                # model_probability, so with odds/projected both "-" every
+                # HR-target candidate this function has ever produced was
+                # pruned at classification as missing_projection_or_odds --
+                # confirmed: the feature has never actually reached the
+                # board. model_probability is exactly the right slot for a
+                # model-computed hit probability, not a workaround.
+                "model_probability": hr_probability,
                 "edge": "-",
                 "score": score,
                 "href": f"/mlb/hr-targets?date={selected_date}",
@@ -5553,14 +5578,45 @@ def _candidate_betting_edge_profile(candidate: dict[str, Any]) -> dict[str, Any]
     }
 
 
-def _candidate_betting_rank_key(candidate: dict[str, Any]) -> tuple[float, float, float]:
+def _candidate_betting_rank_key(candidate: dict[str, Any]) -> tuple[bool, float, float, float, float]:
+    # advanced_ready leads the tuple, matching build_intelligence_board_contract's
+    # card sort (#73): a candidate whose advanced inputs are missing or
+    # unpublished is less trustworthy than one whose inputs are ready,
+    # regardless of raw edge -- that principle was only ever applied to the
+    # board_contract cards. This function backs the flat recommendations
+    # list (_balanced_recommendation_order, _greedy_low_correlation_selection)
+    # and never weighed readiness at all, so "prioritize ready advanced
+    # inputs" held for board cards but not for the served recommendations
+    # list -- two rankings of the same candidates disagreeing on the same
+    # stated priority.
+    advanced_ready = bool((candidate.get("advanced_gate") or {}).get("ready"))
+    # score leads edge/confidence, not the other way around: _score_candidates
+    # folds edge, confidence, tier, AND the risk-profile/market-focus
+    # adjustments into score (see the worked example above
+    # _risk_profile_score_adjustment's call site) -- putting raw edge ahead
+    # of it let a single unadjusted component outvote the composite exactly
+    # the risk profile was computed to influence. Confirmed: a "highest
+    # confidence" (-> conservative) query still ranked a 38%-confidence
+    # +320 longshot above a 64%-confidence -135 favorite, because edge
+    # (12.8% vs 2.5%) was compared before the correctly risk-adjusted score.
+    # Same principle build_intelligence_board_contract's card sort (#73)
+    # already applies; this function just hadn't caught up.
+    score_value = _numeric_hint(candidate.get("score"))
+    score = score_value if score_value is not None else float("-inf")
     profile = _candidate_betting_edge_profile(candidate)
     edge = profile["adjusted_edge"] if profile is not None else float("-inf")
     confidence = _numeric_hint(candidate.get("confidence"))
     confidence_value = confidence if confidence is not None else float("-inf")
-    score_value = _numeric_hint(candidate.get("score"))
-    score = score_value if score_value is not None else float("-inf")
-    return edge, confidence_value, score
+    # Last, as a tiebreaker only -- same placement and same reasoning as
+    # build_intelligence_board_contract's card sort: folding
+    # source_summary_score into `score` directly was tried there and
+    # regressed test_intelligence_query_prioritizes_ready_advanced_inputs
+    # (a qualitative text signal outranking a data-readiness one). It only
+    # speaks when score/edge/confidence are genuinely tied, which is exactly
+    # the case two props on identical line/odds/confidence but opposite
+    # recent-form writeups produce.
+    source_summary_score = _numeric_hint(candidate.get("source_summary_score")) or 0.0
+    return advanced_ready, score, edge, confidence_value, source_summary_score
 
 
 def _candidate_correlation_score(first_candidate: dict[str, Any], second_candidate: dict[str, Any]) -> float:

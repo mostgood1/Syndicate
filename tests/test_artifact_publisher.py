@@ -139,6 +139,15 @@ class HotArtifactAllowlistTests(unittest.TestCase):
         self.assertTrue(is_hot_artifact_relative_path("reports/intelligence/intelligence_state.json"))
         self.assertTrue(is_hot_artifact_relative_path("reports/intelligence/intelligence_state_2026_07_26.json"))
 
+    def test_accepts_bounded_steam_record_but_rejects_the_raw_lifecycle_log(self) -> None:
+        # steam_events_<date>.json is capped at the newest 200 events
+        # (_STEAM_EVENTS_KEEP) and carries capture_phase directly -- the
+        # cheap, bounded way to verify #82/#83 without exporting the raw
+        # per-observation lifecycle log, which reached 1.2GB in a single day
+        # and must never be allowlisted.
+        self.assertTrue(is_hot_artifact_relative_path("reports/steam/steam_events_2026-07-27.json"))
+        self.assertFalse(is_hot_artifact_relative_path("data/odds_events/2026-07-27.jsonl"))
+
     def test_rejects_path_traversal_and_absolute_paths(self) -> None:
         self.assertFalse(is_hot_artifact_relative_path("../../etc/passwd"))
         self.assertFalse(is_hot_artifact_relative_path(f"/{HOT_RELATIVE_PATH}"))

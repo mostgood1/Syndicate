@@ -6,7 +6,7 @@ list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-07-27 (see "Reconciliation 2026-07-27").
 
-> **Next free ID: 91.** IDs are never reused. Closed items move to
+> **Next free ID: 93.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
 
@@ -70,6 +70,186 @@ now genuinely met rather than merely believed.
   change (NBA's `processed_path` lost its multi-root existing-file fallback —
   matches the codebase's "no source-app fallback" direction, not a bug).
   See #90 for a real inconsistency this surfaced.
+- **New: #91** (filed, open) — a same-session `git status` review (prompted by
+  a "commit all pending updates" request) found a large body of
+  **already-written, uncommitted intelligence-query fixes** with no todo entry
+  at all, distinct from #74/#87/#88. Committed as-is in `0250ac82` after
+  manual diff review (full test suite was interrupted, see #74's row), so
+  these are shipped-but-unvalidated-this-session, same caveat as #74:
+  - `run_intelligence_query` (intelligence.py): an explicitly requested
+    subject ("Compare Judge vs Ohtani") now survives the edge-quality gate
+    even if it wouldn't clear the board threshold on its own; the gate still
+    applies to everything the question didn't name.
+  - Same function: odds-window preferences (`plus_money_only`,
+    `candidate_odds_min/max`, `favorite_floor`) and timing preferences
+    (`live_only`/`pregame_only`) now filter the flat `recommendations` list,
+    not just parlay legs — previously "plus money only" still served
+    minus-odds picks outside a parlay.
+    build_parlays (intelligence_parlay_runtime.py): honors the requested
+    min/max leg count as-is instead of clamping both to `[2,3]` — a 4-leg
+    request was silently rebuilt as 3-leg tickets.
+  - `response_builder.py`'s `_frontend_parlay` was whitelisting 5 keys and
+    silently dropping `label`/`leg_count`/`combined_odds`; now additive over
+    the full parlay payload, matching the opportunity-alias pattern already
+    used elsewhere in the same file.
+  - `syndicate/blueprints/intelligence.py`'s fresh-compute path now calls
+    `_hydrate_board_response_payload` (every cached-read path already did) —
+    without it, a fresh compute and a cache hit served different top-level
+    shapes for `parlays`/`recommendations`/`portfolio`.
+  - `_attach_intelligence_response_aliases` now backfills `american_odds`/
+    `subject_key`/`market_key` on engine recommendations, which previously
+    only pool-serialized candidates carried.
+  - A new `_display_subject_names` helper maps lowercase subject-matching
+    keys back to real display casing ("Aaron Judge", not "judge") for the
+    public `parsed_request.requested_subjects` field.
+  - All three Render services (web, refresh-worker, live-odds-worker)
+    redeployed to `0250ac82` same session, confirmed `live` and on-commit via
+    `/api/ops/version`; no MLB sim was in flight at trigger time (checked via
+    `/api/ops/live-refresh/state` immediately before deploying).
+- **New: #92** (filed, shipped this session, commit pending) — continuing the
+  overnight test-fixing pass that produced #91: fixing the ~29 originally-
+  failing `test_intelligence.py` cases one at a time surfaced several more
+  real production defects, each verified by making the specific failing test
+  pass and (where practical) a targeted unit test on top:
+  - 🔴 **MLB's "best home run matchups" feature has likely never surfaced a
+    candidate on the real board.** `_mlb_home_run_candidates_from_artifact`
+    (intelligence.py) hardcodes `"odds": "-"` and `"projected": "-"` for
+    every HR-target candidate it has ever produced — there's no book line to
+    project against, that part is correct — but `normalize_candidate`'s
+    projection scan never looked at `hr_probability` (the model's actual
+    signal), only at `model_probability`/`edge`/etc., so every single
+    HR-target candidate was pruned at classification as
+    `missing_projection_or_odds`. Fixed by setting `model_probability` from
+    `hr_probability` at candidate-build time — the correct semantic slot,
+    not a workaround (distinct from #68's explicit "do not add `confidence`"
+    warning, which was about a phantom signal masking dead MLS data; here
+    the field is real and always populated). Added a direct unit test
+    (`test_mlb_home_run_artifact_candidates_survive_classification`) since
+    the existing integration test mocks the builder out entirely and could
+    never have caught this.
+  - `_candidate_betting_rank_key` (governs the flat `recommendations` list,
+    used by `_balanced_recommendation_order` and
+    `_greedy_low_correlation_selection`) disagreed with
+    `build_intelligence_board_contract`'s card sort (#73) on two things it
+    had already gotten right there: `advanced_ready` now leads the tuple
+    (was absent), and `score` — which already folds in edge, confidence,
+    tier, and the risk-profile/market-focus adjustments — now sorts above
+    raw `edge`/`confidence` instead of below them. Confirmed regression: a
+    "highest confidence" (→ conservative risk profile) query still ranked a
+    38%-confidence +320 longshot above a 64%-confidence -135 favorite,
+    because raw edge (12.8% vs 2.5%) was compared before the correctly
+    risk-adjusted score. `source_summary_score` added as a final tiebreaker,
+    same placement/reasoning as the board-contract sort (folding it into
+    `score` directly was tried there and reverted — regressed the
+    advanced-ready-inputs test).
+  - `_frontend_recommendation` (response_builder.py) prefixed every
+    recommendation's rationale with "Advanced drivers in play" whenever
+    `advanced_inputs`/`advanced_context` were merely *present* — even when
+    `advanced_ready` was explicitly `False`, i.e. attached-but-untrustworthy
+    context got the same confident framing as genuinely ready inputs. Now
+    gated on `advanced_ready` itself; the not-ready case surfaces the real
+    gap ("Readiness is partial because N advanced inputs are missing or
+    unpublished") instead.
+  - `_mlb_subject_prop_candidates_from_artifact` (matches a top-props
+    artifact row's player name against the question, independent of the
+    "top N"/explicit-market phrasing `_mlb_market_prop_candidates_from_artifact`
+    requires) was fully implemented but never called from anywhere. A real
+    subject question ("What does Brandon Young's matchup look like") with
+    data sitting in the artifact produced zero candidates. Wired into
+    `_collect_candidates` for MLB; self-gated by the function's own
+    whole-word name match, so it's a no-op for every query that doesn't
+    name a rostered player.
+  - `structured_response` (the engine's summary/key_factors/risks/confidence
+    bundle, built by `_build_structured_response` in
+    `pipeline/intelligence_pipeline.py`) was set on the `IntelligenceResult`
+    but never promoted from the nested `analysis` object to the query
+    response's top level — same shape of gap as #91's `parlays`/
+    `recommendations`/`portfolio` promotion, just a field that hadn't been
+    caught yet. Fixed in both `_compute_response`
+    (`pipeline/intelligence_state.py`) and the cached-read hydration path
+    (`_hydrate_board_response_payload`), matching the existing pattern for
+    consistency between a fresh compute and a cache hit.
+  - Additive alias-layer extensions (`_normalize_opportunity_item`,
+    intelligence.py): `market_fit_score` (was nested under
+    `candidate["market_fit"]`, several read sites already flattened it back
+    out ad hoc), `rationale` (`_candidate_rationale` existed but only
+    `_candidate_summary` — itself dead code, nothing serves through it —
+    called it), `advanced_readiness`/`advanced_ready`/
+    `missing_advanced_inputs` (same dead-code-only-caller pattern).
+  - `scripts/fetch_mlb_weather.py`'s `_todays_home_teams` checked a filename
+    (`oddsapi_game_lines.json`, no date suffix) that has never existed under
+    `daily/snapshots/<date>/`; the real writer and its snapshot mirror both
+    use `oddsapi_game_lines_<date_slug>.json`. Confirmed against production:
+    yesterday's file exists exactly where the fix now looks, today's simply
+    hadn't been produced yet at the time of checking. Zero prior test
+    coverage of this function; added two regression tests.
+  - `reports/steam/steam_events_<date>.json` (#83's bounded, capped-at-200
+    steam record, carries `capture_phase` directly) added to
+    `HOT_ARTIFACT_PATTERNS` so it's reachable through the existing
+    `/api/ops/artifacts/export` debug endpoint — deliberately NOT the raw
+    per-observation lifecycle log (`data/odds_events/<date>.jsonl`), which
+    hit 1.2GB in a single day (see `odds_lifecycle.py`) and allowlisting it
+    would reproduce the exact oversized-payload pattern #43/#50/#54 already
+    cost three outages over.
+  - Two tests in `tests/test_live_refresh_loop.py` carried the
+    long-standing "two known-failing, accepted baseline" label
+    (`test_create_app_starts_shared_live_refresh_loop*`) — both were
+    genuinely fixable, not baseline noise: (a)
+    `test_defers_while_the_board_build_is_computing` depended on a
+    disk-persisted consecutive-defer counter
+    (`reports/live_refresh_loop/last_mlb_sim_pipeline_defer.json`) that had
+    been accidentally committed mid-threshold (`count: 5`) by the same
+    pollution incident below, permanently flipping which branch the test
+    hit regardless of what it mocked — now isolates the counter read/write.
+    (b) `test_create_app_starts_shared_live_refresh_loop_on_render_web`
+    asserted the opposite of the documented, deliberate web/worker split
+    (render.yaml pins `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP=false` on
+    web specifically) — renamed and inverted to pin the actual contract.
+    Full file now 159/159.
+  - `tests/test_refresh_worker.py::test_main_starts_intelligence_state_background_loop`
+    never set `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP`, so the
+    code path it asserted on never ran — same failure mode present in the
+    very first traceback taken at the start of this session, so pre-existing
+    and unrelated to any change made tonight.
+  - ⚠️ **Validation gap, same caveat as #91 and #74**: every fix above was
+    verified by making its specific failing test (plus, where added, a
+    direct unit test) pass in isolation — confirmed via targeted `pytest`
+    invocations, not a completed full-file sweep. `tests/test_intelligence.py`
+    alone takes ~20 minutes; two full-sweep attempts this session were
+    interrupted (once by an unrelated background-session incident, once by
+    the same "tests taking too long" concern that closed out #91's
+    validation). **The test suite's own runtime is now a explicit followup**
+    — flagged by the user directly: a single file taking 20+ minutes is
+    unreasonable and blocks exactly this kind of end-of-session validation.
+    Next session should run `pytest --durations=20` to find the actual worst
+    offenders (suspects, from tonight's pattern: tests that exercise the
+    full `run_intelligence_query` pipeline end-to-end with no mocking of
+    candidate generation/scoring/enrichment) before attempting another full
+    sweep.
+  - 🔴 **Separate incident, same session: a background task spawned for a
+    narrow fix ("update stale NBA/NHL resolver checks in migration gate")
+    committed the entire working tree instead** — 166 files of local
+    test-run/dev-session scratch state (`reports/live_refresh_loop/mlb_sim_runs/`
+    per-run dumps, dated `intelligence_state_2026_07_18..27` snapshots,
+    schedule-adapter scratch), plus `data/prediction_ledger.json`
+    (+84,909 lines — #72 already removed the production write path, so this
+    can only be local pytest runs) and `data/odds_events/*.jsonl` (the same
+    test-leakage-into-real-paths pattern #91's session independently found
+    in `tests/test_odds_refresh_tracking.py`, here landing in git instead of
+    just on disk). Pushed to `origin/main` and triggered a full redeploy of
+    all three Render services before being caught. Production impact
+    checked and was benign — all three services came up `live` cleanly, and
+    `sim_run_status.state` was `finished` (not mid-run) at trigger time, so
+    nothing was killed — but the pollution itself was real and now
+    permanent in git history up to the revert. Reverted in a dedicated
+    follow-up commit (166 files removed, 14 legitimately-tracked `reports/`
+    files restored to pre-pollution content, `.gitignore` extended so the
+    categories can't silently reaccumulate); the actual code/test fixes
+    from that commit (the migration-gate resolver retargeting, #91's
+    fixes) were reviewed and left intact. **Lesson for any future spawned/
+    background session with a narrowly-scoped assignment: commit and push
+    only the files the assignment actually touched — never a blanket
+    `git add -A`/`git commit -a` sweep of the whole working tree.**
 - **New: #90** (filed, open) — NBA's `available_dates()` still scans **every**
   preferred artifact root (via `nba.sources._artifact_roots()`), but
   `processed_path()`/`live_snapshot_path()` (post-`757952e1`) only ever build a
@@ -444,7 +624,7 @@ were resolved and nine already-closed rows removed from the open tables.
 | **62** | **A re-pricing path that refreshes edges without a full Monte Carlo.** Behind #48. `run_mlb_daily_sim_job.py` only takes `--only-game-pks`, and `daily_update.py`'s only skip mechanism is `--preserve-started` (games past Preview), so there is no way to react to a price move except re-simulating. #48 removed prices from the sim fingerprint because the sim summary row is pure model output — win probabilities, run distributions, HR/prop likelihoods, **no odds and no edges** — and the market board joins odds at *read* time. That is correct for the board, but any artifact that *does* bake prices at sim time now goes stale until a lineup/line/tip-off trigger. Architectural, #27/#28 territory. |
 | **42** | `source_cards_api_payload`'s cache can never hit — keyed on the file it rewrites. **Third instance of this pattern** (`build_mlb_market_board` fixed in `34c9427d`; avoided deliberately in `build_soccer_market_board`). Worth a rule, not three one-off fixes. |
 | **37** | `logger.info` never reaches Render's log collector — use `print(..., flush=True)`. This is why the `NameError` in #8 hid for hours, and why #43's stale-date replay stayed invisible for a day. |
-| **74** | 🟡 **A router-inferred `mode` silently overwrites the question's own intent.** Found 2026-07-26 while fixing headlines. `QueryRouter` classifies e.g. "Explain the best points targets across NBA and WNBA" as `player_analysis`; [intelligence_pipeline.py:86](pipeline/intelligence_pipeline.py:86) `_pipeline_mode_for_query_type` maps that to `"pregame"`; `_query_preferences` reads `mode` as an **instruction** and replaces the parsed intent (`best_bets`) with `pregame_bets`. So a lane the caller never asked for drives downstream behaviour. Two known consequences: the headline (worked around in `17a40505` by letting a named market outrank a generic lane — the workaround is fine but the cause is here), and **`parsed_request.intent` reports the routed intent rather than the parsed one**, which is a public field. **Attempted and reverted**: adding `mode_inferred` to `IntelligencePipelineRequest` and withholding an inferred mode from `run_intelligence_query` is the right shape, but `route_intelligence_request` → `QueryRouter.route_request` **stamps `mode` into the payload before `_normalize_request` sees it**, so by then inferred and caller-supplied are indistinguishable. The fix has to thread an explicit/inferred flag through the router. ⚠️ Blocks promoting the pipeline's `parsed_request` to the top level, which is what several `test_intelligence.py` subject failures need (`requested_subjects` is resolved against the real candidate pool inside `run_intelligence_query` and cannot be reproduced by re-parsing the question). Promoting it before this lands trades ~2 fixed tests for ~3 broken ones — measured. |
+| **74** | 🟡 **SHIPPED 2026-07-27 (commit `0250ac82`), NOT YET FULLY VALIDATED.** A router-inferred `mode` silently overwrote the question's own intent (found 2026-07-26 while fixing headlines): `QueryRouter` classifies e.g. "Explain the best points targets across NBA and WNBA" as `player_analysis`; [intelligence_pipeline.py:86](pipeline/intelligence_pipeline.py:86) `_pipeline_mode_for_query_type` maps that to `"pregame"`; `_query_preferences` read `mode` as an **instruction** and replaced the parsed intent (`best_bets`) with `pregame_bets`. The blocked fix ("Attempted and reverted", 2026-07-26) is the one that shipped: `route_payload` now stamps `mode_inferred` alongside `mode` ([query_router.py](router/query_router.py)), `IntelligencePipelineRequest` carries it through, and `_call_black_box_intelligence` withholds an inferred mode from `run_intelligence_query` rather than forwarding it as an instruction. `syndicate/blueprints/intelligence.py` now also promotes the engine's own `parsed_request` (with real `requested_subjects`) to the top level, gated on this fix existing. ⚠️ **This code sat uncommitted in the working tree for a full session** before today — see [[project_closed_todo_not_shipped_gap]] equivalent lesson in Operational notes. ⚠️ **Not validated this session**: `python -m pytest tests/test_intelligence.py tests/test_intelligence_board_contract.py tests/test_query_router.py` was started but interrupted before completing (user: tests taking too long) — it had progressed cleanly through 55+ cases with zero failures before being stopped, which is supportive but not a completed run. Confirm with a full pass of those three files, or production observation of a `player_analysis`-routed query keeping its own `best_bets` intent, before closing this for real. |
 | **39** | Make canonical board-state dual-write safe, then re-enable (disabled; doubled boot memory). |
 | **38** | 🟡 **UNBLOCKED 2026-07-27** (was gated on #43/#66/#68; #43 and #66 are closed and #68's MLB half does not depend on these prints). Prune diagnostic scaffolding from `intelligence_state` **and** the rest of today's: `cards_context_*`, `board_contract_*`, `sim_contract_*`, `ODDS_JSONL_LARGE`, `KEYVALUE_PAYLOAD_COMPOSITION`, `BETTING_PAYLOAD_READ`, `game_candidate_inputs`, `PROCESS_ENUM_DEBUG`. ⚠️ **Keep `ROLLOVER_PROBE_BEGIN`/`END` and the dated `CANDIDATE_POOL_READY`/`BOARD_PUBLICATION_RESPONSE_READY`** — those exist because their absence caused three misreadings, and they are one line per cycle. Keep `ALL_PROCESS_MEMORY`/`CONTAINER_MEMORY` until #76 lands, since #79's fix is new. |
 | **51** | `hasSampleData` is inverted — and it is **two sites, not one** (corrected 2026-07-26). [mlb/cards.py:2375-2376](syndicate/features/mlb/cards.py:2375) and the *shared* contract at [game_board_contract.py:622-623](syndicate/features/shared/game_board_contract.py:622) both set `hasSampleData` and `hasArtifactData` to the same expression (`not using_sample_data`), so the two can never disagree and the name means the opposite of what it says. The shared-contract copy means every sport on `game_board_v1` inherits it, not just MLB. Note `tests/test_archives.py:203-204` and `:1261-1262` assert both are true, so the tests currently lock in the wrong semantics and must change with the fix. |
@@ -634,6 +814,19 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
   closed 2026-07-27 after an audit found #64 to be the only historical gap — but
   the gap mattered: #64 shipped the exact instrumentation another item was still
   asking to build. Run for 2026-07-27: 30 IDs, all present.
+- **The inverse of #71 is worse, and #71's check does not catch it: a todo item
+  marked closed does not mean its code ever reached git.** Found 2026-07-27:
+  #87 and #88 were both recorded closed in `todo_closed.md` from the prior
+  session, but `git status` showed both fixes (plus an unrelated #74 fix and
+  a batch of undocumented intelligence.py fixes, filed as #91) sitting as
+  **uncommitted working-tree changes** — real, tested, correct work that
+  simply never got committed before the session ended. They only reached
+  `main` when a later session ran `git commit`/`git push` (`0250ac82`). A
+  session can do everything right and still ship nothing if it stops before
+  the commit. **Before trusting a recent "closed" entry as proof a fix is
+  live, run `git status`/`git diff` and check the files that entry names are
+  actually clean against `HEAD`** — don't take the doc's word for it,
+  especially right before building on top of that fix or deploying.
 - **A cross-service comparison must be same-instant, or it is a cross-TIME
   comparison wearing a disguise.** #68's MLB half was diagnosed as "the worker
   sees stubs, web yields 38 candidates" off a worker reading taken live and a

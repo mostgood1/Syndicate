@@ -3344,6 +3344,15 @@ class IntelligenceStateService:
                 if limit_value is not None:
                     analysis_recommendations = analysis_recommendations[: max(int(limit_value), 0)]
                 response["recommendations"] = analysis_recommendations
+            # Same promotion, for the same reason: run_routed_intelligence_pipeline's
+            # post-processing (_build_structured_response) sets this on the
+            # analysis result, but nothing copied it up to the query
+            # response's own top level -- callers reading
+            # response["structured_response"] (the summary/key_factors/
+            # risks/confidence bundle) always saw an absent key.
+            analysis_structured_response = analysis.get("structured_response")
+            if isinstance(analysis_structured_response, dict) and analysis_structured_response:
+                response["structured_response"] = dict(analysis_structured_response)
             response_last_updated = _utc_now()
             response_candidate_count = len(candidates)
             response["state_last_updated"] = response_last_updated

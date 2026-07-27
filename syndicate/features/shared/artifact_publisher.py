@@ -93,6 +93,16 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # matches the stated architecture: workers write artifacts, web reads them.
     "reports/intelligence/intelligence_state.json",
     "reports/intelligence/intelligence_state_*.json",
+    # #83's bounded per-date steam record. capture_phase and steam detection
+    # are otherwise only observable through the raw per-observation lifecycle
+    # log (odds_events/<date>.jsonl), which reached 1.2GB in a single day
+    # (odds_lifecycle.py) -- allowlisting that would reproduce the exact
+    # oversized-payload pattern that caused #43/#50/#54. This file is the
+    # opposite by construction: capped at the newest 200 events
+    # (_STEAM_EVENTS_KEEP in odds_refresh_tracking.py), each event carrying
+    # capture_phase directly, so it is the cheap, bounded way to verify both
+    # without exporting bulk data.
+    "reports/steam/steam_events_*.json",
     # MLB's vendored daily sim (vendor/mlb_bettingv2/tools/daily_update.py,
     # triggered from live_refresh_loop.py's MLB daily-sim gate) writes under
     # data/daily/, data/manager/, data/park/, data/umpire/ -- none of which

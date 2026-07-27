@@ -382,6 +382,12 @@ Five defects, in order of how load-bearing they were.
     tests). Confirm the orchestrator's `ncaaf_lines_snapshot` step actually
     writes updated lines on its next real run before considering NCAAF fully
     healthy again.
+  - Both #87 and #88 were marked closed here while their fixes still sat
+    uncommitted. Neither reached `main` until a later session (2026-07-27)
+    ran `git commit`/`git push` on request, landing in commit `0250ac82`
+    alongside #74's fix and the undocumented #91 batch. See the Operational
+    note in `todo.md` about the inverse of #71: a closed doc entry does not
+    mean the code shipped to git.
 
 - **89 — `migration_gate.py`'s `evaluate_protected_local_resolvers()` was
   stale against `757952e1`** ("Refactor WNBA odds path resolution",

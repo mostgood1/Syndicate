@@ -1719,13 +1719,27 @@ class LiveRefreshLoopTests(unittest.TestCase):
 
         mocked_start.assert_called_once()
 
-    def test_create_app_starts_shared_live_refresh_loop_on_render_web(self) -> None:
+    def test_create_app_never_starts_live_refresh_loop_on_render_web(self) -> None:
+        # Renamed and inverted: this used to assert the OPPOSITE of the
+        # deliberate web/worker split (see docs/ai_context/runtime_execution_model.md
+        # and the CLAUDE.md rule it's drawn from) -- "the web service does no
+        # heavy computation... all simulation, artifact generation,
+        # enrichment happens in background workers, never inside a web
+        # request/dyno." render.yaml pins both
+        # SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP and
+        # SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP to "false" on
+        # the web service specifically -- _bootstrap_background_loops only
+        # calls start_live_refresh_background_loop() `if not render_web_dyno`.
+        # A web dyno starting this loop would be the regression, not the
+        # contract; setting the env var to "true" here (as the old version
+        # did) doesn't reflect any real deployment.
         with patch.dict(
             os.environ,
             {
                 "RENDER": "true",
                 "RENDER_SERVICE_ID": "svc-test",
-                "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
+                "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "false",
+                "SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP": "false",
                 "SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue",
                 "SYNDICATE_REFRESH_STATE_URL": "redis://example",
                 "SYNDICATE_REQUIRE_HOSTED_STORAGE": "true",
@@ -1736,7 +1750,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
         ):
             create_app()
 
-        mocked_start.assert_called_once()
+        mocked_start.assert_not_called()
 
     def test_run_live_odds_refresh_worker_run_once_releases_lock(self) -> None:
         with patch.object(run_live_odds_refresh_worker, "_acquire_process_lock", return_value=True) as mocked_acquire, patch.object(
@@ -2294,8 +2308,26 @@ class SimDefersToIntelligencePipelineTests(unittest.TestCase):
         self.addCleanup(lambda: os.environ.pop("SYNDICATE_MLB_SIM_DEFER_TO_INTELLIGENCE", None))
 
     def test_defers_while_the_board_build_is_computing(self) -> None:
+        # _sim_pipeline_deferral_reason reads a disk-persisted consecutive-
+        # defer counter (reports/live_refresh_loop/last_mlb_sim_pipeline_defer.json,
+        # keyed by date) so it survives across ticks and deploy restarts --
+        # but that means an unmocked read here depends on whatever a PRIOR
+        # run (in this repo checkout or a previous test invocation) already
+        # wrote for date_str="2026-07-25". A stale committed count already at
+        # or past _max_consecutive_pipeline_defers() flips the branch this
+        # test is pinning ("still politely waiting") into the other one
+        # ("genuinely out of room"), regardless of what _intelligence_pipeline_busy
+        # says. Force a fresh-count read so the test exercises its own
+        # documented scenario instead of whatever the last run left behind.
         with patch.object(live_refresh_loop, "_intelligence_pipeline_busy", return_value=True):
-            decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=1000.0, date_str="2026-07-25")
+            with patch.object(live_refresh_loop, "_read_pipeline_defer_count", return_value=0):
+                # The decision path also WRITES the counter back (real disk,
+                # same committed file) as a side effect -- without this the
+                # test would keep re-poisoning that tracked fixture for
+                # whichever run reads it next, the exact mechanism that broke
+                # this test in the first place.
+                with patch.object(live_refresh_loop, "_write_pipeline_defer_count"):
+                    decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=1000.0, date_str="2026-07-25")
         self.assertFalse(decision["force"])
         self.assertEqual(decision["reason"], "intelligence_pipeline_busy")
 

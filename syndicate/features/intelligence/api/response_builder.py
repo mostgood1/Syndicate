@@ -357,10 +357,30 @@ def build_response(*, recommendations: list[dict[str, Any]], parlays: list[dict[
             recommendation["advanced_inputs"] = recommendation.get("advanced_context")
         if recommendation.get("advanced_ready") is None and isinstance(recommendation.get("advanced_gate"), dict):
             recommendation["advanced_ready"] = bool(recommendation.get("advanced_gate", {}).get("ready"))
-        if recommendation.get("advanced_inputs") or recommendation.get("advanced_context") or recommendation.get("advanced_ready"):
+        # Was gated on advanced_inputs/advanced_context being merely PRESENT,
+        # which claimed "Advanced drivers in play" even when advanced_ready
+        # was explicitly False -- a candidate with unready/untracked advanced
+        # context (data attached but not trustworthy yet) got the same
+        # confident framing as one with fully ready inputs. Require
+        # advanced_ready itself; when it's known False, surface the gap
+        # instead of a false claim of readiness.
+        if recommendation.get("advanced_ready"):
             rationale_text = _safe_text(recommendation.get("rationale"), "")
             if rationale_text and "advanced drivers in play" not in rationale_text.lower():
                 recommendation["rationale"] = f"Advanced drivers in play. {rationale_text}"
+        elif recommendation.get("advanced_ready") is False:
+            # missing_advanced_inputs (the alias layer's flattened version)
+            # isn't populated yet at this point in the pipeline -- this runs
+            # inside build_response, upstream of
+            # _attach_intelligence_response_aliases -- so read the same
+            # source it derives from directly.
+            advanced_gate = recommendation.get("advanced_gate")
+            missing_inputs = advanced_gate.get("missing_inputs") if isinstance(advanced_gate, dict) else None
+            if isinstance(missing_inputs, list) and missing_inputs:
+                rationale_text = _safe_text(recommendation.get("rationale"), "")
+                gap_note = f"Readiness is partial because {len(missing_inputs)} advanced inputs are missing or unpublished."
+                if gap_note.lower() not in rationale_text.lower():
+                    recommendation["rationale"] = f"{rationale_text} {gap_note}".strip()
         if writeup:
             rationale_text = _safe_text(recommendation.get("rationale"), "")
             if writeup not in rationale_text:

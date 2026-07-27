@@ -33,6 +33,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from syndicate.features.shared.refresh_state_store import data_root  # noqa: E402
+from syndicate.features.mlb.sources import daily_snapshot_oddsapi_game_lines_path  # noqa: E402
 
 _USER_AGENT = "syndicate-mlb-weather/1.0 (ops@syndicate.local)"
 _HOURS_KEPT = 14
@@ -124,9 +125,21 @@ def trim_hourly_periods(periods: list, *, now_epoch: float, hours: int = _HOURS_
 
 
 def _todays_home_teams(date_str: str) -> list[str]:
+    # Both filenames here were wrong: the writer (fetch_mlb_oddsapi_local.py
+    # fetch_and_write_live_odds_for_date) and its daily-snapshot mirror
+    # (refresh_mlb_oddsapi.py's FILE_TEMPLATES) both use the date-suffixed
+    # name oddsapi_game_lines_{date_slug}.json in EITHER directory -- the
+    # bare "oddsapi_game_lines.json" this checked for under snapshots/ never
+    # existed, so parks/errors came back empty on every run regardless of
+    # game data actually being available (confirmed 2026-07-27: neither
+    # candidate ever matched, weather stayed empty every hour since launch).
+    # daily_snapshot_oddsapi_game_lines_path is the canonical resolver
+    # (syndicate/features/mlb/sources.py) every other reader of this file
+    # already uses; keep the raw writer's own path as a fallback for the
+    # narrow window before the daily-snapshot mirror copy lands.
     token = date_str.replace("-", "_")
     candidates = (
-        data_root() / "mlb_source" / "source_artifacts" / "data" / "daily" / "snapshots" / date_str / "oddsapi_game_lines.json",
+        daily_snapshot_oddsapi_game_lines_path(date_str),
         data_root() / "mlb_source" / "source_artifacts" / "data" / "market" / "oddsapi" / f"oddsapi_game_lines_{token}.json",
     )
     for path in candidates:

@@ -888,6 +888,14 @@ def _hydrate_board_response_payload(response_payload: dict[str, object] | None) 
         if nested_portfolio:
             current["portfolio"] = dict(nested_portfolio)
 
+    if not isinstance(current.get("structured_response"), dict) or not current.get("structured_response"):
+        nested_structured = nested.get("structured_response") if isinstance(nested.get("structured_response"), dict) else {}
+        if not nested_structured:
+            nested_analysis = nested.get("analysis") if isinstance(nested.get("analysis"), dict) else {}
+            nested_structured = nested_analysis.get("structured_response") if isinstance(nested_analysis.get("structured_response"), dict) else {}
+        if nested_structured:
+            current["structured_response"] = dict(nested_structured)
+
     if not isinstance(current.get("recommendation_history"), dict) or not current.get("recommendation_history"):
         nested_history = nested.get("recommendation_history") if isinstance(nested.get("recommendation_history"), dict) else {}
         if nested_history:

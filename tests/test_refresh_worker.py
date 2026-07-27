@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import time
@@ -92,7 +93,13 @@ class RefreshWorkerTests(unittest.TestCase):
             latest_manifest_path = Path(tmp_dir) / "refresh_status_latest.json"
             latest_manifest_path.write_text(json.dumps({"state": "idle"}), encoding="utf-8")
 
-            with patch.object(
+            # main() only calls start_intelligence_state_background_loop when
+            # SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP is set --
+            # refresh-worker is the one service that owns this loop in
+            # production (see render.yaml), but nothing in the test
+            # environment sets it, so without this the call this test
+            # asserts on never happens.
+            with patch.dict(os.environ, {"SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP": "true"}), patch.object(
                 sys,
                 "argv",
                 ["run_refresh_worker.py", "--latest-manifest", str(latest_manifest_path), "--run-once"],
