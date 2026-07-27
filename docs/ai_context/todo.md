@@ -415,6 +415,24 @@ were resolved and nine already-closed rows removed from the open tables.
 > reading finally honors. See #15 for why the intervening 1.42M/mo period
 > average was measuring a degraded system, and for the decision points.
 >
+> **The arithmetic of getting under 5M** (2026-07-27, from #16's audit model
+> ~573 credits/sweep × ~625 sweeps/day; attribution shipped `c01302f1` will
+> replace these estimates with measured splits after one full slate):
+>
+> | Lever | Type | Est. effect on MLB's 358k/day |
+> |---|---|---|
+> | #16(a) drop 8 `alternate_*` | **USER product call** | −21% (−120/sweep) |
+> | #16(b) drop 6 `first7` | **USER product call** | −16% (−90/sweep) |
+> | Off-hours gate (no sweeps when nothing live/imminent) | engineering | −25–35% of sweeps (by_hour histogram will measure) |
+> | Event scoping (props+segments only for live/near games; ~5 of 15 avg) | engineering | −60–70% of per-event burn during active hours |
+> | Cadence tiering (segments every Nth sweep) | **USER reversal of #15's "do not tier"** | further, if needed |
+>
+> (a)+(b) alone: 358k → ~227k/day ≈ 6.8M/mo — **not enough on its own.**
+> (a)+(b) + off-hours + event scoping: est. **~60–90k/day ≈ 1.8–2.7M/mo**,
+> leaving genuine headroom for football season. Sequence: read tomorrow's
+> attributed slate first, then decide (a)/(b), then build scoping/off-hours
+> against measured numbers rather than this table.
+>
 > **These are required work, not optimisations. The target is 5M.**
 > The plan currently reads 15M, but it was bumped to 15M *because of a real
 > prior overage* — it is remediation, and the objective is to cut burn enough to
