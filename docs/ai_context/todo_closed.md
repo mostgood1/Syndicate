@@ -201,6 +201,71 @@ work takes the next free number (see the counter at the top of `todo.md`).
   odds refresh with cache bypass and soccer props are ~2,400 credits/sweep
   (#19) — keep dark until burn fits the 5M target.
 
+## Closed 2026-07-26 / 07-27 — the empty-board session
+
+The board went from serving 7 shell-command placeholders to **27 real MLB props
+with prices, lines and edges** (`/api/intelligence/status` 2026-07-27T00:05:49Z,
+`candidate_count: 27`, all from the one live game, correctly flagged live).
+Five defects, in order of how load-bearing they were.
+
+- **79 — the board build's memory guard counted reclaimable page cache.**
+  `MEMORY_GUARD_ABORT` every cycle: `current 3228.3 / max 4096`,
+  `headroom 867.7` against a 900 floor. But `anon` was **662.5 MB** and
+  `inactive_file` **2476.3 MB** with `shmem 0.0` — real headroom was 3393.7 MB.
+  Fixed to `max - (current - inactive_file - slab_reclaimable)` (`7b204998`),
+  conservative on purpose (`active_file` and `shmem` still count as used) and
+  falling back to the old calculation when `memory.stat` is unreadable.
+  ⚠️ **This retired the "2.7 GB plateau" as page cache from the 1.24 GB
+  odds-events file, not a leak** — which is why `tracemalloc` was blind to it.
+  **#76 still leaves that file unbounded.** The gate is shared with
+  `live_refresh_loop`'s odds-refresh gate and the MLB live-lens `estimate_live`
+  gate, so both gained headroom too.
+- **68a — a projection of exactly zero read as missing.** The presence test was
+  `_safe_text(value, "") not in {"", "-"}` and `_safe_text` is truthiness-based.
+  A live game-level candidate with no explicit `live_projection` gets the game's
+  combined score, which is **0 for every scoreless live game**, and that 0 also
+  shadowed the real `model_probability` behind it. Fixed with
+  `_candidate_value_is_present`.
+- **68b — `shared_top_play_rows` published a display panel as picks.** 56 rows
+  per MLS slate reading "Projected score: …", "Margin: 0.80 (home perspective)"
+  and literally **"Simulations: 400"**. Gated on the row expressing a side
+  (over/under) or carrying a scraped price/edge. ⚠️ Only 68a's bug was keeping
+  these off the board — fixing 68a alone would have published all 56.
+- **77 — placeholders and false liveness.** (a) `_unsimulated_game` empty states
+  reached the board as LIVE picks whose `pick` was a shell command; gated at the
+  producer on an explicit marker (`70ad2c9f`). (b) **Reported by the user:**
+  yesterday's finished MLS fixtures flagged live. The payload contradicted
+  itself — `shared_is_live: true` beside
+  `shared_game_state {"live": false, …}` — and soccer's `status` is a display
+  string so neither the `status` dict nor `live_state` was populated. Structured
+  state now wins (`1b333736`), scoped so `shared_is_live` still decides when
+  nothing contradicts it.
+- **78 — WITHDRAWN, not a date-selection defect.** Every cycle builds TODAY and
+  *then* probes tomorrow; the probe emits its own dated traces, so a tail of the
+  logs shows only the tomorrow half. Misread into three investigations
+  (#65, #68, #78). `ROLLOVER_PROBE_BEGIN`/`END` and dated
+  `CANDIDATE_POOL_READY` now make the two halves unambiguous.
+- **65 — MISDIAGNOSED, kept as the worked example.** The rollover probe is
+  expected behaviour, not a queued future-dated payload; the two guards shipped
+  against the queue path never fired because the queue was never involved.
+- **66 — board shows no opportunities.** Superseded: the live-slate reading it
+  asked for was taken (100% pruned at classification) and the causes are 68a/68b
+  above.
+- **75 — refresh-worker OOM at 4 GiB.** `_load_jsonl_rows` slurped a 1.24 GB
+  odds file before applying its row cap; streamed into a `deque(maxlen=N)`
+  (`5181ed3d`), 734.6 MB → 2.9 MB peak.
+- **43 — Layer 2 curated board empty.** ✅ **Closure criterion finally met:**
+  `candidate_count: 27` **with** `snapshot_generated_at 2026-07-27T00:05:49Z`.
+  The transport work (`e323d61f`, `31ff3438`, `81475c19`) is deployed on web and
+  worker. ⚠️ **Still unexercised at size** — no cycle since has produced a pool
+  large enough to divert to the artifact transport, so the oversized-payload
+  path remains deployed-but-unproven. If a big slate ever fails to publish,
+  start there rather than assuming it works.
+- **71 — nothing checks that shipped work reaches this list.** Audited across
+  200 commits: #64 was the only instance, so it is rare rather than systemic.
+  The check now lives in Operational notes and was run for this reconciliation
+  (30 IDs across 80 commits, all present).
+
 ---
 
 ## Closed earlier
