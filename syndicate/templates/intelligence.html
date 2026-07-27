@@ -945,7 +945,12 @@
                   <div class="board-strip-card__prop">${escapeHtml(event.market_text || "")}</div>
                   <div class="board-strip-card__lineval">${escapeHtml(event.line_text || "")}</div>
                 </div>
-                <div class="board-strip-card__move">${escapeHtml(steamDeltaText(event))}</div>
+                <div class="board-strip-card__move">${
+                  (Array.isArray(event.movement_lines) && event.movement_lines.length
+                    ? event.movement_lines
+                    : [steamDeltaText(event)]
+                  ).map((line) => `<div class="board-strip-card__move-line">${escapeHtml(line)}</div>`).join("")
+                }</div>
               </div>
               <div class="board-strip-card__pick">${escapeHtml(formatTimestamp(event.timestamp))}${event.is_live ? " · live" : ""}</div>
             </div>

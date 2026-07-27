@@ -1976,7 +1976,12 @@ def _steam_event_significance(event: dict[str, Any]) -> tuple[int, float]:
     return (0, magnitude)
 
 
-def _steam_event_movement_text(event: dict[str, Any]) -> str:
+def _steam_event_movement_lines(event: dict[str, Any]) -> list[str]:
+    # Two separate lines (odds move, line move), not one joined string -- a
+    # card with both ("-147 -> +220 · 0.5 -> 1.5 line") overflowed the
+    # narrow movement column (confirmed live 2026-07-27, user screenshot).
+    # Each one is short enough to fit its own line; only the combined
+    # string wasn't.
     steam = event.get("steam") if isinstance(event.get("steam"), dict) else {}
     parts = []
     prev_odds = _steam_format_odds(steam.get("previous_odds"))
@@ -1988,9 +1993,7 @@ def _steam_event_movement_text(event: dict[str, Any]) -> str:
         curr_line = _steam_format_line(event.get("line"))
         if prev_line and curr_line and prev_line != curr_line:
             parts.append(f"{prev_line} → {curr_line} line")
-    if parts:
-        return " · ".join(parts)
-    return "Movement detected"
+    return parts or ["Movement detected"]
 
 
 @intelligence_bp.get("/api/board/steam")
@@ -2038,7 +2041,9 @@ def board_steam_api():
         event["market_text"] = market_text
         event["line_text"] = line_text
         event["label"] = f"{subject} — {market_text}" if subject != "Market" else market_text
-        event["movement_text"] = _steam_event_movement_text(event)
+        movement_lines = _steam_event_movement_lines(event)
+        event["movement_lines"] = movement_lines
+        event["movement_text"] = " · ".join(movement_lines)
         event["headshot_url"] = None
         if str(event.get("sport") or "").strip().lower() == "mlb" and event.get("player_name"):
             if mlb_id_lookup is None:

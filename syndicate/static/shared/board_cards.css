@@ -206,11 +206,21 @@ body.syndicate-body .cards-shell {
 
 .board-strip-card__move {
   flex: 0 0 auto;
-  font-size: 11px;
-  font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   text-align: right;
+  max-width: 92px;
+}
+
+.board-strip-card__move-line {
+  font-size: 10.5px;
+  font-weight: 700;
   white-space: nowrap;
-  max-width: 90px;
+}
+
+.board-strip-card__move-line:first-child {
+  font-size: 11px;
 }
 
 .board-strip-card__edge {
