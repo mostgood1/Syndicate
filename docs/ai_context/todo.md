@@ -88,6 +88,13 @@ were resolved and nine already-closed rows removed from the open tables.
 >    `by_market_family` + `by_hour_utc`. One full slate of data decides #16's
 >    cuts (a)/(b) and validates the off-hours gate + per-sport cadence +
 >    `lines_props` tiering savings against the 11.12M/30d baseline.
+>    ⚠️ **First overnight reading (02:10–04:40Z): `event_list` shows 653 calls
+>    / 1,234 credits — a bucket the #15 analysis believed was FREE.** Either
+>    that belief is wrong or billed requests whose URLs carry no `markets=`
+>    param are misfiled into it (check the slate-endpoint and props-job URL
+>    shapes against `_attribute_request_families`). Resolve this before
+>    trusting the family split — it may also mean ~1.9 credits/call of
+>    "free" event polling is a real cost bucket nobody has counted.
 > 2. **CLV capture** — lifecycle observations are phase-tagged
 >    (`drift/ramp/closing/live`, `event_type="open"` = opener). Check the first
 >    full day's tags and whether T-window sweeps fired (`T_WINDOW_SWEEP_DUE`;
