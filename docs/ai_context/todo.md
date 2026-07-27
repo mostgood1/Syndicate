@@ -56,22 +56,24 @@ were resolved and nine already-closed rows removed from the open tables.
 
 ## Do first
 
-> **START HERE: #68's MLB half.** As of 2026-07-26T23:20Z the board is **still
-> empty, and that is now the correct answer** rather than a bug hiding one.
-> Four defects were fixed today (#79 memory guard, #68 a+b, #77b liveness) and
-> the board is no longer *wrong* — the shell-command picks and the false LIVE
-> flags are gone. It is empty because the two sports that could fill it can't:
-> **MLS has no book prices at all** (`odds: "-"` on every row — #52/#53) and
-> its fixtures on today's board are yesterday's, and **MLB contributes nothing
-> because the worker's MLB dashboard games arrive as stubs** with every market
-> block at 0, while the same code over web's payload yields priced, edged
-> candidates. **MLB is the largest remaining lever by far.**
+> **START HERE: confirm the board still fills on a fresh slate.** At
+> 2026-07-27T00:05Z it serves **27 real MLB props** with prices, lines and
+> edges, all from the one live game, correctly flagged live. That is the first
+> genuinely correct populated board of the day, after five fixes: #79 (memory
+> guard counting evictable page cache — without it the build aborted before
+> doing anything), #68 a+b (zero-projection, panel-rows-as-picks) and #77b
+> (false liveness).
+>
+> ⚠️ **But it filled because a game went live, not because of the MLB artifact
+> work — see the correction in #68.** The board has still never been observed
+> healthy across a full pregame→live→final cycle, and both remaining sports
+> gaps are real: **MLS has no book prices at all** (#52/#53) and yesterday's
+> fixtures appear on today's soccer board. Watch a morning slate before
+> declaring any of this closed.
 >
 > ⚠️ **Read #68's "two bugs cancelling out" note before touching
-> `normalize_candidate`.** Today's board briefly showed 8 candidates that
-> looked like a fix and were an artifact of two defects agreeing; the obvious
-> next move (adding `confidence` to the projection sources) would rebuild that
-> artifact deliberately.
+> `normalize_candidate`.** Adding `confidence` to the projection sources would
+> deliberately rebuild an artifact that briefly looked like a fix today.
 >
 > #79 is resolved and also retires the "2.7 GB plateau" the last handoff left
 > open. #78 is **withdrawn**; both rows are kept because the corrections in
@@ -241,8 +243,45 @@ were resolved and nine already-closed rows removed from the open tables.
   `{unknown: 16} kept=0`; **MLB byte-identical** at
   `{final: 13, live: 1, scheduled: 1} kept=17`.
 
-  🔴 **MLB HALF — ROOT-CAUSED 2026-07-26T23:46Z. A once-daily artifact cannot
-  be pulled by a lookback-bounded pull.** The chain, each step measured:
+  🟢 **BOARD LIVE 2026-07-27T00:05Z: `candidate_count: 27`, real MLB props
+  with prices, lines and edges** (`pitcher strikeouts UNDER Cristopher Sánchez,
+  odds -120, line 7.5, edge 0.3735, conf 91.9%`). All 27 are from NYY @ PHI,
+  `0-2 | In Progress | Bottom 3rd | 0 outs`, `is_final: false` — so the live
+  flags are correct, checked after #77b.
+
+  ⚠️ **CORRECTION, and it matters more than the result: the MLB diagnosis
+  below was substantially wrong, and the fix I shipped for it is not what
+  unblocked MLB.**
+  - **"The worker sees stubs while web yields 38" was a CROSS-TIME
+    comparison, not cross-service.** The worker reading was live; the web
+    payload was fetched earlier, when 3 games were live and 1 pregame. Measured
+    again side by side at 00:04Z: **web had exactly 1 game with ml/totals
+    markets, matching the worker's `betting_game_count: 1`.** There was no
+    worker/web gap by then. This is the same methodology error the handoff
+    warns about three times, made while being careful about it elsewhere in the
+    same session — a single-fetch A/B was used for the soccer work and not
+    here.
+  - **`season_betting_day_<date>.json` is not the source of `markets`.**
+    `_cards_recommendation_payload_by_game` builds them from
+    `daily_summary_<date>_locked_policy.json` via `_recommendations_by_game`;
+    the betting-day file only *supplements*. That locked-policy file was
+    **already allowlisted** (`daily_summary_*.json` matches it).
+  - **The betting-day file does not exist on web either.** The repair pull
+    fetched it successfully and got nothing back:
+    `PULL_REPAIR_MISSING … ok=True written=0`. So it is simply not produced in
+    this deployment.
+  - **What actually filled the board:** game 823433 (NYY @ PHI) went from
+    Preview to In Progress, and its live props became available. Not the
+    artifact work.
+  **The artifact work is still worth keeping** — the allowlist gap and the
+  since=-can-never-repair-a-missing-file gap are both real and both latent —
+  but they are robustness, not the fix, and #68's MLB half should be considered
+  **unproven** rather than closed: it has never been observed failing with web
+  and worker genuinely disagreeing at the same instant.
+
+  *Superseded diagnosis, kept because the individual measurements in it are
+  sound and only the comparison was wrong:* A once-daily artifact cannot
+  be pulled by a lookback-bounded pull. The chain:
   1. `game_candidate_inputs` on the worker: MLB game blocks **all 0**.
   2. `game["markets"]` is the only source of those blocks —
      `_mlb_game_market_recommendation_rows` translates
@@ -544,6 +583,15 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
   documented it. It stays expensive because the date is not printed: the
   rollover decision is `logger.info("BETTING_BOARD_PUBLISH_DATE")` only, and per
   #37 that never reaches Render. Print it.
+- **A cross-service comparison must be same-instant, or it is a cross-TIME
+  comparison wearing a disguise.** #68's MLB half was diagnosed as "the worker
+  sees stubs, web yields 38 candidates" off a worker reading taken live and a
+  web payload fetched earlier in the evening. Measured side by side minutes
+  later, both showed **1**. Nothing was wrong between the services; the slate
+  had simply gone final in between. The soccer work in the same session used a
+  single-fetch A/B *specifically* because `/mlb/api/cards` moves under you —
+  and then the MLB work did not. If two numbers come from two fetches, they
+  are not evidence of a difference.
 - **Run the real code over production's own payloads before instrumenting.**
   `/mlb/api/cards` and `/soccer/mls/api/cards` are public and carry the exact
   game dicts candidate generation consumes, so `_game_bet_candidates_from_game`
