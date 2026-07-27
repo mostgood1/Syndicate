@@ -266,6 +266,9 @@ Five defects, in order of how load-bearing they were.
   The check now lives in Operational notes and was run for this reconciliation
   (30 IDs across 80 commits, all present).
 
+- **80 — admin-token rotation.** Removed from the list at the user's request
+  2026-07-27. ID retired, not reused.
+
 ---
 
 ## Closed earlier
