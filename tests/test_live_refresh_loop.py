@@ -341,7 +341,13 @@ class LiveRefreshLoopTests(unittest.TestCase):
     def test_run_tick_uses_pregame_phase_and_idle_interval_when_nothing_live(self) -> None:
         with patch.dict(
             os.environ,
-            {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true"},
+            {
+                "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
+                # Gate disabled: this test asserts the idle-phase launch
+                # and reads the repo's real launch marker; the #15
+                # off-hours gate has its own tests.
+                "SYNDICATE_ODDS_OFF_HOURS_MAX_STALENESS_SECONDS": "0",
+            },
             clear=False,
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-13"), patch.object(
             live_refresh_loop, "_any_tracked_sport_game_live", return_value=False
@@ -1635,7 +1641,14 @@ class LiveRefreshLoopTests(unittest.TestCase):
     def test_run_tick_launches_look_ahead_refresh_when_enabled_idle_and_games_scheduled(self) -> None:
         with patch.dict(
             os.environ,
-            {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true", "SYNDICATE_LOOK_AHEAD_ENABLED": "true"},
+            {
+                "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
+                "SYNDICATE_LOOK_AHEAD_ENABLED": "true",
+                # Gate disabled: this test asserts the idle-phase launch
+                # and reads the repo's real launch marker; the #15
+                # off-hours gate has its own tests.
+                "SYNDICATE_ODDS_OFF_HOURS_MAX_STALENESS_SECONDS": "0",
+            },
             clear=False,
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-15"), patch.object(
             live_refresh_loop, "_any_tracked_sport_game_live", return_value=False
@@ -2462,3 +2475,51 @@ class SimPipelineDeferralBoundTests(unittest.TestCase):
         os.environ["SYNDICATE_MLB_SIM_MAX_PIPELINE_DEFERS"] = "1"
         self.assertEqual(self._reason(1, busy=True), "intelligence_pipeline_busy")
         self.assertIsNone(self._reason(2, busy=True, headroom={"sufficient": True}))
+
+
+class OffHoursOddsGateTests(unittest.TestCase):
+    """#15. Measured 371,563 credits/day (11.1M/30d against a 5M target).
+
+    When nothing is live, every sweep prices a board nobody's odds are moving
+    for. This gate makes the off-hours ceiling explicit: at most one sweep per
+    SYNDICATE_ODDS_OFF_HOURS_MAX_STALENESS_SECONDS while no tracked game is
+    live, resuming full cadence the moment one is.
+    """
+
+    def _gate(self, *, any_live, last_epoch, now_epoch=10_000.0, ceiling=None):
+        env = {}
+        if ceiling is not None:
+            env["SYNDICATE_ODDS_OFF_HOURS_MAX_STALENESS_SECONDS"] = str(ceiling)
+        with patch.dict(os.environ, env, clear=False):
+            with patch.object(
+                live_refresh_loop,
+                "_read_last_odds_refresh_launch",
+                return_value={"epoch": last_epoch} if last_epoch is not None else {},
+            ):
+                return live_refresh_loop._off_hours_gate_blocks_launch(
+                    now_epoch=now_epoch, any_live=any_live
+                )
+
+    def test_blocks_when_nothing_live_and_a_sweep_ran_recently(self) -> None:
+        self.assertTrue(self._gate(any_live=False, last_epoch=9_500.0))
+
+    def test_heartbeat_sweep_when_the_staleness_ceiling_expires(self) -> None:
+        # Bounded staleness, not zero sweeps: pregame lines may not go more
+        # than the ceiling without a refresh even on a dead night.
+        self.assertFalse(self._gate(any_live=False, last_epoch=10_000.0 - 3601.0))
+
+    def test_live_games_are_never_gated(self) -> None:
+        self.assertFalse(self._gate(any_live=True, last_epoch=9_999.0))
+
+    def test_unknown_liveness_fails_open(self) -> None:
+        # any_live is None when adaptive is off or the signal was unreadable.
+        # A sweep that cannot establish liveness must run, not starve.
+        self.assertFalse(self._gate(any_live=None, last_epoch=9_999.0))
+
+    def test_missing_launch_marker_fails_open(self) -> None:
+        # The sweep that then runs writes the marker; the gate self-heals.
+        self.assertFalse(self._gate(any_live=False, last_epoch=None))
+        self.assertFalse(self._gate(any_live=False, last_epoch=0.0))
+
+    def test_zero_ceiling_disables_the_gate(self) -> None:
+        self.assertFalse(self._gate(any_live=False, last_epoch=9_999.0, ceiling=0))

@@ -2379,6 +2379,43 @@ def _record_pregame_launch(epoch: float, date_str: str) -> None:
 	write_json_file(_last_pregame_launch_path(), {"epoch": epoch, "date": date_str, "recordedAt": _utc_now()})
 
 
+def _off_hours_max_staleness_seconds() -> int:
+	# How stale the odds may get while NO tracked game is live. 3600 bounds
+	# worst-case pregame staleness at one hour -- the moment any game goes
+	# live, full cadence resumes on the next tick regardless of this. 0
+	# disables the gate entirely.
+	raw = str(os.environ.get("SYNDICATE_ODDS_OFF_HOURS_MAX_STALENESS_SECONDS") or "").strip()
+	try:
+		value = int(raw or 3600)
+	except Exception:
+		value = 3600
+	return max(0, value)
+
+
+def _off_hours_gate_blocks_launch(*, now_epoch: float, any_live: bool | None) -> bool:
+	"""#15. True when nothing is live and a sweep ran recently enough.
+
+	Only a definite any_live=False can block: None means adaptive is off or
+	the liveness signal was unreadable, and a sweep that cannot establish
+	liveness must run, not starve (same fail-open rule as the empty-board
+	guard). A missing/unreadable launch marker also fails open -- the sweep
+	that then runs writes the marker, so the gate self-heals.
+	"""
+	if any_live is not False:
+		return False
+	ceiling = _off_hours_max_staleness_seconds()
+	if ceiling <= 0:
+		return False
+	try:
+		last = _read_last_odds_refresh_launch()
+		last_epoch = float(last.get("epoch") or 0.0)
+	except Exception:
+		return False
+	if last_epoch <= 0.0:
+		return False
+	return (now_epoch - last_epoch) < ceiling
+
+
 def _pregame_relaunch_blocked(*, now_epoch: float, date_str: str) -> bool:
 	cooldown = _pregame_relaunch_cooldown_seconds()
 	if cooldown <= 0:
@@ -2707,6 +2744,25 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 		meta["ok"] = False
 		meta["skipped"] = True
 		meta["error"] = "pregame refresh relaunch blocked by cooldown (previous attempt still within cooldown window)"
+		skip_launch = True
+	if not skip_launch and _off_hours_gate_blocks_launch(now_epoch=tick_started_epoch, any_live=any_live):
+		# #15 off-hours gate. When NOTHING is live, every sweep prices a
+		# board nobody's odds are moving for. The idle interval (900s) and
+		# pregame cooldown (1800s) already throttled off-hours to ~2
+		# sweeps/hour; this halves that again by default and makes the
+		# ceiling explicit and tunable rather than an accident of two
+		# unrelated settings. Fail-open by construction: adaptive off or an
+		# unreadable liveness signal means any_live is None, not False, and
+		# the gate only ever fires on a definite False -- an odds refresh
+		# that cannot establish liveness must sweep, not starve.
+		meta["ok"] = False
+		meta["skipped"] = True
+		meta["offHoursSkipped"] = True
+		meta["error"] = "off-hours: no tracked game live; next sweep when the staleness ceiling expires or a game goes live"
+		print(
+			f"[live_refresh_loop] ODDS_REFRESH_OFF_HOURS_SKIPPED max_staleness_s={_off_hours_max_staleness_seconds()}",
+			flush=True,
+		)
 		skip_launch = True
 	if not skip_launch:
 		if effective_phase == "pregame":
