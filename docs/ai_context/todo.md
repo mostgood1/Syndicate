@@ -6,7 +6,7 @@ list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-07-27 (see "Reconciliation 2026-07-27").
 
-> **Next free ID: 95.** IDs are never reused. Closed items move to
+> **Next free ID: 96.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
 
@@ -420,6 +420,32 @@ now genuinely met rather than merely believed.
     `_diag_log_all_process_memory`/cycle-timing logs for the new today+1/+2
     builds for ~24h before flipping `SYNDICATE_INTELLIGENCE_COMBINED_BOARD_DEFAULT`
     on.
+- **New: #95** (filed, shipped, live) — user reported the exact #93 symptom
+  recurring right after #94 deployed: WNBA-only opps for tomorrow served
+  under today's date. Root-caused live via `/api/ops/intelligence/candidate-trace`:
+  today's own candidate pool was genuinely healthy (128 real MLB candidates)
+  at the moment a `force_refresh` request for `date=2026-07-27` still rolled
+  over and returned 24 WNBA-only candidates dated `2026-07-28`. Cause: the
+  rollover triggers in `_compute_board_publication_response` and
+  `_compute_response` (`pipeline/intelligence_state.py`) checked only "does
+  the resolved date equal today", never "did the caller explicitly ask for
+  that date" — a single transient empty read for today (plausible under
+  tonight's heavy concurrent MLB-sim load) substituted tomorrow's slate for
+  an **explicit** request, not just the dateless default rollover was
+  originally meant to cover. Fixed by capturing whether the caller's own
+  payload carried an explicit date and gating both triggers on its absence.
+  Confirmed via the same two pre-existing rollover tests that their
+  "dateless default" scenario was never actually reachable (a payload with
+  no `date` key resolves `selected_date` to `None`, which can never equal
+  `central_today_iso()`'s string return) — replaced with a test documenting
+  that plus two new regression tests for the real, reachable bug. Full
+  `test_intelligence_state.py` + `test_intelligence_contracts.py`: 202
+  passed, 0 failed. **Under #94's board-window model this makes rollover
+  fully dead code in practice — every payload the board-window watch set
+  queues now carries an explicit date, and no remaining caller sends a
+  genuinely dateless one either — full removal is a lower-risk follow-up,
+  not done here** to keep this fix minimal while production was actively
+  wrong.
 
 ### Reconciliation 2026-07-26
 
