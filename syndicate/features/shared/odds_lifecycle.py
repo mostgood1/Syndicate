@@ -444,6 +444,82 @@ def _compact_odds_lifecycle_file(path: Path) -> None:
     _JSONL_ROWS_CACHE.pop(str(path), None)
 
 
+# How often a process re-scans for oversized past-date logs. The scan is a
+# directory listing plus one stat per file, so this is cheap; the interval
+# exists only to keep it off every single append.
+_STALE_SCAN_INTERVAL_SECONDS = 1800
+_last_stale_scan_epoch = 0.0
+
+
+def compact_stale_odds_lifecycle_files(*, root: Path | None = None, today: date | None = None) -> int:
+    """Trim PAST-DATE odds-event logs that are already oversized.
+
+    #76 backlog. Compaction on the append path only ever touches the file
+    currently being written, so it bounds today's log and leaves every earlier
+    one at whatever size it had reached. Measured on refresh-worker
+    2026-07-27, all predating the append-path fix:
+
+        07-21  46.7MB   07-24  315.7MB
+        07-22  56.9MB   07-25  512.5MB
+        07-23  16.5MB   07-26 1712.5MB
+
+    ~948MB of that is in CLOSED files, and `load_recent_odds_events` still
+    reads all of them every cycle through its 7-day lookback, so they keep
+    filling the page cache that #79 showed `memory.current` counting.
+
+    Past-date files have no writer -- the odds refresh only ever appends to
+    the current slate date -- so trimming them carries none of the
+    read-then-replace race the live file does.
+
+    Note this is a no-op in steady state: from now on each day's log is
+    compacted repeatedly *during* its own day and rolls over already small.
+    It exists to clear the backlog, and to catch a file that went stale while
+    large (compaction disabled, a long outage).
+
+    Deliberately trims rather than deletes. Removing whole files beyond the
+    lookback window would reclaim marginally more and is the other option
+    recorded in #76, but this recovers ~94% of it without destroying anything.
+    """
+    odds_root = root or odds_lifecycle_root()
+    reference = today or central_today()
+    trigger = _compaction_trigger_bytes()
+    if not trigger:
+        return 0
+    compacted = 0
+    try:
+        candidates = sorted(odds_root.glob("*.jsonl"))
+    except OSError:
+        return 0
+    for path in candidates:
+        file_date = _parse_date_token(path.stem)
+        # Unparseable stem: leave it alone rather than guess. Today's and any
+        # future-dated file may have a writer and is the append path's job.
+        if file_date is None or file_date >= reference:
+            continue
+        try:
+            if path.stat().st_size <= trigger:
+                continue
+        except OSError:
+            continue
+        _compact_odds_lifecycle_file(path)
+        compacted += 1
+    if compacted:
+        print(f"ODDS_JSONL_STALE_SCAN compacted={compacted} root={odds_root}", flush=True)
+    return compacted
+
+
+def _maybe_compact_stale_odds_lifecycle_files() -> None:
+    global _last_stale_scan_epoch
+    now = datetime.now(timezone.utc).timestamp()
+    if now - _last_stale_scan_epoch < _STALE_SCAN_INTERVAL_SECONDS:
+        return
+    _last_stale_scan_epoch = now
+    try:
+        compact_stale_odds_lifecycle_files()
+    except Exception as exc:  # pragma: no cover - must never break the write path
+        print(f"ODDS_JSONL_STALE_SCAN_FAILED error={exc}", flush=True)
+
+
 def append_odds_lifecycle_events(date_str: str, events: Sequence[Mapping[str, Any]]) -> Path | None:
     records = [json.dumps(dict(event), ensure_ascii=True, separators=(",", ":")) for event in events if isinstance(event, Mapping)]
     if not records:
@@ -470,6 +546,9 @@ def append_odds_lifecycle_events(date_str: str, events: Sequence[Mapping[str, An
             pass
         except Exception as exc:  # pragma: no cover - defensive
             print(f"ODDS_JSONL_COMPACT_UNEXPECTED path={path} error={exc}", flush=True)
+        # Past-date logs have no writer, so nothing else will ever shrink them
+        # (#76 backlog). Rate-limited internally; a no-op in steady state.
+        _maybe_compact_stale_odds_lifecycle_files()
     elapsed_ms = round((datetime.now(timezone.utc) - started).total_seconds() * 1000, 3)
     _trace_log("after_append_odds_lifecycle_events", path=str(path), rows=len(records), size_bytes=_trace_file_size(path), elapsed_ms=elapsed_ms)
     return path

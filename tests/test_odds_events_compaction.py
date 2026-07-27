@@ -146,5 +146,105 @@ class OddsEventCompactionTests(unittest.TestCase):
         self.assertEqual(leftovers, [])
 
 
+
+class StaleOddsEventBacklogTests(unittest.TestCase):
+    """#76 backlog. The append path only ever touches the file being written,
+    so every earlier day stayed at whatever size it had reached -- ~948MB in
+    closed files on refresh-worker 2026-07-27, all still read every cycle by
+    the 7-day lookback.
+    """
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        odds_lifecycle._COMPACTION_NEXT_THRESHOLD.clear()
+        odds_lifecycle._JSONL_ROWS_CACHE.clear()
+        patcher = patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_DATA_ROOT": self._tmp.name,
+                "SYNDICATE_ODDS_EVENTS_COMPACT_BYTES": str(512 * 1024),
+            },
+            clear=False,
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.root = Path(self._tmp.name) / "odds_events"
+        self.root.mkdir(parents=True, exist_ok=True)
+
+    def _write(self, name: str, rows: int) -> Path:
+        path = self.root / name
+        with path.open("w", encoding="utf-8") as handle:
+            for seq in range(rows):
+                handle.write(json.dumps(_event(seq)) + "\n")
+        return path
+
+    def _rows(self, path: Path) -> int:
+        with path.open(encoding="utf-8") as handle:
+            return sum(1 for line in handle if line.strip())
+
+    def test_closed_oversized_logs_are_trimmed(self) -> None:
+        from datetime import date
+
+        stale = self._write("2026-07-25.jsonl", 40_000)
+        before = stale.stat().st_size
+        count = odds_lifecycle.compact_stale_odds_lifecycle_files(root=self.root, today=date(2026, 7, 26))
+        self.assertEqual(count, 1)
+        self.assertLess(stale.stat().st_size, before)
+        self.assertLessEqual(self._rows(stale), odds_lifecycle._MAX_PERSISTED_ROWS_PER_FILE)
+
+    def test_todays_log_is_left_to_the_append_path(self) -> None:
+        # It has a writer; trimming it here would race the appender.
+        from datetime import date
+
+        today_log = self._write("2026-07-26.jsonl", 40_000)
+        before = today_log.stat().st_size
+        count = odds_lifecycle.compact_stale_odds_lifecycle_files(root=self.root, today=date(2026, 7, 26))
+        self.assertEqual(count, 0)
+        self.assertEqual(today_log.stat().st_size, before)
+
+    def test_future_dated_and_unparseable_names_are_left_alone(self) -> None:
+        from datetime import date
+
+        future = self._write("2026-07-27.jsonl", 40_000)
+        junk = self._write("not-a-date.jsonl", 40_000)
+        sizes = (future.stat().st_size, junk.stat().st_size)
+        odds_lifecycle.compact_stale_odds_lifecycle_files(root=self.root, today=date(2026, 7, 26))
+        self.assertEqual((future.stat().st_size, junk.stat().st_size), sizes)
+
+    def test_small_closed_logs_are_not_rewritten(self) -> None:
+        from datetime import date
+
+        small = self._write("2026-07-24.jsonl", 100)
+        mtime = small.stat().st_mtime_ns
+        count = odds_lifecycle.compact_stale_odds_lifecycle_files(root=self.root, today=date(2026, 7, 26))
+        self.assertEqual(count, 0)
+        self.assertEqual(small.stat().st_mtime_ns, mtime)
+
+    def test_the_lookback_still_reads_the_newest_rows_of_a_trimmed_day(self) -> None:
+        # The lookback reads closed days too, so trimming must preserve the
+        # same tail those reads already select.
+        from datetime import date
+
+        stale = self._write("2026-07-25.jsonl", 40_000)
+        odds_lifecycle.compact_stale_odds_lifecycle_files(root=self.root, today=date(2026, 7, 26))
+        odds_lifecycle._JSONL_ROWS_CACHE.clear()
+        rows = odds_lifecycle._load_jsonl_rows(stale)
+        seqs = [row["seq"] for row in rows]
+        self.assertEqual(seqs[-1], 39_999)
+        self.assertEqual(seqs, list(range(40_000 - len(seqs), 40_000)))
+
+    def test_scan_is_rate_limited_off_the_append_path(self) -> None:
+        odds_lifecycle._last_stale_scan_epoch = 0.0
+        with patch.object(odds_lifecycle, "compact_stale_odds_lifecycle_files") as spy:
+            for _ in range(5):
+                odds_lifecycle._maybe_compact_stale_odds_lifecycle_files()
+        self.assertEqual(spy.call_count, 1)
+
+    def test_a_failing_scan_never_breaks_the_write_path(self) -> None:
+        odds_lifecycle._last_stale_scan_epoch = 0.0
+        with patch.object(odds_lifecycle, "compact_stale_odds_lifecycle_files", side_effect=RuntimeError("boom")):
+            odds_lifecycle._maybe_compact_stale_odds_lifecycle_files()  # must not raise
+
 if __name__ == "__main__":
     unittest.main()
