@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import uuid
 from collections import deque
 from datetime import date
 from datetime import datetime
@@ -30,6 +31,47 @@ _ODDS_HISTORY_SHARD_LOOKBACK_DEFAULT = 1
 # ~100MB to ~1.86GB in one tick. Rows are append-ordered, so keeping the most
 # recent N preserves exactly the "recent market history" this data is for.
 _MAX_JSONL_ROWS_PER_FILE = 2000
+
+# #76. The cap above bounds what a READ costs; nothing bounded the file, and on
+# 2026-07-26 odds_events/2026-07-26.jsonl reached 1,238,217,572 bytes in a
+# single day. With a 7-day lookback that is ~8GB of disk at steady state
+# against a 50GB volume, and it is also the whole of the "2.7GB memory plateau"
+# that #79 chased: reading a 1.24GB file fills the cgroup's page cache, which
+# memory.current counts. Measured on refresh-worker after #79 landed: container
+# 2842MB with only 381MB owned by any process.
+#
+# What makes trimming SAFE rather than lossy-in-practice: every consumer of
+# this data already discards all but the tail. _load_jsonl_rows streams into a
+# deque(maxlen=_MAX_JSONL_ROWS_PER_FILE), and it is the only path that reads
+# these files in production (load_recent_odds_events -> _recent_history_rows;
+# load_odds_lifecycle_events below has no caller outside tests). So everything
+# before the last 2000 rows of a given day is already read by nothing at all.
+#
+# Retained rows are therefore 10x what any reader can see, so a reader cannot
+# be starved by compaction even if the read cap is raised substantially later.
+_MAX_PERSISTED_ROWS_PER_FILE = 20000
+
+# Compaction rewrites the file, so it must be rare relative to appends. This is
+# the number of bytes a file must GROW before it is compacted again -- not an
+# absolute size ceiling, which is what it was first written as.
+#
+# The absolute version is subtly wrong and a local run caught it: if the
+# retained rows are themselves larger than the ceiling, every append lands
+# above it, so compaction runs on EVERY append and rewrites the whole retained
+# set each time. Measured at 300 compactions for 80,000 appended rows. Today's
+# production numbers (20k rows ~= 12MB, against 64MB) would not have tripped
+# it, so this would have shipped as a latent CPU sink waiting for a bigger row
+# or a raised retention.
+#
+# Framing it as growth-since-last-compaction makes the cost O(1) compactions
+# per this many bytes written, whatever the row size: a day that would have
+# reached 1.24GB instead peaks at retained + 64MB and compacts ~19 times.
+_COMPACTION_TRIGGER_BYTES = 64 * 1024 * 1024
+
+# Per-path size the file must exceed before its next compaction, set to
+# (post-compaction size + trigger) each time one runs. In-process only: losing
+# it on restart just means one extra compaction, never a missed one.
+_COMPACTION_NEXT_THRESHOLD: dict[str, int] = {}
 
 
 def _odds_history_shard_lookback() -> int:
@@ -313,6 +355,95 @@ def _recent_history_rows(candidate: Mapping[str, Any], *, sport: str | None = No
     return []
 
 
+def _compaction_trigger_bytes() -> int:
+    raw = str(os.environ.get("SYNDICATE_ODDS_EVENTS_COMPACT_BYTES") or "").strip()
+    try:
+        value = int(raw) if raw else _COMPACTION_TRIGGER_BYTES
+    except ValueError:
+        value = _COMPACTION_TRIGGER_BYTES
+    # 0 disables compaction entirely; otherwise never trim below what a reader
+    # can consume, so a mis-set env var cannot starve the board.
+    if value <= 0:
+        return 0
+    return max(value, 1024 * 1024)
+
+
+def _compact_odds_lifecycle_file(path: Path) -> None:
+    """Trim an odds-events log to its last _MAX_PERSISTED_ROWS_PER_FILE lines.
+
+    #76. Keeps RAW lines rather than parsed rows: nothing here needs to
+    understand the payload, and round-tripping through json would both cost
+    more and risk changing bytes the reader already accepts.
+
+    Must never raise -- this runs on the odds-refresh write path, and failing
+    to compact is merely the status quo, whereas failing the append is a
+    refresh outage.
+
+    ⚠️ Concurrency: this is read-then-replace, so an append landing between the
+    two loses those lines. Today there is exactly one writer
+    (odds_refresh_tracking.append_odds_lifecycle_events) and compaction runs
+    inline right after its own append, which makes the window small but not
+    zero. That is an acceptable trade for telemetry whose consumers only ever
+    read the last 2000 rows -- it would NOT be acceptable if this file ever
+    became a system of record. If a second writer appears, this needs a lock.
+    """
+    try:
+        original_size = path.stat().st_size
+    except OSError:
+        return
+    kept: deque[str] = deque(maxlen=_MAX_PERSISTED_ROWS_PER_FILE)
+    total_lines = 0
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if line.strip():
+                    total_lines += 1
+                    kept.append(line if line.endswith("\n") else line + "\n")
+    except OSError as exc:
+        print(f"ODDS_JSONL_COMPACT_READ_FAILED path={path} error={exc}", flush=True)
+        return
+    if total_lines <= len(kept):
+        # Already at or under the retention target: the file is big because its
+        # rows are big, not because there are many. Rewriting would buy nothing.
+        # Still push the threshold out, or this repeats on every append.
+        _COMPACTION_NEXT_THRESHOLD[str(path)] = original_size + _compaction_trigger_bytes()
+        print(
+            f"ODDS_JSONL_COMPACT_SKIPPED path={path} bytes={original_size} rows={total_lines}",
+            flush=True,
+        )
+        return
+    # Unique temp name per #25: two writers of the same file must not collide
+    # on one temp path.
+    temp_path = path.parent / f"{path.name}.{os.getpid()}.{uuid.uuid4().hex}.compact.tmp"
+    try:
+        with temp_path.open("w", encoding="utf-8") as handle:
+            handle.writelines(kept)
+        os.replace(temp_path, path)
+    except OSError as exc:
+        print(f"ODDS_JSONL_COMPACT_WRITE_FAILED path={path} error={exc}", flush=True)
+        try:
+            if temp_path.exists():
+                temp_path.unlink()
+        except OSError:
+            pass
+        return
+    try:
+        new_size = path.stat().st_size
+    except OSError:
+        new_size = -1
+    if new_size >= 0:
+        _COMPACTION_NEXT_THRESHOLD[str(path)] = new_size + _compaction_trigger_bytes()
+    print(
+        f"ODDS_JSONL_COMPACTED path={path} before_bytes={original_size} after_bytes={new_size} "
+        f"rows_before={total_lines} rows_kept={len(kept)}",
+        flush=True,
+    )
+    # The row cache keys on mtime, and compaction changes both the mtime and
+    # the content -- but dropping the entry explicitly means a reader between
+    # here and its next stat() cannot serve pre-compaction rows.
+    _JSONL_ROWS_CACHE.pop(str(path), None)
+
+
 def append_odds_lifecycle_events(date_str: str, events: Sequence[Mapping[str, Any]]) -> Path | None:
     records = [json.dumps(dict(event), ensure_ascii=True, separators=(",", ":")) for event in events if isinstance(event, Mapping)]
     if not records:
@@ -325,6 +456,20 @@ def append_odds_lifecycle_events(date_str: str, events: Sequence[Mapping[str, An
         for record in records:
             handle.write(record)
             handle.write("\n")
+    # #76. Checked after the append, on a plain stat(), so the common case
+    # costs one syscall. Deliberately not raising out of here: an append that
+    # succeeded is the important part, and a failed compaction just leaves the
+    # file as it would have been anyway.
+    trigger_bytes = _compaction_trigger_bytes()
+    if trigger_bytes:
+        try:
+            threshold = _COMPACTION_NEXT_THRESHOLD.get(str(path), trigger_bytes)
+            if path.stat().st_size > threshold:
+                _compact_odds_lifecycle_file(path)
+        except OSError:
+            pass
+        except Exception as exc:  # pragma: no cover - defensive
+            print(f"ODDS_JSONL_COMPACT_UNEXPECTED path={path} error={exc}", flush=True)
     elapsed_ms = round((datetime.now(timezone.utc) - started).total_seconds() * 1000, 3)
     _trace_log("after_append_odds_lifecycle_events", path=str(path), rows=len(records), size_bytes=_trace_file_size(path), elapsed_ms=elapsed_ms)
     return path
