@@ -79,11 +79,10 @@ class PortfolioSummaryStakeAndParlayTests(unittest.TestCase):
         self.assertEqual(exposure.get("wnba"), 30.0)
 
     def test_stakeless_records_are_excluded_entirely_not_defaulted(self) -> None:
-        # A record with no stake is the auto-tracking path
-        # (run_intelligence_query's ENABLE_PREDICTION_TRACKING, every board
-        # candidate regardless of user action) -- not a real position, so
-        # it must not appear in the portfolio at all, not even defaulted
-        # to a 1-unit position.
+        # A record with no stake is the OLD auto-tracking path (deleted
+        # 2026-07-27, #72), whose rows still exist in real ledgers -- not a
+        # real position, so it must not appear in the portfolio at all, not
+        # even defaulted to a 1-unit position.
         record_prediction(sport="mlb", market="Total", selection="Over 8.5", odds=-110, ledger_path=self.ledger_path)
 
         summary = build_portfolio_summary()

@@ -13,17 +13,16 @@ from syndicate.features.shared.timezone import central_today_iso
 
 
 def _is_user_placed_bet(prediction: Mapping[str, Any]) -> bool:
-    # data/prediction_ledger.json is shared by two unrelated writers: every
-    # board recommendation gets auto-recorded here for model-calibration
-    # purposes (run_intelligence_query's ENABLE_PREDICTION_TRACKING path,
-    # intelligence.py) regardless of whether a user ever saw or acted on
-    # it -- that's the source of the 1000+ "tracked plays" that used to
-    # show up here. A user-placed bet (POST /api/portfolio/bets, the bet
-    # slip's "Log to portfolio") always carries a real stake; the
-    # auto-tracking call site never passes one. Stake presence is the
-    # cleanest signal to separate "the model tracked this candidate" from
-    # "the user actually bet this" without touching the calibration
-    # feature at all.
+    # data/prediction_ledger.json USED to be shared by two unrelated writers:
+    # every board recommendation was auto-recorded by run_intelligence_query
+    # regardless of whether a user ever saw it -- the source of the 1000+
+    # "tracked plays" that used to show up here. That writer was deleted
+    # 2026-07-27 (#72: written on every request, read by nobody, rewrote the
+    # whole multi-MB file each time). The stake check STAYS: existing ledgers
+    # still carry years of stakeless auto-tracked rows, and the one remaining
+    # writer (POST /api/portfolio/bets, the bet slip's "Log to portfolio")
+    # always passes a real stake -- so stake presence still cleanly separates
+    # "the model tracked this candidate" from "the user actually bet this".
     return prediction.get("stake") is not None
 
 

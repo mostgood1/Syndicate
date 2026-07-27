@@ -128,8 +128,6 @@ from syndicate.features.intelligence_parlay_runtime import build_parlays as _run
 from syndicate.features.intelligence_parlay_runtime import build_round_robin_parlays as _runtime_build_round_robin_parlays
 from syndicate.features.intelligence_parlay_runtime import parlay_rank_score as _runtime_parlay_rank_score
 from syndicate.features.intelligence_router import analysis_focus_from_question as _runtime_analysis_focus_from_question
-from syndicate.features.prediction_ledger import PredictionRecord
-from syndicate.features.prediction_ledger import record_prediction
 from syndicate.features.intelligence.api.response_builder import build_response
 from syndicate.features.intelligence.scoring.edge import get_top_live_opportunities
 from syndicate.features.intelligence.signals.normalization import _numeric_hint
@@ -143,7 +141,6 @@ from syndicate.features.intelligence_board import build_intelligence_board_contr
 from syndicate.features.shared.simulation_adapter import build_simulation_engine_context_from_candidate
 
 
-ENABLE_PREDICTION_TRACKING = True
 _SIMULATION_ENGINE = SimulationEngine()
 MAX_CORRELATION_THRESHOLD = 0.65
 logger = logging.getLogger(__name__)
@@ -7810,59 +7807,21 @@ def run_intelligence_query(
         final_picks=recommendations,
         pipeline_name="run_intelligence_query",
     )
-    if ENABLE_PREDICTION_TRACKING:
-        tracking_started_at = time.perf_counter()
-        for recommendation in recommendations:
-            if recommendation.get("is_final") is False:
-                continue
-            prediction_record = PredictionRecord(
-                sport=_safe_text(recommendation.get("sport") or preferences.get("sport"), ""),
-                market=_safe_text(recommendation.get("market") or recommendation.get("market_key"), ""),
-                selection=_safe_text(recommendation.get("selection") or recommendation.get("pick") or recommendation.get("name"), ""),
-                odds=recommendation.get("odds"),
-                implied_probability=recommendation.get("implied_probability") or recommendation.get("fair_probability"),
-                model_probability=recommendation.get("model_probability") or recommendation.get("confidence"),
-                edge=recommendation.get("edge"),
-                confidence=recommendation.get("confidence"),
-                signals={
-                    "decision_strategy": recommendation.get("decision_strategy"),
-                    "adjusted_score": recommendation.get("adjusted_score"),
-                    "rank": recommendation.get("rank"),
-                    "signal_contributions": recommendation.get("signal_contributions"),
-                    "signal_contributions_top_positive": recommendation.get("signal_contributions_top_positive"),
-                    "signal_contributions_top_negative": recommendation.get("signal_contributions_top_negative"),
-                },
-                features_snapshot={
-                    "selected_date": preferences.get("selected_date") or preferences.get("date"),
-                    "event_id": recommendation.get("event_id"),
-                    "sport": recommendation.get("sport"),
-                    "market": recommendation.get("market"),
-                    "market_key": recommendation.get("market_key"),
-                    "line": recommendation.get("line") or recommendation.get("market_line") or recommendation.get("prop_line"),
-                    "score": recommendation.get("score"),
-                    "fair_probability": recommendation.get("fair_probability"),
-                    "confidence_drivers": recommendation.get("confidence_drivers"),
-                    "historical_profile": recommendation.get("historical_profile"),
-                },
-            )
-            try:
-                record_prediction(
-                    sport=prediction_record.sport,
-                    market=prediction_record.market,
-                    selection=prediction_record.selection,
-                    odds=prediction_record.odds,
-                    implied_probability=prediction_record.implied_probability,
-                    model_probability=prediction_record.model_probability,
-                    edge=prediction_record.edge,
-                    confidence=prediction_record.confidence,
-                    signals=prediction_record.signals,
-                    features_snapshot=prediction_record.features_snapshot,
-                    timestamp=prediction_record.timestamp,
-                    prediction_id=prediction_record.id,
-                )
-            except Exception:
-                pass
-        _intel_trace_timed("snapshot_write", tracking_started_at, pipeline="run_intelligence_query", recommendation_count=len(recommendations))
+    # #72 (2026-07-27): the per-query prediction-ledger write is GONE, on the
+    # user's decision that the ledger is obsolete. What it did: for every
+    # recommendation of every intelligence query, record_prediction() appended
+    # ~14.5KB to data/prediction_ledger.json and REWROTE THE WHOLE FILE --
+    # measured at 2.5MB and growing, on the request path of a 2-thread web
+    # service (#56), while its only automated reader
+    # (pipeline/performance_aggregator.py) reported
+    # used_prediction_ledger_fallback: false / prediction_ledger_count: 0.
+    # Written on every request, read by nobody, cost growing with age.
+    #
+    # Deliberately NOT removed: the explicit write in
+    # syndicate/blueprints/intelligence.py (/api/portfolio/bets) -- that is a
+    # user-submitted bet, bounded by user action, and /portfolio genuinely
+    # reads it through portfolio_summary.py. Same file, different feature.
+    # The prediction_ledger module itself stays for that path.
     response_started_at = time.perf_counter()
     parlay_limit = preferences["limit"] if preferences.get("parlay_type") == "round_robin" else min(3, preferences["limit"])
     parlays = _build_parlays(filtered_candidates, limit=parlay_limit, preferences=preferences) if preferences.get("intent") == "parlay" or "parlay" in preferences.get("question", "").lower() else []

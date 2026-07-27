@@ -914,19 +914,10 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self._persist_patcher = patch.object(IntelligenceStateService, "_persist_locked", return_value=None)
         self._persist_patcher.start()
 
-        # 1d. Same story for the prediction ledger. intelligence.py:7706 calls
-        #     record_prediction() on every query, and its path resolves through
-        #     data_root() to this machine's real data/prediction_ledger.json --
-        #     2.5MB, read and rewritten twice per test. Profiling put it at 1.46s
-        #     of a 2.6s test, the largest single cost left after 1c. Patched at
-        #     the call site rather than by redirecting data_root, because setting
-        #     SYNDICATE_DATA_ROOT breaks the artifact isolation above (see 1b).
-        #     No test in this file references record_prediction.
-        self._record_prediction_patcher = patch(
-            "syndicate.features.intelligence.record_prediction",
-            return_value=None,
-        )
-        self._record_prediction_patcher.start()
+        # 1d used to patch out record_prediction here -- intelligence.py called
+        #     it on every query and rewrote the real 2.5MB ledger twice per
+        #     test (1.46s of a 2.6s test). The production write path itself
+        #     was deleted 2026-07-27 (#72), so there is nothing left to patch.
 
         self._intel_state_path_patchers = [
             patch("pipeline.intelligence_state.STATE_PATH", temp_reports_dir / "query_state_cache.json"),
@@ -1129,7 +1120,6 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         for path_patcher in self._intel_state_path_patchers:
             path_patcher.stop()
         self._persist_patcher.stop()
-        self._record_prediction_patcher.stop()
         self._source_root_env_patcher.stop()
         self._intel_state_tempdir.cleanup()
         for loop_patcher in self._background_loop_patchers:
@@ -5534,26 +5524,25 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         overview = _sample_overview()
         candidate = {"name": "Play 1", "sport": "NBA", "market": "PTS", "score": 91.0}
 
-        with patch("syndicate.features.intelligence.ENABLE_PREDICTION_TRACKING", False):
-            with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=overview):
-                with patch("syndicate.features.intelligence._odds_history_payloads_by_sport", return_value={}):
-                    with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
-                        with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
-                            with patch("syndicate.features.intelligence.collect_all_recommendations", return_value=[candidate]) as mocked_collect:
-                                with patch("syndicate.features.intelligence._resolved_requested_subjects", return_value=[]):
-                                    with patch("syndicate.features.intelligence._resolved_requested_markets", return_value=[]):
-                                        with patch("syndicate.features.intelligence._analysis_focus_from_resolved_candidates", return_value=None):
-                                            with patch("syndicate.features.intelligence._enrich_candidates_with_odds_history", side_effect=lambda candidates, _: candidates):
-                                                with patch("syndicate.features.intelligence._score_candidates", side_effect=lambda candidates, advanced_by_sport, preferences: candidates):
-                                                    with patch("syndicate.features.intelligence.filter_candidates", side_effect=lambda candidates, sport=None: candidates):
-                                                        with patch("syndicate.features.intelligence.rank_candidates", side_effect=lambda candidates, sport=None, limit=None: candidates):
-                                                            with patch("syndicate.features.intelligence._greedy_low_correlation_selection", side_effect=lambda candidates, limit, threshold: candidates):
-                                                                with patch("syndicate.features.intelligence._analysis_views_for_query", return_value={}):
-                                                                    with patch("syndicate.features.intelligence._build_supporting_evidence", return_value={}):
-                                                                        with patch("syndicate.features.intelligence._build_analysis_brief", return_value={"summary": "ok"}):
-                                                                            with patch("syndicate.features.intelligence.build_response", side_effect=lambda recommendations, parlays: {"recommendations": recommendations, "parlays": parlays}) as mocked_build_response:
-                                                                                first = run_intelligence_query("top edges today", selected_date="2026-06-11")
-                                                                                second = run_intelligence_query("top edges today", selected_date="2026-06-11")
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=overview):
+            with patch("syndicate.features.intelligence._odds_history_payloads_by_sport", return_value={}):
+                with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                    with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
+                        with patch("syndicate.features.intelligence.collect_all_recommendations", return_value=[candidate]) as mocked_collect:
+                            with patch("syndicate.features.intelligence._resolved_requested_subjects", return_value=[]):
+                                with patch("syndicate.features.intelligence._resolved_requested_markets", return_value=[]):
+                                    with patch("syndicate.features.intelligence._analysis_focus_from_resolved_candidates", return_value=None):
+                                        with patch("syndicate.features.intelligence._enrich_candidates_with_odds_history", side_effect=lambda candidates, _: candidates):
+                                            with patch("syndicate.features.intelligence._score_candidates", side_effect=lambda candidates, advanced_by_sport, preferences: candidates):
+                                                with patch("syndicate.features.intelligence.filter_candidates", side_effect=lambda candidates, sport=None: candidates):
+                                                    with patch("syndicate.features.intelligence.rank_candidates", side_effect=lambda candidates, sport=None, limit=None: candidates):
+                                                        with patch("syndicate.features.intelligence._greedy_low_correlation_selection", side_effect=lambda candidates, limit, threshold: candidates):
+                                                            with patch("syndicate.features.intelligence._analysis_views_for_query", return_value={}):
+                                                                with patch("syndicate.features.intelligence._build_supporting_evidence", return_value={}):
+                                                                    with patch("syndicate.features.intelligence._build_analysis_brief", return_value={"summary": "ok"}):
+                                                                        with patch("syndicate.features.intelligence.build_response", side_effect=lambda recommendations, parlays: {"recommendations": recommendations, "parlays": parlays}) as mocked_build_response:
+                                                                            first = run_intelligence_query("top edges today", selected_date="2026-06-11")
+                                                                            second = run_intelligence_query("top edges today", selected_date="2026-06-11")
 
         self.assertEqual(first, second)
         self.assertEqual(mocked_collect.call_count, 2)
