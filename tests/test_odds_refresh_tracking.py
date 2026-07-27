@@ -714,6 +714,22 @@ class SteamDetectorTests(unittest.TestCase):
         self.assertIsNone(self._signal(previous_ts=None, current_line=12.0))
         self.assertIsNone(self._signal(previous_ts="garbage", current_line=12.0))
 
+    def test_naive_previous_ts_is_treated_as_utc_not_rejected(self) -> None:
+        # Raw odds-fetch snapshots stamp retrieved_at with a naive
+        # datetime.utcnow() (no offset) even though the value IS UTC -- the
+        # every-other-timestamp-in-this-pipeline convention. Confirmed live
+        # 2026-07-27: this silently zeroed out steam detection for every
+        # prop-market observation all day despite real qualifying swings,
+        # because the old code rejected any naive timestamp outright.
+        steam = self._signal(
+            current_line=9.0,
+            previous_ts="2026-07-27T18:00:00",
+            observed_ts="2026-07-27T18:10:00+00:00",
+        )
+        self.assertIsNotNone(steam)
+        self.assertEqual(steam["line_delta"], 0.5)
+        self.assertEqual(steam["window_seconds"], 600.0)
+
     def test_record_is_bounded_and_never_raises(self) -> None:
         import json as _json
         from tempfile import TemporaryDirectory

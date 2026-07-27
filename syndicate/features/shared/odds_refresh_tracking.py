@@ -190,6 +190,30 @@ def _steam_thresholds(capture_phase: str | None) -> tuple[float, float, float]:
     return line_move, odds_move, window_seconds
 
 
+def _parse_utc_datetime(value: Any) -> datetime | None:
+    """Parses an ISO timestamp, treating a naive result as UTC.
+
+    Every timestamp this pipeline generates itself is aware (_utc_now() uses
+    datetime.now(timezone.utc)), but raw odds-fetch snapshots stamp their own
+    retrieved_at with a naive datetime.utcnow() -- the value IS UTC, it is
+    only missing the offset. Rejecting it outright (the previous behavior:
+    "if parsed.tzinfo is None: return None") silently disabled steam
+    detection for every observation sourced from those snapshots -- confirmed
+    2026-07-27: zero STEAM_DETECTED prints all day on either worker despite
+    real production odds carrying >200pt swings and >1.0 line moves well past
+    the steam thresholds. Treating naive as UTC (not discarding it) is what
+    fixes that without needing every fetch script's timestamp writer fixed
+    first.
+    """
+    try:
+        parsed = datetime.fromisoformat(str(value or "").replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
 def _steam_signal(
     *,
     previous_line: float | None,
@@ -210,12 +234,9 @@ def _steam_signal(
     """
     if previous_ts is None:
         return None
-    try:
-        prev = datetime.fromisoformat(str(previous_ts).replace("Z", "+00:00"))
-        curr = datetime.fromisoformat(str(observed_ts).replace("Z", "+00:00"))
-    except (TypeError, ValueError):
-        return None
-    if prev.tzinfo is None or curr.tzinfo is None:
+    prev = _parse_utc_datetime(previous_ts)
+    curr = _parse_utc_datetime(observed_ts)
+    if prev is None or curr is None:
         return None
     gap_seconds = (curr - prev).total_seconds()
     line_move, odds_move, window_seconds = _steam_thresholds(capture_phase)
