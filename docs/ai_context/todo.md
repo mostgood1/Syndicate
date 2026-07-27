@@ -491,10 +491,7 @@ endpoints out of prod · **22** stop retrying 4xx in vendor clients
 **26** NBA/WNBA board parity (ESPN athlete IDs, headshots, live projection/line
 movement — mirror `288d1e5e`, `604f96f6`, `83315e5c`) · **27** Layer 1 Phase 5:
 Layer 2 consumes Layer 1 · **28** Layer 1 Phase 6: market board → NHL, then
-NFL/NCAAF/NCAAB · **32–36** NHL revamp Phases 6–10 · **45** WNBA All-Star game
-missing from the market board (`/wnba/api/source/cards` shows 1 game,
-`/wnba/api/market-board` shows 0; sims may be infeasible for All-Star rosters but
-it should still appear and pull lines) · **52** MLS: 1432 `unmatched_no_sim_coverage`
+NFL/NCAAF/NCAAB · **32–36** NHL revamp Phases 6–10 · **52** MLS: 1432 `unmatched_no_sim_coverage`
 rows (~71% of the board have no sim projection at all — separate from #44) ·
 **69** "last simmed" per-league rollout — MLB has `simUpdatedAtDisplay` from
 `9b5806c6`; needs other sports plus the *reason* (lineup vs injury vs tip-off).

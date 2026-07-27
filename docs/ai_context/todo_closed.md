@@ -282,6 +282,11 @@ Five defects, in order of how load-bearing they were.
 
 - **76 —**🟢 **RESOLVED 2026-07-27T01:11Z — verified by file size, not by log line.** `odds_events/<date>.jsonl` grew unbounded (1.24 GB → 1.71 GB in one day); nothing read past the last 2000 rows (`_load_jsonl_rows` deque cap, sole production reader), so it was pure dead weight filling the page cache #79 measured. **Fix, three commits:** append-path compaction to the last 20k raw lines (`0508f8bd`) with a **growth-based** trigger — an absolute ceiling compacted on *every* append once retained > ceiling, 300 compactions/80k rows measured locally, caught before ship; a stale-file scan for closed days (`ec256961`); and the scan triggered from the **read** path too (`3d2110e3`) — production showed refresh-worker holds the 2.66 GB backlog but never appends (odds refresh appends on live-odds-worker), so an append-only hook would never have run on the box that needed it. **Verified in production:** `2026-07-26.jsonl` **1,712,508,566 → 39,296,335 bytes**; `07-24` (315.7 MB) and `07-25` (512.5 MB) stopped printing `ODDS_JSONL_LARGE` entirely (threshold 8 MB), so both trimmed; the `COMPACTED` prints themselves never surfaced (subprocess stdout / spotty logs API) — **the sizes are the evidence**. Residual by design: `07-21/22/23` (46.7/56.9/16.5 MB) sit **below the 64 MB trigger** and are left alone; ~120 MB total, ages out within a week. Footprint ~2.66 GB → ~175 MB. ⚠️ Read-then-replace race documented in the code: fine for tail-read telemetry, needs a lock if a second writer or system-of-record use ever appears. `SYNDICATE_ODDS_EVENTS_COMPACT_BYTES=0` disables.
 
+- **45 — WNBA All-Star game missing from the market board.** Overtaken by
+  events 2026-07-26: the game has been played. Closed without a fix at the
+  user's direction; if the same gap matters for a future special-event game,
+  file it fresh against that game.
+
 ---
 
 ## Closed earlier
