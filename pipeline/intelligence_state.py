@@ -433,6 +433,61 @@ def _watched_payload_eviction_reason(payload: dict[str, Any] | None, today_iso: 
     return None
 
 
+# Serialized-bytes budget for the snapshots section of the STATE_PATH payload.
+# The store's ceiling is 8MB for the WHOLE payload; queue fields are ~1.5KB, so
+# 6MB leaves real headroom for the wrapper and for estimation error (sizes here
+# are measured with the same json.dumps the store uses, but on the pre-wrapped
+# entries).
+_PERSISTED_SNAPSHOTS_BUDGET_BYTES = 6 * 1024 * 1024
+
+
+def _budgeted_snapshots_payload(snapshots_payload: dict[str, dict[str, Any]], latest_key: str | None) -> dict[str, dict[str, Any]]:
+    """The snapshots section trimmed to fit the keyvalue ceiling.
+
+    Full responses are kept newest-first (the latest key always first) until
+    the budget is spent; every remaining entry keeps its metadata but has
+    response set to None. _load_persisted_state_locked skips response-less
+    entries, so the cost of being trimmed is exactly "this key recomputes
+    after a reboot instead of warm-starting" -- while the entry's key/payload/
+    computed_at survive for anything that only needs to know the snapshot
+    existed.
+
+    Deterministic on purpose: the same input always trims the same way, so a
+    payload that fits today cannot flap in and out of the fallback as dict
+    order shifts.
+    """
+    ordered_keys = list(snapshots_payload.keys())
+    # OrderedDict appends newest last; walk newest-first, latest key up front.
+    priority = [key for key in ([latest_key] if latest_key in snapshots_payload else [])]
+    priority += [key for key in reversed(ordered_keys) if key != latest_key]
+    spent = 0
+    keep_full: set[str] = set()
+    for key in priority:
+        entry = snapshots_payload.get(key)
+        if not isinstance(entry, dict):
+            continue
+        try:
+            entry_bytes = len(json.dumps(entry, default=str))
+        except Exception:
+            continue
+        if spent + entry_bytes > _PERSISTED_SNAPSHOTS_BUDGET_BYTES and keep_full:
+            continue
+        if spent + entry_bytes > _PERSISTED_SNAPSHOTS_BUDGET_BYTES:
+            # Not even the single newest entry fits; nothing keeps a response.
+            break
+        spent += entry_bytes
+        keep_full.add(key)
+    trimmed: dict[str, dict[str, Any]] = {}
+    for key, entry in snapshots_payload.items():
+        if not isinstance(entry, dict):
+            continue
+        if key in keep_full:
+            trimmed[key] = entry
+        else:
+            trimmed[key] = {**entry, "response": None}
+    return trimmed
+
+
 def _empty_board_protection_window_seconds() -> int:
     raw = str(os.environ.get("SYNDICATE_EMPTY_BOARD_PROTECTION_SECONDS") or "").strip()
     try:
@@ -3486,28 +3541,78 @@ class IntelligenceStateService:
             "watched_board_dates": dict(self._watched_board_dates),
             "snapshots": snapshots_payload,
         }
-        write_json_file(STATE_PATH, payload)
+        # 2026-07-27: the first genuinely populated board killed the worker's
+        # background loop THREAD, right here. 27 real candidates made each
+        # snapshot's response ~4.6MB; this payload carries every snapshot's
+        # full response (snapshots=10,896,866 bytes for 7 of them, per
+        # KEYVALUE_PAYLOAD_COMPOSITION), the store's #60 guard raised
+        # KeyValuePayloadTooLarge -- loudly and correctly -- and nothing here
+        # caught it. The exception escaped _background_loop, the thread died,
+        # the board froze on its 00:04:13Z snapshot, AND the execution guard
+        # (acquired at the top of the loop body, released after this returns,
+        # not in a finally) stayed held, so the MLB sim launcher deferred on
+        # intelligence_pipeline_busy against a pipeline that no longer
+        # existed. Exactly the failure #43's closure flagged as
+        # deployed-but-unproven.
+        #
+        # Two rules, both enforced below:
+        # - a persist failure must NEVER propagate: durability here is
+        #   best-effort by design (the queue fields exist for cross-process
+        #   visibility, the snapshots for reboot warm-start), and every
+        #   caller -- the loop, the eviction sweep, request-path queueing --
+        #   is worse off dead than un-persisted for one cycle;
+        # - when the payload is the problem, shrink it deterministically
+        #   rather than give up: full responses newest-first within a byte
+        #   budget, metadata-only beyond it. _load_persisted_state_locked
+        #   already skips entries whose response is not a dict, so a stripped
+        #   entry degrades to "recompute that key after a reboot", nothing
+        #   else changes.
+        try:
+            write_json_file(STATE_PATH, payload)
+        except KeyValuePayloadTooLarge:
+            payload["snapshots"] = _budgeted_snapshots_payload(snapshots_payload, latest_key_to_write)
+            try:
+                write_json_file(STATE_PATH, payload)
+                print(
+                    f"[intelligence_state] STATE_PERSIST_TRIMMED latest_key={latest_key_to_write} "
+                    f"kept_full={sum(1 for entry in payload['snapshots'].values() if isinstance(entry.get('response'), dict))} "
+                    f"of={len(payload['snapshots'])}",
+                    flush=True,
+                )
+            except Exception as exc:
+                # Even latest-only did not fit (or the store failed outright).
+                # The in-memory board still serves; say so and survive.
+                print(f"[intelligence_state] STATE_PERSIST_FAILED {type(exc).__name__}: {exc}", flush=True)
+        except Exception as exc:
+            print(f"[intelligence_state] STATE_PERSIST_FAILED {type(exc).__name__}: {exc}", flush=True)
         if latest_snapshot is not None:
-            daily_paths = _intelligence_state_daily_paths()
-            latest_response = dict(latest_snapshot.response or {}) if isinstance(latest_snapshot.response, dict) else {}
-            board_snapshot_payload = _intelligence_board_snapshot_payload(
-                latest_response,
-                selected_date=str(latest_snapshot.payload.get("date") or latest_snapshot.payload.get("selected_date") or "").strip() or None,
-            )
-            write_json_file(
-                BOARD_SNAPSHOT_PATH,
-                {
-                    "latest_key": latest_snapshot.key,
-                    **board_snapshot_payload,
-                },
-            )
-            write_json_file(
-                daily_paths["board_snapshot"],
-                {
-                    "latest_key": latest_snapshot.key,
-                    **board_snapshot_payload,
-                },
-            )
+            try:
+                daily_paths = _intelligence_state_daily_paths()
+                latest_response = dict(latest_snapshot.response or {}) if isinstance(latest_snapshot.response, dict) else {}
+                board_snapshot_payload = _intelligence_board_snapshot_payload(
+                    latest_response,
+                    selected_date=str(latest_snapshot.payload.get("date") or latest_snapshot.payload.get("selected_date") or "").strip() or None,
+                )
+                write_json_file(
+                    BOARD_SNAPSHOT_PATH,
+                    {
+                        "latest_key": latest_snapshot.key,
+                        **board_snapshot_payload,
+                    },
+                )
+                write_json_file(
+                    daily_paths["board_snapshot"],
+                    {
+                        "latest_key": latest_snapshot.key,
+                        **board_snapshot_payload,
+                    },
+                )
+            except Exception as exc:
+                # Same rule: today's board_snapshot write was 5.15MB with the
+                # 27-candidate board -- a bigger slate crosses the same 8MB
+                # ceiling here too, and this write failing must not take the
+                # thread (or a request) with it.
+                print(f"[intelligence_state] BOARD_SNAPSHOT_PERSIST_FAILED {type(exc).__name__}: {exc}", flush=True)
 
 
 _INTELLIGENCE_STATE_SERVICE = IntelligenceStateService()
