@@ -8,7 +8,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from scripts.fetch_mlb_weather import STADIUM_COORDS, _todays_home_teams, parse_wind_mph, trim_hourly_periods
+from scripts.fetch_mlb_weather import STADIUM_COORDS, _home_teams_from_statsapi_schedule, _todays_home_teams, parse_wind_mph, trim_hourly_periods
 
 
 class MlbWeatherTests(unittest.TestCase):
@@ -60,13 +60,59 @@ class MlbWeatherTests(unittest.TestCase):
                 teams = _todays_home_teams("2026-07-27")
         self.assertEqual(teams, ["Boston Red Sox", "New York Yankees"])
 
-    def test_todays_home_teams_returns_empty_without_a_snapshot(self) -> None:
+    def test_todays_home_teams_falls_back_to_statsapi_schedule_when_no_local_snapshot(self) -> None:
+        # Regression for 2026-07-27: on the service that actually runs this
+        # script, neither local snapshot candidate ever resolved (confirmed
+        # in production -- separate Render disks, no filesystem sharing), so
+        # parks/errors stayed {} on every run even on a live 12-game slate.
+        # Weather only needs "which parks have a game today", so this falls
+        # back to MLB's own free/keyless schedule endpoint instead of
+        # depending on the odds pipeline having synced a local file.
+        schedule_payload = {
+            "dates": [
+                {
+                    "games": [
+                        {"teams": {"home": {"team": {"name": "Boston Red Sox"}}}},
+                        {"teams": {"home": {"team": {"name": "New York Yankees"}}}},
+                    ]
+                }
+            ]
+        }
         with TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             with patch("syndicate.features.mlb.sources._artifact_roots", return_value=[root]):
                 with patch("scripts.fetch_mlb_weather.data_root", return_value=root):
-                    teams = _todays_home_teams("2026-07-27")
+                    with patch("scripts.fetch_mlb_weather._get_json", return_value=schedule_payload) as mock_get:
+                        teams = _todays_home_teams("2026-07-27")
+        self.assertEqual(teams, ["Boston Red Sox", "New York Yankees"])
+        mock_get.assert_called_once()
+        self.assertIn("statsapi.mlb.com", mock_get.call_args[0][0])
+
+    def test_todays_home_teams_fails_open_when_everything_is_unavailable(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            with patch("syndicate.features.mlb.sources._artifact_roots", return_value=[root]):
+                with patch("scripts.fetch_mlb_weather.data_root", return_value=root):
+                    with patch("scripts.fetch_mlb_weather._get_json", side_effect=OSError("network down")):
+                        teams = _todays_home_teams("2026-07-27")
         self.assertEqual(teams, [])
+
+    def test_statsapi_schedule_fallback_parses_home_teams_and_dedupes(self) -> None:
+        schedule_payload = {
+            "dates": [
+                {
+                    "games": [
+                        {"teams": {"home": {"team": {"name": "Athletics"}}}},
+                        {"teams": {"home": {"team": {"name": "Athletics"}}}},
+                        {"teams": {}},
+                        {},
+                    ]
+                }
+            ]
+        }
+        with patch("scripts.fetch_mlb_weather._get_json", return_value=schedule_payload):
+            teams = _home_teams_from_statsapi_schedule("2026-07-27")
+        self.assertEqual(teams, ["Athletics"])
 
 
 if __name__ == "__main__":

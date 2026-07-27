@@ -124,6 +124,32 @@ def trim_hourly_periods(periods: list, *, now_epoch: float, hours: int = _HOURS_
     return out
 
 
+def _home_teams_from_statsapi_schedule(date_str: str) -> list[str]:
+    # Both file candidates below depend on this service's own disk already
+    # having today's odds-derived snapshot -- confirmed 2026-07-27 that this
+    # still comes back empty on the service that runs this script even when
+    # the identical relative path has a fully-populated snapshot on another
+    # Render service's disk (separate disks per service, no filesystem
+    # sharing; see CLAUDE.md). Weather only needs "which parks have a game
+    # today", not odds, so this asks MLB's own free/keyless schedule endpoint
+    # directly -- same trust level as the NWS calls below, no cross-service
+    # artifact-sync dependency at all.
+    url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={date_str}"
+    payload = _get_json(url)
+    teams: set[str] = set()
+    for day in payload.get("dates") or []:
+        if not isinstance(day, dict):
+            continue
+        for game in day.get("games") or []:
+            if not isinstance(game, dict):
+                continue
+            home = (((game.get("teams") or {}).get("home") or {}).get("team") or {}).get("name")
+            name = str(home or "").strip()
+            if name:
+                teams.add(name)
+    return sorted(teams)
+
+
 def _todays_home_teams(date_str: str) -> list[str]:
     # Both filenames here were wrong: the writer (fetch_mlb_oddsapi_local.py
     # fetch_and_write_live_odds_for_date) and its daily-snapshot mirror
@@ -153,7 +179,16 @@ def _todays_home_teams(date_str: str) -> list[str]:
         teams = sorted({str(g.get("home_team") or "").strip() for g in games if isinstance(g, dict) and str(g.get("home_team") or "").strip()})
         if teams:
             return teams
-    return []
+    # Still fixing 2026-07-27's regression: on the service that actually runs
+    # this script, neither file candidate above has ever resolved to a
+    # non-empty games list -- confirmed by production's parks/errors both
+    # staying {} every run since #92 shipped. Rather than keep guessing at
+    # which local path this service's disk happens to have, fall back to the
+    # schedule directly; a transient statsapi failure still fails open to [].
+    try:
+        return _home_teams_from_statsapi_schedule(date_str)
+    except Exception:
+        return []
 
 
 def fetch_weather_for_date(date_str: str) -> dict:
