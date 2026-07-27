@@ -45136,6 +45136,43 @@ def api_cron_live_lens_tick():
     include_player_props = str(request.args.get("include_player_props") or "1").strip().lower() in {"1", "true", "yes"}
     ttl = _parse_ttl_param(request, default=15, lo=1, hi=300)
 
+    payload = _live_lens_tick_payload(
+        ds,
+        min_interval_sec=min_interval_sec,
+        max_props=max_props,
+        recent_window_sec=recent_window_sec,
+        first_bet_only=first_bet_only,
+        include_total=include_total,
+        include_ats=include_ats,
+        include_ml=include_ml,
+        include_player_props=include_player_props,
+        ttl=ttl,
+    )
+    return jsonify(payload)
+
+
+def _live_lens_tick_payload(
+    ds: str,
+    *,
+    min_interval_sec: int = 60,
+    max_props: int = 8,
+    recent_window_sec: int = 180,
+    first_bet_only: bool = True,
+    include_total: bool = True,
+    include_ats: bool = True,
+    include_ml: bool = True,
+    include_player_props: bool = True,
+    ttl: int = 15,
+) -> dict[str, Any]:
+    """Compute Live Lens signals/projections for one date and write them to
+    live_lens_signals_<date>.jsonl / live_lens_projections_<date>.jsonl.
+
+    Extracted from api_cron_live_lens_tick's body (unchanged below this point)
+    so callers in-process (e.g. Syndicate's wnba/live_lens.py) can invoke the
+    real pace-adjusted live projection logic directly, the same way MLB's
+    live_lens.py calls vendor.mlb_bettingv2.tools.web.flask_frontend's
+    _live_lens_payload, instead of only reaching it over HTTP via this route.
+    """
     # Keep the in-memory first-BET cache bounded across long-lived processes.
     try:
         with _live_lens_tick_lock:
@@ -46449,7 +46486,7 @@ def api_cron_live_lens_tick():
         except Exception as e:
             errors.append(f"props_block:{str(e)}")
 
-    return jsonify({
+    return {
         "ok": True,
         "date": ds,
         "in_progress_games": int(len(inprog)),
@@ -46465,7 +46502,7 @@ def api_cron_live_lens_tick():
         "artifacts_dir": str(_live_lens_artifacts_dir()),
         "errors": errors[:25],
         "utc": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-    })
+    }
 
 
 @app.route("/api/admin/daily-update", methods=["POST", "GET"])

@@ -17,9 +17,17 @@ up a garbage-time factor NBA's copy never got).
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from syndicate.features.shared.market_inventory import join_odds_to_sim
+
+# Stat codes the sim artifact actually carries a mean/sd pair for (confirmed
+# 2026-07-27 against real cards_sim_detail_<date>.json for both NBA and
+# WNBA: every player row carries {stat}_mean/{stat}_sd for exactly these
+# eight; combo/streak markets like pr/pa/ra/dd/td are display-only labels
+# for recommendation-engine picks and never get their own sim distribution).
+_DIST_STAT_CODES: tuple[str, ...] = ("pts", "reb", "ast", "threes", "stl", "blk", "tov", "pra")
 
 _PROP_MARKET_LABELS: dict[str, str] = {
     "pts": "Points",
@@ -155,12 +163,72 @@ def basketball_game_state(game: dict[str, Any]) -> str:
     return "pregame"
 
 
+def _prob_over(mean: float, sd: float, line: float) -> float | None:
+    """P(actual stat > line) under a normal approximation of the player's
+    own simulated distribution -- the same formula the vendored WNBA sim
+    engine already uses internally for its own live-tick probability
+    (vendor/wnba_betting_repo/app.py's `_prob_over`, confirmed identical
+    2026-07-27), reimplemented locally so this module has no vendor
+    dependency for a two-line computation.
+    """
+    try:
+        mean_v, sd_v, line_v = float(mean), float(sd), float(line)
+    except (TypeError, ValueError):
+        return None
+    if not (math.isfinite(mean_v) and math.isfinite(sd_v) and math.isfinite(line_v)):
+        return None
+    if sd_v <= 1e-9:
+        return 1.0 if mean_v > line_v else 0.0
+    z = (line_v - mean_v) / sd_v
+    return max(0.0, min(1.0, 1.0 - 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))))
+
+
+def player_stat_distributions_from_sim(sim_players: dict[str, Any] | None) -> tuple[dict[str, dict[str, tuple[float, float]]], dict[str, str]]:
+    """Reads the sim artifact's own per-player {stat}_mean/{stat}_sd fields
+    (confirmed present for both NBA and WNBA's cards_sim_detail_<date>.json,
+    2026-07-27) into {normalized_player: {stat_code: (mean, sd)}}, plus a
+    normalized->display-name map. This is real sim coverage independent of
+    whether the recommendation engine picked a side for that stat -- the
+    #101 gap this closes.
+    """
+    dist: dict[str, dict[str, tuple[float, float]]] = {}
+    display_names: dict[str, str] = {}
+    if not isinstance(sim_players, dict):
+        return dist, display_names
+    for side in ("away", "home"):
+        rows = sim_players.get(side)
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            player = str(row.get("player_name") or row.get("player") or "").strip()
+            if not player:
+                continue
+            normalized = _canonical_player_key(player)
+            display_names.setdefault(normalized, player)
+            stats: dict[str, tuple[float, float]] = {}
+            for stat_code in _DIST_STAT_CODES:
+                mean = row.get(f"{stat_code}_mean")
+                sd = row.get(f"{stat_code}_sd")
+                if mean is None or sd is None:
+                    continue
+                try:
+                    stats[stat_code] = (float(mean), float(sd))
+                except (TypeError, ValueError):
+                    continue
+            if stats:
+                dist[normalized] = stats
+    return dist, display_names
+
+
 def basketball_market_board_rows_for_game(
     *,
     game_pk: Any,
     betting: dict[str, Any] | None,
     prop_recommendations: dict[str, Any] | None,
     raw_player_props: dict[str, dict[str, dict[str, Any]]] | None = None,
+    sim_players: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     odds_rows: list[dict[str, Any]] = []
     sim_rows: list[dict[str, Any]] = []
@@ -217,7 +285,9 @@ def basketball_market_board_rows_for_game(
     # back to the clean display label after join_odds_to_sim runs.
     raw_player_props = raw_player_props if isinstance(raw_player_props, dict) else {}
     prop_recommendations = prop_recommendations if isinstance(prop_recommendations, dict) else {}
+    player_stat_dist, sim_display_names = player_stat_distributions_from_sim(sim_players)
     recommended_props_by_entity: dict[str, dict[str, dict[str, Any]]] = {}
+    entity_stats_with_sim_row: set[tuple[str, str]] = set()
     for entries in (prop_recommendations.get("away"), prop_recommendations.get("home")):
         if not isinstance(entries, list):
             continue
@@ -234,40 +304,79 @@ def basketball_market_board_rows_for_game(
             # No official/candidate tier split exists in this feed (its
             # "tier" field is a confidence label like "High", not
             # official-vs-extra) and, like MLB props, odds and model
-            # confidence come from the same recommendation row -- so
-            # p_win (model win prob for the picked side) is the best
-            # available "sim" signal, falling back to edge if p_win is
-            # absent.
-            confidence = entry.get("p_win") if entry.get("p_win") is not None else entry.get("edge")
+            # confidence come from the same recommendation row. p_win (model
+            # win probability for the picked side) is a genuine two-sided
+            # probability -- when present, convert it to model_prob_over
+            # (P(Over)) so join_odds_to_sim derives the complementary Under
+            # side itself instead of both sides sharing the picked side's
+            # raw number (the #101 bug: "the one row with a Model % showed
+            # the SAME number for both Over and Under -- impossible for real
+            # win probabilities", fixed for MLB's own market board via the
+            # same join_odds_to_sim mechanism). edge is not a probability
+            # and can't be complemented this way, so it stays a plain
+            # single-sided sim_projection, matching prior behavior.
+            p_win = entry.get("p_win")
+            edge = entry.get("edge")
             normalized_entity = _canonical_player_key(player)
+            stat_code = _canonical_stat_code(entry.get("market"))
 
-            recommended_props_by_entity.setdefault(player, {})[_canonical_stat_code(entry.get("market"))] = {
+            recommended_props_by_entity.setdefault(player, {})[stat_code] = {
                 "market_label": market_label,
                 "line": line,
                 "odds": odds,
                 "side": selection,
             }
-            if confidence is not None:
+            if p_win is not None:
+                try:
+                    p_win_value = max(0.0, min(1.0, float(p_win)))
+                except (TypeError, ValueError):
+                    p_win_value = None
+                if p_win_value is not None:
+                    model_prob_over = p_win_value if selection == "over" else 1.0 - p_win_value
+                    sim_rows.append(
+                        {
+                            "game_id": game_pk,
+                            "market": _prop_join_market_key(market_label, normalized_entity),
+                            "period": "full_game",
+                            "entity": player,
+                            "model_prob_over": model_prob_over,
+                            "sim_source": "basketball_recommendation_engine",
+                        }
+                    )
+                    entity_stats_with_sim_row.add((normalized_entity, stat_code))
+            elif edge is not None:
                 sim_rows.append(
                     {
                         "game_id": game_pk,
                         "market": _prop_join_market_key(market_label, normalized_entity),
                         "period": "full_game",
                         "entity": player,
-                        "sim_projection": confidence,
+                        "sim_projection": edge,
                         "sim_source": "basketball_recommendation_engine",
                     }
                 )
+                entity_stats_with_sim_row.add((normalized_entity, stat_code))
 
-    # Raw OddsAPI feed -- the true book-odds source, when we can attribute
-    # a player to this game. Basketball has no "probable pitcher"
-    # equivalent, so attribution is purely via existing recommendation
-    # coverage: a player with genuinely zero recommendation-engine coverage
-    # today has no roster signal to attribute them by, so they're not
-    # surfaced yet -- the same bounded limitation MLB's hitter props have.
+    # Raw OddsAPI feed -- the true book-odds source, when we can attribute a
+    # player to this game. Basketball has no "probable pitcher" equivalent,
+    # so attribution used to be purely via recommendation-engine coverage --
+    # a player with zero recommendation-engine coverage had no roster signal
+    # to attribute them by. The sim artifact's own per-player rows ARE a
+    # real roster signal (confirmed 2026-07-27: cards_sim_detail_<date>.json
+    # carries every rostered player with sim coverage, independent of
+    # whether the recommendation engine picked anything for them), so a
+    # player with sim coverage but no recommendation now also gets
+    # attributed -- this is what lets a quoted line with zero
+    # recommendation-engine coverage get a genuine model view instead of
+    # staying blank (the #101 gap: MLB's fix covers every market-quoted
+    # stat with sim coverage, not just recommended ones; this closes the
+    # same gap for basketball).
+    attributed_players: dict[str, str] = {_canonical_player_key(player): player for player in recommended_props_by_entity}
+    for normalized_entity, display_name in sim_display_names.items():
+        attributed_players.setdefault(normalized_entity, display_name)
+
     covered_entity_stats: set[tuple[str, str]] = set()
-    for player in recommended_props_by_entity:
-        normalized_entity = _canonical_player_key(player)
+    for normalized_entity, player in attributed_players.items():
         player_markets = raw_player_props.get(normalized_entity)
         if not isinstance(player_markets, dict):
             continue
@@ -284,6 +393,29 @@ def basketball_market_board_rows_for_game(
             if under_odds is not None:
                 odds_rows.append({"game_id": game_pk, "market": join_key, "period": "full_game", "entity": player, "side": "under", "line": line, "odds": under_odds, "market_type": "prop"})
             covered_entity_stats.add((normalized_entity, _canonical_stat_code(stat_key)))
+
+            stat_code = _canonical_stat_code(stat_key)
+            if (normalized_entity, stat_code) in entity_stats_with_sim_row:
+                continue
+            if line is None:
+                continue
+            dist = player_stat_dist.get(normalized_entity, {}).get(stat_code)
+            if dist is None:
+                continue
+            model_prob_over = _prob_over(dist[0], dist[1], line)
+            if model_prob_over is None:
+                continue
+            sim_rows.append(
+                {
+                    "game_id": game_pk,
+                    "market": join_key,
+                    "period": "full_game",
+                    "entity": player,
+                    "model_prob_over": model_prob_over,
+                    "sim_source": "basketball_sim_distribution",
+                }
+            )
+            entity_stats_with_sim_row.add((normalized_entity, stat_code))
 
     for player, props in recommended_props_by_entity.items():
         normalized_entity = _canonical_player_key(player)
@@ -390,9 +522,15 @@ def build_basketball_market_board(
         home_abbr = str(home.get("abbr") or game.get("home_tri") or "HME").strip().upper()
         betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
         prop_recommendations = game.get("prop_recommendations") if isinstance(game.get("prop_recommendations"), dict) else {}
+        sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
+        sim_players = sim.get("players") if isinstance(sim.get("players"), dict) else None
 
         odds_rows, sim_rows = basketball_market_board_rows_for_game(
-            game_pk=game_pk, betting=betting, prop_recommendations=prop_recommendations, raw_player_props=raw_player_props
+            game_pk=game_pk,
+            betting=betting,
+            prop_recommendations=prop_recommendations,
+            raw_player_props=raw_player_props,
+            sim_players=sim_players,
         )
         inventory = join_odds_to_sim(odds_rows, sim_rows)
         for row in inventory:

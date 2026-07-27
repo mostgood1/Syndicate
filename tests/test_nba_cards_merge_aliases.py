@@ -51,18 +51,14 @@ class NbaCardsMergeAliasTests(unittest.TestCase):
         self.assertEqual(merged_games[0].get("detail"), "Final")
 
     def test_sim_detail_payload_does_not_use_remote_base_url_without_explicit_fallback(self) -> None:
+        # The remote source-app-fallback code this test used to pin as
+        # unreachable (_remote_source_fallback_enabled/_remote_source_base_url/
+        # _remote_fetch_json) was itself dead -- confirmed zero callers
+        # anywhere in nba/cards.py -- and removed. Nothing left to assert
+        # isn't called; this now just confirms the artifact-only path.
         with patch("syndicate.features.nba.cards._artifact_bundle", return_value={"sim": {}, "paths": {}, "rows": []}), patch(
             "syndicate.features.nba.cards.build_cards_page_context",
             return_value={"games": []},
-        ), patch(
-            "syndicate.features.nba.cards._remote_source_fallback_enabled",
-            return_value=False,
-        ), patch(
-            "syndicate.features.nba.cards._remote_source_base_url",
-            return_value="https://source-app.example",
-        ), patch(
-            "syndicate.features.nba.cards._remote_fetch_json",
-            side_effect=AssertionError("remote source fetch should not be used when fallback is disabled"),
         ):
             payload = build_cards_sim_detail_payload("2026-05-22", "BOS", "NYK")
 
@@ -76,9 +72,6 @@ class NbaCardsMergeAliasTests(unittest.TestCase):
         ), patch(
             "syndicate.features.nba.cards._resolve_games_for_event_ids",
             return_value={},
-        ), patch(
-            "syndicate.features.nba.cards._remote_live_snapshot_payload",
-            side_effect=AssertionError("remote live snapshot should not be used"),
         ), patch(
             "syndicate.features.nba.cards.build_cards_page_context",
             return_value={"date": "2026-05-22", "games": []},

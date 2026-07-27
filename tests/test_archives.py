@@ -2719,9 +2719,6 @@ class DateArchiveHelperTests(unittest.TestCase):
         ), patch(
             "syndicate.features.nba.cards._best_live_state_payload",
             return_value=None,
-        ), patch(
-            "syndicate.features.nba.cards._remote_source_fallback_enabled",
-            return_value=False,
         ):
             payload = build_live_state_payload("2026-06-05")
 
@@ -2764,12 +2761,6 @@ class DateArchiveHelperTests(unittest.TestCase):
             return_value=None,
         ), patch(
             "syndicate.features.wnba.cards._public_scoreboard_live_state_payload",
-            return_value=None,
-        ), patch(
-            "syndicate.features.wnba.cards._remote_source_fallback_enabled",
-            return_value=False,
-        ), patch(
-            "syndicate.features.wnba.cards._remote_live_snapshot_payload",
             return_value=None,
         ):
             payload = build_live_state_payload("2026-06-05")

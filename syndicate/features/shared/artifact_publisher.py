@@ -33,6 +33,16 @@ logger = logging.getLogger("artifact_publisher")
 HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "*_source/source_artifacts/data/live_lens/live_lens_report_*.json",
     "*_source/source_artifacts/data/live_lens/render_sync/*.json",
+    # NBA/WNBA's in-game pace-adjusted live projections, written by the
+    # vendored live-lens tick (now called in-process from
+    # syndicate/features/wnba/live_lens.py instead of only over HTTP) and read
+    # by wnba/cards.py's _artifact_live_player_lens_payload. Written on
+    # live-odds-worker, read on web -- Render gives each service its own
+    # disk, so this allowlist entry is what actually gets a live game's
+    # projection from the worker that computes it to the service that serves
+    # it, not just a path-naming fix.
+    "*_source/source_artifacts/data/live_lens/live_lens_projections_*.jsonl",
+    "*_source/source_artifacts/data/live_lens/live_lens_signals_*.jsonl",
     "*_source/source_artifacts/data/processed/recommendations*.json",
     "*_source/source_artifacts/data/processed/recommendations*.csv",
     "*_source/source_artifacts/data/processed/props_recommendations*.json",
@@ -72,6 +82,8 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # above alone silently match zero files for those sports.
     "*_source/data/live_lens/live_lens_report_*.json",
     "*_source/data/live_lens/render_sync/*.json",
+    "*_source/data/live_lens/live_lens_projections_*.jsonl",
+    "*_source/data/live_lens/live_lens_signals_*.jsonl",
     "*_source/data/processed/recommendations*.json",
     "*_source/data/processed/recommendations*.csv",
     "*_source/data/processed/props_recommendations*.json",

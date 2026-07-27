@@ -162,7 +162,7 @@ services:
       - key: WNBA_BETTING_DATA_ROOT
         value: /opt/render/project/data/wnba_source/data
       - key: WNBA_LIVE_LENS_DIR
-        value: ./data/wnba_source/source_artifacts/data/live_lens
+        value: /opt/render/project/data/wnba_source/source_artifacts/data/live_lens
       - key: SYNDICATE_WNBA_SOURCE_APP_FALLBACK
         value: "false"
       - key: MLB_ENABLE_LIVE_LENS_LOOP
@@ -365,7 +365,7 @@ services:
       - key: WNBA_BETTING_DATA_ROOT
         value: /opt/render/project/data/wnba_source/data
       - key: WNBA_LIVE_LENS_DIR
-        value: ./data/wnba_source/source_artifacts/data/live_lens
+        value: /opt/render/project/data/wnba_source/source_artifacts/data/live_lens
       - key: MLB_ENABLE_LIVE_LENS_LOOP
         value: "false"
       - key: MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS
@@ -655,7 +655,7 @@ services:
       - key: WNBA_BETTING_DATA_ROOT
         value: /opt/render/project/data/wnba_source/data
       - key: WNBA_LIVE_LENS_DIR
-        value: ./data/wnba_source/source_artifacts/data/live_lens
+        value: /opt/render/project/data/wnba_source/source_artifacts/data/live_lens
       - key: SYNDICATE_WNBA_SOURCE_APP_FALLBACK
         value: "false"
       # 2026-07-19: yesterday's smart-sim engine upgrade (25f34697) raised the

@@ -386,7 +386,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
                     }
                 ]
             },
-        ), patch("syndicate.features.wnba.cards._remote_live_snapshot_payload", return_value=None), patch(
+        ), patch(
             "syndicate.features.wnba.cards._public_scoreboard_live_state_payload",
             return_value=None,
         ):
@@ -398,7 +398,11 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual([game.get("game_id") for game in payload.get("games") or []], ["42"])
         self.assertTrue(((payload.get("games") or [{}])[0]).get("in_progress"))
 
-    def test_live_state_payload_render_skips_remote_and_public_fallbacks(self) -> None:
+    def test_live_state_payload_render_skips_public_fallback(self) -> None:
+        # The remote source-app fallback this test used to also pin as
+        # unreachable on Render (_remote_live_snapshot_payload) was itself
+        # dead code -- confirmed zero callers anywhere in wnba/cards.py --
+        # and removed, so there's nothing left to assert isn't called there.
         with patch.dict("os.environ", {"RENDER": "1"}, clear=False), patch(
             "syndicate.features.wnba.cards.central_today_iso",
             return_value="2026-05-21",
@@ -420,9 +424,6 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
                 ],
             },
         ) as local_payload, patch(
-            "syndicate.features.wnba.cards._remote_live_snapshot_payload",
-            side_effect=AssertionError("remote snapshot should not be used on Render"),
-        ) as remote_payload, patch(
             "syndicate.features.wnba.cards._public_scoreboard_live_state_payload",
             side_effect=AssertionError("public scoreboard should not be used on Render"),
         ) as public_payload, patch(
@@ -447,7 +448,6 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual(payload.get("source"), "local_snapshot")
         self.assertEqual([game.get("event_id") for game in payload.get("games") or []], ["evt-1"])
         self.assertEqual(local_payload.call_count, 1)
-        self.assertEqual(remote_payload.call_count, 0)
         self.assertEqual(public_payload.call_count, 0)
 
     def test_live_state_payload_render_normalizes_stringified_status_dict(self) -> None:
@@ -456,9 +456,6 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
             return_value="2026-05-21",
         ), patch(
             "syndicate.features.wnba.cards._local_live_state_payload",
-            return_value=None,
-        ), patch(
-            "syndicate.features.wnba.cards._remote_live_snapshot_payload",
             return_value=None,
         ), patch(
             "syndicate.features.wnba.cards._public_scoreboard_live_state_payload",
@@ -514,9 +511,6 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
                 ],
             },
         ), patch(
-            "syndicate.features.wnba.cards._remote_live_snapshot_payload",
-            return_value=None,
-        ), patch(
             "syndicate.features.wnba.cards._public_scoreboard_live_state_payload",
             return_value={
                 "ok": True,
@@ -567,9 +561,6 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
 
     def test_live_state_payload_repairs_stale_public_scoreboard_with_cards_context(self) -> None:
         with patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-05-21"), patch(
-            "syndicate.features.wnba.cards._remote_live_snapshot_payload",
-            return_value=None,
-        ), patch(
             "syndicate.features.wnba.cards._local_live_state_payload",
             return_value=None,
         ), patch(
@@ -621,9 +612,6 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
 
     def test_live_state_payload_preserves_public_rows_when_cards_context_is_incomplete(self) -> None:
         with patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-05-21"), patch(
-            "syndicate.features.wnba.cards._remote_live_snapshot_payload",
-            return_value=None,
-        ), patch(
             "syndicate.features.wnba.cards._local_live_state_payload",
             return_value=None,
         ), patch(

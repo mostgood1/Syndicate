@@ -3,10 +3,12 @@ from __future__ import annotations
 import atexit
 import os
 import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from syndicate.features.shared.artifact_publisher import publish_changed_hot_artifacts
 from syndicate.features.mlb.live_lens import build_live_lens_snapshot_internal as _mlb_build
 from syndicate.features.mlb.live_lens import live_lens_snapshot_path as _mlb_snapshot_path
 from syndicate.features.mlb.live_lens import validate_live_lens_snapshot as _mlb_validate
@@ -269,12 +271,32 @@ def _run_live_lens_tick() -> dict[str, Any]:
 	return meta
 
 
+def _live_lens_publish_enabled() -> bool:
+	return _env_bool("SYNDICATE_LIVE_LENS_LOOP_PUBLISH_ARTIFACTS", default=True)
+
+
 def _live_lens_background_loop() -> None:
 	status_path = _meta_dir() / "live_lens_loop_status.json"
 	interval_seconds = _live_lens_loop_interval_seconds()
+	# live_lens_loop runs on live-odds-worker, which has its own disk separate
+	# from the web service's (Render gives each service its own mount even at
+	# the same path) -- writing live_lens_projections_*.jsonl/live_lens_signals_
+	# *.jsonl here does nothing for web's read side without an explicit publish.
+	# Bounded to files changed since the previous tick so a slow cycle doesn't
+	# repeatedly re-scan/re-publish the same unchanged files.
+	last_publish_epoch = time.time()
 	while not _LIVE_LENS_LOOP_STOP.is_set():
 		started_at = _utc_now()
+		started_epoch = time.time()
 		meta = _run_live_lens_tick()
+		if _live_lens_publish_enabled():
+			try:
+				published_count = publish_changed_hot_artifacts(last_publish_epoch)
+				if published_count:
+					print(f"[live_lens_loop] published_hot_artifacts count={published_count}", flush=True)
+			except Exception as exc:
+				print(f"[live_lens_loop] publish_hot_artifacts_failed error={type(exc).__name__}: {exc}", flush=True)
+		last_publish_epoch = started_epoch
 		write_json_file(
 			status_path,
 			{

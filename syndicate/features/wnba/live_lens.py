@@ -47,8 +47,24 @@ def _live_line_value(game: dict[str, Any]) -> float | None:
     return None
 
 
-def _live_line_map(selected_date: str, games: list[dict[str, Any]]) -> dict[str, float]:
-    return {}
+def _run_wnba_live_lens_tick(selected_date: str) -> dict[str, Any] | None:
+    """Run the vendored pace-adjusted live-projection pipeline in-process.
+
+    Writes live_lens_signals_<date>.jsonl / live_lens_projections_<date>.jsonl
+    (read by wnba/cards.py's live player-lens builders) for any games currently
+    in progress. Mirrors mlb/live_lens.py's _persist_live_lens_report, which
+    imports and calls MLB's vendored _live_lens_payload directly instead of
+    going over HTTP -- vendor.wnba_betting_repo.app._live_lens_tick_payload is
+    the same kind of extraction, done for this fix.
+    """
+    try:
+        from vendor.wnba_betting_repo.app import _live_lens_tick_payload
+    except Exception:
+        return None
+    try:
+        return _live_lens_tick_payload(selected_date)
+    except Exception:
+        return None
 
 
 def _load_live_lens_snapshot() -> dict[str, Any] | None:
@@ -210,6 +226,7 @@ def validate_live_lens_snapshot(snapshot: Any) -> bool:
 
 
 def build_live_lens_snapshot(selected_date: str, *, limit: int = 50) -> dict[str, Any]:
+    _run_wnba_live_lens_tick(selected_date)
     try:
         cards_context = build_cards_page_context(selected_date, allow_stored_date_fallback=False)
     except Exception:

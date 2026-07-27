@@ -8,6 +8,7 @@ from syndicate.features.shared.basketball_market_board import build_basketball_m
 from syndicate.features.shared.basketball_market_board import hydrate_live_prop_rows
 from syndicate.features.shared.basketball_market_board import live_rows_by_event_id
 from syndicate.features.shared.basketball_market_board import parse_raw_basketball_player_props_rows
+from syndicate.features.shared.basketball_market_board import player_stat_distributions_from_sim
 from syndicate.features.shared.market_inventory import JOIN_STATUS_MATCHED
 from syndicate.features.shared.market_inventory import JOIN_STATUS_NEEDS_RESIM
 from syndicate.features.shared.market_inventory import JOIN_STATUS_NO_SIM_COVERAGE
@@ -109,15 +110,49 @@ class BasketballMarketBoardRowsTests(unittest.TestCase):
         self.assertEqual(odds_rows[0]["side"], "over")
         self.assertEqual(odds_rows[0]["market_type"], "prop")
         self.assertEqual(len(sim_rows), 1)
-        self.assertAlmostEqual(sim_rows[0]["sim_projection"], 1.0)  # p_win preferred over edge
+        # #101-style fix: p_win becomes a side-aware model_prob_over (P(Over))
+        # instead of a flat sim_projection duplicated onto both sides at
+        # join time -- an OVER pick's p_win IS model_prob_over directly.
+        self.assertNotIn("sim_projection", sim_rows[0])
+        self.assertAlmostEqual(sim_rows[0]["model_prob_over"], 1.0)
 
         inventory = join_odds_to_sim(odds_rows, sim_rows)
         self.assertEqual(inventory[0]["join_status"], JOIN_STATUS_MATCHED)
+        self.assertAlmostEqual(inventory[0]["sim_projection"], 1.0)
+        self.assertEqual(inventory[0]["model_side"], "over")
 
     def test_prop_row_falls_back_to_edge_when_p_win_absent(self) -> None:
         prop_recommendations = {"away": [{"player": "Someone", "market": "reb", "side": "under", "line": 6.5, "price": -110.0, "edge": 0.12}]}
         _, sim_rows = basketball_market_board_rows_for_game(game_pk=1, betting={}, prop_recommendations=prop_recommendations)
         self.assertAlmostEqual(sim_rows[0]["sim_projection"], 0.12)
+
+    def test_prop_row_p_win_under_pick_derives_complementary_over_probability(self) -> None:
+        # Before this fix, an UNDER pick's p_win (e.g. 0.7 confidence in
+        # Under) would have been stamped straight onto sim_projection and
+        # shared identically by BOTH the Over and Under odds rows at join
+        # time -- the exact #101 bug ("impossible for real win
+        # probabilities"). model_prob_over must be P(Over), i.e. 1 - p_win
+        # for an Under pick, so the join derives two genuinely different,
+        # complementary probabilities for the sibling Over/Under odds rows.
+        prop_recommendations = {
+            "away": [
+                {"player": "Someone", "market": "reb", "side": "under", "line": 6.5, "price": -110.0, "p_win": 0.7}
+            ]
+        }
+        odds_rows, sim_rows = basketball_market_board_rows_for_game(
+            game_pk=1,
+            betting={},
+            prop_recommendations=prop_recommendations,
+            raw_player_props={"someone": {"reb": {"line": 6.5, "over_odds": -120.0, "under_odds": -110.0}}},
+        )
+        self.assertAlmostEqual(sim_rows[0]["model_prob_over"], 0.3)
+
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+        by_side = {row["side"]: row for row in inventory}
+        self.assertAlmostEqual(by_side["over"]["sim_projection"], 0.3)
+        self.assertAlmostEqual(by_side["under"]["sim_projection"], 0.7)
+        self.assertEqual(by_side["over"]["model_side"], "under")
+        self.assertEqual(by_side["under"]["model_side"], "under")
 
     def test_props_missing_player_or_invalid_side_are_skipped(self) -> None:
         prop_recommendations = {
@@ -356,6 +391,121 @@ class BasketballMarketBoardRawPropsFeedTests(unittest.TestCase):
         statuses = {row["join_status"] for row in inventory}
         self.assertNotIn(JOIN_STATUS_NEEDS_RESIM, statuses)
         self.assertTrue(all(status == JOIN_STATUS_MATCHED for status in statuses))
+
+
+class PlayerStatDistributionsFromSimTests(unittest.TestCase):
+    def test_parses_mean_sd_pairs_for_known_stat_codes(self) -> None:
+        # Real shape confirmed 2026-07-27 against production
+        # cards_sim_detail_<date>.json for both NBA and WNBA.
+        sim_players = {
+            "away": [{"player_name": "A'ja Wilson", "pts_mean": 22.4, "pts_sd": 5.1, "reb_mean": 9.8, "reb_sd": 2.9, "minutes": 32.0}],
+            "home": [],
+        }
+        dist, names = player_stat_distributions_from_sim(sim_players)
+        key = "a'ja wilson"
+        self.assertIn(key, dist)
+        self.assertEqual(dist[key]["pts"], (22.4, 5.1))
+        self.assertEqual(dist[key]["reb"], (9.8, 2.9))
+        self.assertNotIn("ast", dist[key])  # no ast_mean/ast_sd supplied
+        self.assertEqual(names[key], "A'ja Wilson")
+
+    def test_returns_empty_for_missing_or_malformed_input(self) -> None:
+        self.assertEqual(player_stat_distributions_from_sim(None), ({}, {}))
+        self.assertEqual(player_stat_distributions_from_sim({"away": "not-a-list"}), ({}, {}))
+
+
+class BasketballMarketBoardSimDistributionCoverageTests(unittest.TestCase):
+    """Covers the #101 follow-up: MLB's own market-board fix produces a
+    genuine model probability for every market-quoted stat with sim
+    coverage, not just recommendation-engine picks -- WNBA/NBA's sim
+    artifact carries the same mean/sd per player/stat MLB's does (confirmed
+    2026-07-27 against real cards_sim_detail_<date>.json), it just wasn't
+    being read. These tests lock in that it now is."""
+
+    def test_player_with_sim_coverage_but_no_recommendation_gets_model_prob_over(self) -> None:
+        sim_players = {"away": [{"player_name": "Breanna Stewart", "pts_mean": 24.0, "pts_sd": 6.0}], "home": []}
+        raw_player_props = {"breanna stewart": {"points": {"line": 20.5, "over_odds": -115, "under_odds": -105}}}
+
+        odds_rows, sim_rows = basketball_market_board_rows_for_game(
+            game_pk=1,
+            betting={},
+            prop_recommendations={},  # zero recommendation-engine coverage
+            raw_player_props=raw_player_props,
+            sim_players=sim_players,
+        )
+
+        self.assertEqual(len(odds_rows), 2)  # over + under both surfaced
+        self.assertEqual(len(sim_rows), 1)
+        self.assertEqual(sim_rows[0]["sim_source"], "basketball_sim_distribution")
+        # mean 24.0 > line 20.5 -> real P(Over) should be well above 0.5,
+        # not the "no model view" blank this player would have gotten
+        # before (zero recommendation-engine coverage).
+        self.assertGreater(sim_rows[0]["model_prob_over"], 0.5)
+
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+        by_side = {row["side"]: row for row in inventory}
+        self.assertIsNotNone(by_side["over"]["sim_projection"])
+        self.assertIsNotNone(by_side["under"]["sim_projection"])
+        self.assertAlmostEqual(by_side["over"]["sim_projection"] + by_side["under"]["sim_projection"], 1.0, places=6)
+
+    def test_recommendation_p_win_takes_priority_over_distribution_for_same_stat(self) -> None:
+        # The recommendation engine's own p_win is presumably more refined
+        # (post-shrinkage, matchup-adjusted, etc.) than a raw normal-CDF
+        # approximation over the sim's mean/sd -- the distribution fallback
+        # must never override an existing recommendation-engine sim_row.
+        sim_players = {"away": [{"player_name": "Breanna Stewart", "pts_mean": 24.0, "pts_sd": 6.0}], "home": []}
+        prop_recommendations = {
+            "away": [{"player": "Breanna Stewart", "market": "pts", "side": "over", "line": 20.5, "price": -115.0, "p_win": 0.91}],
+            "home": [],
+        }
+        raw_player_props = {"breanna stewart": {"points": {"line": 20.5, "over_odds": -115, "under_odds": -105}}}
+
+        _, sim_rows = basketball_market_board_rows_for_game(
+            game_pk=1,
+            betting={},
+            prop_recommendations=prop_recommendations,
+            raw_player_props=raw_player_props,
+            sim_players=sim_players,
+        )
+
+        self.assertEqual(len(sim_rows), 1)
+        self.assertEqual(sim_rows[0]["sim_source"], "basketball_recommendation_engine")
+        self.assertAlmostEqual(sim_rows[0]["model_prob_over"], 0.91)
+
+    def test_stat_with_no_sim_coverage_still_gets_no_model_view(self) -> None:
+        # A player the sim never modeled at all (e.g. not in the boxscore
+        # projection for that stat) must still show no model view rather
+        # than fabricating a probability -- this is the honest "we don't
+        # know" case, distinct from the gap this fix closes.
+        raw_player_props = {"random bench player": {"points": {"line": 4.5, "over_odds": -110, "under_odds": -110}}}
+
+        odds_rows, sim_rows = basketball_market_board_rows_for_game(
+            game_pk=1, betting={}, prop_recommendations={}, raw_player_props=raw_player_props, sim_players=None
+        )
+        self.assertEqual(odds_rows, [])
+        self.assertEqual(sim_rows, [])
+
+    def test_build_basketball_market_board_passes_sim_players_through(self) -> None:
+        games = [
+            {
+                "gamePk": "1",
+                "event_id": "evt-1",
+                "away": {"abbr": "LVA"},
+                "home": {"abbr": "SEA"},
+                "status": "Scheduled",
+                "betting": {},
+                "prop_recommendations": {},
+                "sim": {"players": {"away": [{"player_name": "A'ja Wilson", "pts_mean": 22.0, "pts_sd": 5.0}], "home": []}},
+            }
+        ]
+        raw_player_props = {"a'ja wilson": {"points": {"line": 18.5, "over_odds": -110, "under_odds": -110}}}
+
+        board = build_basketball_market_board(sport_slug="wnba", selected_date="2026-07-27", games=games, raw_player_props=raw_player_props)
+
+        rows = board["games"][0]["rows"]
+        prop_rows = [row for row in rows if row.get("market_type") == "prop"]
+        self.assertEqual(len(prop_rows), 2)
+        self.assertTrue(any(row.get("sim_projection") is not None for row in prop_rows))
 
 
 if __name__ == "__main__":
