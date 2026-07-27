@@ -1919,13 +1919,42 @@ def _steam_event_market_text(event: dict[str, Any]) -> str:
     return market[:1].upper() + market[1:] if market else "Market"
 
 
+_STEAM_NO_LINE_MARKET_TYPES = {"h2h", "moneyline"}
+
+
+def _steam_event_has_real_line(event: dict[str, Any]) -> bool:
+    # h2h (moneyline) rows have no genuine line -- _primary_line_value falls
+    # back to the odds field itself when line/point/spread/total are all
+    # absent, so current_line/current_odds (and their deltas) end up
+    # numerically identical. Confirmed live 2026-07-27: "Detroit Tigers
+    # H2h" showed a fabricated "-198 -> 159 line" move (really just the
+    # moneyline price) outranking genuine prop line moves because
+    # line_delta == odds_delta exactly matched the "real line move" test.
+    # Named-market exclusion for h2h; the delta-equality check is a second,
+    # market-agnostic guard for any other market shaped the same way.
+    market_type = str(event.get("market_type") or "").strip().lower()
+    if market_type in _STEAM_NO_LINE_MARKET_TYPES:
+        return False
+    steam = event.get("steam") if isinstance(event.get("steam"), dict) else {}
+    line_delta = steam.get("line_delta")
+    odds_delta = steam.get("odds_delta")
+    if (
+        isinstance(line_delta, (int, float))
+        and isinstance(odds_delta, (int, float))
+        and line_delta == odds_delta
+        and line_delta != 0
+    ):
+        return False
+    return True
+
+
 def _steam_event_line_text(event: dict[str, Any]) -> str:
     # selection (over/under) and line are separate fields on props
     # (_flatten_mlb_props), absent on game markets (h2h/totals/spreads), so
     # both are optional -- the card's third line is blank rather than
     # showing a bare "Line" placeholder when neither is there.
     selection = str(event.get("selection") or "").strip().capitalize()
-    line = _steam_format_line(event.get("line"))
+    line = _steam_format_line(event.get("line")) if _steam_event_has_real_line(event) else None
     if selection and line:
         return f"{selection} {line}"
     return selection or line or ""
@@ -1939,7 +1968,7 @@ def _steam_event_significance(event: dict[str, Any]) -> tuple[int, float]:
     # magnitude first.
     steam = event.get("steam") if isinstance(event.get("steam"), dict) else {}
     line_delta = steam.get("line_delta")
-    has_line_move = isinstance(line_delta, (int, float)) and line_delta != 0
+    has_line_move = isinstance(line_delta, (int, float)) and line_delta != 0 and _steam_event_has_real_line(event)
     if has_line_move:
         return (1, abs(line_delta))
     odds_delta = steam.get("odds_delta")
@@ -1954,10 +1983,11 @@ def _steam_event_movement_text(event: dict[str, Any]) -> str:
     curr_odds = _steam_format_odds(event.get("price"))
     if prev_odds and curr_odds and prev_odds != curr_odds:
         parts.append(f"{prev_odds} → {curr_odds}")
-    prev_line = _steam_format_line(steam.get("previous_line"))
-    curr_line = _steam_format_line(event.get("line"))
-    if prev_line and curr_line and prev_line != curr_line:
-        parts.append(f"{prev_line} → {curr_line} line")
+    if _steam_event_has_real_line(event):
+        prev_line = _steam_format_line(steam.get("previous_line"))
+        curr_line = _steam_format_line(event.get("line"))
+        if prev_line and curr_line and prev_line != curr_line:
+            parts.append(f"{prev_line} → {curr_line} line")
     if parts:
         return " · ".join(parts)
     return "Movement detected"
