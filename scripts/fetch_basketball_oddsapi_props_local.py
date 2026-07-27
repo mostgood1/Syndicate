@@ -107,7 +107,9 @@ def _quota_sport(url: str) -> str:
 
 def _get(url: str, params: dict[str, object]) -> requests.Response:
     response = requests.get(url, params=params, headers=_headers(), timeout=45)
-    record_oddsapi_quota(response.headers, sport=_quota_sport(url), endpoint=url)
+    # response.url, not url: the markets= the attribution buckets read live in
+    # params, and the recorder redacts apiKey before persisting.
+    record_oddsapi_quota(response.headers, sport=_quota_sport(url), endpoint=response.url)
     response.raise_for_status()
     return response
 

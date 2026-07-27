@@ -90,7 +90,9 @@ def _http_get(url: str, params: dict[str, Any], timeout: int = 30) -> tuple[Any,
     # headers, and a call that failed may well have been billed. Dropping
     # those observations would bias measured burn downward -- exactly the
     # direction that makes an over-budget account look fine.
-    record_oddsapi_quota(response.headers, sport="mlb", endpoint=url)
+    # response.url, not url: the markets= the attribution buckets read live in
+    # params, and the recorder redacts apiKey before persisting.
+    record_oddsapi_quota(response.headers, sport="mlb", endpoint=response.url)
     response.raise_for_status()
     return response.json(), {str(key).lower(): str(value) for key, value in response.headers.items()}
 

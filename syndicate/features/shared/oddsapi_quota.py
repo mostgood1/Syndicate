@@ -124,6 +124,33 @@ def _attribute_request_families(endpoint: str, last_cost: int) -> dict[str, floa
     return out
 
 
+def _sanitize_endpoint(endpoint: str) -> str:
+    """Strip credentials from a request URL, keeping the rest of the query.
+
+    The recorded endpoint is persisted to the shared state store, so it must
+    never carry apiKey -- which is why several fetchers used to record only
+    the path. But attribution needs the QUERY (markets= is what
+    _attribute_request_families reads), and a path-only endpoint files every
+    cost-carrying call under event_list: the first attributed day read 100%
+    event_list precisely because callers were stripping (or never had) the
+    query. Central redaction lets callers pass the real requested URL.
+
+    On any parse failure the whole query is dropped -- losing attribution for
+    one observation is acceptable; persisting a key never is.
+    """
+    endpoint = str(endpoint or "").strip()
+    if "?" not in endpoint:
+        return endpoint
+    try:
+        from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+        parts = urlsplit(endpoint)
+        query = [(key, value) for key, value in parse_qsl(parts.query, keep_blank_values=True) if key.lower() not in {"apikey", "api_key"}]
+        return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+    except Exception:
+        return endpoint.split("?", 1)[0]
+
+
 def _utc_now_iso() -> str:
     # Milliseconds, not seconds: fetchers fire several calls inside one
     # second, and at second resolution those collapse to an identical
@@ -178,7 +205,7 @@ def record_oddsapi_quota(headers: Any, *, sport: str | None = None, endpoint: st
         observation = {
             **parsed,
             "sport": str(sport or "").strip().lower() or None,
-            "endpoint": str(endpoint or "").strip() or None,
+            "endpoint": _sanitize_endpoint(endpoint) or None,
             "observedAt": _utc_now_iso(),
         }
         payload = read_json_file(_quota_path())

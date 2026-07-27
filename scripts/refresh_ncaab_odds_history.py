@@ -98,9 +98,9 @@ class TheOddsApiClient:
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 payload = response.read().decode("utf-8")
-                # url carries apiKey in its query string -- record only the
-                # path, since the endpoint is persisted to the shared store.
-                record_oddsapi_quota(response.headers, sport="ncaab", endpoint=url.split("?", 1)[0])
+                # Full url: the recorder redacts apiKey before persisting, and
+                # attribution needs the markets= in the query.
+                record_oddsapi_quota(response.headers, sport="ncaab", endpoint=url)
         except urllib.error.HTTPError as exc:
             status_code = int(getattr(exc, "code", 0) or 0)
             if status_code in ignore_statuses:

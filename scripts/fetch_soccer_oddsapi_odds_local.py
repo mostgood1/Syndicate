@@ -109,7 +109,9 @@ def fetch_game_odds(api_key: str, *, sport_key: str, region: str, markets: list[
         params={"apiKey": api_key, "regions": region, "markets": ",".join(markets), "oddsFormat": "american"},
         timeout=20,
     )
-    record_oddsapi_quota(response.headers, sport="soccer", endpoint=url)
+    # response.url, not url: the markets= the attribution buckets read live in
+    # params, and the recorder redacts apiKey before persisting.
+    record_oddsapi_quota(response.headers, sport="soccer", endpoint=response.url)
     response.raise_for_status()
     payload = response.json()
     return payload if isinstance(payload, list) else []

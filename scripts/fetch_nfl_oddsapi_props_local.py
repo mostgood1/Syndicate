@@ -176,7 +176,9 @@ def fetch_player_props(api_key: str, *, sport_key: str = "americanfootball_nfl",
         },
         timeout=20,
     )
-    record_oddsapi_quota(response.headers, sport="nfl", endpoint=url)
+    # response.url, not url: the markets= the attribution buckets read live in
+    # params, and the recorder redacts apiKey before persisting.
+    record_oddsapi_quota(response.headers, sport="nfl", endpoint=response.url)
     response.raise_for_status()
     return response.json()
 

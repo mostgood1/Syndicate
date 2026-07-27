@@ -171,7 +171,9 @@ class OddsApiClient:
         headers = {str(key).lower(): str(value) for key, value in response.headers.items()}
         # Recorded before raise_for_status: a failed call may still be billed,
         # and dropping it would bias measured burn downward (#14).
-        record_oddsapi_quota(headers, sport="nhl", endpoint=path)
+        # response.url, not path: the markets= the attribution buckets read
+        # live in params, and the recorder redacts apiKey before persisting.
+        record_oddsapi_quota(headers, sport="nhl", endpoint=str(getattr(response, "url", "") or path))
         try:
             response.raise_for_status()
         except requests.HTTPError:

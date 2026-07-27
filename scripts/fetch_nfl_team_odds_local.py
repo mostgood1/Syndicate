@@ -170,7 +170,9 @@ def fetch_odds(
         },
         timeout=20,
     )
-    record_oddsapi_quota(response.headers, sport="nfl", endpoint=f"{get_base_url()}/sports/{sport_key}/odds")
+    # response.url, not the rebuilt path: the markets= the attribution buckets
+    # read live in params, and the recorder redacts apiKey before persisting.
+    record_oddsapi_quota(response.headers, sport="nfl", endpoint=response.url)
     response.raise_for_status()
     return response.json()
 

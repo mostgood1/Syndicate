@@ -352,9 +352,9 @@ def _fetch_odds(*, api_key: str, sport: str, regions: str, markets: str, odds_fo
         with urlopen(url, timeout=15) as response:
             payload = response.read().decode("utf-8")
             status_code = getattr(response, "status", 200)
-            # url carries apiKey in its query string -- record only the path,
-            # since the endpoint is persisted to the shared state store.
-            record_oddsapi_quota(response.headers, sport="ncaaf", endpoint=url.split("?", 1)[0])
+            # Full url: the recorder redacts apiKey before persisting, and
+            # attribution needs the markets= in the query.
+            record_oddsapi_quota(response.headers, sport="ncaaf", endpoint=url)
     except Exception as exc:
         raise RuntimeError(f"Odds API request failed: {exc}") from exc
     if status_code != 200:

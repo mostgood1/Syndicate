@@ -156,7 +156,7 @@ def _pick_player_from_outcome(outcome: dict[str, Any]) -> str | None:
 def fetch_events(api_key: str, *, sport_key: str, region: str) -> list[dict[str, Any]]:
     url = f"{_get_base_url()}/sports/{sport_key}/events"
     response = requests.get(url, params={"apiKey": api_key, "regions": region}, timeout=20)
-    record_oddsapi_quota(response.headers, sport="soccer", endpoint=url)
+    record_oddsapi_quota(response.headers, sport="soccer", endpoint=response.url)
     response.raise_for_status()
     return response.json()
 
@@ -181,7 +181,9 @@ def fetch_event_player_props(
             },
             timeout=20,
         )
-        record_oddsapi_quota(response.headers, sport="soccer", endpoint=url)
+        # response.url, not url: the markets= the attribution buckets read
+        # live in params, and the recorder redacts apiKey before persisting.
+        record_oddsapi_quota(response.headers, sport="soccer", endpoint=response.url)
         response.raise_for_status()
         return response.json()
     except HTTPError as exc:

@@ -239,6 +239,46 @@ class MarketFamilyAttributionTests(unittest.TestCase):
             (bucket,) = hours.values()
             self.assertEqual(bucket, {"calls": 2, "credits": 12})
 
+    def test_recorded_endpoint_keeps_markets_but_never_the_api_key(self) -> None:
+        # Fetchers now pass the REAL requested URL (response.url), which
+        # carries both apiKey and markets=. The stored endpoint must keep the
+        # markets (attribution reads them) and must never persist the key --
+        # the shared-store privacy rule that used to make callers strip the
+        # whole query, which is what filed 100% of a day's burn under
+        # event_list.
+        with TemporaryDirectory() as tmp_dir:
+            quota_file = Path(tmp_dir) / "oddsapi_quota.json"
+            with patch("syndicate.features.shared.oddsapi_quota._quota_path", return_value=quota_file):
+                record_oddsapi_quota(
+                    {"x-requests-remaining": "100", "x-requests-used": "50", "x-requests-last": "4"},
+                    sport="mlb",
+                    endpoint="https://api.the-odds-api.com/v4/sports/baseball_mlb/events/abc/odds?apiKey=SECRET&regions=us&markets=h2h,batter_hits",
+                )
+                result = read_oddsapi_quota()
+            raw = quota_file.read_text(encoding="utf-8")
+        self.assertNotIn("SECRET", raw)
+        self.assertIn("markets=", result["latest"]["endpoint"])
+        # And the cost attributed by market, not filed under event_list.
+        self.assertEqual(result["by_market_family"]["full_game"], {"calls": 1, "credits": 2.0})
+        self.assertEqual(result["by_market_family"]["props"], {"calls": 1, "credits": 2.0})
+        self.assertNotIn("event_list", result["by_market_family"])
+
+    def test_endpoint_sanitizer_drops_the_query_when_it_cannot_parse(self) -> None:
+        # Losing one observation's attribution is acceptable; persisting a
+        # credential never is.
+        from syndicate.features.shared.oddsapi_quota import _sanitize_endpoint
+
+        self.assertEqual(
+            _sanitize_endpoint("https://x/odds?apiKey=SECRET&markets=h2h"),
+            "https://x/odds?markets=h2h",
+        )
+        self.assertEqual(
+            _sanitize_endpoint("https://x/odds?api_key=SECRET"),
+            "https://x/odds",
+        )
+        self.assertEqual(_sanitize_endpoint("https://x/events"), "https://x/events")
+        self.assertEqual(_sanitize_endpoint(""), "")
+
     def test_reader_passes_the_attribution_buckets_through(self) -> None:
         # The recorder aggregated by_market_family/by_hour_utc for a full day
         # before anyone noticed the reader silently dropped them -- the quota
