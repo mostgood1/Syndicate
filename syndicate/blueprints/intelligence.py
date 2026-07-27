@@ -1884,12 +1884,63 @@ def board_game_chips_api():
     return _no_cache_response(jsonify({"ok": True, "date": selected_date, "chips": chips}))
 
 
-def _steam_event_label(event: dict[str, Any]) -> str:
-    sport = str(event.get("sport") or "").strip().upper()
-    market_type = str(event.get("market_type") or "").strip().replace("_", " ")
-    subject = str(event.get("player_id") or event.get("game_id") or "").strip()
-    bits = [part for part in (sport, market_type, subject) if part]
-    return " · ".join(bits) if bits else "Market movement"
+def _steam_format_odds(value: Any) -> str | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return f"{number:+.0f}"
+
+
+def _steam_format_line(value: Any) -> str | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return f"{number:g}"
+
+
+def _steam_event_subject(event: dict[str, Any]) -> str:
+    name = str(event.get("player_name") or "").strip()
+    if name:
+        return name
+    fallback = str(event.get("player_id") or event.get("game_id") or "").strip()
+    return fallback or "Market"
+
+
+def _steam_event_market_text(event: dict[str, Any]) -> str:
+    # market_type is a raw stat slug ("batter_runs_scored") -- humanize it
+    # rather than exposing OddsAPI's own vocabulary. selection (over/under)
+    # and line are separate fields on props (_flatten_mlb_props), absent on
+    # game markets (h2h/totals/spreads), so both are optional here.
+    market = str(event.get("market_type") or "").strip().replace("_", " ").strip()
+    market = market[:1].upper() + market[1:] if market else "Market"
+    selection = str(event.get("selection") or "").strip().capitalize()
+    line = _steam_format_line(event.get("line"))
+    bits = [market]
+    if selection and line:
+        bits.append(f"{selection} {line}")
+    elif selection:
+        bits.append(selection)
+    elif line:
+        bits.append(line)
+    return " · ".join(bits)
+
+
+def _steam_event_movement_text(event: dict[str, Any]) -> str:
+    steam = event.get("steam") if isinstance(event.get("steam"), dict) else {}
+    parts = []
+    prev_odds = _steam_format_odds(steam.get("previous_odds"))
+    curr_odds = _steam_format_odds(event.get("price"))
+    if prev_odds and curr_odds and prev_odds != curr_odds:
+        parts.append(f"{prev_odds} → {curr_odds}")
+    prev_line = _steam_format_line(steam.get("previous_line"))
+    curr_line = _steam_format_line(event.get("line"))
+    if prev_line and curr_line and prev_line != curr_line:
+        parts.append(f"{prev_line} → {curr_line} line")
+    if parts:
+        return " · ".join(parts)
+    return "Movement detected"
 
 
 @intelligence_bp.get("/api/board/steam")
@@ -1916,8 +1967,33 @@ def board_steam_api():
         _LOGGER.exception("BOARD_STEAM_READ_FAILURE")
         events = []
     recent = list(reversed(events))[:limit]
+    # Headshots need a real MLBAM player ID, which the raw OddsAPI prop rows
+    # never carry (only a display name) -- resolved via the day's roster
+    # snapshots (hr_targets.mlb_player_id_lookup_for_date), same source
+    # hr_targets/k_ladder_targets already use for headshots elsewhere. Only
+    # built if this batch actually has an MLB event to look up, and only
+    # once per request regardless of how many MLB events are in it.
+    mlb_id_lookup: dict[str, int] | None = None
     for event in recent:
-        event["label"] = _steam_event_label(event)
+        subject = _steam_event_subject(event)
+        market_text = _steam_event_market_text(event)
+        event["label"] = f"{subject} — {market_text}" if subject != "Market" else market_text
+        event["movement_text"] = _steam_event_movement_text(event)
+        event["headshot_url"] = None
+        if str(event.get("sport") or "").strip().lower() == "mlb" and event.get("player_name"):
+            if mlb_id_lookup is None:
+                try:
+                    from syndicate.features.mlb.hr_targets import mlb_player_id_lookup_for_date
+
+                    mlb_id_lookup = mlb_player_id_lookup_for_date(selected_date)
+                except Exception:
+                    _LOGGER.exception("BOARD_STEAM_HEADSHOT_LOOKUP_FAILURE")
+                    mlb_id_lookup = {}
+            from syndicate.features.mlb.hr_targets import mlb_headshot_url_for_player, mlb_normalize_player_name
+
+            player_id = mlb_id_lookup.get(mlb_normalize_player_name(event.get("player_name")))
+            if player_id:
+                event["headshot_url"] = mlb_headshot_url_for_player(player_id)
     return _no_cache_response(jsonify({"ok": True, "date": selected_date, "count": len(recent), "events": recent}))
 
 

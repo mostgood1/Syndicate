@@ -350,6 +350,15 @@ def _market_lifecycle_event(
         "sport": sport,
         "market_id": normalized_entry.get("market_id") or market_key,
         "player_id": row.get("player_id") or row.get("athlete_id"),
+        # #83 steam rail: props (_flatten_mlb_props' output rows) carry a
+        # real display-cased player_name and an explicit over/under
+        # selection, neither of which player_id/market_type above capture --
+        # player_id is always empty for props (OddsAPI has no MLBAM id),
+        # and selection was only ever read as a last-resort market_type
+        # fallback. Additive: nothing downstream reads these yet except the
+        # new steam rail, so no existing consumer is affected.
+        "player_name": row.get("player_name") or normalized_entry.get("entity") or row.get("entity") or row.get("player") or None,
+        "selection": row.get("selection") or normalized_entry.get("selection") or None,
         "market_type": normalized_entry.get("market_type") or row.get("market_type") or row.get("market") or row.get("selection"),
         "event_type": event_type,
         "line": current_line,
@@ -1143,6 +1152,12 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
                 capture_phase=lifecycle_event.get("capture_phase"),
             )
             if steam is not None:
+                # Absolute prior values, not just the delta -- the steam
+                # rail wants "prev -> current", and previous_line/
+                # previous_odds are already in scope here from the same
+                # comparison _steam_signal just made.
+                steam["previous_line"] = previous_line
+                steam["previous_odds"] = previous_odds
                 lifecycle_event["steam"] = steam
                 steam_events.append({**lifecycle_event})
             lifecycle_events.append(lifecycle_event)

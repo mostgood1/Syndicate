@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import unicodedata
 from datetime import date
 from datetime import datetime, timedelta
 from functools import lru_cache
@@ -150,6 +151,62 @@ def _load_roster_game_payload(selected_date: str, game_pk: int | None) -> dict[s
         if payload:
             return payload
     return {}
+
+
+def mlb_normalize_player_name(value: Any) -> str:
+    text = " ".join(str(value or "").strip().lower().split())
+    normalized = unicodedata.normalize("NFKD", text)
+    return "".join(ch for ch in normalized if not unicodedata.combining(ch))
+
+
+def mlb_player_id_lookup_for_date(selected_date: str) -> dict[str, int]:
+    """Normalized player name -> MLBAM ID across every game on this date's
+    slate.
+
+    _load_roster_game_payload/_mlb_player_id_lookup_for_game (cards.py) need
+    a game_pk up front; callers that only have a player's name (raw OddsAPI
+    prop rows carry no game/roster linkage at all -- see #83's steam rail)
+    have no game_pk to give them. Globs every per-game roster-snapshot file
+    under this date's roster_objs/ directory instead of requiring one.
+    """
+    if not selected_date:
+        return {}
+    snapshot_dir = _daily_snapshot_root() / selected_date
+    if not snapshot_dir.exists():
+        return {}
+    # _load_roster_game_payload checks roster_objs/ first, falling back to
+    # the flat layout -- confirmed live 2026-07-27: production actually
+    # writes flat (roster_<n>_<AWAY>_at_<HOME>_pk<game_pk>_g1.json directly
+    # under snapshots/<date>/), roster_objs/ was empty. Glob both so this
+    # keeps working if that ever changes. The pk*-scoped pattern excludes
+    # roster_events.json (a different, non-per-game payload shape) sitting
+    # in the same flat directory.
+    candidate_paths = sorted(snapshot_dir.glob("roster_objs/*.json")) + sorted(snapshot_dir.glob("roster_*_pk*.json"))
+    lookup: dict[str, int] = {}
+    for path in candidate_paths:
+        payload = _load_json_path(str(path))
+        if not payload:
+            continue
+        for side in ("away", "home"):
+            side_doc = payload.get(side)
+            if not isinstance(side_doc, dict):
+                continue
+            for batter in _lineup_batters(side_doc):
+                player_id = _profile_player_id(batter)
+                name = _profile_player_name(batter)
+                if player_id and name:
+                    lookup[mlb_normalize_player_name(name)] = player_id
+            pitcher_profile = _side_pitcher_profile(side_doc)
+            if pitcher_profile:
+                player_id = _profile_player_id(pitcher_profile)
+                name = _profile_player_name(pitcher_profile)
+                if player_id and name:
+                    lookup[mlb_normalize_player_name(name)] = player_id
+    return lookup
+
+
+def mlb_headshot_url_for_player(player_id: int | None) -> str | None:
+    return _mlb_headshot_url(player_id)
 
 
 def _pitch_mix_context(selected_date: str, row: dict[str, Any]) -> dict[str, Any]:

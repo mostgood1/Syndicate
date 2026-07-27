@@ -890,7 +890,30 @@
     });
   }
 
+  function steamInitials(name) {
+    const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return "?";
+    const first = parts[0][0] || "";
+    const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+    return (first + last).toUpperCase();
+  }
+
+  function steamAvatarHtml(event) {
+    const initials = escapeHtml(steamInitials(event.player_name));
+    // The fallback initials circle is always in the DOM (display:none while
+    // a headshot_url is present) rather than injected via onerror string
+    // concatenation -- an <img> whose src 404s (a rostered player with no
+    // photo published yet, not just an unresolved name) swaps to it on
+    // error without any inline JS beyond toggling two display styles.
+    const img = event.headshot_url
+      ? `<img class="board-strip-card__avatar" src="${escapeHtml(event.headshot_url)}" alt="" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">`
+      : "";
+    const initialsStyle = event.headshot_url ? ' style="display:none"' : "";
+    return `${img}<div class="board-strip-card__avatar board-strip-card__avatar--initials"${initialsStyle}>${initials}</div>`;
+  }
+
   function steamDeltaText(event) {
+    if (event && event.movement_text) return event.movement_text;
     const steam = event && event.steam ? event.steam : {};
     const bits = [];
     if (typeof steam.line_delta === "number" && steam.line_delta !== 0) {
@@ -914,8 +937,11 @@
         <h2 class="board-section-title">📡 Steam</h2>
         <div class="board-strip">
           ${lastSteamEvents.slice(0, 6).map((event) => `
-            <div class="board-strip-card" title="${escapeHtml((event.capture_phase || "").toString())}">
-              <div class="board-strip-card__title">${escapeHtml(event.label || "Market movement")}</div>
+            <div class="board-strip-card board-strip-card--steam" title="${escapeHtml((event.capture_phase || "").toString())}">
+              <div class="board-strip-card__head">
+                ${steamAvatarHtml(event)}
+                <div class="board-strip-card__title">${escapeHtml(event.label || "Market movement")}</div>
+              </div>
               <div class="board-strip-card__edge">${escapeHtml(steamDeltaText(event))}</div>
               <div class="board-strip-card__pick">${escapeHtml(formatTimestamp(event.timestamp))}${event.is_live ? " · live" : ""}</div>
             </div>
