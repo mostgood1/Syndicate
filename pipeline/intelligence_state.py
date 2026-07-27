@@ -3328,6 +3328,22 @@ class IntelligenceStateService:
                 "candidate_pool": candidate_pool,
                 "selected_date": selected_date,
             }
+            # The engine's recommendations reflect the question's own
+            # preferences (plus-money-only, explicit limit, market filters);
+            # the candidate pool does not. Set them here so
+            # _promote_board_contract_cards' fill-when-empty guard leaves
+            # them alone -- otherwise every query response serves the
+            # unfiltered pool at top level and the query contract only
+            # survives on the nested analysis.
+            analysis_recommendations = [dict(item) for item in (analysis.get("recommendations") or []) if isinstance(item, dict)]
+            if analysis_recommendations:
+                # An explicit limit param caps what the caller is served; the
+                # no-param board default stays uncapped by design ("the board
+                # should show every real candidate" -- see
+                # run_intelligence_query's correlation-cap removal note).
+                if limit_value is not None:
+                    analysis_recommendations = analysis_recommendations[: max(int(limit_value), 0)]
+                response["recommendations"] = analysis_recommendations
             response_last_updated = _utc_now()
             response_candidate_count = len(candidates)
             response["state_last_updated"] = response_last_updated

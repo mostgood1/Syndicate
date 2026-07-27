@@ -6,7 +6,7 @@ list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-07-27 (see "Reconciliation 2026-07-27").
 
-> **Next free ID: 87.** IDs are never reused. Closed items move to
+> **Next free ID: 91.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
 
@@ -43,6 +43,42 @@ now genuinely met rather than merely believed.
   one present in this file or the archive. No gaps.
 - ⚠️ **#43 closed does NOT mean its transport is proven** — no cycle has yet
   produced a pool large enough to exercise the oversized-payload path.
+- **New: #87** (filed and closed same session) — the event-sim rerun decision's
+  `-ArtifactPath` argument was a stringified garbage path, not a cast, so it
+  always forced a rerun. See `todo_closed.md` for the fix and the parser-level
+  repro; see Operational notes below for the reusable PowerShell lesson.
+- **New: #88** (filed and closed same session) — `refresh_ncaaf_oddsapi.py`
+  (from `ce48b4de`) had a mangled `_base_norm` (normalized every team name to
+  `""`) and crashed in artifact-root-only mode (the runner's actual production
+  call shape from `refresh_odds_sources.py`) because `_prediction_files`
+  assumed a `data/` subdirectory the flat bundle layout doesn't have. Both
+  fixed; see `todo_closed.md` for detail. ⚠️ Not yet observed fixed against a
+  live OddsAPI key in production — confirm the orchestrator's
+  `ncaaf_lines_snapshot` step on its next real run.
+- **New: #89** (filed and closed same session) — `scripts/migration_gate.py`'s
+  `evaluate_protected_local_resolvers()` had gone stale against commit
+  `757952e1` ("Refactor WNBA odds path resolution", 2026-06-28): NBA's and
+  NHL's `processed_path`/`scoreboard_snapshot_path`/`slate_summaries` now
+  resolve their root through `odds_control_plane.current_odds_root_for_sport`,
+  which imports `preferred_source_roots` in its own module — so the gate's
+  `patch("...nba.sources.preferred_source_roots", ...)` /
+  `patch("...nhl.sources._source_roots", ...)` were patching bindings nothing
+  reads anymore, and the gate **unconditionally reported 3 violations**
+  (`runtime_dependency_ok` permanently `False`). Retargeted both to
+  `patch("syndicate.features.shared.odds_control_plane.preferred_source_roots", ...)`.
+  See `todo_closed.md` for detail, including the confirmed real contract
+  change (NBA's `processed_path` lost its multi-root existing-file fallback —
+  matches the codebase's "no source-app fallback" direction, not a bug).
+  See #90 for a real inconsistency this surfaced.
+- **New: #90** (filed, open) — NBA's `available_dates()` still scans **every**
+  preferred artifact root (via `nba.sources._artifact_roots()`), but
+  `processed_path()`/`live_snapshot_path()` (post-`757952e1`) only ever build a
+  path in the *primary* root. If NBA is ever configured with more than one
+  preferred root (e.g. `SYNDICATE_DATA_ROOT` set alongside the local mirror),
+  `available_dates()` can advertise a date whose artifact only exists in a
+  secondary root, and `processed_path()` for that date will 404 against the
+  primary root instead. Invisible today because production only has one NBA
+  root; worth a look before adding a second one.
 
 ### Reconciliation 2026-07-26
 
@@ -418,6 +454,7 @@ were resolved and nine already-closed rows removed from the open tables.
 | **24** | Look-ahead interval violations (~28min instead of 60). |
 | **12** | Phase 4: smaller per-sport artifacts. |
 | **30** | WNBA schedule-bootstrap cost. |
+| **90** | NBA `available_dates()` scans all preferred artifact roots but `processed_path()`/`live_snapshot_path()` only resolve against the primary root since `757952e1` — a date can be listed and still 404 if it only exists in a secondary root. Dormant while NBA has one root in production. See Reconciliation 2026-07-27. |
 
 ## OddsAPI budget (after #14/#15)
 
@@ -624,7 +661,40 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
   and #43) — a `NameError` in one case, an oversized Redis write in the other.
   Do not treat it as a solved class, and do not assume a past fix covers a new
   occurrence.
+- **An un-parenthesized `[type]$obj.prop` as a bare command argument is NOT a
+  cast in PowerShell.** In argument-parsing mode, `-Foo [string]$x.prop` binds
+  `-Foo` to the literal text `[string]` and then evaluates `$x.prop` as a
+  *second*, separate, unbound argument — for a property access this actually
+  stringifies the whole parent object (`$x.prop` on its own line is fine;
+  `[string]$x.prop` in argument position is not the same expression). #87 hid
+  this for an unknown number of ticks because the resulting garbage path simply
+  never existed, so `Test-Path` returned false and the caller silently took the
+  "must rerun" branch instead of erroring. Grep `unified_daily_update.ps1` for
+  other bare `[type]$` casts passed as command arguments before assuming this
+  was the only instance; wrap the cast in parens: `-Foo ([string]$x.prop)`.
+  Verify with a two-line repro (`function T {param([string]$X) $X}; T -X
+  [string]$obj.prop`) rather than trusting it by inspection — it looks correct
+  at a glance. **Checked 2026-07-27:** every other `[type]$var.prop` in
+  `unified_daily_update.ps1` sits inside `(...)`, `{...}`, or a comparison
+  operator (expression-mode parsing, where casts work correctly) — #87 was the
+  only bare-argument instance. Re-grep if new command calls are added with a
+  cast argument.
 
+- **Patching `preferred_source_roots` only works if you patch it where it's
+  actually called from.** `757952e1` moved NBA's `processed_path` and NHL's
+  `processed_path`/`scoreboard_snapshot_path`/`slate_summaries` behind
+  `odds_control_plane.current_odds_root_for_sport`, which imports
+  `preferred_source_roots` in `odds_control_plane.py` itself — patching the
+  name imported into `nba.sources`/`nhl.sources` (still correct for
+  `nba.sources.available_dates`, which is a separate call path) silently does
+  nothing for those functions and a test can pass its own patched mock
+  straight through to the wrong root without erroring. #89. When a resolver
+  is refactored to delegate to a shared helper, re-check every test/gate that
+  patches its old module-local import. **Prefer patching the sport module's
+  own public wrapper** (`nba.sources.artifact_processed_root`,
+  `nhl.sources._data_roots`) **over the shared helper it delegates to** — it's
+  one hop shorter and matches what the rest of the NBA test suite had already
+  converged on for this same gap.
 - **A Render env-var change via the API does NOT restart the service.** The running process keeps the old
   value until a deploy/restart. Cost real time twice: a mitigation set at 20:16 stayed inert until 20:26, and a
   "fix verified" claim was made against a service still on the previous commit. **Always confirm the deploy is

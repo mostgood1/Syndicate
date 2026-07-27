@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -14,7 +15,9 @@ from tests.test_refresh_state_store import _FakeKeyValueClient
 
 class OddsRefreshTrackingTests(unittest.TestCase):
     def test_sync_nhl_tracking_writes_tracking_files(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False):
+        # SYNDICATE_ODDS_EVENTS_ROOT keeps the lifecycle-event append from
+        # landing in the real repo data/odds_events/ shard.
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports"), "SYNDICATE_ODDS_EVENTS_ROOT": str(Path(tmpdir) / "odds_events")}, clear=False):
             root = Path(tmpdir)
             props_root = root / "data" / "props" / "player_props_lines" / "date=2026-06-07"
             team_root = root / "data" / "odds" / "team" / "date=2026-06-07"
@@ -59,9 +62,19 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertEqual(first_entry["event_id"], "Away@Home")
             self.assertEqual(first_entry["market_type"], "total")
             self.assertEqual(first_entry["entity"], "over")
-            self.assertEqual(first_entry["line"], 6.5)
+            # "line" carries the raw price-field snapshot of the source row
+            # (every populated line/price column); the canonical scalar the
+            # board and intelligence readers consume is "current_line".
+            self.assertEqual(first_entry["line"], {"line": 6.5, "price": -110})
+            self.assertEqual(first_entry["current_line"], 6.5)
             self.assertEqual(first_entry["odds"], -110)
-            self.assertEqual(first_entry["timestamp"], first_entry["captured_at"])
+            # write_json_file re-renders "timestamp" keys in Central time
+            # (normalize_timestamped_payload) while "captured_at" stays UTC --
+            # same instant, different zone rendering.
+            self.assertEqual(
+                datetime.fromisoformat(first_entry["timestamp"]),
+                datetime.fromisoformat(first_entry["captured_at"]),
+            )
             self.assertEqual(first_state["last_line"], 6.5)
             self.assertEqual(first_state["movement"], "flat")
             self.assertIsNone(first_state["delta"])
@@ -86,9 +99,13 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertEqual(latest_entry["event_id"], "Away@Home")
             self.assertEqual(latest_entry["market_type"], "total")
             self.assertEqual(latest_entry["entity"], "over")
-            self.assertEqual(latest_entry["line"], 7.0)
+            self.assertEqual(latest_entry["line"], {"line": 7.0, "price": -110})
+            self.assertEqual(latest_entry["current_line"], 7.0)
             self.assertEqual(latest_entry["odds"], -110)
-            self.assertEqual(latest_entry["timestamp"], latest_entry["captured_at"])
+            self.assertEqual(
+                datetime.fromisoformat(latest_entry["timestamp"]),
+                datetime.fromisoformat(latest_entry["captured_at"]),
+            )
             self.assertEqual(market_state["last_line"], 7.0)
             self.assertEqual(market_state["movement"], "up")
             self.assertAlmostEqual(market_state["delta"], 0.5)
@@ -97,7 +114,7 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertEqual(market_state["history"][1]["movement"], "up")
 
     def test_sync_nhl_tracking_appends_when_odds_change_without_line_change(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False):
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports"), "SYNDICATE_ODDS_EVENTS_ROOT": str(Path(tmpdir) / "odds_events")}, clear=False):
             root = Path(tmpdir)
             props_root = root / "data" / "props" / "player_props_lines" / "date=2026-06-07"
             props_root.mkdir(parents=True)
@@ -121,14 +138,17 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertTrue(second_result["ok"])
             self.assertEqual(second_result["artifacts"]["odds_history"]["entries_appended"], 1)
             history_payload = json.loads((root / "tracking" / "odds_history" / "2026-06-07.json").read_text(encoding="utf-8"))
-            market_key = next(key for key in history_payload["markets"] if "selection=" in key)
+            # Props rows have no selection column, so the market key is built
+            # only from the identity fields present on the row.
+            market_key = "player_name=Player One|market=POINTS|book=draftkings"
+            self.assertIn(market_key, history_payload["markets"])
             market_state = history_payload["markets"][market_key]
             self.assertEqual(len(market_state["history"]), 2)
             self.assertEqual(market_state["history"][0]["current_line"], market_state["history"][1]["current_line"])
             self.assertNotEqual(market_state["history"][0]["last_odds"], market_state["history"][1]["last_odds"])
 
     def test_sync_nhl_tracking_appends_when_refresh_timestamp_changes_without_market_change(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False):
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports"), "SYNDICATE_ODDS_EVENTS_ROOT": str(Path(tmpdir) / "odds_events")}, clear=False):
             root = Path(tmpdir)
             props_root = root / "data" / "props" / "player_props_lines" / "date=2026-06-07"
             props_root.mkdir(parents=True)
@@ -153,7 +173,8 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertTrue(second_result["ok"])
             self.assertEqual(second_result["artifacts"]["odds_history"]["entries_appended"], 1)
             history_payload = json.loads((root / "tracking" / "odds_history" / "2026-06-07.json").read_text(encoding="utf-8"))
-            market_key = next(key for key in history_payload["markets"] if "selection=" in key)
+            market_key = "player_name=Player One|market=POINTS|book=draftkings"
+            self.assertIn(market_key, history_payload["markets"])
             market_state = history_payload["markets"][market_key]
             self.assertEqual(len(market_state["history"]), 2)
             self.assertEqual(market_state["history"][0]["current_line"], market_state["history"][1]["current_line"])

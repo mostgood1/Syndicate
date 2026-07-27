@@ -792,7 +792,14 @@ def _compute_intelligence_response(payload: dict[str, object], *, source: str = 
         # Set before the "response" copy below, so the nested alias carries it
         # too; callers read either shape.
         if not isinstance(response.get("parsed_request"), dict):
-            response["parsed_request"] = _parsed_request_for_question(
+            # Prefer the engine's own parsed_request: requested_subjects is
+            # resolved against the real candidate pool inside
+            # run_intelligence_query and cannot be reproduced by re-parsing
+            # the question (#74 -- safe to promote now that the router
+            # threads mode_inferred and no longer overwrites parsed intent).
+            analysis_payload = response.get("analysis") if isinstance(response.get("analysis"), dict) else {}
+            analysis_parsed = analysis_payload.get("parsed_request") if isinstance(analysis_payload.get("parsed_request"), dict) else None
+            response["parsed_request"] = analysis_parsed or _parsed_request_for_question(
                 str(payload.get("question") or "").strip(),
                 payload,
             )
@@ -810,6 +817,11 @@ def _compute_intelligence_response(payload: dict[str, object], *, source: str = 
                 "parlays": [],
             },
         )
+        # Every cached read path hydrates before returning (see
+        # _cached_intelligence_response_with_source) -- a fresh compute must
+        # too, or top-level parlays/recommendations/portfolio only exist on
+        # the nested analysis and the two branches serve different shapes.
+        response = _hydrate_board_response_payload(response)
         _attach_intelligence_response_aliases(response)
         global LAST_RESULT
         LAST_RESULT = dict(response.get("response") or response.get("analysis") or {})

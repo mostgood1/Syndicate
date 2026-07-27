@@ -11,7 +11,9 @@ class QueryRouterTests(unittest.TestCase):
         self.router = QueryRouter()
 
     def test_classifies_trend_queries(self) -> None:
-        self.assertEqual(self.router.classify_query("What is the recent trend for points?"), "trend")
+        # classify_query returns the fine-grained query_type; route_question's
+        # pipeline_mode mapping is what collapses this to "trend".
+        self.assertEqual(self.router.classify_query("What is the recent trend for points?"), "trend_analysis")
 
     def test_classifies_explanation_queries(self) -> None:
         self.assertEqual(self.router.classify_query("Why is this matchup strong?"), "explanation")
@@ -20,7 +22,9 @@ class QueryRouterTests(unittest.TestCase):
         self.assertEqual(self.router.classify_query("Compare Player A vs Player B"), "comparison")
 
     def test_classifies_live_queries(self) -> None:
-        self.assertEqual(self.router.classify_query("What are the best live bets right now?"), "live")
+        # classify_query returns the fine-grained query_type; route_question's
+        # pipeline_mode mapping is what collapses this to "live".
+        self.assertEqual(self.router.classify_query("What are the best live bets right now?"), "live_analysis")
 
     def test_routes_request_payload_with_mode(self) -> None:
         request = SimpleNamespace(get_json=lambda silent=True: {"question": "Compare Player A vs Player B", "date": "2026-06-04"}, form={})

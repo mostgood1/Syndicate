@@ -41,7 +41,11 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
                 },
             )
 
-            with patch("syndicate.features.nba.sources._artifact_roots", return_value=[root]):
+            with patch("syndicate.features.nba.sources._artifact_roots", return_value=[root]), patch(
+                # snapshot/artifact reads now resolve via the odds-control-plane processed root
+                "syndicate.features.nba.sources.artifact_processed_root",
+                return_value=root / "data" / "processed",
+            ):
                 _local_live_snapshot_payload.cache_clear()
                 payload = build_live_player_boxscore_payload("2026-05-21", ["evt-2"], ttl=20)
                 _local_live_snapshot_payload.cache_clear()
@@ -94,7 +98,11 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
                 },
             )
 
-            with patch("syndicate.features.nba.sources._artifact_roots", return_value=[root]):
+            with patch("syndicate.features.nba.sources._artifact_roots", return_value=[root]), patch(
+                # snapshot/artifact reads now resolve via the odds-control-plane processed root
+                "syndicate.features.nba.sources.artifact_processed_root",
+                return_value=root / "data" / "processed",
+            ):
                 _local_live_snapshot_payload.cache_clear()
                 payload = build_live_player_lens_payload("2026-05-21", ["evt-2"], ttl=20)
                 _local_live_snapshot_payload.cache_clear()
@@ -118,7 +126,11 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
                 },
             )
 
-            with patch("syndicate.features.nba.sources._artifact_roots", return_value=[root]):
+            with patch("syndicate.features.nba.sources._artifact_roots", return_value=[root]), patch(
+                # snapshot/artifact reads now resolve via the odds-control-plane processed root
+                "syndicate.features.nba.sources.artifact_processed_root",
+                return_value=root / "data" / "processed",
+            ):
                 _local_live_snapshot_payload.cache_clear()
                 payload = build_live_lines_payload("2026-05-21", ["evt-2"], ttl=20, include_period_totals=True)
                 _local_live_snapshot_payload.cache_clear()
@@ -174,7 +186,11 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
                 },
             )
 
-            with patch("syndicate.features.nba.sources._artifact_roots", return_value=[root]):
+            with patch("syndicate.features.nba.sources._artifact_roots", return_value=[root]), patch(
+                # snapshot/artifact reads now resolve via the odds-control-plane processed root
+                "syndicate.features.nba.sources.artifact_processed_root",
+                return_value=root / "data" / "processed",
+            ):
                 _local_live_snapshot_payload.cache_clear()
                 payload = build_live_pbp_stats_payload("2026-05-21", ["evt-2"], ttl=20)
                 _local_live_snapshot_payload.cache_clear()
@@ -400,6 +416,10 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
             )
 
             with patch("syndicate.features.nba.sources._artifact_roots", return_value=[root]), patch(
+                # snapshot/artifact reads now resolve via the odds-control-plane processed root
+                "syndicate.features.nba.sources.artifact_processed_root",
+                return_value=root / "data" / "processed",
+            ), patch(
                 "syndicate.features.nba.cards.build_cards_page_context",
                 return_value={"date": "2026-05-21"},
             ), patch(
@@ -484,6 +504,10 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
             )
 
             with patch("syndicate.features.nba.sources._artifact_roots", return_value=[root]), patch(
+                # snapshot/artifact reads now resolve via the odds-control-plane processed root
+                "syndicate.features.nba.sources.artifact_processed_root",
+                return_value=root / "data" / "processed",
+            ), patch(
                 "syndicate.features.nba.cards.build_cards_page_context",
                 return_value={"date": "2026-05-21"},
             ), patch(
@@ -549,6 +573,10 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
             )
 
             with patch("syndicate.features.nba.sources._artifact_roots", return_value=[root]), patch(
+                # snapshot/artifact reads now resolve via the odds-control-plane processed root
+                "syndicate.features.nba.sources.artifact_processed_root",
+                return_value=root / "data" / "processed",
+            ), patch(
                 "syndicate.features.nba.cards.build_cards_page_context",
                 return_value={"date": "2026-05-21"},
             ), patch(

@@ -601,8 +601,10 @@ class BasketballPropsPredictionsTests(unittest.TestCase):
                 side_effect=lambda **kwargs: smart_sim_calls.append(dict(kwargs)) or {"wrote": 1, "failures": 0},
             ), patch.object(
                 smart_sim_module,
+                # Must be non-empty: da79c827 made an empty merged sim df a
+                # hard RuntimeError instead of a silent no-sim export.
                 "_load_sim_df",
-                return_value=None,
+                return_value=self._BranchFakeFrame([{"player_id": 1, "team": "ATL", "player_name": "Player A"}]),
             ), patch.object(
                 smart_sim_module,
                 "_merge_smart_sim_into_preds",
@@ -761,7 +763,10 @@ class BasketballPropsPredictionsTests(unittest.TestCase):
                     )
                 )
                 smart_game_calls.append(dict(kwargs))
-                return {"players": {"home": [], "away": []}}
+                # Must include at least one player row: da79c827 made the
+                # worker return status="failed" on zero player rows instead
+                # of writing an empty artifact.
+                return {"players": {"home": [{"player_id": 1, "player_name": "Player A"}], "away": []}}
 
             fake_smart_sim_module.simulate_smart_game = _fake_simulate_smart_game
 

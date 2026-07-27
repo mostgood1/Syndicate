@@ -33,8 +33,13 @@ class DailyUpdateSmokeTests(unittest.TestCase):
         self.assertTrue(any(link.get("href") == f"/wnba/cards?date={today_date}" for link in links))
         self.assertTrue(any(link.get("href") == f"/wnba/live-lens?date={today_date}" for link in links))
 
-    def test_home_exposes_live_lens_link(self) -> None:
-        html = self.client.get("/").get_data(as_text=True)
+    def test_home_dashboard_payload_exposes_live_lens_link(self) -> None:
+        # Nav/IA change 2026-07-24: "/" now renders the intelligence Betting
+        # Board (see home.py::home). The per-sport dashboard with the live-lens
+        # rail is still intentionally served through /api/home's html payload.
+        payload = self.client.get("/api/home").get_json()
 
+        self.assertTrue(payload.get("ok"))
+        html = payload.get("html") or ""
         self.assertIn("Open Live Lens", html)
         self.assertIn("Live lens feed", html)

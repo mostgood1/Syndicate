@@ -318,6 +318,112 @@ Five defects, in order of how load-bearing they were.
   still carries both shapes (`candidate_count: 38` vs 35 cards); folding the
   canonical key into the pool merge is a small cleanup.
 
+- **87 — event-sim rerun decision always forced a rerun** (2026-07-27). The call
+  site at [unified_daily_update.ps1:4619](../../scripts/unified_daily_update.ps1)
+  passed `-ArtifactPath [string]$eventPlan.artifactPath` — in PowerShell argument
+  mode an un-parenthesized `[type]` before a value is not a cast, it is literal
+  text, so the argument was actually `"[string]" + $eventPlan.ToString() +
+  ".artifactPath"`, a path that can never exist. `Test-Path` inside
+  `Get-EventSimExecutionDecision` (line 2040) therefore always returned false and
+  forced `$true`, permanently defeating the fingerprint-equality skip four lines
+  below it (line 2052) — the event sim reran every tick regardless of whether its
+  inputs had changed. User caught this by reasoning through the parser, not from
+  observed behavior. Fixed by parenthesizing: `-ArtifactPath
+  ([string]$eventPlan.artifactPath)`. Repro'd the parse bug directly
+  (`Test-Arg -ArtifactPath [string]$eventPlan.artifactPath` prints the literal
+  `[string]@{...}.artifactPath` text) before and after the fix. Added
+  `UnifiedDailyUpdateEventSimDecisionBehaviorTests` to
+  `tests/test_unified_daily_update_event_sim_freshness_window.py`, which actually
+  invokes the extracted PowerShell function via `powershell.exe -ExecutionPolicy
+  Bypass` rather than only pinning source text. ⚠️ **Verified by reverting the
+  fix that only the string-pin test catches this exact regression** — the
+  behavioral tests construct their own arguments and exercise the function
+  correctly regardless of what the buggy call site does, so they pass either way.
+  A call-site argument-parsing bug like this one needs a source-text assertion,
+  not (only) a functional test of the callee.
+
+- **88 — two production bugs in `refresh_ncaaf_oddsapi.py` from `ce48b4de`
+  ("Allow local NCAAF artifact refresh", 2026-05-22)** (2026-07-27). Both were
+  in code that had apparently never run end to end since that commit.
+  - **(a) `_base_norm` was mangled.** Its body was a copy-pasted fragment of
+    `_copy_tree_if_exists` (referencing undefined `source`/`destination`) that
+    fell through to `return ""` for every team name; the real normalization
+    tail had been left as dead code *after* `_resolve_data_root`'s
+    `raise FileNotFoundError`. Every team name normalized to the empty string,
+    so `_norm_team`/`_best_schedule_norm` could never match an odds row to a
+    schedule row on a real refresh. Fixed by restoring `_base_norm`'s body and
+    deleting the dead fragment; also dropped a redundant literal-filename
+    `.exists()` check in `_resolve_data_root` that duplicated the glob check
+    beneath it and could never match a real (timestamped) filename anyway.
+  - **(b) artifact-root-only mode crashed.** `_prediction_files` always looked
+    under `<root>/data`, but `scripts/refresh_odds_sources.py`'s NCAAF step
+    (the actual production caller) invokes the runner with `--artifact-root`
+    only, and that bundle stores
+    `college_football_schedule_*_predicted_totals_enhanced*.csv` at the bundle
+    **top level**, not under a `data/` subdirectory — so every orchestrator run
+    raised `FileNotFoundError` before reaching the OddsAPI call. Verified
+    against the real bundle
+    (`data/ncaaf_source/source_artifacts/college_football_schedule_2025_predicted_totals_enhanced_*.csv`
+    sits at top level, confirmed with `ls`). Fixed `_prediction_files` to try
+    `<root>/data` then fall back to `<root>` directly, so both the
+    `--source-root` (nested) and `--artifact-root`-only (flat) layouts resolve.
+    Reproduced the exact orchestrator invocation
+    (`--artifact-root data/ncaaf_source/source_artifacts --week 7`) before and
+    after: before, `FileNotFoundError`; after, it reaches the live OddsAPI
+    request (fails only on an invalid dummy key, as expected).
+  - The existing test (`test_main_uses_artifact_root_as_data_root_when_source_root_omitted`)
+    was silently papering over (b) by creating the CSV in **both** locations;
+    simplified to only the flat layout now that the runner handles it. Added
+    two direct regression tests for `_prediction_files`/`_prediction_context`
+    (flat and nested layouts) and one for `_base_norm`/`_norm_team`. All 192
+    NCAAF-tagged tests pass (`python -m pytest tests/ -k ncaaf`).
+  - ⚠️ **Not yet observed fixed against a live OddsAPI key in production** —
+    verification here was local (real bundle files, dummy key, and unit
+    tests). Confirm the orchestrator's `ncaaf_lines_snapshot` step actually
+    writes updated lines on its next real run before considering NCAAF fully
+    healthy again.
+
+- **89 — `migration_gate.py`'s `evaluate_protected_local_resolvers()` was
+  stale against `757952e1`** ("Refactor WNBA odds path resolution",
+  2026-06-28) (2026-07-27). That commit routed NBA's `processed_path` and
+  NHL's `processed_path`/`scoreboard_snapshot_path`/`slate_summaries` through
+  the new `odds_control_plane.current_odds_root_for_sport`, which imports
+  `preferred_source_roots` in `odds_control_plane.py` itself — not the
+  binding in `nba.sources` or `nhl.sources` that the gate was patching. So the
+  gate's mocks silently stopped taking effect and it **unconditionally
+  reported 3 violations** (`runtime_dependency_ok` permanently `False`,
+  failing `tests/test_migration_gate.py::MigrationGateRuntimeDependencyTests::test_evaluate_protected_local_resolvers_passes_current_contracts`).
+  - **NHL fix was mechanical.** `_data_roots()` always resolved to a single
+    root even before the refactor (`_source_roots()[0] / "data"`), so the
+    gate's expected values (local mirror, never the sibling bundle) were
+    already right — only the patch target moved, to
+    `syndicate.features.nhl.sources._data_roots` directly (matching the
+    already-public wrapper the module exposes, rather than reaching into
+    `odds_control_plane`'s internals).
+  - **NBA is a real contract change, confirmed against the diff, not just a
+    stale mock.** `757952e1` deleted the `_first_existing_path` fallback scan
+    from `processed_path`/`live_snapshot_path`; NBA no longer picks whichever
+    preferred root actually has the file — it always resolves to the primary
+    root now, matching NFL/NCAAF's existing "stays on local mirror, no
+    sibling-app fallback" pattern and the codebase's stated direction away
+    from source-app fallback dependencies. Updated the gate's expectation to
+    match (`local_root`, not the external bundle) and patched
+    `nba.sources.artifact_processed_root` directly, alongside the existing
+    `nba.sources.preferred_source_roots` patch (the latter still governs
+    `available_dates()`, which is unaffected by this refactor). This mirrors
+    the patch convention other pending test fixes in the same working tree
+    (`tests/test_nba_live_snapshots_local.py`, `tests/test_nba_refresh_runner.py`)
+    had already converged on for the same `757952e1` gap — same root cause,
+    caught independently in two places.
+  - Verified: `python -m pytest tests/test_migration_gate.py -q` → 16 passed;
+    `evaluate_protected_local_resolvers()` also returns `[]` against the real
+    (unpatched) environment.
+  - ⚠️ **Surfaced a real, separate latent inconsistency, filed open as #90**:
+    NBA's `available_dates()` was left scanning all preferred artifact roots
+    while `processed_path()` now only resolves the primary one — dormant
+    today because production has one NBA root, but a foot-gun the moment a
+    second one exists.
+
 ---
 
 ## Closed earlier

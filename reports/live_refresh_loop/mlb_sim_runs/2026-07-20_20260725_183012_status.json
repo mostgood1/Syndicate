@@ -1,0 +1,22 @@
+{
+  "date": "2026-07-20",
+  "run_stamp": "20260725_183012",
+  "pid": 4242,
+  "reason": "evening_next_day_sim",
+  "command": [
+    "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\python.exe",
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\scripts\\run_mlb_daily_sim_job.py",
+    "--date",
+    "2026-07-20",
+    "--season",
+    "2026",
+    "--sims",
+    "1000",
+    "--workers",
+    "2",
+    "--reason",
+    "evening_next_day_sim"
+  ],
+  "started_at": "2026-07-25T18:30:12Z",
+  "state": "running"
+}

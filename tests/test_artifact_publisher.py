@@ -129,13 +129,15 @@ class HotArtifactAllowlistTests(unittest.TestCase):
         self.assertFalse(is_hot_artifact_relative_path("mlb_source/source_artifacts/data/statcast/2026.csv"))
         self.assertFalse(is_hot_artifact_relative_path(""))
 
-    def test_rejects_intelligence_board_snapshot_and_state(self) -> None:
-        # board_snapshot.json / intelligence_state.json are written through the
-        # shared keyvalue (Redis) backend already, so they're intentionally
-        # excluded from the HTTP-push allowlist. A file never exists on disk for
-        # these on Render, so publishing would always fail anyway.
+    def test_rejects_board_snapshot_but_accepts_intelligence_state(self) -> None:
+        # board_snapshot.json stays on the shared keyvalue (Redis) backend and
+        # out of the HTTP-push allowlist. intelligence_state.json used to live
+        # there too, but #43 moved it onto the artifact transport: measured at
+        # 15.5MB for 150 candidates against the store's ~8MB hard ceiling, so
+        # it is data (workers write, web reads), not coordination state.
         self.assertFalse(is_hot_artifact_relative_path("reports/intelligence/board_snapshot.json"))
-        self.assertFalse(is_hot_artifact_relative_path("reports/intelligence/intelligence_state.json"))
+        self.assertTrue(is_hot_artifact_relative_path("reports/intelligence/intelligence_state.json"))
+        self.assertTrue(is_hot_artifact_relative_path("reports/intelligence/intelligence_state_2026_07_26.json"))
 
     def test_rejects_path_traversal_and_absolute_paths(self) -> None:
         self.assertFalse(is_hot_artifact_relative_path("../../etc/passwd"))

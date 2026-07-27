@@ -352,10 +352,13 @@ def build_parlays(
         correlation_threshold = _safe_float(resolved_preferences.get("correlation_threshold"))
     if correlation_threshold is None:
         correlation_threshold = 0.45
-    smart_min_leg_count = max(2, min(3, min_leg_count))
-    smart_max_leg_count = max(2, min(3, max_leg_count))
-    if smart_min_leg_count > smart_max_leg_count:
-        smart_min_leg_count, smart_max_leg_count = smart_max_leg_count, smart_min_leg_count
+    # Honor the requested leg window as-is. min/max_leg_count are already
+    # clamped to [2, 5] above; a further min(3, ...) here silently rebuilt
+    # every "four-leg parlay" request as 3-leg tickets. The combination
+    # search stays bounded by search_window (<= limit*3+5 candidates), so
+    # 5-leg requests are C(20,5)-scale at worst, not explosive.
+    smart_min_leg_count = min_leg_count
+    smart_max_leg_count = max_leg_count
     same_game_parlay = _safe_text(resolved_preferences.get("parlay_type"), "standard") == "same_game"
 
     ranked_pool = sorted(candidate_pool, key=_candidate_portfolio_score, reverse=True)

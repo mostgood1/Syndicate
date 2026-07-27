@@ -35,6 +35,13 @@ class NcaafRefreshRunnerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             source_root = Path(tmp_dir) / "source"
             (source_root / "data").mkdir(parents=True)
+            # main() unconditionally resolves a prediction context (season /
+            # latest game date, used for the stale-season auto-skip guard)
+            # from <data_root>/data before running the refresh.
+            (source_root / "data" / "college_football_schedule_2025_predicted_totals_enhanced.csv").write_text(
+                "season,week,home_team,away_team,start_date\n2025,7,Texas,Oklahoma,2025-10-11T19:00:00Z\n",
+                encoding="utf-8",
+            )
             argv = [
                 "refresh_ncaaf_oddsapi.py",
                 "--source-root",
@@ -128,3 +135,45 @@ class NcaafRefreshRunnerTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             _, kwargs = run_refresh.call_args
             self.assertEqual(kwargs["source_root"], artifact_root.resolve())
+
+    def test_prediction_files_finds_flat_artifact_bundle_layout(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            artifact_root = Path(tmp_dir) / "bundle"
+            artifact_root.mkdir(parents=True)
+            (artifact_root / "college_football_schedule_2025_predicted_totals_enhanced.csv").write_text(
+                "season,week,home_team,away_team,start_date\n2025,7,Texas,Oklahoma,2025-10-11T19:00:00Z\n",
+                encoding="utf-8",
+            )
+
+            files = module._prediction_files(artifact_root)
+            self.assertEqual(len(files), 1)
+
+            context = module._prediction_context(artifact_root)
+            self.assertEqual(context["season"], 2025)
+
+    def test_prediction_files_finds_nested_source_root_layout(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir) / "source"
+            (source_root / "data").mkdir(parents=True)
+            (source_root / "data" / "college_football_schedule_2025_predicted_totals_enhanced.csv").write_text(
+                "season,week,home_team,away_team,start_date\n2025,7,Texas,Oklahoma,2025-10-11T19:00:00Z\n",
+                encoding="utf-8",
+            )
+
+            files = module._prediction_files(source_root)
+            self.assertEqual(len(files), 1)
+
+            context = module._prediction_context(source_root)
+            self.assertEqual(context["season"], 2025)
+
+    def test_base_norm_normalizes_team_names(self) -> None:
+        module = self._load_module()
+
+        self.assertEqual(module._base_norm("Ohio State"), "ohio state")
+        self.assertEqual(module._base_norm("Texas A&M"), "texas a and m")
+        self.assertEqual(module._base_norm("Hawai'i"), "hawaii")
+        self.assertEqual(module._norm_team("Ole Miss"), "mississippi")

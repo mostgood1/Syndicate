@@ -115,6 +115,11 @@ class IntelligencePipelineRequest:
     selected_date: str | None = None
     query_type: str | None = None
     mode: str | None = None
+    # True when mode came from routing rather than the caller (#74). An
+    # inferred mode may steer views/enrichment but must not be forwarded to
+    # run_intelligence_query as an instruction -- there it overrides intent
+    # the question itself expresses.
+    mode_inferred: bool = False
     preview_subject: str | None = None
     player_subject: str | None = None
     sport: str | None = None
@@ -132,6 +137,7 @@ class IntelligencePipelineRequest:
             "selected_date": self.selected_date,
             "query_type": self.query_type,
             "mode": self.mode,
+            "mode_inferred": self.mode_inferred,
             "preview_subject": self.preview_subject,
             "player_subject": self.player_subject,
             "sport": self.sport,
@@ -188,12 +194,24 @@ def _normalize_request(request_or_payload: Any) -> IntelligencePipelineRequest:
     question = str(payload.get("question") or getattr(request_or_payload, "question", "") or "").strip()
     routed = _QUERY_ROUTER.route_question(question) if question else None
     query_type = str(payload.get("query_type") or "").strip() or (routed.query_type if routed is not None else None)
-    mode = str(payload.get("mode") or "").strip() or (routed.pipeline_mode if routed is not None else _pipeline_mode_for_query_type(query_type))
+    # A payload mode counts as caller-chosen only when the payload does not
+    # say otherwise: QueryRouter.route_payload stamps mode BEFORE this
+    # function runs, so without its mode_inferred flag a routed guess is
+    # indistinguishable from an explicit request (#74).
+    payload_mode = str(payload.get("mode") or "").strip()
+    payload_mode_inferred = _optional_bool(payload.get("mode_inferred")) or False
+    if payload_mode:
+        mode = payload_mode
+        mode_inferred = payload_mode_inferred
+    else:
+        mode = routed.pipeline_mode if routed is not None else _pipeline_mode_for_query_type(query_type)
+        mode_inferred = mode is not None
     return IntelligencePipelineRequest(
         question=question,
         selected_date=str(payload.get("date") or payload.get("selected_date") or "").strip() or (routed.selected_date if routed is not None else None),
         query_type=query_type,
         mode=mode,
+        mode_inferred=mode_inferred,
         preview_subject=str(payload.get("preview_subject") or "").strip() or (routed.preview_subject if routed is not None else None),
         player_subject=str(payload.get("player_subject") or "").strip() or (routed.player_subject if routed is not None else None),
         sport=str(payload.get("sport") or "").strip() or None,
@@ -1218,10 +1236,14 @@ def _call_intelligence(normalized_request: IntelligencePipelineRequest, context:
     return result
 
 def _call_black_box_intelligence(normalized_request: IntelligencePipelineRequest) -> dict[str, Any]:
+    # An inferred mode is withheld here (#74): _query_preferences treats mode
+    # as an instruction that outranks what the question says, so forwarding a
+    # routed guess e.g. filters live legs out of an explicitly requested
+    # parlay. The question alone carries the caller's intent in that case.
     return run_intelligence_query(
         normalized_request.question,
         selected_date=normalized_request.selected_date,
-        mode=normalized_request.mode,
+        mode=None if normalized_request.mode_inferred else normalized_request.mode,
         sport=normalized_request.sport,
         game_state=normalized_request.game_state,
         limit=normalized_request.limit,

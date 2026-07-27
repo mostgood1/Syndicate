@@ -1,0 +1,127 @@
+{
+  "fetchedAt": 1785012528.568762,
+  "date": "2026-07-25",
+  "sport": "mlb",
+  "events": [
+    {
+      "event_id": "824244",
+      "home": "Detroit Tigers",
+      "away": "Kansas City Royals",
+      "start_time_utc": "2026-07-25T17:10:00Z",
+      "home_team_id": 116,
+      "away_team_id": 118
+    },
+    {
+      "event_id": "822704",
+      "home": "Washington Nationals",
+      "away": "Arizona Diamondbacks",
+      "start_time_utc": "2026-07-25T20:05:00Z",
+      "home_team_id": 120,
+      "away_team_id": 109
+    },
+    {
+      "event_id": "823197",
+      "home": "San Francisco Giants",
+      "away": "Los Angeles Angels",
+      "start_time_utc": "2026-07-25T20:05:00Z",
+      "home_team_id": 137,
+      "away_team_id": 108
+    },
+    {
+      "event_id": "824734",
+      "home": "Boston Red Sox",
+      "away": "Toronto Blue Jays",
+      "start_time_utc": "2026-07-25T20:10:00Z",
+      "home_team_id": 111,
+      "away_team_id": 141
+    },
+    {
+      "event_id": "823841",
+      "home": "Miami Marlins",
+      "away": "San Diego Padres",
+      "start_time_utc": "2026-07-25T20:10:00Z",
+      "home_team_id": 146,
+      "away_team_id": 135
+    },
+    {
+      "event_id": "823435",
+      "home": "Philadelphia Phillies",
+      "away": "New York Yankees",
+      "start_time_utc": "2026-07-25T22:05:00Z",
+      "home_team_id": 143,
+      "away_team_id": 147
+    },
+    {
+      "event_id": "822948",
+      "home": "Tampa Bay Rays",
+      "away": "Cleveland Guardians",
+      "start_time_utc": "2026-07-25T22:10:00Z",
+      "home_team_id": 139,
+      "away_team_id": 114
+    },
+    {
+      "event_id": "823355",
+      "home": "Pittsburgh Pirates",
+      "away": "Chicago Cubs",
+      "start_time_utc": "2026-07-25T22:40:00Z",
+      "home_team_id": 134,
+      "away_team_id": 112
+    },
+    {
+      "event_id": "824811",
+      "home": "Baltimore Orioles",
+      "away": "Atlanta Braves",
+      "start_time_utc": "2026-07-25T23:05:00Z",
+      "home_team_id": 110,
+      "away_team_id": 144
+    },
+    {
+      "event_id": "823679",
+      "home": "Minnesota Twins",
+      "away": "Athletics",
+      "start_time_utc": "2026-07-25T23:10:00Z",
+      "home_team_id": 142,
+      "away_team_id": 133
+    },
+    {
+      "event_id": "824571",
+      "home": "Chicago White Sox",
+      "away": "Houston Astros",
+      "start_time_utc": "2026-07-25T23:10:00Z",
+      "home_team_id": 145,
+      "away_team_id": 117
+    },
+    {
+      "event_id": "823758",
+      "home": "Milwaukee Brewers",
+      "away": "Colorado Rockies",
+      "start_time_utc": "2026-07-25T23:10:00Z",
+      "home_team_id": 158,
+      "away_team_id": 115
+    },
+    {
+      "event_id": "823600",
+      "home": "New York Mets",
+      "away": "Los Angeles Dodgers",
+      "start_time_utc": "2026-07-25T23:15:00Z",
+      "home_team_id": 121,
+      "away_team_id": 119
+    },
+    {
+      "event_id": "823027",
+      "home": "St. Louis Cardinals",
+      "away": "Cincinnati Reds",
+      "start_time_utc": "2026-07-25T23:15:00Z",
+      "home_team_id": 138,
+      "away_team_id": 113
+    },
+    {
+      "event_id": "822869",
+      "home": "Texas Rangers",
+      "away": "Seattle Mariners",
+      "start_time_utc": "2026-07-25T23:15:00Z",
+      "home_team_id": 140,
+      "away_team_id": 136
+    }
+  ]
+}

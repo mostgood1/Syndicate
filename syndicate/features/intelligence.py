@@ -201,6 +201,29 @@ def _attach_intelligence_response_aliases(response: dict[str, Any]) -> dict[str,
         payload["edge"] = edge
         if payload.get("normalized_edge") in {None, ""} and edge not in {None, ""}:
             payload["normalized_edge"] = edge
+        # Consumers read american_odds off these items (price displays, the
+        # plus-money contract); only pool-serialized candidates carried it,
+        # engine recommendations only carry the raw odds text.
+        if payload.get("american_odds") is None:
+            payload["american_odds"] = _american_odds_value(payload.get("odds"))
+        if payload.get("subject_key") is None:
+            payload["subject_key"] = _candidate_subject_key(payload)
+        if payload.get("market_key") is None:
+            payload["market_key"] = _candidate_market_key(payload)
+        # _candidate_rationale builds the narrative sentence(s) from the raw
+        # candidate fields (live projection vs line, edge, confidence, ...);
+        # only _candidate_summary called it, and nothing serves items
+        # through that path -- run_intelligence_query's flat recommendations
+        # never had a "rationale" populated at all.
+        if not _safe_text(payload.get("rationale"), ""):
+            payload["rationale"] = _candidate_rationale(payload)
+        # _score_candidates nests this under candidate["market_fit"]
+        # ({"market_fit_score": ...}); several table/chart builders already
+        # flatten it back out at read time (see the market_fit.get(...)
+        # sites elsewhere in this file) -- do it once here instead.
+        if payload.get("market_fit_score") is None:
+            market_fit = payload.get("market_fit") if isinstance(payload.get("market_fit"), dict) else {}
+            payload["market_fit_score"] = market_fit.get("market_fit_score")
         return payload
 
     def _normalize_opportunity_list(key: str) -> None:
@@ -4733,6 +4756,38 @@ def _resolved_requested_subjects(question: str, candidates: list[dict[str, Any]]
     return [subject for _, subject in sorted(matches, key=lambda item: item[0])]
 
 
+def _display_subject_names(candidates: list[dict[str, Any]], subject_keys: list[str] | tuple[str, ...] | None) -> list[str]:
+    """Map lowercase subject keys back to display-cased names.
+
+    parsed_request is a public, UI-facing field; its subjects should read
+    "Aaron Judge", not the lowercase matching key. The candidate's own name
+    carries the real casing (naive title-casing breaks McCutchen, O'Neill),
+    so resolve through the pool and only fall back to capitalization for a
+    key no candidate carries.
+    """
+    display_by_key: dict[str, str] = {}
+    for candidate in candidates:
+        if not isinstance(candidate, Mapping):
+            continue
+        key = _candidate_subject_key(candidate)
+        if not key or key in display_by_key:
+            continue
+        name_text = _safe_text(candidate.get("name"), "")
+        lowered = name_text.lower()
+        for marker in (" over ", " under "):
+            if marker in f" {lowered} ":
+                cut = lowered.index(marker.strip())
+                display_by_key[key] = name_text[:cut].strip()
+                break
+        else:
+            display_by_key[key] = name_text.strip() or key
+    return [
+        display_by_key.get(key, " ".join(part.capitalize() for part in str(key).split()))
+        for key in (subject_keys or [])
+        if str(key).strip()
+    ]
+
+
 def _filter_candidates_to_requested_subjects(
     candidates: list[dict[str, Any]],
     requested_subjects: list[str] | tuple[str, ...] | None,
@@ -5200,6 +5255,22 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
             candidates.extend(hr_candidates)
             if hr_candidates:
                 _log_candidate_stage(pipeline_name="collect_candidates", stage="mlb_home_run_backfill", before=[], after=hr_candidates)
+        if _safe_text(sport.get("slug"), "").lower() == "mlb":
+            # _mlb_subject_prop_candidates_from_artifact was defined
+            # (matches a top-props artifact row's player name against the
+            # question, independent of the "top N"/explicit-market phrasing
+            # wants_ranked_mlb_market_backfill requires) but never called --
+            # "What does Brandon Young's matchup look like" named no market
+            # and no "top N", so a real subject question with data sitting
+            # in the artifact still produced zero candidates. It already
+            # self-gates on a whole-word match against the question, so this
+            # is a no-op for every query that doesn't name a rostered player.
+            subject_prop_candidates = _mlb_subject_prop_candidates_from_artifact(
+                sport, question=_safe_text(preferences.get("question"), ""), preferences=preferences
+            )
+            candidates.extend(subject_prop_candidates)
+            if subject_prop_candidates:
+                _log_candidate_stage(pipeline_name="collect_candidates", stage="mlb_subject_prop_backfill", before=[], after=subject_prop_candidates)
         if wants_ranked_mlb_market_backfill:
             backfill_candidates: list[dict[str, Any]] = []
             for artifact_candidate in _mlb_market_prop_candidates_from_artifact(sport, preferences):
@@ -7753,6 +7824,22 @@ def run_intelligence_query(
     ranking_started_at = time.perf_counter()
     pre_filter_candidates = [dict(candidate) for candidate in candidates if isinstance(candidate, Mapping)]
     filtered_candidates = filter_candidates(candidates, sport=_safe_text(preferences.get("sport"), "") or None)
+    # An explicitly requested subject must survive the edge gate: "Compare
+    # Judge vs Ohtani" is a question about both players, and answering with
+    # only the one that clears the board threshold silently rewrites it.
+    # The gate still applies to everything the question didn't name.
+    requested_subject_keys = {str(item).strip().lower() for item in (preferences.get("requested_subjects") or []) if str(item).strip()}
+    if requested_subject_keys:
+        # Re-add by SUBJECT, not by row: the gate's survivors are copies with
+        # normalized fields, so row-level identity can't be trusted, and the
+        # invariant is "each requested subject survives", not "every one of
+        # its rows does".
+        gated_subjects = {_candidate_subject_key(candidate) for candidate in filtered_candidates}
+        for candidate in candidates:
+            subject = _candidate_subject_key(candidate) or ""
+            if subject in requested_subject_keys and subject not in gated_subjects:
+                filtered_candidates.append(candidate)
+                gated_subjects.add(subject)
     _log_candidate_stage(pipeline_name="run_intelligence_query", stage="filter_candidates", before=pre_filter_candidates, after=filtered_candidates)
     pre_balance_candidates = [dict(candidate) for candidate in filtered_candidates if isinstance(candidate, Mapping)]
     ranked_recommendations = _balanced_recommendation_order(filtered_candidates)
@@ -7778,6 +7865,29 @@ def run_intelligence_query(
     # market family) at the front for any client that only renders the
     # first N, without dropping the rest.
     recommendations = [dict(candidate) for candidate in ranked_recommendations]
+    # Odds-window preferences (plus-money-only, favorite floor, explicit
+    # min/max) parsed from the question apply to the flat recommendations,
+    # not only to parlay legs -- _american_odds_match was otherwise consumed
+    # solely by the parlay runtime, so "plus money only" requests still
+    # served minus-odds picks. Candidates with no parseable odds pass only
+    # when no odds preference was expressed, matching the helper's contract.
+    if any(
+        preferences.get(key) is not None and preferences.get(key) is not False
+        for key in ("plus_money_only", "candidate_odds_min", "candidate_odds_max", "favorite_floor")
+    ):
+        recommendations = [
+            candidate
+            for candidate in recommendations
+            if _american_odds_match(_american_odds_value(candidate.get("odds")), preferences)
+        ]
+    # Same for the timing preference: live_only/pregame_only previously only
+    # nudged scoring, so an explicit timing=live request still served pregame
+    # picks. These flags are only set when the caller (or the question)
+    # expressed a timing, so strict filtering is the requested behavior.
+    if preferences.get("live_only"):
+        recommendations = [candidate for candidate in recommendations if bool(candidate.get("is_live"))]
+    elif preferences.get("pregame_only"):
+        recommendations = [candidate for candidate in recommendations if not bool(candidate.get("is_live"))]
     _log_candidate_stage(pipeline_name="run_intelligence_query", stage="_greedy_low_correlation_selection", before=pre_selection_recommendations, after=recommendations)
     _intel_trace_timed("evaluation", evaluation_started_at, pipeline="run_intelligence_query", recommendation_count=len(recommendations))
     _intel_trace(
@@ -7903,6 +8013,12 @@ def run_intelligence_query(
     final_response["parsed_request"] = dict(preferences)
     final_response["parsed_request"]["question"] = question
     final_response["parsed_request"]["selected_date"] = effective_date
+    final_response["parsed_request"]["requested_subjects"] = _display_subject_names(
+        candidates, preferences.get("requested_subjects") or []
+    )
+    final_response["parsed_request"]["requested_markets"] = _market_focus_labels(
+        preferences.get("requested_markets") or []
+    )
     final_response["headline"] = headline
     final_response["summary"] = structured_response.get("summary") or summary
     final_response["analysis_views"] = dict(analysis_views or {})

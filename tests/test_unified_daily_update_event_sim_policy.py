@@ -58,7 +58,13 @@ class UnifiedDailyUpdateEventSimPolicyTests(unittest.TestCase):
         self.assertIn("$timeToStartMinutes = $null", content)
         self.assertIn("Get-Policy -Context $eventPolicyContext -PolicyConfig $eventSimPolicyConfig", content)
         self.assertIn("Get-Policy -Context $eventPolicyContext -PolicyConfig $eventSimPolicyConfig -PolicyPerformance @($runManifest.policyPerformance)", content)
-        self.assertIn("Get-EventSimExecutionDecision -CurrentFingerprint $currentEventInputFingerprint -PreviousFingerprint $previousInputFingerprint -Fallback $null -CurrentTimeUtc $currentTimeUtc -EventStartTimeUtc $eventStartTimeUtc -ForceWithinMinutes $effectiveForceWindowMinutes", content)
+        # Pin stable leading arguments plus the force-window argument; the call
+        # gained -ArtifactPath mid-list, so avoid asserting the full line.
+        self.assertIn(
+            "Get-EventSimExecutionDecision -CurrentFingerprint $currentEventInputFingerprint -PreviousFingerprint $previousInputFingerprint",
+            content,
+        )
+        self.assertIn("-ForceWithinMinutes $effectiveForceWindowMinutes", content)
         self.assertIn("$currentTimeOffset -ge $windowStartOffset -and $currentTimeOffset -le $eventStartOffset", content)
 
 

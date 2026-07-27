@@ -127,9 +127,10 @@ class LocalMarketAccuracyTests(unittest.TestCase):
         with TemporaryDirectory() as tmp_dir:
             artifact_root = Path(tmp_dir)
             _write_market_accuracy_artifacts(artifact_root, "2026-05-19")
+            # the module resolves its artifact directory via _artifact_root()
             with patch(
-                "syndicate.features.wnba.market_accuracy.processed_path",
-                return_value=artifact_root / "game_cards_2099-01-01.csv",
+                "syndicate.features.wnba.market_accuracy._artifact_root",
+                return_value=artifact_root,
             ):
                 payload = build_wnba_market_accuracy("date=2026-05-19")
 
@@ -143,8 +144,8 @@ class LocalMarketAccuracyTests(unittest.TestCase):
         with TemporaryDirectory() as tmp_dir:
             artifact_root = Path(tmp_dir)
             with patch(
-                "syndicate.features.wnba.market_accuracy.processed_path",
-                return_value=artifact_root / "game_cards_2099-01-01.csv",
+                "syndicate.features.wnba.market_accuracy._artifact_root",
+                return_value=artifact_root,
             ):
                 payload = build_wnba_market_accuracy("date=2026-05-19")
 
@@ -157,10 +158,11 @@ class LocalMarketAccuracyTests(unittest.TestCase):
         with TemporaryDirectory() as tmp_dir:
             artifact_root = Path(tmp_dir)
             _write_market_accuracy_artifacts(artifact_root, "2026-05-19")
+            # fully local now: no source_api_json fallback seam remains
             with patch(
-                "syndicate.features.nba.market_accuracy.processed_path",
-                return_value=artifact_root / "game_cards_2099-01-01.csv",
-            ), patch("syndicate.features.nba.market_accuracy.source_api_json", return_value=None):
+                "syndicate.features.nba.market_accuracy._artifact_root",
+                return_value=artifact_root,
+            ):
                 payload = build_nba_market_accuracy("date=2026-05-19")
 
         self.assertIsInstance(payload, dict)

@@ -4616,7 +4616,7 @@ try {
                     $effectivePolicy = if ($null -ne $eventPolicy) { $eventPolicy } else { [ordered]@{ policyId = 'policy:default'; policySource = 'fallback'; keyParameters = [ordered]@{ forceWithinMinutes = [int]$EventSimForceWindowMinutes } } }
                     $effectiveForceWindowMinutes = if ($null -ne $effectivePolicy -and $null -ne $effectivePolicy.keyParameters -and $null -ne $effectivePolicy.keyParameters.forceWithinMinutes) { [int]$effectivePolicy.keyParameters.forceWithinMinutes } else { [int]$EventSimForceWindowMinutes }
 
-                    $eventDecision = Get-EventSimExecutionDecision -CurrentFingerprint $currentEventInputFingerprint -PreviousFingerprint $previousInputFingerprint -Fallback $null -CurrentTimeUtc $currentTimeUtc -EventStartTimeUtc $eventStartTimeUtc -ArtifactPath [string]$eventPlan.artifactPath -ForceWithinMinutes $effectiveForceWindowMinutes
+                    $eventDecision = Get-EventSimExecutionDecision -CurrentFingerprint $currentEventInputFingerprint -PreviousFingerprint $previousInputFingerprint -Fallback $null -CurrentTimeUtc $currentTimeUtc -EventStartTimeUtc $eventStartTimeUtc -ArtifactPath ([string]$eventPlan.artifactPath) -ForceWithinMinutes $effectiveForceWindowMinutes
                     if ($null -eq $eventDecision) {
                         $stepShouldRunSim = $null
                         $stepEventDecisions = @()

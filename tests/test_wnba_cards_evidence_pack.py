@@ -175,16 +175,18 @@ class WnbaCardsEvidencePackTests(unittest.TestCase):
         self.assertEqual(first.get("best_reason"), "Aces ML")
         self.assertIsInstance(first.get("show_more_lines"), list)
 
-    def test_cards_parity_source_contains_main_board_evidence_pack_markup(self) -> None:
+    def test_cards_parity_source_omits_main_board_evidence_pack_markup(self) -> None:
+        # The WNBA-only evidence-pack card section was deliberately removed
+        # from the main board for MLB parity (commit e165cfdc); the backend
+        # evidence_pack payload above remains, but the parity JS must not
+        # render it as its own per-game section.
         js_path = Path(__file__).resolve().parents[1] / "syndicate" / "static" / "wnba" / "cards-parity.js"
         js_content = js_path.read_text(encoding="utf-8")
 
-        self.assertIn("renderEvidencePack(game)", js_content)
-        self.assertIn("Main board evidence pack", js_content)
-        self.assertIn("cards-evidence-card", js_content)
-        self.assertIn("cards-evidence-more", js_content)
-        self.assertIn("Show more lines", js_content)
-        self.assertIn("cards-live-lens-grid cards-evidence-pack-grid", js_content)
+        self.assertNotIn("renderEvidencePack", js_content)
+        self.assertNotIn("Main board evidence pack", js_content)
+        self.assertNotIn("cards-evidence-card", js_content)
+        self.assertNotIn("cards-evidence-pack-grid", js_content)
 
     def test_cards_parity_source_contains_prop_lens_promotion_markup(self) -> None:
         js_path = Path(__file__).resolve().parents[1] / "syndicate" / "static" / "wnba" / "cards-parity.js"

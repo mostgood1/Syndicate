@@ -42,12 +42,25 @@ class ModuleTrackerSnapshotTests(unittest.TestCase):
         self.assertIn("ncaab", report)
         self.assertIn("ncaaf", report)
 
-    def test_text_report_suppresses_zero_gap_rankings(self) -> None:
+    def test_text_report_ranks_real_gaps_and_suppresses_empty_rankings(self) -> None:
+        # Soccer ships without a season betting-card surface (no settlement
+        # pipeline yet), so the live snapshot now carries one real parity gap;
+        # pin the "- None" suppression against an emptied gap summary instead.
         snapshot = module_snapshot()
         report = render_text_report(snapshot)
 
-        self.assertIn("Highest leverage MLB parity gaps:\n- None", report)
-        self.assertIn("Modules ranked by remaining gap count:\n- None", report)
+        self.assertIn("Highest leverage MLB parity gaps:\n- season betting-card: 1 modules (soccer)", report)
+        self.assertIn("Modules ranked by remaining gap count:\n- soccer: gaps=1;", report)
+
+        emptied = dict(snapshot)
+        emptied["gap_summary"] = {
+            "highest_leverage_gaps": [],
+            "modules_ranked_by_gap_count": [],
+            "lowest_ownership_modules": snapshot["gap_summary"].get("lowest_ownership_modules") or [],
+        }
+        emptied_report = render_text_report(emptied)
+        self.assertIn("Highest leverage MLB parity gaps:\n- None", emptied_report)
+        self.assertIn("Modules ranked by remaining gap count:\n- None", emptied_report)
 
 
 if __name__ == "__main__":

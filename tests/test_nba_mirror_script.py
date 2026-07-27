@@ -124,9 +124,11 @@ class UnifiedDailyUpdatePublishTests(unittest.TestCase):
         script_path = repo_root / "scripts" / "unified_daily_update.ps1"
         content = script_path.read_text(encoding="utf-8")
 
+        # Basketball publish paths moved into Add-BasketballPublishPaths, which
+        # derives ${sportSlug} from the sport root instead of taking ${SportName}.
         self.assertIn("props_movement_signals_${DateValue}.csv", content)
-        self.assertIn("odds_${SportName}_player_props_opening_${DateValue}.csv", content)
-        self.assertIn("odds_${SportName}_player_props_history_${DateValue}.csv", content)
+        self.assertIn("odds_${sportSlug}_player_props_opening_${DateValue}.csv", content)
+        self.assertIn("odds_${sportSlug}_player_props_history_${DateValue}.csv", content)
 
     def test_nba_advanced_gate_includes_live_lens_fallback_artifacts(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
@@ -143,7 +145,11 @@ class UnifiedDailyUpdatePublishTests(unittest.TestCase):
         script_path = repo_root / "scripts" / "unified_daily_update.ps1"
         content = script_path.read_text(encoding="utf-8")
 
-        self.assertIn("data/mlb_source/tracking", content)
+        # MLB tracking is now published relative to each MLB data root
+        # ('data/mlb_source/data' and 'data/mlb_source/source_artifacts/data')
+        # via a shared "../tracking" pattern rather than a literal path.
+        self.assertIn("'data/mlb_source/data', 'data/mlb_source/source_artifacts/data'", content)
+        self.assertIn('Add-PathsUnderRoot -RelativeRoot "$rootRelative/../tracking"', content)
         self.assertIn("data/nhl_source/tracking", content)
         self.assertIn("data/nfl_source/tracking", content)
         self.assertIn("data/ncaaf_source/tracking", content)

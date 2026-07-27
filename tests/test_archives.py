@@ -49,6 +49,8 @@ from syndicate.features.nba.betting_card import source_web_text
 from syndicate.features.nba.live_prop_audit import build_live_prop_audit_payload
 from syndicate.features.nba.sources import default_date_for_season as default_nba_date_for_season
 from syndicate.features.nba.sources import processed_path as nba_processed_path
+from syndicate.features.wnba.sources import available_dates as wnba_available_dates
+from syndicate.features.wnba.sources import default_date as default_wnba_date
 from syndicate.features.wnba.sources import default_date_for_season as default_wnba_date_for_season
 from syndicate.features.nhl.cards import build_source_bundle_payload as build_nhl_source_bundle_payload
 from syndicate.features.nhl.cards import build_props_cards_payload as build_nhl_props_cards_payload
@@ -3394,13 +3396,24 @@ class HomeBoardTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload_mock.assert_called_once_with(selected_date="2026-05-20", force_refresh=True)
 
-    def test_home_page_mounts_hydrated_sport_stack_container(self) -> None:
+    def test_home_page_renders_curated_betting_board(self) -> None:
+        # Nav/IA change 2026-07-24: "/" renders the curated Betting Board
+        # (intelligence_home), not the old per-sport dashboard (home.html) --
+        # that dashboard is retired from nav, though its server-rendered
+        # stack stays reachable through /api/home (covered by
+        # test_home_api_returns_rendered_sport_stack_html above). "Betting
+        # Board" in nav points at the Layer 1 /market-board hub, while
+        # /intelligence itself still works directly, unchanged.
         response = self.client.get("/")
         body = response.get_data(as_text=True)
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn('id="syndicate-home-sport-stack"', body)
-        self.assertIn('/api/home', body)
+        self.assertIn("Syndicate | Betting Board", body)
+        self.assertIn('id="board-toolbar"', body)
+        self.assertIn('id="board-game-cards"', body)
+        self.assertIn('id="initial-intelligence-response"', body)
+        self.assertIn('href="/market-board"', body)
+        self.assertNotIn('id="syndicate-home-sport-stack"', body)
 
     def test_home_page_preserves_date_across_sport_links(self) -> None:
         # A dedicated #home-board-date <input> (a "global date control") no
@@ -3419,23 +3432,34 @@ class HomeBoardTests(unittest.TestCase):
         self.assertIn('href="/ncaab?date=2026-05-20"', body)
 
     def test_home_page_poll_preserves_date_query(self) -> None:
+        # A requested date must survive both the server render (?date= seeds
+        # the #board-date input) and the curated board's background refresh
+        # loop (state.date is re-sent on every poll tick and kept in the
+        # URL), so a user parked on a past date never gets snapped back to
+        # today by a background refresh.
+        response = self.client.get("/?date=2026-05-20")
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('class="board-date-input" value="2026-05-20"', body)
+        self.assertIn('date: urlParams.get("date") || document.getElementById("board-date").value || ""', body)
+        self.assertIn("if (state.date) payload.date = state.date;", body)
+        self.assertIn('url.searchParams.set("date", state.date);', body)
+
+    def test_home_page_background_poll_uses_shared_polling_policy(self) -> None:
+        # The curated board self-refreshes through the shared polling policy
+        # (background ticks that skip while hidden and never overlap) rather
+        # than the retired dashboard's DOM-patching poll -- losing any of
+        # these markers would silently freeze the homepage board.
         response = self.client.get("/")
         body = response.get_data(as_text=True)
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("const selectedDate = currentParams.get('date');", body)
-        self.assertIn("url.searchParams.set('date', selectedDate);", body)
-
-    def test_home_page_poll_preserves_existing_embed_nodes(self) -> None:
-        response = self.client.get("/")
-        body = response.get_data(as_text=True)
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("function replaceStackRoot(nextRoot)", body)
-        self.assertIn("function patchLiveNode(currentNode, nextNode)", body)
-        self.assertIn("function patchChildElements(currentParent, nextParent)", body)
-        self.assertIn("patchChildElements(stackRoot, nextRoot);", body)
-        self.assertIn("replaceStackRoot(preservePersistentNodes(payload.html));", body)
+        self.assertIn('src="/static/shared/polling.js"', body)
+        self.assertIn("window.SyndicatePolling.startFromPolicy(", body)
+        self.assertIn("loadIntelligence({ background: true })", body)
+        self.assertIn("skipWhenHidden: true", body)
+        self.assertIn("preventOverlap: true", body)
 
     def test_home_wnba_compact_game_items_use_local_cards_without_source_proxy(self) -> None:
         from syndicate.blueprints import home as home_module
@@ -4973,9 +4997,11 @@ class HomeBoardTests(unittest.TestCase):
         # site-wide gap (most standalone pages had no way back to Ask the
         # Syndicate or the Betting Board), not an intentional design choice
         # for this page specifically, so the nav is now shown like every
-        # other hub-style page.
+        # other hub-style page. Since the 2026-07-24 nav/IA change the
+        # "Betting Board" pill targets the /market-board hub rather than
+        # /intelligence (which still works directly, just isn't in nav).
         self.assertIn('href="/syndicate', html)
-        self.assertIn('href="/intelligence', html)
+        self.assertIn('href="/market-board', html)
 
     def test_wnba_props_page_empty_state_renders_in_standalone_shell(self) -> None:
         response = self.client.get('/wnba/props?date=1900-01-01')
@@ -5585,13 +5611,27 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertEqual(payload.get("requested_date"), today_date)
 
     def test_wnba_cards_api_without_date_uses_today(self) -> None:
-        today_date = date.today().isoformat()
+        # default_date() is central_today_iso(), not date.today() -- the
+        # slate date is Central everywhere, and the two differ late at
+        # night on non-Central machines.
+        today_date = default_wnba_date()
         response = self.client.get("/wnba/api/cards")
         payload = response.get_json()
 
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(payload, dict)
-        self.assertEqual(payload.get("date"), today_date)
+        self.assertEqual(payload.get("requested_date"), today_date)
+        # Every wnba.py API caller passes allow_stored_date_fallback=True,
+        # so when the schedule confirms games today but today's game_cards
+        # artifact hasn't been mirrored into this checkout yet, the served
+        # "date" legitimately rewrites to a stored artifact date instead of
+        # presenting an empty board (see _resolved_source_cards_date). Only
+        # those two outcomes are valid for a no-date request.
+        resolved_date = str(payload.get("date") or "")
+        self.assertTrue(
+            resolved_date == today_date or resolved_date in wnba_available_dates(),
+            f"resolved date {resolved_date!r} is neither today ({today_date}) nor a stored artifact date",
+        )
 
     def test_wnba_cards_default_route_uses_local_source_shell(self) -> None:
         with patch(
@@ -6189,7 +6229,12 @@ class ArchiveRouteTests(unittest.TestCase):
         wnba_hub = self.client.get("/wnba/hub").get_data(as_text=True)
         nhl_hub = self.client.get("/nhl/hub").get_data(as_text=True)
         nba_hub = self.client.get("/nba/hub").get_data(as_text=True)
-        home = self.client.get("/").get_data(as_text=True)
+        # Nav/IA change 2026-07-24: "/" now renders the curated Betting
+        # Board, so the per-sport dashboard copy below ("Active sports",
+        # the live-rail strip, the sport-stack tags) is asserted against
+        # the dashboard HTML still served by the /api/home poll endpoint.
+        home_payload = self.client.get("/api/home").get_json()
+        home = str((home_payload or {}).get("html") or "")
 
         self.assertEqual(mlb_launch_date, latest_mlb_date)
         self.assertIn(f"/mlb/cards?date={latest_mlb_date}", mlb_hub)

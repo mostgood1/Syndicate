@@ -100,8 +100,13 @@ class IntelligenceBoardContractTests(unittest.TestCase):
         )
 
         self.assertEqual(contract["recommendation_count"], 2)
-        self.assertEqual([card["name"] for card in contract["cards"]], ["Jayson Tatum", "Aaron Judge"])
-        self.assertEqual(contract["cards"][1]["lane"], "pregame")
+        # #73 reworked the card sort to rank the pipeline's composite `score`
+        # above raw simulated_edge: Judge carries score 0.42, Tatum only an
+        # edge component, so Judge leads. The structured dictionary decides
+        # WHICH cards exist; the contract's own ranking decides their order.
+        self.assertEqual([card["name"] for card in contract["cards"]], ["Aaron Judge", "Jayson Tatum"])
+        self.assertEqual(contract["cards"][0]["lane"], "pregame")
+        self.assertEqual(contract["cards"][1]["lane"], "live")
 
     def test_build_intelligence_board_contract_keeps_all_cards_and_exposes_waterfall(self) -> None:
         contract = build_intelligence_board_contract(

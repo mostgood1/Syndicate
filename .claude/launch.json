@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "syndicate",
+      "runtimeExecutable": "py",
+      "runtimeArgs": ["-3", "app.py"],
+      "port": 5000
+    }
+  ]
+}

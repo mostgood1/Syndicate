@@ -730,12 +730,13 @@ def evaluate_protected_local_resolvers() -> list[dict[str, object]]:
             external_file = external_root / "data" / "processed" / "game_cards_2026-05-17.csv"
             external_file.parent.mkdir(parents=True, exist_ok=True)
             external_file.write_text("x", encoding="utf-8")
-            expected = external_file
+            expected = local_root / "data" / "processed" / "game_cards_2026-05-17.csv"
             with patch("syndicate.features.nba.sources.preferred_source_roots", return_value=[local_root, external_root]):
-                actual_path = nba_processed_path("game_cards_2026-05-17.csv")
-                actual_dates = nba_available_dates()
+                with patch("syndicate.features.nba.sources.artifact_processed_root", return_value=local_root / "data" / "processed"):
+                    actual_path = nba_processed_path("game_cards_2026-05-17.csv")
+                    actual_dates = nba_available_dates()
             if not _same_path(expected, actual_path):
-                _append_violation("nba", "processed_path resolves from source bundle when available", expected=str(expected), actual=str(actual_path))
+                _append_violation("nba", "processed_path stays on the primary preferred root (no sibling-bundle fallback)", expected=str(expected), actual=str(actual_path))
             if actual_dates != ["2026-05-17"]:
                 _append_violation("nba", "available_dates include source bundle artifacts", expected=["2026-05-17"], actual=actual_dates)
     except Exception as error:
@@ -758,7 +759,7 @@ def evaluate_protected_local_resolvers() -> list[dict[str, object]]:
             external_scoreboard.write_text("x", encoding="utf-8")
             expected_processed = local_root / "data" / "processed" / "recommendations_2026-05-17.csv"
             expected_scoreboard = local_root / "data" / "odds" / "games" / "date=2026-05-17" / "scoreboard.csv"
-            with patch("syndicate.features.nhl.sources._source_roots", return_value=[local_root, external_root]):
+            with patch("syndicate.features.nhl.sources._data_roots", return_value=[local_root / "data"]):
                 actual_processed = nhl_processed_path("recommendations_2026-05-17.csv")
                 actual_scoreboard = nhl_scoreboard_snapshot_path("2026-05-17")
                 actual_slates = nhl_slate_summaries()

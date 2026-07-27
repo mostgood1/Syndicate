@@ -80,5 +80,5 @@ class NcaabHistoricalLocalTests(unittest.TestCase):
             betting_context = build_season_betting_card_page_context(2025, "2026-04-06")
 
         self.assertIn("data/ncaab_source/api/recommendations/recommendations_2026-04-06.json", context["source_path"])
-        self.assertEqual(context["source_title"], "NCAAB 2025 mirrored season review data")
+        self.assertEqual(context["source_title"], "NCAAB 2025 season review data")
         self.assertEqual(betting_context["source_title"], "NCAAB mirrored historical betting card data")

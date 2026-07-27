@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
-from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
@@ -128,25 +127,23 @@ class WeekResolutionTests(unittest.TestCase):
         with patch.object(sources, "schedule_payload", return_value=self._payload()):
             self.assertEqual(sources.available_weeks("epl", 2026), [1, 2, 3])
 
+    # default_week resolves "today" through central_today_iso() (2026-07-24
+    # timezone fix: date.today() drifted to tomorrow after 19:00 CDT on UTC
+    # dynos), so tests pin that instead of date_cls.today to stay
+    # deterministic regardless of the real wall clock.
     def test_default_week_picks_the_week_containing_today(self) -> None:
         with patch.object(sources, "schedule_payload", return_value=self._payload()), \
-             patch("syndicate.features.soccer.sources.date_cls") as mock_date:
-            mock_date.today.return_value = date(2026, 8, 10)
-            mock_date.fromisoformat.side_effect = date.fromisoformat
+             patch.object(sources, "central_today_iso", return_value="2026-08-10"):
             self.assertEqual(sources.default_week("epl", 2026), 2)
 
     def test_default_week_picks_nearest_upcoming_when_today_is_before_season(self) -> None:
         with patch.object(sources, "schedule_payload", return_value=self._payload()), \
-             patch("syndicate.features.soccer.sources.date_cls") as mock_date:
-            mock_date.today.return_value = date(2026, 7, 1)
-            mock_date.fromisoformat.side_effect = date.fromisoformat
+             patch.object(sources, "central_today_iso", return_value="2026-07-01"):
             self.assertEqual(sources.default_week("epl", 2026), 1)
 
     def test_default_week_falls_back_to_last_week_when_season_is_over(self) -> None:
         with patch.object(sources, "schedule_payload", return_value=self._payload()), \
-             patch("syndicate.features.soccer.sources.date_cls") as mock_date:
-            mock_date.today.return_value = date(2026, 12, 1)
-            mock_date.fromisoformat.side_effect = date.fromisoformat
+             patch.object(sources, "central_today_iso", return_value="2026-12-01"):
             self.assertEqual(sources.default_week("epl", 2026), 3)
 
     def test_default_week_is_1_when_no_weeks_stored(self) -> None:
@@ -160,16 +157,12 @@ class WeekResolutionTests(unittest.TestCase):
         # this, a future date crossing a matchweek boundary silently
         # returned the wrong week's games/props.
         with patch.object(sources, "schedule_payload", return_value=self._payload()), \
-             patch("syndicate.features.soccer.sources.date_cls") as mock_date:
-            mock_date.today.return_value = date(2026, 7, 1)
-            mock_date.fromisoformat.side_effect = date.fromisoformat
+             patch.object(sources, "central_today_iso", return_value="2026-07-01"):
             self.assertEqual(sources.default_week("epl", 2026, reference_date="2026-08-10"), 2)
 
     def test_default_week_invalid_reference_date_falls_back_to_today(self) -> None:
         with patch.object(sources, "schedule_payload", return_value=self._payload()), \
-             patch("syndicate.features.soccer.sources.date_cls") as mock_date:
-            mock_date.today.return_value = date(2026, 8, 10)
-            mock_date.fromisoformat.side_effect = date.fromisoformat
+             patch.object(sources, "central_today_iso", return_value="2026-08-10"):
             self.assertEqual(sources.default_week("epl", 2026, reference_date="not-a-date"), 2)
 
     def test_week_label_includes_date_range_when_known(self) -> None:

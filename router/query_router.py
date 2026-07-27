@@ -190,10 +190,18 @@ class QueryRouter:
         route = self.route_question(question)
         routed_payload["question"] = route.question
         routed_payload["query_type"] = route.query_type
+        # mode_inferred (#74): once mode is stamped here, downstream cannot
+        # tell a caller-chosen mode from a routed guess -- and _query_preferences
+        # treats mode as an instruction, so a guessed "pregame" silently
+        # overrides intent the question itself expresses (e.g. filtering the
+        # live legs out of an explicitly requested parlay). The flag lets
+        # consumers keep inferred modes advisory.
         if route.query_type in {"game_preview", "player_analysis", "comparison"} or not explicit_mode:
             routed_payload["mode"] = route.pipeline_mode
+            routed_payload["mode_inferred"] = True
         else:
             routed_payload["mode"] = explicit_mode
+            routed_payload["mode_inferred"] = False
         if not explicit_date and route.selected_date:
             routed_payload["selected_date"] = route.selected_date
             routed_payload["date"] = route.selected_date

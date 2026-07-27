@@ -41,6 +41,22 @@ data/tmp_*/
 data/nfl_source/historical_truth/
 data/ncaaf_source/historical_truth/
 
+# Raw NFL tracking pulls (nflverse pbp, FTN charting): regenerable release
+# downloads, not source, and individual files run 90MB+ -- too large for
+# GitHub history.
+data/nfl_source/tracking/
+
+# Accidental/tooling virtualenvs outside the standard .venv/ name.
+vendor/mlb_bettingv2/.venv_x64/
+
+# Ad hoc local test-run output, not source.
+/test_stdout.log
+/test_stderr.log
+reports/live_refresh_loop/weather_fetch.log
+
+# Verification screenshots from the run-syndicate skill smoke test.
+.claude/skills/run-syndicate/screenshots/
+
 # Generated source trees are operational artifacts, not Render deploy inputs.
 data/*_source/data/
 vendor/*/data/

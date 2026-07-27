@@ -1,0 +1,270 @@
+{
+  "generated_at": "2026-07-25T16:27:41-05:00",
+  "sport": "all",
+  "selected_date": "2026-07-04",
+  "live_games": 0,
+  "live_props": 0,
+  "live_prop_items": 0,
+  "live_odds_game_ids": 0,
+  "live_candidates": 25,
+  "live_recommendations": 25,
+  "board_live_count": 25,
+  "top_live_opportunities": 25,
+  "live_mirror_exists": false,
+  "live_mirror_timestamp": null,
+  "stage_counts": {
+    "raw_candidates": {
+      "total": 29,
+      "live": 25,
+      "pregame": 4
+    },
+    "ranked_candidates": {
+      "total": 29,
+      "live": 25,
+      "pregame": 4
+    },
+    "selected_recommendations": {
+      "total": 29,
+      "live": 25,
+      "pregame": 4
+    },
+    "board_payload": {
+      "total": 29,
+      "live": 25,
+      "pregame": 4
+    }
+  },
+  "by_sport": {
+    "mlb": {
+      "live_games": 0,
+      "live_props": 0,
+      "live_prop_items": 0,
+      "live_odds_game_ids": 0,
+      "live_candidates": 25,
+      "live_recommendations": 25,
+      "board_live_count": 25,
+      "top_live_opportunities": 25,
+      "live_mirror_exists": false,
+      "live_mirror_timestamp": null
+    },
+    "nba": {
+      "live_games": 0,
+      "live_props": 0,
+      "live_prop_items": 0,
+      "live_odds_game_ids": 0,
+      "live_candidates": 0,
+      "live_recommendations": 0,
+      "board_live_count": 0,
+      "top_live_opportunities": 0,
+      "live_mirror_exists": false,
+      "live_mirror_timestamp": null
+    },
+    "ncaab": {
+      "live_games": 0,
+      "live_props": 0,
+      "live_prop_items": 0,
+      "live_odds_game_ids": 0,
+      "live_candidates": 0,
+      "live_recommendations": 0,
+      "board_live_count": 0,
+      "top_live_opportunities": 0,
+      "live_mirror_exists": false,
+      "live_mirror_timestamp": null
+    },
+    "ncaaf": {
+      "live_games": 0,
+      "live_props": 0,
+      "live_prop_items": 0,
+      "live_odds_game_ids": 0,
+      "live_candidates": 0,
+      "live_recommendations": 0,
+      "board_live_count": 0,
+      "top_live_opportunities": 0,
+      "live_mirror_exists": false,
+      "live_mirror_timestamp": null
+    },
+    "nfl": {
+      "live_games": 0,
+      "live_props": 0,
+      "live_prop_items": 0,
+      "live_odds_game_ids": 0,
+      "live_candidates": 0,
+      "live_recommendations": 0,
+      "board_live_count": 0,
+      "top_live_opportunities": 0,
+      "live_mirror_exists": false,
+      "live_mirror_timestamp": null
+    },
+    "nhl": {
+      "live_games": 0,
+      "live_props": 0,
+      "live_prop_items": 0,
+      "live_odds_game_ids": 0,
+      "live_candidates": 0,
+      "live_recommendations": 0,
+      "board_live_count": 0,
+      "top_live_opportunities": 0,
+      "live_mirror_exists": false,
+      "live_mirror_timestamp": null
+    },
+    "soccer": {
+      "live_games": 0,
+      "live_props": 0,
+      "live_prop_items": 0,
+      "live_odds_game_ids": 0,
+      "live_candidates": 0,
+      "live_recommendations": 0,
+      "board_live_count": 0,
+      "top_live_opportunities": 0,
+      "live_mirror_exists": false,
+      "live_mirror_timestamp": null
+    },
+    "wnba": {
+      "live_games": 0,
+      "live_props": 0,
+      "live_prop_items": 0,
+      "live_odds_game_ids": 0,
+      "live_candidates": 0,
+      "live_recommendations": 0,
+      "board_live_count": 0,
+      "top_live_opportunities": 0,
+      "live_mirror_exists": false,
+      "live_mirror_timestamp": null
+    }
+  },
+  "last_successful_live_cycle": {
+    "generated_at": "2026-07-25T16:27:41-05:00",
+    "sport": "all",
+    "selected_date": "2026-07-04",
+    "live_games": 0,
+    "live_props": 0,
+    "live_prop_items": 0,
+    "live_odds_game_ids": 0,
+    "live_candidates": 25,
+    "live_recommendations": 25,
+    "board_live_count": 25,
+    "top_live_opportunities": 25,
+    "live_mirror_exists": false,
+    "live_mirror_timestamp": null,
+    "stage_counts": {
+      "raw_candidates": {
+        "total": 29,
+        "live": 25,
+        "pregame": 4
+      },
+      "ranked_candidates": {
+        "total": 29,
+        "live": 25,
+        "pregame": 4
+      },
+      "selected_recommendations": {
+        "total": 29,
+        "live": 25,
+        "pregame": 4
+      },
+      "board_payload": {
+        "total": 29,
+        "live": 25,
+        "pregame": 4
+      }
+    },
+    "by_sport": {
+      "mlb": {
+        "live_games": 0,
+        "live_props": 0,
+        "live_prop_items": 0,
+        "live_odds_game_ids": 0,
+        "live_candidates": 25,
+        "live_recommendations": 25,
+        "board_live_count": 25,
+        "top_live_opportunities": 25,
+        "live_mirror_exists": false,
+        "live_mirror_timestamp": null
+      },
+      "nba": {
+        "live_games": 0,
+        "live_props": 0,
+        "live_prop_items": 0,
+        "live_odds_game_ids": 0,
+        "live_candidates": 0,
+        "live_recommendations": 0,
+        "board_live_count": 0,
+        "top_live_opportunities": 0,
+        "live_mirror_exists": false,
+        "live_mirror_timestamp": null
+      },
+      "ncaab": {
+        "live_games": 0,
+        "live_props": 0,
+        "live_prop_items": 0,
+        "live_odds_game_ids": 0,
+        "live_candidates": 0,
+        "live_recommendations": 0,
+        "board_live_count": 0,
+        "top_live_opportunities": 0,
+        "live_mirror_exists": false,
+        "live_mirror_timestamp": null
+      },
+      "ncaaf": {
+        "live_games": 0,
+        "live_props": 0,
+        "live_prop_items": 0,
+        "live_odds_game_ids": 0,
+        "live_candidates": 0,
+        "live_recommendations": 0,
+        "board_live_count": 0,
+        "top_live_opportunities": 0,
+        "live_mirror_exists": false,
+        "live_mirror_timestamp": null
+      },
+      "nfl": {
+        "live_games": 0,
+        "live_props": 0,
+        "live_prop_items": 0,
+        "live_odds_game_ids": 0,
+        "live_candidates": 0,
+        "live_recommendations": 0,
+        "board_live_count": 0,
+        "top_live_opportunities": 0,
+        "live_mirror_exists": false,
+        "live_mirror_timestamp": null
+      },
+      "nhl": {
+        "live_games": 0,
+        "live_props": 0,
+        "live_prop_items": 0,
+        "live_odds_game_ids": 0,
+        "live_candidates": 0,
+        "live_recommendations": 0,
+        "board_live_count": 0,
+        "top_live_opportunities": 0,
+        "live_mirror_exists": false,
+        "live_mirror_timestamp": null
+      },
+      "soccer": {
+        "live_games": 0,
+        "live_props": 0,
+        "live_prop_items": 0,
+        "live_odds_game_ids": 0,
+        "live_candidates": 0,
+        "live_recommendations": 0,
+        "board_live_count": 0,
+        "top_live_opportunities": 0,
+        "live_mirror_exists": false,
+        "live_mirror_timestamp": null
+      },
+      "wnba": {
+        "live_games": 0,
+        "live_props": 0,
+        "live_prop_items": 0,
+        "live_odds_game_ids": 0,
+        "live_candidates": 0,
+        "live_recommendations": 0,
+        "board_live_count": 0,
+        "top_live_opportunities": 0,
+        "live_mirror_exists": false,
+        "live_mirror_timestamp": null
+      }
+    }
+  }
+}

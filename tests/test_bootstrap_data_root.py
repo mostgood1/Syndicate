@@ -119,6 +119,7 @@ class BootstrapDataRootTests(unittest.TestCase):
                     "data/ncaab_source/manifests",
                     "data/wnba_source/source_artifacts",
                     "data/wnba_source/manifests",
+                    "data/soccer_source",
                     "reports/odds_control_plane",
                     "reports/daily_update/latest",
                     "reports/refresh_status/latest",

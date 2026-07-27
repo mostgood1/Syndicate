@@ -325,14 +325,18 @@ def build_response(*, recommendations: list[dict[str, Any]], parlays: list[dict[
         visible_recommendations = [dict(candidate) for candidate in recommendations if isinstance(candidate, dict)]
 
     def _frontend_parlay(parlay: dict[str, Any]) -> dict[str, Any]:
+        # Additive, like the opportunity aliases above: this used to whitelist
+        # five keys, which silently dropped label/leg_count/combined_odds --
+        # the builder's full payload is the contract, the frontend fields are
+        # aliases on top of it.
         correlation_profile = parlay.get("correlation_profile") if isinstance(parlay.get("correlation_profile"), dict) else {}
-        return {
-            "legs": [dict(leg) for leg in (parlay.get("legs") or []) if isinstance(leg, dict)],
-            "combined_probability": parlay.get("combined_probability"),
-            "combined_edge": parlay.get("combined_edge"),
-            "expected_value": parlay.get("combined_expected_value"),
-            "correlation_score": correlation_profile.get("max_correlation") if correlation_profile else None,
-        }
+        payload = dict(parlay)
+        payload["legs"] = [dict(leg) for leg in (parlay.get("legs") or []) if isinstance(leg, dict)]
+        if payload.get("expected_value") is None:
+            payload["expected_value"] = parlay.get("combined_expected_value")
+        if payload.get("correlation_score") is None:
+            payload["correlation_score"] = correlation_profile.get("max_correlation") if correlation_profile else None
+        return payload
 
     def _frontend_recommendation(candidate: dict[str, Any]) -> dict[str, Any]:
         recommendation = dict(candidate)

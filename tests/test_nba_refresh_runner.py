@@ -1354,6 +1354,15 @@ class NbaRefreshRunnerTests(unittest.TestCase):
             with patch.object(module, "_source_app_fallback_enabled", return_value=False), patch(
                 "syndicate.features.nba.cards.build_live_player_boxscore_payload",
                 return_value={"games": [{"event_id": "401859964", "players": []}]},
+            ), patch(
+                # nba.sources no longer honors SYNDICATE_NBA_ARTIFACT_ROOT, so the
+                # bundle must be seamed in via the sources root resolvers or the
+                # repo-local mirror leaks into the built payloads
+                "syndicate.features.nba.sources._artifact_roots",
+                return_value=[tmp_root / "bundle"],
+            ), patch(
+                "syndicate.features.nba.sources.artifact_processed_root",
+                return_value=processed_root,
             ):
                 copied = module._export_live_snapshot_artifacts(
                     source_root=source_root,
@@ -1519,7 +1528,12 @@ class NbaRefreshRunnerTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")):
+            with patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")), patch(
+                # manifest/day paths resolve through nba.sources roots, not
+                # SYNDICATE_NBA_ARTIFACT_ROOT, so point them at the source bundle
+                "syndicate.features.nba.sources._artifact_roots",
+                return_value=[source_root],
+            ):
                 copied = module._export_season_betting_card_artifacts(
                     source_root=source_root,
                     date_str=date_str,

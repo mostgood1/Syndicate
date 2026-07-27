@@ -149,7 +149,9 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         self.assertTrue(summary["ok"])
         self.assertEqual(len(summary["results"]), 1)
         sport_result = summary["results"][0]
-        self.assertEqual(sport_result["sport_manifest"], manifest_payload)
+        # Result-retention compaction keeps only the manifest path plus an
+        # artifact count in the summary, not the full publish payload.
+        self.assertEqual(sport_result["sport_manifest"], {"path": "reports/manifests/wnba.json", "artifact_count": 0})
         mocked_publish.assert_called_once()
         _, kwargs = mocked_publish.call_args
         self.assertEqual(kwargs["sport"], "wnba")
@@ -208,9 +210,12 @@ class RefreshOddsSourcesTests(unittest.TestCase):
 
         sport_result = summary["results"][0]
         self.assertIn(artifact_path, sport_result["artifact_paths"])
-        self.assertEqual(sport_result["refresh_steps"][0]["stdout"], "")
-        self.assertEqual(sport_result["refresh_steps"][0]["stderr"], "")
-        self.assertEqual(sport_result["refresh_steps"][0]["row_counts"], None)
+        # Compaction now rebuilds each step as a compact view that omits the
+        # bulky keys entirely (stdout/stderr/empty row_counts) rather than
+        # blanking them in place.
+        self.assertNotIn("stdout", sport_result["refresh_steps"][0])
+        self.assertNotIn("stderr", sport_result["refresh_steps"][0])
+        self.assertNotIn("row_counts", sport_result["refresh_steps"][0])
 
     def test_build_summary_emits_publish_parity_on_success(self) -> None:
         module = self._load_module()
@@ -247,7 +252,12 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         self.assertEqual(summary["publish_parity"]["totalForcedPublishPaths"], 3)
         mocked_publish_parity.assert_called_once()
 
-    def test_build_summary_includes_structured_runtime_memory_snapshot(self) -> None:
+    def test_build_summary_omits_runtime_memory_snapshot(self) -> None:
+        # The structured summary["runtime"] block (and the
+        # get_all_process_memory_snapshot import feeding it) was removed:
+        # runtime memory observability now flows through the
+        # log_all_process_memory/log_runtime_memory log lines instead of the
+        # persisted summary payload.
         module = self._load_module()
         args = argparse.Namespace(
             date="2026-06-07",
@@ -267,25 +277,7 @@ class RefreshOddsSourcesTests(unittest.TestCase):
             list=False,
         )
 
-        phase_calls = {"count": 0}
-
-        def fake_phase_snapshot() -> dict[str, object]:
-            phase_calls["count"] += 1
-            return {"rss_bytes": 1000 if phase_calls["count"] == 1 else 1600}
-
-        final_process_memory = {
-            "process_count": 2,
-            "accounted_rss_mb": 48.125,
-            "container_memory_mb": 64.0,
-            "unexplained_memory_mb": 15.875,
-            "processes": [],
-        }
-
-        with patch.object(module, "_phase_memory_snapshot", side_effect=fake_phase_snapshot), patch.object(
-            module,
-            "get_all_process_memory_snapshot",
-            return_value=final_process_memory,
-        ), patch.object(module, "_log_memory", return_value=None), patch.object(module, "log_all_process_memory", return_value={}), patch.object(
+        with patch.object(module, "_log_memory", return_value=None), patch.object(module, "log_all_process_memory", return_value={}), patch.object(
             module,
             "log_runtime_memory",
             return_value=None,
@@ -300,15 +292,15 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         ):
             summary = module._build_summary(args)
 
-        runtime = summary["runtime"]
-        self.assertEqual(runtime["rss_bytes"], 1600)
-        self.assertEqual(runtime["rss_delta_bytes"], 600)
-        self.assertEqual(runtime["rss_growth_ratio"], 1.6)
-        self.assertEqual(runtime["container_memory_mb"], 64.0)
-        self.assertEqual(runtime["accounted_rss_mb"], 48.125)
-        self.assertEqual(runtime["unexplained_memory_mb"], 15.875)
+        self.assertTrue(summary["ok"])
+        self.assertNotIn("runtime", summary)
+        self.assertFalse(hasattr(module, "get_all_process_memory_snapshot"))
 
-    def test_build_summary_routes_progress_logs_to_stderr(self) -> None:
+    def test_build_summary_routes_progress_logs_to_stdout(self) -> None:
+        # Progress lines like serial_gate deliberately go to stdout (no
+        # file= kwarg): stderr is reserved for the STEP_* status lines that
+        # get persisted as the failure record, and stdout is what Render's
+        # log collector reliably captures.
         module = self._load_module()
         args = argparse.Namespace(
             date="2026-06-07",
@@ -346,7 +338,7 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         self.assertTrue(summary["ok"])
         serial_gate_calls = [call for call in mocked_print.call_args_list if "[refresh_odds_sources] serial_gate" in str(call.args[0])]
         self.assertEqual(len(serial_gate_calls), 1)
-        self.assertEqual(serial_gate_calls[0].kwargs.get("file"), module.sys.stderr)
+        self.assertIsNone(serial_gate_calls[0].kwargs.get("file"))
 
     def test_sport_control_plane_metadata_uses_same_refresh_contract_for_mlb_and_wnba(self) -> None:
         module = self._load_module()

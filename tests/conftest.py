@@ -83,6 +83,46 @@ def _clear_wall_clock_ttl_caches() -> None:
 
 
 @pytest.fixture(autouse=True)
+def _no_background_loops_in_tests():
+    # create_app wires _start_background_loops onto the app's first request
+    # for non-Render runs, so ANY test that touches a test client spawns the
+    # intelligence-state background loop thread. That thread contends the
+    # process-wide intelligence execution guard: whichever request loses the
+    # race is silently served get_latest_intelligence_cached_response's
+    # snapshot instead of a fresh pipeline run, so dozens of
+    # test_intelligence assertions pass solo and fail in a full run,
+    # depending on where the loop happened to be. The loop also persists
+    # state, bleeding one test's snapshots into the next.
+    #
+    # Tests that assert the loops DO start patch these same seams themselves;
+    # a with-patch inside a test rebinds over this fixture's patch for its
+    # scope, so those assertions still see their own mocks.
+    from unittest.mock import patch as _patch
+
+    import syndicate.app as app_module
+
+    with _patch.object(app_module, "start_intelligence_state_background_loop", return_value=True), _patch.object(
+        app_module, "start_live_refresh_background_loop", return_value=None
+    ):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def _reset_intelligence_state_snapshots():
+    # _INTELLIGENCE_STATE_SERVICE is a module singleton whose snapshot cache
+    # outlives any single test in the same process. A snapshot computed under
+    # one test's patches is a perfectly valid cache hit for the next test's
+    # identical payload (same question/date literals), so later tests read
+    # the earlier test's fixture data. Start each test cold.
+    from pipeline.intelligence_state import _INTELLIGENCE_STATE_SERVICE as _service
+
+    with _service._condition:
+        _service._snapshots.clear()
+        _service._latest_key = None
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _isolate_intelligence_pipeline_busy_signal():
     # _mlb_daily_sim_decision now defers while the intelligence board build is
     # computing (#55), which it detects by reading the live service's

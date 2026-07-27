@@ -26,15 +26,17 @@ class NbaLiveLensRouteTests(unittest.TestCase):
             page_context = nba_live_lens.read_latest_live_lens_page_context("2026-06-05", season=2026, profile="retuned")
             api_payload = nba_live_lens.read_latest_live_lens_api_payload("2026-06-05")
 
-        expected = {
-            "games": [],
-            "cards": [],
-            "date": "2026-06-05",
-            "status": "empty",
-        }
-
-        self.assertEqual(page_context, expected)
-        self.assertEqual(api_payload, expected)
+        # On failure the readers fall back to the full empty rank-board contract
+        # (dd75f74e), not a minimal {games, cards, date, status} stub, so the
+        # route can still render the board shell.
+        self.assertEqual(page_context.get("date"), "2026-06-05")
+        self.assertEqual(page_context.get("rank_cards"), [])
+        self.assertEqual(page_context.get("games"), [])
+        self.assertEqual(page_context.get("route_path"), "/nba/season/2026/live-lens")
+        self.assertIn("live_lens_contract", page_context)
+        self.assertEqual(api_payload.get("date"), "2026-06-05")
+        self.assertEqual(api_payload.get("rank_cards"), [])
+        self.assertEqual(api_payload.get("route_path"), "/nba/live-lens")
         self.assertGreaterEqual(mocked_print.call_count, 2)
         self.assertTrue(
             any(
@@ -76,7 +78,7 @@ class NbaLiveLensRouteTests(unittest.TestCase):
         self.assertEqual(page_response.get_data(as_text=True), "PAGE")
         self.assertEqual(api_response.status_code, 200)
         self.assertEqual(api_response.get_json(), api_payload)
-        mocked_page.assert_called_once_with("2026-06-05")
+        mocked_page.assert_called_once_with("2026-06-05", embed_mode=None)
         mocked_render.assert_called_once()
         mocked_api.assert_called_once_with("2026-06-05")
 
@@ -100,7 +102,7 @@ class NbaLiveLensRouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_data(as_text=True), "SEASON_PAGE")
-        mocked_page.assert_called_once_with("2025-06-05", season=2025, profile="retuned")
+        mocked_page.assert_called_once_with("2025-06-05", season=2025, profile="retuned", embed_mode=None)
 
     def test_nba_live_player_lines_pbp_routes_read_snapshot_payloads(self) -> None:
         app = create_app()

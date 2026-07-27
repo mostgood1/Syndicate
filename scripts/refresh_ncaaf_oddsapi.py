@@ -172,30 +172,23 @@ def _copy_tree_with_fallback(source: Path, destination: Path) -> None:
 
 def _base_norm(name: str) -> str:
     try:
-        if source.resolve() == destination.resolve():
-            return True
-    except Exception:
-        pass
-    try:
         text = str(name or "")
     except Exception:
         return ""
-
-
-def _resolve_data_root(*, source_root: Path | None, artifact_root: Path) -> Path:
-    if source_root is not None:
-        return source_root.resolve()
-    if (artifact_root / PRED_FILES_GLOB.replace("*", "")).exists():
-        return artifact_root.resolve()
-    pattern_matches = list(artifact_root.glob(PRED_FILES_GLOB))
-    if pattern_matches:
-        return artifact_root.resolve()
-    raise FileNotFoundError("NCAAF runner needs --source-root or an --artifact-root containing the predicted schedule CSV.")
     text = text.strip().lower().replace("&", " and ")
     text = text.replace("ʻ", "'").replace("’", "'")
     text = re.sub(r"[^a-z0-9 '\-]", " ", text)
     text = text.replace("hawai'i", "hawaii")
     return _SPACE_RE.sub(" ", text).strip()
+
+
+def _resolve_data_root(*, source_root: Path | None, artifact_root: Path) -> Path:
+    if source_root is not None:
+        return source_root.resolve()
+    pattern_matches = list(artifact_root.glob(PRED_FILES_GLOB))
+    if pattern_matches:
+        return artifact_root.resolve()
+    raise FileNotFoundError("NCAAF runner needs --source-root or an --artifact-root containing the predicted schedule CSV.")
 
 
 def _norm_team(name: str) -> str:
@@ -261,8 +254,11 @@ def _parse_utc_datetime(value: object) -> datetime | None:
 
 
 def _prediction_files(source_root: Path) -> list[Path]:
-    data_root = source_root / "data"
-    return sorted(data_root.glob(PRED_FILES_GLOB), key=lambda path: path.stat().st_mtime, reverse=True)
+    for data_root in (source_root / "data", source_root):
+        matches = sorted(data_root.glob(PRED_FILES_GLOB), key=lambda path: path.stat().st_mtime, reverse=True)
+        if matches:
+            return matches
+    return []
 
 
 def _prediction_context(source_root: Path) -> dict[str, Any]:
@@ -293,7 +289,7 @@ def _prediction_context(source_root: Path) -> dict[str, Any]:
             "season": int(seasons[0]),
             "latest_game_dt": latest_game_dt,
         }
-    raise FileNotFoundError(f"No predictions files found under {source_root / 'data'}")
+    raise FileNotFoundError(f"No predictions files found under {source_root / 'data'} or {source_root}")
 
 
 def _lines_file_name(season: int) -> str:

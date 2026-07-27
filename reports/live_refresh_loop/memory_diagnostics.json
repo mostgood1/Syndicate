@@ -1,0 +1,2171 @@
+{
+  "records": [
+    {
+      "stage": "pre_source_state_fingerprint",
+      "wall_clock": 1785134506.3105006,
+      "pid": 10812,
+      "process_count": 2,
+      "accounted_rss_mb": 149.82,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 10812,
+          "ppid": 28468,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_artifact_publisher.py",
+            "-q",
+            "--tb=no",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 149.82
+        },
+        {
+          "pid": 28468,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "pre_source_state_fingerprint",
+      "wall_clock": 1785134518.178979,
+      "pid": 9184,
+      "process_count": 2,
+      "accounted_rss_mb": 144.957,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 9184,
+          "ppid": 32284,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_daily_update_smoke.py",
+            "-q",
+            "--tb=no",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 144.957
+        },
+        {
+          "pid": 32284,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "pre_source_state_fingerprint",
+      "wall_clock": 1785134522.237435,
+      "pid": 14368,
+      "process_count": 2,
+      "accounted_rss_mb": 149.434,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 14368,
+          "ppid": 39332,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "-q",
+            "--tb=long",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 149.434
+        },
+        {
+          "pid": 39332,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "pre_source_state_fingerprint",
+      "wall_clock": 1785134522.7077863,
+      "pid": 21760,
+      "process_count": 2,
+      "accounted_rss_mb": 148.801,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 21760,
+          "ppid": 6060,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_home.py",
+            "-q",
+            "--tb=no",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 148.801
+        },
+        {
+          "pid": 6060,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "build_candidate_pool_start",
+      "wall_clock": 1785134533.0284119,
+      "pid": 14368,
+      "process_count": 2,
+      "accounted_rss_mb": 181.188,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 14368,
+          "ppid": 39332,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "-q",
+            "--tb=long",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 181.188
+        },
+        {
+          "pid": 39332,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_pull_hot_artifacts",
+      "wall_clock": 1785134533.096353,
+      "pid": 14368,
+      "process_count": 2,
+      "accounted_rss_mb": 180.43,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 14368,
+          "ppid": 39332,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "-q",
+            "--tb=long",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 180.43
+        },
+        {
+          "pid": 39332,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_build_overview",
+      "wall_clock": 1785134544.559427,
+      "pid": 14368,
+      "process_count": 2,
+      "accounted_rss_mb": 186.832,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 14368,
+          "ppid": 39332,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "-q",
+            "--tb=long",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 186.832
+        },
+        {
+          "pid": 39332,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_collect_candidates_with_fallback_merge",
+      "wall_clock": 1785134587.1498368,
+      "pid": 14368,
+      "process_count": 2,
+      "accounted_rss_mb": 489.91,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 14368,
+          "ppid": 39332,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "-q",
+            "--tb=long",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 489.91
+        },
+        {
+          "pid": 39332,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_candidate_building",
+      "wall_clock": 1785134587.2207859,
+      "pid": 14368,
+      "process_count": 2,
+      "accounted_rss_mb": 461.879,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 14368,
+          "ppid": 39332,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "-q",
+            "--tb=long",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 461.879
+        },
+        {
+          "pid": 39332,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_pool_assembled",
+      "wall_clock": 1785134590.813945,
+      "pid": 14368,
+      "process_count": 2,
+      "accounted_rss_mb": 464.715,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 14368,
+          "ppid": 39332,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "-q",
+            "--tb=long",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 464.715
+        },
+        {
+          "pid": 39332,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "pre_source_state_fingerprint",
+      "wall_clock": 1785136090.9406476,
+      "pid": 27728,
+      "process_count": 2,
+      "accounted_rss_mb": 146.582,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 27728,
+          "ppid": 12452,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_mounts_hydrated_sport_stack_container",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_date_query",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_existing_embed_nodes",
+            "tests/test_archives.py::HomeBoardTests::test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "-q"
+          ],
+          "rss_mb": 146.582
+        },
+        {
+          "pid": 12452,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "build_candidate_pool_start",
+      "wall_clock": 1785136104.978779,
+      "pid": 27728,
+      "process_count": 2,
+      "accounted_rss_mb": 228.023,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 27728,
+          "ppid": 12452,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_mounts_hydrated_sport_stack_container",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_date_query",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_existing_embed_nodes",
+            "tests/test_archives.py::HomeBoardTests::test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "-q"
+          ],
+          "rss_mb": 228.023
+        },
+        {
+          "pid": 12452,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_pull_hot_artifacts",
+      "wall_clock": 1785136105.0465102,
+      "pid": 27728,
+      "process_count": 2,
+      "accounted_rss_mb": 228.266,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 27728,
+          "ppid": 12452,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_mounts_hydrated_sport_stack_container",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_date_query",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_existing_embed_nodes",
+            "tests/test_archives.py::HomeBoardTests::test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "-q"
+          ],
+          "rss_mb": 228.266
+        },
+        {
+          "pid": 12452,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_build_overview",
+      "wall_clock": 1785136116.0591543,
+      "pid": 27728,
+      "process_count": 2,
+      "accounted_rss_mb": 234.711,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 27728,
+          "ppid": 12452,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_mounts_hydrated_sport_stack_container",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_date_query",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_existing_embed_nodes",
+            "tests/test_archives.py::HomeBoardTests::test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "-q"
+          ],
+          "rss_mb": 234.711
+        },
+        {
+          "pid": 12452,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_collect_candidates_with_fallback_merge",
+      "wall_clock": 1785136153.4344234,
+      "pid": 27728,
+      "process_count": 2,
+      "accounted_rss_mb": 295.652,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 27728,
+          "ppid": 12452,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_mounts_hydrated_sport_stack_container",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_date_query",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_existing_embed_nodes",
+            "tests/test_archives.py::HomeBoardTests::test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "-q"
+          ],
+          "rss_mb": 295.652
+        },
+        {
+          "pid": 12452,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_candidate_building",
+      "wall_clock": 1785136153.5115838,
+      "pid": 27728,
+      "process_count": 2,
+      "accounted_rss_mb": 250.078,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 27728,
+          "ppid": 12452,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_mounts_hydrated_sport_stack_container",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_date_query",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_existing_embed_nodes",
+            "tests/test_archives.py::HomeBoardTests::test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "-q"
+          ],
+          "rss_mb": 250.078
+        },
+        {
+          "pid": 12452,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_pool_assembled",
+      "wall_clock": 1785136157.2289753,
+      "pid": 27728,
+      "process_count": 2,
+      "accounted_rss_mb": 253.586,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 27728,
+          "ppid": 12452,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_mounts_hydrated_sport_stack_container",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_date_query",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_existing_embed_nodes",
+            "tests/test_archives.py::HomeBoardTests::test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "-q"
+          ],
+          "rss_mb": 253.586
+        },
+        {
+          "pid": 12452,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "pre_source_state_fingerprint",
+      "wall_clock": 1785136174.4642558,
+      "pid": 3756,
+      "process_count": 2,
+      "accounted_rss_mb": 145.812,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 3756,
+          "ppid": 25920,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_mounts_hydrated_sport_stack_container",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_date_query",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_existing_embed_nodes",
+            "tests/test_archives.py::HomeBoardTests::test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "-q",
+            "--tb=line",
+            "--no-header",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 145.812
+        },
+        {
+          "pid": 25920,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "build_candidate_pool_start",
+      "wall_clock": 1785136187.801827,
+      "pid": 3756,
+      "process_count": 2,
+      "accounted_rss_mb": 223.266,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 3756,
+          "ppid": 25920,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_mounts_hydrated_sport_stack_container",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_date_query",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_existing_embed_nodes",
+            "tests/test_archives.py::HomeBoardTests::test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "-q",
+            "--tb=line",
+            "--no-header",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 223.266
+        },
+        {
+          "pid": 25920,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_pull_hot_artifacts",
+      "wall_clock": 1785136187.8750048,
+      "pid": 3756,
+      "process_count": 2,
+      "accounted_rss_mb": 223.586,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 3756,
+          "ppid": 25920,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_mounts_hydrated_sport_stack_container",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_date_query",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_existing_embed_nodes",
+            "tests/test_archives.py::HomeBoardTests::test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "-q",
+            "--tb=line",
+            "--no-header",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 223.586
+        },
+        {
+          "pid": 25920,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_build_overview",
+      "wall_clock": 1785136198.889431,
+      "pid": 3756,
+      "process_count": 2,
+      "accounted_rss_mb": 231.184,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 3756,
+          "ppid": 25920,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_mounts_hydrated_sport_stack_container",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_date_query",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_existing_embed_nodes",
+            "tests/test_archives.py::HomeBoardTests::test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "-q",
+            "--tb=line",
+            "--no-header",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 231.184
+        },
+        {
+          "pid": 25920,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_collect_candidates_with_fallback_merge",
+      "wall_clock": 1785136236.617936,
+      "pid": 3756,
+      "process_count": 2,
+      "accounted_rss_mb": 469.289,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 3756,
+          "ppid": 25920,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_mounts_hydrated_sport_stack_container",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_date_query",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_existing_embed_nodes",
+            "tests/test_archives.py::HomeBoardTests::test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "-q",
+            "--tb=line",
+            "--no-header",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 469.289
+        },
+        {
+          "pid": 25920,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_candidate_building",
+      "wall_clock": 1785136236.690969,
+      "pid": 3756,
+      "process_count": 2,
+      "accounted_rss_mb": 433.66,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 3756,
+          "ppid": 25920,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_mounts_hydrated_sport_stack_container",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_date_query",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_existing_embed_nodes",
+            "tests/test_archives.py::HomeBoardTests::test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "-q",
+            "--tb=line",
+            "--no-header",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 433.66
+        },
+        {
+          "pid": 25920,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_pool_assembled",
+      "wall_clock": 1785136240.3050716,
+      "pid": 3756,
+      "process_count": 2,
+      "accounted_rss_mb": 438.555,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 3756,
+          "ppid": 25920,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_mounts_hydrated_sport_stack_container",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_date_query",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_existing_embed_nodes",
+            "tests/test_archives.py::HomeBoardTests::test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "-q",
+            "--tb=line",
+            "--no-header",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 438.555
+        },
+        {
+          "pid": 25920,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "pre_source_state_fingerprint",
+      "wall_clock": 1785136251.3409984,
+      "pid": 41412,
+      "process_count": 2,
+      "accounted_rss_mb": 130.828,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 41412,
+          "ppid": 8840,
+          "name": "-",
+          "cmdline": [
+            "-"
+          ],
+          "rss_mb": 130.828
+        },
+        {
+          "pid": 8840,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "pre_source_state_fingerprint",
+      "wall_clock": 1785136401.969142,
+      "pid": 19472,
+      "process_count": 2,
+      "accounted_rss_mb": 150.496,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 19472,
+          "ppid": 39476,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_basketball_props_predictions.py::BasketballPropsPredictionsTests::test_smart_sim_helper_does_not_import_source_cli",
+            "tests/test_basketball_props_predictions.py::BasketballPropsPredictionsTests::test_smart_sim_worker_uses_local_small_helpers",
+            "tests/test_daily_update_smoke.py::DailyUpdateSmokeTests::test_home_dashboard_payload_exposes_live_lens_link",
+            "-q"
+          ],
+          "rss_mb": 150.496
+        },
+        {
+          "pid": 39476,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "build_candidate_pool_start",
+      "wall_clock": 1785136414.1123207,
+      "pid": 19472,
+      "process_count": 2,
+      "accounted_rss_mb": 183.609,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 19472,
+          "ppid": 39476,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_basketball_props_predictions.py::BasketballPropsPredictionsTests::test_smart_sim_helper_does_not_import_source_cli",
+            "tests/test_basketball_props_predictions.py::BasketballPropsPredictionsTests::test_smart_sim_worker_uses_local_small_helpers",
+            "tests/test_daily_update_smoke.py::DailyUpdateSmokeTests::test_home_dashboard_payload_exposes_live_lens_link",
+            "-q"
+          ],
+          "rss_mb": 183.609
+        },
+        {
+          "pid": 39476,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_pull_hot_artifacts",
+      "wall_clock": 1785136414.1803935,
+      "pid": 19472,
+      "process_count": 2,
+      "accounted_rss_mb": 184.102,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 19472,
+          "ppid": 39476,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_basketball_props_predictions.py::BasketballPropsPredictionsTests::test_smart_sim_helper_does_not_import_source_cli",
+            "tests/test_basketball_props_predictions.py::BasketballPropsPredictionsTests::test_smart_sim_worker_uses_local_small_helpers",
+            "tests/test_daily_update_smoke.py::DailyUpdateSmokeTests::test_home_dashboard_payload_exposes_live_lens_link",
+            "-q"
+          ],
+          "rss_mb": 184.102
+        },
+        {
+          "pid": 39476,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "pre_source_state_fingerprint",
+      "wall_clock": 1785136429.0434642,
+      "pid": 24704,
+      "process_count": 2,
+      "accounted_rss_mb": 150.336,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 24704,
+          "ppid": 23116,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_artifact_publisher.py",
+            "-q"
+          ],
+          "rss_mb": 150.336
+        },
+        {
+          "pid": 23116,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "pre_source_state_fingerprint",
+      "wall_clock": 1785136436.5052977,
+      "pid": 26664,
+      "process_count": 2,
+      "accounted_rss_mb": 148.52,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 26664,
+          "ppid": 33876,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_daily_update_smoke.py",
+            "-q"
+          ],
+          "rss_mb": 148.52
+        },
+        {
+          "pid": 33876,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "pre_source_state_fingerprint",
+      "wall_clock": 1785136440.0266967,
+      "pid": 19972,
+      "process_count": 2,
+      "accounted_rss_mb": 134.234,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 19972,
+          "ppid": 5284,
+          "name": "-",
+          "cmdline": [
+            "-"
+          ],
+          "rss_mb": 134.234
+        },
+        {
+          "pid": 5284,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "pre_source_state_fingerprint",
+      "wall_clock": 1785136583.9012313,
+      "pid": 21988,
+      "process_count": 2,
+      "accounted_rss_mb": 147.246,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 21988,
+          "ppid": 22944,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_renders_curated_betting_board",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_date_query",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_background_poll_uses_shared_polling_policy",
+            "tests/test_archives.py::HomeBoardTests::test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "-q",
+            "--tb=line"
+          ],
+          "rss_mb": 147.246
+        },
+        {
+          "pid": 22944,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "build_candidate_pool_start",
+      "wall_clock": 1785136597.7220793,
+      "pid": 21988,
+      "process_count": 2,
+      "accounted_rss_mb": 227.02,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 21988,
+          "ppid": 22944,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_renders_curated_betting_board",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_date_query",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_background_poll_uses_shared_polling_policy",
+            "tests/test_archives.py::HomeBoardTests::test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "-q",
+            "--tb=line"
+          ],
+          "rss_mb": 227.02
+        },
+        {
+          "pid": 22944,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_pull_hot_artifacts",
+      "wall_clock": 1785136597.7894533,
+      "pid": 21988,
+      "process_count": 2,
+      "accounted_rss_mb": 227.465,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 21988,
+          "ppid": 22944,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_renders_curated_betting_board",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_date_query",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_background_poll_uses_shared_polling_policy",
+            "tests/test_archives.py::HomeBoardTests::test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "-q",
+            "--tb=line"
+          ],
+          "rss_mb": 227.465
+        },
+        {
+          "pid": 22944,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_build_overview",
+      "wall_clock": 1785136606.8231242,
+      "pid": 21988,
+      "process_count": 2,
+      "accounted_rss_mb": 227.082,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 21988,
+          "ppid": 22944,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_renders_curated_betting_board",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_date_query",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_background_poll_uses_shared_polling_policy",
+            "tests/test_archives.py::HomeBoardTests::test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "-q",
+            "--tb=line"
+          ],
+          "rss_mb": 227.082
+        },
+        {
+          "pid": 22944,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_collect_candidates_with_fallback_merge",
+      "wall_clock": 1785136645.5493705,
+      "pid": 21988,
+      "process_count": 2,
+      "accounted_rss_mb": 491.59,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 21988,
+          "ppid": 22944,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_renders_curated_betting_board",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_date_query",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_background_poll_uses_shared_polling_policy",
+            "tests/test_archives.py::HomeBoardTests::test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "-q",
+            "--tb=line"
+          ],
+          "rss_mb": 491.59
+        },
+        {
+          "pid": 22944,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_candidate_building",
+      "wall_clock": 1785136645.6207228,
+      "pid": 21988,
+      "process_count": 2,
+      "accounted_rss_mb": 464.578,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 21988,
+          "ppid": 22944,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_renders_curated_betting_board",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_date_query",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_background_poll_uses_shared_polling_policy",
+            "tests/test_archives.py::HomeBoardTests::test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "-q",
+            "--tb=line"
+          ],
+          "rss_mb": 464.578
+        },
+        {
+          "pid": 22944,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_pool_assembled",
+      "wall_clock": 1785136649.184602,
+      "pid": 21988,
+      "process_count": 2,
+      "accounted_rss_mb": 469.305,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 21988,
+          "ppid": 22944,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_renders_curated_betting_board",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_poll_preserves_date_query",
+            "tests/test_archives.py::HomeBoardTests::test_home_page_background_poll_uses_shared_polling_policy",
+            "tests/test_archives.py::HomeBoardTests::test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests/test_archives.py::ArchiveRouteTests::test_archive_launch_links_and_tracker_copy",
+            "tests/test_archives.py::ArchiveRouteTests::test_wnba_cards_api_without_date_uses_today",
+            "-q",
+            "--tb=line"
+          ],
+          "rss_mb": 469.305
+        },
+        {
+          "pid": 22944,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "pre_source_state_fingerprint",
+      "wall_clock": 1785136671.7689502,
+      "pid": 25080,
+      "process_count": 2,
+      "accounted_rss_mb": 161.551,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 25080,
+          "ppid": 31660,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests",
+            "tests/test_archives.py::ArchiveRouteTests",
+            "-q",
+            "--tb=line"
+          ],
+          "rss_mb": 161.551
+        },
+        {
+          "pid": 31660,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "build_candidate_pool_start",
+      "wall_clock": 1785136699.1023796,
+      "pid": 25080,
+      "process_count": 2,
+      "accounted_rss_mb": 246.145,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 25080,
+          "ppid": 31660,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests",
+            "tests/test_archives.py::ArchiveRouteTests",
+            "-q",
+            "--tb=line"
+          ],
+          "rss_mb": 246.145
+        },
+        {
+          "pid": 31660,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_pull_hot_artifacts",
+      "wall_clock": 1785136699.1595623,
+      "pid": 25080,
+      "process_count": 2,
+      "accounted_rss_mb": 246.645,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 25080,
+          "ppid": 31660,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests",
+            "tests/test_archives.py::ArchiveRouteTests",
+            "-q",
+            "--tb=line"
+          ],
+          "rss_mb": 246.645
+        },
+        {
+          "pid": 31660,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_build_overview",
+      "wall_clock": 1785136708.634416,
+      "pid": 25080,
+      "process_count": 2,
+      "accounted_rss_mb": 253.645,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 25080,
+          "ppid": 31660,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests",
+            "tests/test_archives.py::ArchiveRouteTests",
+            "-q",
+            "--tb=line"
+          ],
+          "rss_mb": 253.645
+        },
+        {
+          "pid": 31660,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_collect_candidates_with_fallback_merge",
+      "wall_clock": 1785136748.408337,
+      "pid": 25080,
+      "process_count": 2,
+      "accounted_rss_mb": 444.812,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 25080,
+          "ppid": 31660,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests",
+            "tests/test_archives.py::ArchiveRouteTests",
+            "-q",
+            "--tb=line"
+          ],
+          "rss_mb": 444.812
+        },
+        {
+          "pid": 31660,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_candidate_building",
+      "wall_clock": 1785136748.4735432,
+      "pid": 25080,
+      "process_count": 2,
+      "accounted_rss_mb": 427.957,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 25080,
+          "ppid": 31660,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests",
+            "tests/test_archives.py::ArchiveRouteTests",
+            "-q",
+            "--tb=line"
+          ],
+          "rss_mb": 427.957
+        },
+        {
+          "pid": 31660,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_pool_assembled",
+      "wall_clock": 1785136754.496494,
+      "pid": 25080,
+      "process_count": 2,
+      "accounted_rss_mb": 440.195,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 25080,
+          "ppid": 31660,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_archives.py::HomeBoardTests",
+            "tests/test_archives.py::ArchiveRouteTests",
+            "-q",
+            "--tb=line"
+          ],
+          "rss_mb": 440.195
+        },
+        {
+          "pid": 31660,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "pre_source_state_fingerprint",
+      "wall_clock": 1785136787.1687968,
+      "pid": 31536,
+      "process_count": 2,
+      "accounted_rss_mb": 137.93,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 31536,
+          "ppid": 38324,
+          "name": "python.exe -m unittest",
+          "cmdline": [
+            "python.exe -m unittest",
+            "tests.test_archives.HomeBoardTests.test_home_page_renders_curated_betting_board",
+            "tests.test_archives.HomeBoardTests.test_home_page_poll_preserves_date_query",
+            "tests.test_archives.HomeBoardTests.test_home_page_background_poll_uses_shared_polling_policy",
+            "tests.test_archives.HomeBoardTests.test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests.test_archives.ArchiveRouteTests.test_archive_launch_links_and_tracker_copy",
+            "tests.test_archives.ArchiveRouteTests.test_wnba_cards_api_without_date_uses_today"
+          ],
+          "rss_mb": 137.93
+        },
+        {
+          "pid": 38324,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "build_candidate_pool_start",
+      "wall_clock": 1785136801.0858755,
+      "pid": 31536,
+      "process_count": 2,
+      "accounted_rss_mb": 219.266,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 31536,
+          "ppid": 38324,
+          "name": "python.exe -m unittest",
+          "cmdline": [
+            "python.exe -m unittest",
+            "tests.test_archives.HomeBoardTests.test_home_page_renders_curated_betting_board",
+            "tests.test_archives.HomeBoardTests.test_home_page_poll_preserves_date_query",
+            "tests.test_archives.HomeBoardTests.test_home_page_background_poll_uses_shared_polling_policy",
+            "tests.test_archives.HomeBoardTests.test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests.test_archives.ArchiveRouteTests.test_archive_launch_links_and_tracker_copy",
+            "tests.test_archives.ArchiveRouteTests.test_wnba_cards_api_without_date_uses_today"
+          ],
+          "rss_mb": 219.266
+        },
+        {
+          "pid": 38324,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_pull_hot_artifacts",
+      "wall_clock": 1785136801.1451454,
+      "pid": 31536,
+      "process_count": 2,
+      "accounted_rss_mb": 218.684,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 31536,
+          "ppid": 38324,
+          "name": "python.exe -m unittest",
+          "cmdline": [
+            "python.exe -m unittest",
+            "tests.test_archives.HomeBoardTests.test_home_page_renders_curated_betting_board",
+            "tests.test_archives.HomeBoardTests.test_home_page_poll_preserves_date_query",
+            "tests.test_archives.HomeBoardTests.test_home_page_background_poll_uses_shared_polling_policy",
+            "tests.test_archives.HomeBoardTests.test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests.test_archives.ArchiveRouteTests.test_archive_launch_links_and_tracker_copy",
+            "tests.test_archives.ArchiveRouteTests.test_wnba_cards_api_without_date_uses_today"
+          ],
+          "rss_mb": 218.684
+        },
+        {
+          "pid": 38324,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_build_overview",
+      "wall_clock": 1785136810.0015602,
+      "pid": 31536,
+      "process_count": 2,
+      "accounted_rss_mb": 218.941,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 31536,
+          "ppid": 38324,
+          "name": "python.exe -m unittest",
+          "cmdline": [
+            "python.exe -m unittest",
+            "tests.test_archives.HomeBoardTests.test_home_page_renders_curated_betting_board",
+            "tests.test_archives.HomeBoardTests.test_home_page_poll_preserves_date_query",
+            "tests.test_archives.HomeBoardTests.test_home_page_background_poll_uses_shared_polling_policy",
+            "tests.test_archives.HomeBoardTests.test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests.test_archives.ArchiveRouteTests.test_archive_launch_links_and_tracker_copy",
+            "tests.test_archives.ArchiveRouteTests.test_wnba_cards_api_without_date_uses_today"
+          ],
+          "rss_mb": 218.941
+        },
+        {
+          "pid": 38324,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_collect_candidates_with_fallback_merge",
+      "wall_clock": 1785136851.9170065,
+      "pid": 31536,
+      "process_count": 2,
+      "accounted_rss_mb": 498.945,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 31536,
+          "ppid": 38324,
+          "name": "python.exe -m unittest",
+          "cmdline": [
+            "python.exe -m unittest",
+            "tests.test_archives.HomeBoardTests.test_home_page_renders_curated_betting_board",
+            "tests.test_archives.HomeBoardTests.test_home_page_poll_preserves_date_query",
+            "tests.test_archives.HomeBoardTests.test_home_page_background_poll_uses_shared_polling_policy",
+            "tests.test_archives.HomeBoardTests.test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests.test_archives.ArchiveRouteTests.test_archive_launch_links_and_tracker_copy",
+            "tests.test_archives.ArchiveRouteTests.test_wnba_cards_api_without_date_uses_today"
+          ],
+          "rss_mb": 498.945
+        },
+        {
+          "pid": 38324,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_candidate_building",
+      "wall_clock": 1785136851.9703395,
+      "pid": 31536,
+      "process_count": 2,
+      "accounted_rss_mb": 478.527,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 31536,
+          "ppid": 38324,
+          "name": "python.exe -m unittest",
+          "cmdline": [
+            "python.exe -m unittest",
+            "tests.test_archives.HomeBoardTests.test_home_page_renders_curated_betting_board",
+            "tests.test_archives.HomeBoardTests.test_home_page_poll_preserves_date_query",
+            "tests.test_archives.HomeBoardTests.test_home_page_background_poll_uses_shared_polling_policy",
+            "tests.test_archives.HomeBoardTests.test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests.test_archives.ArchiveRouteTests.test_archive_launch_links_and_tracker_copy",
+            "tests.test_archives.ArchiveRouteTests.test_wnba_cards_api_without_date_uses_today"
+          ],
+          "rss_mb": 478.527
+        },
+        {
+          "pid": 38324,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_pool_assembled",
+      "wall_clock": 1785136855.509995,
+      "pid": 31536,
+      "process_count": 2,
+      "accounted_rss_mb": 483.441,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 31536,
+          "ppid": 38324,
+          "name": "python.exe -m unittest",
+          "cmdline": [
+            "python.exe -m unittest",
+            "tests.test_archives.HomeBoardTests.test_home_page_renders_curated_betting_board",
+            "tests.test_archives.HomeBoardTests.test_home_page_poll_preserves_date_query",
+            "tests.test_archives.HomeBoardTests.test_home_page_background_poll_uses_shared_polling_policy",
+            "tests.test_archives.HomeBoardTests.test_wnba_props_page_uses_standalone_ladder_shell",
+            "tests.test_archives.ArchiveRouteTests.test_archive_launch_links_and_tracker_copy",
+            "tests.test_archives.ArchiveRouteTests.test_wnba_cards_api_without_date_uses_today"
+          ],
+          "rss_mb": 483.441
+        },
+        {
+          "pid": 38324,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "pre_source_state_fingerprint",
+      "wall_clock": 1785138068.9412916,
+      "pid": 28532,
+      "process_count": 2,
+      "accounted_rss_mb": 134.352,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 28532,
+          "ppid": 41060,
+          "name": "-",
+          "cmdline": [
+            "-"
+          ],
+          "rss_mb": 134.352
+        },
+        {
+          "pid": 41060,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "pre_source_state_fingerprint",
+      "wall_clock": 1785138498.7878056,
+      "pid": 28532,
+      "process_count": 2,
+      "accounted_rss_mb": 145.727,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 28532,
+          "ppid": 5388,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_parlay_probe_scratch.py",
+            "-q",
+            "-s",
+            "--tb=short",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 145.727
+        },
+        {
+          "pid": 5388,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "build_candidate_pool_start",
+      "wall_clock": 1785138704.0411346,
+      "pid": 21104,
+      "process_count": 2,
+      "accounted_rss_mb": 154.484,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 21104,
+          "ppid": 31092,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_parlay_probe_scratch.py",
+            "-q",
+            "-s",
+            "--tb=short",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 154.484
+        },
+        {
+          "pid": 31092,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_pull_hot_artifacts",
+      "wall_clock": 1785138704.104645,
+      "pid": 21104,
+      "process_count": 2,
+      "accounted_rss_mb": 154.387,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 21104,
+          "ppid": 31092,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_parlay_probe_scratch.py",
+            "-q",
+            "-s",
+            "--tb=short",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 154.387
+        },
+        {
+          "pid": 31092,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_build_overview",
+      "wall_clock": 1785138704.1709986,
+      "pid": 21104,
+      "process_count": 2,
+      "accounted_rss_mb": 154.531,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 21104,
+          "ppid": 31092,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_parlay_probe_scratch.py",
+            "-q",
+            "-s",
+            "--tb=short",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 154.531
+        },
+        {
+          "pid": 31092,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_collect_candidates_with_fallback_merge",
+      "wall_clock": 1785138791.3204098,
+      "pid": 21104,
+      "process_count": 2,
+      "accounted_rss_mb": 260.734,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 21104,
+          "ppid": 31092,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_parlay_probe_scratch.py",
+            "-q",
+            "-s",
+            "--tb=short",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 260.734
+        },
+        {
+          "pid": 31092,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_candidate_building",
+      "wall_clock": 1785138791.3901756,
+      "pid": 21104,
+      "process_count": 2,
+      "accounted_rss_mb": 214.215,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 21104,
+          "ppid": 31092,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_parlay_probe_scratch.py",
+            "-q",
+            "-s",
+            "--tb=short",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 214.215
+        },
+        {
+          "pid": 31092,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    },
+    {
+      "stage": "post_pool_assembled",
+      "wall_clock": 1785138791.451055,
+      "pid": 21104,
+      "process_count": 2,
+      "accounted_rss_mb": 214.215,
+      "container_memory_mb": null,
+      "container_memory_max_mb": null,
+      "container_memory_headroom_mb": null,
+      "container_memory_pct_of_max": null,
+      "unexplained_memory_mb": null,
+      "processes": [
+        {
+          "pid": 21104,
+          "ppid": 31092,
+          "name": "__main__.py",
+          "cmdline": [
+            "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-x64\\Lib\\site-packages\\pytest\\__main__.py",
+            "tests/test_parlay_probe_scratch.py",
+            "-q",
+            "-s",
+            "--tb=short",
+            "-p",
+            "no:cacheprovider"
+          ],
+          "rss_mb": 214.215
+        },
+        {
+          "pid": 31092,
+          "ppid": -1,
+          "name": "parent_process",
+          "cmdline": [],
+          "rss_mb": null
+        }
+      ]
+    }
+  ]
+}

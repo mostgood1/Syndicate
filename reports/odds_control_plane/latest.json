@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-07-11T21:47:30-05:00",
-  "date": "2026-07-11",
+  "generated_at": "2026-07-26T22:20:46-05:00",
+  "date": "2026-07-27",
   "phase": "all",
   "execution_mode": "source",
-  "dry_run": false,
+  "dry_run": true,
   "publish_parity": {
-    "generatedAt": "2026-07-11T21:47:30-05:00",
-    "date": "2026-07-11",
+    "generatedAt": "2026-07-26T22:20:46-05:00",
+    "date": "2026-07-27",
     "totalForcedPublishPaths": 1,
     "totalIntelligencePublishPaths": 0,
     "totalPublishPaths": 1,
@@ -67,7 +67,7 @@
       "sport": "mlb",
       "ok": true,
       "generation_mode": "local_artifact_bundle",
-      "ingestion_mode": null,
+      "ingestion_mode": "mirror_script",
       "source_repo": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source",
       "source_root_env_var": "SYNDICATE_SOURCE_ROOT_MLB",
       "artifact_paths": [
@@ -77,13 +77,25 @@
       "mirror_ok": null,
       "odds_history": {
         "sport": "mlb",
-        "candidate_paths": [
-          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\odds_control_plane\\odds_history\\mlb\\odds_history.json",
-          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\artifacts\\mlb\\odds_history.json",
-          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_history.json"
+        "shard_count": 1,
+        "shards": [
+          {
+            "sport": "mlb",
+            "shard_key": "odds_history",
+            "candidate_paths": [
+              "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\odds_control_plane\\odds_history\\mlb\\odds_history.json",
+              "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\artifacts\\mlb\\odds_history\\odds_history.json",
+              "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\tracking\\odds_history\\odds_history.json"
+            ],
+            "active_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\odds_control_plane\\odds_history\\mlb\\odds_history.json",
+            "has_payload": true,
+            "source_precedence": [
+              "shared_history",
+              "artifact_history",
+              "tracking_history"
+            ]
+          }
         ],
-        "active_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\odds_control_plane\\odds_history\\mlb\\odds_history.json",
-        "has_payload": true,
         "source_precedence": [
           "shared_history",
           "artifact_history",
