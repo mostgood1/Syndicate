@@ -290,6 +290,8 @@ def read_oddsapi_quota() -> dict[str, Any]:
     baseline = payload.get("baseline") if isinstance(payload.get("baseline"), dict) else None
     latest = payload.get("latest") if isinstance(payload.get("latest"), dict) else None
     by_sport = payload.get("by_sport") if isinstance(payload.get("by_sport"), dict) else {}
+    by_family = payload.get("by_market_family") if isinstance(payload.get("by_market_family"), dict) else {}
+    by_hour = payload.get("by_hour_utc") if isinstance(payload.get("by_hour_utc"), dict) else {}
     observation_count = payload.get("observation_count")
 
     legacy = payload.get("observations")
@@ -317,6 +319,12 @@ def read_oddsapi_quota() -> dict[str, Any]:
         "credits_per_hour": None,
         "projected_30d_credits": None,
         "by_sport": dict(by_sport),
+        # The attribution aggregates never reset, so a rate over them is only
+        # computable against aggregates_started_at, not the burn baseline --
+        # the baseline rolls forward (rollover, 7-day cap) while these do not.
+        "by_market_family": dict(by_family),
+        "by_hour_utc": dict(by_hour),
+        "aggregates_started_at": payload.get("aggregates_started_at"),
     }
 
     if not isinstance(baseline, dict) or not isinstance(latest, dict):

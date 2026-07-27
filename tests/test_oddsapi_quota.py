@@ -239,6 +239,28 @@ class MarketFamilyAttributionTests(unittest.TestCase):
             (bucket,) = hours.values()
             self.assertEqual(bucket, {"calls": 2, "credits": 12})
 
+    def test_reader_passes_the_attribution_buckets_through(self) -> None:
+        # The recorder aggregated by_market_family/by_hour_utc for a full day
+        # before anyone noticed the reader silently dropped them -- the quota
+        # endpoint served an attribution-free payload while the store had the
+        # answer the whole time. The reader must surface what the recorder
+        # writes, plus aggregates_started_at (the only epoch a rate over these
+        # never-resetting aggregates can be computed against).
+        with TemporaryDirectory() as tmp_dir:
+            quota_file = Path(tmp_dir) / "oddsapi_quota.json"
+            with patch("syndicate.features.shared.oddsapi_quota._quota_path", return_value=quota_file):
+                record_oddsapi_quota(
+                    {"x-requests-remaining": "100", "x-requests-used": "50", "x-requests-last": "6"},
+                    sport="mlb",
+                    endpoint="https://api.the-odds-api.com/v4/sports/baseball_mlb/events/abc/odds?markets=h2h,batter_hits,h2h_1st_7_innings",
+                )
+                result = read_oddsapi_quota()
+        self.assertEqual(result["by_market_family"]["full_game"], {"calls": 1, "credits": 2.0})
+        self.assertEqual(result["by_market_family"]["props"], {"calls": 1, "credits": 2.0})
+        self.assertEqual(result["by_market_family"]["first7"], {"calls": 1, "credits": 2.0})
+        self.assertEqual(len(result["by_hour_utc"]), 1)
+        self.assertTrue(result["aggregates_started_at"])
+
     def test_attribution_failure_degrades_to_unattributed_not_unrecorded(self) -> None:
         # The burn counter is load-bearing (#15's whole decision rests on it);
         # attribution is a bonus. A bug in the classifier must cost the
