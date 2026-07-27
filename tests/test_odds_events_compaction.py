@@ -245,6 +245,17 @@ class StaleOddsEventBacklogTests(unittest.TestCase):
         odds_lifecycle._last_stale_scan_epoch = 0.0
         with patch.object(odds_lifecycle, "compact_stale_odds_lifecycle_files", side_effect=RuntimeError("boom")):
             odds_lifecycle._maybe_compact_stale_odds_lifecycle_files()  # must not raise
+    def test_the_read_path_also_triggers_the_scan(self) -> None:
+        # The service holding the backlog is not the one writing it:
+        # refresh-worker carries 2.66GB of these logs and emitted zero append
+        # traces across 19 minutes, because the odds refresh appends on
+        # live-odds-worker while refresh-worker only READS them. An
+        # append-only hook would never have run on the box that needed it.
+        odds_lifecycle._last_stale_scan_epoch = 0.0
+        with patch.object(odds_lifecycle, "compact_stale_odds_lifecycle_files") as spy:
+            odds_lifecycle.load_recent_odds_events(days_back=1, end_date="2026-07-26")
+        spy.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

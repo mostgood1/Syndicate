@@ -287,6 +287,19 @@ def _load_jsonl_rows(path: Path) -> list[dict[str, Any]]:
 
 
 def load_recent_odds_events(*, days_back: int = 7, end_date: str | None = None, root: Path | None = None) -> list[dict[str, Any]]:
+    # #76 backlog. Hooked here as well as on the append path, because the
+    # service that HOLDS the backlog is not the one that writes it. Measured
+    # 2026-07-27: refresh-worker carries 2.66GB of these logs and emitted zero
+    # append traces across 19 minutes -- the odds refresh appends on
+    # live-odds-worker, while refresh-worker only reads them through this
+    # function. An append-triggered cleanup would never have run on the box
+    # that needed it.
+    #
+    # Safe from a reader: the scan only ever touches PAST-DATE files, which
+    # have no writer, and it is rate-limited to once per 30 minutes per
+    # process so the hot read path pays a directory listing at most twice an
+    # hour.
+    _maybe_compact_stale_odds_lifecycle_files()
     lookback = max(int(days_back or 0), 1)
     end_token = _parse_date_token(end_date) or central_today()
     odds_root = root or odds_lifecycle_root()
