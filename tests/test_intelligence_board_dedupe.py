@@ -168,3 +168,79 @@ class TestDegenerateInput:
         """Empty rows carry no identity, so they must not collapse into one."""
         deduped = dedupe_recommendation_items([{}, {}, {}])
         assert len(deduped) == 3
+
+
+class TestCrossSourceMarketSynonyms:
+    """User-reported 2026-07-27: 'Tyler Phillips outs is listed twice from two
+    sources.' The 'Pitcher top props' rail and the props-artifact candidates
+    spell the same bet differently -- market 'outs recorded' vs 'pitcher outs',
+    selection 'Over 15+' vs 'OVER Tyler Phillips' -- and #29's raw-string core
+    could never collide them. Verbatim production shapes below.
+    """
+
+    @staticmethod
+    def _rail_row(**overrides):
+        row = {
+            "sport": "mlb",
+            "matchup": "PHI @ MIA",
+            "market": "outs recorded",
+            "pick": "Over 15+",
+            "selection": "Over 15+",
+            "player_name": "Tyler Phillips",
+            "name": "Tyler Phillips Outs Recorded",
+            "team": "—",
+            "line": 14.5,
+            "odds": -130.0,
+            "surface": "Pitcher top props",
+        }
+        row.update(overrides)
+        return row
+
+    @staticmethod
+    def _artifact_row(**overrides):
+        row = {
+            "sport": "mlb",
+            "matchup": "PHI @ MIA",
+            "market": "pitcher outs",
+            "pick": "OVER Tyler Phillips",
+            "selection": "OVER Tyler Phillips",
+            "player_name": "Tyler Phillips",
+            "name": "Tyler Phillips",
+            "team": "MIA",
+            "line": 14.5,
+            "odds": -130.0,
+        }
+        row.update(overrides)
+        return row
+
+    def test_the_tyler_phillips_pair_collapses_to_one(self):
+        assert len(dedupe_recommendation_items([self._rail_row(), self._artifact_row()])) == 1
+
+    def test_same_player_different_stat_families_stay_distinct(self):
+        outs = self._artifact_row()
+        strikeouts = self._artifact_row(market="pitcher strikeouts", line=4.5, odds=134.0)
+        assert len(dedupe_recommendation_items([outs, strikeouts])) == 2
+
+    def test_over_and_under_never_collapse(self):
+        over = self._rail_row()
+        under = self._artifact_row(pick="UNDER Tyler Phillips", selection="UNDER Tyler Phillips")
+        assert len(dedupe_recommendation_items([over, under])) == 2
+
+    def test_two_real_lines_on_the_same_side_stay_distinct(self):
+        # Deliberate ladder rungs are not duplicates.
+        assert len(dedupe_recommendation_items([self._artifact_row(line=14.5), self._artifact_row(line=16.5)])) == 2
+
+    def test_two_way_player_survives_via_the_line_wildcard(self):
+        # Ohtani-style: pitcher Ks and batter Ks share the canonical family
+        # after prefix-stripping, but their lines differ and both are present,
+        # so the #29 wildcard keeps them distinct.
+        pitcher_ks = self._artifact_row(market="pitcher strikeouts", player_name="Shohei Ohtani", name="Shohei Ohtani", pick="OVER Shohei Ohtani", selection="OVER Shohei Ohtani", line=9.5)
+        batter_ks = self._rail_row(market="strikeouts", player_name="Shohei Ohtani", name="Shohei Ohtani Strikeouts", pick="Over 0.5", selection="Over 0.5", line=0.5)
+        assert len(dedupe_recommendation_items([pitcher_ks, batter_ks])) == 2
+
+    def test_game_markets_keep_their_full_selection(self):
+        # No player subject -> no side-collapse: two different game totals with
+        # the same side must not merge into one.
+        total_low = {"sport": "mlb", "matchup": "PHI @ MIA", "market": "totals", "selection": "Over 8.5", "pick": "Over 8.5", "line": 8.5}
+        total_high = {"sport": "mlb", "matchup": "PHI @ MIA", "market": "totals", "selection": "Over 9.5", "pick": "Over 9.5", "line": 9.5}
+        assert len(dedupe_recommendation_items([total_low, total_high])) == 2

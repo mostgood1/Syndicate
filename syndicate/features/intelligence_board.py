@@ -242,6 +242,45 @@ def _dedupe_line_token(value: Any) -> str:
     return str(int(number)) if number.is_integer() else str(number)
 
 
+# 2026-07-27, user-reported: "Tyler Phillips outs is listed twice from two
+# sources." Confirmed on the live board -- the "Pitcher top props" rail emits
+# {market: "outs recorded", selection: "Over 15+"} and the props-artifact
+# candidates emit {market: "pitcher outs", selection: "OVER Tyler Phillips"}
+# for the SAME bet (same player, matchup, line 14.5, odds -130). The #29 core
+# key compared raw market and selection strings, so the pair could never
+# collide. Same class observed for Peterson and Keller in the same snapshot.
+#
+# The fix canonicalizes the two fields the sources disagree on:
+#   market  -> role prefix (pitcher/hitter/batter) stripped + synonym-mapped,
+#              so "outs recorded" and "pitcher outs" both key as "outs";
+#   selection -> collapsed to its side token (over/under) -- but ONLY when the
+#              item carries a player subject, so game markets ("Home ML",
+#              "Over 8.5" totals) keep their full selection and today's
+#              behavior exactly.
+# Lines stay the #29 wildcard: Ohtani-style pitcher-Ks vs batter-Ks for the
+# same player survive because their lines differ and both are present.
+_MARKET_FAMILY_SYNONYMS = {
+    "outs recorded": "outs",
+    "walks allowed": "walks",
+}
+_ROLE_PREFIXES = ("pitcher ", "hitter ", "batter ")
+
+
+def _canonical_market_family(market: str) -> str:
+    text = " ".join(str(market or "").strip().lower().replace("+", " ").split())
+    for prefix in _ROLE_PREFIXES:
+        if text.startswith(prefix):
+            text = text[len(prefix):]
+            break
+    return _MARKET_FAMILY_SYNONYMS.get(text, text)
+
+
+def _selection_side(selection: str) -> str | None:
+    token = str(selection or "").strip().lower().split(" ", 1)[0] if selection else ""
+    return token if token in ("over", "under") else None
+
+
+
 def dedupe_recommendation_items(items: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
     """Collapse the same underlying pick arriving in different shapes (#29).
 
@@ -294,12 +333,19 @@ def dedupe_recommendation_items(items: Sequence[Mapping[str, Any]]) -> list[Mapp
             continue
 
         selection = _safe_text(item.get("selection"), item.get("pick"), default="").strip().lower()
+        player_subject = _safe_text(item.get("player_name"), default="").strip().lower()
+        side = _selection_side(selection)
+        # Side-collapse only with a real player subject (see the
+        # canonicalization comment above): "OVER Tyler Phillips" and
+        # "Over 15+" are the same side of the same prop, while a game total's
+        # "over 8.5" must keep its full selection.
+        selection_component = side if (player_subject and side) else selection
         core = (
             _safe_text(item.get("sport_slug"), item.get("sport"), default="").strip().lower(),
             _safe_text(item.get("matchup"), default="").strip().lower(),
-            _safe_text(item.get("market"), item.get("market_label"), item.get("market_key"), default="").strip().lower(),
-            _safe_text(item.get("player_name"), item.get("name"), default=selection).strip().lower(),
-            selection,
+            _canonical_market_family(_safe_text(item.get("market"), item.get("market_label"), item.get("market_key"), default="")),
+            player_subject or _safe_text(item.get("name"), default=selection).strip().lower(),
+            selection_component,
         )
         line_token = _dedupe_line_token(item.get("line"))
         if any(core):
