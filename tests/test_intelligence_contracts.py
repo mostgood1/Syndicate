@@ -6,6 +6,7 @@ from pipeline.intelligence_models import IntelligenceResult
 from syndicate.features.intelligence import _candidate_summary
 from syndicate.features.intelligence.scoring.edge import get_top_live_opportunities
 from syndicate.features.shared.intelligence_contracts import build_intelligence_evaluation_record
+from syndicate.features.shared.intelligence_contracts import resolve_candidate_game_date
 from syndicate.features.shared.intelligence_contracts import UniversalCandidate
 
 
@@ -197,6 +198,78 @@ class IntelligenceContractsTest(unittest.TestCase):
 
         self.assertEqual(opportunities[0]["actual"], "19")
         self.assertEqual(opportunities[0]["settlement"]["status"], "live")
+
+
+class CandidateGameDateTests(unittest.TestCase):
+    """#93 follow-up. Before this fix, UniversalCandidate.from_raw folded
+    every candidate's date tag down to payload["selected_date"]/["date"] --
+    the date the OUTER overview build was run for, identical for every
+    candidate from that build. A cross-date combined board needs each
+    candidate's OWN game date to filter correctly.
+    """
+
+    def test_from_raw_uses_commence_time_over_shared_selected_date(self) -> None:
+        # Two candidates from the same overview build (same selected_date /
+        # context_label) but different games -- their real game dates must
+        # differ. This is the assertion that fails against pre-fix code:
+        # both used to resolve to the identical shared "2026-07-27".
+        candidate_a = UniversalCandidate.from_raw(
+            {
+                "candidate_id": "a",
+                "sport": "WNBA",
+                "selected_date": "2026-07-27",
+                "commence_time": "2026-07-27T23:00:00Z",
+            }
+        )
+        candidate_b = UniversalCandidate.from_raw(
+            {
+                "candidate_id": "b",
+                "sport": "WNBA",
+                "selected_date": "2026-07-27",
+                "commence_time": "2026-07-29T02:00:00Z",
+            }
+        )
+        assert candidate_a is not None and candidate_b is not None
+        self.assertNotEqual(candidate_a.provenance["selected_date"], candidate_b.provenance["selected_date"])
+        self.assertEqual(candidate_a.provenance["selected_date"], "2026-07-27")
+        # 2026-07-29T02:00:00Z is 2026-07-28 21:00 Central -- still the 28th.
+        self.assertEqual(candidate_b.provenance["selected_date"], "2026-07-28")
+
+    def test_from_raw_falls_back_to_selected_date_when_no_game_timestamp(self) -> None:
+        candidate = UniversalCandidate.from_raw(
+            {
+                "candidate_id": "c",
+                "sport": "MLB",
+                "selected_date": "2026-07-27",
+            }
+        )
+        assert candidate is not None
+        self.assertEqual(candidate.provenance["selected_date"], "2026-07-27")
+
+    def test_resolve_candidate_game_date_priority_order(self) -> None:
+        # commence_time wins over start_time_utc/game_time_utc/game_date when
+        # more than one is present.
+        resolved = resolve_candidate_game_date(
+            {
+                "commence_time": "2026-07-27T18:00:00Z",
+                "start_time_utc": "2026-07-28T18:00:00Z",
+                "game_date": "2026-07-29",
+            }
+        )
+        self.assertEqual(resolved, "2026-07-27")
+
+    def test_resolve_candidate_game_date_accepts_bare_date_string(self) -> None:
+        self.assertEqual(resolve_candidate_game_date({"game_date": "2026-07-27"}), "2026-07-27")
+
+    def test_resolve_candidate_game_date_returns_fallback_when_nothing_resolves(self) -> None:
+        self.assertEqual(resolve_candidate_game_date({}, fallback="2026-07-27"), "2026-07-27")
+        self.assertIsNone(resolve_candidate_game_date({}, fallback=None))
+
+    def test_resolve_candidate_game_date_ignores_unparseable_timestamp(self) -> None:
+        self.assertEqual(
+            resolve_candidate_game_date({"commence_time": "not-a-date"}, fallback="2026-07-27"),
+            "2026-07-27",
+        )
 
 
 if __name__ == "__main__":

@@ -1371,7 +1371,20 @@ class IntelligenceStateTests(unittest.TestCase):
             }
             refresh_state_store.write_json_file(state_path, persisted_state)
 
-            with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path):
+            # #93 follow-up: central_today_iso pinned to this payload's own
+            # date, and _ensure_default_board_window_watched no-opped -- this
+            # test is about queue/persist mechanics, not the board-window
+            # watch set (covered separately by EnsureDefaultBoardWindowWatchedTests).
+            # Without pinning, the real wall-clock date makes "2026-06-15"
+            # look stale to _watched_payload_eviction_reason's point-of-use
+            # check, which silently drops it and (pre-#93-follow-up, with
+            # nothing else in the queue) hangs this test forever instead of
+            # failing loudly.
+            with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(
+                intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path
+            ), patch.object(intelligence_state_module, "central_today_iso", return_value="2026-06-15"), patch.object(
+                service, "_ensure_default_board_window_watched"
+            ):
                 board_state = {
                     "ok": True,
                     "top_opportunities": [{"name": "Play 1"}],
@@ -1440,7 +1453,15 @@ class IntelligenceStateTests(unittest.TestCase):
             }
             refresh_state_store.write_json_file(state_path, persisted_state)
 
-            with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path):
+            # central_today_iso pinned (not left to coincide with the real
+            # wall-clock date) and _ensure_default_board_window_watched
+            # no-opped -- this test is isolated to the rollover-key fix,
+            # not Phase 1's board-window watch set.
+            with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(
+                intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path
+            ), patch.object(intelligence_state_module, "central_today_iso", return_value=today), patch.object(
+                service, "_ensure_default_board_window_watched"
+            ):
                 rolled_over_response = {
                     "ok": True,
                     "top_opportunities": [{"sport": "WNBA"}],
@@ -1467,7 +1488,13 @@ class IntelligenceStateTests(unittest.TestCase):
 
         self.assertNotIn(today_key, service._snapshots)
         self.assertIn(tomorrow_key, service._snapshots)
-        self.assertEqual(service._latest_key, tomorrow_key)
+        # self._latest_key must NOT be promoted to a rolled-over, non-today
+        # snapshot -- a further hardening added after this test's first cut
+        # (see LATEST_KEY_PROMOTION_SKIPPED_NON_TODAY): promoting it here
+        # would reintroduce the exact ambiguity this whole fix exists to
+        # remove, just via self._latest_key instead of the storage key. A
+        # rolled-over date is only ever reachable through its own key.
+        self.assertIsNone(service._latest_key)
         self.assertEqual(service._snapshots[tomorrow_key].payload.get("date"), tomorrow)
 
     def test_state_compute_promotes_candidate_pool_when_ranking_returns_empty(self) -> None:
@@ -1946,6 +1973,119 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(payload["response"]["portfolio_events"]["event_count"], 2)
         self.assertEqual(payload["response"]["portfolio_event_records"][0]["portfolio_event_id"], "evt_1")
         self.assertEqual(payload["response"]["board_contract"]["schema"], "intelligence_board_v1")
+
+    def test_query_endpoint_uses_combined_response_when_no_date_and_flag_enabled(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        combined_response = {
+            "ok": True,
+            "selected_date": None,
+            "dates_covered": ["2026-07-27", "2026-07-28"],
+            "top_opportunities": [{"name": "Combined Play"}],
+            "recommendations": [{"name": "Combined Play"}],
+            "by_sport": {"mlb": [{"name": "Combined Play"}]},
+            "candidate_count": 1,
+        }
+
+        with app.test_request_context("/api/intelligence/query", method="POST", json={"question": "top edges today"}):
+            with patch.dict(os.environ, {"SYNDICATE_INTELLIGENCE_COMBINED_BOARD_DEFAULT": "true"}, clear=False):
+                with patch(
+                    "syndicate.blueprints.intelligence.read_combined_intelligence_response",
+                    return_value=dict(combined_response),
+                ) as mocked_combined:
+                    response = intelligence_query_api()
+
+        mocked_combined.assert_called_once()
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertIsNone(payload["selected_date"])
+        self.assertEqual(payload["dates_covered"], ["2026-07-27", "2026-07-28"])
+        self.assertEqual(payload["response"]["top_opportunities"][0]["name"], "Combined Play")
+
+    def test_query_endpoint_never_uses_combined_response_when_date_explicit(self) -> None:
+        # The core backward-compatibility guarantee: an explicit date must
+        # always bypass the combined reader entirely, even with the flag on.
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        engine_response = {
+            "ok": True,
+            "selected_date": "2026-07-27",
+            "top_opportunities": [{"name": "Today Play"}],
+            "recommendations": [{"name": "Today Play"}],
+            "by_sport": {"mlb": [{"name": "Today Play"}]},
+        }
+
+        with app.test_request_context(
+            "/api/intelligence/query", method="POST", json={"question": "top edges today", "date": "2026-07-27"}
+        ):
+            with patch.dict(os.environ, {"SYNDICATE_INTELLIGENCE_COMBINED_BOARD_DEFAULT": "true"}, clear=False):
+                with patch(
+                    "syndicate.blueprints.intelligence.read_combined_intelligence_response",
+                    side_effect=AssertionError("combined reader must not be called for an explicit-date request"),
+                ):
+                    with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict(engine_response)):
+                        response = intelligence_query_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload["response"]["top_opportunities"][0]["name"], "Today Play")
+
+    def test_query_endpoint_default_unchanged_when_combined_flag_disabled(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        engine_response = {
+            "ok": True,
+            "selected_date": "2026-07-27",
+            "top_opportunities": [{"name": "Today Play"}],
+            "recommendations": [{"name": "Today Play"}],
+            "by_sport": {"mlb": [{"name": "Today Play"}]},
+        }
+
+        with app.test_request_context("/api/intelligence/query", method="POST", json={"question": "top edges today"}):
+            os.environ.pop("SYNDICATE_INTELLIGENCE_COMBINED_BOARD_DEFAULT", None)
+            with patch(
+                "syndicate.blueprints.intelligence.read_combined_intelligence_response",
+                side_effect=AssertionError("combined reader must not be called when the flag is off"),
+            ):
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict(engine_response)):
+                    response = intelligence_query_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload["response"]["top_opportunities"][0]["name"], "Today Play")
+
+    def test_home_route_uses_combined_response_when_no_date_and_flag_enabled(self) -> None:
+        app = create_app()
+        combined_response = {
+            "ok": True,
+            "selected_date": None,
+            "top_opportunities": [{"name": "Combined Play"}],
+            "recommendations": [{"name": "Combined Play"}],
+            "by_sport": {"mlb": [{"name": "Combined Play"}]},
+        }
+        with app.test_client() as client:
+            with patch.dict(os.environ, {"SYNDICATE_INTELLIGENCE_COMBINED_BOARD_DEFAULT": "true"}, clear=False):
+                with patch(
+                    "syndicate.blueprints.intelligence.read_combined_intelligence_response",
+                    return_value=dict(combined_response),
+                ) as mocked_combined:
+                    response = client.get("/intelligence")
+        mocked_combined.assert_called_once()
+        self.assertEqual(response.status_code, 200)
+
+    def test_home_route_explicit_date_query_param_uses_single_date_path(self) -> None:
+        app = create_app()
+        with app.test_client() as client:
+            with patch.dict(os.environ, {"SYNDICATE_INTELLIGENCE_COMBINED_BOARD_DEFAULT": "true"}, clear=False):
+                with patch(
+                    "syndicate.blueprints.intelligence.read_combined_intelligence_response",
+                    side_effect=AssertionError("combined reader must not be called for an explicit-date request"),
+                ):
+                    response = client.get("/intelligence?date=2026-07-27")
+        self.assertEqual(response.status_code, 200)
 
     def test_portfolio_event_endpoint_records_manual_event_bundle(self) -> None:
         app = Flask(__name__)
@@ -2672,7 +2812,16 @@ class IntelligenceStateTests(unittest.TestCase):
     def test_background_refresh_recomputes_when_snapshot_fingerprint_matches(self) -> None:
         service = IntelligenceStateService()
         service._interval_seconds = 0
-        payload = {"question": "top edges today", "date": "2026-06-10", "limit": 5}
+        # #93 follow-up. "limit" removed: _watched_payload_eviction_reason
+        # treats any watched payload carrying one as stale_limit ("no real
+        # caller sends one anymore" -- see its own docstring), which drops
+        # this payload at the point-of-use check before it ever reaches
+        # _compute_board_publication_response, regardless of date. That
+        # eviction rule predates this session's board-redesign work; this
+        # test's payload shape was simply never updated for it, and would
+        # hang forever pre-#93-follow-up (nothing else queued to fall back
+        # to) rather than fail loudly.
+        payload = {"question": "top edges today", "date": "2026-06-10"}
         normalized = service._normalize_payload(payload)
         snapshot_key = _payload_key(normalized)
 
@@ -2701,7 +2850,9 @@ class IntelligenceStateTests(unittest.TestCase):
         # separately.
         board_response = {"ok": True, "top_opportunities": [], "by_sport": {}, "analysis": None}
         with patch.object(service, "_compute_board_publication_response", return_value=board_response) as mocked_compute:
-            with patch.object(service, "_sync_persisted_queue_locked"):
+            with patch.object(service, "_sync_persisted_queue_locked"), patch.object(
+                service, "_ensure_default_board_window_watched"
+            ), patch.object(intelligence_state_module, "central_today_iso", return_value="2026-06-10"):
                 with patch("pipeline.intelligence_state.logger.info") as mocked_logger_info:
                     with patch("pipeline.intelligence_state.write_latest_intelligence_state", side_effect=lambda state: fake_write_latest_intelligence_state(state, mocked_logger_info)) as mocked_write:
                         service._background_loop()
@@ -3966,3 +4117,256 @@ class NoDeferralCanStarveTests(unittest.TestCase):
                 consecutive_odds_defers=0, consecutive_sim_defers=99
             )
         self.assertIn("no_headroom", reason)
+
+
+class DefaultBoardWindowDatesTests(unittest.TestCase):
+    """#93 follow-up. The single-date "latest slot" model is what let a
+    rollover-computed response silently corrupt "today"'s shared storage
+    key. _default_board_window_dates replaces the single ambiguous default
+    with an explicit, bounded set of dates the background loop keeps warm
+    independently -- each with its own stable key, so there is nothing left
+    for a rollover to exploit.
+    """
+
+    def setUp(self) -> None:
+        self._prior = os.environ.get("SYNDICATE_INTELLIGENCE_BOARD_WINDOW_DAYS")
+        self.addCleanup(self._restore)
+
+    def _restore(self) -> None:
+        if self._prior is None:
+            os.environ.pop("SYNDICATE_INTELLIGENCE_BOARD_WINDOW_DAYS", None)
+        else:
+            os.environ["SYNDICATE_INTELLIGENCE_BOARD_WINDOW_DAYS"] = self._prior
+
+    def test_includes_today_and_next_n_days_when_all_supported(self) -> None:
+        with patch.object(
+            intelligence_state_module,
+            "_supported_intelligence_dates",
+            return_value=["2026-07-27", "2026-07-28", "2026-07-29", "2026-07-30"],
+        ):
+            result = intelligence_state_module._default_board_window_dates("2026-07-27")
+        self.assertEqual(result, ["2026-07-27", "2026-07-28", "2026-07-29"])
+
+    def test_always_includes_today_even_if_unsupported(self) -> None:
+        # Artifacts for today may not have posted yet when the loop starts
+        # the day -- today must never be silently dropped from the window.
+        with patch.object(
+            intelligence_state_module,
+            "_supported_intelligence_dates",
+            return_value=["2026-07-28"],
+        ):
+            result = intelligence_state_module._default_board_window_dates("2026-07-27")
+        self.assertIn("2026-07-27", result)
+
+    def test_excludes_dates_outside_supported_set(self) -> None:
+        with patch.object(
+            intelligence_state_module,
+            "_supported_intelligence_dates",
+            return_value=["2026-07-27"],
+        ):
+            result = intelligence_state_module._default_board_window_dates("2026-07-27")
+        self.assertNotIn("2026-07-29", result)
+        self.assertEqual(result, ["2026-07-27"])
+
+    def test_respects_window_days_env_override(self) -> None:
+        os.environ["SYNDICATE_INTELLIGENCE_BOARD_WINDOW_DAYS"] = "1"
+        with patch.object(
+            intelligence_state_module,
+            "_supported_intelligence_dates",
+            return_value=["2026-07-27", "2026-07-28", "2026-07-29"],
+        ):
+            result = intelligence_state_module._default_board_window_dates("2026-07-27")
+        self.assertEqual(result, ["2026-07-27"])
+
+    def test_window_days_env_override_is_clamped(self) -> None:
+        os.environ["SYNDICATE_INTELLIGENCE_BOARD_WINDOW_DAYS"] = "99"
+        with patch.object(
+            intelligence_state_module,
+            "_supported_intelligence_dates",
+            return_value=[f"2026-08-{day:02d}" for day in range(1, 15)],
+        ):
+            result = intelligence_state_module._default_board_window_dates("2026-08-01")
+        self.assertEqual(len(result), 7)
+
+
+class EnsureDefaultBoardWindowWatchedTests(unittest.TestCase):
+    """#93 follow-up. Before this fix, the background loop only ever seeded
+    one payload per cycle (today's, dateless-or-not depending on caller) --
+    there was no proactive, cadence-differentiated multi-date watch set at
+    all. These tests fail against pre-fix code because
+    _ensure_default_board_window_watched does not exist there.
+    """
+
+    def _service_with_window(self, window_dates):
+        service = IntelligenceStateService()
+        self._patches = [
+            patch.object(intelligence_state_module, "central_today_iso", return_value=window_dates[0]),
+            patch.object(intelligence_state_module, "_default_board_window_dates", return_value=window_dates),
+            patch.object(service, "queue_refresh", side_effect=lambda payload: _payload_key(payload)),
+        ]
+        for p in self._patches:
+            p.start()
+        self.addCleanup(lambda: [p.stop() for p in self._patches])
+        return service
+
+    def test_queues_full_window_on_first_call(self) -> None:
+        service = self._service_with_window(["2026-07-27", "2026-07-28", "2026-07-29"])
+        service._ensure_default_board_window_watched()
+        queued_dates = [call.args[0]["date"] for call in service.queue_refresh.call_args_list]
+        self.assertEqual(queued_dates, ["2026-07-27", "2026-07-28", "2026-07-29"])
+
+    def test_throttles_future_dates_but_not_today(self) -> None:
+        service = self._service_with_window(["2026-07-27", "2026-07-28"])
+        with patch.object(intelligence_state_module.time, "time", return_value=1000.0):
+            service._ensure_default_board_window_watched()
+        self.assertEqual(service.queue_refresh.call_count, 2)
+        service.queue_refresh.reset_mock()
+
+        # A moment later (well under the slow-refresh window): today must be
+        # re-queued again (matching the pre-existing every-cycle cadence the
+        # single-date default already had), but tomorrow must NOT be -- this
+        # is the assertion that fails against pre-fix code, since no such
+        # differentiation exists there at all.
+        with patch.object(intelligence_state_module.time, "time", return_value=1010.0):
+            service._ensure_default_board_window_watched()
+        queued_dates = [call.args[0]["date"] for call in service.queue_refresh.call_args_list]
+        self.assertEqual(queued_dates, ["2026-07-27"])
+
+    def test_requeues_future_date_after_slow_refresh_interval_elapses(self) -> None:
+        service = self._service_with_window(["2026-07-27", "2026-07-28"])
+        os.environ["SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS"] = "60"
+        self.addCleanup(lambda: os.environ.pop("SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS", None))
+        with patch.object(intelligence_state_module.time, "time", return_value=1000.0):
+            service._ensure_default_board_window_watched()
+        service.queue_refresh.reset_mock()
+        with patch.object(intelligence_state_module.time, "time", return_value=1061.0):
+            service._ensure_default_board_window_watched()
+        queued_dates = [call.args[0]["date"] for call in service.queue_refresh.call_args_list]
+        self.assertEqual(queued_dates, ["2026-07-27", "2026-07-28"])
+
+
+class ReadCombinedIntelligenceResponseTests(unittest.TestCase):
+    """#93 follow-up. read_combined_intelligence_response is the read-side
+    half of the board redesign: it unions several already-computed per-date
+    responses (written to disk by write_latest_intelligence_state under
+    their own date-keyed files, per the earlier fix in this same session)
+    into one cross-date board. Every test here fails outright against
+    pre-fix code, since the function does not exist there.
+    """
+
+    def _write_daily_fixture(self, reports_root: Path, date: str, by_sport: dict) -> None:
+        candidate_count = sum(len(items) for items in by_sport.values())
+        refresh_state_store.write_json_file(
+            reports_root / "intelligence" / f"intelligence_state_{date.replace('-', '_')}.json",
+            {
+                "ok": True,
+                "selected_date": date,
+                "candidate_count": candidate_count,
+                "by_sport": by_sport,
+            },
+        )
+
+    def test_unions_multiple_dates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            self._write_daily_fixture(reports_root, "2030-01-01", {"mlb": [{"name": "MLB Play", "score": 5.0}]})
+            self._write_daily_fixture(reports_root, "2030-01-02", {"wnba": [{"name": "WNBA Play", "score": 3.0}]})
+            with patch.object(intelligence_state_module, "reports_root", return_value=reports_root):
+                result = intelligence_state_module.read_combined_intelligence_response(dates=["2030-01-01", "2030-01-02"])
+
+        self.assertEqual(result["dates_covered"], ["2030-01-01", "2030-01-02"])
+        self.assertEqual(result["candidate_count"], 2)
+        self.assertIn("mlb", result["by_sport"])
+        self.assertIn("wnba", result["by_sport"])
+        names = {item.get("name") for item in result["ranked_all"]}
+        self.assertEqual(names, {"MLB Play", "WNBA Play"})
+
+    def test_skips_missing_or_empty_dates_without_erroring(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            self._write_daily_fixture(reports_root, "2030-02-01", {"mlb": [{"name": "MLB Play", "score": 5.0}]})
+            # 2030-02-02 has no fixture file at all.
+            with patch.object(intelligence_state_module, "reports_root", return_value=reports_root):
+                result = intelligence_state_module.read_combined_intelligence_response(dates=["2030-02-01", "2030-02-02"])
+
+        self.assertEqual(result["candidate_count"], 1)
+        self.assertEqual(result["by_date"]["2030-02-02"]["candidate_count"], 0)
+
+    def test_tags_source_board_date_per_candidate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            self._write_daily_fixture(reports_root, "2030-03-01", {"mlb": [{"name": "MLB Play", "score": 5.0}]})
+            self._write_daily_fixture(reports_root, "2030-03-02", {"mlb": [{"name": "MLB Play 2", "score": 4.0}]})
+            with patch.object(intelligence_state_module, "reports_root", return_value=reports_root):
+                result = intelligence_state_module.read_combined_intelligence_response(dates=["2030-03-01", "2030-03-02"])
+
+        by_name = {item["name"]: item["source_board_date"] for item in result["ranked_all"]}
+        self.assertEqual(by_name["MLB Play"], "2030-03-01")
+        self.assertEqual(by_name["MLB Play 2"], "2030-03-02")
+
+    def test_never_calls_build_candidate_pool(self) -> None:
+        # The hard invariant: this function must be read-only. A call to
+        # _build_candidate_pool here would reintroduce the exact
+        # OOM-multiplication risk the combined-board design exists to avoid.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            self._write_daily_fixture(reports_root, "2030-04-01", {"mlb": [{"name": "MLB Play", "score": 5.0}]})
+            with patch.object(intelligence_state_module, "reports_root", return_value=reports_root):
+                with patch.object(
+                    intelligence_state_module.IntelligenceStateService,
+                    "_build_candidate_pool",
+                    side_effect=AssertionError("read_combined_intelligence_response must never compute"),
+                ):
+                    result = intelligence_state_module.read_combined_intelligence_response(dates=["2030-04-01"])
+        self.assertEqual(result["candidate_count"], 1)
+
+    def test_sorting_has_no_date_component(self) -> None:
+        # A lower-scored candidate from an earlier date must not outrank a
+        # higher-scored candidate from a later date -- date is a filter
+        # dimension, never a ranking one.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            self._write_daily_fixture(
+                reports_root,
+                "2030-05-01",
+                {"mlb": [{"name": "Low Score Early", "score": 1.0, "simulated_edge": 0.01, "confidence": 0.1}]},
+            )
+            self._write_daily_fixture(
+                reports_root,
+                "2030-05-02",
+                {"mlb": [{"name": "High Score Late", "score": 99.0, "simulated_edge": 0.5, "confidence": 0.9}]},
+            )
+            with patch.object(intelligence_state_module, "reports_root", return_value=reports_root):
+                result = intelligence_state_module.read_combined_intelligence_response(dates=["2030-05-01", "2030-05-02"])
+
+        cards = result["board_contract"]["cards"]
+        names_in_order = [card.get("name") for card in cards]
+        self.assertEqual(names_in_order[0], "High Score Late")
+
+    def test_applies_sport_and_limit_slicing_across_merged_dates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            self._write_daily_fixture(reports_root, "2030-06-01", {"mlb": [{"name": "MLB A", "score": 5.0}]})
+            self._write_daily_fixture(
+                reports_root,
+                "2030-06-02",
+                {"mlb": [{"name": "MLB B", "score": 4.0}], "wnba": [{"name": "WNBA A", "score": 3.0}]},
+            )
+            with patch.object(intelligence_state_module, "reports_root", return_value=reports_root):
+                result = intelligence_state_module.read_combined_intelligence_response(
+                    dates=["2030-06-01", "2030-06-02"], sport="mlb", limit=1
+                )
+
+        self.assertEqual(len(result["top_opportunities"]), 1)
+        self.assertNotIn("WNBA A", [item.get("name") for item in result["top_opportunities"]])
+
+    def test_falls_back_to_today_when_nothing_warm(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            with patch.object(intelligence_state_module, "reports_root", return_value=reports_root):
+                with patch.object(intelligence_state_module, "central_today_iso", return_value="2030-07-01"):
+                    result = intelligence_state_module.read_combined_intelligence_response(dates=[])
+
+        self.assertEqual(result["candidate_count"], 0)
+        self.assertEqual(result["dates_covered"], ["2030-07-01"])
+        self.assertIsInstance(result["ranked_all"], list)

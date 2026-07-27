@@ -6,7 +6,7 @@ list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-07-27 (see "Reconciliation 2026-07-27").
 
-> **Next free ID: 94.** IDs are never reused. Closed items move to
+> **Next free ID: 95.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
 
@@ -337,6 +337,89 @@ now genuinely met rather than merely believed.
   secondary root, and `processed_path()` for that date will 404 against the
   primary root instead. Invisible today because production only has one NBA
   root; worth a look before adding a second one.
+- **New: #94** (filed, shipped this session as Phases 1/3/4/5, **dark-launched — no
+  production behavior change yet**) — Layer 2 board redefinition, per explicit
+  user direction after #93: stop patching the single-date "latest slot" model
+  (three successive fixes tonight — `6c978398`/`7b5d82af`/`18ffd26b` — closed the
+  specific corruption bug but left the underlying "one ambiguous current date"
+  model in place). New default: the board shows everything currently relevant
+  across sports/dates, date becomes an optional filter, not the storage/query
+  key.
+  - **Storage decision:** built on the legacy `_watched_payloads`/`_snapshots`
+    per-date store (proven live, correctly keyed as of tonight's `18ffd26b`),
+    **not** the canonical `board_state_<date>.json` store — that one is
+    disabled in production (`SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE=false`)
+    and blocked on its own unresolved #39 (doubled boot memory). Confirmed
+    `SYNDICATE_LOOK_AHEAD_ENABLED=true` is the real production value (a
+    `render.yaml` "deliberate overrides" comment claiming `false` is stale
+    docs, not reality — worth a one-line fix separately).
+  - **`pipeline/intelligence_state.py`:** `_default_board_window_dates()`
+    (today + `SYNDICATE_INTELLIGENCE_BOARD_WINDOW_DAYS`, default 3, clamped
+    1-7) + `IntelligenceStateService._ensure_default_board_window_watched()`,
+    called every `_background_loop()` iteration — today re-queued every
+    cycle, today+1/+2 throttled to `SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS`
+    (default 300s) so watching a 3-day window costs "1 today-cadence build +
+    a slow trickle of ≤2 more", not a flat 3x multiply of the OOM-sensitive
+    `_build_candidate_pool`.
+  - **Two real bugs found and fixed while building this, both pre-existing
+    (not introduced by the redesign), both would have actively corrupted data
+    the instant the board-window watch set started computing extra dates:**
+    (1) `write_latest_intelligence_state`'s daily file path
+    (`_intelligence_state_daily_paths`) was keyed by **wall-clock day of
+    writing**, not the content's own `selected_date` — a today+1 compute
+    landing on "today" (wall clock) would silently overwrite today's own
+    daily file and the global `INTELLIGENCE_STATE_PATH`/`BOARD_SNAPSHOT_PATH`
+    "latest" pointers. Fixed: `_intelligence_state_daily_paths(selected_date)`
+    now accepts the content's real date; global "latest" files are only
+    written when the content represents today-or-dateless. (2)
+    `self._latest_key` promotion in `_background_loop` used to promote to
+    "whichever date the loop just processed", which would make it flip-flop
+    across today/tomorrow/day-after now that several dates are watched
+    simultaneously — gated with a `represents_today_or_dateless` check so it
+    can never again drift off today.
+  - **`read_combined_intelligence_response()`** (new, `pipeline/intelligence_state.py`):
+    read-only union of already-computed per-date responses, hard invariant
+    "never calls `_build_candidate_pool`" (guarded by a dedicated regression
+    test). Stamps `game_date`/`source_board_date` per candidate via a new
+    `resolve_candidate_game_date()` helper (`syndicate/features/shared/intelligence_contracts.py`)
+    that also fixed a real, independent bug in `UniversalCandidate.from_raw`:
+    every candidate from one overview build used to share the SAME date tag
+    (`payload["selected_date"]`/`["date"]`), never its own game's date.
+  - **`syndicate/blueprints/intelligence.py`:** new
+    `SYNDICATE_INTELLIGENCE_COMBINED_BOARD_DEFAULT` flag (default `false`,
+    dark-launched like the canonical-board-state flag). `intelligence_query_api`/
+    `intelligence_home` check for an explicit `date` in the **raw** request
+    (before any default-injection) — explicit-date requests are byte-for-byte
+    unchanged regardless of this flag; only a genuinely dateless request with
+    the flag on gets the combined response.
+  - **`syndicate/templates/intelligence.html`:** new "All" day tab (default),
+    Today/Tomorrow/All are now client-side filters over one fetched response
+    (matching the existing sport/market/edge tab pattern) instead of each
+    triggering its own `/api/intelligence/query` round trip. The free-text
+    date input is still a real server fetch — the explicit override for a
+    date outside the warm window.
+  - **Explicitly deferred (Phase 2, not this session):** week-scoped sports
+    (NFL/NCAAF need a "current week" window, not a rolling day-count; soccer's
+    available-date probe is per-league) — can't be validated live this
+    season, tracked via a code-comment seam in `_default_board_window_dates`
+    rather than bolted into the daily-window logic.
+  - Full plan: `C:\Users\tempadmin\.claude\plans\quirky-plotting-hummingbird.md`.
+  - **Test coverage:** ~35 new tests across `tests/test_intelligence_state.py`
+    and `tests/test_intelligence_contracts.py`, all confirmed non-vacuous
+    (failed against pre-fix source). Fixed 3 pre-existing, unrelated
+    background-loop tests that this session's fuller `_background_loop()`
+    exercise exposed as broken by real wall-clock time passing (hardcoded
+    2026-06-xx dates hit `_watched_payload_eviction_reason`'s stale-date/
+    stale-limit checks) — those tests would have hung forever pre-#93-follow-up
+    (nothing else queued to fall back to), not failed loudly; confirmed
+    unrelated to the board redesign itself. Full `test_intelligence_state.py`
+    + `test_intelligence_contracts.py`: 201 passed, 0 failed.
+  - ⚠️ **NOT YET VALIDATED IN PRODUCTION.** The flag is off; Phases 1/3
+    (background-loop seeding, the two write-side fixes) ARE live once
+    deployed regardless of the flag, since they're unconditional — watch
+    `_diag_log_all_process_memory`/cycle-timing logs for the new today+1/+2
+    builds for ~24h before flipping `SYNDICATE_INTELLIGENCE_COMBINED_BOARD_DEFAULT`
+    on.
 
 ### Reconciliation 2026-07-26
 

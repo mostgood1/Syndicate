@@ -111,11 +111,16 @@
   ];
   const DEFAULT_QUESTION = "top edges today";
 
-  // The server's own resolved "today" (already Central-time-correct, same
-  // value the #board-date input defaults to) -- used as the anchor for
-  // "Tomorrow" instead of the browser's own local clock/timezone, which
-  // could disagree with which slate the backend actually considers today.
-  const TODAY_ISO = "{{ initial_intelligence_selected_date | default('', true) }}";
+  // The server's own resolved "today" (already Central-time-correct) --
+  // used as the anchor for "Tomorrow" instead of the browser's own local
+  // clock/timezone, which could disagree with which slate the backend
+  // actually considers today. Deliberately a SEPARATE variable from
+  // initial_intelligence_selected_date (which now defaults to empty/None
+  // for the combined "All" board -- see #93 follow-up): the tab dates must
+  // always be real regardless of which filter is initially active, but the
+  // #board-date input's own default value should stay empty so state.date
+  // initializes to "All", not implicitly "today".
+  const TODAY_ISO = "{{ initial_intelligence_today_iso | default('', true) }}";
   function isoDatePlusDays(isoDate, days) {
     if (!isoDate) return "";
     const parts = isoDate.split("-").map(Number);
@@ -125,12 +130,15 @@
     return date.toISOString().slice(0, 10);
   }
   const TOMORROW_ISO = isoDatePlusDays(TODAY_ISO, 1);
-  // Day-ahead lookahead (2026-07-24): "Tomorrow" surfaces whatever the
-  // day-ahead sim + OddsAPI lookahead process has already produced for the
-  // next date -- force_refresh:true on the query lets the backend
-  // synchronously compute a real board for a date it's never been asked
-  // for yet, instead of only ever serving whatever's already cached.
+  // #93 follow-up: "All" is the default board -- everything currently
+  // relevant across sports/dates in one fetch (server-side, gated on
+  // SYNDICATE_INTELLIGENCE_COMBINED_BOARD_DEFAULT) -- with date as a filter
+  // over that single fetch, not a trigger for a new one. See the day-tab
+  // click handler below: Today/Tomorrow are now client-side filters too,
+  // same as sport/game-state, instead of each triggering their own
+  // /api/intelligence/query round trip.
   const DAY_TABS = [
+    { value: "all", label: "All", date: null },
     { value: "today", label: "Today", date: TODAY_ISO },
     { value: "tomorrow", label: "Tomorrow", date: TOMORROW_ISO },
   ];
@@ -142,6 +150,7 @@
   let hasRenderedIntelligence = false;
   let currentIntelligenceRequest = null;
   let lastRenderItems = [];
+  let lastSteamEvents = [];
 
   const urlParams = new URLSearchParams(window.location.search);
   const state = {
@@ -229,26 +238,27 @@
     // client-side (matchesFilters, same as the market/min-edge tabs below
     // already do via matchesClientFilters) makes tab switches instant and
     // removes the dependence on that cold path entirely.
-    // Unlike the other tab groups below, a day change is NOT a client-side
-    // refinement over already-fetched data -- it's a genuinely different
-    // date's board, so this is the one tab group that triggers a real
-    // server round trip (forceRefresh), same as the free date-input submit
-    // just below it in the DOM.
-    const activeDayValue = state.date === TOMORROW_ISO ? "tomorrow" : (!state.date || state.date === TODAY_ISO ? "today" : null);
+    // #93 follow-up: day tabs are now a client-side refinement too, same as
+    // sport/game-state below -- the default "All" fetch already contains
+    // every currently-relevant date (see read_combined_intelligence_response
+    // server-side), so Today/Tomorrow/All just narrow lastRenderItems via
+    // matchesClientFilters' date clause instead of triggering a new
+    // /api/intelligence/query round trip. The free-text #board-date input
+    // (below, in the DOM) is the one remaining path that still does a real
+    // server fetch -- it's the explicit override for a date outside the
+    // warm window, which genuinely isn't in lastRenderItems yet.
+    const activeDayValue = !state.date ? "all" : (state.date === TODAY_ISO ? "today" : (state.date === TOMORROW_ISO ? "tomorrow" : null));
     renderTabs("board-day-tabs", DAY_TABS, activeDayValue, (value) => {
       const tab = DAY_TABS.find((candidate) => candidate.value === value);
-      if (!tab || !tab.date || tab.date === state.date) return;
-      state.date = tab.date;
+      if (!tab) return;
+      const nextDate = tab.date || "";
+      if (nextDate === (state.date || "")) return;
+      state.date = nextDate;
       const dateInput = document.getElementById("board-date");
-      if (dateInput) dateInput.value = tab.date;
+      if (dateInput) dateInput.value = nextDate;
       syncUrlState();
-      // Re-render immediately (optimistic) so the clicked pill shows as
-      // active right away rather than waiting on the async fetch below --
-      // same fix as the Layer 1 market board's tab groups needed earlier
-      // this session (a click must re-invoke its own render, not just
-      // mutate state and wait for something else to redraw it).
       renderFilterTabs();
-      void loadIntelligence({ forceRefresh: true });
+      renderBoardBody();
     });
     renderTabs("board-sport-tabs", SPORT_TABS, state.sport, (value) => {
       state.sport = value;
@@ -625,6 +635,15 @@
       if (state.marketFamily === "prop" && !isProp) return false;
       if (state.marketFamily === "game" && isProp) return false;
     }
+    // #93 follow-up: date narrows the combined "All" fetch client-side, same
+    // as market/min-edge above. game_date/source_board_date are stamped
+    // server-side by read_combined_intelligence_response; an item with
+    // neither (e.g. a single-date fetch that predates this field) is never
+    // excluded by a date filter, since it has nothing to disagree with.
+    if (state.date) {
+      const itemDate = String(item.game_date || item.source_board_date || "").slice(0, 10);
+      if (itemDate && itemDate !== state.date) return false;
+    }
     return true;
   }
 
@@ -751,6 +770,17 @@
     } catch (err) { /* scoreboard hydration is best-effort */ }
   }
 
+  async function loadSteam() {
+    try {
+      const dateParam = state.date ? `date=${encodeURIComponent(state.date)}&` : "";
+      const res = await fetch(`/api/board/steam?${dateParam}limit=6`, { cache: "no-store" });
+      if (!res.ok) return;
+      const json = await res.json();
+      lastSteamEvents = Array.isArray(json.events) ? json.events : [];
+      renderTopStrip(lastRenderItems.filter(matchesFilters).filter(matchesClientFilters));
+    } catch (err) { /* steam rail is best-effort */ }
+  }
+
   function chipForGame(group) {
     if (gameChipsById.has(group.key)) return gameChipsById.get(group.key);
     const sport = String(group.sport || "").toLowerCase();
@@ -860,9 +890,40 @@
     });
   }
 
+  function steamDeltaText(event) {
+    const steam = event && event.steam ? event.steam : {};
+    const bits = [];
+    if (typeof steam.line_delta === "number" && steam.line_delta !== 0) {
+      bits.push(`${steam.line_delta > 0 ? "+" : ""}${steam.line_delta} line`);
+    }
+    if (typeof steam.odds_delta === "number" && steam.odds_delta !== 0) {
+      bits.push(`${steam.odds_delta > 0 ? "+" : ""}${steam.odds_delta}¢`);
+    }
+    return bits.join(" · ") || "Movement detected";
+  }
+
   function renderTopStrip(items) {
     const container = document.getElementById("board-top-strip");
     if (!container) return;
+    // #83/#86: steam takes the rail whenever there's any today -- it's the
+    // more actionable signal (a real, fast market move) than a static
+    // edge ranking. Falls back to the edge-ranked "Best opportunities" rail
+    // on a quiet day so the strip is never just empty.
+    if (Array.isArray(lastSteamEvents) && lastSteamEvents.length) {
+      container.innerHTML = `
+        <h2 class="board-section-title">📡 Steam</h2>
+        <div class="board-strip">
+          ${lastSteamEvents.slice(0, 6).map((event) => `
+            <div class="board-strip-card" title="${escapeHtml((event.capture_phase || "").toString())}">
+              <div class="board-strip-card__title">${escapeHtml(event.label || "Market movement")}</div>
+              <div class="board-strip-card__edge">${escapeHtml(steamDeltaText(event))}</div>
+              <div class="board-strip-card__pick">${escapeHtml(formatTimestamp(event.timestamp))}${event.is_live ? " · live" : ""}</div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+      return;
+    }
     const top = items.slice().sort((a, b) => edgeValue(b) - edgeValue(a)).slice(0, 6);
     if (!top.length) {
       container.innerHTML = "";
@@ -1231,6 +1292,7 @@
     state.date = document.getElementById("board-date").value || state.date;
     syncUrlState();
     void loadGameChips();
+    void loadSteam();
     void loadIntelligence({ forceRefresh: true });
   });
 
@@ -1249,10 +1311,11 @@
     void loadIntelligence({});
   }
   void loadGameChips();
+  void loadSteam();
 
   window.SyndicatePolling.startFromPolicy(
     {},
-    { onTick: () => { void loadGameChips(); return loadIntelligence({ background: true }); } },
+    { onTick: () => { void loadGameChips(); void loadSteam(); return loadIntelligence({ background: true }); } },
     { enabled: true, intervalMs: 60000, refreshOnVisible: true, refreshOnFocus: true, skipWhenHidden: true, preventOverlap: true }
   );
 })();

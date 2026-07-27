@@ -2,11 +2,48 @@ from __future__ import annotations
 
 from collections.abc import MutableMapping
 from dataclasses import dataclass, field
+from datetime import datetime as _datetime
 from typing import Any, Mapping
+
+from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
 
 
 def _copy_mapping(value: Any) -> dict[str, Any]:
     return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _parse_candidate_timestamp_to_central_date(value: Any) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    normalized = text.replace("Z", "+00:00")
+    try:
+        parsed = _datetime.fromisoformat(normalized)
+    except Exception:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=CENTRAL_TIMEZONE)
+    return parsed.astimezone(CENTRAL_TIMEZONE).date().isoformat()
+
+
+def resolve_candidate_game_date(payload: Mapping[str, Any], *, fallback: str | None = None) -> str | None:
+    """The candidate's OWN game date, not "which build produced it".
+
+    UniversalCandidate.from_raw used to fold every candidate's date tag down
+    to payload["selected_date"]/["date"] -- the date the outer overview was
+    built for, identical for every candidate from that one build. A
+    per-game timestamp (when the raw row carries one, e.g. WNBA's
+    start_time_utc in cards.py) is what actually varies per candidate, and
+    is what a cross-date combined board needs in order to filter by date
+    correctly. See #93 follow-up: the combined-board work that motivated
+    this needs per-candidate dates that are genuinely per-candidate.
+    """
+    for key in ("commence_time", "start_time_utc", "game_time_utc", "game_date"):
+        resolved = _parse_candidate_timestamp_to_central_date(payload.get(key))
+        if resolved:
+            return resolved
+    text = str(fallback or "").strip()
+    return text or None
 
 
 def _copy_sequence_of_strings(value: Any) -> tuple[str, ...]:
@@ -307,10 +344,11 @@ class UniversalCandidate(MutableMapping[str, Any]):
         }
         sport_context = {key: value for key, value in sport_context.items() if value is not None}
 
+        shared_selected_date = _first_text(provenance_payload.get("selected_date"), payload.get("selected_date"), payload.get("date"))
         provenance = {
             "source": _first_text(provenance_payload.get("source"), payload.get("source"), payload.get("source_path")),
             "source_id": _first_text(provenance_payload.get("source_id"), payload.get("source_id"), payload.get("prediction_id"), payload.get("recommendation_id")),
-            "selected_date": _first_text(provenance_payload.get("selected_date"), payload.get("selected_date"), payload.get("date")),
+            "selected_date": resolve_candidate_game_date(payload, fallback=shared_selected_date),
             "created_at": _first_text(provenance_payload.get("created_at"), payload.get("created_at")),
         }
         provenance = {key: value for key, value in provenance.items() if value is not None}

@@ -11,6 +11,7 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime
 from datetime import date
+from datetime import timedelta
 from datetime import timezone
 from pathlib import Path
 from typing import Any, Mapping
@@ -35,6 +36,7 @@ from syndicate.features.intelligence_board import build_intelligence_board_contr
 from syndicate.features.intelligence_board import dedupe_recommendation_items
 from syndicate.features.intelligence.signals.normalization import _numeric_hint
 from syndicate.features.intelligence.signals.normalization import _safe_text
+from syndicate.features.shared.intelligence_contracts import resolve_candidate_game_date
 from syndicate.features.shared.market_id import attach_market_id
 from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
 from syndicate.features.shared.odds_control_plane import odds_history_roots_for_sport
@@ -101,6 +103,40 @@ def _next_supported_intelligence_date(current_date: str | None) -> str | None:
         return None
     future_dates = [value for value in _supported_intelligence_dates() if date.fromisoformat(value) > reference_date]
     return future_dates[0] if future_dates else None
+
+
+def _board_window_days() -> int:
+    raw = _env_int("SYNDICATE_INTELLIGENCE_BOARD_WINDOW_DAYS", 3)
+    return max(1, min(7, raw))
+
+
+def _default_board_window_dates(today: str | None = None) -> list[str]:
+    """Which dates the background loop should proactively keep warm for the
+    combined cross-date board (see #93's follow-up: the single-date "latest
+    slot" model is what let rollover corrupt a shared key). Always includes
+    today even if it isn't in _supported_intelligence_dates() yet (artifacts
+    can post after the loop starts for the day) so today's own slot is never
+    silently dropped from the watch set. Days after today are intersected
+    with _supported_intelligence_dates() so no cycle is wasted computing a
+    date nothing has published a schedule for.
+
+    Deliberately daily/near-daily sports only (mlb, nba, wnba, ncaab, nhl --
+    whatever _supported_intelligence_dates() covers). NFL/NCAAF are
+    week-scoped, not date-scoped, and soccer's available-date probe is
+    per-league -- conflating either into this rolling day-window would be
+    the wrong shape for them. Tracked as a separate follow-up
+    (_default_week_scoped_dates, not yet implemented) rather than bolted on
+    here.
+    """
+    reference = str(today or "").strip() or central_today_iso()
+    try:
+        reference_date = date.fromisoformat(reference)
+    except Exception:
+        return [reference]
+    window_days = _board_window_days()
+    candidate_dates = [(reference_date + timedelta(days=offset)).isoformat() for offset in range(window_days)]
+    supported = set(_supported_intelligence_dates())
+    return [value for value in candidate_dates if value == reference or value in supported]
 
 
 def _state_backend_kind() -> str:
@@ -511,7 +547,7 @@ def _empty_write_would_clobber_good_board(incoming: dict[str, Any]) -> bool:
         return False
     try:
         selected_date = str(incoming.get("selected_date") or "").strip()
-        existing = read_json_file(_intelligence_state_daily_paths()["state"]) if selected_date else None
+        existing = read_json_file(_intelligence_state_daily_paths(selected_date)["state"]) if selected_date else None
         if not isinstance(existing, dict):
             return False
         if str(existing.get("selected_date") or "").strip() != selected_date:
@@ -1004,12 +1040,24 @@ def _decorate_response_with_state_meta(response: dict[str, Any] | None, snapshot
     return current
 
 
-def _intelligence_state_daily_suffix() -> str:
-    return central_today_iso().replace("-", "_")
+def _intelligence_state_daily_suffix(selected_date: str | None = None) -> str:
+    value = str(selected_date or "").strip() or central_today_iso()
+    return value.replace("-", "_")
 
 
-def _intelligence_state_daily_paths() -> dict[str, Path]:
-    suffix = _intelligence_state_daily_suffix()
+def _intelligence_state_daily_paths(selected_date: str | None = None) -> dict[str, Path]:
+    """selected_date should be the CONTENT's own represented date, not the
+    wall-clock day of writing -- passing none defaults to wall-clock today,
+    which is correct for every pre-#93-follow-up caller (they all read/write
+    today's own state). write_latest_intelligence_state now passes the
+    response's actual selected_date explicitly: before this parameter
+    existed, a today+1/today+2 board-window cycle (see
+    _ensure_default_board_window_watched) would write its content into
+    TODAY's daily file just because that's when it happened to run, silently
+    mixing two different dates' data into one file -- the same corruption
+    class #93 fixed for the in-memory snapshot key, reappearing here on disk.
+    """
+    suffix = _intelligence_state_daily_suffix(selected_date)
     base_dir = reports_root() / "intelligence"
     return {
         "state": base_dir / f"intelligence_state_{suffix}.json",
@@ -1481,7 +1529,21 @@ def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
         return None
     logger.info("INTELLIGENCE STATE PERSIST BEFORE", extra={"candidate_count": candidate_count})
     print(f"[intelligence_state] STATE_PERSIST_BEGIN candidate_count={candidate_count}", flush=True)
-    daily_paths = _intelligence_state_daily_paths()
+    # #93 follow-up. daily_paths must be keyed by THIS content's own date, not
+    # wall-clock today: with the board-window watch set proactively computing
+    # today+1/today+2 (_ensure_default_board_window_watched), a call for
+    # tomorrow's content landing here on a call made "today" used to write
+    # into intelligence_state_<today>.json purely because of when it ran --
+    # silently mixing two different dates' data into the file every reader of
+    # "today's daily file" trusts. The GLOBAL, no-date files
+    # (INTELLIGENCE_STATE_PATH/BOARD_SNAPSHOT_PATH) are reserved for today's
+    # own board specifically -- many callers read them with no date at all,
+    # so a future date must never become "latest" there; it stays reachable
+    # only through its own dated file.
+    content_date = str(normalized.get("selected_date") or "").strip()
+    today_iso = central_today_iso()
+    represents_today_or_dateless = (not content_date) or content_date == today_iso
+    daily_paths = _intelligence_state_daily_paths(content_date or today_iso)
     state_meta = dict(normalized.get("state_meta") or {})
     live_pipeline = dict(normalized.get("live_pipeline") or {})
     board_snapshot_payload = _intelligence_board_snapshot_payload(normalized)
@@ -1489,7 +1551,8 @@ def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
     # connection on the full ~8.9MB payload, discarding a correctly computed
     # board every cycle. See _compact_state_for_persist.
     persisted = _compact_state_for_persist(normalized)
-    _write_state_payload(INTELLIGENCE_STATE_PATH, persisted)
+    if represents_today_or_dateless:
+        _write_state_payload(INTELLIGENCE_STATE_PATH, persisted)
     _write_state_payload(daily_paths["state"], persisted)
     history_entry = _intelligence_state_history_entry(normalized)
     INTELLIGENCE_HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -1500,7 +1563,8 @@ def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
     with daily_paths["history"].open("a", encoding="utf-8") as history_file:
         history_file.write(json.dumps(history_entry, sort_keys=True, ensure_ascii=False, default=str))
         history_file.write("\n")
-    write_json_file(BOARD_SNAPSHOT_PATH, board_snapshot_payload)
+    if represents_today_or_dateless:
+        write_json_file(BOARD_SNAPSHOT_PATH, board_snapshot_payload)
     write_json_file(daily_paths["board_snapshot"], board_snapshot_payload)
     if _live_pipeline_has_activity(live_pipeline):
         live_pipeline["generated_at"] = str(live_pipeline.get("generated_at") or state_meta.get("computed_at") or normalized.get("snapshot_generated_at") or _utc_now()).strip() or _utc_now()
@@ -1677,6 +1741,16 @@ class IntelligenceStateService:
         self._max_snapshots = max(5, _env_int("SYNDICATE_INTELLIGENCE_MAX_SNAPSHOTS", 12))
         self._snapshots: OrderedDict[str, IntelligenceSnapshot] = OrderedDict()
         self._watched_payloads: OrderedDict[str, dict[str, Any]] = OrderedDict()
+        # #93 follow-up: which dates _ensure_default_board_window_watched has
+        # queued and when, so today can be re-queued every cycle (matching
+        # the pre-existing single-date-default cadence) while today+1/today+2
+        # are throttled to SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS
+        # -- near-future candidate pools change far less between odds ticks
+        # than today's live-game state does, so re-building them every
+        # interval would be pure multiplication of an already OOM-sensitive
+        # call, not a real freshness gain. Process-local by design: a restart
+        # simply re-queues everything on the next iteration, same as today.
+        self._board_window_last_queued_at: dict[str, float] = {}
         self._pending_keys: OrderedDict[str, dict[str, Any]] = OrderedDict()
         # Separate from _watched_payloads/_pending_keys above (which are keyed
         # by a hash of the whole request payload, incl. free-text "question" --
@@ -2687,6 +2761,42 @@ class IntelligenceStateService:
             "force_refresh": True,
         }
 
+    def _ensure_default_board_window_watched(self) -> None:
+        """Proactively keeps a small, bounded set of upcoming dates warm
+        (see _default_board_window_dates) instead of relying on the single
+        dateless "default" payload plus reactive rollover-on-thin, which is
+        what let a look-ahead-shifted compute silently corrupt the shared
+        "today" key (#93). Every date here is queued with an EXPLICIT date,
+        so each gets its own stable, never-overwritten storage key -- there
+        is no ambiguity left for a rollover to exploit.
+
+        today is re-queued every call (same cadence the single-date default
+        already had). today+1/today+2 are throttled to
+        SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS so watching
+        a 3-day window costs roughly "1 today-cadence build + a slow trickle
+        of up to 2 more", not a flat 3x multiply of _build_candidate_pool
+        calls every cycle -- this repo has a real OOM history around that
+        function.
+        """
+        today = central_today_iso()
+        slow_refresh_seconds = max(30, _env_int("SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS", 300))
+        now = time.time()
+        for window_date in _default_board_window_dates(today):
+            if window_date != today:
+                last_queued_at = self._board_window_last_queued_at.get(window_date)
+                if last_queued_at is not None and (now - last_queued_at) < slow_refresh_seconds:
+                    continue
+            payload = self._default_payload()
+            payload["date"] = window_date
+            self.queue_refresh(payload)
+            self._board_window_last_queued_at[window_date] = now
+        # Drop tracking for dates that have aged out of the window (e.g. a
+        # slate that finished and rolled off yesterday) so this dict does not
+        # grow without bound across days.
+        current_window = set(_default_board_window_dates(today))
+        for stale_date in [tracked for tracked in self._board_window_last_queued_at if tracked not in current_window]:
+            self._board_window_last_queued_at.pop(stale_date, None)
+
     def _sync_persisted_state_locked(self, *, force: bool = True) -> None:
         self._load_persisted_state_locked(force=force or _state_backend_kind() == "keyvalue")
 
@@ -2741,6 +2851,16 @@ class IntelligenceStateService:
             # a factor -- settles whether the thread is genuinely idle or
             # actually working. Remove once resolved.
             print(f"[intelligence_state] LOOP_ITERATION pending_keys={len(self._pending_keys)} watched_payloads={len(self._watched_payloads)}", flush=True)
+            # #93 follow-up. Independent of the canonical board-state flags
+            # below -- this seeds the legacy _watched_payloads queue (the
+            # storage that's actually live in production) with an explicit
+            # per-date payload for each date in the board window, so "today"
+            # never again shares a key with a look-ahead-shifted compute.
+            # NOT wrapped in `with self._condition` here: it calls
+            # self.queue_refresh() internally, which acquires the condition
+            # itself -- self._lock is a plain, non-reentrant threading.Lock,
+            # so nesting the two would deadlock this thread against itself.
+            self._ensure_default_board_window_watched()
             if canonical_board_state_enabled() or canonical_board_state_shadow_compare_enabled():
                 # Additive dual-write during the migration-step-2 validation
                 # window: drains _watched_board_dates and writes the new
@@ -2988,7 +3108,27 @@ class IntelligenceStateService:
                         existing_latest = self._snapshots.get(self._latest_key or "") if self._latest_key else None
                         existing_latest_count = _intelligence_state_candidate_count(existing_latest.response) if existing_latest is not None and isinstance(existing_latest.response, dict) else 0
                         snapshot_count = _intelligence_state_candidate_count(response) if isinstance(response, dict) else 0
-                        if snapshot_count > 0 or existing_latest_count <= 0 or self._latest_key == snapshot.key:
+                        # #93 follow-up: Phase 1's board-window watch set means
+                        # this loop now legitimately processes several distinct
+                        # dates' payloads in the same run (today, today+1,
+                        # today+2), each already stored under its own stable
+                        # key above. self._latest_key is what every DATELESS
+                        # read resolves through -- promoting it to "whichever
+                        # date this loop iteration happened to process" would
+                        # make it flip-flop between today/tomorrow/day-after
+                        # depending on processing order, reintroducing the
+                        # exact ambiguity #93 fixed via a different path.
+                        # self._latest_key must only ever represent today (or a
+                        # genuinely dateless payload) -- a future date is only
+                        # ever reachable through its own explicit key.
+                        effective_date = str(effective_payload.get("date") or effective_payload.get("selected_date") or "").strip()
+                        represents_today_or_dateless = (not effective_date) or effective_date == central_today_iso()
+                        if not represents_today_or_dateless:
+                            print(
+                                f"[intelligence_state] LATEST_KEY_PROMOTION_SKIPPED_NON_TODAY key={snapshot.key} date={effective_date}",
+                                flush=True,
+                            )
+                        elif snapshot_count > 0 or existing_latest_count <= 0 or self._latest_key == snapshot.key:
                             self._latest_key = snapshot.key
                         else:
                             print(
@@ -3696,11 +3836,18 @@ class IntelligenceStateService:
             print(f"[intelligence_state] STATE_PERSIST_FAILED {type(exc).__name__}: {exc}", flush=True)
         if latest_snapshot is not None:
             try:
-                daily_paths = _intelligence_state_daily_paths()
+                # #93 follow-up: keyed by latest_snapshot's OWN date (matching
+                # write_latest_intelligence_state's fix), not wall-clock today
+                # -- self._latest_key should only ever reach here already
+                # representing today-or-dateless (see the promotion guard in
+                # _background_loop), but deriving the path from the actual
+                # content rather than assuming is the same hardening either way.
+                latest_snapshot_date = str(latest_snapshot.payload.get("date") or latest_snapshot.payload.get("selected_date") or "").strip() or None
+                daily_paths = _intelligence_state_daily_paths(latest_snapshot_date)
                 latest_response = dict(latest_snapshot.response or {}) if isinstance(latest_snapshot.response, dict) else {}
                 board_snapshot_payload = _intelligence_board_snapshot_payload(
                     latest_response,
-                    selected_date=str(latest_snapshot.payload.get("date") or latest_snapshot.payload.get("selected_date") or "").strip() or None,
+                    selected_date=latest_snapshot_date,
                 )
                 write_json_file(
                     BOARD_SNAPSHOT_PATH,
@@ -3763,6 +3910,125 @@ def read_latest_intelligence_state_response(
         allow_latest_fallback=allow_latest_fallback,
     )
     return _promote_board_contract_cards(response) if isinstance(response, dict) else response
+
+
+_COMBINED_INTELLIGENCE_RESPONSE_CACHE: dict[tuple[Any, ...], tuple[float, dict[str, Any]]] = {}
+_COMBINED_INTELLIGENCE_RESPONSE_CACHE_MAX_ENTRIES = 32
+
+
+def _combined_board_response_cache_ttl_seconds() -> float:
+    return max(1.0, float(_env_int("SYNDICATE_INTELLIGENCE_COMBINED_BOARD_CACHE_SECONDS", 15)))
+
+
+def _read_single_date_response_for_combining(selected_date: str) -> dict[str, Any] | None:
+    """One date's already-computed response, read-only. Tries the in-memory
+    snapshot the background loop already holds first (cheapest -- exactly
+    what _ensure_default_board_window_watched populates), then falls back to
+    that date's own on-disk file for cross-process/cold-start reads. Never
+    computes anything -- see read_combined_intelligence_response's own
+    docstring for why that invariant matters.
+    """
+    payload = _INTELLIGENCE_STATE_SERVICE._default_payload()
+    payload["date"] = selected_date
+    normalized = _INTELLIGENCE_STATE_SERVICE._normalize_payload(payload)
+    key = _payload_key(normalized)
+    snapshot = _INTELLIGENCE_STATE_SERVICE._snapshots.get(key)
+    if snapshot is not None and isinstance(snapshot.response, dict) and _intelligence_state_candidate_count(snapshot.response) > 0:
+        return dict(snapshot.response)
+    on_disk = read_json_file(_intelligence_state_daily_paths(selected_date)["state"])
+    if isinstance(on_disk, dict) and _intelligence_state_candidate_count(on_disk) > 0:
+        return on_disk
+    return None
+
+
+def read_combined_intelligence_response(
+    dates: list[str] | None = None,
+    *,
+    sport: str = "all",
+    limit: int | None = None,
+) -> dict[str, Any]:
+    """Unions several already-computed per-date responses into one cross-date
+    board -- the read-side half of #93's follow-up: the default board is
+    everything currently relevant across sports and dates, and date becomes
+    a filter, not the primary query key.
+
+    Hard invariant: this function NEVER calls _build_candidate_pool or any
+    other compute path. It only reads what _ensure_default_board_window_watched
+    (in the background loop) has already built. _build_candidate_pool is
+    expensive enough to have caused production OOM kills; calling it
+    synchronously per request, per date, would multiply that risk exactly
+    the way this whole redesign is trying to avoid.
+    """
+    requested_dates = [str(value).strip() for value in (dates or _default_board_window_dates()) if str(value or "").strip()]
+    if not requested_dates:
+        requested_dates = [central_today_iso()]
+    cache_key = (tuple(sorted(requested_dates)), str(sport or "all").strip().lower(), limit)
+    ttl_seconds = _combined_board_response_cache_ttl_seconds()
+    cached = _COMBINED_INTELLIGENCE_RESPONSE_CACHE.get(cache_key)
+    if cached is not None and (time.time() - cached[0]) < ttl_seconds:
+        return dict(cached[1])
+
+    merged_recommendations: list[dict[str, Any]] = []
+    by_date_summary: dict[str, dict[str, Any]] = {}
+    covered_sports: set[str] = set()
+
+    for requested_date in requested_dates:
+        date_response = _read_single_date_response_for_combining(requested_date)
+        if date_response is None:
+            by_date_summary[requested_date] = {"candidate_count": 0, "covered_sports": []}
+            print(f"[intelligence_state] COMBINED_BOARD_STATE_DATE_MISS date={requested_date}", flush=True)
+            continue
+        date_by_sport = date_response.get("by_sport") if isinstance(date_response.get("by_sport"), dict) else {}
+        date_candidate_count = 0
+        date_covered_sports: set[str] = set()
+        for sport_key, items in date_by_sport.items():
+            if not isinstance(items, list):
+                continue
+            for item in items:
+                if not isinstance(item, Mapping):
+                    continue
+                tagged = dict(item)
+                tagged["game_date"] = resolve_candidate_game_date(tagged, fallback=requested_date)
+                tagged["source_board_date"] = requested_date
+                tagged.setdefault("sport", sport_key)
+                merged_recommendations.append(tagged)
+                date_candidate_count += 1
+                date_covered_sports.add(str(sport_key))
+                covered_sports.add(str(sport_key))
+        by_date_summary[requested_date] = {"candidate_count": date_candidate_count, "covered_sports": sorted(date_covered_sports)}
+
+    # build_intelligence_board_contract does the real, date-agnostic ranking
+    # (publication_priority/coverage_score/advanced_ready/score/edge/
+    # confidence -- no date component); feeding it the raw merged candidates
+    # here, THEN deriving by_sport/top_opportunities/recommendations from its
+    # sorted+deduped cards via _promote_board_contract_cards, keeps every
+    # exposed list in one single, consistently-ordered representation
+    # instead of maintaining two independently-sorted copies.
+    contract_input = {"recommendations": merged_recommendations}
+    board_contract = build_intelligence_board_contract(contract_input)
+    combined = _promote_board_contract_cards({"board_contract": board_contract})
+    combined["ranked_all"] = list(combined.get("top_opportunities") or [])
+    combined["ok"] = True
+    combined["selected_date"] = None
+    combined["dates_covered"] = requested_dates
+    combined["by_date"] = by_date_summary
+    combined["covered_sports"] = sorted(covered_sports)
+    combined["candidate_count"] = len(merged_recommendations)
+    combined["state_meta"] = {
+        "source": "combined_board_window",
+        "computed_at": _utc_now(),
+        "age_seconds": 0.0,
+        "is_fresh": True,
+    }
+
+    sliced = slice_intelligence_board_state_for_request(combined, sport=sport, limit=limit)
+    sliced["board_contract"] = board_contract
+
+    _COMBINED_INTELLIGENCE_RESPONSE_CACHE[cache_key] = (time.time(), sliced)
+    if len(_COMBINED_INTELLIGENCE_RESPONSE_CACHE) > _COMBINED_INTELLIGENCE_RESPONSE_CACHE_MAX_ENTRIES:
+        oldest_key = min(_COMBINED_INTELLIGENCE_RESPONSE_CACHE, key=lambda k: _COMBINED_INTELLIGENCE_RESPONSE_CACHE[k][0])
+        _COMBINED_INTELLIGENCE_RESPONSE_CACHE.pop(oldest_key, None)
+    return dict(sliced)
 
 
 def _decorate_intelligence_board_snapshot_response(

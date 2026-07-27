@@ -21,6 +21,7 @@ from pipeline.intelligence_state import canonical_board_state_shadow_compare_ena
 from pipeline.intelligence_state import read_intelligence_board_state
 from pipeline.intelligence_state import read_latest_intelligence_board_state
 from pipeline.intelligence_state import slice_intelligence_board_state_for_request
+from pipeline.intelligence_state import read_combined_intelligence_response
 from pipeline.intelligence_state import _INTELLIGENCE_STATE_SERVICE
 from syndicate.features.intelligence import _market_focus_labels
 from syndicate.features.intelligence import _parlay_request_summary
@@ -193,6 +194,17 @@ def _no_cache_response(response):
 
 def _render_hosted_request() -> bool:
     raw_value = str(os.environ.get("RENDER") or os.environ.get("SYNDICATE_REQUIRE_HOSTED_STORAGE") or "").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
+
+
+def combined_board_default_enabled() -> bool:
+    # Dark-launched like SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE: ships
+    # off, flips on once production logs confirm it behaves as expected. See
+    # #93 follow-up -- "no explicit date" becomes "everything currently
+    # relevant across sports/dates" instead of "today only", with date
+    # turning into a client-side filter (syndicate/templates/intelligence.html)
+    # rather than the primary query key.
+    raw_value = str(os.environ.get("SYNDICATE_INTELLIGENCE_COMBINED_BOARD_DEFAULT") or "").strip().lower()
     return raw_value in {"1", "true", "yes", "on"}
 
 
@@ -1307,7 +1319,25 @@ def read_latest_intelligence_state(payload: dict[str, object] | None = None) -> 
 
 @intelligence_bp.get("/intelligence")
 def intelligence_home():
+    # #93 follow-up. Same explicit-date-first check as intelligence_query_api:
+    # captured before any default-injection, so a caller that passes ?date=
+    # gets byte-for-byte the existing single-date page, unchanged, regardless
+    # of this flag.
+    explicit_date = bool(str(request.args.get("date") or "").strip())
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    if not explicit_date and combined_board_default_enabled():
+        try:
+            initial_response = read_combined_intelligence_response(sport="all")
+            initial_response = _hydrate_board_response_payload(initial_response)
+        except Exception:
+            _LOGGER.exception("COMBINED_BOARD_RESPONSE_FAILURE")
+            initial_response = _empty_default_intelligence_response()
+        return render_template(
+            "intelligence.html",
+            initial_intelligence_response=initial_response,
+            initial_intelligence_selected_date=None,
+            initial_intelligence_today_iso=central_today_iso(),
+        )
     payload = _intelligence_page_payload(selected_date, force_refresh=True)
     initial_response: dict[str, Any] = {}
     try:
@@ -1350,19 +1380,60 @@ def intelligence_home():
         "intelligence.html",
         initial_intelligence_response=initial_response,
         initial_intelligence_selected_date=selected_date,
+        initial_intelligence_today_iso=selected_date,
     )
 
 
 @intelligence_bp.post("/api/intelligence/query")
 def intelligence_query_api():
     global LAST_RESULT
-    payload = request.get_json(silent=True) or {}
-    payload = _normalize_default_query_payload(payload)
+    raw_payload = request.get_json(silent=True) or {}
+    # #93 follow-up. Captured from the RAW body, before _normalize_default_query_payload
+    # runs below -- that function only stamps a date onto the DEFAULT
+    # question, so checking here (rather than after) is what keeps this
+    # backward compatible: any caller that always passes its own date (e.g.
+    # ask_the_syndicate.py) is completely unaffected by anything past this
+    # point, because explicit_date is True for them and the branch below is
+    # never entered.
+    explicit_date = bool(str(raw_payload.get("date") or raw_payload.get("selected_date") or "").strip())
+    payload = _normalize_default_query_payload(raw_payload)
     question = str(payload.get("question") or "").strip()
     if not question:
         response = jsonify({"ok": False, "error": "question is required."})
         response.status_code = 400
         return _no_cache_response(response)
+    if not explicit_date and combined_board_default_enabled():
+        # Serves the cross-date, cross-sport combined board instead of
+        # today-only -- a completely separate, read-only path from
+        # everything below (which stays byte-for-byte unchanged for any
+        # explicit-date request, or when this flag is off). See
+        # read_combined_intelligence_response's own docstring for why it is
+        # safe to call directly from a request handler: it never computes,
+        # only reads what the background loop's board-window watch set
+        # (_ensure_default_board_window_watched) has already built.
+        try:
+            requested_sport = str(payload.get("sport") or "all").strip().lower() or "all"
+            response_payload = read_combined_intelligence_response(sport=requested_sport, limit=payload.get("limit"))
+        except Exception:
+            _LOGGER.exception("COMBINED_BOARD_RESPONSE_FAILURE")
+            response_payload = None
+        if isinstance(response_payload, dict):
+            response_payload = _hydrate_board_response_payload(response_payload)
+            response_payload.setdefault("ok", True)
+            response_payload.setdefault("response", dict(response_payload))
+            _attach_intelligence_response_aliases(response_payload)
+            LAST_RESULT = dict(response_payload.get("response") or response_payload.get("analysis") or {})
+            versioned_response = _versioned_query_response(response_payload)
+            versioned_response.update(_debug_state_fields(response_payload, source="combined_board_window"))
+            versioned_response["selected_date"] = None
+            versioned_response["dates_covered"] = response_payload.get("dates_covered")
+            _LOGGER.info(
+                "BETTING_BOARD_REFRESH_COMPLETE",
+                extra={"selected_date": None, "candidate_count": _response_candidate_count(response_payload), "source": "query_api_combined"},
+            )
+            return _no_cache_response(jsonify(versioned_response))
+        # A combined-reader failure falls through to the existing today-only
+        # path below rather than ever surfacing a 500.
     force_refresh = _query_bool(payload.get("force_refresh"))
     _LOGGER.info("BETTING_BOARD_REFRESH_START", extra={"selected_date": str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or None, "force_refresh": force_refresh, "source": "query_api"})
     if force_refresh:
@@ -1383,7 +1454,10 @@ def intelligence_query_api():
                 response_payload.setdefault("ok", True)
                 response_payload.setdefault("response", dict(response_payload))
                 _attach_intelligence_response_aliases(response_payload)
-                global LAST_RESULT
+                # global LAST_RESULT already declared at the top of this
+                # function -- a second nested declaration here is now a
+                # SyntaxError, since the new combined-board branch above
+                # assigns to LAST_RESULT earlier in the function body.
                 LAST_RESULT = dict(response_payload.get("response") or response_payload.get("analysis") or {})
                 versioned_response = _versioned_query_response(response_payload)
                 versioned_response.update(_debug_state_fields(response_payload, source="snapshot_read"))
@@ -1808,6 +1882,43 @@ def board_game_chips_api():
         _LOGGER.exception("BOARD_GAME_CHIPS_FAILURE")
         chips = []
     return _no_cache_response(jsonify({"ok": True, "date": selected_date, "chips": chips}))
+
+
+def _steam_event_label(event: dict[str, Any]) -> str:
+    sport = str(event.get("sport") or "").strip().upper()
+    market_type = str(event.get("market_type") or "").strip().replace("_", " ")
+    subject = str(event.get("player_id") or event.get("game_id") or "").strip()
+    bits = [part for part in (sport, market_type, subject) if part]
+    return " · ".join(bits) if bits else "Market movement"
+
+
+@intelligence_bp.get("/api/board/steam")
+def board_steam_api():
+    # #83's actuator surface: the bounded per-date steam record
+    # (odds_refresh_tracking.py's _record_steam_events, capped at 200) read
+    # back for the Layer 2 board's steam rail. Deliberately reads the same
+    # small file the ops artifact-export debug endpoint already serves
+    # rather than the raw per-observation lifecycle log -- see the pattern
+    # note in artifact_publisher.py's HOT_ARTIFACT_PATTERNS.
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    try:
+        limit = max(1, min(50, int(request.args.get("limit") or 12)))
+    except (TypeError, ValueError):
+        limit = 12
+    events: list[dict[str, Any]] = []
+    try:
+        path = reports_root() / "steam" / f"steam_events_{selected_date}.json"
+        payload = read_json_file(path)
+        raw_events = payload.get("events") if isinstance(payload, dict) else None
+        if isinstance(raw_events, list):
+            events = [event for event in raw_events if isinstance(event, dict)]
+    except Exception:
+        _LOGGER.exception("BOARD_STEAM_READ_FAILURE")
+        events = []
+    recent = list(reversed(events))[:limit]
+    for event in recent:
+        event["label"] = _steam_event_label(event)
+    return _no_cache_response(jsonify({"ok": True, "date": selected_date, "count": len(recent), "events": recent}))
 
 
 @intelligence_bp.get("/intelligence/status")
