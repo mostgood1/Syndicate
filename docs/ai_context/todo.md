@@ -6,7 +6,7 @@ list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-07-27 (see "Reconciliation 2026-07-27").
 
-> **Next free ID: 99.** IDs are never reused. Closed items move to
+> **Next free ID: 100.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
 
@@ -573,6 +573,79 @@ now genuinely met rather than merely believed.
     state/board_snapshot files) for anything that doesn't specifically need
     a fresh synchronous candidate-pool build, and prefer asking for a
     refresh-worker log pull over triggering one of these on web at all.
+- **New: #99** (filed, shipped this session, **commit pending**) — user
+  reported MLB K-prop targets stuck at 5 rows and pitcher badges missing on
+  a number of game cards. Root-caused via production reads (no deploy
+  needed): the odds and sim pipelines are both healthy —
+  `oddsapi_pitcher_props_<date>.json` refreshes on schedule and the MLB
+  daily-sim reruns on fingerprint changes — but only 5 of today's 24
+  starters had a book-posted strikeout line at the times checked (confirmed
+  by two independent K-ladder-targets rebuilds ~40 minutes apart landing on
+  the exact same 5 pitchers; odds prices drifted, the roster of who-has-a-
+  line didn't). That part is expected pregame-cadence behavior, not a bug.
+  Two real code defects found and fixed while investigating, both in
+  `vendor/mlb_bettingv2/tools/daily_update_multi_profile.py`:
+  - **K-ladder-targets had no protection against a scoped/partial resim
+    regressing a richer existing artifact.** Unlike HR-targets
+    (`_prefer_richer_hr_targets_doc`/`_hr_targets_doc_quality`, comparing
+    `(rows, games, source_priority)` and keeping whichever whole document is
+    bigger), the K-ladder write path (`:6319`) unconditionally overwrote
+    with whatever the current run's scoped `sim_dir` + live odds snapshot
+    produced, as long as it had any rows at all — no comparison against
+    what was already published. Added `_k_ladder_targets_doc_quality`/
+    `_prefer_richer_k_ladder_targets_doc` mirroring HR's pattern exactly and
+    rewired the write block to match. Verified with synthetic inputs: a
+    smaller scoped rebuild now correctly keeps the richer existing doc, a
+    genuinely bigger rebuild still replaces it.
+  - **The displayed summary for both K-targets and HR-targets led with
+    non-explanatory restatements of the model's own math, not real
+    drivers.** `_k_ladder_target_support` (`:3557`) generates two of its
+    three reasons by literally restating the pick's own probability/edge
+    numbers ("Modeled strikeout total clears X..." / "Model favors the over
+    by Y points..."), and because those were prepended first, they
+    dominated `k_target_summary` (the first-two-reasons join) on every row,
+    crowding out the seven real BvP/opponent-team/recent-form/Statcast/
+    pitch-mix generators that already existed further down the list. Same
+    bug, more literal example, in `_hitter_hr_target_support` (`:2920`):
+    "He is tracking toward a premium lineup slot (4)" and a bare PA-
+    opportunity line led ahead of every Statcast/xwoba/exit-velo/pulled-air/
+    platoon/pitch-type/park signal — the "just because he's hitting
+    cleanup" pattern the user named directly. Fixed both by moving the
+    generic-restatement/opportunity/lineup blocks to append last (addition
+    is commutative, so this changes zero score math, only reason-TEXT
+    order); also added a weather reason sentence for HR (`weather_hr_mult`
+    was already scored but never explained in the reason text). Verified
+    with synthetic inputs that Statcast reasons now sort ahead of the
+    generic lines in both functions.
+  - **Weather/park traced end-to-end this session** (an Explore agent did
+    the tracing): live MLB StatsAPI gameday weather is genuinely wired into
+    HR reasoning (`weather_hr_mult`, real, not dead code) via a roster
+    snapshot → sim join. That is a **different** pipeline from #84's newer
+    NWS-based `scripts/fetch_mlb_weather.py` — its
+    `data/weather/weather_<date>.json` still isn't joined into any
+    prediction, confirming #84 is still accurate today. Park factors: the
+    real Statcast-derived generator
+    (`vendor/mlb_bettingv2/tools/datasets/build_park_factors_from_raw.py`)
+    exists but its output was never generated or committed, so
+    `park_hr_mult` runs on a crude geometry fallback today (self-documented
+    in `sim_engine/models.py:169-188` as "not a true historical park
+    factor"). Neither weather nor park factors are wired into
+    K-target/strikeout reasoning at all. User explicitly chose to leave
+    this as-is (not generate the park-factors dataset, not pull in #84's
+    weather artifact) rather than expand scope this session.
+  - ⚠️ **Not yet committed or deployed.** Verified via `py_compile` and
+    synthetic-input sanity checks only —
+    `_hitter_hr_target_support`/`_k_ladder_target_support`/
+    `_prefer_richer_k_ladder_targets_doc` have no existing unit test
+    coverage anywhere in this repo, a pre-existing gap, not introduced this
+    session. Also worth recording: this session found the working tree
+    already carrying large unrelated concurrent edits to
+    `syndicate/features/mlb/cards.py` (+280/-50 lines) and
+    `syndicate/features/shared/market_inventory.py` (+36 lines) from what
+    appears to be a parallel session (matches #98's own "a parallel
+    session's log pull" note, and two commits — `66e9d7b9` #97,
+    `59480b94` #98 — landed on `main` mid-session without this session
+    pushing them) — did not touch, stage, or commit either file.
 
 ### Reconciliation 2026-07-26
 

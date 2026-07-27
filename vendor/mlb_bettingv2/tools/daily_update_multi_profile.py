@@ -2921,52 +2921,17 @@ def _hitter_hr_target_support(
     rec: Dict[str, Any],
     context_fields: Dict[str, Any],
 ) -> Dict[str, Any]:
+    # Reason ordering is deliberate: Statcast/pitch-mix/park/weather blocks
+    # come first because their reasons.append() calls are what the summary
+    # (first two entries) and the trimmed driver bullets actually surface.
+    # The opportunity/lineup-slot block below is real signal for the SCORE
+    # (addition is commutative, so moving it doesn't change score math) but
+    # is not itself an explanation of why a player is a HR threat -- "hits
+    # cleanup" says nothing about his power profile -- so its reasons are
+    # appended last, as lower-priority context rather than the headline.
     score = 50.0
     reasons: List[str] = []
     metrics: Dict[str, Any] = {}
-
-    pa_mean = _safe_float(rec.get("pa_mean"))
-    ab_mean = _safe_float(rec.get("ab_mean"))
-    lineup_order = _safe_int(rec.get("lineup_order"))
-    lineup_status = str(context_fields.get("lineup_status") or "").strip().lower()
-    lineup_confidence = _safe_float(context_fields.get("lineup_confidence"))
-
-    if pa_mean is not None:
-        metrics["paMean"] = round(float(pa_mean), 2)
-        if float(pa_mean) >= 4.3:
-            score += 9.0
-            reasons.append(f"Expected opportunity is strong at about {float(pa_mean):.1f} PA.")
-        elif float(pa_mean) >= 4.0:
-            score += 6.0
-        elif float(pa_mean) < 3.4:
-            score -= 8.0
-    if ab_mean is not None:
-        metrics["abMean"] = round(float(ab_mean), 2)
-        if float(ab_mean) >= 3.6:
-            score += 3.0
-        elif float(ab_mean) < 3.0:
-            score -= 4.0
-    if lineup_order is not None:
-        metrics["lineupOrder"] = int(lineup_order)
-        if int(lineup_order) <= 3:
-            score += 6.0
-            reasons.append(f"He is tracking toward a premium lineup slot ({int(lineup_order)}).")
-        elif int(lineup_order) <= 5:
-            score += 3.0
-        elif int(lineup_order) >= 7:
-            score -= 4.0
-    if lineup_status:
-        metrics["lineupStatus"] = lineup_status
-        if lineup_status == "confirmed":
-            score += 4.0
-        elif lineup_status == "projected":
-            score += 2.0
-    if lineup_confidence is not None:
-        metrics["lineupConfidence"] = round(float(lineup_confidence), 3)
-        if float(lineup_confidence) >= 0.8:
-            score += 2.0
-        elif float(lineup_confidence) <= 0.45:
-            score -= 2.0
 
     batter_hr_quality = _safe_float(context_fields.get("batter_statcast_hr_mult"))
     if batter_hr_quality is not None:
@@ -3081,8 +3046,56 @@ def _hitter_hr_target_support(
         metrics["weatherHr"] = round(float(weather_hr_mult), 3)
         if float(weather_hr_mult) >= 1.03:
             score += 3.0
+            reasons.append("Today's wind and temperature reading favors extra carry on fly balls.")
         elif float(weather_hr_mult) <= 0.97:
             score -= 3.0
+
+    # Opportunity/lineup-slot signal is appended last, deliberately -- see
+    # the block comment at the top of this function. Moving it here changes
+    # nothing about the score (addition is commutative); it only changes
+    # which reasons occupy the summary's first two sentences.
+    pa_mean = _safe_float(rec.get("pa_mean"))
+    ab_mean = _safe_float(rec.get("ab_mean"))
+    lineup_order = _safe_int(rec.get("lineup_order"))
+    lineup_status = str(context_fields.get("lineup_status") or "").strip().lower()
+    lineup_confidence = _safe_float(context_fields.get("lineup_confidence"))
+
+    if pa_mean is not None:
+        metrics["paMean"] = round(float(pa_mean), 2)
+        if float(pa_mean) >= 4.3:
+            score += 9.0
+            reasons.append(f"Expected opportunity is strong at about {float(pa_mean):.1f} PA.")
+        elif float(pa_mean) >= 4.0:
+            score += 6.0
+        elif float(pa_mean) < 3.4:
+            score -= 8.0
+    if ab_mean is not None:
+        metrics["abMean"] = round(float(ab_mean), 2)
+        if float(ab_mean) >= 3.6:
+            score += 3.0
+        elif float(ab_mean) < 3.0:
+            score -= 4.0
+    if lineup_order is not None:
+        metrics["lineupOrder"] = int(lineup_order)
+        if int(lineup_order) <= 3:
+            score += 6.0
+            reasons.append(f"He is tracking toward a premium lineup slot ({int(lineup_order)}).")
+        elif int(lineup_order) <= 5:
+            score += 3.0
+        elif int(lineup_order) >= 7:
+            score -= 4.0
+    if lineup_status:
+        metrics["lineupStatus"] = lineup_status
+        if lineup_status == "confirmed":
+            score += 4.0
+        elif lineup_status == "projected":
+            score += 2.0
+    if lineup_confidence is not None:
+        metrics["lineupConfidence"] = round(float(lineup_confidence), 3)
+        if float(lineup_confidence) >= 0.8:
+            score += 2.0
+        elif float(lineup_confidence) <= 0.45:
+            score -= 2.0
 
     raw_score = max(0.0, float(score))
     clipped_score = min(100.0, raw_score)
@@ -3730,7 +3743,16 @@ def _collect_daily_k_ladder_targets(
             )
             support_label = _k_ladder_target_label(support_score)
 
-            k_target_reasons: List[str] = list(support_reasons)
+            # Advanced-stat / matchup-history reasons lead the list. They're
+            # what the summary (first two entries, below) and the trimmed
+            # driver bullets actually surface to a viewer. _k_ladder_target_
+            # support's own reasons restate the bet's own probability/edge
+            # numbers -- real inputs to the score, but not an explanation of
+            # WHY the model believes them -- so they're demoted to filler at
+            # the end, used only when a pitcher genuinely has no qualifying
+            # BvP/opponent/form/Statcast/pitch-mix driver (e.g. a first-time
+            # matchup with no logged starts).
+            k_target_reasons: List[str] = []
             if pitcher_profile:
                 for reason in (
                     _pitcher_bvp_reason(pitcher_profile, opponent_lineup),
@@ -3742,6 +3764,8 @@ def _collect_daily_k_ladder_targets(
                     _pitcher_workload_reason(pitcher_profile, prop="strikeouts", selection="over"),
                 ):
                     _append_unique_reason(k_target_reasons, reason)
+            for reason in support_reasons:
+                _append_unique_reason(k_target_reasons, reason)
 
             row = {
                 **base,
@@ -3762,7 +3786,7 @@ def _collect_daily_k_ladder_targets(
                 "k_support_score": float(support_score),
                 "k_support_label": support_label,
                 "k_target_reasons": _trim_reason_list(k_target_reasons),
-                "k_target_summary": " ".join(k_target_reasons[:2]) if k_target_reasons else "",
+                "k_target_summary": " ".join(_trim_reason_list(k_target_reasons)[:2]) if k_target_reasons else "",
                 "sim_sample_size": _sim_sample_size_from_sim_obj(sim_obj),
                 "source": "pitcher_props.so_dist",
             }
@@ -3853,6 +3877,27 @@ def _prefer_richer_hr_targets_doc(
     if not isinstance(primary, dict):
         return challenger
     return challenger if _hr_targets_doc_quality(challenger) > _hr_targets_doc_quality(primary) else primary
+
+
+def _k_ladder_targets_doc_quality(doc: Optional[Dict[str, Any]]) -> Tuple[int, int]:
+    # Mirrors _hr_targets_doc_quality (no source_priority term -- K ladder
+    # targets only ever have one source_profile, "pitcher_props_recos").
+    if not isinstance(doc, dict):
+        return (-1, -1)
+    rows = len([row for row in (doc.get("rows") or []) if isinstance(row, dict)])
+    games = _safe_int(((doc.get("counts") or {}).get("games"))) or 0
+    return (int(rows), int(games))
+
+
+def _prefer_richer_k_ladder_targets_doc(
+    primary: Optional[Dict[str, Any]],
+    challenger: Optional[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    if not isinstance(challenger, dict):
+        return primary if isinstance(primary, dict) else None
+    if not isinstance(primary, dict):
+        return challenger
+    return challenger if _k_ladder_targets_doc_quality(challenger) > _k_ladder_targets_doc_quality(primary) else primary
 
 
 def _build_recommendation_reasons(row: Dict[str, Any]) -> List[str]:
@@ -6321,7 +6366,44 @@ def main() -> int:
         k_ladder_sim_dir = _path_from_maybe_relative(pitcher_profile_info.get("sim_dir")) or pitcher_sim_dir
         k_ladder_snapshot_dir = _path_from_maybe_relative(pitcher_profile_info.get("snapshot_dir"))
         if k_ladder_sim_dir is not None and pitcher_lines_path.exists():
-            k_ladder_targets_doc = _collect_daily_k_ladder_targets(
+            # Mirrors the HR-targets merge pattern: a scoped/partial resim can
+            # produce a smaller candidate doc than what's already published
+            # (fewer games in this run's sim_dir, or a transient odds-pull
+            # gap), and this must never regress a richer existing artifact --
+            # the old code unconditionally overwrote whenever the fresh build
+            # had any rows at all, with no comparison against what was
+            # already there.
+            canonical_existing_k_ladder_targets_doc: Optional[Dict[str, Any]] = None
+            try:
+                if k_ladder_targets_path.exists() and k_ladder_targets_path.is_file():
+                    loaded_existing = _read_json(k_ladder_targets_path)
+                    canonical_existing_k_ladder_targets_doc = loaded_existing if isinstance(loaded_existing, dict) else None
+            except Exception:
+                canonical_existing_k_ladder_targets_doc = None
+
+            tracked_k_ladder_targets_path: Optional[Path] = None
+            tracked_existing_k_ladder_targets_doc: Optional[Dict[str, Any]] = None
+            try:
+                candidate_tracked_k_ladder_targets_path = (_ROOT / "data" / "daily" / k_ladder_targets_path.name).resolve()
+                same_existing_path = False
+                try:
+                    same_existing_path = candidate_tracked_k_ladder_targets_path == k_ladder_targets_path.resolve()
+                except Exception:
+                    same_existing_path = str(candidate_tracked_k_ladder_targets_path) == str(k_ladder_targets_path)
+                if not same_existing_path and candidate_tracked_k_ladder_targets_path.exists() and candidate_tracked_k_ladder_targets_path.is_file():
+                    tracked_k_ladder_targets_path = candidate_tracked_k_ladder_targets_path
+                    loaded_tracked_existing = _read_json(tracked_k_ladder_targets_path)
+                    tracked_existing_k_ladder_targets_doc = loaded_tracked_existing if isinstance(loaded_tracked_existing, dict) else None
+            except Exception:
+                tracked_k_ladder_targets_path = None
+                tracked_existing_k_ladder_targets_doc = None
+
+            existing_k_ladder_targets_doc = _prefer_richer_k_ladder_targets_doc(
+                canonical_existing_k_ladder_targets_doc,
+                tracked_existing_k_ladder_targets_doc,
+            )
+
+            candidate_k_ladder_targets_doc = _collect_daily_k_ladder_targets(
                 k_ladder_sim_dir,
                 pitcher_lines_path,
                 k_ladder_snapshot_dir,
@@ -6330,14 +6412,13 @@ def main() -> int:
                 source_profile="pitcher_props_recos",
                 so_prob_calibration=so_prob_calibration,
             )
-            if int(k_ladder_targets_doc["counts"]["rows"]) > 0:
+            k_ladder_targets_doc = _prefer_richer_k_ladder_targets_doc(existing_k_ladder_targets_doc, candidate_k_ladder_targets_doc)
+            if isinstance(k_ladder_targets_doc, dict) and k_ladder_targets_doc is not canonical_existing_k_ladder_targets_doc:
                 _write_json(k_ladder_targets_path, k_ladder_targets_doc)
-                print(f"[multi-profile] Wrote K ladder targets artifact: {_rel(k_ladder_targets_path)} (rows={k_ladder_targets_doc['counts']['rows']})")
-            elif k_ladder_targets_path.exists():
-                print(f"[multi-profile] Kept existing K ladder targets artifact (0 new candidates): {_rel(k_ladder_targets_path)}")
-            else:
-                _write_json(k_ladder_targets_path, k_ladder_targets_doc)
-                print(f"[multi-profile] Wrote empty K ladder targets artifact (0 candidates): {_rel(k_ladder_targets_path)}")
+                rows_written = (k_ladder_targets_doc.get("counts") or {}).get("rows")
+                print(f"[multi-profile] Wrote K ladder targets artifact: {_rel(k_ladder_targets_path)} (rows={rows_written})")
+            elif isinstance(k_ladder_targets_doc, dict):
+                print(f"[multi-profile] Kept richer existing K ladder targets artifact: {_rel(k_ladder_targets_path)}")
         else:
             k_ladder_targets_error = "missing pitcher sim_dir or pitcher lines"
             print(f"[multi-profile] K ladder targets skipped: {k_ladder_targets_error}")
