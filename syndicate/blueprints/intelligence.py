@@ -1948,6 +1948,18 @@ def _steam_event_has_real_line(event: dict[str, Any]) -> bool:
     return True
 
 
+def _steam_event_has_line_move(event: dict[str, Any]) -> bool:
+    # _steam_event_has_real_line answers "can this market type have a real
+    # line at all" (excludes h2h) -- a separate question from "did the line
+    # actually move on THIS event." A market with a real line concept but
+    # line_delta==0 (only the price moved) must not be treated as a line
+    # move by significance ranking or dedup, or an odds-only move on a
+    # normal prop market would wrongly collapse with its opposite side.
+    steam = event.get("steam") if isinstance(event.get("steam"), dict) else {}
+    line_delta = steam.get("line_delta")
+    return isinstance(line_delta, (int, float)) and line_delta != 0 and _steam_event_has_real_line(event)
+
+
 def _steam_event_line_text(event: dict[str, Any]) -> str:
     # selection (over/under) and line are separate fields on props
     # (_flatten_mlb_props), absent on game markets (h2h/totals/spreads), so
@@ -1960,6 +1972,36 @@ def _steam_event_line_text(event: dict[str, Any]) -> str:
     return selection or line or ""
 
 
+def _steam_event_dedupe_key(event: dict[str, Any]) -> tuple:
+    # A real line move is one book decision, not two -- both the over and
+    # the under necessarily reprice when the book moves the number, so
+    # OddsAPI's two rows (one per side) produce two steam events for what a
+    # viewer experiences as a single move. Confirmed live 2026-07-27 (user
+    # screenshot): "Tj Friedl Over 1.5" and "Tj Friedl Under 1.5" both
+    # showing the identical "0.5 -> 1.5 line" move. For a real line move,
+    # selection is deliberately left OUT of the key so both sides collapse
+    # together. An odds-only move (no line change) is a genuine per-side
+    # signal -- one side can get bet up without the other moving at all --
+    # so selection stays part of the key there and both can still show.
+    subject = _steam_event_subject(event).lower()
+    market_type = str(event.get("market_type") or "").strip().lower()
+    game_id = str(event.get("game_id") or "").strip()
+    if _steam_event_has_line_move(event):
+        steam = event.get("steam") if isinstance(event.get("steam"), dict) else {}
+        return (subject, market_type, game_id, "line-move", steam.get("previous_line"), event.get("line"))
+    selection = str(event.get("selection") or "").strip().lower()
+    return (subject, market_type, game_id, selection, event.get("price"))
+
+
+def _steam_event_side_priority(event: dict[str, Any]) -> int:
+    # Tiebreak for which side survives dedup when a real line move produces
+    # an identical key for both -- "over" is the conventional default a
+    # sportsbook leads with, so it wins the tie deterministically rather
+    # than depending on which row happened to sort/arrive first.
+    selection = str(event.get("selection") or "").strip().lower()
+    return {"over": 0, "under": 1}.get(selection, 2)
+
+
 def _steam_event_significance(event: dict[str, Any]) -> tuple[int, float]:
     # User-directed ranking (2026-07-27): a move that actually shifted the
     # line outranks every odds-only move regardless of size -- a real line
@@ -1967,10 +2009,8 @@ def _steam_event_significance(event: dict[str, Any]) -> tuple[int, float]:
     # number, not just repriced around it). Within each tier, biggest
     # magnitude first.
     steam = event.get("steam") if isinstance(event.get("steam"), dict) else {}
-    line_delta = steam.get("line_delta")
-    has_line_move = isinstance(line_delta, (int, float)) and line_delta != 0 and _steam_event_has_real_line(event)
-    if has_line_move:
-        return (1, abs(line_delta))
+    if _steam_event_has_line_move(event):
+        return (1, abs(steam.get("line_delta")))
     odds_delta = steam.get("odds_delta")
     magnitude = abs(odds_delta) if isinstance(odds_delta, (int, float)) else 0.0
     return (0, magnitude)
@@ -2023,9 +2063,20 @@ def board_steam_api():
     # recency -- the whole bounded 200-event set is in play, not just the
     # newest `limit`, since a big move from a few cycles ago should still
     # outrank a tiny move that happened a minute later. The timestamp on
-    # each card is what tells the viewer how fresh it is.
-    ranked = sorted(events, key=_steam_event_significance, reverse=True)
-    recent = ranked[:limit]
+    # each card is what tells the viewer how fresh it is. Side priority
+    # ("over" before "under") only breaks ties between events that will
+    # collapse to the same dedupe key below -- it doesn't otherwise affect
+    # ranking, since significance is compared first.
+    ranked = sorted(events, key=lambda event: (_steam_event_significance(event), -_steam_event_side_priority(event)), reverse=True)
+    deduped: list[dict[str, Any]] = []
+    seen_keys: set[tuple] = set()
+    for event in ranked:
+        key = _steam_event_dedupe_key(event)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        deduped.append(event)
+    recent = deduped[:limit]
     # Headshots need a real MLBAM player ID, which the raw OddsAPI prop rows
     # never carry (only a display name) -- resolved via the day's roster
     # snapshots (hr_targets.mlb_player_id_lookup_for_date), same source
