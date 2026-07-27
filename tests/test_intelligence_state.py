@@ -158,6 +158,37 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertIsNotNone(response)
         self.assertEqual(response.get("response", {}).get("selected_date"), "2026-07-27")
 
+    def test_read_latest_response_rejects_a_direct_key_hit_whose_content_is_a_different_date(self) -> None:
+        # Second half of the same bug: production measures central_today_iso()
+        # == an explicit same-day request's own date on an ordinary day, so
+        # the background loop's dateless "default" cycle and an explicit
+        # "date": "2026-07-27" request normalize to the SAME cache key. If
+        # that key's stored payload nominally says "2026-07-27" (matching)
+        # but its response content actually represents 2026-07-28 (a
+        # look-ahead-shifted compute that ran under a same-day key), the
+        # payload-date check alone says "matches, serve it" -- only checking
+        # the response's own real selected_date catches this. Confirmed live
+        # 2026-07-27: this exact shape (direct key hit, matching payload
+        # date, mismatched response date) is what kept serving MLB's board
+        # as a WNBA-only, tomorrow-dated snapshot even after the latest_key
+        # fallback guard above was deployed -- a direct hit never reaches
+        # that fallback code at all.
+        service = IntelligenceStateService()
+        payload = {"question": "top edges today", "date": "2026-07-27"}
+        snapshot = IntelligenceSnapshot(
+            key=_payload_key(payload),
+            payload=dict(payload),
+            response={"ok": True, "response": {"selected_date": "2026-07-28", "recommendations": [{"sport": "WNBA"}]}},
+            computed_at=intelligence_state_module._utc_now(),
+            source_fingerprint="fingerprint-1",
+        )
+        service._snapshots[snapshot.key] = snapshot
+        service._latest_key = snapshot.key
+
+        response = service.read_latest_response(dict(payload), force_refresh=False, allow_latest_fallback=False)
+
+        self.assertIsNone(response)
+
     def test_read_latest_response_does_not_fall_back_to_other_sport(self) -> None:
         service = IntelligenceStateService()
         mlb_payload = {

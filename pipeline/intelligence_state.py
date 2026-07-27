@@ -648,31 +648,48 @@ def _selected_date_from_response(response: dict[str, Any] | None) -> str | None:
 def _effective_snapshot_date(snapshot: "IntelligenceSnapshot") -> str | None:
     """The date a snapshot actually represents, for matching against a request.
 
-    Confirmed live 2026-07-27: the background loop's own recurring "default"
-    query (the one that keeps the board fresh for plain "today" requests)
-    carries no explicit "date" field in its payload -- by design, per
-    _stale_snapshot_reason's docstring, a dateless payload is "the legitimate
-    'today' default". Look-ahead being enabled (SYNDICATE_LOOK_AHEAD_ENABLED,
-    the deliberate "show tomorrow's slate when today has none" behavior) lets
-    that SAME dateless cycle sometimes resolve internally to TOMORROW's date
-    instead -- observed: every sport's context_label read 2026-07-28 in one
-    cycle while the payload's own "date" field stayed unset. Every date-match
-    guard below only ever inspected the stored payload's nominal date, so
-    "latest_date is None" was read as "matches any requested date" -- which
-    is true for the common case (a dateless default really did compute
-    today) but let a look-ahead-shifted dateless cycle silently stand in for
-    an EXPLICIT same-day request too, serving tomorrow's (WNBA-only) board
-    in place of today's (all-sport) one for hours until the next dateless
-    cycle happened to land back on today.
+    Confirmed live 2026-07-27, two distinct shapes of the same underlying
+    bug: the background loop's own recurring "default" query -- the one
+    that keeps the board fresh for plain "today" requests -- can, with
+    look-ahead enabled (SYNDICATE_LOOK_AHEAD_ENABLED, the deliberate "show
+    tomorrow's slate when today has none" behavior), internally resolve to
+    TOMORROW's date instead of today's -- observed: every sport's
+    context_label read 2026-07-28 in one cycle. This can happen (a) with no
+    explicit "date" field in the stored payload at all (a dateless payload
+    is, per _stale_snapshot_reason's docstring, "the legitimate 'today'
+    default"), or (b) -- confirmed separately, after fixing (a) alone did
+    not clear the production symptom -- with an EXPLICIT payload date that
+    itself claims "2026-07-27" while the response it's paired with actually
+    computed "2026-07-28". Every date-match guard used to trust the stored
+    payload's nominal date (explicit or absent) as authoritative; this let
+    a look-ahead-shifted cycle silently stand in for an explicit same-day
+    request, serving tomorrow's (WNBA-only) board in place of today's
+    (all-sport) one for hours.
 
-    Falls back to the response's own computed selected_date only when the
-    payload itself is silent -- an explicit payload date is still the
-    authoritative signal when present.
+    So the response's own computed selected_date is checked FIRST, not the
+    payload's claim -- the payload cannot be trusted to describe what was
+    actually computed. Only falls back to the payload's date when the
+    response itself doesn't expose one (a genuinely unknown case, not the
+    common one).
     """
-    payload_date = _selected_date_from_payload(snapshot.payload if isinstance(snapshot.payload, dict) else None)
-    if payload_date is not None:
-        return payload_date
-    return _selected_date_from_response(snapshot.response if isinstance(snapshot.response, dict) else None)
+    response_date = _selected_date_from_response(snapshot.response if isinstance(snapshot.response, dict) else None)
+    if response_date is not None:
+        return response_date
+    return _selected_date_from_payload(snapshot.payload if isinstance(snapshot.payload, dict) else None)
+
+
+def _snapshot_matches_requested_date(snapshot: "IntelligenceSnapshot", requested_date: str | None) -> bool:
+    """True unless the snapshot's real content is a KNOWN, DIFFERENT date.
+
+    Thin wrapper around _effective_snapshot_date for the direct-hit
+    branches of read_latest_response, which -- unlike the latest_key
+    fallback below -- never checked the snapshot's date against the
+    request at all (any non-stale hit returned immediately).
+    """
+    if requested_date is None:
+        return True
+    effective_date = _effective_snapshot_date(snapshot)
+    return effective_date is None or effective_date == requested_date
 
 
 def _utc_timestamp_string(value: str | None) -> str | None:
@@ -2610,7 +2627,7 @@ class IntelligenceStateService:
             # stale, same threshold _enqueue_locked already uses to decide
             # whether a snapshot needs recomputing.
             snapshot = self._snapshots.get(key)
-            if snapshot is not None and not self._is_stale(snapshot):
+            if snapshot is not None and not self._is_stale(snapshot) and _snapshot_matches_requested_date(snapshot, requested_date):
                 return dict(snapshot.response)
             if requested_sport and requested_sport != "all":
                 for candidate_snapshot in reversed(list(self._snapshots.values())):
@@ -2635,7 +2652,7 @@ class IntelligenceStateService:
                 return None
             self._sync_persisted_state_locked(force=force_refresh)
             snapshot = self._snapshots.get(key)
-            if snapshot is not None:
+            if snapshot is not None and _snapshot_matches_requested_date(snapshot, requested_date):
                 return dict(snapshot.response)
             latest_snapshot = self._snapshots.get(self._latest_key or "") if self._latest_key else None
             if latest_snapshot is not None:
