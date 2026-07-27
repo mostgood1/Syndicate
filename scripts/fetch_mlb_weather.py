@@ -184,18 +184,26 @@ def _todays_home_teams(date_str: str) -> list[str]:
     # non-empty games list -- confirmed by production's parks/errors both
     # staying {} every run since #92 shipped. Rather than keep guessing at
     # which local path this service's disk happens to have, fall back to the
-    # schedule directly; a transient statsapi failure still fails open to [].
-    try:
-        return _home_teams_from_statsapi_schedule(date_str)
-    except Exception:
-        return []
+    # schedule directly -- this call is allowed to raise; the caller records
+    # WHY into `errors` rather than swallowing it here. A prior version
+    # swallowed it with a bare `except Exception: return []`, which shipped
+    # 2026-07-27 and still produced empty parks/errors in production with
+    # zero visibility into whether the fallback even ran, let alone why it
+    # failed -- this script's own stdout goes to a subprocess-local log file
+    # (weather_fetch.log), not Render's log collector, so that failure mode
+    # was otherwise completely invisible from outside the box.
+    return _home_teams_from_statsapi_schedule(date_str)
 
 
 def fetch_weather_for_date(date_str: str) -> dict:
     now_epoch = datetime.now(timezone.utc).timestamp()
-    teams = _todays_home_teams(date_str)
     parks: dict[str, dict] = {}
     errors: dict[str, str] = {}
+    try:
+        teams = _todays_home_teams(date_str)
+    except Exception as exc:  # fail open: an empty slate beats a crashed run
+        teams = []
+        errors["_home_teams_lookup"] = f"{type(exc).__name__}: {exc}"
     for team in teams:
         coords = STADIUM_COORDS.get(team)
         if not coords:

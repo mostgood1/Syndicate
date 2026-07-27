@@ -8,7 +8,14 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from scripts.fetch_mlb_weather import STADIUM_COORDS, _home_teams_from_statsapi_schedule, _todays_home_teams, parse_wind_mph, trim_hourly_periods
+from scripts.fetch_mlb_weather import (
+    STADIUM_COORDS,
+    _home_teams_from_statsapi_schedule,
+    _todays_home_teams,
+    fetch_weather_for_date,
+    parse_wind_mph,
+    trim_hourly_periods,
+)
 
 
 class MlbWeatherTests(unittest.TestCase):
@@ -88,14 +95,31 @@ class MlbWeatherTests(unittest.TestCase):
         mock_get.assert_called_once()
         self.assertIn("statsapi.mlb.com", mock_get.call_args[0][0])
 
-    def test_todays_home_teams_fails_open_when_everything_is_unavailable(self) -> None:
+    def test_todays_home_teams_raises_when_everything_is_unavailable(self) -> None:
+        # _todays_home_teams itself does NOT swallow the schedule-fallback
+        # failure -- a prior version did (bare `except Exception: return []`
+        # around the fallback call), and that shipped 2026-07-27 still
+        # producing empty parks/errors in production with zero visibility
+        # into why. The caller (fetch_weather_for_date) is what fails open
+        # now, and it records the reason -- see the test below.
         with TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             with patch("syndicate.features.mlb.sources._artifact_roots", return_value=[root]):
                 with patch("scripts.fetch_mlb_weather.data_root", return_value=root):
                     with patch("scripts.fetch_mlb_weather._get_json", side_effect=OSError("network down")):
-                        teams = _todays_home_teams("2026-07-27")
-        self.assertEqual(teams, [])
+                        with self.assertRaises(OSError):
+                            _todays_home_teams("2026-07-27")
+
+    def test_fetch_weather_for_date_fails_open_and_records_the_reason(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            with patch("syndicate.features.mlb.sources._artifact_roots", return_value=[root]):
+                with patch("scripts.fetch_mlb_weather.data_root", return_value=root):
+                    with patch("scripts.fetch_mlb_weather._get_json", side_effect=OSError("network down")):
+                        doc = fetch_weather_for_date("2026-07-27")
+        self.assertEqual(doc["parks"], {})
+        self.assertIn("_home_teams_lookup", doc["errors"])
+        self.assertIn("network down", doc["errors"]["_home_teams_lookup"])
 
     def test_statsapi_schedule_fallback_parses_home_teams_and_dedupes(self) -> None:
         schedule_payload = {
