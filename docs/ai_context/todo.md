@@ -80,28 +80,36 @@ were resolved and nine already-closed rows removed from the open tables.
 
 ## Do first
 
-> **START HERE: confirm the board still fills on a fresh slate.** At
-> 2026-07-27T00:05Z it serves **27 real MLB props** with prices, lines and
-> edges, all from the one live game, correctly flagged live. That is the first
-> genuinely correct populated board of the day, after five fixes: #79 (memory
-> guard counting evictable page cache — without it the build aborted before
-> doing anything), #68 a+b (zero-projection, panel-rows-as-picks) and #77b
-> (false liveness).
+> **START HERE (fresh session): read the morning slate before writing any
+> code.** Everything shipped 2026-07-26/27 reports its own results now, and the
+> morning readout decides what's next:
 >
-> ⚠️ **But it filled because a game went live, not because of the MLB artifact
-> work — see the correction in #68.** The board has still never been observed
-> healthy across a full pregame→live→final cycle, and both remaining sports
-> gaps are real: **MLS has no book prices at all** (#52/#53) and yesterday's
-> fixtures appear on today's soccer board. Watch a morning slate before
-> declaring any of this closed.
+> 1. **Burn attribution** — `/api/ops/oddsapi/quota` now carries
+>    `by_market_family` + `by_hour_utc`. One full slate of data decides #16's
+>    cuts (a)/(b) and validates the off-hours gate + per-sport cadence +
+>    `lines_props` tiering savings against the 11.12M/30d baseline.
+> 2. **CLV capture** — lifecycle observations are phase-tagged
+>    (`drift/ramp/closing/live`, `event_type="open"` = opener). Check the first
+>    full day's tags and whether T-window sweeps fired (`T_WINDOW_SWEEP_DUE`;
+>    WNBA is the sport they exist for).
+> 3. **The board through pregame→live→final** — never yet observed end to end.
+>    It rolled to Monday's slate with 38→35 pregame cards (pregame lane
+>    populated for the first time; cross-source dupes fixed 23fcf8fc). Watch
+>    lanes transition as games go live.
+> 4. **Steam + weather** — first `STEAM_DETECTED` events and
+>    `weather_<date>.json` artifacts should exist; spot-check both.
 >
-> ⚠️ **Read #68's "two bugs cancelling out" note before touching
-> `normalize_candidate`.** Adding `confidence` to the projection sources would
-> deliberately rebuild an artifact that briefly looked like a fix today.
+> Then, in order: **#68's MLB half** (unproven — needs a same-instant
+> worker-vs-web comparison, single-fetch A/B, on a pregame slate with markets),
+> **#84's sim join** (wind/temp into totals/HR via park factors), **#83's
+> surfaces** (board "why is this moving" + Ask the Syndicate, now that steam
+> events exist), **#38** (prune scaffolding — only after the readout validates),
+> **#85/#86** as designed. #56/#74 remain the architectural pair.
 >
-> #79 is resolved and also retires the "2.7 GB plateau" the last handoff left
-> open. #78 is **withdrawn**; both rows are kept because the corrections in
-> them are what stop the next session repeating them.
+> ⚠️ Read #68's "two bugs cancelling out" note before touching
+> `normalize_candidate`, and the cross-time-comparison operational note before
+> comparing worker to web. #78 stays archived as the worked example of the
+> rollover-probe misread.
 
 | # | Item | Notes |
 |---|---|---|
@@ -110,7 +118,6 @@ were resolved and nine already-closed rows removed from the open tables.
 | **85** | 🟡 **Remaining structured event feeds** (from the 2026-07-27 survey; general news watchers rejected). (a) **Soccer confirmed XI at ~T-60** — the biggest soccer line-mover, lands inside #82's ramp window; no free structured source identified yet, needs a source decision before any code. (b) **Official injury-report schedule audit** — basketball injury fetch already exists (`_fetch_injuries` → `fetch-injuries` CLI per sport package, fingerprint-diffed for change detection), so the open question is narrower than it looked: whether those fetches align with the leagues' fixed publication times, not whether the mechanism exists. (c) **Probable-pitcher change detection** — verify `probable_pitcher_overrides.json` is fed by detection rather than manually. |
 | **86** | 🟡 **LLM analyst layer — judgment, not detection.** Two scoped uses on top of #83's steam record and the existing triggers: **materiality classification** of detected changes (star scratch ≠ ninth bullpen arm; today both force the same sweep) and **movement annotation** ("why did this move") attached to steam events for the Ask the Syndicate briefing family, which is the natural home. Explicitly NOT a raw-news-firehose reader — cost, latency, and hallucinated urgency feeding a pipeline where false triggers block the board. Blocked on nothing, but do after #83's surface exists so the annotations have somewhere to land. |
 | **82** | 🟡 **Pregame odds capture: opening line, movement curve, CLV close — per-sport rules agreed 2026-07-27, Phase 1 SHIPPED.** The design (user-signed): each data product has its own sampling need — *opening* = first sweep after posting; *movement* = sparse drift samples + event triggers (lineup/injury force-refresh already exists and bypasses all cadence); *CLV close* = a **per-game T-minus sweep**, which slate-wide cadence structurally misses (worst for WNBA one-game days). **Rules:** MLB/WNBA pregame drift every **2h, full sweeps** (midday PROP samples ride along — user requires them); **soccer 8h (2–3/day)** pre-matchday, daily shape on matchday; live cadence untouched. **Phase 1 (shipped `pregame-cadence` commit):** per-sport interval filter in the tick — a sport whose OWN games aren't live sweeps at most once per its interval (before this, WNBA re-swept every 60s for the whole of an MLB slate); event-triggered sports bypass; every uncertainty fails open; `SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS[_<SPORT>]`, 0 disables. **Phases 2+3 SHIPPED 2026-07-27 (same session):** `capture_phase` tag (`drift/ramp/closing/live`, boundaries 80/12 min bracketing the T-windows; `event_type="open"` marks the opener) on every lifecycle observation; T-window scheduler fires full sweeps at T-75/T-10 per game for **non-live sports only** (a live sport's 60s slate-wide cadence already covers its pregame events — the windows matter exactly when they're cheap: first game of the day and WNBA one-game slates); commence times from MLB's game-lines snapshot and WNBA's vendor schedule, everything failing open to "nothing due"; `market_tier=lines_props` on pure drift sweeps drops MLB's 24 segment/alternate markets (~63% of per-event cost) with **existing segment lanes carried forward so the cards' F1/F3/F5/F7 tabs never blank between full sweeps**; T-windows, live, event triggers, and uncertainty all run full. ⚠️ Known limitation: MLB T-windows only fire from the service that owns MLB's tick (owner rules intact); MLS matchday ramp rides its games going live. *Original Phase 3 plan:* per-game **T-75m** post-lineup sweep and **T-10m closing sweep** driven by each sport's start times, plus a `phase` tag (`opening/drift/lineup_trigger/ramp/closing/live`) on lifecycle observations so opening/closing lines are lookups, not timestamp inference. **Phase 2 (after):** market tiering — lines-only drift via #17's slate endpoint (~6 credits) with props every 4h, full markets only at T-windows. |
-| **81** | 🔴 **The background loop's execution guard is not released in a `finally`, so a dead loop thread blocks the MLB sim forever.** Observed in production 2026-07-27T01:04Z: `_persist_locked` raised `KeyValuePayloadTooLarge` (see `c342f0d0`, now contained), the exception escaped `_background_loop`, and because `self._execution_guard.release()` sits AFTER the persist at the end of the loop body ([intelligence_state.py:2867](pipeline/intelligence_state.py:2867)) rather than in a `finally`, the dead thread kept the guard — `intelligence_pipeline_busy()` reads `guard.locked()`, so every `MLB_SIM_TICK` deferred on `intelligence_pipeline_busy` against a pipeline that no longer existed. `c342f0d0` removes the known thrower, but ANY uncovered exception in the snapshot-install stretch (2820–2866) reproduces this: thread dies silently, board freezes, sim starves, and the only symptom is a stale snapshot. Fix is mechanical but wide: wrap the loop body from guard acquisition through the wait in `try/finally`. Consider at the same time whether the whole `while` body should be exception-proof — today was the second silent thread death this week. |
 | **25** | Phase 0 fail-closed refresh guard + atomic writes | **Phase 0 shipped** — see Done. Remaining: the look-ahead's own interval marker (#24) has not been audited for the same fail-open pattern, and several non-artifact writers still use the unsafe collision-prone temp shape. **Enumerated 2026-07-26 — it is six files, not the three previously listed, and the `backtest_*` scripts are NOT among them** (that entry was wrong): [fetch_soccer_history_local.py:44](scripts/fetch_soccer_history_local.py:44), [fetch_soccer_oddsapi_odds_local.py:82](scripts/fetch_soccer_oddsapi_odds_local.py:82), [fetch_soccer_oddsapi_props_local.py:105](scripts/fetch_soccer_oddsapi_props_local.py:105), [fetch_nfl_oddsapi_props_local.py:74](scripts/fetch_nfl_oddsapi_props_local.py:74), [fetch_mlb_oddsapi_local.py:72](scripts/fetch_mlb_oddsapi_local.py:72), [refresh_ncaaf_oddsapi.py:529](scripts/refresh_ncaaf_oddsapi.py:529). All use `path.with_suffix(path.suffix + ".tmp")`, so two concurrent writers of the same file collide on one temp path. `atomic_artifact_write.py` already exists; this is mechanical. |
 | **15** | 🔴 **DO NOT DOWNGRADE — conclusion INVERTED by the first full-day measurement, 2026-07-27T01:55Z.** The item's own instruction ("let the window run a full day") was finally satisfiable: baseline 2026-07-26T01:52Z → latest 2026-07-27T01:55Z, **86,572 s**. Result: **371,563 credits burned in 24 h → 15,451/hr → projected 11.12 M/30d — 2.2× OVER the 5 M target**, and 74% of even the current 15 M plan. Two independent counters agree exactly (provider `used` delta 1,188,309→1,559,872 vs local window sum). **Composition: MLB is 96.3%** (357,975 of 371,563; soccer 18 credits, WNBA 332 — both noise). ⚠️ **Why the earlier 1.42 M/mo read was wrong:** it was the period-to-date *average* — ~25 days during which the pipeline was repeatedly degraded (OOM loops, empty boards, workers down). Today was arguably the first fully-healthy day, and **a healthy system burns ~8× the degraded average**. The "estimate is 36× too high" claim compared against that suppressed average; against today the original ~585/sweep estimate is only ~2.3× high. ⚠️ Still one day — do not size the *exact* monthly number off it — but the asymmetric conclusion is safe: even occasional 371 k days keep the total far above 5 M, **and football season only adds**. **Next steps, in order:** (1) attribute MLB's 358 k/day by market family — the recorders already pass `endpoint=url` ([oddsapi_quota.py:100](syndicate/features/shared/oddsapi_quota.py:100)), the store just doesn't aggregate it; a `by_market_family` bucket beside `by_sport` is a small never-raises change and tomorrow's slate produces attributed data; (2) USER DECISION on #16's cuts (a)+(b) — now measurement-backed, ~210 of ~585/sweep ≈ 36%, which alone still leaves ~7 M/mo; (3) USER DECISION: this item's "do not tier the cadence" was premised on the problem not existing — the problem now measurably exists, so cadence tiering (full-game every sweep, segments/alternates every Nth) is back on the table, but that reversal is yours to make, not a session's. Caveat: `by_sport` in the store never resets, but the 02:36Z 7-26 reading (MLB 393 calls/179 credits) pins essentially all MLB burn inside this window. |
 

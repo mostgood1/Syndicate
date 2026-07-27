@@ -295,6 +295,29 @@ Five defects, in order of how load-bearing they were.
   the item forward. Verified directly against render.yaml lines ~318–330 and
   ~550–562 before closing.
 
+- **81 — execution guard released in a `finally`** (`b9da4979`, 2026-07-27).
+  Filed and fixed the same night: the release was a plain statement after the
+  persist, so 01:04Z's thread death kept the guard held and the MLB sim
+  deferred forever against a dead pipeline. The whole acquisition-to-wait
+  stretch now runs under a finally; a thread-level test injects a failure into
+  exactly the stretch that killed the production thread and asserts the guard
+  unlocks even though the thread dies. Verified live: first post-deploy cycle
+  built and persisted clean.
+- **#29 follow-on — cross-source market synonyms** (`23fcf8fc`, 2026-07-27).
+  User-reported: "Tyler Phillips outs is listed twice from two sources." The
+  "Pitcher top props" rail (`outs recorded` / `Over 15+`) and the props
+  artifacts (`pitcher outs` / `OVER Tyler Phillips`) spell the same bet
+  differently, and #29's raw-string core could never collide them. Dedupe key
+  now canonicalizes market (role prefix stripped + synonyms) and collapses
+  selection to its side token — only when a player subject exists, so game
+  markets are untouched. Verified against the live board pre-deploy (38→35,
+  exactly the three reported twins) and post-deploy (`board_cards: 35`).
+  ⚠️ Lesson: **an automated "no duplicates" check that shares the dedupe's key
+  is blind to exactly what the dedupe misses** — a user looking at the actual
+  board caught what instrumentation could not. Residual: the candidate POOL
+  still carries both shapes (`candidate_count: 38` vs 35 cards); folding the
+  canonical key into the pool merge is a small cleanup.
+
 ---
 
 ## Closed earlier
