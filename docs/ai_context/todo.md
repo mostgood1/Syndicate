@@ -107,7 +107,7 @@ were resolved and nine already-closed rows removed from the open tables.
 |---|---|---|
 | **81** | 🔴 **The background loop's execution guard is not released in a `finally`, so a dead loop thread blocks the MLB sim forever.** Observed in production 2026-07-27T01:04Z: `_persist_locked` raised `KeyValuePayloadTooLarge` (see `c342f0d0`, now contained), the exception escaped `_background_loop`, and because `self._execution_guard.release()` sits AFTER the persist at the end of the loop body ([intelligence_state.py:2867](pipeline/intelligence_state.py:2867)) rather than in a `finally`, the dead thread kept the guard — `intelligence_pipeline_busy()` reads `guard.locked()`, so every `MLB_SIM_TICK` deferred on `intelligence_pipeline_busy` against a pipeline that no longer existed. `c342f0d0` removes the known thrower, but ANY uncovered exception in the snapshot-install stretch (2820–2866) reproduces this: thread dies silently, board freezes, sim starves, and the only symptom is a stale snapshot. Fix is mechanical but wide: wrap the loop body from guard acquisition through the wait in `try/finally`. Consider at the same time whether the whole `while` body should be exception-proof — today was the second silent thread death this week. |
 | **25** | Phase 0 fail-closed refresh guard + atomic writes | **Phase 0 shipped** — see Done. Remaining: the look-ahead's own interval marker (#24) has not been audited for the same fail-open pattern, and several non-artifact writers still use the unsafe collision-prone temp shape. **Enumerated 2026-07-26 — it is six files, not the three previously listed, and the `backtest_*` scripts are NOT among them** (that entry was wrong): [fetch_soccer_history_local.py:44](scripts/fetch_soccer_history_local.py:44), [fetch_soccer_oddsapi_odds_local.py:82](scripts/fetch_soccer_oddsapi_odds_local.py:82), [fetch_soccer_oddsapi_props_local.py:105](scripts/fetch_soccer_oddsapi_props_local.py:105), [fetch_nfl_oddsapi_props_local.py:74](scripts/fetch_nfl_oddsapi_props_local.py:74), [fetch_mlb_oddsapi_local.py:72](scripts/fetch_mlb_oddsapi_local.py:72), [refresh_ncaaf_oddsapi.py:529](scripts/refresh_ncaaf_oddsapi.py:529). All use `path.with_suffix(path.suffix + ".tmp")`, so two concurrent writers of the same file collide on one temp path. `atomic_artifact_write.py` already exists; this is mechanical. |
-| **15** | **Confirm burn stays under 5M across a full in-season day, then DOWNGRADE the plan** — do *not* tier the cadence. Rewritten 2026-07-26 after measuring instead of estimating. Real billing data: `used` 1,188,488 of a 15M plan = **7.9% period-to-date**, tracking to **~1.42M/month** against the 5M target — already under by ~3.5x. The live rate was 245.7 credits/hr (30d ≈ 177k). The `~585 credits/sweep x 60s ticks ≈ 6.3M/mo` figure that drove this whole workstream was an **estimate and is ~36x too high**; most calls bill *zero* (MLB measured at **393 calls for 179 credits** — event-list calls are free, only market requests bill). Cadence tiering would make props stale for 5–30 min to solve a problem the data says does not exist. **Caveats before acting:** the reading was 02:36 UTC — the quietest hour, MLB ending, one WNBA All-Star game, no football — so an in-season NFL/NCAAF Saturday is the real test; and #54's O(1) quota store keeps only baseline+latest, so there is no full-day curve (the OddsAPI `used` counter is the trustworthy number, not the local store). Some of this headroom is #17/#18, landed 2026-07-25. Keep #19 and #21 from the original scope — they cut waste without costing freshness. |
+| **15** | 🔴 **DO NOT DOWNGRADE — conclusion INVERTED by the first full-day measurement, 2026-07-27T01:55Z.** The item's own instruction ("let the window run a full day") was finally satisfiable: baseline 2026-07-26T01:52Z → latest 2026-07-27T01:55Z, **86,572 s**. Result: **371,563 credits burned in 24 h → 15,451/hr → projected 11.12 M/30d — 2.2× OVER the 5 M target**, and 74% of even the current 15 M plan. Two independent counters agree exactly (provider `used` delta 1,188,309→1,559,872 vs local window sum). **Composition: MLB is 96.3%** (357,975 of 371,563; soccer 18 credits, WNBA 332 — both noise). ⚠️ **Why the earlier 1.42 M/mo read was wrong:** it was the period-to-date *average* — ~25 days during which the pipeline was repeatedly degraded (OOM loops, empty boards, workers down). Today was arguably the first fully-healthy day, and **a healthy system burns ~8× the degraded average**. The "estimate is 36× too high" claim compared against that suppressed average; against today the original ~585/sweep estimate is only ~2.3× high. ⚠️ Still one day — do not size the *exact* monthly number off it — but the asymmetric conclusion is safe: even occasional 371 k days keep the total far above 5 M, **and football season only adds**. **Next steps, in order:** (1) attribute MLB's 358 k/day by market family — the recorders already pass `endpoint=url` ([oddsapi_quota.py:100](syndicate/features/shared/oddsapi_quota.py:100)), the store just doesn't aggregate it; a `by_market_family` bucket beside `by_sport` is a small never-raises change and tomorrow's slate produces attributed data; (2) USER DECISION on #16's cuts (a)+(b) — now measurement-backed, ~210 of ~585/sweep ≈ 36%, which alone still leaves ~7 M/mo; (3) USER DECISION: this item's "do not tier the cadence" was premised on the problem not existing — the problem now measurably exists, so cadence tiering (full-game every sweep, segments/alternates every Nth) is back on the table, but that reversal is yours to make, not a session's. Caveat: `by_sport` in the store never resets, but the 02:36Z 7-26 reading (MLB 393 calls/179 credits) pins essentially all MLB burn inside this window. |
 
 ## In progress
 
@@ -403,22 +403,17 @@ were resolved and nine already-closed rows removed from the open tables.
 
 ## OddsAPI budget (after #14/#15)
 
-> **Measured burn — DO NOT act on a short window.** Two readings, same day:
+> **Measured burn — first genuine full-day window, 2026-07-27T01:55Z:**
 >
 > | Window | Burned | /hour | Projected 30d |
 > |---|---|---|---|
-> | 235s (2 obs) | 525 | 8,042 | **5.79M** |
-> | 855s (7 obs) | 525 | 2,210 | **1.59M** |
+> | **86,572s (50,544 obs)** | **371,563** | **15,451** | **11.12M** |
 >
-> Same 525 credits — the later calls were free `/events` requests, so the short
-> window extrapolated one burst across a month and overstated by ~3.6×. Neither
-> number is trustworthy yet, and the swing itself is the lesson: **let the window
-> run for at least a full day before sizing anything against it.**
->
-> Both readings are also unrepresentative: WNBA-only observations on an All-Star
-> day (one game), MLB's slate winding down, NFL/NCAAF/NCAAB out of season, and
-> only 3 of ~8 fetchers instrumented. Wire the rest (#14 remainder) and re-read
-> on a busy slate before deciding whether the 5M downgrade is safe.
+> MLB 96.3%, soccer and WNBA noise. Provider `used`-delta and local window sum
+> agree exactly. The earlier short-window table (5.79M vs 1.59M off the same
+> 525 credits) is retired; its lesson — full-day windows only — is what this
+> reading finally honors. See #15 for why the intervening 1.42M/mo period
+> average was measuring a degraded system, and for the decision points.
 >
 > **These are required work, not optimisations. The target is 5M.**
 > The plan currently reads 15M, but it was bumped to 15M *because of a real
@@ -482,7 +477,7 @@ request, so batching markets into one request saves nothing — only market
 4. Fund it from the cuts above: (a)+(b) free ~210 credits/sweep, more than the
    ~105 ladders would cost — so ladders can be **net credit-negative** if paired
    with the trims rather than added on top. ·
-**19** cap soccer props (~2,400/sweep) · **20** verify refresh runs can't stack
+**19** cap soccer props (~2,400/sweep; measured 2026-07-27: soccer burned **18 credits in 24h** with #44b dark, so this is a *gate for enabling #44b*, not a live leak) · **20** verify refresh runs can't stack
 (partly addressed by #25's fail-closed marker) · **21** keep 10×-billed historical
 endpoints out of prod · **22** stop retrying 4xx in vendor clients
 
