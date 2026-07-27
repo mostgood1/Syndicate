@@ -393,6 +393,9 @@ class LiveRefreshLoopTests(unittest.TestCase):
             dry_run=False,
             force_refresh=False,
             force_refresh_sports=None,
+            # #82 Phase 2: an idle pregame launch IS a drift sweep, and drift
+            # sweeps carry the lines_props tier by design.
+            market_tier="lines_props",
         )
 
     def test_pregame_relaunch_blocked_false_when_no_prior_launch(self) -> None:
@@ -2620,3 +2623,89 @@ class PregameSportCadenceTests(unittest.TestCase):
         with patch.dict(os.environ, {"SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_MLB": "0"}, clear=False):
             kept, skipped = self._filter(["mlb"], markers={"mlb": 99_999.0})
         self.assertEqual(kept, ["mlb"])
+
+
+class TWindowSweepSchedulerTests(unittest.TestCase):
+    """#82 Phase 3. Guaranteed full sweeps at ~T-75m and ~T-10m per game,
+    fired only while the sport is NOT live -- once anything is live, the 60s
+    live cadence sweeps the whole slate (pregame events included) and the
+    windows would add cost without adding data. WNBA is the sport this exists
+    for: one game, nothing live before tip, closing line otherwise at the
+    mercy of a 2h drift point.
+    """
+
+    def _due(self, *, now_epoch, times, markers=None, live=()):
+        checkers = {s: (lambda s_: (lambda _d: s_ in live))(s) for s in ("mlb", "wnba")}
+        with patch.object(live_refresh_loop, "_LIVE_STATUS_CHECKERS", checkers):
+            with patch.object(live_refresh_loop, "_commence_times_cached", side_effect=lambda sport, d, now_epoch: times.get(sport, [])):
+                with patch.object(live_refresh_loop, "_read_t_window_markers", return_value=dict(markers or {})):
+                    return live_refresh_loop._t_window_due_sports(now_epoch=now_epoch, date_str="2026-07-27")
+
+    def test_closing_window_fires_inside_t10(self) -> None:
+        due = self._due(now_epoch=1000.0, times={"wnba": [("g1", 1000.0 + 8 * 60)]})
+        self.assertEqual(due, {"wnba": {"wnba:closing:g1": 1000.0}})
+
+    def test_ramp_window_fires_inside_t75(self) -> None:
+        due = self._due(now_epoch=1000.0, times={"wnba": [("g1", 1000.0 + 70 * 60)]})
+        self.assertEqual(due, {"wnba": {"wnba:ramp:g1": 1000.0}})
+
+    def test_each_window_fires_once(self) -> None:
+        due = self._due(
+            now_epoch=1000.0,
+            times={"wnba": [("g1", 1000.0 + 8 * 60)]},
+            markers={"wnba:closing:g1": 900.0},
+        )
+        self.assertEqual(due, {})
+
+    def test_a_live_sport_is_never_scheduled(self) -> None:
+        due = self._due(now_epoch=1000.0, times={"mlb": [("g1", 1000.0 + 8 * 60)]}, live={"mlb"})
+        self.assertEqual(due, {})
+
+    def test_started_games_are_ignored(self) -> None:
+        due = self._due(now_epoch=1000.0, times={"wnba": [("g1", 900.0)]})
+        self.assertEqual(due, {})
+
+    def test_no_schedule_fails_open_to_nothing_due(self) -> None:
+        due = self._due(now_epoch=1000.0, times={})
+        self.assertEqual(due, {})
+
+    def test_closing_outranks_ramp_for_the_same_game(self) -> None:
+        # A game inside T-10 is inside T-75 too; it must arm the closing
+        # marker, not burn the ramp one.
+        due = self._due(now_epoch=1000.0, times={"wnba": [("g1", 1000.0 + 5 * 60)]})
+        self.assertEqual(list(due["wnba"].keys()), ["wnba:closing:g1"])
+
+
+class LaunchMarketTierTests(unittest.TestCase):
+    """#82 Phase 2. lines_props only on a definitive pregame DRIFT sweep;
+    live play, T-windows, event triggers, and uncertainty all run full --
+    those are exactly the moments the segment markets exist for.
+    """
+
+    def test_pure_drift_gets_lines_props(self) -> None:
+        self.assertEqual(
+            live_refresh_loop._launch_market_tier(any_live=False, t_window_sports=set(), force_sim_rerun=False),
+            "lines_props",
+        )
+
+    def test_live_runs_full(self) -> None:
+        self.assertEqual(
+            live_refresh_loop._launch_market_tier(any_live=True, t_window_sports=set(), force_sim_rerun=False),
+            "full",
+        )
+
+    def test_unknown_liveness_runs_full(self) -> None:
+        self.assertEqual(
+            live_refresh_loop._launch_market_tier(any_live=None, t_window_sports=set(), force_sim_rerun=False),
+            "full",
+        )
+
+    def test_t_windows_and_event_triggers_run_full(self) -> None:
+        self.assertEqual(
+            live_refresh_loop._launch_market_tier(any_live=False, t_window_sports={"wnba"}, force_sim_rerun=False),
+            "full",
+        )
+        self.assertEqual(
+            live_refresh_loop._launch_market_tier(any_live=False, t_window_sports=set(), force_sim_rerun=True),
+            "full",
+        )

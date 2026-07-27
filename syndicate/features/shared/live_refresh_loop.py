@@ -2416,6 +2416,180 @@ def _off_hours_gate_blocks_launch(*, now_epoch: float, any_live: bool | None) ->
 	return (now_epoch - last_epoch) < ceiling
 
 
+# #82 Phase 3: per-game T-window sweeps. CLV's closing line is the last
+# pregame price, and a slate-wide cadence structurally misses it for the
+# first game of a day and for one-game slates (WNBA's normal case) -- nothing
+# is live yet, so the drift cadence is all there is, and a 2h drift point can
+# miss the close by an hour. These windows guarantee a full sweep at ~T-75m
+# (post-lineup market) and ~T-10m (the close) per game, fired ONLY while the
+# sport is not already live: once any of the sport's games is live, the 60s
+# live cadence sweeps the whole slate -- including its still-pregame events --
+# and the windows would add nothing but cost.
+_T_WINDOW_RAMP_SECONDS = 75 * 60
+_T_WINDOW_CLOSING_SECONDS = 10 * 60
+_COMMENCE_TIMES_CACHE: dict[tuple[str, str], tuple[float, list[tuple[str, float]]]] = {}
+_COMMENCE_TIMES_CACHE_TTL_SECONDS = 600.0
+
+
+def _parse_commence_epoch(value: Any) -> float | None:
+	try:
+		stamp = datetime.fromisoformat(str(value or "").replace("Z", "+00:00"))
+	except (TypeError, ValueError):
+		return None
+	if stamp.tzinfo is None:
+		return None
+	return stamp.timestamp()
+
+
+def _mlb_commence_times(date_str: str) -> list[tuple[str, float]]:
+	token = date_str.replace("-", "_")
+	candidates = (
+		data_root() / "mlb_source" / "source_artifacts" / "data" / "daily" / "snapshots" / date_str / "oddsapi_game_lines.json",
+		data_root() / "mlb_source" / "source_artifacts" / "data" / "market" / "oddsapi" / f"oddsapi_game_lines_{token}.json",
+	)
+	for path in candidates:
+		payload = read_json_file(path)
+		games = payload.get("games") if isinstance(payload, dict) else None
+		if not isinstance(games, list) or not games:
+			continue
+		out: list[tuple[str, float]] = []
+		for row in games:
+			if not isinstance(row, dict):
+				continue
+			epoch = _parse_commence_epoch(row.get("commence_time"))
+			event_id = str(row.get("event_id") or "").strip()
+			if epoch is not None and event_id:
+				out.append((event_id, epoch))
+		if out:
+			return out
+	return []
+
+
+def _wnba_commence_times(date_str: str) -> list[tuple[str, float]]:
+	payload = read_json_file(REPO_ROOT / "vendor" / "wnba_betting_repo" / "data" / "processed" / "schedule_2026.json")
+	rows = payload if isinstance(payload, list) else (payload.get("games") if isinstance(payload, dict) else None)
+	if not isinstance(rows, list):
+		return []
+	out: list[tuple[str, float]] = []
+	for row in rows:
+		if not isinstance(row, dict):
+			continue
+		if str(row.get("date_est") or "").strip()[:10] != date_str:
+			continue
+		epoch = _parse_commence_epoch(row.get("datetime_utc"))
+		game_id = str(row.get("game_id") or "").strip()
+		if epoch is not None and game_id:
+			out.append((game_id, epoch))
+	return out
+
+
+_T_WINDOW_COMMENCE_PROVIDERS = {
+	"mlb": _mlb_commence_times,
+	"wnba": _wnba_commence_times,
+}
+
+
+def _commence_times_cached(sport: str, date_str: str, *, now_epoch: float) -> list[tuple[str, float]]:
+	key = (sport, date_str)
+	cached = _COMMENCE_TIMES_CACHE.get(key)
+	if cached is not None and (now_epoch - cached[0]) < _COMMENCE_TIMES_CACHE_TTL_SECONDS:
+		return cached[1]
+	provider = _T_WINDOW_COMMENCE_PROVIDERS.get(sport)
+	times: list[tuple[str, float]] = []
+	if provider is not None:
+		try:
+			times = provider(date_str)
+		except Exception:
+			times = []
+	_COMMENCE_TIMES_CACHE[key] = (now_epoch, times)
+	if len(_COMMENCE_TIMES_CACHE) > 16:
+		_COMMENCE_TIMES_CACHE.clear()
+	return times
+
+
+def _t_window_markers_path() -> Path:
+	return _meta_dir() / "t_window_sweeps.json"
+
+
+def _read_t_window_markers(date_str: str) -> dict[str, float]:
+	payload = read_json_file(_t_window_markers_path())
+	if not isinstance(payload, dict) or str(payload.get("date") or "") != date_str:
+		return {}
+	markers = payload.get("markers")
+	out: dict[str, float] = {}
+	if isinstance(markers, dict):
+		for key, epoch in markers.items():
+			try:
+				out[str(key)] = float(epoch)
+			except (TypeError, ValueError):
+				continue
+	return out
+
+
+def _record_t_window_markers(date_str: str, new_markers: dict[str, float]) -> None:
+	try:
+		markers = _read_t_window_markers(date_str)
+		markers.update(new_markers)
+		write_json_file(_t_window_markers_path(), {"date": date_str, "markers": markers})
+	except Exception as exc:
+		print(f"[live_refresh_loop] T_WINDOW_MARKER_WRITE_FAILED error={type(exc).__name__}: {exc}", flush=True)
+
+
+def _t_window_due_sports(*, now_epoch: float, date_str: str) -> dict[str, dict[str, float]]:
+	"""{sport: {marker: epoch}} for T-windows due RIGHT NOW.
+
+	A window is due when a game starts within it and no sweep has been
+	credited to that (game, window) yet. Live sports are skipped entirely --
+	their slate-wide live cadence already covers every event, pregame ones
+	included. Everything fails open to "nothing due": a missing schedule
+	artifact costs precision, never a sweep storm.
+	"""
+	due: dict[str, dict[str, float]] = {}
+	for sport in _T_WINDOW_COMMENCE_PROVIDERS:
+		checker = _LIVE_STATUS_CHECKERS.get(sport)
+		try:
+			if checker is not None and checker(date_str):
+				continue
+		except Exception:
+			continue
+		times = _commence_times_cached(sport, date_str, now_epoch=now_epoch)
+		if not times:
+			continue
+		markers = _read_t_window_markers(date_str)
+		sport_due: dict[str, float] = {}
+		for event_id, start_epoch in times:
+			seconds_to_start = start_epoch - now_epoch
+			if seconds_to_start <= 0:
+				continue
+			if seconds_to_start <= _T_WINDOW_CLOSING_SECONDS:
+				# Inside T-10 only the closing window may fire. A plain elif
+				# let a game whose closing sweep had already run fall through
+				# and arm a spurious ramp sweep -- caught by test.
+				if f"{sport}:closing:{event_id}" not in markers:
+					sport_due[f"{sport}:closing:{event_id}"] = now_epoch
+			elif seconds_to_start <= _T_WINDOW_RAMP_SECONDS and f"{sport}:ramp:{event_id}" not in markers:
+				sport_due[f"{sport}:ramp:{event_id}"] = now_epoch
+		if sport_due:
+			due[sport] = sport_due
+	return due
+
+
+def _launch_market_tier(*, any_live: bool | None, t_window_sports: set[str], force_sim_rerun: bool) -> str:
+	"""#82 Phase 2. Which market tier this launch runs at.
+
+	"lines_props" only when this is definitively a pregame DRIFT sweep:
+	nothing live anywhere, no T-window firing, no event trigger. Everything
+	else -- live play, a ramp/closing window, a lineup change, or simply not
+	being able to tell -- runs full, because those are exactly the moments
+	the segment/alternate markets are for.
+	"""
+	if any_live is not False:
+		return "full"
+	if t_window_sports or force_sim_rerun:
+		return "full"
+	return "lines_props"
+
+
 # #15 Phase 1: per-sport pregame sweep intervals. Defaults encode the
 # per-sport rules agreed 2026-07-27: daily sports drift-sample every 2h
 # pregame (full sweeps, so the midday PROP samples ride along); soccer is a
@@ -2893,6 +3067,24 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 				else list(_live_refresh_loop_effective_sports(selected_date))
 			)
 			force_sports = {piece for piece in str(force_refresh_sports or "").split(",") if piece}
+			# #82 Phase 3. T-window sweeps bypass the cadence filter the same
+			# way lineup changes do: an imminent start IS the reason to sweep.
+			# Markers are recorded before the launch (the #25 fail-closed
+			# rule: a launch that dies costs one missed window, never a
+			# duplicate storm), and only for sports actually in this launch --
+			# a sport excluded by owner rules keeps its window armed for the
+			# service that owns it.
+			t_window_due = _t_window_due_sports(now_epoch=tick_started_epoch, date_str=selected_date)
+			t_window_sports = {sport for sport in t_window_due if sport in resolved_launch_sports}
+			if t_window_sports:
+				meta["tWindowSweeps"] = {sport: sorted(t_window_due[sport]) for sport in t_window_sports}
+				print(
+					f"[live_refresh_loop] T_WINDOW_SWEEP_DUE {json.dumps(meta['tWindowSweeps'], sort_keys=True)}",
+					flush=True,
+				)
+				for sport in t_window_sports:
+					_record_t_window_markers(selected_date, t_window_due[sport])
+				force_sports |= t_window_sports
 			kept_sports, cadence_skipped = _apply_pregame_sport_cadence(
 				resolved_launch_sports,
 				now_epoch=tick_started_epoch,
@@ -2918,6 +3110,17 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			# The filter must never be the reason odds stop refreshing --
 			# fail open to the unfiltered launch.
 			print(f"[live_refresh_loop] PREGAME_CADENCE_FILTER_FAILED error={type(exc).__name__}: {exc}", flush=True)
+	launch_market_tier = "full"
+	if not skip_launch:
+		try:
+			launch_market_tier = _launch_market_tier(
+				any_live=any_live,
+				t_window_sports=set((meta.get("tWindowSweeps") or {}).keys()),
+				force_sim_rerun=bool(force_sim_rerun),
+			)
+		except Exception:
+			launch_market_tier = "full"
+		meta["marketTier"] = launch_market_tier
 	if not skip_launch:
 		if effective_phase == "pregame":
 			_record_pregame_launch(tick_started_epoch, selected_date)
@@ -2973,6 +3176,10 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 				dry_run=False,
 				force_refresh=force_sim_rerun,
 				force_refresh_sports=force_refresh_sports,
+				# Omitted entirely (not passed as None) when full: "full" is
+				# the pre-#82 behavior, and callers/mocks asserting the exact
+				# historical kwargs must keep passing.
+				**({"market_tier": launch_market_tier} if launch_market_tier != "full" else {}),
 			)
 			meta["ok"] = True
 			meta["result"] = result

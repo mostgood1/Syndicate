@@ -157,6 +157,44 @@ def _is_final_status_row(row: Mapping[str, Any], normalized_entry: Mapping[str, 
     return any(marker in text for marker in ("final", "closed", "close", "finale", "completed", "finished"))
 
 
+# #82 Phase 3. Boundaries of the pregame capture phases, chosen with the
+# T-window sweep scheduler in live_refresh_loop.py: the ramp window opens just
+# beyond the T-75m post-lineup sweep and the closing window just beyond the
+# T-10m closing sweep, so the observations those sweeps produce land inside
+# the phase they exist to capture.
+_RAMP_WINDOW_SECONDS = 80 * 60
+_CLOSING_WINDOW_SECONDS = 12 * 60
+
+
+def _capture_phase(*, commence_time: Any, observed_at: str, is_live: bool) -> str | None:
+    """Which pregame phase this observation belongs to, or None if unknowable.
+
+    #82: makes opening/closing lines LOOKUPS instead of timestamp inference.
+    CLV's closing line is "the last observation tagged closing (or ramp/drift
+    if no sweep landed closer)"; the movement curve is the drift series;
+    event_type="open" already marks the opener. Fail-open to None -- an
+    observation with no commence time is still a real observation, and the
+    dict comprehension below drops None values rather than inventing a phase.
+    """
+    if is_live:
+        return "live"
+    try:
+        start = datetime.fromisoformat(str(commence_time or "").replace("Z", "+00:00"))
+        observed = datetime.fromisoformat(str(observed_at or "").replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if start.tzinfo is None or observed.tzinfo is None:
+        return None
+    seconds_to_start = (start - observed).total_seconds()
+    if seconds_to_start <= 0:
+        return "live"
+    if seconds_to_start <= _CLOSING_WINDOW_SECONDS:
+        return "closing"
+    if seconds_to_start <= _RAMP_WINDOW_SECONDS:
+        return "ramp"
+    return "drift"
+
+
 def _market_lifecycle_event(
     *,
     row: Mapping[str, Any],
@@ -170,6 +208,11 @@ def _market_lifecycle_event(
     is_live: bool,
 ) -> dict[str, Any]:
     event = {
+        "capture_phase": _capture_phase(
+            commence_time=row.get("commence_time") or normalized_entry.get("commence_time") or row.get("gameDate") or row.get("game_time"),
+            observed_at=timestamp,
+            is_live=is_live,
+        ),
         "timestamp": timestamp,
         "game_id": normalized_entry.get("event_id") or row.get("event_id") or row.get("game_id") or row.get("game_pk"),
         "sport": sport,

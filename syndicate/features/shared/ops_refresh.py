@@ -1137,6 +1137,7 @@ def launch_refresh_run(
     force_refresh_sports: str | None = None,
     wnba_only_matchups: str | None = None,
     lane: str | None = None,
+    market_tier: str | None = None,
 ) -> dict[str, Any]:
     launch_mode = _resolve_launch_mode(launch_mode)
     # The queued/external-runner path is always claimed and executed by
@@ -1194,6 +1195,11 @@ def launch_refresh_run(
         refresh_command.extend(["--bookmakers", bookmakers_text])
     if markets_text:
         refresh_command.extend(["--markets", markets_text])
+    # #82 Phase 2. "full" and unset both mean today's behavior, so the flag
+    # only ever appears on launches that deliberately drop market families.
+    market_tier_text = str(market_tier or "").strip().lower()
+    if market_tier_text and market_tier_text != "full":
+        refresh_command.extend(["--market-tier", market_tier_text])
     refresh_command.extend(["--mode", refresh_mode])
     if bool(force_refresh):
         refresh_command.append("--force-refresh")

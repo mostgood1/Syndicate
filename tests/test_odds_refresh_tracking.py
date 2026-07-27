@@ -578,3 +578,65 @@ class OddsRefreshTrackingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class CapturePhaseTests(unittest.TestCase):
+    """#82 Phase 3. Opening/closing lines become lookups, not timestamp
+    inference: every lifecycle observation is tagged with the pregame phase it
+    was captured in. event_type="open" already marks the opener; CLV's closing
+    line is the last observation tagged "closing".
+    """
+
+    def _phase(self, *, minutes_to_start, is_live=False):
+        from syndicate.features.shared.odds_refresh_tracking import _capture_phase
+
+        observed = "2026-07-27T18:00:00+00:00"
+        commence = f"2026-07-27T{18 + (minutes_to_start // 60):02d}:{minutes_to_start % 60:02d}:00+00:00"
+        return _capture_phase(commence_time=commence, observed_at=observed, is_live=is_live)
+
+    def test_boundaries_bracket_the_t_window_sweeps(self) -> None:
+        # The T-75m sweep must land in "ramp", the T-10m sweep in "closing" --
+        # the windows are 80/12 min so scheduler jitter cannot push a sweep's
+        # observations into the wrong phase.
+        self.assertEqual(self._phase(minutes_to_start=180), "drift")
+        self.assertEqual(self._phase(minutes_to_start=75), "ramp")
+        self.assertEqual(self._phase(minutes_to_start=10), "closing")
+
+    def test_live_wins_regardless_of_clock(self) -> None:
+        self.assertEqual(self._phase(minutes_to_start=75, is_live=True), "live")
+
+    def test_started_games_are_live_even_without_the_flag(self) -> None:
+        from syndicate.features.shared.odds_refresh_tracking import _capture_phase
+
+        self.assertEqual(
+            _capture_phase(
+                commence_time="2026-07-27T17:00:00+00:00",
+                observed_at="2026-07-27T18:00:00+00:00",
+                is_live=False,
+            ),
+            "live",
+        )
+
+    def test_unknowable_fails_open_to_none_not_a_guess(self) -> None:
+        from syndicate.features.shared.odds_refresh_tracking import _capture_phase
+
+        for commence in (None, "", "not-a-date", "2026-07-27T18:00:00"):
+            self.assertIsNone(
+                _capture_phase(commence_time=commence, observed_at="2026-07-27T18:00:00+00:00", is_live=False),
+                commence,
+            )
+
+    def test_lifecycle_events_carry_the_tag(self) -> None:
+        from syndicate.features.shared.odds_refresh_tracking import _market_lifecycle_event
+
+        event = _market_lifecycle_event(
+            row={"commence_time": "2026-07-27T18:05:00+00:00", "event_id": "abc"},
+            normalized_entry={},
+            event_type="open",
+            sport="mlb",
+            timestamp="2026-07-27T18:00:00+00:00",
+            market_key="mlb:abc:h2h",
+            current_line=None,
+            current_odds=-110.0,
+            is_live=False,
+        )
+        self.assertEqual(event["capture_phase"], "closing")

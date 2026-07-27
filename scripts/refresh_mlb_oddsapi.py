@@ -556,6 +556,11 @@ def _freeze_oddsapi_pregame_markets(*, source_root: Path, date_str: str) -> dict
     return copied
 
 
+def _market_tier() -> str:
+    tier = str(os.environ.get("SYNDICATE_ODDS_MARKET_TIER") or "full").strip().lower()
+    return tier if tier in {"full", "lines_props"} else "full"
+
+
 def fetch_live_odds_incremental(*, odds_module, source_root: Path, date_str: str, regions: str, bookmakers: str | None, hitter_markets: list[str] | None) -> dict[str, object]:
     api_key = (
         os.environ.get("ODDS_API_KEY")
@@ -578,7 +583,8 @@ def fetch_live_odds_incremental(*, odds_module, source_root: Path, date_str: str
     existing_pitcher_props_doc = _read_json_if_exists(pitcher_props_path)
     existing_hitter_props_doc = _read_json_if_exists(hitter_props_path)
 
-    print("[mlb_fetch_start]", flush=True)
+    market_tier = _market_tier()
+    print(f"[mlb_fetch_start] market_tier={market_tier}", flush=True)
     live_events = list(odds_module._fetch_live_events_for_date(api_key, date_str))
     print(f"[mlb_fetch_events] events_count={len(live_events) if live_events else 0}", flush=True)
     game_market_keys = [
@@ -610,6 +616,13 @@ def fetch_live_odds_incremental(*, odds_module, source_root: Path, date_str: str
         "totals_1st_7_innings",
         "alternate_totals_1st_7_innings",
     ]
+    if market_tier == "lines_props":
+        # #82 Phase 2. The 24 segment/alternate markets are ~63% of a
+        # per-event request's cost and pregame drift doesn't need them --
+        # T-window and live sweeps run tier=full, so segment lanes refresh
+        # exactly when games approach and while they run. Fetched lines and
+        # props stay identical to a full sweep.
+        game_market_keys = ["h2h", "spreads", "totals"]
     pitcher_market_keys = list(getattr(odds_module, "PITCHER_MARKET_KEY_MAP", {}).keys())
     if hitter_markets:
         desired_hitter_markets = [str(m).strip().lower() for m in hitter_markets if str(m).strip()]
@@ -656,6 +669,17 @@ def fetch_live_odds_incremental(*, odds_module, source_root: Path, date_str: str
         home_team = str(event.get("home_team") or payload.get("home_team") or "")
         away_team = str(event.get("away_team") or payload.get("away_team") or "")
         best_lines, bookmaker_key = odds_module._best_bookmaker_game_lines(payload, home_team=home_team, away_team=away_team)
+        if market_tier != "full" and isinstance(best_lines, dict):
+            # Layer 1 guard: a tiered sweep only re-fetched a subset of
+            # markets, so any market key present in the PREVIOUS snapshot but
+            # absent from this fetch is carried forward rather than dropped --
+            # otherwise the first lines_props sweep would blank every
+            # F1/F3/F5/F7 segment tab until the next full sweep.
+            existing_row = existing_game_rows.get(event_id)
+            existing_markets = (existing_row or {}).get("markets") if isinstance(existing_row, dict) else None
+            if isinstance(existing_markets, dict):
+                for market_name, market_value in existing_markets.items():
+                    best_lines.setdefault(market_name, market_value)
         if isinstance(best_lines, dict):
             game_entry = {
                 "event_id": event_id,
@@ -993,8 +1017,16 @@ def main() -> int:
     parser.add_argument("--artifact-root", required=False, default=str(REPO_ROOT / "data" / "mlb_source" / "source_artifacts"))
     parser.add_argument("--regions", default="us")
     parser.add_argument("--overwrite", choices=("on", "off"), default="on")
+    parser.add_argument(
+        "--market-tier",
+        choices=("full", "lines_props"),
+        default=str(os.environ.get("SYNDICATE_ODDS_MARKET_TIER") or "full").strip().lower() or "full",
+        help="#82 Phase 2: lines_props drops the 24 per-event segment/alternate markets (~63%% of a sweep's per-event cost), keeping h2h/spreads/totals and all props. Existing segment lanes are carried forward from the previous snapshot so the cards' F1/F3/F5/F7 tabs never blank between full sweeps.",
+    )
     parser.add_argument("--mode", choices=("fast", "full"), default="full")
     args = parser.parse_args()
+    if str(getattr(args, "market_tier", "full") or "full") != "full":
+        os.environ["SYNDICATE_ODDS_MARKET_TIER"] = str(args.market_tier)
 
     source_root = Path(args.source_root).resolve()
     artifact_root = Path(args.artifact_root).resolve()
