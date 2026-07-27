@@ -169,3 +169,93 @@ class RecordAndReadQuotaTests(unittest.TestCase):
         self.assertIsNone(state["latest"])
         self.assertEqual(state["observation_count"], 0)
         self.assertEqual(state["by_sport"], {})
+
+
+class MarketFamilyAttributionTests(unittest.TestCase):
+    """#15. 371,563 credits/day measured with MLB at 96.3%, and every cut on
+    the table (#16 a/b, tiering, event scoping) needs to know which MARKETS
+    the credits went to. Families are decision-mapped levers, not taxonomy.
+    """
+
+    def test_families_mirror_the_16_audit_axes(self) -> None:
+        from syndicate.features.shared.oddsapi_quota import _market_family
+
+        # (b): first7 wins even when also alternate_-prefixed, mirroring the
+        # audit's disjoint 8-alternates / 6-first7 counts.
+        self.assertEqual(_market_family("h2h_1st_7_innings"), "first7")
+        self.assertEqual(_market_family("alternate_totals_1st_7_innings"), "first7")
+        # (a): alternates, full-game or segment.
+        self.assertEqual(_market_family("alternate_spreads"), "alternate")
+        self.assertEqual(_market_family("alternate_spreads_1st_1_innings"), "alternate")
+        # Cadence-tier candidate.
+        self.assertEqual(_market_family("h2h_3_way_1st_3_innings"), "segment")
+        # Event-scoping candidate.
+        self.assertEqual(_market_family("batter_total_bases"), "props")
+        self.assertEqual(_market_family("pitcher_strikeouts"), "props")
+        # The board's core -- not a cut candidate.
+        self.assertEqual(_market_family("h2h"), "full_game")
+        self.assertEqual(_market_family("totals"), "full_game")
+
+    def test_request_cost_splits_proportionally_across_families(self) -> None:
+        from syndicate.features.shared.oddsapi_quota import _attribute_request_families
+
+        url = "https://api.the-odds-api.com/v4/sports/baseball_mlb/events/abc/odds?regions=us&markets=h2h,totals,batter_hits,alternate_spreads"
+        split = _attribute_request_families(url, 8)
+        self.assertEqual(split, {"full_game": 4.0, "props": 2.0, "alternate": 2.0})
+
+    def test_no_markets_param_is_the_event_list(self) -> None:
+        from syndicate.features.shared.oddsapi_quota import _attribute_request_families
+
+        split = _attribute_request_families("https://api.the-odds-api.com/v4/sports/baseball_mlb/events?date=x", 0)
+        self.assertEqual(split, {"event_list": 0.0})
+
+    def test_historical_endpoints_get_their_own_alarm_bucket(self) -> None:
+        # #21: 10x-billed, should never appear in production. A non-zero
+        # bucket IS the alarm.
+        from syndicate.features.shared.oddsapi_quota import _attribute_request_families
+
+        url = "https://api.the-odds-api.com/v4/historical/sports/baseball_mlb/odds?markets=h2h"
+        self.assertEqual(_attribute_request_families(url, 20), {"historical": 20.0})
+
+    def test_recorder_accumulates_family_and_hour_buckets(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            quota_file = Path(tmp_dir) / "oddsapi_quota.json"
+            with patch("syndicate.features.shared.oddsapi_quota._quota_path", return_value=quota_file):
+                for _ in range(2):
+                    record_oddsapi_quota(
+                        {"x-requests-remaining": "100", "x-requests-used": "50", "x-requests-last": "6"},
+                        sport="mlb",
+                        endpoint="https://api.the-odds-api.com/v4/sports/baseball_mlb/events/abc/odds?markets=h2h,batter_hits,h2h_1st_7_innings",
+                    )
+            payload = json.loads(quota_file.read_text(encoding="utf-8"))
+            families = payload["by_market_family"]
+            self.assertEqual(families["full_game"], {"calls": 2, "credits": 4.0})
+            self.assertEqual(families["props"], {"calls": 2, "credits": 4.0})
+            self.assertEqual(families["first7"], {"calls": 2, "credits": 4.0})
+            self.assertIn("aggregates_started_at", payload)
+            # Exactly one UTC hour bucket, carrying the full cost.
+            hours = payload["by_hour_utc"]
+            self.assertEqual(len(hours), 1)
+            (bucket,) = hours.values()
+            self.assertEqual(bucket, {"calls": 2, "credits": 12})
+
+    def test_attribution_failure_degrades_to_unattributed_not_unrecorded(self) -> None:
+        # The burn counter is load-bearing (#15's whole decision rests on it);
+        # attribution is a bonus. A bug in the classifier must cost the
+        # breakdown, never the observation.
+        with TemporaryDirectory() as tmp_dir:
+            quota_file = Path(tmp_dir) / "oddsapi_quota.json"
+            with patch("syndicate.features.shared.oddsapi_quota._quota_path", return_value=quota_file):
+                with patch(
+                    "syndicate.features.shared.oddsapi_quota._attribute_request_families",
+                    side_effect=RuntimeError("boom"),
+                ):
+                    result = record_oddsapi_quota(
+                        {"x-requests-remaining": "100", "x-requests-used": "50", "x-requests-last": "6"},
+                        sport="mlb",
+                        endpoint="whatever",
+                    )
+            self.assertIsNotNone(result, "the observation itself must survive")
+            payload = json.loads(quota_file.read_text(encoding="utf-8"))
+            self.assertEqual(payload["latest"]["used"], 50)
+            self.assertEqual(payload["by_market_family"], {})

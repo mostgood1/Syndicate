@@ -57,6 +57,73 @@ def _quota_path():
     return reports_root() / "odds_control_plane" / "oddsapi_quota.json"
 
 
+# #15 attribution (2026-07-27). The first full-day burn reading measured
+# 371,563 credits/day -- 11.1M/30d projected against a 5M target -- with MLB
+# at 96.3%. But "MLB burned 358k" is one number; every cut decision on the
+# table (#16's drop-alternates and drop-first7, cadence tiering, event
+# scoping) needs to know WHICH MARKETS the credits went to. The fetchers
+# already pass endpoint=url into record_oddsapi_quota; these buckets finally
+# aggregate what was already flowing past.
+#
+# Families are DECISION-MAPPED, not taxonomy for its own sake: each one is a
+# lever someone can actually pull.
+#   first7     -> #16 cut (b): any *_1st_7_innings market
+#   alternate  -> #16 cut (a): alternate_* (excluding first7, mirroring the
+#                 audit's disjoint counts of 8 alternates / 6 first7)
+#   segment    -> other *_1st_* period/inning markets (cadence-tier candidate)
+#   props      -> batter_/pitcher_/player_ (event-scoping candidate)
+#   full_game  -> h2h/spreads/totals and their 3-way forms (the board's core;
+#                 not a cut candidate)
+#   event_list -> requests with no markets= param (usually cost 0)
+#   historical -> anything under /historical/ (#21: 10x-billed, should never
+#                 appear in production at all -- a non-zero bucket here IS the
+#                 #21 alarm)
+#
+# A single request carries several markets (cost = markets x regions), so a
+# request's cost is split across families proportionally to market count --
+# exact, because OddsAPI bills per market uniformly within a request.
+_FULL_GAME_MARKETS = {"h2h", "spreads", "totals", "h2h_3_way", "outrights", "spreads_3_way", "totals_3_way"}
+
+
+def _market_family(market: str) -> str:
+    market = str(market or "").strip().lower()
+    if not market:
+        return "other"
+    if "_1st_7_innings" in market:
+        return "first7"
+    if market.startswith("alternate_"):
+        return "alternate"
+    if "_1st_" in market:
+        return "segment"
+    if market.startswith(("batter_", "pitcher_", "player_")):
+        return "props"
+    if market in _FULL_GAME_MARKETS:
+        return "full_game"
+    return "other"
+
+
+def _attribute_request_families(endpoint: str, last_cost: int) -> dict[str, float]:
+    """{family: credits} for one request, splitting cost across families."""
+    endpoint = str(endpoint or "")
+    if "/historical/" in endpoint:
+        return {"historical": float(last_cost)}
+    try:
+        from urllib.parse import parse_qs, urlsplit
+
+        query = parse_qs(urlsplit(endpoint).query)
+        markets = [m for chunk in query.get("markets", []) for m in chunk.split(",") if m.strip()]
+    except Exception:
+        markets = []
+    if not markets:
+        return {"event_list": float(last_cost)}
+    per_market = float(last_cost) / len(markets)
+    out: dict[str, float] = {}
+    for market in markets:
+        family = _market_family(market)
+        out[family] = out.get(family, 0.0) + per_market
+    return out
+
+
 def _utc_now_iso() -> str:
     # Milliseconds, not seconds: fetchers fire several calls inside one
     # second, and at second resolution those collapse to an identical
@@ -128,12 +195,45 @@ def record_oddsapi_quota(headers: Any, *, sport: str | None = None, endpoint: st
         bucket["credits"] = int(bucket.get("credits") or 0) + int(observation.get("last_cost") or 0)
         by_sport[sport_key] = bucket
 
+        # #15 attribution. Both aggregates stay O(1) like by_sport (#54's
+        # hard-won constraint): families are a fixed vocabulary of ~7 and
+        # hours are 24, so this key cannot grow back into the biggest thing
+        # in the store no matter how long it runs.
+        last_cost = int(observation.get("last_cost") or 0)
+        by_family = payload.get("by_market_family") if isinstance(payload.get("by_market_family"), dict) else {}
+        by_hour = payload.get("by_hour_utc") if isinstance(payload.get("by_hour_utc"), dict) else {}
+        try:
+            for family, credits in _attribute_request_families(observation.get("endpoint") or "", last_cost).items():
+                family_bucket = by_family.get(family) if isinstance(by_family.get(family), dict) else {"calls": 0, "credits": 0.0}
+                family_bucket["calls"] = int(family_bucket.get("calls") or 0) + 1
+                family_bucket["credits"] = round(float(family_bucket.get("credits") or 0.0) + credits, 2)
+                by_family[family] = family_bucket
+
+            # Hour-of-day histogram (UTC), for the off-hours question: how
+            # much of the burn happens when nothing is live? 24 fixed buckets.
+            hour_key = str(observation.get("observedAt") or "")[11:13] or "??"
+            hour_bucket = by_hour.get(hour_key) if isinstance(by_hour.get(hour_key), dict) else {"calls": 0, "credits": 0}
+            hour_bucket["calls"] = int(hour_bucket.get("calls") or 0) + 1
+            hour_bucket["credits"] = int(hour_bucket.get("credits") or 0) + last_cost
+            by_hour[hour_key] = hour_bucket
+        except Exception:
+            # Attribution is a bonus on top of the load-bearing burn counter.
+            # If it breaks, the observation must still be recorded --
+            # un-attributed beats un-recorded, and the outer never-raises
+            # handler would otherwise throw away the whole reading.
+            pass
+
         write_json_file(
             _quota_path(),
             {
                 "baseline": baseline,
                 "latest": observation,
                 "by_sport": by_sport,
+                "by_market_family": by_family,
+                "by_hour_utc": by_hour,
+                # Stamped once, because none of the aggregates above ever
+                # reset -- a rate is only computable as total/(now - this).
+                "aggregates_started_at": str(payload.get("aggregates_started_at") or _utc_now_iso()),
                 "observation_count": int(payload.get("observation_count") or 0) + 1,
                 "updatedAt": _utc_now_iso(),
             },
