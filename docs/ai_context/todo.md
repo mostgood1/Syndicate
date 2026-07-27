@@ -6,7 +6,7 @@ list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-07-27 (see "Reconciliation 2026-07-27").
 
-> **Next free ID: 93.** IDs are never reused. Closed items move to
+> **Next free ID: 94.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
 
@@ -250,6 +250,84 @@ now genuinely met rather than merely believed.
     background session with a narrowly-scoped assignment: commit and push
     only the files the assignment actually touched — never a blanket
     `git add -A`/`git commit -a` sweep of the whole working tree.**
+- **New: #93** (filed, shipped this session, commit pending) — user reported
+  the home-page board showing WNBA-only for today (0 MLB despite a 12-game
+  slate) with duplicate rows on WNBA's picks. Investigation found two
+  distinct, unrelated bugs; both fixed and unit-tested, no production
+  incident (caught before either shipped further than tonight's session):
+  - 🔴 **The real MLB-missing cause: a date-matching guard bug in the core
+    board-serving cache, not a keyvalue-size regression as first suspected.**
+    Production has `SYNDICATE_LOOK_AHEAD_ENABLED=true` (the deliberate
+    "show tomorrow's slate when today has none" feature — confirmed
+    intentional, not itself a bug). The background loop's own recurring
+    *default* query payload (the one serving plain "today" requests) carries
+    no explicit `"date"` field by design (`_stale_snapshot_reason`: a
+    dateless payload is the legitimate "today" default) — but with
+    look-ahead on, that same dateless cycle can internally resolve to
+    **tomorrow's** date instead. Observed live: every sport's
+    `context_label` read `2026-07-28` in one cycle (only WNBA had games,
+    hence exactly 29 WNBA-only candidates), while the stored request
+    payload's own `date` field stayed unset. `IntelligenceStateService
+    .read_latest_response`'s `latest_key` fallback (`pipeline/
+    intelligence_state.py`) only ever compared `requested_date` against the
+    *stored payload's* nominal date, so `latest_date is None` was read as
+    "matches any requested date" — true for the common case, but it let a
+    look-ahead-shifted dateless snapshot silently stand in for an *explicit*
+    same-day request too. Confirmed via production logs: the served
+    `/api/intelligence/query` response stayed frozen on a WNBA-only,
+    2026-07-28 snapshot for 20+ minutes across multiple fresh 81-candidate
+    (all-sport, 2026-07-27) compute cycles that never got served. This
+    pattern predates today's deploy (log evidence back to 15:01Z, hours
+    before) — not a regression from tonight's fixes. Fixed by adding
+    `_effective_snapshot_date` (falls back to the *response's own* computed
+    `selected_date` only when the payload itself is silent) and using it in
+    both `latest_key`-fallback branches instead of the payload-only check.
+    Two tests added (`test_read_latest_response_rejects_dateless_latest_that
+    _actually_computed_a_different_date`,
+    `..._still_serves_dateless_latest_that_really_computed_today`) —
+    the first confirmed to fail against pre-fix source (reverted the fix,
+    reran, watched it fail) before being counted as a real guard.
+  - **WNBA rank-card rows were duplicated on the board**: every game-level
+    pick (ATS/Total) appeared twice — once correctly typed via
+    `game_market_recommendations`, and again as a fake "prop" candidate with
+    `market: "betting card"` and `player_name` wrongly holding the team/line
+    text instead of an actual player. Root cause:
+    `_pregame_prop_rows_from_betting_card` (`syndicate/blueprints/home.py`)
+    pulls a sport's **entire** ranked betting-card list — which legitimately
+    mixes player props with team-level game bets — and force-labels every
+    row `heading_override="Betting Card"` regardless of its real market,
+    because the rank card never exposed its true market code (only used as
+    an `eyebrow` fallback, dropped otherwise). Those mislabeled rows then
+    got promoted to `candidate_type="prop"` by `_prop_candidate_from_item`
+    (`syndicate/features/intelligence.py`), duplicating whatever
+    `_game_candidates_for_sport` already built correctly for the same pick
+    — evading the existing #29 cross-type dedup because their
+    `market`/`candidate_type` genuinely differ from the real entries (not
+    the "different arity, same key" bug #29 fixed). MLB is unaffected
+    (`_pregame_prop_rows_from_betting_card` explicitly returns `[]` for
+    `slug == "mlb"`); NBA/NHL share the same helper and were **not**
+    verified either way — worth a look if the same duplication is ever
+    reported there. Fixed by (a) exposing the pick's real market on WNBA's
+    rank card (`_card_from_pick`, `syndicate/features/wnba/picks.py`, was
+    computed but discarded) and (b) filtering game-level markets
+    (ats/total/moneyline/spread) out of the rank-card list in
+    `_pregame_prop_rows_from_betting_card` before it reaches the prop-row
+    builder — deliberately *not* touching `_prop_rows_from_rank_cards`/
+    `_prop_item_from_rank_card` itself, which soccer's props path relies on
+    never skipping a card it's given (`_prop_rows_from_rank_cards` zips
+    `cards`/`rows` 1:1 by index for `match_id` lookup). Two tests added
+    (`test_is_game_level_rank_card_market_classifies_team_bets`,
+    `test_pregame_prop_rows_from_betting_card_drops_game_level_cards`).
+  - ⚠️ Also found, not fixed: three `test_intelligence.py` tests named for
+    fast failure/degradation paths (`..._returns_fallback_when_query_raises`,
+    `..._degrades_when_queue_refresh_fails`, `..._forwards_policy_override`)
+    took 993s/790s/319s respectively — 35 of the file's ~37-minute total
+    runtime — via `pytest --durations=20` per #92's followup. Something in
+    each isn't actually mocked the way the test name implies; worth
+    investigating before the next full-suite validation attempt. Full
+    `test_intelligence.py` run: 163 passed, 10 failed — the 10 failures were
+    not investigated this session (pre-existing per #91/#92's known ~113
+    failures, not confirmed related to tonight's changes).
 - **New: #90** (filed, open) — NBA's `available_dates()` still scans **every**
   preferred artifact root (via `nba.sources._artifact_roots()`), but
   `processed_path()`/`live_snapshot_path()` (post-`757952e1`) only ever build a

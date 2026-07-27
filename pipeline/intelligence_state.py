@@ -645,6 +645,36 @@ def _selected_date_from_response(response: dict[str, Any] | None) -> str | None:
     return None
 
 
+def _effective_snapshot_date(snapshot: "IntelligenceSnapshot") -> str | None:
+    """The date a snapshot actually represents, for matching against a request.
+
+    Confirmed live 2026-07-27: the background loop's own recurring "default"
+    query (the one that keeps the board fresh for plain "today" requests)
+    carries no explicit "date" field in its payload -- by design, per
+    _stale_snapshot_reason's docstring, a dateless payload is "the legitimate
+    'today' default". Look-ahead being enabled (SYNDICATE_LOOK_AHEAD_ENABLED,
+    the deliberate "show tomorrow's slate when today has none" behavior) lets
+    that SAME dateless cycle sometimes resolve internally to TOMORROW's date
+    instead -- observed: every sport's context_label read 2026-07-28 in one
+    cycle while the payload's own "date" field stayed unset. Every date-match
+    guard below only ever inspected the stored payload's nominal date, so
+    "latest_date is None" was read as "matches any requested date" -- which
+    is true for the common case (a dateless default really did compute
+    today) but let a look-ahead-shifted dateless cycle silently stand in for
+    an EXPLICIT same-day request too, serving tomorrow's (WNBA-only) board
+    in place of today's (all-sport) one for hours until the next dateless
+    cycle happened to land back on today.
+
+    Falls back to the response's own computed selected_date only when the
+    payload itself is silent -- an explicit payload date is still the
+    authoritative signal when present.
+    """
+    payload_date = _selected_date_from_payload(snapshot.payload if isinstance(snapshot.payload, dict) else None)
+    if payload_date is not None:
+        return payload_date
+    return _selected_date_from_response(snapshot.response if isinstance(snapshot.response, dict) else None)
+
+
 def _utc_timestamp_string(value: str | None) -> str | None:
     text = str(value or "").strip()
     if not text:
@@ -2588,7 +2618,7 @@ class IntelligenceStateService:
                         return dict(candidate_snapshot.response)
             if self._latest_key and self._latest_key in self._snapshots:
                 latest_snapshot = self._snapshots[self._latest_key]
-                latest_date = _selected_date_from_payload(latest_snapshot.payload)
+                latest_date = _effective_snapshot_date(latest_snapshot)
                 latest_sport = _snapshot_sport(latest_snapshot)
                 if (
                     not self._is_stale(latest_snapshot)
@@ -2609,7 +2639,7 @@ class IntelligenceStateService:
                 return dict(snapshot.response)
             latest_snapshot = self._snapshots.get(self._latest_key or "") if self._latest_key else None
             if latest_snapshot is not None:
-                latest_date = _selected_date_from_payload(latest_snapshot.payload)
+                latest_date = _effective_snapshot_date(latest_snapshot)
                 latest_sport = _snapshot_sport(latest_snapshot)
                 if (
                     (allow_latest_fallback or requested_date is None or latest_date is None or latest_date == requested_date)

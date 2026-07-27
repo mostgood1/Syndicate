@@ -3714,6 +3714,23 @@ def _pregame_prop_rows_from_mlb_recommendations(
         return []
 
 
+_GAME_LEVEL_RANK_CARD_MARKET_KEYWORDS = ("moneyline", "spread", "total", "puck line", "puck_line", "run line", "run_line", "game bet")
+
+
+def _is_game_level_rank_card_market(market_text: Any) -> bool:
+    # A rank card's raw "market" code -- "ats"/"total"/"moneyline" for a
+    # team-level game bet vs. a stat code ("pts"/"reb"/...) for a real
+    # player prop. Mirrors intelligence.py's _is_game_level_market, kept as
+    # a local copy rather than imported to avoid a circular import
+    # (intelligence.py already imports from this module).
+    lowered = str(market_text or "").strip().lower()
+    if not lowered:
+        return False
+    if lowered == "ats":
+        return True
+    return any(keyword in lowered for keyword in _GAME_LEVEL_RANK_CARD_MARKET_KEYWORDS)
+
+
 def _pregame_prop_rows_from_betting_card(
     slug: str,
     *,
@@ -3724,9 +3741,23 @@ def _pregame_prop_rows_from_betting_card(
 ) -> list[dict[str, Any]]:
     if slug == "mlb":
         return []
-    
+
     # For other sports, use rank_cards from betting card
     cards, route_path, resolved_date = _betting_card_rank_cards(slug, context_label=context_label, season=season, week=week)
+    if not cards:
+        return []
+    # Team-level game bets (ats/total/moneyline) reach this same rank-card
+    # list alongside real player props -- they're already correctly
+    # represented as "game" candidates via game_market_recommendations, so
+    # forcing them through here too (as a fake "prop" labeled "Betting
+    # Card") duplicated every game-level pick on the board. Confirmed live
+    # 2026-07-27: WNBA's ATS and Total picks each appeared twice, once
+    # correctly typed and once as a "betting card" prop with the team/line
+    # text wrongly standing in for a player name. Cards whose market is
+    # unknown (no "market" field, e.g. sports whose card builder hasn't
+    # been updated to expose it) pass through unfiltered -- unchanged,
+    # pre-existing behavior for them.
+    cards = [card for card in cards if not _is_game_level_rank_card_market(card.get("market"))]
     if not cards:
         return []
     fallback_href = None

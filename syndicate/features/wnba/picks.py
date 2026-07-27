@@ -22,6 +22,15 @@ def _card_from_pick(game: dict[str, Any], pick: dict[str, Any]) -> dict[str, Any
     return {
         "title": str(pick.get("display_pick") or "WNBA pick").strip() or "WNBA pick",
         "eyebrow": str(pick.get("team") or pick.get("market") or "WNBA picks").strip() or "WNBA picks",
+        # Raw market code (e.g. "ats"/"total"/"moneyline" for a team-level
+        # game bet, a stat code like "pts"/"reb" for a real player prop) --
+        # this used to only surface as the eyebrow fallback, so the home
+        # page's "pregame props" rail (_pregame_prop_rows_from_betting_card)
+        # had no way to tell a team-level pick apart from a player prop and
+        # relabeled every card "Betting Card", duplicating whatever
+        # game_market_recommendations already built correctly for the same
+        # pick. See _is_game_level_rank_card_market in home.py.
+        "market": str(pick.get("market") or "").strip(),
         "badge": f"{format_num(pick.get('ev_pct'))}% EV",
         "meta": str(pick.get("matchup") or game.get("matchup") or "-").strip() or "-",
         "metrics": [

@@ -101,6 +101,63 @@ class IntelligenceStateTests(unittest.TestCase):
 
         self.assertIsNone(response)
 
+    def test_read_latest_response_rejects_dateless_latest_that_actually_computed_a_different_date(self) -> None:
+        # Confirmed live 2026-07-27: the background loop's own recurring
+        # "default" query payload carries no explicit "date" field (a
+        # dateless payload is the legitimate "today" default -- see
+        # _stale_snapshot_reason), but with look-ahead enabled that same
+        # dateless cycle can internally resolve to TOMORROW's date instead
+        # -- every sport's context_label read the next day while the stored
+        # payload's own "date" field stayed unset. The old guard treated
+        # "latest_date is None" as "matches any requested date", so this
+        # look-ahead-shifted response silently stood in for an explicit
+        # same-day request for hours, serving a WNBA-only board in place of
+        # the correct all-sport one.
+        service = IntelligenceStateService()
+        snapshot = IntelligenceSnapshot(
+            key=_payload_key({"question": "top edges today"}),
+            payload={"question": "top edges today"},
+            response={"ok": True, "response": {"selected_date": "2026-07-28", "recommendations": [{"sport": "WNBA"}]}},
+            computed_at=intelligence_state_module._utc_now(),
+            source_fingerprint="fingerprint-1",
+        )
+        service._snapshots[snapshot.key] = snapshot
+        service._latest_key = snapshot.key
+
+        response = service.read_latest_response(
+            {"question": "top edges today", "date": "2026-07-27"},
+            force_refresh=False,
+            allow_latest_fallback=False,
+        )
+
+        self.assertIsNone(response)
+
+    def test_read_latest_response_still_serves_dateless_latest_that_really_computed_today(self) -> None:
+        # Companion to the rejection test above: a dateless "default"
+        # snapshot whose response genuinely represents today must still be
+        # servable as the latest-key fallback -- the fix only closes the
+        # loophole for a MISMATCHED real date, it must not break the common
+        # (no look-ahead shift) case.
+        service = IntelligenceStateService()
+        snapshot = IntelligenceSnapshot(
+            key=_payload_key({"question": "top edges today"}),
+            payload={"question": "top edges today"},
+            response={"ok": True, "response": {"selected_date": "2026-07-27", "recommendations": [{"sport": "MLB"}]}},
+            computed_at=intelligence_state_module._utc_now(),
+            source_fingerprint="fingerprint-1",
+        )
+        service._snapshots[snapshot.key] = snapshot
+        service._latest_key = snapshot.key
+
+        response = service.read_latest_response(
+            {"question": "top edges today", "date": "2026-07-27"},
+            force_refresh=False,
+            allow_latest_fallback=False,
+        )
+
+        self.assertIsNotNone(response)
+        self.assertEqual(response.get("response", {}).get("selected_date"), "2026-07-27")
+
     def test_read_latest_response_does_not_fall_back_to_other_sport(self) -> None:
         service = IntelligenceStateService()
         mlb_payload = {

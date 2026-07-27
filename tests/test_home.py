@@ -21,6 +21,8 @@ from syndicate.blueprints.home import _game_bet_candidates_from_game
 from syndicate.blueprints.home import _mlb_game_market_recommendation_rows
 from syndicate.blueprints.home import _game_status_state
 from syndicate.blueprints.home import _prop_item_from_rank_card
+from syndicate.blueprints.home import _is_game_level_rank_card_market
+from syndicate.blueprints.home import _pregame_prop_rows_from_betting_card
 from syndicate.blueprints.home import _team_for_side_hint
 from syndicate.blueprints.home import _compact_prop_rows
 from syndicate.blueprints.home import _game_sim_vs_line_reasoning
@@ -390,6 +392,42 @@ class HomePageCommandCenterTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["name"], "Player points")
         self.assertEqual(rows[0]["matchup"], "AWY @ HME")
+
+    def test_is_game_level_rank_card_market_classifies_team_bets(self) -> None:
+        # ats/total/moneyline are team-level game bets, already correctly
+        # represented via game_market_recommendations -- these must be
+        # recognized so _pregame_prop_rows_from_betting_card can drop them
+        # instead of duplicating them as fake "Betting Card" props.
+        for market in ("ats", "total", "moneyline", "spread", "Total", "ATS"):
+            self.assertTrue(_is_game_level_rank_card_market(market), market)
+        # Real player-prop stat codes and an absent market must pass through
+        # unaffected -- this filter only targets team-level game bets.
+        for market in ("pts", "reb", "ast", "pra", "", None):
+            self.assertFalse(_is_game_level_rank_card_market(market), market)
+
+    def test_pregame_prop_rows_from_betting_card_drops_game_level_cards(self) -> None:
+        # Confirmed live 2026-07-27: WNBA's rank_cards list mixes real
+        # player props with team-level ats/total picks that are already
+        # correctly represented via game_market_recommendations. Before
+        # market-aware filtering, every card -- both kinds -- was forced
+        # through as a "prop" labeled "Betting Card", duplicating each
+        # game-level pick on the board with the team/line text standing in
+        # for a player name.
+        cards = [
+            {"title": "Minnesota Lynx -15.5", "eyebrow": "MIN", "meta": "TOR @ MIN", "market": "ats", "metrics": []},
+            {"title": "Under 184.0", "eyebrow": "Total", "meta": "TOR @ MIN", "market": "total", "metrics": []},
+            {"title": "Gabby Williams OVER 1.5", "eyebrow": "MIN", "meta": "TOR @ MIN", "market": "pts", "metrics": []},
+        ]
+        with patch(
+            "syndicate.blueprints.home._betting_card_rank_cards",
+            return_value=(cards, "/wnba/season/2026/betting-card", "2026-07-27"),
+        ):
+            rows = _pregame_prop_rows_from_betting_card("wnba", context_label="2026-07-27")
+
+        names = [row["name"] for row in rows]
+        self.assertNotIn("Minnesota Lynx -15.5", names)
+        self.assertNotIn("Under 184.0", names)
+        self.assertIn("Gabby Williams OVER 1.5", names)
 
     def test_load_home_pregame_prop_items_uses_mlb_top_props_when_betting_card_is_empty(self) -> None:
         home_games = [{"gamePk": 1, "away": {"abbr": "AWY"}, "home": {"abbr": "HME"}}]
