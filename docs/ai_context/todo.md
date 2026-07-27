@@ -6,7 +6,7 @@ list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-07-27 (see "Reconciliation 2026-07-27").
 
-> **Next free ID: 97.** IDs are never reused. Closed items move to
+> **Next free ID: 98.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
 
@@ -446,6 +446,68 @@ now genuinely met rather than merely believed.
   genuinely dateless one either — full removal is a lower-risk follow-up,
   not done here** to keep this fix minimal while production was actively
   wrong.
+- **New: #97** (filed, shipped, live) — two follow-ups from chasing why the
+  board still hadn't self-healed after #95 deployed:
+  - 🔴 **Found and fixed a second, more severe bug while investigating**:
+    `_ensure_default_board_window_watched()` (#94's board-window seeding)
+    sat completely UNGUARDED at the top of `_background_loop`'s while body
+    — only ever exercised against mocks in unit tests, never real
+    production data/timing. An uncaught exception there kills the entire
+    background thread instantly, before the loop even reaches its
+    pending-queue sync/process step. Proven with a test (fails against
+    pre-fix code: the loop dies before ever processing a persisted pending
+    payload). Wrapped in the same "a failure here must never kill the loop"
+    pattern already used elsewhere in this function. **This turned out NOT
+    to be tonight's active cause** — a parallel session's log access showed
+    the loop genuinely alive and cycling every 70-90s throughout, not
+    dead — but the gap itself was real and is worth having fixed
+    regardless.
+  - 🟡 **Open, not a bug**: confirmed via `/api/ops/intelligence/candidate-trace`
+    (read_only=true) and a parallel session's log pull that `self._latest_key`
+    sat frozen at one pre-#95 snapshot (24 WNBA candidates, computed
+    2026-07-27T20:58:50Z) for over an hour post-fix, **because today's own
+    candidate pool has been genuinely computing near-empty on every
+    attempt since ~20:58**, not because of any remaining promotion/rollover
+    bug. Real trace at 21:52:05Z: `{"stage": "post_dedupe_and_classify",
+    "normalized_in": 14, "classification_pruned": 9,
+    "classification_reasons": {"missing_projection_or_odds": 9},
+    "dedupe_pruned": 5, "total_candidates": 0}` — only 14 candidates ever
+    entered classification (a thin pool, not a memory-truncated one; ruled
+    out memory contention directly — refresh-worker sat at 218-255MB of a
+    4096MB container the whole window, and zero `MEMORY_GUARD_ABORT` log
+    lines). `self._latest_key` correctly refuses to regress a good board
+    with an empty one (the existing, deliberate anti-#8 rule), which is
+    why the board visibly hasn't changed even though the fix is working as
+    designed. Most likely explanation: it's late evening Central and a lot
+    of tonight's MLB games are probably final by now, so there's
+    legitimately little live/pregame content left — matches the #68
+    investigation's exact failure shape from earlier this project's
+    history. **Not chased further tonight** — worth a look with
+    `/api/ops/intelligence/candidate-trace?date=<today>` next time this
+    recurs, checked against the actual live MLB game states at that hour,
+    before assuming a new bug.
+  - **Also found and cleaned up, unrelated to any of the above**: ~6.7GB of
+    accumulated local test/dev-server pollution in `reports/intelligence/`
+    on this dev machine (`board_snapshot*.json`/`query_state_cache.json`/
+    dated `intelligence_state_*` — all deliberately gitignored, built up
+    across many past local sessions, one single stray file alone was
+    1.89GB) was making 3 unrelated, pre-existing tests
+    (`test_query_endpoint_*_default_cache_is_empty*`) intermittently pick up
+    stray real candidate data instead of their own mocks. Confirmed via an
+    isolated `git worktree` that this was never a code regression — those 3
+    tests pass cleanly there and now pass locally too post-cleanup. Never
+    touched git or production; local-machine-only. ⚠️ Mid-cleanup, a `rm`
+    over-matched and briefly deleted several **git-tracked** dated
+    `board_snapshot_*.json`/`intelligence_state_*.json` files that happen
+    to match the gitignore glob despite being committed before the rule
+    existed (gitignore doesn't retroactively untrack) — caught immediately
+    via `git status` showing them as deleted-tracked rather than
+    untracked, restored via `git checkout --` before anything was
+    committed. No damage, but a reminder to always diff `--ignored` output
+    against plain `git status` before bulk-deleting anything under a
+    gitignore pattern, even in directories believed fully ignored.
+  - Full `test_intelligence_state.py` + `test_intelligence_contracts.py`:
+    203 passed, 0 failed.
 
 ### Reconciliation 2026-07-26
 
