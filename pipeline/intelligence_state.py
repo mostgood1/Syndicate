@@ -1538,6 +1538,30 @@ def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
         logger.info("STATE WRITTEN", extra={"written": False, "candidate_count": 0})
         print("[intelligence_state] STATE_WRITE_SKIPPED_INVALID_PAYLOAD", flush=True)
         return None
+    requested_sport = str(normalized.get("requested_sport") or "all").strip().lower() or "all"
+    if requested_sport != "all":
+        # This is the ONLY writer of the canonical, cross-user board files
+        # (INTELLIGENCE_STATE_PATH/BOARD_SNAPSHOT_PATH and their dated
+        # variants -- the latter read AHEAD of the global fallback by
+        # _intelligence_state_read_path). _compute_board_publication_response
+        # filters top_opportunities/recommendations down to one sport when a
+        # caller passes sport != "all" (a user on the intelligence page with
+        # one sport tab selected, or the per-tab force_refresh queued at
+        # blueprints/intelligence.py:1843-1847) -- it does NOT filter
+        # candidate_count, so the "don't overwrite a good board with an
+        # empty one" guard above cannot catch this. Persisting that filtered
+        # response here would silently replace the real combined board with
+        # a single-sport slice for every reader. Confirmed live as the
+        # WNBA-only board serve in todo.md #6; the leading suspect for MLB
+        # props vanishing from the board while candidate generation upstream
+        # stayed healthy. The caller still gets its own filtered response
+        # back -- it just never becomes what everyone else's board reads.
+        print(
+            f"[intelligence_state] STATE_PERSIST_SKIPPED_SPORT_SCOPED sport={requested_sport} "
+            f"date={normalized.get('selected_date')}",
+            flush=True,
+        )
+        return normalized
     candidate_count = int(normalized.get("candidate_count") or 0)
     if candidate_count <= 0 and _empty_write_would_clobber_good_board(normalized):
         # Observed 2026-07-26: one cycle produced 84 candidates and a later
@@ -3231,7 +3255,22 @@ class IntelligenceStateService:
                         # ever reachable through its own explicit key.
                         effective_date = str(effective_payload.get("date") or effective_payload.get("selected_date") or "").strip()
                         represents_today_or_dateless = (not effective_date) or effective_date == central_today_iso()
-                        if not represents_today_or_dateless:
+                        # self._latest_key also drives _persist_locked's own,
+                        # fallback-free write of BOARD_SNAPSHOT_PATH below --
+                        # a sport-scoped payload (e.g. a user's single-sport
+                        # tab on the intelligence page) produces a snapshot
+                        # whose top_opportunities/recommendations are
+                        # filtered to one sport (_compute_board_publication_
+                        # response), but whose candidate_count still reflects
+                        # the FULL pool -- so snapshot_count alone cannot
+                        # detect it. Never let it become "the board".
+                        effective_sport = str(effective_payload.get("sport") or "all").strip().lower() or "all"
+                        if effective_sport != "all":
+                            print(
+                                f"[intelligence_state] LATEST_KEY_PROMOTION_SKIPPED_SPORT_SCOPED key={snapshot.key} sport={effective_sport}",
+                                flush=True,
+                            )
+                        elif not represents_today_or_dateless:
                             print(
                                 f"[intelligence_state] LATEST_KEY_PROMOTION_SKIPPED_NON_TODAY key={snapshot.key} date={effective_date}",
                                 flush=True,
@@ -3414,6 +3453,7 @@ class IntelligenceStateService:
             "portfolio": {},
             "parlays": [],
             "selected_date": selected_date,
+            "requested_sport": requested_sport,
             "state_last_updated": response_last_updated,
             "last_updated": response_last_updated,
             "snapshot_generated_at": response_last_updated,
@@ -3989,14 +4029,23 @@ class IntelligenceStateService:
                     latest_response,
                     selected_date=latest_snapshot_date,
                 )
-                write_json_file(
+                # _write_state_payload, not a raw write_json_file: this write
+                # had no size fallback at all until now -- every cycle where
+                # the real board_snapshot payload (measured 10.47MB on a full
+                # slate) exceeded the 8MB keyvalue ceiling just failed here
+                # with nothing persisted, silently freezing board_snapshot.json
+                # at whatever last happened to fit. write_latest_intelligence_
+                # state's own board_snapshot write already uses this same
+                # helper (#105); this path -- reached via _persist_locked, not
+                # that function -- was the one still missing it.
+                _write_state_payload(
                     BOARD_SNAPSHOT_PATH,
                     {
                         "latest_key": latest_snapshot.key,
                         **board_snapshot_payload,
                     },
                 )
-                write_json_file(
+                _write_state_payload(
                     daily_paths["board_snapshot"],
                     {
                         "latest_key": latest_snapshot.key,
@@ -4004,10 +4053,11 @@ class IntelligenceStateService:
                     },
                 )
             except Exception as exc:
-                # Same rule: today's board_snapshot write was 5.15MB with the
-                # 27-candidate board -- a bigger slate crosses the same 8MB
-                # ceiling here too, and this write failing must not take the
-                # thread (or a request) with it.
+                # _write_state_payload itself never raises (it swallows and
+                # logs its own ARTIFACT_FALLBACK_FAILED) -- this remains as a
+                # backstop against anything upstream of it (e.g. building
+                # board_snapshot_payload itself) so a persist problem still
+                # cannot take the thread down.
                 print(f"[intelligence_state] BOARD_SNAPSHOT_PERSIST_FAILED {type(exc).__name__}: {exc}", flush=True)
 
 

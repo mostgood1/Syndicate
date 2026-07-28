@@ -1150,6 +1150,86 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertIsNotNone(result)
         mocked_publish.assert_any_call(board_snapshot_path)
 
+    def test_write_latest_intelligence_state_refuses_to_persist_sport_scoped_response(self) -> None:
+        # A response for a specific sport (e.g. a user on the intelligence
+        # page with one sport tab selected, or the per-tab force_refresh
+        # queued at blueprints/intelligence.py:1843-1847) has
+        # top_opportunities/recommendations filtered to that sport by
+        # _compute_board_publication_response, but candidate_count still
+        # reflects the FULL pool -- so it looks "healthy" to every other
+        # guard in this function. Before this fix, write_latest_intelligence_
+        # state persisted it anyway, silently replacing the real combined
+        # board (and today's dated file, read ahead of the global fallback)
+        # with a single-sport slice for every reader. Confirmed live as the
+        # WNBA-only board serve in todo.md #6.
+        state = {
+            "ok": True,
+            "top_opportunities": [{"name": "WNBA Play 1"}],
+            "recommendations": [{"name": "WNBA Play 1"}],
+            "by_sport": {"wnba": [{"name": "WNBA Play 1"}]},
+            "board_contract": {"schema": "intelligence_board_v1", "cards": [{"name": "WNBA Play 1"}]},
+            "analysis": None,
+            "portfolio": {},
+            "parlays": [],
+            "selected_date": "2026-06-15",
+            "requested_sport": "wnba",
+            "candidate_count": 68,
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            state_path = temp_root / "query_state_cache.json"
+            board_snapshot_path = temp_root / "board_snapshot.json"
+            history_path = temp_root / "intelligence" / "intelligence_state_history.jsonl"
+            with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(
+                intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path
+            ), patch.object(
+                intelligence_state_module, "INTELLIGENCE_HISTORY_PATH", history_path
+            ), patch.object(
+                intelligence_state_module, "reports_root", return_value=temp_root
+            ), patch.object(intelligence_state_module, "central_today_iso", return_value="2026-06-15"):
+                result = write_latest_intelligence_state(dict(state))
+
+            self.assertIsNotNone(result)
+            self.assertFalse(state_path.exists())
+            self.assertFalse(board_snapshot_path.exists())
+            self.assertFalse(history_path.exists())
+
+    def test_write_latest_intelligence_state_persists_unfiltered_response(self) -> None:
+        # Sibling of the sport-scoped-refusal test above: an "all" (or
+        # unlabeled, for backward compatibility with existing callers/tests)
+        # response must still persist exactly as before this fix.
+        state = {
+            "ok": True,
+            "top_opportunities": [{"name": "Play 1"}],
+            "recommendations": [{"name": "Play 1"}],
+            "by_sport": {"mlb": [{"name": "Play 1"}]},
+            "board_contract": {"schema": "intelligence_board_v1", "cards": [{"name": "Play 1"}]},
+            "analysis": None,
+            "portfolio": {},
+            "parlays": [],
+            "selected_date": "2026-06-15",
+            "requested_sport": "all",
+            "candidate_count": 1,
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            state_path = temp_root / "query_state_cache.json"
+            board_snapshot_path = temp_root / "board_snapshot.json"
+            history_path = temp_root / "intelligence" / "intelligence_state_history.jsonl"
+            with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(
+                intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path
+            ), patch.object(
+                intelligence_state_module, "INTELLIGENCE_HISTORY_PATH", history_path
+            ), patch.object(
+                intelligence_state_module, "reports_root", return_value=temp_root
+            ), patch.object(intelligence_state_module, "central_today_iso", return_value="2026-06-15"):
+                result = write_latest_intelligence_state(dict(state))
+
+            self.assertIsNotNone(result)
+            self.assertTrue(board_snapshot_path.exists())
+
     def test_state_compute_persists_freshness_metadata_on_board_snapshot(self) -> None:
         service = IntelligenceStateService()
 
@@ -1479,7 +1559,13 @@ class IntelligenceStateTests(unittest.TestCase):
         service = IntelligenceStateService()
         service._interval_seconds = 0
 
-        payload = {"question": "top edges today", "date": "2026-06-15", "sport": "mlb"}
+        # sport deliberately "all", not a specific sport: this test is about
+        # queue/persist mechanics (does a queued payload get consumed,
+        # cached, and promoted to _latest_key), not sport-scoping semantics.
+        # A sport-scoped payload is now correctly refused promotion (see
+        # test_background_loop_never_promotes_a_sport_scoped_payload_to_latest_key
+        # below) and would fail the assertion below for that unrelated reason.
+        payload = {"question": "top edges today", "date": "2026-06-15", "sport": "all"}
         normalized = service._normalize_payload(payload)
         queued_key = _payload_key(normalized)
 
@@ -1540,6 +1626,73 @@ class IntelligenceStateTests(unittest.TestCase):
         mocked_write.assert_called_once()
         self.assertIn(queued_key, service._snapshots)
         self.assertEqual(service._latest_key, queued_key)
+
+    def test_background_loop_never_promotes_a_sport_scoped_payload_to_latest_key(self) -> None:
+        # Sibling of the mechanics test above, isolating the specific bug:
+        # a queued payload for one sport (e.g. a user's single-sport tab on
+        # the intelligence page) must never become self._latest_key, even
+        # when its response reports a non-zero candidate_count -- that count
+        # reflects the full pool, not the sport-filtered top_opportunities/
+        # recommendations _compute_board_publication_response actually
+        # returns for it. self._latest_key drives both
+        # write_latest_intelligence_state's global-file writes and
+        # _persist_locked's own board_snapshot write; promoting it here would
+        # replace the real combined board with a single-sport slice for
+        # every reader. Fails against the pre-fix source (service._latest_key
+        # would equal queued_key).
+        service = IntelligenceStateService()
+        service._interval_seconds = 0
+
+        payload = {"question": "top edges today", "date": "2026-06-15", "sport": "wnba"}
+        normalized = service._normalize_payload(payload)
+        queued_key = _payload_key(normalized)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            state_path = temp_root / "query_state_cache.json"
+            board_snapshot_path = temp_root / "board_snapshot.json"
+            persisted_state = {
+                "latest_key": None,
+                "updated_at": "2026-06-15T20:00:00Z",
+                "watched_payloads": {queued_key: normalized},
+                "pending_keys": {queued_key: normalized},
+                "snapshots": {},
+            }
+            refresh_state_store.write_json_file(state_path, persisted_state)
+
+            with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(
+                intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path
+            ), patch.object(intelligence_state_module, "central_today_iso", return_value="2026-06-15"), patch.object(
+                service, "_ensure_default_board_window_watched"
+            ):
+                board_state = {
+                    "ok": True,
+                    "top_opportunities": [{"name": "WNBA Play 1"}],
+                    "recommendations": [{"name": "WNBA Play 1"}],
+                    "by_sport": {"wnba": [{"name": "WNBA Play 1"}]},
+                    "board_contract": {"schema": "intelligence_board_v1", "cards": [{"name": "WNBA Play 1"}]},
+                    "analysis": None,
+                    "portfolio": {},
+                    "parlays": [],
+                    "selected_date": "2026-06-15",
+                    "requested_sport": "wnba",
+                    "state_last_updated": "2026-06-15T20:00:00Z",
+                    "last_updated": "2026-06-15T20:00:00Z",
+                    "snapshot_generated_at": "2026-06-15T20:00:00Z",
+                    "candidate_count": 68,
+                }
+
+                def fake_write_latest_intelligence_state(state: dict[str, object]) -> dict[str, object]:
+                    service._stop.set()
+                    return dict(state)
+
+                with patch.object(service, "_compute_board_publication_response", return_value=dict(board_state)):
+                    with patch("pipeline.intelligence_state.run_intelligence_pipeline", side_effect=AssertionError("full intelligence pipeline should not run during board-only publication")):
+                        with patch("pipeline.intelligence_state.write_latest_intelligence_state", side_effect=fake_write_latest_intelligence_state):
+                            service._background_loop()
+
+        self.assertIn(queued_key, service._snapshots)
+        self.assertIsNone(service._latest_key)
 
     def test_background_loop_stores_rolled_over_response_under_its_own_date_not_the_requested_one(self) -> None:
         # #93. _compute_board_publication_response's rollover path (see
