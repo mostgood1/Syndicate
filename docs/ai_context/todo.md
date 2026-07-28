@@ -1061,6 +1061,19 @@ were resolved and nine already-closed rows removed from the open tables.
 > attributed slate first, then decide (a)/(b), then build scoping/off-hours
 > against measured numbers rather than this table.
 >
+> ⚠️ **Hard sequencing dependency, flagged 2026-07-27: do not build "Event
+> scoping" before #100.** Event scoping's whole premise is a reliable
+> per-game "is this live or near-live" decision (which games get full
+> props+segments vs. drift-only). Building that on the pre-#100 fragmented
+> game-state checks (26 sites, at least 6 confirmed reading MLB's
+> `abstractGameState` alone and misreading warmup as live) risks either
+> overcharging (a warming-up game wrongly gets full markets) or worse,
+> undercharging at the moment it actually matters (a game about to go live
+> gets denied full markets because its state read as still-drift). **#100
+> shipped and deployed 2026-07-27/28 (`110461f6`)** — build event scoping's
+> per-game decision on `syndicate.features.mlb.game_state.mlb_status_is_live`/
+> `mlb_status_is_final`, not a new bespoke check.
+>
 > **These are required work, not optimisations. The target is 5M.**
 > The plan currently reads 15M, but it was bumped to 15M *because of a real
 > prior overage* — it is remediation, and the objective is to cut burn enough to
