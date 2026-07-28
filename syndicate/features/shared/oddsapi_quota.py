@@ -267,6 +267,37 @@ def record_oddsapi_quota(headers: Any, *, sport: str | None = None, endpoint: st
                 "observedAt": observation.get("observedAt"),
             }
 
+        # Concurrent-write race probe. #106/#107 flagged that by_sport (~96%
+        # complete vs the ground-truth burn counter) and
+        # by_market_family/by_hour_utc (~54%, identical to each other since
+        # they update in the same block above) are written together, in one
+        # function call, to one shared key -- yet diverge in completeness.
+        # That contradicts a plain lost-update race (which should lose all
+        # three equally per collision) if this write and the collision are
+        # simultaneous, so: re-read the store immediately before writing and
+        # compare observation_count against what this call read at the top.
+        # A mismatch proves another writer completed in between -- this call
+        # is about to overwrite it with a payload computed from the stale
+        # read, the exact mechanism under suspicion. Read-only probe: it
+        # does not change what gets written, only records how often this
+        # happens so the rate is measurable instead of inferred.
+        observation_count_at_read = int(payload.get("observation_count") or 0)
+        race_detected_count = int(payload.get("race_detected_count") or 0)
+        last_race_detail = payload.get("last_race_detail")
+        try:
+            fresh_payload = read_json_file(_quota_path())
+            fresh_count = int((fresh_payload or {}).get("observation_count") or 0) if isinstance(fresh_payload, dict) else observation_count_at_read
+            if fresh_count != observation_count_at_read:
+                race_detected_count += 1
+                last_race_detail = {
+                    "observation_count_at_read": observation_count_at_read,
+                    "observation_count_at_write": fresh_count,
+                    "sport": observation.get("sport"),
+                    "observedAt": observation.get("observedAt"),
+                }
+        except Exception:
+            pass
+
         write_json_file(
             _quota_path(),
             {
@@ -277,10 +308,12 @@ def record_oddsapi_quota(headers: Any, *, sport: str | None = None, endpoint: st
                 "by_hour_utc": by_hour,
                 "attribution_error_count": attribution_error_count,
                 "last_attribution_error": last_attribution_error,
+                "race_detected_count": race_detected_count,
+                "last_race_detail": last_race_detail,
                 # Stamped once, because none of the aggregates above ever
                 # reset -- a rate is only computable as total/(now - this).
                 "aggregates_started_at": str(payload.get("aggregates_started_at") or _utc_now_iso()),
-                "observation_count": int(payload.get("observation_count") or 0) + 1,
+                "observation_count": observation_count_at_read + 1,
                 "updatedAt": _utc_now_iso(),
             },
         )
@@ -373,6 +406,8 @@ def read_oddsapi_quota() -> dict[str, Any]:
         "aggregates_started_at": payload.get("aggregates_started_at"),
         "attribution_error_count": int(payload.get("attribution_error_count") or 0),
         "last_attribution_error": payload.get("last_attribution_error"),
+        "race_detected_count": int(payload.get("race_detected_count") or 0),
+        "last_race_detail": payload.get("last_race_detail"),
     }
 
     if not isinstance(baseline, dict) or not isinstance(latest, dict):

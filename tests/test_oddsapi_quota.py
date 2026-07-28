@@ -171,6 +171,111 @@ class RecordAndReadQuotaTests(unittest.TestCase):
         self.assertEqual(state["by_sport"], {})
 
 
+class ConcurrentWriteRaceProbeTests(unittest.TestCase):
+    """#106/#107. by_sport measured ~96% of the ground-truth burn counter
+    while by_market_family/by_hour_utc measured ~54% -- identical to each
+    other, since they update in the same block -- for 8+ hours straight,
+    with zero attribution exceptions recorded. The remaining candidate is a
+    read-modify-write race on the shared keyvalue store (three services can
+    call this concurrently, per test_burn_is_derived_from_absolute_counter_delta's
+    own comment). This probe makes that measurable instead of inferred.
+    """
+
+    def setUp(self) -> None:
+        self._tmp = TemporaryDirectory(ignore_cleanup_errors=True)
+        self.reports_root = Path(self._tmp.name)
+        os.environ["SYNDICATE_REPORTS_ROOT"] = str(self.reports_root)
+        self.addCleanup(self._tmp.cleanup)
+        self.addCleanup(lambda: os.environ.pop("SYNDICATE_REPORTS_ROOT", None))
+
+    def test_no_race_when_calls_are_sequential(self) -> None:
+        record_oddsapi_quota({"x-requests-used": "1", "x-requests-last": "1"}, sport="mlb")
+        record_oddsapi_quota({"x-requests-used": "2", "x-requests-last": "1"}, sport="mlb")
+        state = read_oddsapi_quota()
+        self.assertEqual(state["race_detected_count"], 0)
+        self.assertIsNone(state["last_race_detail"])
+
+    def test_race_detected_when_store_advances_between_read_and_write(self) -> None:
+        from syndicate.features.shared import oddsapi_quota as module
+
+        # Seed a real prior observation first (unpatched) so the probe read
+        # below has an actual stored dict to bump -- an empty store has no
+        # observation_count for a concurrent writer to have advanced.
+        record_oddsapi_quota({"x-requests-used": "0", "x-requests-last": "0"}, sport="mlb")
+
+        real_read = module.read_json_file
+        call_count = {"n": 0}
+
+        def _flaky_read(path):
+            call_count["n"] += 1
+            payload = real_read(path)
+            # Simulate a concurrent writer completing between this call's
+            # own top-of-function read and its pre-write probe read: bump
+            # observation_count on the SECOND read within this invocation
+            # (the probe read), exactly what another process's write would
+            # look like.
+            if call_count["n"] % 2 == 0 and isinstance(payload, dict):
+                payload = dict(payload)
+                payload["observation_count"] = int(payload.get("observation_count") or 0) + 1
+            return payload
+
+        with patch("syndicate.features.shared.oddsapi_quota.read_json_file", side_effect=_flaky_read):
+            record_oddsapi_quota({"x-requests-used": "1", "x-requests-last": "1"}, sport="mlb")
+
+        state = read_oddsapi_quota()
+        self.assertEqual(state["race_detected_count"], 1)
+        self.assertIsNotNone(state["last_race_detail"])
+        self.assertEqual(state["last_race_detail"]["sport"], "mlb")
+
+    def test_race_probe_never_changes_by_sport_computation(self) -> None:
+        # Diagnosis, not a fix: the probe reads the store an extra time to
+        # COUNT collisions, but the actual by_sport/by_family delta computed
+        # and written by this call must be based on this call's own
+        # top-of-function read, unaffected by whatever the probe read sees.
+        record_oddsapi_quota({"x-requests-used": "0", "x-requests-last": "0"}, sport="mlb")
+
+        from syndicate.features.shared import oddsapi_quota as module
+
+        real_read = module.read_json_file
+        call_count = {"n": 0}
+
+        def _flaky_read(path):
+            call_count["n"] += 1
+            payload = real_read(path)
+            # Bump only the PROBE read (this invocation's 2nd read), not the
+            # top-of-function read its own computation is based on.
+            if call_count["n"] == 2 and isinstance(payload, dict):
+                payload = dict(payload)
+                payload["observation_count"] = int(payload.get("observation_count") or 0) + 41
+            return payload
+
+        with patch("syndicate.features.shared.oddsapi_quota.read_json_file", side_effect=_flaky_read):
+            record_oddsapi_quota({"x-requests-used": "1", "x-requests-last": "6"}, sport="mlb")
+
+        state = read_oddsapi_quota()
+        # by_sport reflects this call's own real delta on top of the real
+        # prior state (1 call, 0 credits) -- untouched by the probe's bump.
+        self.assertEqual(state["by_sport"]["mlb"], {"calls": 2, "credits": 6})
+        self.assertEqual(state["race_detected_count"], 1)
+
+    def test_probe_read_failure_does_not_break_recording(self) -> None:
+        from syndicate.features.shared import oddsapi_quota as module
+
+        real_read = module.read_json_file
+        call_count = {"n": 0}
+
+        def _first_read_ok_second_raises(path):
+            call_count["n"] += 1
+            if call_count["n"] % 2 == 0:
+                raise OSError("transient")
+            return real_read(path)
+
+        with patch("syndicate.features.shared.oddsapi_quota.read_json_file", side_effect=_first_read_ok_second_raises):
+            result = record_oddsapi_quota({"x-requests-used": "1", "x-requests-last": "1"}, sport="mlb")
+        self.assertIsNotNone(result)
+        self.assertEqual(read_oddsapi_quota()["observation_count"], 1)
+
+
 class MarketFamilyAttributionTests(unittest.TestCase):
     """#15. 371,563 credits/day measured with MLB at 96.3%, and every cut on
     the table (#16 a/b, tiering, event scoping) needs to know which MARKETS
