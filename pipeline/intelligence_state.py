@@ -110,6 +110,23 @@ def _board_window_days() -> int:
     return max(1, min(7, raw))
 
 
+def _board_window_candidate_dates(today: str | None = None) -> list[str]:
+    """The raw today..today+N-1 window (see _board_window_days), with no
+    per-sport availability filtering. Shared by the build side
+    (_default_board_window_dates, which then intersects with
+    _supported_intelligence_dates()) and the read side
+    (read_combined_intelligence_response), which deliberately does NOT
+    filter -- see that function's use of this helper for why.
+    """
+    reference = str(today or "").strip() or central_today_iso()
+    try:
+        reference_date = date.fromisoformat(reference)
+    except Exception:
+        return [reference]
+    window_days = _board_window_days()
+    return [(reference_date + timedelta(days=offset)).isoformat() for offset in range(window_days)]
+
+
 def _default_board_window_dates(today: str | None = None) -> list[str]:
     """Which dates the background loop should proactively keep warm for the
     combined cross-date board (see #93's follow-up: the single-date "latest
@@ -127,14 +144,22 @@ def _default_board_window_dates(today: str | None = None) -> list[str]:
     the wrong shape for them. Tracked as a separate follow-up
     (_default_week_scoped_dates, not yet implemented) rather than bolted on
     here.
+
+    This filtered/build-only view is intentionally NOT what
+    read_combined_intelligence_response uses (see _board_window_candidate_dates)
+    -- #110: _supported_intelligence_dates() reads each sport's own local
+    on-disk "published schedule" artifacts (e.g. wnba_available_dates()
+    scanning data/processed/game_cards_*.csv), which is a narrower, slower-
+    to-populate signal than what a sport's board build actually needs to
+    produce real candidates. On the read side that narrowness cost a full
+    day of "Tomorrow" showing empty even after refresh-worker had already
+    built and published a real N-candidate board for that date on every
+    sport this touches -- the per-date read already degrades gracefully to
+    0 candidates on a miss (_read_single_date_response_for_combining), so
+    gating the attempt at all only threw away a result that already existed.
     """
     reference = str(today or "").strip() or central_today_iso()
-    try:
-        reference_date = date.fromisoformat(reference)
-    except Exception:
-        return [reference]
-    window_days = _board_window_days()
-    candidate_dates = [(reference_date + timedelta(days=offset)).isoformat() for offset in range(window_days)]
+    candidate_dates = _board_window_candidate_dates(today)
     supported = set(_supported_intelligence_dates())
     return [value for value in candidate_dates if value == reference or value in supported]
 
@@ -2408,6 +2433,16 @@ class IntelligenceStateService:
             if cached_pool is not None:
                 return json.loads(json.dumps(cached_pool, default=str))
 
+        # #56/#98/#109: hard structural gate, not another per-caller patch --
+        # a cache HIT above is a cheap read and always allowed regardless of
+        # caller; only a genuine miss reaching the actual heavy build below
+        # is refused when in a live web request on a hosted deployment. No
+        # exceptions, including the admin-gated ops.py debug endpoint --
+        # #98's OOM incident was exactly that endpoint doing exactly this.
+        from syndicate.features.shared.request_path_guard import refuse_if_compute_in_request_path
+
+        refuse_if_compute_in_request_path("_build_candidate_pool")
+
         # 2026-07-20: this process's own Render disk doesn't have the sport
         # artifacts build_intelligence_overview below is about to read --
         # live-odds-worker (or an on-demand web request) writes them to a
@@ -3521,6 +3556,14 @@ class IntelligenceStateService:
                 _log_stage_timing("request_total", (time.perf_counter() - request_started_at) * 1000.0)
                 return dict(snapshot.response)
 
+        # #56/#98/#109: hard structural gate -- a cache hit above is a cheap
+        # read and always allowed; only a genuine miss reaching the actual
+        # heavy compute below is refused when in a live web request on a
+        # hosted deployment. See request_path_guard.refuse_if_compute_in_request_path.
+        from syndicate.features.shared.request_path_guard import refuse_if_compute_in_request_path
+
+        refuse_if_compute_in_request_path("_compute_response")
+
         guard_acquired = self._execution_guard.acquire(blocking=False)
         if not guard_acquired:
             with self._condition:
@@ -4035,8 +4078,21 @@ def read_combined_intelligence_response(
     expensive enough to have caused production OOM kills; calling it
     synchronously per request, per date, would multiply that risk exactly
     the way this whole redesign is trying to avoid.
+
+    #110: the default window here deliberately uses the UNFILTERED
+    _board_window_candidate_dates, not _default_board_window_dates. The
+    latter intersects with _supported_intelligence_dates(), a per-sport
+    "has a published schedule artifact" check that's a fine build-side
+    optimization (don't waste a compute cycle on a date nothing has a
+    schedule for) but is the wrong gate for reading -- it can lag behind a
+    date that refresh-worker has *already* built and published a real board
+    for (confirmed: WNBA's 2026-07-28 board built 36 candidates while
+    wnba_available_dates() still didn't list that date). A read attempt is
+    cheap and already degrades gracefully to 0 candidates on a miss via
+    _read_single_date_response_for_combining, so there is no cost to always
+    attempting every date in the window here, for every sport.
     """
-    requested_dates = [str(value).strip() for value in (dates or _default_board_window_dates()) if str(value or "").strip()]
+    requested_dates = [str(value).strip() for value in (dates or _board_window_candidate_dates()) if str(value or "").strip()]
     if not requested_dates:
         requested_dates = [central_today_iso()]
     cache_key = (tuple(sorted(requested_dates)), str(sport or "all").strip().lower(), limit)

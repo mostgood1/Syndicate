@@ -4595,7 +4595,42 @@ class ReadCombinedIntelligenceResponseTests(unittest.TestCase):
         self.assertEqual(len(result["top_opportunities"]), 1)
         self.assertNotIn("WNBA A", [item.get("name") for item in result["top_opportunities"]])
 
-    def test_falls_back_to_today_when_nothing_warm(self) -> None:
+    def test_default_window_reads_a_built_date_even_when_not_in_supported_dates(self) -> None:
+        # #110: WNBA (or any sport) can have a real, already-built-and-
+        # published board for tomorrow while that sport's own
+        # available_dates() probe (a narrower "published schedule artifact"
+        # check) still doesn't list tomorrow yet. Before this fix, the
+        # default (no explicit `dates`) window came from
+        # _default_board_window_dates(), which intersects with
+        # _supported_intelligence_dates() -- so tomorrow's already-built
+        # board was silently never even attempted. This asserts the default
+        # window now reads it regardless.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            self._write_daily_fixture(reports_root, "2026-07-27", {"mlb": [{"name": "MLB Today", "score": 5.0}]})
+            self._write_daily_fixture(reports_root, "2026-07-28", {"wnba": [{"name": "WNBA Tomorrow", "score": 3.0}]})
+            with patch.object(intelligence_state_module, "reports_root", return_value=reports_root):
+                with patch.object(intelligence_state_module, "central_today_iso", return_value="2026-07-27"):
+                    # Tomorrow is deliberately excluded here -- this is the
+                    # exact production condition that reproduced the bug.
+                    with patch.object(
+                        intelligence_state_module,
+                        "_supported_intelligence_dates",
+                        return_value=["2026-07-27"],
+                    ):
+                        result = intelligence_state_module.read_combined_intelligence_response()
+
+        self.assertEqual(result["dates_covered"], ["2026-07-27", "2026-07-28", "2026-07-29"])
+        self.assertEqual(result["by_date"]["2026-07-28"]["candidate_count"], 1)
+        names = {item.get("name") for item in result["ranked_all"]}
+        self.assertIn("WNBA Tomorrow", names)
+
+    def test_falls_back_to_today_and_window_when_nothing_warm(self) -> None:
+        # #110: the default window is now the raw today..today+N-1 span
+        # (_board_window_candidate_dates), not the availability-filtered
+        # _default_board_window_dates -- every date here is a genuine miss,
+        # so all degrade gracefully to 0 rather than being narrowed to just
+        # today upfront.
         with tempfile.TemporaryDirectory() as tmp_dir:
             reports_root = Path(tmp_dir) / "reports"
             with patch.object(intelligence_state_module, "reports_root", return_value=reports_root):
@@ -4603,7 +4638,7 @@ class ReadCombinedIntelligenceResponseTests(unittest.TestCase):
                     result = intelligence_state_module.read_combined_intelligence_response(dates=[])
 
         self.assertEqual(result["candidate_count"], 0)
-        self.assertEqual(result["dates_covered"], ["2030-07-01"])
+        self.assertEqual(result["dates_covered"], ["2030-07-01", "2030-07-02", "2030-07-03"])
         self.assertIsInstance(result["ranked_all"], list)
 
 
