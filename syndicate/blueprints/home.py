@@ -2959,6 +2959,24 @@ def _mlb_game_market_recommendation_rows(game: dict[str, Any]) -> list[dict[str,
                     "summary": totals.get("reason") or totals.get("summary"),
                 }
             )
+    # #100/#108 follow-up, 2026-07-27: production traces show MLB's real
+    # candidate-pool build never produces game-type candidates (prop-only
+    # every cycle), while WNBA correctly produces both from the same
+    # architecture -- and a production /mlb/api/cards fetch proves the
+    # underlying markets.ml/totals + predictions.full data supports game
+    # candidates right now. This print settles whether refresh-worker's own
+    # dashboard_games (built from ITS OWN artifact mirror, a separate Render
+    # disk from web's -- see #68's precedent for this exact class of gap)
+    # actually has the same markets/predictions data web serves, or whether
+    # it's missing here specifically. Bounded by construction: called once
+    # per game per cycle (~12 for MLB), not in a hot loop.
+    print(
+        f"[home] MLB_GAME_MARKET_ROWS_DIAG game_pk={game.get('gamePk')} "
+        f"has_markets_ml={isinstance(markets.get('ml'), dict)} has_markets_totals={isinstance(markets.get('totals'), dict)} "
+        f"has_predictions_full={bool(full_predictions)} home_win_prob={full_predictions.get('home_win_prob')} "
+        f"rows_returned={len(rows)}",
+        flush=True,
+    )
     return rows
 
 
