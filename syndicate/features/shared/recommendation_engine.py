@@ -1093,7 +1093,21 @@ def filter_candidates(
         enriched.update(
             {
                 "event_id": _event_id(candidate),
-                "market": market,
+                # `market` here (from _market(), a few lines up) is a
+                # lowercased grouping/lookup key (market profile cache,
+                # calibration lookups, risk_flags text) -- NOT the
+                # human-readable display value, and it is coarser than the
+                # canonical per-market "market_key" set elsewhere in the
+                # pipeline (e.g. a live game's "Live Total" display label
+                # lowercases to "live total" here, not the canonical
+                # "total") -- so it must never be written back as
+                # "market_key" (tried, confirmed live 2026-07-28 that it
+                # clobbers the real one). Confirmed live 2026-07-28: this
+                # used to overwrite the candidate's own display "market"
+                # ("HR") with this lowercased key ("hr"), corrupting it for
+                # every candidate that passed through this filter -- preserve
+                # the candidate's original display value instead.
+                "market": candidate.get("market") or market,
                 "selection": _selection(candidate),
                 "fair_probability": fair_probability,
                 "implied_probability": implied_probability,

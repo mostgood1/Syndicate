@@ -397,7 +397,18 @@ class UniversalCandidate(MutableMapping[str, Any]):
             payload["selection"] = self.selection
         if self.market is not None:
             payload["market"] = self.market
-        if self.odds is not None:
+        # self.odds is the normalized-for-math float (from_raw's own
+        # implied-probability derivation needs the sign as a number). The
+        # display-facing american-odds text ("+124", "-155") -- already
+        # sitting in `payload` from `dict(self.raw)` above -- carries
+        # information self.odds can't reconstruct (a bare 124.0 is
+        # ambiguous between "+124" and "124"), so only synthesize odds from
+        # the numeric field when the raw candidate never had a display value
+        # to begin with. Confirmed live 2026-07-28: unconditionally
+        # overwriting here silently flattened every candidate's odds text to
+        # a raw float the moment it passed through collect_candidates (which
+        # wraps every candidate in UniversalCandidate).
+        if self.odds is not None and not payload.get("odds"):
             payload["odds"] = self.odds
         if self.projection is not None:
             payload["projection"] = self.projection

@@ -4732,8 +4732,43 @@ class BoardWindowWatchFailureDoesNotKillTheLoopTests(unittest.TestCase):
             with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(
                 intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path
             ), patch.object(
+                # This fixture's payload/persisted-state dates are all
+                # hardcoded to "2026-07-27" -- pin "today" to match (same
+                # pattern as this file's other date-fixture tests, e.g.
+                # test_background_refresh_recomputes_when_snapshot_fingerprint_matches
+                # a few lines up) so _watched_payload_eviction_reason never
+                # sees this fixture as stale. Confirmed live 2026-07-28: with
+                # real wall-clock time one day past the fixture's date and
+                # this left unpinned, the loop evicted the payload as stale
+                # on iteration 1, but _sync_persisted_queue_locked re-reads
+                # the same never-updated persisted file on iteration 2 and
+                # re-queues the identical "stale" entry -- an unconditional
+                # evict/re-sync cycle with 0s _interval_seconds that never
+                # reaches write_latest_intelligence_state (the call this test
+                # relies on to set service._stop), spinning at 100% CPU
+                # indefinitely.
+                intelligence_state_module, "central_today_iso", return_value="2026-07-27"
+            ), patch.object(
                 service, "_ensure_default_board_window_watched", side_effect=RuntimeError("simulated production failure")
+            ), patch(
+                "pipeline.intelligence_state._mlb_sim_subprocess_running", return_value=False
+            ), patch(
+                "pipeline.intelligence_state._odds_refresh_in_flight", return_value=False
             ):
+                # _board_build_deferral_reason (consulted every iteration, see
+                # _background_loop) reads REAL ambient machine state -- is an
+                # MLB sim subprocess resident, is an odds refresh in flight --
+                # by design, since that's exactly what it exists to check in
+                # production. Left unmocked, this test's own runtime depends
+                # on whatever happens to be running on the box at the moment
+                # it executes: confirmed live 2026-07-28 that a real resident
+                # sim (from unrelated concurrent activity on the same
+                # machine) made _background_loop() defer every iteration with
+                # a 0s _interval_seconds, spinning at 100% CPU indefinitely --
+                # it never reaches the write_latest_intelligence_state call
+                # this test relies on to set service._stop and end the loop.
+                # Same isolation principle as test_intelligence.py's setUp
+                # ("isolate every test from ambient dev-machine state").
                 with patch.object(service, "_compute_board_publication_response", return_value=dict(board_state)) as mocked_compute:
                     with patch("pipeline.intelligence_state.write_latest_intelligence_state", side_effect=fake_write_latest_intelligence_state):
                         service._background_loop()

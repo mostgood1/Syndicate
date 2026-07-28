@@ -350,7 +350,21 @@ def build_response(*, recommendations: list[dict[str, Any]], parlays: list[dict[
                 recommendation["confidence"] = recommendation.get("coverage_adjusted_confidence")
         writeup = _safe_text(recommendation.get("writeup"), "")
         if not _safe_text(recommendation.get("rationale"), ""):
-            rationale = recommendation.get("reasoning_text") or recommendation.get("summary") or writeup
+            # syndicate.features.intelligence._candidate_rationale already
+            # builds the rich version of this text (projection/edge/
+            # confidence notes, advanced-driver and candidate-level-signal
+            # detail, raw Statcast context) -- confirmed live 2026-07-28 that
+            # falling back to just reasoning_text/summary/writeup here
+            # silently dropped all of that whenever a candidate reached
+            # build_response without "rationale" already set, then the
+            # advanced_ready prepend below stacked "Advanced drivers in
+            # play." on top of the now-bare writeup, reading as if the
+            # detailed drivers/signals were never computed at all. Lazy
+            # import: syndicate.features.intelligence imports this package,
+            # so a top-level import here would be circular.
+            from syndicate.features.intelligence import _candidate_rationale
+
+            rationale = recommendation.get("reasoning_text") or recommendation.get("summary") or _candidate_rationale(recommendation) or writeup
             if rationale:
                 recommendation["rationale"] = rationale
         if not recommendation.get("advanced_inputs") and recommendation.get("advanced_context"):
