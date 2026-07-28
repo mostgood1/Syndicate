@@ -2627,20 +2627,20 @@ def _t_window_due_sports(*, now_epoch: float, date_str: str) -> dict[str, dict[s
 	return due
 
 
-def _launch_market_tier(*, any_live: bool | None, t_window_sports: set[str], force_sim_rerun: bool) -> str:
-	"""#82 Phase 2. Which market tier this launch runs at.
-
-	"lines_props" only when this is definitively a pregame DRIFT sweep:
-	nothing live anywhere, no T-window firing, no event trigger. Everything
-	else -- live play, a ramp/closing window, a lineup change, or simply not
-	being able to tell -- runs full, because those are exactly the moments
-	the segment/alternate markets are for.
-	"""
-	if any_live is not False:
-		return "full"
-	if t_window_sports or force_sim_rerun:
-		return "full"
-	return "lines_props"
+# #107. _launch_market_tier (whole-tick, "lines_props" only when NOTHING
+# on the whole slate is live) used to compute a tier passed to
+# launch_refresh_run's market_tier kwarg, which flowed all the way down to
+# refresh_mlb_oddsapi.py's --market-tier flag -- consumed only by
+# fetch_live_odds_incremental, itself only reachable when fast_mode is
+# true, which requires refresh_mlb_oddsapi.py's own --mode flag to be
+# "fast". render.yaml pins SYNDICATE_LIVE_ODDS_REFRESH_MODE=full on all
+# three services, and the actual caller (refresh_odds_sources.py's
+# _build_mlb_steps) never even passed --mode to that script at all, so
+# args.mode there could only ever be its own "full" default regardless of
+# any env var. Confirmed dead end to end; removed along with
+# fetch_live_odds_incremental itself. Superseded by event scoping
+# (fetch_mlb_oddsapi_local.py's per-game hot/cold decision, not a single
+# whole-slate flag) and the props cadence cache on top of it.
 
 
 # #15 Phase 1: per-sport pregame sweep intervals. Defaults encode the
@@ -3178,17 +3178,6 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			# The filter must never be the reason odds stop refreshing --
 			# fail open to the unfiltered launch.
 			print(f"[live_refresh_loop] PREGAME_CADENCE_FILTER_FAILED error={type(exc).__name__}: {exc}", flush=True)
-	launch_market_tier = "full"
-	if not skip_launch:
-		try:
-			launch_market_tier = _launch_market_tier(
-				any_live=any_live,
-				t_window_sports=set((meta.get("tWindowSweeps") or {}).keys()),
-				force_sim_rerun=bool(force_sim_rerun),
-			)
-		except Exception:
-			launch_market_tier = "full"
-		meta["marketTier"] = launch_market_tier
 	if not skip_launch:
 		if effective_phase == "pregame":
 			_record_pregame_launch(tick_started_epoch, selected_date)
@@ -3244,10 +3233,6 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 				dry_run=False,
 				force_refresh=force_sim_rerun,
 				force_refresh_sports=force_refresh_sports,
-				# Omitted entirely (not passed as None) when full: "full" is
-				# the pre-#82 behavior, and callers/mocks asserting the exact
-				# historical kwargs must keep passing.
-				**({"market_tier": launch_market_tier} if launch_market_tier != "full" else {}),
 			)
 			meta["ok"] = True
 			meta["result"] = result

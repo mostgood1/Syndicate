@@ -558,419 +558,27 @@ def _freeze_oddsapi_pregame_markets(*, source_root: Path, date_str: str) -> dict
     return copied
 
 
-def _market_tier() -> str:
-    tier = str(os.environ.get("SYNDICATE_ODDS_MARKET_TIER") or "full").strip().lower()
-    return tier if tier in {"full", "lines_props"} else "full"
 
 
-def _event_scoping_enabled() -> bool:
-    raw = str(os.environ.get("SYNDICATE_ODDS_EVENT_SCOPING_ENABLED") or "true").strip().lower()
-    return raw not in {"0", "false", "no", "off"}
-
-
-def _event_scoping_window_seconds() -> int:
-    # Matches live_refresh_loop.py's own _T_WINDOW_RAMP_SECONDS (75 min) --
-    # a game inside its own T-window is exactly the case that window exists
-    # to catch, so "hot" here should agree with it rather than invent a
-    # second boundary.
-    raw = str(os.environ.get("SYNDICATE_ODDS_EVENT_SCOPING_WINDOW_SECONDS") or "").strip()
-    try:
-        return max(0, int(raw)) if raw else 75 * 60
-    except ValueError:
-        return 75 * 60
-
-
-def _normalize_matchup_team(value: object) -> str:
-    return " ".join(str(value or "").strip().lower().split())
-
-
-def _load_mlb_status_by_matchup(source_root: Path, date_str: str) -> dict[tuple[str, str], dict[str, object]]:
-    # Event scoping (#16 budget lever): per-event, not per-tick, is-this-
-    # game-hot decision. Reuses the same MLB StatsAPI schedule snapshot
-    # (schedule_raw.json) every daily-update run already produces on this
-    # same source_root -- not a new fetch, just a new read. Keyed by
-    # (away, home) team name since that's what OddsAPI's own event objects
-    # carry; gamePk isn't available on the OddsAPI side to join on directly.
-    path = source_root / "source_artifacts" / "data" / "daily" / "snapshots" / date_str / "schedule_raw.json"
-    try:
-        games = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    if not isinstance(games, list):
-        return {}
-    by_matchup: dict[tuple[str, str], dict[str, object]] = {}
-    for game in games:
-        if not isinstance(game, dict):
-            continue
-        teams = game.get("teams") if isinstance(game.get("teams"), dict) else {}
-        away = ((teams.get("away") or {}).get("team") or {}).get("name") if isinstance(teams.get("away"), dict) else None
-        home = ((teams.get("home") or {}).get("team") or {}).get("name") if isinstance(teams.get("home"), dict) else None
-        away_key = _normalize_matchup_team(away)
-        home_key = _normalize_matchup_team(home)
-        if not away_key or not home_key:
-            continue
-        status = game.get("status") if isinstance(game.get("status"), dict) else {}
-        by_matchup[(away_key, home_key)] = {
-            "abstract": status.get("abstractGameState"),
-            "detailed": status.get("detailedState"),
-            "commence": game.get("gameDate"),
-        }
-    return by_matchup
-
-
-def _event_wants_full_game_markets(
-    *,
-    away_team: object,
-    home_team: object,
-    commence_time: object,
-    status_by_matchup: dict[tuple[str, str], dict[str, object]],
-    now: datetime,
-    window_seconds: int,
-) -> bool:
-    """Whether THIS event needs the full (segment/alternate) game-market set
-    on a tier-reduced tick, vs the cheap h2h/spreads/totals set.
-
-    Full whenever: the schedule snapshot doesn't have this exact matchup
-    (fail open -- an unmatched game must not silently lose coverage, same
-    rule live_refresh_loop.py's own tick-level tier already follows for
-    "simply not being able to tell"), the game is live, or it's within its
-    own T-window. Reduced only for a confirmed-final game or a confirmed-
-    pregame game still outside its window.
-    """
-    key = (_normalize_matchup_team(away_team), _normalize_matchup_team(home_team))
-    status = status_by_matchup.get(key)
-    if status is None:
-        return True
-    abstract = status.get("abstract")
-    detailed = status.get("detailed")
-    if mlb_status_is_live(abstract, detailed):
-        return True
-    if mlb_status_is_final(abstract, detailed):
-        return False
-    commence_text = str(commence_time or status.get("commence") or "").strip()
-    if not commence_text:
-        return True
-    try:
-        commence = datetime.fromisoformat(commence_text.replace("Z", "+00:00"))
-    except ValueError:
-        return True
-    if commence.tzinfo is None:
-        commence = commence.replace(tzinfo=timezone.utc)
-    seconds_to_start = (commence - now).total_seconds()
-    return seconds_to_start <= window_seconds
-
-
-def fetch_live_odds_incremental(*, odds_module, source_root: Path, date_str: str, regions: str, bookmakers: str | None, hitter_markets: list[str] | None) -> dict[str, object]:
-    api_key = (
-        os.environ.get("ODDS_API_KEY")
-        or os.environ.get("ODDSAPI_KEY")
-        or os.environ.get("THEODDS_API_KEY")
-        or os.environ.get("THEODDSAPI_KEY")
-        or os.environ.get("NCAAB_THEODDS_API_KEY")
-    )
-    if not api_key:
-        raise RuntimeError("ODDS_API_KEY not set")
-
-    target_dir = source_root / "data" / "market" / "oddsapi"
-    _ensure_dir(target_dir)
-    token = _date_slug(date_str)
-    game_lines_path = target_dir / f"oddsapi_game_lines_{token}.json"
-    pitcher_props_path = target_dir / f"oddsapi_pitcher_props_{token}.json"
-    hitter_props_path = target_dir / f"oddsapi_hitter_props_{token}.json"
-
-    existing_game_lines_doc = _read_json_if_exists(game_lines_path)
-    existing_pitcher_props_doc = _read_json_if_exists(pitcher_props_path)
-    existing_hitter_props_doc = _read_json_if_exists(hitter_props_path)
-
-    market_tier = _market_tier()
-    print(f"[mlb_fetch_start] market_tier={market_tier}", flush=True)
-    live_events = list(odds_module._fetch_live_events_for_date(api_key, date_str))
-    print(f"[mlb_fetch_events] events_count={len(live_events) if live_events else 0}", flush=True)
-    full_game_market_keys = [
-        "h2h",
-        "spreads",
-        "totals",
-        "h2h_1st_1_innings",
-        "h2h_3_way_1st_1_innings",
-        "spreads_1st_1_innings",
-        "alternate_spreads_1st_1_innings",
-        "totals_1st_1_innings",
-        "alternate_totals_1st_1_innings",
-        "h2h_1st_3_innings",
-        "h2h_3_way_1st_3_innings",
-        "spreads_1st_3_innings",
-        "alternate_spreads_1st_3_innings",
-        "totals_1st_3_innings",
-        "alternate_totals_1st_3_innings",
-        "h2h_1st_5_innings",
-        "h2h_3_way_1st_5_innings",
-        "spreads_1st_5_innings",
-        "alternate_spreads_1st_5_innings",
-        "totals_1st_5_innings",
-        "alternate_totals_1st_5_innings",
-        "h2h_1st_7_innings",
-        "h2h_3_way_1st_7_innings",
-        "spreads_1st_7_innings",
-        "alternate_spreads_1st_7_innings",
-        "totals_1st_7_innings",
-        "alternate_totals_1st_7_innings",
-    ]
-    # #82 Phase 2. The 24 segment/alternate markets are ~63% of a per-event
-    # request's cost and a genuinely idle game doesn't need them refreshed
-    # every cycle -- carried forward from the previous sweep instead (below).
-    reduced_game_market_keys = ["h2h", "spreads", "totals"]
-    # Event scoping (#16 budget lever). #82 Phase 2 made this decision once
-    # per TICK (market_tier == "lines_props" only when NOTHING in the whole
-    # slate is live), so on a normal MLB day -- where something is almost
-    # always live somewhere across an 11-15 game slate -- every game got
-    # full segment/alternate markets on every cycle regardless of its own
-    # state, including games still hours from first pitch and games that
-    # already went final. Per-event scoping makes the same full-vs-reduced
-    # call independently for each game in the SAME sweep, using the
-    # already-shipped #100 canonical live/final classifier so this doesn't
-    # duplicate the game-state-check fragmentation that caused #98.
-    event_scoping_enabled = _event_scoping_enabled()
-    status_by_matchup: dict[tuple[str, str], dict[str, object]] = {}
-    if event_scoping_enabled:
-        status_by_matchup = _load_mlb_status_by_matchup(source_root, date_str)
-        if not status_by_matchup:
-            # Schedule snapshot missing/unreadable: fail open to the
-            # original tick-wide decision rather than guess per event.
-            event_scoping_enabled = False
-    event_scoping_window_seconds = _event_scoping_window_seconds()
-    if not event_scoping_enabled and market_tier == "lines_props":
-        full_game_market_keys = reduced_game_market_keys
-    pitcher_market_keys = list(getattr(odds_module, "PITCHER_MARKET_KEY_MAP", {}).keys())
-    if hitter_markets:
-        desired_hitter_markets = [str(m).strip().lower() for m in hitter_markets if str(m).strip()]
-    else:
-        desired_hitter_markets = [str(m).strip().lower() for m in getattr(odds_module, "DEFAULT_HITTER_MARKETS", []) if str(m).strip()]
-
-    def _combined_markets_for(game_market_keys: list[str]) -> str:
-        combined: list[str] = []
-        for market_name in game_market_keys + pitcher_market_keys + desired_hitter_markets:
-            market_name = str(market_name).strip().lower()
-            if market_name and market_name not in combined:
-                combined.append(market_name)
-        return ",".join(combined)
-
-    pitch_key_map = dict(getattr(odds_module, "PITCHER_MARKET_KEY_MAP", {}))
-    hitter_key_map = {market_name: market_name for market_name in desired_hitter_markets}
-    existing_game_rows = {
-        str(row.get("event_id") or "").strip(): row
-        for row in ((existing_game_lines_doc or {}).get("games") or [])
-        if isinstance(row, dict) and str(row.get("event_id") or "").strip()
-    }
-    game_rows: list[dict[str, object]] = []
-    pitcher_props: dict[str, dict[str, dict[str, object]]] = {}
-    hitter_props: dict[str, dict[str, dict[str, object]]] = {}
-    changed_game_rows = 0
-    reused_game_rows = 0
-
-    events_scoped_full = 0
-    events_scoped_reduced = 0
-    for event in live_events:
-        event_id = str(event.get("id") or "").strip()
-        if not event_id:
-            continue
-        if event_scoping_enabled:
-            wants_full = _event_wants_full_game_markets(
-                away_team=event.get("away_team"),
-                home_team=event.get("home_team"),
-                commence_time=event.get("commence_time"),
-                status_by_matchup=status_by_matchup,
-                now=datetime.now(timezone.utc),
-                window_seconds=event_scoping_window_seconds,
-            )
-            event_game_market_keys = full_game_market_keys if wants_full else reduced_game_market_keys
-            if wants_full:
-                events_scoped_full += 1
-            else:
-                events_scoped_reduced += 1
-        else:
-            event_game_market_keys = full_game_market_keys
-        try:
-            payload = odds_module._fetch_live_event_odds(
-                api_key,
-                event_id,
-                markets_csv=_combined_markets_for(event_game_market_keys),
-                regions=regions,
-                bookmakers=bookmakers,
-            )
-        except getattr(odds_module, "OddsApiLiveFetchError", RuntimeError):
-            raise
-        except Exception:
-            continue
-        if not isinstance(payload, dict):
-            continue
-
-        home_team = str(event.get("home_team") or payload.get("home_team") or "")
-        away_team = str(event.get("away_team") or payload.get("away_team") or "")
-        best_lines, bookmaker_key = odds_module._best_bookmaker_game_lines(payload, home_team=home_team, away_team=away_team)
-        if event_game_market_keys is reduced_game_market_keys and isinstance(best_lines, dict):
-            # Layer 1 guard: a tiered fetch only re-fetched a subset of
-            # markets FOR THIS EVENT, so any market key present in its
-            # PREVIOUS snapshot but absent from this fetch is carried
-            # forward rather than dropped -- otherwise a reduced-tier fetch
-            # would blank every F1/F3/F5/F7 segment tab until this event's
-            # next full-tier fetch. Was keyed on the tick-wide market_tier;
-            # now keyed on this event's own tier, since that's what actually
-            # decided which markets_csv was sent for it.
-            existing_row = existing_game_rows.get(event_id)
-            existing_markets = (existing_row or {}).get("markets") if isinstance(existing_row, dict) else None
-            if isinstance(existing_markets, dict):
-                for market_name, market_value in existing_markets.items():
-                    best_lines.setdefault(market_name, market_value)
-        if isinstance(best_lines, dict):
-            game_entry = {
-                "event_id": event_id,
-                "commence_time": event.get("commence_time") or payload.get("commence_time"),
-                "home_team": home_team,
-                "away_team": away_team,
-                "bookmaker": bookmaker_key,
-                "markets": best_lines,
-            }
-            existing_game_entry = existing_game_rows.get(event_id)
-            if _same_doc(existing_game_entry, game_entry):
-                game_rows.append(existing_game_entry or game_entry)
-                reused_game_rows += 1
-            else:
-                game_rows.append(game_entry)
-                changed_game_rows += 1
-
-        for bookmaker in (payload.get("bookmakers") or []):
-            if not isinstance(bookmaker, dict):
-                continue
-            extracted_pitcher = odds_module._extract_player_props(bookmaker.get("markets"), key_map=pitch_key_map)
-            for name, market_rows in extracted_pitcher.items():
-                dst = pitcher_props.setdefault(name, {})
-                for market_name, row in market_rows.items():
-                    dst[market_name] = odds_module._merge_prop_market_rows(dst.get(market_name, {}), row)
-            extracted_hitter = odds_module._extract_player_props(bookmaker.get("markets"), key_map=hitter_key_map)
-            for name, market_rows in extracted_hitter.items():
-                dst = hitter_props.setdefault(name, {})
-                for market_name, row in market_rows.items():
-                    dst[market_name] = odds_module._merge_prop_market_rows(dst.get(market_name, {}), row)
-
-    print(
-        f"[mlb_fetch_event_scoping] enabled={event_scoping_enabled} full_tier={events_scoped_full} reduced_tier={events_scoped_reduced}",
-        flush=True,
-    )
-    finalized_pitcher_props = odds_module._finalize_prop_market_map(pitcher_props)
-    finalized_hitter_props = odds_module._finalize_prop_market_map(hitter_props)
-
-    game_counts = {
-        "events_matched": int(len(live_events)),
-        "games": int(len(game_rows)),
-        "h2h_games": int(sum(1 for row in game_rows if isinstance((row.get("markets") or {}).get("h2h"), dict))),
-        "totals_games": int(sum(1 for row in game_rows if isinstance((row.get("markets") or {}).get("totals"), dict))),
-        "spreads_games": int(sum(1 for row in game_rows if isinstance((row.get("markets") or {}).get("spreads"), dict))),
-    }
-    print(f"[mlb_counts] events_matched={game_counts['events_matched']} games={game_counts['games']}", flush=True)
-    pitcher_counts = dict(odds_module._prop_market_counts(finalized_pitcher_props))
-    pitcher_counts["events_matched"] = int(len(live_events))
-    hitter_counts = dict(odds_module._prop_market_counts(finalized_hitter_props))
-    hitter_counts["events_matched"] = int(len(live_events))
-
-    retrieved_at = datetime.utcnow().isoformat()
-    game_lines_doc = {
-        "date": str(date_str),
-        "mode": "live",
-        "retrieved_at": retrieved_at,
-        "games": game_rows,
-        "meta": {
-            # The superset possible across this run -- individual events may
-            # have been fetched at either tier; see event_scoping in the
-            # caller's result dict for the actual per-event split.
-            "markets": full_game_market_keys,
-            "regions": str(regions or "us"),
-            "bookmakers": (str(bookmakers).split(",") if bookmakers else None),
-            "counts": game_counts,
-        },
-    }
-    pitcher_props_doc = {
-        "date": str(date_str),
-        "mode": "live",
-        "retrieved_at": retrieved_at,
-        "pitcher_props": finalized_pitcher_props,
-        "meta": {
-            "markets": pitcher_market_keys,
-            "regions": str(regions or "us"),
-            "bookmakers": (str(bookmakers).split(",") if bookmakers else None),
-            "counts": pitcher_counts,
-        },
-    }
-    hitter_props_doc = {
-        "date": str(date_str),
-        "mode": "live",
-        "retrieved_at": retrieved_at,
-        "hitter_props": finalized_hitter_props,
-        "meta": {
-            "markets": desired_hitter_markets,
-            "regions": str(regions or "us"),
-            "bookmakers": (str(bookmakers).split(",") if bookmakers else None),
-            "counts": hitter_counts,
-        },
-    }
-
-    wrote_files: list[str] = []
-    if not _same_doc(existing_game_lines_doc, game_lines_doc):
-        _write_json_file(game_lines_path, game_lines_doc)
-        wrote_files.append(str(game_lines_path))
-    if not _same_doc(existing_pitcher_props_doc, pitcher_props_doc):
-        _write_json_file(pitcher_props_path, pitcher_props_doc)
-        wrote_files.append(str(pitcher_props_path))
-    if not _same_doc(existing_hitter_props_doc, hitter_props_doc):
-        _write_json_file(hitter_props_path, hitter_props_doc)
-        wrote_files.append(str(hitter_props_path))
-
-    result = {
-        "status": "ok" if wrote_files else "skipped",
-        "date": str(date_str),
-        "mode": "live",
-        "incremental": True,
-        "out_dir": str(target_dir),
-        "game_lines_path": str(game_lines_path),
-        "pitcher_props_path": str(pitcher_props_path),
-        "hitter_props_path": str(hitter_props_path),
-        "updated_games": int(changed_game_rows),
-        "reused_games": int(reused_game_rows),
-        "written_files": wrote_files,
-        "event_scoping": {
-            "enabled": bool(event_scoping_enabled),
-            "full_tier_events": int(events_scoped_full),
-            "reduced_tier_events": int(events_scoped_reduced),
-        },
-        "counts": {
-            "game_lines": dict(game_counts),
-            "pitcher_props": dict(pitcher_counts),
-            "hitter_props": dict(hitter_counts),
-        },
-    }
-    if reused_game_rows and not changed_game_rows:
-        result["warnings"] = [f"reused {reused_game_rows} unchanged game rows for {date_str}"]
-    return result
-
-
-def _refresh_source_artifacts(*, odds_module, source_root: Path, date_str: str, regions: str, overwrite: bool, fast_mode: bool) -> dict[str, object]:
+def _refresh_source_artifacts(*, odds_module, source_root: Path, date_str: str, regions: str, overwrite: bool) -> dict[str, object]:
+    # #107. This used to branch on a fast_mode flag that called
+    # fetch_live_odds_incremental (this module's own now-deleted, dead
+    # implementation of segment/alternate tiering) instead of the path
+    # below. Confirmed dead three ways: render.yaml pins
+    # SYNDICATE_LIVE_ODDS_REFRESH_MODE=full on all three services; the real
+    # caller (refresh_odds_sources.py's _build_mlb_steps) never even passed
+    # --mode to this script, so args.mode could only ever be its own "full"
+    # default regardless of any env var; and this branch's own tiering was
+    # a separate, cruder implementation of exactly what event scoping
+    # (fetch_mlb_oddsapi_local.py, per-game hot/cold) already replaced.
     recorded_at = _local_now()
     frozen_pregame = _freeze_oddsapi_pregame_markets(source_root=source_root, date_str=date_str)
-    if fast_mode:
-        result = fetch_live_odds_incremental(
-            odds_module=odds_module,
-            source_root=source_root,
-            date_str=date_str,
-            regions=regions,
-            bookmakers=None,
-            hitter_markets=None,
-        )
-    else:
-        result = odds_module.fetch_and_write_live_odds_for_date(
-            date_str,
-            out_dir=source_root / "data" / "market" / "oddsapi",
-            overwrite=overwrite,
-            regions=regions,
-        )
+    result = odds_module.fetch_and_write_live_odds_for_date(
+        date_str,
+        out_dir=source_root / "data" / "market" / "oddsapi",
+        overwrite=overwrite,
+        regions=regions,
+    )
 
     snapshot_dir = _daily_snapshot_dir(source_root=source_root, date_str=date_str)
     copied: dict[str, str] = {}
@@ -996,17 +604,7 @@ def _refresh_source_artifacts(*, odds_module, source_root: Path, date_str: str, 
     }
     _write_json_file(_cron_meta_dir(source_root=source_root) / "latest_refresh_oddsapi.json", meta)
 
-    if fast_mode:
-        live_lens = _reuse_existing_live_lens_tick(source_root=source_root, date_str=date_str, trigger="syndicate_refresh")
-        if live_lens is None:
-            live_lens = {
-                "ok": True,
-                "date": str(date_str),
-                "skipped": True,
-                "reason": "live_lens_artifacts_missing",
-            }
-    else:
-        live_lens = _refresh_live_lens_artifacts(source_root=source_root, date_str=date_str, trigger="syndicate_refresh")
+    live_lens = _refresh_live_lens_artifacts(source_root=source_root, date_str=date_str, trigger="syndicate_refresh")
 
     return {
         "market_refresh": {
@@ -1170,35 +768,13 @@ def main() -> int:
     parser.add_argument("--artifact-root", required=False, default=str(REPO_ROOT / "data" / "mlb_source" / "source_artifacts"))
     parser.add_argument("--regions", default="us")
     parser.add_argument("--overwrite", choices=("on", "off"), default="on")
-    parser.add_argument(
-        "--market-tier",
-        choices=("full", "lines_props"),
-        default=str(os.environ.get("SYNDICATE_ODDS_MARKET_TIER") or "full").strip().lower() or "full",
-        help="#82 Phase 2: lines_props drops the 24 per-event segment/alternate markets (~63%% of a sweep's per-event cost), keeping h2h/spreads/totals and all props. Existing segment lanes are carried forward from the previous snapshot so the cards' F1/F3/F5/F7 tabs never blank between full sweeps.",
-    )
-    parser.add_argument("--mode", choices=("fast", "full"), default="full")
     args = parser.parse_args()
-    if str(getattr(args, "market_tier", "full") or "full") != "full":
-        os.environ["SYNDICATE_ODDS_MARKET_TIER"] = str(args.market_tier)
 
     source_root = Path(args.source_root).resolve()
     artifact_root = Path(args.artifact_root).resolve()
-    fast_mode = str(args.mode or "full").strip().lower() == "fast"
 
     try:
-        if fast_mode:
-            odds_module = _load_local_fetcher()
-            with _pushd(source_root):
-                refresh_payload = _refresh_source_artifacts(
-                    odds_module=odds_module,
-                    source_root=source_root,
-                    date_str=str(args.date),
-                    regions=str(args.regions or "us"),
-                    overwrite=False,
-                    fast_mode=True,
-                )
-            refresh_payload["mode"] = "fast"
-        elif str(args.overwrite) == "off" and _source_artifacts_ready(source_root=source_root, date_str=str(args.date)):
+        if str(args.overwrite) == "off" and _source_artifacts_ready(source_root=source_root, date_str=str(args.date)):
             refresh_payload = {
                 "market_refresh": {
                     "ok": True,
@@ -1217,7 +793,6 @@ def main() -> int:
                     date_str=str(args.date),
                     regions=str(args.regions or "us"),
                     overwrite=str(args.overwrite) == "on",
-                    fast_mode=False,
                 )
     except Exception as exc:
         message = str(exc)
@@ -1227,15 +802,13 @@ def main() -> int:
         print(json.dumps({"ok": False, "date": args.date, "error": message}))
         return 1
 
-    copied = _materialize_artifact_bundle(source_root=source_root, artifact_root=artifact_root, date_str=str(args.date)) if str(args.mode or "full").strip().lower() == "full" else {}
+    copied = _materialize_artifact_bundle(source_root=source_root, artifact_root=artifact_root, date_str=str(args.date))
     required_live_lens_paths = _required_live_lens_relative_paths(date_str=str(args.date))
     missing_source_live_lens = [str(path) for path in required_live_lens_paths if not (source_root / path).exists()]
     missing_artifact_live_lens = [str(path) for path in required_live_lens_paths if not (artifact_root / path).exists()]
     if missing_source_live_lens or missing_artifact_live_lens:
         refresh_payload["warnings"] = list(refresh_payload.get("warnings") or []) + [
-            "fast mode skipped live-lens rebuild; existing live-lens artifacts were not fully present"
-            if fast_mode
-            else "live-lens artifacts were not fully present after refresh",
+            "live-lens artifacts were not fully present after refresh",
         ]
 
     print(

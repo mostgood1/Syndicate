@@ -652,7 +652,6 @@ def _build_mlb_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 args.regions,
                 "--overwrite",
                 "on",
-                *(("--market-tier", args.market_tier) if str(getattr(args, "market_tier", "full") or "full") != "full" else ()),
             ),
             description="Refresh MLB markets and live-lens artifacts into a Syndicate-owned bundle.",
         ),
@@ -2428,12 +2427,6 @@ def main() -> int:
     parser.add_argument("--regions", default="us", help="Odds regions forwarded to source refresh commands where supported.")
     parser.add_argument("--bookmakers", default="", help="Optional bookmaker filter forwarded to source refresh commands where supported.")
     parser.add_argument("--markets", default="", help="Optional market filter forwarded to source refresh commands where supported.")
-    parser.add_argument(
-        "--market-tier",
-        choices=("full", "lines_props"),
-        default="full",
-        help="#82 Phase 2: 'lines_props' drops the 24 per-event segment/alternate markets from sports that support tiering (MLB), keeping game lines and props. Pregame drift sweeps use it; T-window and live sweeps stay full.",
-    )
     parser.add_argument("--season", type=int, default=None, help="Optional season override for weekly sports like NFL.")
     parser.add_argument("--week", type=int, default=None, help="Optional week override for weekly sports like NFL/NCAAF.")
     parser.add_argument("--skip-mirror", action="store_true", help="Refresh source repos only; do not run the Syndicate mirror scripts.")

@@ -393,9 +393,6 @@ class LiveRefreshLoopTests(unittest.TestCase):
             dry_run=False,
             force_refresh=False,
             force_refresh_sports=None,
-            # #82 Phase 2: an idle pregame launch IS a drift sweep, and drift
-            # sweeps carry the lines_props tier by design.
-            market_tier="lines_props",
         )
 
     def test_pregame_relaunch_blocked_false_when_no_prior_launch(self) -> None:
@@ -2718,36 +2715,11 @@ class TWindowSweepSchedulerTests(unittest.TestCase):
         self.assertEqual(list(due["wnba"].keys()), ["wnba:closing:g1"])
 
 
-class LaunchMarketTierTests(unittest.TestCase):
-    """#82 Phase 2. lines_props only on a definitive pregame DRIFT sweep;
-    live play, T-windows, event triggers, and uncertainty all run full --
-    those are exactly the moments the segment markets exist for.
-    """
-
-    def test_pure_drift_gets_lines_props(self) -> None:
-        self.assertEqual(
-            live_refresh_loop._launch_market_tier(any_live=False, t_window_sports=set(), force_sim_rerun=False),
-            "lines_props",
-        )
-
-    def test_live_runs_full(self) -> None:
-        self.assertEqual(
-            live_refresh_loop._launch_market_tier(any_live=True, t_window_sports=set(), force_sim_rerun=False),
-            "full",
-        )
-
-    def test_unknown_liveness_runs_full(self) -> None:
-        self.assertEqual(
-            live_refresh_loop._launch_market_tier(any_live=None, t_window_sports=set(), force_sim_rerun=False),
-            "full",
-        )
-
-    def test_t_windows_and_event_triggers_run_full(self) -> None:
-        self.assertEqual(
-            live_refresh_loop._launch_market_tier(any_live=False, t_window_sports={"wnba"}, force_sim_rerun=False),
-            "full",
-        )
-        self.assertEqual(
-            live_refresh_loop._launch_market_tier(any_live=False, t_window_sports=set(), force_sim_rerun=True),
-            "full",
-        )
+# LaunchMarketTierTests (_launch_market_tier) removed #107: confirmed dead
+# end to end (render.yaml pins SYNDICATE_LIVE_ODDS_REFRESH_MODE=full on all
+# three services, and refresh_mlb_oddsapi.py's own caller never passed
+# --mode at all, so its fast_mode branch -- the only consumer of the tier
+# this function computed -- could never run). Superseded by event scoping's
+# per-game hot/cold decision. See fetch_mlb_oddsapi.py's and
+# live_refresh_loop.py's own comments at the removal site for the full
+# chain of evidence.
