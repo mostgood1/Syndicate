@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -82,13 +83,43 @@ def odds_history_paths_for_sport(sport_slug: str, shard_key: str) -> list[Path]:
     return paths
 
 
+def _read_odds_history_candidate(path: Path) -> dict[str, Any] | None:
+    """Read one odds_history path, preferring the fresher of the keyvalue
+    copy and a directly-published artifact (#112). On the keyvalue backend,
+    read_json_file consults Redis ONLY -- it never falls back to local disk.
+    The write side (odds_refresh_tracking._sync_odds_history_for_refresh)
+    diverts oversized payloads to a local-disk write + publish_hot_artifact
+    via _write_state_payload (the #43/#108 fallback) when the keyvalue store
+    rejects them for size; without this matching read, the board would keep
+    serving whatever the last successful (small, stale) keyvalue write was
+    and never see the artifact the worker actually published. Mirrors
+    pipeline/intelligence_state.py's _read_state_payload freshness check via
+    the payload's own "updated_at" field.
+    """
+    keyvalue_payload = read_json_file(path)
+    disk_payload: dict[str, Any] | None = None
+    try:
+        if path.is_file():
+            candidate = json.loads(path.read_text(encoding="utf-8-sig"))
+            disk_payload = candidate if isinstance(candidate, dict) else None
+    except Exception:
+        disk_payload = None
+    if disk_payload is None:
+        return keyvalue_payload
+    if keyvalue_payload is None:
+        return disk_payload
+    keyvalue_at = str(keyvalue_payload.get("updated_at") or "")
+    disk_at = str(disk_payload.get("updated_at") or "")
+    return disk_payload if disk_at > keyvalue_at else keyvalue_payload
+
+
 def load_odds_history_payload_for_sport(sport_slug: str, shard_key: str, *, cache: dict[tuple[str, str], dict[str, Any] | None] | None = None) -> dict[str, Any] | None:
     cache_key = (str(sport_slug or "").strip().lower(), str(shard_key or ""))
     if cache is not None and cache_key in cache:
         return cache[cache_key]
     payload: dict[str, Any] | None = None
     for path in odds_history_paths_for_sport(sport_slug, shard_key):
-        candidate_payload = read_json_file(path)
+        candidate_payload = _read_odds_history_candidate(path)
         if isinstance(candidate_payload, dict):
             payload = candidate_payload
             break

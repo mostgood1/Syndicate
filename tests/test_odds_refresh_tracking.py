@@ -735,6 +735,57 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertEqual(payload.get("sport"), "nhl")
             self.assertIn("markets", payload)
 
+    def test_history_sync_falls_back_to_artifact_when_too_large_for_keyvalue(self) -> None:
+        # #112. A bare _keyvalue_write_json_file call raises
+        # KeyValuePayloadTooLarge on an oversized payload, which used to
+        # abort this whole per-shard block before any of the three history
+        # paths were updated -- so the shard-size-bounding logic above could
+        # never actually land on disk, and every cycle re-read the same
+        # stale, still-oversized base forever. Confirms the write now
+        # degrades to a local-disk write instead of raising, AND that the
+        # board-facing readers (both _load_shard_existing_markets here and
+        # odds_control_plane.load_odds_history_payload_for_sport, the one
+        # the live board actually calls) see that fallback write on their
+        # very next read -- not just that the write survives.
+        fake_client = _FakeKeyValueClient()
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict(
+            "os.environ",
+            {
+                "SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports"),
+                "SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue",
+                "SYNDICATE_REFRESH_STATE_URL": "redis://example",
+                "SYNDICATE_KEYVALUE_WARN_BYTES": "1",
+                "SYNDICATE_KEYVALUE_MAX_BYTES": "1",
+            },
+            clear=False,
+        ), patch("syndicate.features.shared.refresh_state_store._get_keyvalue_client", return_value=fake_client):
+            root = Path(tmpdir)
+            team_root = root / "data" / "odds" / "team" / "date=2026-06-07"
+            team_root.mkdir(parents=True)
+            (team_root / "oddsapi.csv").write_text(
+                "home_team,away_team,bookmaker,market,selection,line,price\n"
+                "Home,Away,draftkings,total,over,6.5,-110\n",
+                encoding="utf-8",
+            )
+
+            result = sync_post_refresh_tracking_for_source_root(sport="nhl", source_root=root, date_str="2026-06-07")
+
+            self.assertTrue(result["ok"])
+            # The 1-byte ceiling means every keyvalue write this cycle was
+            # refused -- proving the fallback, not the primary path, is what
+            # was exercised.
+            self.assertFalse(fake_client.store, "expected the keyvalue write to be refused under the 1-byte ceiling")
+
+            history_path = Path(result["artifacts"]["odds_history"]["history_path"])
+            self.assertTrue(history_path.exists(), "expected the fallback to still write the artifact to local disk")
+
+            from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
+
+            board_payload = load_odds_history_payload_for_sport("nhl", "2026-06-07")
+            self.assertIsInstance(board_payload, dict)
+            self.assertIn("markets", board_payload)
+            self.assertTrue(board_payload["markets"], "expected the board reader to see the fallback-published markets")
+
     def test_write_json_writes_atomically(self) -> None:
         # This writes the odds-history artifacts that feed the Betting
         # Board's line-movement/CLV display. Overlapping refresh runs (see

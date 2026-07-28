@@ -2220,18 +2220,31 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(payload["dates_covered"], ["2026-07-27", "2026-07-28"])
         self.assertEqual(payload["response"]["top_opportunities"][0]["name"], "Combined Play")
 
-    def test_query_endpoint_never_uses_combined_response_when_date_explicit(self) -> None:
-        # The core backward-compatibility guarantee: an explicit date must
-        # always bypass the combined reader entirely, even with the flag on.
+    def test_query_endpoint_uses_combined_response_for_explicit_date_when_flag_enabled(self) -> None:
+        # Real bug found live 2026-07-28: an explicit date used to always
+        # bypass the combined reader (see the deleted
+        # test_query_endpoint_never_uses_combined_response_when_date_explicit,
+        # which encoded that as a guarantee) and fall to the older
+        # snapshot_read/board_snapshot cascade instead -- which is a
+        # DIFFERENT, independently-computed candidate pool, not just a
+        # differently-filtered view of the same one. Confirmed via matching
+        # production API calls: the identical nominal "today" query returned
+        # 72 candidates with no date vs. 54 with an explicit date=today. The
+        # combined reader already takes a `dates` list for exactly this case
+        # -- windowed to one date -- so an explicit date now stays on this
+        # path (with the flag on) instead of triggering a second, divergent
+        # computation of "today's board."
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)
 
-        engine_response = {
+        combined_response = {
             "ok": True,
-            "selected_date": "2026-07-27",
-            "top_opportunities": [{"name": "Today Play"}],
-            "recommendations": [{"name": "Today Play"}],
-            "by_sport": {"mlb": [{"name": "Today Play"}]},
+            "selected_date": None,
+            "dates_covered": ["2026-07-27"],
+            "top_opportunities": [{"name": "Combined Play"}],
+            "recommendations": [{"name": "Combined Play"}],
+            "by_sport": {"mlb": [{"name": "Combined Play"}]},
+            "candidate_count": 1,
         }
 
         with app.test_request_context(
@@ -2240,14 +2253,20 @@ class IntelligenceStateTests(unittest.TestCase):
             with patch.dict(os.environ, {"SYNDICATE_INTELLIGENCE_COMBINED_BOARD_DEFAULT": "true"}, clear=False):
                 with patch(
                     "syndicate.blueprints.intelligence.read_combined_intelligence_response",
-                    side_effect=AssertionError("combined reader must not be called for an explicit-date request"),
-                ):
-                    with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict(engine_response)):
-                        response = intelligence_query_api()
+                    return_value=dict(combined_response),
+                ) as mocked_combined:
+                    response = intelligence_query_api()
 
+        mocked_combined.assert_called_once_with(dates=["2026-07-27"], sport="all", limit=None)
         payload = response.get_json()
         self.assertIsNotNone(payload)
-        self.assertEqual(payload["response"]["top_opportunities"][0]["name"], "Today Play")
+        # The explicit date the caller asked for must come back on the
+        # response, not None -- #113/#114 wired intelligence.html's
+        # board-freshness-chip and #board-date input sync off this exact
+        # field, so a None here for an explicit-date request silently
+        # un-fixes both of those.
+        self.assertEqual(payload["selected_date"], "2026-07-27")
+        self.assertEqual(payload["response"]["top_opportunities"][0]["name"], "Combined Play")
 
     def test_query_endpoint_default_unchanged_when_combined_flag_disabled(self) -> None:
         app = Flask(__name__)
@@ -2293,15 +2312,26 @@ class IntelligenceStateTests(unittest.TestCase):
         mocked_combined.assert_called_once()
         self.assertEqual(response.status_code, 200)
 
-    def test_home_route_explicit_date_query_param_uses_single_date_path(self) -> None:
+    def test_home_route_explicit_date_query_param_uses_combined_response_when_flag_enabled(self) -> None:
+        # Same fix as test_query_endpoint_uses_combined_response_for_explicit_date_when_flag_enabled,
+        # applied to the SSR page route -- it had the identical
+        # not-explicit-date gate and the identical bug.
         app = create_app()
+        combined_response = {
+            "ok": True,
+            "selected_date": None,
+            "top_opportunities": [{"name": "Combined Play"}],
+            "recommendations": [{"name": "Combined Play"}],
+            "by_sport": {"mlb": [{"name": "Combined Play"}]},
+        }
         with app.test_client() as client:
             with patch.dict(os.environ, {"SYNDICATE_INTELLIGENCE_COMBINED_BOARD_DEFAULT": "true"}, clear=False):
                 with patch(
                     "syndicate.blueprints.intelligence.read_combined_intelligence_response",
-                    side_effect=AssertionError("combined reader must not be called for an explicit-date request"),
-                ):
+                    return_value=dict(combined_response),
+                ) as mocked_combined:
                     response = client.get("/intelligence?date=2026-07-27")
+        mocked_combined.assert_called_once_with(dates=["2026-07-27"], sport="all")
         self.assertEqual(response.status_code, 200)
 
     def test_portfolio_event_endpoint_records_manual_event_bundle(self) -> None:

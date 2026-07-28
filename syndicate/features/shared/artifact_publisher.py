@@ -218,6 +218,23 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # intentionally excluded here. They're written through refresh_state_store's
     # write_json_file, which already goes over the shared keyvalue (Redis) backend on
     # Render, so all three services see them without needing this HTTP push at all.
+    #
+    # #112: odds_history's per-shard payload is ALSO written through
+    # write_json_file/the keyvalue backend by default -- but it can exceed the
+    # 8MB keyvalue ceiling (confirmed live 2026-07-28, same class of failure
+    # as #43's board_snapshot/intelligence_state), at which point
+    # odds_refresh_tracking._sync_odds_history_for_refresh falls back to a
+    # local-disk write + publish_hot_artifact via the #108 _write_state_payload
+    # pattern. Two of the three paths it writes live under data_root() (the
+    # third, reports/odds_control_plane/odds_history/, is outside data_root()
+    # by construction and can't be matched by is_hot_artifact_relative_path --
+    # that copy only ever reaches the SAME service's own disk, which is
+    # sufficient for the refresh-worker's own next-cycle convergence but not
+    # for cross-service reads). Without these two entries, publish_hot_artifact
+    # would SKIP_NOT_ALLOWLISTED every fallback write and web would never see
+    # an oversized shard no matter how many refresh cycles ran.
+    "*_source/tracking/odds_history/*.json",
+    "*_source/artifacts/*/odds_history/*.json",
 )
 
 

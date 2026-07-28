@@ -1341,15 +1341,17 @@ def read_latest_intelligence_state(payload: dict[str, object] | None = None) -> 
 
 @intelligence_bp.get("/intelligence")
 def intelligence_home():
-    # #93 follow-up. Same explicit-date-first check as intelligence_query_api:
-    # captured before any default-injection, so a caller that passes ?date=
-    # gets byte-for-byte the existing single-date page, unchanged, regardless
-    # of this flag.
-    explicit_date = bool(str(request.args.get("date") or "").strip())
-    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
-    if not explicit_date and combined_board_default_enabled():
+    # #93 follow-up, extended alongside intelligence_query_api's identical
+    # fix (see that function's comment for the full "why"): an explicit
+    # ?date= now still uses the combined-board reader, just windowed to that
+    # one date, instead of dropping to the older single-date cascade below.
+    explicit_date_value = str(request.args.get("date") or "").strip()
+    explicit_date = bool(explicit_date_value)
+    selected_date = explicit_date_value or central_today_iso()
+    if combined_board_default_enabled():
         try:
-            initial_response = read_combined_intelligence_response(sport="all")
+            requested_dates = [explicit_date_value] if explicit_date else None
+            initial_response = read_combined_intelligence_response(dates=requested_dates, sport="all")
             initial_response = _hydrate_board_response_payload(initial_response)
         except Exception:
             _LOGGER.exception("COMBINED_BOARD_RESPONSE_FAILURE")
@@ -1357,7 +1359,7 @@ def intelligence_home():
         return render_template(
             "intelligence.html",
             initial_intelligence_response=initial_response,
-            initial_intelligence_selected_date=None,
+            initial_intelligence_selected_date=selected_date if explicit_date else None,
             initial_intelligence_today_iso=central_today_iso(),
         )
     payload = _intelligence_page_payload(selected_date, force_refresh=True)
@@ -1412,30 +1414,47 @@ def intelligence_query_api():
     raw_payload = request.get_json(silent=True) or {}
     # #93 follow-up. Captured from the RAW body, before _normalize_default_query_payload
     # runs below -- that function only stamps a date onto the DEFAULT
-    # question, so checking here (rather than after) is what keeps this
-    # backward compatible: any caller that always passes its own date (e.g.
-    # ask_the_syndicate.py) is completely unaffected by anything past this
-    # point, because explicit_date is True for them and the branch below is
-    # never entered.
-    explicit_date = bool(str(raw_payload.get("date") or raw_payload.get("selected_date") or "").strip())
+    # question, so checking here (rather than after) is what keeps a caller
+    # that always passes its own date (e.g. ask_the_syndicate.py) scoped to
+    # exactly that date below: explicit_date_value carries the caller's real
+    # requested date into the combined-board branch's `dates=[...]` window,
+    # instead of `_normalize_default_query_payload`'s stamped default
+    # silently widening it to the full cross-date window.
+    explicit_date_value = str(raw_payload.get("date") or raw_payload.get("selected_date") or "").strip()
+    explicit_date = bool(explicit_date_value)
     payload = _normalize_default_query_payload(raw_payload)
     question = str(payload.get("question") or "").strip()
     if not question:
         response = jsonify({"ok": False, "error": "question is required."})
         response.status_code = 400
         return _no_cache_response(response)
-    if not explicit_date and combined_board_default_enabled():
-        # Serves the cross-date, cross-sport combined board instead of
-        # today-only -- a completely separate, read-only path from
-        # everything below (which stays byte-for-byte unchanged for any
-        # explicit-date request, or when this flag is off). See
+    if combined_board_default_enabled():
+        # Serves the cross-date, cross-sport combined board instead of the
+        # older single-date snapshot_read/board_snapshot cascade below. #114
+        # (todo.md) closed one accidental trigger into that older cascade
+        # (a background poll silently carrying a stale client-side date);
+        # #111/#113 closed two more -- all three were different ways an
+        # explicit date snuck in, and every one of them was fixed by keeping
+        # the request off this branch entirely rather than by making this
+        # branch handle a date. That whack-a-mole was the actual bug: this
+        # branch could always serve a single explicit date too --
+        # read_combined_intelligence_response already takes a `dates` list,
+        # windowed to exactly one date when the caller wants exactly one
+        # date -- so there was never a structural reason for an explicit
+        # date to leave this path. Confirmed live 2026-07-28 that skipping
+        # this branch on any explicit date was the actual root cause of the
+        # user-visible "different sources, varying numbers" complaint: the
+        # same nominal "today" query returned 72 candidates
+        # (combined_board_window, no date) vs. 54 (snapshot_read, explicit
+        # date=today) from the live API, not a UI artifact. See
         # read_combined_intelligence_response's own docstring for why it is
         # safe to call directly from a request handler: it never computes,
         # only reads what the background loop's board-window watch set
         # (_ensure_default_board_window_watched) has already built.
         try:
             requested_sport = str(payload.get("sport") or "all").strip().lower() or "all"
-            response_payload = read_combined_intelligence_response(sport=requested_sport, limit=payload.get("limit"))
+            requested_dates = [explicit_date_value] if explicit_date else None
+            response_payload = read_combined_intelligence_response(dates=requested_dates, sport=requested_sport, limit=payload.get("limit"))
         except Exception:
             _LOGGER.exception("COMBINED_BOARD_RESPONSE_FAILURE")
             response_payload = None
@@ -1447,11 +1466,18 @@ def intelligence_query_api():
             LAST_RESULT = dict(response_payload.get("response") or response_payload.get("analysis") or {})
             versioned_response = _versioned_query_response(response_payload)
             versioned_response.update(_debug_state_fields(response_payload, source="combined_board_window"))
-            versioned_response["selected_date"] = None
+            # Was unconditionally None -- correct back when this branch was
+            # only ever reached for the dateless default query. Now that an
+            # explicit single date also routes here (see the comment above),
+            # leaving this None would un-fix #113/#114: both of those wired
+            # intelligence.html's board-freshness-chip and #board-date input
+            # sync off this exact field, and a None here for an explicit-date
+            # request would read as "no date selected" again.
+            versioned_response["selected_date"] = explicit_date_value if explicit_date else None
             versioned_response["dates_covered"] = response_payload.get("dates_covered")
             _LOGGER.info(
                 "BETTING_BOARD_REFRESH_COMPLETE",
-                extra={"selected_date": None, "candidate_count": _response_candidate_count(response_payload), "source": "query_api_combined"},
+                extra={"selected_date": versioned_response["selected_date"], "candidate_count": _response_candidate_count(response_payload), "source": "query_api_combined"},
             )
             return _no_cache_response(jsonify(versioned_response))
         # A combined-reader failure falls through to the existing today-only
