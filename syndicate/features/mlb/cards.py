@@ -1916,7 +1916,35 @@ def _game_line_market_score(markets: dict[str, Any] | None) -> int:
     return score
 
 
-def _tracked_game_lines_index(game_lines_doc: dict[str, Any] | None) -> dict[tuple[str, str], dict[str, Any]]:
+def _parse_iso_datetime_or_none(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _tracked_game_lines_index(game_lines_doc: dict[str, Any] | None) -> dict[tuple[str, str], list[dict[str, Any]]]:
+    # #117 follow-up. Doubleheaders (two games, same two teams, same day)
+    # used to collapse to ONE indexed entry per (away, home) team-pair key
+    # here -- whichever row had the higher _game_line_market_score, or the
+    # later row on a tie, silently won, and the OTHER game's real odds were
+    # discarded outright. Every card for either game then looked up the
+    # SAME single entry, so one of the two games always displayed the
+    # other's market data. Confirmed live 2026-07-28 (CLE @ CIN): this is a
+    # second, independent instance of the doubleheader-collision class
+    # already fixed once in pipeline/intelligence_state.py and
+    # market_id.py -- that fix protects candidate identity/dedup, this one
+    # protects the underlying market DATA those candidates carry.
+    #
+    # Fix: keep every row per team-pair (a list, not a single winner) so no
+    # game's real odds are ever discarded, and disambiguate at lookup time
+    # in _tracked_game_lines_for_source_card by matching each candidate
+    # row's own commence_time against the specific game being built --
+    # commence_time reliably differs by hours between a doubleheader's two
+    # games even though team names are identical.
     rows = game_lines_doc.get("games") if isinstance((game_lines_doc or {}).get("games"), list) else []
     meta = game_lines_doc.get("meta") if isinstance((game_lines_doc or {}).get("meta"), dict) else {}
     retrieved_at = str(
@@ -1925,7 +1953,7 @@ def _tracked_game_lines_index(game_lines_doc: dict[str, Any] | None) -> dict[tup
         or meta.get("retrievedAt")
         or ""
     ).strip() or None
-    indexed: dict[tuple[str, str], dict[str, Any]] = {}
+    indexed: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -1934,19 +1962,17 @@ def _tracked_game_lines_index(game_lines_doc: dict[str, Any] | None) -> dict[tup
         markets = row.get("markets") if isinstance(row.get("markets"), dict) else {}
         if not away_name or not home_name or not markets:
             continue
-        key = (away_name, home_name)
-        current_score = _game_line_market_score(markets)
-        existing_score = _game_line_market_score(indexed.get(key))
-        if current_score >= existing_score:
-            entry = dict(markets)
-            if retrieved_at:
-                entry["retrievedAt"] = retrieved_at
-                entry["retrieved_at"] = retrieved_at
-            indexed[key] = entry
+        entry = dict(markets)
+        if retrieved_at:
+            entry["retrievedAt"] = retrieved_at
+            entry["retrieved_at"] = retrieved_at
+        entry["_commence_time"] = str(row.get("commence_time") or "").strip() or None
+        entry["_market_score"] = _game_line_market_score(markets)
+        indexed.setdefault((away_name, home_name), []).append(entry)
     return indexed
 
 
-def _tracked_game_lines_for_source_card(game: dict[str, Any], game_lines_index: dict[tuple[str, str], dict[str, Any]]) -> dict[str, Any]:
+def _tracked_game_lines_for_source_card(game: dict[str, Any], game_lines_index: dict[tuple[str, str], list[dict[str, Any]]]) -> dict[str, Any]:
     away_abbr = str(((game.get("away") or {}).get("abbr") or "")).strip().upper()
     home_abbr = str(((game.get("home") or {}).get("abbr") or "")).strip().upper()
     away_name = _normalize_mlb_team_name(
@@ -1961,7 +1987,37 @@ def _tracked_game_lines_for_source_card(game: dict[str, Any], game_lines_index: 
     )
     if not away_name or not home_name:
         return {}
-    return dict(game_lines_index.get((away_name, home_name)) or {})
+    candidates = game_lines_index.get((away_name, home_name)) or []
+    if not candidates:
+        return {}
+    chosen: dict[str, Any]
+    if len(candidates) == 1:
+        chosen = candidates[0]
+    else:
+        # More than one row for this team pair -- almost certainly a
+        # doubleheader. Prefer whichever candidate's own commence_time is
+        # closest to this specific game's known start time (game["gameDate"],
+        # threaded through from _schedule_context, MLB's own dateTime for
+        # THIS gamePk) over the old highest-market-score tie-break, which
+        # had no way to tell the two games apart at all. Falls back to the
+        # market-score tie-break only when this game's own start time, or
+        # every candidate's commence_time, can't be parsed -- fail open to
+        # the pre-fix behavior rather than silently return nothing.
+        game_start = _parse_iso_datetime_or_none(game.get("gameDate"))
+        scored: list[tuple[float, dict[str, Any]]] = []
+        if game_start is not None:
+            for candidate in candidates:
+                candidate_start = _parse_iso_datetime_or_none(candidate.get("_commence_time"))
+                if candidate_start is None:
+                    continue
+                scored.append((abs((candidate_start - game_start).total_seconds()), candidate))
+        if scored:
+            scored.sort(key=lambda pair: pair[0])
+            chosen = scored[0][1]
+        else:
+            chosen = max(candidates, key=lambda candidate: candidate.get("_market_score") or 0)
+    result = {key: value for key, value in chosen.items() if key not in {"_commence_time", "_market_score"}}
+    return result
 
 
 def _markets_from_tracked_game_lines(tracked_lines: dict[str, Any] | None) -> dict[str, Any]:
