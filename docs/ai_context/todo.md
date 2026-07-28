@@ -6,7 +6,7 @@ list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-07-27 (see "Reconciliation 2026-07-27").
 
-> **Next free ID: 106.** IDs are never reused. Closed items move to
+> **Next free ID: 108.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
 
@@ -1045,6 +1045,56 @@ were resolved and nine already-closed rows removed from the open tables.
 | **90** | NBA `available_dates()` scans all preferred artifact roots but `processed_path()`/`live_snapshot_path()` only resolve against the primary root since `757952e1` — a date can be listed and still 404 if it only exists in a secondary root. Dormant while NBA has one root in production. See Reconciliation 2026-07-27. |
 
 ## OddsAPI budget (after #14/#15)
+
+- **#106** 🟢 **Event scoping SHIPPED 2026-07-28** (user-directed budget lever,
+  the bigger of the two remaining after the still-open #16 market-drop
+  decision). `fetch_live_game_lines_for_date`'s per-event loop
+  (`fetch_mlb_oddsapi_local.py`) fetched the 18 segment/alternate markets for
+  **every** game on **every** ~90s cycle regardless of that game's own state,
+  as long as *some* game on the slate was live — including games hours from
+  first pitch and games already final. Now decided per event: live/within-
+  75min-T-window games unchanged, everything else skips the per-event
+  segment fetch entirely when the slate-wide core call (#17) already covered
+  it. Uses #100's canonical `game_state.py` (not a new check) against the
+  day's `schedule_raw.json`; fails open on any uncertainty. Verified against
+  real production data (today's actual 12-game slate: 10 full-tier, 2
+  reduced — the one finished and one postponed game). `SYNDICATE_ODDS_EVENT_SCOPING_ENABLED=false`
+  reverts to prior behavior.
+  ⚠️ **First landed as dead code** (`7acdf2e0`): built inside
+  `refresh_mlb_oddsapi.py`'s `fetch_live_odds_incremental`, reachable only
+  via `--mode fast`. The actual command `live_refresh_loop.py` launches uses
+  `--mode full` (this script's own argparse default), which calls a
+  completely different function (`fetch_and_write_live_odds_for_date` →
+  `fetch_live_game_lines_for_date` in `fetch_mlb_oddsapi_local.py`) that the
+  first commit never touched. Only caught by checking
+  `/api/ops/odds-refresh/status`'s captured stdout — Render's log API never
+  surfaced this subprocess's own prints at all (capture mechanism unclear),
+  so log-line verification alone would have reported success on dead code.
+  Refixed same session (`655a53cd`), re-verified through the real entry
+  point. `refresh_mlb_oddsapi.py`'s copy of the scoping logic left in place
+  (harmless, still correct, just on the less-traveled fast-mode path) rather
+  than risk a rushed cross-file refactor — worth consolidating later, not a
+  "two disagreeing predicates" bug since both compute the same thing from
+  the same canonical module.
+- **#107** 🔴 **`SYNDICATE_ODDS_MARKET_TIER` (#82 Phase 2, logged SHIPPED
+  before this session) is apparently never read in `fetch_mlb_oddsapi_local.py`
+  at all** — found while fixing #106. It's only checked in
+  `refresh_mlb_oddsapi.py`'s `fetch_live_odds_incremental`, the same
+  effectively-unused `--mode fast` path #106 was dead-code'd on. If
+  production's real path (`--mode full`) never reads this env var, the
+  entire #82 Phase 2 segment/alternate cost reduction may never have taken
+  effect, despite being logged closed. Circumstantially consistent with
+  tonight's own burn numbers: `segment` (182k) and `alternate` (91k) credits
+  stayed high the whole session regardless of live/pregame state, which is
+  what you'd expect from a tiering flag that's wired into unused code. **Not
+  fixed here** — deserves its own same-instant verification (check
+  `/api/ops/odds-refresh/status` during an off-hours window, confirm whether
+  `market_tier` ever shows up as anything but `full`) before trusting either
+  the "shipped" label or this suspicion. If confirmed, the fix is almost
+  certainly "read `SYNDICATE_ODDS_MARKET_TIER` in
+  `fetch_live_game_lines_for_date` too, gated the same way #106 gates event
+  scoping" — small, but needs the same real-production-data verification
+  #106 got, not just a code read.
 
 > **Measured burn — first genuine full-day window, 2026-07-27T01:55Z:**
 >
