@@ -5,13 +5,17 @@ from datetime import timedelta
 from typing import Any
 from urllib.parse import urlencode
 
+from syndicate.features.nba.cards import build_cards_page_context
+from syndicate.features.nba.cards import build_live_player_lens_payload
 from syndicate.features.nba.sources import available_dates
 from syndicate.features.nba.sources import build_module_links
+from syndicate.features.nba.sources import central_today_iso
 from syndicate.features.nba.sources import format_moneyline
 from syndicate.features.nba.sources import format_num
 from syndicate.features.nba.sources import load_json
 from syndicate.features.nba.sources import market_label
 from syndicate.features.nba.sources import processed_path
+from syndicate.features.shared.basketball_market_board import basketball_game_state
 from syndicate.features.shared.rank_board import build_rank_page_context
 from syndicate.features.shared.top_props_board import build_top_props_page_context
 
@@ -275,13 +279,123 @@ def _focus_panel(rows: list[dict[str, Any]], selected_date: str, filters: dict[s
     }
 
 
+def _live_team_context(selected_date: str) -> dict[str, dict[str, Any]]:
+    """Team abbr (upper) -> {event_id, opponent_tri} for every NBA game
+    currently live on this date. Empty for a pregame-only or historical
+    slate -- callers should treat that as "no live overlay to apply", not
+    an error. Mirrors wnba/props.py's _live_team_context.
+    """
+    try:
+        cards_context = build_cards_page_context(selected_date, allow_stored_date_fallback=False)
+    except Exception:
+        return {}
+    games = cards_context.get("games") if isinstance(cards_context.get("games"), list) else []
+    live_teams: dict[str, dict[str, Any]] = {}
+    for game in games:
+        if not isinstance(game, dict) or basketball_game_state(game) != "live":
+            continue
+        event_id = str(game.get("event_id") or "").strip()
+        if not event_id:
+            continue
+        away = game.get("away") if isinstance(game.get("away"), dict) else {}
+        home = game.get("home") if isinstance(game.get("home"), dict) else {}
+        away_tri = str(away.get("abbr") or game.get("away_tri") or "").strip().upper()
+        home_tri = str(home.get("abbr") or game.get("home_tri") or "").strip().upper()
+        if away_tri:
+            live_teams[away_tri] = {"event_id": event_id, "opponent_tri": home_tri}
+        if home_tri:
+            live_teams[home_tri] = {"event_id": event_id, "opponent_tri": away_tri}
+    return live_teams
+
+
+def _live_prop_cards(selected_date: str, live_teams: dict[str, dict[str, Any]], limit: int, *, filters: dict[str, str] | None = None) -> list[dict[str, Any]]:
+    """Build prop cards from live-modeled projections vs live lines for
+    games currently in progress, mirroring wnba/props.py's _live_prop_cards.
+    Only rows carrying a real live edge (ev_side present) are surfaced.
+    Respects the same team/player filters the pregame board applies, so a
+    filtered view doesn't leak unrelated live cards back in.
+    """
+    event_ids = sorted({info["event_id"] for info in live_teams.values()})
+    if not event_ids:
+        return []
+    try:
+        payload = build_live_player_lens_payload(selected_date, event_ids, ttl=20)
+    except Exception:
+        return []
+    team_filter = str((filters or {}).get("team") or "").strip().upper()
+    player_filter = str((filters or {}).get("player") or "").strip().lower()
+    games = payload.get("games") if isinstance(payload.get("games"), list) else []
+    cards: list[dict[str, Any]] = []
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        rows = game.get("rows") if isinstance(game.get("rows"), list) else []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            ev_side = str(row.get("ev_side") or "").strip().upper()
+            if ev_side not in ("OVER", "UNDER"):
+                continue
+            player = str(row.get("player") or "NBA prop").strip() or "NBA prop"
+            team_tri = str(row.get("team_tri") or "").strip().upper()
+            if team_filter and team_tri != team_filter:
+                continue
+            if player_filter and player_filter not in player.lower():
+                continue
+            opponent_tri = str(live_teams.get(team_tri, {}).get("opponent_tri") or "-")
+            stat = market_label(row.get("stat"))
+            line = format_num(row.get("line_live"))
+            live_projection = row.get("live_projection")
+            live_edge = row.get("live_edge")
+            price = row.get("price_over") if ev_side == "OVER" else row.get("price_under")
+            cards.append(
+                {
+                    "title": f"{player} {ev_side.title()} {line} {stat}".strip(),
+                    "eyebrow": "Live",
+                    "badge": f"Live edge {format_num(live_edge)}" if live_edge is not None else "Live",
+                    "meta": f"{team_tri or '-'} vs {opponent_tri}",
+                    "metrics": [
+                        {"label": "Live proj", "value": format_num(live_projection)},
+                        {"label": "Line", "value": line},
+                        {"label": "Live edge", "value": format_num(live_edge)},
+                        {"label": "Price", "value": format_moneyline(price)},
+                    ],
+                    "summary": f"Live-modeled {stat.lower()} projection for {player} vs the current live line.",
+                    "list_items": [
+                        item
+                        for item in [
+                            f"Actual so far: {format_num(row.get('actual'))}" if row.get("actual") is not None else None,
+                            f"Book: {str(row.get('book') or '').strip()}" if row.get("book") else None,
+                        ]
+                        if item
+                    ],
+                }
+            )
+            if len(cards) >= limit:
+                return cards
+    return cards
+
+
 def build_props_page_context(selected_date: str, *, filters: dict[str, Any] | None = None) -> dict[str, Any]:
     summary_path = processed_path(f"props_recommendations_top_by_game_{selected_date}.json")
     normalized_filters = _normalized_filters(filters)
     summary = load_json(summary_path) or {}
     rows = _summary_rows(summary)
     controls = _control_options(rows, normalized_filters)
+    live_teams = _live_team_context(selected_date) if selected_date == central_today_iso() else {}
     if not _has_active_filters(normalized_filters):
+        def _build_cards(loaded_summary: dict[str, Any], limit: int) -> list[dict[str, Any]]:
+            if not live_teams:
+                return _cards_from_summary(loaded_summary, limit, selected_date=selected_date, filters=normalized_filters)
+            # Live games get their pregame rows dropped in favor of
+            # live-modeled cards below, so the same game never shows a
+            # stale pregame pick next to a fresh live one.
+            summary_rows = loaded_summary.get("data") if isinstance(loaded_summary.get("data"), list) else []
+            pregame_rows = [row for row in summary_rows if not isinstance(row, dict) or _row_team_value(row) not in live_teams]
+            pregame_cards = _cards_from_summary({**loaded_summary, "data": pregame_rows}, limit, selected_date=selected_date, filters=normalized_filters)
+            live_cards = _live_prop_cards(selected_date, live_teams, limit)
+            return (live_cards + pregame_cards)[:limit]
+
         return build_top_props_page_context(
             selected_date=selected_date,
             route_path="/nba/prop-ladders",
@@ -292,12 +406,7 @@ def build_props_page_context(selected_date: str, *, filters: dict[str, Any] | No
             source_title="NBA top props by game",
             active_label="Props",
             load_summary=load_json,
-            build_cards=lambda loaded_summary, limit: _cards_from_summary(
-                loaded_summary,
-                limit,
-                selected_date=selected_date,
-                filters=normalized_filters,
-            ),
+            build_cards=_build_cards,
             build_module_links=build_module_links,
             available_dates=available_dates(),
             warning_panel=_WARNING_PANEL,
@@ -311,9 +420,15 @@ def build_props_page_context(selected_date: str, *, filters: dict[str, Any] | No
         )
 
     filtered_rows = _sort_rows(_filter_rows(rows, normalized_filters), normalized_filters.get("sort", "").lower())
+    if live_teams:
+        pregame_filtered_rows = [row for row in filtered_rows if _row_team_value(row) not in live_teams]
+    else:
+        pregame_filtered_rows = filtered_rows
     filtered_summary = dict(summary)
-    filtered_summary["data"] = filtered_rows
-    cards = _cards_from_summary(filtered_summary, selected_date=selected_date, filters=normalized_filters)
+    filtered_summary["data"] = pregame_filtered_rows
+    pregame_cards = _cards_from_summary(filtered_summary, selected_date=selected_date, filters=normalized_filters)
+    live_cards = _live_prop_cards(selected_date, live_teams, 12, filters=normalized_filters) if live_teams else []
+    cards = live_cards + pregame_cards
     high_tier_count = sum(
         1
         for row in filtered_rows

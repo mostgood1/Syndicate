@@ -154,7 +154,7 @@ services:
       - key: NBA_BETTING_DATA_ROOT
         value: /opt/render/project/data/nba_source/data
       - key: NBA_LIVE_LENS_DIR
-        value: ./data/nba_source/source_artifacts/data/live_lens
+        value: /opt/render/project/data/nba_source/source_artifacts/data/live_lens
       - key: NHL_DATA_DIR
         value: ./data/nhl_source/source_artifacts/data
       - key: NHL_LIVE_LENS_DIR
@@ -357,7 +357,7 @@ services:
       - key: NBA_BETTING_DATA_ROOT
         value: /opt/render/project/data/nba_source/data
       - key: NBA_LIVE_LENS_DIR
-        value: ./data/nba_source/source_artifacts/data/live_lens
+        value: /opt/render/project/data/nba_source/source_artifacts/data/live_lens
       - key: NHL_DATA_DIR
         value: ./data/nhl_source/source_artifacts/data
       - key: NHL_LIVE_LENS_DIR
@@ -647,7 +647,7 @@ services:
       - key: NBA_BETTING_DATA_ROOT
         value: /opt/render/project/data/nba_source/data
       - key: NBA_LIVE_LENS_DIR
-        value: ./data/nba_source/source_artifacts/data/live_lens
+        value: /opt/render/project/data/nba_source/source_artifacts/data/live_lens
       - key: NHL_DATA_DIR
         value: ./data/nhl_source/source_artifacts/data
       - key: NHL_LIVE_LENS_DIR
