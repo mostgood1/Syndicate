@@ -170,6 +170,20 @@
     // now; the input's own value is synced FROM state.date just below,
     // not the other way around.
     date: urlParams.get("date") || "",
+    // Tracks whether state.date is a deliberate server-side override (an
+    // explicit ?date= deep link, or the free-text #board-date input +
+    // Refresh) versus the Today/Tomorrow day tabs, which per #93's design
+    // are supposed to be a PURE client-side filter over the one combined
+    // "All" fetch (see renderFilterTabs' own comment). Without this
+    // distinction, intelligenceQueryPayload previously forwarded state.date
+    // to the server for background polls too whenever a day tab had been
+    // clicked, silently and permanently bypassing the combined-board
+    // default (read_combined_intelligence_response's "not explicit_date"
+    // gate) for the rest of that tab's session -- the same failure shape
+    // #113 fixed for stale input restoration, but reachable here through
+    // ordinary Today/Tomorrow clicks instead. An explicit URL ?date= is
+    // still an intentional deep link, so it starts true.
+    explicitDateOverride: Boolean(urlParams.get("date")),
     sport: urlParams.get("sport") || "all",
     gameState: urlParams.get("game_state") || "all",
     marketFamily: urlParams.get("market_family") || "all",
@@ -273,6 +287,7 @@
       const nextDate = tab.date || "";
       if (nextDate === (state.date || "")) return;
       state.date = nextDate;
+      state.explicitDateOverride = false;
       const dateInput = document.getElementById("board-date");
       if (dateInput) dateInput.value = nextDate;
       syncUrlState();
@@ -1303,7 +1318,13 @@
       background: Boolean(opts.background),
       force_refresh: Boolean(opts.forceRefresh),
     };
-    if (state.date) payload.date = state.date;
+    // Only forward state.date to the server when it's a deliberate override
+    // (URL deep link or the free-text date input) -- day-tab clicks set
+    // state.date for client-side filtering only and must never leak into
+    // the fetch payload, or every background poll after clicking
+    // Today/Tomorrow permanently bypasses the combined-board default. See
+    // state.explicitDateOverride's own comment above.
+    if (state.date && state.explicitDateOverride) payload.date = state.date;
     return payload;
   }
 
@@ -1356,6 +1377,7 @@
   document.getElementById("board-toolbar").addEventListener("submit", (event) => {
     event.preventDefault();
     state.date = document.getElementById("board-date").value || state.date;
+    state.explicitDateOverride = true;
     syncUrlState();
     void loadGameChips();
     void loadSteam();
