@@ -154,6 +154,72 @@ class OddsRefreshTrackingTests(unittest.TestCase):
                 self.assertIn("market_id", entry)
                 self.assertIn("timestamp", entry)
 
+    def test_history_sweep_strips_pre_existing_bloat_on_a_market_not_touched_this_cycle(self) -> None:
+        # #112 correction: an append-time-only version of the strip above
+        # shipped first and did NOT stop KeyValuePayloadTooLarge recurring
+        # in production (confirmed live 2026-07-28, one cycle post-deploy).
+        # The real shard was 18.9MB accumulated over a full day; a market
+        # that doesn't get a fresh append THIS cycle (dedupe short-circuit,
+        # or simply no candidate row for it this pass) never re-enters the
+        # per-row branch that strip lived in, so its old, already-bloated
+        # entries are never revisited. Seeding a market with pre-existing
+        # multi-entry, un-stripped history directly (simulating data
+        # written before this fix existed) and running one more cycle for a
+        # DIFFERENT market proves the shard-wide sweep -- which runs over
+        # every market in the shard whenever the shard gets written at all,
+        # not just the ones with a fresh entry this cycle -- actually
+        # cleans up pre-existing bloat, not just newly-written entries.
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports"), "SYNDICATE_ODDS_EVENTS_ROOT": str(Path(tmpdir) / "odds_events")}, clear=False):
+            root = Path(tmpdir)
+            team_root = root / "data" / "odds" / "team" / "date=2026-06-07"
+            team_root.mkdir(parents=True)
+            (team_root / "oddsapi.csv").write_text(
+                "home_team,away_team,bookmaker,market,selection,line,price\nHome,Away,draftkings,total,over,6.5,-110\n",
+                encoding="utf-8",
+            )
+            result = sync_post_refresh_tracking_for_source_root(sport="nhl", source_root=root, date_str="2026-06-07")
+            self.assertTrue(result["ok"])
+
+            history_path = root / "tracking" / "odds_history" / "2026-06-07.json"
+            history_payload = json.loads(history_path.read_text(encoding="utf-8"))
+            # Directly inject a second, pre-existing market with 3 fully
+            # populated (un-stripped) history entries -- as if it had been
+            # written by pre-#112 code earlier in the day and hasn't been
+            # touched since.
+            bloated_key = "home_team=quiet|away_team=team|market=total|selection=over|bookmaker=draftkings"
+            history_payload["markets"][bloated_key] = {
+                "last_line": 3.5,
+                "history": [
+                    {"current_line": 3.5, "market_id": bloated_key, "timestamp": f"2026-06-07T12:0{i}:00+00:00", "row": {"bulk": "x" * 200}, "normalized": {"bulk": "y" * 200}}
+                    for i in range(3)
+                ],
+            }
+            history_path.write_text(json.dumps(history_payload), encoding="utf-8")
+            # The shared-store copy is what _load_shard_existing_markets
+            # actually reads back on the next cycle (checked before the
+            # local tracking-root copy) -- both must carry the seeded data.
+            shared_path = root / "reports" / "odds_control_plane" / "odds_history" / "nhl" / "2026-06-07.json"
+            shared_path.parent.mkdir(parents=True, exist_ok=True)
+            shared_path.write_text(json.dumps(history_payload), encoding="utf-8")
+
+            # A second cycle where ONLY the original market changes -- the
+            # bloated market gets no candidate row at all this pass.
+            (team_root / "oddsapi.csv").write_text(
+                "home_team,away_team,bookmaker,market,selection,line,price\nHome,Away,draftkings,total,over,7.0,-110\n",
+                encoding="utf-8",
+            )
+            result = sync_post_refresh_tracking_for_source_root(sport="nhl", source_root=root, date_str="2026-06-07")
+            self.assertTrue(result["ok"])
+
+            history_payload = json.loads(history_path.read_text(encoding="utf-8"))
+            bloated_history = history_payload["markets"][bloated_key]["history"]
+            self.assertEqual(len(bloated_history), 3, "the sweep must not drop or add entries, only strip fields")
+            for older_entry in bloated_history[:-1]:
+                self.assertNotIn("row", older_entry)
+                self.assertNotIn("normalized", older_entry)
+            self.assertIn("row", bloated_history[-1])
+            self.assertIn("normalized", bloated_history[-1])
+
     def test_sync_nhl_tracking_appends_when_odds_change_without_line_change(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports"), "SYNDICATE_ODDS_EVENTS_ROOT": str(Path(tmpdir) / "odds_events")}, clear=False):
             root = Path(tmpdir)

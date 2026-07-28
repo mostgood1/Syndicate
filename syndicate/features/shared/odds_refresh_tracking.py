@@ -1188,31 +1188,15 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             )
             if len(history) > _ODDS_HISTORY_LIMIT:
                 history = history[-_ODDS_HISTORY_LIMIT:]
-            # #112. row/normalized are the two heaviest fields on a history
-            # entry (the full JSON-safe raw API row + normalized entry), and
-            # the only reader of either (the missing-market "close" event
-            # synthesis below, latest.get("row")/latest.get("normalized"))
-            # only ever looks at the newest entry. Stripping them from every
-            # OLDER entry is what actually bounds shard size -- confirmed
-            # live 2026-07-28: MLB's odds-history shard grew to 18.9MB
-            # against the #60 8MB ceiling mid-afternoon on a normal slate,
-            # silently failing that cycle's sync and suppressing the
-            # intelligence publish path for it (props flapped 0/222 cycle
-            # to cycle depending on which side of the ceiling the payload
-            # landed on). Trimming entry COUNT alone can't fix this: the
-            # steam detector's 45-min window needs ~30 entries at live
-            # cadence, but the real growth driver here is breadth --
-            # thousands of distinct prop markets on a full slate -- not
-            # per-market depth, so even a count cut small enough to fit
-            # the ceiling would still have been too shallow for steam
-            # detection on the entries it kept. This self-heals the
-            # existing oversized shard over the next few cycles as each
-            # previously-latest entry ages out, without needing a one-time
-            # migration.
-            for old_entry in history[:-1]:
-                if isinstance(old_entry, dict):
-                    old_entry.pop("row", None)
-                    old_entry.pop("normalized", None)
+            # #112. row/normalized (the heaviest two fields per entry) get
+            # stripped from every history entry except each market's own
+            # true latest -- see the shard-wide sweep right before this
+            # shard gets written, a few hundred lines down. Not done here:
+            # this branch only runs for markets that got a NEW entry THIS
+            # cycle (the dedupe check above skips it otherwise), and most of
+            # an oversized shard turned out to be quiet/cold markets sitting
+            # on old, never-revisited history -- stripping only here would
+            # never have touched them.
             market_state["history"] = history
             market_state["last_line"] = current_line
             market_state["previous_line"] = previous_line
@@ -1276,6 +1260,28 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
     for shard_key, shard_markets in shards.items():
         if shard_entries_appended.get(shard_key, 0) <= 0:
             continue
+        # #112 correction: the strip at append time only ever touched
+        # markets that got a NEW entry THIS cycle -- a market whose price
+        # hasn't moved hits the dedupe short-circuit above and skips the
+        # append path entirely, so it never got swept, and it turns out
+        # most of an 18.9MB shard is exactly that: quiet/cold markets sitting
+        # on old fully-loaded history from earlier in the day. Confirmed
+        # live 2026-07-28: the append-time-only version of this fix did not
+        # stop KeyValuePayloadTooLarge from recurring post-deploy. Sweeping
+        # every market in the shard being written -- not just the ones that
+        # changed this cycle -- actually bounds it. Still keeps the one real
+        # consumer's need intact: each market's OWN true last entry is
+        # never touched, whether or not it was updated this cycle.
+        for market_state in shard_markets.values():
+            if not isinstance(market_state, dict):
+                continue
+            history = market_state.get("history")
+            if not isinstance(history, list) or len(history) <= 1:
+                continue
+            for old_entry in history[:-1]:
+                if isinstance(old_entry, dict):
+                    old_entry.pop("row", None)
+                    old_entry.pop("normalized", None)
         history_path = _odds_history_path(tracking_root, shard_key)
         artifact_history_path = _odds_history_artifact_path(source_root, slug, shard_key)
         shared_history_path = _shared_odds_history_path(slug, shard_key)
