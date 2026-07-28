@@ -2535,7 +2535,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
 
         with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as queue_mock:
             with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=state_response) as state_mock:
-                with patch("syndicate.blueprints.intelligence._INTELLIGENCE_STATE_SERVICE._compute_response", return_value=dict(live_result)) as compute_mock:
+                with patch("pipeline.intelligence_state._INTELLIGENCE_STATE_SERVICE._compute_response", return_value=dict(live_result)) as compute_mock:
                     with patch("syndicate.blueprints.intelligence.build_intelligence_board_contract", return_value=dict(board_contract)):
                         response = self.client.post(
                             "/api/intelligence/query",
