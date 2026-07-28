@@ -190,19 +190,20 @@ services:
         value: "false"
       - key: WEEKLY_SPORTS_REFRESH_INTERVAL_SECONDS
         value: "21600"
-      # Phase 2 of migrating off the daily-update GHA cron: prediction
-      # reconciliation/grading never ran on Render, only from
-      # daily_update.ps1. Fixed alongside this: prediction_ledger.py's
-      # default ledger path was resolving inside the ephemeral code checkout
-      # instead of the persistent data disk, so predictions never actually
-      # survived a redeploy -- see syndicate/features/prediction_ledger.py's
-      # _default_ledger_path(). Defaults off for the same dark-launch
-      # reasoning used elsewhere in this file; flip on once a session's
-      # worth of predictions have accumulated at the corrected path.
-      - key: RECONCILIATION_ENABLE_REFRESH_WORKER_AUTORUN
-        value: "false"
-      - key: RECONCILIATION_REFRESH_INTERVAL_SECONDS
-        value: "86400"
+      # #96: RECONCILIATION_ENABLE_REFRESH_WORKER_AUTORUN/
+      # RECONCILIATION_REFRESH_INTERVAL_SECONDS moved from here to the
+      # refresh-worker service's own envVars block below. This `envVars:`
+      # list only applies to THIS (web) service -- despite being anchored
+      # `&shared_render_env_vars`, the alias is never referenced anywhere
+      # else in this file, so nothing was ever actually shared. The code
+      # that reads these two keys (scripts/run_refresh_worker.py's
+      # _reconciliation_auto_refresh_enabled/_reconciliation_interval_seconds)
+      # runs as the refresh-worker SERVICE's own process, which never saw
+      # this key at all (absent, not "false") -- so flipping the value here
+      # to "true" would have had zero effect. Confirmed live 2026-07-28: the
+      # evaluation ledger's entire ~1350-record history is 100% `result:
+      # "pending"`, proving reconciliation autorun has never actually run on
+      # Render regardless of this flag's value here.
       # Play-by-play-level smart sim re-enabled: the OOM this originally
       # mitigated was root-caused to the live-odds-worker's fixed 60s tick
       # relaunching the full pipeline before the previous attempt finished
@@ -254,6 +255,20 @@ services:
         value: "true"
       - key: SYNDICATE_REFRESH_LANE
         value: refresh-worker
+      # #96/#120: moved here from the web service's envVars block, where it
+      # sat inert -- run_refresh_worker.py (this service's own startCommand)
+      # is the actual reader of these two keys, and web's copy of them was
+      # never visible to this process at all. Flipping true here for the
+      # first time; NBA/WNBA/NHL have real actuals writers
+      # (refresh_{nba,wnba,nhl}_oddsapi{_props}.py) so those sports should
+      # start settling. MLB has no actuals writer at all (see the matcher in
+      # prediction_reconciliation.py, and the follow-up scoping note in
+      # todo.md) -- MLB predictions will keep reading "pending" until that's
+      # built separately; this flag alone does not fix MLB.
+      - key: RECONCILIATION_ENABLE_REFRESH_WORKER_AUTORUN
+        value: "true"
+      - key: RECONCILIATION_REFRESH_INTERVAL_SECONDS
+        value: "86400"
       - key: SYNDICATE_REQUIRE_HOSTED_STORAGE
         value: "true"
       - key: SYNDICATE_REFRESH_STATE_BACKEND
