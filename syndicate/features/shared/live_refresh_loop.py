@@ -3078,6 +3078,18 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 		meta["ok"] = False
 		meta["skipped"] = True
 		meta["error"] = "pregame refresh relaunch blocked by cooldown (previous attempt still within cooldown window)"
+		# #107. Unlike the off-hours gate two blocks down (which prints
+		# ODDS_REFRESH_OFF_HOURS_SKIPPED every time it fires), this cooldown
+		# had no log line at all -- only meta["error"], readable solely by
+		# catching the exact tick that hit it via /api/ops/live-refresh/state
+		# before the next tick overwrites it. Confirmed live 2026-07-28: this
+		# made the cooldown's actual observed cadence impossible to verify
+		# from logs, the reason #107 stayed open. Printing it closes that gap
+		# the same way the off-hours gate already does.
+		print(
+			f"[live_refresh_loop] PREGAME_RELAUNCH_COOLDOWN_SKIPPED cooldown_s={_pregame_relaunch_cooldown_seconds()}",
+			flush=True,
+		)
 		skip_launch = True
 	if not skip_launch and _off_hours_gate_blocks_launch(now_epoch=tick_started_epoch, any_live=any_live):
 		# #15 off-hours gate. When NOTHING is live, every sweep prices a

@@ -443,6 +443,10 @@ class LiveRefreshLoopTests(unittest.TestCase):
         # could finish, so game_cards_<date>.csv never got produced. This
         # cooldown blocks a relaunch independently of the outer interval fix
         # and of _assert_no_active_refresh_run's own PID-based guard.
+        import contextlib
+        import io
+
+        captured_stdout = io.StringIO()
         with patch.dict(
             os.environ,
             {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true"},
@@ -458,7 +462,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
         ) as mocked_record, patch.object(
             live_refresh_loop,
             "launch_refresh_run",
-        ) as mocked_launch:
+        ) as mocked_launch, contextlib.redirect_stdout(captured_stdout):
             payload = live_refresh_loop._run_live_refresh_tick()
 
         self.assertFalse(payload["ok"])
@@ -466,6 +470,12 @@ class LiveRefreshLoopTests(unittest.TestCase):
         self.assertIn("cooldown", payload["error"])
         mocked_launch.assert_not_called()
         mocked_record.assert_not_called()
+        # #107. This skip previously had no log line at all -- only the
+        # returned payload, readable solely by catching the exact tick that
+        # hit it before the next one overwrites live state. Made this
+        # cooldown's real observed cadence impossible to verify from
+        # production logs alone.
+        self.assertIn("PREGAME_RELAUNCH_COOLDOWN_SKIPPED", captured_stdout.getvalue())
 
     def test_run_tick_defers_odds_refresh_while_mlb_daily_sim_is_running(self) -> None:
         # Production incident: is_refresh_run_active() only stops a NEW sim
