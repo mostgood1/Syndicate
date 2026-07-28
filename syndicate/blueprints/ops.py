@@ -439,6 +439,27 @@ def api_ops_oddsapi_quota() -> Any:
     return jsonify({"ok": True, "quota": normalize_timestamped_payload(read_oddsapi_quota())})
 
 
+@ops_bp.post("/api/ops/oddsapi/quota/reset")
+def api_ops_oddsapi_quota_reset() -> Any:
+    # Protected endpoint: requires admin token (enforced by before_request)
+    # #106/#107. by_sport/by_market_family/by_hour_utc never reset (O(1)
+    # counters, #54's constraint), so a real early bug that's since been
+    # fixed (c01302f1 -> 6e98ae80, the endpoint-query-stripping bug that
+    # made attribution blind for part of this aggregation window) stays
+    # baked into the cumulative ratio forever, diluting only as slowly as
+    # new data accumulates. Confirmed 2026-07-28: every incremental delta
+    # since has matched exactly (100% attribution), so the fix is already
+    # live -- this just gives the reported ratio a clean baseline to
+    # measure from instead of carrying broken history indefinitely.
+    # credits_burned_in_window is unaffected: it's derived from the
+    # provider's absolute used-counter delta, not from this file.
+    from syndicate.features.shared.oddsapi_quota import _quota_path
+
+    path = _quota_path()
+    write_json_file(path, {})
+    return jsonify({"ok": True, "path": str(path)})
+
+
 @ops_bp.get("/api/ops/live-refresh/state")
 def api_ops_live_refresh_state() -> Any:
     # Read-only view of the live-refresh loop's shared state (tick meta, gate
