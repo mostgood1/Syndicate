@@ -1563,9 +1563,17 @@ def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
     with daily_paths["history"].open("a", encoding="utf-8") as history_file:
         history_file.write(json.dumps(history_entry, sort_keys=True, ensure_ascii=False, default=str))
         history_file.write("\n")
+    # #105 follow-up, confirmed live 2026-07-27: unlike the state payload two
+    # writes above, this called write_json_file directly -- no keyvalue-too-
+    # large fallback at all. A genuinely rich board (84 candidates, 10.18MB
+    # serialized) hit the keyvalue ceiling here, raised uncaught, and
+    # _background_loop's generic exception handler treated the whole cycle
+    # as run_failed, discarding a correctly computed board. _write_state_payload
+    # already exists and is proven for exactly this (#43); it was just never
+    # wired in for board_snapshot specifically.
     if represents_today_or_dateless:
-        write_json_file(BOARD_SNAPSHOT_PATH, board_snapshot_payload)
-    write_json_file(daily_paths["board_snapshot"], board_snapshot_payload)
+        _write_state_payload(BOARD_SNAPSHOT_PATH, board_snapshot_payload)
+    _write_state_payload(daily_paths["board_snapshot"], board_snapshot_payload)
     if _live_pipeline_has_activity(live_pipeline):
         live_pipeline["generated_at"] = str(live_pipeline.get("generated_at") or state_meta.get("computed_at") or normalized.get("snapshot_generated_at") or _utc_now()).strip() or _utc_now()
         write_json_file(LIVE_PIPELINE_LAST_SUCCESSFUL_PATH, live_pipeline)

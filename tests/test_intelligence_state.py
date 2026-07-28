@@ -22,7 +22,9 @@ from syndicate.features.intelligence import collect_candidates_with_fallback_mer
 from pipeline.intelligence_state import read_intelligence_board_state
 from pipeline.intelligence_state import read_latest_intelligence_board_state
 from pipeline.intelligence_state import write_intelligence_board_state
+from pipeline.intelligence_state import write_latest_intelligence_state
 from pipeline.intelligence_state import slice_intelligence_board_state_for_request
+from syndicate.features.shared.refresh_state_store import KeyValuePayloadTooLarge
 from syndicate.app import create_app
 import syndicate.blueprints.intelligence as intelligence_module
 from syndicate.blueprints.intelligence import intelligence_bp
@@ -1095,6 +1097,58 @@ class IntelligenceStateTests(unittest.TestCase):
                 board_snapshot = json.loads(board_snapshot_path.read_text(encoding="utf-8"))
                 self.assertEqual(board_snapshot["board_contract"]["schema"], "intelligence_board_v1")
                 self.assertEqual(board_snapshot["response"]["board_contract"]["schema"], "intelligence_board_v1")
+
+    def test_write_latest_intelligence_state_falls_back_to_artifact_when_board_snapshot_too_large(self) -> None:
+        # #105 follow-up, confirmed live 2026-07-27: unlike the compact state
+        # payload two writes above (which already goes through
+        # _write_state_payload's keyvalue-too-large fallback, per #43), the
+        # board_snapshot write called write_json_file directly with no
+        # fallback at all. A genuinely rich board (84 candidates, 10.18MB
+        # serialized) hit the keyvalue ceiling here, raised uncaught, and
+        # _background_loop's generic exception handler discarded the whole
+        # cycle as run_failed -- even though the compact state payload had
+        # already been persisted successfully moments earlier. This test
+        # fails against the pre-fix source: KeyValuePayloadTooLarge escapes
+        # write_latest_intelligence_state instead of being absorbed by the
+        # artifact-publish fallback.
+        state = {
+            "ok": True,
+            "top_opportunities": [{"name": "Play 1"}],
+            "recommendations": [{"name": "Play 1"}],
+            "by_sport": {"mlb": [{"name": "Play 1"}]},
+            "board_contract": {"schema": "intelligence_board_v1", "cards": [{"name": "Play 1"}]},
+            "analysis": None,
+            "portfolio": {},
+            "parlays": [],
+            "selected_date": "2026-06-15",
+            "candidate_count": 1,
+        }
+
+        def fake_write_json_file(path, payload):
+            if Path(path).name == "board_snapshot.json":
+                raise KeyValuePayloadTooLarge("Refusing keyvalue write for board_snapshot.json: too large")
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            state_path = temp_root / "query_state_cache.json"
+            board_snapshot_path = temp_root / "board_snapshot.json"
+            history_path = temp_root / "intelligence" / "intelligence_state_history.jsonl"
+            with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(
+                intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path
+            ), patch.object(
+                intelligence_state_module, "INTELLIGENCE_HISTORY_PATH", history_path
+            ), patch.object(
+                intelligence_state_module, "reports_root", return_value=temp_root
+            ), patch.object(
+                intelligence_state_module, "central_today_iso", return_value="2026-06-15"
+            ), patch.object(intelligence_state_module, "write_json_file", side_effect=fake_write_json_file), patch(
+                "syndicate.features.shared.artifact_publisher.publish_hot_artifact", return_value=True
+            ) as mocked_publish:
+                # Must not raise -- that is the whole bug.
+                result = write_latest_intelligence_state(dict(state))
+
+        self.assertIsNotNone(result)
+        mocked_publish.assert_any_call(board_snapshot_path)
 
     def test_state_compute_persists_freshness_metadata_on_board_snapshot(self) -> None:
         service = IntelligenceStateService()
