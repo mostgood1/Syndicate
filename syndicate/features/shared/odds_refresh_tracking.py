@@ -1296,7 +1296,23 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             if not isinstance(market_state, dict):
                 continue
             history = market_state.get("history")
-            if not isinstance(history, list) or len(history) <= 1:
+            if not isinstance(history, list) or not history:
+                continue
+            # Same gap, second dimension: the entry-COUNT trim
+            # (history[-_ODDS_HISTORY_LIMIT:]) only ever ran in the
+            # per-row append branch too, so a quiet market sitting on 50
+            # entries from before _ODDS_HISTORY_LIMIT was cut to 20 would
+            # never get trimmed down -- only its fields would get
+            # stripped, not its count. Confirmed live 2026-07-28:
+            # KeyValuePayloadTooLarge recurred on a cycle that ran AFTER
+            # both the field-strip sweep and the 50->20 limit cut were
+            # deployed and confirmed live via /api/ops/version, on a run
+            # that started after that deploy -- the only remaining
+            # explanation was quiet markets never being trimmed either.
+            if len(history) > _ODDS_HISTORY_LIMIT:
+                history = history[-_ODDS_HISTORY_LIMIT:]
+                market_state["history"] = history
+            if len(history) <= 1:
                 continue
             for old_entry in history[:-1]:
                 if isinstance(old_entry, dict):

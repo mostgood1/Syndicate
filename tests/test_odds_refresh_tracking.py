@@ -220,6 +220,65 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertIn("row", bloated_history[-1])
             self.assertIn("normalized", bloated_history[-1])
 
+    def test_history_sweep_trims_entry_count_on_a_quiet_market_too(self) -> None:
+        # #112 correction 3, same shape of gap as the field-strip sweep
+        # above but on the OTHER dimension: history[-_ODDS_HISTORY_LIMIT:]
+        # also only ever ran in the per-row append branch, so a quiet
+        # market sitting on more entries than the current limit (e.g. from
+        # before _ODDS_HISTORY_LIMIT was cut 50->20) would get its fields
+        # stripped by the sweep above but never get trimmed DOWN in count.
+        # Confirmed live 2026-07-28: KeyValuePayloadTooLarge recurred on a
+        # cycle that ran after both the field-strip sweep and the limit
+        # cut were deployed and confirmed live -- this was the remaining
+        # gap. Seeds a market with more entries than the (patched, lower)
+        # limit and confirms the count itself drops on a cycle where that
+        # market gets no candidate row at all.
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports"), "SYNDICATE_ODDS_EVENTS_ROOT": str(Path(tmpdir) / "odds_events")}, clear=False):
+            from syndicate.features.shared import odds_refresh_tracking as tracking
+
+            with patch.object(tracking, "_ODDS_HISTORY_LIMIT", 3):
+                root = Path(tmpdir)
+                team_root = root / "data" / "odds" / "team" / "date=2026-06-07"
+                team_root.mkdir(parents=True)
+                (team_root / "oddsapi.csv").write_text(
+                    "home_team,away_team,bookmaker,market,selection,line,price\nHome,Away,draftkings,total,over,6.5,-110\n",
+                    encoding="utf-8",
+                )
+                result = sync_post_refresh_tracking_for_source_root(sport="nhl", source_root=root, date_str="2026-06-07")
+                self.assertTrue(result["ok"])
+
+                history_path = root / "tracking" / "odds_history" / "2026-06-07.json"
+                history_payload = json.loads(history_path.read_text(encoding="utf-8"))
+                # Inject a pre-existing market with MORE entries than the
+                # patched limit of 3, as if written before the limit was
+                # ever cut this low.
+                overlong_key = "home_team=quiet|away_team=team|market=total|selection=over|bookmaker=draftkings"
+                history_payload["markets"][overlong_key] = {
+                    "last_line": 3.5,
+                    "history": [
+                        {"current_line": 3.5, "market_id": overlong_key, "timestamp": f"2026-06-07T12:0{i}:00+00:00", "row": {"bulk": "x"}, "normalized": {"bulk": "y"}}
+                        for i in range(6)
+                    ],
+                }
+                history_path.write_text(json.dumps(history_payload), encoding="utf-8")
+                shared_path = root / "reports" / "odds_control_plane" / "odds_history" / "nhl" / "2026-06-07.json"
+                shared_path.parent.mkdir(parents=True, exist_ok=True)
+                shared_path.write_text(json.dumps(history_payload), encoding="utf-8")
+
+                (team_root / "oddsapi.csv").write_text(
+                    "home_team,away_team,bookmaker,market,selection,line,price\nHome,Away,draftkings,total,over,7.0,-110\n",
+                    encoding="utf-8",
+                )
+                result = sync_post_refresh_tracking_for_source_root(sport="nhl", source_root=root, date_str="2026-06-07")
+                self.assertTrue(result["ok"])
+
+                history_payload = json.loads(history_path.read_text(encoding="utf-8"))
+                overlong_history = history_payload["markets"][overlong_key]["history"]
+                self.assertEqual(len(overlong_history), 3, "count must drop to the current limit even though this market got no fresh row")
+                self.assertIn("row", overlong_history[-1])
+                for older_entry in overlong_history[:-1]:
+                    self.assertNotIn("row", older_entry)
+
     def test_sync_nhl_tracking_appends_when_odds_change_without_line_change(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports"), "SYNDICATE_ODDS_EVENTS_ROOT": str(Path(tmpdir) / "odds_events")}, clear=False):
             root = Path(tmpdir)
