@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -14,6 +15,25 @@ from syndicate.features.shared.recommendation_engine import filter_candidates
 from syndicate.features.shared.recommendation_engine import compare_policies
 from syndicate.features.shared.recommendation_engine import rank_recommendations
 from syndicate.features.shared.recommendation_engine import select_policy
+
+
+# filter_candidates does `evaluation_records or _load_records_from_ledger(...)`
+# -- an empty list is falsy, so passing [] still falls through to a REAL
+# on-disk ledger read (intelligence_evaluation.py's _load_chunked_ledger_records),
+# which can stall for a long time (confirmed: a OneDrive-synced repo checkout
+# hung on this exact read). Every test in this file must pass a genuinely
+# non-empty evaluation_records list to avoid it -- this one is for a market
+# no test candidate uses, so it never affects scoring.
+_UNRELATED_HISTORY = [
+    {
+        "result": "win",
+        "pnl": 0.0,
+        "stake": 1.0,
+        "implied_probability": 0.5,
+        "recommendation": {"market": "unrelated_placeholder_market", "selection": "n/a", "line": None, "odds": "+100"},
+        "artifact_metadata": {"sport": "mlb"},
+    }
+]
 
 
 class RecommendationEngineTests(unittest.TestCase):
@@ -130,6 +150,94 @@ class RecommendationEngineTests(unittest.TestCase):
         self.assertIn("reasoning", ranked[0])
         self.assertIn("risk_factors", ranked[0])
         self.assertIn("confidence_drivers", ranked[0])
+
+    def test_filter_candidates_rejects_pregame_candidate_stale_beyond_the_sla(self) -> None:
+        # #117 follow-up (Layer 2 Phase 2a). MLB's pregame sweep interval
+        # defaults to 2h, so the SLA ceiling is 3x that = 6h. 8h stale is
+        # well past it.
+        now = datetime.now(timezone.utc)
+        stale_last_updated = (now - timedelta(hours=8)).isoformat()
+        fresh_manifest = now.isoformat()
+        candidates = [
+            {
+                "name": "Home ML",
+                "event_id": "game-1",
+                "market": "moneyline",
+                "selection": "Home ML",
+                "odds": "+110",
+                "model_probability": 0.6,
+                "last_updated": stale_last_updated,
+                "sport_manifest_last_updated": fresh_manifest,
+                "sport_slug": "mlb",
+            }
+        ]
+        filtered = filter_candidates(candidates, sport="mlb", evaluation_records=_UNRELATED_HISTORY)
+        self.assertEqual(filtered, [])
+
+    def test_filter_candidates_keeps_a_fresh_pregame_candidate(self) -> None:
+        now = datetime.now(timezone.utc)
+        fresh_last_updated = (now - timedelta(hours=1)).isoformat()
+        candidates = [
+            {
+                "name": "Home ML",
+                "event_id": "game-1",
+                "market": "moneyline",
+                "selection": "Home ML",
+                "odds": "+110",
+                "model_probability": 0.6,
+                "last_updated": fresh_last_updated,
+                "sport_manifest_last_updated": now.isoformat(),
+                "sport_slug": "mlb",
+            }
+        ]
+        filtered = filter_candidates(candidates, sport="mlb", evaluation_records=_UNRELATED_HISTORY)
+        self.assertEqual(len(filtered), 1)
+
+    def test_filter_candidates_does_not_reject_for_staleness_when_the_whole_pipeline_is_stalled(self) -> None:
+        # If the sport's own manifest is just as stale, an individual
+        # candidate being stale isn't a candidate-specific data problem --
+        # it's the whole pipeline being down, a bigger issue this gate
+        # should not silently paper over by emptying the board.
+        now = datetime.now(timezone.utc)
+        stale_timestamp = (now - timedelta(hours=8)).isoformat()
+        candidates = [
+            {
+                "name": "Home ML",
+                "event_id": "game-1",
+                "market": "moneyline",
+                "selection": "Home ML",
+                "odds": "+110",
+                "model_probability": 0.6,
+                "last_updated": stale_timestamp,
+                "sport_manifest_last_updated": stale_timestamp,
+                "sport_slug": "mlb",
+            }
+        ]
+        filtered = filter_candidates(candidates, sport="mlb", evaluation_records=_UNRELATED_HISTORY)
+        self.assertEqual(len(filtered), 1)
+
+    def test_filter_candidates_uses_a_much_tighter_sla_for_live_candidates(self) -> None:
+        # Live ceiling is 30 min (60s tick x 30) -- 40 minutes stale trips it
+        # even though the same age would be nowhere near the 6h pregame
+        # ceiling for the same sport.
+        now = datetime.now(timezone.utc)
+        stale_last_updated = (now - timedelta(minutes=40)).isoformat()
+        candidates = [
+            {
+                "name": "Home ML",
+                "event_id": "game-1",
+                "market": "moneyline",
+                "selection": "Home ML",
+                "odds": "+110",
+                "model_probability": 0.6,
+                "is_live": True,
+                "last_updated": stale_last_updated,
+                "sport_manifest_last_updated": now.isoformat(),
+                "sport_slug": "mlb",
+            }
+        ]
+        filtered = filter_candidates(candidates, sport="mlb", evaluation_records=_UNRELATED_HISTORY)
+        self.assertEqual(filtered, [])
 
     def test_calculate_edge_uses_fair_probability_and_implied_probability(self) -> None:
         edge = calculate_edge({"odds": "+120", "model_probability": 0.58})

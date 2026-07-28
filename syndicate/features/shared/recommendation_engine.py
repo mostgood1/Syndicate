@@ -15,8 +15,10 @@ from __future__ import annotations
 import logging
 import hashlib
 import json
+import time
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -98,6 +100,65 @@ def _coerce_float(value: Any) -> float | None:
         return float(text)
     except Exception:
         return None
+
+
+def _parse_iso_timestamp_to_epoch(value: Any) -> float | None:
+    text = str(value or "").strip()
+    if not text or text == "-":
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except Exception:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.timestamp()
+
+
+def _candidate_age_seconds(candidate: Mapping[str, Any], *, now: float | None = None) -> float | None:
+    now = now if now is not None else time.time()
+    # last_updated is the freshest known signal on a candidate -- it's what
+    # #117 traced the "21H AGO" board symptom to (intelligence.html's
+    # formatRelativeTime reads this exact field), and it gets overwritten by
+    # odds-history enrichment (pipeline/intelligence_state.py) when that
+    # runs, so it reflects real market-data freshness, not just when the
+    # candidate object was first built. updated_epoch (stamped at candidate
+    # build time, home.py's _append_game_bet_candidate) is the fallback for
+    # candidates enrichment never touched.
+    epoch = _parse_iso_timestamp_to_epoch(candidate.get("last_updated"))
+    if epoch is None:
+        updated_epoch = candidate.get("updated_epoch")
+        if isinstance(updated_epoch, (int, float)) and updated_epoch > 0:
+            epoch = float(updated_epoch)
+    if epoch is None:
+        return None
+    return max(0.0, now - epoch)
+
+
+def _candidate_freshness_ceiling_seconds(sport_slug: str, *, is_live: bool) -> int:
+    # #117 follow-up (Layer 2 board redesign, Phase 2a). Derived from the
+    # pipeline's own already-tuned refresh cadence rather than an invented
+    # constant, per explicit user direction: pregame candidates get 3x each
+    # sport's configured pregame-sweep interval (_pregame_sweep_interval_seconds,
+    # live_refresh_loop.py -- 2h default, 8h soccer, per #82's design) as
+    # slack against normal scheduling jitter while still catching genuine
+    # multi-cycle staleness (the doubleheader candidate #117 found was stale
+    # by ~21.7h against a 2h cadence -- multiple ceilings past). Live
+    # candidates use the slate-wide live-tick interval
+    # (_live_refresh_loop_interval_seconds, 60s default) x 30 (30 minutes) --
+    # no per-sport live cadence config exists to derive from the same way,
+    # so this is a deliberately conservative starting ceiling (loose enough
+    # to tolerate a quiet inning/quarter with no real price movement, tight
+    # enough to catch the actual failure mode: a live-flagged candidate
+    # whose data genuinely stopped updating). Revisit once live-tick
+    # telemetry across sports gives a real basis to tighten this per sport,
+    # the same way the pregame side already has one.
+    from syndicate.features.shared.live_refresh_loop import _live_refresh_loop_interval_seconds
+    from syndicate.features.shared.live_refresh_loop import _pregame_sweep_interval_seconds
+
+    if is_live:
+        return _live_refresh_loop_interval_seconds() * 30
+    return _pregame_sweep_interval_seconds(sport_slug) * 3
 
 
 def _line_odds_movement_summary(market_features: Mapping[str, Any] | None) -> dict[str, Any] | None:
@@ -952,7 +1013,44 @@ def filter_candidates(
     # candidates -- the same shard gets read from scratch once (or twice,
     # with the 1-day lookback) per candidate instead of once per cycle.
     odds_payload_cache: dict[tuple[str, str], dict[str, Any] | None] = {}
+    freshness_check_started_at = time.time()
     for candidate in candidate_rows:
+        # #117 follow-up (Layer 2 Phase 2a). A stale candidate must be
+        # rejected before it's even scored, not just annotated after the
+        # fact -- the live board symptom this closes (a "LIVE, 7th inning"
+        # candidate with 21.7h-old odds attached) was a data-freshness
+        # failure, not an edge-quality one, so it needs its own gate rather
+        # than hoping a stale price also happens to fail the edge check.
+        #
+        # Only rejects when the SPORT'S OWN pipeline looks healthy
+        # (sport_manifest_last_updated itself is within the same ceiling) --
+        # if the whole manifest is old too, that's a pipeline-health problem
+        # bigger than any one candidate, and this gate silently emptying the
+        # board on top of that would hide the real issue rather than surface
+        # it. sport_manifest_last_updated is already attached per-candidate
+        # by pipeline/intelligence_state.py's _build_candidate_pool.
+        candidate_sport_slug = str(candidate.get("sport_slug") or candidate.get("sport") or "").strip().lower()
+        candidate_is_live = bool(candidate.get("is_live"))
+        ceiling_seconds = _candidate_freshness_ceiling_seconds(candidate_sport_slug, is_live=candidate_is_live)
+        candidate_age = _candidate_age_seconds(candidate, now=freshness_check_started_at)
+        if ceiling_seconds > 0 and candidate_age is not None and candidate_age > ceiling_seconds:
+            manifest_age = _candidate_age_seconds(
+                {"last_updated": candidate.get("sport_manifest_last_updated")}, now=freshness_check_started_at
+            )
+            pipeline_looks_healthy = manifest_age is None or manifest_age <= ceiling_seconds
+            if pipeline_looks_healthy:
+                rejected.append(
+                    {
+                        "sport": candidate_sport_slug,
+                        "name": _selection(candidate),
+                        "market": _market(candidate),
+                        "is_live": candidate_is_live,
+                        "age_seconds": round(candidate_age, 1),
+                        "ceiling_seconds": ceiling_seconds,
+                        "reason": "stale_beyond_sla",
+                    }
+                )
+                continue
         market = _market(candidate)
         market_profile = market_profile_cache.get(market)
         if market_profile is None:
