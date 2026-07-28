@@ -928,10 +928,52 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         self.assertEqual(total["pick"], "Over 8.5")
         self.assertEqual(total["line"], "8.5")
         self.assertNotEqual(total["confidence"], "-")
+        # #98/#100: the row's model_prob must survive as a raw 0-1 fraction
+        # under "model_probability", the field normalize_candidate's
+        # projection scan actually checks -- not just as display text under
+        # "confidence", which the scan never looks at.
+        self.assertAlmostEqual(moneyline["model_probability"], 0.57)
+        self.assertAlmostEqual(total["model_probability"], 0.52)
 
     def test_mlb_markets_with_no_selection_produce_no_rows(self) -> None:
         game = self._sample_game(markets={"ml": {}, "totals": {"selection": "over"}})
         self.assertEqual(_mlb_game_market_recommendation_rows(game), [])
+
+    def test_mlb_feed_live_state_does_not_treat_warmup_as_live(self) -> None:
+        # #98/#100: was abstract.lower() == "live" alone -- MLB StatsAPI
+        # reports abstractGameState "Live" during warmup, before the game has
+        # actually started. detailedState "Warmup" is the real signal.
+        from syndicate.blueprints.home import _mlb_feed_live_state
+
+        warmup_payload = {
+            "gameData": {"status": {"abstractGameState": "Live", "detailedState": "Warmup"}},
+            "liveData": {"linescore": {"teams": {}}},
+        }
+        with patch("syndicate.blueprints.home._mlb_feed_live_payload", return_value=warmup_payload):
+            state = _mlb_feed_live_state("2026-07-27", 123456)
+        self.assertIsNotNone(state)
+        self.assertFalse(state["in_progress"])
+        self.assertFalse(state["final"])
+
+        in_progress_payload = {
+            "gameData": {"status": {"abstractGameState": "Live", "detailedState": "In Progress"}},
+            "liveData": {"linescore": {"teams": {}}},
+        }
+        with patch("syndicate.blueprints.home._mlb_feed_live_payload", return_value=in_progress_payload):
+            state = _mlb_feed_live_state("2026-07-27", 123456)
+        self.assertTrue(state["in_progress"])
+
+    def test_first_present_text_treats_numeric_zero_as_present(self) -> None:
+        # #100: str(value or "") is truthiness-based, so a legitimate numeric
+        # 0 (a projected total of 0, a model mean of 0.0) used to fall through
+        # to a lower-priority field in the scan instead of winning -- same bug
+        # class #68 fixed in _candidate_value_is_present.
+        from syndicate.blueprints.home import _first_present_text
+
+        self.assertEqual(_first_present_text(0, "fallback"), "0")
+        self.assertEqual(_first_present_text(0.0, "fallback"), "0.0")
+        self.assertEqual(_first_present_text(None, "", "fallback"), "fallback")
+        self.assertIsNone(_first_present_text(None, ""))
 
     def test_shared_top_play_rows_extracts_player_name_for_hitter_pitcher_markets(self) -> None:
         # Real gap found 2026-07-23: game["shared_top_play_rows"] (a generic

@@ -3263,6 +3263,44 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIsNone(reason)
         self.assertIsNotNone(classified)
 
+    def test_mlb_pregame_game_market_candidate_survives_classification(self) -> None:
+        # #98/#100: a pregame MLB moneyline/total candidate carries a real
+        # model win probability (game["markets"]["ml"/"totals"]["model_prob"])
+        # but no book-line "projected" field. _mlb_game_market_recommendation_rows
+        # (home.py) only ever threaded that probability through as display
+        # text under "confidence" -- a field normalize_candidate's projection
+        # scan never checks -- so every genuinely pregame MLB game-level
+        # candidate classified as missing_projection_or_odds even with real
+        # data present. Confirmed against production ground truth in #98 (8
+        # pregame MLB games, all pruned this way). This exercises the real
+        # cross-file pipeline (home.py's builder into intelligence.py's
+        # classifier), not a mock, so it would fail pre-fix.
+        from syndicate.blueprints.home import (
+            _game_bet_candidates_from_game,
+            _mlb_game_market_recommendation_rows,
+        )
+        from syndicate.features.intelligence import _classify_candidate_with_reason
+
+        game = {
+            "away": "Baltimore Orioles",
+            "home": "Detroit Tigers",
+            "status": {"abstract": "Preview", "detailed": "Scheduled"},
+            "markets": {
+                "ml": {"selection": "home", "model_prob": 0.57, "odds": None},
+                "totals": {"selection": "over", "market_line": 8.5, "model_prob": 0.52, "odds": None},
+            },
+        }
+        game["game_market_recommendations"] = _mlb_game_market_recommendation_rows(game)
+        candidates = _game_bet_candidates_from_game({"slug": "mlb"}, game, fallback_epoch=0.0)
+        moneyline = next(c for c in candidates if c["market"] == "Moneyline")
+
+        self.assertEqual(moneyline["odds"], "-")
+        self.assertEqual(moneyline["projected"], "-")
+        self.assertAlmostEqual(moneyline["model_probability"], 0.57)
+        classified, reason = _classify_candidate_with_reason(moneyline)
+        self.assertIsNone(reason)
+        self.assertIsNotNone(classified)
+
     def test_intelligence_query_builds_nba_analysis_views(self) -> None:
         advanced_rows = [
             {
@@ -6667,10 +6705,7 @@ class PostDedupeAndClassifyTraceTests(unittest.TestCase):
         # order -- so that 0 also shadowed the real model_probability behind
         # it. Measured against production 2026-07-26: all 32 live MLS game
         # candidates were pruned as missing_projection_or_odds this way.
-        from syndicate.features.intelligence import (
-            _candidate_has_usable_projection,
-            _classify_candidate_with_reason,
-        )
+        from syndicate.features.intelligence import _classify_candidate_with_reason
 
         zero_projection = {"type": "game", "selection": "Home ML", "projection": 0.0}
         self.assertIsNotNone(_classify_candidate_with_reason(zero_projection)[0])
@@ -6685,9 +6720,6 @@ class PostDedupeAndClassifyTraceTests(unittest.TestCase):
             "odds": "-",
         }
         self.assertIsNone(_classify_candidate_with_reason(scoreless_live)[1])
-        # The other predicate in the same module always got this right; the two
-        # disagreeing is what made the board look candidate-starved.
-        self.assertTrue(_candidate_has_usable_projection(scoreless_live))
 
         # A genuinely absent projection is still absent.
         for empty in (None, "", "-"):

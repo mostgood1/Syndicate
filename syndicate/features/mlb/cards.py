@@ -19,6 +19,8 @@ from typing import Any
 from urllib.error import URLError
 from urllib.request import urlopen
 
+from syndicate.features.mlb.game_state import mlb_status_is_final as _mlb_status_is_final
+from syndicate.features.mlb.game_state import mlb_status_is_live as _mlb_status_is_live
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.shared.market_inventory import JOIN_STATUS_NEEDS_RESIM
 from syndicate.features.shared.market_inventory import join_odds_to_sim
@@ -2251,7 +2253,8 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(game, dict):
             continue
         status = game.get("status") if isinstance(game.get("status"), dict) else {}
-        if str(status.get("abstract") or status.get("abstractGameState") or "").strip().lower() != "live":
+        # #98/#100: was abstract-only, which misreads MLB warmup as live.
+        if not _mlb_status_is_live(status.get("abstract") or status.get("abstractGameState"), status.get("detailed") or status.get("detailedState")):
             continue
         odds_refreshed_at = str(game.get("oddsRefreshedAt") or game.get("odds_refreshed_at") or "").strip() or None
         if odds_refreshed_at and (latest_live_odds_refreshed_at is None or odds_refreshed_at > latest_live_odds_refreshed_at):
@@ -2943,10 +2946,14 @@ def _live_progress_fraction(actual_payload: dict[str, Any] | None) -> float:
 
 
 def _actual_payload_is_live(actual_payload: dict[str, Any] | None) -> bool:
+    # #98/#100: was `abstract == "live" or detailed == "in progress"` -- MLB
+    # StatsAPI reports abstractGameState "Live" during warmup, so this alone
+    # misread a warming-up game as live. Delegates to the shared canonical
+    # predicate (syndicate.features.mlb.game_state).
     status = ((actual_payload or {}).get("gameData") or {}).get("status") if isinstance((actual_payload or {}).get("gameData"), dict) else {}
-    abstract = str((status or {}).get("abstractGameState") or "").strip().lower()
-    detailed = str((status or {}).get("detailedState") or "").strip().lower()
-    return abstract == "live" or detailed == "in progress"
+    abstract = (status or {}).get("abstractGameState")
+    detailed = (status or {}).get("detailedState")
+    return _mlb_status_is_live(abstract, detailed)
 
 
 def _parse_ip_to_outs(value: Any) -> int | None:
@@ -3463,10 +3470,10 @@ def _registry_live_prop_rows(selected_date: str, game_pk: int, existing_rows: li
 
 
 def _live_lens_row_is_live(live_lens_row: dict[str, Any] | None) -> bool:
+    # #98/#100: same abstract-only-OR-detailed miss as _actual_payload_is_live;
+    # delegates to the shared canonical predicate.
     status = (live_lens_row or {}).get("status") if isinstance((live_lens_row or {}).get("status"), dict) else {}
-    abstract = str(status.get("abstract") or "").strip().lower()
-    detailed = str(status.get("detailed") or "").strip().lower()
-    return abstract == "live" or detailed == "in progress"
+    return _mlb_status_is_live(status.get("abstract"), status.get("detailed"))
 
 
 def _synth_live_hitter_prop_rows(
@@ -4345,19 +4352,22 @@ def _rfi_targets_signal_index(doc: dict[str, Any] | None) -> dict[int, dict[str,
 
 
 def _cards_status_is_live(status: dict[str, Any] | None) -> bool:
+    # #98/#100: was `abstract == "live" or detailed == "in progress"` --
+    # misreads MLB warmup (abstract "Live") as live. Delegates to the shared
+    # canonical predicate.
     if not isinstance(status, dict):
         return False
-    abstract = str(status.get("abstract") or status.get("abstractGameState") or "").strip().lower()
-    detailed = str(status.get("detailed") or status.get("detailedState") or "").strip().lower()
-    return abstract == "live" or detailed == "in progress"
+    abstract = status.get("abstract") or status.get("abstractGameState")
+    detailed = status.get("detailed") or status.get("detailedState")
+    return _mlb_status_is_live(abstract, detailed)
 
 
 def _cards_status_is_final(status: dict[str, Any] | None) -> bool:
     if not isinstance(status, dict):
         return False
-    abstract = str(status.get("abstract") or status.get("abstractGameState") or "").strip().lower()
-    detailed = str(status.get("detailed") or status.get("detailedState") or "").strip().lower()
-    return abstract == "final" or "final" in detailed or detailed in {"game over", "completed early"}
+    abstract = status.get("abstract") or status.get("abstractGameState")
+    detailed = status.get("detailed") or status.get("detailedState")
+    return _mlb_status_is_final(abstract, detailed)
 
 
 def _starter_ladder_badge_from_supported_totals(
@@ -4874,7 +4884,12 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         for game in games:
             if not isinstance(game, dict):
                 continue
-            if isinstance(game.get("status"), dict) and str(game.get("status", {}).get("abstract") or "").strip().lower() == "live":
+            # #98/#100: was abstract-only, which misreads MLB warmup as live.
+            game_status = game.get("status") if isinstance(game.get("status"), dict) else None
+            if isinstance(game_status, dict) and _mlb_status_is_live(
+                game_status.get("abstract") or game_status.get("abstractGameState"),
+                game_status.get("detailed") or game_status.get("detailedState"),
+            ):
                 game["oddsRefreshedAt"] = refresh_ts
                 game["odds_refreshed_at"] = refresh_ts
             elif not str(game.get("oddsRefreshedAt") or game.get("odds_refreshed_at") or "").strip():
@@ -5859,8 +5874,14 @@ def build_mlb_market_board(selected_date: str) -> dict[str, Any]:
         inventory = join_odds_to_sim(odds_rows, sim_rows)
 
         status = game.get("status") if isinstance(game.get("status"), dict) else {}
+        # game_state itself stays a raw display string (abstract text, e.g.
+        # "warmup" is a real, distinct display state) -- but #98/#100: gating
+        # live-lens row inclusion on `game_state == "live"` alone misreads MLB
+        # warmup (abstract "Live") as live, since abstract is all this string
+        # carries. Gate on the canonical predicate instead.
         game_state = str(status.get("abstract") or "").strip().lower() or "pregame"
-        live_lens_rows = _mlb_live_lens_prop_rows_for_game(live_lens_report, game_pk) if game_state == "live" else []
+        is_live_for_market_board = _mlb_status_is_live(status.get("abstract"), status.get("detailed") or status.get("detailedState"))
+        live_lens_rows = _mlb_live_lens_prop_rows_for_game(live_lens_report, game_pk) if is_live_for_market_board else []
 
         for row in inventory:
             market = row.get("market")

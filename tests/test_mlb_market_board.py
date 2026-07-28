@@ -23,6 +23,40 @@ from syndicate.features.shared.market_inventory import JOIN_STATUS_NO_SIM_COVERA
 from syndicate.features.shared.market_inventory import join_odds_to_sim
 
 
+class MlbCardsStatusPredicateTests(unittest.TestCase):
+    # #98/#100: _actual_payload_is_live/_live_lens_row_is_live/
+    # _cards_status_is_live all used `abstract == "live" or detailed == "in
+    # progress"` -- MLB StatsAPI reports abstractGameState "Live" during
+    # warmup, so this misread a warming-up game as live. All three now
+    # delegate to the shared canonical predicate (syndicate.features.mlb.
+    # game_state).
+    def test_actual_payload_is_live_excludes_warmup(self) -> None:
+        from syndicate.features.mlb.cards import _actual_payload_is_live
+
+        warmup = {"gameData": {"status": {"abstractGameState": "Live", "detailedState": "Warmup"}}}
+        in_progress = {"gameData": {"status": {"abstractGameState": "Live", "detailedState": "In Progress"}}}
+        self.assertFalse(_actual_payload_is_live(warmup))
+        self.assertTrue(_actual_payload_is_live(in_progress))
+
+    def test_live_lens_row_is_live_excludes_warmup(self) -> None:
+        from syndicate.features.mlb.cards import _live_lens_row_is_live
+
+        warmup_row = {"status": {"abstract": "Live", "detailed": "Warmup"}}
+        in_progress_row = {"status": {"abstract": "Live", "detailed": "In Progress"}}
+        self.assertFalse(_live_lens_row_is_live(warmup_row))
+        self.assertTrue(_live_lens_row_is_live(in_progress_row))
+
+    def test_cards_status_is_live_and_final_exclude_warmup(self) -> None:
+        from syndicate.features.mlb.cards import _cards_status_is_final
+        from syndicate.features.mlb.cards import _cards_status_is_live
+
+        warmup_status = {"abstract": "Live", "detailed": "Warmup"}
+        self.assertFalse(_cards_status_is_live(warmup_status))
+        self.assertFalse(_cards_status_is_final(warmup_status))
+        self.assertTrue(_cards_status_is_live({"abstract": "Live", "detailed": "In Progress"}))
+        self.assertTrue(_cards_status_is_final({"abstract": "Final", "detailed": "Completed Early"}))
+
+
 class MlbSourcePredictionsTests(unittest.TestCase):
     def test_total_runs_dist_is_surfaced_for_the_market_board(self) -> None:
         # 2026-07-27 fix: total_runs_dist was already hydrated onto the

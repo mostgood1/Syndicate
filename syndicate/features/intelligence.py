@@ -46,6 +46,8 @@ __path__ = [str(Path(__file__).with_name("intelligence"))]
 from syndicate.blueprints.home import _build_sport_overview
 from syndicate.blueprints.home import _build_prop_dashboard_row
 from syndicate.blueprints.home import _game_bet_candidates_from_game
+from syndicate.features.mlb.game_state import mlb_status_is_final as _mlb_status_is_final
+from syndicate.features.mlb.game_state import mlb_status_is_live as _mlb_status_is_live
 from syndicate.features.mlb.sources import daily_artifact_path as mlb_daily_artifact_path
 from syndicate.features.mlb.sources import daily_snapshot_oddsapi_pitcher_props_path as mlb_daily_snapshot_oddsapi_pitcher_props_path
 from syndicate.features.mlb.sources import daily_top_props_path as mlb_daily_top_props_path
@@ -4435,11 +4437,14 @@ def _mlb_candidate_live_state(candidate: dict[str, Any], actual_payload: dict[st
     )
     if abstract_state or detailed_state:
         state["status_display"] = detailed_state or abstract_state
-    if abstract_state.lower() == "final" or detailed_state.lower() in {"final", "game over", "completed"}:
+    # #100: delegates to the shared canonical predicate (syndicate.features.
+    # mlb.game_state) instead of keeping its own inline copy -- this was the
+    # confirmed-correct implementation the consolidation canonicalized on.
+    if _mlb_status_is_final(abstract_state, detailed_state):
         state["is_final"] = True
         state["is_live"] = False
     elif detailed_state:
-        state["is_live"] = detailed_state.lower() not in {"pre-game", "scheduled", "preview", "warmup"}
+        state["is_live"] = _mlb_status_is_live(abstract_state, detailed_state)
 
     current_pitcher_id, current_pitcher_name = _mlb_current_pitcher(actual_payload)
     if current_pitcher_id is not None:
@@ -4997,26 +5002,6 @@ def _candidate_has_required_fields(candidate: dict[str, Any]) -> bool:
     return bool(subject)
 
 
-def _candidate_has_usable_projection(candidate: dict[str, Any]) -> bool:
-    projection_fields = (
-        "projected",
-        "live_projection",
-        "expected_value",
-        "adjusted_edge",
-        "edge",
-        "model_probability",
-        "fair_probability",
-        "live_total",
-    )
-    for field in projection_fields:
-        value = candidate.get(field)
-        if isinstance(value, (int, float)) and not isinstance(value, bool):
-            return True
-        if field in {"projected", "live_projection", "live_total"} and _safe_text(value, "") not in {"", "-"}:
-            return True
-    return False
-
-
 def _candidate_value_is_present(value: Any) -> bool:
     """Whether a normalized candidate field actually carries a value.
 
@@ -5033,9 +5018,10 @@ def _candidate_value_is_present(value: Any) -> bool:
     first *present* field in its scan order, so that 0 also shadows any real
     model_probability/fair_probability/edge further down the list. Measured
     against production 2026-07-26: all 32 live MLS game candidates were pruned
-    this way, and `_candidate_has_usable_projection` -- the predicate three
-    functions up, which does the isinstance check correctly -- returned True
-    for every one of them. Two predicates for one question, disagreeing.
+    this way. `_candidate_has_usable_projection` used to be a second,
+    isinstance-correct copy of this same question with zero callers anywhere
+    in the codebase -- removed as dead code during #100's consolidation pass
+    rather than left as a second implementation nothing used or kept in sync.
 
     Keeps rejecting None, "" and "-", so a genuinely absent field is still
     absent.
@@ -7252,7 +7238,11 @@ def score_candidate(
     has_edge = _numeric_hint(scored_candidate.get("edge")) is not None or _numeric_hint(scored_candidate.get("adjusted_edge")) is not None
     has_model_probability = _numeric_hint(scored_candidate.get("model_probability")) is not None
     has_implied_probability = _numeric_hint(scored_candidate.get("implied_probability")) is not None
-    has_odds = _safe_text(scored_candidate.get("odds"), "") not in {"", "-"}
+    # #100: was a bare truthiness check (_safe_text(...) not in {"", "-"}),
+    # the same bug class #68 fixed in _candidate_value_is_present -- a numeric
+    # odds value of exactly 0 would have read as absent here. Canonicalize on
+    # the shared predicate instead of a third disagreeing copy.
+    has_odds = _candidate_value_is_present(scored_candidate.get("odds"))
     if has_edge and has_model_probability and has_implied_probability:
         scored_candidate["scoring_mode"] = "full"
     elif has_edge and has_odds:

@@ -24,6 +24,8 @@ import json
 
 from flask import Blueprint, current_app, has_app_context, jsonify, render_template, request
 
+from syndicate.features.mlb.game_state import mlb_status_is_final as _mlb_status_is_final
+from syndicate.features.mlb.game_state import mlb_status_is_live as _mlb_status_is_live
 from syndicate.features.mlb.ladders_common import build_module_links as build_mlb_module_links
 from syndicate.features.mlb.sources import available_daily_summary_dates
 from syndicate.features.mlb.sources import daily_top_props_path
@@ -1483,7 +1485,18 @@ def _format_home_timestamp(epoch: float | None) -> str:
 
 
 def _first_present_text(*values: Any) -> str | None:
+    # #100: str(value or "") is truthiness-based, so a legitimate numeric 0
+    # (e.g. a projected total of 0, a model mean of 0.0) silently fell through
+    # to a later, lower-priority field instead of winning the scan -- the same
+    # bug class #68 fixed in _candidate_value_is_present. Every caller here
+    # scans either pure text (market/pick labels, which never carry 0) or
+    # numeric-capable fields (odds/projected/mean/model), so isinstance-first
+    # fixes the latter without changing behavior for the former.
     for value in values:
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, (int, float)):
+            return str(value)
         text = str(value or "").strip()
         if text:
             return text
@@ -2083,6 +2096,20 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
     player_name = None if is_game_level_market else _player_name_from_prop_pick_text(pick_text)
     edge_value = _pct_number(edge_text)
     confidence_value = _pct_number(confidence_text)
+    # #98/#100. MLB's game-market translation (_mlb_game_market_recommendation_rows)
+    # only ever carries a win probability under "confidence" -- it never sets
+    # projected/projection/model/mean -- so every MLB pregame moneyline/total
+    # candidate classified as missing_projection_or_odds even though real
+    # model data was present: normalize_candidate's projection scan checks
+    # model_probability (a raw 0-1 fraction), never confidence (percent-
+    # formatted display text). Stamping the raw fraction here, at the single
+    # choke point every sport's game-level candidate passes through, is the
+    # correct semantic slot for a model probability -- same reasoning as
+    # #92's hr_probability fix -- and only takes effect when nothing higher
+    # in the scan order (projected/edge/etc.) is already present.
+    model_probability = _numeric_value(confidence) if confidence is not None else None
+    if model_probability is not None and abs(model_probability) > 1.0:
+        model_probability = model_probability / 100.0
     updated_epoch = _game_row_updated_epoch(game, fallback_epoch)
     href = str(game.get("href") or sport.get("hub_href") or sport.get("primary_href") or "").strip() or None
     base_detail = _safe_text(detail or game.get("summary") or game.get("detail"), "No game-bet summary available.")
@@ -2111,6 +2138,7 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
             "odds": odds_text or "-",
             "edge": edge_text,
             "confidence": confidence_text,
+            "model_probability": model_probability,
             "projected": projected_text,
             "live_projection": live_projection_text,
             "updated_at": _format_home_timestamp(updated_epoch),
@@ -2747,11 +2775,17 @@ def _mlb_feed_live_state(selected_date: str, game_pk: int) -> dict[str, Any] | N
     half = str(linescore.get("inningHalf") or "").strip().lower()
     outs = linescore.get("outs")
     status_bits = [bit for bit in [detailed, f"{half.title()} {inning}".strip() if inning and half else None, f"{outs} out" if outs == 1 else f"{outs} outs" if outs not in {None, ''} else None] if bit]
+    # #98/#100: was abstract.lower() == "live"/"final" alone -- MLB StatsAPI
+    # reports abstractGameState "Live" during warmup, before the game has
+    # actually started, so this fed a false "live" board-wide for every
+    # warming-up game (confirmed real production data: BAL @ DET). Delegates
+    # to the shared canonical predicate (syndicate.features.mlb.game_state),
+    # which requires detailedState to agree.
     return {
         "away_pts": away_score,
         "home_pts": home_score,
-        "in_progress": abstract.lower() == "live",
-        "final": abstract.lower() == "final",
+        "in_progress": _mlb_status_is_live(abstract, detailed),
+        "final": _mlb_status_is_final(abstract, detailed),
         "status": " | ".join(status_bits) if status_bits else detailed or abstract or None,
     }
 
