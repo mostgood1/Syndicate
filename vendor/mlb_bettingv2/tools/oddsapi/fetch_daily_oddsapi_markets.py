@@ -495,14 +495,46 @@ def fetch_and_write_live_odds_for_date(
     existing_pitcher_props_doc = _read_json_if_exists(pitcher_props_path)
     existing_hitter_props_doc = _read_json_if_exists(hitter_props_path)
 
-    if (
-        _market_doc_entry_count(game_lines_doc, "game_lines") <= 0
-        and _market_doc_entry_count(existing_game_lines_doc, "game_lines") > 0
-    ):
-        game_lines_doc = existing_game_lines_doc or game_lines_doc
-        warnings.append(
-            f"preserved existing game lines for {date_str} because live refresh returned no matched events"
-        )
+    # #111: this call's own live-events fetch can legitimately return fewer
+    # events than the full slate has (a transient partial /events response,
+    # a rate-limited event, or any other reason _fetch_live_events_for_date
+    # comes back short) -- the old "preserve wholesale only if the new fetch
+    # is entirely empty" guard below missed a NEW FETCH RETURNING A PARTIAL
+    # SET, which silently overwrote every OTHER game's lines with nothing.
+    # Confirmed live 2026-07-28: a 16-game slate collapsed to 1 game with
+    # markets after a scoped daily-sim-job run, destroying refresh-worker's
+    # own moneyline/edge data for the other 15 (the sim/predictions side was
+    # unaffected -- it lives in separate per-game files, not this one).
+    # Merge per-event instead of replacing wholesale: any existing game
+    # absent from this fetch's result is carried forward untouched; any game
+    # present in this fetch overwrites its existing entry (this is still the
+    # freshest data for that game). A fetch that legitimately covers every
+    # game reduces to the old full-replace behavior, since every existing
+    # event_id is also in the new result and gets overwritten.
+    existing_games_by_id = {
+        str(row.get("event_id") or "").strip(): row
+        for row in ((existing_game_lines_doc or {}).get("games") or [])
+        if isinstance(row, dict) and str(row.get("event_id") or "").strip()
+    }
+    new_games_by_id = {
+        str(row.get("event_id") or "").strip(): row
+        for row in (game_lines_doc.get("games") or [])
+        if isinstance(row, dict) and str(row.get("event_id") or "").strip()
+    }
+    if existing_games_by_id:
+        merged_games_by_id = {**existing_games_by_id, **new_games_by_id}
+        if len(merged_games_by_id) > len(new_games_by_id):
+            carried_forward = len(merged_games_by_id) - len(new_games_by_id)
+            game_lines_doc = dict(game_lines_doc)
+            game_lines_doc["games"] = list(merged_games_by_id.values())
+            counts = dict(game_lines_doc.get("meta") or {})
+            counts["counts"] = dict(counts.get("counts") or {})
+            counts["counts"]["games"] = len(merged_games_by_id)
+            game_lines_doc["meta"] = counts
+            warnings.append(
+                f"carried forward {carried_forward} existing game(s) for {date_str} missing from this fetch's "
+                f"{len(new_games_by_id)}-event result instead of dropping their lines"
+            )
     if (
         _market_doc_entry_count(pitcher_props_doc, "pitcher_props") <= 0
         and _market_doc_entry_count(existing_pitcher_props_doc, "pitcher_props") > 0
