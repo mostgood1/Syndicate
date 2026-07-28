@@ -627,6 +627,26 @@
   // Market family and min-edge are refinements over an already-fetched
   // board response, so they filter in place rather than triggering a new
   // /api/intelligence/query round trip.
+  // #93 follow-up: date narrows the combined "All" fetch client-side, same
+  // as market/min-edge below. game_date/source_board_date are stamped
+  // server-side by read_combined_intelligence_response; an item with
+  // neither (e.g. a single-date fetch that predates this field) is never
+  // excluded by a date filter, since it has nothing to disagree with.
+  //
+  // Split out from matchesClientFilters (rather than inlined there) because
+  // #110's deriveGameCards/renderGameCards call deliberately bypasses the
+  // sport/edge/market narrowing (so the Games strip still shows a game even
+  // if a stricter min-edge filter hid all its opportunities -- see that
+  // function's own comment) but must NOT bypass date: unlike edge/market,
+  // which narrow opportunities *within* the same slate, date selects a
+  // genuinely different slate -- a "Tomorrow" games strip showing today's
+  // live games would be confusing, not helpful.
+  function matchesDateFilter(item) {
+    if (!state.date) return true;
+    const itemDate = String(item.game_date || item.source_board_date || "").slice(0, 10);
+    return !itemDate || itemDate === state.date;
+  }
+
   function matchesClientFilters(item) {
     if (state.minEdge > 0 && edgeValue(item) * 100 < state.minEdge) return false;
     if (state.marketFamily !== "all") {
@@ -635,15 +655,7 @@
       if (state.marketFamily === "prop" && !isProp) return false;
       if (state.marketFamily === "game" && isProp) return false;
     }
-    // #93 follow-up: date narrows the combined "All" fetch client-side, same
-    // as market/min-edge above. game_date/source_board_date are stamped
-    // server-side by read_combined_intelligence_response; an item with
-    // neither (e.g. a single-date fetch that predates this field) is never
-    // excluded by a date filter, since it has nothing to disagree with.
-    if (state.date) {
-      const itemDate = String(item.game_date || item.source_board_date || "").slice(0, 10);
-      if (itemDate && itemDate !== state.date) return false;
-    }
+    if (!matchesDateFilter(item)) return false;
     return true;
   }
 
@@ -1093,7 +1105,7 @@
 
   function renderBoardBody() {
     const clientFiltered = lastRenderItems.filter(matchesFilters).filter(matchesClientFilters);
-    renderGameCards(lastRenderItems);
+    renderGameCards(lastRenderItems.filter(matchesDateFilter));
     renderTopStrip(clientFiltered);
     if (state.view === "blotter") {
       renderBlotter(clientFiltered);
