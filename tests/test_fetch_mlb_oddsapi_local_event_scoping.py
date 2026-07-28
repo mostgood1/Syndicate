@@ -165,5 +165,129 @@ class EventScopingEnvTests(unittest.TestCase):
             self.assertEqual(_event_scoping_window_seconds(), 75 * 60)
 
 
+class CachedEventPayloadTests(unittest.TestCase):
+    """#16 props cadence. Cold games get a 15-minute props refresh interval
+    instead of every ~90s cycle -- a quiet mid-morning reading showed props
+    at 95.4% of ALL burn precisely because segment/alternate were already
+    scoped for cold games while props kept firing at full cadence.
+    """
+
+    NOW = datetime(2026, 7, 27, 18, 0, 0, tzinfo=timezone.utc)
+
+    def test_no_cache_entry_returns_none(self) -> None:
+        from scripts.fetch_mlb_oddsapi_local import _cached_event_payload
+
+        self.assertIsNone(_cached_event_payload(None, now=self.NOW, cold_interval_seconds=900))
+
+    def test_fresh_cache_entry_within_interval_is_reused(self) -> None:
+        from scripts.fetch_mlb_oddsapi_local import _cached_event_payload
+
+        entry = {"fetched_at": (self.NOW - timedelta(minutes=10)).isoformat(), "payload": {"bookmakers": []}}
+        self.assertEqual(_cached_event_payload(entry, now=self.NOW, cold_interval_seconds=900), {"bookmakers": []})
+
+    def test_stale_cache_entry_past_interval_returns_none(self) -> None:
+        from scripts.fetch_mlb_oddsapi_local import _cached_event_payload
+
+        entry = {"fetched_at": (self.NOW - timedelta(minutes=20)).isoformat(), "payload": {"bookmakers": []}}
+        self.assertIsNone(_cached_event_payload(entry, now=self.NOW, cold_interval_seconds=900))
+
+    def test_malformed_entry_fails_open_to_none(self) -> None:
+        from scripts.fetch_mlb_oddsapi_local import _cached_event_payload
+
+        self.assertIsNone(_cached_event_payload({"fetched_at": "not-a-date", "payload": {}}, now=self.NOW, cold_interval_seconds=900))
+        self.assertIsNone(_cached_event_payload("not-a-dict", now=self.NOW, cold_interval_seconds=900))
+
+
+class PropsCadenceIntegrationTests(unittest.TestCase):
+    """fetch_live_hitter_props_for_date end-to-end: a hot event always
+    fetches; a cold event within the cache window reuses the cached
+    payload (no HTTP call); a cold event past the window fetches again and
+    refreshes the cache.
+    """
+
+    NOW = datetime(2026, 7, 27, 18, 0, 0, tzinfo=timezone.utc)
+
+    def _event(self, event_id: str) -> dict:
+        return {"id": event_id, "away_team": "Seattle Mariners", "home_team": "Texas Rangers", "commence_time": None}
+
+    def _hitter_payload(self, price: str) -> dict:
+        return {
+            "bookmakers": [
+                {
+                    "markets": [
+                        {"key": "batter_hits", "outcomes": [{"description": "Julio Rodriguez", "name": "Over", "point": 1.5, "price": price}]},
+                    ]
+                }
+            ]
+        }
+
+    def test_cold_event_within_window_skips_the_http_call(self) -> None:
+        from scripts.fetch_mlb_oddsapi_local import fetch_live_hitter_props_for_date
+
+        status = {("seattle mariners", "texas rangers"): {"abstract": "Preview", "detailed": "Scheduled", "commence": (self.NOW + timedelta(hours=5)).isoformat()}}
+        with TemporaryDirectory() as tmp_dir, \
+             patch("scripts.fetch_mlb_oddsapi_local.default_mlb_source_root", return_value=Path(tmp_dir)), \
+             patch("scripts.fetch_mlb_oddsapi_local._load_mlb_status_by_matchup", return_value=status), \
+             patch("scripts.fetch_mlb_oddsapi_local.datetime") as mock_datetime, \
+             patch("scripts.fetch_mlb_oddsapi_local._fetch_live_event_odds") as mock_fetch:
+            mock_datetime.now.return_value = self.NOW
+            mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
+            mock_datetime.utcnow.return_value = self.NOW
+            mock_fetch.return_value = self._hitter_payload("-110")
+            fetch_live_hitter_props_for_date("key", "2026-07-27", events=[self._event("evt1")])
+            self.assertEqual(mock_fetch.call_count, 1)
+
+            # Second call, 5 minutes later (still inside the 15-min window):
+            # the cold event must reuse the cache, not call the API again.
+            mock_datetime.now.return_value = self.NOW + timedelta(minutes=5)
+            mock_fetch.reset_mock()
+            result = fetch_live_hitter_props_for_date("key", "2026-07-27", events=[self._event("evt1")])
+            mock_fetch.assert_not_called()
+            self.assertIn("julio rodriguez", result["hitter_props"])
+
+    def test_cold_event_past_window_refetches(self) -> None:
+        from scripts.fetch_mlb_oddsapi_local import fetch_live_hitter_props_for_date
+
+        status = {("seattle mariners", "texas rangers"): {"abstract": "Preview", "detailed": "Scheduled", "commence": (self.NOW + timedelta(hours=5)).isoformat()}}
+        with TemporaryDirectory() as tmp_dir, \
+             patch("scripts.fetch_mlb_oddsapi_local.default_mlb_source_root", return_value=Path(tmp_dir)), \
+             patch("scripts.fetch_mlb_oddsapi_local._load_mlb_status_by_matchup", return_value=status), \
+             patch("scripts.fetch_mlb_oddsapi_local.datetime") as mock_datetime, \
+             patch("scripts.fetch_mlb_oddsapi_local._fetch_live_event_odds") as mock_fetch:
+            mock_datetime.now.return_value = self.NOW
+            mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
+            mock_datetime.utcnow.return_value = self.NOW
+            mock_fetch.return_value = self._hitter_payload("-110")
+            fetch_live_hitter_props_for_date("key", "2026-07-27", events=[self._event("evt1")])
+
+            # 20 minutes later -- past the 15-minute cold interval, must
+            # fetch again.
+            mock_datetime.now.return_value = self.NOW + timedelta(minutes=20)
+            mock_fetch.reset_mock()
+            fetch_live_hitter_props_for_date("key", "2026-07-27", events=[self._event("evt1")])
+            self.assertEqual(mock_fetch.call_count, 1)
+
+    def test_hot_event_always_fetches_even_with_a_cache_entry(self) -> None:
+        from scripts.fetch_mlb_oddsapi_local import fetch_live_hitter_props_for_date
+
+        status = {("seattle mariners", "texas rangers"): {"abstract": "Live", "detailed": "In Progress", "commence": None}}
+        with TemporaryDirectory() as tmp_dir, \
+             patch("scripts.fetch_mlb_oddsapi_local.default_mlb_source_root", return_value=Path(tmp_dir)), \
+             patch("scripts.fetch_mlb_oddsapi_local._load_mlb_status_by_matchup", return_value=status), \
+             patch("scripts.fetch_mlb_oddsapi_local.datetime") as mock_datetime, \
+             patch("scripts.fetch_mlb_oddsapi_local._fetch_live_event_odds") as mock_fetch:
+            mock_datetime.now.return_value = self.NOW
+            mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
+            mock_datetime.utcnow.return_value = self.NOW
+            mock_fetch.return_value = self._hitter_payload("-110")
+            fetch_live_hitter_props_for_date("key", "2026-07-27", events=[self._event("evt1")])
+
+            # Immediately again (well within any cold interval) -- a LIVE
+            # event must still fetch fresh every time, never from cache.
+            mock_fetch.reset_mock()
+            fetch_live_hitter_props_for_date("key", "2026-07-27", events=[self._event("evt1")])
+            mock_fetch.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()

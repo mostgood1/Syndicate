@@ -859,6 +859,68 @@ def _event_wants_full_game_markets(
     return seconds_to_start <= window_seconds
 
 
+def _props_cold_interval_seconds() -> int:
+    # User direction 2026-07-28: cold (pregame-far, not live/T-window) games
+    # get a 15-minute props refresh interval instead of every ~90s cycle.
+    # Props were the one market family event scoping never touched -- a
+    # quiet mid-morning reading showed them at 95.4% of all burn precisely
+    # because segment/alternate were already being cut for the same cold
+    # games while props kept firing at full cadence regardless.
+    raw = str(os.environ.get("SYNDICATE_ODDS_PROPS_COLD_INTERVAL_SECONDS") or "").strip()
+    try:
+        return max(0, int(raw)) if raw else 15 * 60
+    except ValueError:
+        return 15 * 60
+
+
+def _props_event_cache_path(date_str: str, kind: str) -> Path:
+    # Raw per-event payload cache, one file per props kind per date --
+    # deliberately NOT under data/market/oddsapi/ (the public artifact
+    # directory other readers glob), so it can never be mistaken for a
+    # market snapshot.
+    token = str(date_str).replace("-", "_")
+    return default_mlb_source_root() / "source_artifacts" / "tracking" / f"props_event_cache_{kind}_{token}.json"
+
+
+def _load_props_event_cache(date_str: str, kind: str) -> dict[str, dict[str, Any]]:
+    path = _props_event_cache_path(date_str, kind)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _write_props_event_cache(date_str: str, kind: str, cache: dict[str, dict[str, Any]]) -> None:
+    # A cache write failure must never break the fetch it's optimizing --
+    # the cost saving is a bonus, correctness of the props themselves is not
+    # allowed to depend on it.
+    try:
+        path = _props_event_cache_path(date_str, kind)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _write_json(path, cache)
+    except Exception:
+        pass
+
+
+def _cached_event_payload(cache_entry: object, *, now: datetime, cold_interval_seconds: int) -> dict[str, Any] | None:
+    if not isinstance(cache_entry, dict):
+        return None
+    fetched_at_text = str(cache_entry.get("fetched_at") or "").strip()
+    if not fetched_at_text:
+        return None
+    try:
+        fetched_at = datetime.fromisoformat(fetched_at_text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if fetched_at.tzinfo is None:
+        fetched_at = fetched_at.replace(tzinfo=timezone.utc)
+    if (now - fetched_at).total_seconds() >= cold_interval_seconds:
+        return None
+    payload = cache_entry.get("payload")
+    return payload if isinstance(payload, dict) else None
+
+
 def fetch_live_game_lines_for_date(api_key: str, date_str: str, *, regions: str = "us", bookmakers: str | None = None, events: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     live_events = list(events or _fetch_live_events_for_date(api_key, date_str))
     game_market_keys = _CORE_GAME_MARKET_KEYS + _SEGMENT_GAME_MARKET_KEYS
@@ -975,21 +1037,68 @@ def fetch_live_pitcher_props_for_date(api_key: str, date_str: str, *, regions: s
     desired_markets = list(PITCHER_MARKET_KEY_MAP.keys())
     pitcher_props: dict[str, dict[str, dict[str, Any]]] = {}
     market_warnings: list[str] = []
+
+    # Props cadence (#16 budget lever, cold games only). Props were never
+    # touched by event scoping (#82/#106) -- they fired every ~90s cycle for
+    # every event regardless of that event's own state, which is why a quiet
+    # mid-morning reading showed props at 95.4% of ALL burn: segment/
+    # alternate were already being cut for cold games, props weren't.
+    # Reuses the exact same hot/cold decision event scoping already makes
+    # for game markets (_event_wants_full_game_markets) rather than a
+    # second classification. Props have no per-event key once extracted
+    # (_extract_player_props flattens straight to player name), so a cold
+    # event's fetch can't be skipped and merged after the fact the way
+    # segment carry-forward works -- instead the raw per-event payload
+    # itself is cached and re-extracted through the identical code path
+    # below, so the output is indistinguishable from a fresh fetch until
+    # the cache goes stale.
+    event_scoping_enabled = _event_scoping_enabled()
+    status_by_matchup: dict[tuple[str, str], dict[str, object]] = {}
+    if event_scoping_enabled:
+        status_by_matchup = _load_mlb_status_by_matchup(date_str)
+        if not status_by_matchup:
+            event_scoping_enabled = False
+    event_scoping_window_seconds = _event_scoping_window_seconds()
+    cold_interval_seconds = _props_cold_interval_seconds()
+    scoping_now = datetime.now(timezone.utc)
+    cache = _load_props_event_cache(date_str, "pitcher")
+    events_fetched_fresh = 0
+    events_reused_cache = 0
+
     for event in live_events:
         event_id = str(event.get("id") or "").strip()
         if not event_id:
             continue
-        try:
-            payload = _fetch_live_event_odds(api_key, event_id, markets_csv=",".join(desired_markets), regions=regions, bookmakers=bookmakers)
-        except requests.HTTPError:
-            fallback_markets = [market for market in desired_markets if market != "pitcher_earned_runs"]
-            if not fallback_markets:
-                continue
-            market_warnings.append(f"pitcher_earned_runs unavailable for event {event_id}; fetched legacy pitcher markets only")
+        wants_full = True
+        if event_scoping_enabled:
+            wants_full = _event_wants_full_game_markets(
+                away_team=event.get("away_team"),
+                home_team=event.get("home_team"),
+                commence_time=event.get("commence_time"),
+                status_by_matchup=status_by_matchup,
+                now=scoping_now,
+                window_seconds=event_scoping_window_seconds,
+            )
+        payload = None
+        if not wants_full:
+            payload = _cached_event_payload(cache.get(event_id), now=scoping_now, cold_interval_seconds=cold_interval_seconds)
+        if payload is not None:
+            events_reused_cache += 1
+        else:
             try:
-                payload = _fetch_live_event_odds(api_key, event_id, markets_csv=",".join(fallback_markets), regions=regions, bookmakers=bookmakers)
+                payload = _fetch_live_event_odds(api_key, event_id, markets_csv=",".join(desired_markets), regions=regions, bookmakers=bookmakers)
             except requests.HTTPError:
-                continue
+                fallback_markets = [market for market in desired_markets if market != "pitcher_earned_runs"]
+                if not fallback_markets:
+                    continue
+                market_warnings.append(f"pitcher_earned_runs unavailable for event {event_id}; fetched legacy pitcher markets only")
+                try:
+                    payload = _fetch_live_event_odds(api_key, event_id, markets_csv=",".join(fallback_markets), regions=regions, bookmakers=bookmakers)
+                except requests.HTTPError:
+                    continue
+            if isinstance(payload, dict):
+                events_fetched_fresh += 1
+                cache[event_id] = {"fetched_at": scoping_now.isoformat(), "payload": payload}
         if not isinstance(payload, dict):
             continue
         for bookmaker in (payload.get("bookmakers") or []):
@@ -1000,10 +1109,28 @@ def fetch_live_pitcher_props_for_date(api_key: str, date_str: str, *, regions: s
                 dst = pitcher_props.setdefault(name, {})
                 for market_name, row in market_rows.items():
                     dst[market_name] = _merge_prop_market_rows(dst.get(market_name, {}), row)
+    _write_props_event_cache(date_str, "pitcher", cache)
     finalized = _finalize_prop_market_map(pitcher_props)
     counts = _prop_market_counts(finalized)
     counts["events_matched"] = int(len(live_events))
-    return {"date": str(date_str), "mode": "live", "retrieved_at": datetime.utcnow().isoformat(), "pitcher_props": finalized, "meta": {"markets": desired_markets, "regions": str(regions or "us"), "bookmakers": (str(bookmakers).split(",") if bookmakers else None), "counts": counts, "warnings": market_warnings}}
+    print(
+        f"[mlb_fetch_props_cadence] kind=pitcher enabled={event_scoping_enabled} fresh={events_fetched_fresh} cached={events_reused_cache} events_matched={len(live_events)}",
+        flush=True,
+    )
+    return {
+        "date": str(date_str),
+        "mode": "live",
+        "retrieved_at": datetime.utcnow().isoformat(),
+        "pitcher_props": finalized,
+        "meta": {
+            "markets": desired_markets,
+            "regions": str(regions or "us"),
+            "bookmakers": (str(bookmakers).split(",") if bookmakers else None),
+            "counts": counts,
+            "warnings": market_warnings,
+            "props_cadence": {"enabled": bool(event_scoping_enabled), "fresh_events": int(events_fetched_fresh), "cached_events": int(events_reused_cache)},
+        },
+    }
 
 
 def fetch_live_hitter_props_for_date(api_key: str, date_str: str, *, regions: str = "us", bookmakers: str | None = None, markets: list[str] | None = None, events: list[dict[str, Any]] | None = None) -> dict[str, Any]:
@@ -1012,14 +1139,49 @@ def fetch_live_hitter_props_for_date(api_key: str, date_str: str, *, regions: st
     if not desired_markets:
         desired_markets = [str(market).strip().lower() for market in DEFAULT_HITTER_MARKETS]
     hitter_props: dict[str, dict[str, dict[str, Any]]] = {}
+
+    # Props cadence -- see fetch_live_pitcher_props_for_date's comment for
+    # the full rationale; identical mechanism, hitter side.
+    event_scoping_enabled = _event_scoping_enabled()
+    status_by_matchup: dict[tuple[str, str], dict[str, object]] = {}
+    if event_scoping_enabled:
+        status_by_matchup = _load_mlb_status_by_matchup(date_str)
+        if not status_by_matchup:
+            event_scoping_enabled = False
+    event_scoping_window_seconds = _event_scoping_window_seconds()
+    cold_interval_seconds = _props_cold_interval_seconds()
+    scoping_now = datetime.now(timezone.utc)
+    cache = _load_props_event_cache(date_str, "hitter")
+    events_fetched_fresh = 0
+    events_reused_cache = 0
+
     for event in live_events:
         event_id = str(event.get("id") or "").strip()
         if not event_id:
             continue
-        try:
-            payload = _fetch_live_event_odds(api_key, event_id, markets_csv=",".join(desired_markets), regions=regions, bookmakers=bookmakers)
-        except requests.HTTPError:
-            continue
+        wants_full = True
+        if event_scoping_enabled:
+            wants_full = _event_wants_full_game_markets(
+                away_team=event.get("away_team"),
+                home_team=event.get("home_team"),
+                commence_time=event.get("commence_time"),
+                status_by_matchup=status_by_matchup,
+                now=scoping_now,
+                window_seconds=event_scoping_window_seconds,
+            )
+        payload = None
+        if not wants_full:
+            payload = _cached_event_payload(cache.get(event_id), now=scoping_now, cold_interval_seconds=cold_interval_seconds)
+        if payload is not None:
+            events_reused_cache += 1
+        else:
+            try:
+                payload = _fetch_live_event_odds(api_key, event_id, markets_csv=",".join(desired_markets), regions=regions, bookmakers=bookmakers)
+            except requests.HTTPError:
+                continue
+            if isinstance(payload, dict):
+                events_fetched_fresh += 1
+                cache[event_id] = {"fetched_at": scoping_now.isoformat(), "payload": payload}
         if not isinstance(payload, dict):
             continue
         for bookmaker in (payload.get("bookmakers") or []):
@@ -1030,10 +1192,27 @@ def fetch_live_hitter_props_for_date(api_key: str, date_str: str, *, regions: st
                 dst = hitter_props.setdefault(name, {})
                 for market_name, row in market_rows.items():
                     dst[market_name] = _merge_prop_market_rows(dst.get(market_name, {}), row)
+    _write_props_event_cache(date_str, "hitter", cache)
     finalized = _finalize_prop_market_map(hitter_props)
     counts = _prop_market_counts(finalized)
     counts["events_matched"] = int(len(live_events))
-    return {"date": str(date_str), "mode": "live", "retrieved_at": datetime.utcnow().isoformat(), "hitter_props": finalized, "meta": {"markets": desired_markets, "regions": str(regions or "us"), "bookmakers": (str(bookmakers).split(",") if bookmakers else None), "counts": counts}}
+    print(
+        f"[mlb_fetch_props_cadence] kind=hitter enabled={event_scoping_enabled} fresh={events_fetched_fresh} cached={events_reused_cache} events_matched={len(live_events)}",
+        flush=True,
+    )
+    return {
+        "date": str(date_str),
+        "mode": "live",
+        "retrieved_at": datetime.utcnow().isoformat(),
+        "hitter_props": finalized,
+        "meta": {
+            "markets": desired_markets,
+            "regions": str(regions or "us"),
+            "bookmakers": (str(bookmakers).split(",") if bookmakers else None),
+            "counts": counts,
+            "props_cadence": {"enabled": bool(event_scoping_enabled), "fresh_events": int(events_fetched_fresh), "cached_events": int(events_reused_cache)},
+        },
+    }
 
 
 def fetch_and_write_live_odds_for_date(date_str: str, *, out_dir: Path | None = None, overwrite: bool = True, regions: str = "us", bookmakers: str | None = None, hitter_markets: list[str] | None = None) -> dict[str, Any]:
