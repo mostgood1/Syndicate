@@ -1188,6 +1188,31 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             )
             if len(history) > _ODDS_HISTORY_LIMIT:
                 history = history[-_ODDS_HISTORY_LIMIT:]
+            # #112. row/normalized are the two heaviest fields on a history
+            # entry (the full JSON-safe raw API row + normalized entry), and
+            # the only reader of either (the missing-market "close" event
+            # synthesis below, latest.get("row")/latest.get("normalized"))
+            # only ever looks at the newest entry. Stripping them from every
+            # OLDER entry is what actually bounds shard size -- confirmed
+            # live 2026-07-28: MLB's odds-history shard grew to 18.9MB
+            # against the #60 8MB ceiling mid-afternoon on a normal slate,
+            # silently failing that cycle's sync and suppressing the
+            # intelligence publish path for it (props flapped 0/222 cycle
+            # to cycle depending on which side of the ceiling the payload
+            # landed on). Trimming entry COUNT alone can't fix this: the
+            # steam detector's 45-min window needs ~30 entries at live
+            # cadence, but the real growth driver here is breadth --
+            # thousands of distinct prop markets on a full slate -- not
+            # per-market depth, so even a count cut small enough to fit
+            # the ceiling would still have been too shallow for steam
+            # detection on the entries it kept. This self-heals the
+            # existing oversized shard over the next few cycles as each
+            # previously-latest entry ages out, without needing a one-time
+            # migration.
+            for old_entry in history[:-1]:
+                if isinstance(old_entry, dict):
+                    old_entry.pop("row", None)
+                    old_entry.pop("normalized", None)
             market_state["history"] = history
             market_state["last_line"] = current_line
             market_state["previous_line"] = previous_line

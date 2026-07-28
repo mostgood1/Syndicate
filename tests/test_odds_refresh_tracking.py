@@ -113,6 +113,47 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertNotEqual(market_state["history"][0]["current_line"], market_state["history"][1]["current_line"])
             self.assertEqual(market_state["history"][1]["movement"], "up")
 
+    def test_history_strips_row_and_normalized_from_all_but_the_latest_entry(self) -> None:
+        # #112. row/normalized (the full JSON-safe raw API row + normalized
+        # entry) are the two heaviest fields on a history entry, and the
+        # only reader of either (the missing-market "close" event synthesis)
+        # only ever looks at the newest one. MLB's odds-history shard grew
+        # to 18.9MB against the #60 8MB keyvalue ceiling on a normal slate
+        # (confirmed live 2026-07-28) because every one of up to 50 entries
+        # per market carried both fields in full. Stripping them from every
+        # entry except the current last is what actually bounds shard size.
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports"), "SYNDICATE_ODDS_EVENTS_ROOT": str(Path(tmpdir) / "odds_events")}, clear=False):
+            root = Path(tmpdir)
+            team_root = root / "data" / "odds" / "team" / "date=2026-06-07"
+            team_root.mkdir(parents=True)
+
+            for line in ("6.5", "7.0", "7.5"):
+                (team_root / "oddsapi.csv").write_text(
+                    f"home_team,away_team,bookmaker,market,selection,line,price\nHome,Away,draftkings,total,over,{line},-110\n",
+                    encoding="utf-8",
+                )
+                result = sync_post_refresh_tracking_for_source_root(sport="nhl", source_root=root, date_str="2026-06-07")
+                self.assertTrue(result["ok"])
+
+            history_path = root / "tracking" / "odds_history" / "2026-06-07.json"
+            history_payload = json.loads(history_path.read_text(encoding="utf-8"))
+            market_key = next(key for key in history_payload["markets"] if "selection=over" in key)
+            history = history_payload["markets"][market_key]["history"]
+            self.assertEqual(len(history), 3)
+            for older_entry in history[:-1]:
+                self.assertNotIn("row", older_entry)
+                self.assertNotIn("normalized", older_entry)
+            latest_entry = history[-1]
+            self.assertIn("row", latest_entry)
+            self.assertIn("normalized", latest_entry)
+            # Stripping row/normalized must not touch the compact fields
+            # every reader actually uses (movement tracking, the board's
+            # "Move" column, steam detection's previous_line/previous_odds).
+            for entry in history:
+                self.assertIn("current_line", entry)
+                self.assertIn("market_id", entry)
+                self.assertIn("timestamp", entry)
+
     def test_sync_nhl_tracking_appends_when_odds_change_without_line_change(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports"), "SYNDICATE_ODDS_EVENTS_ROOT": str(Path(tmpdir) / "odds_events")}, clear=False):
             root = Path(tmpdir)
