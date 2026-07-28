@@ -353,6 +353,14 @@ def _board_build_deferral_reason(*, consecutive_odds_defers: int, consecutive_si
     rather than hiding behind an unbounded wait.
     """
     if _mlb_sim_subprocess_running():
+        if _env_bool("SYNDICATE_BOARD_BUILD_FORCE_DESPITE_SIM"):
+            # Explicit force lever, off by default. Added 2026-07-27 to test
+            # #108's fallback live: the bounded wait below is correct for
+            # normal operation, but a same-session test needs a build to run
+            # NOW, on refresh-worker's own healthy 4GB (not the memory-tight
+            # web service), rather than waiting out up to 5 defer cycles.
+            print("[intelligence_state] BOARD_BUILD_FORCED_DESPITE_SIM env_override=SYNDICATE_BOARD_BUILD_FORCE_DESPITE_SIM", flush=True)
+            return None
         # BOUNDED, after getting this wrong three times. The original comment
         # here claimed a sim is "finite (~15 min) and occasional, so waiting
         # for one always terminates". The first half is true and the second is

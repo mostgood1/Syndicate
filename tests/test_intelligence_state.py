@@ -4335,6 +4335,24 @@ class NoDeferralCanStarveTests(unittest.TestCase):
             )
         self.assertIn("no_headroom", reason)
 
+    def test_force_despite_sim_env_override_skips_the_wait_entirely(self) -> None:
+        # Explicit force lever added 2026-07-27, off by default: same-session
+        # testing of #108's keyvalue-too-large fallback needed a board build
+        # to run NOW on refresh-worker's own healthy 4GB, not after waiting
+        # out up to 5 defer cycles -- confirmed memory headroom was fine
+        # (3.19GB free) so the wait itself was the only thing in the way.
+        with patch.object(intelligence_state_module, "_mlb_sim_subprocess_running", return_value=True):
+            with patch.dict(os.environ, {"SYNDICATE_BOARD_BUILD_FORCE_DESPITE_SIM": "true"}):
+                reason = intelligence_state_module._board_build_deferral_reason(consecutive_odds_defers=0, consecutive_sim_defers=0)
+        self.assertIsNone(reason)
+
+    def test_force_despite_sim_env_override_is_off_by_default(self) -> None:
+        with patch.object(intelligence_state_module, "_mlb_sim_subprocess_running", return_value=True):
+            with patch.dict(os.environ, {}, clear=False):
+                os.environ.pop("SYNDICATE_BOARD_BUILD_FORCE_DESPITE_SIM", None)
+                reason = intelligence_state_module._board_build_deferral_reason(consecutive_odds_defers=0, consecutive_sim_defers=0)
+        self.assertEqual(reason, "sim_subprocess_resident")
+
 
 class DefaultBoardWindowDatesTests(unittest.TestCase):
     """#93 follow-up. The single-date "latest slot" model is what let a
