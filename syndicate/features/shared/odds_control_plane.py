@@ -84,33 +84,27 @@ def odds_history_paths_for_sport(sport_slug: str, shard_key: str) -> list[Path]:
 
 
 def _read_odds_history_candidate(path: Path) -> dict[str, Any] | None:
-    """Read one odds_history path, preferring the fresher of the keyvalue
-    copy and a directly-published artifact (#112). On the keyvalue backend,
-    read_json_file consults Redis ONLY -- it never falls back to local disk.
-    The write side (odds_refresh_tracking._sync_odds_history_for_refresh)
-    diverts oversized payloads to a local-disk write + publish_hot_artifact
-    via _write_state_payload (the #43/#108 fallback) when the keyvalue store
-    rejects them for size; without this matching read, the board would keep
-    serving whatever the last successful (small, stale) keyvalue write was
-    and never see the artifact the worker actually published. Mirrors
-    pipeline/intelligence_state.py's _read_state_payload freshness check via
-    the payload's own "updated_at" field.
+    """Pure local-disk read, no keyvalue involved. odds_history shards are
+    routinely tens of MB on a real slate (measured live 2026-07-28: 51.1MB
+    for one MLB day) -- not an occasional overflow of the keyvalue store's
+    8MB ceiling, the ordinary case always exceeding it. Per explicit user
+    direction the same day ("the file size limit is frankly unrealistic
+    from keyvalue - we need this to be artifact written/artifact read
+    based"), the write side
+    (odds_refresh_tracking._sync_odds_history_for_refresh /
+    _write_odds_history_artifact) never attempts a keyvalue write for this
+    data at all -- it writes straight to local disk and publishes for
+    cross-service reach. This read matches: publish_hot_artifact is what
+    gets a worker's write onto web's own local disk for this function to
+    then pick up, not a keyvalue round-trip.
     """
-    keyvalue_payload = read_json_file(path)
-    disk_payload: dict[str, Any] | None = None
     try:
-        if path.is_file():
-            candidate = json.loads(path.read_text(encoding="utf-8-sig"))
-            disk_payload = candidate if isinstance(candidate, dict) else None
+        if not path.is_file():
+            return None
+        candidate = json.loads(path.read_text(encoding="utf-8-sig"))
+        return candidate if isinstance(candidate, dict) else None
     except Exception:
-        disk_payload = None
-    if disk_payload is None:
-        return keyvalue_payload
-    if keyvalue_payload is None:
-        return disk_payload
-    keyvalue_at = str(keyvalue_payload.get("updated_at") or "")
-    disk_at = str(disk_payload.get("updated_at") or "")
-    return disk_payload if disk_at > keyvalue_at else keyvalue_payload
+        return None
 
 
 def load_odds_history_payload_for_sport(sport_slug: str, shard_key: str, *, cache: dict[tuple[str, str], dict[str, Any] | None] | None = None) -> dict[str, Any] | None:

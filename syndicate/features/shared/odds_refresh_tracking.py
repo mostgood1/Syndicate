@@ -16,8 +16,6 @@ from syndicate.features.shared.odds_framework import normalize_odds_entry
 from syndicate.features.shared.odds_lifecycle import append_odds_lifecycle_events
 from syndicate.features.shared.odds_lifecycle import odds_lifecycle_path
 from syndicate.features.shared.refresh_state_store import _atomic_write_text
-from syndicate.features.shared.refresh_state_store import read_json_file as _keyvalue_read_json_file
-from syndicate.features.shared.refresh_state_store import write_json_file as _keyvalue_write_json_file
 from syndicate.features.shared.recommendation_engine import build_recommendation_output
 from syndicate.features.shared.week_calendar import shard_key_for_week
 from syndicate.features.shared.week_calendar import week_for_date
@@ -985,36 +983,46 @@ def _shard_key_for_row(row: Mapping[str, Any], *, sport: str, date_str: str, sou
     return date_str
 
 
-def _read_odds_history_candidate(path: Path) -> dict[str, Any] | None:
-    """Read one odds_history path, preferring the fresher of the keyvalue
-    copy and a directly-published artifact -- the read-side match to
-    _write_state_payload's write-side fallback (#112). On the keyvalue
-    backend, read_json_file consults Redis ONLY; it never falls back to
-    local disk. So when a write is too large for the keyvalue store and
-    _write_state_payload diverts it to a local-disk write + publish_hot_artifact
-    instead, a plain _keyvalue_read_json_file call here would never see that
-    artifact, and every subsequent cycle would keep re-reading the same
-    stale, still-oversized Redis copy forever -- the exact non-convergence
-    #112 was chasing. Mirrors pipeline/intelligence_state.py's
-    _read_state_payload (#43/#108), including its freshness comparison via
-    "updated_at" (this payload's equivalent of that function's
-    state_last_updated/last_updated/snapshot_generated_at keys).
+def _write_odds_history_artifact(path: Path, payload: dict[str, Any]) -> None:
+    """odds_history shards are routinely tens of MB on a real slate
+    (measured live 2026-07-28: 51.1MB / 3,713 markets for one MLB day) --
+    not an occasional edge case exceeding the keyvalue store's 8MB
+    ceiling, the ordinary case always exceeding it. Per explicit user
+    direction the same day ("the file size limit is frankly unrealistic
+    from keyvalue - we need this to be artifact written/artifact read
+    based"): this writes straight to local disk and publishes for
+    cross-service reach, with no keyvalue attempt at all -- unlike
+    pipeline/intelligence_state.py's _write_state_payload (#43/#108),
+    which tries keyvalue first because ITS payloads (board_snapshot/
+    intelligence_state) are usually small enough to fit and only
+    occasionally overflow. odds_history never fits, so trying first is
+    pure overhead with no chance of succeeding.
     """
-    keyvalue_payload = _keyvalue_read_json_file(path)
-    disk_payload: dict[str, Any] | None = None
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _atomic_write_text(path, json.dumps(payload, separators=(",", ":")))
     try:
-        if path.is_file():
-            candidate = json.loads(path.read_text(encoding="utf-8-sig"))
-            disk_payload = candidate if isinstance(candidate, dict) else None
+        from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+
+        published = publish_hot_artifact(path)
+        _trace_log("odds_history_artifact_published", path=str(path), published=published)
+    except Exception as exc:
+        _trace_log("odds_history_artifact_publish_failed", path=str(path), error=f"{type(exc).__name__}: {exc}")
+
+
+def _read_odds_history_candidate(path: Path) -> dict[str, Any] | None:
+    """Pure local-disk read, no keyvalue involved -- the read-side match
+    to _write_odds_history_artifact's artifact-only write. Whichever
+    service ran the sync loop writes here directly; publish_hot_artifact
+    is what gets a worker's write onto web's own local disk for THIS read
+    to then pick up, not a keyvalue round-trip.
+    """
+    try:
+        if not path.is_file():
+            return None
+        candidate = json.loads(path.read_text(encoding="utf-8-sig"))
+        return candidate if isinstance(candidate, dict) else None
     except Exception:
-        disk_payload = None
-    if disk_payload is None:
-        return keyvalue_payload
-    if keyvalue_payload is None:
-        return disk_payload
-    keyvalue_at = str(keyvalue_payload.get("updated_at") or "")
-    disk_at = str(disk_payload.get("updated_at") or "")
-    return disk_payload if disk_at > keyvalue_at else keyvalue_payload
+        return None
 
 
 def _load_shard_existing_markets(*, source_root: Path, tracking_root: Path, slug: str, shard_key: str) -> dict[str, dict[str, Any]]:
@@ -1435,34 +1443,25 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
         # "markets" key existing, which this writer hasn't produced in a
         # long time.
         _trace_log("before_write_odds_history_json", sport=slug, shard_key=shard_key, history_path=str(history_path), shared_history_path=str(shared_history_path), artifact_history_path=str(artifact_history_path), markets=len(shard_markets), entries_appended=shard_entries_appended[shard_key])
-        # Keyvalue-aware write (not _write_json's plain local-disk
-        # _atomic_write_text) -- see the comment in
-        # _load_shard_existing_markets above for why: the board reads these
-        # exact paths through Redis in production, so a local-only write
-        # here was invisible to it no matter how many refresh runs completed.
-        #
-        # #112 defense-in-depth (per user direction, alongside the shard-
-        # size bounding above): a bare _keyvalue_write_json_file call
-        # raises KeyValuePayloadTooLarge on an oversized payload, which
-        # aborted this whole per-shard block -- meaning NONE of the three
-        # paths got the freshly-bounded payload, so the sweep's own
-        # reduction (confirmed live 2026-07-28: 18.9MB -> 11.3MB) could
-        # never actually land on disk. Every cycle re-read the SAME
-        # stale, still-oversized base and recomputed a smaller-but-still-
-        # too-big result from it, over and over, never converging.
-        # _write_state_payload (pipeline/intelligence_state.py, #43/#108's
-        # proven pattern) tries the keyvalue write first -- unchanged path
-        # for every payload small enough -- and only on
-        # KeyValuePayloadTooLarge falls back to a compact local-disk write
-        # + publish_hot_artifact, which has no 8MB ceiling. That's what
-        # actually lets a successful write happen at all while the
-        # bounding logic above catches the shard up over the next few
-        # cycles, instead of failing this cycle outright every time.
-        from pipeline.intelligence_state import _write_state_payload
-
-        _write_state_payload(history_path, payload)
-        _write_state_payload(shared_history_path, payload)
-        _write_state_payload(artifact_history_path, payload)
+        # #112/#120, per explicit user direction 2026-07-28 ("the file size
+        # limit is frankly unrealistic from keyvalue - we need this to be
+        # artifact written/artifact read based"): odds_history shards are
+        # routinely tens of MB on a real slate (measured live: 51.1MB,
+        # 3,713 markets, for a single MLB day) -- not an edge case
+        # occasionally exceeding the keyvalue store's 8MB ceiling, but the
+        # ordinary case always exceeding it. Treating keyvalue as the
+        # primary transport and the artifact-publish fallback
+        # (_write_state_payload, #43/#108's pattern) as an occasional
+        # backstop was backwards for a payload shape that's essentially
+        # guaranteed to need the fallback every single cycle -- go straight
+        # to the artifact transport (local-disk write + cross-service
+        # publish) unconditionally, never attempt the keyvalue write at
+        # all. The board reads these exact paths (odds_control_plane.py's
+        # load_odds_history_payload_for_sport) directly off local disk to
+        # match -- no keyvalue read on that side either.
+        _write_odds_history_artifact(history_path, payload)
+        _write_odds_history_artifact(shared_history_path, payload)
+        _write_odds_history_artifact(artifact_history_path, payload)
         _trace_log("after_write_odds_history_json", sport=slug, shard_key=shard_key, history_path=str(history_path), shared_history_path=str(shared_history_path), artifact_history_path=str(artifact_history_path), markets=len(shard_markets), entries_appended=shard_entries_appended[shard_key])
         shard_results[shard_key] = {
             "history_path": str(history_path),

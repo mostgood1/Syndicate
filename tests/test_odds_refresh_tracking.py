@@ -742,20 +742,21 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertEqual(events[-1]["line"], 7.0)
             self.assertEqual(events[-1]["sport"], "nhl")
 
-    def test_odds_history_sync_is_readable_cross_service_via_keyvalue_backend(self) -> None:
-        # Real bug found in production: the odds-history shard write here
-        # used _write_json (plain local-disk _atomic_write_text), but the
-        # board reads these same paths through
-        # odds_control_plane.load_odds_history_payload_for_sport, which
-        # calls refresh_state_store.read_json_file -- keyvalue-store-only
-        # when SYNDICATE_REFRESH_STATE_BACKEND=keyvalue (the production
-        # config on both `syndicate` and `refresh-worker`). A write that
-        # only ever touched local disk was invisible to that read no
-        # matter how many refresh runs completed -- the actual root cause
-        # of the Betting Board's "Move" column staying blank board-wide.
-        # This confirms the write now goes through the same keyvalue-aware
-        # path the board's own reader uses, so a fake keyvalue client
-        # actually receives the write.
+    def test_odds_history_sync_never_touches_keyvalue_and_reaches_disk_directly(self) -> None:
+        # Superseded architecture, per explicit user direction 2026-07-28
+        # ("the file size limit is frankly unrealistic from keyvalue - we
+        # need this to be artifact written/artifact read based"):
+        # odds_history writes used to go through the keyvalue store (with a
+        # #43/#108-style fallback to a published artifact only when
+        # oversized) -- this test used to prove a fake keyvalue client
+        # actually received the write. Now odds_history skips keyvalue
+        # entirely, always: the shard is routinely tens of MB on a real
+        # slate (measured live: 51.1MB for one MLB day), so keyvalue's 8MB
+        # ceiling was never a fit for this data type at all. This confirms
+        # the new contract: even with a keyvalue backend configured and
+        # reachable, odds_history writes go straight to local disk (and
+        # attempt publish_hot_artifact for cross-service reach) without
+        # ever calling into the keyvalue client.
         fake_client = _FakeKeyValueClient()
         with tempfile.TemporaryDirectory() as tmpdir, patch.dict(
             "os.environ",
@@ -780,41 +781,30 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertTrue(result["ok"])
             shared_history_path = Path(result["artifacts"]["odds_history"]["shared_history_path"])
 
-            # The write must have actually gone into the fake keyvalue
-            # store, not just local disk -- proving cross-service reads
-            # (via refresh_state_store.read_json_file) will see it.
-            self.assertTrue(fake_client.store, "expected the odds-history write to reach the keyvalue store")
-            from syndicate.features.shared.refresh_state_store import read_json_file
-
-            payload = read_json_file(shared_history_path)
-            self.assertIsInstance(payload, dict)
+            # No keyvalue call at all -- not even attempted, let alone
+            # falling back from a rejection.
+            self.assertEqual(fake_client.store, {}, "odds_history must never write through the keyvalue client")
+            self.assertTrue(shared_history_path.is_file(), "expected a direct local-disk write regardless of the keyvalue backend being configured")
+            payload = json.loads(shared_history_path.read_text(encoding="utf-8"))
             self.assertEqual(payload.get("sport"), "nhl")
             self.assertIn("markets", payload)
 
-    def test_history_sync_falls_back_to_artifact_when_too_large_for_keyvalue(self) -> None:
-        # #112. A bare _keyvalue_write_json_file call raises
-        # KeyValuePayloadTooLarge on an oversized payload, which used to
-        # abort this whole per-shard block before any of the three history
-        # paths were updated -- so the shard-size-bounding logic above could
-        # never actually land on disk, and every cycle re-read the same
-        # stale, still-oversized base forever. Confirms the write now
-        # degrades to a local-disk write instead of raising, AND that the
-        # board-facing readers (both _load_shard_existing_markets here and
-        # odds_control_plane.load_odds_history_payload_for_sport, the one
-        # the live board actually calls) see that fallback write on their
-        # very next read -- not just that the write survives.
-        fake_client = _FakeKeyValueClient()
+    def test_history_sync_writes_the_artifact_and_the_board_reads_it_back(self) -> None:
+        # #112, superseded shape: this test used to force a 1-byte keyvalue
+        # ceiling to PROVE the artifact-publish fallback (not the primary
+        # keyvalue path) was what got exercised. Now that odds_history
+        # never attempts keyvalue at all (see
+        # test_odds_history_sync_never_touches_keyvalue_and_reaches_disk_directly),
+        # there is no "fallback" left to force -- this keeps only what's
+        # still meaningful: the write lands on local disk, AND the
+        # board-facing reader (odds_control_plane.load_odds_history_payload_for_sport,
+        # the one the live board actually calls) sees it on the very next
+        # read, not just that the write survives.
         with tempfile.TemporaryDirectory() as tmpdir, patch.dict(
             "os.environ",
-            {
-                "SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports"),
-                "SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue",
-                "SYNDICATE_REFRESH_STATE_URL": "redis://example",
-                "SYNDICATE_KEYVALUE_WARN_BYTES": "1",
-                "SYNDICATE_KEYVALUE_MAX_BYTES": "1",
-            },
+            {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")},
             clear=False,
-        ), patch("syndicate.features.shared.refresh_state_store._get_keyvalue_client", return_value=fake_client):
+        ):
             root = Path(tmpdir)
             team_root = root / "data" / "odds" / "team" / "date=2026-06-07"
             team_root.mkdir(parents=True)
@@ -827,13 +817,8 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             result = sync_post_refresh_tracking_for_source_root(sport="nhl", source_root=root, date_str="2026-06-07")
 
             self.assertTrue(result["ok"])
-            # The 1-byte ceiling means every keyvalue write this cycle was
-            # refused -- proving the fallback, not the primary path, is what
-            # was exercised.
-            self.assertFalse(fake_client.store, "expected the keyvalue write to be refused under the 1-byte ceiling")
-
             history_path = Path(result["artifacts"]["odds_history"]["history_path"])
-            self.assertTrue(history_path.exists(), "expected the fallback to still write the artifact to local disk")
+            self.assertTrue(history_path.exists(), "expected a direct local-disk write")
 
             from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
 
