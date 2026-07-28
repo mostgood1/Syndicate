@@ -939,6 +939,64 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         game = self._sample_game(markets={"ml": {}, "totals": {"selection": "over"}})
         self.assertEqual(_mlb_game_market_recommendation_rows(game), [])
 
+    def test_mlb_bare_odds_markets_derive_a_pick_from_sim_predictions(self) -> None:
+        # #100 follow-up, 2026-07-27: confirmed in production that most
+        # non-final MLB games (7 of 9 on a real slate, including every
+        # genuinely pregame one) only ever carry bare book odds under
+        # markets["ml"/"totals"] (away_odds/home_odds, no selection/
+        # model_prob) -- the recommendation engine simply never flagged
+        # them -- even though game["predictions"]["full"] already has real,
+        # non-degenerate win probabilities for every one. Without this sim
+        # fallback, those games produced zero game-level candidates
+        # regardless of the confidence-field fix above, since
+        # _mlb_game_market_recommendation_rows had no pick to translate.
+        game = self._sample_game(
+            markets={
+                "ml": {"away_odds": "-112", "home_odds": "-108"},
+                "totals": {"line": 8.5, "over_odds": "-117", "under_odds": "-103"},
+            },
+            predictions={
+                "full": {
+                    "home_win_prob": 0.579,
+                    "away_win_prob": 0.421,
+                    "total_runs_dist": {"7": 0.3, "8": 0.45, "9": 0.25},
+                }
+            },
+        )
+        rows = _mlb_game_market_recommendation_rows(game)
+        self.assertEqual(len(rows), 2)
+        moneyline = next(r for r in rows if r["market_label"] == "Moneyline")
+        total = next(r for r in rows if r["market_label"] == "Total")
+        # Home is favored (0.579 > 0.421), so the derived pick sides with home
+        # and prices off home_odds, not the (unused) top-level odds/price key.
+        self.assertEqual(moneyline["display_pick"], "Home ML")
+        self.assertEqual(moneyline["odds"], "-108")
+        self.assertAlmostEqual(moneyline["confidence"], 0.579)
+        # total_runs_dist puts 25% of weight over 8.5, so Under is favored.
+        self.assertEqual(total["display_pick"], "Under 8.5")
+        self.assertEqual(total["odds"], "-103")
+        self.assertAlmostEqual(total["confidence"], 0.75)
+
+        game["game_market_recommendations"] = rows
+        candidates = _game_bet_candidates_from_game({"slug": "mlb"}, game, fallback_epoch=0.0)
+        candidate_moneyline = next(c for c in candidates if c["market"] == "Moneyline")
+        self.assertAlmostEqual(candidate_moneyline["model_probability"], 0.579)
+
+    def test_mlb_recommendation_shaped_markets_are_not_overridden_by_sim_fallback(self) -> None:
+        # The sim fallback must only fire when the recommendation engine
+        # left selection/model_prob genuinely absent -- an existing pick
+        # (even one that disagrees with the sim's favored side) must win.
+        game = self._sample_game(
+            markets={
+                "ml": {"selection": "away", "model_prob": 0.3, "odds": "+150"},
+            },
+            predictions={"full": {"home_win_prob": 0.9, "away_win_prob": 0.1}},
+        )
+        rows = _mlb_game_market_recommendation_rows(game)
+        moneyline = next(r for r in rows if r["market_label"] == "Moneyline")
+        self.assertEqual(moneyline["display_pick"], "Away ML")
+        self.assertAlmostEqual(moneyline["confidence"], 0.3)
+
     def test_mlb_feed_live_state_does_not_treat_warmup_as_live(self) -> None:
         # #98/#100: was abstract.lower() == "live" alone -- MLB StatsAPI
         # reports abstractGameState "Live" during warmup, before the game has

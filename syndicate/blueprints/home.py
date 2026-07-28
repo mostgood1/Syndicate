@@ -2890,10 +2890,38 @@ def _mlb_game_market_recommendation_rows(game: dict[str, Any]) -> list[dict[str,
     # period-lens markets like "f7 moneyline", and only for whichever single
     # game happened to be live -- every pregame MLB game showed zero).
     markets = game.get("markets") if isinstance(game.get("markets"), dict) else {}
+    # #100 follow-up, 2026-07-27: model_prob/selection on markets["ml"/"totals"]
+    # only exists for games the recommendation engine happened to flag --
+    # confirmed in production the same night as the confidence-field fix
+    # above: of 9 non-final MLB games, only 2 had a reco-engine pick, so the
+    # other 7 (including all 3 genuinely pregame ones) produced zero game
+    # candidates even though the sim's own predictions.full carried real,
+    # non-degenerate win probabilities for every one of them. Mirrors the
+    # Layer 1 market board's fix for the identical gap
+    # (_mlb_market_board_rows_for_game in mlb/cards.py, whose own docstring
+    # says this outright): fall back to the sim's unconditional win
+    # probability/total-runs distribution when no recommendation is attached,
+    # rather than leaving the game with no candidate at all. Downstream
+    # scoring/tiering (not candidate existence) is where edge-worthiness
+    # should be judged, per this file's own "no candidate dropped solely for
+    # missing source" rule.
+    from syndicate.features.mlb.cards import _dist_prob_over_line
+
+    full_predictions = (game.get("predictions") or {}).get("full") if isinstance(game.get("predictions"), dict) else None
+    full_predictions = full_predictions if isinstance(full_predictions, dict) else {}
+    sim_home_prob = _numeric_value(full_predictions.get("home_win_prob"))
+    sim_away_prob = _numeric_value(full_predictions.get("away_win_prob"))
+    total_runs_dist = full_predictions.get("total_runs_dist")
     rows: list[dict[str, Any]] = []
     moneyline = markets.get("ml") if isinstance(markets.get("ml"), dict) else None
     if isinstance(moneyline, dict):
         side = str(moneyline.get("selection") or "").strip().lower()
+        model_prob = moneyline.get("model_prob")
+        odds = moneyline.get("odds") or moneyline.get("price")
+        if side not in ("home", "away") and sim_home_prob is not None and sim_away_prob is not None:
+            side = "home" if sim_home_prob >= sim_away_prob else "away"
+            model_prob = sim_home_prob if side == "home" else sim_away_prob
+            odds = moneyline.get("home_odds") if side == "home" else moneyline.get("away_odds")
         pick_label = {"home": "Home ML", "away": "Away ML"}.get(side)
         if pick_label:
             rows.append(
@@ -2901,23 +2929,33 @@ def _mlb_game_market_recommendation_rows(game: dict[str, Any]) -> list[dict[str,
                     "market_label": "Moneyline",
                     "display_pick": pick_label,
                     "selection": side,
-                    "odds": moneyline.get("odds") or moneyline.get("price"),
-                    "confidence": moneyline.get("model_prob"),
+                    "odds": odds,
+                    "confidence": model_prob,
                     "summary": moneyline.get("reason") or moneyline.get("summary"),
                 }
             )
     totals = markets.get("totals") if isinstance(markets.get("totals"), dict) else None
     if isinstance(totals, dict):
-        selection = str(totals.get("selection") or "").strip().title()
+        selection = str(totals.get("selection") or "").strip().lower()
         line = totals.get("market_line") if totals.get("market_line") is not None else totals.get("line")
-        if selection and line is not None:
+        model_prob = totals.get("model_prob")
+        odds = totals.get("odds") or totals.get("price")
+        if selection not in ("over", "under") and line is not None:
+            line_value = _numeric_value(line)
+            model_prob_over = _dist_prob_over_line(total_runs_dist, line_value) if line_value is not None else None
+            if model_prob_over is not None:
+                selection = "over" if model_prob_over >= 0.5 else "under"
+                model_prob = model_prob_over if selection == "over" else 1.0 - model_prob_over
+                odds = totals.get("over_odds") if selection == "over" else totals.get("under_odds")
+        display_selection = selection.title()
+        if display_selection and line is not None:
             rows.append(
                 {
                     "market_label": "Total",
-                    "display_pick": f"{selection} {line}".strip(),
+                    "display_pick": f"{display_selection} {line}".strip(),
                     "line": line,
-                    "odds": totals.get("odds") or totals.get("price"),
-                    "confidence": totals.get("model_prob"),
+                    "odds": odds,
+                    "confidence": model_prob,
                     "summary": totals.get("reason") or totals.get("summary"),
                 }
             )
