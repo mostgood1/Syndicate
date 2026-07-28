@@ -10,7 +10,7 @@ import os
 import shutil
 import sys
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib import parse as urllib_parse
 from urllib import request as urllib_request
@@ -21,6 +21,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from syndicate.features.mlb.game_state import mlb_status_is_final
+from syndicate.features.mlb.game_state import mlb_status_is_live
 from syndicate.features.shared.artifact_publisher import publish_hot_artifact
 from syndicate.features.shared.refresh_state_store import build_input_hash
 from syndicate.features.shared.refresh_state_store import path_fingerprint
@@ -561,6 +563,103 @@ def _market_tier() -> str:
     return tier if tier in {"full", "lines_props"} else "full"
 
 
+def _event_scoping_enabled() -> bool:
+    raw = str(os.environ.get("SYNDICATE_ODDS_EVENT_SCOPING_ENABLED") or "true").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _event_scoping_window_seconds() -> int:
+    # Matches live_refresh_loop.py's own _T_WINDOW_RAMP_SECONDS (75 min) --
+    # a game inside its own T-window is exactly the case that window exists
+    # to catch, so "hot" here should agree with it rather than invent a
+    # second boundary.
+    raw = str(os.environ.get("SYNDICATE_ODDS_EVENT_SCOPING_WINDOW_SECONDS") or "").strip()
+    try:
+        return max(0, int(raw)) if raw else 75 * 60
+    except ValueError:
+        return 75 * 60
+
+
+def _normalize_matchup_team(value: object) -> str:
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def _load_mlb_status_by_matchup(source_root: Path, date_str: str) -> dict[tuple[str, str], dict[str, object]]:
+    # Event scoping (#16 budget lever): per-event, not per-tick, is-this-
+    # game-hot decision. Reuses the same MLB StatsAPI schedule snapshot
+    # (schedule_raw.json) every daily-update run already produces on this
+    # same source_root -- not a new fetch, just a new read. Keyed by
+    # (away, home) team name since that's what OddsAPI's own event objects
+    # carry; gamePk isn't available on the OddsAPI side to join on directly.
+    path = source_root / "source_artifacts" / "data" / "daily" / "snapshots" / date_str / "schedule_raw.json"
+    try:
+        games = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(games, list):
+        return {}
+    by_matchup: dict[tuple[str, str], dict[str, object]] = {}
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        teams = game.get("teams") if isinstance(game.get("teams"), dict) else {}
+        away = ((teams.get("away") or {}).get("team") or {}).get("name") if isinstance(teams.get("away"), dict) else None
+        home = ((teams.get("home") or {}).get("team") or {}).get("name") if isinstance(teams.get("home"), dict) else None
+        away_key = _normalize_matchup_team(away)
+        home_key = _normalize_matchup_team(home)
+        if not away_key or not home_key:
+            continue
+        status = game.get("status") if isinstance(game.get("status"), dict) else {}
+        by_matchup[(away_key, home_key)] = {
+            "abstract": status.get("abstractGameState"),
+            "detailed": status.get("detailedState"),
+            "commence": game.get("gameDate"),
+        }
+    return by_matchup
+
+
+def _event_wants_full_game_markets(
+    *,
+    away_team: object,
+    home_team: object,
+    commence_time: object,
+    status_by_matchup: dict[tuple[str, str], dict[str, object]],
+    now: datetime,
+    window_seconds: int,
+) -> bool:
+    """Whether THIS event needs the full (segment/alternate) game-market set
+    on a tier-reduced tick, vs the cheap h2h/spreads/totals set.
+
+    Full whenever: the schedule snapshot doesn't have this exact matchup
+    (fail open -- an unmatched game must not silently lose coverage, same
+    rule live_refresh_loop.py's own tick-level tier already follows for
+    "simply not being able to tell"), the game is live, or it's within its
+    own T-window. Reduced only for a confirmed-final game or a confirmed-
+    pregame game still outside its window.
+    """
+    key = (_normalize_matchup_team(away_team), _normalize_matchup_team(home_team))
+    status = status_by_matchup.get(key)
+    if status is None:
+        return True
+    abstract = status.get("abstract")
+    detailed = status.get("detailed")
+    if mlb_status_is_live(abstract, detailed):
+        return True
+    if mlb_status_is_final(abstract, detailed):
+        return False
+    commence_text = str(commence_time or status.get("commence") or "").strip()
+    if not commence_text:
+        return True
+    try:
+        commence = datetime.fromisoformat(commence_text.replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    if commence.tzinfo is None:
+        commence = commence.replace(tzinfo=timezone.utc)
+    seconds_to_start = (commence - now).total_seconds()
+    return seconds_to_start <= window_seconds
+
+
 def fetch_live_odds_incremental(*, odds_module, source_root: Path, date_str: str, regions: str, bookmakers: str | None, hitter_markets: list[str] | None) -> dict[str, object]:
     api_key = (
         os.environ.get("ODDS_API_KEY")
@@ -587,7 +686,7 @@ def fetch_live_odds_incremental(*, odds_module, source_root: Path, date_str: str
     print(f"[mlb_fetch_start] market_tier={market_tier}", flush=True)
     live_events = list(odds_module._fetch_live_events_for_date(api_key, date_str))
     print(f"[mlb_fetch_events] events_count={len(live_events) if live_events else 0}", flush=True)
-    game_market_keys = [
+    full_game_market_keys = [
         "h2h",
         "spreads",
         "totals",
@@ -616,23 +715,44 @@ def fetch_live_odds_incremental(*, odds_module, source_root: Path, date_str: str
         "totals_1st_7_innings",
         "alternate_totals_1st_7_innings",
     ]
-    if market_tier == "lines_props":
-        # #82 Phase 2. The 24 segment/alternate markets are ~63% of a
-        # per-event request's cost and pregame drift doesn't need them --
-        # T-window and live sweeps run tier=full, so segment lanes refresh
-        # exactly when games approach and while they run. Fetched lines and
-        # props stay identical to a full sweep.
-        game_market_keys = ["h2h", "spreads", "totals"]
+    # #82 Phase 2. The 24 segment/alternate markets are ~63% of a per-event
+    # request's cost and a genuinely idle game doesn't need them refreshed
+    # every cycle -- carried forward from the previous sweep instead (below).
+    reduced_game_market_keys = ["h2h", "spreads", "totals"]
+    # Event scoping (#16 budget lever). #82 Phase 2 made this decision once
+    # per TICK (market_tier == "lines_props" only when NOTHING in the whole
+    # slate is live), so on a normal MLB day -- where something is almost
+    # always live somewhere across an 11-15 game slate -- every game got
+    # full segment/alternate markets on every cycle regardless of its own
+    # state, including games still hours from first pitch and games that
+    # already went final. Per-event scoping makes the same full-vs-reduced
+    # call independently for each game in the SAME sweep, using the
+    # already-shipped #100 canonical live/final classifier so this doesn't
+    # duplicate the game-state-check fragmentation that caused #98.
+    event_scoping_enabled = _event_scoping_enabled()
+    status_by_matchup: dict[tuple[str, str], dict[str, object]] = {}
+    if event_scoping_enabled:
+        status_by_matchup = _load_mlb_status_by_matchup(source_root, date_str)
+        if not status_by_matchup:
+            # Schedule snapshot missing/unreadable: fail open to the
+            # original tick-wide decision rather than guess per event.
+            event_scoping_enabled = False
+    event_scoping_window_seconds = _event_scoping_window_seconds()
+    if not event_scoping_enabled and market_tier == "lines_props":
+        full_game_market_keys = reduced_game_market_keys
     pitcher_market_keys = list(getattr(odds_module, "PITCHER_MARKET_KEY_MAP", {}).keys())
     if hitter_markets:
         desired_hitter_markets = [str(m).strip().lower() for m in hitter_markets if str(m).strip()]
     else:
         desired_hitter_markets = [str(m).strip().lower() for m in getattr(odds_module, "DEFAULT_HITTER_MARKETS", []) if str(m).strip()]
-    combined_markets = []
-    for market_name in game_market_keys + pitcher_market_keys + desired_hitter_markets:
-        market_name = str(market_name).strip().lower()
-        if market_name and market_name not in combined_markets:
-            combined_markets.append(market_name)
+
+    def _combined_markets_for(game_market_keys: list[str]) -> str:
+        combined: list[str] = []
+        for market_name in game_market_keys + pitcher_market_keys + desired_hitter_markets:
+            market_name = str(market_name).strip().lower()
+            if market_name and market_name not in combined:
+                combined.append(market_name)
+        return ",".join(combined)
 
     pitch_key_map = dict(getattr(odds_module, "PITCHER_MARKET_KEY_MAP", {}))
     hitter_key_map = {market_name: market_name for market_name in desired_hitter_markets}
@@ -647,15 +767,33 @@ def fetch_live_odds_incremental(*, odds_module, source_root: Path, date_str: str
     changed_game_rows = 0
     reused_game_rows = 0
 
+    events_scoped_full = 0
+    events_scoped_reduced = 0
     for event in live_events:
         event_id = str(event.get("id") or "").strip()
         if not event_id:
             continue
+        if event_scoping_enabled:
+            wants_full = _event_wants_full_game_markets(
+                away_team=event.get("away_team"),
+                home_team=event.get("home_team"),
+                commence_time=event.get("commence_time"),
+                status_by_matchup=status_by_matchup,
+                now=datetime.now(timezone.utc),
+                window_seconds=event_scoping_window_seconds,
+            )
+            event_game_market_keys = full_game_market_keys if wants_full else reduced_game_market_keys
+            if wants_full:
+                events_scoped_full += 1
+            else:
+                events_scoped_reduced += 1
+        else:
+            event_game_market_keys = full_game_market_keys
         try:
             payload = odds_module._fetch_live_event_odds(
                 api_key,
                 event_id,
-                markets_csv=",".join(combined_markets),
+                markets_csv=_combined_markets_for(event_game_market_keys),
                 regions=regions,
                 bookmakers=bookmakers,
             )
@@ -669,12 +807,15 @@ def fetch_live_odds_incremental(*, odds_module, source_root: Path, date_str: str
         home_team = str(event.get("home_team") or payload.get("home_team") or "")
         away_team = str(event.get("away_team") or payload.get("away_team") or "")
         best_lines, bookmaker_key = odds_module._best_bookmaker_game_lines(payload, home_team=home_team, away_team=away_team)
-        if market_tier != "full" and isinstance(best_lines, dict):
-            # Layer 1 guard: a tiered sweep only re-fetched a subset of
-            # markets, so any market key present in the PREVIOUS snapshot but
-            # absent from this fetch is carried forward rather than dropped --
-            # otherwise the first lines_props sweep would blank every
-            # F1/F3/F5/F7 segment tab until the next full sweep.
+        if event_game_market_keys is reduced_game_market_keys and isinstance(best_lines, dict):
+            # Layer 1 guard: a tiered fetch only re-fetched a subset of
+            # markets FOR THIS EVENT, so any market key present in its
+            # PREVIOUS snapshot but absent from this fetch is carried
+            # forward rather than dropped -- otherwise a reduced-tier fetch
+            # would blank every F1/F3/F5/F7 segment tab until this event's
+            # next full-tier fetch. Was keyed on the tick-wide market_tier;
+            # now keyed on this event's own tier, since that's what actually
+            # decided which markets_csv was sent for it.
             existing_row = existing_game_rows.get(event_id)
             existing_markets = (existing_row or {}).get("markets") if isinstance(existing_row, dict) else None
             if isinstance(existing_markets, dict):
@@ -711,6 +852,10 @@ def fetch_live_odds_incremental(*, odds_module, source_root: Path, date_str: str
                 for market_name, row in market_rows.items():
                     dst[market_name] = odds_module._merge_prop_market_rows(dst.get(market_name, {}), row)
 
+    print(
+        f"[mlb_fetch_event_scoping] enabled={event_scoping_enabled} full_tier={events_scoped_full} reduced_tier={events_scoped_reduced}",
+        flush=True,
+    )
     finalized_pitcher_props = odds_module._finalize_prop_market_map(pitcher_props)
     finalized_hitter_props = odds_module._finalize_prop_market_map(hitter_props)
 
@@ -734,7 +879,10 @@ def fetch_live_odds_incremental(*, odds_module, source_root: Path, date_str: str
         "retrieved_at": retrieved_at,
         "games": game_rows,
         "meta": {
-            "markets": game_market_keys,
+            # The superset possible across this run -- individual events may
+            # have been fetched at either tier; see event_scoping in the
+            # caller's result dict for the actual per-event split.
+            "markets": full_game_market_keys,
             "regions": str(regions or "us"),
             "bookmakers": (str(bookmakers).split(",") if bookmakers else None),
             "counts": game_counts,
@@ -788,6 +936,11 @@ def fetch_live_odds_incremental(*, odds_module, source_root: Path, date_str: str
         "updated_games": int(changed_game_rows),
         "reused_games": int(reused_game_rows),
         "written_files": wrote_files,
+        "event_scoping": {
+            "enabled": bool(event_scoping_enabled),
+            "full_tier_events": int(events_scoped_full),
+            "reduced_tier_events": int(events_scoped_reduced),
+        },
         "counts": {
             "game_lines": dict(game_counts),
             "pitcher_props": dict(pitcher_counts),
