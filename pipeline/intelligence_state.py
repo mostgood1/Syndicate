@@ -2599,6 +2599,18 @@ class IntelligenceStateService:
         if not candidate_pools:
             global_pool = []
 
+        # Layer 2 Phase 4. Annotate (never suppress -- explicit user call)
+        # candidates that are effectively the same bet stacked across
+        # multiple markets, e.g. the CLE@CIN doubleheader screenshot that
+        # started this thread: 5 markets on one game shown as if 5
+        # independent opportunities. Runs once on the final merged,
+        # deduped board -- not per-sport-pool -- so it sees the exact set a
+        # reader would.
+        if global_pool:
+            from syndicate.features.correlation_engine import attach_board_correlation_flags
+
+            attach_board_correlation_flags(global_pool)
+
         pool = {
             "selected_date": selected_date,
             "source_fingerprint": source_fingerprint,

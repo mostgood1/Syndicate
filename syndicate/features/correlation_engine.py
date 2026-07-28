@@ -255,6 +255,73 @@ def compute_correlation(candidate_a: dict[str, Any], candidate_b: dict[str, Any]
     }
 
 
+DEFAULT_BOARD_CORRELATION_BADGE_THRESHOLD = 0.5
+
+
+def attach_board_correlation_flags(candidates: list[dict[str, Any]], *, threshold: float = DEFAULT_BOARD_CORRELATION_BADGE_THRESHOLD) -> None:
+    """Layer 2 Phase 4. Annotates (never removes) candidates whose
+    correlation_score with another candidate on the SAME board clears
+    `threshold`, so a user sees "5 markets on this game are effectively the
+    same bet" instead of 5 unrelated-looking opportunities -- the original
+    CLE@CIN screenshot complaint (5 near-identical markets stacked as if
+    independent) this phase exists to address.
+
+    Deliberately annotate-only, not suppress: user's explicit call after
+    weighing suppress-vs-badge -- board visibility stays complete, the badge
+    carries the judgment call instead of hiding it. Threshold is 0.5, looser
+    than bankroll_manager.build_portfolio's 0.65 (tuned for bet-SIZING risk,
+    a different, higher bar than "is this worth flagging on the board at
+    all") -- also the user's explicit call, not a default carried over
+    unexamined.
+
+    Mutates each candidate's "correlated_with" list in place (creating an
+    empty one on every candidate, even with zero matches, so downstream
+    display code can rely on the key's presence rather than a truthiness
+    check). Scoped per sport (correlation is never meaningful across sports
+    -- every _candidate_*_key lookup is sport-specific-in-practice, e.g. an
+    event_id/matchup never collides across two different sports' games) so
+    the pairwise pass stays bounded to same-sport candidate counts instead
+    of the full multi-sport board.
+    """
+    warn_if_compute_in_request_path("attach_board_correlation_flags")
+    by_sport: dict[str, list[dict[str, Any]]] = {}
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        candidate.setdefault("correlated_with", [])
+        sport_key = _normalize_text(candidate.get("sport_slug") or candidate.get("sport"))
+        by_sport.setdefault(sport_key, []).append(candidate)
+
+    for group in by_sport.values():
+        if len(group) < 2:
+            continue
+        for candidate_a, candidate_b in combinations(group, 2):
+            result = compute_correlation(candidate_a, candidate_b)
+            score = _safe_float(result.get("correlation_score")) or 0.0
+            if score < threshold:
+                continue
+            candidate_a["correlated_with"].append(
+                {
+                    "recommendation_id": candidate_b.get("recommendation_id"),
+                    "name": _safe_text(candidate_b.get("selection") or candidate_b.get("name") or candidate_b.get("pick"), "candidate"),
+                    "market": candidate_b.get("market"),
+                    "correlation_score": round(score, 3),
+                    "same_game": bool(result.get("same_game")),
+                    "same_subject": bool(result.get("same_subject")),
+                }
+            )
+            candidate_b["correlated_with"].append(
+                {
+                    "recommendation_id": candidate_a.get("recommendation_id"),
+                    "name": _safe_text(candidate_a.get("selection") or candidate_a.get("name") or candidate_a.get("pick"), "candidate"),
+                    "market": candidate_a.get("market"),
+                    "correlation_score": round(score, 3),
+                    "same_game": bool(result.get("same_game")),
+                    "same_subject": bool(result.get("same_subject")),
+                }
+            )
+
+
 def _candidate_label(candidate: dict[str, Any], index: int) -> str:
     pieces = [
         _safe_text(candidate.get("name"), ""),
