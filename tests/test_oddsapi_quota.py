@@ -321,3 +321,75 @@ class MarketFamilyAttributionTests(unittest.TestCase):
             payload = json.loads(quota_file.read_text(encoding="utf-8"))
             self.assertEqual(payload["latest"]["used"], 50)
             self.assertEqual(payload["by_market_family"], {})
+
+    def test_attribution_failure_is_recorded_not_silently_swallowed(self) -> None:
+        # Confirmed live 2026-07-28: by_market_family/by_hour_utc measured
+        # ~54% of by_sport's total for the entire tracked window, with a
+        # bare `except Exception: pass` giving zero signal as to why. The
+        # burn counter must still survive a classifier bug (previous test),
+        # but "must still survive" should not mean "must stay a mystery
+        # forever" -- the next occurrence should be a one-read diagnosis.
+        with TemporaryDirectory() as tmp_dir:
+            quota_file = Path(tmp_dir) / "oddsapi_quota.json"
+            with patch("syndicate.features.shared.oddsapi_quota._quota_path", return_value=quota_file):
+                with patch(
+                    "syndicate.features.shared.oddsapi_quota._attribute_request_families",
+                    side_effect=RuntimeError("boom"),
+                ):
+                    record_oddsapi_quota(
+                        {"x-requests-remaining": "100", "x-requests-used": "50", "x-requests-last": "6"},
+                        sport="mlb",
+                        endpoint="whatever",
+                    )
+            payload = json.loads(quota_file.read_text(encoding="utf-8"))
+            self.assertEqual(payload["attribution_error_count"], 1)
+            self.assertEqual(payload["last_attribution_error"]["error"], "RuntimeError: boom")
+            self.assertEqual(payload["last_attribution_error"]["sport"], "mlb")
+            self.assertEqual(payload["last_attribution_error"]["endpoint"], "whatever")
+
+    def test_attribution_error_count_accumulates_across_calls(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            quota_file = Path(tmp_dir) / "oddsapi_quota.json"
+            with patch("syndicate.features.shared.oddsapi_quota._quota_path", return_value=quota_file):
+                with patch(
+                    "syndicate.features.shared.oddsapi_quota._attribute_request_families",
+                    side_effect=RuntimeError("boom"),
+                ):
+                    for used in (50, 51, 52):
+                        record_oddsapi_quota(
+                            {"x-requests-remaining": "100", "x-requests-used": str(used), "x-requests-last": "1"},
+                            sport="mlb",
+                            endpoint="whatever",
+                        )
+            payload = json.loads(quota_file.read_text(encoding="utf-8"))
+            self.assertEqual(payload["attribution_error_count"], 3)
+
+    def test_read_surfaces_attribution_error_fields(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            quota_file = Path(tmp_dir) / "oddsapi_quota.json"
+            with patch("syndicate.features.shared.oddsapi_quota._quota_path", return_value=quota_file):
+                with patch(
+                    "syndicate.features.shared.oddsapi_quota._attribute_request_families",
+                    side_effect=RuntimeError("boom"),
+                ):
+                    record_oddsapi_quota(
+                        {"x-requests-remaining": "100", "x-requests-used": "50", "x-requests-last": "6"},
+                        sport="mlb",
+                        endpoint="whatever",
+                    )
+                result = read_oddsapi_quota()
+            self.assertEqual(result["attribution_error_count"], 1)
+            self.assertEqual(result["last_attribution_error"]["error"], "RuntimeError: boom")
+
+    def test_no_attribution_failure_leaves_error_fields_at_zero_and_none(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            quota_file = Path(tmp_dir) / "oddsapi_quota.json"
+            with patch("syndicate.features.shared.oddsapi_quota._quota_path", return_value=quota_file):
+                record_oddsapi_quota(
+                    {"x-requests-remaining": "100", "x-requests-used": "50", "x-requests-last": "6"},
+                    sport="mlb",
+                    endpoint="https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?markets=h2h",
+                )
+                result = read_oddsapi_quota()
+            self.assertEqual(result["attribution_error_count"], 0)
+            self.assertIsNone(result["last_attribution_error"])

@@ -229,6 +229,8 @@ def record_oddsapi_quota(headers: Any, *, sport: str | None = None, endpoint: st
         last_cost = int(observation.get("last_cost") or 0)
         by_family = payload.get("by_market_family") if isinstance(payload.get("by_market_family"), dict) else {}
         by_hour = payload.get("by_hour_utc") if isinstance(payload.get("by_hour_utc"), dict) else {}
+        attribution_error_count = int(payload.get("attribution_error_count") or 0)
+        last_attribution_error = payload.get("last_attribution_error")
         try:
             for family, credits in _attribute_request_families(observation.get("endpoint") or "", last_cost).items():
                 family_bucket = by_family.get(family) if isinstance(by_family.get(family), dict) else {"calls": 0, "credits": 0.0}
@@ -243,12 +245,27 @@ def record_oddsapi_quota(headers: Any, *, sport: str | None = None, endpoint: st
             hour_bucket["calls"] = int(hour_bucket.get("calls") or 0) + 1
             hour_bucket["credits"] = int(hour_bucket.get("credits") or 0) + last_cost
             by_hour[hour_key] = hour_bucket
-        except Exception:
+        except Exception as exc:
             # Attribution is a bonus on top of the load-bearing burn counter.
             # If it breaks, the observation must still be recorded --
             # un-attributed beats un-recorded, and the outer never-raises
-            # handler would otherwise throw away the whole reading.
-            pass
+            # handler would otherwise throw away the whole reading. But a
+            # bare `except: pass` here previously made that failure
+            # completely invisible: by_market_family/by_hour_utc measured
+            # ~54% of by_sport's total for the entire tracked window with
+            # zero signal as to why (confirmed 2026-07-28, both stuck at the
+            # identical reduced figure, proving they fail together in this
+            # one block). Recording the exception (bounded: one message, one
+            # counter, not one entry per failure) turns the next occurrence
+            # into a one-read diagnosis instead of another blind
+            # investigation.
+            attribution_error_count += 1
+            last_attribution_error = {
+                "error": f"{type(exc).__name__}: {exc}",
+                "endpoint": observation.get("endpoint"),
+                "sport": observation.get("sport"),
+                "observedAt": observation.get("observedAt"),
+            }
 
         write_json_file(
             _quota_path(),
@@ -258,6 +275,8 @@ def record_oddsapi_quota(headers: Any, *, sport: str | None = None, endpoint: st
                 "by_sport": by_sport,
                 "by_market_family": by_family,
                 "by_hour_utc": by_hour,
+                "attribution_error_count": attribution_error_count,
+                "last_attribution_error": last_attribution_error,
                 # Stamped once, because none of the aggregates above ever
                 # reset -- a rate is only computable as total/(now - this).
                 "aggregates_started_at": str(payload.get("aggregates_started_at") or _utc_now_iso()),
@@ -352,6 +371,8 @@ def read_oddsapi_quota() -> dict[str, Any]:
         "by_market_family": dict(by_family),
         "by_hour_utc": dict(by_hour),
         "aggregates_started_at": payload.get("aggregates_started_at"),
+        "attribution_error_count": int(payload.get("attribution_error_count") or 0),
+        "last_attribution_error": payload.get("last_attribution_error"),
     }
 
     if not isinstance(baseline, dict) or not isinstance(latest, dict):
