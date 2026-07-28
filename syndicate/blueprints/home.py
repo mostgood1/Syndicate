@@ -2913,27 +2913,36 @@ def _mlb_game_market_recommendation_rows(game: dict[str, Any]) -> list[dict[str,
     sim_away_prob = _numeric_value(full_predictions.get("away_win_prob"))
     total_runs_dist = full_predictions.get("total_runs_dist")
     rows: list[dict[str, Any]] = []
-    moneyline = markets.get("ml") if isinstance(markets.get("ml"), dict) else None
-    if isinstance(moneyline, dict):
-        side = str(moneyline.get("selection") or "").strip().lower()
-        model_prob = moneyline.get("model_prob")
-        odds = moneyline.get("odds") or moneyline.get("price")
-        if side not in ("home", "away") and sim_home_prob is not None and sim_away_prob is not None:
-            side = "home" if sim_home_prob >= sim_away_prob else "away"
-            model_prob = sim_home_prob if side == "home" else sim_away_prob
-            odds = moneyline.get("home_odds") if side == "home" else moneyline.get("away_odds")
-        pick_label = {"home": "Home ML", "away": "Away ML"}.get(side)
-        if pick_label:
-            rows.append(
-                {
-                    "market_label": "Moneyline",
-                    "display_pick": pick_label,
-                    "selection": side,
-                    "odds": odds,
-                    "confidence": model_prob,
-                    "summary": moneyline.get("reason") or moneyline.get("summary"),
-                }
-            )
+    # #108 follow-up, confirmed live 2026-07-27: refresh-worker's own
+    # dashboard_games carries markets["ml"] as entirely ABSENT for every MLB
+    # game (not merely lacking selection/model_prob, which the block below
+    # already handled) -- while predictions.full is reliably present, since
+    # the sim runs on refresh-worker itself. A moneyline pick needs no book
+    # line to exist (unlike totals, just below, which does), so this no
+    # longer requires markets["ml"] to be a dict at all -- an empty fallback
+    # lets the sim-derived branch fire purely off predictions.full. odds
+    # stays None in that case, which is fine: classification accepts
+    # projection OR odds, same reasoning as the HR-targets precedent (#92).
+    moneyline = markets.get("ml") if isinstance(markets.get("ml"), dict) else {}
+    side = str(moneyline.get("selection") or "").strip().lower()
+    model_prob = moneyline.get("model_prob")
+    odds = moneyline.get("odds") or moneyline.get("price")
+    if side not in ("home", "away") and sim_home_prob is not None and sim_away_prob is not None:
+        side = "home" if sim_home_prob >= sim_away_prob else "away"
+        model_prob = sim_home_prob if side == "home" else sim_away_prob
+        odds = moneyline.get("home_odds") if side == "home" else moneyline.get("away_odds")
+    pick_label = {"home": "Home ML", "away": "Away ML"}.get(side)
+    if pick_label:
+        rows.append(
+            {
+                "market_label": "Moneyline",
+                "display_pick": pick_label,
+                "selection": side,
+                "odds": odds,
+                "confidence": model_prob,
+                "summary": moneyline.get("reason") or moneyline.get("summary"),
+            }
+        )
     totals = markets.get("totals") if isinstance(markets.get("totals"), dict) else None
     if isinstance(totals, dict):
         selection = str(totals.get("selection") or "").strip().lower()

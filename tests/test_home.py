@@ -997,6 +997,27 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         self.assertEqual(moneyline["display_pick"], "Away ML")
         self.assertAlmostEqual(moneyline["confidence"], 0.3)
 
+    def test_mlb_moneyline_derives_from_sim_even_when_markets_ml_is_entirely_absent(self) -> None:
+        # #108 follow-up, confirmed live 2026-07-27: refresh-worker's own
+        # dashboard_games carries markets["ml"] as entirely ABSENT for every
+        # MLB game (not merely a bare-odds dict lacking selection/model_prob,
+        # which the sibling test above already covers) -- production traces
+        # showed has_markets_ml=False for all 12 games in a real cycle, while
+        # predictions.full was reliably present with real win probabilities.
+        # A moneyline pick needs no book line to exist (unlike totals, which
+        # genuinely has nothing to bet against without one), so this must
+        # still produce a candidate from the sim alone, with odds left absent
+        # rather than the whole market silently contributing nothing.
+        game = self._sample_game(
+            markets={},
+            predictions={"full": {"home_win_prob": 0.577, "away_win_prob": 0.423}},
+        )
+        rows = _mlb_game_market_recommendation_rows(game)
+        moneyline = next(r for r in rows if r["market_label"] == "Moneyline")
+        self.assertEqual(moneyline["display_pick"], "Home ML")
+        self.assertAlmostEqual(moneyline["confidence"], 0.577)
+        self.assertIsNone(moneyline["odds"])
+
     def test_mlb_feed_live_state_does_not_treat_warmup_as_live(self) -> None:
         # #98/#100: was abstract.lower() == "live" alone -- MLB StatsAPI
         # reports abstractGameState "Live" during warmup, before the game has
