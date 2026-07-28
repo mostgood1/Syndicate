@@ -3117,11 +3117,27 @@ class IntelligenceStateService:
                     # applied to the rollover decision in
                     # _compute_board_publication_response and to the
                     # candidate-pool cache in _build_candidate_pool.
+                    #
+                    # #100 follow-up, confirmed live 2026-07-27: this guard
+                    # only covered `run_failed` (a raised exception). A cycle
+                    # that completes WITHOUT raising but legitimately computes
+                    # zero candidates -- observed live right after a concurrent
+                    # deploy's restart, when refresh-worker's own artifact/
+                    # cache state was still catching up -- was not run_failed,
+                    # so it sailed past this check and silently overwrote a
+                    # real 6-candidate snapshot with an empty one; the OR
+                    # clause below (`self._latest_key == snapshot.key`, true
+                    # for every recompute of the persistent "today" key) then
+                    # promoted it too, since the data was already gone by that
+                    # point. Widened to cover both: any cycle -- failed or
+                    # merely empty -- must not erase an existing non-empty
+                    # snapshot for the same key.
                     previous_snapshot = self._snapshots.get(snapshot.key)
                     previous_count = _intelligence_state_candidate_count(previous_snapshot.response) if previous_snapshot is not None and isinstance(previous_snapshot.response, dict) else 0
-                    if run_failed and previous_count > 0:
+                    snapshot_count = _intelligence_state_candidate_count(response) if isinstance(response, dict) else 0
+                    if (run_failed or snapshot_count <= 0) and previous_count > 0:
                         print(
-                            f"[intelligence_state] SNAPSHOT_UPDATE_SKIPPED_AFTER_FAILURE key={snapshot.key} kept_candidate_count={previous_count}",
+                            f"[intelligence_state] SNAPSHOT_UPDATE_SKIPPED_AFTER_FAILURE key={snapshot.key} kept_candidate_count={previous_count} run_failed={run_failed} new_snapshot_count={snapshot_count}",
                             flush=True,
                         )
                     else:
@@ -3129,7 +3145,6 @@ class IntelligenceStateService:
                         self._snapshots.move_to_end(snapshot.key)
                         existing_latest = self._snapshots.get(self._latest_key or "") if self._latest_key else None
                         existing_latest_count = _intelligence_state_candidate_count(existing_latest.response) if existing_latest is not None and isinstance(existing_latest.response, dict) else 0
-                        snapshot_count = _intelligence_state_candidate_count(response) if isinstance(response, dict) else 0
                         # #93 follow-up: Phase 1's board-window watch set means
                         # this loop now legitimately processes several distinct
                         # dates' payloads in the same run (today, today+1,

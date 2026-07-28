@@ -1568,6 +1568,98 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertIsNone(service._latest_key)
         self.assertEqual(service._snapshots[tomorrow_key].payload.get("date"), tomorrow)
 
+    def test_background_loop_does_not_overwrite_a_good_snapshot_with_an_empty_recompute(self) -> None:
+        # #100 follow-up, confirmed live 2026-07-27: the existing
+        # SNAPSHOT_UPDATE_SKIPPED_AFTER_FAILURE guard (see the rollover test
+        # above and its sibling for the raised-exception case) only fired
+        # when the compute call itself raised (run_failed). A cycle that
+        # completes WITHOUT raising but legitimately computes zero
+        # candidates -- observed right after a concurrent deploy restarted
+        # refresh-worker, before its own artifact/cache state had caught up
+        # -- was not run_failed, so it silently overwrote a real 6-candidate
+        # snapshot with an empty one, and self._latest_key followed it (its
+        # own guard's `self._latest_key == snapshot.key` clause is trivially
+        # true for the persistent "today" key on every recompute). This test
+        # fails against the pre-fix source: run it there and the snapshot
+        # comes back empty.
+        service = IntelligenceStateService()
+        service._interval_seconds = 0
+
+        today = "2026-07-27"
+        payload = {"question": "top edges today", "date": today}
+        normalized = service._normalize_payload(payload)
+        today_key = _payload_key(normalized)
+
+        good_response = {
+            "ok": True,
+            "top_opportunities": [{"sport": "MLB"}] * 6,
+            "recommendations": [{"sport": "MLB"}] * 6,
+            "by_sport": {"mlb": [{"sport": "MLB"}] * 6},
+            "board_contract": {"schema": "intelligence_board_v1", "cards": [{"sport": "MLB"}] * 6},
+            "analysis": None,
+            "portfolio": {},
+            "parlays": [],
+            "selected_date": today,
+            "state_last_updated": "2026-07-27T19:35:01-05:00",
+            "last_updated": "2026-07-27T19:35:01-05:00",
+            "snapshot_generated_at": "2026-07-27T19:35:01-05:00",
+            "candidate_count": 6,
+        }
+        service._snapshots[today_key] = IntelligenceSnapshot(
+            key=today_key,
+            payload=normalized,
+            response=dict(good_response),
+            computed_at="2026-07-27T19:35:01-05:00",
+            source_fingerprint="",
+        )
+        service._latest_key = today_key
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            state_path = temp_root / "query_state_cache.json"
+            board_snapshot_path = temp_root / "board_snapshot.json"
+            persisted_state = {
+                "latest_key": today_key,
+                "updated_at": "2026-07-27T19:35:01-05:00",
+                "watched_payloads": {today_key: normalized},
+                "pending_keys": {today_key: normalized},
+                "snapshots": {today_key: dict(good_response)},
+            }
+            refresh_state_store.write_json_file(state_path, persisted_state)
+
+            with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(
+                intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path
+            ), patch.object(intelligence_state_module, "central_today_iso", return_value=today), patch.object(
+                service, "_ensure_default_board_window_watched"
+            ):
+                empty_response = {
+                    "ok": True,
+                    "top_opportunities": [],
+                    "recommendations": [],
+                    "by_sport": {},
+                    "board_contract": {"schema": "intelligence_board_v1", "cards": []},
+                    "analysis": None,
+                    "portfolio": {},
+                    "parlays": [],
+                    "selected_date": today,
+                    "state_last_updated": "2026-07-28T00:59:00Z",
+                    "last_updated": "2026-07-28T00:59:00Z",
+                    "snapshot_generated_at": "2026-07-28T00:59:00Z",
+                    "candidate_count": 0,
+                }
+
+                def fake_write_latest_intelligence_state(state: dict[str, object]) -> dict[str, object]:
+                    service._stop.set()
+                    return dict(state)
+
+                with patch.object(service, "_compute_board_publication_response", return_value=dict(empty_response)):
+                    with patch("pipeline.intelligence_state.write_latest_intelligence_state", side_effect=fake_write_latest_intelligence_state):
+                        service._background_loop()
+
+        self.assertEqual(service._latest_key, today_key)
+        self.assertEqual(service._snapshots[today_key].response.get("candidate_count"), 6)
+        self.assertEqual(len(service._snapshots[today_key].response.get("by_sport", {}).get("mlb", [])), 6)
+
     def test_state_compute_promotes_candidate_pool_when_ranking_returns_empty(self) -> None:
         service = IntelligenceStateService()
 
