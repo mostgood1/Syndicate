@@ -1549,6 +1549,69 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertGreaterEqual(live_count, 2)
         self.assertGreaterEqual(pregame_count, 2)
 
+    def test_collect_candidates_keeps_both_games_of_a_doubleheader_distinct(self) -> None:
+        # #117. CLE @ CIN, a real same-day MLB doubleheader, showed a LIVE
+        # candidate carrying the OTHER (not-yet-started) game's 21-hour-stale
+        # odds. Root cause: the dedup identity tuple (candidate_type,
+        # sport_slug, matchup, market, pick) has no per-game field, so two
+        # doubleheader games producing byte-identical tuples ("CLE @ CIN" /
+        # "Moneyline" / "Home ML") collapsed into one -- only one set of 5
+        # candidates existed for the matchup, not two. This fails pre-fix
+        # (one candidate survives, the live game's own gamePk is a coin
+        # flip) and passes post-fix (both gamePks survive as distinct rows).
+        overview = [{"slug": "mlb", "name": "MLB", "dashboard_games": []}]
+
+        def _fake_game_candidates_for_sport(sport: dict[str, object]) -> list[dict[str, object]]:
+            if str(sport.get("slug") or "").lower() != "mlb":
+                return []
+            return [
+                {
+                    "candidate_type": "game",
+                    "sport": "MLB",
+                    "sport_slug": "mlb",
+                    "selection": "Home ML",
+                    "pick": "Home ML",
+                    "market": "Moneyline",
+                    "projection": 0.68,
+                    "odds": "+110",
+                    "is_live": True,
+                    "is_final": False,
+                    "matchup": "CLE @ CIN",
+                    "gamePk": 824489,
+                    "event_id": None,
+                    "score": 10.0,
+                },
+                {
+                    "candidate_type": "game",
+                    "sport": "MLB",
+                    "sport_slug": "mlb",
+                    "selection": "Home ML",
+                    "pick": "Home ML",
+                    "market": "Moneyline",
+                    "projection": 0.55,
+                    "odds": "-120",
+                    "is_live": False,
+                    "is_final": False,
+                    "matchup": "CLE @ CIN",
+                    "gamePk": 824490,
+                    "event_id": None,
+                    "score": 5.0,
+                },
+            ]
+
+        preferences = _query_preferences("top edges today", mode="recommendation", sport="all", timing="all", include_props=True, include_games=True)
+        with patch("syndicate.features.intelligence._game_candidates_for_sport", side_effect=_fake_game_candidates_for_sport):
+            candidates = collect_candidates(overview, preferences)
+
+        cin_candidates = [c for c in candidates if c.get("matchup") == "CLE @ CIN"]
+        self.assertEqual(len(cin_candidates), 2, "expected both doubleheader games to survive dedup as distinct candidates")
+        game_pks = {c.get("gamePk") for c in cin_candidates}
+        self.assertEqual(game_pks, {824489, 824490})
+        live_candidate = next(c for c in cin_candidates if c.get("gamePk") == 824489)
+        self.assertTrue(live_candidate.get("is_live"))
+        not_started_candidate = next(c for c in cin_candidates if c.get("gamePk") == 824490)
+        self.assertFalse(not_started_candidate.get("is_live"))
+
     def test_score_candidate_marks_inactive_prop_as_state_invalid(self) -> None:
         candidate = {
             "sport_slug": "nba",

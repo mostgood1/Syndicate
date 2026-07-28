@@ -5372,18 +5372,29 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
     _log_candidate_stage(pipeline_name="collect_candidates", stage="normalize_candidate", before=candidates, after=normalized_candidates)
 
     deduped: list[dict[str, Any]] = []
-    seen: set[tuple[str, str, str, str, str]] = set()
+    seen: set[tuple[str, ...]] = set()
     classified_candidates: list[dict[str, Any]] = []
     classification_pruned: list[dict[str, Any]] = []
     dedupe_pruned: list[dict[str, Any]] = []
     for row in sorted(normalized_candidates, key=lambda candidate: float(candidate.get("score") or 0.0), reverse=True):
+        # #117: matchup alone ("CLE @ CIN") is identical for both games of a
+        # same-day doubleheader, so without a real per-game identifier in
+        # this tuple, the second game's candidate gets dropped here as a
+        # "duplicate" of the first before it ever reaches scoring -- the
+        # confirmed live cause of only one set of candidates existing for a
+        # doubleheader matchup instead of two. game_identity is appended
+        # (not substituted for matchup) only when a real per-game id is
+        # present, so candidate types that never carry one (some prop paths)
+        # keep the exact prior 5-field behavior rather than risk
+        # under-deduping on an always-empty new field.
+        game_identity = _safe_text(row.get("gamePk") or row.get("game_id") or row.get("event_id"), "")
         identity = (
             _safe_text(row.get("candidate_type"), "candidate"),
             _safe_text(row.get("sport_slug"), "sport"),
             _safe_text(row.get("matchup"), "matchup"),
             _safe_text(row.get("market"), "market"),
             _safe_text(row.get("pick") or row.get("name"), "pick"),
-        )
+        ) + ((game_identity,) if game_identity else ())
         if identity in seen:
             dedupe_pruned.append(_collect_candidate_trace(row, reason="duplicate_identity", stage="deduplication"))
             continue

@@ -77,7 +77,17 @@ def attach_market_id(
     line: Any | None = None,
 ) -> dict[str, Any]:
     payload = dict(row)
-    inferred_event_id = event_id if event_id is not None else payload.get("event_id") or payload.get("matchup") or payload.get("game_id")
+    # #117: matchup is identical for both games of a same-day doubleheader,
+    # so a numeric per-game identifier must outrank it in this fallback --
+    # gamePk/game_id come before matchup, which is the last resort only for
+    # rows that never carry a real game identifier at all (e.g. some prop
+    # paths). Mirrors the identical ordering fix at
+    # pipeline/intelligence_state.py's own attach_market_id call site.
+    inferred_event_id = (
+        event_id
+        if event_id is not None
+        else payload.get("event_id") or payload.get("gamePk") or payload.get("game_id") or payload.get("matchup")
+    )
     inferred_market_type = market_type if market_type is not None else payload.get("market_type") or payload.get("market") or payload.get("selection") or payload.get("period")
     is_prop_candidate = str(payload.get("candidate_type") or "").strip().lower() == "prop"
     if entity is not None:

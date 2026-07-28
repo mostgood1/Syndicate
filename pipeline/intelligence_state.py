@@ -2537,7 +2537,15 @@ class IntelligenceStateService:
             candidate_entry = attach_market_id(
                 candidate_entry,
                 sport=candidate_entry.get("sport_slug") or candidate_entry.get("sport"),
-                event_id=candidate_entry.get("event_id") or candidate_entry.get("matchup") or candidate_entry.get("game_id"),
+                # #117: matchup ("CLE @ CIN") is identical for both games of a
+                # same-day doubleheader, so it must never outrank an actual
+                # per-game identifier. gamePk/game_id come before matchup here
+                # -- previously matchup was tried first, which silently merged
+                # two distinct games' odds-history identity the moment
+                # event_id was empty on the candidate (confirmed live
+                # 2026-07-28: a live game's candidate carried the other,
+                # not-yet-started game's 21-hour-stale pregame odds).
+                event_id=candidate_entry.get("event_id") or candidate_entry.get("gamePk") or candidate_entry.get("game_id") or candidate_entry.get("matchup"),
                 market_type=candidate_entry.get("market_type") or candidate_entry.get("market") or candidate_entry.get("selection") or candidate_entry.get("period"),
                 entity=candidate_entry.get("entity") or candidate_entry.get("player_name") or candidate_entry.get("player") or candidate_entry.get("team") or candidate_entry.get("selection"),
                 line=candidate_entry.get("line") or candidate_entry.get("market_line") or candidate_entry.get("prop_line"),
