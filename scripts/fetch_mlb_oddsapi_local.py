@@ -15,6 +15,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from syndicate.features.mlb.game_state import mlb_status_is_final
+from syndicate.features.mlb.game_state import mlb_status_is_live
+from syndicate.features.mlb.sources import default_mlb_source_root
 from syndicate.features.shared.oddsapi_quota import record_oddsapi_quota
 
 
@@ -758,6 +761,104 @@ def _merge_event_odds_payloads(primary: dict[str, Any] | None, secondary: dict[s
     return merged
 
 
+def _event_scoping_enabled() -> bool:
+    raw = str(os.environ.get("SYNDICATE_ODDS_EVENT_SCOPING_ENABLED") or "true").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _event_scoping_window_seconds() -> int:
+    # Matches live_refresh_loop.py's own _T_WINDOW_RAMP_SECONDS (75 min) --
+    # a game inside its own T-window is exactly the case that window exists
+    # to catch, so "hot" here should agree with it rather than invent a
+    # second boundary.
+    raw = str(os.environ.get("SYNDICATE_ODDS_EVENT_SCOPING_WINDOW_SECONDS") or "").strip()
+    try:
+        return max(0, int(raw)) if raw else 75 * 60
+    except ValueError:
+        return 75 * 60
+
+
+def _normalize_matchup_team(value: object) -> str:
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def _load_mlb_status_by_matchup(date_str: str) -> dict[tuple[str, str], dict[str, object]]:
+    # Event scoping (#16 budget lever): per-event, not per-slate, is-this-
+    # game-hot decision, so a finished or far-pregame game doesn't pull the
+    # 18 segment/alternate markets every ~90s cycle just because some OTHER
+    # game on the same slate is live. Reuses the same MLB StatsAPI schedule
+    # snapshot (schedule_raw.json) every daily-update run already writes
+    # under this same source root -- not a new fetch, just a new read.
+    # Keyed by (away, home) team name since that's what OddsAPI's own event
+    # objects carry; gamePk isn't available on the OddsAPI side to join on.
+    path = default_mlb_source_root() / "source_artifacts" / "data" / "daily" / "snapshots" / date_str / "schedule_raw.json"
+    try:
+        games = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(games, list):
+        return {}
+    by_matchup: dict[tuple[str, str], dict[str, object]] = {}
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        teams = game.get("teams") if isinstance(game.get("teams"), dict) else {}
+        away = ((teams.get("away") or {}).get("team") or {}).get("name") if isinstance(teams.get("away"), dict) else None
+        home = ((teams.get("home") or {}).get("team") or {}).get("name") if isinstance(teams.get("home"), dict) else None
+        away_key = _normalize_matchup_team(away)
+        home_key = _normalize_matchup_team(home)
+        if not away_key or not home_key:
+            continue
+        status = game.get("status") if isinstance(game.get("status"), dict) else {}
+        by_matchup[(away_key, home_key)] = {
+            "abstract": status.get("abstractGameState"),
+            "detailed": status.get("detailedState"),
+            "commence": game.get("gameDate"),
+        }
+    return by_matchup
+
+
+def _event_wants_full_game_markets(
+    *,
+    away_team: object,
+    home_team: object,
+    commence_time: object,
+    status_by_matchup: dict[tuple[str, str], dict[str, object]],
+    now: datetime,
+    window_seconds: int,
+) -> bool:
+    """Whether THIS event needs the full (segment/alternate) game-market set
+    this cycle, vs skipping the per-event segment fetch entirely.
+
+    Full whenever: the schedule snapshot doesn't have this exact matchup
+    (fail open -- an unmatched game must not silently lose coverage), the
+    game is live, or it's within its own T-window. Reduced only for a
+    confirmed-final game or a confirmed-pregame game still outside its
+    window.
+    """
+    key = (_normalize_matchup_team(away_team), _normalize_matchup_team(home_team))
+    status = status_by_matchup.get(key)
+    if status is None:
+        return True
+    abstract = status.get("abstract")
+    detailed = status.get("detailed")
+    if mlb_status_is_live(abstract, detailed):
+        return True
+    if mlb_status_is_final(abstract, detailed):
+        return False
+    commence_text = str(commence_time or status.get("commence") or "").strip()
+    if not commence_text:
+        return True
+    try:
+        commence = datetime.fromisoformat(commence_text.replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    if commence.tzinfo is None:
+        commence = commence.replace(tzinfo=timezone.utc)
+    seconds_to_start = (commence - now).total_seconds()
+    return seconds_to_start <= window_seconds
+
+
 def fetch_live_game_lines_for_date(api_key: str, date_str: str, *, regions: str = "us", bookmakers: str | None = None, events: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     live_events = list(events or _fetch_live_events_for_date(api_key, date_str))
     game_market_keys = _CORE_GAME_MARKET_KEYS + _SEGMENT_GAME_MARKET_KEYS
@@ -774,18 +875,62 @@ def fetch_live_game_lines_for_date(api_key: str, date_str: str, *, regions: str 
     slate_covered = bool(slate_by_event)
     per_event_market_keys = _SEGMENT_GAME_MARKET_KEYS if slate_covered else game_market_keys
 
+    # Event scoping (#16 budget lever). Until now this per-event loop always
+    # fetched the full 18 segment/alternate markets for EVERY game on EVERY
+    # ~90s cycle, regardless of that game's own state -- including games
+    # hours from first pitch and games already final, as long as some OTHER
+    # game on the same slate was live (confirmed live 2026-07-27: this is
+    # the actual default production code path -- SYNDICATE_ODDS_MARKET_TIER
+    # from #82 Phase 2 was never read anywhere in this file, only in
+    # refresh_mlb_oddsapi.py's fast-mode path, which live_refresh_loop.py's
+    # own launches don't use). A cold event now either skips the per-event
+    # call entirely (when the cheap slate-wide core call already covered
+    # it) or, in the rare slate-call-failed fallback, only pulls core
+    # markets instead of the full set -- never the segments.
+    event_scoping_enabled = _event_scoping_enabled()
+    status_by_matchup: dict[tuple[str, str], dict[str, object]] = {}
+    if event_scoping_enabled:
+        status_by_matchup = _load_mlb_status_by_matchup(date_str)
+        if not status_by_matchup:
+            # Schedule snapshot missing/unreadable: fail open to the
+            # original every-event-gets-segments behavior.
+            event_scoping_enabled = False
+    event_scoping_window_seconds = _event_scoping_window_seconds()
+    scoping_now = datetime.now(timezone.utc)
+
     games: list[dict[str, Any]] = []
+    events_scoped_full = 0
+    events_scoped_reduced = 0
     for event in live_events:
         event_id = str(event.get("id") or "").strip()
         if not event_id:
             continue
-        try:
-            payload = _fetch_live_event_odds(api_key, event_id, markets_csv=",".join(per_event_market_keys), regions=regions, bookmakers=bookmakers)
-        except requests.HTTPError:
-            payload = None
+        wants_full = True
+        if event_scoping_enabled:
+            wants_full = _event_wants_full_game_markets(
+                away_team=event.get("away_team"),
+                home_team=event.get("home_team"),
+                commence_time=event.get("commence_time"),
+                status_by_matchup=status_by_matchup,
+                now=scoping_now,
+                window_seconds=event_scoping_window_seconds,
+            )
+        if wants_full:
+            events_scoped_full += 1
+        else:
+            events_scoped_reduced += 1
+        payload = None
+        if wants_full or not slate_covered:
+            event_market_keys = per_event_market_keys if wants_full else _CORE_GAME_MARKET_KEYS
+            try:
+                payload = _fetch_live_event_odds(api_key, event_id, markets_csv=",".join(event_market_keys), regions=regions, bookmakers=bookmakers)
+            except requests.HTTPError:
+                payload = None
         # Merge before scoring: _best_bookmaker_game_lines picks ONE bookmaker
         # from a single payload, so scoring core and segments separately would
-        # mix two books' prices into one game.
+        # mix two books' prices into one game. A cold, slate-covered event
+        # has no per-event payload at all -- this just carries the
+        # slate-wide core payload through unchanged.
         payload = _merge_event_odds_payloads(slate_by_event.get(event_id), payload)
         if not isinstance(payload, dict):
             continue
@@ -802,7 +947,23 @@ def fetch_live_game_lines_for_date(api_key: str, date_str: str, *, regions: str 
         "totals_games": int(sum(1 for row in games if isinstance((row.get("markets") or {}).get("totals"), dict))),
         "spreads_games": int(sum(1 for row in games if isinstance((row.get("markets") or {}).get("spreads"), dict))),
     }
-    return {"date": str(date_str), "mode": "live", "retrieved_at": datetime.utcnow().isoformat(), "games": games, "meta": {"markets": game_market_keys, "regions": str(regions or "us"), "bookmakers": (str(bookmakers).split(",") if bookmakers else None), "counts": counts}}
+    return {
+        "date": str(date_str),
+        "mode": "live",
+        "retrieved_at": datetime.utcnow().isoformat(),
+        "games": games,
+        "meta": {
+            "markets": game_market_keys,
+            "regions": str(regions or "us"),
+            "bookmakers": (str(bookmakers).split(",") if bookmakers else None),
+            "counts": counts,
+            "event_scoping": {
+                "enabled": bool(event_scoping_enabled),
+                "full_tier_events": int(events_scoped_full),
+                "reduced_tier_events": int(events_scoped_reduced),
+            },
+        },
+    }
 
 
 def fetch_live_pitcher_props_for_date(api_key: str, date_str: str, *, regions: str = "us", bookmakers: str | None = None, events: list[dict[str, Any]] | None = None) -> dict[str, Any]:
