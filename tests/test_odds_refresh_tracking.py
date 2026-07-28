@@ -279,6 +279,62 @@ class OddsRefreshTrackingTests(unittest.TestCase):
                 for older_entry in overlong_history[:-1]:
                     self.assertNotIn("row", older_entry)
 
+    def test_history_sweep_evicts_a_market_no_longer_touched_in_a_day(self) -> None:
+        # #112 follow-up (breadth, not depth). Depth bounding (the two tests
+        # above) caps how much history one market carries, but nothing
+        # capped how many DISTINCT markets a shard could accumulate --
+        # confirmed live 2026-07-28: MLB's shard grew from 21.6MB (3,452
+        # markets) to 51.1MB (3,713 markets) over ~2 hours even with depth
+        # bounding deployed and working, because a market is never removed
+        # once created, whether or not its game is still relevant. A market
+        # untouched well past the staleness ceiling should be evicted
+        # outright; a market touched recently (even if quiet -- no new row
+        # this cycle) must survive.
+        from datetime import datetime, timedelta, timezone
+
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports"), "SYNDICATE_ODDS_EVENTS_ROOT": str(Path(tmpdir) / "odds_events")}, clear=False):
+            root = Path(tmpdir)
+            team_root = root / "data" / "odds" / "team" / "date=2026-06-07"
+            team_root.mkdir(parents=True)
+            (team_root / "oddsapi.csv").write_text(
+                "home_team,away_team,bookmaker,market,selection,line,price\nHome,Away,draftkings,total,over,6.5,-110\n",
+                encoding="utf-8",
+            )
+            result = sync_post_refresh_tracking_for_source_root(sport="nhl", source_root=root, date_str="2026-06-07")
+            self.assertTrue(result["ok"])
+
+            history_path = root / "tracking" / "odds_history" / "2026-06-07.json"
+            history_payload = json.loads(history_path.read_text(encoding="utf-8"))
+
+            stale_key = "home_team=long gone|away_team=team|market=total|selection=over|bookmaker=draftkings"
+            history_payload["markets"][stale_key] = {
+                "last_line": 3.5,
+                "last_updated": "2020-01-01T00:00:00+00:00",
+                "history": [{"current_line": 3.5, "market_id": stale_key, "timestamp": "2020-01-01T00:00:00+00:00"}],
+            }
+            fresh_key = "home_team=still relevant|away_team=team|market=total|selection=over|bookmaker=draftkings"
+            fresh_now = datetime.now(timezone.utc).isoformat()
+            history_payload["markets"][fresh_key] = {
+                "last_line": 4.5,
+                "last_updated": fresh_now,
+                "history": [{"current_line": 4.5, "market_id": fresh_key, "timestamp": fresh_now}],
+            }
+            history_path.write_text(json.dumps(history_payload), encoding="utf-8")
+            shared_path = root / "reports" / "odds_control_plane" / "odds_history" / "nhl" / "2026-06-07.json"
+            shared_path.parent.mkdir(parents=True, exist_ok=True)
+            shared_path.write_text(json.dumps(history_payload), encoding="utf-8")
+
+            (team_root / "oddsapi.csv").write_text(
+                "home_team,away_team,bookmaker,market,selection,line,price\nHome,Away,draftkings,total,over,7.0,-110\n",
+                encoding="utf-8",
+            )
+            result = sync_post_refresh_tracking_for_source_root(sport="nhl", source_root=root, date_str="2026-06-07")
+            self.assertTrue(result["ok"])
+
+            history_payload = json.loads(history_path.read_text(encoding="utf-8"))
+            self.assertNotIn(stale_key, history_payload["markets"], "a market untouched for years must be evicted")
+            self.assertIn(fresh_key, history_payload["markets"], "a market touched moments ago must survive even though it got no new row this cycle")
+
     def test_sync_nhl_tracking_appends_when_odds_change_without_line_change(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports"), "SYNDICATE_ODDS_EVENTS_ROOT": str(Path(tmpdir) / "odds_events")}, clear=False):
             root = Path(tmpdir)

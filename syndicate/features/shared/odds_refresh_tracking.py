@@ -46,6 +46,43 @@ def _odds_history_limit() -> int:
 _ODDS_HISTORY_LIMIT = _odds_history_limit()
 
 
+def _odds_history_market_staleness_ceiling_seconds() -> int:
+    # #112 follow-up (breadth, not depth). _ODDS_HISTORY_LIMIT/the shard-wide
+    # sweep bound per-market history DEPTH -- but this file's own #112
+    # comment already named the real growth driver as market COUNT (breadth):
+    # thousands of distinct MLB prop markets on a full slate, each one
+    # persisting forever once created, whether or not the game it belongs to
+    # is still relevant. Confirmed live 2026-07-28: even with depth bounding
+    # deployed and working, the MLB shard grew from 21.6MB (3,452 markets) to
+    # 51.1MB (3,713 markets) over about two hours -- monotonic growth, never
+    # reclaimed, because nothing ever removes a market once quoted, only
+    # trims its history. That size made every write/publish attempt slower
+    # and less reliable, which surfaced as MLB prop candidates specifically
+    # (the largest share of the market count) failing #120's freshness SLA
+    # gate: their odds_history-derived last_updated genuinely was stale,
+    # because the growing shard was struggling to write reliably.
+    #
+    # A market untouched for this long is almost certainly for a game that
+    # has already finished, or a price no longer being quoted -- evict it
+    # outright rather than let it sit forever.
+    #
+    # 8h default, deliberately NOT 24h: a same-day ceiling has no effect at
+    # all on the CURRENT day's already-oversized shard -- every market
+    # created today is, by definition, under 24h old on the very next cycle,
+    # so a 24h ceiling only ever prevents growth ACROSS days, never shrinks
+    # today's. 8h safely covers any single game's real duration (including
+    # extra innings or a doubleheader's first game) with real margin, while
+    # actually being short enough to evict markets from games that started
+    # early today and have since gone final -- which is exactly what's
+    # needed to bring today's 51.1MB/3,713-market MLB shard back down
+    # without waiting for the date to roll over.
+    raw = str(os.environ.get("SYNDICATE_ODDS_HISTORY_MARKET_STALENESS_CEILING_SECONDS") or "").strip()
+    try:
+        return max(3600, int(raw)) if raw else 8 * 3600
+    except ValueError:
+        return 8 * 3600
+
+
 def _trace_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -1312,6 +1349,30 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
     for shard_key, shard_markets in shards.items():
         if shard_entries_appended.get(shard_key, 0) <= 0:
             continue
+        # #112 follow-up (breadth). Evict entire markets that haven't been
+        # touched in _odds_history_market_staleness_ceiling_seconds() BEFORE
+        # the depth-bounding sweep below -- depth bounding trims how much
+        # history a market carries, this bounds how many markets exist at
+        # all, which is the actual driver of the shard's monotonic growth
+        # (see that function's own comment for the live measurements).
+        # Mutating shard_markets in place via a materialized key list, since
+        # deleting during iteration over .values() would raise.
+        staleness_ceiling = _odds_history_market_staleness_ceiling_seconds()
+        now_dt = datetime.now(timezone.utc)
+        evicted_market_count = 0
+        for market_key in list(shard_markets.keys()):
+            market_state = shard_markets.get(market_key)
+            if not isinstance(market_state, dict):
+                continue
+            market_last_updated = _parse_utc_datetime(market_state.get("last_updated") or market_state.get("last_snapshot_ts"))
+            if market_last_updated is None:
+                continue
+            if (now_dt - market_last_updated).total_seconds() > staleness_ceiling:
+                del shard_markets[market_key]
+                evicted_market_count += 1
+        if evicted_market_count:
+            _trace_log("odds_history_market_eviction", sport=slug, shard_key=shard_key, evicted=evicted_market_count, remaining=len(shard_markets), staleness_ceiling_seconds=staleness_ceiling)
+
         # #112 correction: the strip at append time only ever touched
         # markets that got a NEW entry THIS cycle -- a market whose price
         # hasn't moved hits the dedupe short-circuit above and skips the
