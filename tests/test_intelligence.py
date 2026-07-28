@@ -2562,67 +2562,26 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(state_mock.call_count, 2)
         compute_mock.assert_called_once()
 
-    def test_intelligence_query_api_computes_synchronously_on_render_when_cache_misses(self) -> None:
-        # 2026-07-24 fix: a hosted (Render) request used to queue a
-        # background refresh and, on a cache miss (e.g. a date that's never
-        # been requested before, like tomorrow's day-ahead slate), always
-        # hand back an empty placeholder -- even though the exact same
-        # synchronous compute path used below (and by the non-hosted
-        # branch) is fully capable of answering directly and warming the
-        # cache for next time. Confirmed live in production: querying
-        # tomorrow's date returned candidate_count: 0 even with real
-        # lookahead-sim data already on disk. This test locks in the fix:
-        # on a genuine cache miss, the hosted branch must now also try the
-        # synchronous compute before giving up.
-        live_result = {
-            "ok": True,
-            # _compute_intelligence_response derives candidate_count (and
-            # therefore whether _response_has_board_content accepts this
-            # response at all) from a TOP-LEVEL "recommendations" key, not
-            # the one nested under "analysis" -- matches the real
-            # _compute_response contract, not just this test's shorthand.
-            "recommendations": [{"recommendation_id": "rec-1", "name": "Jayson Tatum Over 28.5"}],
-            "analysis": {"recommendations": [{"recommendation_id": "rec-1", "name": "Jayson Tatum Over 28.5"}]},
-            "top_opportunities": [{"recommendation_id": "rec-1", "name": "Jayson Tatum Over 28.5"}],
-            "by_sport": {"nba": [{"recommendation_id": "rec-1", "name": "Jayson Tatum Over 28.5"}]},
-            "response": {"analysis": {"recommendations": [{"recommendation_id": "rec-1", "name": "Jayson Tatum Over 28.5"}]}},
-            "board_contract": {"schema": "intelligence_board_v1", "cards": [{"name": "Jayson Tatum Over 28.5"}]},
-        }
-        board_contract = {"schema": "intelligence_board_v1", "cards": [{"name": "Jayson Tatum Over 28.5"}]}
-
+    def test_intelligence_query_api_never_computes_synchronously_on_render_when_cache_misses(self) -> None:
+        # #109 follow-up, confirmed live 2026-07-27: this test used to assert
+        # the OPPOSITE of what it does now -- that a cache miss on Render
+        # falls through to a synchronous _compute_response call, added as a
+        # 2026-07-24 "fix" for tomorrow's-date queries returning empty. That
+        # caused a real production incident: a single request with a novel
+        # question/date (never matching the background loop's own cached
+        # key) drove web to 100% memory / 0MB headroom, because the compute
+        # ran INSIDE the web request handler on the memory-constrained web
+        # container -- a direct violation of this repo's load-bearing rule
+        # (web does no heavy computation; intelligence runs on
+        # refresh-worker's 4GB via the background loop, web only reads what
+        # it already computed). Reverted: a cache miss on Render always
+        # returns the queued/empty placeholder and waits for the background
+        # loop's own next cycle, regardless of how novel the payload is.
         with patch.dict(os.environ, {"RENDER": "true"}, clear=False):
             with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as queue_mock:
                 with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=None):
                     with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", return_value=(None, "fallback")) as cached_mock:
-                        with patch("syndicate.blueprints.intelligence._INTELLIGENCE_STATE_SERVICE._compute_response", return_value=dict(live_result)) as compute_mock:
-                            with patch("syndicate.blueprints.intelligence.build_intelligence_board_contract", return_value=dict(board_contract)):
-                                response = self.client.post(
-                                    "/api/intelligence/query",
-                                    json={
-                                        "question": "Analyze Jayson Tatum tonight",
-                                        "date": "2026-07-25",
-                                        "force_refresh": True,
-                                    },
-                                )
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.get_json()
-        self.assertEqual((payload.get("response") or {}).get("queued_refresh"), True)
-        self.assertEqual((payload.get("response") or {}).get("execution_source"), "compute_refresh")
-        self.assertEqual((payload.get("response") or {}).get("analysis", {}).get("recommendations", [])[0].get("name"), "Jayson Tatum Over 28.5")
-        queue_mock.assert_called_once()
-        cached_mock.assert_called_once()
-        compute_mock.assert_called_once()
-
-    def test_intelligence_query_api_still_returns_empty_placeholder_when_compute_also_fails(self) -> None:
-        # The degrade-gracefully case: cache misses AND the synchronous
-        # compute itself comes back empty/errors -- must still return the
-        # (queued, empty) placeholder rather than erroring the request.
-        with patch.dict(os.environ, {"RENDER": "true"}, clear=False):
-            with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh"):
-                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=None):
-                    with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", return_value=(None, "fallback")):
-                        with patch("syndicate.blueprints.intelligence._INTELLIGENCE_STATE_SERVICE._compute_response", return_value=None) as compute_mock:
+                        with patch("syndicate.blueprints.intelligence._INTELLIGENCE_STATE_SERVICE._compute_response") as compute_mock:
                             response = self.client.post(
                                 "/api/intelligence/query",
                                 json={
@@ -2637,7 +2596,9 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual((payload.get("response") or {}).get("queued_refresh"), True)
         self.assertEqual((payload.get("response") or {}).get("execution_source"), "fallback")
         self.assertEqual((payload.get("response") or {}).get("analysis", {}).get("recommendations"), [])
-        compute_mock.assert_called_once()
+        queue_mock.assert_called_once()
+        cached_mock.assert_called_once()
+        compute_mock.assert_not_called()
 
     def test_intelligence_query_api_degrades_when_queue_refresh_fails(self) -> None:
         # Mocking read_latest_intelligence_state_response alone left the
