@@ -947,6 +947,10 @@ def fetch_live_game_lines_for_date(api_key: str, date_str: str, *, regions: str 
         "totals_games": int(sum(1 for row in games if isinstance((row.get("markets") or {}).get("totals"), dict))),
         "spreads_games": int(sum(1 for row in games if isinstance((row.get("markets") or {}).get("spreads"), dict))),
     }
+    print(
+        f"[mlb_fetch_event_scoping] enabled={event_scoping_enabled} full_tier={events_scoped_full} reduced_tier={events_scoped_reduced} events_matched={len(live_events)}",
+        flush=True,
+    )
     return {
         "date": str(date_str),
         "mode": "live",
