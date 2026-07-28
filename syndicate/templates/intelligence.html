@@ -154,7 +154,22 @@
 
   const urlParams = new URLSearchParams(window.location.search);
   const state = {
-    date: urlParams.get("date") || document.getElementById("board-date").value || "",
+    // #111 follow-up: this used to also fall back to the live #board-date
+    // input's .value -- but browsers restore a previously-typed <input
+    // type="date"> value on reload independent of HTTP/CDN caching (a hard
+    // refresh does not clear it), so a tab left open since a prior day
+    // silently reintroduced an explicit (and now-stale) date on every
+    // reload. An explicit date bypasses the combined-board default
+    // entirely (see read_combined_intelligence_response's own "not
+    // explicit_date" gate) and falls back to whatever that stale date's
+    // own single-date snapshot last computed -- confirmed live 2026-07-28:
+    // a tab open since before midnight kept sending date=2026-07-27 after
+    // a hard refresh, landing on a "snapshot_read" response frozen at
+    // 2:01 AM instead of the fresh combined_board_window board. Only an
+    // explicit URL param (an intentional deep link) should seed state.date
+    // now; the input's own value is synced FROM state.date just below,
+    // not the other way around.
+    date: urlParams.get("date") || "",
     sport: urlParams.get("sport") || "all",
     gameState: urlParams.get("game_state") || "all",
     marketFamily: urlParams.get("market_family") || "all",
@@ -162,6 +177,10 @@
     view: urlParams.get("view") === "cards" ? "cards" : "blotter",
     game: urlParams.get("game") || "all",
   };
+  {
+    const dateInput = document.getElementById("board-date");
+    if (dateInput) dateInput.value = state.date;
+  }
 
   const initialResponseScript = document.getElementById("initial-intelligence-response");
   let initialIntelligenceResponse = {};
