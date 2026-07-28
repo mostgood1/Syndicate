@@ -934,7 +934,7 @@
     // on a quiet day so the strip is never just empty.
     if (Array.isArray(lastSteamEvents) && lastSteamEvents.length) {
       container.innerHTML = `
-        <h2 class="board-section-title">📡 Steam</h2>
+        <h2 class="board-section-title">📡 Pregame Steam</h2>
         <div class="board-strip">
           ${lastSteamEvents.slice(0, 12).map((event) => `
             <div class="board-strip-card board-strip-card--steam" title="${escapeHtml((event.capture_phase || "").toString())}">
@@ -952,7 +952,7 @@
                   ).map((line) => `<div class="board-strip-card__move-line">${escapeHtml(line)}</div>`).join("")
                 }</div>
               </div>
-              <div class="board-strip-card__pick">${escapeHtml(formatTimestamp(event.timestamp))}${event.is_live ? " · live" : ""}</div>
+              <div class="board-strip-card__pick">${escapeHtml(formatTimestamp(event.timestamp))}</div>
             </div>
           `).join("")}
         </div>

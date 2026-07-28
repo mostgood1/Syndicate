@@ -2021,6 +2021,15 @@ def board_steam_api():
     except Exception:
         _LOGGER.exception("BOARD_STEAM_READ_FAILURE")
         events = []
+    # User direction 2026-07-28: pregame only -- "Pregame Steam", not a
+    # general movement feed. Once a game goes live its odds move constantly
+    # for in-game reasons (a strikeout, a stolen base), which drowns out the
+    # pregame signal this rail exists to surface (informed money moving a
+    # line before first pitch). is_live is already carried on every event
+    # (_market_lifecycle_event sets it from the same liveness check the
+    # rest of the pipeline uses), so this is a plain filter, not a new
+    # classification.
+    events = [event for event in events if not event.get("is_live")]
     # Ranked by significance (real line move first, then magnitude), not
     # recency -- the whole bounded 200-event set is in play, not just the
     # newest `limit`, since a big move from a few cycles ago should still
