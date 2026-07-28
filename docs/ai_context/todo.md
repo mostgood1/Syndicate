@@ -508,7 +508,9 @@ now genuinely met rather than merely believed.
     gitignore pattern, even in directories believed fully ignored.
   - Full `test_intelligence_state.py` + `test_intelligence_contracts.py`:
     203 passed, 0 failed.
-- **New: #98** (filed, open) — user reported the board showing MLB live-only
+- **New: #98** (filed, **still open** — a fix shipped for it via #100 but is
+  **not confirmed working live**, see the end of this entry) — user reported
+  the board showing MLB live-only
   (0 pregame) with WNBA gone entirely, right after #97 shipped. Two separate
   findings:
   - **WNBA vanishing is correct, not a bug.** Checked `/api/board/game-chips`
@@ -573,6 +575,17 @@ now genuinely met rather than merely believed.
     state/board_snapshot files) for anything that doesn't specifically need
     a fresh synchronous candidate-pool build, and prefer asking for a
     refresh-worker log pull over triggering one of these on web at all.
+  - ⚠️ **Live-checked post-#100-deploy, 2026-07-27T19:38 CDT (~10-15 min
+    after `110461f6` went live): still `pregame: 0`, despite 3 genuine
+    pregame MLB games confirmed via `/api/board/game-chips` at that exact
+    moment** (HOU @ LAA, BOS @ ATH, MIL @ SF — West-coast late games).
+    #100's own fix (`model_probability` stamping in
+    `_append_game_bet_candidate`) may simply need more background-loop
+    cycles to reach a fresh compute, or may not be the full fix — **not
+    determined this session**. Do not mark #98 closed/validated on #100's
+    writeup alone; re-check `/api/intelligence/query` (safe,
+    `force_refresh:false`) against `/api/board/game-chips` ground truth on
+    a fresh pregame slate before closing.
 - **New: #99** (filed, shipped this session, **commit pending**) — user
   reported MLB K-prop targets stuck at 5 rows and pitcher badges missing on
   a number of game cards. Root-caused via production reads (no deploy
