@@ -23,7 +23,27 @@ from syndicate.features.shared.week_calendar import shard_key_for_week
 from syndicate.features.shared.week_calendar import week_for_date
 
 
-_ODDS_HISTORY_LIMIT = 50
+def _odds_history_limit() -> int:
+    # #112. Reduced default from 50: the row/normalized strip (see the
+    # shard-wide sweep before each shard write) cut per-entry weight, but
+    # MLB's real growth driver is BREADTH -- thousands of distinct prop
+    # markets on a full slate -- and even lightweight entries at 50/market
+    # across that many markets still exceeded the #60 8MB ceiling in
+    # production (confirmed live 2026-07-28: KeyValuePayloadTooLarge
+    # recurred on a cycle that ran after the sweep fix was already live).
+    # 20 entries covers 5 hours at props' 15-min cold cadence and 30 min at
+    # live/hot 90s cadence -- narrower than the steam detector's stated
+    # 45-min window for hot markets, but a real, immediate size cut beats
+    # an unbounded write failure that drops the data anyway. Env-tunable so
+    # it can be adjusted without another deploy if this still isn't enough.
+    raw = str(os.environ.get("SYNDICATE_ODDS_HISTORY_LIMIT") or "").strip()
+    try:
+        return max(1, int(raw)) if raw else 20
+    except ValueError:
+        return 20
+
+
+_ODDS_HISTORY_LIMIT = _odds_history_limit()
 
 
 def _trace_now() -> str:
