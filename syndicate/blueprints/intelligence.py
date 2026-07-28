@@ -22,7 +22,6 @@ from pipeline.intelligence_state import read_intelligence_board_state
 from pipeline.intelligence_state import read_latest_intelligence_board_state
 from pipeline.intelligence_state import slice_intelligence_board_state_for_request
 from pipeline.intelligence_state import read_combined_intelligence_response
-from pipeline.intelligence_state import _INTELLIGENCE_STATE_SERVICE
 from syndicate.features.intelligence import _market_focus_labels
 from syndicate.features.intelligence import _parlay_request_summary
 from syndicate.features.intelligence import _query_preferences
@@ -771,6 +770,15 @@ def _cached_intelligence_response(payload: dict[str, object]) -> dict[str, objec
 
 
 def _compute_intelligence_response(payload: dict[str, object], *, source: str = "query_api") -> dict[str, object] | None:
+    # Imported here, not at module load, so this always sees whatever object
+    # pipeline.intelligence_state._INTELLIGENCE_STATE_SERVICE currently names
+    # -- a top-level `from ... import _INTELLIGENCE_STATE_SERVICE` would bind
+    # the name ONCE at blueprint-import time, silently ignoring any later
+    # `patch("pipeline.intelligence_state._INTELLIGENCE_STATE_SERVICE", ...)`
+    # (tests need real isolation here; ops.py's admin candidate-trace debug
+    # endpoint already imports it the same lazy way for this exact reason).
+    from pipeline.intelligence_state import _INTELLIGENCE_STATE_SERVICE
+
     try:
         read_latest_intelligence_state_response(payload, force_refresh=False, allow_latest_fallback=False)
         computed_response = _INTELLIGENCE_STATE_SERVICE._compute_response(
@@ -804,17 +812,31 @@ def _compute_intelligence_response(payload: dict[str, object], *, source: str = 
         # Set before the "response" copy below, so the nested alias carries it
         # too; callers read either shape.
         if not isinstance(response.get("parsed_request"), dict):
-            # Prefer the engine's own parsed_request: requested_subjects is
-            # resolved against the real candidate pool inside
-            # run_intelligence_query and cannot be reproduced by re-parsing
-            # the question (#74 -- safe to promote now that the router
-            # threads mode_inferred and no longer overwrites parsed intent).
+            # _parsed_request_for_question builds the UI-facing summary shape
+            # (timing/board_scope/chips/sports/etc, see _parlay_request_summary)
+            # -- this is always the base. The engine's OWN parsed_request
+            # (run_intelligence_query's final_response["parsed_request"]) is a
+            # different, raw-preferences shape with none of those display
+            # fields, but its requested_subjects/requested_markets ARE
+            # resolved against the real candidate pool and can't be
+            # reproduced by re-parsing the question text alone (#74) -- so
+            # overlay just those two fields when the engine actually
+            # resolved something, rather than replacing the whole dict
+            # wholesale (confirmed live 2026-07-28: wholesale replacement
+            # silently dropped timing/sports/chips from every query response,
+            # since the engine's dict never carried them in the first place).
             analysis_payload = response.get("analysis") if isinstance(response.get("analysis"), dict) else {}
             analysis_parsed = analysis_payload.get("parsed_request") if isinstance(analysis_payload.get("parsed_request"), dict) else None
-            response["parsed_request"] = analysis_parsed or _parsed_request_for_question(
+            parsed_request = _parsed_request_for_question(
                 str(payload.get("question") or "").strip(),
                 payload,
             )
+            if isinstance(analysis_parsed, dict):
+                for engine_field in ("requested_subjects", "requested_markets"):
+                    engine_value = analysis_parsed.get(engine_field)
+                    if engine_value:
+                        parsed_request[engine_field] = engine_value
+            response["parsed_request"] = parsed_request
         response.setdefault("ok", True)
         response.setdefault("response", dict(response))
         response.setdefault(

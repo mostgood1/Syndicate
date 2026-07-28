@@ -2581,7 +2581,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
             with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as queue_mock:
                 with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=None):
                     with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", return_value=(None, "fallback")) as cached_mock:
-                        with patch("syndicate.blueprints.intelligence._INTELLIGENCE_STATE_SERVICE._compute_response") as compute_mock:
+                        with patch("pipeline.intelligence_state._INTELLIGENCE_STATE_SERVICE._compute_response") as compute_mock:
                             response = self.client.post(
                                 "/api/intelligence/query",
                                 json={
@@ -2636,7 +2636,19 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         result = payload.get("response") or {}
         structured = result.get("response") if isinstance(result.get("response"), dict) else result
         self.assertEqual((structured.get("top_opportunities") or [])[0].get("name"), "Play 1")
-        queue_mock.assert_called_once()
+        # Unlike the render-hosted branch (which queues a background refresh
+        # before falling back to a cache read), the non-render-hosted branch
+        # exercised here never calls queue_intelligence_state_refresh at all:
+        # _compute_response already persists its own result via
+        # _persist_locked, so a second background-refresh trigger would be
+        # redundant. This assertion used to be assert_called_once() (carried
+        # over from an earlier version of this test that mocked
+        # read_latest_intelligence_state_response instead, before the code
+        # path above it changed) -- corrected 2026-07-28 once the
+        # _INTELLIGENCE_STATE_SERVICE import-freezing bug (see
+        # syndicate/blueprints/intelligence.py's _compute_intelligence_response)
+        # was fixed and this mock started actually taking effect.
+        queue_mock.assert_not_called()
 
     def test_intelligence_query_api_returns_live_recommendations_with_sparse_advanced_signals(self) -> None:
         advanced_rows = [
