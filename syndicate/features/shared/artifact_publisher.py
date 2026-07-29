@@ -695,6 +695,33 @@ def _required_daily_artifact_paths(date_str: str) -> list[Path]:
         paths.append(daily_top_props_path(str(date_str).strip()))
     except Exception:
         pass
+    try:
+        # Same class of gap again, found chasing MLB LIVE props specifically
+        # (pregame props were fixed by daily_top_props above and confirmed
+        # live: pregame_count 0 -> 18/28). Live props stayed at zero even
+        # after that fix, with a diagnostic confirming _MLBDataProvider.
+        # live_props independently finds real prop-backed live games
+        # (prop_backed_games=9) but every one of them has an EMPTY
+        # liveProps/archivedLiveProps list (prop_row_counts=[0]*9) --
+        # structurally present, no actual rows. Traced to
+        # _cards_recommendation_payload_by_game (mlb/cards.py), which merges
+        # betting_games (season_betting_card_day_path, already required
+        # above) with recos_by_game built from THIS file
+        # (daily_artifact_path(date, "_locked_policy") ->
+        # daily_summary_<date>_locked_policy.json) to populate
+        # markets.{pitcher,hitter,extraPitcher,extraHitter}Props, which is
+        # exactly what _live_props_from_card (live_lens.py) reads to build
+        # each live game's liveProps. It matches the allowlist's existing
+        # "daily_summary_*.json" glob (so incremental pulls DO carry it when
+        # fresh), but like season_betting_card_day_path and daily_top_props
+        # it is generated once per slate and can go permanently missing on a
+        # worker that booted, or had its disk reset, after the since=
+        # watermark first advanced past it.
+        from syndicate.features.mlb.sources import daily_artifact_path
+
+        paths.append(daily_artifact_path(str(date_str).strip(), suffix="_locked_policy"))
+    except Exception:
+        pass
     return paths
 
 
