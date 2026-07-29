@@ -157,7 +157,6 @@
   let hasRenderedIntelligence = false;
   let currentIntelligenceRequest = null;
   let lastRenderItems = [];
-  let lastSteamEvents = [];
 
   const urlParams = new URLSearchParams(window.location.search);
   const state = {
@@ -888,17 +887,6 @@
     } catch (err) { /* scoreboard hydration is best-effort */ }
   }
 
-  async function loadSteam() {
-    try {
-      const dateParam = state.date ? `date=${encodeURIComponent(state.date)}&` : "";
-      const res = await fetch(`/api/board/steam?${dateParam}limit=12`, { cache: "no-store" });
-      if (!res.ok) return;
-      const json = await res.json();
-      lastSteamEvents = Array.isArray(json.events) ? json.events : [];
-      renderTopStrip(lastRenderItems.filter(matchesFilters).filter(matchesClientFilters));
-    } catch (err) { /* steam rail is best-effort */ }
-  }
-
   function chipForGame(group) {
     if (gameChipsById.has(group.key)) return gameChipsById.get(group.key);
     const sport = String(group.sport || "").toLowerCase();
@@ -1008,75 +996,12 @@
     });
   }
 
-  function steamInitials(name) {
-    const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
-    if (!parts.length) return "?";
-    const first = parts[0][0] || "";
-    const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
-    return (first + last).toUpperCase();
-  }
-
-  function steamAvatarHtml(event) {
-    const initials = escapeHtml(steamInitials(event.player_name));
-    // The fallback initials circle is always in the DOM (display:none while
-    // a headshot_url is present) rather than injected via onerror string
-    // concatenation -- an <img> whose src 404s (a rostered player with no
-    // photo published yet, not just an unresolved name) swaps to it on
-    // error without any inline JS beyond toggling two display styles.
-    const img = event.headshot_url
-      ? `<img class="board-strip-card__avatar" src="${escapeHtml(event.headshot_url)}" alt="" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">`
-      : "";
-    const initialsStyle = event.headshot_url ? ' style="display:none"' : "";
-    return `${img}<div class="board-strip-card__avatar board-strip-card__avatar--initials"${initialsStyle}>${initials}</div>`;
-  }
-
-  function steamDeltaText(event) {
-    if (event && event.movement_text) return event.movement_text;
-    const steam = event && event.steam ? event.steam : {};
-    const bits = [];
-    if (typeof steam.line_delta === "number" && steam.line_delta !== 0) {
-      bits.push(`${steam.line_delta > 0 ? "+" : ""}${steam.line_delta} line`);
-    }
-    if (typeof steam.odds_delta === "number" && steam.odds_delta !== 0) {
-      bits.push(`${steam.odds_delta > 0 ? "+" : ""}${steam.odds_delta}¢`);
-    }
-    return bits.join(" · ") || "Movement detected";
-  }
-
   function renderTopStrip(items) {
     const container = document.getElementById("board-top-strip");
     if (!container) return;
-    // #83/#86: steam takes the rail whenever there's any today -- it's the
-    // more actionable signal (a real, fast market move) than a static
-    // edge ranking. Falls back to the edge-ranked "Best opportunities" rail
-    // on a quiet day so the strip is never just empty.
-    if (Array.isArray(lastSteamEvents) && lastSteamEvents.length) {
-      container.innerHTML = `
-        <h2 class="board-section-title">📡 Pregame Steam</h2>
-        <div class="board-strip">
-          ${lastSteamEvents.slice(0, 12).map((event) => `
-            <div class="board-strip-card board-strip-card--steam" title="${escapeHtml((event.capture_phase || "").toString())}">
-              <div class="board-strip-card__row">
-                ${steamAvatarHtml(event)}
-                <div class="board-strip-card__info">
-                  <div class="board-strip-card__name">${escapeHtml(event.subject || event.label || "Market")}</div>
-                  <div class="board-strip-card__prop">${escapeHtml(event.market_text || "")}</div>
-                  <div class="board-strip-card__lineval">${escapeHtml(event.line_text || "")}</div>
-                </div>
-                <div class="board-strip-card__move">${
-                  (Array.isArray(event.movement_lines) && event.movement_lines.length
-                    ? event.movement_lines
-                    : [steamDeltaText(event)]
-                  ).map((line) => `<div class="board-strip-card__move-line">${escapeHtml(line)}</div>`).join("")
-                }</div>
-              </div>
-              <div class="board-strip-card__pick">${escapeHtml(formatTimestamp(event.timestamp))}</div>
-            </div>
-          `).join("")}
-        </div>
-      `;
-      return;
-    }
+    // #137: steam moves are now real, filterable board candidates (see
+    // STEAM_TABS/isSteamCandidate) instead of taking over this rail --
+    // this strip is the edge-ranked highlights only now.
     const top = items.slice().sort((a, b) => edgeValue(b) - edgeValue(a)).slice(0, 6);
     if (!top.length) {
       container.innerHTML = "";
@@ -1462,7 +1387,6 @@
     state.explicitDateOverride = true;
     syncUrlState();
     void loadGameChips();
-    void loadSteam();
     void loadIntelligence({ forceRefresh: true });
   });
 
@@ -1481,11 +1405,10 @@
     void loadIntelligence({});
   }
   void loadGameChips();
-  void loadSteam();
 
   window.SyndicatePolling.startFromPolicy(
     {},
-    { onTick: () => { void loadGameChips(); void loadSteam(); return loadIntelligence({ background: true }); } },
+    { onTick: () => { void loadGameChips(); return loadIntelligence({ background: true }); } },
     { enabled: true, intervalMs: 60000, refreshOnVisible: true, refreshOnFocus: true, skipWhenHidden: true, preventOverlap: true }
   );
 })();

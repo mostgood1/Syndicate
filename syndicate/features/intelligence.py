@@ -3909,20 +3909,17 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
     """Board candidates built directly from detected steam (sharp/steam line)
     moves, per the user's explicit direction: steam should be a real,
     filterable row TYPE on the main opportunity board -- "call these out as
-    steam moves" -- not confined to the separate top-strip rail
-    (/api/board/steam, blueprints/intelligence.py), which the user also
-    wants standing but as one presentation, not the only one.
+    steam moves." Originally added alongside a separate top-strip rail
+    (`/api/board/steam`, pregame-only by product decision) which the user
+    then had removed once this board integration was confirmed working, so
+    this function is now the sole board-facing consumer of steam detection.
 
     Detection itself (_steam_signal, odds_refresh_tracking.py) already
     covers live AND pregame with real per-event granularity via
     capture_phase ("live"/"closing"/"ramp"/"drift") and a plain is_live
-    bool -- the rail's endpoint deliberately throws every is_live event away
-    (a 2026-07-28 product decision to keep that specific rail pregame-only,
-    not a detection gap). This function is the live+pregame-inclusive
-    consumer that decision left with no board-candidate home: every steam
-    event for this sport becomes a real candidate here, tagged with its own
-    lane so the existing LIVE/PREGAME state filter, and a new steam-only
-    filter, both work on it exactly like any other candidate.
+    bool. Every steam event for this sport becomes a real candidate here,
+    tagged with its own lane so the existing LIVE/PREGAME state filter, and
+    the steam-only filter, both work on it exactly like any other candidate.
     """
     sport_slug = _safe_text(sport.get("slug"), "").lower()
     if not sport_slug:
@@ -3971,8 +3968,7 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
         # player_name is case-inconsistent at the source ("willy adames") --
         # holds a real team name for game-level markets too (populated
         # upstream via normalized_entry.get("entity")/row.get("entity"),
-        # _market_lifecycle_event, odds_refresh_tracking.py), same idiom the
-        # existing steam rail's _steam_event_subject already relies on.
+        # _market_lifecycle_event, odds_refresh_tracking.py).
         player_name = _safe_text(event.get("player_name"), "").strip().title()
         subject = player_name or selection or market_label
         current_line = _numeric_hint(event.get("line"))
