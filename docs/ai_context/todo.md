@@ -6,9 +6,20 @@ list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-07-28 (see "Reconciliation 2026-07-28").
 
-> **Next free ID: 133.** IDs are never reused. Closed items move to
+> **Next free ID: 134.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
+
+- **New: #133** (filed and fixed in the same concurrent session as #131, commit
+  `e692d44d`, **NOT YET DEPLOYED** as far as this session can tell) — recorded
+  here secondhand, same as #131, to close the "shipped work with zero todo.md
+  record" gap; not independently re-verified. Same class of gap as #131's
+  player-prop fix, one layer up: game-level board candidates (Moneyline/Total/
+  ATS/Spread) were missing `projected`/`line`, for both MLB and WNBA, pregame and
+  live. Touched `syndicate/blueprints/home.py`, `syndicate/features/wnba/cards.py`;
+  new `tests/test_wnba_game_market_projections.py` plus updates to
+  `tests/test_home.py`/`tests/test_intelligence.py`. Correctly used the next free
+  ID (133) after this session's #131 collision fix — no further collision.
 
 - **New: #131** (filed and fixed in a concurrent session, commit `92cdfbc5`, **NOT
   YET DEPLOYED** as far as this session can tell) — recorded here by a different
