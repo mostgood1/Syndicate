@@ -4423,9 +4423,13 @@ class _MLBDataProvider(_HomeSportDataProviderBase):
             for game in (liveish_games or live_games)
             if isinstance(game.get("liveProps"), list) or isinstance(game.get("archivedLiveProps"), list)
         ]
+        prop_row_counts = [
+            len(game.get("liveProps") or []) + len(game.get("archivedLiveProps") or [])
+            for game in prop_backed_games
+        ]
         print(
             f"[MLB_LIVE_PROPS_DIAG] date={context.context_label} liveish_games={len(liveish_games)} "
-            f"prop_backed_games={len(prop_backed_games)}",
+            f"prop_backed_games={len(prop_backed_games)} prop_row_counts={prop_row_counts}",
             flush=True,
         )
         return _prop_rows_from_mlb_live_games(prop_backed_games)
