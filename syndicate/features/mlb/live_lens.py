@@ -22,6 +22,7 @@ from syndicate.features.shared.game_board_contract import apply_game_board_contr
 from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
 from syndicate.features.shared.refresh_state_store import data_root
 from syndicate.features.shared.refresh_state_store import read_json_file
+from syndicate.features.shared.timezone import central_today_iso
 
 
 def live_lens_snapshot_path() -> Path:
@@ -50,7 +51,15 @@ def _live_lens_report_max_age_seconds() -> int:
 
 
 def _live_lens_report_needs_refresh(selected_date: str) -> bool:
-    if str(selected_date).strip() != datetime.now().astimezone().date().isoformat():
+    # #128: was `datetime.now().astimezone().date().isoformat()` -- the
+    # server's system-local date, not the slate's own operating date. On
+    # Render (system tz likely UTC) this silently went stale every night
+    # once UTC crossed midnight while a US evening slate was still very
+    # much "today" in the Central-time terms every other MLB date comparison
+    # in this repo uses -- confirmed live: the whole live-lens refresh
+    # pipeline froze in place for hours (every "needs refresh" check below
+    # short-circuited False), masking every other #128 fix behind it.
+    if str(selected_date).strip() != central_today_iso():
         return False
     report_path = live_lens_report_path(selected_date)
     report = load_json_file(report_path)
@@ -143,7 +152,7 @@ def _status_bucket_from_row(row: dict[str, Any]) -> str:
 
 
 def _refresh_current_date_live_statuses(games: list[dict[str, Any]], selected_date: str) -> None:
-    if str(selected_date).strip() != datetime.now().astimezone().date().isoformat():
+    if str(selected_date).strip() != central_today_iso():
         return
     mlb_vendor_client, fetch_game_feed_live = _load_vendor_live_frontend()
     if mlb_vendor_client is None or fetch_game_feed_live is None:
@@ -1377,7 +1386,7 @@ def _snapshot_generated_at_age_seconds(snapshot: dict[str, Any] | None) -> float
 
 
 def _live_lens_snapshot_needs_refresh(selected_date: str, snapshot: dict[str, Any] | None) -> bool:
-    if str(selected_date).strip() != datetime.now().astimezone().date().isoformat():
+    if str(selected_date).strip() != central_today_iso():
         return False
     if not bool(_snapshot_games(snapshot or {})):
         return True

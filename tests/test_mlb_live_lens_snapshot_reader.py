@@ -39,7 +39,14 @@ class LiveLensSnapshotNeedsRefreshTests(unittest.TestCase):
     """
 
     def _today_iso(self) -> str:
-        return datetime.now().astimezone().date().isoformat()
+        # #128: must match the real implementation's notion of "today"
+        # (central_today_iso(), the site's operating date for MLB slates),
+        # not the test runner's own system-local date -- those two silently
+        # diverge for hours every night once UTC crosses midnight while a US
+        # evening slate is still today in Central time, and a test helper
+        # that used the same wrong reference as a since-fixed implementation
+        # bug would never have caught it.
+        return live_lens.central_today_iso()
 
     def test_fresh_snapshot_generated_at_wins_even_when_report_file_looks_stale(self) -> None:
         recent = (datetime.now().astimezone() - timedelta(seconds=5)).isoformat(timespec="seconds")
@@ -76,6 +83,24 @@ class LiveLensSnapshotNeedsRefreshTests(unittest.TestCase):
         yesterday = (datetime.now().astimezone().date() - timedelta(days=1)).isoformat()
         self.assertFalse(live_lens._live_lens_snapshot_needs_refresh(yesterday, None))
         self.assertFalse(live_lens._live_lens_snapshot_needs_refresh(yesterday, {"games": []}))
+
+    def test_today_check_uses_central_time_not_system_local_time(self) -> None:
+        # #128: _live_lens_report_needs_refresh/_live_lens_snapshot_needs_refresh
+        # used to compare against datetime.now().astimezone().date() -- the
+        # test/server process's own system-local date. On Render (system tz
+        # UTC) that silently diverged from the site's real Central-time
+        # operating date for hours every night, freezing MLB's live-lens
+        # refresh in place for the rest of an evening slate. Both functions
+        # must consult central_today_iso() specifically -- mock it (not
+        # datetime.now, which no longer matters to either function) and
+        # confirm a date that only matches the mocked Central "today" is
+        # treated as today.
+        with patch.object(live_lens, "central_today_iso", return_value="2026-07-28"):
+            self.assertTrue(live_lens._live_lens_snapshot_needs_refresh("2026-07-28", None))
+            self.assertFalse(live_lens._live_lens_snapshot_needs_refresh("2026-07-29", None))
+            with patch.object(live_lens, "load_json_file", return_value=None):
+                self.assertTrue(live_lens._live_lens_report_needs_refresh("2026-07-28"))
+            self.assertFalse(live_lens._live_lens_report_needs_refresh("2026-07-29"))
 
 
 class SnapshotGeneratedAtAgeSecondsTests(unittest.TestCase):
