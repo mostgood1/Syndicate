@@ -5649,6 +5649,21 @@ def _build_sport_overview(
         hydrated_game_ids = {identifier for identifier in active_game_ids if identifier in prop_item_ids}
     if active_today and not hydrated_game_ids and active_game_ids:
         hydrated_game_ids = {identifier for identifier in active_game_ids if identifier in game_item_ids}
+    if slug == "mlb":
+        # TEMPORARY diagnostic (todo.md #124 follow-up) -- pregame props are
+        # now confirmed fixed live; live props still read zero downstream
+        # despite _MLBDataProvider.live_props independently finding real
+        # prop-backed games upstream, so the gap is somewhere in this
+        # identity-based hydration filter. print, not logger.info -- see the
+        # other #124 diagnostic in _MLBDataProvider.live_props for why.
+        # Remove once the actual mismatch is confirmed.
+        print(
+            f"[MLB_HYDRATION_DIAG] active_game_ids={sorted(active_game_ids)} game_item_ids={sorted(game_item_ids)} "
+            f"hydrated_game_ids={sorted(hydrated_game_ids)} "
+            f"live_prop_item_ids={sorted({_game_identifier(item) for item in live_prop_items if _game_identifier(item)})} "
+            f"live_prop_items_count={len(live_prop_items)}",
+            flush=True,
+        )
     game_items = [item for item in game_items if _game_identifier(item) in hydrated_game_ids]
     pregame_prop_items = [item for item in pregame_prop_items if _game_identifier(item) in hydrated_game_ids]
     live_prop_items = [item for item in live_prop_items if _game_identifier(item) in hydrated_game_ids]
