@@ -1031,7 +1031,28 @@ def filter_candidates(
         # by pipeline/intelligence_state.py's _build_candidate_pool.
         candidate_sport_slug = str(candidate.get("sport_slug") or candidate.get("sport") or "").strip().lower()
         candidate_is_live = bool(candidate.get("is_live"))
-        ceiling_seconds = _candidate_freshness_ceiling_seconds(candidate_sport_slug, is_live=candidate_is_live)
+        # #124, per explicit user direction ("market still open should be
+        # the SLA"): for LIVE candidates, whether the underlying market is
+        # still open is the real freshness signal, not how many seconds
+        # since last_updated. A confirmed-live game whose prop price simply
+        # hasn't needed to move (a strikeouts line nobody's re-quoted in the
+        # last hour) is not stale, it's just quiet -- but the time-based
+        # ceiling below can't tell those apart and was rejecting both the
+        # same way. "Is the market still open" already has a real, upstream
+        # check: _apply_candidate_state_guard (intelligence.py) sets
+        # state_invalid=True on a final game, a live claim frozen for >8h
+        # with no update at all, or an inactive/DNP player, and every one of
+        # those is dropped before a candidate ever reaches this function. A
+        # live candidate that survives to here has already passed that
+        # check, so the separate, much tighter (30-minute) time-based
+        # ceiling was pure redundancy layered on top of a correct signal --
+        # confirmed live: 123 of 144 total rejections in one cycle were
+        # exactly this, discarding real, currently-open MLB prop markets the
+        # moment real live data started flowing through the pipeline.
+        # Pregame candidates have no equivalent "is the market still open"
+        # state (the game hasn't started), so they keep the time-based gate.
+        market_confirmed_open = candidate_is_live and not bool(candidate.get("state_invalid"))
+        ceiling_seconds = 0 if market_confirmed_open else _candidate_freshness_ceiling_seconds(candidate_sport_slug, is_live=candidate_is_live)
         candidate_age = _candidate_age_seconds(candidate, now=freshness_check_started_at)
         if ceiling_seconds > 0 and candidate_age is not None and candidate_age > ceiling_seconds:
             manifest_age = _candidate_age_seconds(
@@ -1039,20 +1060,6 @@ def filter_candidates(
             )
             pipeline_looks_healthy = manifest_age is None or manifest_age <= ceiling_seconds
             if pipeline_looks_healthy:
-                # Temporary diagnostic (#112/#120, MLB props absent from the
-                # board 2026-07-28 despite real candidates being generated
-                # upstream): rejected.append's summary is only ever surfaced
-                # through logger.info, which never reaches Render's log
-                # collector. print(..., flush=True) does. Remove once the
-                # props-specific mechanism is confirmed.
-                print(
-                    f"[FILTER_CANDIDATES_REJECTED] reason=stale_beyond_sla sport={candidate_sport_slug} "
-                    f"candidate_type={candidate.get('candidate_type') or candidate.get('type')} "
-                    f"market={_market(candidate)} is_live={candidate_is_live} age_seconds={round(candidate_age, 1)} "
-                    f"ceiling_seconds={ceiling_seconds} last_updated={candidate.get('last_updated')} "
-                    f"updated_epoch={candidate.get('updated_epoch')} sport_manifest_last_updated={candidate.get('sport_manifest_last_updated')}",
-                    flush=True,
-                )
                 rejected.append(
                     {
                         "sport": candidate_sport_slug,
@@ -1088,15 +1095,6 @@ def filter_candidates(
         if reliability_multiplier < 0.88:
             threshold += 0.01
         if edge is not None and edge < threshold:
-            # Temporary diagnostic, see the stale_beyond_sla print above --
-            # same reasoning, remove once the props-specific mechanism is
-            # confirmed.
-            print(
-                f"[FILTER_CANDIDATES_REJECTED] reason=edge_below_threshold sport={str(candidate.get('sport_slug') or candidate.get('sport') or '').strip().lower()} "
-                f"candidate_type={candidate.get('candidate_type') or candidate.get('type')} market={market} "
-                f"edge={edge} threshold={round(threshold, 4)} market_sample={market_sample} market_roi={market_roi}",
-                flush=True,
-            )
             rejected.append(
                 {
                     "sport": str(candidate.get("sport_slug") or candidate.get("sport") or "").strip().lower(),

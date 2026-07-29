@@ -4399,18 +4399,6 @@ class _MLBDataProvider(_HomeSportDataProviderBase):
 
         live_games = list(read_latest_live_lens_page_context(context.context_label).get("games") or [])
         live_games = [game for game in live_games if isinstance(game, dict)]
-        # TEMPORARY diagnostic (todo.md #124 follow-up) -- confirmed live
-        # that web's OWN disk has real liveProps (24/18/16 rows on 3 live
-        # games), but refresh-worker's candidate-pool build reports zero MLB
-        # live props. print, not logger.info -- logger.info never reaches
-        # Render's log collector. Remove once the actual gap (report pull
-        # staleness vs liveish-game filtering vs liveProps absent on this
-        # process's own recompute) is confirmed.
-        print(
-            f"[MLB_LIVE_PROPS_DIAG] date={context.context_label} live_games={len(live_games)} "
-            f"with_props={sum(1 for g in live_games if isinstance(g.get('liveProps'), list) or isinstance(g.get('archivedLiveProps'), list))}",
-            flush=True,
-        )
         if not live_games:
             return []
         liveish_games = [
@@ -4423,15 +4411,6 @@ class _MLBDataProvider(_HomeSportDataProviderBase):
             for game in (liveish_games or live_games)
             if isinstance(game.get("liveProps"), list) or isinstance(game.get("archivedLiveProps"), list)
         ]
-        prop_row_counts = [
-            len(game.get("liveProps") or []) + len(game.get("archivedLiveProps") or [])
-            for game in prop_backed_games
-        ]
-        print(
-            f"[MLB_LIVE_PROPS_DIAG] date={context.context_label} liveish_games={len(liveish_games)} "
-            f"prop_backed_games={len(prop_backed_games)} prop_row_counts={prop_row_counts}",
-            flush=True,
-        )
         return _prop_rows_from_mlb_live_games(prop_backed_games)
 
 
@@ -5610,17 +5589,6 @@ def _build_sport_overview(
             context_label=context_label,
             home_games=home_games,
         )
-    if slug == "mlb":
-        # TEMPORARY diagnostic (todo.md #124 follow-up), narrower than
-        # MLB_HYDRATION_DIAG below -- pins down whether the drop from
-        # _MLBDataProvider.live_props's real 9 prop-backed games to zero
-        # happens inside _load_home_prop_items/_finalize_home_prop_rows
-        # (this line) or somewhere between here and the hydration filter.
-        print(
-            f"[MLB_LIVE_PROPS_POST_FINALIZE_DIAG] live_prop_items_count={len(live_prop_items)} "
-            f"pregame_prop_items_count={len(pregame_prop_items)}",
-            flush=True,
-        )
     live_href, live_label = _link_lookup_any(links, ["Live Lens", "Live Prop Audit"])
     cards_href, cards_label = _link_lookup_any(links, ["Cards"])
     props_href, props_label = _link_lookup_any(links, ["Props", "Top props", "Prop Ladders", "Pitcher top props", "Hitter top props", "Pitcher ladders", "Hitter ladders"])
@@ -5664,21 +5632,6 @@ def _build_sport_overview(
         hydrated_game_ids = {identifier for identifier in active_game_ids if identifier in prop_item_ids}
     if active_today and not hydrated_game_ids and active_game_ids:
         hydrated_game_ids = {identifier for identifier in active_game_ids if identifier in game_item_ids}
-    if slug == "mlb":
-        # TEMPORARY diagnostic (todo.md #124 follow-up) -- pregame props are
-        # now confirmed fixed live; live props still read zero downstream
-        # despite _MLBDataProvider.live_props independently finding real
-        # prop-backed games upstream, so the gap is somewhere in this
-        # identity-based hydration filter. print, not logger.info -- see the
-        # other #124 diagnostic in _MLBDataProvider.live_props for why.
-        # Remove once the actual mismatch is confirmed.
-        print(
-            f"[MLB_HYDRATION_DIAG] active_game_ids={sorted(active_game_ids)} game_item_ids={sorted(game_item_ids)} "
-            f"hydrated_game_ids={sorted(hydrated_game_ids)} "
-            f"live_prop_item_ids={sorted({_game_identifier(item) for item in live_prop_items if _game_identifier(item)})} "
-            f"live_prop_items_count={len(live_prop_items)}",
-            flush=True,
-        )
     game_items = [item for item in game_items if _game_identifier(item) in hydrated_game_ids]
     pregame_prop_items = [item for item in pregame_prop_items if _game_identifier(item) in hydrated_game_ids]
     live_prop_items = [item for item in live_prop_items if _game_identifier(item) in hydrated_game_ids]

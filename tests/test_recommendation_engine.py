@@ -216,10 +216,39 @@ class RecommendationEngineTests(unittest.TestCase):
         filtered = filter_candidates(candidates, sport="mlb", evaluation_records=_UNRELATED_HISTORY)
         self.assertEqual(len(filtered), 1)
 
-    def test_filter_candidates_uses_a_much_tighter_sla_for_live_candidates(self) -> None:
-        # Live ceiling is 30 min (60s tick x 30) -- 40 minutes stale trips it
-        # even though the same age would be nowhere near the 6h pregame
-        # ceiling for the same sport.
+    def test_filter_candidates_never_time_gates_a_confirmed_open_live_candidate(self) -> None:
+        # #124, per explicit user direction ("market still open should be
+        # the SLA"): superseded the old 30-minute time-based live ceiling.
+        # A live candidate that has already passed the upstream state guard
+        # (not final, live claim not frozen for 8h+, player not inactive --
+        # i.e. no state_invalid) is trusted regardless of how long ago its
+        # price last moved. Confirmed live: real, currently-open MLB prop
+        # markets were being discarded by exactly this old time check the
+        # moment real live data started flowing through the pipeline.
+        now = datetime.now(timezone.utc)
+        very_stale_last_updated = (now - timedelta(hours=2)).isoformat()
+        candidates = [
+            {
+                "name": "Home ML",
+                "event_id": "game-1",
+                "market": "moneyline",
+                "selection": "Home ML",
+                "odds": "+110",
+                "model_probability": 0.6,
+                "is_live": True,
+                "last_updated": very_stale_last_updated,
+                "sport_manifest_last_updated": now.isoformat(),
+                "sport_slug": "mlb",
+            }
+        ]
+        filtered = filter_candidates(candidates, sport="mlb", evaluation_records=_UNRELATED_HISTORY)
+        self.assertEqual(len(filtered), 1)
+
+    def test_filter_candidates_still_time_gates_a_live_candidate_the_state_guard_already_flagged(self) -> None:
+        # Defense in depth: state_invalid should never reach filter_candidates
+        # in the real pipeline (the upstream state guard drops it first), but
+        # if it somehow does, the market-confirmed-open bypass must not apply
+        # to it -- it falls back to the old, tighter time-based ceiling.
         now = datetime.now(timezone.utc)
         stale_last_updated = (now - timedelta(minutes=40)).isoformat()
         candidates = [
@@ -231,6 +260,7 @@ class RecommendationEngineTests(unittest.TestCase):
                 "odds": "+110",
                 "model_probability": 0.6,
                 "is_live": True,
+                "state_invalid": True,
                 "last_updated": stale_last_updated,
                 "sport_manifest_last_updated": now.isoformat(),
                 "sport_slug": "mlb",
