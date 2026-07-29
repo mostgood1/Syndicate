@@ -116,6 +116,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             dry_run=False,
             force_refresh=False,
             force_refresh_sports=None,
+            wnba_only_matchups=None,
         )
 
     def test_run_tick_defaults_to_detached_subprocess_on_render(self) -> None:
@@ -152,6 +153,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             dry_run=False,
             force_refresh=False,
             force_refresh_sports=None,
+            wnba_only_matchups=None,
         )
 
     def test_run_tick_uses_explicit_launch_mode_override(self) -> None:
@@ -187,6 +189,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             dry_run=False,
             force_refresh=False,
             force_refresh_sports=None,
+            wnba_only_matchups=None,
         )
 
     def test_run_tick_marks_active_refresh_as_skipped(self) -> None:
@@ -393,6 +396,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             dry_run=False,
             force_refresh=False,
             force_refresh_sports=None,
+            wnba_only_matchups=None,
         )
 
     def test_pregame_relaunch_blocked_false_when_no_prior_launch(self) -> None:
@@ -912,6 +916,85 @@ class LiveRefreshLoopTests(unittest.TestCase):
 
         self.assertIn("100", fingerprints)
 
+    def test_mlb_sim_input_fingerprint_by_game_isolates_injury_change(self) -> None:
+        # MLB's counterpart to the lineup isolation test above: a change to
+        # just one team's injury report must change only the game(s) that
+        # team is playing in, not the whole slate's fingerprint.
+        with TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir)
+            daily_dir = data_root / "mlb_source" / "source_artifacts" / "data" / "daily"
+            daily_dir.mkdir(parents=True, exist_ok=True)
+            injuries_path = daily_dir / "mlb_injuries_2026_07_19.json"
+            injuries_path.write_text(
+                json.dumps({"date": "2026-07-19", "teams": {"144": [{"player_id": 1}], "116": []}}), encoding="utf-8"
+            )
+
+            events = [
+                live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="Atlanta Braves", away="Detroit Tigers", start_time_utc=None, home_team_id=144, away_team_id=116),
+                live_refresh_loop.ScheduleEvent(sport="mlb", event_id="200", home="Boston Red Sox", away="New York Yankees", start_time_utc=None, home_team_id=111, away_team_id=147),
+            ]
+
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": str(data_root)}, clear=False):
+                before = live_refresh_loop._mlb_sim_input_fingerprint_by_game("2026-07-19", events)
+
+            # Team 144 (game 100's home team) picks up a new injury.
+            injuries_path.write_text(
+                json.dumps({"date": "2026-07-19", "teams": {"144": [{"player_id": 1}, {"player_id": 2}], "116": []}}),
+                encoding="utf-8",
+            )
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": str(data_root)}, clear=False):
+                after = live_refresh_loop._mlb_sim_input_fingerprint_by_game("2026-07-19", events)
+
+        self.assertNotEqual(before["100"], after["100"])
+        self.assertEqual(before["200"], after["200"])
+
+    def test_mlb_injuries_artifact_path_is_date_scoped(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": tmp_dir}, clear=False):
+                path_a = live_refresh_loop._mlb_injuries_artifact_path("2026-07-19")
+                path_b = live_refresh_loop._mlb_injuries_artifact_path("2026-07-20")
+
+        self.assertNotEqual(path_a, path_b)
+        self.assertIn("2026_07_19", str(path_a))
+
+    def test_fetch_mlb_injuries_writes_artifact_on_success(self) -> None:
+        fake_result = MagicMock(returncode=0, stdout=json.dumps({"date": "2026-07-19", "teams": {"144": []}}))
+        with TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ, {"SYNDICATE_DATA_ROOT": tmp_dir}, clear=False
+        ), patch.object(live_refresh_loop.subprocess, "run", return_value=fake_result) as mocked_run:
+            result = live_refresh_loop._fetch_mlb_injuries("2026-07-19")
+
+            self.assertTrue(result)
+            mocked_run.assert_called_once()
+            written = live_refresh_loop._read_json_file_lenient(live_refresh_loop._mlb_injuries_artifact_path("2026-07-19"))
+            self.assertEqual(written, {"date": "2026-07-19", "teams": {"144": []}})
+
+    def test_fetch_mlb_injuries_returns_false_on_nonzero_exit(self) -> None:
+        fake_result = MagicMock(returncode=1, stdout="")
+        with TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ, {"SYNDICATE_DATA_ROOT": tmp_dir}, clear=False
+        ), patch.object(live_refresh_loop.subprocess, "run", return_value=fake_result):
+            result = live_refresh_loop._fetch_mlb_injuries("2026-07-19")
+
+        self.assertFalse(result)
+
+    def test_fetch_mlb_injuries_returns_false_on_malformed_json(self) -> None:
+        fake_result = MagicMock(returncode=0, stdout="not json")
+        with TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ, {"SYNDICATE_DATA_ROOT": tmp_dir}, clear=False
+        ), patch.object(live_refresh_loop.subprocess, "run", return_value=fake_result):
+            result = live_refresh_loop._fetch_mlb_injuries("2026-07-19")
+
+        self.assertFalse(result)
+
+    def test_fetch_mlb_injuries_returns_false_on_subprocess_exception(self) -> None:
+        with TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ, {"SYNDICATE_DATA_ROOT": tmp_dir}, clear=False
+        ), patch.object(live_refresh_loop.subprocess, "run", side_effect=RuntimeError("boom")):
+            result = live_refresh_loop._fetch_mlb_injuries("2026-07-19")
+
+        self.assertFalse(result)
+
     def test_mlb_daily_sim_decision_fingerprint_change_isolates_one_game(self) -> None:
         events = [
             live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None),
@@ -928,6 +1011,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
             live_refresh_loop, "events_starting_within", return_value=[]
         ), patch.object(
             live_refresh_loop, "_read_last_mlb_sim_check", return_value={"epoch": 1000.0, "date": "2026-07-19", "fingerprints": {"100": "aaa", "200": "bbb", "300": "ccc"}}
+        ), patch.object(
+            live_refresh_loop, "_fetch_mlb_injuries", return_value=True
         ), patch.object(
             live_refresh_loop, "_mlb_sim_input_fingerprint_by_game", return_value={"100": "aaa", "200": "CHANGED", "300": "ccc"}
         ), patch.object(
@@ -958,6 +1043,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
         ), patch.object(
             live_refresh_loop, "_read_last_mlb_sim_check", return_value={}
         ), patch.object(
+            live_refresh_loop, "_fetch_mlb_injuries", return_value=True
+        ), patch.object(
             live_refresh_loop, "_mlb_sim_input_fingerprint_by_game", return_value={"100": "aaa", "200": "bbb"}
         ), patch.object(
             live_refresh_loop, "_mlb_join_mismatch_game_pks", return_value=[]
@@ -983,6 +1070,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
             live_refresh_loop, "events_starting_within", return_value=[]
         ), patch.object(
             live_refresh_loop, "_read_last_mlb_sim_check", return_value={"epoch": 1000.0, "date": "2026-07-19", "fingerprint": "old-style-string"}
+        ), patch.object(
+            live_refresh_loop, "_fetch_mlb_injuries", return_value=True
         ), patch.object(
             live_refresh_loop, "_mlb_sim_input_fingerprint_by_game", return_value={"100": "aaa"}
         ), patch.object(
@@ -1013,6 +1102,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
             live_refresh_loop, "events_starting_within", return_value=[]
         ), patch.object(
             live_refresh_loop, "_read_last_mlb_sim_check", return_value={"epoch": 1000.0, "date": "2026-07-19", "fingerprints": {"100": "aaa", "200": "bbb"}}
+        ), patch.object(
+            live_refresh_loop, "_fetch_mlb_injuries", return_value=True
         ), patch.object(
             live_refresh_loop, "_mlb_sim_input_fingerprint_by_game", return_value={"100": "aaa", "200": "bbb"}
         ), patch.object(
@@ -1046,6 +1137,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
         ), patch.object(
             live_refresh_loop, "_read_last_mlb_sim_check", return_value={"epoch": 1000.0, "date": "2026-07-19", "fingerprints": {"100": "aaa", "200": "bbb", "300": "ccc"}}
         ), patch.object(
+            live_refresh_loop, "_fetch_mlb_injuries", return_value=True
+        ), patch.object(
             live_refresh_loop, "_mlb_sim_input_fingerprint_by_game", return_value={"100": "aaa", "200": "CHANGED", "300": "ccc"}
         ), patch.object(
             live_refresh_loop, "_mlb_join_mismatch_game_pks", return_value=["300"]
@@ -1069,6 +1162,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
             live_refresh_loop, "events_starting_within", return_value=[]
         ), patch.object(
             live_refresh_loop, "_read_last_mlb_sim_check", return_value={"epoch": 1000.0, "date": "2026-07-19", "fingerprints": {"100": "aaa"}}
+        ), patch.object(
+            live_refresh_loop, "_fetch_mlb_injuries", return_value=True
         ), patch.object(
             live_refresh_loop, "_mlb_sim_input_fingerprint_by_game", return_value={"100": "aaa"}
         ), patch.object(
@@ -1188,6 +1283,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             dry_run=False,
             force_refresh=False,
             force_refresh_sports=None,
+            wnba_only_matchups=None,
         )
 
     def test_lineup_check_interval_defaults_to_thirty_minutes(self) -> None:
@@ -1434,6 +1530,10 @@ class LiveRefreshLoopTests(unittest.TestCase):
             # tracking never populated -- falls back to today's original
             # "force every basketball sport" behavior, same as before this fix.
             force_refresh_sports="nba,wnba",
+            # Same reason: the per-matchup global stays None (tearDown-reset,
+            # never populated by a mocked _should_force_sim_rerun), so this
+            # narrows to nothing -- unscoped, matching pre-wiring behavior.
+            wnba_only_matchups=None,
         )
 
     def test_run_tick_narrows_force_refresh_sports_to_the_sport_that_changed(self) -> None:
@@ -1470,6 +1570,108 @@ class LiveRefreshLoopTests(unittest.TestCase):
 
         self.assertTrue(payload["simRerunTriggered"])
         self.assertEqual(mocked_launch.call_args.kwargs["force_refresh_sports"], "nba")
+
+    def test_run_tick_passes_wnba_only_matchups_for_the_game_that_actually_changed(self) -> None:
+        # The end of the staged rollout: a real per-matchup fingerprint diff
+        # (not mocked at the _should_force_sim_rerun level) must reach
+        # launch_refresh_run as wnba_only_matchups, so SmartSim rebuilds just
+        # that game's projection instead of leaving every game's projection
+        # frozen after its first build of the day (the gap this wiring closes).
+        with patch.dict(
+            os.environ,
+            {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true"},
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-13"), patch.object(
+            live_refresh_loop, "_any_tracked_sport_game_live", return_value=True
+        ), patch.object(
+            live_refresh_loop,
+            "_read_last_lineup_check",
+            return_value={"epoch": 0.0, "date": "2026-07-13", "fingerprints": {"nba": "SAME", "wnba": "OLD"}},
+        ), patch.object(
+            live_refresh_loop, "_any_gated_sport_event_within_force_window", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_fetch_injuries", return_value=True
+        ), patch.object(
+            live_refresh_loop, "_nba_lineup_injury_fingerprint", return_value="SAME"
+        ), patch.object(
+            live_refresh_loop, "_wnba_lineup_injury_fingerprint", return_value="CHANGED"
+        ), patch.object(
+            live_refresh_loop,
+            "_wnba_lineup_injury_fingerprint_by_game",
+            return_value={("LVA", "NYL"): "changed", ("SEA", "CHI"): "same"},
+        ), patch.object(
+            live_refresh_loop,
+            "_read_last_wnba_matchup_lineup_check",
+            return_value={"date": "2026-07-13", "fingerprints": {"LVA-NYL": "old", "SEA-CHI": "same"}},
+        ), patch.object(
+            live_refresh_loop, "_record_wnba_matchup_lineup_check"
+        ), patch.object(
+            live_refresh_loop, "_record_lineup_check"
+        ), patch.object(
+            live_refresh_loop, "_record_lineup_injury_change_epochs"
+        ), patch.object(
+            live_refresh_loop,
+            "launch_refresh_run",
+            return_value={"ok": True, "state": "running"},
+        ) as mocked_launch:
+            payload = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertTrue(payload["simRerunTriggered"])
+        self.assertEqual(mocked_launch.call_args.kwargs["wnba_only_matchups"], "LVA-NYL")
+        self.assertEqual(payload["wnbaOnlyMatchups"], "LVA-NYL")
+
+    def test_run_tick_leaves_wnba_only_matchups_unset_when_the_changed_game_is_not_identifiable(self) -> None:
+        # Sport-level WNBA fingerprint changed, but no prior per-matchup
+        # record exists to diff against (first-seen date, migration gap) --
+        # must stay unscoped (None), not guess or force the whole slate.
+        with patch.dict(
+            os.environ,
+            {"SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true"},
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-13"), patch.object(
+            live_refresh_loop, "_any_tracked_sport_game_live", return_value=True
+        ), patch.object(
+            live_refresh_loop,
+            "_read_last_lineup_check",
+            return_value={"epoch": 0.0, "date": "2026-07-13", "fingerprints": {"nba": "SAME", "wnba": "OLD"}},
+        ), patch.object(
+            live_refresh_loop, "_any_gated_sport_event_within_force_window", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_fetch_injuries", return_value=True
+        ), patch.object(
+            live_refresh_loop, "_nba_lineup_injury_fingerprint", return_value="SAME"
+        ), patch.object(
+            live_refresh_loop, "_wnba_lineup_injury_fingerprint", return_value="CHANGED"
+        ), patch.object(
+            live_refresh_loop,
+            "_wnba_lineup_injury_fingerprint_by_game",
+            return_value={("LVA", "NYL"): "changed"},
+        ), patch.object(
+            live_refresh_loop, "_read_last_wnba_matchup_lineup_check", return_value={}
+        ), patch.object(
+            live_refresh_loop, "_record_wnba_matchup_lineup_check"
+        ), patch.object(
+            live_refresh_loop, "_record_lineup_check"
+        ), patch.object(
+            live_refresh_loop, "_record_lineup_injury_change_epochs"
+        ), patch.object(
+            live_refresh_loop,
+            "launch_refresh_run",
+            return_value={"ok": True, "state": "running"},
+        ) as mocked_launch:
+            payload = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertTrue(payload["simRerunTriggered"])
+        self.assertIsNone(mocked_launch.call_args.kwargs["wnba_only_matchups"])
+        self.assertNotIn("wnbaOnlyMatchups", payload)
+
+    def test_wnba_only_matchups_arg_from_changed_formats_sorted_home_away_pairs(self) -> None:
+        self.assertIsNone(live_refresh_loop._wnba_only_matchups_arg_from_changed(None))
+        self.assertIsNone(live_refresh_loop._wnba_only_matchups_arg_from_changed(set()))
+        self.assertEqual(
+            live_refresh_loop._wnba_only_matchups_arg_from_changed({("SEA", "CHI"), ("LVA", "NYL")}),
+            "LVA-NYL,SEA-CHI",
+        )
 
     def test_run_tick_reports_not_ok_when_launch_fails(self) -> None:
         with patch.dict(
@@ -2443,9 +2645,9 @@ class MlbSimOddsFingerprintSliceTests(unittest.TestCase):
     def test_lineup_changes_still_trigger_a_resim(self) -> None:
         # The whole point is preserving real triggers while dropping noise.
         events = [live_refresh_loop.ScheduleEvent(sport="mlb", event_id="1", home="BOS", away="NYY", start_time_utc=None)]
-        with patch.object(live_refresh_loop, "_read_json_file_lenient", side_effect=[{"10": ["a"]}, {}, {}]):
+        with patch.object(live_refresh_loop, "_read_json_file_lenient", side_effect=[{"10": ["a"]}, {}, {}, {}]):
             first = live_refresh_loop._mlb_sim_input_fingerprint_by_game("2026-07-25", events)
-        with patch.object(live_refresh_loop, "_read_json_file_lenient", side_effect=[{"10": ["b"]}, {}, {}]):
+        with patch.object(live_refresh_loop, "_read_json_file_lenient", side_effect=[{"10": ["b"]}, {}, {}, {}]):
             second = live_refresh_loop._mlb_sim_input_fingerprint_by_game("2026-07-25", events)
         self.assertNotEqual(first.get("1"), second.get("1"))
 

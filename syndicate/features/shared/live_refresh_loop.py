@@ -605,6 +605,21 @@ def _last_wnba_lineup_injury_changed_matchups() -> set[tuple[str, str]] | None:
 	return set(_LAST_WNBA_LINEUP_INJURY_CHANGED_MATCHUPS) if _LAST_WNBA_LINEUP_INJURY_CHANGED_MATCHUPS is not None else None
 
 
+def _wnba_only_matchups_arg_from_changed(changed: set[tuple[str, str]] | None) -> str | None:
+	# End of the staged rollout referenced above: None or empty means "don't
+	# know which game(s) changed" (first-seen date, diff failed, or the
+	# sport-level hash moved without a decomposable per-game difference) --
+	# stays unscoped, matching today's existing behavior exactly (no
+	# --only-matchups means smart-sim's own per-game file check still skips
+	# every game with an existing artifact, same as before this wiring).
+	# Deliberately never falls back to --smart-sim-overwrite here: that nukes
+	# the whole date's smart-sim artifacts and is the exact whole-slate-
+	# every-trigger cost this scoping mechanism exists to avoid.
+	if not changed:
+		return None
+	return ",".join(f"{home}-{away}" for home, away in sorted(changed))
+
+
 def _last_wnba_matchup_lineup_check_path() -> Path:
 	return _meta_dir() / "last_wnba_matchup_lineup_check.json"
 
@@ -1079,6 +1094,42 @@ def _mlb_sim_odds_fingerprint_slice(rows: list[dict[str, Any]]) -> list[Any]:
 	return reduced
 
 
+def _mlb_injuries_artifact_path(date_str: str) -> Path:
+	date_slug = date_str.replace("-", "_")
+	return data_root() / "mlb_source" / "source_artifacts" / "data" / "daily" / f"mlb_injuries_{date_slug}.json"
+
+
+def _fetch_mlb_injuries(date_str: str, *, timeout_s: float = 60.0) -> bool:
+	# MLB's counterpart to _fetch_injuries above (NBA/WNBA) -- isolated in its
+	# own subprocess for the same reason (fetch_mlb_injuries.py mirrors
+	# fetch_mlb_live_game_pks_for_date.py's pattern) since MLB has no
+	# dedicated vendored injury-fetch CLI the way NBA/WNBA's packages do.
+	# Before this, an injury/scratch not yet reflected in the posted lineup
+	# artifact (lineups_last_known_by_team.json) went undetected between sim
+	# runs -- MLB's fingerprint had no injury-report input at all.
+	helper = REPO_ROOT / "scripts" / "fetch_mlb_injuries.py"
+	if not helper.exists():
+		return False
+	python_exe = sys.executable if (sys.executable and Path(sys.executable).exists()) else "python"
+	try:
+		result = subprocess.run(
+			[python_exe, str(helper), "--date", date_str],
+			cwd=str(REPO_ROOT),
+			capture_output=True,
+			text=True,
+			timeout=timeout_s,
+		)
+		if result.returncode != 0:
+			return False
+		payload = json.loads(result.stdout or "{}")
+		if not isinstance(payload, dict) or not isinstance(payload.get("teams"), dict):
+			return False
+	except Exception:
+		return False
+	write_json_file(_mlb_injuries_artifact_path(date_str), payload)
+	return True
+
+
 def _mlb_sim_input_fingerprint_by_game(date_str: str, events: list[ScheduleEvent]) -> dict[str, str]:
 	# Was a single whole-file-hash blob covering all 3 sources at once (see
 	# git history) -- told you THAT something changed, never WHICH game, so
@@ -1096,6 +1147,10 @@ def _mlb_sim_input_fingerprint_by_game(date_str: str, events: list[ScheduleEvent
 	overrides_for_date = overrides_doc.get(date_str) if isinstance(overrides_doc, dict) else None
 	if not isinstance(overrides_for_date, dict):
 		overrides_for_date = {}
+	injuries_doc = _read_json_file_lenient(_mlb_injuries_artifact_path(date_str))
+	injuries_by_team = injuries_doc.get("teams") if isinstance(injuries_doc, dict) else None
+	if not isinstance(injuries_by_team, dict):
+		injuries_by_team = {}
 
 	odds_by_pair: dict[tuple[str, str], list[dict[str, Any]]] = {}
 	for row in odds_games:
@@ -1121,12 +1176,23 @@ def _mlb_sim_input_fingerprint_by_game(date_str: str, events: list[ScheduleEvent
 			# but never under-inclusive, and still scoped to one game rather
 			# than today's whole-slate behavior.
 			lineup_slice = {"__whole_file__": lineups_doc}
+		if event.home_team_id is not None and event.away_team_id is not None:
+			injuries_slice: Any = {
+				"home": injuries_by_team.get(str(event.home_team_id)),
+				"away": injuries_by_team.get(str(event.away_team_id)),
+			}
+		else:
+			# Same degraded fallback as lineups above: over-inclusive, never
+			# under-inclusive.
+			injuries_slice = {"__whole_file__": injuries_by_team}
 		# Reduced rather than verbatim (#48): see
 		# _mlb_sim_odds_fingerprint_slice for why hashing raw odds rows made
 		# this fire on nearly every refresh.
 		odds_slice = _mlb_sim_odds_fingerprint_slice(odds_by_pair.get((event.home, event.away), []))
 		override_slice = overrides_for_date.get(game_pk, {})
-		fingerprints[game_pk] = _hash_json_value({"lineups": lineup_slice, "odds": odds_slice, "overrides": override_slice})
+		fingerprints[game_pk] = _hash_json_value(
+			{"lineups": lineup_slice, "odds": odds_slice, "overrides": override_slice, "injuries": injuries_slice}
+		)
 	return fingerprints
 
 
@@ -1314,6 +1380,14 @@ def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any
 	if last_epoch > 0.0 and last_date == date_str and (now_epoch - last_epoch) < interval:
 		return {"force": False, "reason": "within_check_interval"}
 
+	# Refresh the injury-report input right before computing fingerprints,
+	# same cadence/placement as NBA/WNBA's _fetch_injuries call in
+	# _should_force_sim_rerun above -- gated by the interval check just
+	# passed, so this runs at most once per _mlb_sim_check_interval_seconds,
+	# not every tick. Best-effort: a failed fetch just means this check
+	# reacts to whatever injuries snapshot is already on disk (or none),
+	# never blocks the sim decision itself.
+	_fetch_mlb_injuries(date_str)
 	current_fingerprints = _mlb_sim_input_fingerprint_by_game(date_str, events)
 	stored_fingerprints = last.get("fingerprints") if last_date == date_str else None
 	if not isinstance(stored_fingerprints, dict):
@@ -3220,6 +3294,7 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			# doesn't launch; the WNBA marker is only a gate input.
 			print(f"[live_refresh_loop] WNBA_LAUNCH_MARKER_SKIPPED error={type(exc).__name__}: {exc}", flush=True)
 		try:
+			wnba_only_matchups_arg = _wnba_only_matchups_arg_from_changed(_last_wnba_lineup_injury_changed_matchups())
 			result = launch_refresh_run(
 				date=meta["date"],
 				sports=launch_sports,
@@ -3233,8 +3308,12 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 				dry_run=False,
 				force_refresh=force_sim_rerun,
 				force_refresh_sports=force_refresh_sports,
+				wnba_only_matchups=wnba_only_matchups_arg,
 			)
 			meta["ok"] = True
+			if wnba_only_matchups_arg:
+				meta["wnbaOnlyMatchups"] = wnba_only_matchups_arg
+				print(f"[live_refresh_loop] WNBA_SCOPED_SMART_SIM_RESIM_TRIGGERED matchups={wnba_only_matchups_arg}", flush=True)
 			meta["result"] = result
 			if force_sim_rerun:
 				print(f"[live_refresh_loop] LINEUP_INJURY_CHANGE_RESIM_TRIGGERED date={meta['date']} phase={meta['phase']}", flush=True)

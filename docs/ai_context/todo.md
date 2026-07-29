@@ -6,9 +6,99 @@ list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-07-28 (see "Reconciliation 2026-07-28").
 
-> **Next free ID: 134.** IDs are never reused. Closed items move to
+> **Next free ID: 136.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
+
+- **New: #135** (filed and fixed this session, **NOT YET DEPLOYED**) — MLB had
+  no distinct injury-report ingestion at all (confirmed via a general-purpose
+  agent's trace: `_LINEUP_INJURY_FETCH_PACKAGES` explicitly excludes `"mlb"`,
+  unlike NBA/WNBA's dedicated `fetch-injuries` CLI). A scratched player only
+  ever got noticed once it changed the POSTED lineup artifact
+  (`lineups_last_known_by_team.json`), moved a betting line, or fell inside the
+  30-min pre-tip-off force window — a live, mid-game injury had no catch at
+  all. User asked to build real ingestion, mirroring NBA/WNBA's pattern. New
+  `scripts/fetch_mlb_injuries.py` (isolated subprocess, same shape as the
+  existing `fetch_mlb_live_game_pks_for_date.py`) fetches today's schedule via
+  the vendored `sim_engine.data.statsapi` client, pulls each playing team's
+  active+40Man roster, and flags IL/DL status using the exact same detection
+  logic `daily_update.py`'s own roster step already applies internally
+  (`_status_is_injured`, duplicated since it's a closure, not an importable
+  helper) — **verified against the real MLB Stats API this session** (ran it
+  for 2026-07-29, got real IL/DL players back, e.g. Adam Frazier/Anthony
+  Rendon/Travis d'Arnaud on team 108). Wired into
+  `_mlb_daily_sim_decision` (`live_refresh_loop.py`): `_fetch_mlb_injuries`
+  runs right before the fingerprint check, gated by the same
+  `_mlb_sim_check_interval_seconds` the rest of the check already uses (no new
+  cadence). `_mlb_sim_input_fingerprint_by_game` now includes an injuries
+  slice per game (home/away team_id, same degraded whole-file fallback pattern
+  already used for lineups when team ids aren't resolvable), so a fresh IL/DL
+  status now genuinely changes that game's fingerprint and triggers a scoped
+  resim. New `tests/test_fetch_mlb_injuries.py` (pure-function coverage:
+  IL/DL/description detection, team-id extraction, malformed-input tolerance)
+  plus new tests in `tests/test_live_refresh_loop.py` for the fetch/write path
+  (success, non-zero exit, malformed JSON, subprocess exception) and the
+  fingerprint's injury isolation (mirrors the existing lineup isolation test).
+  All 6 pre-existing `_mlb_daily_sim_decision` tests updated to mock
+  `_fetch_mlb_injuries` (it wasn't mocked on the first pass, which actually hit
+  the real MLB Stats API during a local test run and wrote real injury data to
+  the repo's real `data/` tree at `mlb_injuries_2026_07_19.json` — caught and
+  cleaned up; the file is gitignored so nothing leaked, but a good reminder to
+  mock this everywhere it's exercised). Full `tests/test_live_refresh_loop.py`
+  suite: 170/170 passing (down from a stray 55s to 32s once the accidental
+  real network calls were mocked out). **Not addressed, left open on
+  purpose:** mid-game (in-progress) injury detection specifically — the fetch
+  now runs on the same cadence as the rest of the sim-decision check
+  (`SYNDICATE_MLB_SIM_CHECK_INTERVAL_SECONDS`, default 600s) plus the 30-min
+  tip-off force window, which covers pregame well but a in-game injury still
+  waits for the next periodic check rather than an event-driven push.
+
+- **New: #134** (filed and fixed this session, **NOT YET DEPLOYED**) — user's
+  stated expectation: "injury news and lineup news is triggering resims, which
+  should also update projections for players, which then need to recompute
+  edges and what gets to the Layer 2 board" — is that actually happening for
+  MLB and WNBA? Two parallel general-purpose agents traced the full chain for
+  each sport (detection → resim trigger → player projections → edges → Layer 2
+  board), independently, with file:line evidence. **MLB: PARTIAL** — resim
+  trigger/execution/projection-update all genuinely work, but odds/sim reach
+  the board through a separate artifact-direct path rather than the intended
+  `join_odds_to_sim`/Layer 1 join (tracked separately as open item #27, not a
+  fresh bug); see #135 above for the real detection gap this surfaced (no MLB
+  injury feed). **WNBA: PARTIAL, closer to NO for the part that mattered** —
+  injury/lineup detection genuinely triggers a pipeline rerun
+  (`_should_force_sim_rerun`), but the automated trigger only ever passed
+  `--force-refresh` to `refresh_wnba_oddsapi_props.py`, which bypasses outer
+  artifact-reuse gates but does **not** set the separate `smart_sim_overwrite`
+  flag SmartSim itself checks (`test_force_refresh_alone_does_not_force_smart_sim_overwrite`
+  asserts this is deliberate, tested, current behavior) — so after each
+  matchup's first SmartSim build of the day, injury/lineup news changed edges
+  against a FROZEN projection, never the projection itself, until the next
+  calendar day. Existing `todo.md` item #102 had already flagged something
+  here but framed it as an efficiency shortfall (whole-slate vs. scoped
+  resim); the actual finding is stronger — no projection resim happens
+  automatically at all, scoped or whole-slate. **Fixed**: the already-built,
+  already-tested "Phase 1" scoping mechanism
+  (`_wnba_lineup_injury_fingerprint_by_game`/`_last_wnba_lineup_injury_changed_matchups`,
+  `--only-matchups`/`--wnba-only-matchups` threaded all the way through
+  `ops_refresh.py` → `refresh_odds_sources.py` → `refresh_wnba_oddsapi_props.py`
+  → `basketball_props_smart_sim.py`'s `is_targeted` check) was fully wired but
+  never actually invoked from `_run_live_refresh_tick` — a "staged rollout,
+  observation-only for now" per the code's own comment. New
+  `_wnba_only_matchups_arg_from_changed` helper formats the already-computed
+  per-matchup diff and passes it to `launch_refresh_run` as
+  `wnba_only_matchups`, scoped to only the game(s) that actually changed —
+  deliberately never falls back to `--smart-sim-overwrite` (which nukes the
+  whole date's artifacts) when the diff is unscoped/unknown, to avoid
+  reintroducing the exact whole-slate-every-trigger memory pressure that
+  forced WNBA's sim count down 500→250→100 on live-odds-worker's 2GB container
+  in the first place. New tests: the actual scoped wiring end-to-end (real,
+  unmocked `_should_force_sim_rerun` call proves a real per-matchup diff
+  reaches `launch_refresh_run`), the unscoped-stays-unscoped case, and the
+  formatting helper directly. All 158 `tests/test_live_refresh_loop.py` tests
+  passing (6 pre-existing full-kwargs assertions on the `launch_refresh_run`
+  call updated for the new `wnba_only_matchups` kwarg). **Before deploying
+  either fix**: confirm with the user first, same standing rule as
+  #129/#130/#131 — these change live production odds/sim-refresh behavior.
 
 - **New: #133** (filed and fixed in the same concurrent session as #131, commit
   `e692d44d`, **NOT YET DEPLOYED** as far as this session can tell) — recorded
