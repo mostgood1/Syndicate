@@ -4399,6 +4399,18 @@ class _MLBDataProvider(_HomeSportDataProviderBase):
 
         live_games = list(read_latest_live_lens_page_context(context.context_label).get("games") or [])
         live_games = [game for game in live_games if isinstance(game, dict)]
+        # TEMPORARY diagnostic (todo.md #124 follow-up) -- confirmed live
+        # that web's OWN disk has real liveProps (24/18/16 rows on 3 live
+        # games), but refresh-worker's candidate-pool build reports zero MLB
+        # live props. print, not logger.info -- logger.info never reaches
+        # Render's log collector. Remove once the actual gap (report pull
+        # staleness vs liveish-game filtering vs liveProps absent on this
+        # process's own recompute) is confirmed.
+        print(
+            f"[MLB_LIVE_PROPS_DIAG] date={context.context_label} live_games={len(live_games)} "
+            f"with_props={sum(1 for g in live_games if isinstance(g.get('liveProps'), list) or isinstance(g.get('archivedLiveProps'), list))}",
+            flush=True,
+        )
         if not live_games:
             return []
         liveish_games = [
@@ -4411,6 +4423,11 @@ class _MLBDataProvider(_HomeSportDataProviderBase):
             for game in (liveish_games or live_games)
             if isinstance(game.get("liveProps"), list) or isinstance(game.get("archivedLiveProps"), list)
         ]
+        print(
+            f"[MLB_LIVE_PROPS_DIAG] date={context.context_label} liveish_games={len(liveish_games)} "
+            f"prop_backed_games={len(prop_backed_games)}",
+            flush=True,
+        )
         return _prop_rows_from_mlb_live_games(prop_backed_games)
 
 

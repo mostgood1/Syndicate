@@ -21,15 +21,19 @@ HOT_RELATIVE_PATH = "wnba_source/source_artifacts/data/processed/recommendations
 
 
 def _write_required_daily_artifact(data_root: str, date_str: str) -> Path:
-    """Create the once-daily betting-card payload inside a test data root.
+    """Create the once-daily betting-card AND top-props payloads inside a
+    test data root.
 
     #68 added a repair pass to pull_hot_artifacts: any board-critical artifact
     that is written once a day and is MISSING gets one extra exact-path fetch,
-    because the since= watermark can never reach it. In a TemporaryDirectory
-    every such artifact is missing, so tests that count requests for unrelated
-    reasons would otherwise see that extra call. Creating the file keeps each
-    of those tests about the thing it is actually asserting; the repair pass
-    has its own tests.
+    because the since= watermark can never reach it. #124 added
+    daily_top_props to the same repair list (confirmed live: MLB props
+    absent from the board because refresh-worker's copy was permanently
+    missing, not merely stale). In a TemporaryDirectory every such artifact
+    is missing, so tests that count requests for unrelated reasons would
+    otherwise see extra calls. Creating both files keeps each of those tests
+    about the thing it is actually asserting; the repair pass has its own
+    tests.
     """
     season = int(date_str[:4])
     target = (
@@ -45,6 +49,18 @@ def _write_required_daily_artifact(data_root: str, date_str: str) -> Path:
     )
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps({"games": {}}), encoding="utf-8")
+
+    top_props_target = (
+        Path(data_root)
+        / "mlb_source"
+        / "source_artifacts"
+        / "data"
+        / "daily"
+        / "top_props"
+        / f"daily_top_props_{date_str.replace('-', '_')}.json"
+    )
+    top_props_target.parent.mkdir(parents=True, exist_ok=True)
+    top_props_target.write_text(json.dumps({"pitcher": [], "hitter": []}), encoding="utf-8")
     return target
 
 
@@ -884,20 +900,26 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
                 pull_hot_artifacts(date_str=date_str)
         return [call.args[0].full_url for call in mocked_urlopen.call_args_list]
 
-    def test_missing_artifact_triggers_one_exact_path_request_with_no_since(self) -> None:
+    def test_missing_artifact_triggers_one_exact_path_request_per_required_file_with_no_since(self) -> None:
+        # #124: daily_top_props joined season_betting_day in the required
+        # list (both written once a day; confirmed live that a permanently
+        # missing daily_top_props copy on refresh-worker is why MLB props
+        # never reached candidate generation), so a fully empty data root
+        # now needs two repair requests, not one.
         with TemporaryDirectory() as tmp_dir:
             urls = self._run_pull(tmp_dir, "2026-07-26")
 
         repair_urls = [url for url in urls if "path=" in url]
-        self.assertEqual(len(repair_urls), 1, urls)
-        repair_url = repair_urls[0]
+        self.assertEqual(len(repair_urls), 2, urls)
         # ?path= is the endpoint's single-artifact form: one stat and one read,
         # no glob over the matched set. That is what makes ignoring the
         # watermark safe here -- the ceiling exists to bound response SIZE, and
-        # this response is one small file.
-        self.assertIn("season_betting_day_2026_07_26.json", repair_url)
-        self.assertNotIn("since=", repair_url)
-        self.assertNotIn("pattern=", repair_url)
+        # each response is one small file.
+        self.assertTrue(any("season_betting_day_2026_07_26.json" in url for url in repair_urls), repair_urls)
+        self.assertTrue(any("daily_top_props_2026_07_26.json" in url for url in repair_urls), repair_urls)
+        for repair_url in repair_urls:
+            self.assertNotIn("since=", repair_url)
+            self.assertNotIn("pattern=", repair_url)
 
     def test_no_repair_request_when_the_artifact_is_already_present(self) -> None:
         # Costs nothing on a healthy worker.
@@ -915,7 +937,8 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
         with TemporaryDirectory() as tmp_dir:
             urls = self._run_pull(tmp_dir, "2026-07-26")
 
-        self.assertEqual(len(urls), 3, urls)
+        self.assertEqual(len(urls), 4, urls)
         self.assertNotIn("path=", urls[0])
         self.assertNotIn("path=", urls[1])
         self.assertIn("path=", urls[2])
+        self.assertIn("path=", urls[3])

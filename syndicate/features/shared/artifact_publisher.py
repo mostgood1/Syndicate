@@ -672,6 +672,29 @@ def _required_daily_artifact_paths(date_str: str) -> list[Path]:
         # Must never raise -- a repair that cannot be computed just means the
         # normal incremental pull is all this cycle gets.
         pass
+    try:
+        # 2026-07-28: the exact same "written once, permanently un-repairable"
+        # gap as season_betting_card_day_path above, confirmed live for MLB
+        # props specifically absent from the board. daily_top_props is
+        # generated once (or a few times) per day by the vendored daily
+        # pipeline, IS allowlisted (HOT_ARTIFACT_PATTERNS), and web's own
+        # disk had it fully populated (307 pitcher + hitter rows, verified
+        # live) -- but refresh-worker's incremental since= pull can only
+        # repair a copy OLDER than web's, never one that never arrived, and
+        # this file was never in the explicit repair list that exists
+        # specifically to cover that case. home.py's
+        # _load_mlb_home_top_prop_items (the sole source of MLB pregame
+        # props for candidate generation, via _MLBDataProvider.pregame_props)
+        # reads exactly this path, so a permanently-missing copy on
+        # refresh-worker means zero MLB pregame prop candidates every cycle,
+        # regardless of anything downstream (filter_candidates, freshness
+        # gates) -- confirmed live: MLB prop rejections in filter_candidates
+        # were exactly zero, meaning props never reached it at all.
+        from syndicate.features.mlb.sources import daily_top_props_path
+
+        paths.append(daily_top_props_path(str(date_str).strip()))
+    except Exception:
+        pass
     return paths
 
 
