@@ -6,11 +6,34 @@ list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-07-28 (see "Reconciliation 2026-07-28").
 
-> **Next free ID: 132.** IDs are never reused. Closed items move to
+> **Next free ID: 133.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
 
-- **New: #131** (filed and fixed this session, **NOT YET DEPLOYED**) — same
+- **New: #131** (filed and fixed in a concurrent session, commit `92cdfbc5`, **NOT
+  YET DEPLOYED** as far as this session can tell) — recorded here by a different
+  concurrent session (this one was mid-audit and hit an ID collision with it — both
+  independently read "next free ID: 131" and used it minutes apart; see #132 below
+  for the other side of that collision). User reported WNBA isn't showing
+  projection or line movement on the board. Confirmed live: WNBA candidates had
+  `projected="-"`, `line=None`, and `line_odds_movement.opening_line`/`latest_line`
+  both `None` (only price/odds moved), even though `recommendations_slate_<date>.json`'s
+  raw pick rows carry a real `projection` value (confirmed 1.98 for a real live
+  row) — the data exists, it just never reached the board. Root cause:
+  `_prop_item_from_rank_card` (home.py) reads `projected`/`line` by scanning a rank
+  card's `metrics` list for labels like "projected"/"line"; `wnba/picks.py`'s
+  `_card_from_pick` only ever built four metrics (Win prob/EV/Price/Score), so that
+  scan always came back empty regardless of the real data one level up in the raw
+  pick dict. Fixed by adding "Projected" and "Line" metrics to `_card_from_pick`'s
+  output; line movement itself needed no separate fix since the downstream
+  odds-history join was already correctly wired, it just had nothing to key a line
+  off of until now. New `tests/test_wnba_picks.py`, 6/6 passing; 14/14 home.py
+  wnba/rank_card/betting_card tests and 108/108 archive picks/wnba tests still pass
+  per that session's own report. Not independently re-verified by this session —
+  recorded secondhand from the commit message to close the "shipped work with zero
+  todo.md record" gap, not from firsthand testing.
+
+- **New: #132** (filed and fixed this session, **NOT YET DEPLOYED**) — same
   3-service-architecture compliance check as #129, applied to WNBA pregame/live.
   General-purpose agent traced `syndicate/blueprints/wnba.py` +
   `syndicate/features/wnba/*.py` against the same contract, then every claim about
