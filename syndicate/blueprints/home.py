@@ -3419,7 +3419,12 @@ def _prop_item_from_rank_card(
         "photo": headshot_url,
         "headshot_url": headshot_url,
         "is_live": False,
-        "market": _metric_value(metrics, ["market", "stat"]),
+        # Rank-card builders (e.g. wnba/picks.py's _card_from_pick) put the
+        # stat category in the card's own top-level "market" field, never in
+        # "metrics" -- the metrics scan alone always came back empty, so this
+        # always fell through to the generic "Props"/"Betting Card" heading
+        # regardless of what stat the prop was actually on.
+        "market": _metric_value(metrics, ["market", "stat"]) or _safe_text(card.get("market"), None),
         # badge is an EV/confidence percentage (e.g. "20.4% EV") -- it is
         # never a valid "pick" value. It used to be checked first here, and
         # since format_num() always produces a truthy string, it always won,

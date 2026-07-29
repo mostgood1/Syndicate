@@ -205,9 +205,23 @@ def _recommendation_card(item: Mapping[str, Any]) -> dict[str, Any]:
     # without those fields. Keep both: the structured object under
     # "movement", and the short string under "movement_summary".
     movement_context = card.get("movement") if isinstance(card.get("movement"), Mapping) else {}
+    # The combined board merges every date in the look-ahead window into one
+    # response (read_combined_intelligence_response) with no distinction
+    # between a real, actionable candidate and a future-date preview whose
+    # market hasn't posted yet -- both rendered identically as blank dashes,
+    # which reads as broken rather than "check back later". quality.has_market_price
+    # is already computed upstream (UniversalCandidate.from_raw) precisely to
+    # answer this; nothing downstream read it until now. Falls back to a
+    # direct line/odds check when quality is missing entirely (defensive,
+    # never blocks the card from rendering).
+    quality = card.get("quality") if isinstance(card.get("quality"), Mapping) else {}
+    has_market_price = quality.get("has_market_price")
+    if has_market_price is None:
+        has_market_price = line is not None or card.get("odds") is not None
     card.update(
         {
             "lane": lane,
+            "market_posted": bool(has_market_price),
             "sport": _safe_text(card.get("sport"), card.get("sport_slug"), default="sport").lower(),
             "team": _safe_text(card.get("team"), card.get("team_name"), default="—"),
             "player": _safe_text(card.get("player_name"), card.get("name"), default="—"),

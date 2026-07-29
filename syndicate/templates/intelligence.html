@@ -764,6 +764,12 @@
     if (odds) facts.push(["Odds", odds]);
     if (projection) facts.push(["Projected", projection]);
     if (liveProjection) facts.push(["Live proj.", liveProjection]);
+    // Same look-ahead-preview distinction as the blotter table: a future
+    // date's market not being posted yet silently omitted both facts here,
+    // indistinguishable from a real data gap.
+    if (!odds && !projection && item.quality?.has_market_price === false) {
+      facts.push(["Market", "Not posted yet"]);
+    }
     return facts;
   }
 
@@ -1128,6 +1134,15 @@
               // field is worse than showing nothing, since there's no
               // "current" value to report yet.
               const liveDisplay = itemState === "live" ? displayLiveProjection(item) : null;
+              // The combined board merges today's real candidates with
+              // future-date look-ahead previews whose market hasn't posted
+              // yet -- both used to render as an identical bare "&mdash;",
+              // which reads as broken rather than "check back later".
+              // quality.has_market_price (computed upstream, already present
+              // on every item) distinguishes them; default true when absent
+              // so a missing field never hides real data.
+              const hasMarket = item.quality?.has_market_price !== false;
+              const pendingMarketHtml = '<span style="color:var(--cards-text-dim);font-style:italic;">Not posted</span>';
               const updatedIso = String(item.last_updated ?? item.updated_at ?? "").trim();
               const updatedDisplay = formatRelativeTime(updatedIso);
               const rowAttrs = `data-syndicate-name="${escapeHtml(title)}" data-syndicate-market="${escapeHtml(item.market || item.market_label || "")}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}" data-syndicate-odds="${escapeHtml(oddsText)}" data-syndicate-prop-line="${escapeHtml(propText)}"`;
@@ -1140,8 +1155,8 @@
                     <div class="board-blotter__meta">${escapeHtml(sport)}${matchup ? " &middot; " + escapeHtml(matchup) : ""}${updatedDisplay ? ` &middot; <span title="${escapeHtml(updatedIso)}">${escapeHtml(updatedDisplay)}</span>` : ""}</div>
                   </td>
                   <td>${escapeHtml(propText || "-")}</td>
-                  <td>${oddsDisplay ? escapeHtml(oddsDisplay) : "&mdash;"}</td>
-                  <td>${projectedDisplay ? escapeHtml(projectedDisplay) : "&mdash;"}</td>
+                  <td>${oddsDisplay ? escapeHtml(oddsDisplay) : (hasMarket ? "&mdash;" : pendingMarketHtml)}</td>
+                  <td>${projectedDisplay ? escapeHtml(projectedDisplay) : (hasMarket ? "&mdash;" : pendingMarketHtml)}</td>
                   <td>${liveDisplay ? escapeHtml(liveDisplay) : "&mdash;"}</td>
                   <td>${confidence !== null ? Math.round(confidence * 100) + "%" : "&mdash;"}</td>
                   <td class="board-blotter__edge board-blotter__edge--${tier}">${(edge * 100).toFixed(1)}%</td>

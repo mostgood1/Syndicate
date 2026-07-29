@@ -6,9 +6,69 @@ list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-07-28 (see "Reconciliation 2026-07-28").
 
-> **Next free ID: 136.** IDs are never reused. Closed items move to
+> **Next free ID: 137.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
+
+- **New: #136** (filed and fixed this session, **NOT YET DEPLOYED**) — user
+  screenshotted the `/intelligence` "Board" and reported WNBA prop rows with
+  no stat label and no projections. Confirmed live via the real
+  `/api/intelligence/query` payload (not just the screenshot), two distinct
+  root causes:
+  1. **No stat-category label on ANY WNBA prop, working or broken.** Every
+     candidate carried `market: "PROPS"`/`market_key: "props"` — a generic
+     bucket, never "Points"/"Rebounds"/"Assists". Traced the real stat
+     category (`stat`/`stat_label`, e.g. from `top_play.get("stat")`) all the
+     way from `scripts/refresh_wnba_oddsapi_props.py`'s
+     `_build_local_recommendations_slate_artifact` through to where it was
+     discarded: **line 1720 hardcoded `"market": "PROPS"`** even though
+     `stat_label` was already computed three lines earlier for a different
+     purpose (the summary sentence). A second, independent loss compounded
+     it: `syndicate/blueprints/home.py:3422`'s `_prop_item_from_rank_card`
+     only scanned the card's `metrics` list for a "market"/"stat" entry, but
+     `wnba/picks.py`'s `_card_from_pick` puts market on the card's own
+     top-level field, never inside `metrics` — so the scan always came back
+     empty regardless. Fixed both: `refresh_wnba_oddsapi_props.py:1720` now
+     uses `stat_label`; `home.py:3422` now also falls back to
+     `card.get("market")` directly. Confirmed no code anywhere compares this
+     field against the literal "PROPS" (safe to change the value, not just
+     add a parallel field). 140/140 tests passing across
+     `tests/test_wnba_picks.py`, `tests/test_home.py`,
+     `tests/test_wnba_refresh_runner.py`.
+  2. **Future-date look-ahead candidates render identically to real ones.**
+     The combined board (`read_combined_intelligence_response`) merges
+     today's real candidates with tomorrow's look-ahead preview into one
+     response by design — but tomorrow's games don't have odds/props posted
+     yet, so those candidates come back as null shells (`line: null`,
+     `odds: null`, `projected: "-"`, the literal `"-"` baked into the pick
+     name e.g. "Chelsea Gray OVER -"). Confirmed via real data:
+     `game_date: "2026-07-30"` (tomorrow) on every broken row,
+     `game_date: "2026-07-29"` (today) on every working one. The exact signal
+     needed already exists and already reaches the frontend unused:
+     `quality.has_market_price` (computed in `UniversalCandidate.from_raw`,
+     `syndicate/features/shared/intelligence_contracts.py:356-359`) is
+     `false` on every one of these shells. Fixed in
+     `syndicate/templates/intelligence.html`: the blotter table's Odds/
+     Projected cells and the card view's `cardFacts` now render an
+     italicized "Not posted" / "Not posted yet" label instead of a bare
+     `&mdash;` when `quality.has_market_price === false` — fails open to the
+     original dash behavior when the field is absent entirely (verified via
+     a synthetic-object JS check run against the actual page in a local
+     preview, since the real functions live inside an IIFE closure not
+     reachable from devtools: broken → "Not posted", working → real value,
+     missing-quality-field → original `&mdash;`, all as expected). Also added
+     `market_posted` to `syndicate/features/intelligence_board.py`'s
+     `_recommendation_card` for the separate `recommendations` list path
+     (not the `ranked_all` path the board actually reads from, which already
+     carried `quality.has_market_price` unmodified — this addition doesn't
+     fix the board itself but keeps the signal available wherever
+     `_recommendation_card` is the terminal transform).
+  **Not addressed, left open on purpose:** whether look-ahead candidates
+  should be filtered out of the default board view entirely instead of shown
+  labeled — the user chose "show but label clearly" for now. **Before
+  deploying**: confirm with the user first, same standing rule as
+  #129/#130/#131/#134/#135 — this changes what a user-facing production page
+  displays, not just backend behavior.
 
 - **New: #135** (filed and fixed this session, **NOT YET DEPLOYED**) — MLB had
   no distinct injury-report ingestion at all (confirmed via a general-purpose

@@ -1717,7 +1717,16 @@ def _build_local_recommendations_slate_artifact(*, processed_root: Path, date_st
                 projection_value = _float_or_none(model.get(stat))
 
         grouped_pick = {
-            "market": "PROPS",
+            # Was the literal "PROPS" -- a generic bucket that told the board
+            # nothing about WHICH stat this prop was on (points? rebounds?
+            # assists?), even though stat_label already carries that exact
+            # answer three lines above for the summary sentence. Every
+            # downstream consumer of this field (picks.py, home.py's board
+            # rows, intelligence.py's market-focus matching) just copies the
+            # string through -- confirmed no code anywhere compares this
+            # field against the literal "PROPS", so this is a pure data-loss
+            # fix, not a behavior change for anything that branches on it.
+            "market": stat_label,
             "team": team_tri,
             "display_pick": display_pick,
             "selection": selection,
