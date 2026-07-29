@@ -6,9 +6,99 @@ list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-07-28 (see "Reconciliation 2026-07-28").
 
-> **Next free ID: 128.** IDs are never reused. Closed items move to
+> **Next free ID: 129.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
+
+- **New: #128** (filed, shipped this session, **NOT YET DEPLOYED — see below**)
+  — implements #124's two explicitly-deferred follow-ups (a) and (b), triggered
+  by the user reporting the same symptom fresh (MLB props still absent/wrong on
+  the Layer 2 board) plus a new one ("Live" column showing the game's live total
+  instead of the player's own actual, or 0). Confirmed live via production before
+  touching code: `/mlb/api/live-lens` had `counts.props: 0` across all 8 live
+  games at the time, even though `/mlb/api/cards` showed 6 of those 8 already had
+  real `hitterProps`/`pitcherProps` populated — proving the card data existed and
+  simply never reached the board, matching #124(a)'s diagnosis exactly.
+  - **(a) `mlb/live_lens.py` inverted to cards-primary.** `_persist_live_lens_report`
+    now builds the report from `_cards_backed_live_lens_report` FIRST (props come
+    from cards, which is reliable per the production check above), then layers the
+    vendored 120-sim Monte Carlo live re-sim on top as an *enhancement* via two new
+    functions (`_enhance_card_row_with_live_projection`,
+    `_enhance_cards_report_with_live_projection`) — MC only ever contributes
+    `gameLens`/`status`/`score`/`predictions`, and only fills `props`/`liveProps`/
+    `trackedProps` if the card row's are genuinely empty (never overwrites real
+    card props). The old cards-onto-MC merge direction (`_merge_cards_context_into_report`/
+    `_merge_cards_context_into_live_row`) is left in place (still has direct test
+    coverage) but is no longer called from the main path.
+  - **(b) The heavy MC re-sim is now hard-refused inside a web request.**
+    `_live_projection_enhancement_payload` wraps the vendor `_live_lens_payload`
+    call in `refuse_if_compute_in_request_path` (same guard/pattern as
+    `_build_candidate_pool` in `pipeline/intelligence_state.py`) — raises only on
+    hosted Render inside a real Flask request, no-ops for the live-odds-worker tick
+    (no request context there) and local dev. `build_live_lens_snapshot_internal`
+    itself now also calls `warn_if_compute_in_request_path` (soft, matches WNBA's
+    own request-path fallback), documenting that it's reachable in-request as a
+    cache-miss fallback, same shape as `wnba/live_lens.py`'s
+    `build_live_lens_page_context`.
+  - **New gap found and fixed in the same pass, not previously logged: MLB's
+    plain card props (`markets.hitterProps`/`pitcherProps`) carry NO
+    `actual`/`live_projection` fields at all** — confirmed via a real production
+    `/mlb/api/cards` row (gamePk 824003, live game): full pregame sim/model
+    fields, zero live-actual fields. The real live-actuals pipeline
+    (registry-tracked snapshots + box-score-driven synthesis —
+    `_synth_live_hitter_prop_rows`/`_current_live_pitcher_prop_rows`, genuinely
+    independent of the vendored MC path) already existed in `mlb/cards.py` but was
+    only reachable through the single-game detail view
+    (`source_card_detail_payload` → `_source_sim_detail`). Extracted the shared
+    computation into `_live_prop_rows_computed` (used by both) plus a new public
+    `live_prop_rows_for_game(selected_date, game_pk)` entrypoint; `live_lens.py`'s
+    `_card_to_live_lens_row` now calls a new `_live_props_from_game_detail` for
+    any game whose card status bucket is "live", preferring those (real actuals)
+    over the plain card props. Same hard-refuse guard as (b) — this does a live
+    box-score fetch per game, so it's worker-tick-owned; a web request falls back
+    to the plain (actual-less) card props rather than adding fetch latency to the
+    request path.
+  - **Frontend: `templates/intelligence.html`'s `displayLiveProjection`
+    (the board's "Live" column) fixed to stop falling back to `item.live_total`
+    (the GAME's live total) for prop candidates** — it was doing so
+    unconditionally via `??`, which is exactly why every live prop's "Live" column
+    showed the game score (or a real 0 from a genuine live_total) instead of the
+    player's own value whenever `live_projection` was unset (i.e. always, before
+    this session's backend fix). Now gated on `candidate_type`/`player_name` the
+    same way `matchesClientFilters`' `isProp` check already does elsewhere in the
+    same file; only game-level candidates still use `live_total` as their live value.
+  - **Explicit user direction, not yet acted on beyond this session's MLB work**:
+    apply the same architecture to WNBA "moving forward." Checked: WNBA's
+    `wnba/live_lens.py` already matches this exact pattern (`build_cards_page_context`
+    primary, thin live-line overlay, zero in-process simulation) — this was the
+    reference implementation #124(a) told MLB to converge toward, not a gap on
+    WNBA's side. No WNBA code changed this session; flagging in case a similar
+    "props exist but the live-actuals field is empty" gap turns up there too.
+  - **Also cleaned up in the same pass (test hygiene, not a feature change):**
+    `report.json` at the repo root was a committed test-pollution artifact (fixture
+    output from `tests/test_mlb_refresh_runner.py`'s live-lens tests, which mock
+    `live_lens_report_path` to a bare relative `Path("report.json")` instead of a
+    tmp path — confirmed via `git log` it's been accidentally recommitted at least
+    3 times across sessions: `66720d0b`, `42472a9f`, `71b57a82`). Removed and added
+    `/report.json` to `.gitignore` so it stops silently changing test outcomes
+    based on git state (this is exactly what made two of these tests initially
+    look like regressions from this session's change before the pollution was
+    isolated and confirmed unrelated).
+  - **Verification**: 197/198 targeted MLB + live-lens tests green (`test_mlb_refresh_runner.py`,
+    `test_mlb_live_lens_snapshot_reader.py`, `test_live_lens_loop.py`, and 10 more
+    `test_mlb_*.py` files) — the one failure
+    (`test_live_lens_payload_refreshes_card_before_game_lens`) is a pre-existing,
+    unrelated, run-order-dependent flake confirmed to fail identically against
+    unmodified `main` in the same full-file run; not caused by this change.
+    ⚠️ **Not yet deployed or checked against live production** — this session's
+    fix was written and test-verified but not pushed/deployed (8 MLB games were
+    live at investigation time; deploy should wait for a natural gap or explicit
+    go-ahead per this file's standing deploy-caution note). Next session: deploy,
+    then re-run the exact same production check used to diagnose this
+    (`/mlb/api/live-lens` `counts.props` across live games; `/mlb/api/cards` for
+    comparison) to confirm props actually reach the board, and separately confirm
+    the "Live" column shows real per-prop actuals (not the game total) on a real
+    live prop row.
 
 Conventions:
 - IDs are stable and never reused. New work appends at the next free number.

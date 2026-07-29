@@ -556,6 +556,44 @@ def _live_props_from_card(card: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
+def _live_props_from_game_detail(selected_date: str, game_pk: int) -> list[dict[str, Any]]:
+    """Real live actuals for one live game: registry-tracked snapshots plus
+    box-score-driven synthesis (mlb/cards.py's live_prop_rows_for_game --
+    the same pipeline the game-detail sim panel already uses), not just the
+    plain pregame-projection markets list. Involves a live box-score fetch
+    per game, so this is hard-refused inside a web request (#124 follow-up
+    (b)) -- it belongs on the live-lens worker tick; a web request falls
+    back to the plain card props (still real, just without a live actual
+    until the next tick fills it in).
+    """
+    if not game_pk:
+        return []
+    from syndicate.features.shared.request_path_guard import refuse_if_compute_in_request_path
+
+    try:
+        refuse_if_compute_in_request_path("mlb_live_lens_game_detail_props")
+    except Exception:
+        return []
+
+    try:
+        from syndicate.features.mlb.cards import live_prop_rows_for_game
+    except Exception:
+        return []
+
+    try:
+        raw_rows = live_prop_rows_for_game(selected_date, game_pk)
+    except Exception:
+        return []
+
+    rows = [_normalize_live_prop_row(row) for row in raw_rows if isinstance(row, dict)]
+    rows = [row for row in rows if row is not None]
+    rows.sort(
+        key=lambda value: float(value.get("rankingScore") or value.get("estimatedWinProb") or value.get("modelProbOver") or value.get("odds") or 0.0),
+        reverse=True,
+    )
+    return rows
+
+
 def _card_score_from_card(card: dict[str, Any]) -> dict[str, Any]:
     score = card.get("score") if isinstance(card.get("score"), dict) else {}
     if score:
@@ -851,6 +889,15 @@ def _card_to_live_lens_row(card: dict[str, Any], *, report_date: str) -> dict[st
     home = card.get("home") if isinstance(card.get("home"), dict) else {}
     score = _card_score_from_card(card)
     card_props = _live_props_from_card(card)
+    if _card_status_bucket(card) == "live":
+        # Plain card markets are pregame-only projections with no `actual`/
+        # `liveProjection` fields at all -- the real live-actuals pipeline
+        # (registry-tracked snapshots + box-score-driven synthesis) lives in
+        # mlb/cards.py's game-detail sim panel. Prefer it here so the board's
+        # live column shows genuine actuals instead of nothing.
+        live_detail_props = _live_props_from_game_detail(report_date, int(card.get("gamePk") or 0))
+        if live_detail_props:
+            card_props = live_detail_props
     card_game_lens = card.get("gameLens") if isinstance(card.get("gameLens"), list) else []
     derived_segments = _live_lens_segments_from_card(card)
     return {
@@ -978,9 +1025,110 @@ def _merge_cards_context_into_report(report: dict[str, Any], selected_date: str)
     return merged_report
 
 
-def _persist_live_lens_report(selected_date: str) -> dict[str, Any] | None:
-    report_path = live_lens_report_path(selected_date)
-    log_path = live_lens_log_path(selected_date)
+def _enhance_card_row_with_live_projection(card_row: dict[str, Any], projection_row: dict[str, Any]) -> dict[str, Any]:
+    """Overlay a Monte-Carlo-derived (or previously persisted) row's live
+    projection signal onto a card-based row, WITHOUT touching the card
+    row's props -- the card artifact is the reliable source for those (#124
+    follow-up (a)); the projection row only ever adds gameLens/score/
+    predictions signal the card path doesn't already have.
+    """
+    enhanced = dict(card_row)
+    card_status = enhanced.get("status") if isinstance(enhanced.get("status"), dict) else {}
+    projection_status = projection_row.get("status") if isinstance(projection_row.get("status"), dict) else {}
+    card_status_text = f"{str(card_status.get('abstract') or '').strip()} {str(card_status.get('detailed') or '').strip()}".strip().lower()
+    projection_status_text = f"{str(projection_status.get('abstract') or '').strip()} {str(projection_status.get('detailed') or '').strip()}".strip().lower()
+    card_is_live_or_final = any(token in card_status_text for token in ("live", "in progress", "warmup", "final", "game over", "completed"))
+    projection_is_live_or_final = any(token in projection_status_text for token in ("live", "in progress", "warmup", "final", "game over", "completed"))
+
+    # gameLens: the projection row's segments reflect actual in-game state
+    # (which segment is live right now); the card's own derived segments are
+    # only a generic pregame list. Mirrors the pre-#124 merge direction's
+    # should_replace_game_lens, roles swapped (card is base here, not row).
+    projection_game_lens = projection_row.get("gameLens") if isinstance(projection_row.get("gameLens"), list) else []
+    card_game_lens = enhanced.get("gameLens") if isinstance(enhanced.get("gameLens"), list) else []
+    card_game_lens_has_signal = _lens_rows_have_projection_signal(card_game_lens)
+    projection_game_lens_has_signal = _lens_rows_have_projection_signal(projection_game_lens)
+    should_use_projection_lens = projection_game_lens and (
+        not card_game_lens
+        or not card_is_live_or_final
+        or (projection_game_lens_has_signal and not card_game_lens_has_signal)
+    )
+    if should_use_projection_lens:
+        enhanced["gameLens"] = projection_game_lens
+
+    if projection_status and (projection_is_live_or_final or not card_is_live_or_final):
+        enhanced["status"] = projection_status
+
+    # Props: cards stay the reliable primary source (#124 follow-up (a)) --
+    # never overwritten here -- but if the card artifact genuinely has none
+    # for this game while the projection report does, fill the gap rather
+    # than showing nothing.
+    if not (enhanced.get("liveProps") or enhanced.get("props") or enhanced.get("trackedProps")):
+        projection_props = (
+            projection_row.get("liveProps")
+            or projection_row.get("props")
+            or projection_row.get("trackedProps")
+        )
+        if isinstance(projection_props, list) and projection_props:
+            enhanced["liveProps"] = projection_props
+            enhanced["props"] = projection_props
+            enhanced["trackedProps"] = projection_props
+
+    projection_matchup = projection_row.get("matchup") if isinstance(projection_row.get("matchup"), dict) else {}
+    projection_score = projection_matchup.get("score") if isinstance(projection_matchup.get("score"), dict) else None
+    if isinstance(projection_score, dict) and (projection_score.get("away") is not None or projection_score.get("home") is not None):
+        matchup = dict(enhanced.get("matchup") or {})
+        matchup["score"] = projection_score
+        enhanced["matchup"] = matchup
+        enhanced["score"] = projection_score
+    if not enhanced.get("predictions") and isinstance(projection_row.get("predictions"), dict) and projection_row.get("predictions"):
+        enhanced["predictions"] = projection_row.get("predictions")
+    if not enhanced.get("archivedLiveProps") and isinstance(projection_row.get("archivedLiveProps"), list) and projection_row.get("archivedLiveProps"):
+        enhanced["archivedLiveProps"] = projection_row.get("archivedLiveProps")
+    return enhanced
+
+
+def _enhance_cards_report_with_live_projection(cards_report: dict[str, Any], projection_report: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(projection_report, dict):
+        return cards_report
+    projection_games = projection_report.get("games") if isinstance(projection_report.get("games"), list) else []
+    projection_by_game_pk = {
+        int(game.get("gamePk") or 0): game
+        for game in projection_games
+        if isinstance(game, dict) and int(game.get("gamePk") or 0)
+    }
+    if not projection_by_game_pk:
+        return cards_report
+    games = cards_report.get("games") if isinstance(cards_report.get("games"), list) else []
+    enhanced_games: list[dict[str, Any]] = []
+    for row in games:
+        if not isinstance(row, dict):
+            continue
+        projection_row = projection_by_game_pk.get(int(row.get("gamePk") or 0))
+        enhanced_games.append(
+            _enhance_card_row_with_live_projection(row, projection_row) if isinstance(projection_row, dict) else row
+        )
+    enhanced_report = dict(cards_report)
+    if enhanced_games:
+        enhanced_report["games"] = enhanced_games
+    return enhanced_report
+
+
+def _live_projection_enhancement_payload(selected_date: str) -> dict[str, Any] | None:
+    """Best-effort fetch of MLB's vendored 120-sim-per-live-game Monte Carlo
+    live re-sim (#124 follow-up (a)): a real enhancement layer over the
+    card-based primary source, never a requirement for props to appear.
+    Hard-refused inside a real web request on hosted Render (#124 follow-up
+    (b)) -- this is the one genuinely heavy piece of live-lens compute, and
+    it belongs on live-odds-worker's own tick, not a request thread.
+    """
+    from syndicate.features.shared.request_path_guard import refuse_if_compute_in_request_path
+
+    try:
+        refuse_if_compute_in_request_path("mlb_live_lens_monte_carlo_resim")
+    except Exception:
+        return None
+
     try:
         from vendor.mlb_bettingv2.tools.web.flask_frontend import _live_lens_payload
     except Exception:
@@ -992,12 +1140,25 @@ def _persist_live_lens_report(selected_date: str) -> dict[str, Any] | None:
         return None
 
     if not isinstance(payload, dict) or not isinstance(payload.get("games"), list) or not payload.get("games"):
-        fallback_payload = _cards_backed_live_lens_report(selected_date)
-        if fallback_payload is not None:
-            payload = fallback_payload
-        if not isinstance(payload, dict):
-            return None
-    payload = _merge_cards_context_into_report(payload, selected_date)
+        return None
+    return payload
+
+
+def _persist_live_lens_report(selected_date: str) -> dict[str, Any] | None:
+    report_path = live_lens_report_path(selected_date)
+    log_path = live_lens_log_path(selected_date)
+
+    payload = _cards_backed_live_lens_report(selected_date)
+    mc_payload = _live_projection_enhancement_payload(selected_date)
+    if isinstance(payload, dict) and payload.get("games"):
+        payload = _enhance_cards_report_with_live_projection(payload, mc_payload)
+    elif isinstance(mc_payload, dict):
+        # Cards artifact entirely unavailable (rare) -- fall back to the MC
+        # payload alone rather than losing the report outright.
+        payload = mc_payload
+
+    if not isinstance(payload, dict):
+        return None
 
     try:
         report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1264,26 +1425,36 @@ def read_latest_live_lens_api_payload(selected_date: str, *, season: int | None 
 
 
 def build_live_lens_snapshot_internal(selected_date: str, *, season: int | None = None, persist: bool = False) -> dict[str, Any]:
-    # Worker-only compute function
+    # Intended as a worker-only compute function (live-odds-worker's
+    # live_lens_loop tick), but reachable in-request as a cache-miss
+    # fallback from read_latest_live_lens_page_context/api_payload -- same
+    # shape as wnba/live_lens.py's build_live_lens_page_context. The one
+    # genuinely heavy piece (the vendored Monte Carlo live re-sim) is hard-
+    # refused inside a real web request via
+    # _live_projection_enhancement_payload -> refuse_if_compute_in_request_path
+    # (#124 follow-up (b)); this function's own remaining work is the cheap
+    # card-artifact read, same cost class as WNBA's request-path fallback.
+    from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
+
+    warn_if_compute_in_request_path("build_live_lens_snapshot_internal")
     parsed_date = parse_iso_date(selected_date)
     prev_date = parsed_date.fromordinal(parsed_date.toordinal() - 1).isoformat()
     next_date = parsed_date.fromordinal(parsed_date.toordinal() + 1).isoformat()
 
     report_path = live_lens_report_path(selected_date)
     should_refresh_report = bool(persist or _live_lens_report_needs_refresh(selected_date))
+    # _persist_live_lens_report already builds cards-primary (#124 follow-up
+    # (a)) with the vendor MC/rich-live-actuals enhancement layered on top
+    # when it actually refreshes; a report loaded from disk (not stale, per
+    # the max-age check above) was written by that same composition on a
+    # prior call/tick, so no separate re-freshen pass is needed here -- one
+    # was tried and reverted, since it would have overwritten the rich
+    # per-prop actuals with a cheap plain-cards rebuild on every read.
     report = _persist_live_lens_report(selected_date) if should_refresh_report else load_json_file(report_path)
     if not isinstance(report, dict) or not isinstance(report.get("games"), list) or not report.get("games"):
         fallback_report = _cards_backed_live_lens_report(selected_date)
         if fallback_report is not None:
             report = fallback_report
-    elif isinstance(report, dict):
-        merged_report = _merge_cards_context_into_report(report, selected_date)
-        if isinstance(merged_report, dict):
-            report = merged_report
-    if not persist and isinstance(report, dict) and str(report.get("source_title") or "").strip() == "MLB Game Cards":
-        refreshed_report = _persist_live_lens_report(selected_date)
-        if isinstance(refreshed_report, dict):
-            report = refreshed_report
     runtime_live_lens_dir = str(report_path.parent)
     runtime_data_root = str(report_path.parent.parent)
     generated_at = str((report or {}).get("generatedAt") or datetime.now().astimezone().isoformat(timespec="seconds")).strip() or selected_date

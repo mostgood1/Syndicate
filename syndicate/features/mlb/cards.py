@@ -3800,12 +3800,25 @@ def _source_snapshot_detail(selected_date: str, game_pk: int, actual_payload: di
     }
 
 
-def _source_sim_detail(selected_date: str, game_pk: int, sim_payload: dict[str, Any] | None, actual_payload: dict[str, Any] | None = None, live_lens_row: dict[str, Any] | None = None) -> dict[str, Any]:
-    matchup = (live_lens_row or {}).get("matchup") if isinstance((live_lens_row or {}).get("matchup"), dict) else {}
-    away_team = matchup.get("away") if isinstance(matchup.get("away"), dict) else {}
-    home_team = matchup.get("home") if isinstance(matchup.get("home"), dict) else {}
+def _live_prop_rows_computed(
+    selected_date: str,
+    game_pk: int,
+    sim_payload: dict[str, Any] | None,
+    actual_payload: dict[str, Any] | None,
+    live_lens_row: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """The real live-props pipeline: registry-tracked snapshots (actual
+    line/odds movement over time) plus box-score-driven synthesis
+    (_synth_live_hitter_prop_rows/_current_live_pitcher_prop_rows -- live
+    `actual`/`live_projection` computed directly from sim_payload's
+    pregame per-player distribution + actual_payload's live box score, with
+    no dependency on the vendored MC live-lens pipeline). Extracted out of
+    _source_sim_detail so mlb/live_lens.py's card-based live-props primary
+    source (#124 follow-up (a)) can reuse the exact same real actuals the
+    game-detail sim panel already shows, instead of the plain pregame-only
+    markets.hitterProps/pitcherProps list.
+    """
     today_iso = central_today_iso()
-    refreshed_at = central_now().isoformat(timespec="seconds")
     is_historical_date = bool(selected_date and selected_date != today_iso)
     has_live_props = isinstance((live_lens_row or {}).get("liveProps"), list) and bool((live_lens_row or {}).get("liveProps"))
     has_archived_live_props = isinstance((live_lens_row or {}).get("archivedLiveProps"), list) and bool((live_lens_row or {}).get("archivedLiveProps"))
@@ -3839,7 +3852,30 @@ def _source_sim_detail(selected_date: str, game_pk: int, sim_payload: dict[str, 
     ranking_rows = live_prop_rows
     if is_live_game:
         ranking_rows = _annotate_source_live_prop_rows_with_state(live_prop_rows, actual_payload, live_lens_row)
-    live_prop_rows = _apply_source_live_prop_ranking_scores(ranking_rows)
+    return _apply_source_live_prop_ranking_scores(ranking_rows)
+
+
+def live_prop_rows_for_game(selected_date: str, game_pk: int) -> list[dict[str, Any]]:
+    """Public entrypoint for mlb/live_lens.py: the real, independently-
+    computable live-props list (real actuals + live projections) for one
+    game, same pipeline the game-detail sim panel uses. Cheap for the
+    handful of currently-live games a live-lens tick actually needs this
+    for -- not the whole slate.
+    """
+    sim_payload = _daily_sim_by_game(selected_date, [int(game_pk)]).get(int(game_pk))
+    actual_payload = _daily_actual_by_game(selected_date, [int(game_pk)]).get(int(game_pk))
+    live_lens_row = _live_lens_game_row(selected_date, int(game_pk))
+    return _live_prop_rows_computed(selected_date, int(game_pk), sim_payload, actual_payload, live_lens_row)
+
+
+def _source_sim_detail(selected_date: str, game_pk: int, sim_payload: dict[str, Any] | None, actual_payload: dict[str, Any] | None = None, live_lens_row: dict[str, Any] | None = None) -> dict[str, Any]:
+    matchup = (live_lens_row or {}).get("matchup") if isinstance((live_lens_row or {}).get("matchup"), dict) else {}
+    away_team = matchup.get("away") if isinstance(matchup.get("away"), dict) else {}
+    home_team = matchup.get("home") if isinstance(matchup.get("home"), dict) else {}
+    today_iso = central_today_iso()
+    refreshed_at = central_now().isoformat(timespec="seconds")
+    is_historical_date = bool(selected_date and selected_date != today_iso)
+    live_prop_rows = _live_prop_rows_computed(selected_date, game_pk, sim_payload, actual_payload, live_lens_row)
     if not isinstance(sim_payload, dict):
         return {
             "found": False,

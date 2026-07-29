@@ -122,3 +122,9 @@ reports/refresh_status/latest/hot_artifact_pull_watermark.json
 # by accident.
 data/prediction_ledger.json
 data/odds_events/
+
+# tests/test_mlb_refresh_runner.py's live-lens tests mock live_lens_report_path
+# to a bare relative "report.json" instead of a tmp path; repeatedly leaked
+# fixture output into this repo-root file across several sessions (66720d0b,
+# 42472a9f, 71b57a82, ...) and got committed by accident each time.
+/report.json

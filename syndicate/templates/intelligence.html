@@ -465,8 +465,16 @@
     return Number.isFinite(numeric) ? (Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1)) : String(projection).trim();
   }
 
+  // #124/#126: live_total is the GAME's live total (runs/points scored),
+  // not this candidate's own stat. Falling back to it unconditionally made
+  // every live PROP row's "Live" column show the game score instead of the
+  // player's own live actual/projection (or "0" whenever live_total itself
+  // was a real 0) -- only game-level candidates (moneyline/spread/total)
+  // have a live_total that's actually meaningful as their own live value.
   function displayLiveProjection(item) {
-    const projection = item.live_projection ?? item.live_total;
+    const candidateType = String(item.candidate_type || item.type || "").trim().toLowerCase();
+    const isProp = candidateType === "prop" || Boolean(item.player_name || item.player_id);
+    const projection = isProp ? item.live_projection : (item.live_projection ?? item.live_total);
     if (projection === null || projection === undefined || projection === "" || projection === "-") return null;
     const numeric = Number(projection);
     return Number.isFinite(numeric) ? (Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1)) : String(projection).trim();
