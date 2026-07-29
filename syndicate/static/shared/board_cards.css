@@ -499,6 +499,7 @@ body.syndicate-body .cards-shell {
 .board-badge--matched { background: rgba(46, 204, 113, 0.16); color: #d6ffe4; border-color: rgba(46, 204, 113, 0.38); }
 .board-badge--no-coverage { background: rgba(255, 255, 255, 0.06); color: var(--cards-text-dim); border-color: var(--cards-line); }
 .board-badge--alert { background: rgba(231, 76, 60, 0.16); color: #ffd4d4; border-color: rgba(231, 76, 60, 0.38); }
+.board-badge--steam { background: rgba(255, 149, 0, 0.18); color: #ffe0b3; border-color: rgba(255, 149, 0, 0.45); }
 
 /* Which side (Over/Under, home/away) the sim's own probability actually
    favors for a two-sided market (row.model_side === row.side) -- distinct

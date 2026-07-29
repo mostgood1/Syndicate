@@ -6,9 +6,65 @@ list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-07-28 (see "Reconciliation 2026-07-28").
 
-> **Next free ID: 137.** IDs are never reused. Closed items move to
+> **Next free ID: 138.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
+
+- **New: #137** (filed and shipped this session, **NOT YET DEPLOYED**) — user
+  asked to integrate steam (sharp/steam line-movement detection) into the
+  main opportunity board itself, not just the separate top-strip rail:
+  "call these out as steam moves, add a steam selector, make sure we have
+  live and pregame coding for steam." Detection was already solid and
+  already covered both lanes (`_steam_signal`/`_capture_phase`,
+  `odds_refresh_tracking.py`, #83) — the gap was purely presentational:
+  `/api/board/steam` (`blueprints/intelligence.py:2049`) deliberately
+  throws away every `is_live` event (a 2026-07-28 product decision to keep
+  that one rail "Pregame Steam" specifically), and nothing in
+  `_collect_candidates`/`build_intelligence_board_contract` read steam
+  events at all, live or pregame — zero "steam" references anywhere in
+  `intelligence.py` before this. Added `_steam_candidates_for_sport`
+  (`syndicate/features/intelligence.py`): reads
+  `reports/steam/steam_events_<date>.json` directly (the same bounded,
+  200-event file the rail reads), builds one real board candidate per
+  detected steam move for every sport, tagged `candidate_type: "steam"` and
+  `lane: "live"/"pregame"` straight from the event's own
+  `capture_phase`/`is_live` fields — no new detection logic, just a new
+  consumer of what already existed. Wired into `_collect_candidates`
+  unconditionally (same `include_props`/`include_games` gate every other
+  sport-agnostic block already uses, not a question-text heuristic), with
+  `line_odds_movement` populated from the event's own line/price deltas so
+  the board's existing "Move" column renders it for free. Deliberately does
+  **not** set `player_name` for team/game-level markets (h2h/spreads/
+  totals) — the frontend's market-family filter treats any truthy
+  `player_name` as a prop, which would have misfiled a team total's steam
+  move as a "Player prop" and hidden it from "Game markets".
+  Frontend (`intelligence.html`): new `STEAM_TABS` pill group ("All
+  opportunities" / "⚡ Steam moves only"), following the exact
+  `renderTabs`/`state.*`/`syncUrlState`/`matchesClientFilters` pattern the
+  market-family and min-edge tabs already use; a steam badge
+  (`board-badge--steam`, new CSS in `board_cards.css`) on both the blotter
+  row and the card view; min-edge filter explicitly exempts steam
+  candidates (they have no real "edge," so a nonzero threshold would
+  otherwise hide every steam row including under steam-only). Left the
+  existing `/api/board/steam` top-strip rail (pregame-only by design)
+  standing as-is — the user's phrasing ("instead of the steam rail") was
+  ambiguous between "replace" and "in addition to"; kept both since
+  removing a working, tested surface on an ambiguous read is the riskier
+  interpretation. Flag if the rail should actually come out.
+  6 new direct unit tests (`tests/test_intelligence_steam_candidates.py`) —
+  live prop steam event, pregame team-total steam event (confirms no
+  `player_name` leak), cross-sport exclusion, missing-steam-signal skip,
+  duplicate-event dedup, empty-input safety — all survive
+  `_classify_candidate_with_reason`, matching this file's established
+  "test the real builder against the real classifier" pattern. `node
+  --check` passed on the extracted script block. Verified end-to-end in a
+  local browser preview: toolbar renders the new pill group, clicking
+  "Steam moves only" correctly narrows the blotter (0 matches locally, no
+  local `reports/steam/` data — expected), clicking back to "All
+  opportunities" restores the normal board, zero console errors either way.
+  **Not yet deployed** — no local steam data to verify the populated case
+  against; needs a live production check (a date with real detected steam
+  events) before/shortly after deploying.
 
 - **New: #136** (filed and fixed this session, **NOT YET DEPLOYED**) — user
   screenshotted the `/intelligence` "Board" and reported WNBA prop rows with

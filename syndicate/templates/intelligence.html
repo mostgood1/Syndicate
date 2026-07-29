@@ -36,6 +36,9 @@
       <div class="board-tabs cards-tabs" id="board-edge-tabs" role="tablist" aria-label="Minimum edge filter"></div>
       <div class="board-tabs cards-tabs" id="board-view-tabs" role="tablist" aria-label="Board view"></div>
     </div>
+    <div class="board-toolbar-row">
+      <div class="board-tabs cards-tabs" id="board-steam-tabs" role="tablist" aria-label="Steam move filter"></div>
+    </div>
   </form>
 
   <div id="board-summary-strip" class="board-summary-strip" hidden></div>
@@ -104,6 +107,10 @@
     { value: "3", label: "3%+" },
     { value: "5", label: "5%+" },
     { value: "8", label: "8%+" },
+  ];
+  const STEAM_TABS = [
+    { value: "all", label: "All opportunities" },
+    { value: "steam", label: "⚡ Steam moves only" },
   ];
   const VIEW_TABS = [
     { value: "cards", label: "Cards" },
@@ -190,6 +197,7 @@
     minEdge: Number(urlParams.get("min_edge") || 0) || 0,
     view: urlParams.get("view") === "cards" ? "cards" : "blotter",
     game: urlParams.get("game") || "all",
+    steamOnly: urlParams.get("steam") === "1",
   };
   {
     const dateInput = document.getElementById("board-date");
@@ -243,6 +251,7 @@
     if (state.minEdge > 0) url.searchParams.set("min_edge", String(state.minEdge)); else url.searchParams.delete("min_edge");
     if (state.view && state.view !== "blotter") url.searchParams.set("view", state.view); else url.searchParams.delete("view");
     if (state.game && state.game !== "all") url.searchParams.set("game", state.game); else url.searchParams.delete("game");
+    if (state.steamOnly) url.searchParams.set("steam", "1"); else url.searchParams.delete("steam");
     window.history.replaceState({}, "", url.toString());
   }
 
@@ -323,6 +332,12 @@
     });
     renderTabs("board-view-tabs", VIEW_TABS, state.view, (value) => {
       state.view = value;
+      syncUrlState();
+      renderFilterTabs();
+      renderBoardBody();
+    });
+    renderTabs("board-steam-tabs", STEAM_TABS, state.steamOnly ? "steam" : "all", (value) => {
+      state.steamOnly = value === "steam";
       syncUrlState();
       renderFilterTabs();
       renderBoardBody();
@@ -721,8 +736,18 @@
     return !itemDate || itemDate === state.date;
   }
 
+  function isSteamCandidate(item) {
+    return String(item.candidate_type || item.type || "").trim().toLowerCase() === "steam";
+  }
+
   function matchesClientFilters(item) {
-    if (state.minEdge > 0 && edgeValue(item) * 100 < state.minEdge) return false;
+    // A steam move carries no "edge" (it's a movement signal, not a
+    // model-vs-price gap) -- edgeValue() defaults it to 0, so a nonzero
+    // min-edge filter would silently hide every steam row, including under
+    // "Steam moves only", which is the one view where they must never
+    // disappear.
+    if (state.minEdge > 0 && !isSteamCandidate(item) && edgeValue(item) * 100 < state.minEdge) return false;
+    if (state.steamOnly && !isSteamCandidate(item)) return false;
     if (state.marketFamily !== "all") {
       const candidateType = String(item.candidate_type || item.type || "").trim().toLowerCase();
       const isProp = candidateType === "prop" || Boolean(item.player_name || item.player_id);
@@ -787,6 +812,7 @@
     const badges = [];
     if (itemState === "live") badges.push('<span class="board-badge board-badge--live">Live</span>');
     if (itemState === "pregame") badges.push('<span class="board-badge board-badge--pregame">Pregame</span>');
+    if (isSteamCandidate(item)) badges.push('<span class="board-badge board-badge--steam" title="Steam move: a sharp, fast line/price move detected by the odds tracker">⚡ Steam</span>');
     if (confidence !== null && confidence >= 0.7) badges.push('<span class="board-badge board-badge--confidence">High confidence</span>');
     const sport = String(item.sport || item.sport_slug || "").trim().toUpperCase();
     const market = String(item.market || item.market_label || "").trim();
@@ -1147,9 +1173,10 @@
               const updatedDisplay = formatRelativeTime(updatedIso);
               const rowAttrs = `data-syndicate-name="${escapeHtml(title)}" data-syndicate-market="${escapeHtml(item.market || item.market_label || "")}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}" data-syndicate-odds="${escapeHtml(oddsText)}" data-syndicate-prop-line="${escapeHtml(propText)}"`;
               const headshot = playerHeadshot(item);
+              const steamBadge = isSteamCandidate(item) ? '<span class="board-badge board-badge--steam" title="Steam move: a sharp, fast line/price move detected by the odds tracker">⚡ Steam</span>' : "";
               return `
                 <tr ${rowAttrs}>
-                  <td><span class="board-badge board-badge--${itemState === "live" ? "live" : "pregame"}">${itemState === "live" ? "Live" : "Pre"}</span></td>
+                  <td><span class="board-badge board-badge--${itemState === "live" ? "live" : "pregame"}">${itemState === "live" ? "Live" : "Pre"}</span>${steamBadge}</td>
                   <td>
                     <div class="board-blotter__primary">${headshot}${escapeHtml(title)}</div>
                     <div class="board-blotter__meta">${escapeHtml(sport)}${matchup ? " &middot; " + escapeHtml(matchup) : ""}${updatedDisplay ? ` &middot; <span title="${escapeHtml(updatedIso)}">${escapeHtml(updatedDisplay)}</span>` : ""}</div>

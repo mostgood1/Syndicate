@@ -80,6 +80,7 @@ from syndicate.features.shared.ops_refresh import load_latest_refresh_status
 from syndicate.features.shared.source_roots import preferred_artifact_roots
 from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport as _canonical_load_odds_history_payload_for_sport
 from syndicate.features.shared.odds_control_plane import resolve_current_shard_key
+from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.week_calendar import shard_key_for_week
 from syndicate.features.intelligence_parlay_correlation import parlay_leg_market_key as _runtime_parlay_leg_market_key
@@ -3887,6 +3888,175 @@ def _prop_candidate_from_item(sport: dict[str, Any], item: dict[str, Any], *, su
     return row
 
 
+def _steam_events_path(date_str: str) -> Path:
+    return reports_root() / "steam" / f"steam_events_{date_str}.json"
+
+
+def _load_steam_events_for_date(date_str: str) -> list[dict[str, Any]]:
+    payload = read_json_file(_steam_events_path(date_str))
+    events = payload.get("events") if isinstance(payload, dict) else None
+    return [event for event in events if isinstance(event, dict)] if isinstance(events, list) else []
+
+
+def _steam_event_current_odds_text(value: Any) -> str:
+    odds_value = _american_odds_value(value)
+    if odds_value is None:
+        return "-"
+    return f"+{int(odds_value)}" if odds_value > 0 else str(int(odds_value))
+
+
+def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
+    """Board candidates built directly from detected steam (sharp/steam line)
+    moves, per the user's explicit direction: steam should be a real,
+    filterable row TYPE on the main opportunity board -- "call these out as
+    steam moves" -- not confined to the separate top-strip rail
+    (/api/board/steam, blueprints/intelligence.py), which the user also
+    wants standing but as one presentation, not the only one.
+
+    Detection itself (_steam_signal, odds_refresh_tracking.py) already
+    covers live AND pregame with real per-event granularity via
+    capture_phase ("live"/"closing"/"ramp"/"drift") and a plain is_live
+    bool -- the rail's endpoint deliberately throws every is_live event away
+    (a 2026-07-28 product decision to keep that specific rail pregame-only,
+    not a detection gap). This function is the live+pregame-inclusive
+    consumer that decision left with no board-candidate home: every steam
+    event for this sport becomes a real candidate here, tagged with its own
+    lane so the existing LIVE/PREGAME state filter, and a new steam-only
+    filter, both work on it exactly like any other candidate.
+    """
+    sport_slug = _safe_text(sport.get("slug"), "").lower()
+    if not sport_slug:
+        return []
+    selected_date = _safe_text(sport.get("context_label"), "")
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", selected_date):
+        return []
+    events = _load_steam_events_for_date(selected_date)
+    if not events:
+        return []
+
+    candidates: list[dict[str, Any]] = []
+    seen_keys: set[tuple[str, str, str, str, str]] = set()
+    for event in events:
+        if _safe_text(event.get("sport"), "").lower() != sport_slug:
+            continue
+        steam = event.get("steam") if isinstance(event.get("steam"), dict) else {}
+        if not steam:
+            continue
+        capture_phase = _safe_text(steam.get("capture_phase") or event.get("capture_phase"), "")
+        is_live = bool(event.get("is_live")) or capture_phase == "live"
+        lane = "live" if is_live else "pregame"
+        market_type = _safe_text(event.get("market_type"), "")
+        market_key = _market_key_from_text(market_type, allow_fallback=True)
+        market_label = _market_label(market_key) if market_key else (market_type.replace("_", " ").title() or "Market")
+        selection = _safe_text(event.get("selection"), "")
+        # player_name is case-inconsistent at the source ("willy adames") --
+        # holds a real team name for game-level markets too (populated
+        # upstream via normalized_entry.get("entity")/row.get("entity"),
+        # _market_lifecycle_event, odds_refresh_tracking.py), same idiom the
+        # existing steam rail's _steam_event_subject already relies on.
+        player_name = _safe_text(event.get("player_name"), "").strip().title()
+        subject = player_name or selection or market_label
+        current_line = _numeric_hint(event.get("line"))
+        current_price = _numeric_hint(event.get("price"))
+        previous_line = _numeric_hint(steam.get("previous_line"))
+        previous_price = _numeric_hint(steam.get("previous_odds"))
+        line_delta = _numeric_hint(steam.get("line_delta"))
+        odds_delta = _numeric_hint(steam.get("odds_delta"))
+        implied_prob = _numeric_hint(event.get("implied_prob"))
+        game_id = _safe_text(event.get("game_id"), "")
+        timestamp = _safe_text(event.get("timestamp"), "")
+        dedupe_key = (sport_slug, game_id, market_type, selection or player_name, timestamp)
+        if dedupe_key in seen_keys:
+            continue
+        seen_keys.add(dedupe_key)
+
+        pick_text = f"{selection} {current_line:.1f}".strip() if selection and current_line is not None else (selection or f"{subject} steam move")
+        odds_text = _steam_event_current_odds_text(current_price)
+        line_direction = "up" if (line_delta or 0.0) > 0 else "down" if (line_delta or 0.0) < 0 else "flat"
+        price_direction = "up" if (odds_delta or 0.0) > 0 else "down" if (odds_delta or 0.0) < 0 else "flat"
+        move_bits = []
+        if line_delta:
+            move_bits.append(f"line moved {line_delta:+.1f}")
+        if odds_delta:
+            move_bits.append(f"price moved {odds_delta:+.0f}")
+        move_text = " and ".join(move_bits) if move_bits else "odds moved sharply"
+
+        candidates.append(
+            {
+                "candidate_type": "steam",
+                "sport": _safe_text(sport.get("name"), sport_slug.upper()),
+                "sport_slug": sport_slug,
+                "surface_key": lane,
+                "surface_title": "Steam moves",
+                "name": f"{subject} {market_label} steam move".strip(),
+                # Only set on a genuine player prop -- market_key already
+                # canonicalizes market_type into _GAME_SIDE_MARKETS'
+                # vocabulary for team/game-level markets (moneyline/spread/
+                # total), and the frontend's market-family filter treats
+                # any candidate with a truthy player_name as a "prop"
+                # (matchesClientFilters, intelligence.html) regardless of
+                # candidate_type -- a team-total steam move would otherwise
+                # wrongly show up under "Player props" and disappear from
+                # "Game markets".
+                "player_name": (player_name or None) if market_key not in _GAME_SIDE_MARKETS else None,
+                "market": f"{market_label} · Steam",
+                "market_key": market_key,
+                "pick": pick_text,
+                "selection": pick_text,
+                "matchup": _safe_text(event.get("matchup"), "-"),
+                "game_id": game_id,
+                "event_id": game_id,
+                "game_pk": _safe_int(game_id),
+                "context_label": selected_date,
+                "line": f"{current_line:.1f}" if current_line is not None else "-",
+                "odds": odds_text,
+                "projected": "-",
+                "confidence": f"{implied_prob * 100.0:.1f}%" if implied_prob is not None else "-",
+                "model_probability": implied_prob,
+                "edge": "-",
+                "is_live": is_live,
+                "lane": lane,
+                "line_odds_movement": {
+                    "opening_line": previous_line,
+                    "latest_line": current_line,
+                    "line_delta": line_delta,
+                    "line_direction": line_direction,
+                    "opening_price": previous_price,
+                    "latest_price": current_price,
+                    "price_delta": odds_delta,
+                    "price_direction": price_direction,
+                },
+                "steam": {
+                    "capture_phase": capture_phase or None,
+                    "window_seconds": steam.get("window_seconds"),
+                    "line_delta": line_delta,
+                    "odds_delta": odds_delta,
+                },
+                "timestamp": timestamp or None,
+                "last_updated": timestamp or None,
+                "source": _safe_text(event.get("source"), "") or None,
+                "score": (abs(line_delta or 0.0) * 20.0) + (abs(odds_delta or 0.0) * 0.5),
+                "href": f"/{sport_slug}/cards?date={selected_date}",
+                "href_label": "Open board",
+                "writeup": f"Steam move: {market_label} for {subject} -- {move_text}.",
+                "display_pills": [
+                    pill
+                    for pill in (
+                        f"Line {previous_line:.1f} → {current_line:.1f}"
+                        if previous_line is not None and current_line is not None and previous_line != current_line
+                        else "",
+                        f"Odds {int(previous_price)} → {int(current_price)}"
+                        if previous_price is not None and current_price is not None and previous_price != current_price
+                        else "",
+                        "Live" if is_live else capture_phase.title() if capture_phase else "Pregame",
+                    )
+                    if pill
+                ],
+            }
+        )
+    return candidates
+
+
 def _mlb_home_run_candidates_from_artifact(sport: dict[str, Any]) -> list[dict[str, Any]]:
     if _safe_text(sport.get("slug"), "").lower() != "mlb":
         return []
@@ -5397,6 +5567,20 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
             candidates.extend(game_candidates)
             if game_candidates:
                 _log_candidate_stage(pipeline_name="collect_candidates", stage="game_candidate_creation", before=[], after=game_candidates)
+        # Steam moves as real board candidates, per explicit user direction:
+        # every sport, unconditionally (gated only on the same
+        # props-or-games-requested check every other sport-agnostic block
+        # above uses -- "top edges today"'s own default resolves both True,
+        # see the include_props/include_games derivation above), not behind
+        # a question-text heuristic. Both lanes: _steam_candidates_for_sport
+        # tags each event "live"/"pregame" from the detector's own
+        # capture_phase/is_live fields, so the existing LIVE/PREGAME state
+        # filter and a new steam-only filter both work on these unmodified.
+        if preferences.get("include_props") or preferences.get("include_games"):
+            steam_candidates = _steam_candidates_for_sport(sport)
+            candidates.extend(steam_candidates)
+            if steam_candidates:
+                _log_candidate_stage(pipeline_name="collect_candidates", stage="steam_candidate_creation", before=[], after=steam_candidates)
         if wants_mlb_hr_targets:
             hr_candidates = _mlb_home_run_candidates_from_artifact(sport)
             candidates.extend(hr_candidates)
