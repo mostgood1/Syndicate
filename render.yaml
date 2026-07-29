@@ -711,6 +711,19 @@ services:
         value: "true"
       - key: SYNDICATE_LIVE_LENS_INTERVAL_SECONDS
         value: "60"
+      # #124: the code default (1800MB) requires total usage stay under
+      # ~250MB on this service's 2048MB container -- confirmed live via a
+      # temporary diagnostic that MLB's live-lens tick was failing this
+      # exact check on ~80% of cycles (2/11, then 3/13 measured), always at
+      # the SAME steady-state usage (850-880MB) whether the tick succeeded
+      # or failed, meaning the threshold -- not actual memory pressure --
+      # was the cause. NBA and WNBA never fail; MLB is the only sport gated
+      # by this check at all (_mlb_live_lens_headroom_snapshot). 1000MB still
+      # leaves ~170MB of margin above the observed steady baseline before
+      # the gate blocks, a real safety margin against genuine OOM risk,
+      # without rejecting nearly every cycle the way 1800MB did.
+      - key: SYNDICATE_LIVE_LENS_MIN_HEADROOM_MB
+        value: "1000"
       # Play-by-play-level smart sim re-enabled: the OOM this originally
       # mitigated was root-caused to the live-odds-worker's fixed 60s tick
       # relaunching the full pipeline before the previous attempt finished
