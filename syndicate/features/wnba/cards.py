@@ -4446,6 +4446,17 @@ def _fallback_live_lines_game(
     live_state = _cards_context_live_state_snapshot(game)
     period_totals: dict[str, Any] = {}
     period_spreads: dict[str, Any] = {}
+    # #125 follow-up diagnostic, 2026-07-29: settle whether the merge layer
+    # (_merge_live_lines_game, which never touches top-level status/
+    # in_progress/period/clock -- only lines.*) is discarding these fresh
+    # values in favor of a stale primary payload, or whether live_state
+    # itself is coming back wrong from this game object. Bounded: one print
+    # per fallback-game build, not a hot loop.
+    print(
+        f"[wnba_cards] FALLBACK_LIVE_LINES_STATE_DIAG event_id={event_id or game.get('event_id')} "
+        f"raw_live_state={game.get('live_state')!r} computed={live_state!r}",
+        flush=True,
+    )
     if include_period_totals and selected_date and bool(live_state.get("in_progress")):
         away_tri = _canonical_wnba_tri(
             str(game.get("away_tri") or ((game.get("away") or {}).get("abbr") if isinstance(game.get("away"), dict) else "") or "").strip().upper()
