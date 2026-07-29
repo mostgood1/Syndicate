@@ -478,14 +478,49 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(context["games"][0]["detail"], "2026-06-03")
         self.assertEqual(context["games"][0]["matchup"]["score"], {"away": 0, "home": 0})
 
+    def test_cards_backed_live_lens_report_calls_real_build_cards_page_context_signature(self) -> None:
+        # #128 regression: _cards_backed_live_lens_report/_merge_cards_context_into_report
+        # called build_cards_page_context(selected_date, allow_request_daily_ladders_refresh=True)
+        # for a long time, but the real function only ever accepted
+        # `selected_date` -- every call silently raised TypeError, caught by
+        # the bare except Exception, so this fallback path never actually
+        # worked in production. Every other test in this file mocks
+        # build_cards_page_context with a signature that accepted the bogus
+        # kwarg, which is exactly how this stayed hidden -- this test uses
+        # inspect on the REAL function instead of a hand-written mock.
+        import inspect
+
+        from syndicate.features.mlb import cards as cards_module
+        from syndicate.features.mlb import live_lens as live_lens_module
+
+        signature = inspect.signature(cards_module.build_cards_page_context)
+        self.assertNotIn(
+            "allow_request_daily_ladders_refresh",
+            signature.parameters,
+            "build_cards_page_context's real signature changed -- if it now accepts this "
+            "kwarg, this regression test (and its comment) are stale and should be updated.",
+        )
+
+        called: dict[str, object] = {}
+
+        def real_shaped_build_cards_page_context(selected_date: str) -> dict[str, object]:
+            called["selected_date"] = selected_date
+            return {"games": [{"gamePk": 824755, "status": {"abstract": "Live", "detailed": "In Progress"}, "markets": {}}], "source_title": "MLB Game Cards"}
+
+        with patch.object(live_lens_module, "build_cards_page_context", side_effect=real_shaped_build_cards_page_context):
+            report = live_lens_module._cards_backed_live_lens_report("2026-06-03")
+
+        self.assertEqual(called.get("selected_date"), "2026-06-03")
+        self.assertIsNotNone(report)
+        self.assertEqual(len(report.get("games") or []), 1)
+
     def test_live_lens_page_context_opts_into_today_ladder_refresh(self) -> None:
         from syndicate.features.mlb import live_lens as live_lens_module
 
         captured: dict[str, object] = {}
 
-        def fake_build_cards_page_context(selected_date: str, *, allow_request_daily_ladders_refresh: bool = False):
+        def fake_build_cards_page_context(selected_date: str):
             captured["selected_date"] = selected_date
-            captured["allow_request_daily_ladders_refresh"] = allow_request_daily_ladders_refresh
             return {"games": [], "source_title": "MLB Game Cards", "using_sample_data": False}
 
         empty_report = {"games": [], "counts": {"games": 0, "live": 0, "final": 0, "pregame": 0, "props": 0, "archivedLiveProps": 0}, "source_title": "MLB Game Cards"}
@@ -498,7 +533,6 @@ class MlbRefreshRunnerTests(unittest.TestCase):
             context = live_lens_module.build_live_lens_snapshot_internal("2026-06-03", persist=False)
 
         self.assertEqual(captured["selected_date"], "2026-06-03")
-        self.assertTrue(captured["allow_request_daily_ladders_refresh"])
         self.assertEqual(context["counts"]["games"], 0)
 
     def test_live_lens_page_context_prefers_persisted_live_report_over_cards_merge(self) -> None:
@@ -524,9 +558,8 @@ class MlbRefreshRunnerTests(unittest.TestCase):
             self.assertEqual(selected_date, "2026-06-03")
             return fresh_report
 
-        def fake_build_cards_page_context(selected_date: str, *, allow_request_daily_ladders_refresh: bool = False):
+        def fake_build_cards_page_context(selected_date: str):
             self.assertEqual(selected_date, "2026-06-03")
-            self.assertTrue(allow_request_daily_ladders_refresh)
             return {
                 "games": [
                     {
