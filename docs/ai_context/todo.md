@@ -101,12 +101,21 @@ Last reconciled: 2026-07-28 (see "Reconciliation 2026-07-28").
      rejected). 7/7 steam candidate tests, 8/8 relevant recommendation-
      engine tests, 20/20 full `test_recommendation_engine.py`, 15/15
      `test_intelligence_board_contract.py`, 36/36 collect_candidates/mlb/
-     live_lens/classify tests all pass. **Not yet deployed as of this
-     writing** — next session (or later this one): deploy, then re-run the
-     exact `by_sport` diagnostic that found bug 2 (query
-     `/api/intelligence/query` with the default question, check
-     `response.by_sport.<sport>` for `candidate_type: "steam"` entries)
-     against real production data before calling this closed.
+     live_lens/classify tests all pass. **Deployed and confirmed live
+     end-to-end, both API and rendered UI.** `/api/intelligence/query`'s
+     `response.by_sport.mlb` went from `{"prop": 8, "game": 8}` (zero
+     steam) to `{"prop": 8, "game": 8, "steam": 14}` post-deploy. Loaded
+     `/intelligence?steam=1` directly in a browser: the "⚡ Steam moves
+     only" filter correctly narrows the blotter to real candidates (e.g.
+     "Brett Sullivan over 0.5 · Home runs · Steam", `+2000` odds, writeup
+     "Steam move: Home runs for Brett Sullivan -- price moved +500."), each
+     tagged with the new `⚡ STEAM` badge alongside the existing Live/Pre
+     lane badge. The pre-existing "📡 Pregame Steam" top-strip rail still
+     renders correctly alongside it, untouched. `matchup` still shows "-"
+     for most rows (the `dashboard_games` lookup often doesn't match) --
+     cosmetic only, not required for correctness now that `pick` carries
+     the subject; a real fix would need a better game_id/matchup join,
+     left for later if it's ever actually requested. **This closes #137.**
 
 - **New: #136** (filed and fixed this session, **NOT YET DEPLOYED**) — user
   screenshotted the `/intelligence` "Board" and reported WNBA prop rows with
