@@ -2213,10 +2213,24 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
             )
     betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
     if betting:
-        _append_game_bet_candidate(candidates, sport=sport, game=game, market="Moneyline", pick=f"Away ML", odds=betting.get("away_ml"), edge=betting.get("away_ml_ev"), confidence=betting.get("p_away_win"), detail=game.get("summary"), fallback_epoch=fallback_epoch, live_odds_game_ids=live_odds_game_ids, team=_game_team_label(game, "away"), sim_context=game_sim_context)
-        _append_game_bet_candidate(candidates, sport=sport, game=game, market="Moneyline", pick=f"Home ML", odds=betting.get("home_ml"), edge=betting.get("home_ml_ev"), confidence=betting.get("p_home_win"), detail=game.get("summary"), fallback_epoch=fallback_epoch, live_odds_game_ids=live_odds_game_ids, team=_game_team_label(game, "home"), sim_context=game_sim_context)
+        # Moneyline has no separate "projected line" -- the win probability
+        # itself IS the projection, same reasoning as MLB's equivalent fix in
+        # _mlb_game_market_recommendation_rows. Neither Moneyline call passed
+        # projected= at all before, so every betting-sourced Moneyline
+        # candidate (any sport whose betting dict lacks its own richer
+        # "projected"-shaped fields) showed "-" on the board regardless of
+        # how real p_away_win/p_home_win were.
+        away_win_prob = betting.get("p_away_win")
+        home_win_prob = betting.get("p_home_win")
+        _append_game_bet_candidate(candidates, sport=sport, game=game, market="Moneyline", pick=f"Away ML", odds=betting.get("away_ml"), edge=betting.get("away_ml_ev"), confidence=away_win_prob, projected=f"{away_win_prob * 100.0:.1f}%" if isinstance(away_win_prob, (int, float)) else None, detail=game.get("summary"), fallback_epoch=fallback_epoch, live_odds_game_ids=live_odds_game_ids, team=_game_team_label(game, "away"), sim_context=game_sim_context)
+        _append_game_bet_candidate(candidates, sport=sport, game=game, market="Moneyline", pick=f"Home ML", odds=betting.get("home_ml"), edge=betting.get("home_ml_ev"), confidence=home_win_prob, projected=f"{home_win_prob * 100.0:.1f}%" if isinstance(home_win_prob, (int, float)) else None, detail=game.get("summary"), fallback_epoch=fallback_epoch, live_odds_game_ids=live_odds_game_ids, team=_game_team_label(game, "home"), sim_context=game_sim_context)
         if betting.get("total") is not None:
-            total_projected = _first_present_text(betting.get("projected"), betting.get("projection"), betting.get("model"), betting.get("mean"))
+            # projected_total (wnba/cards.py's _source_betting, and any other
+            # sport's betting-dict builder that adopts the same field name) is
+            # the real model total -- prefer it over the older, generic
+            # projected/projection/model/mean scan, which nothing in this
+            # repo's betting-dict builders actually populates.
+            total_projected = _first_present_text(betting.get("projected_total"), betting.get("projected"), betting.get("projection"), betting.get("model"), betting.get("mean"))
             total_odds = _first_present_text(betting.get("odds"), betting.get("price"), betting.get("american_odds"))
             if _safe_text(sport.get("slug"), "").lower() != "wnba" or (total_projected and total_odds):
                 _append_game_bet_candidate(candidates, sport=sport, game=game, market="Total", pick=f"Over { _prop_metric_text(betting.get('total')) or '-' }", line=betting.get("total"), odds=total_odds, projected=total_projected or _prop_metric_text(betting.get("total")), edge=betting.get("over_ev"), confidence=betting.get("p_total_over"), detail=game.get("summary"), fallback_epoch=fallback_epoch, live_odds_game_ids=live_odds_game_ids, sim_context=game_sim_context)
@@ -2293,11 +2307,28 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
             continue
         lens_label = _safe_text(lens.get("label"), "Live")
         markets = lens.get("markets") if isinstance(lens.get("markets"), dict) else {}
+        # The segment's real model projection (total runs / home margin) lives
+        # as a sibling of "markets", not inside any individual market dict --
+        # see mlb/live_lens.py's _live_lens_segments_from_card, which sets
+        # segment["projection"] = {"total": ..., "homeMargin": ...} alongside
+        # segment["markets"]. The per-market projected=... scan just below
+        # only ever looked inside `market` itself, which never has any of
+        # those four field names, so live MLB gameLens candidates (moneyline/
+        # spread/total, every segment) always showed projected="-" on the
+        # board despite this real projection value existing one level up.
+        segment_projection = lens.get("projection") if isinstance(lens.get("projection"), dict) else {}
         for market_key, market_label in [("moneyline", "Moneyline"), ("spread", "Spread"), ("total", "Total")]:
             market = markets.get(market_key) if isinstance(markets.get(market_key), dict) else {}
             pick = _first_present_text(market.get("pick"), market.get("selection"))
             if not pick:
                 continue
+            fallback_projected = (
+                segment_projection.get("total")
+                if market_key == "total"
+                else segment_projection.get("homeMargin")
+                if market_key == "spread"
+                else f"{market.get('p_win') * 100.0:.1f}%" if isinstance(market.get("p_win"), (int, float)) else None
+            )
             _append_game_bet_candidate(
                 candidates,
                 sport=sport,
@@ -2308,7 +2339,13 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
                 odds=_first_present_text(market.get("odds"), market.get("price")),
                 edge=market.get("edge"),
                 confidence=market.get("p_win"),
-                projected=market.get("projected") if market.get("projected") is not None else market.get("projection") if market.get("projection") is not None else market.get("model") if market.get("model") is not None else market.get("mean"),
+                projected=(
+                    market.get("projected") if market.get("projected") is not None
+                    else market.get("projection") if market.get("projection") is not None
+                    else market.get("model") if market.get("model") is not None
+                    else market.get("mean") if market.get("mean") is not None
+                    else fallback_projected
+                ),
                 live_projection=market.get("live_projection") if market.get("live_projection") is not None else market.get("liveProjection") if market.get("liveProjection") is not None else market.get("live_proj") if market.get("live_proj") is not None else market.get("projected_live"),
                 detail=game.get("summary"),
                 fallback_epoch=fallback_epoch,
@@ -2940,6 +2977,14 @@ def _mlb_game_market_recommendation_rows(game: dict[str, Any]) -> list[dict[str,
                 "selection": side,
                 "odds": odds,
                 "confidence": model_prob,
+                # A moneyline has no separate "projected line" concept the way
+                # totals/spreads do -- the sim's own win probability IS the
+                # projection. Without this, _game_bet_candidates_from_game's
+                # projected= scan (row.get("projected")/"projection"/"model"/
+                # "mean") always came back empty for every MLB Moneyline
+                # candidate, confirmed live: board showed projected="-" for
+                # every one despite real predictions.full data existing.
+                "projected": f"{model_prob * 100.0:.1f}%" if isinstance(model_prob, (int, float)) else None,
                 "summary": moneyline.get("reason") or moneyline.get("summary"),
             }
         )
@@ -2958,6 +3003,15 @@ def _mlb_game_market_recommendation_rows(game: dict[str, Any]) -> list[dict[str,
                 odds = totals.get("over_odds") if selection == "over" else totals.get("under_odds")
         display_selection = selection.title()
         if display_selection and line is not None:
+            # The sim's own projected total (away_runs_mean + home_runs_mean)
+            # was sitting in full_predictions the whole time -- mlb/cards.py
+            # already sums these two for its own "Full total" display tile --
+            # but this function never carried it through, so the Total row's
+            # "projected" field always fell back to "-" even though a real
+            # model total existed for every game with predictions.full.
+            away_runs_mean = _numeric_value(full_predictions.get("away_runs_mean"))
+            home_runs_mean = _numeric_value(full_predictions.get("home_runs_mean"))
+            projected_total = away_runs_mean + home_runs_mean if away_runs_mean is not None and home_runs_mean is not None else None
             rows.append(
                 {
                     "market_label": "Total",
@@ -2965,6 +3019,7 @@ def _mlb_game_market_recommendation_rows(game: dict[str, Any]) -> list[dict[str,
                     "line": line,
                     "odds": odds,
                     "confidence": model_prob,
+                    "projected": projected_total,
                     "summary": totals.get("reason") or totals.get("summary"),
                 }
             )

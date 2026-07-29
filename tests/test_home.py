@@ -913,7 +913,8 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
             markets={
                 "ml": {"selection": "home", "model_prob": 0.57, "odds": -135},
                 "totals": {"selection": "over", "market_line": 8.5, "model_prob": 0.52, "odds": -110},
-            }
+            },
+            predictions={"full": {"away_runs_mean": 4.268, "home_runs_mean": 4.18}},
         )
         rows = _mlb_game_market_recommendation_rows(game)
         self.assertEqual(len(rows), 2)
@@ -934,6 +935,16 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         # "confidence", which the scan never looks at.
         self.assertAlmostEqual(moneyline["model_probability"], 0.57)
         self.assertAlmostEqual(total["model_probability"], 0.52)
+        # #131 follow-up, confirmed live 2026-07-29: game-level candidates
+        # (MLB Moneyline/Total, same class as the WNBA prop/game fixes)
+        # showed projected="-" on the board even with real sim data present.
+        # Moneyline's projection IS the win probability (no separate
+        # "projected line" concept exists for a moneyline); Total's real
+        # model projection is the sim's own away_runs_mean + home_runs_mean,
+        # already computed elsewhere in mlb/cards.py for display but never
+        # threaded through this specific translation before.
+        self.assertEqual(moneyline["projected"], "57.0%")
+        self.assertEqual(total["projected"], "8.4")
 
     def test_mlb_markets_with_no_selection_produce_no_rows(self) -> None:
         game = self._sample_game(markets={"ml": {}, "totals": {"selection": "over"}})
@@ -1270,6 +1281,56 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         lens_moneyline = next(c for c in candidates if c["market"] == "Live Moneyline")
         self.assertFalse(spread["is_live"])
         self.assertFalse(lens_moneyline["is_live"])
+
+    def test_gamelens_candidates_use_segment_projection_when_market_has_none(self) -> None:
+        # #131 follow-up, confirmed live 2026-07-29: live MLB gameLens
+        # candidates (moneyline/spread/total, every segment) showed
+        # projected="-" even though mlb/live_lens.py's
+        # _live_lens_segments_from_card already computes a real model
+        # projection (total runs / home margin) per segment -- it just lives
+        # as segment["projection"], a SIBLING of segment["markets"], which
+        # this loop's projected= scan never looked at (it only ever checked
+        # inside the individual market dict, which never has these fields).
+        game = self._sample_game(
+            status={"in_progress": True, "final": False, "status": "In Progress"},
+            gameLens=[
+                {
+                    "closed": False,
+                    "label": "Full game",
+                    "projection": {"total": 8.4, "homeMargin": 1.2},
+                    "markets": {
+                        "total": {"pick": "Over 7.5", "line": 7.5, "odds": -110, "edge": 3.1, "p_win": 0.54},
+                        "spread": {"pick": "Home -1.5", "homeLine": -1.5, "odds": -105, "edge": 2.2, "p_win": 0.53},
+                        "moneyline": {"pick": "Home ML", "odds": -130, "edge": 5.5, "p_win": 0.58},
+                    },
+                }
+            ],
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "mlb"}, game, fallback_epoch=0.0)
+        total = next(c for c in candidates if c["market"] == "Full game Total")
+        spread = next(c for c in candidates if c["market"] == "Full game Spread")
+        moneyline = next(c for c in candidates if c["market"] == "Full game Moneyline")
+        self.assertEqual(total["projected"], "8.4")
+        self.assertEqual(spread["projected"], "1.2")
+        self.assertEqual(moneyline["projected"], "58.0%")
+
+    def test_gamelens_candidate_prefers_a_real_market_projection_over_the_segment_fallback(self) -> None:
+        game = self._sample_game(
+            status={"in_progress": True, "final": False, "status": "In Progress"},
+            gameLens=[
+                {
+                    "closed": False,
+                    "label": "Full game",
+                    "projection": {"total": 8.4, "homeMargin": 1.2},
+                    "markets": {
+                        "total": {"pick": "Over 7.5", "line": 7.5, "odds": -110, "projected": 9.9},
+                    },
+                }
+            ],
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "mlb"}, game, fallback_epoch=0.0)
+        total = next(c for c in candidates if c["market"] == "Full game Total")
+        self.assertEqual(total["projected"], "9.9")
 
     def test_game_status_state_does_not_let_unrelated_text_override_known_in_progress_false(self) -> None:
         # Real bug found in production: every WNBA game carries

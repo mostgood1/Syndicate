@@ -1081,12 +1081,38 @@ def _source_market_label(value: Any) -> str:
     }.get(code, market_label(value))
 
 
+_RECOMMENDATION_LINE_RE = re.compile(r"(-?\d+(?:\.\d+)?)\s*$")
+
+
+def _line_from_recommendation_pick(pick: dict[str, Any]) -> float | None:
+    # recommendations_slate rows carry no separate structured "line" field for
+    # game-level picks either (same gap _line_from_selection in wnba/picks.py
+    # already fixed for props) -- the market line only ever exists as
+    # trailing text on display_pick/selection, e.g. "Golden State Valkyries
+    # -5.0" (ATS) or "Over 156.5" (Total). pick.get("line") is always None,
+    # so _source_game_market_recommendations's line/market_line fields were
+    # always None too, confirmed live: WNBA game candidates showed line=None.
+    for source in (pick.get("display_pick"), pick.get("selection")):
+        text = str(source or "").strip()
+        if not text:
+            continue
+        match = _RECOMMENDATION_LINE_RE.search(text)
+        if match:
+            try:
+                return float(match.group(1))
+            except ValueError:
+                continue
+    return None
+
+
 def _source_game_market_recommendations(picks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for pick in picks:
         if not isinstance(pick, dict):
             continue
         line_value = _safe_float(pick.get("line"))
+        if line_value is None:
+            line_value = _line_from_recommendation_pick(pick)
         rows.append(
             {
                 "market_label": _source_market_label(pick.get("market")),
@@ -1101,6 +1127,14 @@ def _source_game_market_recommendations(picks: list[dict[str, Any]]) -> list[dic
                 "line": line_value,
                 "market_line": line_value,
                 "price": _safe_float(pick.get("price") or pick.get("odds")),
+                # Only real for PROPS picks (recommendations_slate's own
+                # per-pick model projection, e.g. 1.98) -- ATS/Total picks
+                # never carry this field, they only have the model number
+                # embedded as prose in basketball_summary ("Model margin 9.3
+                # vs market -5.0"), which the caller fills in separately from
+                # the game's real sim `score` dict (margin_mean/total_mean),
+                # since that's a per-game value this per-pick loop doesn't have.
+                "projected": _safe_float(pick.get("projection") if pick.get("projection") is not None else pick.get("projected")),
                 "card_bucket": "playable",
                 "recommendation_priority_score": _safe_float(pick.get("recommendation_priority_score") or pick.get("basketball_priority_score") or pick.get("score")),
                 "score": _safe_float(pick.get("score") or pick.get("ev_pct")),
@@ -1111,6 +1145,25 @@ def _source_game_market_recommendations(picks: list[dict[str, Any]]) -> list[dic
             }
         )
     return rows
+
+
+def _stamp_game_level_projected(game_market_recommendations: list[dict[str, Any]], score: dict[str, Any]) -> None:
+    # Fills in the "projected" field left blank above for ATS/Total picks
+    # (score is only available to the caller, which computes it once per
+    # game -- see _source_game_from_row/_game_from_row). Moneyline is
+    # deliberately not stamped here: it has no separate model-margin/total
+    # analog, and home.py's _game_bet_candidates_from_game already derives a
+    # Moneyline projection from win probability for the sports that need it.
+    margin_mean = _safe_float(score.get("margin_mean")) if isinstance(score, dict) else None
+    total_mean = _safe_float(score.get("total_mean")) if isinstance(score, dict) else None
+    for recommendation in game_market_recommendations:
+        if recommendation.get("projected") is not None:
+            continue
+        market_label_text = str(recommendation.get("market_label") or "").strip().upper()
+        if market_label_text == "ATS" and margin_mean is not None:
+            recommendation["projected"] = margin_mean
+        elif market_label_text == "TOTAL" and total_mean is not None:
+            recommendation["projected"] = total_mean
 
 
 def _wnba_game_projection_text(score: dict[str, Any] | None) -> str:
@@ -1233,15 +1286,25 @@ def _source_betting(row: dict[str, str]) -> dict[str, Any]:
     if away_ml is None and away_win_prob is not None:
         away_ml = _american_from_prob(away_win_prob)
 
-    if home_spread is None:
-        margin_hint = _safe_float(row.get("pred_margin") or row.get("margin_mean"))
-        if margin_hint is not None:
-            home_spread = _round_half(-margin_hint)
+    # Real model margin/total, computed unconditionally (not just when a book
+    # line is absent) -- these used to only exist here as a *fallback for
+    # deriving the market line itself* (home_spread/total below), never
+    # exposed on the return dict, so home.py's _game_bet_candidates_from_game
+    # (which reads betting.get("projected")/"projection"/"model"/"mean" for
+    # its Total row, and passed no projected= at all for Moneyline) always
+    # showed "-" for every WNBA Moneyline/Total candidate sourced through
+    # this function, even when the real model projection was sitting right
+    # here the whole time.
+    projected_margin = _safe_float(row.get("pred_margin") or row.get("margin_mean"))
+    projected_total = _safe_float(row.get("pred_total") or row.get("total_mean"))
+    if projected_total is not None and projected_total <= 1.0:
+        projected_total = None
 
-    if total is None:
-        total_hint = _safe_float(row.get("pred_total") or row.get("total_mean"))
-        if total_hint is not None and total_hint > 1.0:
-            total = _round_half(total_hint)
+    if home_spread is None and projected_margin is not None:
+        home_spread = _round_half(-projected_margin)
+
+    if total is None and projected_total is not None:
+        total = _round_half(projected_total)
 
     home_cover_prob = _safe_float(row.get("p_home_cover") or row.get("prob_home_cover"))
     away_cover_prob = _safe_float(row.get("p_away_cover") or row.get("prob_away_cover"))
@@ -1288,6 +1351,8 @@ def _source_betting(row: dict[str, str]) -> dict[str, Any]:
         "p_away_cover": away_cover_prob,
         "p_total_over": total_over_prob,
         "p_total_under": total_under_prob,
+        "projected_total": projected_total,
+        "projected_margin": projected_margin,
     }
 
 
@@ -1591,6 +1656,7 @@ def _source_game_from_row(
         }
     )
     game_market_recommendations = [dict(item) for item in _source_game_market_recommendations(picks)]
+    _stamp_game_level_projected(game_market_recommendations, score)
     for recommendation in game_market_recommendations:
         recommendation["evidence_pack"] = _wnba_evidence_pack_row(recommendation, score=score)
     evidence_pack = [dict(item.get("evidence_pack") or {}) for item in game_market_recommendations if item.get("evidence_pack")]
@@ -1955,6 +2021,7 @@ def _game_from_row(
     )
     prop_recommendations = dict((props_game or {}).get("prop_recommendations") or {"away": [], "home": []})
     game_market_recommendations = [dict(item) for item in _source_game_market_recommendations(picks)]
+    _stamp_game_level_projected(game_market_recommendations, score)
     for recommendation in game_market_recommendations:
         recommendation["evidence_pack"] = _wnba_evidence_pack_row(recommendation, score=score)
     evidence_pack = [dict(item.get("evidence_pack") or {}) for item in game_market_recommendations if item.get("evidence_pack")]

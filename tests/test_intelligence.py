@@ -3438,7 +3438,14 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         moneyline = next(c for c in candidates if c["market"] == "Moneyline")
 
         self.assertEqual(moneyline["odds"], "-")
-        self.assertEqual(moneyline["projected"], "-")
+        # #131 follow-up: projected used to stay "-" here even with real model
+        # data present (this test originally pinned that as the reason
+        # classification had to fall back to model_probability alone) --
+        # _mlb_game_market_recommendation_rows now also stamps the win
+        # probability onto "projected" directly (a moneyline's projection IS
+        # its win probability, no separate "projected line" concept exists),
+        # so it survives classification via BOTH fields now, not just one.
+        self.assertEqual(moneyline["projected"], "57.0%")
         self.assertAlmostEqual(moneyline["model_probability"], 0.57)
         classified, reason = _classify_candidate_with_reason(moneyline)
         self.assertIsNone(reason)
