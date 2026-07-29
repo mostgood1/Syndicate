@@ -110,12 +110,25 @@ Last reconciled: 2026-07-28 (see "Reconciliation 2026-07-28").
      "Brett Sullivan over 0.5 · Home runs · Steam", `+2000` odds, writeup
      "Steam move: Home runs for Brett Sullivan -- price moved +500."), each
      tagged with the new `⚡ STEAM` badge alongside the existing Live/Pre
-     lane badge. The pre-existing "📡 Pregame Steam" top-strip rail still
-     renders correctly alongside it, untouched. `matchup` still shows "-"
-     for most rows (the `dashboard_games` lookup often doesn't match) --
-     cosmetic only, not required for correctness now that `pick` carries
-     the subject; a real fix would need a better game_id/matchup join,
-     left for later if it's ever actually requested. **This closes #137.**
+     lane badge. `matchup` still shows "-" for most rows (the
+     `dashboard_games` lookup often doesn't match) -- cosmetic only, not
+     required for correctness now that `pick` carries the subject; a real
+     fix would need a better game_id/matchup join, left for later if it's
+     ever actually requested. **Once the board integration was confirmed,
+     user asked to remove the now-redundant "📡 Pregame Steam" top-strip
+     rail entirely** -- removed `/api/board/steam` and its full support
+     cluster (11 `_steam_event_*`/`_steam_format_*` helpers,
+     `blueprints/intelligence.py`) plus the frontend rail rendering/fetch
+     (`loadSteam`, `lastSteamEvents`, `steamAvatarHtml`/`steamDeltaText`/
+     `steamInitials`, `intelligence.html`) and its now-dead CSS
+     (`board_cards.css`) -- confirmed via grep zero other consumers and no
+     test coverage of any of it. `renderTopStrip` now always shows the
+     edge-ranked "🔥 Best opportunities" highlights (already the rail's own
+     fallback path, unchanged). Verified: `py_compile`/`node --check`
+     clean, `create_app()` loads all 316 routes, local browser preview
+     shows zero `/api/board/steam` requests and correct fallback rendering,
+     zero console errors. **This closes #137, including the rail
+     removal.**
 
 - **New: #136** (filed and fixed this session, **NOT YET DEPLOYED**) — user
   screenshotted the `/intelligence` "Board" and reported WNBA prop rows with
