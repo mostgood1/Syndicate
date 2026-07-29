@@ -93,6 +93,11 @@ def _write_required_daily_artifact(data_root: str, date_str: str) -> Path:
     )
     daily_summary_target.parent.mkdir(parents=True, exist_ok=True)
     daily_summary_target.write_text(json.dumps({}), encoding="utf-8")
+
+    wnba_processed_dir = Path(data_root) / "wnba_source" / "data" / "processed"
+    wnba_processed_dir.mkdir(parents=True, exist_ok=True)
+    (wnba_processed_dir / f"recommendations_slate_{date_str}.json").write_text(json.dumps({}), encoding="utf-8")
+    (wnba_processed_dir / f"props_recommendations_{date_str}.csv").write_text("", encoding="utf-8")
     return target
 
 
@@ -973,6 +978,13 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
                 "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports_root"),
                 "ADMIN_TOKEN": "secret-token",
                 "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                # WNBA's required-artifact paths (added alongside the MLB ones
+                # above) resolve via syndicate.features.wnba.sources, which
+                # falls back to the REAL repo's data/wnba_source when this
+                # isn't set -- non-deterministic across environments. Isolate
+                # it the same way test_wnba_refresh_runner.py/test_intelligence.py
+                # already do.
+                "SYNDICATE_WNBA_SOURCE_ROOT": str(Path(tmp_dir) / "wnba_source"),
             },
             clear=False,
         ):
@@ -1002,10 +1014,17 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
         # reached candidate generation). #128 added the base daily-summary
         # file (a different file from the locked-policy one -- confirmed
         # live on live-odds-worker that build_cards_page_context still
-        # reported zero props even after the locked-policy repair alone),
-        # so a fully empty data root now needs four repair requests, not
-        # three -- plus the three always-on live-lens snapshot fetches (see
-        # class comment above).
+        # reported zero props even after the locked-policy repair alone).
+        # Same session, same night: a cross-sport comparison found WNBA had
+        # never been added to this list at all, despite its pregame-props
+        # source (recommendations_slate_<date>.json, the sole input to
+        # _WNBADataProvider.pregame_props) being the identical
+        # written-once-a-day shape as the four MLB entries -- latent, not yet
+        # observed in production, but the same class of gap. Added
+        # recommendations_slate + props_recommendations, so a fully empty
+        # data root now needs six repair requests, not four -- plus the
+        # three always-on live-lens snapshot fetches (see class comment
+        # above).
         with TemporaryDirectory() as tmp_dir:
             urls = self._run_pull(tmp_dir, "2026-07-26")
 
@@ -1013,7 +1032,7 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
         live_lens_urls = [url for url in path_urls if url in self._LIVE_LENS_SNAPSHOT_URLS]
         repair_urls = [url for url in path_urls if url not in self._LIVE_LENS_SNAPSHOT_URLS]
         self.assertEqual(set(live_lens_urls), self._LIVE_LENS_SNAPSHOT_URLS, urls)
-        self.assertEqual(len(repair_urls), 4, urls)
+        self.assertEqual(len(repair_urls), 6, urls)
         # ?path= is the endpoint's single-artifact form: one stat and one read,
         # no glob over the matched set. That is what makes ignoring the
         # watermark safe here -- the ceiling exists to bound response SIZE, and
@@ -1024,6 +1043,8 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
         self.assertTrue(
             any(url.endswith("daily_summary_2026_07_26.json") for url in repair_urls), repair_urls
         )
+        self.assertTrue(any("recommendations_slate_2026-07-26.json" in url for url in repair_urls), repair_urls)
+        self.assertTrue(any("props_recommendations_2026-07-26.csv" in url for url in repair_urls), repair_urls)
         for repair_url in path_urls:
             self.assertNotIn("since=", repair_url)
             self.assertNotIn("pattern=", repair_url)
@@ -1043,11 +1064,11 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
         # Ordering matters: the incremental pull may itself supply the file, in
         # which case there is nothing to repair. It also means a repair failure
         # cannot stop the watermark advancing for the pull that did succeed.
-        # 2 date-pattern + 4 missing-required repairs + 3 always-on live-lens.
+        # 2 date-pattern + 6 missing-required repairs + 3 always-on live-lens.
         with TemporaryDirectory() as tmp_dir:
             urls = self._run_pull(tmp_dir, "2026-07-26")
 
-        self.assertEqual(len(urls), 9, urls)
+        self.assertEqual(len(urls), 11, urls)
         self.assertNotIn("path=", urls[0])
         self.assertNotIn("path=", urls[1])
         for later_url in urls[2:]:

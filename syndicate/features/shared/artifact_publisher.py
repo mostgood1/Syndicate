@@ -791,6 +791,29 @@ def _required_daily_artifact_paths(date_str: str) -> list[Path]:
         paths.append(daily_artifact_path(str(date_str).strip()))
     except Exception:
         pass
+    try:
+        # Same "written once, permanently un-repairable if never pulled"
+        # class of gap as the four MLB entries above, confirmed to exist in
+        # principle (not yet observed in production) for WNBA during a
+        # 2026-07-29 cross-sport comparison after MLB's own version of this
+        # bug was fixed. recommendations_slate_<date>.json is WNBA's sole
+        # pregame-props source (syndicate.features.wnba.picks._summary_for_date,
+        # the only reader _WNBADataProvider.pregame_props -> home_rails.pregame
+        # ultimately depends on) -- the normal incremental pull DOES cover a
+        # stale copy (HOT_ARTIFACT_PATTERNS already globs recommendations*.json),
+        # but not one that never arrived at all after the since= watermark
+        # advanced past it, e.g. a worker that booted or had its disk reset
+        # post-watermark. processed_path_or_default never raises (returns a
+        # plain path even when the file doesn't exist yet), matching this
+        # function's own "must never raise" contract without needing the
+        # try/except below to do that work.
+        from syndicate.features.wnba.sources import processed_path_or_default as _wnba_processed_path_or_default
+
+        selected = str(date_str).strip()
+        paths.append(_wnba_processed_path_or_default(f"recommendations_slate_{selected}.json"))
+        paths.append(_wnba_processed_path_or_default(f"props_recommendations_{selected}.csv"))
+    except Exception:
+        pass
     return paths
 
 
