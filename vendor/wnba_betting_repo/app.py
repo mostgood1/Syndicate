@@ -614,6 +614,8 @@ def _live_oddsapi_period_totals_for_game(date_str: str, home_tri: str, away_tri:
 
         # 2) Discover market keys.
         keys: set[str] = set()
+        discover_status = None
+        discover_error = None
         try:
             r = requests.get(
                 f"{base}/v4/sports/{sport}/events/{event_id}/markets",
@@ -621,6 +623,7 @@ def _live_oddsapi_period_totals_for_game(date_str: str, home_tri: str, away_tri:
                 headers=headers,
                 timeout=timeout_s,
             )
+            discover_status = r.status_code
             jd = r.json() if r.ok else None
             if isinstance(jd, dict):
                 # OddsAPI v4 shape: {id, ... , bookmakers:[{markets:[{key,...},...]}, ...]}
@@ -640,8 +643,21 @@ def _live_oddsapi_period_totals_for_game(date_str: str, home_tri: str, away_tri:
                 for m in jd:
                     if isinstance(m, dict) and m.get("key"):
                         keys.add(str(m.get("key")))
-        except Exception:
+        except Exception as exc:
+            discover_error = f"{type(exc).__name__}: {exc}"
             keys = set()
+
+        # #125 follow-up, 2026-07-28: user asked whether the live period
+        # total/spread line "may be named different than expected" rather
+        # than genuinely absent -- this settles it directly against a real
+        # OddsAPI response instead of guessing. Bounded to once per (date,
+        # matchup) per 20s cache window (this function's own cache_key/TTL
+        # above), not a hot loop.
+        print(
+            f"[wnba_live_lens] PERIOD_MARKET_DISCOVERY_DIAG matchup={h}@{a} event_id={event_id} "
+            f"discover_status={discover_status} discover_error={discover_error} discovered_keys={sorted(keys)}",
+            flush=True,
+        )
 
         # Candidate keys (OddsAPI period keys commonly use suffixes like _q1 and _h1)
         want: dict[str, list[str]] = {

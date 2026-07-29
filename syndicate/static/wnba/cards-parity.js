@@ -1408,10 +1408,11 @@
       const halfLineFromPeriod = Number(periodTotals?.[lensHalfKey]);
       const halfSim = simPeriodMean(game, lensHalfKey);
       const halfLine = halfLineFromPeriod;
+      const hasHalfLine = Number.isFinite(halfLine);
       const halfActual = useUpcomingHalf ? 0 : halfTotalSoFar(liveState, currentTotal);
       const halfMinutesElapsed = lensHalfMinutesElapsed;
       const halfMinutesRemaining = lensHalfMinutesRemaining;
-      if (Number.isFinite(halfLine) && Number.isFinite(halfActual) && Number.isFinite(halfMinutesElapsed) && Number(halfMinutesRemaining) > 0) {
+      if (Number.isFinite(halfActual) && Number.isFinite(halfMinutesElapsed) && Number(halfMinutesRemaining) > 0) {
         const elapsedForRate = Math.max(halfMinutesElapsed, 1);
         const liveRate = halfActual / elapsedForRate;
         const paceRaw = clampPaceProjection(halfActual + (liveRate * Math.max(0, halfMinutesRemaining || 0)), WNBA_HALF_TOTAL_PACE_CAP);
@@ -1419,45 +1420,66 @@
         const projection = Number.isFinite(halfSim)
           ? ((1 - blendWeight) * halfSim) + (blendWeight * paceRaw)
           : paceRaw;
-        const edge = projection - halfLine;
-        const side = edge > 1 ? 'Over' : (edge < -1 ? 'Under' : 'No edge');
-        const klass = classifyLens(Math.abs(edge), thresholds.half_total.watch, thresholds.half_total.bet);
-        halfSignal = buildSignal(
-          'half_total',
-          lensHalfLabel,
-          klass,
-          side,
-          edge,
-          halfLine,
-          projection,
-          [halfMinutesElapsed > 0 ? `Total ${fmtInteger(halfActual)}` : 'Opening live half line']
-            .filter(Boolean)
-            .join(' · ')
-        );
-        halfSignal.score = signalScore(Math.abs(edge), thresholds.half_total.bet);
+        if (!hasHalfLine) {
+          // No live period-total market right now (confirmed 2026-07-28:
+          // period_totals/period_spreads come back empty from the odds
+          // source for WNBA) -- the model's own projection (pregame sim
+          // blended with live scoring pace, same math as when a line IS
+          // present) is still real and worth showing rather than hiding
+          // behind "No live period line yet." with nothing else.
+          halfSignal = buildSignal(
+            'half_total',
+            lensHalfLabel,
+            'MODEL',
+            null,
+            null,
+            null,
+            projection,
+            [halfMinutesElapsed > 0 ? `Total ${fmtInteger(halfActual)}` : 'Pregame model only', 'No live period market yet']
+              .filter(Boolean)
+              .join(' · ')
+          );
+        } else {
+          const edge = projection - halfLine;
+          const side = edge > 1 ? 'Over' : (edge < -1 ? 'Under' : 'No edge');
+          const klass = classifyLens(Math.abs(edge), thresholds.half_total.watch, thresholds.half_total.bet);
+          halfSignal = buildSignal(
+            'half_total',
+            lensHalfLabel,
+            klass,
+            side,
+            edge,
+            halfLine,
+            projection,
+            [halfMinutesElapsed > 0 ? `Total ${fmtInteger(halfActual)}` : 'Opening live half line']
+              .filter(Boolean)
+              .join(' · ')
+          );
+          halfSignal.score = signalScore(Math.abs(edge), thresholds.half_total.bet);
 
-        const halfTotalShapeReasons = [];
-        let halfTotalShapeScore = 0;
-        const halfTotalShape = {
-          pregameGap: Number.isFinite(halfSim) ? Number((halfSim - halfLine).toFixed(3)) : null,
-          livePaceGap: Number.isFinite(paceRaw) ? Number((paceRaw - halfLine).toFixed(3)) : null,
-          actual: Number.isFinite(halfActual) ? Number(halfActual.toFixed(3)) : null,
-          minutesRemaining: Number.isFinite(halfMinutesRemaining) ? Number(halfMinutesRemaining.toFixed(3)) : null,
-        };
-        if (side !== 'No edge') {
-          const directional = side === 'Over' ? 1 : -1;
-          const priorGap = Number.isFinite(halfSim) ? directional * (halfSim - halfLine) : null;
-          const liveGap = Number.isFinite(paceRaw) ? directional * (paceRaw - halfLine) : null;
-          if (Number.isFinite(priorGap) && priorGap >= 1.5) {
-            halfTotalShapeReasons.push(`${lensHalfLabel} opened ${fmtNumber(priorGap, 1)} points toward the ${side.toLowerCase()} on the sim baseline`);
-            halfTotalShapeScore += Math.min(0.16, priorGap / 12);
+          const halfTotalShapeReasons = [];
+          let halfTotalShapeScore = 0;
+          const halfTotalShape = {
+            pregameGap: Number.isFinite(halfSim) ? Number((halfSim - halfLine).toFixed(3)) : null,
+            livePaceGap: Number.isFinite(paceRaw) ? Number((paceRaw - halfLine).toFixed(3)) : null,
+            actual: Number.isFinite(halfActual) ? Number(halfActual.toFixed(3)) : null,
+            minutesRemaining: Number.isFinite(halfMinutesRemaining) ? Number(halfMinutesRemaining.toFixed(3)) : null,
+          };
+          if (side !== 'No edge') {
+            const directional = side === 'Over' ? 1 : -1;
+            const priorGap = Number.isFinite(halfSim) ? directional * (halfSim - halfLine) : null;
+            const liveGap = Number.isFinite(paceRaw) ? directional * (paceRaw - halfLine) : null;
+            if (Number.isFinite(priorGap) && priorGap >= 1.5) {
+              halfTotalShapeReasons.push(`${lensHalfLabel} opened ${fmtNumber(priorGap, 1)} points toward the ${side.toLowerCase()} on the sim baseline`);
+              halfTotalShapeScore += Math.min(0.16, priorGap / 12);
+            }
+            if (Number.isFinite(liveGap) && liveGap >= 1.0) {
+              halfTotalShapeReasons.push(`${lensHalfLabel} pace is still tracking ${fmtNumber(liveGap, 1)} points toward the ${side.toLowerCase()}`);
+              halfTotalShapeScore += Math.min(0.18, liveGap / 10);
+            }
           }
-          if (Number.isFinite(liveGap) && liveGap >= 1.0) {
-            halfTotalShapeReasons.push(`${lensHalfLabel} pace is still tracking ${fmtNumber(liveGap, 1)} points toward the ${side.toLowerCase()}`);
-            halfTotalShapeScore += Math.min(0.18, liveGap / 10);
-          }
+          applySignalGameShape(halfSignal, halfTotalShapeReasons, halfTotalShapeScore, halfTotalShape);
         }
-        applySignalGameShape(halfSignal, halfTotalShapeReasons, halfTotalShapeScore, halfTotalShape);
       }
     }
 
@@ -1466,12 +1488,13 @@
       const quarterLineFromPeriod = Number(periodTotals?.[lensQuarterKey]);
       const quarterSim = simPeriodMean(game, lensQuarterKey);
       const quarterLine = quarterLineFromPeriod;
+      const hasQuarterLine = Number.isFinite(quarterLine);
       const quarterActual = useUpcomingQuarter
         ? 0
         : currentQuarterTotal(liveState, currentTotal, lensQuarterKey);
       const quarterMinutesElapsed = lensQuarterMinutesElapsed;
       const quarterMinutesRemaining = lensQuarterMinutesRemaining;
-      if (Number.isFinite(quarterLine) && Number.isFinite(quarterActual) && Number.isFinite(quarterMinutesElapsed) && Number(quarterMinutesRemaining) > 0) {
+      if (Number.isFinite(quarterActual) && Number.isFinite(quarterMinutesElapsed) && Number(quarterMinutesRemaining) > 0) {
         const elapsedForRate = Math.max(quarterMinutesElapsed, 1);
         const liveRate = quarterActual / elapsedForRate;
         const paceRaw = clampPaceProjection(quarterActual + (liveRate * Math.max(0, quarterMinutesRemaining || 0)), WNBA_QUARTER_TOTAL_PACE_CAP);
@@ -1479,45 +1502,63 @@
         const projection = Number.isFinite(quarterSim)
           ? ((1 - blendWeight) * quarterSim) + (blendWeight * paceRaw)
           : paceRaw;
-        const edge = projection - quarterLine;
-        const side = edge > 1 ? 'Over' : (edge < -1 ? 'Under' : 'No edge');
-        const klass = classifyLens(Math.abs(edge), thresholds.quarter_total.watch, thresholds.quarter_total.bet);
-        quarterSignal = buildSignal(
-          'quarter_total',
-          lensQuarterLabel,
-          klass,
-          side,
-          edge,
-          quarterLine,
-          projection,
-          [quarterMinutesElapsed > 0 ? `Total ${fmtInteger(quarterActual)}` : 'Opening live period line']
-            .filter(Boolean)
-            .join(' · ')
-        );
-        quarterSignal.score = signalScore(Math.abs(edge), thresholds.quarter_total.bet);
+        if (!hasQuarterLine) {
+          // Same reasoning as halfSignal above: no live period-total market
+          // right now, but the model's own projection is real and worth
+          // surfacing rather than hiding.
+          quarterSignal = buildSignal(
+            'quarter_total',
+            lensQuarterLabel,
+            'MODEL',
+            null,
+            null,
+            null,
+            projection,
+            [quarterMinutesElapsed > 0 ? `Total ${fmtInteger(quarterActual)}` : 'Pregame model only', 'No live period market yet']
+              .filter(Boolean)
+              .join(' · ')
+          );
+        } else {
+          const edge = projection - quarterLine;
+          const side = edge > 1 ? 'Over' : (edge < -1 ? 'Under' : 'No edge');
+          const klass = classifyLens(Math.abs(edge), thresholds.quarter_total.watch, thresholds.quarter_total.bet);
+          quarterSignal = buildSignal(
+            'quarter_total',
+            lensQuarterLabel,
+            klass,
+            side,
+            edge,
+            quarterLine,
+            projection,
+            [quarterMinutesElapsed > 0 ? `Total ${fmtInteger(quarterActual)}` : 'Opening live period line']
+              .filter(Boolean)
+              .join(' · ')
+          );
+          quarterSignal.score = signalScore(Math.abs(edge), thresholds.quarter_total.bet);
 
-        const quarterTotalShapeReasons = [];
-        let quarterTotalShapeScore = 0;
-        const quarterTotalShape = {
-          pregameGap: Number.isFinite(quarterSim) ? Number((quarterSim - quarterLine).toFixed(3)) : null,
-          livePaceGap: Number.isFinite(paceRaw) ? Number((paceRaw - quarterLine).toFixed(3)) : null,
-          actual: Number.isFinite(quarterActual) ? Number(quarterActual.toFixed(3)) : null,
-          minutesRemaining: Number.isFinite(quarterMinutesRemaining) ? Number(quarterMinutesRemaining.toFixed(3)) : null,
-        };
-        if (side !== 'No edge') {
-          const directional = side === 'Over' ? 1 : -1;
-          const priorGap = Number.isFinite(quarterSim) ? directional * (quarterSim - quarterLine) : null;
-          const liveGap = Number.isFinite(paceRaw) ? directional * (paceRaw - quarterLine) : null;
-          if (Number.isFinite(priorGap) && priorGap >= 1.0) {
-            quarterTotalShapeReasons.push(`${lensQuarterLabel} opened ${fmtNumber(priorGap, 1)} points toward the ${side.toLowerCase()} on the sim baseline`);
-            quarterTotalShapeScore += Math.min(0.14, priorGap / 10);
+          const quarterTotalShapeReasons = [];
+          let quarterTotalShapeScore = 0;
+          const quarterTotalShape = {
+            pregameGap: Number.isFinite(quarterSim) ? Number((quarterSim - quarterLine).toFixed(3)) : null,
+            livePaceGap: Number.isFinite(paceRaw) ? Number((paceRaw - quarterLine).toFixed(3)) : null,
+            actual: Number.isFinite(quarterActual) ? Number(quarterActual.toFixed(3)) : null,
+            minutesRemaining: Number.isFinite(quarterMinutesRemaining) ? Number(quarterMinutesRemaining.toFixed(3)) : null,
+          };
+          if (side !== 'No edge') {
+            const directional = side === 'Over' ? 1 : -1;
+            const priorGap = Number.isFinite(quarterSim) ? directional * (quarterSim - quarterLine) : null;
+            const liveGap = Number.isFinite(paceRaw) ? directional * (paceRaw - quarterLine) : null;
+            if (Number.isFinite(priorGap) && priorGap >= 1.0) {
+              quarterTotalShapeReasons.push(`${lensQuarterLabel} opened ${fmtNumber(priorGap, 1)} points toward the ${side.toLowerCase()} on the sim baseline`);
+              quarterTotalShapeScore += Math.min(0.14, priorGap / 10);
+            }
+            if (Number.isFinite(liveGap) && liveGap >= 0.8) {
+              quarterTotalShapeReasons.push(`${lensQuarterLabel} pace is still leaning ${side.toLowerCase()} by ${fmtNumber(liveGap, 1)}`);
+              quarterTotalShapeScore += Math.min(0.16, liveGap / 8);
+            }
           }
-          if (Number.isFinite(liveGap) && liveGap >= 0.8) {
-            quarterTotalShapeReasons.push(`${lensQuarterLabel} pace is still leaning ${side.toLowerCase()} by ${fmtNumber(liveGap, 1)}`);
-            quarterTotalShapeScore += Math.min(0.16, liveGap / 8);
-          }
+          applySignalGameShape(quarterSignal, quarterTotalShapeReasons, quarterTotalShapeScore, quarterTotalShape);
         }
-        applySignalGameShape(quarterSignal, quarterTotalShapeReasons, quarterTotalShapeScore, quarterTotalShape);
       }
     }
 
@@ -1579,6 +1620,24 @@
             halfAtsShapeScore += Math.min(0.14, liveGap / 7);
           }
           applySignalGameShape(halfAtsSignal, halfAtsShapeReasons, halfAtsShapeScore, halfAtsShape);
+        } else if (Number.isFinite(projectedHalfMargin)) {
+          // No live period-spread market right now -- same reasoning as
+          // halfSignal above: the projected margin is real model output,
+          // not contingent on a market line existing to compare it to.
+          const side = projectedHalfMargin >= 0 ? game?.home_tri : game?.away_tri;
+          const projection = Math.abs(projectedHalfMargin);
+          halfAtsSignal = buildSignal(
+            'half_ats',
+            `${lensHalfLabel} ATS`,
+            'MODEL',
+            side,
+            null,
+            null,
+            projection,
+            [halfMinutesElapsed > 0 ? `Margin ${fmtSigned(projectedHalfMargin, 1)}` : 'Pregame model only', 'No live period market yet']
+              .filter(Boolean)
+              .join(' · ')
+          );
         }
 
         const halfMlThresholds = derivedPeriodMlThresholds(lensHalfKey);
@@ -1689,6 +1748,22 @@
             quarterAtsShapeScore += Math.min(0.12, liveGap / 6);
           }
           applySignalGameShape(quarterAtsSignal, quarterAtsShapeReasons, quarterAtsShapeScore, quarterAtsShape);
+        } else if (Number.isFinite(projectedQuarterMargin)) {
+          // Same reasoning as halfAtsSignal's no-line branch above.
+          const side = projectedQuarterMargin >= 0 ? game?.home_tri : game?.away_tri;
+          const projection = Math.abs(projectedQuarterMargin);
+          quarterAtsSignal = buildSignal(
+            'quarter_ats',
+            `${lensQuarterLabel} ATS`,
+            'MODEL',
+            side,
+            null,
+            null,
+            projection,
+            [quarterMinutesElapsed > 0 ? `Margin ${fmtSigned(projectedQuarterMargin, 1)}` : 'Pregame model only', 'No live period market yet']
+              .filter(Boolean)
+              .join(' · ')
+          );
         }
 
         const quarterMlThresholds = derivedPeriodMlThresholds(lensQuarterKey);
@@ -4557,15 +4632,30 @@
         ? `Model ${fmtPercent(projection, 0)} | Edge ${edgeText}`
         : `Edge ${edgeText}`;
     } else if (marketType === 'spread') {
-      main = side && Number.isFinite(line) ? `${side} ${fmtSigned(line, 1)}` : (side || 'ATS live');
-      sub = Number.isFinite(projection) && Number.isFinite(line)
-        ? `Proj ${fmtSigned(projection, 1)} vs ${fmtSigned(line, 1)}`
-        : `Edge ${edgeText}`;
+      if (Number.isFinite(line)) {
+        main = side ? `${side} ${fmtSigned(line, 1)}` : 'ATS live';
+        sub = Number.isFinite(projection) ? `Proj ${fmtSigned(projection, 1)} vs ${fmtSigned(line, 1)}` : `Edge ${edgeText}`;
+      } else if (Number.isFinite(projection) && side) {
+        // No live period-spread market -- show the model's own projected
+        // margin plainly rather than pretending there's a line to price it
+        // against (klass 'MODEL' from the signal builder, not BET/WATCH).
+        main = `${side} by ${fmtNumber(projection, 1)}`;
+        sub = 'Model projection · no live market yet';
+      } else {
+        main = side || 'ATS live';
+        sub = `Edge ${edgeText}`;
+      }
     } else if (marketType === 'total') {
-      main = side && Number.isFinite(line) ? `${side} ${fmtNumber(line, 1)}` : (side || 'Total live');
-      sub = Number.isFinite(projection) && Number.isFinite(line)
-        ? `Proj ${fmtNumber(projection, 1)} vs ${fmtNumber(line, 1)}`
-        : `Edge ${edgeText}`;
+      if (Number.isFinite(line)) {
+        main = side ? `${side} ${fmtNumber(line, 1)}` : 'Total live';
+        sub = Number.isFinite(projection) ? `Proj ${fmtNumber(projection, 1)} vs ${fmtNumber(line, 1)}` : `Edge ${edgeText}`;
+      } else if (Number.isFinite(projection)) {
+        main = `Proj ${fmtNumber(projection, 1)}`;
+        sub = 'Model projection · no live market yet';
+      } else {
+        main = 'Total live';
+        sub = `Edge ${edgeText}`;
+      }
     }
     return {
       shortLabel,
