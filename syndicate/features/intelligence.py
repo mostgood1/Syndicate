@@ -4188,6 +4188,142 @@ def _mlb_subject_prop_candidates_from_artifact(
     return candidates
 
 
+def _mlb_live_lens_prop_candidates_from_artifact(sport: dict[str, Any]) -> list[dict[str, Any]]:
+    """Board candidates generated directly from MLB's live-lens artifact for
+    LIVE games, not merely an enhancement layer on pre-existing daily_top_props
+    candidates the way _mlb_hydrate_live_prop_projection is.
+
+    daily_top_props_<date>.json (the sole source for every other MLB prop
+    candidate function above) is written once, or a few times, per day --
+    confirmed live: unchanged since 21:57 PM across a whole evening slate.
+    live-lens now rotates continuously as live-odds-worker's tick refreshes
+    real per-game props (confirmed live: counts.props 0 -> 134 the same
+    night, after several independent artifact/timing bugs were fixed). Without
+    this function, a prop that only ever shows up in live-lens -- one that
+    never made the original static snapshot, or whose relevant player/market
+    combination simply isn't in it -- could never become a board candidate no
+    matter how strong its live edge, which is exactly the "same props for an
+    hour" symptom #124/#128 both chased. Pregame stays untouched here
+    (daily_top_props + the season betting card's own sim-vs-line edge already
+    cover it correctly) -- this is deliberately live-games-only.
+    """
+    if _safe_text(sport.get("slug"), "").lower() != "mlb":
+        return []
+    selected_date = _safe_text(sport.get("context_label"), "")
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", selected_date):
+        return []
+    report = _mlb_live_lens_report_cached(selected_date, {})
+    games = report.get("games") if isinstance(report, dict) else None
+    if not isinstance(games, list):
+        return []
+
+    candidates: list[dict[str, Any]] = []
+    seen_keys: set[tuple[str, str, str, int]] = set()
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        status = game.get("status") if isinstance(game.get("status"), dict) else {}
+        status_text = f"{_safe_text(status.get('abstract'), '')} {_safe_text(status.get('detailed'), '')}".strip().lower()
+        if not any(token in status_text for token in ("live", "in progress", "warmup")):
+            continue
+        game_pk = _safe_int(game.get("gamePk"))
+        rows = game.get("trackedProps") if isinstance(game.get("trackedProps"), list) else None
+        if not rows:
+            rows = game.get("props") if isinstance(game.get("props"), list) else []
+        matchup_obj = game.get("matchup") if isinstance(game.get("matchup"), dict) else {}
+        away = matchup_obj.get("away") if isinstance(matchup_obj.get("away"), dict) else {}
+        home = matchup_obj.get("home") if isinstance(matchup_obj.get("home"), dict) else {}
+        away_abbr = _safe_text(away.get("abbr"), "")
+        home_abbr = _safe_text(home.get("abbr"), "")
+        matchup_text = f"{away_abbr} @ {home_abbr}" if away_abbr or home_abbr else "-"
+
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            player_name = _safe_text(row.get("playerName"), "")
+            if not player_name:
+                continue
+            market_label = _safe_text(row.get("marketLabel"), "") or _market_label(_market_key_from_text(row.get("market"), allow_fallback=True))
+            market_key = _market_key_from_text(market_label or row.get("market"), allow_fallback=True)
+            if not market_key:
+                continue
+            line_value = _numeric_hint(row.get("line"))
+            selection_label = _safe_text(row.get("selection"), "Over") or "Over"
+            selection_direction = 1 if selection_label.lower() == "over" else -1 if selection_label.lower() == "under" else 0
+            odds_value = _american_odds_value(row.get("odds"))
+            odds_text = (f"+{int(odds_value)}" if odds_value > 0 else str(int(odds_value))) if odds_value is not None else "-"
+            # estimatedWinProb is already the probability of THIS row's own
+            # selection (over or under, whichever the live pipeline picked) --
+            # not the raw over-probability -- matching how the rest of this
+            # file already treats the two as interchangeable fallbacks of
+            # each other (see _normalize_live_prop_row, mlb/live_lens.py).
+            model_prob = _numeric_hint(row.get("estimatedWinProb"))
+            if model_prob is None:
+                model_prob = _numeric_hint(row.get("modelProbOver"))
+            live_projection_value = _numeric_hint(row.get("liveProjection"))
+            actual_value = _numeric_hint(row.get("actual"))
+            ranking_score = _numeric_hint(row.get("rankingScore"))
+            pick = f"{selection_label} {line_value:.1f}" if line_value is not None else selection_label
+            dedupe_key = (_normalized_market_text(player_name), market_key, pick, game_pk or 0)
+            if dedupe_key in seen_keys:
+                continue
+            seen_keys.add(dedupe_key)
+            score = (float(model_prob or 0.0) * 60.0) + max(0.0, float(ranking_score or 0.0)) * 40.0
+            projected_text = f"{live_projection_value:.1f}" if live_projection_value is not None else "-"
+            confidence_text = f"{model_prob * 100.0:.1f}%" if model_prob is not None else "-"
+            candidates.append(
+                {
+                    "candidate_type": "prop",
+                    "sport": _safe_text(sport.get("name"), "MLB"),
+                    "sport_slug": "mlb",
+                    "surface_key": "live",
+                    "surface_title": "Live lens props",
+                    "name": (
+                        f"{player_name} {selection_label} {line_value:.1f} {market_label}"
+                        if line_value is not None
+                        else f"{player_name} {selection_label} {market_label}"
+                    ),
+                    "market": market_label,
+                    "market_key": market_key,
+                    "pick": pick,
+                    "player_name": player_name,
+                    "matchup": matchup_text,
+                    "team": away_abbr or home_abbr or "-",
+                    "context_label": selected_date,
+                    "game_pk": game_pk,
+                    "game_id": _safe_text(game_pk, ""),
+                    "event_id": _safe_text(game_pk, ""),
+                    "line": f"{line_value:.1f}" if line_value is not None else "-",
+                    "odds": odds_text,
+                    "projected": projected_text,
+                    "model_probability": model_prob,
+                    "confidence": confidence_text,
+                    "live_projection": projected_text,
+                    "actual": f"{actual_value:.1f}" if actual_value is not None else "-",
+                    "is_live": True,
+                    "selection_direction": selection_direction,
+                    "score": score,
+                    "href": f"/mlb/live-lens?date={selected_date}",
+                    "href_label": "Open live lens",
+                    "writeup": (
+                        f"Live lens {market_label.lower()} view for {player_name}."
+                        + (f" Model win probability {model_prob * 100.0:.1f}%." if model_prob is not None else "")
+                    ),
+                    "display_pills": [
+                        pill
+                        for pill in (
+                            f"Line {line_value:.1f}" if line_value is not None else "",
+                            f"Odds {odds_text}" if odds_text != "-" else "",
+                            f"Sim% {confidence_text}" if confidence_text != "-" else "",
+                            f"Live Proj {projected_text}" if projected_text != "-" else "",
+                        )
+                        if pill
+                    ],
+                }
+            )
+    return candidates
+
+
 _GAME_LEVEL_MARKET_KEYWORDS = ("moneyline", "spread", "total", "puck line", "puck_line", "run line", "run_line", "game bet")
 
 
@@ -5282,6 +5418,29 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
             candidates.extend(subject_prop_candidates)
             if subject_prop_candidates:
                 _log_candidate_stage(pipeline_name="collect_candidates", stage="mlb_subject_prop_backfill", before=[], after=subject_prop_candidates)
+            # #128: unconditional, not gated behind a question-text heuristic
+            # like the other MLB backfills above -- daily_top_props is a
+            # once-a-day snapshot, live-lens rotates continuously, and a live
+            # prop that only ever exists in live-lens must still be able to
+            # become a board candidate. In-pool dedup below (same
+            # subject/market/pick already present) prevents a duplicate for
+            # anything daily_top_props/subject-prop backfill already added.
+            live_lens_prop_candidates: list[dict[str, Any]] = []
+            for artifact_candidate in _mlb_live_lens_prop_candidates_from_artifact(sport):
+                artifact_subject = _candidate_subject_key(artifact_candidate)
+                artifact_market = _candidate_market_key(artifact_candidate)
+                artifact_pick = _safe_text(artifact_candidate.get("pick"), "")
+                if any(
+                    _candidate_subject_key(existing) == artifact_subject
+                    and _candidate_market_key(existing) == artifact_market
+                    and _safe_text(existing.get("pick"), "") == artifact_pick
+                    for existing in candidates
+                ):
+                    continue
+                candidates.append(artifact_candidate)
+                live_lens_prop_candidates.append(artifact_candidate)
+            if live_lens_prop_candidates:
+                _log_candidate_stage(pipeline_name="collect_candidates", stage="mlb_live_lens_prop_backfill", before=[], after=live_lens_prop_candidates)
         if wants_ranked_mlb_market_backfill:
             backfill_candidates: list[dict[str, Any]] = []
             for artifact_candidate in _mlb_market_prop_candidates_from_artifact(sport, preferences):

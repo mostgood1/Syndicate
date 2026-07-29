@@ -3299,6 +3299,113 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIsNone(reason)
         self.assertIsNotNone(classified)
 
+    def test_mlb_live_lens_prop_candidates_generated_and_survive_classification(self) -> None:
+        # #128: daily_top_props_<date>.json (every other MLB prop candidate
+        # function's sole source) is a once-a-day artifact -- confirmed live
+        # unchanged for over an hour during an active slate, while live-lens
+        # itself rotates continuously. Without a candidate-generation path
+        # sourced directly from live-lens, a prop that only ever appears
+        # there (not in the static snapshot) could never become a board
+        # candidate. Fixture shapes match real production field names
+        # confirmed the same night (gamePk, status.abstract="Live",
+        # trackedProps rows with playerName/marketLabel/line/odds/selection/
+        # estimatedWinProb/liveProjection/actual).
+        from syndicate.features.intelligence import (
+            _classify_candidate_with_reason,
+            _mlb_live_lens_prop_candidates_from_artifact,
+        )
+
+        live_lens_payload = {
+            "games": [
+                {
+                    "gamePk": 824003,
+                    "status": {"abstract": "Live", "detailed": "In Progress"},
+                    "matchup": {"away": {"abbr": "HOU"}, "home": {"abbr": "LAA"}},
+                    "trackedProps": [
+                        {
+                            "playerName": "Yordan Alvarez",
+                            "market": "hitter_total_bases",
+                            "marketLabel": "Hitter Total Bases",
+                            "prop": "batter_total_bases",
+                            "selection": "Under",
+                            "line": 4.5,
+                            "odds": "-120",
+                            "estimatedWinProb": 0.837,
+                            "modelProbOver": 0.163,
+                            "rankingScore": 0.43,
+                            "actual": None,
+                            "liveProjection": None,
+                        }
+                    ],
+                },
+                {
+                    # Final game -- must be excluded (live-only by design).
+                    "gamePk": 823598,
+                    "status": {"abstract": "Final", "detailed": "Final"},
+                    "matchup": {"away": {"abbr": "SEA"}, "home": {"abbr": "LAD"}},
+                    "trackedProps": [
+                        {
+                            "playerName": "Cal Raleigh",
+                            "market": "hitter_hits",
+                            "marketLabel": "Hitter Hits",
+                            "selection": "Over",
+                            "line": 1.5,
+                            "odds": "+110",
+                            "estimatedWinProb": 0.6,
+                        }
+                    ],
+                },
+            ]
+        }
+        with patch(
+            "syndicate.features.intelligence._mlb_live_lens_report_cached",
+            return_value=live_lens_payload,
+        ):
+            candidates = _mlb_live_lens_prop_candidates_from_artifact({"slug": "mlb", "name": "MLB", "context_label": "2026-07-28"})
+
+        self.assertEqual(len(candidates), 1, candidates)
+        candidate = candidates[0]
+        self.assertEqual(candidate.get("player_name"), "Yordan Alvarez")
+        self.assertEqual(candidate.get("market"), "Hitter Total Bases")
+        self.assertEqual(candidate.get("pick"), "Under 4.5")
+        self.assertEqual(candidate.get("odds"), "-120")
+        self.assertEqual(candidate.get("game_pk"), 824003)
+        self.assertTrue(candidate.get("is_live"))
+        self.assertAlmostEqual(candidate.get("model_probability"), 0.837)
+        classified, reason = _classify_candidate_with_reason(candidate)
+        self.assertIsNone(reason)
+        self.assertIsNotNone(classified)
+
+    def test_mlb_live_lens_prop_candidates_dedupe_within_same_game(self) -> None:
+        from syndicate.features.intelligence import _mlb_live_lens_prop_candidates_from_artifact
+
+        row = {
+            "playerName": "Jake Bennett",
+            "market": "pitcher_props",
+            "marketLabel": "Strikeouts",
+            "selection": "Over",
+            "line": 2.5,
+            "odds": "-145",
+            "estimatedWinProb": 0.888,
+        }
+        live_lens_payload = {
+            "games": [
+                {
+                    "gamePk": 824976,
+                    "status": {"abstract": "Live", "detailed": "In Progress"},
+                    "matchup": {"away": {"abbr": "BOS"}, "home": {"abbr": "ATH"}},
+                    "trackedProps": [dict(row), dict(row)],
+                }
+            ]
+        }
+        with patch(
+            "syndicate.features.intelligence._mlb_live_lens_report_cached",
+            return_value=live_lens_payload,
+        ):
+            candidates = _mlb_live_lens_prop_candidates_from_artifact({"slug": "mlb", "context_label": "2026-07-28"})
+
+        self.assertEqual(len(candidates), 1, candidates)
+
     def test_mlb_pregame_game_market_candidate_survives_classification(self) -> None:
         # #98/#100: a pregame MLB moneyline/total candidate carries a real
         # model win probability (game["markets"]["ml"/"totals"]["model_prob"])
