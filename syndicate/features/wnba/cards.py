@@ -29,6 +29,7 @@ from syndicate.features.shared.game_board_contract import _sim_payload
 from syndicate.features.shared.basketball_market_board import build_basketball_market_board
 from syndicate.features.shared.basketball_market_board import parse_raw_basketball_player_props_rows
 from syndicate.features.shared.memory_observability import log_runtime_memory
+from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
 from syndicate.features.shared.refresh_state_store import data_root as _refresh_state_data_root
 from syndicate.features.shared.refresh_state_store import read_json_file as _keyvalue_read_json_file
 from syndicate.features.shared.source_roots import preferred_source_roots
@@ -2955,6 +2956,7 @@ _local_live_state_payload.cache_info = _local_live_state_payload_cached.cache_in
 
 
 def _public_scoreboard_live_state_payload(selected_date: str) -> dict[str, Any] | None:
+    warn_if_compute_in_request_path("wnba_public_scoreboard_live_state_fetch")
     iso_date = str(selected_date or "").strip()
     parsed = parse_iso_date(iso_date)
     compact_date = parsed.strftime("%Y%m%d")
@@ -4501,6 +4503,7 @@ def _public_live_player_boxscore_payload(selected_date: str, event_ids: list[str
     if not normalized_event_ids:
         return None
 
+    warn_if_compute_in_request_path("wnba_public_live_player_boxscore_fetch")
     out_games: list[dict[str, Any]] = []
     for event_id in normalized_event_ids:
         request_url = (

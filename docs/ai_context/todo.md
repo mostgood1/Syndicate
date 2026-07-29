@@ -6,9 +6,53 @@ list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-07-28 (see "Reconciliation 2026-07-28").
 
-> **Next free ID: 131.** IDs are never reused. Closed items move to
+> **Next free ID: 132.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
+
+- **New: #131** (filed and fixed this session, **NOT YET DEPLOYED**) — same
+  3-service-architecture compliance check as #129, applied to WNBA pregame/live.
+  General-purpose agent traced `syndicate/blueprints/wnba.py` +
+  `syndicate/features/wnba/*.py` against the same contract, then every claim about
+  a live env-var's actual value was independently re-verified against the real
+  Render dashboard (lesson from #130's mid-session correction) before drawing any
+  conclusion. **Odds ownership: confirmed clean, stronger than MLB's pre-#130
+  state** — no direct OddsAPI call anywhere in `syndicate/features/wnba/`, no
+  WNBA-equivalent of MLB's `MLB_ENABLE_REFRESH_WORKER_AUTORUN`, and refresh-worker's
+  entrypoint script doesn't even import the function that would let it launch a
+  WNBA odds/sim job (verified live: `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP=true`
+  on live-odds-worker / `false` on refresh-worker, matches git, no drift this time).
+  **Sim placement:** WNBA's SmartSim runs on live-odds-worker itself, not
+  refresh-worker (confirmed live, `REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS=100`
+  there) — a real, deliberate, team-documented departure from MLB's isolation
+  pattern (OOM history forced sims 500->250->100 in that shared 2GB container),
+  left alone this pass since it wasn't what was asked, but worth revisiting now
+  that 4GB exists on refresh-worker. **Real gap found and fixed:** unlike MLB
+  post-#129, WNBA had FOUR web-request-handler call sites doing direct synchronous
+  external HTTP (all to ESPN, not OddsAPI, so no budget risk, but still against
+  "web does no fetching" and a real request-latency/reliability exposure) with
+  zero guard on three of them and only the non-blocking guard on the fourth:
+  `wnba.py:427` `api_source_team_logo` (cdn.wnba.com), `wnba/sources.py:59`
+  `has_games_for_date()` (ESPN scoreboard, deliberately re-checked live every call
+  for today's date per its own comment), `wnba/cards.py:2957`
+  `_public_scoreboard_live_state_payload()` (explicitly commented to run
+  "regardless of `_render_web_dyno()`"), `wnba/cards.py:4500`
+  `_public_live_player_boxscore_payload()` (one ESPN call per live game). Added
+  `warn_if_compute_in_request_path` to all four, matching the visibility-only
+  pattern used for MLB's #129 fix and WNBA's own pre-existing live-lens fallback
+  guard. Verified: all 3 edited files import/parse clean, the full app still
+  builds its url_map (51 `/wnba` routes), and the 7 most relevant WNBA test files
+  (84 tests: sources/has-games, cards artifact-first/evidence-pack/keyvalue/merge,
+  live-snapshots, props-live-overlay) pass unchanged. **Not addressed, left open on
+  purpose:** WNBA's `live_lens.py` on-request backfill (`build_live_lens_snapshot()`
+  fallback inside `build_live_lens_page_context`) already had a guard, but only the
+  warn-only variant — MLB's equivalent paths use the hard-blocking
+  `refuse_if_compute_in_request_path`, confirmed live to actually take effect on
+  Render-hosted web (`SYNDICATE_REQUIRE_HOSTED_STORAGE=true` there). Upgrading that
+  guard's strength is a real behavior change (it would start raising, not just
+  logging) and wasn't part of what was asked this pass — flagging for a future
+  session. **Before deploying**: no in-flight-sim concern for WNBA specifically,
+  but confirm with the user first per the same standing rule as #130.
 
 - **New: #130** (filed and fixed this session, **NOT YET DEPLOYED**) — direct
   follow-on from #129's architecture audit. User asked explicitly: "nothing should

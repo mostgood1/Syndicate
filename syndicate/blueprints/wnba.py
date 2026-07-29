@@ -15,6 +15,7 @@ from urllib.request import urlopen
 from flask import Blueprint, Response, jsonify, redirect, render_template, request, url_for
 
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
+from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
 from syndicate.features.wnba.archive import build_archive_api_payload
 from syndicate.features.wnba.archive import build_archive_page_context
 from syndicate.features.wnba.cards import build_cards_page_context
@@ -429,6 +430,7 @@ def api_source_team_logo(team_id: str):
     official_team_id = _official_wnba_logo_team_id(team_id)
     if official_team_id is None:
         return team_logo_badge(team_id)
+    warn_if_compute_in_request_path("wnba_team_logo_fetch")
     request_obj = Request(
         f"https://cdn.wnba.com/logos/wnba/{official_team_id}/primary/L/logo.svg",
         headers={

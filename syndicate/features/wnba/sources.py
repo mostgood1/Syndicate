@@ -11,6 +11,7 @@ from urllib import parse as urllib_parse
 from urllib import request as urllib_request
 
 from syndicate.features.shared.odds_control_plane import current_odds_root_for_sport
+from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
 from syndicate.features.shared.source_roots import preferred_artifact_roots
 from syndicate.features.shared.source_roots import preferred_source_roots
 from syndicate.features.shared.timezone import central_today
@@ -83,6 +84,7 @@ def has_games_for_date(date_str: str) -> bool | None:
     # yet listed, or a transient request failure) -- caching it would
     # silently freeze "no games today" for the rest of the process's life.
     # A confirmed True is stable and safe to remember above.
+    warn_if_compute_in_request_path("wnba_has_games_for_date_espn_fetch")
     score_date = selected_date.replace("-", "")
     url = f"https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard?dates={score_date}"
     request = urllib_request.Request(url, headers={"User-Agent": "Syndicate-WNBA/1.0"})
