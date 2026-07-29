@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from syndicate.features.shared.artifact_publisher import publish_changed_hot_artifacts
+from syndicate.features.shared.artifact_publisher import pull_hot_artifacts
 from syndicate.features.mlb.live_lens import build_live_lens_snapshot_internal as _mlb_build
 from syndicate.features.mlb.live_lens import live_lens_snapshot_path as _mlb_snapshot_path
 from syndicate.features.mlb.live_lens import validate_live_lens_snapshot as _mlb_validate
@@ -304,6 +305,23 @@ def _live_lens_publish_enabled() -> bool:
 	return _env_bool("SYNDICATE_LIVE_LENS_LOOP_PUBLISH_ARTIFACTS", default=True)
 
 
+def _live_lens_pull_enabled() -> bool:
+	# #128: live-odds-worker never calls pull_hot_artifacts anywhere else --
+	# that only runs inside the intelligence-state background loop, which
+	# this service deliberately does NOT own (SYNDICATE_ENABLE_INTELLIGENCE_
+	# STATE_BACKGROUND_LOOP is false here, true on refresh-worker, "so
+	# exactly one service owns the loop"). Confirmed live: MLB's
+	# build_cards_page_context ran fine on this service (schedule/status/
+	# matchup all correct) but its own source_title came back "MLB cards
+	# unavailable" -- daily_summary_<date>_locked_policy.json (the file
+	# _live_props_from_card ultimately depends on, see #124 item 3) was
+	# never on this service's disk because nothing here had ever asked web
+	# for it. pull_hot_artifacts is watermark-incremental plus a repair pass
+	# for exactly this "permanently missing, not merely stale" case, and
+	# never raises -- safe to call every tick.
+	return _env_bool("SYNDICATE_LIVE_LENS_LOOP_PULL_ARTIFACTS", default=True)
+
+
 def _live_lens_background_loop() -> None:
 	status_path = _meta_dir() / "live_lens_loop_status.json"
 	interval_seconds = _live_lens_loop_interval_seconds()
@@ -317,6 +335,13 @@ def _live_lens_background_loop() -> None:
 	while not _LIVE_LENS_LOOP_STOP.is_set():
 		started_at = _utc_now()
 		started_epoch = time.time()
+		if _live_lens_pull_enabled():
+			try:
+				pulled_count = pull_hot_artifacts(date_str=central_today_iso())
+				if pulled_count:
+					print(f"[live_lens_loop] pulled_hot_artifacts count={pulled_count}", flush=True)
+			except Exception as exc:
+				print(f"[live_lens_loop] pull_hot_artifacts_failed error={type(exc).__name__}: {exc}", flush=True)
 		meta = _run_live_lens_tick()
 		if _live_lens_publish_enabled():
 			try:

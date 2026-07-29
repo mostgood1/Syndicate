@@ -28,6 +28,41 @@ class LiveLensLoopTests(unittest.TestCase):
         with patch.dict(os.environ, {"SYNDICATE_LIVE_LENS_INTERVAL_SECONDS": "90"}, clear=False):
             self.assertEqual(live_lens_loop._live_lens_loop_interval_seconds(), 90)
 
+    def test_pull_enabled_by_default(self) -> None:
+        # #128: live-odds-worker had no mechanism to pull hot artifacts from
+        # web at all (that only ran inside the intelligence-state loop,
+        # which this service deliberately doesn't own) -- confirmed live via
+        # MLB's build_cards_page_context reporting source_title "MLB cards
+        # unavailable" on this service despite the identical call succeeding
+        # on web. Default must stay True; a silent env-driven regression to
+        # False would reintroduce this gap.
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertTrue(live_lens_loop._live_lens_pull_enabled())
+
+    def test_pull_honors_env_override(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_LIVE_LENS_LOOP_PULL_ARTIFACTS": "false"}, clear=False):
+            self.assertFalse(live_lens_loop._live_lens_pull_enabled())
+
+    def test_background_loop_pulls_hot_artifacts_before_each_tick(self) -> None:
+        with patch.object(live_lens_loop, "_live_lens_pull_enabled", return_value=True), patch.object(
+            live_lens_loop, "pull_hot_artifacts", return_value=0
+        ) as mock_pull, patch.object(live_lens_loop, "_run_live_lens_tick", return_value={"ok": True, "results": {}}), patch.object(
+            live_lens_loop, "_live_lens_publish_enabled", return_value=False
+        ), patch.object(live_lens_loop, "write_json_file"), patch.object(
+            live_lens_loop, "_live_lens_loop_interval_seconds", return_value=60
+        ):
+            live_lens_loop._LIVE_LENS_LOOP_STOP.clear()
+
+            def stop_after_first_wait(_seconds: float) -> bool:
+                live_lens_loop._LIVE_LENS_LOOP_STOP.set()
+                return True
+
+            with patch.object(live_lens_loop._LIVE_LENS_LOOP_STOP, "wait", side_effect=stop_after_first_wait):
+                live_lens_loop._live_lens_background_loop()
+
+        mock_pull.assert_called_once()
+        self.assertEqual(mock_pull.call_args.kwargs.get("date_str"), live_lens_loop.central_today_iso())
+
     def test_run_tick_for_sport_writes_valid_snapshot(self) -> None:
         snapshot = {"date": "2026-07-13", "rank_cards": [], "cards": [], "games": []}
         with TemporaryDirectory() as tmp_dir:
