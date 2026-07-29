@@ -4722,6 +4722,101 @@ class ReadCombinedIntelligenceResponseTests(unittest.TestCase):
         self.assertEqual(by_name["MLB Play"], "2030-03-01")
         self.assertEqual(by_name["MLB Play 2"], "2030-03-02")
 
+    def test_prefers_fresher_of_in_memory_snapshot_and_on_disk_file(self) -> None:
+        # #128: before this fix, a non-empty in-memory snapshot was trusted
+        # unconditionally forever, even after a newer on-disk file existed
+        # for the same date -- confirmed live 2026-07-29: web kept serving a
+        # ~1 AM, zero-MLB-prop in-memory snapshot for 7+ hours after
+        # refresh-worker had already computed and published a fresh
+        # 98-candidate/61-MLB-prop state to web's own disk. Locks in
+        # "fresher wins" by timestamp, matching _read_state_payload's
+        # existing keyvalue-vs-artifact comparison pattern.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            stale_response = {
+                "ok": True,
+                "selected_date": "2030-07-10",
+                "candidate_count": 1,
+                "by_sport": {"mlb": [{"name": "Stale MLB Play", "score": 1.0}]},
+                "last_updated": "2030-07-10T01:00:00Z",
+            }
+            fresh_response = {
+                "ok": True,
+                "selected_date": "2030-07-10",
+                "candidate_count": 1,
+                "by_sport": {"mlb": [{"name": "Fresh MLB Play", "score": 9.0}]},
+                "last_updated": "2030-07-10T08:00:00Z",
+            }
+            refresh_state_store.write_json_file(
+                reports_root / "intelligence" / "intelligence_state_2030_07_10.json",
+                fresh_response,
+            )
+            with patch.object(intelligence_state_module, "reports_root", return_value=reports_root):
+                service = intelligence_state_module._INTELLIGENCE_STATE_SERVICE
+                payload = service._default_payload()
+                payload["date"] = "2030-07-10"
+                key = _payload_key(service._normalize_payload(payload))
+                service._snapshots[key] = IntelligenceSnapshot(
+                    key=key,
+                    payload=payload,
+                    response=stale_response,
+                    computed_at="2030-07-10T01:00:00Z",
+                    source_fingerprint="stale",
+                )
+                try:
+                    result = intelligence_state_module.read_combined_intelligence_response(dates=["2030-07-10"])
+                finally:
+                    service._snapshots.pop(key, None)
+
+        names = {item.get("name") for item in result["ranked_all"]}
+        self.assertIn("Fresh MLB Play", names)
+        self.assertNotIn("Stale MLB Play", names)
+
+    def test_still_prefers_in_memory_snapshot_when_it_is_the_fresher_one(self) -> None:
+        # The flip side of the test above: a genuinely fresher in-memory
+        # snapshot (the common case -- same process just computed it) must
+        # still win over an older on-disk file, not get bypassed entirely.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            stale_disk_response = {
+                "ok": True,
+                "selected_date": "2030-07-11",
+                "candidate_count": 1,
+                "by_sport": {"mlb": [{"name": "Stale Disk Play", "score": 1.0}]},
+                "last_updated": "2030-07-11T01:00:00Z",
+            }
+            fresh_memory_response = {
+                "ok": True,
+                "selected_date": "2030-07-11",
+                "candidate_count": 1,
+                "by_sport": {"mlb": [{"name": "Fresh Memory Play", "score": 9.0}]},
+                "last_updated": "2030-07-11T08:00:00Z",
+            }
+            refresh_state_store.write_json_file(
+                reports_root / "intelligence" / "intelligence_state_2030_07_11.json",
+                stale_disk_response,
+            )
+            with patch.object(intelligence_state_module, "reports_root", return_value=reports_root):
+                service = intelligence_state_module._INTELLIGENCE_STATE_SERVICE
+                payload = service._default_payload()
+                payload["date"] = "2030-07-11"
+                key = _payload_key(service._normalize_payload(payload))
+                service._snapshots[key] = IntelligenceSnapshot(
+                    key=key,
+                    payload=payload,
+                    response=fresh_memory_response,
+                    computed_at="2030-07-11T08:00:00Z",
+                    source_fingerprint="fresh",
+                )
+                try:
+                    result = intelligence_state_module.read_combined_intelligence_response(dates=["2030-07-11"])
+                finally:
+                    service._snapshots.pop(key, None)
+
+        names = {item.get("name") for item in result["ranked_all"]}
+        self.assertIn("Fresh Memory Play", names)
+        self.assertNotIn("Stale Disk Play", names)
+
     def test_never_calls_build_candidate_pool(self) -> None:
         # The hard invariant: this function must be read-only. A call to
         # _build_candidate_pool here would reintroduce the exact

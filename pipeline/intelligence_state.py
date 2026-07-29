@@ -4111,24 +4111,45 @@ def _combined_board_response_cache_ttl_seconds() -> float:
 
 
 def _read_single_date_response_for_combining(selected_date: str) -> dict[str, Any] | None:
-    """One date's already-computed response, read-only. Tries the in-memory
-    snapshot the background loop already holds first (cheapest -- exactly
-    what _ensure_default_board_window_watched populates), then falls back to
-    that date's own on-disk file for cross-process/cold-start reads. Never
-    computes anything -- see read_combined_intelligence_response's own
-    docstring for why that invariant matters.
+    """One date's already-computed response, read-only. Consults both the
+    in-memory snapshot the background loop already holds (cheapest -- exactly
+    what _ensure_default_board_window_watched populates) and that date's own
+    on-disk file, and returns whichever is FRESHER by its own recorded
+    timestamp -- the same "consult both, fresher wins" reasoning
+    _read_state_payload already uses for its keyvalue-vs-artifact split.
+
+    Before this, the in-memory snapshot was trusted unconditionally forever
+    once merely non-empty -- no age check at all. Confirmed live 2026-07-29:
+    web's own in-memory copy for today stayed pinned on a ~1 AM, zero-MLB-
+    prop snapshot for 7+ hours after refresh-worker had already computed and
+    published a fresh 98-candidate/61-MLB-prop state to web's own disk --
+    web simply never looked at the newer file again for that date, because
+    "some candidates" (however stale) always satisfied the only check this
+    function made. Never computes anything -- see
+    read_combined_intelligence_response's own docstring for why that
+    invariant matters; this still only compares two already-computed
+    sources.
     """
     payload = _INTELLIGENCE_STATE_SERVICE._default_payload()
     payload["date"] = selected_date
     normalized = _INTELLIGENCE_STATE_SERVICE._normalize_payload(payload)
     key = _payload_key(normalized)
     snapshot = _INTELLIGENCE_STATE_SERVICE._snapshots.get(key)
-    if snapshot is not None and isinstance(snapshot.response, dict) and _intelligence_state_candidate_count(snapshot.response) > 0:
-        return dict(snapshot.response)
+    in_memory = (
+        dict(snapshot.response)
+        if snapshot is not None and isinstance(snapshot.response, dict) and _intelligence_state_candidate_count(snapshot.response) > 0
+        else None
+    )
     on_disk = read_json_file(_intelligence_state_daily_paths(selected_date)["state"])
-    if isinstance(on_disk, dict) and _intelligence_state_candidate_count(on_disk) > 0:
+    on_disk = on_disk if isinstance(on_disk, dict) and _intelligence_state_candidate_count(on_disk) > 0 else None
+
+    if in_memory is None:
         return on_disk
-    return None
+    if on_disk is None:
+        return in_memory
+    if _state_payload_timestamp(on_disk) > _state_payload_timestamp(in_memory):
+        return on_disk
+    return in_memory
 
 
 def read_combined_intelligence_response(
