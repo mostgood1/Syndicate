@@ -215,6 +215,50 @@ Last reconciled: 2026-07-28 (see "Reconciliation 2026-07-28").
       not yet removed — remove both once this is resolved) to see exactly
       which of `_daily_sim_by_game`/`_daily_actual_by_game`/the three
       `_source_live_prop_rows` variants comes back empty on the worker.
+    - 🟢 **A SECOND, deeper bug found and fixed the same night, after the
+      above was confirmed live: the board UI still showed the same handful
+      of MLB props for over an hour even with `counts.props` correctly at
+      134.** User caught this directly ("the actual UI is not updated...
+      same props we've had for the last hour"). Root cause, confirmed by
+      checking the artifact directly: `daily_top_props_<date>.json` — the
+      **sole** source every existing MLB prop candidate function
+      (`_mlb_market_prop_candidates_from_artifact`,
+      `_mlb_subject_prop_candidates_from_artifact`, etc.) reads from — was
+      generated once, at **21:57 PM**, and never regenerated for the rest
+      of the slate (it's a "few times a day" artifact by design).
+      `_mlb_hydrate_live_prop_projection` only ever *attaches* live actuals
+      onto candidates that already exist from that static snapshot; it
+      never creates new ones. So a prop that only ever showed up in
+      live-lens — even with tonight's fix flowing 134 real props through
+      it — could never become a board candidate. This is precisely what the
+      user's very first message of the session asked for ("live lens...
+      should determine what live opportunities are getting pushed") and
+      exactly the "same props for hours" symptom #124's own follow-up (a)
+      originally flagged. **Fixed** (`0c87e96f`): new
+      `_mlb_live_lens_prop_candidates_from_artifact` in `intelligence.py`
+      reads MLB's live-lens report directly and builds a real board
+      candidate per `trackedProps`/`props` row **for LIVE games only**
+      (pregame deliberately untouched — `daily_top_props` + the season
+      betting card's own sim-vs-line edge are already correct there, per
+      the user's own scoping). Wired into `_collect_candidates`
+      unconditionally (not gated behind a question-text heuristic like the
+      sibling MLB backfills), with the same in-pool subject/market/pick
+      dedup guard `wants_ranked_mlb_market_backfill` already uses. Two new
+      direct unit tests (real builder against `_classify_candidate_with_reason`,
+      not a mock, matching this file's established pattern) plus 36/36
+      `collect_candidates`/`mlb`/`live_lens`/`classify`-keyword tests and
+      47/47 candidate/backfill/dedup tests pass. **Confirmed live in the
+      actual rendered UI** (not just the API) post-deploy: new entries with
+      the function's own writeup text verbatim — "Luis Arraez... Live lens
+      hitter runs view for Luis Arraez. Model win probability 51.7%." and
+      "Luis Campusano... Live lens hitter runs view..." — players/props that
+      only exist because of this fix, not the static snapshot. **This
+      closes out the original reported symptom end to end**: live-lens now
+      both carries real prop data (bugs 3–6 above) AND actually determines
+      what shows up as a live opportunity on the board (this fix), matching
+      the user's original architectural ask. The smaller live-actuals gap
+      immediately above (item still showing `live_projection`/`actual` as
+      `"-"` on these new candidates) remains open, same scope as before.
 
 Conventions:
 - IDs are stable and never reused. New work appends at the next free number.
