@@ -123,42 +123,98 @@ Last reconciled: 2026-07-28 (see "Reconciliation 2026-07-28").
     (`tests/test_mlb_refresh_runner.py`) which uses `inspect.signature` on
     the REAL function instead of a hand-written mock, specifically so this
     class of drift can't hide again. Deployed as `86fbfc8e`.
-  - ⚠️ **Still not fully fixed after all three deploys — one more layer
-    confirmed, not yet resolved.** Post-`86fbfc8e`, the persisted worker
-    report now has the CORRECT card-based shape (all the
-    `_card_to_live_lens_row` fields present, confirming the TypeError fix
-    landed and cards-primary is genuinely running) but `liveProps` is still
-    empty, and `build_cards_page_context`'s own `source_title` came back
-    `"MLB cards unavailable"` (`mlb/cards.py:5058`, gated on `summary and
-    games` — `games` is provably non-empty here, so `summary` must be
-    falsy). That `summary` traces to `daily_artifact_path(selected_date,
-    suffix="_locked_policy")` → `daily_summary_<date>_locked_policy.json`,
-    which per **#124 item 3** already feeds
-    `markets.{pitcher,hitter,extraPitcher,extraHitter}Props` specifically —
-    confirmed present on **web's** disk via `/api/ops/artifacts/export`
-    (count 1), but that only proves web has it, not live-odds-worker (no
-    endpoint exposes worker's own disk contents directly). Leading
-    hypothesis, not yet confirmed: live-odds-worker's `pull_hot_artifacts`
-    call pulls a narrower artifact set than web/refresh-worker (focused on
-    live odds, not the full daily betting-card summary), so this file
-    genuinely never reaches its disk even though #124 item 3's repair fixed
-    the *transport allowlist* gap, not necessarily *which service* asks for
-    it. **Deliberately stopped debugging live here** rather than keep
-    redeploying during an active MLB slate (3 rounds of deploys already
-    killed/re-triggered the same scoped fingerprint-change resim multiple
-    times tonight, each time with explicit user go-ahead). **Next session**:
-    (1) confirm whether live-odds-worker's `pull_hot_artifacts`/hot-artifact
-    fetch list includes `daily_summary_*_locked_policy.json` at all — if
-    not, that's the real remaining fix, same shape as #124 items 2/3 but for
-    a different consuming service; (2) once confirmed fixed, re-run this
-    session's exact check (`/mlb/api/live-lens` `counts.props` across live
-    games, cross-referenced against `/mlb/api/cards`) to close this out;
-    (3) remove the `[CARDS_BACKED_LIVE_LENS_DIAG]` prints once confirmed
-    fixed and stable; (4) the frontend "Live" column fix
-    (`intelligence.html`'s `displayLiveProjection`) IS confirmed correct
-    and deployed — no longer falls back to the game's live total for props
-    — but hasn't been visually confirmed against a real populated live prop
-    row yet since props still aren't reaching the board.
+  - 🟢 **RESOLVED, confirmed live end-to-end 2026-07-29T04:2xZ, after 7
+    deploys and 3 more independently-real bugs found chasing this same
+    symptom across the night** (all on top of the (a)/(b) architecture fix
+    above — none of these existed before tonight, they're why the
+    architecture fix alone didn't visibly work at first):
+    - **Bug 3**: `pull_hot_artifacts()` had exactly one production call
+      site (`pipeline/intelligence_state.py`, inside the intelligence-state
+      background loop) — confirmed via live Render env vars that this loop
+      is enabled on refresh-worker (`true`) and explicitly disabled on
+      live-odds-worker (`false`, "so exactly one service owns the loop").
+      live-odds-worker therefore had **no mechanism at all** to pull any
+      artifact from web onto its own (separate, per-service) disk. Fixed
+      (`ad76c957`): wired `pull_hot_artifacts(date_str=...)` into
+      `live_lens_loop`'s own tick, gated by
+      `SYNDICATE_LIVE_LENS_LOOP_PULL_ARTIFACTS` (default true).
+    - **Bug 4**: `_required_daily_artifact_paths` (the one-time repair list
+      #124 item 3 added) only covered
+      `daily_summary_<date>_locked_policy.json`. `build_cards_page_context`
+      separately loads `daily_summary_<date>.json` (**no suffix** — a
+      different file) as its own `summary`, which gates both its own
+      `source_title` ("MLB cards unavailable" whenever falsy) and the
+      `game_pks` several other loaders key off. Never in the repair list at
+      all. Fixed (`376bb9fb`): added it alongside the `_locked_policy`
+      entry; updated the 4 tests that hardcoded the required-artifact
+      count.
+    - **Bug 5, the real blocker underneath bugs 3+4 both appearing to do
+      nothing when first deployed**: `_live_lens_report_needs_refresh` (and
+      `_refresh_current_date_live_statuses`, and — before an earlier fix
+      this same night — `_live_lens_snapshot_needs_refresh`) compared
+      `selected_date` against `datetime.now().astimezone().date()` — the
+      server's raw **system-local** date, not `central_today_iso()` (the
+      site's real Central-time operating date, already used correctly
+      elsewhere, e.g. `live_lens_loop.py`'s own tick). On Render (system tz
+      almost certainly UTC) this silently diverges from "today" for hours
+      every night, exactly during a live evening slate — once UTC crosses
+      midnight, these checks short-circuit `False` for the *correct* date,
+      freezing the report at whatever it last computed before that
+      boundary. This is very likely a real, separate, pre-existing bug,
+      not introduced tonight. Fixed (`63522a42`) across all three call
+      sites in `mlb/live_lens.py`; also fixed
+      `LiveLensSnapshotNeedsRefreshTests`' own `_today_iso()` test helper,
+      which used the identical wrong pattern (so it could never have caught
+      this — both sides of the comparison were wrong the same way).
+    - **Bug 6, introduced by this same session's bug-3 fix**: once
+      live-odds-worker started calling `pull_hot_artifacts` every tick, its
+      date-scoped incremental pull (matches `*<date>*`) also re-fetched
+      `live_lens_report_<date>.json` — a file **this same service is the
+      canonical writer of** — from web every cycle regardless of content,
+      resetting the local file's mtime to "now" every time.
+      `_live_lens_report_needs_refresh` measured pure file mtime, so it
+      always saw a "fresh" (<60s) file and never triggered a real rebuild —
+      a self-reinforcing loop, and why bug 5's fix alone still didn't
+      visibly help. `_live_lens_snapshot_needs_refresh`'s own comment
+      already documented this exact failure mode for a different caller
+      (refresh-worker) and already fixed it there. Applied the identical
+      fix to `_live_lens_report_needs_refresh` (`cc68bf2b`): trust the
+      report's own `generatedAt` content field first, file mtime only as a
+      fallback when content carries none.
+    - **Confirmed live post-`cc68bf2b`** (all three services deployed and
+      two full ticks observed): `/mlb/api/live-lens` `counts.props` went
+      **0 → 134** across the live games; sample rows show real players
+      (Yordan Alvarez, Jackson Chourio, Cal Raleigh, etc.), real
+      markets/lines/odds/model probabilities. Cross-checked against the
+      actual Layer 2 board (`/api/intelligence/query`, `sport=mlb`): 11
+      real MLB prop cards with `is_live: true`, `lane: "live"` — the
+      original reported symptom is fixed end to end, backend to board.
+      The frontend "Live" column fix (`intelligence.html`'s
+      `displayLiveProjection`, no longer falls back to the game's live
+      total for props) is deployed and structurally correct.
+    - ⚠️ **Smaller gap still open, deliberately not chased further
+      tonight given how much of the night this already took**: every prop
+      row's `actual`/`liveProjection` field is still `null` (confirmed on
+      both the raw `/mlb/api/live-lens` payload and the board's
+      `live_projection`/`actual` fields, which show `"-"`) — meaning
+      `_live_props_from_game_detail` (the rich box-score-driven live-actual
+      pipeline wired in earlier tonight) is falling through to the plain
+      `card_props` fallback rather than returning real rows, for reasons
+      not yet diagnosed. Given the guard only refuses inside a real web
+      request and this is confirmed running from the worker's own tick (no
+      request context), the fallthrough is a genuine computation gap, not
+      the guard firing — most likely `cards.live_prop_rows_for_game`'s own
+      dependencies (`_daily_sim_by_game`/`_daily_actual_by_game`) hitting
+      the same class of "artifact missing on live-odds-worker's disk"
+      problem as bugs 3/4 above, just for a different file. **Net effect
+      is still a real, confirmed fix**: props/lines/odds/model-probability
+      now reach the board reliably; only the live in-game actual/projection
+      overlay on top of an already-real prop row remains missing. Next
+      session: add a diagnostic print inside `_live_props_from_game_detail`
+      (same pattern as `[CARDS_BACKED_LIVE_LENS_DIAG]`, still present and
+      not yet removed — remove both once this is resolved) to see exactly
+      which of `_daily_sim_by_game`/`_daily_actual_by_game`/the three
+      `_source_live_prop_rows` variants comes back empty on the worker.
 
 Conventions:
 - IDs are stable and never reused. New work appends at the next free number.
