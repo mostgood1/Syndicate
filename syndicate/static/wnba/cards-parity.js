@@ -4472,8 +4472,21 @@
     };
   }
 
-  function liveLensMarketFromSignal(game, marketType, shortLabel, signal) {
+  function liveLensMarketFromSignal(game, marketType, shortLabel, signal, periodScoped = false) {
     if (!signal) {
+      // A period/half segment with no real quarter_ml/half_total/etc. signal
+      // (period_totals/period_spreads simply empty upstream -- confirmed
+      // 2026-07-28, sportsbooks/Bovada fallback aren't carrying WNBA period
+      // markets right now) used to fall through to the full-game betting
+      // line below and label it as if it were that segment's own line --
+      // e.g. "Current period" and "Current half" both showing the exact
+      // same full-game Total with no indication it wasn't period-specific.
+      // That's what read as "still showing game total at every interval."
+      // Full-game fallback stays correct for the actual 'full-game' segment
+      // (below), which is genuinely supposed to show game.betting.*.
+      if (periodScoped) {
+        return emptyLensMarket(shortLabel, 'No live period line yet.', hasStartedGame(getLiveState(game)));
+      }
       const betting = game?.betting || {};
       if (marketType === 'moneyline') {
         const homeMl = Number(betting.home_ml);
@@ -4620,9 +4633,9 @@
         modelHomeWinProb: liveMoneylineHomeProb(game, signals?.quarter_ml),
         baselineHomeWinProb: Number.isFinite(Number(signals?.quarter_ml?.line)) ? Number(signals.quarter_ml.line) : null,
         markets: {
-          moneyline: liveLensMarketFromSignal(game, 'moneyline', 'ML', signals?.quarter_ml),
-          spread: liveLensMarketFromSignal(game, 'spread', 'ATS', signals?.quarter_ats),
-          total: liveLensMarketFromSignal(game, 'total', 'Total', signals?.quarter_total),
+          moneyline: liveLensMarketFromSignal(game, 'moneyline', 'ML', signals?.quarter_ml, true),
+          spread: liveLensMarketFromSignal(game, 'spread', 'ATS', signals?.quarter_ats, true),
+          total: liveLensMarketFromSignal(game, 'total', 'Total', signals?.quarter_total, true),
         },
       },
       {
@@ -4636,9 +4649,9 @@
         modelHomeWinProb: liveMoneylineHomeProb(game, signals?.half_ml),
         baselineHomeWinProb: Number.isFinite(Number(signals?.half_ml?.line)) ? Number(signals.half_ml.line) : null,
         markets: {
-          moneyline: liveLensMarketFromSignal(game, 'moneyline', 'ML', signals?.half_ml),
-          spread: liveLensMarketFromSignal(game, 'spread', 'ATS', signals?.half_ats),
-          total: liveLensMarketFromSignal(game, 'total', 'Total', signals?.half_total),
+          moneyline: liveLensMarketFromSignal(game, 'moneyline', 'ML', signals?.half_ml, true),
+          spread: liveLensMarketFromSignal(game, 'spread', 'ATS', signals?.half_ats, true),
+          total: liveLensMarketFromSignal(game, 'total', 'Total', signals?.half_total, true),
         },
       },
       {
