@@ -553,8 +553,40 @@
     if (movement.previous_line !== undefined && movement.previous_line !== null && movement.last_line !== undefined && movement.last_line !== null && movement.previous_line !== movement.last_line) {
       parts.push(`${movement.previous_line} → ${movement.last_line}`);
     }
+    // history is the raw per-snapshot record (this object only ever tracks
+    // LINE movement above -- odds/price aren't fields on `movement` itself,
+    // only on each history entry) -- so a real odds-only move (juice
+    // shifting on an unchanged line) previously fell through with zero
+    // context. Worse: history.length alone was used as the "moves" count,
+    // counting repeated IDENTICAL snapshots as real moves -- 20 unchanged
+    // observations of the same line/price displayed as "20 moves" with no
+    // direction, actively implying movement that never happened. Both fixed
+    // by counting only snapshot-to-snapshot pairs that actually differ.
     if (history.length > 1) {
-      parts.push(`${history.length} moves`);
+      const firstEntry = history[0] || {};
+      const lastEntry = history[history.length - 1] || {};
+      const firstOdds = numericValue(firstEntry.odds ?? firstEntry.last_odds);
+      const lastOdds = numericValue(lastEntry.odds ?? lastEntry.last_odds);
+      if (firstOdds !== null && lastOdds !== null && firstOdds !== lastOdds && !parts.some((part) => part.startsWith("Odds"))) {
+        parts.push(`Odds ${firstOdds > 0 ? "+" : ""}${firstOdds} → ${lastOdds > 0 ? "+" : ""}${lastOdds}`);
+      }
+      let realMoveCount = 0;
+      for (let i = 1; i < history.length; i += 1) {
+        const prevEntry = history[i - 1] || {};
+        const currEntry = history[i] || {};
+        const prevLine = numericValue(prevEntry.current_line);
+        const currLine = numericValue(currEntry.current_line);
+        const prevOdds = numericValue(prevEntry.odds ?? prevEntry.last_odds);
+        const currOdds = numericValue(currEntry.odds ?? currEntry.last_odds);
+        const lineChanged = prevLine !== null && currLine !== null && prevLine !== currLine;
+        const oddsChanged = prevOdds !== null && currOdds !== null && prevOdds !== currOdds;
+        if (lineChanged || oddsChanged) {
+          realMoveCount += 1;
+        }
+      }
+      if (realMoveCount > 0) {
+        parts.push(`${realMoveCount} move${realMoveCount === 1 ? "" : "s"}`);
+      }
     }
     if (!parts.length) {
       return null;
