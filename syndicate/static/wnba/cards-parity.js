@@ -1256,9 +1256,16 @@
 
     function buildSignal(key, label, klass, side, edge, line, projection, extraDetail) {
       const sideLabel = side ? `${side} ` : '';
-      const edgeValue = Number(edge);
-      const projectionValue = Number(projection);
-      const lineValue = Number(line);
+      // Number(null) is 0 in JS, not NaN -- passing edge/line as null (the
+      // #125 MODEL-signal case, meaning "no live market to compare against")
+      // used to silently become a real 0 value here, rendering as "vs 0.0"
+      // instead of being treated as genuinely absent. null/undefined must
+      // convert to NaN so the Number.isFinite checks below correctly treat
+      // them as missing, same as any other non-numeric input already does.
+      const toNumberOrNaN = (value) => (value === null || value === undefined ? NaN : Number(value));
+      const edgeValue = toNumberOrNaN(edge);
+      const projectionValue = toNumberOrNaN(projection);
+      const lineValue = toNumberOrNaN(line);
       const parts = [];
       if (key === 'ml' || key === 'half_ml' || key === 'quarter_ml') {
         if (Number.isFinite(projectionValue) && Number.isFinite(lineValue)) {
