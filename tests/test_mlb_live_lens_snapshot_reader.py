@@ -103,6 +103,55 @@ class LiveLensSnapshotNeedsRefreshTests(unittest.TestCase):
             self.assertFalse(live_lens._live_lens_report_needs_refresh("2026-07-29"))
 
 
+class LiveLensReportNeedsRefreshTests(unittest.TestCase):
+    """#128: live-odds-worker now calls pull_hot_artifacts every tick (added
+    this same session) -- its date-scoped incremental pull matches
+    live_lens_report_<date>.json's own filename pattern and re-fetches/
+    re-writes it from web every cycle regardless of whether the CONTENT
+    changed. That resets the file's mtime, which _live_lens_report_needs_refresh
+    used to rely on exclusively -- making a genuinely stale report look
+    "fresh" (<max-age) forever and permanently starving _persist_live_lens_report
+    of ever running again. Confirmed live: the persisted report stayed at the
+    exact same generatedAt/source_title across several confirmed ticks after
+    two independent artifact-repair fixes landed and their pulls succeeded.
+    Same fix shape _live_lens_snapshot_needs_refresh's own comment already
+    documents for a different caller (refresh-worker): trust the report's own
+    generatedAt content field first, file mtime only as a fallback.
+    """
+
+    def _today(self) -> str:
+        return live_lens.central_today_iso()
+
+    def test_stale_content_needs_refresh_even_with_fresh_mtime(self) -> None:
+        old_generated_at = (datetime.now().astimezone() - timedelta(seconds=120)).isoformat(timespec="seconds")
+        report = {"games": [{"gamePk": 1}], "generatedAt": old_generated_at}
+        with patch.object(live_lens, "load_json_file", return_value=report), patch.object(
+            live_lens, "_path_age_seconds", return_value=1.0
+        ) as mocked_path_age:
+            self.assertTrue(live_lens._live_lens_report_needs_refresh(self._today()))
+        mocked_path_age.assert_not_called()
+
+    def test_fresh_content_does_not_need_refresh_even_with_stale_mtime(self) -> None:
+        recent_generated_at = datetime.now().astimezone().isoformat(timespec="seconds")
+        report = {"games": [{"gamePk": 1}], "generatedAt": recent_generated_at}
+        with patch.object(live_lens, "load_json_file", return_value=report), patch.object(
+            live_lens, "_path_age_seconds", return_value=9999.0
+        ) as mocked_path_age:
+            self.assertFalse(live_lens._live_lens_report_needs_refresh(self._today()))
+        mocked_path_age.assert_not_called()
+
+    def test_missing_generated_at_falls_back_to_file_mtime(self) -> None:
+        report = {"games": [{"gamePk": 1}]}
+        with patch.object(live_lens, "load_json_file", return_value=report), patch.object(
+            live_lens, "_path_age_seconds", return_value=9999.0
+        ):
+            self.assertTrue(live_lens._live_lens_report_needs_refresh(self._today()))
+        with patch.object(live_lens, "load_json_file", return_value=report), patch.object(
+            live_lens, "_path_age_seconds", return_value=1.0
+        ):
+            self.assertFalse(live_lens._live_lens_report_needs_refresh(self._today()))
+
+
 class SnapshotGeneratedAtAgeSecondsTests(unittest.TestCase):
     def test_parses_aware_iso_timestamp(self) -> None:
         five_seconds_ago = (datetime.now().astimezone() - timedelta(seconds=5)).isoformat(timespec="seconds")

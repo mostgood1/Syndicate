@@ -65,6 +65,20 @@ def _live_lens_report_needs_refresh(selected_date: str) -> bool:
     report = load_json_file(report_path)
     if not isinstance(report, dict) or not isinstance(report.get("games"), list) or not report.get("games"):
         return True
+    # #128: file mtime is the wrong freshness proxy now that live-odds-worker
+    # also calls pull_hot_artifacts every tick (added this same session) --
+    # the date-scoped incremental pull matches this exact file's own
+    # filename pattern and re-fetches/re-writes it from web on every cycle
+    # regardless of whether its CONTENT changed, which resets the mtime this
+    # check used to rely on and made it look "fresh" (<max-age) forever,
+    # permanently starving _persist_live_lens_report of ever running again.
+    # Exactly the same failure mode _live_lens_snapshot_needs_refresh's own
+    # comment already documented for a different caller (refresh-worker) --
+    # same fix: trust the report's own generatedAt content field first, only
+    # falling back to the file-mtime proxy when it doesn't carry one.
+    content_age_seconds = _snapshot_generated_at_age_seconds(report)
+    if content_age_seconds is not None:
+        return content_age_seconds > float(_live_lens_report_max_age_seconds())
     report_age_seconds = _path_age_seconds(report_path)
     if report_age_seconds is None:
         return True
