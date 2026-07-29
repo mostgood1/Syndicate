@@ -1094,7 +1094,20 @@ def filter_candidates(
             threshold += min(0.04, calibration_error * 0.15)
         if reliability_multiplier < 0.88:
             threshold += 0.01
-        if edge is not None and edge < threshold:
+        # #137 follow-up, confirmed live: a steam move's signal IS the
+        # market's own recent movement, not a model-vs-price gap -- its
+        # model_probability is deliberately sourced from the market's own
+        # implied_prob (intelligence.py's _steam_candidates_for_sport has no
+        # independent model to compare against), so edge here is always
+        # ~0 by construction and every steam candidate failed this gate
+        # unconditionally. Confirmed in production: candidate_generation
+        # showed real steam candidates surviving scoring with 0 filtered at
+        # that stage, but the background-loop's board-publication path
+        # (which, unlike run_intelligence_query, calls this filter with
+        # apply_edge_filter=True) still served zero of them -- traced to
+        # exactly this line before the fix.
+        is_steam_move = str(candidate.get("candidate_type") or "").strip().lower() == "steam"
+        if edge is not None and edge < threshold and not is_steam_move:
             rejected.append(
                 {
                     "sport": str(candidate.get("sport_slug") or candidate.get("sport") or "").strip().lower(),

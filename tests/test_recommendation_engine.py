@@ -193,6 +193,46 @@ class RecommendationEngineTests(unittest.TestCase):
         filtered = filter_candidates(candidates, sport="mlb", evaluation_records=_UNRELATED_HISTORY)
         self.assertEqual(len(filtered), 1)
 
+    def test_filter_candidates_exempts_steam_moves_from_the_edge_threshold(self) -> None:
+        # #137 follow-up, confirmed live: a steam move's model_probability is
+        # deliberately sourced from the market's own implied_prob (there is
+        # no independent model to compare against -- the signal IS the
+        # market's recent movement), so its computed edge is always ~0 by
+        # construction. Before this fix, every steam candidate failed the
+        # ordinary edge-quality gate unconditionally, even though
+        # candidate_generation/candidate_scoring showed them surviving
+        # every earlier pipeline stage -- traced to this exact gate.
+        now = datetime.now(timezone.utc)
+        fresh = now.isoformat()
+        base = {
+            "event_id": "game-1",
+            "market": "hits_allowed",
+            "selection": "Over 4.5",
+            "odds": "+130",
+            "implied_probability": 0.435,
+            "model_probability": 0.435,  # edge ~= 0, same as a real steam candidate
+            "last_updated": fresh,
+            "sport_manifest_last_updated": fresh,
+            "sport_slug": "mlb",
+        }
+        steam_candidate = {**base, "name": "Jacob Lopez Over 4.5", "candidate_type": "steam"}
+        ordinary_prop = {**base, "name": "Some Other Prop", "candidate_type": "prop"}
+
+        # min_edge forces a real positive threshold -- with the default 0.0
+        # and no market history, edge(0.0) < threshold(0.0) is False for
+        # EVERYONE, which would make the contrast assertion below pass
+        # vacuously regardless of whether the exemption is scoped correctly.
+        filtered = filter_candidates(
+            [steam_candidate, ordinary_prop], sport="mlb", evaluation_records=_UNRELATED_HISTORY, min_edge=0.05
+        )
+
+        filtered_types = {c.get("candidate_type") for c in filtered}
+        self.assertIn("steam", filtered_types, filtered)
+        # Contrast: the ordinary prop, with the identical near-zero edge,
+        # must still be rejected -- this test would pass vacuously if the
+        # fix accidentally exempted everything instead of just steam.
+        self.assertNotIn("prop", filtered_types, filtered)
+
     def test_filter_candidates_does_not_reject_for_staleness_when_the_whole_pipeline_is_stalled(self) -> None:
         # If the sport's own manifest is just as stale, an individual
         # candidate being stale isn't a candidate-specific data problem --

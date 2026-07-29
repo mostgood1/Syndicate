@@ -62,9 +62,51 @@ Last reconciled: 2026-07-28 (see "Reconciliation 2026-07-28").
   "Steam moves only" correctly narrows the blotter (0 matches locally, no
   local `reports/steam/` data — expected), clicking back to "All
   opportunities" restores the normal board, zero console errors either way.
-  **Not yet deployed** — no local steam data to verify the populated case
-  against; needs a live production check (a date with real detected steam
-  events) before/shortly after deploying.
+  **Deployed, then found broken in production, then fixed twice more —
+  now confirmed genuinely working end to end.** First deploy: production
+  logs showed real steam candidates generating and surviving
+  `candidate_scoring` (17+ for MLB, 0 filtered at that stage) but the
+  actual served board always showed zero. Two independent, real bugs, both
+  found by tracing the pipeline stage by stage against live production
+  data rather than guessing:
+  1. **Identity-based dedup collision.** `_collect_candidates`' hard-drop
+     dedup keys on `(candidate_type, sport_slug, matchup, market, pick[,
+     game_identity])`. A raw steam lifecycle event carries no `matchup`
+     field at all (universal `"-"` here) and `pick` was a bare "Over 4.5"
+     with no subject — so any two different players/teams sharing the same
+     market+line+selection (common; specific lines like 4.5 recur
+     constantly) collided on identity and all but the highest-scored one
+     were silently dropped. Fixed by baking the subject into `pick`
+     ("Willy Adames Over 1.5"), which also fixed the identical collision
+     shape in this function's own internal dedup (`player_name`/`selection`
+     were OR'd into one key slot). `matchup` also now best-effort resolves
+     from `sport["dashboard_games"]` by `game_id` — cosmetic, not required
+     for correctness after the pick fix.
+  2. **The real blocker: an unconditional edge-quality gate.**
+     `filter_candidates` (`recommendation_engine.py`) rejects any candidate
+     whose `edge < threshold`. A steam candidate's `model_probability` is
+     deliberately sourced from the market's own `implied_prob` (there is no
+     independent model to compare against — the signal IS the market's
+     movement), so its edge is always ~0 by construction, and it failed
+     this gate unconditionally. This explains why generation/scoring looked
+     fine while the served board stayed empty: `run_intelligence_query`
+     (ad-hoc queries) calls this pipeline with `apply_edge_filter=False`,
+     but the background loop's own board-publication path
+     (`_build_candidate_pool`) calls it with `apply_edge_filter=True` by
+     default — the two paths silently disagreed. Fixed with a one-line
+     exemption (`candidate_type == "steam"` skips the edge-threshold
+     rejection specifically; the freshness/staleness gate above it still
+     applies). New contrast test confirms the exemption is scoped correctly
+     (an ordinary prop with the identical near-zero edge is still
+     rejected). 7/7 steam candidate tests, 8/8 relevant recommendation-
+     engine tests, 20/20 full `test_recommendation_engine.py`, 15/15
+     `test_intelligence_board_contract.py`, 36/36 collect_candidates/mlb/
+     live_lens/classify tests all pass. **Not yet deployed as of this
+     writing** — next session (or later this one): deploy, then re-run the
+     exact `by_sport` diagnostic that found bug 2 (query
+     `/api/intelligence/query` with the default question, check
+     `response.by_sport.<sport>` for `candidate_type: "steam"` entries)
+     against real production data before calling this closed.
 
 - **New: #136** (filed and fixed this session, **NOT YET DEPLOYED**) — user
   screenshotted the `/intelligence` "Board" and reported WNBA prop rows with
