@@ -3226,6 +3226,25 @@ def _merge_live_lines_game(primary: dict[str, Any], secondary: dict[str, Any]) -
     merged = dict(primary)
     merged["found"] = bool(primary.get("found")) or bool(secondary.get("found"))
 
+    # #125 follow-up, 2026-07-29: primary is typically a local/artifact
+    # snapshot that can be stale (written before this game went live), while
+    # secondary (the freshly rebuilt fallback entry, since #125's fix) now
+    # reflects real-time in_progress/status/period/clock -- confirmed live,
+    # a genuinely in-progress game's fallback entry correctly computed
+    # in_progress=True/period=3/clock='1:35' but the merge below was
+    # discarding all of it, since this function never touched these keys at
+    # all. Prefer secondary's live-state fields whenever it reports the game
+    # as further along (in progress or final) than primary does -- the same
+    # "fresher live signal wins" reasoning _live_state_row_needs_cards_override
+    # already uses elsewhere in this file for a different merge.
+    secondary_more_current = (bool(secondary.get("in_progress")) and not bool(primary.get("in_progress"))) or (
+        bool(secondary.get("final")) and not bool(primary.get("final"))
+    )
+    if secondary_more_current:
+        for key in ("status", "detail", "period", "clock", "in_progress", "final"):
+            if secondary.get(key) is not None:
+                merged[key] = secondary.get(key)
+
     for key in ("total", "home_spread", "away_spread", "home_ml", "away_ml"):
         if merged.get(key) is None and secondary.get(key) is not None:
             merged[key] = secondary.get(key)

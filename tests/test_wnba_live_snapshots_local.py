@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from syndicate.features.wnba.cards import _local_live_snapshot_payload
 from syndicate.features.wnba.cards import _local_live_state_payload
+from syndicate.features.wnba.cards import _merge_live_lines_game
 from syndicate.features.wnba.cards import _props_index_from_recommendations_rows
 from syndicate.features.wnba.cards import build_live_lines_payload
 from syndicate.features.wnba.cards import build_live_pbp_stats_payload
@@ -257,6 +258,42 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertTrue(game.get("in_progress"))
         self.assertEqual(game.get("lines", {}).get("period_totals"), {"h1": 82.5, "q4": 21.5})
         self.assertEqual(game.get("lines", {}).get("period_spreads"), {"h1": -3.5})
+
+    def test_merge_live_lines_game_prefers_fresher_in_progress_state(self) -> None:
+        # #125 follow-up: confirmed live that a stale local/artifact snapshot
+        # (primary) written before a game went live was winning the merge
+        # for status/in_progress/period/clock over a freshly-rebuilt
+        # fallback entry (secondary) that correctly computed the game as
+        # in progress -- this function never touched those keys at all,
+        # only lines.*. A genuinely live game kept showing "Scheduled" /
+        # in_progress: False on /wnba/api/live_lines as a result.
+        primary = {
+            "event_id": "evt-2",
+            "found": True,
+            "status": "Scheduled",
+            "detail": "Scheduled",
+            "period": None,
+            "clock": "",
+            "in_progress": False,
+            "final": False,
+            "lines": {"total": 157.0, "period_totals": {}, "period_spreads": {}},
+        }
+        secondary = {
+            "event_id": "evt-2",
+            "found": True,
+            "status": "1:35 - 3rd",
+            "detail": "1:35 - 3rd",
+            "period": 3,
+            "clock": "1:35",
+            "in_progress": True,
+            "final": False,
+            "lines": {"total": 157.0, "period_totals": {}, "period_spreads": {}},
+        }
+        merged = _merge_live_lines_game(primary, secondary)
+        self.assertTrue(merged.get("in_progress"))
+        self.assertEqual(merged.get("status"), "1:35 - 3rd")
+        self.assertEqual(merged.get("period"), 3)
+        self.assertEqual(merged.get("clock"), "1:35")
 
     def test_live_pbp_stats_payload_uses_local_snapshot(self) -> None:
         with TemporaryDirectory() as temp_dir:
