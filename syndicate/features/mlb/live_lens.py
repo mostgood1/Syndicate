@@ -932,11 +932,26 @@ def _card_to_live_lens_row(card: dict[str, Any], *, report_date: str) -> dict[st
 def _cards_backed_live_lens_report(selected_date: str) -> dict[str, Any] | None:
     try:
         cards_context = build_cards_page_context(selected_date, allow_request_daily_ladders_refresh=True)
-    except Exception:
+    except Exception as exc:
+        # TEMPORARY diagnostic (todo.md #128 follow-up) -- remove once the
+        # cards-primary path's worker-side failure mode is confirmed.
+        import traceback
+
+        print(
+            f"[CARDS_BACKED_LIVE_LENS_DIAG] build_cards_page_context raised {type(exc).__name__}: {exc}\n{traceback.format_exc()}",
+            flush=True,
+        )
         return None
 
     cards = cards_context.get("games") if isinstance(cards_context.get("games"), list) else []
     if not cards:
+        # TEMPORARY diagnostic (todo.md #128 follow-up) -- remove once the
+        # cards-primary path's worker-side failure mode is confirmed.
+        print(
+            f"[CARDS_BACKED_LIVE_LENS_DIAG] build_cards_page_context returned no games "
+            f"is_dict={isinstance(cards_context, dict)} keys={sorted(cards_context.keys()) if isinstance(cards_context, dict) else None}",
+            flush=True,
+        )
         return None
 
     report_path = live_lens_report_path(selected_date)
