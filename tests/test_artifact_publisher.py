@@ -184,6 +184,25 @@ class HotArtifactAllowlistTests(unittest.TestCase):
         self.assertFalse(is_hot_artifact_relative_path(f"/{HOT_RELATIVE_PATH}"))
         self.assertFalse(is_hot_artifact_relative_path(f"wnba_source/../../../{HOT_RELATIVE_PATH}"))
 
+    def test_accepts_the_three_live_lens_snapshots_but_rejects_lookalikes(self) -> None:
+        # #124: live-odds-worker's live_lens_loop.py writes these three paths
+        # (data_root()/live/{mlb,nba,wnba}_live_lens.json) every ~60s while
+        # games are live, with real populated liveProps/archivedLiveProps --
+        # they were never allowlisted at all, so the loop's own periodic
+        # publish_changed_hot_artifacts sweep always skipped them
+        # (SKIP_NOT_ALLOWLISTED), and every other service fell back to an
+        # independent recompute that structurally has the same keys but with
+        # zero rows (confirmed live: prop_row_counts=[0]*9 across 9 real live
+        # games on refresh-worker, vs 24/18/16 real rows on web).
+        self.assertTrue(is_hot_artifact_relative_path("live/mlb_live_lens.json"))
+        self.assertTrue(is_hot_artifact_relative_path("live/nba_live_lens.json"))
+        self.assertTrue(is_hot_artifact_relative_path("live/wnba_live_lens.json"))
+        # Not a prefix match -- a same-directory file with a different name,
+        # or the same filename nested a level deeper, must not slip through.
+        self.assertFalse(is_hot_artifact_relative_path("live/mlb_live_lens_backup.json"))
+        self.assertFalse(is_hot_artifact_relative_path("mlb_source/live/mlb_live_lens.json"))
+        self.assertFalse(is_hot_artifact_relative_path("live/nhl_live_lens.json"))
+
 
 class PublishHotArtifactClientTests(unittest.TestCase):
     def test_noop_when_publish_url_not_configured(self) -> None:
@@ -347,19 +366,35 @@ class PullHotArtifactClientTests(unittest.TestCase):
                 with patch("urllib.request.urlopen", return_value=mocked_response) as mocked_urlopen:
                     pull_hot_artifacts(date_str="2026-07-20")
 
-            self.assertEqual(mocked_urlopen.call_count, 2)
+            # 2 date-pattern requests + 3 unconditional live-lens snapshot
+            # fetches (#124: mlb/nba/wnba_live_lens.json carry no date in
+            # their filename at all, so the date-pattern glob above can
+            # never match them -- they're always fetched by exact path
+            # instead, every cycle, regardless of watermark or presence).
+            self.assertEqual(mocked_urlopen.call_count, 5)
             requested_urls = {call.args[0].full_url for call in mocked_urlopen.call_args_list}
+            pattern_urls = {url for url in requested_urls if "pattern=" in url}
+            live_lens_urls = {url for url in requested_urls if "path=live%2F" in url}
             # Every request now carries a since= floor: "no watermark" used to
             # mean an unbounded pull, which is what OOM-looped the worker on
             # 2026-07-25. Assert the pattern scoping, ignore the epoch value.
             self.assertEqual(
-                {url.split("&since=")[0] for url in requested_urls},
+                {url.split("&since=")[0] for url in pattern_urls},
                 {
                     "https://syndicate.onrender.com/api/ops/artifacts/export?pattern=%2A2026-07-20%2A",
                     "https://syndicate.onrender.com/api/ops/artifacts/export?pattern=%2A2026_07_20%2A",
                 },
             )
-            self.assertTrue(all("since=" in url for url in requested_urls))
+            self.assertTrue(all("since=" in url for url in pattern_urls))
+            self.assertEqual(
+                live_lens_urls,
+                {
+                    "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fmlb_live_lens.json",
+                    "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fnba_live_lens.json",
+                    "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fwnba_live_lens.json",
+                },
+            )
+            self.assertTrue(all("since=" not in url for url in live_lens_urls))
 
     def test_date_glob_patterns_cover_both_separator_styles(self) -> None:
         import fnmatch
@@ -470,7 +505,13 @@ class PullHotArtifactClientTests(unittest.TestCase):
             ):
                 with patch("urllib.request.urlopen", return_value=empty_response) as mocked_urlopen:
                     pull_hot_artifacts(date_str="2026-07-24")
-                    first_call_url = mocked_urlopen.call_args.args[0].full_url
+                    # #124: the unconditional live-lens snapshot fetches
+                    # always run last and never carry since=, so pick the
+                    # last date-*pattern* call specifically rather than the
+                    # literal last call overall.
+                    first_call_url = next(
+                        call.args[0].full_url for call in reversed(mocked_urlopen.call_args_list) if "pattern=" in call.args[0].full_url
+                    )
                     # With no watermark the request now carries the bounded
                     # window floor rather than no since= at all. "No
                     # watermark" used to mean an unbounded pull, which is what
@@ -479,7 +520,9 @@ class PullHotArtifactClientTests(unittest.TestCase):
                     first_since = float(first_call_url.split("since=")[1])
 
                     pull_hot_artifacts(date_str="2026-07-24")
-                    second_call_url = mocked_urlopen.call_args.args[0].full_url
+                    second_call_url = next(
+                        call.args[0].full_url for call in reversed(mocked_urlopen.call_args_list) if "pattern=" in call.args[0].full_url
+                    )
                     self.assertIn("since=", second_call_url)
 
     def test_failed_pull_does_not_advance_watermark(self) -> None:
@@ -509,7 +552,12 @@ class PullHotArtifactClientTests(unittest.TestCase):
                     # next pull still has nothing to advance FROM -- it falls
                     # back to the bounded window floor rather than to an
                     # unbounded fetch, which is the whole point of the clamp.
-                    retry_url = mocked_urlopen.call_args.args[0].full_url
+                    # #124: pick the last date-*pattern* call specifically --
+                    # the unconditional live-lens snapshot fetches run last
+                    # and never carry since=.
+                    retry_url = next(
+                        call.args[0].full_url for call in reversed(mocked_urlopen.call_args_list) if "pattern=" in call.args[0].full_url
+                    )
                     self.assertIn("since=", retry_url)
                     from syndicate.features.shared.artifact_publisher import _MAX_PULL_WINDOW_SECONDS
                     import time as _time
@@ -915,17 +963,35 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
                 pull_hot_artifacts(date_str=date_str)
         return [call.args[0].full_url for call in mocked_urlopen.call_args_list]
 
+    # #124: the three live-lens snapshot fetches (mlb/nba/wnba_live_lens.json)
+    # run unconditionally on EVERY pull, regardless of watermark or whether the
+    # file already exists locally -- unlike the missing-artifact repair pass,
+    # they carry no date in their filename at all, so the date-pattern glob
+    # can never match them, and they need to stay fresh every cycle rather
+    # than being fetched once and left stale forever. Every test below has to
+    # account for these three extra `path=` requests alongside whatever the
+    # missing-required-artifact repair pass contributes.
+    _LIVE_LENS_SNAPSHOT_URLS = {
+        "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fmlb_live_lens.json",
+        "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fnba_live_lens.json",
+        "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fwnba_live_lens.json",
+    }
+
     def test_missing_artifact_triggers_one_exact_path_request_per_required_file_with_no_since(self) -> None:
         # #124: daily_top_props and then the locked-policy summary both
         # joined season_betting_day in the required list (all three written
         # once a day; confirmed live that a permanently missing copy of
         # each on refresh-worker is why MLB pregame AND live props never
         # reached candidate generation), so a fully empty data root now
-        # needs three repair requests, not one.
+        # needs three repair requests, not one -- plus the three
+        # always-on live-lens snapshot fetches (see class comment above).
         with TemporaryDirectory() as tmp_dir:
             urls = self._run_pull(tmp_dir, "2026-07-26")
 
-        repair_urls = [url for url in urls if "path=" in url]
+        path_urls = [url for url in urls if "path=" in url]
+        live_lens_urls = [url for url in path_urls if url in self._LIVE_LENS_SNAPSHOT_URLS]
+        repair_urls = [url for url in path_urls if url not in self._LIVE_LENS_SNAPSHOT_URLS]
+        self.assertEqual(set(live_lens_urls), self._LIVE_LENS_SNAPSHOT_URLS, urls)
         self.assertEqual(len(repair_urls), 3, urls)
         # ?path= is the endpoint's single-artifact form: one stat and one read,
         # no glob over the matched set. That is what makes ignoring the
@@ -934,29 +1000,31 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
         self.assertTrue(any("season_betting_day_2026_07_26.json" in url for url in repair_urls), repair_urls)
         self.assertTrue(any("daily_top_props_2026_07_26.json" in url for url in repair_urls), repair_urls)
         self.assertTrue(any("daily_summary_2026_07_26_locked_policy.json" in url for url in repair_urls), repair_urls)
-        for repair_url in repair_urls:
+        for repair_url in path_urls:
             self.assertNotIn("since=", repair_url)
             self.assertNotIn("pattern=", repair_url)
 
     def test_no_repair_request_when_the_artifact_is_already_present(self) -> None:
-        # Costs nothing on a healthy worker.
+        # Costs nothing extra on a healthy worker beyond the always-on
+        # live-lens fetches.
         with TemporaryDirectory() as tmp_dir:
             _write_required_daily_artifact(tmp_dir, "2026-07-26")
             urls = self._run_pull(tmp_dir, "2026-07-26")
 
-        self.assertEqual([url for url in urls if "path=" in url], [])
-        self.assertEqual(len(urls), 2, urls)
+        path_urls = {url for url in urls if "path=" in url}
+        self.assertEqual(path_urls, self._LIVE_LENS_SNAPSHOT_URLS, urls)
+        self.assertEqual(len(urls), 5, urls)
 
     def test_repair_runs_after_the_normal_date_scoped_pull(self) -> None:
         # Ordering matters: the incremental pull may itself supply the file, in
         # which case there is nothing to repair. It also means a repair failure
         # cannot stop the watermark advancing for the pull that did succeed.
+        # 2 date-pattern + 3 missing-required repairs + 3 always-on live-lens.
         with TemporaryDirectory() as tmp_dir:
             urls = self._run_pull(tmp_dir, "2026-07-26")
 
-        self.assertEqual(len(urls), 5, urls)
+        self.assertEqual(len(urls), 8, urls)
         self.assertNotIn("path=", urls[0])
         self.assertNotIn("path=", urls[1])
-        self.assertIn("path=", urls[2])
-        self.assertIn("path=", urls[3])
-        self.assertIn("path=", urls[4])
+        for later_url in urls[2:]:
+            self.assertIn("path=", later_url)

@@ -235,6 +235,33 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # an oversized shard no matter how many refresh cycles ran.
     "*_source/tracking/odds_history/*.json",
     "*_source/artifacts/*/odds_history/*.json",
+    # #124: the actual root cause of MLB live props reading zero everywhere
+    # except web. syndicate/features/shared/live_lens_loop.py runs on
+    # live-odds-worker (per its own header comment: "runs independently ...
+    # in the same process (live-odds-worker)"), builds a real per-game
+    # live-lens snapshot with populated liveProps/archivedLiveProps (a real
+    # in-game Monte Carlo re-sim for MLB), writes it to
+    # data_root()/live/{mlb,nba,wnba}_live_lens.json via write_json_file, and
+    # then calls publish_changed_hot_artifacts EVERY TICK specifically to
+    # push files like this one to web. None of these three paths were ever
+    # in this allowlist, so that periodic push always skipped them
+    # (SKIP_NOT_ALLOWLISTED) -- not a keyvalue-size failure like #43/#112,
+    # just a plain missing entry. Every other service (web serving a direct
+    # page request, refresh-worker's candidate-pool build) has no path to
+    # this data at all and falls back to an independent, thinner recompute
+    # (mlb/live_lens.py's build_live_lens_snapshot_internal) from the lighter
+    # live_lens_report_*.json artifact alone, which structurally carries the
+    # liveProps/archivedLiveProps keys but never actually populates them --
+    # confirmed live: web's own direct recompute had real data (24/18/16
+    # prop rows across 3 games), refresh-worker's had prop_row_counts=[0]*9
+    # across all 9 real live games, unchanged even after fixing two other
+    # once-daily artifact gaps in the same investigation. These paths are
+    # NOT under a "*_source/..." prefix like everything else in this list --
+    # data/live/ is its own top-level tree -- so the pattern has to be
+    # written out per sport rather than reusing the generic prefix.
+    "live/mlb_live_lens.json",
+    "live/nba_live_lens.json",
+    "live/wnba_live_lens.json",
 )
 
 
@@ -643,6 +670,33 @@ def pull_hot_artifacts(*, date_str: str | None = None, timeout_seconds: int = 30
         print(
             f"[artifact_publisher] PULL_REPAIR_MISSING path={relative_path} "
             f"ok={repair_succeeded} written={repair_written}",
+            flush=True,
+        )
+    # #124: the live-lens snapshots (data/live/{mlb,nba,wnba}_live_lens.json,
+    # now allowlisted above) are continuously rewritten -- every ~60s while
+    # games are live -- but carry no date in their filename at all, so
+    # _date_glob_patterns' *2026-07-28*/*2026_07_28* patterns can NEVER match
+    # them; the incremental, date-scoped pull above structurally cannot ever
+    # request them, regardless of watermark freshness. The missing-artifact
+    # repair pass above doesn't fit either: it only fires once, the first
+    # time a path is absent, and then skips forever once ANY copy exists
+    # locally -- exactly wrong for a file that needs to be fresh every
+    # cycle, not merely present once. So these three are fetched
+    # unconditionally, every cycle, via the same cheap single-file ?path=
+    # form (one stat, one read, no since=/pattern= glob over anything else).
+    # Confirmed this is where the actual live MLB prop data lives: web's own
+    # direct-request recompute has real liveProps (24/18/16 rows across 3
+    # live games), while every other service's independent recompute from
+    # the lighter, dated live_lens_report_*.json alone produces the
+    # liveProps/archivedLiveProps keys with zero rows in them.
+    for relative_path in ("live/mlb_live_lens.json", "live/nba_live_lens.json", "live/wnba_live_lens.json"):
+        live_lens_succeeded, live_lens_written = _pull_hot_artifacts_request(
+            _export_url(exact_path=relative_path), token, timeout_seconds=timeout_seconds
+        )
+        written += live_lens_written
+        print(
+            f"[artifact_publisher] PULL_LIVE_LENS_SNAPSHOT path={relative_path} "
+            f"ok={live_lens_succeeded} written={live_lens_written}",
             flush=True,
         )
     return written
