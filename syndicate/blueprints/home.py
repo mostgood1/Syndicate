@@ -5606,6 +5606,17 @@ def _build_sport_overview(
             context_label=context_label,
             home_games=home_games,
         )
+    if slug == "mlb":
+        # TEMPORARY diagnostic (todo.md #124 follow-up), narrower than
+        # MLB_HYDRATION_DIAG below -- pins down whether the drop from
+        # _MLBDataProvider.live_props's real 9 prop-backed games to zero
+        # happens inside _load_home_prop_items/_finalize_home_prop_rows
+        # (this line) or somewhere between here and the hydration filter.
+        print(
+            f"[MLB_LIVE_PROPS_POST_FINALIZE_DIAG] live_prop_items_count={len(live_prop_items)} "
+            f"pregame_prop_items_count={len(pregame_prop_items)}",
+            flush=True,
+        )
     live_href, live_label = _link_lookup_any(links, ["Live Lens", "Live Prop Audit"])
     cards_href, cards_label = _link_lookup_any(links, ["Cards"])
     props_href, props_label = _link_lookup_any(links, ["Props", "Top props", "Prop Ladders", "Pitcher top props", "Hitter top props", "Pitcher ladders", "Hitter ladders"])
