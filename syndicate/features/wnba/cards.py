@@ -4430,39 +4430,6 @@ def _hydrate_live_player_lens_payload(
     return hydrated_payload
 
 
-def _live_oddsapi_period_lines_for_game(selected_date: str, home_tri: str, away_tri: str) -> dict[str, Any] | None:
-    """In-process call into the vendored OddsAPI period-market fetch (#125
-    follow-up). `_fallback_live_lines_game` used to only ever return static
-    game.betting.* lines with period_totals/period_spreads hardcoded to {}
-    -- confirmed live 2026-07-28 via production's own
-    build_live_lines_payload_fallback_return log marker firing on every
-    single request for a genuinely live game, meaning this vendored
-    function (which has real per-period OddsAPI fetch logic, matching
-    #102's already-fixed _live_lens_tick_payload gap) was never reachable
-    from Syndicate's actual production code path at all. Same lazy-import
-    idiom as wnba/live_lens.py's _run_wnba_live_lens_tick, for the same
-    reason (a ~40k-line vendored module, imported lazily to avoid module-
-    load-time side effects and circular imports).
-    """
-    try:
-        from vendor.wnba_betting_repo.app import _live_oddsapi_period_totals_for_game
-    except Exception as exc:
-        # #125 follow-up diagnostic, 2026-07-29: this silent return None was
-        # indistinguishable from "genuinely nothing found" -- confirmed live
-        # the in_progress gate above IS passing (a real game computed
-        # in_progress=True) yet PERIOD_MARKET_DISCOVERY_DIAG (printed inside
-        # the vendored function itself) never appeared in logs, meaning
-        # this import or the call below is failing before ever reaching
-        # that print. Bounded: one print per fallback-game build.
-        print(f"[wnba_cards] LIVE_ODDSAPI_PERIOD_IMPORT_FAILED {type(exc).__name__}: {exc}", flush=True)
-        return None
-    try:
-        return _live_oddsapi_period_totals_for_game(selected_date, home_tri, away_tri)
-    except Exception as exc:
-        print(f"[wnba_cards] LIVE_ODDSAPI_PERIOD_CALL_FAILED {type(exc).__name__}: {exc}", flush=True)
-        return None
-
-
 def _fallback_live_lines_game(
     game: dict[str, Any],
     *,
@@ -4470,39 +4437,33 @@ def _fallback_live_lines_game(
     include_period_totals: bool,
     selected_date: str | None = None,
 ) -> dict[str, Any]:
+    # #125 follow-up, 2026-07-29: this used to call
+    # vendor.wnba_betting_repo.app._live_oddsapi_period_totals_for_game
+    # directly from here -- a live, synchronous, per-request third-party
+    # HTTP call made from a web request handler. That's the same "web does
+    # no heavy compute" violation this session hard-enforced elsewhere
+    # tonight for intelligence compute (request_path_guard.py), just in a
+    # different corner of the codebase -- caught directly by the user
+    # ("are you getting live odds from the live odds worker?"). The correct
+    # mechanism already exists and predates this session:
+    # scripts/refresh_wnba_oddsapi_props.py (its own per-game live-odds
+    # step) already calls this same vendored function on a worker's
+    # schedule and is meant to write real period_totals/period_spreads into
+    # the live_lines snapshot artifact this function's caller
+    # (build_live_lines_payload) reads FIRST, before ever reaching this
+    # fallback. This function's job is a thin, static fallback shaped from
+    # whatever's already on the game object -- not a fetch of its own.
+    # selected_date is kept as a parameter (unused here) since callers
+    # still pass it; removing it would be a wider, unrelated signature
+    # churn for no behavioral gain.
+    del selected_date
     betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
     live_state = _cards_context_live_state_snapshot(game)
-    period_totals: dict[str, Any] = {}
-    period_spreads: dict[str, Any] = {}
-    # #125 follow-up diagnostic, 2026-07-29: settle whether the merge layer
-    # (_merge_live_lines_game, which never touches top-level status/
-    # in_progress/period/clock -- only lines.*) is discarding these fresh
-    # values in favor of a stale primary payload, or whether live_state
-    # itself is coming back wrong from this game object. Bounded: one print
-    # per fallback-game build, not a hot loop.
-    print(
-        f"[wnba_cards] FALLBACK_LIVE_LINES_STATE_DIAG event_id={event_id or game.get('event_id')} "
-        f"raw_live_state={game.get('live_state')!r} computed={live_state!r}",
-        flush=True,
-    )
-    if include_period_totals and selected_date and bool(live_state.get("in_progress")):
-        away_tri = _canonical_wnba_tri(
-            str(game.get("away_tri") or ((game.get("away") or {}).get("abbr") if isinstance(game.get("away"), dict) else "") or "").strip().upper()
-        )
-        home_tri = _canonical_wnba_tri(
-            str(game.get("home_tri") or ((game.get("home") or {}).get("abbr") if isinstance(game.get("home"), dict) else "") or "").strip().upper()
-        )
-        print(
-            f"[wnba_cards] FALLBACK_LIVE_LINES_TRI_DIAG event_id={event_id or game.get('event_id')} "
-            f"away_tri={away_tri!r} home_tri={home_tri!r} raw_away={game.get('away')!r} raw_home={game.get('home')!r} "
-            f"raw_away_tri={game.get('away_tri')!r} raw_home_tri={game.get('home_tri')!r}",
-            flush=True,
-        )
-        if away_tri and home_tri:
-            oddsapi_period = _live_oddsapi_period_lines_for_game(selected_date, home_tri, away_tri)
-            if isinstance(oddsapi_period, dict):
-                period_totals = oddsapi_period.get("period_totals") if isinstance(oddsapi_period.get("period_totals"), dict) else {}
-                period_spreads = oddsapi_period.get("period_spreads") if isinstance(oddsapi_period.get("period_spreads"), dict) else {}
+    period_totals: dict[str, Any] = betting.get("period_totals") if isinstance(betting.get("period_totals"), dict) else {}
+    period_spreads: dict[str, Any] = betting.get("period_spreads") if isinstance(betting.get("period_spreads"), dict) else {}
+    if not include_period_totals:
+        period_totals = {}
+        period_spreads = {}
     return {
         "event_id": event_id or game.get("event_id"),
         "found": True,

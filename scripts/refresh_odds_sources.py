@@ -71,7 +71,19 @@ from syndicate.features.wnba.sources import available_dates as wnba_available_da
 _PUBLISH_MANIFEST_LOCK = Lock()
 
 _DEFAULT_INTERVAL_MARKETS = "h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,totals_h2"
-_WNBA_GAME_MARKETS = "h2h,spreads,totals"
+# #125 follow-up, 2026-07-29: this used to be "h2h,spreads,totals" -- unlike
+# NBA/NCAAB (_effective_markets -> _DEFAULT_INTERVAL_MARKETS above), WNBA's
+# bulk scheduled fetch never requested spreads_h1/totals_h1/spreads_h2/
+# totals_h2 at all, so the "Current half" live-lens segment could never
+# have a real period line from this path -- confirmed live: period_totals/
+# period_spreads came back empty for every WNBA game all night. Brought to
+# parity with NBA/NCAAB's half-period markets; quarter markets are
+# deliberately NOT added here, matching that same precedent (this repo's
+# bulk-refresh cadence doesn't fetch quarter-level odds for any basketball
+# sport, likely a real cost/availability tradeoff, not an oversight -- see
+# #15/#16's OddsAPI budget findings). Quarter-level data still depends on
+# the separate live on-demand fast-path (_live_oddsapi_period_totals_for_game).
+_WNBA_GAME_MARKETS = "h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,totals_h2"
 _WNBA_PLAYER_PROP_MARKETS = "player_points,player_rebounds,player_assists,player_points_rebounds_assists,player_threes,player_steals,player_blocks,player_turnovers,player_points_rebounds,player_points_assists,player_rebounds_assists,player_double_double,player_triple_double"
 # game_odds_{date}.csv / game_cards_{date}.csv are built to parse h2h/spreads/totals
 # rows out of the same per-event snapshot as player props (see
