@@ -172,5 +172,52 @@ class SteamCandidatesForSportTests(unittest.TestCase):
         self.assertTrue(any("Player B" in pick for pick in picks), picks)
 
 
+class SteamMatchupResolutionTests(unittest.TestCase):
+    # #137 follow-up 3: user reported the soccer steam section was
+    # unusable -- every row showed matchup "-", no way to tell which match
+    # a player belonged to. Root cause: soccer's steam events carry a real,
+    # consistent OddsAPI-hash event_id, but dashboard_games (the only
+    # lookup that existed) is single-league-curated and keyed by the sim's
+    # unrelated ESPN-numeric event_id -- the two id spaces never intersect.
+    def test_event_level_home_away_team_wins_over_dashboard_lookup(self) -> None:
+        # odds_refresh_tracking.py now stamps home_team/away_team directly
+        # onto new events for sports whose raw rows carry those columns
+        # (soccer) -- most direct source, should be used before any lookup.
+        event = dict(LIVE_PROP_STEAM_EVENT, sport="soccer", home_team="Inter Miami", away_team="LA Galaxy", game_id="abc123")
+        sport = _sport(slug="soccer")
+        sport["dashboard_games"] = []  # would resolve to "-" if this were consulted
+        with patch("syndicate.features.intelligence._load_steam_events_for_date", return_value=[event]):
+            candidates = _steam_candidates_for_sport(sport)
+        self.assertEqual(len(candidates), 1, candidates)
+        self.assertEqual(candidates[0]["matchup"], "LA Galaxy @ Inter Miami")
+
+    def test_soccer_falls_back_to_the_raw_odds_row_lookup_when_event_has_no_team_names(self) -> None:
+        # Events recorded before the source-side stamp existed have no
+        # home_team/away_team of their own -- soccer specifically can still
+        # resolve them via the raw OddsAPI fetch rows (game_odds_current.csv/
+        # props/<date>.csv), which _soccer_steam_matchup_lookup reads.
+        event = dict(LIVE_PROP_STEAM_EVENT, sport="soccer", game_id="deadbeef")
+        event.pop("home_team", None)
+        event.pop("away_team", None)
+        sport = _sport(slug="soccer")
+        sport["dashboard_games"] = []
+        with patch("syndicate.features.intelligence._load_steam_events_for_date", return_value=[event]), patch(
+            "syndicate.features.intelligence._soccer_steam_matchup_lookup",
+            return_value={"deadbeef": "NYCFC @ Inter Miami"},
+        ):
+            candidates = _steam_candidates_for_sport(sport)
+        self.assertEqual(len(candidates), 1, candidates)
+        self.assertEqual(candidates[0]["matchup"], "NYCFC @ Inter Miami")
+
+    def test_soccer_matchup_lookup_never_raises_when_soccer_sources_unavailable(self) -> None:
+        from syndicate.features.intelligence import _soccer_steam_matchup_lookup
+
+        with patch(
+            "syndicate.features.soccer.sources.active_leagues_for_date",
+            side_effect=RuntimeError("boom"),
+        ):
+            self.assertEqual(_soccer_steam_matchup_lookup("2026-07-29"), {})
+
+
 if __name__ == "__main__":
     unittest.main()

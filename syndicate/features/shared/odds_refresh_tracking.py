@@ -415,6 +415,18 @@ def _market_lifecycle_event(
         "player_name": row.get("player_name") or normalized_entry.get("entity") or row.get("entity") or row.get("player") or None,
         "selection": row.get("selection") or normalized_entry.get("selection") or None,
         "market_type": normalized_entry.get("market_type") or row.get("market_type") or row.get("market") or row.get("selection"),
+        # #137 follow-up: soccer's raw fetch rows (scripts/fetch_soccer_
+        # oddsapi_{odds,props}_local.py) already carry these two columns --
+        # confirmed live: the board's steam-move candidates for soccer
+        # showed a real, consistent OddsAPI event_id but no way to tell
+        # which match it was (that id is an OddsAPI hash, unrelated to the
+        # sim's own ESPN-numeric event_id used elsewhere on the board, so a
+        # dashboard-games lookup by id can never match it). Stamping these
+        # here means every NEW steam event carries a real matchup with no
+        # separate resolver needed; harmless no-op for sports whose rows
+        # don't have these columns.
+        "home_team": row.get("home_team") or normalized_entry.get("home_team"),
+        "away_team": row.get("away_team") or normalized_entry.get("away_team"),
         "event_type": event_type,
         "line": current_line,
         "price": current_odds,

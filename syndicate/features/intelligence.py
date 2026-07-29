@@ -3905,6 +3905,43 @@ def _steam_event_current_odds_text(value: Any) -> str:
     return f"+{int(odds_value)}" if odds_value > 0 else str(int(odds_value))
 
 
+def _soccer_steam_matchup_lookup(selected_date: str) -> dict[str, str]:
+    """event_id -> "Away @ Home" for soccer, built from the raw OddsAPI
+    fetch rows (game_odds_current.csv + today's props/<date>.csv per active
+    league) -- the only place a steam event's real OddsAPI-hash event_id
+    can actually be resolved to team names for events recorded before
+    odds_refresh_tracking.py started stamping home_team/away_team directly.
+    Cheap: a full day across all active leagues is dozens of rows (a single
+    rolling "current odds" file per league), not hundreds. Never raises --
+    game_odds_rows/props_odds_rows already degrade to () on any read
+    failure, matching this whole function's best-effort/cosmetic purpose.
+    """
+    try:
+        from syndicate.features.soccer.sources import active_leagues_for_date, game_odds_rows, props_odds_rows
+    except Exception:
+        return {}
+    lookup: dict[str, str] = {}
+    try:
+        leagues = active_leagues_for_date(selected_date)
+    except Exception:
+        leagues = []
+    for league in leagues:
+        rows: tuple[dict[str, str], ...] = ()
+        try:
+            rows = (*game_odds_rows(league), *props_odds_rows(league, selected_date))
+        except Exception:
+            continue
+        for row in rows:
+            event_id = _safe_text(row.get("event_id"), "")
+            if not event_id or event_id in lookup:
+                continue
+            home = _safe_text(row.get("home_team"), "")
+            away = _safe_text(row.get("away_team"), "")
+            if home or away:
+                lookup[event_id] = f"{away or '-'} @ {home or '-'}"
+    return lookup
+
+
 def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
     """Board candidates built directly from detected steam (sharp/steam line)
     moves, per the user's explicit direction: steam should be a real,
@@ -3931,11 +3968,13 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
     if not events:
         return []
 
-    # Best-effort matchup text -- the raw lifecycle event itself carries no
-    # matchup field at all (_market_lifecycle_event, odds_refresh_tracking.py),
-    # only a game_id. Not required for correctness (the identity-dedup fix
-    # above no longer depends on it), just avoids a universal "-" on every
-    # steam row when the game is one already in today's dashboard slate.
+    # Best-effort matchup text -- the raw lifecycle event itself carried no
+    # matchup field at all before #137's follow-up (odds_refresh_tracking.py
+    # now stamps home_team/away_team directly onto new events for sports
+    # whose CSV rows have those columns), so older events and sports without
+    # them still need a lookup. Not required for correctness (the
+    # identity-dedup fix above no longer depends on it), just avoids a
+    # universal "-" on every steam row.
     matchup_by_game_id: dict[str, str] = {}
     for game in sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []:
         if not isinstance(game, dict):
@@ -3949,6 +3988,18 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
         home_label = _safe_text(home.get("abbr") or home.get("name"), "") or _safe_text(game.get("home_label"), "")
         if away_label or home_label:
             matchup_by_game_id[game_key] = f"{away_label or '-'} @ {home_label or '-'}"
+    # Confirmed live: soccer's steam moves showed a real, consistent
+    # OddsAPI-hash game_id but every one still landed on "-" -- dashboard_games
+    # can't resolve it (single-league-curated, _resolve_league picks exactly
+    # one league/day) AND is keyed by the sim's own ESPN-numeric event_id, a
+    # completely different id space from OddsAPI's hash (same mismatch
+    # documented in soccer/market_board.py). This is the one sport where the
+    # authoritative event_id -> team-name join lives in its own raw fetch
+    # rows, so it gets its own read-time lookup for events recorded before
+    # the source-side stamp above existed.
+    if sport_slug == "soccer":
+        for event_id, matchup_text in _soccer_steam_matchup_lookup(selected_date).items():
+            matchup_by_game_id.setdefault(event_id, matchup_text)
 
     candidates: list[dict[str, Any]] = []
     seen_keys: set[tuple[str, str, str, str, str, str]] = set()
@@ -3980,6 +4031,12 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
         implied_prob = _numeric_hint(event.get("implied_prob"))
         game_id = _safe_text(event.get("game_id"), "")
         timestamp = _safe_text(event.get("timestamp"), "")
+        # Prefer the event's own stamped team names (new events, per the
+        # odds_refresh_tracking.py source-side fix) over the lookup tables
+        # built once above -- most direct, no join needed.
+        event_home = _safe_text(event.get("home_team"), "")
+        event_away = _safe_text(event.get("away_team"), "")
+        matchup_text = f"{event_away or '-'} @ {event_home or '-'}" if (event_home or event_away) else matchup_by_game_id.get(game_id, "-")
         # player_name and selection were previously OR'd into a single slot
         # -- two different players sharing the same selection ("Over")
         # collapsed into one, silently dropping one player's real steam
@@ -4039,7 +4096,7 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
                 "market_key": market_key,
                 "pick": pick_text,
                 "selection": pick_text,
-                "matchup": matchup_by_game_id.get(game_id, "-"),
+                "matchup": matchup_text,
                 "game_id": game_id,
                 "event_id": game_id,
                 "game_pk": _safe_int(game_id),
