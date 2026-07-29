@@ -4140,7 +4140,16 @@ def _read_single_date_response_for_combining(selected_date: str) -> dict[str, An
         if snapshot is not None and isinstance(snapshot.response, dict) and _intelligence_state_candidate_count(snapshot.response) > 0
         else None
     )
-    on_disk = read_json_file(_intelligence_state_daily_paths(selected_date)["state"])
+    # _read_state_payload, not read_json_file directly: on the keyvalue
+    # backend, read_json_file only ever consults the keyvalue store, and
+    # today's state (18.8MB observed) is well over its 8MB write ceiling --
+    # confirmed live via STATE_TOO_LARGE_FOR_KEYVALUE/falling_back_to_artifact
+    # in refresh-worker's own logs the same morning this function's other
+    # bug was fixed. A plain read_json_file here would see nothing at all
+    # for any oversized date, masked until now only because the in-memory
+    # snapshot was (wrongly) never treated as stale. _read_state_payload
+    # already checks both the store and the on-disk artifact file.
+    on_disk = _read_state_payload(_intelligence_state_daily_paths(selected_date)["state"])
     on_disk = on_disk if isinstance(on_disk, dict) and _intelligence_state_candidate_count(on_disk) > 0 else None
 
     if in_memory is None:
