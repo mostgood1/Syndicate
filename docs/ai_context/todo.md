@@ -90,15 +90,75 @@ Last reconciled: 2026-07-28 (see "Reconciliation 2026-07-28").
     (`test_live_lens_payload_refreshes_card_before_game_lens`) is a pre-existing,
     unrelated, run-order-dependent flake confirmed to fail identically against
     unmodified `main` in the same full-file run; not caused by this change.
-    ⚠️ **Not yet deployed or checked against live production** — this session's
-    fix was written and test-verified but not pushed/deployed (8 MLB games were
-    live at investigation time; deploy should wait for a natural gap or explicit
-    go-ahead per this file's standing deploy-caution note). Next session: deploy,
-    then re-run the exact same production check used to diagnose this
-    (`/mlb/api/live-lens` `counts.props` across live games; `/mlb/api/cards` for
-    comparison) to confirm props actually reach the board, and separately confirm
-    the "Live" column shows real per-prop actuals (not the game total) on a real
-    live prop row.
+  - **UPDATE, same session: user asked to commit/push/deploy. Deployed
+    (3 rounds, all three services, commits `11815f8b` → `aa1eec15` →
+    `86fbfc8e`), and production checking after each round found a SECOND,
+    independent, previously-hidden bug that (a)'s fix depended on.**
+    `11815f8b` (the fix above) deployed clean but `/mlb/api/live-lens` still
+    showed `counts.props: 0` across all live games. Pulled the actual
+    persisted worker artifact directly (`/api/ops/artifacts/export`) rather
+    than guessing: it was structurally the raw vendor-MC shape (missing
+    `prop_groups`/`prop_lens`/`market_tiles`/`probable`/`actual_box_panel`/
+    `first1BetSignal`/`score` — fields only `_card_to_live_lens_row` sets),
+    proving `_cards_backed_live_lens_report` was silently returning `None`
+    on live-odds-worker and falling through to the MC-only branch. Added
+    print diagnostics (`[CARDS_BACKED_LIVE_LENS_DIAG]`, `aa1eec15`,
+    **still live, not yet removed**) and redeployed; the very first tick
+    after that deploy logged the real cause:
+    **`_cards_backed_live_lens_report`/`_merge_cards_context_into_report`
+    have called `build_cards_page_context(selected_date,
+    allow_request_daily_ladders_refresh=True)` since these functions were
+    introduced — but the real `build_cards_page_context` (`mlb/cards.py`)
+    only ever accepted `selected_date`, no such kwarg. Every call raised
+    `TypeError`, silently swallowed by a bare `except Exception`, so the
+    cards-fallback path has never actually worked in production, at any
+    point before this session — this predates today's cards-primary change
+    entirely; today's fix just made this dead-on-arrival path load-bearing
+    for the first time, which is what surfaced it.** Every existing test
+    mocked `build_cards_page_context` with a signature that accepted the
+    bogus kwarg, which is exactly how this stayed hidden for however long
+    it's been broken. Fixed both call sites, fixed the two test mocks to
+    match the real signature, and added
+    `test_cards_backed_live_lens_report_calls_real_build_cards_page_context_signature`
+    (`tests/test_mlb_refresh_runner.py`) which uses `inspect.signature` on
+    the REAL function instead of a hand-written mock, specifically so this
+    class of drift can't hide again. Deployed as `86fbfc8e`.
+  - ⚠️ **Still not fully fixed after all three deploys — one more layer
+    confirmed, not yet resolved.** Post-`86fbfc8e`, the persisted worker
+    report now has the CORRECT card-based shape (all the
+    `_card_to_live_lens_row` fields present, confirming the TypeError fix
+    landed and cards-primary is genuinely running) but `liveProps` is still
+    empty, and `build_cards_page_context`'s own `source_title` came back
+    `"MLB cards unavailable"` (`mlb/cards.py:5058`, gated on `summary and
+    games` — `games` is provably non-empty here, so `summary` must be
+    falsy). That `summary` traces to `daily_artifact_path(selected_date,
+    suffix="_locked_policy")` → `daily_summary_<date>_locked_policy.json`,
+    which per **#124 item 3** already feeds
+    `markets.{pitcher,hitter,extraPitcher,extraHitter}Props` specifically —
+    confirmed present on **web's** disk via `/api/ops/artifacts/export`
+    (count 1), but that only proves web has it, not live-odds-worker (no
+    endpoint exposes worker's own disk contents directly). Leading
+    hypothesis, not yet confirmed: live-odds-worker's `pull_hot_artifacts`
+    call pulls a narrower artifact set than web/refresh-worker (focused on
+    live odds, not the full daily betting-card summary), so this file
+    genuinely never reaches its disk even though #124 item 3's repair fixed
+    the *transport allowlist* gap, not necessarily *which service* asks for
+    it. **Deliberately stopped debugging live here** rather than keep
+    redeploying during an active MLB slate (3 rounds of deploys already
+    killed/re-triggered the same scoped fingerprint-change resim multiple
+    times tonight, each time with explicit user go-ahead). **Next session**:
+    (1) confirm whether live-odds-worker's `pull_hot_artifacts`/hot-artifact
+    fetch list includes `daily_summary_*_locked_policy.json` at all — if
+    not, that's the real remaining fix, same shape as #124 items 2/3 but for
+    a different consuming service; (2) once confirmed fixed, re-run this
+    session's exact check (`/mlb/api/live-lens` `counts.props` across live
+    games, cross-referenced against `/mlb/api/cards`) to close this out;
+    (3) remove the `[CARDS_BACKED_LIVE_LENS_DIAG]` prints once confirmed
+    fixed and stable; (4) the frontend "Live" column fix
+    (`intelligence.html`'s `displayLiveProjection`) IS confirmed correct
+    and deployed — no longer falls back to the game's live total for props
+    — but hasn't been visually confirmed against a real populated live prop
+    row yet since props still aren't reaching the board.
 
 Conventions:
 - IDs are stable and never reused. New work appends at the next free number.
