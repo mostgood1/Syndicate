@@ -98,6 +98,13 @@ def _write_required_daily_artifact(data_root: str, date_str: str) -> Path:
     wnba_processed_dir.mkdir(parents=True, exist_ok=True)
     (wnba_processed_dir / f"recommendations_slate_{date_str}.json").write_text(json.dumps({}), encoding="utf-8")
     (wnba_processed_dir / f"props_recommendations_{date_str}.csv").write_text("", encoding="utf-8")
+
+    from syndicate.features.soccer.sources import active_leagues_for_date, default_season
+
+    for league in active_leagues_for_date(date_str):
+        schedule_dir = Path(data_root) / "soccer_source" / league / "api" / "schedule"
+        schedule_dir.mkdir(parents=True, exist_ok=True)
+        (schedule_dir / f"schedule_{default_season(league)}.json").write_text(json.dumps({"weeks": [], "matches": []}), encoding="utf-8")
     return target
 
 
@@ -1024,7 +1031,11 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
         # recommendations_slate + props_recommendations, so a fully empty
         # data root now needs six repair requests, not four -- plus the
         # three always-on live-lens snapshot fetches (see class comment
-        # above).
+        # above). A later same-night fix (chasing why soccer's steam-move
+        # board candidates couldn't resolve a real matchup) added soccer's
+        # once-a-season schedule artifact, scoped to whichever leagues are
+        # actually in season for this date -- July means only MLS, so one
+        # more repair request, seven total.
         with TemporaryDirectory() as tmp_dir:
             urls = self._run_pull(tmp_dir, "2026-07-26")
 
@@ -1032,7 +1043,7 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
         live_lens_urls = [url for url in path_urls if url in self._LIVE_LENS_SNAPSHOT_URLS]
         repair_urls = [url for url in path_urls if url not in self._LIVE_LENS_SNAPSHOT_URLS]
         self.assertEqual(set(live_lens_urls), self._LIVE_LENS_SNAPSHOT_URLS, urls)
-        self.assertEqual(len(repair_urls), 6, urls)
+        self.assertEqual(len(repair_urls), 7, urls)
         # ?path= is the endpoint's single-artifact form: one stat and one read,
         # no glob over the matched set. That is what makes ignoring the
         # watermark safe here -- the ceiling exists to bound response SIZE, and
@@ -1045,6 +1056,7 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
         )
         self.assertTrue(any("recommendations_slate_2026-07-26.json" in url for url in repair_urls), repair_urls)
         self.assertTrue(any("props_recommendations_2026-07-26.csv" in url for url in repair_urls), repair_urls)
+        self.assertTrue(any("mls" in url and "schedule_" in url for url in repair_urls), repair_urls)
         for repair_url in path_urls:
             self.assertNotIn("since=", repair_url)
             self.assertNotIn("pattern=", repair_url)
@@ -1064,11 +1076,11 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
         # Ordering matters: the incremental pull may itself supply the file, in
         # which case there is nothing to repair. It also means a repair failure
         # cannot stop the watermark advancing for the pull that did succeed.
-        # 2 date-pattern + 6 missing-required repairs + 3 always-on live-lens.
+        # 2 date-pattern + 7 missing-required repairs + 3 always-on live-lens.
         with TemporaryDirectory() as tmp_dir:
             urls = self._run_pull(tmp_dir, "2026-07-26")
 
-        self.assertEqual(len(urls), 11, urls)
+        self.assertEqual(len(urls), 12, urls)
         self.assertNotIn("path=", urls[0])
         self.assertNotIn("path=", urls[1])
         for later_url in urls[2:]:

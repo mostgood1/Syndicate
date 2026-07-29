@@ -814,6 +814,35 @@ def _required_daily_artifact_paths(date_str: str) -> list[Path]:
         paths.append(_wnba_processed_path_or_default(f"props_recommendations_{selected}.csv"))
     except Exception:
         pass
+    try:
+        # Same class of gap again, found chasing why soccer's steam-move
+        # board candidates couldn't resolve a real matchup: confirmed live
+        # 2026-07-29 that refresh-worker's own overview build reported
+        # dashboard_games_count=0 for soccer on every cycle (both today and
+        # tomorrow), while web's own /soccer/mls/api/cards correctly showed
+        # 16 real games -- refresh-worker never had a usable copy of the
+        # per-league season schedule at all. schedule_<season>.json is a
+        # once-a-season artifact (week_matches/schedule_payload,
+        # syndicate/features/soccer/sources.py), already allowlisted for
+        # the normal incremental pull ("soccer_source/*/api/schedule/
+        # schedule_*.json" in HOT_ARTIFACT_PATTERNS above), but a
+        # since=-scoped pull can never repair a copy that never arrived in
+        # the first place -- same shape as every entry above. Scoped to
+        # only the leagues actually in season for this date (soccer tracks
+        # 10 leagues; most of the year only 1-3 are active), so this stays
+        # a handful of small requests, not ten.
+        from syndicate.features.soccer.sources import active_leagues_for_date
+        from syndicate.features.soccer.sources import default_season
+        from syndicate.features.soccer.sources import schedule_path
+
+        selected = str(date_str).strip()
+        for league in active_leagues_for_date(selected):
+            try:
+                paths.append(schedule_path(league, default_season(league)))
+            except Exception:
+                continue
+    except Exception:
+        pass
     return paths
 
 
