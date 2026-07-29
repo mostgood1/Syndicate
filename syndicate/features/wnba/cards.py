@@ -4411,24 +4411,70 @@ def _hydrate_live_player_lens_payload(
     return hydrated_payload
 
 
+def _live_oddsapi_period_lines_for_game(selected_date: str, home_tri: str, away_tri: str) -> dict[str, Any] | None:
+    """In-process call into the vendored OddsAPI period-market fetch (#125
+    follow-up). `_fallback_live_lines_game` used to only ever return static
+    game.betting.* lines with period_totals/period_spreads hardcoded to {}
+    -- confirmed live 2026-07-28 via production's own
+    build_live_lines_payload_fallback_return log marker firing on every
+    single request for a genuinely live game, meaning this vendored
+    function (which has real per-period OddsAPI fetch logic, matching
+    #102's already-fixed _live_lens_tick_payload gap) was never reachable
+    from Syndicate's actual production code path at all. Same lazy-import
+    idiom as wnba/live_lens.py's _run_wnba_live_lens_tick, for the same
+    reason (a ~40k-line vendored module, imported lazily to avoid module-
+    load-time side effects and circular imports).
+    """
+    try:
+        from vendor.wnba_betting_repo.app import _live_oddsapi_period_totals_for_game
+    except Exception:
+        return None
+    try:
+        return _live_oddsapi_period_totals_for_game(selected_date, home_tri, away_tri)
+    except Exception:
+        return None
+
+
 def _fallback_live_lines_game(
     game: dict[str, Any],
     *,
     event_id: str | None = None,
     include_period_totals: bool,
+    selected_date: str | None = None,
 ) -> dict[str, Any]:
     betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
+    live_state = _cards_context_live_state_snapshot(game)
+    period_totals: dict[str, Any] = {}
+    period_spreads: dict[str, Any] = {}
+    if include_period_totals and selected_date and bool(live_state.get("in_progress")):
+        away_tri = _canonical_wnba_tri(
+            str(game.get("away_tri") or ((game.get("away") or {}).get("abbr") if isinstance(game.get("away"), dict) else "") or "").strip().upper()
+        )
+        home_tri = _canonical_wnba_tri(
+            str(game.get("home_tri") or ((game.get("home") or {}).get("abbr") if isinstance(game.get("home"), dict) else "") or "").strip().upper()
+        )
+        if away_tri and home_tri:
+            oddsapi_period = _live_oddsapi_period_lines_for_game(selected_date, home_tri, away_tri)
+            if isinstance(oddsapi_period, dict):
+                period_totals = oddsapi_period.get("period_totals") if isinstance(oddsapi_period.get("period_totals"), dict) else {}
+                period_spreads = oddsapi_period.get("period_spreads") if isinstance(oddsapi_period.get("period_spreads"), dict) else {}
     return {
         "event_id": event_id or game.get("event_id"),
         "found": True,
+        "status": live_state.get("status"),
+        "detail": live_state.get("status"),
+        "period": live_state.get("period"),
+        "clock": live_state.get("clock"),
+        "in_progress": bool(live_state.get("in_progress")),
+        "final": bool(live_state.get("final")),
         "lines": {
             "total": _safe_float(betting.get("total")),
             "home_spread": _safe_float(betting.get("home_spread")),
             "away_spread": _safe_float(betting.get("away_spread")),
             "home_ml": _safe_float(betting.get("home_ml")),
             "away_ml": _safe_float(betting.get("away_ml")),
-            "period_totals": {} if include_period_totals else {},
-            "period_spreads": {},
+            "period_totals": period_totals,
+            "period_spreads": period_spreads,
         },
     }
 
@@ -5205,7 +5251,7 @@ def build_live_lines_payload(
 
     game_index = _resolve_games_for_event_ids(resolved_date, normalized_event_ids)
     fallback_games = [
-        _fallback_live_lines_game(game, event_id=event_id, include_period_totals=bool(include_period_totals))
+        _fallback_live_lines_game(game, event_id=event_id, include_period_totals=bool(include_period_totals), selected_date=resolved_date)
         for event_id in normalized_event_ids
         for game in [game_index.get(event_id)]
         if isinstance(game, dict)

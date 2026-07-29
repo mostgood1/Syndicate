@@ -203,6 +203,61 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
             self.assertEqual([game.get("event_id") for game in payload.get("games") or []], ["evt-2"])
             self.assertEqual(((stored_payload.get("payload") or {}).get("games") or [{}])[0].get("total"), 159.5)
 
+    def test_live_lines_fallback_fetches_real_period_totals_for_a_live_game(self) -> None:
+        # #125 follow-up: _fallback_live_lines_game used to hardcode
+        # period_totals/period_spreads to {} unconditionally and never
+        # attempt a real fetch -- confirmed live 2026-07-28 that production
+        # landed on this exact fallback branch on every request for a
+        # genuinely in-progress game, with the vendored function that DOES
+        # have real per-period OddsAPI fetch logic
+        # (_live_oddsapi_period_totals_for_game) unreachable from this code
+        # path at all (same class of gap #102 already fixed for the
+        # separate live-lens-tick pipeline). This pins the fix: a live game
+        # with no local/artifact coverage now calls into the real fetch and
+        # surfaces genuine in_progress/period_totals, not silent {}/False.
+        with TemporaryDirectory() as temp_dir:
+            processed_root = Path(temp_dir) / "data" / "processed"
+            processed_root.mkdir(parents=True, exist_ok=True)
+
+            with patch("syndicate.features.wnba.cards.processed_root", return_value=processed_root), patch(
+                "syndicate.features.wnba.cards.central_today_iso",
+                return_value="2026-05-21",
+            ), patch(
+                "syndicate.features.wnba.cards.build_cards_page_context",
+                return_value={"date": "2026-05-21"},
+            ), patch(
+                "syndicate.features.wnba.cards._filtered_local_live_snapshot_payload",
+                return_value=None,
+            ), patch(
+                "syndicate.features.wnba.cards._artifact_live_lines_payload",
+                return_value=None,
+            ), patch(
+                "syndicate.features.wnba.cards._resolve_games_for_event_ids",
+                return_value={
+                    "evt-2": {
+                        "event_id": "evt-2",
+                        "away_tri": "NYL",
+                        "home_tri": "LAS",
+                        "away": {"abbr": "NYL", "score": 81},
+                        "home": {"abbr": "LAS", "score": 79},
+                        "live_state": {"status": "Live", "detail": "3:27 - 4th", "in_progress": True, "final": False},
+                        "betting": {"total": 166.5},
+                    }
+                },
+            ), patch(
+                "syndicate.features.wnba.cards._live_oddsapi_period_lines_for_game",
+                return_value={"period_totals": {"h1": 82.5, "q4": 21.5}, "period_spreads": {"h1": -3.5}},
+            ) as mocked_fetch:
+                _local_live_snapshot_payload.cache_clear()
+                payload = build_live_lines_payload("2026-05-21", ["evt-2"], ttl=20, include_period_totals=True)
+                _local_live_snapshot_payload.cache_clear()
+
+        mocked_fetch.assert_called_once_with("2026-05-21", "LAS", "NYL")
+        game = (payload.get("games") or [{}])[0]
+        self.assertTrue(game.get("in_progress"))
+        self.assertEqual(game.get("lines", {}).get("period_totals"), {"h1": 82.5, "q4": 21.5})
+        self.assertEqual(game.get("lines", {}).get("period_spreads"), {"h1": -3.5})
+
     def test_live_pbp_stats_payload_uses_local_snapshot(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
