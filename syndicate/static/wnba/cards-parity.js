@@ -3402,7 +3402,16 @@
       const gameItems = safeArray(game?.rows)
         .filter((row) => row && row.player && row.team_tri)
         .filter((row) => row.line_source && row.line_source !== 'model')
-        .filter((row) => !isSyntheticLiveLineSource(row?.line_source))
+        // #125 follow-up, 2026-07-29: this used to exclude every row whose
+        // line_source is box-score/sim-estimated (isSyntheticLiveLineSource)
+        // entirely -- confirmed live, EVERY row for a genuinely in-progress
+        // WNBA game had this line_source, so the "Live opportunities" bucket
+        // came back completely empty and the whole panel silently fell back
+        // to showing pregame recommendations with no live total at all. User
+        // wants a live total shown even when it's estimated (badged as such)
+        // rather than hidden outright -- these rows are still included now,
+        // just tagged so rendering can show an "Est." indicator instead of
+        // treating them as a real freshly-priced market update.
         .filter((row) => row.live_projection != null || row.liveProjection != null || row.live_edge != null || row.liveEdge != null || row.pace_proj != null || row.sim_mu_adjusted != null || row.sim_mu != null || row.ev_side || row.lean)
         .map((row) => {
           try {
@@ -3441,6 +3450,7 @@
               live_rank_probability: row?.live_rank_probability,
               klass: row?.klass,
               line_source: row?.line_source,
+              estimated: isSyntheticLiveLineSource(row?.line_source),
               status_label: status?.final ? 'Final' : (status?.in_progress ? `Q${status?.period || '-'} ${status?.clock || ''}`.trim() : 'Live'),
               actual: row?.actual,
               live_projection: projection,
@@ -4012,6 +4022,11 @@
       statusLabel,
       item?.lens_profile === 'playoffs' ? 'Playoff lens' : (item?.lens_profile === 'regular_season' ? 'Regular lens' : ''),
       lineSource && !syntheticLineSource ? (lineSource === 'oddsapi' ? 'Live OddsAPI' : titleCase(lineSource)) : '',
+      // #125 follow-up: these rows used to be filtered out entirely rather
+      // than reaching this point at all -- now that they're included, tag
+      // them explicitly so the UI is honest that this total is a box-score/
+      // sim estimate, not a freshly re-priced market line.
+      syntheticLineSource ? 'Estimated' : '',
       Number.isFinite(Number(item?.pregame_stat_multiplier)) && Math.abs(Number(item?.pregame_stat_multiplier) - 1) >= 0.01 ? 'Adjusted prior' : '',
     ].filter(Boolean);
     return {
@@ -4041,6 +4056,7 @@
       actionLabel: klass || 'LIVE',
       statusLabel,
       lineSource: item?.line_source,
+      estimated: syntheticLineSource,
       actual: Number.isFinite(Number(item?.actual)) ? Number(item?.actual) : null,
       liveProjection: Number.isFinite(projection) ? projection : null,
       liveEdge: Number.isFinite(liveEdge) ? liveEdge : null,
