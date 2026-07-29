@@ -232,6 +232,13 @@ def _run_live_lens_tick_for_sport(sport: str, date_str: str) -> dict[str, Any]:
 				meta["skipped"] = True
 				meta["reason"] = "low_headroom"
 				meta["memoryHeadroom"] = headroom_snapshot
+				# TEMPORARY diagnostic (todo.md #124 follow-up) -- the third
+				# ok=False path, missed by the first pass of this diagnostic
+				# (which only covered the exception and invalid_snapshot
+				# branches, neither of which fired even once across 12
+				# measured failing ticks). print, not logger.info. Remove
+				# once the actual failure mode is confirmed.
+				print(f"[LIVE_LENS_TICK_DIAG] sport={sport} ok=False reason=low_headroom headroom={headroom_snapshot}", flush=True)
 				return meta
 		builder = _LIVE_LENS_BUILDERS[sport]
 		validator = _LIVE_LENS_VALIDATORS[sport]
