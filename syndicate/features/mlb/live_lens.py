@@ -1185,11 +1185,49 @@ def read_latest_live_lens_snapshot() -> dict[str, Any] | None:
     return dict(snapshot) if isinstance(snapshot, dict) else None
 
 
+def _snapshot_generated_at_age_seconds(snapshot: dict[str, Any] | None) -> float | None:
+    generated_at = str((snapshot or {}).get("generatedAt") or "").strip()
+    if not generated_at:
+        return None
+    try:
+        parsed = datetime.fromisoformat(generated_at)
+    except Exception:
+        return None
+    try:
+        now = datetime.now(parsed.tzinfo) if parsed.tzinfo is not None else datetime.now()
+        return max(0.0, (now - parsed).total_seconds())
+    except Exception:
+        return None
+
+
 def _live_lens_snapshot_needs_refresh(selected_date: str, snapshot: dict[str, Any] | None) -> bool:
     if str(selected_date).strip() != datetime.now().astimezone().date().isoformat():
         return False
     if not bool(_snapshot_games(snapshot or {})):
         return True
+    # 2026-07-29 (#124): this used to defer to _live_lens_report_needs_refresh
+    # unconditionally, but that measures the REPORT FILE's own mtime on THIS
+    # process's disk (reset every time pull_hot_artifacts re-fetches it), not
+    # when the snapshot's own content was actually generated. With a 60s
+    # max-age tighter than a refresh-worker candidate-pool cycle (measured
+    # 60-90s+), that check evaluated stale on nearly every cycle, discarding
+    # a snapshot that had just been read fresh from the shared keyvalue store
+    # (written by live-odds-worker's dedicated live-lens loop, with real
+    # liveProps) and replacing it with a from-scratch local recompute that
+    # structurally carries the same liveProps/archivedLiveProps keys but
+    # never actually populates them -- confirmed live: refresh-worker's
+    # recompute had prop_row_counts=[0]*9 across 9 real live games while
+    # web's own snapshot had 24/18/16 real rows for 3 of them, unchanged
+    # even after fixing two other artifact-distribution gaps in the same
+    # investigation. Trust the already-read snapshot's own generatedAt when
+    # present -- it reflects when the actual source of truth (live-odds-
+    # worker) generated it, not an unrelated file's local pull history --
+    # and only fall back to the report-file proxy when the snapshot doesn't
+    # carry one at all (e.g. an old cached shape from before this field
+    # existed).
+    content_age_seconds = _snapshot_generated_at_age_seconds(snapshot)
+    if content_age_seconds is not None:
+        return content_age_seconds > float(_live_lens_report_max_age_seconds())
     return _live_lens_report_needs_refresh(selected_date)
 
 
