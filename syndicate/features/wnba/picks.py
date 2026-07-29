@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from syndicate.features.shared.rank_board import build_rank_page_context
@@ -18,7 +19,34 @@ def _summary_for_date(selected_date: str) -> dict[str, Any]:
     return summary if isinstance(summary, dict) else {}
 
 
+_SELECTION_LINE_RE = re.compile(r"(-?\d+(?:\.\d+)?)\s*$")
+
+
+def _line_from_selection(pick: dict[str, Any]) -> float | None:
+    # recommendations_slate rows carry a real projection but no separate
+    # structured "line" field -- the line is only ever embedded as trailing
+    # text in "selection"/"display_pick" (e.g. "OVER 1.5", "Gabby Williams
+    # OVER 1.5"). Confirmed live 2026-07-29: with no "Line" metric here,
+    # _prop_item_from_rank_card's _metric_value(metrics, ["line", ...]) scan
+    # always came back empty, so every WNBA board candidate sourced through
+    # this rank-card path showed no line, no projection, and (since movement
+    # history is keyed off having a real line to match against) no line
+    # movement either -- confirmed via the board API, not inferred.
+    for source in (pick.get("selection"), pick.get("display_pick")):
+        text = str(source or "").strip()
+        if not text:
+            continue
+        match = _SELECTION_LINE_RE.search(text)
+        if match:
+            try:
+                return float(match.group(1))
+            except ValueError:
+                continue
+    return None
+
+
 def _card_from_pick(game: dict[str, Any], pick: dict[str, Any]) -> dict[str, Any]:
+    line_value = _line_from_selection(pick)
     return {
         "title": str(pick.get("display_pick") or "WNBA pick").strip() or "WNBA pick",
         "eyebrow": str(pick.get("team") or pick.get("market") or "WNBA picks").strip() or "WNBA picks",
@@ -38,6 +66,13 @@ def _card_from_pick(game: dict[str, Any], pick: dict[str, Any]) -> dict[str, Any
             {"label": "EV", "value": f"{format_num(pick.get('ev_pct'))}%"},
             {"label": "Price", "value": format_moneyline(pick.get("price"))},
             {"label": "Score", "value": format_num(pick.get("score"))},
+            # Added: _prop_item_from_rank_card (home.py) scans metrics for
+            # "projected"/"line" labels specifically -- these were never here,
+            # so every rank-card-sourced WNBA candidate showed no projection
+            # and no line (and, downstream, no line movement) regardless of
+            # the real projection/line data present one level up in `pick`.
+            {"label": "Projected", "value": format_num(pick.get("projection") if pick.get("projection") is not None else pick.get("projected"))},
+            {"label": "Line", "value": format_num(line_value) if line_value is not None else "-"},
         ],
         "summary": str(pick.get("basketball_summary") or pick.get("display_pick") or "No summary available.").strip(),
         "list_items": [
