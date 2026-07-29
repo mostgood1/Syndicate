@@ -3934,8 +3934,27 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
     if not events:
         return []
 
+    # Best-effort matchup text -- the raw lifecycle event itself carries no
+    # matchup field at all (_market_lifecycle_event, odds_refresh_tracking.py),
+    # only a game_id. Not required for correctness (the identity-dedup fix
+    # above no longer depends on it), just avoids a universal "-" on every
+    # steam row when the game is one already in today's dashboard slate.
+    matchup_by_game_id: dict[str, str] = {}
+    for game in sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []:
+        if not isinstance(game, dict):
+            continue
+        game_key = _safe_text(game.get("gamePk") or game.get("game_id") or game.get("event_id"), "")
+        if not game_key:
+            continue
+        away = game.get("away") if isinstance(game.get("away"), dict) else {}
+        home = game.get("home") if isinstance(game.get("home"), dict) else {}
+        away_label = _safe_text(away.get("abbr") or away.get("name"), "") or _safe_text(game.get("away_label"), "")
+        home_label = _safe_text(home.get("abbr") or home.get("name"), "") or _safe_text(game.get("home_label"), "")
+        if away_label or home_label:
+            matchup_by_game_id[game_key] = f"{away_label or '-'} @ {home_label or '-'}"
+
     candidates: list[dict[str, Any]] = []
-    seen_keys: set[tuple[str, str, str, str, str]] = set()
+    seen_keys: set[tuple[str, str, str, str, str, str]] = set()
     for event in events:
         if _safe_text(event.get("sport"), "").lower() != sport_slug:
             continue
@@ -3965,12 +3984,33 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
         implied_prob = _numeric_hint(event.get("implied_prob"))
         game_id = _safe_text(event.get("game_id"), "")
         timestamp = _safe_text(event.get("timestamp"), "")
-        dedupe_key = (sport_slug, game_id, market_type, selection or player_name, timestamp)
+        # player_name and selection were previously OR'd into a single slot
+        # -- two different players sharing the same selection ("Over")
+        # collapsed into one, silently dropping one player's real steam
+        # event before it ever became a candidate.
+        dedupe_key = (sport_slug, game_id, market_type, player_name, selection, timestamp)
         if dedupe_key in seen_keys:
             continue
         seen_keys.add(dedupe_key)
 
-        pick_text = f"{selection} {current_line:.1f}".strip() if selection and current_line is not None else (selection or f"{subject} steam move")
+        # #137 follow-up, confirmed live: candidates were generating and
+        # surviving scoring (INTEL_TRACE showed steam counts intact through
+        # candidate_scoring) but never reaching the final board. Root cause:
+        # _collect_candidates' identity-dedup tuple is (candidate_type,
+        # sport_slug, matchup, market, pick[, game_identity]) -- matchup was
+        # always "-" here (no per-game text resolvable from a raw lifecycle
+        # event) and pick was a bare "Over 4.5" with no subject, so any two
+        # DIFFERENT players/teams sharing the same market+line+selection
+        # (common -- "Over 4.5" recurs constantly) collided on identity and
+        # all but the highest-scored one were silently dropped as
+        # duplicates, even when game_identity (from game_id) also differed.
+        # Baking subject into pick makes the tuple genuinely unique per
+        # steam event without needing a real matchup string.
+        pick_text = (
+            f"{subject} {selection} {current_line:.1f}".strip()
+            if selection and current_line is not None
+            else f"{subject} {selection}".strip() if selection else f"{subject} steam move"
+        )
         odds_text = _steam_event_current_odds_text(current_price)
         line_direction = "up" if (line_delta or 0.0) > 0 else "down" if (line_delta or 0.0) < 0 else "flat"
         price_direction = "up" if (odds_delta or 0.0) > 0 else "down" if (odds_delta or 0.0) < 0 else "flat"
@@ -4003,7 +4043,7 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
                 "market_key": market_key,
                 "pick": pick_text,
                 "selection": pick_text,
-                "matchup": _safe_text(event.get("matchup"), "-"),
+                "matchup": matchup_by_game_id.get(game_id, "-"),
                 "game_id": game_id,
                 "event_id": game_id,
                 "game_pk": _safe_int(game_id),

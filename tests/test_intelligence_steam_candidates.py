@@ -138,6 +138,39 @@ class SteamCandidatesForSportTests(unittest.TestCase):
         with patch("syndicate.features.intelligence._load_steam_events_for_date", return_value=[]):
             self.assertEqual(_steam_candidates_for_sport(_sport()), [])
 
+    def test_different_players_same_market_line_selection_get_distinct_picks(self) -> None:
+        # Confirmed live 2026-07-29: candidates were generating and surviving
+        # candidate_scoring (INTEL_TRACE showed real counts intact) but never
+        # reached the final board. Root cause: _collect_candidates' identity
+        # dedup tuple is (candidate_type, sport_slug, matchup, market, pick[,
+        # game_identity]) -- with no per-game matchup resolvable from a raw
+        # steam event and no game_id on many real events, two DIFFERENT
+        # players sharing the same generic "Over 4.5" pick text collided on
+        # identity and all but the highest-scored one were silently dropped.
+        # Regression: pick must be unique per subject even with identical
+        # market/line/selection and no game_id -- this test constructs
+        # exactly that collision shape and asserts it no longer collides.
+        event_a = dict(LIVE_PROP_STEAM_EVENT, player_name="Player A", game_id=None)
+        event_b = dict(LIVE_PROP_STEAM_EVENT, player_name="Player B", game_id=None)
+        with patch(
+            "syndicate.features.intelligence._load_steam_events_for_date",
+            return_value=[event_a, event_b],
+        ):
+            candidates = _steam_candidates_for_sport(_sport())
+
+        self.assertEqual(len(candidates), 2, candidates)
+        picks = {c["pick"] for c in candidates}
+        matchups = {c["matchup"] for c in candidates}
+        markets = {c["market"] for c in candidates}
+        # The actual identity-dedup collision shape: matchup and market
+        # identical (both "-" / same market text) -- pick is the only field
+        # that can disambiguate without a real game_id, so it must differ.
+        self.assertEqual(len(matchups), 1, candidates)
+        self.assertEqual(len(markets), 1, candidates)
+        self.assertEqual(len(picks), 2, picks)
+        self.assertTrue(any("Player A" in pick for pick in picks), picks)
+        self.assertTrue(any("Player B" in pick for pick in picks), picks)
+
 
 if __name__ == "__main__":
     unittest.main()
