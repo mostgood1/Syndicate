@@ -4446,11 +4446,20 @@ def _live_oddsapi_period_lines_for_game(selected_date: str, home_tri: str, away_
     """
     try:
         from vendor.wnba_betting_repo.app import _live_oddsapi_period_totals_for_game
-    except Exception:
+    except Exception as exc:
+        # #125 follow-up diagnostic, 2026-07-29: this silent return None was
+        # indistinguishable from "genuinely nothing found" -- confirmed live
+        # the in_progress gate above IS passing (a real game computed
+        # in_progress=True) yet PERIOD_MARKET_DISCOVERY_DIAG (printed inside
+        # the vendored function itself) never appeared in logs, meaning
+        # this import or the call below is failing before ever reaching
+        # that print. Bounded: one print per fallback-game build.
+        print(f"[wnba_cards] LIVE_ODDSAPI_PERIOD_IMPORT_FAILED {type(exc).__name__}: {exc}", flush=True)
         return None
     try:
         return _live_oddsapi_period_totals_for_game(selected_date, home_tri, away_tri)
-    except Exception:
+    except Exception as exc:
+        print(f"[wnba_cards] LIVE_ODDSAPI_PERIOD_CALL_FAILED {type(exc).__name__}: {exc}", flush=True)
         return None
 
 
@@ -4482,6 +4491,12 @@ def _fallback_live_lines_game(
         )
         home_tri = _canonical_wnba_tri(
             str(game.get("home_tri") or ((game.get("home") or {}).get("abbr") if isinstance(game.get("home"), dict) else "") or "").strip().upper()
+        )
+        print(
+            f"[wnba_cards] FALLBACK_LIVE_LINES_TRI_DIAG event_id={event_id or game.get('event_id')} "
+            f"away_tri={away_tri!r} home_tri={home_tri!r} raw_away={game.get('away')!r} raw_home={game.get('home')!r} "
+            f"raw_away_tri={game.get('away_tri')!r} raw_home_tri={game.get('home_tri')!r}",
+            flush=True,
         )
         if away_tri and home_tri:
             oddsapi_period = _live_oddsapi_period_lines_for_game(selected_date, home_tri, away_tri)
