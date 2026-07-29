@@ -21,8 +21,8 @@ HOT_RELATIVE_PATH = "wnba_source/source_artifacts/data/processed/recommendations
 
 
 def _write_required_daily_artifact(data_root: str, date_str: str) -> Path:
-    """Create the once-daily betting-card, top-props, AND locked-policy
-    payloads inside a test data root.
+    """Create the once-daily betting-card, top-props, locked-policy, AND
+    base daily-summary payloads inside a test data root.
 
     #68 added a repair pass to pull_hot_artifacts: any board-critical artifact
     that is written once a day and is MISSING gets one extra exact-path fetch,
@@ -33,11 +33,17 @@ def _write_required_daily_artifact(data_root: str, date_str: str) -> Path:
     stayed empty even after the top-props fix -- traced to
     _cards_recommendation_payload_by_game reading this file to populate
     markets.{pitcher,hitter,extraPitcher,extraHitter}Props, which
-    _live_props_from_card needs). In a TemporaryDirectory every such artifact
-    is missing, so tests that count requests for unrelated reasons would
-    otherwise see extra calls. Creating all three files keeps each of those
-    tests about the thing it is actually asserting; the repair pass has its
-    own tests.
+    _live_props_from_card needs). #128 added the base daily_summary_<date>.json
+    (no suffix -- a DIFFERENT file from the locked-policy one, loaded
+    separately by build_cards_page_context as its own `summary`; confirmed
+    live: even after the locked-policy repair landed and ran on
+    live-odds-worker, build_cards_page_context still reported source_title
+    "MLB cards unavailable" and zero props, because THIS file, not the
+    locked-policy one, is what that check actually gates on). In a
+    TemporaryDirectory every such artifact is missing, so tests that count
+    requests for unrelated reasons would otherwise see extra calls. Creating
+    all four files keeps each of those tests about the thing it is actually
+    asserting; the repair pass has its own tests.
     """
     season = int(date_str[:4])
     target = (
@@ -76,6 +82,17 @@ def _write_required_daily_artifact(data_root: str, date_str: str) -> Path:
     )
     locked_policy_target.parent.mkdir(parents=True, exist_ok=True)
     locked_policy_target.write_text(json.dumps({}), encoding="utf-8")
+
+    daily_summary_target = (
+        Path(data_root)
+        / "mlb_source"
+        / "source_artifacts"
+        / "data"
+        / "daily"
+        / f"daily_summary_{date_str.replace('-', '_')}.json"
+    )
+    daily_summary_target.parent.mkdir(parents=True, exist_ok=True)
+    daily_summary_target.write_text(json.dumps({}), encoding="utf-8")
     return target
 
 
@@ -982,9 +999,13 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
         # joined season_betting_day in the required list (all three written
         # once a day; confirmed live that a permanently missing copy of
         # each on refresh-worker is why MLB pregame AND live props never
-        # reached candidate generation), so a fully empty data root now
-        # needs three repair requests, not one -- plus the three
-        # always-on live-lens snapshot fetches (see class comment above).
+        # reached candidate generation). #128 added the base daily-summary
+        # file (a different file from the locked-policy one -- confirmed
+        # live on live-odds-worker that build_cards_page_context still
+        # reported zero props even after the locked-policy repair alone),
+        # so a fully empty data root now needs four repair requests, not
+        # three -- plus the three always-on live-lens snapshot fetches (see
+        # class comment above).
         with TemporaryDirectory() as tmp_dir:
             urls = self._run_pull(tmp_dir, "2026-07-26")
 
@@ -992,7 +1013,7 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
         live_lens_urls = [url for url in path_urls if url in self._LIVE_LENS_SNAPSHOT_URLS]
         repair_urls = [url for url in path_urls if url not in self._LIVE_LENS_SNAPSHOT_URLS]
         self.assertEqual(set(live_lens_urls), self._LIVE_LENS_SNAPSHOT_URLS, urls)
-        self.assertEqual(len(repair_urls), 3, urls)
+        self.assertEqual(len(repair_urls), 4, urls)
         # ?path= is the endpoint's single-artifact form: one stat and one read,
         # no glob over the matched set. That is what makes ignoring the
         # watermark safe here -- the ceiling exists to bound response SIZE, and
@@ -1000,6 +1021,9 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
         self.assertTrue(any("season_betting_day_2026_07_26.json" in url for url in repair_urls), repair_urls)
         self.assertTrue(any("daily_top_props_2026_07_26.json" in url for url in repair_urls), repair_urls)
         self.assertTrue(any("daily_summary_2026_07_26_locked_policy.json" in url for url in repair_urls), repair_urls)
+        self.assertTrue(
+            any(url.endswith("daily_summary_2026_07_26.json") for url in repair_urls), repair_urls
+        )
         for repair_url in path_urls:
             self.assertNotIn("since=", repair_url)
             self.assertNotIn("pattern=", repair_url)
@@ -1019,11 +1043,11 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
         # Ordering matters: the incremental pull may itself supply the file, in
         # which case there is nothing to repair. It also means a repair failure
         # cannot stop the watermark advancing for the pull that did succeed.
-        # 2 date-pattern + 3 missing-required repairs + 3 always-on live-lens.
+        # 2 date-pattern + 4 missing-required repairs + 3 always-on live-lens.
         with TemporaryDirectory() as tmp_dir:
             urls = self._run_pull(tmp_dir, "2026-07-26")
 
-        self.assertEqual(len(urls), 8, urls)
+        self.assertEqual(len(urls), 9, urls)
         self.assertNotIn("path=", urls[0])
         self.assertNotIn("path=", urls[1])
         for later_url in urls[2:]:

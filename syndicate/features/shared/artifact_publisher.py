@@ -776,6 +776,21 @@ def _required_daily_artifact_paths(date_str: str) -> list[Path]:
         paths.append(daily_artifact_path(str(date_str).strip(), suffix="_locked_policy"))
     except Exception:
         pass
+    try:
+        # #128: the base daily_summary_<date>.json (no suffix) is a DIFFERENT
+        # file from the _locked_policy one just above -- build_cards_page_context
+        # (mlb/cards.py) loads it separately as `summary_path`/`summary` for its
+        # own `outputs`/game_pks list AND to decide its own source_title
+        # ("MLB cards unavailable" whenever `summary` is falsy). Missing from
+        # this list entirely until now: confirmed live on live-odds-worker,
+        # after the _locked_policy repair above landed and ran, cards still
+        # reported source_title "MLB cards unavailable" and zero props --
+        # this is the file that check actually gates on.
+        from syndicate.features.mlb.sources import daily_artifact_path
+
+        paths.append(daily_artifact_path(str(date_str).strip()))
+    except Exception:
+        pass
     return paths
 
 
