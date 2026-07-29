@@ -21,6 +21,7 @@ from urllib.request import urlopen
 
 from syndicate.features.mlb.game_state import mlb_status_is_final as _mlb_status_is_final
 from syndicate.features.mlb.game_state import mlb_status_is_live as _mlb_status_is_live
+from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.shared.market_inventory import JOIN_STATUS_NEEDS_RESIM
 from syndicate.features.shared.market_inventory import join_odds_to_sim
@@ -2130,6 +2131,7 @@ def _sim_section_from_payload(sim_payload: dict[str, Any] | None) -> dict[str, A
 
 
 def _fetch_current_feed_live(game_pk: int) -> dict[str, Any] | None:
+    warn_if_compute_in_request_path("mlb_cards_fetch_current_feed_live")
     try:
         with urlopen(f"https://statsapi.mlb.com/api/v1.1/game/{int(game_pk)}/feed/live", timeout=8) as response:
             if int(getattr(response, "status", 200) or 200) >= 400:

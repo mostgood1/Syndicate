@@ -124,6 +124,16 @@ def main() -> int:
         # exits 1 before simming AND before the queued next-day build, which
         # left the board empty on 2026-07-16.
         "--allow-empty-current-oddsapi", "on",
+        # #129: this job was still doing its OWN fresh OddsAPI pull by default
+        # (daily_update.py's --refresh-current-oddsapi defaults "on") despite
+        # the comment above already saying "the live-odds loop owns odds
+        # ingestion" -- a second, redundant OddsAPI caller for MLB, on top of
+        # the render.yaml-level duplication this same incident fixed. The sim
+        # itself never consumes odds as a model input (join_odds_to_sim joins
+        # odds onto sim output post-hoc), so it doesn't need a fresh pull --
+        # whatever live-odds-worker last wrote (or nothing, per
+        # --allow-empty-current-oddsapi above) is enough.
+        "--refresh-current-oddsapi", "off",
     ]
     only_game_pks = str(args.only_game_pks or "").strip()
     if only_game_pks:

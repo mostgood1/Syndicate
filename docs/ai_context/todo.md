@@ -6,9 +6,94 @@ list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-07-28 (see "Reconciliation 2026-07-28").
 
-> **Next free ID: 129.** IDs are never reused. Closed items move to
+> **Next free ID: 131.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
+
+- **New: #130** (filed and fixed this session, **NOT YET DEPLOYED**) — direct
+  follow-on from #129's architecture audit. User asked explicitly: "nothing should
+  do its own OddsAPI refresh (this creates credit burn) — this would be duplicate
+  work of live odds worker, wouldn't it?" **Confirmed yes, live in production, not
+  theoretical.** The 2026-07-20/07-21 MLB-sim-ownership-relocation commits
+  (`ea6a2188`, `6c677eca`) moved MLB's odds-refresh *decision-making* from
+  live-odds-worker to refresh-worker (`MLB_ENABLE_REFRESH_WORKER_AUTORUN=true` on
+  refresh-worker, `SYNDICATE_MLB_REFRESH_TICK_OWNER=false` on live-odds-worker) to
+  relieve live-odds-worker's 2GB OOM pressure from co-locating odds-refresh +
+  NBA/WNBA SmartSim + the 1000-sim MLB Monte Carlo job. That solved memory but made
+  refresh-worker a **second independent OddsAPI caller for MLB**. Verified against
+  production, not just code: `/api/ops/odds-refresh/status` showed a real
+  `refresh_odds_sources.py --sports mlb --phase live` run completing at
+  `2026-07-29T13:57:03Z` from this exact path, ~20s before/after live-odds-worker's
+  own separate adaptive tick independently evaluated (and skipped) the same
+  question for the same date. `/api/ops/oddsapi/quota` showed MLB at 37,333
+  calls / 164,526 credits over the prior ~35.5h (~5,425 credits/hr account-wide,
+  `props` markets dominating cost) — against the user-confirmed
+  [[project-oddsapi-call-budget|5M-credit/month cap]], a real budget risk, not
+  just wasted compute. Additionally, `_launch_autorun_mlb_refresh`'s own staleness
+  gate (`run_refresh_worker.py:113`, meant to cap this to once per
+  `MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS=60`) reads
+  `_mlb_live_lens_report_path` — a file on refresh-worker's *own* local disk that
+  nothing ever writes there (no `pull_hot_artifacts` call anywhere in
+  `run_refresh_worker.py`), so the gate almost certainly never blocks and this
+  fires closer to every ~30s poll cycle than every 60s (could not get an exact
+  firing count — the event only writes a status file via
+  `refresh_state_store`, never printed to stdout, and there's no run-history
+  endpoint, only "latest"). Separately, `run_mlb_daily_sim_job.py`'s wrapper around
+  `daily_update.py --workflow ui-daily` was **also** doing its own fresh OddsAPI
+  pull every sim/resim run (`daily_update.py`'s `--refresh-current-oddsapi`
+  defaults `"on"`) despite the wrapper's own comment already saying "the live-odds
+  loop owns odds ingestion on its own cadence" — a third, redundant caller, never
+  actually turned off. **Fixed, not yet deployed:** (1) `render.yaml` —
+  `MLB_ENABLE_REFRESH_WORKER_AUTORUN` flipped back to `"false"` on refresh-worker;
+  (2) `render.yaml` — `SYNDICATE_MLB_REFRESH_TICK_OWNER` flipped back to `"true"`
+  on live-odds-worker, restoring it as MLB's sole odds-refresh owner; (3)
+  `scripts/run_mlb_daily_sim_job.py` — added `"--refresh-current-oddsapi", "off"`
+  to the sim job's command, since `join_odds_to_sim` (confirmed during #129) joins
+  odds onto sim output post-hoc and the sim's own probability model never consumes
+  odds as an input, so it never needed a fresh pull of its own.
+  `SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER`/`SYNDICATE_MLB_SIM_TICK_OWNER` (the
+  actual 1000-sim Monte Carlo compute, unrelated to odds) were deliberately left
+  alone — that isolation on refresh-worker's now-4GB container is still legitimate
+  and doesn't need OddsAPI access of its own. **User separately flagged a
+  discrepancy**: `/api/ops/oddsapi/quota`'s `baseline.used`/`baseline.remaining`
+  summed to 15,000,000, not the confirmed 5,000,000/month
+  ([[project-oddsapi-call-budget]]) — user's call was to trust the 5M figure and
+  treat that quota field as tracking something else (not resolved further this
+  session, flagging in case it resurfaces). **Before deploying**: check for an
+  in-flight MLB sim first (deploy kills it, see Operational notes) and confirm
+  with the user — this changes live production odds-refresh ownership for a
+  budget-capped paid API, not a cosmetic fix.
+
+- **New: #129** (filed and fixed this session, **NOT YET DEPLOYED**) — user asked
+  for a 3-service-architecture compliance check of MLB pregame/live specifically
+  ("web does no compute, live-odds-worker is the odds source of truth, refresh-worker
+  owns sim/board, cross-disk access between the 3 Render disks is a hard
+  requirement"). A general-purpose agent traced the actual MLB pregame/live code
+  paths end to end against that contract. Odds path, sim/board path, and the
+  live-lens Monte Carlo re-sim path (guarded since #128) all check out compliant —
+  the artifact-publisher HTTP push/pull allowlist is the real, deliberate bridge
+  across the 3 disks, not a same-disk assumption. **One real gap found:**
+  `_fetch_current_feed_live` (`mlb/cards.py:2132`), called from
+  `_daily_actual_by_game` (`cards.py:2106`) and reachable from
+  `/mlb/game/<game_pk>`, `/mlb/api/game/<game_pk>`,
+  `/mlb/api/game/<game_pk>/card-detail`, and `/mlb/api/game/<game_pk>/snapshot`
+  (`game_detail.py:123`, `cards.py:3970`), does a synchronous live HTTP GET to
+  `statsapi.mlb.com`'s `feed/live` endpoint inside a web request handler whenever
+  today's locally-mirrored raw-feed artifact is missing/stale, with **no guard at
+  all** (unlike every other heavy path in this module). Fixed by adding
+  `warn_if_compute_in_request_path("mlb_cards_fetch_current_feed_live")` at the top
+  of `_fetch_current_feed_live` — warn-only, not hard-refuse, because (1) it's a
+  single lightweight GET with an 8s timeout, not comparable to the Monte Carlo
+  re-sim `refuse_if_compute_in_request_path` guards against, and (2) #122
+  (unstarted) explicitly plans to build an MLB actuals writer on top of this exact
+  cached fetch — hard-refusing it on hosted web would silently break live/final
+  card rendering, not just log a warning. This just makes the in-request fetch
+  visible in logs the way the live-lens cheap-reassembly path already is; it does
+  not change behavior. **Not addressed, left as-is on purpose:** whether this
+  fetch should instead move to a worker tick that writes `raw_feed_live_path` for
+  web to read (the architecturally "pure" fix) — that's a bigger change than what
+  was asked, and #122's build-out is the natural place to revisit it since it
+  already touches this exact code path.
 
 - **New: #128** (filed, shipped this session, **NOT YET DEPLOYED — see below**)
   — implements #124's two explicitly-deferred follow-ups (a) and (b), triggered

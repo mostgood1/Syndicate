@@ -399,18 +399,24 @@ services:
       # possession simulation and returns real per-minute scoring buckets.
       - key: REFRESH_PREDICT_PROPS_SMART_SIM_PBP
         value: "true"
-      # Found 2026-07-20 while relocating MLB sim ownership here: these three
-      # autorun flags were only ever declared on the `syndicate` web
-      # service's env block (Render doesn't share env vars across services),
-      # so refresh-worker's actual deployed process has never received any
-      # of them -- MLB_ENABLE_REFRESH_WORKER_AUTORUN's staleness-check job
-      # was likely never firing in production despite the code being wired
-      # up for it. Declaring them here for real, plus turning weekly sports
-      # on per explicit request -- _active_weekly_sports_for_date() already
-      # season-gates NFL/NCAAF/NCAAB internally, so this is a safe no-op
-      # outside their seasons.
+      # #129: MLB_ENABLE_REFRESH_WORKER_AUTORUN turned this worker into a
+      # SECOND independent OddsAPI caller for MLB (via _launch_autorun_mlb_refresh
+      # -> refresh_odds_sources.py), duplicating live-odds-worker's own odds
+      # ownership and burning real OddsAPI credit budget for no benefit --
+      # confirmed live in production (a real "phase=live" mlb refresh_odds_sources
+      # run at 2026-07-29T13:57:03Z, ~20s from live-odds-worker's own tick
+      # deciding independently whether MLB needed a refresh). Its own staleness
+      # gate (_mlb_live_lens_report_path) checks a file that nothing ever
+      # writes/pulls onto this service's disk, so the gate never actually
+      # blocked anything. Turned back off -- live-odds-worker
+      # (SYNDICATE_MLB_REFRESH_TICK_OWNER=true there now) is the sole MLB
+      # odds-refresh owner again. Only the heavy 1000-sim Monte Carlo job
+      # (SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER/SYNDICATE_MLB_SIM_TICK_OWNER
+      # below, unrelated to odds) stays isolated here -- that isolation was
+      # the legitimate reason for the 2026-07-20 move and doesn't need OddsAPI
+      # access of its own (see run_mlb_daily_sim_job.py's --refresh-current-oddsapi off).
       - key: MLB_ENABLE_REFRESH_WORKER_AUTORUN
-        value: "true"
+        value: "false"
       - key: WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN
         value: "true"
       - key: WEEKLY_SPORTS_REFRESH_INTERVAL_SECONDS
@@ -631,17 +637,13 @@ services:
       # _run_live_refresh_tick -- it just no longer LAUNCHES one itself.
       - key: SYNDICATE_MLB_SIM_TICK_OWNER
         value: "false"
-      # This worker's own tick and refresh-worker's purpose-built MLB autorun
-      # (_launch_autorun_mlb_refresh, which reacts to the live-lens report's
-      # actual staleness) were both independently deciding "MLB needs a
-      # refresh" in the same window -- confirmed in production. The
-      # cross-service refresh-run lock (ops_refresh.py's
-      # _refresh_run_still_active) already makes that collision safe, but
-      # this removes the redundant decision-making at the source: MLB is
-      # excluded from what this worker's tick launches, same ownership split
-      # already made for the sim above.
+      # #129: reverted back to "true" -- refresh-worker's competing
+      # MLB_ENABLE_REFRESH_WORKER_AUTORUN path (set "false" there now) is
+      # fully disabled, so this worker is the sole MLB odds-refresh owner
+      # again, not just nominally excluded from a race with another owner.
+      # See render.yaml's refresh-worker block for the full incident writeup.
       - key: SYNDICATE_MLB_REFRESH_TICK_OWNER
-        value: "false"
+        value: "true"
       # Same ownership-split pattern as MLB above, for nfl/ncaaf/ncaab -- see
       # the matching comment on refresh-worker's WEEKLY_SPORTS_REFRESH_TICK_OWNER
       # (set "true" there). Without this, this worker's own tick and
