@@ -242,6 +242,21 @@ def _run_live_lens_tick_for_sport(sport: str, date_str: str) -> dict[str, Any]:
 			meta["ok"] = False
 			meta["skipped"] = True
 			meta["reason"] = "invalid_snapshot"
+			# TEMPORARY diagnostic (todo.md #124 follow-up) -- MLB's tick
+			# fails ~80% of the time (2/11 succeeded in one measured window)
+			# while NBA/WNBA never fail, and meta["error"]/meta["reason"]
+			# were only ever written to latest_live_lens_tick.json (itself
+			# keyvalue-routed, unreadable without the admin token). print,
+			# not logger.info -- see other #124 diagnostics for why. Remove
+			# once the actual failure mode is confirmed.
+			if sport == "mlb":
+				games = snapshot.get("games") if isinstance(snapshot, dict) else None
+				print(
+					f"[LIVE_LENS_TICK_DIAG] sport={sport} ok=False reason=invalid_snapshot "
+					f"is_dict={isinstance(snapshot, dict)} games_type={type(games).__name__} "
+					f"games_len={len(games) if isinstance(games, list) else None}",
+					flush=True,
+				)
 			return meta
 		if sport == "mlb":
 			meta["liveMcSources"] = _tally_mlb_live_mc_sources(snapshot)
@@ -251,6 +266,13 @@ def _run_live_lens_tick_for_sport(sport: str, date_str: str) -> dict[str, Any]:
 	except Exception as exc:
 		meta["ok"] = False
 		meta["error"] = f"{type(exc).__name__}: {exc}"
+		if sport == "mlb":
+			import traceback
+
+			print(
+				f"[LIVE_LENS_TICK_DIAG] sport={sport} ok=False error={type(exc).__name__}: {exc}\n{traceback.format_exc()}",
+				flush=True,
+			)
 	finally:
 		meta["finishedAt"] = _utc_now()
 		log_all_process_memory(f"live_lens_tick_after_{sport}", sport=sport, date=date_str, ok=bool(meta.get("ok")))
