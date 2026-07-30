@@ -27,9 +27,51 @@ unpushed. Cross-session ID collisions (#131, #139) were both caught and
 resolved without data loss, in both directions, via direct session-to-
 session messages rather than silent overwrites.
 
-> **Next free ID: 145.** IDs are never reused. Closed items move to
+> **Next free ID: 146.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
+
+- **New: #145** (root-caused and fixed this session, distinct from #144,
+  **NOT YET DEPLOYED**) — verifying #142's Layer 2 mini-card fix surfaced a
+  live production bug: every MLB steam-move candidate built from hitter/
+  pitcher prop rows (name pattern "`<player>` `<market>` steam move", e.g.
+  "Nick Sogard Home runs steam move") had `game_id=""`, `gamePk=None`,
+  `event_id="-"`, `matchup="-"` — fully unresolved, all landing under one
+  shared `mlb|-` grouping key on the Games mini-card strip
+  (`intelligence.html`'s `gameKey()`) instead of each candidate's real game.
+  Root-caused to the source: `_flatten_mlb_props`
+  (`syndicate/features/shared/odds_refresh_tracking.py`) flattens
+  `oddsapi_hitter_props`/`oddsapi_pitcher_props` snapshots into rows with
+  ONLY `player_name`/`market`/`selection`/`line`/`price`/`snapshot_ts` — no
+  `event_id`/`game_id`/`game_pk`/`home_team`/`away_team` column exists in
+  the raw OddsAPI payload at all (confirmed by inspecting a real snapshot:
+  meta only records aggregate `events_matched`, never per-player). So
+  `_canonical_event_id`/`_market_lifecycle_event` had nothing to read for
+  these rows, unlike soccer's raw rows (#140) which do carry team columns.
+  `_steam_candidates_for_sport`'s `matchup_by_game_id` lookup
+  (`syndicate/features/intelligence.py`) then also missed, since it's keyed
+  by `game_id` and `game_id` was empty. **Fixed** by reusing the exact
+  mechanism `syndicate/features/mlb/hr_targets.py` already built for this
+  identical problem on the HR-targets board (its own docstring: "raw OddsAPI
+  prop rows carry no game/roster linkage at all — see #83's steam rail"):
+  the per-game roster snapshot files
+  (`roster_<n>_<AWAY>_at_<HOME>_pk<game_pk>_g1.json`) are the only place a
+  game_pk can be joined to a bare player name. Added
+  `mlb_player_game_lookup_for_date()` (hr_targets.py) — normalized player
+  name → game_pk across every roster file for the date, game_pk parsed from
+  the filename (never a payload field) — and wired it into
+  `_steam_candidates_for_sport`: when an MLB event has no `game_id`, resolve
+  one via the player's own roster entry before the existing
+  `matchup_by_game_id` lookup runs. The resolved game_pk is the SAME key
+  `dashboard_games` already uses, so no separate matchup-formatting logic
+  was needed — it flows straight into the existing lookup built for every
+  other sport. 6 new tests in `tests/test_intelligence_steam_candidates.py`
+  (`MlbSteamGameIdResolutionTests`, `MlbPlayerGameLookupForDateTests`), all
+  passing; full file 16/16. **Not yet verified against the live production
+  board** (`/api/intelligence/query`, sport=mlb) — that requires deploying,
+  which per this repo's own operational rule kills any in-flight MLB sim, so
+  it needs a sim-status check first; deferred to whoever picks this up next
+  (or the same session, once the user confirms it's safe to deploy).
 
 - **New: #144** (root-caused and fixed this session, direct follow-on to
   #143, **NOT YET DEPLOYED**) — user reported live, right after #143

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import unicodedata
 from datetime import date
 from datetime import datetime, timedelta
@@ -202,6 +203,51 @@ def mlb_player_id_lookup_for_date(selected_date: str) -> dict[str, int]:
                 name = _profile_player_name(pitcher_profile)
                 if player_id and name:
                     lookup[mlb_normalize_player_name(name)] = player_id
+    return lookup
+
+
+_ROSTER_FILENAME_GAME_PK_RE = re.compile(r"pk(\d+)", re.IGNORECASE)
+
+
+def mlb_player_game_lookup_for_date(selected_date: str) -> dict[str, int]:
+    """Normalized player name -> game_pk across every game on this date's
+    slate, resolved from the same per-game roster snapshots
+    mlb_player_id_lookup_for_date already globs.
+
+    Raw OddsAPI hitter/pitcher prop rows (see _flatten_mlb_props) carry no
+    game/roster linkage at all -- not even a team column -- so MLB steam
+    candidates built from those rows (_steam_candidates_for_sport,
+    intelligence.py) had no game_id to group under and no way to resolve a
+    real matchup. The roster filename itself is the only place a game_pk is
+    recorded (flat layout: roster_<n>_<AWAY>_at_<HOME>_pk<game_pk>_g1.json --
+    roster_objs/ has none, so entries there are skipped rather than guessed).
+    """
+    if not selected_date:
+        return {}
+    snapshot_dir = _daily_snapshot_root() / selected_date
+    if not snapshot_dir.exists():
+        return {}
+    lookup: dict[str, int] = {}
+    for path in sorted(snapshot_dir.glob("roster_*_pk*.json")):
+        match = _ROSTER_FILENAME_GAME_PK_RE.search(path.stem)
+        game_pk = _safe_int(match.group(1)) if match else None
+        if game_pk is None:
+            continue
+        payload = _load_json_path(str(path))
+        if not payload:
+            continue
+        for side in ("away", "home"):
+            side_doc = payload.get(side)
+            if not isinstance(side_doc, dict):
+                continue
+            names = [_profile_player_name(batter) for batter in _lineup_batters(side_doc)]
+            pitcher_profile = _side_pitcher_profile(side_doc)
+            if pitcher_profile:
+                names.append(_profile_player_name(pitcher_profile))
+            for name in names:
+                if not name:
+                    continue
+                lookup.setdefault(mlb_normalize_player_name(name), game_pk)
     return lookup
 
 

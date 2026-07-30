@@ -4059,6 +4059,24 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
         for event_id, matchup_text in _soccer_steam_matchup_lookup(selected_date).items():
             matchup_by_game_id.setdefault(event_id, matchup_text)
 
+    # Confirmed live: MLB steam candidates built from hitter/pitcher prop
+    # rows (_flatten_mlb_props) had NO game_id at all -- unlike soccer's raw
+    # rows, those rows carry no event_id/game_id/team column whatsoever
+    # (odds_refresh_tracking.py's _canonical_event_id/_market_lifecycle_event
+    # have nothing to read), so every one of these candidates landed under
+    # the same shared "mlb|-" grouping key with no resolvable matchup. The
+    # per-game roster snapshots (mlb_player_game_lookup_for_date,
+    # hr_targets.py -- already used the same way for HR-target matchups) are
+    # the only place a game_pk can be joined to one of these events, via the
+    # player's own name; the resolved game_pk is dashboard_games' own key,
+    # so it flows straight into the matchup_by_game_id lookup above with no
+    # separate join needed.
+    mlb_game_pk_by_player: dict[str, int] = {}
+    if sport_slug == "mlb":
+        from syndicate.features.mlb.hr_targets import mlb_normalize_player_name, mlb_player_game_lookup_for_date
+
+        mlb_game_pk_by_player = mlb_player_game_lookup_for_date(selected_date)
+
     candidates: list[dict[str, Any]] = []
     seen_keys: set[tuple[str, str, str, str, str, str]] = set()
     for event in events:
@@ -4088,6 +4106,10 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
         odds_delta = _numeric_hint(steam.get("odds_delta"))
         implied_prob = _numeric_hint(event.get("implied_prob"))
         game_id = _safe_text(event.get("game_id"), "")
+        if not game_id and sport_slug == "mlb" and player_name:
+            resolved_game_pk = mlb_game_pk_by_player.get(mlb_normalize_player_name(player_name))
+            if resolved_game_pk is not None:
+                game_id = str(resolved_game_pk)
         timestamp = _safe_text(event.get("timestamp"), "")
         # Prefer the event's own stamped team names (new events, per the
         # odds_refresh_tracking.py source-side fix) over the lookup tables

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import json
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from syndicate.features.intelligence import _classify_candidate_with_reason
 from syndicate.features.intelligence import _steam_candidates_for_sport
+from syndicate.features.mlb.hr_targets import mlb_player_game_lookup_for_date
 
 
 LIVE_PROP_STEAM_EVENT = {
@@ -220,6 +224,155 @@ class SteamMatchupResolutionTests(unittest.TestCase):
             side_effect=RuntimeError("boom"),
         ):
             self.assertEqual(_soccer_steam_matchup_lookup("2026-07-29"), {})
+
+
+MLB_PROP_STEAM_EVENT_NO_GAME_ID = {
+    "capture_phase": "closing",
+    "timestamp": "2026-07-30T22:00:00+00:00",
+    "sport": "mlb",
+    "player_name": "nick sogard",
+    "selection": "Over",
+    "market_type": "batter_home_runs",
+    "event_type": "update",
+    "line": 0.5,
+    "price": 650.0,
+    "implied_prob": 0.133,
+    "source": "oddsapi",
+    "is_live": False,
+    "steam": {
+        "line_delta": None,
+        "odds_delta": 120.0,
+        "window_seconds": 300.0,
+        "capture_phase": "closing",
+        "previous_line": 0.5,
+        "previous_odds": 530.0,
+    },
+}
+
+
+class MlbSteamGameIdResolutionTests(unittest.TestCase):
+    # Confirmed live 2026-07-30: MLB prop steam events (_flatten_mlb_props'
+    # output feeds odds_refresh_tracking.py's lifecycle-event builder) carry
+    # NO game_id, event_id, home_team, or away_team at all -- unlike soccer,
+    # the raw hitter/pitcher props payload has no per-row game linkage
+    # whatsoever, so every one of these candidates previously landed under
+    # a shared "mlb|-" grouping key with no resolvable matchup.
+    def test_mlb_event_without_game_id_resolves_via_roster_lookup(self) -> None:
+        sport = _sport(slug="mlb")
+        sport["dashboard_games"] = [
+            {
+                "gamePk": 824555,
+                "away": {"abbr": "BOS"},
+                "home": {"abbr": "NYY"},
+            }
+        ]
+        with patch(
+            "syndicate.features.intelligence._load_steam_events_for_date",
+            return_value=[MLB_PROP_STEAM_EVENT_NO_GAME_ID],
+        ), patch(
+            "syndicate.features.mlb.hr_targets.mlb_player_game_lookup_for_date",
+            return_value={"nick sogard": 824555},
+        ):
+            candidates = _steam_candidates_for_sport(sport)
+
+        self.assertEqual(len(candidates), 1, candidates)
+        candidate = candidates[0]
+        self.assertEqual(candidate["game_id"], "824555")
+        self.assertEqual(candidate["event_id"], "824555")
+        self.assertEqual(candidate["game_pk"], 824555)
+        self.assertEqual(candidate["matchup"], "BOS @ NYY")
+
+    def test_mlb_event_without_game_id_and_no_roster_match_falls_back_to_dash(self) -> None:
+        # No roster entry for this player -- must degrade to "-" rather than
+        # raising or inventing a game, exactly like the pre-fix behavior for
+        # every other unresolvable event.
+        sport = _sport(slug="mlb")
+        sport["dashboard_games"] = []
+        with patch(
+            "syndicate.features.intelligence._load_steam_events_for_date",
+            return_value=[MLB_PROP_STEAM_EVENT_NO_GAME_ID],
+        ), patch(
+            "syndicate.features.mlb.hr_targets.mlb_player_game_lookup_for_date",
+            return_value={},
+        ):
+            candidates = _steam_candidates_for_sport(sport)
+
+        self.assertEqual(len(candidates), 1, candidates)
+        candidate = candidates[0]
+        self.assertEqual(candidate["game_id"], "")
+        self.assertEqual(candidate["matchup"], "-")
+
+    def test_event_with_its_own_game_id_skips_the_roster_lookup(self) -> None:
+        # The roster-name join is a last resort -- an event that already
+        # carries a real game_id (the normal, non-prop-collision case) must
+        # not be overridden by a same-named roster entry from another game.
+        event = dict(MLB_PROP_STEAM_EVENT_NO_GAME_ID, game_id="999111")
+        sport = _sport(slug="mlb")
+        with patch(
+            "syndicate.features.intelligence._load_steam_events_for_date",
+            return_value=[event],
+        ), patch(
+            "syndicate.features.mlb.hr_targets.mlb_player_game_lookup_for_date",
+            return_value={"nick sogard": 824555},
+        ):
+            candidates = _steam_candidates_for_sport(sport)
+
+        self.assertEqual(len(candidates), 1, candidates)
+        self.assertEqual(candidates[0]["game_id"], "999111")
+
+
+class MlbPlayerGameLookupForDateTests(unittest.TestCase):
+    # Direct coverage of the new roster-glob lookup itself: game_pk only
+    # exists in the flat roster filename (roster_<n>_<AWAY>_at_<HOME>_pk
+    # <game_pk>_g1.json), never as a field inside the payload.
+    def _write_roster_fixture(self, snapshot_dir: Path, *, filename: str) -> None:
+        payload = {
+            "away": {
+                "team": {"abbreviation": "BOS"},
+                "lineup": {
+                    "batters": [{"name": "Nick Sogard", "player": {"id": 1}}],
+                },
+                "starter_profile": {"name": "Away Starter", "player": {"id": 2}},
+            },
+            "home": {
+                "team": {"abbreviation": "NYY"},
+                "lineup": {
+                    "batters": [{"name": "Aaron Judge", "player": {"id": 3}}],
+                },
+                "starter_profile": {"name": "Home Starter", "player": {"id": 4}},
+            },
+        }
+        (snapshot_dir / filename).write_text(json.dumps(payload), encoding="utf-8")
+
+    def test_resolves_game_pk_for_every_lineup_name_from_the_filename(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            snapshot_root = Path(tmp)
+            snapshot_dir = snapshot_root / "2026-07-30"
+            snapshot_dir.mkdir(parents=True)
+            self._write_roster_fixture(snapshot_dir, filename="roster_0_BOS_at_NYY_pk824555_g1.json")
+
+            with patch(
+                "syndicate.features.mlb.hr_targets._daily_snapshot_root",
+                return_value=snapshot_root,
+            ):
+                lookup = mlb_player_game_lookup_for_date("2026-07-30")
+
+        self.assertEqual(lookup.get("nick sogard"), 824555)
+        self.assertEqual(lookup.get("aaron judge"), 824555)
+        self.assertEqual(lookup.get("away starter"), 824555)
+        self.assertEqual(lookup.get("home starter"), 824555)
+
+    def test_missing_snapshot_dir_returns_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            snapshot_root = Path(tmp)
+            with patch(
+                "syndicate.features.mlb.hr_targets._daily_snapshot_root",
+                return_value=snapshot_root,
+            ):
+                self.assertEqual(mlb_player_game_lookup_for_date("2026-07-30"), {})
+
+    def test_no_selected_date_returns_empty(self) -> None:
+        self.assertEqual(mlb_player_game_lookup_for_date(""), {})
 
 
 if __name__ == "__main__":
