@@ -421,6 +421,25 @@ services:
         value: "true"
       - key: WEEKLY_SPORTS_REFRESH_INTERVAL_SECONDS
         value: "21600"
+      # 2026-07-29, per explicit user direction: soccer (MLS in season now)
+      # gets its own dedicated autorun rather than joining the
+      # WEEKLY_SPORTS_* one above (which is NFL/NCAAF/NCAAB-only, both by
+      # code -- _active_weekly_sports_for_date hard-codes that tuple -- and
+      # by intent, so fixing soccer doesn't touch their already-live
+      # cadence). Confirmed live: soccer's pregame-only steps (schedule/
+      # odds/props/picks) never ran anywhere in production, because
+      # live-odds-worker -- the only service with the live-odds refresh
+      # loop on -- is pinned to phase=live, and those steps are
+      # phases=("pregame",). This week's Saturday MLS fixtures showed
+      # is_unsimulated_placeholder=True on /soccer/mls/api/cards as a
+      # result (matches todo #52: "71% of MLS board has no sim projection
+      # at all"). _launch_autorun_soccer_weekly_refresh (run_refresh_worker.py)
+      # runs phase="all" so schedule/odds/props/picks (pregame-only) and
+      # artifacts/live_state (pregame+live / live-only) all run together.
+      - key: SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN
+        value: "true"
+      - key: SYNDICATE_SOCCER_WEEKLY_REFRESH_INTERVAL_SECONDS
+        value: "14400"
       # Same ownership-split pattern as SYNDICATE_MLB_REFRESH_TICK_OWNER below
       # (mirrored on live-odds-worker, set to "false" there): without this,
       # live-odds-worker's combined tick and this autorun would both target

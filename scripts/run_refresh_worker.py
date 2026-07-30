@@ -251,6 +251,112 @@ def _launch_autorun_weekly_sports_refresh(
     return True
 
 
+# Soccer (MLS et al.) gets its own dedicated autorun, deliberately separate
+# from the NFL/NCAAF/NCAAB weekly-sports one above, per explicit user
+# direction (2026-07-29): reusing that flag/cadence would have activated a
+# currently-dark path for those three sports too, as a side effect of just
+# fixing soccer. Root cause this exists to fix, confirmed live: soccer's
+# pregame-only steps (soccer_{league}_schedule/odds/props/picks --
+# scripts/refresh_odds_sources.py's _build_soccer_steps, phases=("pregame",))
+# never ran anywhere in production. live-odds-worker is the only service
+# with SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP on, and it's pinned to
+# SYNDICATE_LIVE_ODDS_REFRESH_PHASE=live, so those steps were silently
+# excluded from the one tick that's actually running -- only
+# soccer_{league}_artifacts (phases=("pregame", "live")) ever fired, against
+# stale/missing odds and no real recommendations coverage. Confirmed via
+# /soccer/mls/api/cards: this week's Saturday fixtures all carried
+# is_unsimulated_placeholder=True (no real line, no sim -- matches todo #52's
+# "71% of MLS board has no sim projection at all"), while Tue/Wed fixtures
+# earlier in the same week did not, consistent with the pregame pipeline
+# simply never running for the *current* week's later games.
+#
+# default_week()/_soccer_artifact_scope_args() (soccer/sources.py,
+# refresh_odds_sources.py) already resolve the CONTAINING week correctly --
+# there is no "wait until game day" gate to fix. phase="all" here is what
+# actually runs schedule/odds/props/picks (pregame-only) AND artifacts/
+# live_state (pregame+live / live-only) together in one launch, instead of
+# needing two separate phase-scoped calls.
+def _soccer_weekly_refresh_enabled() -> bool:
+    raw_value = str(os.environ.get("SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN") or "").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
+
+
+def _soccer_weekly_refresh_interval_seconds() -> int:
+    raw_value = str(os.environ.get("SYNDICATE_SOCCER_WEEKLY_REFRESH_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = int(raw_value or 14400)  # 4h default -- shorter than NFL/NCAAF's 6h since soccer's tracked leagues run mid-week fixtures too, not just a single weekly slate.
+    except ValueError:
+        value = 14400
+    return max(1, value)
+
+
+def _soccer_weekly_autorun_status_path() -> Path:
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "soccer_weekly_autorun_status.json"
+
+
+def _soccer_active_for_date(selected_date: str) -> bool:
+    active = {item.strip().lower() for item in _active_sports_for_date(selected_date).split(",") if item.strip()}
+    return "soccer" in active
+
+
+def _launch_autorun_soccer_weekly_refresh(
+    *,
+    latest_manifest_path: Path,
+    worker_status_path: Path,
+    refresh_cycle: dict[str, int],
+) -> bool:
+    if not _soccer_weekly_refresh_enabled():
+        return False
+    selected_date = central_today_iso()
+    if not _soccer_active_for_date(selected_date):
+        return False
+
+    status_path = _soccer_weekly_autorun_status_path()
+    last_status = _refresh_state_store()["read_json_file"](status_path) or {}
+    last_epoch = float((last_status or {}).get("epoch") or 0.0)
+    if last_epoch > 0.0 and (time.time() - last_epoch) < float(_soccer_weekly_refresh_interval_seconds()):
+        return False
+
+    try:
+        result = launch_refresh_run(
+            date=selected_date,
+            sports="soccer",
+            phase="all",
+            execution_mode="source",
+            regions="us",
+            skip_mirror=True,
+            mode=str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_MODE") or "full"),
+            launch_mode="web_process",
+        )
+    except Exception as exc:
+        _refresh_state_store()["write_json_file"](status_path, {"epoch": time.time(), "sports": "soccer", "date": selected_date, "error": f"{type(exc).__name__}: {exc}"})
+        _write_worker_status(
+            worker_status_path=worker_status_path,
+            latest_manifest_path=latest_manifest_path,
+            state="error",
+            detail=f"Failed to auto-launch soccer weekly refresh: {type(exc).__name__}: {exc}",
+            ran_job=False,
+            latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+            refresh_cycle=refresh_cycle,
+        )
+        return False
+
+    _refresh_state_store()["write_json_file"](status_path, {"epoch": time.time(), "sports": "soccer", "date": selected_date})
+    refresh_cycle["claimed_count"] = int(refresh_cycle.get("claimed_count") or 0) + 1
+    _write_worker_status(
+        worker_status_path=worker_status_path,
+        latest_manifest_path=latest_manifest_path,
+        state="launched",
+        detail=f"Auto-launched soccer weekly refresh for {selected_date}.",
+        ran_job=True,
+        run_exit_code=None,
+        latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+        launch_pid=int(result.get("pid") or 0) or None,
+        refresh_cycle=refresh_cycle,
+    )
+    return True
+
+
 # Prediction reconciliation/grading never runs on Render today -- it was only
 # ever invoked from scripts/daily_update.ps1's GHA pipeline. Runs in-process
 # (unlike the launch_refresh_run-based autoruns above) since it's a light
@@ -715,6 +821,13 @@ def main() -> int:
             if args.run_once:
                 return 0
         elif _launch_autorun_weekly_sports_refresh(
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_soccer_weekly_refresh(
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,

@@ -295,6 +295,100 @@ class RefreshWorkerTests(unittest.TestCase):
         self.assertEqual(module._active_weekly_sports_for_date("2026-10-15"), "nfl,ncaaf")
         self.assertEqual(module._active_weekly_sports_for_date("2026-12-01"), "nfl,ncaaf,ncaab")
 
+    # 2026-07-29 follow-up: soccer's pregame pipeline (schedule/odds/props/
+    # picks) is phases=("pregame",)-only (refresh_odds_sources.py's
+    # _build_soccer_steps), but live-odds-worker -- the only service with
+    # the live-odds refresh loop enabled -- is pinned to phase=live, so
+    # those steps never ran anywhere in production. Confirmed live via
+    # /soccer/mls/api/cards: this week's Saturday fixtures all carried
+    # is_unsimulated_placeholder=True while earlier-week fixtures did not.
+    # Deliberately a SEPARATE autorun/flag from weekly-sports (NFL/NCAAF/
+    # NCAAB) per explicit user direction, so fixing soccer doesn't
+    # side-effect-activate that currently-dark path for those three sports.
+    def test_main_run_once_autolaunches_soccer_weekly_refresh_when_in_season_and_enabled(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            latest_manifest_path = reports_root / "refresh_status" / "latest" / "refresh_status_latest.json"
+            worker_status_path = reports_root / "refresh_status" / "latest" / "refresh_worker_status.json"
+            latest_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            latest_manifest_path.write_text(json.dumps({"state": "idle"}), encoding="utf-8")
+
+            fake_launch_result = {"ok": True, "pid": 4343, "state": "running"}
+
+            with patch.dict(
+                module.os.environ,
+                {
+                    "SYNDICATE_REPORTS_ROOT": str(reports_root),
+                    "SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN": "1",
+                },
+                clear=True,
+            ), patch.object(
+                sys,
+                "argv",
+                [
+                    "run_refresh_worker.py",
+                    "--latest-manifest",
+                    str(latest_manifest_path),
+                    "--worker-status",
+                    str(worker_status_path),
+                    "--run-once",
+                ],
+            ), patch.object(module, "central_today_iso", return_value="2026-07-29"), patch.object(
+                module, "launch_refresh_run", return_value=fake_launch_result
+            ) as mocked_launch, patch.object(module.subprocess, "Popen") as mocked_popen:
+                exit_code = module.main()
+
+            self.assertEqual(exit_code, 0)
+            mocked_launch.assert_called_once()
+            called_kwargs = mocked_launch.call_args.kwargs
+            self.assertEqual(called_kwargs["sports"], "soccer")
+            self.assertEqual(called_kwargs["phase"], "all")
+            self.assertEqual(called_kwargs["launch_mode"], "web_process")
+            mocked_popen.assert_not_called()
+            worker_status = json.loads(worker_status_path.read_text(encoding="utf-8"))
+            self.assertEqual(worker_status["state"], "launched")
+            self.assertTrue(worker_status["ranJob"])
+            self.assertEqual(worker_status["launchPid"], 4343)
+
+    def test_main_run_once_skips_soccer_weekly_refresh_when_disabled(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            latest_manifest_path = reports_root / "refresh_status" / "latest" / "refresh_status_latest.json"
+            worker_status_path = reports_root / "refresh_status" / "latest" / "refresh_worker_status.json"
+            latest_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            latest_manifest_path.write_text(json.dumps({"state": "idle"}), encoding="utf-8")
+
+            with patch.dict(
+                module.os.environ,
+                {"SYNDICATE_REPORTS_ROOT": str(reports_root)},
+                clear=True,
+            ), patch.object(
+                sys,
+                "argv",
+                [
+                    "run_refresh_worker.py",
+                    "--latest-manifest",
+                    str(latest_manifest_path),
+                    "--worker-status",
+                    str(worker_status_path),
+                    "--run-once",
+                ],
+            ), patch.object(module, "central_today_iso", return_value="2026-07-29"), patch.object(
+                module, "launch_refresh_run"
+            ) as mocked_launch:
+                exit_code = module.main()
+
+            self.assertEqual(exit_code, 0)
+            mocked_launch.assert_not_called()
+            worker_status = json.loads(worker_status_path.read_text(encoding="utf-8"))
+            self.assertEqual(worker_status["state"], "idle")
+
     def test_main_run_once_autoruns_reconciliation_when_enabled(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module = self._load_module(repo_root)
