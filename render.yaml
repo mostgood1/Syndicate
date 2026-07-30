@@ -434,8 +434,16 @@ services:
       # is_unsimulated_placeholder=True on /soccer/mls/api/cards as a
       # result (matches todo #52: "71% of MLS board has no sim projection
       # at all"). _launch_autorun_soccer_weekly_refresh (run_refresh_worker.py)
-      # runs phase="all" so schedule/odds/props/picks (pregame-only) and
-      # artifacts/live_state (pregame+live / live-only) all run together.
+      # originally ran phase="all" so schedule/odds/props/picks (pregame-only)
+      # and artifacts/live_state (pregame+live / live-only) all ran together.
+      #
+      # #148: narrowed to phase="live" -- phase="all" made refresh-worker a
+      # second direct OddsAPI caller for soccer (a duplicate-cost ownership
+      # violation, same class as MLB's #139/#144). The pregame-only steps
+      # (schedule/odds/props/picks) are now owned by live-odds-worker's own
+      # dedicated SYNDICATE_ENABLE_SOCCER_PREGAME_REFRESH_AUTORUN (see that
+      # worker's block below). This autorun keeps only the sim
+      # (soccer_{league}_artifacts, phases=("pregame","live")) and live_state.
       - key: SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN
         value: "true"
       - key: SYNDICATE_SOCCER_WEEKLY_REFRESH_INTERVAL_SECONDS
@@ -670,6 +678,23 @@ services:
       # in-season weekly-sport artifacts once football season starts.
       - key: WEEKLY_SPORTS_REFRESH_TICK_OWNER
         value: "false"
+      # #148: soccer's pregame steps (schedule/odds/props/picks -- direct
+      # OddsAPI calls) need a trigger that doesn't depend on the shared
+      # adaptive tick's GLOBAL cross-sport phase (that phase reads "live" the
+      # instant ANY sport has a live game, which is most evenings once
+      # MLB/WNBA/NBA are running, starving soccer's own pregame cadence
+      # window even when soccer itself is due). refresh-worker's own soccer
+      # autorun (SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN above) used to
+      # cover this gap with phase="all", but that made refresh-worker a
+      # second direct OddsAPI caller for soccer -- the same ownership
+      # violation fixed for MLB in #139/#144. This is the real fix: an
+      # independent, soccer-scoped pregame trigger owned by this worker (the
+      # only service that should ever call OddsAPI), while refresh-worker's
+      # autorun is now scoped to phase="live" (the sim only).
+      - key: SYNDICATE_ENABLE_SOCCER_PREGAME_REFRESH_AUTORUN
+        value: "true"
+      - key: SYNDICATE_SOCCER_PREGAME_REFRESH_INTERVAL_SECONDS
+        value: "14400"
       - key: SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER
         value: "false"
       - key: SYNDICATE_LOOK_AHEAD_ENABLED

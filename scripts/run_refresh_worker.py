@@ -378,7 +378,21 @@ def _launch_autorun_soccer_weekly_refresh(
         result = launch_refresh_run(
             date=selected_date,
             sports="soccer",
-            phase="all",
+            # #148: was "all" -- ran soccer_{league}_odds/props/schedule
+            # (fetch_soccer_oddsapi_odds_local.py/fetch_soccer_oddsapi_props_local.py,
+            # direct OddsAPI calls) from refresh-worker on top of
+            # soccer_{league}_artifacts (the sim, the actual reason this
+            # autorun belongs here). That's a second, independent OddsAPI
+            # caller for soccer alongside live-odds-worker -- the same
+            # violation class fixed for MLB in #139/#144, just for a
+            # different sport. "live" keeps this autorun's real job (the sim
+            # -- soccer_{league}_artifacts and _live_state both accept
+            # phase="live" per their own phases tuples) while dropping the
+            # pregame-only odds/props/schedule steps, which
+            # _launch_autorun_soccer_pregame_refresh (run_live_odds_refresh_worker.py)
+            # now owns instead, on live-odds-worker, independent of the
+            # shared adaptive tick's global (cross-sport) phase.
+            phase="live",
             execution_mode="source",
             regions="us",
             skip_mirror=True,

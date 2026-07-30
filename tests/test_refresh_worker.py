@@ -386,7 +386,15 @@ class RefreshWorkerTests(unittest.TestCase):
             mocked_launch.assert_called_once()
             called_kwargs = mocked_launch.call_args.kwargs
             self.assertEqual(called_kwargs["sports"], "soccer")
-            self.assertEqual(called_kwargs["phase"], "all")
+            # #148: was "all" -- ran soccer's odds/props/schedule steps
+            # directly from refresh-worker, a second direct OddsAPI caller
+            # for soccer alongside live-odds-worker (same violation class
+            # fixed for MLB in #139/#144). "live" keeps this autorun's real
+            # job (the sim, soccer_{league}_artifacts, phases=("pregame","live"))
+            # while dropping the pregame-only odds/props/schedule steps,
+            # which _launch_autorun_soccer_pregame_refresh
+            # (run_live_odds_refresh_worker.py) now owns instead.
+            self.assertEqual(called_kwargs["phase"], "live")
             self.assertEqual(called_kwargs["launch_mode"], "web_process")
             mocked_popen.assert_not_called()
             worker_status = json.loads(worker_status_path.read_text(encoding="utf-8"))

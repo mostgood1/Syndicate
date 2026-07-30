@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
+from syndicate.features.soccer.features.loaders import build_soccer_player_features
 from syndicate.features.soccer.features.loaders import build_soccer_simulation_input
 from syndicate.features.soccer.features.loaders import compute_team_ratings
 from syndicate.features.soccer.features.loaders import team_rows_from_match_history
@@ -46,6 +48,47 @@ class TeamNameTests(unittest.TestCase):
         # clear the default threshold and returns None.
         candidates = ["New York Red Bulls", "Charlotte FC"]
         self.assertEqual(match_team_name("Red Bull New York", candidates), "New York Red Bulls")
+
+
+class BuildSoccerPlayerFeaturesTests(unittest.TestCase):
+    # #148 follow-up. build_soccer_player_features silently dropped any
+    # player whose roster-CSV team name doesn't resolve against the
+    # fixture's ESPN team names -- no log, no count, same "no error path
+    # for an unmatched case" shape as #146's _load_player_rows. Confirming
+    # the drop behavior is unchanged (still correctly excludes an
+    # unmatched-team player from the fixture) while also confirming the new
+    # visibility print actually fires for the dropped row and stays quiet
+    # when nothing was dropped.
+    def _rows(self) -> list[dict]:
+        return [
+            {"player_id": "p1", "player_name": "Real Player", "team": "Manchester City", "position": "FW"},
+            {"player_id": "p2", "player_name": "Ghost Player", "team": "Real Madrid", "position": "MF"},
+        ]
+
+    def test_matched_player_is_kept_and_unmatched_player_is_dropped(self) -> None:
+        features = build_soccer_player_features(
+            self._rows(), league="epl", date="2026-08-01", fixture_teams=["Manchester City", "Everton"]
+        )
+        self.assertEqual(len(features), 1)
+        self.assertEqual(features[0].player_name, "Real Player")
+        self.assertEqual(features[0].team, "Manchester City")
+
+    def test_unmatched_team_prints_a_visible_drop_summary(self) -> None:
+        with patch("builtins.print") as mocked_print:
+            build_soccer_player_features(
+                self._rows(), league="epl", date="2026-08-01", fixture_teams=["Manchester City", "Everton"]
+            )
+        mocked_print.assert_called_once()
+        printed_text = mocked_print.call_args.args[0]
+        self.assertIn("SOCCER_PLAYER_ROWS_UNMATCHED_TEAM", printed_text)
+        self.assertIn("Real Madrid", printed_text)
+
+    def test_no_print_when_every_row_matches(self) -> None:
+        rows = [{"player_id": "p1", "player_name": "Real Player", "team": "Manchester City", "position": "FW"}]
+        with patch("builtins.print") as mocked_print:
+            features = build_soccer_player_features(rows, league="epl", date="2026-08-01", fixture_teams=["Manchester City", "Everton"])
+        self.assertEqual(len(features), 1)
+        mocked_print.assert_not_called()
 
 
 class TeamRatingTests(unittest.TestCase):

@@ -166,10 +166,22 @@ def build_soccer_player_features(
     adapter's home/away side matching lines up regardless of source.
     """
     features: list[SoccerPlayerFeatures] = []
+    dropped_teams: dict[str, int] = {}
     for row in player_rows:
         source_team = str(row.get("team") or "")
         fixture_team = match_team_name(source_team, fixture_teams)
         if fixture_team is None:
+            # #148 follow-up. Same "no error path for an unmatched case"
+            # shape as #146's _load_player_rows -- a roster-CSV team name
+            # that doesn't resolve against this fixture's ESPN team names
+            # (a rename, a promoted/relegated club, a data-source spelling
+            # mismatch) silently vanished every one of that team's players
+            # from the fixture's props, with nothing anywhere to show it
+            # happened. Not currently firing for any tracked league
+            # (confirmed team-name matching succeeds for all of them as of
+            # 2026-07-30), but worth a visible signal instead of a silent
+            # zero the next time a roster/fixture naming mismatch appears.
+            dropped_teams[source_team] = dropped_teams.get(source_team, 0) + 1
             continue
         usage_metrics = {
             key: row.get(key)
@@ -200,6 +212,12 @@ def build_soccer_player_features(
                 usage_metrics=usage_metrics,
                 adapter_metadata={"source_team": source_team, "source": row.get("source")},
             )
+        )
+    if dropped_teams:
+        print(
+            f"[loaders] SOCCER_PLAYER_ROWS_UNMATCHED_TEAM league={league} date={date} "
+            f"fixture_teams={list(fixture_teams)} dropped_by_source_team={dropped_teams}",
+            flush=True,
         )
     return tuple(features)
 

@@ -59,9 +59,77 @@ unpushed. Cross-session ID collisions (#131, #139) were both caught and
 resolved without data loss, in both directions, via direct session-to-
 session messages rather than silent overwrites.
 
-> **Next free ID: 148.** IDs are never reused. Closed items move to
+> **Next free ID: 149.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
+
+- **New: #148** (root-caused, fixed, and tested this session, **NOT YET
+  DEPLOYED at time of writing**) — user asked for a full soccer architecture
+  assessment mirroring the earlier MLB (#129) and WNBA audits. Found two real
+  issues: (1) an odds-ownership violation — #146/#137's own
+  `_launch_autorun_soccer_weekly_refresh` (`scripts/run_refresh_worker.py`)
+  runs `phase="all"`, which includes soccer's pregame-only
+  odds/props/schedule steps (`fetch_soccer_oddsapi_odds_local.py`/
+  `fetch_soccer_oddsapi_props_local.py` — direct OddsAPI calls). That made
+  refresh-worker a second direct OddsAPI caller for soccer, the same
+  violation class already fixed for MLB in #139/#144 (only live-odds-worker
+  should ever call OddsAPI). Root cause of why this workaround existed in the
+  first place: `_run_live_refresh_tick`'s adaptive phase
+  (`syndicate/features/shared/live_refresh_loop.py`) is a single GLOBAL
+  decision across ALL active sports (`effective_phase = "live"` the instant
+  ANY sport has a live game), not per-sport — with MLB/WNBA/NBA live most
+  evenings, soccer's own per-sport pregame cadence
+  (`_apply_pregame_sport_cadence`, 8h window) rarely coincides with a
+  genuinely "pregame" global tick, so soccer's pregame steps kept getting
+  filtered out of live-odds-worker's real launches even when soccer was
+  independently due. **Fixed** by splitting ownership: added
+  `_launch_autorun_soccer_pregame_refresh()` to
+  `scripts/run_live_odds_refresh_worker.py` — an independent, soccer-scoped
+  trigger that never depends on the shared tick's cross-sport phase, gated by
+  new env vars `SYNDICATE_ENABLE_SOCCER_PREGAME_REFRESH_AUTORUN` (off by
+  default) and `SYNDICATE_SOCCER_PREGAME_REFRESH_INTERVAL_SECONDS` (default
+  14400s/4h, matching the old cadence), calling
+  `launch_refresh_run(phase="pregame")` directly on its own schedule.
+  `_launch_autorun_soccer_weekly_refresh` (`run_refresh_worker.py`) is now
+  scoped to `phase="live"` only, keeping just the sim
+  (`soccer_{league}_artifacts`, `phases=("pregame","live")`, no OddsAPI
+  dependency) and live_state polling. `render.yaml` updated: new env vars
+  added to live-odds-worker's block (`SYNDICATE_ENABLE_SOCCER_PREGAME_REFRESH_AUTORUN=true`,
+  `SYNDICATE_SOCCER_PREGAME_REFRESH_INTERVAL_SECONDS=14400`), refresh-worker's
+  existing soccer-autorun comment updated to reflect the `phase="live"`
+  narrowing. (2) A silent-failure pattern in
+  `syndicate/features/soccer/features/loaders.py`'s
+  `build_soccer_player_features` — a player row whose roster-CSV team name
+  doesn't resolve against the fixture's ESPN team names was silently dropped
+  with no log or count, the same "no error path for an unmatched case" shape
+  as #146's `_load_player_rows`. Not currently firing for any tracked league
+  (confirmed team-name matching succeeds for all 8 as of 2026-07-30), but
+  fixed pre-emptively: now tracks dropped rows by source team name and prints
+  a visible `SOCCER_PLAYER_ROWS_UNMATCHED_TEAM` summary (league, date,
+  fixture teams, drop counts by source team) when any occur — no behavior
+  change, purely observability. New tests:
+  `tests/test_live_odds_refresh_worker.py` (new file, 4 tests covering
+  disabled/not-active/launches-with-pregame-phase/interval-dedup, all
+  patching env via `patch.dict` with assertions kept inside the patched
+  block — an earlier draft that read the status file back outside the
+  `with` block failed because `reports_root()` re-reads
+  `SYNDICATE_REPORTS_ROOT` fresh on every call and had already reverted to
+  the real repo path by then); `tests/test_refresh_worker.py` updated to
+  assert `phase == "live"` instead of `"all"`; 3 new tests in
+  `tests/test_soccer_feature_loaders.py` for the loaders.py print. 142/142
+  passing across `tests/test_refresh_worker.py` (24),
+  `tests/test_live_odds_refresh_worker.py` (4),
+  `tests/test_soccer_feature_loaders.py` (12), `tests/test_ops.py` (rest).
+  **Unrelated pre-existing flakiness noted, not caused by this work**: 6
+  tests in `tests/test_live_refresh_loop.py` fail intermittently based on
+  real on-disk cadence state that isn't fully mocked away by those tests
+  (confirmed by reverting every file this session touched and reproducing
+  the same 6 failures on unmodified `HEAD` — a pre-existing test-isolation
+  gap, not a regression from this fix; worth a follow-up if it starts
+  blocking CI). **Not yet deployed** — next steps: commit, push, deploy all
+  three services, then confirm `SOCCER_PREGAME_AUTORUN_LAUNCHED` actually
+  appears in live-odds-worker's logs and that MLS's current-week artifact
+  eventually regenerates with real player props under the new split.
 
 - **New: #147** (implemented, deployed, and confirmed against production
   data this session) — user asked for the Layer 2 board to show three

@@ -29,9 +29,92 @@ from syndicate.features.shared.live_refresh_loop import _release_process_lock
 from syndicate.features.shared.live_refresh_loop import _LIVE_REFRESH_LOOP_STOP
 from syndicate.features.shared.live_lens_loop import start_live_lens_loop
 from syndicate.features.shared.refresh_state_store import assert_refresh_state_backend_ready
+from syndicate.features.shared.refresh_state_store import read_json_file
+from syndicate.features.shared.refresh_state_store import reports_root
+from syndicate.features.shared.refresh_state_store import write_json_file
 from syndicate.features.shared.memory_observability import log_all_process_memory
 from syndicate.features.shared.memory_observability import log_runtime_memory
+from syndicate.features.shared.ops_refresh import _active_sports_for_date
+from syndicate.features.shared.ops_refresh import launch_refresh_run
+from syndicate.features.shared.timezone import central_today_iso
 from vendor.mlb_bettingv2.tools.web.flask_frontend import start_live_lens_background_loop
+
+
+# #148. Soccer's pregame steps (schedule/odds/props/picks --
+# scripts/refresh_odds_sources.py's _build_soccer_steps, phases=("pregame",))
+# depend on _run_live_refresh_tick's shared adaptive phase ever actually
+# resolving to "pregame" -- but that phase is a single GLOBAL decision across
+# ALL active sports (effective_phase = "live" the instant ANY sport anywhere
+# has a live game), not per-sport. With MLB/WNBA/NBA running live games most
+# evenings, soccer's own per-sport pregame-cadence window
+# (_apply_pregame_sport_cadence, 8h) and the tick's global phase being
+# genuinely "pregame" rarely coincide in practice -- confirmed live
+# 2026-07-30: MLB's live game made effective_phase="live" while soccer was
+# independently "due" for its own sweep, so soccer's pregame steps still got
+# filtered out of that tick's launch entirely. That's why #137/#146's own
+# workaround put a dedicated, unconditional autorun on refresh-worker instead
+# (phase="all", bundling odds+props+schedule with the sim) -- but that made
+# refresh-worker a second direct OddsAPI caller for soccer, the same
+# violation class fixed for MLB in #139/#144.
+#
+# This is the real fix: an independent, soccer-scoped pregame trigger that
+# never depends on the shared tick's cross-sport phase at all -- runs on its
+# own cadence, calls launch_refresh_run(phase="pregame") directly, only ever
+# covering schedule/odds/props/picks (odds ownership stays on
+# live-odds-worker, where it belongs). refresh-worker's own autorun now
+# requests phase="live" only, keeping just the sim (soccer_{league}_artifacts,
+# phases=("pregame","live")) and live_state polling.
+def _soccer_pregame_refresh_enabled() -> bool:
+    raw_value = str(os.environ.get("SYNDICATE_ENABLE_SOCCER_PREGAME_REFRESH_AUTORUN") or "").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
+
+
+def _soccer_pregame_refresh_interval_seconds() -> int:
+    raw_value = str(os.environ.get("SYNDICATE_SOCCER_PREGAME_REFRESH_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = int(raw_value or 14400)  # 4h -- matches refresh-worker's old cadence for this same work.
+    except ValueError:
+        value = 14400
+    return max(1, value)
+
+
+def _soccer_pregame_autorun_status_path() -> Path:
+    return reports_root() / "refresh_status" / "latest" / "soccer_pregame_autorun_status.json"
+
+
+def _soccer_active_for_date(date_str: str) -> bool:
+    active = {item.strip().lower() for item in _active_sports_for_date(date_str).split(",") if item.strip()}
+    return "soccer" in active
+
+
+def _launch_autorun_soccer_pregame_refresh() -> None:
+    if not _soccer_pregame_refresh_enabled():
+        return
+    selected_date = central_today_iso()
+    if not _soccer_active_for_date(selected_date):
+        return
+    status_path = _soccer_pregame_autorun_status_path()
+    last_status = read_json_file(status_path) or {}
+    last_epoch = float((last_status or {}).get("epoch") or 0.0)
+    if last_epoch > 0.0 and (time.time() - last_epoch) < float(_soccer_pregame_refresh_interval_seconds()):
+        return
+    try:
+        result = launch_refresh_run(
+            date=selected_date,
+            sports="soccer",
+            phase="pregame",
+            execution_mode="source",
+            regions="us",
+            skip_mirror=True,
+            mode=str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_MODE") or "full"),
+            launch_mode="web_process",
+        )
+    except Exception as exc:
+        write_json_file(status_path, {"epoch": time.time(), "sports": "soccer", "date": selected_date, "error": f"{type(exc).__name__}: {exc}"})
+        print(f"[live_odds_worker] SOCCER_PREGAME_AUTORUN_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return
+    write_json_file(status_path, {"epoch": time.time(), "sports": "soccer", "date": selected_date})
+    print(f"[live_odds_worker] SOCCER_PREGAME_AUTORUN_LAUNCHED date={selected_date} pid={result.get('pid')}", flush=True)
 
 
 def _memory_trace_enabled() -> bool:
@@ -183,6 +266,15 @@ def _max_uptime_seconds() -> float | None:
 
 
 def _run_tick() -> dict[str, object] | None:
+    # #148: independent of the shared adaptive tick below (same relationship
+    # as run_refresh_worker.py's own MLB sim tick, called every cycle
+    # regardless of the queued-contract handling) -- its own interval gate
+    # makes this a no-op on every call except when soccer's pregame refresh
+    # is actually due, so calling it unconditionally here is cheap.
+    try:
+        _launch_autorun_soccer_pregame_refresh()
+    except Exception as exc:
+        print(f"[live_odds_worker] SOCCER_PREGAME_AUTORUN_ERROR {type(exc).__name__}: {exc}", flush=True)
     try:
         _log_worker_memory("tick_start")
         meta = _run_live_refresh_tick()
