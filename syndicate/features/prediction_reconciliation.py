@@ -153,7 +153,16 @@ def _row_outcome(row: Mapping[str, Any], prediction: Mapping[str, Any]) -> str |
     except Exception:
         return None
 
-    selection_text = _normalize_text(prediction.get("selection"))
+    # The wagered side lives in features_snapshot.pick for bets logged since
+    # the bet-slip write-path fix (portfolio_bets_api) -- `prediction.
+    # selection` is the player's name for a straight prop bet, not the side,
+    # so it never carries over/under text on its own. Legacy predictions
+    # (no features_snapshot.pick) fall through to the old selection-text
+    # heuristic, which still works for any prediction whose selection text
+    # itself happens to be "Over 4.5"/"Under 4.5"-shaped.
+    features_snapshot = prediction.get("features_snapshot") if isinstance(prediction.get("features_snapshot"), Mapping) else {}
+    pick_text = _normalize_text(features_snapshot.get("pick"))
+    selection_text = pick_text or _normalize_text(prediction.get("selection"))
     if "under" in selection_text:
         if actual < line:
             return "win"
@@ -269,6 +278,30 @@ def _candidate_result_debug_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict
             }
         )
     return candidates
+
+
+def pending_prediction_dates(*, ledger_path: Path | str | None = None) -> list[str]:
+    """Distinct dates (YYYY-MM-DD) carrying at least one still-unsettled
+    prediction.
+
+    Without this, a caller that only ever reconciles a fixed rolling window
+    (e.g. "yesterday and today") can never retry a prediction whose date
+    fell outside that window on every run since it was logged -- worker
+    downtime, the autorun flag not being live yet, or simply placing a bet
+    a few days ahead of the game all produce a prediction that's dated
+    outside "yesterday/today" forever, even once real result data exists.
+    """
+    ledger_root = Path(ledger_path) if ledger_path is not None else None
+    predictions = load_all_predictions(ledger_path=ledger_root)
+    dates: set[str] = set()
+    for prediction in predictions:
+        result = prediction.get("result") if isinstance(prediction.get("result"), Mapping) else None
+        if result and _normalize_text(result.get("outcome")) in {"win", "loss", "push", "void"}:
+            continue
+        prediction_date = _prediction_date(prediction)
+        if prediction_date:
+            dates.add(prediction_date)
+    return sorted(dates)
 
 
 def reconcile_prediction_results_for_date(

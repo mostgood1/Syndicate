@@ -214,6 +214,20 @@
     color: var(--cards-text-soft);
     font-variant-numeric: tabular-nums;
   }
+
+  .portfolio-delete-btn {
+    background: transparent;
+    border: 1px solid rgba(231, 76, 60, 0.4);
+    border-radius: 8px;
+    color: #e74c3c;
+    font-size: 11px;
+    padding: 4px 8px;
+    cursor: pointer;
+  }
+
+  .portfolio-delete-btn:hover {
+    background: rgba(231, 76, 60, 0.12);
+  }
 </style>
 
 {% set summary = portfolio_summary or {} %}
@@ -305,6 +319,7 @@
             <th>Confidence</th>
             <th>Status</th>
             <th>P/L</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -331,6 +346,11 @@
               <td>{{ "%.0f"|format(row.confidence) if row.confidence is not none else "—" }}</td>
               <td><span class="status-pill-inline status-pill-inline--{{ row.status }}">{{ row.status }}</span></td>
               <td>{{ "%+.2f"|format(row.pnl) if row.pnl is not none else "—" }}</td>
+              <td>
+                <form method="post" action="/portfolio/bets/{{ row.id }}/delete" onsubmit="return confirm('Delete this bet?');">
+                  <button type="submit" class="portfolio-delete-btn">Delete</button>
+                </form>
+              </td>
             </tr>
           {% endfor %}
         </tbody>

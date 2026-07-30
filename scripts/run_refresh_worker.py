@@ -432,7 +432,8 @@ def _launch_autorun_soccer_weekly_refresh(
 # ever invoked from scripts/daily_update.ps1's GHA pipeline. Runs in-process
 # (unlike the launch_refresh_run-based autoruns above) since it's a light
 # read/write over the prediction ledger, not a heavy subprocess. Reconciles
-# both yesterday's and today's Central-time dates on every run: matching
+# yesterday's and today's Central-time dates PLUS every date that still has
+# an unsettled prediction (pending_prediction_dates()) on every run: matching
 # predictions are skipped cheaply (see reconcile_prediction_results_for_date),
 # so this is safe to call repeatedly rather than needing to precisely
 # replicate the old pipeline's exact run-time semantics.
@@ -454,6 +455,65 @@ def _reconciliation_autorun_status_path() -> Path:
     return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "reconciliation_autorun_status.json"
 
 
+def _mlb_actuals_writer_enabled() -> bool:
+    raw_value = str(os.environ.get("RECONCILIATION_ENABLE_MLB_ACTUALS_WRITER") or "").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
+
+
+def _mlb_actuals_writer_interval_seconds() -> int:
+    raw_value = str(os.environ.get("RECONCILIATION_MLB_ACTUALS_WRITER_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = int(raw_value or 3600)
+    except ValueError:
+        value = 3600
+    return max(1, value)
+
+
+def _mlb_actuals_writer_status_path() -> Path:
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "mlb_actuals_writer_status.json"
+
+
+def _run_mlb_actuals_writer_tick() -> dict[str, Any] | None:
+    # Gated and run independently of _launch_autorun_reconciliation below --
+    # deliberately does NOT live inside that function's elif chain (see the
+    # main loop), so a cycle that also claims a reconciliation-autorun turn
+    # still gets a fresh actuals write first. Own env var/interval so it can
+    # be toggled without touching the (already-working, per #96) reconciliation
+    # autorun flag.
+    if not _mlb_actuals_writer_enabled():
+        return None
+    status_path = _mlb_actuals_writer_status_path()
+    last_status = _refresh_state_store()["read_json_file"](status_path) or {}
+    last_epoch = float((last_status or {}).get("epoch") or 0.0)
+    if last_epoch > 0.0 and (time.time() - last_epoch) < float(_mlb_actuals_writer_interval_seconds()):
+        return None
+
+    from scripts.build_mlb_actuals import write_mlb_actuals_for_date
+    from syndicate.features.prediction_reconciliation import pending_prediction_dates
+
+    today_date = central_today_iso()
+    yesterday_date = (date.fromisoformat(today_date) - timedelta(days=1)).isoformat()
+    try:
+        stale_pending_dates = pending_prediction_dates()
+    except Exception:
+        stale_pending_dates = []
+    target_dates = tuple(sorted({yesterday_date, today_date, *stale_pending_dates}))
+    output_root = _refresh_state_store()["data_root"]()
+
+    summaries: dict[str, Any] = {}
+    error_text: str | None = None
+    try:
+        for target_date in target_dates:
+            result = write_mlb_actuals_for_date(target_date, output_root=output_root)
+            summaries[target_date] = result.get("summary")
+    except Exception as exc:
+        error_text = f"{type(exc).__name__}: {exc}"
+
+    status = {"epoch": time.time(), "dates": list(target_dates), "summaries": summaries, "error": error_text}
+    _refresh_state_store()["write_json_file"](status_path, status)
+    return status
+
+
 def _launch_autorun_reconciliation(
     *,
     latest_manifest_path: Path,
@@ -469,16 +529,38 @@ def _launch_autorun_reconciliation(
     if last_epoch > 0.0 and (time.time() - last_epoch) < float(_reconciliation_interval_seconds()):
         return False
 
+    from syndicate.features.prediction_reconciliation import pending_prediction_dates
     from syndicate.features.prediction_reconciliation import reconcile_prediction_results_for_date
 
     today_date = central_today_iso()
     yesterday_date = (date.fromisoformat(today_date) - timedelta(days=1)).isoformat()
-    target_dates = (yesterday_date, today_date)
+    # Always include yesterday/today (cheap, catches same-day settlement),
+    # unioned with every date that still has an unsettled prediction --
+    # reconcile_prediction_results_for_date is already a safe no-op for
+    # anything already settled, so retrying a growing date list here costs
+    # nothing extra once a date's predictions are actually resolved. Without
+    # this union, any prediction dated outside yesterday/today (worker
+    # downtime, the autorun flag not being live yet when it was logged, an
+    # advance bet placed a few days ahead of the game) could never be
+    # retried again, no matter how long the app kept running.
+    try:
+        stale_pending_dates = pending_prediction_dates()
+    except Exception:
+        stale_pending_dates = []
+    target_dates = tuple(sorted({yesterday_date, today_date, *stale_pending_dates}))
+    # reconcile_prediction_results_for_date's own default result_roots
+    # ([repo_root]/data) is the EPHEMERAL code checkout, not the persistent
+    # Render disk (data_root(), SYNDICATE_DATA_ROOT) result-file writers
+    # (e.g. scripts/build_mlb_actuals.py) actually write to -- passing it
+    # explicitly here is what lets the autorun path actually find them.
+    # The CLI entrypoint (scripts/daily_update.ps1's GHA pipeline) keeps
+    # using the function's own repo-relative default, unaffected by this.
+    result_roots = [_refresh_state_store()["data_root"]()]
     summaries: dict[str, Any] = {}
     error_text: str | None = None
     try:
         for target_date in target_dates:
-            result = reconcile_prediction_results_for_date(target_date)
+            result = reconcile_prediction_results_for_date(target_date, result_roots=result_roots)
             summaries[target_date] = result.get("summary")
     except Exception as exc:
         error_text = f"{type(exc).__name__}: {exc}"
@@ -505,7 +587,89 @@ def _launch_autorun_reconciliation(
         worker_status_path=worker_status_path,
         latest_manifest_path=latest_manifest_path,
         state="launched",
-        detail=f"Auto-ran prediction reconciliation for {yesterday_date} and {today_date}.",
+        detail=f"Auto-ran prediction reconciliation for {', '.join(target_dates)}.",
+        ran_job=True,
+        run_exit_code=0,
+        latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+        refresh_cycle=refresh_cycle,
+    )
+    return True
+
+
+# Evaluation-ledger settlement (syndicate.features.shared.evaluation_settlement)
+# never runs on Render today -- the ledger's settle_result() had no caller at
+# all until this autorun was added. Off by default so it can be verified
+# against real production data (dry-run match rates) before being trusted to
+# write on a schedule; mirrors the reconciliation autorun's shape above.
+def _evaluation_settlement_auto_refresh_enabled() -> bool:
+    raw_value = str(os.environ.get("EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN") or "").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
+
+
+def _evaluation_settlement_interval_seconds() -> int:
+    raw_value = str(os.environ.get("EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = int(raw_value or 86400)
+    except ValueError:
+        value = 86400
+    return max(1, value)
+
+
+def _evaluation_settlement_autorun_status_path() -> Path:
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "evaluation_settlement_autorun_status.json"
+
+
+def _launch_autorun_evaluation_settlement(
+    *,
+    latest_manifest_path: Path,
+    worker_status_path: Path,
+    refresh_cycle: dict[str, int],
+) -> bool:
+    if not _evaluation_settlement_auto_refresh_enabled():
+        return False
+
+    status_path = _evaluation_settlement_autorun_status_path()
+    last_status = _refresh_state_store()["read_json_file"](status_path) or {}
+    last_epoch = float((last_status or {}).get("epoch") or 0.0)
+    if last_epoch > 0.0 and (time.time() - last_epoch) < float(_evaluation_settlement_interval_seconds()):
+        return False
+
+    from syndicate.features.shared.evaluation_settlement import settle_ledger_for_dates
+
+    today_date = central_today_iso()
+    yesterday_date = (date.fromisoformat(today_date) - timedelta(days=1)).isoformat()
+    target_dates = (yesterday_date, today_date)
+    summaries: dict[str, Any] = {}
+    error_text: str | None = None
+    try:
+        result = settle_ledger_for_dates(list(target_dates), sports=["mlb", "wnba"])
+        summaries = result.get("totals") or {}
+    except Exception as exc:
+        error_text = f"{type(exc).__name__}: {exc}"
+
+    _refresh_state_store()["write_json_file"](
+        status_path,
+        {"epoch": time.time(), "dates": list(target_dates), "summary": summaries, "error": error_text},
+    )
+
+    if error_text:
+        _write_worker_status(
+            worker_status_path=worker_status_path,
+            latest_manifest_path=latest_manifest_path,
+            state="error",
+            detail=f"Failed to auto-run evaluation-ledger settlement: {error_text}",
+            ran_job=False,
+            latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+            refresh_cycle=refresh_cycle,
+        )
+        return False
+
+    refresh_cycle["claimed_count"] = int(refresh_cycle.get("claimed_count") or 0) + 1
+    _write_worker_status(
+        worker_status_path=worker_status_path,
+        latest_manifest_path=latest_manifest_path,
+        state="launched",
+        detail=f"Auto-ran evaluation-ledger settlement for {', '.join(target_dates)}: {summaries}.",
         ran_job=True,
         run_exit_code=0,
         latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
@@ -823,6 +987,16 @@ def main() -> int:
             print(f"[refresh_worker] MLB_SIM_TICK_ERROR {type(exc).__name__}: {exc}", flush=True)
         _diag_log_all_process_memory("post_mlb_sim_tick")
 
+        # Unconditional (not part of the claimed_count/elif chain below) so a
+        # cycle that also claims a reconciliation-autorun turn still gets a
+        # freshly-written actuals file first -- see _run_mlb_actuals_writer_tick.
+        try:
+            mlb_actuals_meta = _run_mlb_actuals_writer_tick()
+            if mlb_actuals_meta:
+                print(f"[refresh_worker] MLB_ACTUALS_TICK {json.dumps(mlb_actuals_meta, sort_keys=True, default=str)}", flush=True)
+        except Exception as exc:
+            print(f"[refresh_worker] MLB_ACTUALS_TICK_ERROR {type(exc).__name__}: {exc}", flush=True)
+
         refresh_cycle = {"claimed_count": 0, "reclaimed_count": 0, "skipped_due_to_cap": 0}
         if _recover_stuck_claim(latest_manifest_path, timeout_minutes=stuck_claim_timeout_minutes):
             refresh_cycle["reclaimed_count"] = 1
@@ -907,6 +1081,13 @@ def main() -> int:
             if args.run_once:
                 return 0
         elif _launch_autorun_reconciliation(
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_evaluation_settlement(
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,

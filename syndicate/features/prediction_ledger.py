@@ -385,6 +385,36 @@ def record_result(
     return result_dict
 
 
+def delete_prediction(prediction_id: Any, ledger_path: Path | str | None = None) -> bool:
+    """Remove a prediction (and its result, if any) from the ledger.
+
+    Manual escape hatch for the small set of predictions that can never
+    settle automatically -- e.g. logged before the bet-slip write-path fix
+    that started capturing a real wagered side/line, whose original board
+    context is gone and can't be recovered. Returns whether anything was
+    actually removed.
+    """
+    target_id = _normalize_text(prediction_id)
+    if not target_id:
+        return False
+    path = Path(ledger_path) if ledger_path is not None else _default_ledger_path()
+    payload = _read_payload(path)
+    predictions = [dict(item) for item in payload.get("predictions", []) if isinstance(item, Mapping)]
+    results = [dict(item) for item in payload.get("results", []) if isinstance(item, Mapping)]
+
+    remaining_predictions = [item for item in predictions if _normalize_text(item.get("id")) != target_id]
+    remaining_results = [item for item in results if _normalize_text(item.get("prediction_id")) != target_id]
+    removed = len(remaining_predictions) != len(predictions) or len(remaining_results) != len(results)
+    if not removed:
+        return False
+
+    payload["predictions"] = remaining_predictions
+    payload["results"] = remaining_results
+    payload["updated_at"] = _utc_now()
+    _write_payload(path, payload)
+    return True
+
+
 def result_exists(prediction_id: Any, ledger_path: Path | str | None = None) -> bool:
     path = Path(ledger_path) if ledger_path is not None else _default_ledger_path()
     payload = _read_payload(path)

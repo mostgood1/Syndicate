@@ -133,11 +133,19 @@ window.SyndicateBetSlip = (function () {
     const leg = {
       name: card.getAttribute("data-syndicate-name") || "",
       market: card.getAttribute("data-syndicate-market") || "",
+      // The wagered side (Over/Under), distinct from `name` -- for a player
+      // prop `name` is the player's display title, never the pick itself.
+      // Without this, the ledger has no way to grade a settled prop: it can
+      // know the final stat total and the line, but not which side of that
+      // line was actually bet.
+      pick: card.getAttribute("data-syndicate-selection") || "",
       propLine: card.getAttribute("data-syndicate-prop-line") || "",
       odds: card.getAttribute("data-syndicate-odds") || "",
       sport: card.getAttribute("data-syndicate-sport") || "",
       predictionId: card.getAttribute("data-syndicate-prediction-id") || "",
       recommendationId: card.getAttribute("data-syndicate-recommendation-id") || "",
+      eventId: card.getAttribute("data-syndicate-event-id") || "",
+      gameDate: card.getAttribute("data-syndicate-game-date") || "",
       stake: DEFAULT_SLIP_STAKE,
     };
     const key = slipLegKey(leg);
@@ -219,6 +227,10 @@ window.SyndicateBetSlip = (function () {
           odds: Number(leg.odds) || null,
           prediction_id: leg.predictionId || undefined,
           recommendation_id: leg.recommendationId || undefined,
+          pick: leg.pick || undefined,
+          line: leg.propLine || undefined,
+          event_id: leg.eventId || undefined,
+          game_date: leg.gameDate || undefined,
         }));
         const combinedDecimal = combinedDecimalOdds(betSlip);
         const combinedAmerican = combinedDecimal === null ? null : americanOddsFromDecimal(combinedDecimal);
@@ -233,6 +245,10 @@ window.SyndicateBetSlip = (function () {
             stake: Number(leg.stake) || 0,
             prediction_id: leg.predictionId || undefined,
             recommendation_id: leg.recommendationId || undefined,
+            pick: leg.pick || undefined,
+            line: leg.propLine || undefined,
+            event_id: leg.eventId || undefined,
+            game_date: leg.gameDate || undefined,
           });
         }
       }

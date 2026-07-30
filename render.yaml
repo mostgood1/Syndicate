@@ -269,6 +269,18 @@ services:
         value: "true"
       - key: RECONCILIATION_REFRESH_INTERVAL_SECONDS
         value: "86400"
+      # MLB's own actuals writer (scripts/build_mlb_actuals.py) -- the "MLB
+      # has no actuals writer at all" gap the comment above calls out.
+      # Reads daily_top_props + each game's cached box score, writes
+      # props_actuals_{date}.csv (the RECONCILIATION_PATTERNS-recognized
+      # format), so the reconciliation autorun above has something to match
+      # MLB predictions against. Own flag/interval, independent of the
+      # reconciliation autorun's -- both must be true for MLB predictions to
+      # actually settle.
+      - key: RECONCILIATION_ENABLE_MLB_ACTUALS_WRITER
+        value: "true"
+      - key: RECONCILIATION_MLB_ACTUALS_WRITER_INTERVAL_SECONDS
+        value: "3600"
       - key: SYNDICATE_REQUIRE_HOSTED_STORAGE
         value: "true"
       - key: SYNDICATE_REFRESH_STATE_BACKEND

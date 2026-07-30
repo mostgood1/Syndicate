@@ -38,6 +38,7 @@ from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.shared.ops_refresh import launch_refresh_run
 from syndicate.features.shared.ops_refresh import load_latest_refresh_status
 from syndicate.features.portfolio_summary import build_portfolio_summary
+from syndicate.features.prediction_ledger import delete_prediction
 from syndicate.features.prediction_ledger import record_prediction
 
 
@@ -1762,7 +1763,21 @@ def portfolio_bets_api():
         stake = payload.get("stake")
         odds = payload.get("odds")
         recommendation_id = payload.get("recommendation_id")
-        features_snapshot = {"recommendation_id": recommendation_id} if recommendation_id else None
+        # Key names match what prediction_reconciliation.py's _prediction_keys/
+        # _prediction_date already read from features_snapshot (event_id/
+        # game_id/line/selected_date/date/game_date) -- no reconciliation
+        # read-side changes needed for those. "pick" (the wagered Over/Under
+        # side) is new: without it, a straight prop bet's ledger entry has no
+        # way to be graded even once real actual/line data exists, since
+        # `selection` is the player's name, not the side.
+        features_snapshot_fields = {
+            "recommendation_id": recommendation_id,
+            "pick": payload.get("pick"),
+            "line": payload.get("line"),
+            "event_id": payload.get("event_id"),
+            "game_date": payload.get("game_date"),
+        }
+        features_snapshot = {key: value for key, value in features_snapshot_fields.items() if value not in (None, "")} or None
 
         if bet_type == "parlay":
             legs = payload.get("legs")
@@ -1923,3 +1938,15 @@ def portfolio_summary_api():
 def portfolio_home():
     summary = build_portfolio_summary(limit=100)
     return render_template("portfolio.html", portfolio_summary=summary)
+
+
+@intelligence_bp.post("/portfolio/bets/<prediction_id>/delete")
+def portfolio_bet_delete(prediction_id: str):
+    # Plain page-form action, not a /api/ JSON endpoint -- /portfolio is
+    # currently 100% server-rendered with no client-side JS at all, so a
+    # plain HTML form fits its existing style better than adding a
+    # fetch-based flow for just this one action. Manual escape hatch for
+    # predictions that can never settle automatically (see
+    # prediction_ledger.delete_prediction's own docstring).
+    delete_prediction(prediction_id)
+    return redirect("/portfolio", code=303)

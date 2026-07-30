@@ -472,7 +472,13 @@ class RefreshWorkerTests(unittest.TestCase):
             ), patch.object(module, "central_today_iso", return_value="2026-07-15"), patch(
                 "syndicate.features.prediction_reconciliation.reconcile_prediction_results_for_date",
                 return_value={"ok": True, "summary": fake_summary},
-            ) as mocked_reconcile:
+            ) as mocked_reconcile, patch(
+                # No stale pending dates in this case -- verifies the
+                # yesterday/today behavior is unchanged when
+                # pending_prediction_dates() has nothing extra to add.
+                "syndicate.features.prediction_reconciliation.pending_prediction_dates",
+                return_value=[],
+            ):
                 exit_code = module.main()
 
             self.assertEqual(exit_code, 0)
@@ -482,6 +488,55 @@ class RefreshWorkerTests(unittest.TestCase):
             worker_status = json.loads(worker_status_path.read_text(encoding="utf-8"))
             self.assertEqual(worker_status["state"], "launched")
             self.assertTrue(worker_status["ranJob"])
+
+    def test_main_run_once_reconciles_stale_pending_dates_too(self) -> None:
+        # #147 follow-up: predictions dated outside the yesterday/today
+        # window (worker downtime, autorun flag not live yet when logged,
+        # an advance bet) previously could never be retried again, no
+        # matter how long the app kept running. pending_prediction_dates()
+        # must widen the reconciled date set to include them.
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            latest_manifest_path = reports_root / "refresh_status" / "latest" / "refresh_status_latest.json"
+            worker_status_path = reports_root / "refresh_status" / "latest" / "refresh_worker_status.json"
+            latest_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            latest_manifest_path.write_text(json.dumps({"state": "idle"}), encoding="utf-8")
+
+            fake_summary = {"date": "placeholder", "predictions": 0, "resolved": 0, "skipped": 0, "result_files": []}
+
+            with patch.dict(
+                module.os.environ,
+                {
+                    "SYNDICATE_REPORTS_ROOT": str(reports_root),
+                    "RECONCILIATION_ENABLE_REFRESH_WORKER_AUTORUN": "1",
+                },
+                clear=True,
+            ), patch.object(
+                sys,
+                "argv",
+                [
+                    "run_refresh_worker.py",
+                    "--latest-manifest",
+                    str(latest_manifest_path),
+                    "--worker-status",
+                    str(worker_status_path),
+                    "--run-once",
+                ],
+            ), patch.object(module, "central_today_iso", return_value="2026-07-15"), patch(
+                "syndicate.features.prediction_reconciliation.reconcile_prediction_results_for_date",
+                return_value={"ok": True, "summary": fake_summary},
+            ) as mocked_reconcile, patch(
+                "syndicate.features.prediction_reconciliation.pending_prediction_dates",
+                return_value=["2026-06-23"],
+            ):
+                exit_code = module.main()
+
+            self.assertEqual(exit_code, 0)
+            called_dates = sorted(call.args[0] for call in mocked_reconcile.call_args_list)
+            self.assertEqual(called_dates, ["2026-06-23", "2026-07-14", "2026-07-15"])
 
     def test_main_run_once_skips_reconciliation_when_disabled(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
@@ -518,6 +573,44 @@ class RefreshWorkerTests(unittest.TestCase):
             mocked_reconcile.assert_not_called()
             worker_status = json.loads(worker_status_path.read_text(encoding="utf-8"))
             self.assertEqual(worker_status["state"], "idle")
+
+    def test_mlb_actuals_writer_tick_skipped_when_disabled(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+        with TemporaryDirectory() as tmp_dir, patch.dict(
+            module.os.environ,
+            {"SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports")},
+            clear=True,
+        ):
+            self.assertIsNone(module._run_mlb_actuals_writer_tick())
+
+    def test_mlb_actuals_writer_tick_runs_for_pending_and_recent_dates(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            data_root = Path(tmp_dir) / "data"
+            with patch.dict(
+                module.os.environ,
+                {
+                    "SYNDICATE_REPORTS_ROOT": str(reports_root),
+                    "SYNDICATE_DATA_ROOT": str(data_root),
+                    "RECONCILIATION_ENABLE_MLB_ACTUALS_WRITER": "1",
+                },
+                clear=True,
+            ), patch.object(module, "central_today_iso", return_value="2026-07-15"), patch(
+                "scripts.build_mlb_actuals.write_mlb_actuals_for_date",
+                return_value={"summary": {"resolved": 0}},
+            ) as mocked_writer, patch(
+                "syndicate.features.prediction_reconciliation.pending_prediction_dates",
+                return_value=["2026-06-23"],
+            ):
+                status = module._run_mlb_actuals_writer_tick()
+
+            self.assertIsNotNone(status)
+            called_dates = sorted(call.args[0] for call in mocked_writer.call_args_list)
+            self.assertEqual(called_dates, ["2026-06-23", "2026-07-14", "2026-07-15"])
 
     def test_main_run_once_marks_worker_status_claimed_when_pending(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
