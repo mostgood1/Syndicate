@@ -241,7 +241,7 @@ def _find_lens(row: dict[str, Any], key: str) -> dict[str, Any]:
 
 
 def _segment_items(row: dict[str, Any], *, limit: int = 4) -> list[str]:
-    order = ["live", "full", "first7", "first5", "first3", "first1"]
+    order = ["live", "full", "first5", "first3", "first1"]
     items: list[str] = []
     for key in order:
         lens = _find_lens(row, key)
@@ -644,7 +644,7 @@ def _live_lens_segments_from_card(card: dict[str, Any]) -> list[dict[str, Any]]:
     segments: list[dict[str, Any]] = []
     overview_rows = card.get("segment_overview_cards") if isinstance(card.get("segment_overview_cards"), list) else []
     probability_rows = card.get("probability_rows") if isinstance(card.get("probability_rows"), list) else []
-    row_order = ["live", "full", "first7", "first5", "first3", "first1"]
+    row_order = ["live", "full", "first5", "first3", "first1"]
     for index, row in enumerate(overview_rows):
         if not isinstance(row, dict):
             continue
@@ -652,8 +652,6 @@ def _live_lens_segments_from_card(card: dict[str, Any]) -> list[dict[str, Any]]:
         key_text = label.lower()
         if "live" in key_text:
             key = "live"
-        elif "7" in key_text:
-            key = "first7"
         elif "5" in key_text:
             key = "first5"
         elif "3" in key_text:

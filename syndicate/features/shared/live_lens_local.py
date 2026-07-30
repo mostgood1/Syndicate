@@ -363,6 +363,7 @@ def _score_market_games_day(root: Path, date_str: str) -> dict[str, Any]:
 
     overall = _init_accuracy_bucket()
     by_market: dict[str, dict[str, Any]] = {}
+    detail_rows: list[dict[str, Any]] = []
     for row in rec_rows:
         market = str(row.get("market") or "").strip().upper()
         side = str(row.get("side") or "").strip()
@@ -382,16 +383,17 @@ def _score_market_games_day(root: Path, date_str: str) -> dict[str, Any]:
             continue
         home_pts, away_pts = scores
         result = None
+        actual: float | None = None
         if market == "TOTAL" and line is not None:
-            actual_total = float(home_pts) + float(away_pts)
-            if abs(actual_total - float(line)) < 1e-9:
+            actual = float(home_pts) + float(away_pts)
+            if abs(actual - float(line)) < 1e-9:
                 result = "push"
             else:
                 normalized_side = side.lower()
                 if normalized_side.startswith("o"):
-                    result = "win" if actual_total > float(line) else "loss"
+                    result = "win" if actual > float(line) else "loss"
                 elif normalized_side.startswith("u"):
-                    result = "win" if actual_total < float(line) else "loss"
+                    result = "win" if actual < float(line) else "loss"
         elif market == "ATS" and line is not None:
             normalized_side = _norm_text(side)
             margin = float(home_pts) - float(away_pts)
@@ -400,6 +402,7 @@ def _score_market_games_day(root: Path, date_str: str) -> dict[str, Any]:
                 diff = margin + float(line)
             elif normalized_side == away:
                 diff = (float(away_pts) - float(home_pts)) + float(line)
+            actual = diff
             if diff is not None:
                 if abs(diff) < 1e-9:
                     result = "push"
@@ -417,11 +420,25 @@ def _score_market_games_day(root: Path, date_str: str) -> dict[str, Any]:
             by_market[market] = _init_accuracy_bucket()
         _apply_accuracy_result(overall, result, price)
         _apply_accuracy_result(by_market[market], result, price)
+        if result is not None:
+            detail_rows.append(
+                {
+                    "market": market,
+                    "side": side,
+                    "home": row.get("home"),
+                    "away": row.get("away"),
+                    "line": line,
+                    "actual": actual,
+                    "price": price,
+                    "result": result,
+                }
+            )
 
     return {
         "available": True,
         "overall": _finalize_accuracy_bucket(overall),
         "by_market": {key: _finalize_accuracy_bucket(bucket) for key, bucket in by_market.items()},
+        "rows": detail_rows,
     }
 
 
@@ -485,6 +502,7 @@ def _score_market_props_day(root: Path, date_str: str) -> dict[str, Any]:
 
     overall = _init_accuracy_bucket()
     by_market: dict[str, dict[str, Any]] = {}
+    detail_rows: list[dict[str, Any]] = []
     for row in props_rows:
         plays = _parse_jsonish(row.get("plays") or row.get("_plays_list"))
         plays_list = plays if isinstance(plays, list) else []
@@ -514,11 +532,25 @@ def _score_market_props_day(root: Path, date_str: str) -> dict[str, Any]:
             by_market[market] = _init_accuracy_bucket()
         _apply_accuracy_result(overall, result, price)
         _apply_accuracy_result(by_market[market], result, price)
+        if result is not None:
+            detail_rows.append(
+                {
+                    "market": market,
+                    "side": side,
+                    "player": row.get("player"),
+                    "team": row.get("team"),
+                    "line": line,
+                    "actual": actual,
+                    "price": price,
+                    "result": result,
+                }
+            )
 
     return {
         "available": True,
         "overall": _finalize_accuracy_bucket(overall),
         "by_market": {key: _finalize_accuracy_bucket(bucket) for key, bucket in by_market.items()},
+        "rows": detail_rows,
     }
 
 

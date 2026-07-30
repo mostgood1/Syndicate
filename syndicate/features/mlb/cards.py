@@ -1909,7 +1909,7 @@ def _game_line_market_score(markets: dict[str, Any] | None) -> int:
         if isinstance(markets.get(key), dict) and markets.get(key):
             score += 1
     segments = markets.get("segments") if isinstance(markets.get("segments"), dict) else {}
-    for segment in ("full", "first1", "first3", "first5", "first7"):
+    for segment in ("full", "first1", "first3", "first5"):
         segment_markets = segments.get(segment) if isinstance(segments.get(segment), dict) else {}
         for key in ("h2h", "spreads", "totals"):
             if isinstance(segment_markets.get(key), dict) and segment_markets.get(key):
