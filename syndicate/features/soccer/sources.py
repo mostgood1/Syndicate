@@ -230,11 +230,32 @@ def _team_branding_rows(league: str) -> tuple[Any, ...]:
     return read_team_branding_snapshot(team_branding_path(league))
 
 
-def _team_dict(row: Any) -> dict[str, Any]:
+# ESPN's raw club abbreviation runs to 4 characters for a handful of clubs
+# (e.g. "LAFC", "ROMA"), which overflows the shared compact-card badge sized
+# for the 2-3 char tricodes every other sport uses (MLB's curated map, or the
+# NBA/NHL/WNBA provider-native codes) -- confirmed via the branding CSVs, every
+# other soccer club ESPN gives is already 2-3 chars. This trims just those
+# clubs to a unique 3-letter tricode per league; everything else passes
+# through ESPN's code unchanged.
+_ABBREVIATION_OVERRIDES: dict[str, dict[str, str]] = {
+    "belgian_pro_league": {"GENT": "GNT", "GENK": "GNK", "KVCW": "WES", "STVV": "STV"},
+    "ligue_1": {"LILL": "LIL", "LYON": "LYO", "NICE": "NIC"},
+    "mls": {"LAFC": "LAF", "RBNY": "NYR"},
+    "primeira_liga": {"CPAC": "CAS", "GVFC": "GIL", "RAFC": "RIO", "CDSC": "SCL"},
+    "serie_a": {"ROMA": "ROM", "COMO": "COM"},
+}
+
+
+def _normalized_abbreviation(league: str, raw_abbreviation: Any) -> str:
+    raw = str(raw_abbreviation or "").strip().upper()
+    return _ABBREVIATION_OVERRIDES.get(league, {}).get(raw, raw)
+
+
+def _team_dict(row: Any, league: str) -> dict[str, Any]:
     return {
         "team_id": row.team_id,
         "name": row.display_name,
-        "abbreviation": row.abbreviation,
+        "abbreviation": _normalized_abbreviation(league, row.abbreviation),
         "short_name": row.location,
         "color": str(row.primary_color or "").lstrip("#"),
         "alternate_color": str(row.secondary_color or "").lstrip("#"),
@@ -246,7 +267,7 @@ def _team_dict(row: Any) -> dict[str, Any]:
 def _team_index(league: str) -> dict[str, dict[str, Any]]:
     index: dict[str, dict[str, Any]] = {}
     for row in _team_branding_rows(league):
-        team = _team_dict(row)
+        team = _team_dict(row, league)
         for key in (team.get("name"), team.get("abbreviation"), team.get("short_name")):
             normalized = _normalize_team_key(key)
             if normalized:
@@ -257,7 +278,7 @@ def _team_index(league: str) -> dict[str, dict[str, Any]]:
 def team_by_id(league: str, team_id: str) -> dict[str, Any] | None:
     for row in _team_branding_rows(league):
         if str(row.team_id) == str(team_id):
-            return _team_dict(row)
+            return _team_dict(row, league)
     return None
 
 
@@ -266,7 +287,7 @@ def team_by_name(league: str, team_name: str) -> dict[str, Any] | None:
 
 
 def all_teams(league: str) -> list[dict[str, Any]]:
-    return [_team_dict(row) for row in _team_branding_rows(league)]
+    return [_team_dict(row, league) for row in _team_branding_rows(league)]
 
 
 # --- Full rosters ------------------------------------------------------------

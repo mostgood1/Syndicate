@@ -184,7 +184,15 @@ def _scheduled_status_token(game: dict[str, Any]) -> str | None:
         local_dt = parsed.astimezone(CENTRAL_TIMEZONE)
         hour_minute = local_dt.strftime("%I:%M").lstrip("0")
         meridiem = "P" if local_dt.strftime("%p") == "PM" else "A"
-        return f"{hour_minute}{meridiem} CT"
+        time_token = f"{hour_minute}{meridiem} CT"
+        # Mirrors home.py's _scheduled_status_line: a chip strip can span
+        # several days at once (soccer's week-keyed schedule is the clearest
+        # case, but a "today" filter that slips can mix days for any sport),
+        # so a time-only token is ambiguous about which day it's for. Only
+        # tag the date on when it isn't today, to keep the common case terse.
+        if local_dt.date().isoformat() != central_today_iso():
+            return f"{local_dt.strftime('%a')} {local_dt.strftime('%b')} {local_dt.strftime('%d').lstrip('0')} · {time_token}"
+        return time_token
     # Some cards payloads (e.g. MLB's) carry only a pre-formatted local
     # display time like "3:10 PM" instead of any ISO timestamp.
     for value in (game.get("startTime"), game.get("start_time"), game.get("start_time_local")):

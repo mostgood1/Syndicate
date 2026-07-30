@@ -170,6 +170,7 @@ def _unsimulated_game(fixture: dict[str, Any], *, league: str, week: int, season
         "is_unsimulated_placeholder": True,
         "status": _status_label(status_state, fixture.get("date")),
         "detail": date_str or league_display_name(league),
+        "scheduled_start_utc": fixture.get("date"),
         "summary": f"{away_team} at {home_team} is on the schedule for Week {week} but has not been simulated yet.",
         "compact_box_line": "",
         "href": f"/soccer/{league}/game/{event_id or 'unknown'}?week={week}&season={season}",
@@ -432,6 +433,12 @@ def _match_to_game(match: dict[str, Any], *, league: str, week: int, season: int
         "card_variant": "soccer_main",
         "status": _status_label(status_state, match.get("kickoff")),
         "detail": score_text if score_text != "-" else league_display_name(league),
+        # Raw ISO kickoff, distinct from "detail" above (which carries a
+        # score/league string, not a timestamp) -- the shared game-chip and
+        # home-rail scheduled-status helpers read this key to render a
+        # time/date badge; without it soccer's pregame chips render no time
+        # or date at all (see game_chip_scoreboard.py's _scheduled_status_token).
+        "scheduled_start_utc": match.get("kickoff"),
         "summary": summary,
         "href": f"/soccer/{league}/game/{event_id or 'unknown'}?week={week}&season={season}",
         "href_label": "Open match card",

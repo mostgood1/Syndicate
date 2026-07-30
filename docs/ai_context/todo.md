@@ -27,9 +27,52 @@ unpushed. Cross-session ID collisions (#131, #139) were both caught and
 resolved without data loss, in both directions, via direct session-to-
 session messages rather than silent overwrites.
 
-> **Next free ID: 142.** IDs are never reused. Closed items move to
+> **Next free ID: 143.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
+
+- **New: #142** (filed and fixed this session, **NOT YET COMMITTED/DEPLOYED**)
+  — user asked for soccer tricodes across all leagues so compact/Layer-2
+  cards render at the right size, plus a day/date indicator on Layer 2
+  compact cards. Root cause for the sizing bug: soccer passes ESPN's raw
+  `abbreviation` straight through (`soccer/cards.py:_abbr` →
+  `soccer/sources.py:team_by_name`), and unlike every other sport (MLB's
+  curated map, NBA/NHL/WNBA's provider-native codes, always 2-3 chars), ESPN
+  gives 21 soccer clubs across 10 leagues a 4-char code (`LAFC`, `ROMA`,
+  `GENK`, etc.) that overflows the shared fixed-width compact badge
+  (`dense_cards.css`/`mlb/cards.css` `.cards-strip-logo`, sized for ≤3
+  chars). Fixed by adding a per-league `_ABBREVIATION_OVERRIDES` map in
+  `soccer/sources.py` (`_normalized_abbreviation`, applied in `_team_dict`)
+  trimming just those 21 clubs to a unique 3-letter code per league — every
+  other club's real ESPN code passes through unchanged. Verified all 204
+  teams across all 10 leagues are now ≤3 chars with no in-league collisions.
+  Separately, found soccer was excluded from Layer 2's game-chip hydration
+  entirely (`intelligence.py:_GAME_CHIP_DEFAULT_SPORTS` and the hardcoded
+  JS fetch list in `intelligence.html` both omitted it, even though a
+  `_SoccerDataProvider` is already registered) — added `"soccer"` to both.
+  Soccer's game dict also never carried an ISO kickoff timestamp (`detail`
+  held a score string or the literal league name, e.g. `"MLS"`), so neither
+  the Layer 2 chip helper nor the home rail's date-aware clock could detect
+  it — added a `scheduled_start_utc` field to both `_match_to_game` and
+  `_unsimulated_game` in `soccer/cards.py`, which fixes both call sites at
+  once (confirmed `home.py:_central_scheduled_datetime` checks that exact
+  key first). For the date indicator itself, extended
+  `game_chip_scoreboard.py:_scheduled_status_token` (shared by every sport's
+  Layer 1/Layer 2 mini cards, not soccer-only) to prefix `"Sat Jul 25 · "`
+  onto the time when the game's date isn't today, mirroring the pattern
+  `home.py:_scheduled_status_line` already used — a chip strip spanning
+  several days (soccer's week-keyed schedule is the clearest case) was
+  otherwise showing a bare, ambiguous time for every game regardless of
+  which day it fell on. Tests: updated
+  `test_game_chip_scoreboard.py::test_pregame_chip_has_scheduled_token_and_no_scores`
+  to pin "today" (the date-qualifier logic needs the current date mocked,
+  since the fixture's date was previously coincidentally always "not
+  today" from the *old* code's perspective — it had no today-check at all),
+  added `test_pregame_chip_on_a_different_day_includes_date`; soccer/home/
+  intelligence/market-board suites all still pass (see Operational notes
+  before closing — this needs a commit + `git push` + Render deploy, and a
+  production check that Layer 2 actually shows soccer chips with correct
+  tricodes/dates, before this can move to `todo_closed.md`).
 
 - **New: #141** (filed, fixed, deployed, commit `f5efa674`) — cross-sport
   comparison of WNBA's board pregame/props pipeline against MLB's (then just

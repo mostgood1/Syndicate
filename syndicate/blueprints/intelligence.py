@@ -1874,7 +1874,7 @@ def intelligence_status_api():
     return _no_cache_response(jsonify(response_payload))
 
 
-_GAME_CHIP_DEFAULT_SPORTS = ["mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab"]
+_GAME_CHIP_DEFAULT_SPORTS = ["mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"]
 
 
 @intelligence_bp.get("/api/board/game-chips")

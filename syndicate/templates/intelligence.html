@@ -868,7 +868,7 @@
   async function loadGameChips() {
     try {
       const dateParam = state.date ? `date=${encodeURIComponent(state.date)}&` : "";
-      const res = await fetch(`/api/board/game-chips?${dateParam}sports=mlb,nba,wnba,nhl,nfl,ncaaf,ncaab`, { cache: "no-store" });
+      const res = await fetch(`/api/board/game-chips?${dateParam}sports=mlb,nba,wnba,nhl,nfl,ncaaf,ncaab,soccer`, { cache: "no-store" });
       if (!res.ok) return;
       const json = await res.json();
       const chips = Array.isArray(json.chips) ? json.chips : [];

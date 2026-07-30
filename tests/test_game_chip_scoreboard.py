@@ -63,13 +63,32 @@ class GameChipBuilderTests(unittest.TestCase):
             "scheduled_start_utc": "2026-07-24T23:10:00Z",
         }
 
-        chip = build_game_chip("mlb", game)
+        with patch("syndicate.features.shared.game_chip_scoreboard.central_today_iso", return_value="2026-07-24"):
+            chip = build_game_chip("mlb", game)
 
         self.assertEqual(chip["state"], "pregame")
         self.assertEqual(chip["status_token"], "6:10P CT")
         self.assertIsNone(chip["away"]["score"])
         self.assertIsNone(chip["home"]["score"])
         self.assertIsNone(chip["leader"])
+
+    def test_pregame_chip_on_a_different_day_includes_date(self) -> None:
+        # A chip strip can span several days at once (soccer's week-keyed
+        # schedule is the clearest case), so a game not on "today" gets a
+        # day/date prefix instead of a bare, ambiguous time.
+        game = {
+            "gamePk": 7,
+            "away": {"abbr": "CHC", "score": 0},
+            "home": {"abbr": "ATL", "score": 0},
+            "status": {"abstract": "Scheduled", "detailed": "Scheduled"},
+            "scheduled_start_utc": "2026-07-24T23:10:00Z",
+        }
+
+        with patch("syndicate.features.shared.game_chip_scoreboard.central_today_iso", return_value="2026-07-25"):
+            chip = build_game_chip("mlb", game)
+
+        self.assertEqual(chip["state"], "pregame")
+        self.assertEqual(chip["status_token"], "Fri Jul 24 · 6:10P CT")
 
     def test_pregame_chip_falls_back_to_display_start_time(self) -> None:
         # MLB's cards payload has no ISO timestamp -- only a pre-formatted
