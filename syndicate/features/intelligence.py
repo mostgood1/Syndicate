@@ -5919,7 +5919,18 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
         )
 
     before_merge_count = len(candidates)
+    # TEMP DIAGNOSTIC (#151 investigation, remove after root cause found).
+    _intel_trace(
+        "SOCCER_PROP_DEBUG_151",
+        stage="pre_merge",
+        soccer_prop_count=sum(1 for c in candidates if isinstance(c, dict) and str(c.get("sport_slug") or "").lower() == "soccer" and str(c.get("candidate_type") or "").lower() == "prop"),
+    )
     candidates = _merge_duplicate_prop_candidates(candidates)
+    _intel_trace(
+        "SOCCER_PROP_DEBUG_151",
+        stage="post_merge",
+        soccer_prop_count=sum(1 for c in candidates if isinstance(c, dict) and str(c.get("sport_slug") or "").lower() == "soccer" and str(c.get("candidate_type") or "").lower() == "prop"),
+    )
     if len(candidates) != before_merge_count:
         _log_candidate_stage(pipeline_name="collect_candidates", stage="prop_duplicate_merge", before=[], after=candidates)
 
@@ -8193,8 +8204,24 @@ def collect_candidates_with_fallback_merge(
                 for sport_row in overview
                 if isinstance(sport_row, dict)
             }
+        # TEMP DIAGNOSTIC (#151 investigation, remove after root cause found).
+        _intel_trace(
+            "SOCCER_PROP_DEBUG_151",
+            stage="pre_score_and_filter",
+            soccer_prop_count=sum(1 for c in raw_candidates if isinstance(c, Mapping) and str(c.get("sport_slug") or "").lower() == "soccer" and str(c.get("candidate_type") or "").lower() == "prop"),
+        )
         scored_candidates = _score_candidates(raw_candidates, advanced_by_sport, preferences, pipeline="collect_candidates_with_fallback_merge")
+        _intel_trace(
+            "SOCCER_PROP_DEBUG_151",
+            stage="post_score",
+            soccer_prop_count=sum(1 for c in scored_candidates if isinstance(c, Mapping) and str(c.get("sport_slug") or "").lower() == "soccer" and str(c.get("candidate_type") or "").lower() == "prop"),
+        )
         raw_candidates = filter_candidates(scored_candidates, sport=None)
+        _intel_trace(
+            "SOCCER_PROP_DEBUG_151",
+            stage="post_filter",
+            soccer_prop_count=sum(1 for c in raw_candidates if isinstance(c, Mapping) and str(c.get("sport_slug") or "").lower() == "soccer" and str(c.get("candidate_type") or "").lower() == "prop"),
+        )
 
     if apply_thin_pool_merge and 0 < len(raw_candidates) < _THIN_CANDIDATE_POOL_THRESHOLD:
         try:
