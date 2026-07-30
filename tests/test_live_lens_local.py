@@ -328,12 +328,22 @@ class LocalDailyAccuracyTests(unittest.TestCase):
 
             fixed_now = datetime(2026, 7, 3, 18, 0, tzinfo=timezone.utc)
             fixed_time = fixed_now.timestamp()
+            # _live_lens_report_needs_refresh short-circuits False for any
+            # selected_date that isn't central_today_iso()'s real answer --
+            # mocking this module's own `datetime` doesn't cover that call,
+            # since central_today_iso() is a separate function imported from
+            # syndicate.features.shared.timezone. Pin it to this test's fixed
+            # "today" too, so the assertion doesn't silently go stale as the
+            # real wall-clock date moves past 2026-07-03.
             with patch("syndicate.features.mlb.live_lens.live_lens_report_path", return_value=report_path), patch(
                 "syndicate.features.mlb.live_lens.load_json_file",
                 return_value={"games": [{"gamePk": 1}]},
             ), patch("syndicate.features.mlb.live_lens.datetime") as mock_datetime, patch(
                 "syndicate.features.mlb.live_lens.time.time",
                 return_value=fixed_time,
+            ), patch(
+                "syndicate.features.mlb.live_lens.central_today_iso",
+                return_value="2026-07-03",
             ):
                 mock_datetime.now.return_value = fixed_now
                 os.utime(report_path, (fixed_time - 61.0, fixed_time - 61.0))
@@ -345,6 +355,9 @@ class LocalDailyAccuracyTests(unittest.TestCase):
             ), patch("syndicate.features.mlb.live_lens.datetime") as mock_datetime, patch(
                 "syndicate.features.mlb.live_lens.time.time",
                 return_value=fixed_time,
+            ), patch(
+                "syndicate.features.mlb.live_lens.central_today_iso",
+                return_value="2026-07-03",
             ):
                 mock_datetime.now.return_value = fixed_now
                 os.utime(report_path, (fixed_time - 59.0, fixed_time - 59.0))

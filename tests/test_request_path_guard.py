@@ -17,7 +17,17 @@ class RequestPathGuardTests(unittest.TestCase):
     def test_live_lens_page_context_logs_warning_in_request_context(self) -> None:
         app = Flask(__name__)
         with app.test_request_context("/wnba/live-lens?date=2026-06-19", method="GET"):
-            with patch("syndicate.features.shared.request_path_guard.logger.warning") as mocked_warning:
+            # has_games_for_date() falls through to a real ESPN scoreboard
+            # fetch (and its own warn_if_compute_in_request_path call) for
+            # any date not already confirmed via the local artifact mirror --
+            # 2026-06-19 ages out of that mirror's rolling window over time,
+            # which would otherwise make this test's warning count depend on
+            # how recently data/wnba_source was refreshed. Stub the schedule
+            # check so this test only measures the one warning it's actually
+            # about: build_live_lens_page_context's own guard call.
+            with patch("syndicate.features.wnba.cards.has_games_for_date", return_value=True), patch(
+                "syndicate.features.shared.request_path_guard.logger.warning"
+            ) as mocked_warning:
                 build_live_lens_page_context("2026-06-19")
 
         mocked_warning.assert_called_once_with("WARNING: compute in request path", extra={"operation": "build_live_lens_page_context"})

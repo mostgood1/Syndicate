@@ -573,16 +573,18 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                 "using_sample_data": False,
             }
 
-        with patch.object(live_lens_module, "build_cards_page_context", side_effect=fake_build_cards_page_context), patch.object(
-            live_lens_module,
-            "_persist_live_lens_report",
-            side_effect=fake_persist_live_lens_report,
-        ), patch.object(live_lens_module, "_refresh_current_date_live_statuses", return_value=None), patch.object(
-            live_lens_module,
-            "live_lens_report_path",
-            return_value=Path("report.json"),
-        ):
-            context = live_lens_module.build_live_lens_snapshot_internal("2026-06-03", persist=True)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_path = Path(tmp_dir) / "report.json"
+            with patch.object(live_lens_module, "build_cards_page_context", side_effect=fake_build_cards_page_context), patch.object(
+                live_lens_module,
+                "_persist_live_lens_report",
+                side_effect=fake_persist_live_lens_report,
+            ), patch.object(live_lens_module, "_refresh_current_date_live_statuses", return_value=None), patch.object(
+                live_lens_module,
+                "live_lens_report_path",
+                return_value=report_path,
+            ):
+                context = live_lens_module.build_live_lens_snapshot_internal("2026-06-03", persist=True)
 
         self.assertEqual(context["games"][0]["status"]["abstract"], "Live")
         self.assertEqual(context["games"][0]["gameLens"][0]["key"], "live")
@@ -882,14 +884,19 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                     ],
                 }
 
+                # #150 follow-up: _live_lens_payload lives on the real, shared
+                # vendor.mlb_bettingv2.tools.web.flask_frontend module (not the
+                # importlib-fresh `module` copy above) -- see the matching
+                # comment in test_build_live_lens_snapshot_internal_merges_cards_detail_into_vendor_report
+                # for why a direct assignment here would leak past this test.
                 import vendor.mlb_bettingv2.tools.web.flask_frontend as vendor_frontend
 
                 module.live_lens_report_path = lambda d: report_path
                 module.live_lens_log_path = lambda d: log_path
                 module.build_cards_page_context = lambda selected_date, **kwargs: {"source_title": "MLB Game Cards", "using_sample_data": False, "games": []}
-                vendor_frontend._live_lens_payload = lambda date_str, *, persist=False, refresh_markets=False: dict(payload)
 
-                result = module._persist_live_lens_report("2026-06-01")
+                with patch.object(vendor_frontend, "_live_lens_payload", lambda date_str, *, persist=False, refresh_markets=False: dict(payload)):
+                    result = module._persist_live_lens_report("2026-06-01")
                 log_lines = log_path.read_text(encoding="utf-8").splitlines()
 
                 self.assertIsNotNone(result)
@@ -1100,9 +1107,6 @@ class MlbRefreshRunnerTests(unittest.TestCase):
 
                 module.live_lens_report_path = lambda d: report_path
                 module.load_json_file = lambda path: json.loads(report_path.read_text(encoding="utf-8"))
-                import vendor.mlb_bettingv2.tools.web.flask_frontend as vendor_frontend
-                vendor_frontend._live_lens_payload = lambda *args, **kwargs: {}
-                vendor_frontend._live_lens_reports_payload = lambda d, include_archive=False: json.loads(report_path.read_text(encoding="utf-8"))
                 module.build_cards_page_context = lambda selected_date, **kwargs: {
                     "source_title": "MLB Game Cards",
                     "using_sample_data": False,
@@ -1129,7 +1133,25 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                     ],
                 }
 
-                context = module.build_live_lens_snapshot_internal("2026-06-02", persist=True)
+                # #150 follow-up: these two attributes live on the real, shared
+                # vendor.mlb_bettingv2.tools.web.flask_frontend module (not the
+                # importlib-fresh `module` copy above), so a direct assignment
+                # here would permanently replace them for every later test in
+                # the process -- unlike `module.*`, popping spec.name from
+                # sys.modules never undoes it. Confirmed this was exactly why
+                # test_live_lens_payload_refreshes_card_before_game_lens (which
+                # calls the real vendor._live_lens_payload) failed whenever it
+                # ran after this test, in this file alone, via unittest's
+                # default alphabetical method order. patch.object scopes the
+                # replacement to this `with` block and restores it on exit.
+                import vendor.mlb_bettingv2.tools.web.flask_frontend as vendor_frontend
+
+                with patch.object(vendor_frontend, "_live_lens_payload", lambda *args, **kwargs: {}), patch.object(
+                    vendor_frontend,
+                    "_live_lens_reports_payload",
+                    lambda d, include_archive=False: json.loads(report_path.read_text(encoding="utf-8")),
+                ):
+                    context = module.build_live_lens_snapshot_internal("2026-06-02", persist=True)
                 persisted_report = json.loads(report_path.read_text(encoding="utf-8"))
 
             target_game = next((game for game in context["games"] if game.get("gamePk") == 123), None)
