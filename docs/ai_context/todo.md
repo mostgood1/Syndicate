@@ -14,10 +14,11 @@ settlement / Phase 1)").
 
 ### Reconciliation 2026-07-30 (MLB evening next-day sim headroom gate)
 
-Not closing yet — same session as #149 (K-ladder-targets hydration fix,
-already committed/deployed/confirmed live earlier this session). **Not
-committed or pushed.** One file of real logic, one test file:
-`syndicate/features/shared/live_refresh_loop.py`,
+Closing this session's own arc. Same session as #149 (K-ladder-targets
+hydration fix, committed/deployed/confirmed live earlier this session).
+**#157 committed (`8d369b82`), pushed, and deployed to refresh-worker**
+(`dep-d9lppclbedkc73c2dr9g`, confirmed `live` via the Render API). One file
+of real logic, one test file: `syndicate/features/shared/live_refresh_loop.py`,
 `tests/test_live_refresh_loop.py`.
 
 **New: #157** — user asked why MLB doesn't get next-day look-ahead sims the
@@ -66,10 +67,14 @@ unmeasurable-headroom-treated-as-ok, previous-run-active, odds-refresh-active,
 already-simmed, no-games-scheduled). Full `tests/test_live_refresh_loop.py`
 suite: 173/173 passing, no regressions from dropping the now-unused
 `any_live` parameter from `_mlb_evening_next_day_sim_decision`'s signature
-(only one call site, updated in the same change). **Not yet run against the
-full `tests/` suite, not committed, not pushed, not deployed** — do that
-next. Once deployed, the way to confirm this actually fires is watching
-refresh-worker logs/`/api/ops/live-refresh/state`'s
+(only one call site, updated in the same change). **Not run against the
+broader `tests/` suite this session** (scoped to the one affected file per
+this session's usual practice) — worth a full `python -m pytest tests/`
+pass in a future session if anything downstream seems off. **Committed
+(`8d369b82`), pushed, and deployed to refresh-worker — confirmed live.**
+Row-count/production-firing confirmation is still open (see below): the
+way to confirm this actually fires is watching refresh-worker logs/
+`/api/ops/live-refresh/state`'s
 `mlbEveningNextDaySim` tick-meta key for `reason=evening_next_day_sim`
 (launched) on a normal game evening rather than `sport_currently_live` (the
 old, now-removed reason) or `insufficient_memory_headroom` (the new,
@@ -85,6 +90,10 @@ against whatever was on disk at write time — if a "Next free ID" collision
 shows up later, check `todo_closed.md` and recent `git log` messages for
 the real next number rather than trusting any single stale pointer in this
 file.
+
+> **Next free ID: 158.** IDs are never reused. Closed items move to
+> [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
+> free, and run the shipped-work check in Operational notes before reconciling.
 
 ### Reconciliation 2026-07-30 (MLB live-lens headroom gate / Phase 3)
 
