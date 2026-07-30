@@ -1851,13 +1851,9 @@ def _mlb_evening_next_day_sim_start_hour() -> int:
 	return max(0, min(23, value))
 
 
-def _mlb_evening_next_day_sim_decision(*, now_epoch: float, selected_date: str, any_live: bool | None) -> dict[str, Any]:
+def _mlb_evening_next_day_sim_decision(*, now_epoch: float, selected_date: str) -> dict[str, Any]:
 	if not _mlb_evening_next_day_sim_enabled():
 		return {"force": False, "reason": "disabled"}
-	if any_live:
-		# Same posture as look-ahead: never compete with a live tick for the
-		# container's resources.
-		return {"force": False, "reason": "sport_currently_live"}
 	local_hour = central_datetime_from_epoch(now_epoch).hour
 	if local_hour < _mlb_evening_next_day_sim_start_hour():
 		return {"force": False, "reason": "before_evening_window"}
@@ -1880,6 +1876,25 @@ def _mlb_evening_next_day_sim_decision(*, now_epoch: float, selected_date: str, 
 		events = []
 	if not events:
 		return {"force": False, "reason": "no_games_scheduled"}
+	# Memory gate, checked last since real headroom is a moving target across
+	# ticks. This replaces an old blanket "not any_live" gate: MLB games run
+	# live most evenings roughly 1pm-midnight local, overlapping almost the
+	# entire post-start-hour window, so that gate effectively never opened on
+	# a normal game night -- unlike WNBA/soccer's next-day prep, which rides
+	# the generic always-on look-ahead tick because their sim is cheap enough
+	# to bundle into the ordinary odds-refresh step. Uses the exact same
+	# snapshot helper and "unmeasurable is OK, only a measured shortfall
+	# blocks" policy as _mlb_daily_sim_decision, which is the proof this is
+	# safe: that decision gates TODAY's own sim launch purely on measured
+	# headroom too, with no "not live" check at all, and already runs
+	# alongside live games in production without incident.
+	headroom = _mlb_sim_memory_headroom_snapshot()
+	if headroom is not None and not headroom.get("sufficient", True):
+		print(
+			f"[live_refresh_loop] MLB_EVENING_NEXT_DAY_SIM_DEFERRED_LOW_MEMORY {json.dumps(headroom, sort_keys=True)}",
+			flush=True,
+		)
+		return {"force": False, "reason": "insufficient_memory_headroom", "memory": headroom}
 	return {"force": True, "reason": "evening_next_day_sim", "date": target_date}
 
 
@@ -2996,7 +3011,7 @@ def _run_mlb_sim_tick() -> dict[str, Any]:
 			meta["lookAheadDay2"] = {"ok": False, "launched": False, "error": f"{type(exc).__name__}: {exc}"}
 
 	try:
-		evening_sim_decision = _mlb_evening_next_day_sim_decision(now_epoch=tick_started_epoch, selected_date=selected_date, any_live=any_live)
+		evening_sim_decision = _mlb_evening_next_day_sim_decision(now_epoch=tick_started_epoch, selected_date=selected_date)
 		if evening_sim_decision.get("force"):
 			meta["mlbEveningNextDaySim"] = _launch_mlb_daily_sim(str(evening_sim_decision.get("date")), evening_sim_decision)
 		else:

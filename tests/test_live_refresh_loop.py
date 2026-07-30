@@ -2309,6 +2309,138 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class MlbEveningNextDaySimDecisionTests(unittest.TestCase):
+    # #149 follow-up: this decision used to gate on a blanket "not any_live"
+    # check, which on a normal MLB night (games live roughly 1pm-midnight
+    # local, overlapping almost the entire post-start-hour window) meant it
+    # essentially never launched. Replaced with the same real memory-headroom
+    # gate _mlb_daily_sim_decision already uses to launch TODAY's own sim
+    # alongside live games -- these tests cover the new gate and confirm the
+    # old any_live-only skip reason is gone.
+
+    _EVENING_EPOCH = datetime(2026, 7, 30, 23, 30, tzinfo=timezone.utc).timestamp()  # ~6:30pm CDT
+    _BEFORE_WINDOW_EPOCH = datetime(2026, 7, 30, 15, 0, tzinfo=timezone.utc).timestamp()  # ~10am CDT
+
+    def setUp(self) -> None:
+        os.environ["SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_ENABLED"] = "true"
+        self.addCleanup(lambda: os.environ.pop("SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_ENABLED", None))
+
+    def test_disabled_by_default(self) -> None:
+        os.environ.pop("SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_ENABLED", None)
+        decision = live_refresh_loop._mlb_evening_next_day_sim_decision(
+            now_epoch=self._EVENING_EPOCH, selected_date="2026-07-30"
+        )
+        self.assertFalse(decision["force"])
+        self.assertEqual(decision["reason"], "disabled")
+
+    def test_skips_before_evening_window(self) -> None:
+        decision = live_refresh_loop._mlb_evening_next_day_sim_decision(
+            now_epoch=self._BEFORE_WINDOW_EPOCH, selected_date="2026-07-30"
+        )
+        self.assertFalse(decision["force"])
+        self.assertEqual(decision["reason"], "before_evening_window")
+
+    def test_launches_while_a_game_is_live_when_headroom_is_sufficient(self) -> None:
+        # The old behavior this replaces: this exact scenario used to return
+        # reason="sport_currently_live" and never launch.
+        with patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(live_refresh_loop, "is_refresh_run_active", return_value=False), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path, patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=[{"id": "1"}]
+        ), patch.object(
+            live_refresh_loop, "_mlb_sim_memory_headroom_snapshot", return_value={"sufficient": True}
+        ):
+            mocked_summary_path.return_value.exists.return_value = False
+            decision = live_refresh_loop._mlb_evening_next_day_sim_decision(
+                now_epoch=self._EVENING_EPOCH, selected_date="2026-07-30"
+            )
+
+        self.assertTrue(decision["force"])
+        self.assertEqual(decision["reason"], "evening_next_day_sim")
+        self.assertEqual(decision["date"], "2026-07-31")
+
+    def test_skips_on_measured_insufficient_headroom(self) -> None:
+        with patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(live_refresh_loop, "is_refresh_run_active", return_value=False), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path, patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=[{"id": "1"}]
+        ), patch.object(
+            live_refresh_loop, "_mlb_sim_memory_headroom_snapshot", return_value={"sufficient": False}
+        ):
+            mocked_summary_path.return_value.exists.return_value = False
+            decision = live_refresh_loop._mlb_evening_next_day_sim_decision(
+                now_epoch=self._EVENING_EPOCH, selected_date="2026-07-30"
+            )
+
+        self.assertFalse(decision["force"])
+        self.assertEqual(decision["reason"], "insufficient_memory_headroom")
+
+    def test_unmeasurable_headroom_is_treated_as_ok_matching_daily_sim_decision(self) -> None:
+        with patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(live_refresh_loop, "is_refresh_run_active", return_value=False), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path, patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=[{"id": "1"}]
+        ), patch.object(
+            live_refresh_loop, "_mlb_sim_memory_headroom_snapshot", return_value=None
+        ):
+            mocked_summary_path.return_value.exists.return_value = False
+            decision = live_refresh_loop._mlb_evening_next_day_sim_decision(
+                now_epoch=self._EVENING_EPOCH, selected_date="2026-07-30"
+            )
+
+        self.assertTrue(decision["force"])
+
+    def test_skips_when_previous_run_still_active(self) -> None:
+        with patch.object(live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=True):
+            decision = live_refresh_loop._mlb_evening_next_day_sim_decision(
+                now_epoch=self._EVENING_EPOCH, selected_date="2026-07-30"
+            )
+        self.assertFalse(decision["force"])
+        self.assertEqual(decision["reason"], "previous_run_still_active")
+
+    def test_skips_when_odds_refresh_active(self) -> None:
+        with patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(live_refresh_loop, "is_refresh_run_active", return_value=True):
+            decision = live_refresh_loop._mlb_evening_next_day_sim_decision(
+                now_epoch=self._EVENING_EPOCH, selected_date="2026-07-30"
+            )
+        self.assertFalse(decision["force"])
+        self.assertEqual(decision["reason"], "odds_refresh_active")
+
+    def test_skips_when_already_simmed(self) -> None:
+        with patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(live_refresh_loop, "is_refresh_run_active", return_value=False), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path:
+            mocked_summary_path.return_value.exists.return_value = True
+            decision = live_refresh_loop._mlb_evening_next_day_sim_decision(
+                now_epoch=self._EVENING_EPOCH, selected_date="2026-07-30"
+            )
+        self.assertFalse(decision["force"])
+        self.assertEqual(decision["reason"], "already_simmed")
+
+    def test_skips_when_no_games_scheduled(self) -> None:
+        with patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(live_refresh_loop, "is_refresh_run_active", return_value=False), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path, patch.object(live_refresh_loop, "fetch_schedule_for_date", return_value=[]):
+            mocked_summary_path.return_value.exists.return_value = False
+            decision = live_refresh_loop._mlb_evening_next_day_sim_decision(
+                now_epoch=self._EVENING_EPOCH, selected_date="2026-07-30"
+            )
+        self.assertFalse(decision["force"])
+        self.assertEqual(decision["reason"], "no_games_scheduled")
+
+
 class SoccerJoinMismatchResimTriggerTests(unittest.TestCase):
     """Soccer had NO event-driven resim path of any kind: it is absent from
     _LINEUP_INJURY_FETCH_PACKAGES, and only MLB consumed the shared

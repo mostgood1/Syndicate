@@ -4,10 +4,221 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (steam
-candidates, Layer 2 projection, portfolio reconciliation)" below; prior
-session: "Reconciliation 2026-07-30 (evaluation-ledger settlement / Phase
-1)" further down).
+Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (MLB evening
+next-day sim headroom gate)" below; prior session: "Reconciliation 2026-07-30
+(MLB live-lens headroom gate / Phase 3)" further down; before that:
+"Reconciliation 2026-07-30 (opportunity board / Phase 2)"; before that:
+"Reconciliation 2026-07-30 (steam candidates, Layer 2 projection, portfolio
+reconciliation)"; before that: "Reconciliation 2026-07-30 (evaluation-ledger
+settlement / Phase 1)").
+
+### Reconciliation 2026-07-30 (MLB evening next-day sim headroom gate)
+
+Not closing yet — same session as #149 (K-ladder-targets hydration fix,
+already committed/deployed/confirmed live earlier this session). **Not
+committed or pushed.** One file of real logic, one test file:
+`syndicate/features/shared/live_refresh_loop.py`,
+`tests/test_live_refresh_loop.py`.
+
+**New: #157** — user asked why MLB doesn't get next-day look-ahead sims the
+way WNBA does, and to check real memory headroom instead of a blanket
+"not live" gate for a timing fix. Root-caused: WNBA (and soccer)'s next-day
+prep rides the generic, always-on hourly look-ahead tick
+(`_look_ahead_decision` → `refresh_odds_sources.py --phase pregame`)
+essentially for free, because their sim is cheap enough to be bundled
+directly into that per-sport pregame refresh step. MLB's sim is a separate,
+heavyweight Monte Carlo subprocess (`run_mlb_daily_sim_job.py`, ~1000
+trials/game) deliberately pulled out of that orchestrator for resource
+reasons, so it needed — and had — its own dedicated trigger:
+`_mlb_evening_next_day_sim_decision` (`SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_ENABLED`,
+enabled on refresh-worker per `render.yaml`). That trigger's gate was
+`local_hour >= 18 and not any_live`. Since MLB games run live most evenings
+roughly 1pm-midnight local, `any_live` overlaps almost the entire
+post-18:00 window on a normal game night, so in practice the gate rarely if
+ever actually opened — next-day sims essentially weren't happening despite
+being nominally "enabled."
+
+**Fix**: replaced the blanket `any_live` check with the exact same
+real-memory-headroom gate (`_mlb_sim_memory_headroom_snapshot`,
+cgroup-measured, "unmeasurable is OK, only a *measured* shortfall blocks")
+that `_mlb_daily_sim_decision` already uses to launch **today's own** MLB
+sim — including alongside live games, in production, without incident. That
+existing decision never gated on "not live" at all, which is the proof this
+swap is safe: real headroom, not a blanket live/not-live flag, is what
+actually protects a service with a documented OOM history
+(`docs/ai_context/handoff_refresh_worker_oom.md`). The `local_hour >= 18`
+start-hour floor was left as-is (unclear this session whether that's really
+about resource contention — now handled by the headroom gate — or about
+data readiness, i.e. whether tomorrow's schedule/probable-pitchers are
+reliably posted by then; `_mlb_evening_next_day_sim_decision`'s own
+`fetch_schedule_for_date` call doesn't check probable-pitcher completeness
+at all, only that games exist, so there's no hard evidence either way).
+**Open follow-up, explicitly left to the user/a future session**: whether
+`SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_START_HOUR` (default 18, Central) should
+be lowered now that the headroom gate carries the safety burden — would need
+either empirical evidence of when tomorrow's probable pitchers actually post,
+or a policy call from the user.
+
+New tests: `tests/test_live_refresh_loop.py::MlbEveningNextDaySimDecisionTests`
+(9 tests — disabled, before-window, launches-while-live-with-headroom
+[the exact case that used to be blocked], measured-insufficient-headroom,
+unmeasurable-headroom-treated-as-ok, previous-run-active, odds-refresh-active,
+already-simmed, no-games-scheduled). Full `tests/test_live_refresh_loop.py`
+suite: 173/173 passing, no regressions from dropping the now-unused
+`any_live` parameter from `_mlb_evening_next_day_sim_decision`'s signature
+(only one call site, updated in the same change). **Not yet run against the
+full `tests/` suite, not committed, not pushed, not deployed** — do that
+next. Once deployed, the way to confirm this actually fires is watching
+refresh-worker logs/`/api/ops/live-refresh/state`'s
+`mlbEveningNextDaySim` tick-meta key for `reason=evening_next_day_sim`
+(launched) on a normal game evening rather than `sport_currently_live` (the
+old, now-removed reason) or `insufficient_memory_headroom` (the new,
+legitimate reason it might still correctly decline).
+
+**Also noted, not touched (same as #149's note)**: this working directory
+continues to have unrelated uncommitted changes from other concurrent
+sessions (evaluation-ledger settlement, opportunity board, soccer prop
+grading, live-lens headroom gate — see the reconciliation entries above/
+below). `docs/ai_context/todo.md` itself is being concurrently edited by
+multiple sessions this evening; this entry was prepended read-modify-write
+against whatever was on disk at write time — if a "Next free ID" collision
+shows up later, check `todo_closed.md` and recent `git log` messages for
+the real next number rather than trusting any single stale pointer in this
+file.
+
+### Reconciliation 2026-07-30 (MLB live-lens headroom gate / Phase 3)
+
+Not closing yet — same session's own arc as #153 (Phase 1) and #155
+(Phase 2), **not committed or pushed**. Single file touched:
+`syndicate/features/shared/live_lens_loop.py` (one constant + comment),
+plus `tests/test_live_lens_loop.py` (one new regression test).
+
+**#124, root-caused and fixed.** Phase 3 of the 5-phase accuracy-tracking/
+tuning roadmap (#153's note) — MLB's live-lens tick's ~80%+ failure rate.
+Root-caused via real Render log analysis (`live-odds-worker`,
+`srv-d91dpertqb8s73co8lt0`), not local reasoning:
+- Pulled every `[LIVE_LENS_TICK_DIAG]` line (the diagnostic instrumentation
+  added by `db1482ca`/`555d8f0b`) over a 40h window: **33/33 failures were
+  `reason=low_headroom`. Zero exceptions, zero `invalid_snapshot`.** The
+  code path itself was never the problem.
+- Paired 100 real `live_lens_tick_before_mlb`/`_after_build_mlb`
+  `ALL_PROCESS_MEMORY` snapshots from the same day to measure what
+  `estimate_live` (120 sims/live game) actually costs: **0-13MB per tick.**
+- Root cause: `_mlb_live_lens_min_headroom_bytes()`'s 1800MB default was
+  copy-pasted from `live_refresh_loop.py`'s *separate* WNBA odds-refresh
+  gate (`_odds_refresh_min_headroom_bytes`), which is deliberately
+  calibrated to a much heavier operation (~1528MB worst-case WNBA
+  odds-refresh RSS spike). 1800MB required headroom on a 2048MB container
+  left only 248MB "allowed" to be in use at any time — live-odds-worker's
+  steady-state baseline (~700-900MB) never satisfied that, regardless of
+  what the actual MLB tick needed. Failures clustered in bursts as
+  container memory climbed toward the threshold, clearing when it dropped
+  (consistent with the still-separately-open "container restarts roughly
+  once per cycle" mystery noted elsewhere in the file — not resolved by
+  this fix, just no longer masked by a gate that was almost always closed
+  regardless).
+- Fix (user-approved, after presenting findings and three options): lowered
+  the default to **300MB** — same "worst measured + margin" calibration
+  philosophy already used for the WNBA odds-refresh gate, just applied to
+  what *this* gate actually guards (>20x the observed 13MB worst case)
+  instead of a different, heavier operation's number.
+- New regression test asserts the 300MB default so a future edit can't
+  silently drift back toward 1800 and reintroduce the near-permanent
+  failure rate. 17/17 tests passing in `test_live_lens_loop.py`.
+
+**Not done / explicitly out of scope for this pass:** did not touch the
+Render env var (`SYNDICATE_LIVE_LENS_MIN_HEADROOM_MB`) directly — code
+default only, per explicit user instruction. If the env var is currently
+set to `1800` on Render (overriding the code default either way), it needs
+to be cleared or updated there too, and either way this still needs an
+actual deploy to take effect (remember: Render auto-deploy is OFF, and
+check for an in-flight MLB sim before triggering one). Also: the separate,
+not-yet-root-caused "container restarts roughly once per cycle" memory
+mystery referenced in `live_lens_loop.py`'s own comments is still open —
+this fix makes the gate stop blocking almost everything, it does not
+explain where that restart cadence comes from.
+
+> **Next free ID: 157.** IDs are never reused. Closed items move to
+> [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
+> free, and run the shipped-work check in Operational notes before reconciling.
+
+### Reconciliation 2026-07-30 (opportunity board / Phase 2)
+
+Not closing yet — this session's own arc (same session as #153's Phase 1),
+**not committed or pushed**. Files touched this pass:
+`syndicate/features/shared/intelligence_evaluation.py` (extended, not
+duplicated), `syndicate/app.py` (one import + one `register_blueprint`
+call), new `syndicate/blueprints/opportunity_board.py`, new
+`syndicate/templates/intelligence/opportunity_board.html`,
+`tests/test_intelligence_evaluation.py` (2 new tests), new
+`tests/test_opportunity_board.py`. Did not touch
+`syndicate/blueprints/intelligence.py`/`intelligence.html`/`bet_slip.js` —
+those had been contested by a concurrent session at Phase 1 hand-off time;
+that work (portfolio reconciliation/#154) has since landed and committed
+(`56aeafec` etc.), so the caution turned out to be unnecessary but cost
+nothing.
+
+**New: #155.** Phase 2 of the 5-phase accuracy-tracking/tuning roadmap
+(#153's Phase 1 note). Original roadmap wording ("re-add a cheap automated
+write path like the one #72 removed") turned out to not apply — that
+concern was specific to `prediction_ledger.py`'s monolithic-JSON-file
+write; the evaluation ledger already writes continuously and safely
+(`build_intelligence_evaluation_bundle(persist=True)` only ever runs inside
+`IntelligenceStateService._compute_response()`, gated by
+`refuse_if_compute_in_request_path()` — structurally impossible to run in
+a Render web-dyno request). What was actually missing was a **reporting
+surface**: nothing anywhere displayed `build_recommendation_performance_
+analytics()`'s output, which is computed as a side effect of every
+worker cycle but never surfaced. Fixed by:
+1. Adding a `publish_date` field (`_recommendation_publish_date()`, mirrors
+   `_ledger_record_chunk_name()`'s own date-resolution priority so a
+   record's `by_date` bucket matches the chunk file it's actually stored
+   in) and a `by_date` bucket to `build_recommendation_performance_
+   analytics()`.
+2. Adding `build_recommendation_performance_analytics_for_window()` — reads
+   only the chunk files for dates in `[since, until]` (not the whole ledger
+   history) and delegates to the existing, unmodified aggregation function.
+3. New standalone blueprint `syndicate/blueprints/opportunity_board.py`
+   (deliberately not added to the contested `intelligence.py` blueprint) —
+   `GET /intelligence/opportunity-board` (page) and
+   `GET /intelligence/api/opportunity-board?since=&until=&sport=` (JSON),
+   registered in `syndicate/app.py`.
+4. New template mirroring `mlb/market_accuracy.html`'s shell/CSS/nav
+   conventions but simplified for aggregate-bucket data (summary tiles,
+   `by_sport`/`by_market`/`by_date` tables, collapsible
+   `by_confidence_tier`/`by_edge_bucket`/`by_recommendation_type`), with a
+   graceful "0 settled yet" empty-state note.
+
+**Verified end-to-end against real local data** (not just fixtures) — ran
+the actual local dev server and hit the live page: 436 real published
+recommendations from `reports/intelligence/evaluation_ledger_chunks/`
+(322 mlb, 87 wnba, 7 nba, etc.) rendered correctly windowed/bucketed by
+sport/market/date, all showing `settled: 0` (correct and expected, since
+Phase 1's settlement isn't running in production yet) with the empty-state
+note displaying. Zero console/JS errors. Note for whoever verifies this
+next: the local dev server took ~70-90s to answer the API request during
+this check — confirmed via server logs to be the background
+`intelligence_state` loop's full 8-sport force-refresh cycle starving the
+single-threaded Werkzeug dev server of CPU time, not a bug in this code;
+matches the `run-syndicate` skill's own documented `/api/home` latency
+gotcha (same class of issue, different endpoint). Don't mistake a slow
+local response for a hang — check server logs for `OVERVIEW_SPORT_*`
+churn before assuming a regression.
+
+19/19 new + existing tests passing (`test_intelligence_evaluation.py`,
+`test_opportunity_board.py`). Not yet done: wiring a nav link to this page
+from `home.py`/a dashboard (deliberately deferred — those files weren't
+contested by the time this landed, but out of scope for this pass; page is
+reachable by direct URL at `/intelligence/opportunity-board` in the
+meantime). Side effect to be aware of: running the local dev server for
+this verification left `reports/intelligence/intelligence_state.json` /
+`intelligence_state_history.jsonl` showing as modified in git status —
+those are regenerated state files from the manual verification run, not
+part of this change; don't commit them as if they were.
+
+> **Next free ID: 156.** IDs are never reused. Closed items move to
+> [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
+> free, and run the shipped-work check in Operational notes before reconciling.
 
 ### Reconciliation 2026-07-30 (steam candidates, Layer 2 projection, portfolio reconciliation)
 
