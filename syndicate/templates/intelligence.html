@@ -494,6 +494,17 @@
     return Number.isFinite(numeric) ? (Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1)) : String(projection).trim();
   }
 
+  // The real box-score/current-game-state value right now -- distinct from
+  // both "Projected" (pregame sim) and "Live proj." (live re-sim). Unlike
+  // live_projection, `actual` never had a live_total-style conflation
+  // quirk, so no candidate-type branching is needed here.
+  function displayLiveActual(item) {
+    const actual = item.actual;
+    if (actual === null || actual === undefined || actual === "" || actual === "-") return null;
+    const numeric = Number(actual);
+    return Number.isFinite(numeric) ? (Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1)) : String(actual).trim();
+  }
+
   // How long ago this row's own projection/odds were last refreshed --
   // requested so a stale-looking row (e.g. "Live" showing "-" during a
   // market-line handoff) can be told apart from one that's just never
@@ -784,10 +795,12 @@
     const odds = displayOdds(item);
     const projection = displayProjection(item);
     const liveProjection = displayLiveProjection(item);
+    const liveActual = displayLiveActual(item);
     if (matchup) facts.push(["Matchup", matchup]);
     if (odds) facts.push(["Odds", odds]);
     if (projection) facts.push(["Projected", projection]);
     if (liveProjection) facts.push(["Live proj.", liveProjection]);
+    if (liveActual) facts.push(["Live actual", liveActual]);
     // Same look-ahead-preview distinction as the blotter table: a future
     // date's market not being posted yet silently omitted both facts here,
     // indistinguishable from a real data gap.
@@ -1063,7 +1076,7 @@
       <div class="board-blotter-wrap">
         <table class="board-blotter">
           <thead>
-            <tr><th>Lane</th><th>Matchup</th><th>Pick</th><th>Odds</th><th>Projected</th><th>Live</th><th>Win%</th><th>Edge</th><th>Move</th><th></th></tr>
+            <tr><th>Lane</th><th>Matchup</th><th>Pick</th><th>Odds</th><th>Projected</th><th>Live</th><th>Actual</th><th>Win%</th><th>Edge</th><th>Move</th><th></th></tr>
           </thead>
           <tbody>
             ${sorted.map((item) => {
@@ -1085,6 +1098,9 @@
               // field is worse than showing nothing, since there's no
               // "current" value to report yet.
               const liveDisplay = itemState === "live" ? displayLiveProjection(item) : null;
+              // Same "only meaningful once live" reasoning as liveDisplay --
+              // a pregame row has no "current" actual to report yet.
+              const actualDisplay = itemState === "live" ? displayLiveActual(item) : null;
               // The combined board merges today's real candidates with
               // future-date look-ahead previews whose market hasn't posted
               // yet -- both used to render as an identical bare "&mdash;",
@@ -1110,6 +1126,7 @@
                   <td>${oddsDisplay ? escapeHtml(oddsDisplay) : (hasMarket ? "&mdash;" : pendingMarketHtml)}</td>
                   <td>${projectedDisplay ? escapeHtml(projectedDisplay) : (hasMarket ? "&mdash;" : pendingMarketHtml)}</td>
                   <td>${liveDisplay ? escapeHtml(liveDisplay) : "&mdash;"}</td>
+                  <td>${actualDisplay ? escapeHtml(actualDisplay) : "&mdash;"}</td>
                   <td>${confidence !== null ? Math.round(confidence * 100) + "%" : "&mdash;"}</td>
                   <td class="board-blotter__edge board-blotter__edge--${tier}">${(edge * 100).toFixed(1)}%</td>
                   <td>${movementHtml || "&mdash;"}</td>
@@ -1120,7 +1137,7 @@
                     </div>
                   </td>
                 </tr>
-                ${reasoning ? `<tr class="board-blotter__reason-row" ${rowAttrs}><td></td><td colspan="9">${escapeHtml(reasoning)}</td></tr>` : ""}
+                ${reasoning ? `<tr class="board-blotter__reason-row" ${rowAttrs}><td></td><td colspan="10">${escapeHtml(reasoning)}</td></tr>` : ""}
               `;
             }).join("")}
           </tbody>

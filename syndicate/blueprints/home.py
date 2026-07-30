@@ -1990,6 +1990,52 @@ def _game_current_combined_score(game: dict[str, Any]) -> float | None:
     return away_score + home_score
 
 
+def _gamelens_matching_pregame_value(candidates: list[dict[str, Any]], *, market_family: str, pick_text: str, field: str = "projected") -> Any:
+    # A gameLens segment never carries a genuine PREGAME value of its own --
+    # everything on it (segment_projection, per-market overrides) reflects
+    # live/current-segment state. The only place a real pregame projection
+    # exists for the same market+side is the plain betting-dict candidate
+    # _game_bet_candidates_from_game already appended earlier in this same
+    # `candidates` list for this game (the plain block and the gameLens
+    # block both run unconditionally, back to back, into the same list --
+    # additive, not alternative sources -- so it's always there by the time
+    # this runs, for a live game with a real pregame market to begin with).
+    side_key = str(pick_text or "").strip().split(" ", 1)[0].strip().lower()
+    if not side_key:
+        return None
+    for existing in candidates:
+        if _safe_text(existing.get("market"), "") != market_family:
+            continue
+        existing_side = str(existing.get("pick") or "").strip().split(" ", 1)[0].strip().lower()
+        if existing_side != side_key:
+            continue
+        value = existing.get(field)
+        if value not in (None, "-"):
+            return value
+    return None
+
+
+def _gamelens_segment_actual_value(lens: dict[str, Any], *, market_key: str, pick_text: str) -> float | None:
+    # lens["actualSegment"] (real box-score segment totals, {"home","away"})
+    # passes through verbatim from the vendored live-lens payload into
+    # game["gameLens"] but was never read anywhere in this codebase before --
+    # every gameLens candidate's "actual" silently stayed unset/"-".
+    segment = lens.get("actualSegment") if isinstance(lens.get("actualSegment"), dict) else {}
+    home_actual = _numeric_value(segment.get("home"))
+    away_actual = _numeric_value(segment.get("away"))
+    if home_actual is None or away_actual is None:
+        return None
+    if market_key == "total":
+        return home_actual + away_actual
+    side = str(pick_text or "").strip().split(" ", 1)[0].strip().lower()
+    margin = home_actual - away_actual
+    if side == "home":
+        return margin
+    if side == "away":
+        return -margin
+    return margin
+
+
 # Maps a recommendation prop row's canonical `prop` key to the stat-specific
 # `*_mean` field that holds its real projected value. Necessary because a
 # hitter prop row carries several means (e.g. batter_hits has ab_mean, pa_mean
@@ -2041,7 +2087,7 @@ def _mlb_prop_player_id(prop_row: dict[str, Any]) -> int | None:
     return None
 
 
-def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[str, Any], game: dict[str, Any], market: str, pick: str, line: Any = None, odds: Any = None, edge: Any = None, confidence: Any = None, projected: Any = None, live_projection: Any = None, detail: str | None = None, fallback_epoch: float, live_odds_game_ids: set[str] | None = None, team: Any = None, sim_context: str | None = None, player_id: Any = None, headshot_url: str | None = None) -> None:
+def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[str, Any], game: dict[str, Any], market: str, pick: str, line: Any = None, odds: Any = None, edge: Any = None, confidence: Any = None, projected: Any = None, live_projection: Any = None, actual: Any = None, detail: str | None = None, fallback_epoch: float, live_odds_game_ids: set[str] | None = None, team: Any = None, sim_context: str | None = None, player_id: Any = None, headshot_url: str | None = None) -> None:
     pick_text = _safe_text(pick, "-")
     if pick_text == "-":
         return
@@ -2080,7 +2126,7 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
     # Real regression found 2026-07-23: this function also builds per-game
     # PLAYER PROP candidates (market == f"Hitter {prop_type}"/f"Pitcher
     # {prop_type}", mixed in alongside genuine Moneyline/Spread/Total by the
-    # gameLens loop below), none of which pass an explicit live_projection --
+    # gameLens loop below), none of which pass an explicit actual value --
     # the combined-score fallback was applying the GAME's total score to
     # every hitter/pitcher prop candidate for that game regardless of stat
     # type, so completely different props (total bases, hits, for different
@@ -2090,9 +2136,15 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
     # uses to distinguish these.
     market_text_lower = _safe_text(market, "").strip().lower()
     is_game_level_market = not (market_text_lower.startswith("hitter ") or market_text_lower.startswith("pitcher "))
-    if live_projection is None and is_live and is_game_level_market:
-        live_projection = _game_current_combined_score(game)
     live_projection_text = _prop_metric_text(live_projection) if live_projection is not None else "-"
+    # The current combined score is real, live GAME STATE -- not a
+    # projection of anything -- so it belongs in "actual", never as a
+    # stand-in for a missing live_projection (that used to conflate the two
+    # under one label, implying a sim result that was actually just the
+    # scoreboard).
+    if actual is None and is_live and is_game_level_market:
+        actual = _game_current_combined_score(game)
+    actual_text = _prop_metric_text(actual) if actual is not None else "-"
     player_name = None if is_game_level_market else _player_name_from_prop_pick_text(pick_text)
     edge_value = _pct_number(edge_text)
     confidence_value = _pct_number(confidence_text)
@@ -2141,6 +2193,7 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
             "model_probability": model_probability,
             "projected": projected_text,
             "live_projection": live_projection_text,
+            "actual": actual_text,
             "updated_at": _format_home_timestamp(updated_epoch),
             "updated_epoch": updated_epoch,
             "detail": detail_text,
@@ -2307,15 +2360,13 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
             continue
         lens_label = _safe_text(lens.get("label"), "Live")
         markets = lens.get("markets") if isinstance(lens.get("markets"), dict) else {}
-        # The segment's real model projection (total runs / home margin) lives
-        # as a sibling of "markets", not inside any individual market dict --
-        # see mlb/live_lens.py's _live_lens_segments_from_card, which sets
-        # segment["projection"] = {"total": ..., "homeMargin": ...} alongside
-        # segment["markets"]. The per-market projected=... scan just below
-        # only ever looked inside `market` itself, which never has any of
-        # those four field names, so live MLB gameLens candidates (moneyline/
-        # spread/total, every segment) always showed projected="-" on the
-        # board despite this real projection value existing one level up.
+        # The segment's real LIVE re-sim projection (total runs / home
+        # margin) lives as a sibling of "markets", not inside any individual
+        # market dict -- see mlb/live_lens.py's _live_lens_segments_from_card,
+        # which sets segment["projection"] = {"total": ..., "homeMargin": ...}
+        # alongside segment["markets"]. This is genuinely live/current-segment
+        # data, never a true pregame value, so it feeds live_projection=
+        # below (fallback_projected), not projected=.
         segment_projection = lens.get("projection") if isinstance(lens.get("projection"), dict) else {}
         for market_key, market_label in [("moneyline", "Moneyline"), ("spread", "Spread"), ("total", "Total")]:
             market = markets.get(market_key) if isinstance(markets.get(market_key), dict) else {}
@@ -2329,6 +2380,20 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
                 if market_key == "spread"
                 else f"{market.get('p_win') * 100.0:.1f}%" if isinstance(market.get("p_win"), (int, float)) else None
             )
+            # Everything that used to feed "projected" here (the per-market
+            # override chain AND fallback_projected/segment_projection) is
+            # a genuinely PREGAME-shaped explicit override on `market` itself
+            # (projected/projection/model/mean, e.g. a market builder that
+            # sets both this AND its own live_projection as siblings) still
+            # wins for `projected=` -- only when the market carries none of
+            # those does this fall back to cross-referencing the plain
+            # betting-dict candidate for the same market+side (the only
+            # other legitimate source of a true pregame value). The segment-
+            # level fallback (fallback_projected, derived from
+            # segment_projection -- always live/current-segment data, never
+            # a pregame value on its own) now feeds `live_projection=`
+            # instead, as its OWN last resort after any explicit
+            # live-projection-shaped key on `market`.
             _append_game_bet_candidate(
                 candidates,
                 sport=sport,
@@ -2344,9 +2409,16 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
                     else market.get("projection") if market.get("projection") is not None
                     else market.get("model") if market.get("model") is not None
                     else market.get("mean") if market.get("mean") is not None
+                    else _gamelens_matching_pregame_value(candidates, market_family=market_label, pick_text=pick)
+                ),
+                live_projection=(
+                    market.get("live_projection") if market.get("live_projection") is not None
+                    else market.get("liveProjection") if market.get("liveProjection") is not None
+                    else market.get("live_proj") if market.get("live_proj") is not None
+                    else market.get("projected_live") if market.get("projected_live") is not None
                     else fallback_projected
                 ),
-                live_projection=market.get("live_projection") if market.get("live_projection") is not None else market.get("liveProjection") if market.get("liveProjection") is not None else market.get("live_proj") if market.get("live_proj") is not None else market.get("projected_live"),
+                actual=_gamelens_segment_actual_value(lens, market_key=market_key, pick_text=pick),
                 detail=game.get("summary"),
                 fallback_epoch=fallback_epoch,
                 live_odds_game_ids=live_odds_game_ids,

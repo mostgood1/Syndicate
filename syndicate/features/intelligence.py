@@ -4555,6 +4555,33 @@ def _mlb_subject_prop_candidates_from_artifact(
     return candidates
 
 
+def _mlb_pregame_mean_by_player_market(selected_date: str) -> dict[tuple[str, str, int | None], float]:
+    """Normalized player name + market key (+ game_pk) -> pregame sim mean,
+    read from the same daily_top_props artifact _mlb_prop_candidate_from_
+    artifact_row already sources its own "projected" from (row.get("mean")).
+
+    _mlb_live_lens_prop_candidates_from_artifact's own rows (trackedProps/
+    props on the live-lens report) carry no pregame projection field at all
+    -- only a live one -- so this is the one place a genuine pregame value
+    can still be attached to a live-lens-sourced candidate, via a join on
+    the player+market (+game) rather than a shared row shape.
+    """
+    lookup: dict[tuple[str, str, int | None], float] = {}
+    for row in _mlb_top_props_rows_from_artifact(selected_date):
+        player_name = _safe_text(row.get("ownerName") or row.get("playerName"), "")
+        if not player_name:
+            continue
+        market_key = _market_key_from_text(row.get("stat") or row.get("statLabel"), allow_fallback=True)
+        if not market_key:
+            continue
+        mean_value = _numeric_hint(row.get("mean"))
+        if mean_value is None:
+            continue
+        game_pk = _safe_int(row.get("gamePk") or row.get("game_pk"))
+        lookup[(_normalized_market_text(player_name), market_key, game_pk)] = mean_value
+    return lookup
+
+
 def _mlb_live_lens_prop_candidates_from_artifact(sport: dict[str, Any]) -> list[dict[str, Any]]:
     """Board candidates generated directly from MLB's live-lens artifact for
     LIVE games, not merely an enhancement layer on pre-existing daily_top_props
@@ -4584,6 +4611,7 @@ def _mlb_live_lens_prop_candidates_from_artifact(sport: dict[str, Any]) -> list[
     if not isinstance(games, list):
         return []
 
+    pregame_means = _mlb_pregame_mean_by_player_market(selected_date)
     candidates: list[dict[str, Any]] = []
     seen_keys: set[tuple[str, str, str, int]] = set()
     for game in games:
@@ -4636,7 +4664,9 @@ def _mlb_live_lens_prop_candidates_from_artifact(sport: dict[str, Any]) -> list[
                 continue
             seen_keys.add(dedupe_key)
             score = (float(model_prob or 0.0) * 60.0) + max(0.0, float(ranking_score or 0.0)) * 40.0
-            projected_text = f"{live_projection_value:.1f}" if live_projection_value is not None else "-"
+            pregame_mean = pregame_means.get((_normalized_market_text(player_name), market_key, game_pk))
+            projected_text = f"{pregame_mean:.1f}" if pregame_mean is not None else "-"
+            live_projection_text = f"{live_projection_value:.1f}" if live_projection_value is not None else "-"
             confidence_text = f"{model_prob * 100.0:.1f}%" if model_prob is not None else "-"
             candidates.append(
                 {
@@ -4665,7 +4695,7 @@ def _mlb_live_lens_prop_candidates_from_artifact(sport: dict[str, Any]) -> list[
                     "projected": projected_text,
                     "model_probability": model_prob,
                     "confidence": confidence_text,
-                    "live_projection": projected_text,
+                    "live_projection": live_projection_text,
                     "actual": f"{actual_value:.1f}" if actual_value is not None else "-",
                     "is_live": True,
                     "selection_direction": selection_direction,
@@ -4682,7 +4712,7 @@ def _mlb_live_lens_prop_candidates_from_artifact(sport: dict[str, Any]) -> list[
                             f"Line {line_value:.1f}" if line_value is not None else "",
                             f"Odds {odds_text}" if odds_text != "-" else "",
                             f"Sim% {confidence_text}" if confidence_text != "-" else "",
-                            f"Live Proj {projected_text}" if projected_text != "-" else "",
+                            f"Live Proj {live_projection_text}" if live_projection_text != "-" else "",
                         )
                         if pill
                     ],

@@ -769,11 +769,12 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         self.assertEqual(moneyline_by_pick.get("Away ML"), "Boston Celtics")
         self.assertEqual(moneyline_by_pick.get("Home ML"), "New York Knicks")
 
-    def test_live_game_candidates_show_current_combined_score_in_live_column(self) -> None:
-        # The board's Live column was empty for every Moneyline/Spread/Total
-        # candidate built from the plain "betting" dict -- none of those
-        # call sites ever passed live_projection, so it always fell back to
-        # "-" regardless of whether the game was actually in progress.
+    def test_live_game_candidates_show_current_combined_score_as_actual_not_live_projection(self) -> None:
+        # The board's Live column used to show the game's current combined
+        # score for every Moneyline/Spread/Total candidate built from the
+        # plain "betting" dict -- conflating real game state with a
+        # projection. NBA has no live re-sim, so live_projection correctly
+        # stays "-"; the combined score now surfaces honestly as "actual".
         game = self._sample_game(
             shared_is_live=True,
             status={"in_progress": True},
@@ -786,8 +787,9 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         self.assertTrue(moneyline_candidates)
         for candidate in moneyline_candidates:
             self.assertTrue(candidate["is_live"])
-            self.assertNotEqual(candidate["live_projection"], "-")
-            self.assertEqual(float(candidate["live_projection"]), 8.0)
+            self.assertEqual(candidate["live_projection"], "-")
+            self.assertNotEqual(candidate["actual"], "-")
+            self.assertEqual(float(candidate["actual"]), 8.0)
 
     def test_pregame_candidates_leave_live_column_blank(self) -> None:
         game = self._sample_game(
@@ -814,6 +816,7 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         for candidate in moneyline_candidates:
             self.assertTrue(candidate["is_live"])
             self.assertEqual(candidate["live_projection"], "-")
+            self.assertEqual(candidate["actual"], "-")
 
     def test_live_player_prop_candidates_do_not_get_game_combined_score_as_live_projection(self) -> None:
         # Real regression found 2026-07-23: _game_bet_candidates_from_game's
@@ -842,6 +845,7 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         for candidate in prop_candidates:
             self.assertTrue(candidate["is_live"])
             self.assertEqual(candidate["live_projection"], "-")
+            self.assertEqual(candidate["actual"], "-")
 
     def test_spread_candidates_get_team_projected_and_confidence(self) -> None:
         game = self._sample_game(
@@ -1282,15 +1286,21 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         self.assertFalse(spread["is_live"])
         self.assertFalse(lens_moneyline["is_live"])
 
-    def test_gamelens_candidates_use_segment_projection_when_market_has_none(self) -> None:
+    def test_gamelens_candidates_use_segment_projection_as_live_projection_when_market_has_none(self) -> None:
         # #131 follow-up, confirmed live 2026-07-29: live MLB gameLens
         # candidates (moneyline/spread/total, every segment) showed
         # projected="-" even though mlb/live_lens.py's
         # _live_lens_segments_from_card already computes a real model
         # projection (total runs / home margin) per segment -- it just lives
         # as segment["projection"], a SIBLING of segment["markets"], which
-        # this loop's projected= scan never looked at (it only ever checked
-        # inside the individual market dict, which never has these fields).
+        # this loop's scan never looked at (it only ever checked inside the
+        # individual market dict, which never has these fields).
+        #
+        # Layer 2 projection/live-projection/live-actual follow-up: that
+        # segment projection is LIVE re-sim data, never a true pregame value
+        # -- it now lands in live_projection. projected stays "-" here since
+        # this fixture has no preceding plain betting-dict candidate for the
+        # same market+side to cross-reference (no "betting" override passed).
         game = self._sample_game(
             status={"in_progress": True, "final": False, "status": "In Progress"},
             gameLens=[
@@ -1310,11 +1320,22 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         total = next(c for c in candidates if c["market"] == "Full game Total")
         spread = next(c for c in candidates if c["market"] == "Full game Spread")
         moneyline = next(c for c in candidates if c["market"] == "Full game Moneyline")
-        self.assertEqual(total["projected"], "8.4")
-        self.assertEqual(spread["projected"], "1.2")
-        self.assertEqual(moneyline["projected"], "58.0%")
+        self.assertEqual(total["projected"], "-")
+        self.assertEqual(total["live_projection"], "8.4")
+        self.assertEqual(spread["projected"], "-")
+        self.assertEqual(spread["live_projection"], "1.2")
+        self.assertEqual(moneyline["projected"], "-")
+        self.assertEqual(moneyline["live_projection"], "58.0%")
 
     def test_gamelens_candidate_prefers_a_real_market_projection_over_the_segment_fallback(self) -> None:
+        # A market-level explicit override (market.get("projected")) is a
+        # genuinely pregame-shaped value some market builders attach
+        # directly (confirmed real: NBA/WNBA gameLens markets can carry both
+        # a "projection" AND a separate "live_projection" as siblings) -- it
+        # still wins for "projected" over the segment-level fallback, which
+        # is always live/current-segment data and has no market-level
+        # explicit override to compete with here, so it lands in
+        # "live_projection" instead.
         game = self._sample_game(
             status={"in_progress": True, "final": False, "status": "In Progress"},
             gameLens=[
@@ -1331,6 +1352,59 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         candidates = _game_bet_candidates_from_game({"slug": "mlb"}, game, fallback_epoch=0.0)
         total = next(c for c in candidates if c["market"] == "Full game Total")
         self.assertEqual(total["projected"], "9.9")
+        self.assertEqual(total["live_projection"], "8.4")
+
+    def test_gamelens_candidate_cross_references_pregame_projection_from_plain_candidate(self) -> None:
+        # A live game whose plain betting dict already produced a real
+        # pregame Moneyline candidate ("Home ML", projected win prob) --
+        # the gameLens loop's "Full game Moneyline" candidate for the same
+        # side should pick up that same pregame value, since a gameLens
+        # segment never carries one of its own.
+        game = self._sample_game(
+            status={"in_progress": True, "final": False, "status": "In Progress"},
+            betting={"away_ml": -120, "home_ml": 105, "p_away_win": 0.45, "p_home_win": 0.55},
+            gameLens=[
+                {
+                    "closed": False,
+                    "label": "Full game",
+                    "projection": {},
+                    "markets": {
+                        "moneyline": {"pick": "Home ML", "odds": -130, "edge": 5.5, "p_win": 0.58},
+                    },
+                }
+            ],
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "mlb"}, game, fallback_epoch=0.0)
+        plain_moneyline = next(c for c in candidates if c["market"] == "Moneyline" and c["pick"] == "Home ML")
+        lens_moneyline = next(c for c in candidates if c["market"] == "Full game Moneyline")
+        self.assertEqual(plain_moneyline["projected"], "55.0%")
+        self.assertEqual(lens_moneyline["projected"], "55.0%")
+        self.assertEqual(lens_moneyline["live_projection"], "58.0%")
+
+    def test_gamelens_candidate_actual_reads_real_box_score_segment(self) -> None:
+        # lens["actualSegment"] carries the real box-score segment totals --
+        # previously never read at all, so every gameLens candidate's
+        # "actual" silently stayed "-".
+        game = self._sample_game(
+            status={"in_progress": True, "final": False, "status": "In Progress"},
+            gameLens=[
+                {
+                    "closed": False,
+                    "label": "Full game",
+                    "projection": {"total": 8.4, "homeMargin": 1.2},
+                    "actualSegment": {"home": 5, "away": 3},
+                    "markets": {
+                        "total": {"pick": "Over 7.5", "line": 7.5, "odds": -110, "edge": 3.1, "p_win": 0.54},
+                        "moneyline": {"pick": "Home ML", "odds": -130, "edge": 5.5, "p_win": 0.58},
+                    },
+                }
+            ],
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "mlb"}, game, fallback_epoch=0.0)
+        total = next(c for c in candidates if c["market"] == "Full game Total")
+        moneyline = next(c for c in candidates if c["market"] == "Full game Moneyline")
+        self.assertEqual(float(total["actual"]), 8.0)
+        self.assertEqual(float(moneyline["actual"]), 2.0)
 
     def test_game_status_state_does_not_let_unrelated_text_override_known_in_progress_false(self) -> None:
         # Real bug found in production: every WNBA game carries

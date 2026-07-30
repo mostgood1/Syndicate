@@ -3405,6 +3405,101 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIsNone(reason)
         self.assertIsNotNone(classified)
 
+    def test_mlb_live_lens_prop_candidates_use_pregame_mean_as_projected(self) -> None:
+        # Layer 2 board follow-up: live-lens rows carry no pregame projection
+        # field at all -- only a live one -- so "projected" and
+        # "live_projection" used to be stamped with the SAME live value.
+        # When a matching daily_top_props row exists for the same
+        # player+market(+game), its "mean" is the real pregame value and
+        # must end up in "projected", distinct from the live value.
+        from syndicate.features.intelligence import _mlb_live_lens_prop_candidates_from_artifact
+
+        live_lens_payload = {
+            "games": [
+                {
+                    "gamePk": 824003,
+                    "status": {"abstract": "Live", "detailed": "In Progress"},
+                    "matchup": {"away": {"abbr": "HOU"}, "home": {"abbr": "LAA"}},
+                    "trackedProps": [
+                        {
+                            "playerName": "Yordan Alvarez",
+                            "market": "hitter_total_bases",
+                            "marketLabel": "Hitter Total Bases",
+                            "selection": "Under",
+                            "line": 4.5,
+                            "odds": "-120",
+                            "estimatedWinProb": 0.837,
+                            "liveProjection": 3.9,
+                            "actual": 1.0,
+                        }
+                    ],
+                }
+            ]
+        }
+        pregame_rows = [
+            {
+                "ownerName": "Yordan Alvarez",
+                "stat": "hitter_total_bases",
+                "mean": 4.6,
+                "gamePk": 824003,
+            }
+        ]
+        with patch(
+            "syndicate.features.intelligence._mlb_live_lens_report_cached",
+            return_value=live_lens_payload,
+        ), patch(
+            "syndicate.features.intelligence._mlb_top_props_rows_from_artifact",
+            return_value=pregame_rows,
+        ):
+            candidates = _mlb_live_lens_prop_candidates_from_artifact({"slug": "mlb", "name": "MLB", "context_label": "2026-07-28"})
+
+        self.assertEqual(len(candidates), 1, candidates)
+        candidate = candidates[0]
+        self.assertEqual(candidate.get("projected"), "4.6")
+        self.assertEqual(candidate.get("live_projection"), "3.9")
+        self.assertNotEqual(candidate.get("projected"), candidate.get("live_projection"))
+
+    def test_mlb_live_lens_prop_candidates_projected_stays_dash_without_a_pregame_match(self) -> None:
+        # No matching daily_top_props row -- must NOT fabricate a pregame
+        # value from the live one; "-" is the honest answer.
+        from syndicate.features.intelligence import _mlb_live_lens_prop_candidates_from_artifact
+
+        live_lens_payload = {
+            "games": [
+                {
+                    "gamePk": 824003,
+                    "status": {"abstract": "Live", "detailed": "In Progress"},
+                    "matchup": {"away": {"abbr": "HOU"}, "home": {"abbr": "LAA"}},
+                    "trackedProps": [
+                        {
+                            "playerName": "Yordan Alvarez",
+                            "market": "hitter_total_bases",
+                            "marketLabel": "Hitter Total Bases",
+                            "selection": "Under",
+                            "line": 4.5,
+                            "odds": "-120",
+                            "estimatedWinProb": 0.837,
+                            "liveProjection": 3.9,
+                            "actual": 1.0,
+                        }
+                    ],
+                }
+            ]
+        }
+        with patch(
+            "syndicate.features.intelligence._mlb_live_lens_report_cached",
+            return_value=live_lens_payload,
+        ), patch(
+            "syndicate.features.intelligence._mlb_top_props_rows_from_artifact",
+            return_value=[],
+        ):
+            candidates = _mlb_live_lens_prop_candidates_from_artifact({"slug": "mlb", "name": "MLB", "context_label": "2026-07-28"})
+
+        self.assertEqual(len(candidates), 1, candidates)
+        candidate = candidates[0]
+        self.assertEqual(candidate.get("projected"), "-")
+        self.assertEqual(candidate.get("live_projection"), "3.9")
+
     def test_mlb_live_lens_prop_candidates_dedupe_within_same_game(self) -> None:
         from syndicate.features.intelligence import _mlb_live_lens_prop_candidates_from_artifact
 

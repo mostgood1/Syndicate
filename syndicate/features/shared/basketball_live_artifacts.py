@@ -410,7 +410,13 @@ def build_live_player_lens_payload_from_artifacts(
             if row.get("live_projection") is not None
             else (row.get("proj") if row.get("proj") is not None else row.get("pred"))
         )
-        sim_mu = _safe_float(
+        # Pregame and live-adjusted sim means are genuinely distinct concepts
+        # (Layer 2 board's "Projection" vs "Live projection") -- they must
+        # NOT be merged into one value here. sim_mu_adjusted falls back to
+        # sim_mu only when no live-adjusted value exists at all (e.g. a
+        # pregame-only row), never the other way around.
+        sim_mu_pregame = _safe_float(row.get("sim_mu"))
+        sim_mu_adjusted = _safe_float(
             row.get("sim_mu_adjusted")
             if row.get("sim_mu_adjusted") is not None
             else row.get("sim_mu")
@@ -439,8 +445,8 @@ def build_live_player_lens_payload_from_artifacts(
             "actual": _safe_float(row.get("actual")),
             "pace_proj": _safe_float(row.get("pace_proj") if row.get("pace_proj") is not None else live_projection),
             "pace_vs_line": None,
-            "sim_mu": sim_mu,
-            "sim_mu_adjusted": sim_mu,
+            "sim_mu": sim_mu_pregame,
+            "sim_mu_adjusted": sim_mu_adjusted,
             "live_projection": live_projection,
             "liveProjection": live_projection,
         }
@@ -449,8 +455,8 @@ def build_live_player_lens_payload_from_artifacts(
             rendered_row["live_edge"] = live_edge
             rendered_row["liveEdge"] = live_edge
             rendered_row["pace_vs_line"] = live_edge
-        if line_value is not None and sim_mu is not None:
-            sim_vs_line = round(sim_mu - line_value, 3)
+        if line_value is not None and sim_mu_adjusted is not None:
+            sim_vs_line = round(sim_mu_adjusted - line_value, 3)
             rendered_row["sim_vs_line"] = sim_vs_line
             rendered_row["sim_vs_line_adjusted"] = sim_vs_line
         grouped_rows.setdefault(event_id, []).append(rendered_row)
