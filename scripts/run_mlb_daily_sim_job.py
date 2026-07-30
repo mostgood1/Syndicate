@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -26,10 +27,62 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from syndicate.features.mlb.sources import daily_snapshot_oddsapi_game_lines_path
+from syndicate.features.mlb.sources import daily_snapshot_oddsapi_hitter_props_path
+from syndicate.features.mlb.sources import daily_snapshot_oddsapi_pitcher_props_path
 from syndicate.features.shared.artifact_publisher import publish_changed_hot_artifacts
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
 from syndicate.features.shared.refresh_state_store import write_text_file
+
+
+def _hydrate_vendor_oddsapi_mirror(date_str: str, vendor_cwd: Path) -> None:
+    """Copy this service's already-fetched odds snapshots into the vendored
+    tool's own local data tree.
+
+    tools/daily_update_multi_profile.py's K-ladder-targets builder reads
+    pitcher (and hitter/game-line) prop lines from
+    vendor/mlb_bettingv2/data/market/oddsapi/oddsapi_*_<date>.json -- a tree
+    that is private to this vendored tool (_DATA_DIR, resolved relative to
+    tools/, not to SYNDICATE_DATA_ROOT) and is never written by the odds
+    orchestrator (scripts/refresh_odds_sources.py -> refresh_mlb_oddsapi.py),
+    which only publishes into data/mlb_source/source_artifacts/data/daily/
+    snapshots/<date>/. Before #129/#130 (commit 1465a5dc, 2026-07-29) this
+    job called daily_update.py with --refresh-current-oddsapi on, which had
+    daily_update.py do its own OddsAPI pull straight into that vendor tree --
+    incidentally also keeping it populated. That flag is now off (correctly,
+    to stop refresh-worker duplicating live-odds-worker's OddsAPI calls), and
+    nothing replaced the population it happened to provide as a side effect:
+    K-ladder-targets silently regressed to "missing pitcher sim_dir or
+    pitcher lines" on any date with no pre-existing artifact to fall back on
+    (masked for a few days by _prefer_richer_k_ladder_targets_doc keeping
+    older dates' already-written artifacts). This is a pure local file copy
+    (whatever this service's own snapshot mirror already has, via the normal
+    hot-artifact sync) -- no OddsAPI call, so it doesn't reintroduce the
+    duplication #129/#130 removed. A missing source snapshot is left alone;
+    daily_update_multi_profile.py already handles a genuinely absent pitcher
+    lines file by skipping K-ladder-targets for that run.
+    """
+    dest_dir = vendor_cwd / "data" / "market" / "oddsapi"
+    token = date_str.replace("-", "_")
+    pairs = (
+        (daily_snapshot_oddsapi_game_lines_path(date_str), f"oddsapi_game_lines_{token}.json"),
+        (daily_snapshot_oddsapi_pitcher_props_path(date_str), f"oddsapi_pitcher_props_{token}.json"),
+        (daily_snapshot_oddsapi_hitter_props_path(date_str), f"oddsapi_hitter_props_{token}.json"),
+    )
+    for source, filename in pairs:
+        try:
+            if not source.exists() or not source.is_file():
+                continue
+            dest = dest_dir / filename
+            if dest.exists() and dest.stat().st_mtime_ns >= source.stat().st_mtime_ns:
+                continue
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, dest)
+            print(f"MLB_DAILY_SIM_HYDRATE_ODDSAPI_MIRROR copied {source} -> {dest}", flush=True)
+        except Exception as exc:
+            print(f"MLB_DAILY_SIM_HYDRATE_ODDSAPI_MIRROR_FAILED source={source} error={type(exc).__name__}: {exc}", flush=True)
+            continue
 
 
 def _utc_now() -> str:
@@ -139,6 +192,7 @@ def main() -> int:
     if only_game_pks:
         command.extend(["--only-game-pks", only_game_pks])
     vendor_cwd = REPO_ROOT / "vendor" / "mlb_bettingv2"
+    _hydrate_vendor_oddsapi_mirror(str(args.date), vendor_cwd)
 
     started_at = _utc_now()
     started_epoch = time.time()

@@ -59,9 +59,80 @@ unpushed. Cross-session ID collisions (#131, #139) were both caught and
 resolved without data loss, in both directions, via direct session-to-
 session messages rather than silent overwrites.
 
-> **Next free ID: 149.** IDs are never reused. Closed items move to
+> **Next free ID: 150.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
+
+- **New: #149** (root-caused, fixed, and unit-tested this session; **not yet
+  committed/deployed/confirmed live** — next session or later this one should
+  finish that loop) — user reported MLB's K Targets and pitcher Top Props
+  boards empty for 2026-07-30. Two distinct bugs, found in sequence:
+
+  1. **Timing gap (real, but not this date's main blocker)**: production's
+     only MLB sim run for the date launched at 05:33 UTC (00:33 CDT,
+     `reason=fingerprint_change`), before sportsbooks had posted pitcher prop
+     lines (pitcher-props OddsAPI snapshot wasn't retrieved until 13:49 UTC).
+     Fixed operationally: invalidated today's stored per-game fingerprints
+     for all 10 game_pks via `/api/ops/live-refresh/force-mlb-resim`, which
+     triggered a fresh scoped resim (run `20260730_145031`, finished, exit
+     0). **Confirmed live**: pitcher Top Props now shows 12 rows for today
+     (`/mlb/api/top-props?date=2026-07-30`).
+
+  2. **The real K-targets blocker — a code bug, now fixed**: even after that
+     resim ran with pitcher props confirmed available, K ladder targets
+     still skipped with `"missing pitcher sim_dir or pitcher lines"` (log
+     line confirmed from the resim's own output). Traced to
+     `vendor/mlb_bettingv2/tools/daily_update_multi_profile.py`'s
+     `_collect_daily_k_ladder_targets`, which reads pitcher prop lines from
+     `vendor/mlb_bettingv2/data/market/oddsapi/oddsapi_pitcher_props_<date>.json`
+     — a tree private to the vendored tool (`_DATA_DIR`, resolved relative to
+     `tools/`, independent of `SYNDICATE_DATA_ROOT`), never written by the
+     odds orchestrator (`scripts/refresh_odds_sources.py` →
+     `refresh_mlb_oddsapi.py`, which only publishes into the shared
+     `data/mlb_source/source_artifacts/data/daily/snapshots/<date>/` mirror —
+     confirmed populated for today via `/api/ops/artifacts/export`, while the
+     vendor-tree path was confirmed empty the same way). Root cause of the
+     regression: before commit `1465a5dc` (2026-07-29, "#129/#130: MLB
+     architecture audit — stop refresh-worker duplicating live-odds-worker's
+     OddsAPI calls"), `scripts/run_mlb_daily_sim_job.py` ran
+     `daily_update.py` with `--refresh-current-oddsapi on`, which had
+     `daily_update.py` do its own OddsAPI pull straight into that vendor
+     tree — incidentally keeping it populated as a side effect of a call the
+     architecture audit correctly identified as a redundant, rule-violating
+     second OddsAPI caller. Turning that flag off (correct) removed the only
+     thing that had ever populated the vendor tree, and nothing replaced it.
+     Masked for a few days because `_prefer_richer_k_ladder_targets_doc`
+     keeps an existing artifact rather than overwriting with an empty
+     candidate — 2026-07-29/28/25 all show old row counts (4/8/3) that
+     predate the regression; 2026-07-30 was the first date with no
+     prior-day artifact to fall back on, fully exposing it. **Fix**: added
+     `_hydrate_vendor_oddsapi_mirror()` to
+     [`scripts/run_mlb_daily_sim_job.py`](scripts/run_mlb_daily_sim_job.py),
+     called right before the `daily_update.py` subprocess launches. It's a
+     pure local file copy (game_lines/pitcher_props/hitter_props, copy-if-
+     source-is-newer) from the shared snapshot mirror
+     (`syndicate.features.mlb.sources.daily_snapshot_oddsapi_*_path`, which
+     already resolves the right root per-service) into the vendor tree — no
+     network call, so it does not reintroduce the #129/#130 duplication. A
+     missing source snapshot is left alone; `daily_update_multi_profile.py`
+     already degrades gracefully (skips K-ladder-targets for that run) when
+     lines are genuinely unavailable anywhere. New tests:
+     [`tests/test_run_mlb_daily_sim_job.py`](tests/test_run_mlb_daily_sim_job.py)
+     (5 tests: copies-when-missing, copies-all-three-files, missing-snapshot-
+     is-a-noop, doesn't-overwrite-a-fresh-copy, refreshes-when-source-is-
+     newer), all passing; also spot-checked against
+     `tests/test_daily_update_simulation_contract.py` and
+     `tests/test_fetch_mlb_oddsapi_local_event_scoping.py` (23 passing, no
+     regressions) since both touch adjacent MLB-source-path code.
+     **Not yet committed, pushed, or deployed** — do that next, then re-check
+     `/mlb/api/k-ladder-targets?date=<some future date with no pre-existing
+     artifact>` for non-empty rows once a sim runs after the fix is live
+     (today's 2026-07-30 K-targets will likely stay empty regardless, since
+     today's own vendor-tree gap already happened before the fix could run —
+     verify against a *later* date, or force one more resim for today after
+     deploying). **Full local test suite was not re-run this session** —
+     worth a `python -m pytest tests/` pass before/after committing, given
+     the change touches a production sim-launch path.
 
 - **New: #148** (root-caused, fixed, tested, and deployed this session) —
   user asked for a full soccer architecture
