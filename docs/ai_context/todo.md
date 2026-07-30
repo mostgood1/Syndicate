@@ -4,13 +4,163 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (MLB evening
-next-day sim headroom gate)" below; prior session: "Reconciliation 2026-07-30
-(MLB live-lens headroom gate / Phase 3)" further down; before that:
-"Reconciliation 2026-07-30 (opportunity board / Phase 2)"; before that:
-"Reconciliation 2026-07-30 (steam candidates, Layer 2 projection, portfolio
+Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (soccer
+cross-sport opportunities integration, #150/#151)" below; prior session:
+"Reconciliation 2026-07-30 (WNBA native live-lens game-shape / Phase 4)"
+further down; before that: "Reconciliation 2026-07-30 (MLB evening
+next-day sim headroom gate)"; before that: "Reconciliation 2026-07-30 (MLB
+live-lens headroom gate / Phase 3)"; before that: "Reconciliation
+2026-07-30 (opportunity board / Phase 2)"; before that: "Reconciliation
+2026-07-30 (steam candidates, Layer 2 projection, portfolio
 reconciliation)"; before that: "Reconciliation 2026-07-30 (evaluation-ledger
 settlement / Phase 1)").
+
+### Reconciliation 2026-07-30 (soccer cross-sport opportunities integration, #150/#151)
+
+Closing this session's own arc. Both #150 and #151 are committed, pushed,
+deployed to all three services, and confirmed live — see each item's own
+entry below for full detail; this note is the closure summary only.
+
+**#150** (`c2daaa11`) — soccer's game-level markets (Moneyline/Total/Spread)
+now reach the cross-sport intelligence board's `top_opportunities` as real
+`candidate_type="game"` entries, not just steam moves. Two root causes
+fixed: `_game_status_state` (`home.py`) never resolved `"scheduled"` for
+soccer's payload shape (a display-string `status`, no `status_badge`/
+`status_line`), zeroing `dashboard_games`/`home_rails` hydration for the
+whole sport; and `_market_data_for_match` (soccer `cards.py`) captured only
+probabilities/lines from `picks_rows`, never real price/edge or the
+`home_puck_line`/`away_puck_line` keys `_game_bet_candidates_from_game`
+actually gates Spread-candidate creation on. **Confirmed live**: soccer
+went from `{"steam": 126}` to `{"game": 6, "steam": ~130}` in
+`/api/intelligence/query`'s `top_opportunities`, stable across many
+production ticks since.
+
+**#151** (`8effa311` real fix, `71324235` final cleanup) — direct
+follow-up: player props hydrated but were rejected downstream
+(`missing_projection_or_odds`) because the rank cards only ever carried a
+simulated probability, never a real market price. Added
+`build_prop_picks()` (`scripts/build_soccer_picks.py`) to grade the sim's
+anytime-goalscorer probability against the real captured price (same
+`picks_{date}.csv` game-market grading already uses), joined into
+`props.py`'s rank cards by normalized player name. **Root-caused, via
+Render's raw log API (`GET /v1/logs?ownerId=...&resource=...&text=...`,
+discovered this session — the account's `ownerId` comes from
+`GET /v1/services/<id>`), why props still show zero**: the join code is
+correct (confirmed both by 9 unit tests and a direct production
+row-count check — `picks_rows` for MLS week 18 has 102 real game-market
+rows but 0 `PROP` rows) — the captured player-prop odds simply don't
+exist yet, most likely because these fixtures are 2+ days out and
+sportsbooks post player props much closer to kickoff than game lines.
+Not a code bug; the fix is deployed and will start populating real prop
+candidates once books post the market. All temporary
+`SOCCER_PROP_DEBUG_151`/`SOCCER_PROP_PICKS...DEBUG_151` diagnostics added
+during this investigation were removed once the finding was confirmed.
+**Real next step for whoever picks this up**: re-check `/soccer/mls/api/
+props` and the board's soccer `"prop"` count within ~24-48h of Friday's
+(2026-07-31) kickoffs; if still zero at that point, a team-name mismatch
+between the ESPN-sourced sim and the Odds-API-sourced props feed becomes
+the more likely explanation and is worth a fresh subprocess-level
+diagnostic (confirming the log path actually captures subprocess stdout
+first — this session's attempt to read a `refresh_odds_sources.py`
+subprocess's own stdout via the ops API came back empty both times, a
+real tooling gap distinct from the soccer investigation itself).
+
+**#71 check run this session**: `git log --format=%s -80 | grep -oE
+'#[0-9]{1,3}' | sort -u` → 31 distinct IDs (#104 through #157), every one
+present in `todo.md` or `todo_closed.md`. No gap.
+
+**Coordination**: two other sessions ("MLB missing props, opps, K
+targets" and "MLB/WNBA model accuracy tracking") were active in this same
+shared working directory throughout — coordinated directly via
+`send_message` before every refresh-worker deploy (holding for their
+in-flight resim verification twice), and staged/committed only this
+session's own files each time, leaving their in-progress MLB/evaluation
+work untouched. `git fetch`/`git log HEAD..origin/main` checked
+immediately before every commit and push; no ID or file collisions this
+session (both #147 and #149→#150 next-free-ID advances from concurrent
+sessions were caught and adopted rather than overwritten).
+
+### Reconciliation 2026-07-30 (WNBA native live-lens game-shape / Phase 4)
+
+Not closing yet — same session's own arc as #153 (Phase 1), #155 (Phase 2),
+and #124 (Phase 3), **not committed or pushed**. Files touched:
+`syndicate/features/wnba/live_lens.py` (three new functions + wiring),
+`syndicate/features/shared/live_lens_loop.py` (one explanatory comment,
+no logic change), `render.yaml` (reconciled the `SYNDICATE_LIVE_LENS_
+MIN_HEADROOM_MB` override to `300` to match #124's code default — see
+below), new `tests/test_wnba_live_lens_game_shape.py`.
+
+**New: #158.** Phase 4 of the 5-phase accuracy-tracking/tuning roadmap
+(#153's note). Original framing turned out to be based on a false premise:
+research this session found MLB doesn't actually have a native in-game
+resim either — `mlb/live_lens.py` is an orchestration/report-shaping layer;
+the real play-by-play Monte Carlo (`estimate_live`, ~3,700 lines) is
+vendored (`vendor/mlb_bettingv2/sim_engine/`). What MLB owns natively is
+the `gameLens` lane/fallback contract and a *deterministic* non-MC fallback
+tier (pace-interpolation + a logistic win-probability-from-margin curve
+with a time-decaying scale) — not a simulation. Presented this reframing
+plus three scope options to the user; approved: build that same tractable
+layer for WNBA, no new Monte Carlo/possession engine (which would stack a
+second heavy sim onto a container that already runs one — WNBA's existing
+possession-level SmartSim, already throttled after measuring 1.5GB+ RSS
+spikes on this same 2048MB `live-odds-worker`).
+
+Built: `_wnba_elapsed_minutes()` (clock+period -> minutes elapsed out of 40
+regulation, 5-min OT periods), `_wnba_live_margin_win_prob()` (time-decaying
+logistic blend of pregame win-prob toward a live-margin-derived one, adapted
+from the pattern already proven in the vendored WNBA tick's moneyline
+section — ported as a starting point, not yet backtested against real WNBA
+outcomes, flagged for Phase 5), and `_build_wnba_game_lens()` (single `"live"`
+lane, reusing MLB's `"pregame"`/`"live_projection"` source vocabulary).
+Wired `gameLens` + two new display metrics ("Win probability", "Model
+margin") into the existing generic rank-card output — deliberately did not
+build a dedicated MLB-style template/JS (out of scope for the approved
+"tractable" scope; flagged as a natural Phase 4b). Deliberately did not add
+a WNBA memory gate to `live_lens_loop.py` (the new computation is a clock
+parse + one logistic call, not a sampling loop — comparable to NBA's
+current ungated posture; if real measurement ever shows otherwise,
+calibrate from *that* measurement, never copy MLB's number — the exact
+#124 mistake).
+
+**Verified end-to-end against real local data**: 100 targeted tests passing
+(`test_wnba_live_lens_game_shape.py` x18 new, plus
+`test_wnba_live_lens_worker.py`/`test_wnba_live_snapshots_local.py`/
+`test_wnba_live_projection_garbage_time.py`/`test_live_lens_loop.py` x82,
+no regressions), plus a live local-server check of `/wnba/api/live-lens`:
+`gameLens` correctly attached to all 3 real local fixture games, correct
+`source: "pregame"` fallback (no live/in-progress game locally to exercise
+the `live_projection` path — that branch is covered by the unit tests, not
+live-server-verified against a real in-progress WNBA game this session).
+Did not run the full `tests/` suite (repo has known pre-existing unrelated
+failures in `test_intelligence.py`; targeted runs only, per established
+practice this session).
+
+**Side finding, reconciled**: `render.yaml` already had a separate, earlier,
+never-deployed commit (`e1f17691d`, 2026-07-28) setting
+`SYNDICATE_LIVE_LENS_MIN_HEADROOM_MB=1000` from an independent prior
+investigation of the same #124 symptom. Since an env var beats a code
+default, that would have silently superseded #124's 300MB fix once
+deployed. User approved reconciling render.yaml to `300` too, so there's one
+number, not two. Not deployed as part of this reconciliation — only
+committed/pushed, matching established practice.
+
+**Explicitly not acted on, per user instruction**: `render.yaml` has
+`ODDS_API_KEY` committed in plaintext (not `sync: false` like the adjacent
+`ANTHROPIC_API_KEY`) at three service blocks. Surfaced to the user, who said
+ignore for now — noted here only so it isn't rediscovered as if new.
+
+**Not done / explicitly deferred**: consolidating WNBA's three duplicate
+live-status classifier functions into one MLB-`game_state.py`-style
+canonical module; investigating `vendor/wnba_betting_repo/src/wnba_betting/
+sim/quarters.py` (925 lines, not read) as a possible future path to a real
+possession sim; backtesting the live logistic's time-decay constants
+against real settled WNBA outcomes (needs Phase 1/2's settlement pipeline
+to actually grade enough live WNBA recommendations first — ties to Phase 5).
+Roadmap Phase 5 (tuning-loop wiring/threshold revisit) is still fully open.
+
+> **Next free ID: 159.** IDs are never reused. Closed items move to
+> [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
+> free, and run the shipped-work check in Operational notes before reconciling.
 
 ### Reconciliation 2026-07-30 (MLB evening next-day sim headroom gate)
 
