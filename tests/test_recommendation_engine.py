@@ -578,6 +578,10 @@ class RecommendationEngineTests(unittest.TestCase):
         self.assertEqual(aggressive[0]["market"], "points")
 
     def test_policy_summary_promotes_better_labeled_strategy(self) -> None:
+        # Phase 5: min_sample_size was raised 8 -> 50 (see DecisionPolicy's
+        # own comment) -- bumped from range(8) to range(50) so this clean,
+        # unambiguous all-win-vs-all-loss scenario still clears the new gate.
+        # The test's intent (an obvious signal still promotes) is unchanged.
         balanced_records = [
             {
                 "result": "loss",
@@ -588,7 +592,7 @@ class RecommendationEngineTests(unittest.TestCase):
                 "recommendation": {"market": "points", "selection": "Over 28.5", "confidence": 0.57, "edge": 0.02},
                 "artifact_metadata": {"sport": "nba"},
             }
-            for _ in range(8)
+            for _ in range(50)
         ]
         aggressive_records = [
             {
@@ -600,7 +604,7 @@ class RecommendationEngineTests(unittest.TestCase):
                 "recommendation": {"market": "moneyline", "selection": "Boston Celtics", "confidence": 0.64, "edge": 0.07},
                 "artifact_metadata": {"sport": "nba"},
             }
-            for _ in range(8)
+            for _ in range(50)
         ]
         history = balanced_records + aggressive_records
 
@@ -611,6 +615,32 @@ class RecommendationEngineTests(unittest.TestCase):
         self.assertEqual(summary["selected_policy"], "aggressive")
         self.assertTrue(summary["promoted"])
         self.assertEqual(select_policy(history, sport="nba"), "aggressive")
+
+    def test_small_sample_noise_does_not_trigger_promotion(self) -> None:
+        # Phase 5 regression test for the exact bug found: a 1-bet-out-of-12
+        # swing (ordinary binomial noise for a ~55% strategy) used to
+        # immediately promote the "luckier" policy under the old
+        # promotion_margin=0.01-0.02 / min_sample_size=8 thresholds. With the
+        # rescaled thresholds, this small, noisy sample must NOT promote.
+        def _record(policy: str, win: bool) -> dict:
+            return {
+                "result": "win" if win else "loss",
+                "pnl": 0.91 if win else -1.0,
+                "stake": 1.0,
+                "implied_probability": 0.5,
+                "recommendation": {"policy": policy, "edge": 0.04, "confidence": 0.58, "sport": "mlb"},
+                "query": {"sport": "mlb"},
+            }
+
+        history = []
+        for policy, wins in (("balanced", 6), ("aggressive", 7)):
+            for i in range(12):
+                history.append(_record(policy, win=i < wins))
+
+        summary = build_policy_optimization_summary(history, sport="mlb")
+
+        self.assertFalse(summary["promoted"])
+        self.assertEqual(summary["selected_policy"], recommendation_engine.DEFAULT_POLICY)
 
     def test_artifact_metadata_carries_policy_selection(self) -> None:
         policy_comparison = [

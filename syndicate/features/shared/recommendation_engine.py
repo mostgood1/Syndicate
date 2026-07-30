@@ -38,6 +38,21 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class DecisionPolicy:
+    # Phase 5 (2026-07-30): promotion_margin/min_sample_size used to default
+    # to 0.015/8. Empirically demonstrated (synthetic script, not guessed)
+    # that this was broken: 12 settled bets per policy, one policy winning
+    # just 1 more bet than the other out of 12 (ordinary binomial noise for
+    # a ~55% strategy), triggered an immediate promotion. Root cause:
+    # promotion_margin was scaled for a 0-1 metric, but compare_policies()
+    # compares it against promotion_score, a weighted sum that realistically
+    # ranges roughly +/-20 to +80 -- the margin was negligible at that scale,
+    # so min_sample_size=8 was the only real gate, and 8-12 settled bets is
+    # nowhere near enough to distinguish skill from variance. Same class of
+    # bug as #124 (a threshold copied from/scaled for the wrong context),
+    # different subsystem. These new values are a principled-but-unbacktested
+    # starting point -- there's no real settled promotion history to
+    # calibrate against yet (Phase 1 only just made settlement possible) --
+    # revisit once enough real promotion history exists.
     name: str
     edge_weight: float
     confidence_weight: float
@@ -45,8 +60,8 @@ class DecisionPolicy:
     calibration_weight: float
     market_fit_weight: float
     min_edge_bias: float = 0.0
-    promotion_margin: float = 0.015
-    min_sample_size: int = 8
+    promotion_margin: float = 3.0
+    min_sample_size: int = 50
 
 
 POLICY_REGISTRY: dict[str, DecisionPolicy] = {
@@ -66,7 +81,7 @@ POLICY_REGISTRY: dict[str, DecisionPolicy] = {
         calibration_weight=0.25,
         market_fit_weight=0.05,
         min_edge_bias=0.015,
-        promotion_margin=0.02,
+        promotion_margin=4.0,
     ),
     "aggressive": DecisionPolicy(
         name="aggressive",
@@ -76,7 +91,7 @@ POLICY_REGISTRY: dict[str, DecisionPolicy] = {
         calibration_weight=0.10,
         market_fit_weight=0.10,
         min_edge_bias=-0.005,
-        promotion_margin=0.01,
+        promotion_margin=2.0,
     ),
 }
 DEFAULT_POLICY = "balanced"
