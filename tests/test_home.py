@@ -840,6 +840,31 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         self.assertEqual(moneyline_by_pick.get("Away ML"), "Boston Celtics")
         self.assertEqual(moneyline_by_pick.get("Home ML"), "New York Knicks")
 
+    def test_soccer_candidates_show_league_display_instead_of_generic_sport_name(self) -> None:
+        # #162: soccer covers several leagues at once (MLS, La Liga, ...);
+        # game.get("league_display") -- only ever stamped by soccer's own
+        # game builders (soccer/cards.py) -- should override the generic
+        # "Soccer" sport family label on every game-level candidate.
+        game = self._sample_game(
+            league="mls",
+            league_display="MLS",
+            betting={"away_ml": -120, "home_ml": 105, "p_away_win": 0.55, "p_home_win": 0.45},
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "soccer", "name": "Soccer"}, game, fallback_epoch=0.0)
+        self.assertTrue(candidates)
+        for candidate in candidates:
+            self.assertEqual(candidate["sport"], "MLS")
+            self.assertEqual(candidate["sport_slug"], "soccer")
+
+    def test_non_soccer_candidates_are_unaffected_by_league_display_field(self) -> None:
+        game = self._sample_game(
+            betting={"away_ml": -120, "home_ml": 105, "p_away_win": 0.55, "p_home_win": 0.45},
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "nba", "name": "NBA"}, game, fallback_epoch=0.0)
+        self.assertTrue(candidates)
+        for candidate in candidates:
+            self.assertEqual(candidate["sport"], "NBA")
+
     def test_live_game_candidates_show_current_combined_score_as_actual_not_live_projection(self) -> None:
         # The board's Live column used to show the game's current combined
         # score for every Moneyline/Spread/Total candidate built from the

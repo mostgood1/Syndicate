@@ -25,6 +25,32 @@ class GameChipBuilderTests(unittest.TestCase):
         self.assertEqual(chip["leader"], "away")
         self.assertEqual(chip["game_key"], "823759")
 
+    def test_soccer_chip_carries_league_display(self) -> None:
+        # #162: soccer's game dicts (soccer/cards.py) stamp league/
+        # league_display -- passed through so a consumer can show "MLS"/
+        # "La Liga" instead of the generic "soccer" sport slug.
+        game = {
+            "gamePk": "761689",
+            "league": "mls",
+            "league_display": "MLS",
+            "away": {"abbr": "ATX", "score": 0},
+            "home": {"abbr": "HOU", "score": 0},
+            "status": {"abstract": "Scheduled"},
+        }
+
+        chip = build_game_chip("soccer", game)
+
+        self.assertEqual(chip["league"], "mls")
+        self.assertEqual(chip["league_display"], "MLS")
+
+    def test_non_soccer_chip_has_no_league_fields(self) -> None:
+        game = {"gamePk": 1, "away": {"abbr": "NYY", "score": 4}, "home": {"abbr": "BOS", "score": 2}}
+
+        chip = build_game_chip("mlb", game)
+
+        self.assertIsNone(chip["league"])
+        self.assertIsNone(chip["league_display"])
+
     def test_mlb_live_chip_from_live_state_half_and_inning_fields(self) -> None:
         game = {
             "gamePk": 1,

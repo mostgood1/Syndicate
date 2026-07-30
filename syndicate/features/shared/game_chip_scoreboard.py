@@ -346,6 +346,12 @@ def build_game_chip(sport: str, game: dict[str, Any]) -> dict[str, Any]:
     start_time_utc = _resolve_scheduled_start_utc(game)
     return {
         "sport": sport_slug,
+        # #162: only ever set by soccer's own game builders
+        # (soccer/cards.py) -- "MLS"/"La Liga" etc., so a consumer can show
+        # the specific league instead of the generic sport label. None for
+        # every other sport.
+        "league": _text(game.get("league")) or None,
+        "league_display": _text(game.get("league_display")) or None,
         "game_key": _game_key(game),
         "matchup": _matchup_text(game),
         "away": {"abbr": _side_label(game, "away"), "score": away_score},

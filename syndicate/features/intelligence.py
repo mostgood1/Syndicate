@@ -3989,22 +3989,28 @@ def _mlb_team_abbr_any(team_name: str) -> str:
     return abbreviation or _soccer_abbr_from_name(text)
 
 
-def _soccer_steam_matchup_lookup(selected_date: str) -> dict[str, str]:
-    """event_id -> "Away @ Home" for soccer, built from the raw OddsAPI
-    fetch rows (game_odds_current.csv + today's props/<date>.csv per active
-    league) -- the only place a steam event's real OddsAPI-hash event_id
-    can actually be resolved to team names for events recorded before
-    odds_refresh_tracking.py started stamping home_team/away_team directly.
-    Cheap: a full day across all active leagues is dozens of rows (a single
-    rolling "current odds" file per league), not hundreds. Never raises --
-    game_odds_rows/props_odds_rows already degrade to () on any read
-    failure, matching this whole function's best-effort/cosmetic purpose.
+def _soccer_steam_matchup_lookup(selected_date: str) -> dict[str, dict[str, str]]:
+    """event_id -> {"matchup": "Away @ Home", "league_display": "MLS"} for
+    soccer, built from the raw OddsAPI fetch rows (game_odds_current.csv +
+    today's props/<date>.csv per active league) -- the only place a steam
+    event's real OddsAPI-hash event_id can actually be resolved to team
+    names for events recorded before odds_refresh_tracking.py started
+    stamping home_team/away_team directly. Cheap: a full day across all
+    active leagues is dozens of rows (a single rolling "current odds" file
+    per league), not hundreds. Never raises -- game_odds_rows/props_odds_rows
+    already degrade to () on any read failure, matching this whole
+    function's best-effort/cosmetic purpose.
+
+    #162: this loop already walks per-league, so the league that resolved
+    each event_id is known right here -- stamped alongside matchup so
+    _steam_candidates_for_sport can show "MLS"/"La Liga" instead of the
+    generic "Soccer" sport label every other steam candidate got before.
     """
     try:
-        from syndicate.features.soccer.sources import active_leagues_for_date, game_odds_rows, props_odds_rows
+        from syndicate.features.soccer.sources import active_leagues_for_date, game_odds_rows, league_display_name, props_odds_rows
     except Exception:
         return {}
-    lookup: dict[str, str] = {}
+    lookup: dict[str, dict[str, str]] = {}
     try:
         leagues = active_leagues_for_date(selected_date)
     except Exception:
@@ -4024,7 +4030,7 @@ def _soccer_steam_matchup_lookup(selected_date: str) -> dict[str, str]:
             if home or away:
                 away_abbr = _soccer_team_abbr(league, away) if away else "-"
                 home_abbr = _soccer_team_abbr(league, home) if home else "-"
-                lookup[event_id] = f"{away_abbr} @ {home_abbr}"
+                lookup[event_id] = {"matchup": f"{away_abbr} @ {home_abbr}", "league_display": league_display_name(league)}
     return lookup
 
 
@@ -4078,6 +4084,11 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
     # serialized it as a raw None instead of the "-" placeholder every
     # other unresolvable field on this board uses.
     actual_by_game_id: dict[str, float] = {}
+    # #162: soccer's game dicts (soccer/cards.py) stamp league_display
+    # ("MLS", "La Liga", ...) directly -- carried through so steam
+    # candidates can show the real league instead of the generic "Soccer"
+    # sport label every other candidate type on this board already fixed.
+    league_display_by_game_id: dict[str, str] = {}
     for game in sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []:
         if not isinstance(game, dict):
             continue
@@ -4090,6 +4101,9 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
         home_label = _safe_text(home.get("abbr") or home.get("name"), "") or _safe_text(game.get("home_label"), "")
         if away_label or home_label:
             matchup_by_game_id[game_key] = f"{away_label or '-'} @ {home_label or '-'}"
+        league_display_val = _safe_text(game.get("league_display"), "")
+        if league_display_val:
+            league_display_by_game_id[game_key] = league_display_val
         away_abbr_val = _safe_text(away.get("abbr"), "").upper()
         home_abbr_val = _safe_text(home.get("abbr"), "").upper()
         if away_abbr_val and home_abbr_val:
@@ -4117,8 +4131,11 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
     # rows, so it gets its own read-time lookup for events recorded before
     # the source-side stamp above existed.
     if sport_slug == "soccer":
-        for event_id, matchup_text in _soccer_steam_matchup_lookup(selected_date).items():
-            matchup_by_game_id.setdefault(event_id, matchup_text)
+        for event_id, lookup_entry in _soccer_steam_matchup_lookup(selected_date).items():
+            matchup_by_game_id.setdefault(event_id, lookup_entry.get("matchup", "-"))
+            league_display_val = lookup_entry.get("league_display")
+            if league_display_val:
+                league_display_by_game_id.setdefault(event_id, league_display_val)
 
     # Confirmed live: MLB steam candidates built from hitter/pitcher prop
     # rows (_flatten_mlb_props) had NO game_id at all -- unlike soccer's raw
@@ -4247,7 +4264,10 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
         candidates.append(
             {
                 "candidate_type": "steam",
-                "sport": _safe_text(sport.get("name"), sport_slug.upper()),
+                # #162: prefer the resolved league ("MLS", "La Liga") over
+                # the generic sport family name for soccer -- see
+                # league_display_by_game_id above.
+                "sport": league_display_by_game_id.get(game_id) or _safe_text(sport.get("name"), sport_slug.upper()),
                 "sport_slug": sport_slug,
                 "surface_key": lane,
                 "surface_title": "Steam moves",

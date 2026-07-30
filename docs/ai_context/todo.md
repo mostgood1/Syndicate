@@ -4,8 +4,9 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (#161, Layer 1
-closing-line fix)" below; prior session: "Reconciliation 2026-07-30 (#160,
+Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (#162, soccer
+league display)" below; prior session: "Reconciliation 2026-07-30 (#161,
+Layer 1 closing-line fix)"; before that: "Reconciliation 2026-07-30 (#160,
 Games-strip board bugs)" further down; before that: "Reconciliation
 2026-07-30 (tuning-loop wiring / Phase 5)"; before that: "Reconciliation
 2026-07-30 (soccer cross-sport opportunities integration, #150/#151)"; before
@@ -16,6 +17,62 @@ headroom gate / Phase 3)"; before that: "Reconciliation 2026-07-30
 (opportunity board / Phase 2)"; before that: "Reconciliation 2026-07-30
 (steam candidates, Layer 2 projection, portfolio reconciliation)"; before
 that: "Reconciliation 2026-07-30 (evaluation-ledger settlement / Phase 1)").
+
+### Reconciliation 2026-07-30 (#162, soccer league display)
+
+User asked for soccer's Games-strip/board cards to show the actual league
+("MLS", "La Liga") instead of the generic "Soccer"/"SOCCER" sport label,
+since soccer covers several leagues at once.
+
+Traced the single choke point every sport's game-level candidate passes
+through (`home.py`'s `_append_game_bet_candidate`) and the soccer-specific
+steam-candidate builder (`intelligence.py`'s `_steam_candidates_for_sport`).
+Both stamped `"sport"` from the static per-sport config name ("Soccer"),
+with no per-match league information available at that point.
+
+1. **Source fields.** `soccer/cards.py`'s two game-dict constructors
+   (`_match_to_game`, `_unsimulated_game`) now stamp `"league"` (slug, e.g.
+   `"mls"`) and `"league_display"` (`"MLS"`) directly on every game dict,
+   using the already-resolved `league` the caller passes in (soccer is
+   week-keyed per league; the home-page provider resolves exactly one
+   active league per call today, preferring MLS).
+2. **Game-level candidates.** `home.py`'s `_append_game_bet_candidate` now
+   prefers `game.get("league_display")` over the generic sport name when
+   present -- a no-op for every other sport (the field is soccer-only), and
+   `sport_slug` is untouched, so sport-tab filtering and game-chip
+   id-matching (both keyed on the slug, never the display name) are
+   unaffected.
+3. **Steam candidates.** `_steam_candidates_for_sport` now also builds a
+   `league_display_by_game_id` map (from `dashboard_games`' own
+   `league_display` field, and from `_soccer_steam_matchup_lookup`'s
+   per-league raw-odds-row scan, which already iterated per league but
+   discarded that fact -- now returns `{"matchup": ..., "league_display":
+   ...}` per event_id) and uses it to override `"sport"` on soccer steam
+   candidates the same way.
+4. **Chip payload.** `game_chip_scoreboard.py`'s `build_game_chip` now
+   passes through `league`/`league_display` from the game dict (additive,
+   `None` for every other sport) for API completeness -- not required for
+   the fix itself, since the Games-strip badge reads `item.sport`
+   (already fixed above), not the chip directly.
+
+Net effect: everywhere a soccer candidate's sport badge renders (Games
+strip, Board table, Best-opportunities strip) now shows "MLS"/"La Liga"/etc.
+instead of "SOCCER", with zero JS changes needed (`intelligence.html`'s
+`deriveGameCards()` already derives its badge from `item.sport`).
+
+**Coverage gap, not fixed this pass:** player-prop candidates
+(`_prop_candidate_from_item`/`_build_prop_dashboard_row`) still stamp the
+generic sport name unconditionally -- soccer has little/no prop volume on
+this board today so it wasn't prioritized, but if that changes the same
+`game.get("league_display")`-preference pattern should be applied there too.
+Also: `_soccer_steam_matchup_lookup`'s per-league resolution only covers
+whichever leagues `active_leagues_for_date` returns as calendar-active, same
+scope as the existing matchup-text resolution it was already doing --  no
+new limitation introduced.
+
+Verified live 2026-07-30: not yet deployed as of this reconciliation --
+209 tests passing locally (soccer/home/intelligence/game-chip suites plus
+the two broader intelligence/soccer-sources suites), pending commit+deploy.
 
 ### Reconciliation 2026-07-30 (#161, Layer 1 closing-line fix)
 

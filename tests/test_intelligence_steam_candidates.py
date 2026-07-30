@@ -210,11 +210,39 @@ class SteamMatchupResolutionTests(unittest.TestCase):
         sport["dashboard_games"] = []
         with patch("syndicate.features.intelligence._load_steam_events_for_date", return_value=[event]), patch(
             "syndicate.features.intelligence._soccer_steam_matchup_lookup",
-            return_value={"deadbeef": "NYCFC @ Inter Miami"},
+            return_value={"deadbeef": {"matchup": "NYCFC @ Inter Miami", "league_display": "MLS"}},
         ):
             candidates = _steam_candidates_for_sport(sport)
         self.assertEqual(len(candidates), 1, candidates)
         self.assertEqual(candidates[0]["matchup"], "NYCFC @ Inter Miami")
+        # #162: the league resolved by _soccer_steam_matchup_lookup should
+        # replace the generic "Soccer" sport label on this candidate.
+        self.assertEqual(candidates[0]["sport"], "MLS")
+
+    def test_soccer_steam_candidate_uses_league_display_from_dashboard_games(self) -> None:
+        # #162: soccer's game dicts (soccer/cards.py) stamp league_display
+        # ("MLS", "La Liga", ...) -- a steam candidate resolvable to one of
+        # today's dashboard_games via game_id should show the real league
+        # instead of the generic "Soccer" sport label.
+        event = dict(LIVE_PROP_STEAM_EVENT, sport="soccer", game_id="761689")
+        event.pop("home_team", None)
+        event.pop("away_team", None)
+        sport = _sport(slug="soccer")
+        sport["dashboard_games"] = [
+            {
+                "gamePk": "761689",
+                "league": "la_liga",
+                "league_display": "La Liga",
+                "away": {"abbr": "RMA"},
+                "home": {"abbr": "BAR"},
+            }
+        ]
+        with patch("syndicate.features.intelligence._load_steam_events_for_date", return_value=[event]), patch(
+            "syndicate.features.intelligence._soccer_steam_matchup_lookup", return_value={}
+        ):
+            candidates = _steam_candidates_for_sport(sport)
+        self.assertEqual(len(candidates), 1, candidates)
+        self.assertEqual(candidates[0]["sport"], "La Liga")
 
     def test_soccer_matchup_lookup_never_raises_when_soccer_sources_unavailable(self) -> None:
         from syndicate.features.intelligence import _soccer_steam_matchup_lookup

@@ -2191,7 +2191,16 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
             "game_id": _game_identifier(game),
             "gamePk": game.get("gamePk") or game.get("game_pk") or game.get("game_id"),
             "event_id": game.get("event_id"),
-            "sport": _safe_text(sport.get("name"), str(sport.get("slug") or "").upper()),
+            # #162: soccer covers several leagues (MLS, La Liga, ...) but
+            # "sport" for it was always the generic family label "Soccer" --
+            # every game/board card badge read "SOCCER" regardless of which
+            # league the match was actually in. game.get("league_display")
+            # is only ever set by soccer's own game builders
+            # (soccer/cards.py), so this is a no-op for every other sport;
+            # sport_slug below stays the family slug either way, so
+            # sport-tab filtering and game-chip id-matching (both keyed on
+            # sport_slug, not this display field) are unaffected.
+            "sport": _safe_text(game.get("league_display"), "") or _safe_text(sport.get("name"), str(sport.get("slug") or "").upper()),
             "sport_slug": _safe_text(sport.get("slug"), "sport").lower(),
             "matchup": _sport_matchup(game),
             "market": _safe_text(market, _market_label_from_pick_text(pick_text)),

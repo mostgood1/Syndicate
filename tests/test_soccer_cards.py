@@ -35,6 +35,10 @@ class MatchToGameTests(unittest.TestCase):
         self.assertEqual(metrics["Away win"], "20.0%")
         self.assertIn("/soccer/epl/game/123?week=1&season=2026", game["href"])
         self.assertEqual(game["panels"][0]["eyebrow"], "Match projection")
+        # #162: stamped so downstream candidate/chip builders can show the
+        # specific league ("EPL") instead of the generic "Soccer" label.
+        self.assertEqual(game["league"], "epl")
+        self.assertEqual(game["league_display"], "EPL")
 
     def test_unsimulated_fixture_shows_placeholder_card(self) -> None:
         fixture = {
@@ -50,6 +54,8 @@ class MatchToGameTests(unittest.TestCase):
         self.assertEqual(game["metrics"][0]["value"], "-")
         self.assertEqual(game["panels"][0]["eyebrow"], "Not yet simulated")
         self.assertIn("has not been simulated yet", game["summary"])
+        self.assertEqual(game["league"], "epl")
+        self.assertEqual(game["league_display"], "EPL")
 
     def test_team_roster_href_uses_directory_id_when_matched(self) -> None:
         with patch.object(cards, "team_by_name", return_value={"team_id": "359", "abbreviation": "ARS"}):

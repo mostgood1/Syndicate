@@ -141,6 +141,8 @@ def _unsimulated_game(fixture: dict[str, Any], *, league: str, week: int, season
     return {
         "gamePk": event_id or f"{league}_{date_str}_{home_team}_{away_team}".replace(" ", "_"),
         "event_id": event_id,
+        "league": league,
+        "league_display": league_display_name(league),
         "away": {
             "abbr": _abbr(away_team, league),
             "name": away_team,
@@ -462,6 +464,8 @@ def _match_to_game(match: dict[str, Any], *, league: str, week: int, season: int
     return {
         "gamePk": event_id or f"{league}_{match.get('date')}_{home_team}_{away_team}".replace(" ", "_"),
         "event_id": event_id,
+        "league": league,
+        "league_display": league_display_name(league),
         "away": {
             "abbr": _abbr(away_team, league),
             "name": away_team,
