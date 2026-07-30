@@ -160,10 +160,11 @@ session messages rather than silent overwrites.
      and stamp real `line`/`odds`/`projected`/`edge` onto each rank card
      before it reaches `_prop_item_from_rank_card`.
 
-- **New: #149** (root-caused, fixed, and unit-tested this session; **not yet
-  committed/deployed/confirmed live** — next session or later this one should
-  finish that loop) — user reported MLB's K Targets and pitcher Top Props
-  boards empty for 2026-07-30. Two distinct bugs, found in sequence:
+- **New: #149** (root-caused and fixed this session, with one real
+  self-correction along the way; deployed to refresh-worker, resim
+  re-triggered post-deploy — **row-count confirmation on the live board still
+  pending** as of writing) — user reported MLB's K Targets and pitcher Top
+  Props boards empty for 2026-07-30. Two distinct bugs, found in sequence:
 
   1. **Timing gap (real, but not this date's main blocker)**: production's
      only MLB sim run for the date launched at 05:33 UTC (00:33 CDT,
@@ -175,61 +176,88 @@ session messages rather than silent overwrites.
      0). **Confirmed live**: pitcher Top Props now shows 12 rows for today
      (`/mlb/api/top-props?date=2026-07-30`).
 
-  2. **The real K-targets blocker — a code bug, now fixed**: even after that
-     resim ran with pitcher props confirmed available, K ladder targets
-     still skipped with `"missing pitcher sim_dir or pitcher lines"` (log
-     line confirmed from the resim's own output). Traced to
+  2. **The real K-targets blocker — a code bug**: even after that resim ran
+     with pitcher props confirmed available, K ladder targets still skipped
+     with `"missing pitcher sim_dir or pitcher lines"`. Traced to
      `vendor/mlb_bettingv2/tools/daily_update_multi_profile.py`'s
      `_collect_daily_k_ladder_targets`, which reads pitcher prop lines from
-     `vendor/mlb_bettingv2/data/market/oddsapi/oddsapi_pitcher_props_<date>.json`
-     — a tree private to the vendored tool (`_DATA_DIR`, resolved relative to
-     `tools/`, independent of `SYNDICATE_DATA_ROOT`), never written by the
-     odds orchestrator (`scripts/refresh_odds_sources.py` →
+     `_DATA_DIR/market/oddsapi/oddsapi_pitcher_props_<date>.json` — never
+     written by the odds orchestrator (`scripts/refresh_odds_sources.py` →
      `refresh_mlb_oddsapi.py`, which only publishes into the shared
-     `data/mlb_source/source_artifacts/data/daily/snapshots/<date>/` mirror —
-     confirmed populated for today via `/api/ops/artifacts/export`, while the
-     vendor-tree path was confirmed empty the same way). Root cause of the
-     regression: before commit `1465a5dc` (2026-07-29, "#129/#130: MLB
-     architecture audit — stop refresh-worker duplicating live-odds-worker's
-     OddsAPI calls"), `scripts/run_mlb_daily_sim_job.py` ran
-     `daily_update.py` with `--refresh-current-oddsapi on`, which had
-     `daily_update.py` do its own OddsAPI pull straight into that vendor
-     tree — incidentally keeping it populated as a side effect of a call the
-     architecture audit correctly identified as a redundant, rule-violating
-     second OddsAPI caller. Turning that flag off (correct) removed the only
-     thing that had ever populated the vendor tree, and nothing replaced it.
-     Masked for a few days because `_prefer_richer_k_ladder_targets_doc`
-     keeps an existing artifact rather than overwriting with an empty
-     candidate — 2026-07-29/28/25 all show old row counts (4/8/3) that
-     predate the regression; 2026-07-30 was the first date with no
-     prior-day artifact to fall back on, fully exposing it. **Fix**: added
-     `_hydrate_vendor_oddsapi_mirror()` to
+     `data/mlb_source/source_artifacts/data/daily/snapshots/<date>/`
+     mirror). Root cause of the regression: before commit `1465a5dc`
+     (2026-07-29, "#129/#130: MLB architecture audit — stop refresh-worker
+     duplicating live-odds-worker's OddsAPI calls"),
+     `scripts/run_mlb_daily_sim_job.py` ran `daily_update.py` with
+     `--refresh-current-oddsapi on`, which had `daily_update.py` do its own
+     OddsAPI pull straight into `_DATA_DIR/market/oddsapi/` — incidentally
+     keeping it populated as a side effect of a call the architecture audit
+     correctly identified as a redundant, rule-violating second OddsAPI
+     caller. Turning that flag off (correct) removed the only thing that had
+     ever populated that tree, and nothing replaced it. Masked for a few
+     days because `_prefer_richer_k_ladder_targets_doc` keeps an existing
+     artifact rather than overwriting with an empty candidate —
+     2026-07-29/28/25 all show old row counts (4/8/3) that predate the
+     regression; 2026-07-30 was the first date with no prior-day artifact to
+     fall back on, fully exposing it.
+
+     **First fix attempt was wrong, caught and corrected before it did any
+     good**: assumed `_DATA_DIR` (no `MLB_BETTING_DATA_ROOT`/
+     `MLB_BETTING_DATA_ROOT_DIR` env override) resolved to the vendored
+     tool's own git-checkout-relative `vendor/mlb_bettingv2/data/` — it does
+     NOT in production. `render.yaml` sets `MLB_BETTING_DATA_ROOT` to
+     `/opt/render/project/data/mlb_source/source_artifacts/data` on **all
+     three services** (a var name that doesn't contain the substring
+     `DATA_ROOT_DIR`, which is why the first pass's `render.yaml` grep for
+     that missed it). Committed (`64d57ed2`), pushed, and deployed to
+     refresh-worker (`dep-d9lmucrl550s73cgpmig`) believing the fix hydrated
+     `vendor/mlb_bettingv2/data/market/oddsapi/` — the tree nothing actually
+     reads. Caught immediately after deploy: forced one more resim and its
+     log tail still showed `"missing pitcher sim_dir or pitcher lines"`,
+     with an explicit path in the adjacent "no pitcher prop market entries"
+     line — `.../mlb_source/source_artifacts/data/market/oddsapi/
+     oddsapi_pitcher_props_2026_07_30.json` — proving `_DATA_DIR` was the
+     `MLB_BETTING_DATA_ROOT` override the whole time.
+
+     **Corrected fix**: added `_vendor_mlb_data_dir()` to
      [`scripts/run_mlb_daily_sim_job.py`](scripts/run_mlb_daily_sim_job.py),
-     called right before the `daily_update.py` subprocess launches. It's a
-     pure local file copy (game_lines/pitcher_props/hitter_props, copy-if-
-     source-is-newer) from the shared snapshot mirror
-     (`syndicate.features.mlb.sources.daily_snapshot_oddsapi_*_path`, which
-     already resolves the right root per-service) into the vendor tree — no
-     network call, so it does not reintroduce the #129/#130 duplication. A
-     missing source snapshot is left alone; `daily_update_multi_profile.py`
-     already degrades gracefully (skips K-ladder-targets for that run) when
-     lines are genuinely unavailable anywhere. New tests:
+     mirroring the vendored tool's own `_DATA_DIR` resolution exactly
+     (`MLB_BETTING_DATA_ROOT` / `MLB_BETTING_DATA_ROOT_DIR` override, else
+     `vendor_cwd/data`), and pointed `_hydrate_vendor_oddsapi_mirror()`'s
+     destination at it. In production this now correctly lands the copy at
+     `MLB_BETTING_DATA_ROOT/market/oddsapi/oddsapi_*_<date>.json` — a real
+     subfolder of the *same* `source_artifacts` tree the daily/snapshots
+     copy already lives in and that the normal hot-artifact sync keeps
+     current on this service's own disk, so this is still a same-disk local
+     copy with no OddsAPI call (does not reintroduce #129/#130's
+     duplication). Bonus: because that destination is itself
+     `HOT_ARTIFACT_PATTERNS`-covered, the sim job's own post-run
+     `publish_changed_hot_artifacts()` call will now also push this file up
+     to the web-shared store, closing a second, previously-unnoticed gap
+     (`mlb_source/source_artifacts/data/market/oddsapi/oddsapi_pitcher_props_
+     2026-07-30.json` was confirmed absent there too via
+     `/api/ops/artifacts/export`, count 0). Tests rewritten to cover both
+     branches of `_vendor_mlb_data_dir` explicitly, including one asserting
+     the copy lands under the override path and NOT under
+     `vendor_cwd/data` — the exact distinction the first attempt missed:
      [`tests/test_run_mlb_daily_sim_job.py`](tests/test_run_mlb_daily_sim_job.py)
-     (5 tests: copies-when-missing, copies-all-three-files, missing-snapshot-
-     is-a-noop, doesn't-overwrite-a-fresh-copy, refreshes-when-source-is-
-     newer), all passing; also spot-checked against
-     `tests/test_daily_update_simulation_contract.py` and
-     `tests/test_fetch_mlb_oddsapi_local_event_scoping.py` (23 passing, no
-     regressions) since both touch adjacent MLB-source-path code.
-     **Not yet committed, pushed, or deployed** — do that next, then re-check
-     `/mlb/api/k-ladder-targets?date=<some future date with no pre-existing
-     artifact>` for non-empty rows once a sim runs after the fix is live
-     (today's 2026-07-30 K-targets will likely stay empty regardless, since
-     today's own vendor-tree gap already happened before the fix could run —
-     verify against a *later* date, or force one more resim for today after
-     deploying). **Full local test suite was not re-run this session** —
-     worth a `python -m pytest tests/` pass before/after committing, given
-     the change touches a production sim-launch path.
+     (8 tests, all passing). Committed as a second commit, pushed, and
+     redeployed to refresh-worker; a resim was force-triggered again
+     post-deploy for all 10 of today's game_pks. **As of writing, that
+     resim's own log tail had not yet been re-checked and
+     `/mlb/api/k-ladder-targets?date=2026-07-30` still needs a final
+     row-count check** — do that next, and note today's own gap happened
+     before either fix was live, so 2026-07-30 may need one more forced
+     resim even after the corrected fix is confirmed working; a cleaner test
+     is a *later* date's first-ever sim run. **Full local test suite was
+     not re-run this session** — worth a `python -m pytest tests/` pass.
+     **Also noted, not touched**: while working in this checkout, unrelated
+     uncommitted local changes to `syndicate/features/mlb/cards.py` and
+     `syndicate/features/mlb/live_lens.py` (removing `first7` segment
+     support) appeared mid-session from what looks like a concurrent session
+     sharing this working directory — left entirely alone and excluded from
+     both of this entry's commits; whoever owns that change still needs to
+     commit/reconcile it separately.
 
 - **New: #148** (root-caused, fixed, tested, and deployed this session) —
   user asked for a full soccer architecture
@@ -2735,7 +2763,7 @@ were resolved and nine already-closed rows removed from the open tables.
 | **51** | `hasSampleData` is inverted — and it is **two sites, not one** (corrected 2026-07-26). [mlb/cards.py:2375-2376](syndicate/features/mlb/cards.py:2375) and the *shared* contract at [game_board_contract.py:622-623](syndicate/features/shared/game_board_contract.py:622) both set `hasSampleData` and `hasArtifactData` to the same expression (`not using_sample_data`), so the two can never disagree and the name means the opposite of what it says. The shared-contract copy means every sport on `game_board_v1` inherits it, not just MLB. Note `tests/test_archives.py:203-204` and `:1261-1262` assert both are true, so the tests currently lock in the wrong semantics and must change with the fix. |
 | **59** | **Measure WNBA's real peak memory on a live slate (next games Tuesday).** *Reframed 2026-07-26: this no longer "decides #57" — #57 was closed by upgrading refresh-worker to pro/4GB, so the board build is no longer looking for a host.* What still matters is that **live-odds-worker's own headroom is unverified**: it runs the WNBA refresh leg in a 2048MB container, and [render.yaml:550-555](render.yaml:550) explicitly flags that as `UNVERIFIED ON A REAL WNBA SLATE`. The 1.3–1.5GB figure everything is reasoning from is a **code comment from a past incident, not a measurement** ([live_refresh_loop.py:1958](syndicate/features/shared/live_refresh_loop.py:1958)); what was actually measured 2026-07-25 was 412–652MB, on an All-Star day with one game, so it proves nothing. The instrumentation already exists: `basketball_props_smart_sim.py` has 9 `log_list_memory` call sites emitting to stderr, which produced **zero** lines that day (consistent with WNBA being idle, not with broken instrumentation). Watch `ALL_PROCESS_MEMORY` peaks on live-odds-worker through a full WNBA slate. **Measure peak, never median** — a median of 515MB hid a documented 1.3–1.5GB spike and nearly drove a bad placement decision. ⚠️ **#58 closing does not help here.** It cut quarter-sim CPU 73×, but the accumulators went from two 5,000-float lists to two arrays — a rounding error against a 1.3GB question. Take the measurement. |
 | **56** | 🔴 **Web dies from health-check starvation, not memory.** Same incident, *different* failure: `"HTTP health check failed (timed out after 5 seconds)"`, `oomKilled: false`. `WEB_CONCURRENCY=2` × `GUNICORN_THREADS=1` gives the whole service **two concurrent requests**, and because `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false` on web, intelligence persistence runs on the **request path** ([intelligence_state.py:2678](pipeline/intelligence_state.py:2678)) — so slow requests are routine, not exceptional. Two of them starve `/healthz` and Render kills the instance. render.yaml now sets `GUNICORN_THREADS=4`, **but that is not live** — Render only reads render.yaml on a blueprint sync. Threads not workers: each worker is a whole process on 2GB, and this is I/O-bound waiting. Real fix is to stop persisting on the request path. |
-| **53** | **Prop ladder odds for all sports** (split out of #16). No `*_alternate` player market is fetched in any sport, so `_finalize_prop_market`'s `alternates` array is always empty and MLB's ladder surfaces have no book prices to compare the sim against. See #16 for the cost model and why this should ride #15's cadence tiering rather than get its own scheduler. |
+| **53** | **Prop ladder odds for all sports** (split out of #16, closed 2026-07-25 `1986caf6`). No `*_alternate` player market is fetched in any sport, so `_finalize_prop_market`'s `alternates` array is always empty and MLB's ladder surfaces (`/mlb/hitter-ladders`, `/mlb/pitcher-ladders`, `/mlb/k-ladder-targets`) have no book prices to compare the sim against. Fetch alternates only for markets with a ladder surface (~+105 credits/sweep on a 15-game slate) and run ladders on a slower cadence than base props (same mechanism as #15's tiering) to offset — the #16 close freed ~ the same order of credits by dropping F7, so this can ride net credit-neutral rather than needing its own budget. |
 | **24** | Look-ahead interval violations (~28min instead of 60). |
 | **12** | Phase 4: smaller per-sport artifacts. |
 | **30** | WNBA schedule-bootstrap cost. |
@@ -2744,8 +2772,7 @@ were resolved and nine already-closed rows removed from the open tables.
 ## OddsAPI budget (after #14/#15)
 
 - **#106** 🟢 **Event scoping SHIPPED 2026-07-28** (user-directed budget lever,
-  the bigger of the two remaining after the still-open #16 market-drop
-  decision). `fetch_live_game_lines_for_date`'s per-event loop
+  landing after #16's market-drop decisions closed 2026-07-25). `fetch_live_game_lines_for_date`'s per-event loop
   (`fetch_mlb_oddsapi_local.py`) fetched the 18 segment/alternate markets for
   **every** game on **every** ~90s cycle regardless of that game's own state,
   as long as *some* game on the slate was live — including games hours from
@@ -2853,8 +2880,10 @@ were resolved and nine already-closed rows removed from the open tables.
 > | 218,085s (48,048 obs) | 242,245 | 3,998.8 | **2.88M** | **57.6%**, ~2.1M/mo headroom |
 >
 > Down from the 07-27 pre-#106 reading (371,563/day → 11.12M/mo) to ~95,971/day
-> now — **#106's event scoping did the bulk of the work**, without #16's
-> alternate/first7 cuts (still open/undecided) or explicit cadence tiering.
+> now — **#106's event scoping did the bulk of the work**, on top of #16
+> (closed 2026-07-25, see above): first7 fully dropped (0 credits — no
+> `first7` bucket even appears below), alternate deliberately *kept* (not cut)
+> as a ladder, so its 18,578cr is by design, not an open decision.
 > `by_sport`: mlb 211,781cr (98.0%), soccer 2,294cr, wnba 2,187cr — soccer/wnba
 > still noise-level, consistent with mid-MLB-season. `by_market_family` (sums
 > to `by_sport`'s total, ~10.7% under `credits_burned_in_window` — some calls
@@ -2862,68 +2891,29 @@ were resolved and nine already-closed rows removed from the open tables.
 > dominates at 152,015cr (70.3%)**, segment 37,139cr (17.2%), alternate
 > 18,578cr (8.6%), full_game 8,157cr (3.8%), event_list 161cr (~0%). This is a
 > reversal from the pre-#106 profile where segment/alternate dominated — props
-> was never covered by #16's candidate cuts or #106's event scoping (props
-> aren't gated by live/near-live state the same way), so **props is the next
-> lever if headroom ever tightens**, not alternate/first7.
+> isn't gated by live/near-live state the way #106's event scoping gates
+> segments, so **props is the next lever if headroom ever tightens**.
 >
 > **Bottom line: comfortably under the 5M target today** (57.6% projected),
-> mostly from engineering (#106) rather than the still-pending #16 product
-> call. Re-check after any #16 decision or once football season adds
+> from #16 (closed) + #106 (engineering) together — no open product decision
+> is blocking anything right now. Re-check once football season adds
 > sport-count pressure — this reading is MLB-season-only load.
 
-**16** — **AUDIT DONE 2026-07-25, decision needed.** After #17 the per-event call
-still requests **24 segment markets per game** ≈ **360 credits/sweep** on a
-15-game slate, dwarfing the 42 that #17 saved. Findings:
-
-- All 27 markets *are* parsed by `_extract_game_lines`, so nothing is dropped
-  at parse time. The waste, if any, is further downstream.
-- **The Layer 1 market board renders only `full_game`.** Measured on the live
-  2026-07-25 board: 1,336 rows across 15 games, **zero** segment rows. The 24
-  segment markets never reach it.
-- Segments *do* reach the cards surface — `cards.py:1844` iterates
-  `full/first1/first3/first5/first7` and `static/mlb/cards_source.js:1030`
-  renders an "F7" tab.
-- **The sim produces `full/first1/first3/first5` but not `first7`** (see
-  `_daily_summary_row`), so the 6 first7 markets render book lines with no model
-  behind them — the MLB analogue of soccer's `no_sim_coverage`.
-- **Game-line alternates collapse to a single lane.** `_select_primary_game_*_lane`
-  keeps only the most-balanced lane per segment; unlike `_finalize_prop_market`,
-  which preserves an `alternates` array. So the 8 `alternate_*` markets only
-  influence *which* lane wins.
-
-Two candidate cuts, both needing a product call rather than a code judgement:
-**(a)** drop the 8 `alternate_*` markets ≈ **120 credits/sweep** — but they
-currently compete to be the primary lane, so the displayed line could change;
-**(b)** drop the 6 `first7` markets ≈ **90 credits/sweep** — but the F7 tab
-would lose its lines, and it already has no sim projection.
-
-**Props half of the audit (2026-07-25) — and a real gap: prop ladders are
-never fetched.** MLB requests 7 base hitter markets (`batter_hits`,
-`batter_total_bases`, `batter_home_runs`, …) and the pitcher equivalents.
-**No `*_alternate` player market is requested anywhere, in any sport.** OddsAPI
-serves prop ladders only through those alternate markets, so:
-
-- `_finalize_prop_market` computes `primary` + `alternates`, but with one lane
-  per prop the `alternates` array is **always empty**. The ladder plumbing
-  already exists and is being fed nothing.
-- MLB already ships ladder *surfaces* — `/mlb/hitter-ladders`,
-  `/mlb/pitcher-ladders`, `/mlb/k-ladder-targets` — built from the **sim**.
-  Without book ladders there is nothing to price them against, so no edge can
-  be computed anywhere off the primary line.
-
-**Efficient way to get them.** OddsAPI bills 1 credit per market per region per
-request, so batching markets into one request saves nothing — only market
-*count* matters. Levers, in order:
-1. Fetch alternates only for markets that have a ladder surface, not all 7+.
-   (~+1 credit/market/event; +7 markets on a 15-game MLB slate ≈ +105/sweep.)
-2. Run ladders on a **slower cadence** than base props — ladder shape moves far
-   less than the primary line. This is the same mechanism as #15's tiering, so
-   do it as part of that rather than as a separate scheduler.
-3. Alternates are per-event only, like segments, so they cannot ride #17's
-   slate endpoint.
-4. Fund it from the cuts above: (a)+(b) free ~210 credits/sweep, more than the
-   ~105 ladders would cost — so ladders can be **net credit-negative** if paired
-   with the trims rather than added on top. ·
+**16** 🟢 **CLOSED 2026-07-25** (`1986caf6`, "Drop F7 markets; standard line
+wins, alternates kept as a ladder") — **do not treat this as an open decision**,
+it appeared that way further down in this file and in #106's writeup for days
+after it shipped; corrected 2026-07-30. Both candidate cuts from the audit were
+decided:
+**(a)** alternate_\* markets: NOT dropped — kept, and `_select_primary_game_*_lane`
+now exposes them as a sorted ladder alongside the primary (the shape #53 wants),
+instead of the old behavior of fetching them, using only whichever won the
+primary lane, and discarding the rest. No credit savings from this half by
+design — it was a data-quality fix, not a cut.
+**(b)** first7 markets: **dropped**, fetch and the "F7" UI tab together
+(`scripts/fetch_mlb_oddsapi_local.py`, `syndicate/static/mlb/cards_source.js:1030`)
+— confirmed live in production 2026-07-30 (no `first7` bucket in
+`/api/ops/oddsapi/quota`'s `by_market_family` at all). Findings behind the
+decision, and the still-open prop-ladder gap it surfaced, now live under #53.
 **19** cap soccer props (~2,400/sweep; measured 2026-07-27: soccer burned **18 credits in 24h** with #44b dark, so this is a *gate for enabling #44b*, not a live leak) · **20** verify refresh runs can't stack
 (partly addressed by #25's fail-closed marker) · **21** keep 10×-billed historical
 endpoints out of prod · **22** stop retrying 4xx in vendor clients

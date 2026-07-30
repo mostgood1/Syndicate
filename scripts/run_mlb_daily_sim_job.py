@@ -36,20 +36,38 @@ from syndicate.features.shared.refresh_state_store import write_json_file
 from syndicate.features.shared.refresh_state_store import write_text_file
 
 
-def _hydrate_vendor_oddsapi_mirror(date_str: str, vendor_cwd: Path) -> None:
-    """Copy this service's already-fetched odds snapshots into the vendored
-    tool's own local data tree.
+def _vendor_mlb_data_dir(vendor_cwd: Path) -> Path:
+    # Mirrors vendor/mlb_bettingv2/tools/daily_update_multi_profile.py's own
+    # _DATA_DIR resolution exactly. render.yaml sets MLB_BETTING_DATA_ROOT to
+    # /opt/render/project/data/mlb_source/source_artifacts/data on all three
+    # services -- a first attempt at this fix assumed the vendored tool read
+    # its own git-checkout-relative data/ dir (the fallback below, used only
+    # when the env var is unset) and hydrated THAT tree. Confirmed wrong via
+    # a production sim-job log tail after deploying it: the run still logged
+    # "no pitcher prop market entries in
+    # .../mlb_source/source_artifacts/data/market/oddsapi/oddsapi_pitcher_props_*.json"
+    # -- i.e. _DATA_DIR was actually the MLB_BETTING_DATA_ROOT override the
+    # whole time, so the first fix wrote to a tree nothing ever reads.
+    override = str(os.environ.get("MLB_BETTING_DATA_ROOT") or os.environ.get("MLB_BETTING_DATA_ROOT_DIR") or "").strip()
+    if override:
+        return Path(override).resolve()
+    return (vendor_cwd / "data").resolve()
 
-    tools/daily_update_multi_profile.py's K-ladder-targets builder reads
-    pitcher (and hitter/game-line) prop lines from
-    vendor/mlb_bettingv2/data/market/oddsapi/oddsapi_*_<date>.json -- a tree
-    that is private to this vendored tool (_DATA_DIR, resolved relative to
-    tools/, not to SYNDICATE_DATA_ROOT) and is never written by the odds
-    orchestrator (scripts/refresh_odds_sources.py -> refresh_mlb_oddsapi.py),
-    which only publishes into data/mlb_source/source_artifacts/data/daily/
-    snapshots/<date>/. Before #129/#130 (commit 1465a5dc, 2026-07-29) this
-    job called daily_update.py with --refresh-current-oddsapi on, which had
-    daily_update.py do its own OddsAPI pull straight into that vendor tree --
+
+def _hydrate_vendor_oddsapi_mirror(date_str: str, vendor_cwd: Path) -> None:
+    """Copy this service's already-fetched odds snapshots into the tree
+    tools/daily_update_multi_profile.py's K-ladder-targets builder actually
+    reads pitcher/hitter/game-line prop lines from (_DATA_DIR/market/oddsapi/
+    oddsapi_*_<date>.json, resolved via _vendor_mlb_data_dir above). On
+    Render that tree is MLB_BETTING_DATA_ROOT/market/oddsapi -- a real
+    subfolder of the SAME data/mlb_source/source_artifacts tree the odds
+    orchestrator (scripts/refresh_odds_sources.py -> refresh_mlb_oddsapi.py)
+    already writes daily/snapshots/<date>/ into and that the normal hot-
+    artifact sync keeps current on this service's own disk -- but the
+    orchestrator only ever writes the snapshots/ copy, never a market/oddsapi/
+    one. Before #129/#130 (commit 1465a5dc, 2026-07-29) this job called
+    daily_update.py with --refresh-current-oddsapi on, which had
+    daily_update.py do its own OddsAPI pull straight into market/oddsapi/ --
     incidentally also keeping it populated. That flag is now off (correctly,
     to stop refresh-worker duplicating live-odds-worker's OddsAPI calls), and
     nothing replaced the population it happened to provide as a side effect:
@@ -63,7 +81,7 @@ def _hydrate_vendor_oddsapi_mirror(date_str: str, vendor_cwd: Path) -> None:
     daily_update_multi_profile.py already handles a genuinely absent pitcher
     lines file by skipping K-ladder-targets for that run.
     """
-    dest_dir = vendor_cwd / "data" / "market" / "oddsapi"
+    dest_dir = _vendor_mlb_data_dir(vendor_cwd) / "market" / "oddsapi"
     token = date_str.replace("-", "_")
     pairs = (
         (daily_snapshot_oddsapi_game_lines_path(date_str), f"oddsapi_game_lines_{token}.json"),
