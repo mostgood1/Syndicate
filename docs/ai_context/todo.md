@@ -53,12 +53,32 @@ line concept underneath it was already silently broken:
    `closing_line`/`closing_price` on rows; `market_board.js` renders a
    "Closing" fact (card view) and column (blotter view) alongside the
    existing live "Line move"/"Odds move".
-4. **Tested, not yet committed/pushed/deployed.** New unit tests in
-   `test_odds_refresh_tracking.py` (stamp-once-on-first-live, idempotent
-   across later live ticks), `test_odds_lifecycle_shards.py` (stamped value
-   wins over the always-latest scan), `test_mlb_market_board.py`
-   (propagation to board rows). Full targeted suite green (109 passed).
-5. **Deliberately NOT done this pass:** NBA/WNBA's Layer 1 board
+4. **Tested, committed (`09d012d4`), pushed, and deployed to all 3 Render
+   services** — held for an in-flight fingerprint-change resim first (two
+   scoped runs back to back, ~34 min total; confirmed `exit_code: 0` before
+   deploying), then deployed and confirmed `live` on web/refresh-worker/
+   live-odds-worker.
+5. **Follow-up fix, found via the post-deploy production check itself**
+   (`/mlb/api/market-board` showed `rows_with_closing_line: 0` even for
+   games already live/final): the original stamp condition
+   (`is_live_row and market_key not in seen_live_market_keys`) can't tell
+   "just went live" apart from "has been live for hours, we just never
+   recorded it" for any market whose FIRST observation under this code is
+   already mid-game — `seen_live_market_keys` resets every call, so it
+   would have stamped whatever line was sitting there at deploy time
+   (an arbitrary in-play number) as a fake "closing" value. Fixed by
+   requiring an explicit prior `market_state["is_live"] is False`
+   observation (a new persisted, sticky-once-true field, updated on every
+   row including deduped/unchanged ones) before trusting `previous_line` as
+   a real closing candidate — a market that predates this field, or was
+   never observed pregame under it, now correctly gets no closing line
+   rather than a wrong one. New regression test:
+   `test_sync_nhl_tracking_does_not_stamp_closing_line_for_a_market_first_seen_already_live`.
+   **Net effect:** closing lines will only appear for games that go live
+   AFTER this deploy (2026-07-30 ~22:48 UTC) — tonight's remaining pregame
+   slate is the first real chance to confirm it end-to-end; not yet
+   re-verified against a live transition.
+6. **Deliberately NOT done this pass:** NBA/WNBA's Layer 1 board
    (`basketball_market_board.py`) has no odds-history hydration wired in at
    all for game-level markets today — only MLB threads `odds_history`
    through its board rows. Closing-line display for NBA/WNBA needs that

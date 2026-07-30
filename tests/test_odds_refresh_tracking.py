@@ -497,6 +497,48 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertEqual(market_state["closing_price"], -110.0)
             self.assertEqual(market_state["last_line"], 4.5)
 
+    def test_sync_nhl_tracking_does_not_stamp_closing_line_for_a_market_first_seen_already_live(self) -> None:
+        # Regression: a market whose FIRST-EVER observation under this code
+        # is already live (e.g. a game in progress for hours before this
+        # deploy shipped) has no confirmed pregame value to fall back to.
+        # market_state.get("is_live") is absent, not False, for such a
+        # market -- was_confirmed_pregame must require an EXPLICIT prior
+        # False, not just "missing", or this would stamp whatever line
+        # happened to be sitting there as if it were a real closing line.
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports"), "SYNDICATE_ODDS_EVENTS_ROOT": str(Path(tmpdir) / "odds_events")}, clear=False):
+            root = Path(tmpdir)
+            props_root = root / "data" / "props" / "player_props_lines" / "date=2026-06-07"
+            props_root.mkdir(parents=True)
+            csv_path = props_root / "oddsapi.csv"
+
+            csv_path.write_text(
+                "player_name,market,book,line,over_price,status,last_seen_at\n"
+                "Player One,POINTS,draftkings,3.5,-120,live,2026-06-07T19:05:00Z\n",
+                encoding="utf-8",
+            )
+            first_seen_live_result = sync_post_refresh_tracking_for_source_root(sport="nhl", source_root=root, date_str="2026-06-07")
+            self.assertTrue(first_seen_live_result["ok"])
+
+            market_key = "player_name=Player One|market=POINTS|book=draftkings"
+            history_payload = json.loads((root / "tracking" / "odds_history" / "2026-06-07.json").read_text(encoding="utf-8"))
+            market_state = history_payload["markets"][market_key]
+            self.assertIsNone(market_state.get("closing_line"))
+            self.assertIsNone(market_state.get("closing_price"))
+            self.assertEqual(market_state["last_line"], 3.5)
+
+            # Even a later live tick with a moved line must not backfill one.
+            csv_path.write_text(
+                "player_name,market,book,line,over_price,status,last_seen_at\n"
+                "Player One,POINTS,draftkings,4.5,-130,live,2026-06-07T19:10:00Z\n",
+                encoding="utf-8",
+            )
+            second_result = sync_post_refresh_tracking_for_source_root(sport="nhl", source_root=root, date_str="2026-06-07")
+            self.assertTrue(second_result["ok"])
+            history_payload = json.loads((root / "tracking" / "odds_history" / "2026-06-07.json").read_text(encoding="utf-8"))
+            market_state = history_payload["markets"][market_key]
+            self.assertIsNone(market_state.get("closing_line"))
+            self.assertIsNone(market_state.get("closing_price"))
+
     def test_sync_nfl_tracking_reads_source_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False):
             root = Path(tmpdir)

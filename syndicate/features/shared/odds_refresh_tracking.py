@@ -1198,6 +1198,27 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             previous_snapshot_ts = str(market_state.get("last_snapshot_ts") or "").strip() or None
             if previous_snapshot_ts is None and history:
                 previous_snapshot_ts = str((history[-1] or {}).get("captured_at") or (history[-1] or {}).get("snapshot_ts") or "").strip() or None
+            # Confirmed live 2026-07-30, right after this deploy: for a market
+            # ALREADY mid-live-game the first time this code runs against it,
+            # market_state carries no "is_live" history at all (it predates
+            # this field), so a naive "is_live and not seen this call" check
+            # can't tell "genuinely just went live" apart from "has been live
+            # for hours, we just never recorded it" -- and would stamp
+            # whatever line happened to be sitting there (an arbitrary
+            # already-in-play number) as if it were the real pregame close.
+            # Require an EXPLICIT prior `is_live: False` observation before
+            # trusting previous_line as a real closing candidate; markets
+            # that predate this field (key absent) get none, by design --
+            # no closing line is better than a wrong one. Read BEFORE
+            # updating market_state["is_live"] just below, and updated
+            # unconditionally (ahead of the dedupe short-circuit right
+            # after) so a market whose line sits unchanged for many ticks
+            # while pregame still gets its pregame observation recorded --
+            # otherwise the transition tick, when the line finally DOES
+            # move, would find no prior "is_live: False" to trust.
+            was_confirmed_pregame = market_state.get("is_live") is False
+            row_is_live_cheap = _is_live_odds_row(row)
+            market_state["is_live"] = True if (row_is_live_cheap or market_state.get("is_live") is True) else False
 
             if previous_line is not None and current_line == previous_line and previous_odds is not None and current_odds == previous_odds and previous_snapshot_ts == row_snapshot_ts and history:
                 markets[market_key] = market_state
@@ -1267,7 +1288,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
                 # makes the stamp idempotent. Left unset (never backfilled)
                 # when previous_line is None -- e.g. a market first observed
                 # already live has no real pregame value to record.
-                if market_state.get("closing_line") is None and previous_line is not None:
+                if was_confirmed_pregame and market_state.get("closing_line") is None and previous_line is not None:
                     market_state["closing_line"] = previous_line
                     market_state["closing_price"] = previous_odds
                     market_state["closing_captured_at"] = now
