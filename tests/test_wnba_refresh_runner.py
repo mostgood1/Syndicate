@@ -979,6 +979,12 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(slate_payload["counts"]["games"], 1)
         self.assertEqual(slate_payload["per_game"][0]["home"], "CHI")
         self.assertTrue(any(float(pick.get("last5_average") or 0.0) == 12.4 for pick in (slate_payload["per_game"][0]["picks"] or []) if isinstance(pick, dict)))
+        # The CSV's own top_play dict only ever carries the stat code under
+        # "market" (as written above), never under "stat" -- confirmed live in
+        # production this is the NORMAL shape for a real top_play, not an edge
+        # case. Without _coerce_top_play aliasing "stat" from "market", this
+        # pick's label falls back to the generic "Prop" instead of "Reb".
+        self.assertEqual(slate_payload["per_game"][0]["picks"][0]["market"], "Reb")
         self.assertEqual(props_payload["games"][0]["prop_recommendations"]["home"][0]["player"], "Angel Reese")
         self.assertEqual(props_payload["games"][0]["prop_recommendations"]["home"][0]["last10_workload"], 32.0)
         self.assertEqual(top_payload["data"][0]["team_tricode"], "CHI")

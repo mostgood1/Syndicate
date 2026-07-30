@@ -6,12 +6,49 @@ list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-07-28 (see "Reconciliation 2026-07-28").
 
-> **Next free ID: 139.** IDs are never reused. Closed items move to
+> **Next free ID: 140.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
 
-- **New: #138** (filed and fixed this session, **NOT YET DEPLOYED**) — direct
-  continuation of #136 (WNBA prop board stat labels). User reported live in
+- **New: #139** (filed, fixed, deployed, and confirmed live this session) —
+  direct continuation of #138 (recommendations_slate now regenerates) and
+  #136 (stat labels). After #138 deployed, triggered a real full-mode WNBA
+  refresh and confirmed `recommendations_slate_2026-07-29.json` actually
+  rebuilt (size changed) — but the result still showed the generic `"Prop"`
+  fallback instead of a real stat name, not the literal `"PROPS"` bug #136
+  targeted but also not fixed. Traced via the raw production CSV
+  (`props_recommendations_2026-07-29.csv`, fetched through
+  `/api/ops/artifacts/export`): the real per-player `top_play` data genuinely
+  has a stat code (`{'market': 'threes', ...}`, `{'market': 'pa', ...}`,
+  `{'market': 'reb', ...}`) — not missing at all. Root cause:
+  `_coerce_top_play` (`scripts/refresh_wnba_oddsapi_props.py:1501`) has two
+  branches — when the CSV's own `top_play` column already parses to a
+  non-empty dict (the NORMAL case for real production data, confirmed via
+  this exact CSV), it returns that dict **as-is**, which only ever has a
+  `"market"` key, never `"stat"`. The synthetic fallback branch a few lines
+  down (`"market": market_value, "stat": market_value`) sets both keys for
+  exactly this reason, but the pass-through branch never got the same
+  treatment. `_build_local_recommendations_slate_artifact` reads
+  `top_play.get("stat")` specifically (line ~1701), so it was always empty
+  for real data, silently falling back to `"Prop"`. **Fixed**: pass-through
+  branch now aliases `"stat"` from `"market"` when `"stat"` is absent.
+  Strengthened the existing `test_local_basketball_json_exports_use_owned_inputs`
+  test with an assertion on the resulting label (`"Reb"`, not `"Prop"`) —
+  confirmed this assertion fails without the fix (`'Prop' != 'Reb'`) and
+  passes with it, via a git-stash revert-and-rerun. 65/65 passing. **Note**:
+  the real stat labels are short internal codes title-cased as-is
+  (`"threes"` → `"Threes"`, `"reb"` → `"Reb"`, `"pa"`/`"ra"`/`"pr"` →
+  `"Pa"`/`"Ra"`/`"Pr"`, the last three being combo-stat abbreviations for
+  points+assists/rebounds+assists/points+rebounds) — real and non-generic,
+  which was the actual ask, but not expanded to full human-readable names.
+  Left as-is; flagging as a possible follow-up polish, not a bug, since the
+  reported problem was "doesn't say what prop it is" (now true) not
+  "abbreviation is unclear." Deployed on commit (this session, see git log)
+  and confirmed live: production's `recommendations_slate_2026-07-29.json`
+  now shows real stat codes instead of `"Prop"`.
+
+- **New: #138** (filed, fixed, deployed, and confirmed live this session) —
+  direct continuation of #136 (WNBA prop board stat labels). User reported live in
   production: prop rows on the combined board still showed generic "PROPS"
   with no stat category and no projection/odds after #136 deployed. Traced via
   the actual `/api/intelligence/query` response (not speculation): the

@@ -1501,6 +1501,19 @@ def _load_local_props_recommendations(*, processed_root: Path, date_str: str) ->
     def _coerce_top_play(row: dict[str, str]) -> dict[str, object]:
         top_play = _structured_literal_or_none(row.get("top_play"))
         if isinstance(top_play, dict) and top_play:
+            # The CSV's own embedded top_play dict only ever carries the stat
+            # code under "market" (e.g. "threes"/"pa"/"reb") -- it never has a
+            # "stat" key of its own. _build_local_recommendations_slate_artifact
+            # reads top_play.get("stat") specifically, so without this alias
+            # every real production pick (which always takes this branch, since
+            # the CSV's top_play column is already structured) silently fell
+            # back to the generic "Prop" label -- confirmed live: #138 fixed
+            # this artifact regenerating at all, and the very next real rebuild
+            # still showed "Prop" instead of "Threes"/"Points Assists"/etc. The
+            # synthetic branch below already sets both keys for this exact
+            # reason; this branch just never got the same treatment.
+            if not top_play.get("stat") and top_play.get("market"):
+                top_play = {**top_play, "stat": top_play.get("market")}
             return top_play
 
         ev_pct = _float_or_none(row.get("ev_pct") or row.get("score"))
