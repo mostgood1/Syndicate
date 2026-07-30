@@ -5919,18 +5919,7 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
         )
 
     before_merge_count = len(candidates)
-    # TEMP DIAGNOSTIC (#151 investigation, remove after root cause found).
-    _intel_trace(
-        "SOCCER_PROP_DEBUG_151",
-        stage="pre_merge",
-        soccer_prop_count=sum(1 for c in candidates if isinstance(c, dict) and str(c.get("sport_slug") or "").lower() == "soccer" and str(c.get("candidate_type") or "").lower() == "prop"),
-    )
     candidates = _merge_duplicate_prop_candidates(candidates)
-    _intel_trace(
-        "SOCCER_PROP_DEBUG_151",
-        stage="post_merge",
-        soccer_prop_count=sum(1 for c in candidates if isinstance(c, dict) and str(c.get("sport_slug") or "").lower() == "soccer" and str(c.get("candidate_type") or "").lower() == "prop"),
-    )
     if len(candidates) != before_merge_count:
         _log_candidate_stage(pipeline_name="collect_candidates", stage="prop_duplicate_merge", before=[], after=candidates)
 
@@ -5987,19 +5976,6 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
     normalized_candidates = [normalize_candidate(candidate) for candidate in candidates]
     _log_candidate_stage(pipeline_name="collect_candidates", stage="normalize_candidate", before=candidates, after=normalized_candidates)
 
-    # TEMP DIAGNOSTIC (#151 investigation, remove after root cause found).
-    for _debug_row in normalized_candidates:
-        if isinstance(_debug_row, dict) and str(_debug_row.get("sport_slug") or "").lower() == "soccer" and str(_debug_row.get("candidate_type") or "").lower() == "prop":
-            _intel_trace(
-                "SOCCER_PROP_DEBUG_151",
-                stage="pre_dedupe_classify_row",
-                matchup=_debug_row.get("matchup"),
-                market=_debug_row.get("market"),
-                pick=_debug_row.get("pick") or _debug_row.get("name"),
-                odds=_debug_row.get("odds"),
-                projected=_debug_row.get("projected"),
-                score=_debug_row.get("score"),
-            )
     deduped: list[dict[str, Any]] = []
     seen: set[tuple[str, ...]] = set()
     classified_candidates: list[dict[str, Any]] = []
@@ -6024,17 +6000,12 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
             _safe_text(row.get("market"), "market"),
             _safe_text(row.get("pick") or row.get("name"), "pick"),
         ) + ((game_identity,) if game_identity else ())
-        _debug_is_soccer_prop = str(row.get("sport_slug") or "").lower() == "soccer" and str(row.get("candidate_type") or "").lower() == "prop"
         if identity in seen:
-            if _debug_is_soccer_prop:
-                _intel_trace("SOCCER_PROP_DEBUG_151", stage="dedupe_rejected", identity=list(identity))
             dedupe_pruned.append(_collect_candidate_trace(row, reason="duplicate_identity", stage="deduplication"))
             continue
         seen.add(identity)
         classified_row = classify_candidate(row)
         if classified_row is None:
-            if _debug_is_soccer_prop:
-                _intel_trace("SOCCER_PROP_DEBUG_151", stage="classify_rejected", reason=_candidate_classification_removal_reason(row))
             classification_pruned.append(_collect_candidate_trace(row, reason=_candidate_classification_removal_reason(row), stage="candidate_classification"))
             continue
         classified_candidates.append(classified_row)
@@ -8222,24 +8193,8 @@ def collect_candidates_with_fallback_merge(
                 for sport_row in overview
                 if isinstance(sport_row, dict)
             }
-        # TEMP DIAGNOSTIC (#151 investigation, remove after root cause found).
-        _intel_trace(
-            "SOCCER_PROP_DEBUG_151",
-            stage="pre_score_and_filter",
-            soccer_prop_count=sum(1 for c in raw_candidates if isinstance(c, Mapping) and str(c.get("sport_slug") or "").lower() == "soccer" and str(c.get("candidate_type") or "").lower() == "prop"),
-        )
         scored_candidates = _score_candidates(raw_candidates, advanced_by_sport, preferences, pipeline="collect_candidates_with_fallback_merge")
-        _intel_trace(
-            "SOCCER_PROP_DEBUG_151",
-            stage="post_score",
-            soccer_prop_count=sum(1 for c in scored_candidates if isinstance(c, Mapping) and str(c.get("sport_slug") or "").lower() == "soccer" and str(c.get("candidate_type") or "").lower() == "prop"),
-        )
         raw_candidates = filter_candidates(scored_candidates, sport=None)
-        _intel_trace(
-            "SOCCER_PROP_DEBUG_151",
-            stage="post_filter",
-            soccer_prop_count=sum(1 for c in raw_candidates if isinstance(c, Mapping) and str(c.get("sport_slug") or "").lower() == "soccer" and str(c.get("candidate_type") or "").lower() == "prop"),
-        )
 
     if apply_thin_pool_merge and 0 < len(raw_candidates) < _THIN_CANDIDATE_POOL_THRESHOLD:
         try:

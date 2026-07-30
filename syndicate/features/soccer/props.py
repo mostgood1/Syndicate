@@ -71,16 +71,10 @@ def _prop_picks_by_player(league: str, week: int, season: int) -> dict[str, dict
     # (confirmed live 2026-07-30: 18 hydrated prop items, zero surfaced as
     # real candidates).
     picks: dict[str, dict[str, Any]] = {}
-    # TEMP DIAGNOSTIC (#151 investigation, remove after root cause found).
-    total_rows = 0
-    prop_rows_seen = 0
     for date_str in week_date_list(league, season, week):
-        date_rows = picks_rows(league, date_str)
-        total_rows += len(date_rows)
-        for row in date_rows:
+        for row in picks_rows(league, date_str):
             if str(row.get("market") or "").strip().upper() != "PROP":
                 continue
-            prop_rows_seen += 1
             player_key = _normalize_player_name(row.get("player"))
             if not player_key:
                 continue
@@ -89,12 +83,6 @@ def _prop_picks_by_player(league: str, week: int, season: int) -> dict[str, dict
             # -- same "freshest wins" convention market_board.py's
             # _soccer_week_matches uses for its own date-window merge.
             picks[player_key] = row
-    print(
-        f"[props] SOCCER_PROP_PICKS_DEBUG_151 league={league} week={week} season={season} "
-        f"total_picks_rows={total_rows} prop_rows_seen={prop_rows_seen} picks_by_player={len(picks)} "
-        f"sample_keys={list(picks)[:5]}",
-        flush=True,
-    )
     return picks
 
 

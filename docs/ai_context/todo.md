@@ -676,6 +676,53 @@ session messages rather than silent overwrites.
   captured `props/{date}.csv` for MLS has ANY `player_goal_scorer_anytime`
   rows at all before assuming the join code is at fault.
 
+  **Follow-up, same session, resolved the "inconclusive" gap above.** Found
+  Render's raw log API directly (`GET api.render.com/v1/logs?ownerId=...
+  &resource=<service>&text=...`, needs the account's `ownerId` from
+  `GET /v1/services/<id>` — this session's own ops endpoints were the
+  wrong tool for reading a live service's own stdout, not a subprocess's
+  redirected file). Added row-level diagnostics: `intelligence.py`'s
+  `_collect_candidates` (per-row prints at the dedupe/classify_candidate
+  call sites) and `collect_candidates_with_fallback_merge` (soccer-prop
+  counts at pre-merge/post-merge/pre-score/post-score/post-filter), plus
+  `props.py`'s `_prop_picks_by_player` and `build_soccer_picks.py`'s
+  `build_prop_picks` (row counts at the join itself). Deployed to
+  refresh-worker and live-odds-worker. **Confirmed directly via real
+  production logs** (`_prop_picks_by_player`'s own print, which runs
+  inside the persistent worker process and reliably reaches Render's log
+  stream, unlike a `refresh_odds_sources.py`-launched subprocess's own
+  prints — those redirect to files this session could not get the ops API
+  to serve back reliably): `total_picks_rows=102, prop_rows_seen=0,
+  picks_by_player=0` for MLS week 18 — the picks pipeline IS running and
+  writing real game-market rows, but zero `market="PROP"` rows exist in
+  `picks_{date}.csv` for any date this week. This lands on explanation (2)
+  from above, not (1): `build_prop_picks`'s join code is working as
+  designed (9 unit tests + this row-count check both show it correctly
+  returns nothing when there's nothing to join) — the captured
+  `props/{date}.csv` itself has no `player_goal_scorer_anytime` rows yet,
+  most likely because MLS's upcoming fixtures are 2+ days out
+  (2026-07-30 today, games Fri 07-31/Sat 08-01) and sportsbooks typically
+  post player-prop markets much closer to kickoff than game lines (already
+  confirmed present and real). **Not fully ruled out**: a team-name
+  mismatch between the ESPN-sourced sim and the Odds-API-sourced props
+  feed remains theoretically possible and wasn't directly disproven (the
+  subprocess-level `build_prop_picks` diagnostic, which would have shown
+  `props_rows_all`/`odds_by_key`/`matched_rows` counts to distinguish "no
+  odds captured at all" from "odds captured but name join failed", never
+  reached a readable log despite two attempts — see the note above about
+  subprocess stdout redirecting to files). All temporary diagnostics
+  removed after this finding (both `SOCCER_PROP_DEBUG_151` blocks in
+  `intelligence.py` and the two `SOCCER_PROP_PICKS...DEBUG_151` prints in
+  `props.py`/`build_soccer_picks.py`) — 217/217 passing across the same
+  test files as above after removal. **Real next step**: re-check
+  `/soccer/mls/api/props` and `/api/intelligence/query`'s soccer
+  `"prop"` count again closer to Friday's kickoffs (within ~24-48h), once
+  sportsbooks would plausibly have posted anytime-goalscorer markets for
+  these fixtures. If still zero at that point, the team-name-mismatch
+  possibility becomes the more likely explanation and is worth a fresh,
+  targeted subprocess-level diagnostic (this time confirming the log path
+  actually captures subprocess stdout before relying on it).
+
 - **New: #150** (root-caused, fixed, unit-tested, deployed, and confirmed
   live this session — see the props gap called out below, closed separately
   as #151) — follow-up to #148's soccer architecture audit. User asked
