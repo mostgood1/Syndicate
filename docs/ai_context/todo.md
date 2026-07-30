@@ -4,9 +4,51 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-29 (see "Reconciliation 2026-07-29 (soccer tricodes /
-Layer 2 session)" below; prior same-date session: "Reconciliation 2026-07-29"
-further down; before that: "Reconciliation 2026-07-28").
+Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (MLB/WNBA live-lens
+test flakiness)" below; prior session: "Reconciliation 2026-07-29 (soccer
+tricodes / Layer 2 session)" further down).
+
+### Reconciliation 2026-07-30 (MLB/WNBA live-lens test flakiness)
+
+Closing this session. Test-only, no production code touched. **#152**
+(committed and pushed as `a3dfd12b`; no deploy needed or done — nothing
+runtime-facing changed). Confirmed test-order-dependent: `python -m pytest
+tests/test_live_lens_local.py tests/test_mlb_refresh_runner.py
+tests/test_request_path_guard.py tests/test_oddsapi_credit_reduction.py -q`
+failed 4 tests. Root cause was **not** an `lru_cache`/singleton like the
+existing WNBA-cards autouse-fixture precedent (`tests/conftest.py`'s
+`_clear_wall_clock_ttl_caches`) — it was two tests in
+`tests/test_mlb_refresh_runner.py` doing a bare `vendor_frontend.
+_live_lens_payload = lambda ...` directly on the real, shared
+`vendor.mlb_bettingv2.tools.web.flask_frontend` module (not the
+`importlib`-fresh module copy the rest of those tests manipulate, and not
+`patch.object`, so nothing ever reverted it) — the stub outlived the test
+and broke a sibling test that calls the real function. Since unittest runs
+methods alphabetically, the leaking test always ran first even with the
+file run alone, so this reproduced with zero cross-file interaction. A
+third test in the same file wrote a real `report.json` to the repo root
+(mocked `live_lens_report_path` to a bare relative `Path("report.json")`
+instead of a tmp dir) — gitignored so invisible to `git status`, and it
+persisted across every future run, including brand-new isolated ones, until
+manually deleted. Fixed all three by switching to `patch.object`/
+`tempfile.TemporaryDirectory()`, matching patterns already used elsewhere
+in the same file. The other 2 of the original 4 failures were a **separate,
+unrelated bug class** surfaced by the same repro command but not actually
+order-dependent (failed identically fully standalone): both hardcode a past
+date and depend on production checks keyed to real wall-clock "today" or a
+rolling local-artifact-mirror window (`central_today_iso()` in
+`test_live_lens_local.py`'s sixty-seconds test;
+`has_games_for_date`'s ESPN-fetch fallback in
+`test_request_path_guard.py`'s WNBA warning-count test) that had drifted as
+real time moved past those literals — fixed by pinning/stubbing the
+date-dependent seam each test actually cares about. Verified 88/88 passing
+across all 4 files in forward order, reverse order, and each file run
+alone. No open PRs; landed directly on `main`. `git fetch` re-checked
+immediately before both commit and push — no collision.
+
+> **Next free ID: 153.** IDs are never reused. Closed items move to
+> [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
+> free, and run the shipped-work check in Operational notes before reconciling.
 
 ### Reconciliation 2026-07-29 (soccer tricodes / Layer 2 session)
 
