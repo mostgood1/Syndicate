@@ -963,6 +963,13 @@
           count: 0,
           hasLive: false,
           allFinal: true,
+          // A live-scoreboard chip won't exist for a game outside today's
+          // /api/board/game-chips window (soccer's week-keyed schedule is
+          // the common case) -- that shouldn't mean the mini-card shows no
+          // date at all, which reads as indistinguishable from a phantom
+          // "-" card. Fall back to the candidate's own date field so every
+          // real game gets a visible date even without chip hydration.
+          fallbackDate: String(item.game_date || item.source_board_date || item.context_label || "").slice(0, 10) || null,
         });
       }
       const group = groups.get(key);
@@ -983,16 +990,43 @@
       const chip = chipForGame(group);
       group.startTimeUtc = chip && chip.start_time_utc ? chip.start_time_utc : null;
     }
+    // Precise chip start time wins when available; a chip-less card (a
+    // game outside today's /api/board/game-chips window, e.g. soccer's
+    // week-keyed schedule) still sorts by its own date rather than falling
+    // straight to opportunity count, which had no relationship to
+    // chronology at all.
+    const sortTimeKey = (group) => {
+      if (group.startTimeUtc) {
+        const parsed = Date.parse(group.startTimeUtc);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+      if (group.fallbackDate) {
+        const parsed = Date.parse(`${group.fallbackDate}T12:00:00`);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+      return null;
+    };
     return gamesList.sort((a, b) => {
       if (a.hasLive !== b.hasLive) return a.hasLive ? -1 : 1;
-      const aTime = a.startTimeUtc ? Date.parse(a.startTimeUtc) : NaN;
-      const bTime = b.startTimeUtc ? Date.parse(b.startTimeUtc) : NaN;
-      const aHasTime = Number.isFinite(aTime);
-      const bHasTime = Number.isFinite(bTime);
-      if (aHasTime && bHasTime && aTime !== bTime) return aTime - bTime;
-      if (aHasTime !== bHasTime) return aHasTime ? -1 : 1;
+      const aTime = sortTimeKey(a);
+      const bTime = sortTimeKey(b);
+      if (aTime !== null && bTime !== null && aTime !== bTime) return aTime - bTime;
+      if ((aTime !== null) !== (bTime !== null)) return aTime !== null ? -1 : 1;
       return b.count - a.count;
     });
+  }
+
+  // "YYYY-MM-DD" -> "Fri Jul 31", mirroring the day-prefix format the
+  // server already uses for chip status tokens (game_chip_scoreboard.py's
+  // _scheduled_status_token), so a chip-less card's fallback date reads
+  // the same way a chip-hydrated one's does.
+  function formatFallbackDateLabel(isoDate) {
+    if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return null;
+    const parsed = new Date(`${isoDate}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return null;
+    const weekday = parsed.toLocaleDateString("en-US", { weekday: "short" });
+    const month = parsed.toLocaleDateString("en-US", { month: "short" });
+    return `${weekday} ${month} ${parsed.getDate()}`;
   }
 
   function renderGameCards(items) {
@@ -1026,9 +1060,11 @@
             `;
           }
           const stateLabel = game.hasLive ? '<span class="live-dot">&#9679; live</span>' : game.allFinal ? "final" : "pregame";
+          const fallbackDateLabel = formatFallbackDateLabel(game.fallbackDate);
+          const headLeft = fallbackDateLabel ? `${escapeHtml(game.sport)} · ${escapeHtml(fallbackDateLabel)}` : escapeHtml(game.sport);
           return `
             <button type="button" class="game-mini-card" data-game-key="${escapeHtml(game.key)}" aria-pressed="${isSelected}">
-              <div class="game-mini-card__head"><span>${escapeHtml(game.sport)}</span><span>${stateLabel}</span></div>
+              <div class="game-mini-card__head"><span>${headLeft}</span><span>${stateLabel}</span></div>
               <div class="game-mini-card__matchup">${escapeHtml(game.matchup)}</div>
               <div class="game-mini-card__meta">${game.count} opportunit${game.count === 1 ? "y" : "ies"}</div>
             </button>
