@@ -123,6 +123,41 @@ Full re-run after this follow-up: `test_game_chip_scoreboard.py` (14),
 `_keyvalue_backend.py`, `test_wnba_live_lens_game_shape.py`,
 `test_wnba_props_live_overlay.py` (40) — all green.
 
+**Second follow-up (after deploying the above and re-verifying live):
+WNBA decimal scores still weren't fixed, and WNBA cards had no date/
+time.** Both fixes above were real but landed on paths the web dyno
+doesn't actually use for this data. Root-caused further:
+
+- **The actual score bug.** `wnba/cards.py`'s
+  `_build_live_state_payload_uncached` has a `_render_web_dyno()` branch
+  that's what Render's web service (and therefore
+  `/api/board/game-chips`) actually executes — a THIRD, completely
+  unconditional instance of `"home_pts": _safe_float(sim_score.get(...))`
+  with no gate at all, upstream of both fixes from the first follow-up.
+  Fixed the same way (gate on in_progress/final); also fixed the sibling
+  non-web-dyno branch for consistency. Tests:
+  `test_live_state_payload_render_omits_projected_pts_for_pregame_game`,
+  `..._keeps_projected_pts_for_live_game` in
+  `tests/test_wnba_live_snapshots_local.py`.
+- **Missing WNBA date/time (the "is this a phantom game?" report).**
+  `_scheduled_status_token()`/`_resolve_scheduled_start_utc()`
+  (`game_chip_scoreboard.py`) never checked `"startTime"` (camelCase) —
+  the actual field WNBA's `wnba/cards.py` stamps the real ISO commence
+  timestamp onto (confirmed via its own test suite). Every WNBA chip's
+  `status_token`/`start_time_utc` came back `None`, so WNBA games sorted
+  last and showed no date/time — indistinguishable from a phantom card.
+  Added `"startTime"` and a nested `odds.commence_time` fallback to both
+  functions. Tests:
+  `test_wnba_pregame_start_time_resolved_from_camel_case_start_time_field`,
+  `test_start_time_resolved_from_nested_odds_commence_time` in
+  `tests/test_game_chip_scoreboard.py`. Verified against production
+  before this fix: only WNBA (3/29 chips) had a null `status_token`; no
+  other sport in today's live slate was affected.
+
+Full re-run after this second follow-up (221 tests: the 190 above plus
+`test_wnba_picks.py`, `test_wnba_game_market_projections.py`) — all
+green.
+
 ### Reconciliation 2026-07-30 (tuning-loop wiring / Phase 5)
 
 Closing this session's own 5-phase arc (#153/#155/#124/#158, this one:

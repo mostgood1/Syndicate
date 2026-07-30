@@ -207,6 +207,42 @@ class GameChipBuilderTests(unittest.TestCase):
 
         self.assertIsNone(chip["start_time_utc"])
 
+    def test_wnba_pregame_start_time_resolved_from_camel_case_start_time_field(self) -> None:
+        # #160 follow-up: WNBA's own game-list builder (wnba/cards.py)
+        # stamps the real ISO commence timestamp onto "startTime"
+        # (camelCase) rather than any of the snake_case ISO fields checked
+        # above -- missing this key meant every WNBA chip's status_token
+        # and start_time_utc came back None, so WNBA games sorted last on
+        # the Games strip and showed no date/time at all (indistinguishable
+        # from a phantom card).
+        game = {
+            "game_id": "401857900",
+            "away": {"abbr": "NYL"},
+            "home": {"abbr": "LVA"},
+            "status": "Scheduled",
+            "startTime": "2026-07-31T00:00:00Z",
+        }
+
+        with patch("syndicate.features.shared.game_chip_scoreboard.central_today_iso", return_value="2026-07-30"):
+            chip = build_game_chip("wnba", game)
+
+        self.assertEqual(chip["state"], "pregame")
+        self.assertEqual(chip["start_time_utc"], "2026-07-31T00:00:00+00:00")
+        self.assertIsNotNone(chip["status_token"])
+
+    def test_start_time_resolved_from_nested_odds_commence_time(self) -> None:
+        game = {
+            "game_id": "401857901",
+            "away": {"abbr": "NYL"},
+            "home": {"abbr": "LVA"},
+            "status": "Scheduled",
+            "odds": {"commence_time": "2026-07-31T00:00:00Z"},
+        }
+
+        chip = build_game_chip("wnba", game)
+
+        self.assertEqual(chip["start_time_utc"], "2026-07-31T00:00:00+00:00")
+
 
 class BuildGameChipsTests(unittest.TestCase):
     def test_build_game_chips_reads_registered_providers(self) -> None:

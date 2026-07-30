@@ -164,11 +164,20 @@ def _scheduled_status_token(game: dict[str, Any]) -> str | None:
     candidates = [
         game.get("scheduled_start_utc"),
         game.get("start_time_utc"),
+        # WNBA's own game-list builder (wnba/cards.py) stamps the real ISO
+        # commence timestamp onto "startTime" (camelCase) -- confirmed via
+        # its own test suite (test_source_cards_payload_uses_live_supplement
+        # _for_today asserts first_game["startTime"] == an ISO string).
+        # Missing this key meant every WNBA chip's status_token/start_time_utc
+        # came back None, which then also broke Games-strip start-time
+        # sorting for WNBA specifically (#160 follow-up).
+        game.get("startTime"),
         game.get("gameDate"),
         game.get("game_date"),
         game.get("scheduled"),
         game.get("scheduled_start"),
         game.get("commence_time"),
+        (game.get("odds") or {}).get("commence_time") if isinstance(game.get("odds"), dict) else None,
     ]
     for value in candidates:
         text = _text(value)
@@ -221,6 +230,12 @@ def _scheduled_status_token(game: dict[str, Any]) -> str | None:
 _START_TIME_ISO_FIELDS = (
     "scheduled_start_utc",
     "start_time_utc",
+    # WNBA's own game-list builder stamps the real ISO commence timestamp
+    # onto "startTime" (camelCase) -- without this key, every WNBA chip's
+    # start_time_utc came back None, so it sorted last on the Games strip
+    # and showed no date/time at all, making a real game indistinguishable
+    # from a phantom one (#160 follow-up).
+    "startTime",
     "gameDate",
     "game_date",
     "scheduled",
@@ -247,6 +262,17 @@ def _resolve_scheduled_start_utc(game: dict[str, Any]) -> datetime | None:
         if parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=timezone.utc)
         return parsed.astimezone(timezone.utc)
+    nested_commence = (game.get("odds") or {}).get("commence_time") if isinstance(game.get("odds"), dict) else None
+    nested_text = _text(nested_commence)
+    if nested_text and "T" in nested_text:
+        try:
+            parsed = datetime.fromisoformat(nested_text.replace("Z", "+00:00"))
+        except Exception:
+            parsed = None
+        if parsed is not None:
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.astimezone(timezone.utc)
     # No ISO timestamp -- same plain-date-plus-formatted-clock fallback as
     # _scheduled_status_token's own fallback (MLB's cards payload shape).
     date_text = _text(game.get("game_date") or game.get("gameDate"))

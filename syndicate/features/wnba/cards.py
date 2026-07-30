@@ -4882,14 +4882,26 @@ def _build_live_state_payload_uncached(selected_date: str, ttl: int = 12, *, all
                 period=game.get("period"),
                 clock=game.get("clock"),
             )
+            # #160: the actual root cause -- this is the branch that runs on
+            # Render's web dyno (_render_web_dyno() above), which is what
+            # /api/board/game-chips and every other web-served WNBA game
+            # list actually hits. home_pts/away_pts fell back to the
+            # SmartSim *projected* point total unconditionally, with no
+            # in_progress/final gate at all, so a pregame game showed a
+            # fabricated decimal "score" (e.g. 91.81-91.17). The two other
+            # consumers of this payload (_apply_wnba_live_scores in home.py
+            # and _supplement_games_with_live_state above) were already
+            # gated this session, but both read (or overlay on top of) this
+            # same out_games list, so the ungated value here overrode both.
+            is_underway_or_final = bool(status_fields.get("in_progress")) or bool(status_fields.get("final"))
             out_games.append(
                 {
                     "game_id": game.get("gamePk"),
                     "event_id": game.get("event_id"),
                     "home": game.get("home_tri") or home_info.get("abbr"),
                     "away": game.get("away_tri") or away_info.get("abbr"),
-                    "home_pts": _safe_float(sim_score.get("home_mean")),
-                    "away_pts": _safe_float(sim_score.get("away_mean")),
+                    "home_pts": _safe_float(sim_score.get("home_mean")) if is_underway_or_final else None,
+                    "away_pts": _safe_float(sim_score.get("away_mean")) if is_underway_or_final else None,
                     "status_id": None,
                     "status": status_fields["status"],
                     "period": status_fields.get("period"),
@@ -4992,14 +5004,20 @@ def _build_live_state_payload_uncached(selected_date: str, ttl: int = 12, *, all
             source_period = normalized_status.get("period")
             source_in_progress = bool(normalized_status["in_progress"])
             source_final = bool(normalized_status["final"])
+        # Same gate as the _render_web_dyno() branch above: source_away_pts/
+        # source_home_pts fall back to the SmartSim projected total when no
+        # real ESPN boxscore row (source_row) has matched -- must not be
+        # reported as "pts" (read as "score" by every consumer) unless the
+        # game is actually underway or over (#160).
+        source_is_underway_or_final = source_in_progress or source_final
         out_games.append(
             {
                 "game_id": game.get("gamePk"),
                 "event_id": game.get("event_id"),
                 "home": game.get("home_tri") or home_info.get("abbr"),
                 "away": game.get("away_tri") or away_info.get("abbr"),
-                "home_pts": source_home_pts,
-                "away_pts": source_away_pts,
+                "home_pts": source_home_pts if source_is_underway_or_final else None,
+                "away_pts": source_away_pts if source_is_underway_or_final else None,
                 "status_id": None,
                 "status": source_status,
                 "period": source_period,

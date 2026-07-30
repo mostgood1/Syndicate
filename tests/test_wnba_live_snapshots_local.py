@@ -635,6 +635,80 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual(game.get("clock"), "3:27")
         self.assertTrue(game.get("in_progress"))
 
+    def test_live_state_payload_render_omits_projected_pts_for_pregame_game(self) -> None:
+        # #160: this _render_web_dyno() branch is what /api/board/game-chips
+        # and every other web-served WNBA game list actually hits on Render.
+        # home_pts/away_pts fell back to the SmartSim *projected* point
+        # total unconditionally, so a pregame game reported a fabricated
+        # decimal "score" (e.g. 91.81-91.17) even though it hadn't tipped
+        # off. Must be omitted (None) unless the game is live or final.
+        with patch.dict("os.environ", {"RENDER": "1"}, clear=False), patch(
+            "syndicate.features.wnba.cards.central_today_iso",
+            return_value="2026-07-30",
+        ), patch(
+            "syndicate.features.wnba.cards._local_live_state_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value={
+                "games": [
+                    {
+                        "gamePk": "401857900",
+                        "event_id": "401857900",
+                        "away_tri": "NYL",
+                        "home_tri": "LVA",
+                        "away": {"abbr": "NYL"},
+                        "home": {"abbr": "LVA"},
+                        "status": "Scheduled",
+                        "detail": "Scheduled",
+                        "live_state": {"in_progress": False, "final": False},
+                        "sim": {"score": {"away_mean": 91.81, "home_mean": 91.17}},
+                    }
+                ]
+            },
+        ):
+            _local_live_state_payload.cache_clear()
+            payload = build_live_state_payload("2026-07-30", ttl=12)
+            _local_live_state_payload.cache_clear()
+
+        game = (payload.get("games") or [{}])[0]
+        self.assertIsNone(game.get("away_pts"))
+        self.assertIsNone(game.get("home_pts"))
+
+    def test_live_state_payload_render_keeps_projected_pts_for_live_game(self) -> None:
+        with patch.dict("os.environ", {"RENDER": "1"}, clear=False), patch(
+            "syndicate.features.wnba.cards.central_today_iso",
+            return_value="2026-07-30",
+        ), patch(
+            "syndicate.features.wnba.cards._local_live_state_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value={
+                "games": [
+                    {
+                        "gamePk": "401857901",
+                        "event_id": "401857901",
+                        "away_tri": "NYL",
+                        "home_tri": "LVA",
+                        "away": {"abbr": "NYL"},
+                        "home": {"abbr": "LVA"},
+                        "status": "Live",
+                        "detail": "Q3",
+                        "live_state": {"in_progress": True, "final": False},
+                        "sim": {"score": {"away_mean": 61.0, "home_mean": 64.0}},
+                    }
+                ]
+            },
+        ):
+            _local_live_state_payload.cache_clear()
+            payload = build_live_state_payload("2026-07-30", ttl=12)
+            _local_live_state_payload.cache_clear()
+
+        game = (payload.get("games") or [{}])[0]
+        self.assertEqual(game.get("away_pts"), 61.0)
+        self.assertEqual(game.get("home_pts"), 64.0)
+
     def test_live_state_payload_render_rejects_mixed_stale_snapshot(self) -> None:
         with patch.dict("os.environ", {"RENDER": "1"}, clear=False), patch(
             "syndicate.features.wnba.cards.central_today_iso",
