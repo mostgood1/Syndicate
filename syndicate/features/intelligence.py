@@ -3905,6 +3905,62 @@ def _steam_event_current_odds_text(value: Any) -> str:
     return f"+{int(odds_value)}" if odds_value > 0 else str(int(odds_value))
 
 
+def _soccer_abbr_from_name(team_name: str) -> str:
+    tokens = [token for token in str(team_name or "").replace("&", " ").split() if token]
+    if not tokens:
+        return "-"
+    if len(tokens) == 1:
+        return tokens[0][:3].upper()
+    return "".join(token[0] for token in tokens[:3]).upper()
+
+
+def _soccer_team_abbr(league: str, team_name: str) -> str:
+    # Steam events carry OddsAPI's market-name spelling ("LA Galaxy"), not
+    # necessarily the branding directory's exact display name, so an exact
+    # team_by_name() miss falls back to the same fuzzy matcher soccer's own
+    # cross-source team reconciliation already uses (team_names.py) before
+    # giving up and abbreviating the raw text token-by-token.
+    from syndicate.features.soccer.sources import all_teams, team_by_name
+
+    text = _safe_text(team_name, "")
+    if not text:
+        return "-"
+    directory_team = team_by_name(league, text)
+    if directory_team is None:
+        try:
+            from syndicate.features.soccer.features.team_names import match_team_name
+
+            names = [_safe_text(team.get("name"), "") for team in all_teams(league)]
+            matched_name = match_team_name(text, [name for name in names if name])
+        except Exception:
+            matched_name = None
+        if matched_name:
+            directory_team = team_by_name(league, matched_name)
+    abbreviation = _safe_text((directory_team or {}).get("abbreviation"), "")
+    return abbreviation.upper() if abbreviation else _soccer_abbr_from_name(text)
+
+
+def _soccer_team_abbr_any_league(selected_date: str, team_name: str) -> str:
+    # Steam events carry no league field of their own (see
+    # _soccer_steam_matchup_lookup's docstring), so this tries every league
+    # active that day rather than requiring the caller to already know which
+    # one a given event belongs to.
+    from syndicate.features.soccer.sources import active_leagues_for_date
+
+    text = _safe_text(team_name, "")
+    if not text:
+        return "-"
+    try:
+        leagues = active_leagues_for_date(selected_date)
+    except Exception:
+        leagues = []
+    for league in leagues:
+        abbreviation = _soccer_team_abbr(league, text)
+        if abbreviation != _soccer_abbr_from_name(text):
+            return abbreviation
+    return _soccer_abbr_from_name(text)
+
+
 def _soccer_steam_matchup_lookup(selected_date: str) -> dict[str, str]:
     """event_id -> "Away @ Home" for soccer, built from the raw OddsAPI
     fetch rows (game_odds_current.csv + today's props/<date>.csv per active
@@ -3938,7 +3994,9 @@ def _soccer_steam_matchup_lookup(selected_date: str) -> dict[str, str]:
             home = _safe_text(row.get("home_team"), "")
             away = _safe_text(row.get("away_team"), "")
             if home or away:
-                lookup[event_id] = f"{away or '-'} @ {home or '-'}"
+                away_abbr = _soccer_team_abbr(league, away) if away else "-"
+                home_abbr = _soccer_team_abbr(league, home) if home else "-"
+                lookup[event_id] = f"{away_abbr} @ {home_abbr}"
     return lookup
 
 
@@ -4036,7 +4094,21 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
         # built once above -- most direct, no join needed.
         event_home = _safe_text(event.get("home_team"), "")
         event_away = _safe_text(event.get("away_team"), "")
-        matchup_text = f"{event_away or '-'} @ {event_home or '-'}" if (event_home or event_away) else matchup_by_game_id.get(game_id, "-")
+        if event_home or event_away:
+            if sport_slug == "soccer":
+                # Steam events carry OddsAPI's full team names -- convert to
+                # the same abbreviation soccer/cards.py hands the Layer 2
+                # mini game-card strip, so this candidate type shows a
+                # tricode like every other soccer card instead of a full
+                # club name, and (when it resolves the same code) can even
+                # id-less-match a live game-chip's own abbreviated matchup.
+                away_text = _soccer_team_abbr_any_league(selected_date, event_away) if event_away else "-"
+                home_text = _soccer_team_abbr_any_league(selected_date, event_home) if event_home else "-"
+            else:
+                away_text, home_text = event_away or "-", event_home or "-"
+            matchup_text = f"{away_text} @ {home_text}"
+        else:
+            matchup_text = matchup_by_game_id.get(game_id, "-")
         # player_name and selection were previously OR'd into a single slot
         # -- two different players sharing the same selection ("Over")
         # collapsed into one, silently dropping one player's real steam
@@ -4208,6 +4280,16 @@ def _mlb_home_run_candidates_from_artifact(sport: dict[str, Any]) -> list[dict[s
                 "team": _safe_text(row.get("team"), "-"),
                 "team_key": _safe_text(row.get("team"), "").lower() or None,
                 "player_team": _safe_text(row.get("team"), "-"),
+                # Without these, this candidate type has no id at all, so the
+                # Layer 2 mini game-card strip's grouping falls back to a
+                # sport+matchup-text key (intelligence.html's gameKey()) that
+                # never matches the id-keyed group every other MLB candidate
+                # type produces for the same real game -- confirmed live as
+                # a duplicate "Team A @ Team B, N opportunities" fallback
+                # card sitting next to the real, chip-hydrated score card.
+                "game_pk": _safe_int(row.get("gamePk") or row.get("game_pk")),
+                "game_id": _safe_text(row.get("gamePk") or row.get("game_pk"), ""),
+                "event_id": _safe_text(row.get("gamePk") or row.get("game_pk"), ""),
                 "line": "0.5",
                 "odds": "-",
                 "projected": "-",

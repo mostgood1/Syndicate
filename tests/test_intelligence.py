@@ -3299,6 +3299,35 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIsNone(reason)
         self.assertIsNotNone(classified)
 
+    def test_mlb_home_run_candidates_carry_the_game_id_the_artifact_row_has(self) -> None:
+        # Without game_id/gamePk/event_id, intelligence.html's gameKey() falls
+        # back to a sport+matchup-text key that can never match the id-keyed
+        # group every other MLB candidate type produces for the same real
+        # game -- confirmed live as a duplicate "Team A @ Team B, N
+        # opportunities" fallback card sitting next to the real,
+        # chip-hydrated score card for that game.
+        from syndicate.features.intelligence import _mlb_home_run_candidates_from_artifact
+
+        artifact_payload = {
+            "rows": [
+                {
+                    "player_name": "Aaron Judge",
+                    "team": "NYY",
+                    "matchup": "NYY at BOS",
+                    "p_hr_1plus": 0.241,
+                    "gamePk": 745804,
+                }
+            ]
+        }
+        with patch("syndicate.features.intelligence.mlb_load_json_file", return_value=artifact_payload):
+            candidates = _mlb_home_run_candidates_from_artifact({"slug": "mlb", "context_label": "2026-06-05"})
+
+        self.assertEqual(len(candidates), 1)
+        candidate = candidates[0]
+        self.assertEqual(candidate.get("game_pk"), 745804)
+        self.assertEqual(candidate.get("game_id"), "745804")
+        self.assertEqual(candidate.get("event_id"), "745804")
+
     def test_mlb_live_lens_prop_candidates_generated_and_survive_classification(self) -> None:
         # #128: daily_top_props_<date>.json (every other MLB prop candidate
         # function's sole source) is a once-a-day artifact -- confirmed live

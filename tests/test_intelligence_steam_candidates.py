@@ -189,7 +189,10 @@ class SteamMatchupResolutionTests(unittest.TestCase):
         with patch("syndicate.features.intelligence._load_steam_events_for_date", return_value=[event]):
             candidates = _steam_candidates_for_sport(sport)
         self.assertEqual(len(candidates), 1, candidates)
-        self.assertEqual(candidates[0]["matchup"], "LA Galaxy @ Inter Miami")
+        # Converted to tricodes (not the raw OddsAPI team names) so this
+        # candidate type displays and groups consistently with every other
+        # soccer card on the Layer 2 mini game-card strip.
+        self.assertEqual(candidates[0]["matchup"], "LA @ MIA")
 
     def test_soccer_falls_back_to_the_raw_odds_row_lookup_when_event_has_no_team_names(self) -> None:
         # Events recorded before the source-side stamp existed have no

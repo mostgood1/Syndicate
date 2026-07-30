@@ -2888,17 +2888,30 @@ def _apply_mlb_live_scores(games: list[dict[str, Any]], selected_date: str) -> l
         updated = dict(game)
         away = dict(game.get("away") or {}) if isinstance(game.get("away"), dict) else {}
         home = dict(game.get("home") or {}) if isinstance(game.get("home"), dict) else {}
-        if live_state.get("away_pts") is not None:
-            away["score"] = live_state.get("away_pts")
-        if live_state.get("home_pts") is not None:
-            home["score"] = live_state.get("home_pts")
+        # A live or final game always has a real (possibly 0) cumulative run
+        # total per side -- MLB StatsAPI's linescore.teams.<side>.runs can
+        # still come back null for one side while the other has a real
+        # number (confirmed in production: one side rendered as "-" on both
+        # live and final games while its opponent showed a real score). Once
+        # the game state itself confirms live/final, treat a missing runs
+        # value as 0 rather than leaving that side's score unset -- an
+        # actually-unknown score only makes sense pregame.
+        in_progress_or_final = bool(live_state.get("in_progress") or live_state.get("final"))
+        away_pts = live_state.get("away_pts")
+        home_pts = live_state.get("home_pts")
+        if away_pts is not None:
+            away["score"] = away_pts
+        elif in_progress_or_final:
+            away["score"] = 0
+        if home_pts is not None:
+            home["score"] = home_pts
+        elif in_progress_or_final:
+            home["score"] = 0
         updated["away"] = away
         updated["home"] = home
         status = dict(game.get("status") or {}) if isinstance(game.get("status"), dict) else {}
-        if live_state.get("away_pts") is not None:
-            status["away_score"] = live_state.get("away_pts")
-        if live_state.get("home_pts") is not None:
-            status["home_score"] = live_state.get("home_pts")
+        status["away_score"] = away.get("score", status.get("away_score"))
+        status["home_score"] = home.get("score", status.get("home_score"))
         status["is_live"] = bool(live_state.get("in_progress"))
         status["in_progress"] = bool(live_state.get("in_progress"))
         status["is_final"] = bool(live_state.get("final"))

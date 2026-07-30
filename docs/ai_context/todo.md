@@ -103,7 +103,7 @@ session messages rather than silent overwrites.
   `/api/ops/odds-history/inspect?sport=wnba&date=<today>` again after the
   next live-lens tick to confirm `market_count` actually grows past 2.
 
-- **New: #142** (filed and fixed this session, **NOT YET COMMITTED/DEPLOYED**)
+- **New: #142** (filed, fixed, committed `5e539d9e`, deployed, confirmed live)
   — user asked for soccer tricodes across all leagues so compact/Layer-2
   cards render at the right size, plus a day/date indicator on Layer 2
   compact cards. Root cause for the sizing bug: soccer passes ESPN's raw
@@ -141,10 +141,63 @@ session messages rather than silent overwrites.
   since the fixture's date was previously coincidentally always "not
   today" from the *old* code's perspective — it had no today-check at all),
   added `test_pregame_chip_on_a_different_day_includes_date`; soccer/home/
-  intelligence/market-board suites all still pass (see Operational notes
-  before closing — this needs a commit + `git push` + Render deploy, and a
-  production check that Layer 2 actually shows soccer chips with correct
-  tricodes/dates, before this can move to `todo_closed.md`).
+  intelligence/market-board suites all still pass. Confirmed live against
+  production after deploy: `/api/board/game-chips?sports=soccer` went from 0
+  chips to a real 16-chip MLS matchday with tricodes correctly overridden
+  (`LAF` for LAFC, `NYR` for Red Bull New York).
+
+  **#142 follow-up (same session, fixed, NOT YET COMMITTED/DEPLOYED)** —
+  user sent a screenshot of the Layer 2 "Games" mini-card strip
+  (`/intelligence`) right after the above deployed, showing three more bugs
+  in the same strip, not all soccer-specific:
+  1. **Duplicate cards for one real game** (`CHC @ STL` and `KC @ MIN` each
+     showed both a chip-hydrated score card AND a separate "Team A @ Team B,
+     N opportunities" fallback card). Root cause:
+     `_mlb_home_run_candidates_from_artifact` (`syndicate/features/
+     intelligence.py`) was the one MLB candidate builder that set none of
+     `game_id`/`gamePk`/`event_id` on its returned dict, so
+     `intelligence.html`'s `gameKey()` fell back to a full-name-matchup key
+     for that candidate type alone, splitting it into a second
+     `deriveGameCards()` group that could never chip-match. Fixed by adding
+     the same three id fields from the artifact row's `gamePk`, mirroring
+     `_mlb_prop_candidate_from_artifact_row`'s existing pattern.
+  2. **Scores showing "-" on live/final MLB games** (e.g. `NYY 4 / CWS -`,
+     `ATL 1 / NYM -` on a FINAL game) even though every side of a real game
+     has a real (possibly 0) run total. Root cause: MLB's base game dict
+     carries no score at all — `_apply_mlb_live_scores`
+     (`syndicate/blueprints/home.py`) is the only place a score is attached,
+     from MLB StatsAPI's `linescore.teams.<side>.runs`, and only set a
+     side's `score` key `if ... is not None` — confirmed that field can come
+     back null for one side while the other has a real number, on both live
+     and final games, leaving that side with no `score` key whatsoever.
+     Fixed: once the game state itself confirms live/final, a missing runs
+     value now defaults to `0` instead of leaving the side unset (an
+     actually-unknown score only makes sense pregame).
+  3. **Soccer opportunities showing full team names instead of tricodes**
+     (e.g. "Toronto ... 23 opportunities") — a different mechanism than #1:
+     soccer's steam-move candidates (`_steam_candidates_for_sport`) are
+     keyed by OddsAPI's own hash id (a documented, accepted different id
+     space from soccer's ESPN-numeric ids — see that function's existing
+     comment), so they can never id-match a chip, and their matchup text was
+     built from the raw OddsAPI `home_team`/`away_team` full names, which
+     can't string-match the chip's abbreviated matchup either. Fixed by
+     converting those team names to tricodes at build time (new
+     `_soccer_team_abbr`/`_soccer_team_abbr_any_league` helpers, reusing
+     `team_by_name` plus soccer's existing cross-source fuzzy name matcher,
+     `soccer/features/team_names.py:match_team_name`, before falling back to
+     a token-initials abbreviation) — fixes the visible complaint directly,
+     and when the resolved code matches the chip's own abbreviation (same
+     `_normalized_abbreviation` override table from this item's first half),
+     these candidates can now even chip-match via the matchup-text fallback.
+  Tests: `test_intelligence.py::test_mlb_home_run_candidates_carry_the_
+  game_id_the_artifact_row_has` (new), `test_home.py::
+  MLBLiveScoreFallbackTests` (new, 3 cases), updated
+  `test_intelligence_steam_candidates.py`'s
+  `test_event_level_home_away_team_wins_over_dashboard_lookup` for the new
+  tricode output. 270+99 relevant tests passing. Needs a commit + push +
+  Render deploy, and a follow-up look at the live board to confirm the
+  duplicate-card and dash-score symptoms are actually gone in production
+  before this closes out.
 
 - **New: #141** (filed, fixed, deployed, commit `f5efa674`) — cross-sport
   comparison of WNBA's board pregame/props pipeline against MLB's (then just

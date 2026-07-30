@@ -1468,3 +1468,37 @@ class HomeCacheBoundingTests(unittest.TestCase):
         # permanent -- an ID lookup index, not hydrated game state.
         self.assertIsInstance(home_module._BASKETBALL_PLAYER_ID_CACHE, dict)
         self.assertNotIsInstance(home_module._BASKETBALL_PLAYER_ID_CACHE, OrderedDict)
+
+
+class MLBLiveScoreFallbackTests(unittest.TestCase):
+    """Confirmed live: MLB StatsAPI's linescore.teams.<side>.runs can come
+    back null for one side while the other has a real number, on both live
+    and final games -- _apply_mlb_live_scores only ever set a side's score
+    when that value was not None, so the affected side kept no "score" key
+    at all (MLB's base game dict never carries one either) and rendered as
+    an ambiguous "-" on the Layer 2 mini game-card strip right next to its
+    opponent's real number."""
+
+    def _game(self):
+        return {"gamePk": 1, "away": {"abbr": "KC"}, "home": {"abbr": "MIN"}, "status": {}}
+
+    def test_missing_side_defaults_to_zero_when_live(self) -> None:
+        live_states = {1: {"away_pts": 4, "home_pts": None, "in_progress": True, "final": False, "status": "Bot 8"}}
+        with patch("syndicate.blueprints.home._mlb_feed_live_states", return_value=live_states):
+            enriched = home_module._apply_mlb_live_scores([self._game()], "2026-07-29")
+        self.assertEqual(enriched[0]["away"]["score"], 4)
+        self.assertEqual(enriched[0]["home"]["score"], 0)
+        self.assertEqual(enriched[0]["status"]["home_score"], 0)
+
+    def test_missing_side_defaults_to_zero_when_final(self) -> None:
+        live_states = {1: {"away_pts": None, "home_pts": 1, "in_progress": False, "final": True, "status": "Final"}}
+        with patch("syndicate.blueprints.home._mlb_feed_live_states", return_value=live_states):
+            enriched = home_module._apply_mlb_live_scores([self._game()], "2026-07-29")
+        self.assertEqual(enriched[0]["away"]["score"], 0)
+        self.assertEqual(enriched[0]["home"]["score"], 1)
+
+    def test_no_live_state_leaves_game_untouched(self) -> None:
+        with patch("syndicate.blueprints.home._mlb_feed_live_states", return_value={1: None}):
+            enriched = home_module._apply_mlb_live_scores([self._game()], "2026-07-29")
+        self.assertNotIn("score", enriched[0]["away"])
+        self.assertNotIn("score", enriched[0]["home"])
