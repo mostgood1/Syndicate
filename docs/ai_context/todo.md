@@ -4,16 +4,97 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (soccer
-cross-sport opportunities integration, #150/#151)" below; prior session:
-"Reconciliation 2026-07-30 (WNBA native live-lens game-shape / Phase 4)"
-further down; before that: "Reconciliation 2026-07-30 (MLB evening
-next-day sim headroom gate)"; before that: "Reconciliation 2026-07-30 (MLB
-live-lens headroom gate / Phase 3)"; before that: "Reconciliation
-2026-07-30 (opportunity board / Phase 2)"; before that: "Reconciliation
-2026-07-30 (steam candidates, Layer 2 projection, portfolio
-reconciliation)"; before that: "Reconciliation 2026-07-30 (evaluation-ledger
-settlement / Phase 1)").
+Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (tuning-loop
+wiring / Phase 5)" below; prior session: "Reconciliation 2026-07-30 (soccer
+cross-sport opportunities integration, #150/#151)" further down; before
+that: "Reconciliation 2026-07-30 (WNBA native live-lens game-shape / Phase
+4)"; before that: "Reconciliation 2026-07-30 (MLB evening next-day sim
+headroom gate)"; before that: "Reconciliation 2026-07-30 (MLB live-lens
+headroom gate / Phase 3)"; before that: "Reconciliation 2026-07-30
+(opportunity board / Phase 2)"; before that: "Reconciliation 2026-07-30
+(steam candidates, Layer 2 projection, portfolio reconciliation)"; before
+that: "Reconciliation 2026-07-30 (evaluation-ledger settlement / Phase 1)").
+
+### Reconciliation 2026-07-30 (tuning-loop wiring / Phase 5)
+
+Closing this session's own 5-phase arc (#153/#155/#124/#158, this one:
+#159), **not committed or pushed**. Files touched:
+`syndicate/features/shared/recommendation_engine.py` (threshold rescale +
+comment), `syndicate/features/prediction_ledger.py` (removed 2 functions,
+1 call site), `tests/test_recommendation_engine.py` (1 test updated, 1
+new).
+
+**New: #159.** Phase 5 of the 5-phase accuracy-tracking/tuning roadmap
+(#153's note) — this closes the roadmap. Landscape turned out bigger than
+the roadmap line implied: **four** overlapping "learn from track record"
+mechanisms exist, not one or two — (1) `intelligence_evaluation.py`'s
+reliability multiplier (Phase 1's concern), (2)
+`recommendation_engine.py`'s policy promotion (`compare_policies`/
+`select_policy`) — wrongly assumed dormant like everything else Phase 1
+found; it's actually **already wired into production** via
+`rank_recommendations()` (called from `intelligence.py`), (3) a second,
+separate confidence nudge inside `recommendation_engine.py`
+(`_performance_multiplier_for_candidate`, fed by `performance_summary.json`
+via `pipeline/performance_aggregator.py`, which reads *both* ledgers — not
+audited in depth this pass, flagged for a future look), (4)
+`prediction_ledger.py`'s per-signal weight tuner — confirmed genuinely
+orphaned (correctly wired to `record_result()`, but the only surviving
+ledger writer, manual portfolio bets, never populates the
+`signal_contributions` it needs).
+
+**Found and fixed a real bug in (2)**, empirically demonstrated (synthetic
+script, not guessed): 12 settled bets per policy, one policy winning 1 more
+bet than the other out of 12 (ordinary binomial noise for a ~55% strategy)
+immediately triggered `promoted: True`. Root cause: `DecisionPolicy.
+promotion_margin` (0.01-0.02) is scaled for a 0-1 metric but compared
+against `promotion_score`, a weighted sum realistically ranging ~±20 to
++80 — the margin was negligible at that scale, so `min_sample_size=8`
+(shared default, never overridden per-policy) was the only real gate, and
+8-12 bets can't distinguish skill from variance. Same class of bug as #124
+(threshold copied/scaled for the wrong context), different subsystem.
+
+Presented the full landscape + 3 fix options to the user; approved:
+rescale `promotion_margin` (0.015/0.02/0.01 -> 3.0/4.0/2.0, ratios
+preserved) **and** raise `min_sample_size` (8 -> 50) in
+`recommendation_engine.py`. Re-ran the synthetic script against the fix:
+`promoted` now correctly `False`, `selected_policy` stays `balanced`.
+Added a regression test (`test_small_sample_noise_does_not_trigger_
+promotion`) encoding the exact scenario. Updated
+`test_policy_summary_promotes_better_labeled_strategy` (range(8) ->
+range(50), same clean all-win-vs-all-loss scenario, intent unchanged).
+
+**Retired (4)** per user's approved choice: removed
+`_update_signal_weights_from_prediction()` and its call site in
+`record_result()`, plus `_write_signal_weights()` (became genuinely unused).
+**Kept** `_read_signal_weights()`/`_signal_weight()`/
+`_default_signal_weights_path()` — confirmed `_signal_weight` is live,
+imported and called by `intelligence.py:1272`'s advanced-signal-contribution
+scoring; removing it would have broken a real path.
+`signal_weights.json`'s weights simply stay frozen at whatever they
+currently are (effectively all default/1.0) — accurate, since the writer
+never had real input to work with.
+
+16/16 `test_prediction_ledger.py` passing, targeted
+`test_recommendation_engine.py` subsets passing (confirmed import of
+`_signal_weight` still resolves). **Note for whoever runs the full file
+next**: `test_recommendation_engine.py` has a pre-existing hang unrelated
+to this change — `test_policy_specific_filtering_changes_threshold_behavior`
+(and possibly others alphabetically after it) stalls on a real on-disk
+ledger read on this OneDrive-synced checkout, matching a warning already
+documented inline in that test file. Confirmed via a bounded run that the
+first 10 collected tests (alphabetical) plus this session's 2 touched
+tests all pass; did not chase the pre-existing hang further (out of
+Phase 5's scope) — worth a dedicated look in a future session.
+
+**Roadmap complete: Phases 1-5 all done, all uncommitted.** Everything
+from tonight's arc (#153, #155, #124, #158, #159) is sitting in the working
+tree, verified individually but never committed or deployed as a whole —
+whoever picks this up next should decide on a commit/review/deploy
+strategy for the full set rather than assuming any of it is live.
+
+> **Next free ID: 160.** IDs are never reused. Closed items move to
+> [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
+> free, and run the shipped-work check in Operational notes before reconciling.
 
 ### Reconciliation 2026-07-30 (soccer cross-sport opportunities integration, #150/#151)
 
