@@ -63,8 +63,8 @@ session messages rather than silent overwrites.
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
 
-- **New: #148** (root-caused, fixed, and tested this session, **NOT YET
-  DEPLOYED at time of writing**) — user asked for a full soccer architecture
+- **New: #148** (root-caused, fixed, tested, and deployed this session) —
+  user asked for a full soccer architecture
   assessment mirroring the earlier MLB (#129) and WNBA audits. Found two real
   issues: (1) an odds-ownership violation — #146/#137's own
   `_launch_autorun_soccer_weekly_refresh` (`scripts/run_refresh_worker.py`)
@@ -126,10 +126,20 @@ session messages rather than silent overwrites.
   (confirmed by reverting every file this session touched and reproducing
   the same 6 failures on unmodified `HEAD` — a pre-existing test-isolation
   gap, not a regression from this fix; worth a follow-up if it starts
-  blocking CI). **Not yet deployed** — next steps: commit, push, deploy all
-  three services, then confirm `SOCCER_PREGAME_AUTORUN_LAUNCHED` actually
-  appears in live-odds-worker's logs and that MLS's current-week artifact
-  eventually regenerates with real player props under the new split.
+  blocking CI). Committed `a2e37a54`, pushed. A concurrent session layered
+  commit `30a6cff9` (Layer 2 "actual" gaps fix) on top and triggered its own
+  deploy of all three services before this session's own deploy trigger
+  finished building — Render canceled this session's redundant in-progress
+  builds and the concurrent session's deploy carried both commits live
+  together (confirmed via `/api/ops/version`: `commit: 30a6cff9...`, which
+  has `a2e37a54` as its direct parent). This interrupted an in-flight
+  single-game scoped MLB resim (`game_pk 824973`, `fingerprint_change`
+  reason) — same precedent as #147's deploy: not irreplaceable, re-triggers
+  on the next fingerprint check. **Not yet re-verified against the live
+  board** — next step for a future session: confirm
+  `SOCCER_PREGAME_AUTORUN_LAUNCHED` actually appears in live-odds-worker's
+  logs and that MLS's current-week artifact eventually regenerates with real
+  player props under the new split.
 
 - **New: #147** (implemented, deployed, and confirmed against production
   data this session) — user asked for the Layer 2 board to show three
