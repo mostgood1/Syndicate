@@ -105,10 +105,9 @@ session messages rather than silent overwrites.
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
 
-- **New: #151** (root-caused, fixed, and unit-tested this session; **not yet
-  committed/deployed/confirmed live** — coordinate with two other active
-  sessions in this same working directory before committing/deploying, see
-  Operational notes) — direct follow-up to #150's own props gap. Soccer's
+- **New: #151** (root-caused, fixed, unit-tested, and deployed this session;
+  **production confirmation inconclusive, not a fix failure — see the note
+  at the end of this entry**) — direct follow-up to #150's own props gap. Soccer's
   player-prop rank cards (`syndicate/features/soccer/props.py`'s
   `_prop_rank_card`) hydrated correctly onto the intelligence board's
   `home_rails.pregame.items` after #150, but every one had
@@ -160,23 +159,58 @@ session messages rather than silent overwrites.
   `tests/test_build_soccer_picks.py`, `tests/test_soccer_props.py`,
   `tests/test_soccer_market_board.py`, `tests/test_soccer_cards.py`,
   `tests/test_home.py`, `tests/test_intelligence.py`,
-  `tests/test_intelligence_steam_candidates.py`. **Not yet committed,
-  deployed, or verified live** — two other sessions ("MLB missing props,
-  opps, K targets" and "MLB/WNBA model accuracy tracking") are actively
-  editing this same shared working directory concurrently (confirmed via
-  uncommitted changes to `syndicate/features/mlb/cards.py`,
+  `tests/test_intelligence_steam_candidates.py`. Two other sessions ("MLB
+  missing props, opps, K targets" and "MLB/WNBA model accuracy tracking")
+  were actively editing this same shared working directory concurrently
+  (uncommitted changes to `syndicate/features/mlb/cards.py`,
   `syndicate/features/mlb/live_lens.py`,
-  `syndicate/features/shared/intelligence_evaluation.py` sitting alongside
-  this fix's own files at the time this entry was written) — staged and
+  `syndicate/features/shared/intelligence_evaluation.py`) — staged and
   committed only this fix's own files
   (`scripts/build_soccer_picks.py`, `syndicate/features/soccer/props.py`,
   `tests/test_build_soccer_picks.py`, `tests/test_soccer_props.py`, this
   todo.md entry), left the other sessions' in-progress MLB files untouched.
-  **Next step**: `git fetch`/re-check for new commits immediately before
-  committing and again before pushing (established pattern this session),
-  then deploy all three services and re-run the same production
-  `/api/intelligence/query` check to confirm soccer's `top_opportunities`
-  shows a nonzero `"prop"` count.
+  Coordinated directly with the "MLB missing props" session via
+  `send_message` before deploying: it had a full-slate resim on
+  refresh-worker in flight verifying its own K-ladder-targets fix, so web
+  and live-odds-worker deployed immediately (commit `8effa311`) while
+  refresh-worker was held; that session confirmed its resim finished
+  (K Targets/pitcher Top Props both showing real rows) and gave the
+  go-ahead, then refresh-worker deployed too — all three services
+  confirmed live on `8effa311`.
+  **Production confirmation: inconclusive, not proof the fix is wrong.**
+  Watched `/api/intelligence/query` for several minutes post-deploy —
+  soccer's `top_opportunities` showed `game: 6` (from #150, still working)
+  but never a nonzero `"prop"` count. Triggered two manual refreshes
+  (`/api/ops/full-refresh/run`, sports=soccer, phase=pregame) to force the
+  picks pipeline to regenerate sooner than the natural ~4h cadence: the
+  first sat at `queue_state: "queued"`/`pid: null` for 4+ minutes and never
+  visibly progressed; the second (`launch_mode: "detached_subprocess"`,
+  forced onto the web process directly — a deliberate one-off exception to
+  the "web does no compute" rule for this single diagnostic, not a pattern
+  to repeat) DID show a real PID that ran for ~110s and exited, but its own
+  stdout/stderr capture files never got created (`"exists": false` on both)
+  — the same racy job-tracking this session already documented for
+  `/api/ops/odds-refresh/status` (see #148's notes), so this doesn't
+  distinguish "the picks step crashed" from "the diagnostic layer just
+  didn't capture it." **Two real possibilities left open, not
+  distinguished**: (1) a bug in `build_prop_picks`'s join surviving past
+  9 passing unit tests (possible if real production data hits an edge case
+  the synthetic test fixtures didn't — e.g. a real team-name spelling
+  mismatch between the ESPN-sourced sim and the Odds-API-sourced props feed
+  that `_normalize_player_name`'s accent-stripping alone doesn't resolve),
+  or (2) a genuine data-availability gap: OddsAPI/the tracked books
+  (`draftkings,fanduel,betmgm,pointsbetus,caesars`) may simply not post an
+  `player_goal_scorer_anytime` market for MLS at all (a smaller US league),
+  in which case zero prop picks is the CORRECT output, not a bug — #150's
+  loaders.py fix documented this same "not currently firing for any
+  tracked league" shape for a different join. **Next step for whoever picks
+  this up**: once the natural pregame autorun cycle runs (or a cleaner
+  manual trigger lands, e.g. `SYNDICATE_LIVE_ODDS_REFRESH_MODE` variants,
+  or checking Render's actual service logs directly rather than this ops
+  API), re-check `/soccer/mls/api/props`'s rank cards for a nonzero
+  `market`-set count, and if still zero, confirm directly whether the
+  captured `props/{date}.csv` for MLS has ANY `player_goal_scorer_anytime`
+  rows at all before assuming the join code is at fault.
 
 - **New: #150** (root-caused, fixed, unit-tested, deployed, and confirmed
   live this session — see the props gap called out below, closed separately
