@@ -59,9 +59,72 @@ unpushed. Cross-session ID collisions (#131, #139) were both caught and
 resolved without data loss, in both directions, via direct session-to-
 session messages rather than silent overwrites.
 
-> **Next free ID: 147.** IDs are never reused. Closed items move to
+> **Next free ID: 148.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
+
+- **New: #147** (implemented, deployed, and confirmed against production
+  data this session) — user asked for the Layer 2 board to show three
+  distinct values per candidate for props AND for Game ML/Total: pregame
+  **Projection**, **Live Projection** (a live re-sim), and **Live Actual**
+  (real box-score/current game state). Investigation found the board was
+  silently collapsing these into one or two values in three separate
+  places: (1) `_mlb_live_lens_prop_candidates_from_artifact`
+  (`syndicate/features/intelligence.py`) stamped the same live value onto
+  both `projected` and `live_projection` — fixed by cross-referencing the
+  `daily_top_props` artifact's pregame mean by player+market(+game_pk) via
+  a new `_mlb_pregame_mean_by_player_market` helper, falling back to `"-"`
+  (never fabricated) when no match exists; (2) the identical bug one layer
+  down for NBA/WNBA props in
+  `syndicate/features/shared/basketball_live_artifacts.py`'s
+  `build_live_player_lens_payload_from_artifacts` — `sim_mu` (pregame) and
+  `sim_mu_adjusted` (live) were merged into one value before ever reaching
+  the board; (3) Game ML/Total/Spread candidates
+  (`syndicate/blueprints/home.py`'s `_append_game_bet_candidate`) had no
+  `actual` field at all, and `live_projection` silently fell back to the
+  **current combined score** when live — not a projection. Added a real
+  `actual` field/fallback (current score moves to the honestly-labeled
+  slot), and reworked the MLB-only `gameLens` loop so a market-level
+  explicit pregame override still wins for `projected`, the segment-level
+  live re-sim value (previously mislabeled as `projected`) now feeds
+  `live_projection`, and the real box-score segment total
+  (`lens["actualSegment"]`, confirmed to pass through from the vendored
+  live-lens payload verbatim but never read anywhere in this codebase
+  before) now populates `actual`. Scope confirmed with the user up front:
+  MLB + NBA/WNBA now; other sports show `"-"` for live projection rather
+  than faking it with the current score, since they have no live-sim
+  recompute. Added `displayLiveActual` to
+  `syndicate/templates/intelligence.html`, wired into both the card
+  layout's generic facts list and a new "Actual" column in the blotter
+  table. One real design correction mid-implementation: a first pass
+  assumed every market-level `projected`/`projection`/`model`/`mean`
+  override in the gameLens loop was live-only data, but a pre-existing
+  test (`test_intelligence_query_uses_live_game_projection_for_live_totals`)
+  proved a market can legitimately carry both an explicit pregame value
+  and a separate live one as siblings — corrected the field-priority order
+  accordingly before shipping. 256/256 tests passing across
+  `tests/test_home.py`, `tests/test_intelligence.py`, and a new
+  `tests/test_basketball_live_artifacts.py`. Verified live in the browser
+  (both card and blotter views, synthetic fetch-mocked candidates) that a
+  prop and a game-market candidate each render three distinct values with
+  no console errors, **and** confirmed against real production data post-
+  deploy (`/api/intelligence/query`, `force_refresh: true`, date
+  `2026-07-29`): e.g. an MLB RBIs prop showing `projected=0.7` /
+  `live_projection=2.1` / `actual=2.0`, a Total Bases prop showing
+  `1.3`/`4.6`/`4.0`, and a WNBA threes prop showing `0.9`/`0.7`/`0` — all
+  genuinely distinct, none fabricated. Committed as `f76e65f0`, pushed,
+  and deployed to all three services (web, refresh-worker,
+  live-odds-worker) — this interrupted an in-flight scoped
+  `fingerprint_change` resim (single game, `game_pk 824973`), judged
+  acceptable per the same precedent as #145's deploy (not irreplaceable,
+  re-triggers on the next fingerprint change). **Known pre-existing gap,
+  NOT introduced or fixed by this session**: MLB's "Hitter X"/"Pitcher X"
+  game-market-recommendation-sourced prop candidates (home.py's
+  `game_recs`/`hitterProps`/`pitcherProps` loops, distinct from the two
+  prop paths this session fixed) still show `actual: null` in the API
+  response rather than `"-"` — never wired to any actual-value source and
+  out of this session's approved scope; worth a follow-up if the user
+  wants full `actual` coverage across every MLB prop candidate source.
 
 - **New: #146** (root-caused and fixed this session, **NOT YET DEPLOYED**) —
   user asked to verify soccer sims are actually happening, then whether they
