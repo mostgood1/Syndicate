@@ -3961,6 +3961,34 @@ def _soccer_team_abbr_any_league(selected_date: str, team_name: str) -> str:
     return _soccer_abbr_from_name(text)
 
 
+_MLB_TEAM_ABBR_BY_NAME: dict[str, str] | None = None
+
+
+def _mlb_team_abbr_any(team_name: str) -> str:
+    # Mirrors _soccer_team_abbr_any_league: MLB game-level steam events
+    # (moneyline/spread/total) carry OddsAPI's full club names
+    # ("New York Yankees") via event_home/event_away, stamped source-side by
+    # odds_refresh_tracking.py -- unlike soccer, this branch used to hand
+    # those names straight through unabbreviated, producing a matchup like
+    # "New York Yankees @ Chicago White Sox" that can never text-match
+    # /api/board/game-chips' abbreviated "NYY @ CWS" chips, so the game
+    # rendered as a second, chip-less duplicate card on the board (#160).
+    global _MLB_TEAM_ABBR_BY_NAME
+    text = _safe_text(team_name, "")
+    if not text:
+        return "-"
+    if _MLB_TEAM_ABBR_BY_NAME is None:
+        from syndicate.features.mlb.cards import _MLB_TEAM_META_BY_ABBR
+
+        _MLB_TEAM_ABBR_BY_NAME = {
+            str(meta.get("name", "")).strip().lower(): abbr
+            for abbr, meta in _MLB_TEAM_META_BY_ABBR.items()
+            if meta.get("name")
+        }
+    abbreviation = _MLB_TEAM_ABBR_BY_NAME.get(text.strip().lower())
+    return abbreviation or _soccer_abbr_from_name(text)
+
+
 def _soccer_steam_matchup_lookup(selected_date: str) -> dict[str, str]:
     """event_id -> "Away @ Home" for soccer, built from the raw OddsAPI
     fetch rows (game_odds_current.csv + today's props/<date>.csv per active
@@ -4034,6 +4062,13 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
     # identity-dedup fix above no longer depends on it), just avoids a
     # universal "-" on every steam row.
     matchup_by_game_id: dict[str, str] = {}
+    # away-abbr|home-abbr -> game_key, so a steam event that only carries
+    # full team names (no game_id of its own) can still resolve today's
+    # real game_id once those names are abbreviated below -- without this,
+    # the candidate kept game_id empty even after the abbreviation fix,
+    # which still left it in a matchup-text-only mini-card group that
+    # /api/board/game-chips (id-keyed first) couldn't match (#160).
+    game_id_by_team_abbrs: dict[str, str] = {}
     # Same "actual" concept as _append_game_bet_candidate's game-level
     # fallback (home.py's _game_current_combined_score) -- the current
     # combined score, the one signal meaningful across every game-level
@@ -4055,6 +4090,10 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
         home_label = _safe_text(home.get("abbr") or home.get("name"), "") or _safe_text(game.get("home_label"), "")
         if away_label or home_label:
             matchup_by_game_id[game_key] = f"{away_label or '-'} @ {home_label or '-'}"
+        away_abbr_val = _safe_text(away.get("abbr"), "").upper()
+        home_abbr_val = _safe_text(home.get("abbr"), "").upper()
+        if away_abbr_val and home_abbr_val:
+            game_id_by_team_abbrs[f"{away_abbr_val}|{home_abbr_val}"] = game_key
         live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
         away_score = _numeric_hint(away.get("score"))
         if away_score is None:
@@ -4148,6 +4187,21 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
                 # id-less-match a live game-chip's own abbreviated matchup.
                 away_text = _soccer_team_abbr_any_league(selected_date, event_away) if event_away else "-"
                 home_text = _soccer_team_abbr_any_league(selected_date, event_home) if event_home else "-"
+            elif sport_slug == "mlb":
+                # Same problem as soccer above, for MLB's own game-level
+                # (moneyline/spread/total) steam candidates: OddsAPI's full
+                # club names ("New York Yankees") were passed straight
+                # through, so this matchup could never text-match a
+                # game-chip's abbreviated "NYY @ CWS" -- and because these
+                # rows also carry no game_id (the player-name game_pk
+                # lookup above only applies to prop events), the candidate
+                # fell back to a matchup-keyed mini-card group that showed
+                # the full names as a second, duplicate "Games" strip card
+                # for the same live game (#160).
+                away_text = _mlb_team_abbr_any(event_away) if event_away else "-"
+                home_text = _mlb_team_abbr_any(event_home) if event_home else "-"
+                if not game_id:
+                    game_id = game_id_by_team_abbrs.get(f"{away_text}|{home_text}", "")
             else:
                 away_text, home_text = event_away or "-", event_home or "-"
             matchup_text = f"{away_text} @ {home_text}"

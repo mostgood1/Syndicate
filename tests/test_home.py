@@ -602,6 +602,77 @@ class HomePageCommandCenterTests(unittest.TestCase):
         self.assertEqual(live_items, live_rows)
         self.assertNotEqual(live_items, pregame_rows)
 
+    def test_apply_wnba_live_scores_ignores_projection_for_pregame_game(self) -> None:
+        # cards.py's live-state row falls back to the SmartSim *projected*
+        # point total for away_pts/home_pts whenever no real ESPN boxscore
+        # row has matched yet -- the normal state for a game that hasn't
+        # tipped off. Without the in_progress/final gate, a pregame game
+        # picked up a fabricated decimal "score" (e.g. 91.81-91.17) on the
+        # board's game-chip strip (#160).
+        games = [
+            {
+                "game_id": "wnba-game-2",
+                "away_tri": "NYL",
+                "home_tri": "LVA",
+                "away": {"abbr": "NYL"},
+                "home": {"abbr": "LVA"},
+                "status": {"abstract": "Scheduled"},
+            }
+        ]
+        live_payload = {
+            "games": [
+                {
+                    "away": "NYL",
+                    "home": "LVA",
+                    "away_pts": 91.81,
+                    "home_pts": 91.17,
+                    "in_progress": False,
+                    "final": False,
+                    "status": "Scheduled",
+                }
+            ]
+        }
+
+        with patch("syndicate.features.wnba.cards.build_live_state_payload", return_value=live_payload):
+            enriched = home_module._apply_wnba_live_scores(games, "2026-07-30")
+
+        self.assertEqual(len(enriched), 1)
+        self.assertIsNone(enriched[0]["away"].get("score"))
+        self.assertIsNone(enriched[0]["home"].get("score"))
+        self.assertIsNone(enriched[0]["status"].get("away_score"))
+        self.assertIsNone(enriched[0]["status"].get("home_score"))
+
+    def test_apply_wnba_live_scores_keeps_real_score_for_live_game(self) -> None:
+        games = [
+            {
+                "game_id": "wnba-game-3",
+                "away_tri": "NYL",
+                "home_tri": "LVA",
+                "away": {"abbr": "NYL"},
+                "home": {"abbr": "LVA"},
+                "status": {"abstract": "Live"},
+            }
+        ]
+        live_payload = {
+            "games": [
+                {
+                    "away": "NYL",
+                    "home": "LVA",
+                    "away_pts": 61,
+                    "home_pts": 58,
+                    "in_progress": True,
+                    "final": False,
+                    "status": "Q3 4:12",
+                }
+            ]
+        }
+
+        with patch("syndicate.features.wnba.cards.build_live_state_payload", return_value=live_payload):
+            enriched = home_module._apply_wnba_live_scores(games, "2026-07-30")
+
+        self.assertEqual(enriched[0]["away"]["score"], 61)
+        self.assertEqual(enriched[0]["home"]["score"], 58)
+
     def test_nfl_is_live_not_forced_false_without_live_prop_source(self) -> None:
         # NFL/NCAAF/NCAAB have no branch in _load_home_live_prop_items, so
         # live_prop_items is always []. Before the fix, _game_identity_set([])

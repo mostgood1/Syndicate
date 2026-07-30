@@ -4,16 +4,81 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (tuning-loop
-wiring / Phase 5)" below; prior session: "Reconciliation 2026-07-30 (soccer
-cross-sport opportunities integration, #150/#151)" further down; before
-that: "Reconciliation 2026-07-30 (WNBA native live-lens game-shape / Phase
+Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (#160, Games-strip
+board bugs)" below; prior session: "Reconciliation 2026-07-30 (tuning-loop
+wiring / Phase 5)" further down; before that: "Reconciliation 2026-07-30
+(soccer cross-sport opportunities integration, #150/#151)"; before that:
+"Reconciliation 2026-07-30 (WNBA native live-lens game-shape / Phase
 4)"; before that: "Reconciliation 2026-07-30 (MLB evening next-day sim
 headroom gate)"; before that: "Reconciliation 2026-07-30 (MLB live-lens
 headroom gate / Phase 3)"; before that: "Reconciliation 2026-07-30
 (opportunity board / Phase 2)"; before that: "Reconciliation 2026-07-30
 (steam candidates, Layer 2 projection, portfolio reconciliation)"; before
 that: "Reconciliation 2026-07-30 (evaluation-ledger settlement / Phase 1)").
+
+### Reconciliation 2026-07-30 (#160, Games-strip board bugs)
+
+User-reported (screenshots of the live `/intelligence` board): the "Games"
+mini-card strip showed the same live MLB game twice (TRI-code chip card +
+a full-team-name duplicate), an MLB card with no team names and a bare "9
+opportunities", every soccer game marked LIVE at 0-0, WNBA pregame cards
+showing decimal "scores" (91.81-91.17), and non-today games showing only a
+time with no date. All four root-caused and fixed this session, **not yet
+committed/pushed/deployed**:
+
+1. **Duplicate MLB game cards.** `_steam_candidates_for_sport()`
+   (`syndicate/features/intelligence.py`) built matchup text for MLB
+   game-level (moneyline/spread/total) steam candidates from OddsAPI's raw
+   full team names ("New York Yankees @ Chicago White Sox") with no
+   game_id resolved — couldn't text- or id-match `/api/board/game-chips`'
+   abbreviated chips, so `deriveGameCards()` (intelligence.html) rendered
+   it as a second, chip-less card for the same game. Fixed: added
+   `_mlb_team_abbr_any()` (mirrors the existing `_soccer_team_abbr_any_league`)
+   and a `game_id_by_team_abbrs` backfill sourced from the day's
+   `dashboard_games`.
+2. **Unnamed MLB game with orphan opportunities.** Steam events whose
+   player→game_pk roster lookup fails entirely still had matchup="-" and
+   no id (pre-existing, not fully fixed — see below). UI fix in
+   `deriveGameCards()` (intelligence.html): a group with neither an id nor
+   a resolvable matchup no longer gets a mini-card at all; its
+   opportunities still show in the main board list.
+3. **Soccer always "LIVE".** `_infer_live_state()`
+   (`syndicate/features/shared/game_board_contract.py`) fell back to a
+   bare-substring live-token check when soccer's game dict has no
+   structured status/live_state — the token `"ot"` matched inside "**not**
+   been simulated yet" and "t**ot**al {value}", so every soccer game
+   (unsimulated or simulated) matched. Fixed with word-boundary regex
+   matching.
+4. **WNBA decimal "scores".** `_apply_wnba_live_scores()`
+   (`syndicate/blueprints/home.py`) copied `away_pts`/`home_pts` from
+   cards.py's live-state row into the `score` field unconditionally —
+   cards.py falls back to the SmartSim *projected* point total
+   (`sim_score.get("away_mean"/"home_mean")`) whenever no real ESPN
+   boxscore row has matched yet (the normal pregame state), so a pregame
+   game displayed a fabricated decimal score. Fixed: gated on
+   `in_progress`/`final`.
+5. **No date on non-today games.** `_scheduled_status_token()`
+   (`syndicate/features/shared/game_chip_scoreboard.py`)'s
+   pre-formatted-`startTime`-only fallback path (MLB's cards payload has
+   no ISO timestamp) never checked the game's calendar date against
+   today, unlike the ISO-timestamp path above it. Fixed: resolves a date
+   prefix from `game_date`/`gameDate` even without a full ISO timestamp.
+
+Tests added/updated and passing (`tests/test_intelligence_steam_candidates.py`,
+`tests/test_home.py`, `tests/test_game_chip_scoreboard.py`,
+`tests/test_soccer_cards.py`); full `tests/test_intelligence.py` +
+`test_intelligence_board_contract.py` + `test_intelligence_contracts.py`
+(207 tests) also re-run clean after these changes.
+
+**Known remaining gap, not fixed this session:** the root cause of #2's
+"-" matchup — some MLB steam events' player names never resolve via
+`mlb_player_game_lookup_for_date`'s roster-snapshot glob (confirmed live:
+9 "Steam" candidates for players including Graham Pauley, Brett Baty, Jose
+Tena had `event_id`/`game_id` both empty). Also spotted in the same
+production pull: a mojibake `"�"` character in these candidates' `market`
+field (should be a middle-dot "· Steam" separator) — likely a non-UTF-8
+file read/write somewhere upstream of `_steam_candidates_for_sport`, not
+investigated.
 
 ### Reconciliation 2026-07-30 (tuning-loop wiring / Phase 5)
 

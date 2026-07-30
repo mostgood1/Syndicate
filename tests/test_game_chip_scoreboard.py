@@ -92,7 +92,7 @@ class GameChipBuilderTests(unittest.TestCase):
 
     def test_pregame_chip_falls_back_to_display_start_time(self) -> None:
         # MLB's cards payload has no ISO timestamp -- only a pre-formatted
-        # local "startTime" like "3:10 PM".
+        # local "startTime" like "3:10 PM". Same-day game: no date prefix.
         game = {
             "gamePk": 6,
             "away": {"abbr": "COL"},
@@ -102,10 +102,31 @@ class GameChipBuilderTests(unittest.TestCase):
             "startTime": "3:10 PM",
         }
 
-        chip = build_game_chip("mlb", game)
+        with patch("syndicate.features.shared.game_chip_scoreboard.central_today_iso", return_value="2026-07-24"):
+            chip = build_game_chip("mlb", game)
 
         self.assertEqual(chip["state"], "pregame")
         self.assertEqual(chip["status_token"], "3:10P CT")
+
+    def test_pregame_chip_on_a_different_day_includes_date_without_iso_timestamp(self) -> None:
+        # Same fallback path (no ISO timestamp, only a pre-formatted
+        # "startTime"), but the game isn't today -- the date-only
+        # gameDate/game_date field must still surface a day prefix, not
+        # silently look identical to a same-day game (#160).
+        game = {
+            "gamePk": 8,
+            "away": {"abbr": "COL"},
+            "home": {"abbr": "MIL"},
+            "status": {"abstract": "Preview", "detailed": "Pre-Game"},
+            "gameDate": "2026-07-24",
+            "startTime": "3:10 PM",
+        }
+
+        with patch("syndicate.features.shared.game_chip_scoreboard.central_today_iso", return_value="2026-07-25"):
+            chip = build_game_chip("mlb", game)
+
+        self.assertEqual(chip["state"], "pregame")
+        self.assertEqual(chip["status_token"], "Fri Jul 24 · 3:10P CT")
 
     def test_final_chip_reports_final_token(self) -> None:
         game = {

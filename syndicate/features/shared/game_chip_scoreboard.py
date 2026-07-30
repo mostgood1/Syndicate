@@ -194,12 +194,27 @@ def _scheduled_status_token(game: dict[str, Any]) -> str | None:
             return f"{local_dt.strftime('%a')} {local_dt.strftime('%b')} {local_dt.strftime('%d').lstrip('0')} · {time_token}"
         return time_token
     # Some cards payloads (e.g. MLB's) carry only a pre-formatted local
-    # display time like "3:10 PM" instead of any ISO timestamp.
+    # display time like "3:10 PM" with no ISO timestamp, so the loop above
+    # never runs and this game's date silently disappears -- a "Tomorrow"
+    # tab game read identically to a same-day one. The calendar date is
+    # usually still available as a plain "YYYY-MM-DD" string (game_date/
+    # gameDate) even without a full ISO timestamp; resolve the day-prefix
+    # from that instead of skipping it.
+    game_date = _text(game.get("game_date") or game.get("gameDate"))
+    day_prefix = None
+    if game_date:
+        try:
+            parsed_date = datetime.strptime(game_date[:10], "%Y-%m-%d").date()
+        except Exception:
+            parsed_date = None
+        if parsed_date is not None and parsed_date.isoformat() != central_today_iso():
+            day_prefix = f"{parsed_date.strftime('%a')} {parsed_date.strftime('%b')} {parsed_date.strftime('%d').lstrip('0')}"
     for value in (game.get("startTime"), game.get("start_time"), game.get("start_time_local")):
         text = _text(value)
         match = _CLOCK_TIME_RE.match(text)
         if match:
-            return f"{int(match.group(1))}:{match.group(2)}{match.group(3).upper()} CT"
+            time_token = f"{int(match.group(1))}:{match.group(2)}{match.group(3).upper()} CT"
+            return f"{day_prefix} · {time_token}" if day_prefix else time_token
     return None
 
 

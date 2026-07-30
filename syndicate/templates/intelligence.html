@@ -936,6 +936,15 @@
     for (const item of sportPool) {
       const key = gameKey(item);
       if (!key) continue;
+      // A candidate with neither a real game id nor a resolvable matchup
+      // (e.g. a steam-move event whose player->game lookup missed, see
+      // #160's "unnamed MLB game" report) can't be shown as a
+      // distinguishable mini-card -- it would just render as a blank/"-"
+      // tile. Its opportunities still surface in the main board list;
+      // they just don't get a phantom Games-strip entry.
+      const hasId = Boolean(item.game_id || item.gamePk || item.event_id);
+      const matchupText = displayMatchup(item);
+      if (!hasId && (!matchupText || matchupText === "-")) continue;
       if (!groups.has(key)) {
         groups.set(key, {
           key,

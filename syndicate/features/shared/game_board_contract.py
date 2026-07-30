@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any
 
 from syndicate.features.shared.publication_adapter import normalize_publication_game
@@ -116,11 +117,23 @@ def _infer_live_state(game: dict[str, Any]) -> bool:
             str(game.get("summary") or ""),
         ]
     ).lower()
+    # Bare substring checks (see soccer's every-game-shows-live report, #160):
+    # short/ambiguous tokens like "ot" match constantly inside ordinary
+    # prose that has nothing to do with overtime -- "not been simulated
+    # yet", "total {value}" both contain "ot", so every unsimulated or
+    # already-simulated soccer game (whose summary/detail text is the only
+    # thing in this haystack, since soccer's status field is a plain
+    # display string rather than a structured dict) silently came back
+    # live=True. Word-boundary match every token, not just the short ones,
+    # so a longer token embedded in a longer word ("delivered" containing
+    # "live") can't false-positive either.
     live_tokens = ("live", "in progress", "in-progress", "quarter", "period", "inning", "ot", "halftime", "intermission")
     final_tokens = ("final", "closed", "scheduled", "preview", "pregame", "historical", "processed artifact")
-    if any(token in haystack for token in final_tokens):
+    def _has_token(token: str) -> bool:
+        return re.search(rf"\b{re.escape(token)}\b", haystack) is not None
+    if any(_has_token(token) for token in final_tokens):
         return False
-    return any(token in haystack for token in live_tokens)
+    return any(_has_token(token) for token in live_tokens)
 
 
 def _format_pct(value: float | None) -> str:

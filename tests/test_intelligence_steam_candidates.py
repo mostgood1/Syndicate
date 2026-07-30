@@ -358,6 +358,42 @@ class MlbSteamGameIdResolutionTests(unittest.TestCase):
         self.assertEqual(candidate["game_id"], "")
         self.assertEqual(candidate["matchup"], "-")
 
+    def test_mlb_game_level_event_abbreviates_full_team_names_and_resolves_game_id(self) -> None:
+        # #160: game-level (moneyline/spread/total) steam events carry
+        # OddsAPI's full club names via home_team/away_team and no game_id
+        # of their own -- previously left unabbreviated ("New York Yankees
+        # @ Chicago White Sox"), which could never text-match a live
+        # game-chip's "NYY @ CWS" and so rendered as a second, duplicate
+        # mini-card on the board's Games strip for the same live game.
+        event = dict(
+            PREGAME_TEAM_STEAM_EVENT,
+            game_id=None,
+            home_team="Chicago White Sox",
+            away_team="New York Yankees",
+        )
+        sport = _sport(slug="mlb")
+        sport["dashboard_games"] = [
+            {
+                "gamePk": 824568,
+                "away": {"abbr": "NYY"},
+                "home": {"abbr": "CWS"},
+            }
+        ]
+        with patch(
+            "syndicate.features.intelligence._load_steam_events_for_date",
+            return_value=[event],
+        ), patch(
+            "syndicate.features.mlb.hr_targets.mlb_player_game_lookup_for_date",
+            return_value={},
+        ):
+            candidates = _steam_candidates_for_sport(sport)
+
+        self.assertEqual(len(candidates), 1, candidates)
+        candidate = candidates[0]
+        self.assertEqual(candidate["matchup"], "NYY @ CWS")
+        self.assertEqual(candidate["game_id"], "824568")
+        self.assertEqual(candidate["event_id"], "824568")
+
     def test_event_with_its_own_game_id_skips_the_roster_lookup(self) -> None:
         # The roster-name join is a last resort -- an event that already
         # carries a real game_id (the normal, non-prop-collision case) must

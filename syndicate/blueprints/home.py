@@ -3256,8 +3256,17 @@ def _apply_wnba_live_scores(games: list[dict[str, Any]], selected_date: str) -> 
             "status": str(live_row.get("status") or "").strip(),
         }
 
-        live_away_pts = live_state.get("away_pts")
-        live_home_pts = live_state.get("home_pts")
+        # cards.py's live-state row falls back to the SmartSim *projected*
+        # point total for away_pts/home_pts whenever no real ESPN boxscore
+        # row has matched yet (the normal state for any game that hasn't
+        # tipped off) -- that's a legitimate pregame projection elsewhere,
+        # but "score" fields must only ever hold a real observed score.
+        # Without this in_progress/final gate, a pregame WNBA game showed a
+        # fabricated decimal "score" like 91.81-91.17 on the board's
+        # game-chip strip (#160).
+        is_game_underway = bool(live_state.get("in_progress")) or bool(live_state.get("final"))
+        live_away_pts = live_state.get("away_pts") if is_game_underway else None
+        live_home_pts = live_state.get("home_pts") if is_game_underway else None
         if live_away_pts is not None:
             away["score"] = live_away_pts
         if live_home_pts is not None:
