@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import unicodedata
 from typing import Any
 
 from syndicate.features.soccer.sources import available_weeks
@@ -9,6 +10,7 @@ from syndicate.features.soccer.sources import default_week
 from syndicate.features.soccer.sources import league_display_name
 from syndicate.features.soccer.sources import league_select_control
 from syndicate.features.soccer.sources import normalize_league
+from syndicate.features.soccer.sources import picks_rows
 from syndicate.features.soccer.sources import recommendations_payload
 from syndicate.features.soccer.sources import week_date_list
 from syndicate.features.shared.rank_board import build_rank_page_context
@@ -39,15 +41,78 @@ def _safe_float(value: Any) -> float:
         return 0.0
 
 
-def _prop_rank_card(row: dict[str, Any], *, league: str, week: int, season: int) -> dict[str, Any]:
+def _normalize_player_name(value: Any) -> str:
+    # Same join key scripts/build_soccer_picks.py's build_prop_picks and
+    # market_board.py's _normalize_soccer_name use for this exact problem:
+    # the sim's player names (American Soccer Analysis) and the Odds API
+    # props feed spell the same player differently often enough (accents,
+    # diacritics) that a bare string match misses real matches.
+    text = " ".join(str(value or "").strip().lower().split())
+    normalized = unicodedata.normalize("NFKD", text)
+    return "".join(char for char in normalized if not unicodedata.combining(char))
+
+
+def _american_odds_text(price: Any) -> str:
+    try:
+        value = float(price)
+    except Exception:
+        return "-"
+    return f"+{int(value)}" if value > 0 else str(int(value))
+
+
+def _prop_picks_by_player(league: str, week: int, season: int) -> dict[str, dict[str, Any]]:
+    # #150 follow-up. build_soccer_picks.py's build_prop_picks grades the
+    # sim's anytime-goalscorer probability against a real captured price
+    # (market="PROP"), written into the same picks_{date}.csv the game-market
+    # grading already uses (cards.py's _market_data_for_match). Without this
+    # join, every player-prop rank card carried only the simulated
+    # probability and no real market/odds/edge -- rejected downstream by
+    # intelligence.py's classify_candidate as missing_projection_or_odds
+    # (confirmed live 2026-07-30: 18 hydrated prop items, zero surfaced as
+    # real candidates).
+    picks: dict[str, dict[str, Any]] = {}
+    for date_str in week_date_list(league, season, week):
+        for row in picks_rows(league, date_str):
+            if str(row.get("market") or "").strip().upper() != "PROP":
+                continue
+            player_key = _normalize_player_name(row.get("player"))
+            if not player_key:
+                continue
+            # A later date's row (if a player appears in more than one this
+            # week, or a rerun refreshed the pick) overwrites an earlier one
+            # -- same "freshest wins" convention market_board.py's
+            # _soccer_week_matches uses for its own date-window merge.
+            picks[player_key] = row
+    return picks
+
+
+def _prop_rank_card(row: dict[str, Any], *, league: str, week: int, season: int, pick: dict[str, Any] | None = None) -> dict[str, Any]:
     player_name = str(row.get("player_name") or "Player").strip() or "Player"
     team = str(row.get("team") or "").strip()
     side = str(row.get("side") or "").strip()
+    metrics = [
+        {"label": "Anytime scorer", "value": _fmt_pct(row.get("anytime_scorer_probability"))},
+        {"label": "If playing", "value": _fmt_pct(row.get("anytime_scorer_probability_if_playing"))},
+        {"label": "xShots", "value": _fmt_num(row.get("expected_shots"), 2)},
+        {"label": "xSOT", "value": _fmt_num(row.get("expected_shots_on_target"), 2)},
+        {"label": "Min share", "value": _fmt_pct(row.get("expected_minutes_share"))},
+    ]
+    market = None
+    if pick:
+        market = "Anytime Goalscorer"
+        metrics.extend(
+            [
+                {"label": "Odds", "value": _american_odds_text(pick.get("price"))},
+                {"label": "Model probability", "value": _fmt_pct(pick.get("model_probability"))},
+                {"label": "Edge", "value": _fmt_pct(pick.get("edge"))},
+            ]
+        )
     return {
         "title": player_name,
         "eyebrow": f"{team} ({side})" if side else team,
         "badge": _fmt_pct(row.get("anytime_scorer_probability")),
         "meta": league_display_name(league),
+        "market": market,
         # Not read by this page's own rendering -- carried through so
         # home.py's _prop_rows_from_rank_cards/_home_prop_matched_game can
         # attach the real game_id/gamePk (props.py's "meta" is just the
@@ -55,13 +120,7 @@ def _prop_rank_card(row: dict[str, Any], *, league: str, week: int, season: int)
         # sports' rank cards, so the usual team-label text match never
         # hits for soccer without this).
         "match_id": str(row.get("match_id") or "").strip() or None,
-        "metrics": [
-            {"label": "Anytime scorer", "value": _fmt_pct(row.get("anytime_scorer_probability"))},
-            {"label": "If playing", "value": _fmt_pct(row.get("anytime_scorer_probability_if_playing"))},
-            {"label": "xShots", "value": _fmt_num(row.get("expected_shots"), 2)},
-            {"label": "xSOT", "value": _fmt_num(row.get("expected_shots_on_target"), 2)},
-            {"label": "Min share", "value": _fmt_pct(row.get("expected_minutes_share"))},
-        ],
+        "metrics": metrics,
         "summary": (
             f"{player_name} ({team}) projects {_fmt_num(row.get('expected_shots'), 2)} shots and "
             f"{_fmt_num(row.get('expected_shots_on_target'), 2)} on target, with a {_fmt_pct(row.get('anytime_scorer_probability'))} "
@@ -101,7 +160,17 @@ def build_props_page_context(league: str, week: int | None = None, season: int |
     ]
     filtered.sort(key=lambda row: _safe_float(row.get(sort_key)), reverse=True)
 
-    rank_cards = [_prop_rank_card(row, league=league, week=resolved_week, season=resolved_season) for row in filtered]
+    picks_by_player = _prop_picks_by_player(league, resolved_week, resolved_season)
+    rank_cards = [
+        _prop_rank_card(
+            row,
+            league=league,
+            week=resolved_week,
+            season=resolved_season,
+            pick=picks_by_player.get(_normalize_player_name(row.get("player_name"))),
+        )
+        for row in filtered
+    ]
 
     query = f"?week={resolved_week}&season={resolved_season}"
     prev_week = max([w for w in weeks if w < resolved_week], default=resolved_week)

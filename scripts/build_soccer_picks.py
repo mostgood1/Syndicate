@@ -15,6 +15,14 @@ graded via the sim's own scoreline_probabilities distribution rather than a
 single point estimate). BTTS is not covered: confirmed unavailable from the
 Odds API at the current plan/region (HTTP 422 as of 2026-07-21).
 
+Player props: anytime-goalscorer only (market="PROP", side="anytime_scorer")
+-- the one player-prop market build_soccer_artifacts.py's sim already
+outputs as a ready-made 0-1 probability (anytime_scorer_probability).
+Shots/shots-on-target are captured as EXPECTED COUNTS, not a probability of
+clearing a specific line, and grading those against a real line would
+require a new distributional model, not a data join -- out of scope here,
+see #150's todo.md entry.
+
 Usage:
     python scripts/build_soccer_picks.py --league mls --date 2026-07-22
 """
@@ -25,7 +33,9 @@ import argparse
 import json
 import statistics
 import sys
+import unicodedata
 from datetime import date as date_cls
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +50,15 @@ from syndicate.features.shared.atomic_artifact_write import atomic_write_csv
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
+
+
+def _safe_float(value: Any) -> float | None:
+    try:
+        if value is None or (isinstance(value, float) and value != value) or str(value).strip() == "":
+            return None
+        return float(value)
+    except Exception:
+        return None
 
 
 def _american_to_implied_prob(price: float) -> float | None:
@@ -238,12 +257,126 @@ def build_picks(league: str, iso_date: str, *, source_root: Path, out_root: Path
     return pd.DataFrame(rows)
 
 
+def _normalize_player_name(value: Any) -> str:
+    # Same accent/diacritic-stripping join key
+    # syndicate/features/soccer/market_board.py's _normalize_soccer_name
+    # uses for this exact problem (sim player names come from American
+    # Soccer Analysis, a different provider than the Odds API props feed,
+    # e.g. "Kevin Denkey" vs "Kévin Denkey") -- duplicated rather than
+    # imported to keep this script's existing no-syndicate.features.soccer
+    # dependency style (it already re-derives its own
+    # _american_to_implied_prob/_devig rather than importing sources.py).
+    text = " ".join(str(value or "").strip().lower().split())
+    normalized = unicodedata.normalize("NFKD", text)
+    return "".join(char for char in normalized if not unicodedata.combining(char))
+
+
+def _props_rows_near_date(
+    league: str, iso_date: str, *, source_root: Path, lookback_days: int = 3, lookahead_days: int = 10
+) -> list[dict[str, Any]]:
+    # fetch_soccer_oddsapi_props_local.py files its capture under the day it
+    # RAN, not each event's own date (a single call returns every upcoming
+    # event for the league) -- same reasoning as game_odds_current.csv being
+    # a single rolling file rather than per-date, just per-date-filed
+    # instead of overwritten. A pregame sweep for iso_date may have last
+    # captured props on a nearby day, so this scans a bounded window rather
+    # than requiring an exact iso_date match. Window matches
+    # market_board.py's own _soccer_relevant_dates (±3/+10 days).
+    try:
+        base = date_cls.fromisoformat(iso_date)
+    except ValueError:
+        return []
+    rows: list[dict[str, Any]] = []
+    for offset in range(-lookback_days, lookahead_days + 1):
+        path = source_root / league / "props" / f"{(base + timedelta(days=offset)).isoformat()}.csv"
+        if not path.exists():
+            continue
+        try:
+            rows.extend(pd.read_csv(path).to_dict("records"))
+        except Exception:
+            continue
+    return rows
+
+
+def build_prop_picks(league: str, iso_date: str, *, source_root: Path) -> pd.DataFrame:
+    """Grade the sim's anytime-goalscorer probability against a real
+    captured price, the player-prop analog of build_picks' game markets
+    above. See this module's docstring for why only this one market.
+    """
+    rec_path = source_root / league / "api" / "recommendations" / f"recommendations_{iso_date}.json"
+    if not rec_path.exists():
+        return pd.DataFrame()
+    payload = json.loads(rec_path.read_text(encoding="utf-8"))
+    player_props = payload.get("player_props") if isinstance(payload, dict) else None
+    if not player_props:
+        return pd.DataFrame()
+
+    props_rows_all = _props_rows_near_date(league, iso_date, source_root=source_root)
+    if not props_rows_all:
+        return pd.DataFrame()
+
+    # Odds API's anytime-goalscorer market is a single "yes" price per
+    # player (no paired "no" side to devig against), so this grades the raw
+    # implied probability -- an honest, simpler number than a fabricated
+    # devig, not a shortcut around one that exists.
+    odds_by_key: dict[tuple[str, str, str], float] = {}
+    for row in props_rows_all:
+        if str(row.get("market_key") or "").strip() != "player_goal_scorer_anytime":
+            continue
+        player_key = _normalize_player_name(row.get("player"))
+        home = str(row.get("home_team") or "").strip()
+        away = str(row.get("away_team") or "").strip()
+        price = _safe_float(row.get("over_price"))
+        if not player_key or not (home or away) or price is None:
+            continue
+        key = (player_key, home, away)
+        # Multiple books may quote this player; fetch_soccer_oddsapi_props_
+        # local.py already orders preferred books first in the raw feed, and
+        # _props_rows_near_date reads files oldest-offset-first, so the
+        # first-seen price per key is the most representative single one to
+        # grade against, same convention build_picks' own book-price
+        # selection already uses.
+        odds_by_key.setdefault(key, price)
+
+    rows: list[dict[str, Any]] = []
+    for prop_row in player_props:
+        if not isinstance(prop_row, dict):
+            continue
+        model_prob = _safe_float(prop_row.get("anytime_scorer_probability"))
+        player_name = str(prop_row.get("player_name") or "").strip()
+        team = str(prop_row.get("team") or "").strip()
+        if model_prob is None or not player_name or not team:
+            continue
+        player_key = _normalize_player_name(player_name)
+        price = next(
+            (odds_price for (odds_player, home, away), odds_price in odds_by_key.items() if odds_player == player_key and team in (home, away)),
+            None,
+        )
+        if price is None:
+            continue
+        market_prob = _american_to_implied_prob(price)
+        rows.append(
+            {
+                "league": league, "date": iso_date,
+                "player": player_name, "team": team,
+                "market": "PROP", "side": "anytime_scorer", "line": None, "price": price,
+                "model_probability": round(model_prob, 4),
+                "market_probability": round(market_prob, 4) if market_prob is not None else None,
+                "edge": round(model_prob - market_prob, 4) if market_prob is not None else None,
+                "ev": _ev(model_prob, price),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def _write_picks_for_date(league: str, iso_date: str, *, source_root: Path, out_root: Path) -> int:
-    df = build_picks(league, iso_date, source_root=source_root, out_root=out_root)
+    game_df = build_picks(league, iso_date, source_root=source_root, out_root=out_root)
+    prop_df = build_prop_picks(league, iso_date, source_root=source_root)
+    df = pd.concat([game_df, prop_df], ignore_index=True) if not prop_df.empty else game_df
     out_path = out_root / league / "api" / "picks" / f"picks_{iso_date}.csv"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_csv(out_path, df)
-    print(f"wrote {len(df)} picks to {out_path}")
+    print(f"wrote {len(df)} picks ({len(game_df)} game, {len(prop_df)} prop) to {out_path}")
     return len(df)
 
 

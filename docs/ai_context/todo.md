@@ -59,13 +59,87 @@ unpushed. Cross-session ID collisions (#131, #139) were both caught and
 resolved without data loss, in both directions, via direct session-to-
 session messages rather than silent overwrites.
 
-> **Next free ID: 151.** IDs are never reused. Closed items move to
+> **Next free ID: 152.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
 
-- **New: #150** (root-caused, fixed, and unit-tested this session; **not yet
-  committed/deployed/confirmed live** — next step is to finish that loop) —
-  follow-up to #148's soccer architecture audit. User asked whether soccer's
+- **New: #151** (root-caused, fixed, and unit-tested this session; **not yet
+  committed/deployed/confirmed live** — coordinate with two other active
+  sessions in this same working directory before committing/deploying, see
+  Operational notes) — direct follow-up to #150's own props gap. Soccer's
+  player-prop rank cards (`syndicate/features/soccer/props.py`'s
+  `_prop_rank_card`) hydrated correctly onto the intelligence board's
+  `home_rails.pregame.items` after #150, but every one had
+  `market`/`line`/`odds`/`projected`/`edge` all `null`, because the rank
+  card only ever carried the SIMULATED anytime-scorer/shots probability —
+  never a real market price — so `classify_candidate`'s
+  `missing_projection_or_odds` check rejected every single one. Confirmed
+  live 2026-07-30 (4+ ticks of #150's own production monitoring): soccer's
+  `top_opportunities` never showed a nonzero `"prop"` count. The real prices
+  for this exact market (anytime goalscorer) are already captured by
+  `scripts/fetch_soccer_oddsapi_props_local.py` into
+  `{league}/props/{date}.csv` — they were just never joined anywhere.
+  **Fixed** by mirroring #150's own established pattern
+  (`_market_data_for_match` grading game markets against `picks_rows`) for
+  player props: added `build_prop_picks()` to
+  `scripts/build_soccer_picks.py` — grades each player's
+  `anytime_scorer_probability` (from `recommendations_{date}.json`'s
+  `player_props`) against the real captured price (via a new
+  `_props_rows_near_date` helper that scans a bounded ±3/+10-day window,
+  mirroring `market_board.py`'s own `_soccer_relevant_dates` window, since
+  the props fetch files its capture under the day it RAN, not each event's
+  own date), joined by a normalized/accent-stripped player-name match (same
+  join-key gap `market_board.py`'s `_normalize_soccer_name` already handles
+  for the same two providers spelling names differently) — writes
+  `market="PROP"`/`side="anytime_scorer"` rows into the SAME
+  `picks_{date}.csv` game-market grading already uses. Deliberately scoped
+  to anytime-goalscorer only: shots/shots-on-target are captured as
+  EXPECTED COUNTS, not a probability of clearing a specific line, and
+  grading those against a real line would require inventing a new
+  distributional model — a genuine sim-rule change, not a data-join fix,
+  and out of this session's scope. `syndicate/features/soccer/props.py`'s
+  `build_props_page_context` now reads these graded picks
+  (`_prop_picks_by_player`) and `_prop_rank_card` stamps `market`/`Odds`/
+  `Model probability`/`Edge` onto each matched card, which
+  `_prop_item_from_rank_card` (home.py) already knows how to read into
+  `market`/`odds`/`projected`/`edge`/`confidence`. Verified end-to-end
+  locally against real production data (NYCFC's Nicolás Fernández,
+  `event_id=761695`): the resulting candidate item passes
+  `_candidate_value_is_present` for both `projected` and `odds`, so it will
+  no longer be rejected as `missing_projection_or_odds`. New tests:
+  `tests/test_build_soccer_picks.py` (5 tests: accent-stripped name
+  matching, a matched player is graded with real price/edge/ev, an
+  unmatched player is skipped, props captured under a nearby (not exact)
+  date file are still found, no recommendations file returns empty) and
+  `tests/test_soccer_props.py` (4 tests: name normalization, a rank card
+  with no matched pick omits Odds/Edge metrics, a rank card with a matched
+  pick populates them correctly, `_prop_picks_by_player` matches across
+  multiple week dates and ignores non-PROP rows). 333/333 passing across
+  `tests/test_build_soccer_picks.py`, `tests/test_soccer_props.py`,
+  `tests/test_soccer_market_board.py`, `tests/test_soccer_cards.py`,
+  `tests/test_home.py`, `tests/test_intelligence.py`,
+  `tests/test_intelligence_steam_candidates.py`. **Not yet committed,
+  deployed, or verified live** — two other sessions ("MLB missing props,
+  opps, K targets" and "MLB/WNBA model accuracy tracking") are actively
+  editing this same shared working directory concurrently (confirmed via
+  uncommitted changes to `syndicate/features/mlb/cards.py`,
+  `syndicate/features/mlb/live_lens.py`,
+  `syndicate/features/shared/intelligence_evaluation.py` sitting alongside
+  this fix's own files at the time this entry was written) — staged and
+  committed only this fix's own files
+  (`scripts/build_soccer_picks.py`, `syndicate/features/soccer/props.py`,
+  `tests/test_build_soccer_picks.py`, `tests/test_soccer_props.py`, this
+  todo.md entry), left the other sessions' in-progress MLB files untouched.
+  **Next step**: `git fetch`/re-check for new commits immediately before
+  committing and again before pushing (established pattern this session),
+  then deploy all three services and re-run the same production
+  `/api/intelligence/query` check to confirm soccer's `top_opportunities`
+  shows a nonzero `"prop"` count.
+
+- **New: #150** (root-caused, fixed, unit-tested, deployed, and confirmed
+  live this session — see the props gap called out below, closed separately
+  as #151) — follow-up to #148's soccer architecture audit. User asked
+  whether soccer's
   sim rules needed a revamp to inform "opportunities" the way MLB/WNBA do.
   Investigation found the sim itself is sound (real game projections, real
   player props, real per-market EV/edge already computed by
