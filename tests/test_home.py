@@ -1446,6 +1446,29 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         )
         self.assertNotEqual(_game_status_state(game), "live")
 
+    def test_shared_game_state_live_false_resolves_to_scheduled_not_empty(self) -> None:
+        # #150. The test above only checked "not live" -- under the pre-fix
+        # code this game resolved to "" (not "scheduled"), which is exactly
+        # what zeroed out get_active_games() for every upcoming soccer
+        # fixture: get_active_games only keeps games whose state is
+        # "scheduled" or "live", so "" silently excluded them, which then
+        # zeroed dashboard_games/home_rails for the whole sport in
+        # _build_sport_overview (hydrated_game_ids stayed empty with no
+        # live games and no wnba-style fallback). Same shape as the test
+        # above (soccer's real payload: `status` is a display string,
+        # `shared_game_state` explicitly says not-live/not-final, and
+        # neither `detail` nor `summary` contains a "scheduled"/"preview"/
+        # "pregame"/"warmup" token) -- confirmed live 2026-07-30 against a
+        # real upcoming MLS fixture.
+        game = self._sample_game(
+            status="Fri, Jul 31 · 6:30 PM CT",
+            detail="MLS",
+            shared_is_live=True,
+            shared_game_state={"live": False, "final": False, "clock": "", "period": None},
+            summary="Projected Toronto FC 1.3 @ New York City FC 1.8 (total 3.1).",
+        )
+        self.assertEqual(_game_status_state(game), "scheduled")
+
     def test_shared_is_live_still_decides_when_nothing_contradicts_it(self) -> None:
         # The fix must only bite where a structured source actually disagrees.
         # With no in_progress and no shared_game_state, shared_is_live is still

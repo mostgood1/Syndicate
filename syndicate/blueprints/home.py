@@ -474,6 +474,24 @@ def _game_status_state(game: dict[str, Any]) -> str:
         return "live"
     if any(token in status_text for token in ("scheduled", "preview", "pregame", "warmup")):
         return "scheduled"
+    # #150. A structured source that explicitly says "not in progress" (and
+    # we already know from the checks above it isn't final either) is real
+    # evidence of "upcoming", even when nothing in status_text spells out
+    # one of the scheduled/preview/pregame/warmup tokens. Soccer's card
+    # payload is the confirmed case: `status` is a display STRING, not a
+    # dict, so `status_badge`/`status_line`/etc (what status_text is built
+    # from) are never populated for it, and its narrative `detail`/`summary`
+    # text never contains those tokens either -- only `shared_game_state`
+    # carries the real signal (`live: False, final: False`). Without this,
+    # every soccer game with in_progress explicitly False fell through to
+    # "" and get_active_games() (which only keeps "scheduled"/"live")
+    # dropped every upcoming fixture, zeroing out dashboard_games/home_rails
+    # for the whole sport until kickoff. Confirmed live 2026-07-30: a real
+    # upcoming MLS fixture's shared_game_state was exactly
+    # {"live": False, "final": False, ...} and _game_status_state returned ""
+    # for it.
+    if in_progress is False:
+        return "scheduled"
     return ""
 
 

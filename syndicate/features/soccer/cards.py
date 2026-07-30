@@ -221,6 +221,20 @@ def _market_data_for_match(league: str, date_str: str, home_team: str, away_team
     # which is what the sim payload's event_id/match_id actually is), so
     # team-name matching is the only field both sources share -- same join
     # key build_soccer_picks.py itself already uses internally.
+    #
+    # #150 follow-up. This originally only captured p_home_win/p_away_win/
+    # total/home_spread -- enough for game_board_contract.py's own sim-vs-
+    # line display, but not enough for home.py's cross-sport
+    # _game_bet_candidates_from_game, which reads this same dict to build
+    # the board's "game" candidates. That function needs real price/edge
+    # (home_ml/away_ml/*_ev) to show anything but blank odds, and gates
+    # Spread-candidate creation on home_puck_line/away_puck_line specifically
+    # (not home_spread, which this function set instead) -- so soccer's real,
+    # already-graded picks never produced a single Spread candidate on the
+    # cross-sport opportunities board even once the game itself was hydrated.
+    # Adds those fields from the same picks rows, without changing the
+    # existing p_home_win/p_away_win/total/home_spread keys anything else
+    # already reads.
     if not date_str or not home_team or not away_team:
         return {}
     rows = [
@@ -235,28 +249,64 @@ def _market_data_for_match(league: str, date_str: str, home_team: str, away_team
         market = str(row.get("market") or "").strip().upper()
         side = str(row.get("side") or "").strip().lower()
         line_text = row.get("line")
+        price = _safe_float(row.get("price"))
+        ev = _safe_float(row.get("ev"))
+        prob = _safe_float(row.get("market_probability"))
         if market == "ML":
-            prob = _safe_float(row.get("market_probability"))
-            if prob is None:
-                continue
             if side == "home":
-                betting["p_home_win"] = prob
+                if prob is not None:
+                    betting["p_home_win"] = prob
+                if price is not None:
+                    betting["home_ml"] = price
+                if ev is not None:
+                    betting["home_ml_ev"] = ev
             elif side == "away":
-                betting["p_away_win"] = prob
-        elif market == "TOTAL" and "total" not in betting:
+                if prob is not None:
+                    betting["p_away_win"] = prob
+                if price is not None:
+                    betting["away_ml"] = price
+                if ev is not None:
+                    betting["away_ml_ev"] = ev
+        elif market == "TOTAL":
             line = _safe_float(line_text)
-            if line is not None:
+            if line is not None and "total" not in betting:
                 betting["total"] = line
-        elif market == "SPREAD" and side == "home":
+            if side == "over":
+                if price is not None:
+                    betting.setdefault("odds", price)
+                if prob is not None:
+                    betting["p_total_over"] = prob
+                if ev is not None:
+                    betting["over_ev"] = ev
+            elif side == "under":
+                if prob is not None:
+                    betting["p_total_under"] = prob
+                if ev is not None:
+                    betting["under_ev"] = ev
+        elif market == "SPREAD":
             line = _safe_float(line_text)
             if line is None:
                 continue
-            current = betting.get("home_spread")
             # Multiple books quote different Asian-handicap lines; the one
             # closest to pick'em is the most representative single line to
             # show, same convention a real odds board defaults to.
-            if current is None or abs(line) < abs(current):
-                betting["home_spread"] = line
+            if side == "home":
+                current = betting.get("home_spread")
+                if current is None or abs(line) < abs(current):
+                    betting["home_spread"] = line
+                    betting["home_puck_line"] = line
+                if prob is not None:
+                    betting["p_home_cover"] = prob
+                if ev is not None:
+                    betting["home_spread_ev"] = ev
+            elif side == "away":
+                current = betting.get("away_puck_line")
+                if current is None or abs(line) < abs(current):
+                    betting["away_puck_line"] = line
+                if prob is not None:
+                    betting["p_away_cover"] = prob
+                if ev is not None:
+                    betting["away_spread_ev"] = ev
     return betting
 
 

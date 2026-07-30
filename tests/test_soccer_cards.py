@@ -60,6 +60,65 @@ class MatchToGameTests(unittest.TestCase):
             self.assertIsNone(cards._team_roster_href("Unknown FC", "epl"))
 
 
+class MarketDataForMatchTests(unittest.TestCase):
+    # #150. _market_data_for_match originally only captured p_home_win/
+    # p_away_win/total/home_spread -- enough for this module's own sim-vs-
+    # line display, but not enough for home.py's _game_bet_candidates_from_
+    # game, which reads this same "betting" dict to build the cross-sport
+    # board's "game" candidates: it needs real price/edge (home_ml/away_ml/
+    # *_ev) to show anything but blank odds, and specifically gates Spread-
+    # candidate creation on home_puck_line/away_puck_line (not home_spread).
+    _ROWS = (
+        {"home": "Arsenal", "away": "Chelsea", "market": "ML", "side": "home", "line": "", "price": "-150", "market_probability": "0.62", "ev": "0.04"},
+        {"home": "Arsenal", "away": "Chelsea", "market": "ML", "side": "away", "line": "", "price": "400", "market_probability": "0.20", "ev": "-0.02"},
+        {"home": "Arsenal", "away": "Chelsea", "market": "TOTAL", "side": "over", "line": "2.5", "price": "-110", "market_probability": "0.55", "ev": "0.05"},
+        {"home": "Arsenal", "away": "Chelsea", "market": "TOTAL", "side": "under", "line": "2.5", "price": "-110", "market_probability": "0.45", "ev": "-0.05"},
+        {"home": "Arsenal", "away": "Chelsea", "market": "SPREAD", "side": "home", "line": "-0.5", "price": "-120", "market_probability": "0.58", "ev": "0.03"},
+        {"home": "Arsenal", "away": "Chelsea", "market": "SPREAD", "side": "away", "line": "0.5", "price": "-105", "market_probability": "0.42", "ev": "-0.01"},
+    )
+
+    def test_ml_total_spread_rows_populate_price_and_ev_fields(self) -> None:
+        with patch.object(cards, "picks_rows", return_value=self._ROWS):
+            betting = cards._market_data_for_match("epl", "2026-08-21", "Arsenal", "Chelsea")
+        self.assertEqual(betting["p_home_win"], 0.62)
+        self.assertEqual(betting["p_away_win"], 0.20)
+        self.assertEqual(betting["home_ml"], -150.0)
+        self.assertEqual(betting["away_ml"], 400.0)
+        self.assertEqual(betting["home_ml_ev"], 0.04)
+        self.assertEqual(betting["away_ml_ev"], -0.02)
+        self.assertEqual(betting["total"], 2.5)
+        self.assertEqual(betting["odds"], -110.0)
+        self.assertEqual(betting["p_total_over"], 0.55)
+        self.assertEqual(betting["p_total_under"], 0.45)
+        self.assertEqual(betting["over_ev"], 0.05)
+        self.assertEqual(betting["under_ev"], -0.05)
+        # home_spread is kept for game_board_contract's own sim-vs-line
+        # comparison; home_puck_line/away_puck_line are the new keys
+        # _game_bet_candidates_from_game actually gates Spread creation on.
+        self.assertEqual(betting["home_spread"], -0.5)
+        self.assertEqual(betting["home_puck_line"], -0.5)
+        self.assertEqual(betting["away_puck_line"], 0.5)
+        self.assertEqual(betting["p_home_cover"], 0.58)
+        self.assertEqual(betting["p_away_cover"], 0.42)
+        self.assertEqual(betting["home_spread_ev"], 0.03)
+        self.assertEqual(betting["away_spread_ev"], -0.01)
+
+    def test_no_matching_rows_returns_empty_dict(self) -> None:
+        with patch.object(cards, "picks_rows", return_value=self._ROWS):
+            betting = cards._market_data_for_match("epl", "2026-08-21", "Manchester City", "Everton")
+        self.assertEqual(betting, {})
+
+    def test_closest_to_pickem_spread_line_wins_on_both_sides(self) -> None:
+        rows = self._ROWS + (
+            {"home": "Arsenal", "away": "Chelsea", "market": "SPREAD", "side": "home", "line": "-0.25", "price": "-115", "market_probability": "0.53", "ev": "0.01"},
+            {"home": "Arsenal", "away": "Chelsea", "market": "SPREAD", "side": "away", "line": "0.25", "price": "-110", "market_probability": "0.47", "ev": "0.0"},
+        )
+        with patch.object(cards, "picks_rows", return_value=rows):
+            betting = cards._market_data_for_match("epl", "2026-08-21", "Arsenal", "Chelsea")
+        self.assertEqual(betting["home_puck_line"], -0.25)
+        self.assertEqual(betting["away_puck_line"], 0.25)
+
+
 class WeekGamesMergeTests(unittest.TestCase):
     def test_merges_real_schedule_with_simulated_output_by_event_id(self) -> None:
         fixtures = [

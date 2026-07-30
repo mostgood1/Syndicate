@@ -59,9 +59,83 @@ unpushed. Cross-session ID collisions (#131, #139) were both caught and
 resolved without data loss, in both directions, via direct session-to-
 session messages rather than silent overwrites.
 
-> **Next free ID: 150.** IDs are never reused. Closed items move to
+> **Next free ID: 151.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
+
+- **New: #150** (root-caused, fixed, and unit-tested this session; **not yet
+  committed/deployed/confirmed live** — next step is to finish that loop) —
+  follow-up to #148's soccer architecture audit. User asked whether soccer's
+  sim rules needed a revamp to inform "opportunities" the way MLB/WNBA do.
+  Investigation found the sim itself is sound (real game projections, real
+  player props, real per-market EV/edge already computed by
+  `scripts/build_soccer_picks.py`) but soccer never actually reached the
+  cross-sport intelligence board's `candidate_type="game"`/`"prop"` lists —
+  confirmed live 2026-07-30: soccer produced 126 candidates on
+  `/api/intelligence/query`'s `top_opportunities`, but ALL 126 were
+  `candidate_type="steam"` (the one sport-agnostic path that reads raw odds
+  artifacts directly), vs. MLB's 18 prop + 8 game and WNBA's 14 prop + 12
+  game. Two real, narrow root causes, not a sim problem:
+  1. `_game_status_state` (`syndicate/blueprints/home.py`) fell through to
+     `""` for soccer's real game shape — soccer's `status` field is a
+     display STRING (not a dict), so none of `status_badge`/`status_line`
+     (what `_game_status_text` reads) are ever populated, and neither
+     `detail` nor `summary` contain a "scheduled"/"preview"/"pregame"/
+     "warmup" token. `shared_game_state` DOES carry the real signal
+     (`{"live": false, "final": false, ...}`), and the function correctly
+     used it to rule out "live"/"final" — but had no branch that concluded
+     "scheduled" from that same explicit evidence, so it fell through to an
+     empty string. `get_active_games()` only keeps `"scheduled"`/`"live"`
+     games, so every upcoming soccer fixture got excluded, which zeroed
+     `hydrated_game_ids` in `_build_sport_overview` (no live games + no
+     WNBA-style empty-hydration fallback for soccer) and, with it,
+     `dashboard_games`/`home_rails` for the entire sport. **Fixed**: added a
+     branch returning `"scheduled"` when structured evidence says explicitly
+     not-live and not-final, rather than falling through to `""` — a small,
+     sport-agnostic generalization (any sport whose payload shape hits this
+     same gap benefits, not just soccer).
+  2. Even once hydrated, soccer's existing `_market_data_for_match`
+     (`syndicate/features/soccer/cards.py` — already wired to `game["betting"]`
+     by a prior session, confirmed live: real games already carried
+     `{"home_spread": -0.5, "p_away_win":..., "p_home_win":..., "total": 2.5}`)
+     only captured probabilities and lines from `picks_rows`, never
+     `price`/`edge`/`ev` — so any game candidate that DID get built would
+     show blank odds/edge. Worse, it stored the spread line as `home_spread`
+     only, while `_game_bet_candidates_from_game`
+     (`syndicate/blueprints/home.py`) gates Spread-candidate creation
+     specifically on `home_puck_line`/`away_puck_line` — keys
+     `_market_data_for_match` never set at all, so soccer's Spread market
+     never produced a candidate regardless of hydration. **Fixed**: extended
+     `_market_data_for_match` to also capture `home_ml`/`away_ml`/
+     `home_ml_ev`/`away_ml_ev` (ML), `odds`/`p_total_over`/`p_total_under`/
+     `over_ev`/`under_ev` (Total), and `home_puck_line`/`away_puck_line`/
+     `p_home_cover`/`p_away_cover`/`home_spread_ev`/`away_spread_ev`
+     (Spread) — all from columns `build_soccer_picks.py` already computes,
+     no new sim math. Verified end-to-end locally with a real
+     production-shaped game+betting payload
+     (`event_id=761695`, NYCFC vs Toronto FC, 2026-07-31): `_game_status_state`
+     now returns `"scheduled"`, `get_active_games` keeps it, and
+     `_game_bet_candidates_from_game` produces 6 real priced/edged
+     candidates (Moneyline both sides, Total over/under, Spread both sides).
+     New tests: `test_home.py::test_shared_game_state_live_false_resolves_to_scheduled_not_empty`;
+     `test_soccer_cards.py::MarketDataForMatchTests` (3 tests: price/ev field
+     population, no-match returns empty, closest-to-pick'em spread-line
+     tiebreak preserved on both sides). 324/324 passing across
+     `tests/test_home.py`, `tests/test_soccer_cards.py`,
+     `tests/test_soccer_market_board.py`, `tests/test_intelligence.py`,
+     `tests/test_intelligence_steam_candidates.py`. **Not yet verified**: the
+     props side (`home_rails.pregame/live.items` → `candidate_type="prop"`)
+     — soccer's prop rows already flow through the same generic
+     `_prop_rows_from_rank_cards`/`_prop_candidate_from_item` path every
+     other sport uses, and `_SoccerDataProvider.pregame_props` already
+     stamps `game_id`/`gamePk` from the props rank-card's `match_id`, which
+     `build_soccer_artifacts.py` sets to the real ESPN `event_id` when
+     available — reasoned to already work once hydration is fixed, but not
+     empirically confirmed against a real slate the way the game-candidate
+     path was. **Next step**: deploy, then re-run the same production
+     `/api/intelligence/query` check from #148's investigation and confirm
+     soccer now shows nonzero `candidate_type="game"`/`"prop"` counts (not
+     just `"steam"`), for both games and props.
 
 - **New: #149** (root-caused, fixed, and unit-tested this session; **not yet
   committed/deployed/confirmed live** — next session or later this one should
@@ -2747,6 +2821,32 @@ were resolved and nine already-closed rows removed from the open tables.
 > made on evidence rather than on a projection that has already been wrong once.
 > #19 (cap soccer props, ~2,400 credits/sweep) also gates enabling #44b, which
 > forces cache-bypassed soccer refreshes and should stay dark until burn fits 5M.
+
+> **Measured burn — 2026-07-30T15:10Z, `/api/ops/oddsapi/quota` (2.52-day
+> window, baseline 07-28T02:36Z which lands right at #106's ship time):**
+>
+> | Window | Burned | /hour | Projected 30d | vs 5M target |
+> |---|---|---|---|---|
+> | 218,085s (48,048 obs) | 242,245 | 3,998.8 | **2.88M** | **57.6%**, ~2.1M/mo headroom |
+>
+> Down from the 07-27 pre-#106 reading (371,563/day → 11.12M/mo) to ~95,971/day
+> now — **#106's event scoping did the bulk of the work**, without #16's
+> alternate/first7 cuts (still open/undecided) or explicit cadence tiering.
+> `by_sport`: mlb 211,781cr (98.0%), soccer 2,294cr, wnba 2,187cr — soccer/wnba
+> still noise-level, consistent with mid-MLB-season. `by_market_family` (sums
+> to `by_sport`'s total, ~10.7% under `credits_burned_in_window` — some calls
+> aren't reaching `record_oddsapi_quota`, not yet chased down): **props now
+> dominates at 152,015cr (70.3%)**, segment 37,139cr (17.2%), alternate
+> 18,578cr (8.6%), full_game 8,157cr (3.8%), event_list 161cr (~0%). This is a
+> reversal from the pre-#106 profile where segment/alternate dominated — props
+> was never covered by #16's candidate cuts or #106's event scoping (props
+> aren't gated by live/near-live state the same way), so **props is the next
+> lever if headroom ever tightens**, not alternate/first7.
+>
+> **Bottom line: comfortably under the 5M target today** (57.6% projected),
+> mostly from engineering (#106) rather than the still-pending #16 product
+> call. Re-check after any #16 decision or once football season adds
+> sport-count pressure — this reading is MLB-season-only load.
 
 **16** — **AUDIT DONE 2026-07-25, decision needed.** After #17 the per-event call
 still requests **24 segment markets per game** ≈ **360 credits/sweep** on a
