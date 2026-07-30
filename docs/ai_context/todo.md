@@ -86,11 +86,21 @@ first 10 collected tests (alphabetical) plus this session's 2 touched
 tests all pass; did not chase the pre-existing hang further (out of
 Phase 5's scope) — worth a dedicated look in a future session.
 
-**Roadmap complete: Phases 1-5 all done, all uncommitted.** Everything
-from tonight's arc (#153, #155, #124, #158, #159) is sitting in the working
-tree, verified individually but never committed or deployed as a whole —
-whoever picks this up next should decide on a commit/review/deploy
-strategy for the full set rather than assuming any of it is live.
+**Roadmap complete: Phases 1-5 all done, committed, pushed, and deployed —
+confirmed live.** Superseding the "all uncommitted" note this paragraph
+used to end with: committed as 3 commits (`187575be` Phases 1-2,
+`4a2e54b2` Phases 3-4, `5b748891` Phase 5), pushed to `origin/main` (0
+ahead/behind confirmed). Deployed to all 3 Render services —
+`web`/`live-odds-worker` deployed together, `refresh-worker` held for its
+own in-flight MLB sim to clear first (per established practice), then
+deployed once clear. All three confirmed `live`. Post-deploy spot check:
+`GET /` and `GET /intelligence/opportunity-board` both `200` against the
+live web service. Also found and committed, sitting uncommitted in this
+shared working tree from an origin-unclear concurrent session (inspected,
+confirmed unrelated to and non-conflicting with this arc, left in the
+working tree by two other sessions tonight before this one finally
+committed it): `ba8ad05e` — drops the `first7` display lane (completes
+#16) and adds market-accuracy row detail to `live_lens_local.py`.
 
 > **Next free ID: 160.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
@@ -3903,6 +3913,24 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
   names itself is recoverable; one that closes the connection and gets swallowed
   by a generic handler is not. Do not add a new write path to that store without
   a bound.
+- **A safety threshold copy-pasted from a different operation's calibration
+  is not a safety margin, it's a coin flip that happens to look like one.**
+  Hit twice in the same session, two different subsystems: (#124)
+  `_mlb_live_lens_min_headroom_bytes()`'s 1800MB default was copied from
+  `live_refresh_loop.py`'s WNBA odds-refresh gate (calibrated to a ~1528MB
+  *WNBA* spike), leaving MLB's actual ~13MB-per-tick operation failing its
+  own gate ~80% of the time on a 2048MB container; (#159)
+  `recommendation_engine.py`'s `DecisionPolicy.promotion_margin` (0.01-0.02)
+  was scaled for a 0-1 metric but compared against `promotion_score`, a
+  weighted sum realistically ±20 to +80 — negligible at that scale, so 8-12
+  settled bets (ordinary binomial noise) could trigger `promoted: True`.
+  Both bugs read as "the threshold looks reasonable" on inspection; both
+  only revealed themselves against **real measured data from the specific
+  operation the threshold gates** (production log analysis for #124, a
+  synthetic-but-realistic sample-size scenario for #159). Before trusting
+  any safety/promotion/gating constant, ask where the number actually came
+  from — if the answer is "another gate's number" or "seemed about right,"
+  recalibrate from this operation's own measurements before relying on it.
 - **Measure a candidate host's peak, never its median.** live-odds-worker's
   median of 515MB nearly justified putting the board build on a box whose WNBA
   leg is documented spiking to 1.3–1.5GB. Related: a *code comment* is not a
