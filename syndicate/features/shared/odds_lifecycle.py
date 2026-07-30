@@ -354,6 +354,25 @@ def build_recent_market_history_index(events: Sequence[Mapping[str, Any]]) -> di
 # this path at 2000 rows/day, so the whole 7-day set is ~14k events and
 # rebuilding it 15 times is noise. The uncapped path was the odds-history
 # shards; see the payload_cache threading in simulation_adapter.py.
+def _subject_text_for_filtering(row: Mapping[str, Any]) -> str:
+    # Mirrors _candidate_market_id's own entity fallback chain, plus the
+    # schema aliases confirmed live 2026-07-29 for WNBA/NBA's live-lens rows
+    # ("player"/"entity" instead of "player_name", never "home"/"away" team
+    # names for a prop). Never falls back to team for a prop candidate
+    # (matching attach_market_id's own rule) -- a team-level match would
+    # silently readmit the exact cross-player collision this filter exists
+    # to prevent.
+    is_prop = str(row.get("candidate_type") or "").strip().lower() == "prop"
+    entity = row.get("entity") or row.get("player_name") or row.get("player")
+    if not entity and not is_prop:
+        entity = row.get("team") or row.get("team_tri") or row.get("selection")
+    return str(entity or "").strip().lower()
+
+
+def _stat_text_for_filtering(row: Mapping[str, Any]) -> str:
+    return str(row.get("stat") or row.get("market_type") or row.get("market") or "").strip().lower()
+
+
 def _recent_history_rows(candidate: Mapping[str, Any], *, sport: str | None = None, lookback_days: int = 7, end_date: str | None = None) -> list[dict[str, Any]]:
     recent_events = load_recent_odds_events(days_back=lookback_days, end_date=end_date)
     if not recent_events:
@@ -361,10 +380,37 @@ def _recent_history_rows(candidate: Mapping[str, Any], *, sport: str | None = No
     index = build_recent_market_history_index(recent_events)
     candidate_row = dict(candidate)
     candidate_market_id = _candidate_market_id(candidate_row, sport=sport)
+    market_level_aliases = {candidate_market_id, str(candidate_row.get("market_id") or "").strip(), str(candidate_row.get("player_id") or candidate_row.get("athlete_id") or "").strip()}
     candidate_aliases = [candidate_market_id, str(candidate_row.get("market_id") or "").strip(), str(candidate_row.get("event_id") or "").strip(), str(candidate_row.get("game_id") or "").strip(), str(candidate_row.get("gamePk") or candidate_row.get("game_pk") or "").strip(), str(candidate_row.get("player_id") or candidate_row.get("athlete_id") or "").strip()]
+    candidate_subject = _subject_text_for_filtering(candidate_row)
+    candidate_stat = _stat_text_for_filtering(candidate_row)
     for alias in candidate_aliases:
-        if alias and alias in index:
-            return [dict(row) for row in index[alias]]
+        if not alias or alias not in index:
+            continue
+        rows = index[alias]
+        if alias in market_level_aliases:
+            # candidate_market_id/market_id/player_id already identify a
+            # single specific market -- trust it as-is.
+            return [dict(row) for row in rows]
+        # event_id/game_id/gamePk are shared by EVERY candidate in the same
+        # game -- confirmed live 2026-07-29: without this filter, several
+        # different players' (and different stats') history all merged into
+        # one shared "recent history" whenever the market-level alias above
+        # missed, showing the identical wrong opening/latest line for every
+        # prop in that game. Only accept rows that are actually about this
+        # candidate's own subject (and stat, when both sides have one) --
+        # if that yields nothing, keep trying the remaining, even coarser
+        # aliases rather than silently returning the unfiltered game-wide set.
+        if not candidate_subject:
+            return [dict(row) for row in rows]
+        filtered = [
+            row
+            for row in rows
+            if _subject_text_for_filtering(row) == candidate_subject
+            and (not candidate_stat or not _stat_text_for_filtering(row) or _stat_text_for_filtering(row) == candidate_stat)
+        ]
+        if filtered:
+            return [dict(row) for row in filtered]
     return []
 
 

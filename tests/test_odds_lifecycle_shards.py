@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from syndicate.features.shared.odds_lifecycle import _candidate_market_id
+from syndicate.features.shared.odds_lifecycle import _recent_history_rows
 from syndicate.features.shared.odds_lifecycle import _resolve_market_state_across_shards
 from syndicate.features.shared.odds_lifecycle import build_market_features
 from syndicate.features.shared.odds_lifecycle import build_market_history_view
@@ -22,6 +23,47 @@ def _write_shard(root: Path, *, sport: str, shard_key: str, market_id: str, hist
         "markets": {market_id: {"history": history, "last_line": history[-1]["current_line"] if history else None}},
     }
     path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+class RecentHistoryRowsFilterTests(unittest.TestCase):
+    # Confirmed live 2026-07-29 on the WNBA board: when the odds-history shard
+    # lookup misses (as it always does today for WNBA -- a separate,
+    # pre-existing key-format mismatch between the write side's descriptive
+    # key and _candidate_market_id's own colon-normalized format),
+    # build_market_history_view falls through to _recent_history_rows, whose
+    # alias chain degrades to a bare event_id/game_id match shared by every
+    # candidate in the same game. Without filtering, every player's (and
+    # every stat's) "recent history" merged into one shared list, so several
+    # different props showed the identical wrong opening/latest line.
+    _EVENTS = [
+        {"event_id": "GAME1", "game_id": "GAME1", "entity": "Alyssa Thomas", "stat": "ast", "current_line": 8.5, "timestamp": "2026-07-30T00:00:00Z"},
+        {"event_id": "GAME1", "game_id": "GAME1", "entity": "Kahleah Copper", "stat": "threes", "current_line": 9.5, "timestamp": "2026-07-30T00:01:00Z"},
+        {"event_id": "GAME1", "game_id": "GAME1", "entity": "Kahleah Copper", "stat": "threes", "current_line": 24.5, "timestamp": "2026-07-30T00:02:00Z"},
+    ]
+
+    def test_game_level_alias_fallback_filters_by_subject_and_stat(self) -> None:
+        with patch("syndicate.features.shared.odds_lifecycle.load_recent_odds_events", return_value=self._EVENTS):
+            kahleah = _recent_history_rows(
+                {"entity": "Kahleah Copper", "stat": "threes", "sport_slug": "wnba", "game_id": "GAME1", "candidate_type": "prop"},
+                sport="wnba",
+            )
+            alyssa = _recent_history_rows(
+                {"entity": "Alyssa Thomas", "stat": "ast", "sport_slug": "wnba", "game_id": "GAME1", "candidate_type": "prop"},
+                sport="wnba",
+            )
+
+        self.assertEqual([row["current_line"] for row in kahleah], [9.5, 24.5])
+        self.assertTrue(all(row["entity"] == "Kahleah Copper" for row in kahleah))
+        self.assertEqual([row["current_line"] for row in alyssa], [8.5])
+        self.assertTrue(all(row["entity"] == "Alyssa Thomas" for row in alyssa))
+
+    def test_game_level_alias_falls_back_unfiltered_when_candidate_has_no_subject(self) -> None:
+        # A game-level candidate (a team ATS/Total pick) genuinely has no
+        # player subject -- there's nothing to filter by, so the existing
+        # unfiltered game-wide behavior is correct and must be preserved.
+        with patch("syndicate.features.shared.odds_lifecycle.load_recent_odds_events", return_value=self._EVENTS):
+            rows = _recent_history_rows({"sport_slug": "wnba", "game_id": "GAME1", "candidate_type": "game"}, sport="wnba")
+        self.assertEqual(len(rows), 3)
 
 
 class OddsLifecycleShardMergeTests(unittest.TestCase):

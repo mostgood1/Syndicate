@@ -27,9 +27,55 @@ unpushed. Cross-session ID collisions (#131, #139) were both caught and
 resolved without data loss, in both directions, via direct session-to-
 session messages rather than silent overwrites.
 
-> **Next free ID: 144.** IDs are never reused. Closed items move to
+> **Next free ID: 145.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
+
+- **New: #144** (root-caused and fixed this session, direct follow-on to
+  #143, **NOT YET DEPLOYED**) — user reported live, right after #143
+  deployed: the Layer 2 board STILL showed Kahleah Copper's identical wrong
+  `Line 9.5 → 24.5` movement, even with `force_refresh: true` on the query.
+  #143's fix was real (confirmed: the odds-history "markets" dict went from
+  2 shared entries to 67 correctly player+stat-scoped ones, zero
+  `content_collisions`) but turned out to fix a store the board's read path
+  never actually reads from. Confirmed via
+  `/api/ops/odds-history/inspect`: every entry's top-level `stored_market_id`
+  is `null` -- `_market_state_from_payload`'s exact-key lookup (both the
+  primary `markets.get(market_id)` and the embedded-field fallback) can
+  never succeed for WNBA, because the write side's descriptive
+  pipe-delimited key (`"game_id=...|player=...|stat=..."`, #143's format) can
+  never equal `_candidate_market_id`'s own colon-normalized format
+  (`"WNBA:event:MARKET:entity:line"`) -- a separate, pre-existing
+  read/write format mismatch #143 didn't touch. So `build_market_history_view`
+  (`syndicate/features/shared/odds_lifecycle.py`) always falls through to
+  `_recent_history_rows`, which reads a COMPLETELY DIFFERENT store (the
+  `odds_events`/lifecycle log, `load_recent_odds_events`). Its alias chain
+  (`candidate_market_id` → `market_id` → `event_id` → `game_id` → `gamePk` →
+  `player_id`) returns the FIRST alias that matches anything in the index,
+  unfiltered -- when the specific market-level aliases miss, it silently
+  degrades to `event_id`/`game_id`, which is identical for every candidate
+  in the same game, so the whole game's merged event list (every player,
+  every stat) got returned for each individual candidate. **Fixed**: added
+  `_subject_text_for_filtering`/`_stat_text_for_filtering` helpers (mirroring
+  `_candidate_market_id`'s own entity fallback, including the "never fall
+  back to team for a prop" rule from `market_id.py`) and, when
+  `_recent_history_rows` falls back to a game/event-level alias, filter the
+  returned rows to the candidate's own subject+stat before accepting them;
+  if nothing matches, keep trying the remaining aliases rather than
+  returning the unfiltered game-wide set. A candidate with no real subject
+  (a team-level ATS/Total pick) still gets the unfiltered game-level rows,
+  since there's nothing to filter by and that's the correct existing
+  behavior. Verified directly with the real production row shapes: Kahleah
+  Copper's own rows now show only her 9.5→24.5 sequence, Alyssa Thomas's
+  only her 8.5 entry -- confirmed both fail without the fix (returns all 3
+  merged) and pass with it, via git-stash revert-and-rerun. New tests in
+  `tests/test_odds_lifecycle_shards.py`
+  (`RecentHistoryRowsFilterTests`) — 6/6 passing in that file.
+  **Not yet deployed or re-verified against the live board** — next step is
+  the same deploy-and-query loop used for #143
+  (`/api/intelligence/query` for Kahleah Copper's candidate,
+  `force_refresh: true`, confirm `line_odds_movement` is no longer the
+  stale 9.5→24.5 shared value).
 
 - **New: #143** (root-caused, fixed, and confirmed against production data
   this session) — user reported live on the WNBA board: multiple
