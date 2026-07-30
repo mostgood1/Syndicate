@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fnmatch
+import json
 import os
 import threading
 import subprocess
@@ -669,6 +670,94 @@ def api_ops_reset_lineup_gate() -> Any:
     path = reports_root() / "live_refresh_loop" / "last_lineup_check.json"
     write_json_file(path, {})
     return jsonify({"ok": True, "path": str(path)})
+
+
+@ops_bp.get("/api/ops/odds-history/inspect")
+def api_ops_odds_history_inspect() -> Any:
+    # Protected endpoint: requires admin token (enforced by before_request).
+    # Read-only diagnostic for a real symptom (confirmed live 2026-07-29):
+    # several distinct WNBA prop candidates in the same game showed the
+    # identical line_odds_movement (opening_line/latest_line/history) despite
+    # having distinct, correctly-computed market_id values. reports/odds_control_plane/odds_history/*
+    # isn't in artifact_publisher's HOT_ARTIFACT_PATTERNS allowlist (that
+    # list is for cross-service sync, not debugging), so there was no way to
+    # see the raw payload's actual `markets` dict shape to confirm whether
+    # multiple keys collapse onto the same stored object (a write-side
+    # collision) versus a read-side join bug. Returns a per-market_id summary
+    # (never the full raw history array, to keep the response small) so a
+    # collision -- multiple different requested/stored market_ids sharing
+    # identical opening/latest line+price -- is visible at a glance.
+    sport = str(request.args.get("sport") or "").strip().lower()
+    date = str(request.args.get("date") or "").strip()
+    if not sport or not date:
+        return jsonify({"ok": False, "error": "sport and date parameters required (date as YYYY-MM-DD)."}), 400
+    market_id_filter = str(request.args.get("market_id") or "").strip() or None
+    try:
+        from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
+        from syndicate.features.shared.odds_control_plane import odds_history_path_status_for_sport
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"ImportError: {type(exc).__name__}: {exc}"}), 500
+
+    path_status = odds_history_path_status_for_sport(sport, date)
+    payload = load_odds_history_payload_for_sport(sport, date)
+    if not isinstance(payload, dict):
+        return jsonify({"ok": True, "sport": sport, "date": date, "path_status": path_status, "markets": None, "market_count": 0})
+
+    markets = payload.get("markets")
+    if not isinstance(markets, dict):
+        return jsonify({"ok": True, "sport": sport, "date": date, "path_status": path_status, "markets": None, "market_count": 0})
+
+    summaries: dict[str, Any] = {}
+    seen_object_ids: dict[int, list[str]] = {}
+    content_signatures: dict[tuple[Any, ...], list[str]] = {}
+    for key, value in markets.items():
+        if market_id_filter and key != market_id_filter and not (isinstance(value, dict) and str(value.get("market_id") or "") == market_id_filter):
+            continue
+        if not isinstance(value, dict):
+            continue
+        history = value.get("history") if isinstance(value.get("history"), list) else []
+        summaries[key] = {
+            "stored_market_id": value.get("market_id"),
+            "last_line": value.get("last_line"),
+            "last_odds": value.get("last_odds"),
+            "history_points": len(history),
+            "history_first": history[0] if history else None,
+            "history_last": history[-1] if history else None,
+        }
+        seen_object_ids.setdefault(id(value), []).append(key)
+        # id()-based collision only catches a shared in-memory reference within
+        # THIS process -- useless once the payload has round-tripped through
+        # JSON on disk, where a write-side bug that produced identical content
+        # under different keys shows up as separate objects with equal values,
+        # not equal identity. history_points alone would false-positive on two
+        # genuinely-untouched (0-point) markets, so require at least one point.
+        if history:
+            signature = (value.get("last_line"), value.get("last_odds"), len(history), json.dumps(history[0], sort_keys=True, default=str), json.dumps(history[-1], sort_keys=True, default=str))
+            content_signatures.setdefault(signature, []).append(key)
+
+    identity_collisions = {obj_id: keys for obj_id, keys in seen_object_ids.items() if len(keys) > 1}
+    content_collisions = {i: keys for i, keys in enumerate(sig_keys for sig_keys in content_signatures.values() if len(sig_keys) > 1)}
+    return jsonify(
+        {
+            "ok": True,
+            "sport": sport,
+            "date": date,
+            "path_status": path_status,
+            "market_count": len(markets),
+            "returned_count": len(summaries),
+            "markets": summaries,
+            # Non-empty only if the SAME in-memory dict object is stored under
+            # multiple distinct keys -- a shared-mutable reference bug caught
+            # within this one process's memory.
+            "shared_object_collisions": {str(obj_id): keys for obj_id, keys in identity_collisions.items()},
+            # Non-empty if multiple DIFFERENT market_id keys have byte-identical
+            # last_line/last_odds/history endpoints -- the real signal for a
+            # write-side key collision that already happened before this read,
+            # survives a JSON round-trip, and is what actually explains the
+            # live symptom (several distinct props showing one shared movement).
+            "content_collisions": {str(i): keys for i, keys in content_collisions.items()},
+        }
+    )
 
 
 @ops_bp.get("/api/ops/wnba/artifact-counts")

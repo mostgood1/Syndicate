@@ -27,9 +27,54 @@ unpushed. Cross-session ID collisions (#131, #139) were both caught and
 resolved without data loss, in both directions, via direct session-to-
 session messages rather than silent overwrites.
 
-> **Next free ID: 143.** IDs are never reused. Closed items move to
+> **Next free ID: 144.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
+
+- **New: #143** (in progress, diagnostic tool added and deployed, **root cause
+  NOT yet confirmed**) — user reported live on the WNBA board: multiple
+  distinct prop candidates in the SAME game (GSV @ PHX, event `401857098`) —
+  Kahleah Copper 3PM, Gabby Williams 3PM, Alyssa Thomas PTS+AST, Veronica
+  Burton Assists, GSV team ATS — all showed the byte-identical `Line 9.5 →
+  24.5 +15` movement badge, despite each having a distinct, correctly-formed
+  `market_id` (e.g. `WNBA:401857098:THREES:kahleah_copper:1.5` vs
+  `...RA:alyssa_thomas:16.5`, confirmed via `/api/intelligence/query`).
+  Confirmed via a DIFFERENT game (MIN @ TOR) in the same response showing
+  correct, distinct movement — this is scoped to one game, not universal.
+  Traced the full read path (`syndicate/features/shared/odds_lifecycle.py`
+  `_candidate_market_id` → `build_market_history_view` →
+  `_resolve_market_state_across_shards` → `_market_state_from_payload`) and
+  the write path (`syndicate/features/shared/odds_refresh_tracking.py`'s
+  main loop, `_odds_history_market_key`) — every hypothesis formed while
+  reading the code (shared mutable default object, coarse write-side key,
+  pre-computed `market_id`/`market_key` on the raw WNBA fetch row) was
+  contradicted by the next piece of code read. Could not go further because
+  `reports/odds_control_plane/odds_history/*` isn't in
+  `artifact_publisher.HOT_ARTIFACT_PATTERNS` (that allowlist is for
+  cross-service sync, not debugging) — there was no way to see the actual
+  `markets` dict for this game/date. **Added `GET
+  /api/ops/odds-history/inspect?sport=<sport>&date=<YYYY-MM-DD>` (`syndicate/blueprints/ops.py`,
+  admin-token gated)** — reuses `load_odds_history_payload_for_sport`/
+  `odds_history_path_status_for_sport` directly (the same functions the real
+  pipeline uses, not a reimplementation), returns a per-market_id summary
+  (never the full history array) plus two collision detectors:
+  `shared_object_collisions` (in-memory identity, `id()`-based, only useful
+  within one process) and `content_collisions` (byte-identical
+  last_line/last_odds/history-endpoints under different keys — the real
+  signal, survives a JSON round-trip). New tests
+  `test_odds_history_inspect_requires_sport_and_date` and
+  `test_odds_history_inspect_flags_content_collisions`
+  (`tests/test_ops.py`) — 102/102 passing. **Next step for whoever picks
+  this up**: call `/api/ops/odds-history/inspect?sport=wnba&date=2026-07-29`
+  on production once deployed, look at `content_collisions` for event
+  `401857098` — a non-empty result there confirms a write-side collision (fix
+  in `odds_refresh_tracking.py`); an empty result means the bug is actually
+  upstream of the odds-history file entirely (something attaching the same
+  `market_features`/`line_odds_movement` dict onto multiple candidates
+  during the scoring pass in `recommendation_engine.py`'s `filter_candidates`
+  loop, ~line 1080 — not yet ruled out, since a fresh look at that candidate
+  loop's `market_profile_cache`/`odds_payload_cache` reuse pattern is the
+  next place to check if the odds-history data itself turns out clean).
 
 - **New: #142** (filed and fixed this session, **NOT YET COMMITTED/DEPLOYED**)
   — user asked for soccer tricodes across all leagues so compact/Layer-2

@@ -1033,6 +1033,69 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertIn("-SourceArtifactRoot", command)
         self.assertIn("C:/published/ncaaf-bundle", command)
 
+    def test_odds_history_inspect_requires_sport_and_date(self) -> None:
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
+            response = self.client.get(
+                "/api/ops/odds-history/inspect?sport=wnba",
+                headers={"X-Admin-Token": "secret-token"},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.get_json()["ok"])
+
+    def test_odds_history_inspect_flags_content_collisions(self) -> None:
+        # Mirrors the real symptom confirmed live 2026-07-29: distinct
+        # market_id keys (different players/markets) whose stored history
+        # is byte-identical -- a write-side collision, not a coincidence.
+        shared_history = [
+            {"current_line": 9.5, "last_odds": -110, "captured_at": "2026-07-29T10:00:00Z"},
+            {"current_line": 24.5, "last_odds": -110, "captured_at": "2026-07-29T12:00:00Z"},
+        ]
+        payload = {
+            "markets": {
+                "WNBA:401857098:THREES:kahleah_copper:1.5": {
+                    "market_id": "WNBA:401857098:THREES:kahleah_copper:1.5",
+                    "last_line": 24.5,
+                    "last_odds": -110,
+                    "history": shared_history,
+                },
+                "WNBA:401857098:RA:alyssa_thomas:16.5": {
+                    "market_id": "WNBA:401857098:RA:alyssa_thomas:16.5",
+                    "last_line": 24.5,
+                    "last_odds": -110,
+                    "history": shared_history,
+                },
+                "WNBA:401857098:TOTAL::171.5": {
+                    "market_id": "WNBA:401857098:TOTAL::171.5",
+                    "last_line": 171.5,
+                    "last_odds": -110,
+                    "history": [{"current_line": 171.5, "last_odds": -110, "captured_at": "2026-07-29T10:00:00Z"}],
+                },
+            }
+        }
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
+            "syndicate.features.shared.odds_control_plane.load_odds_history_payload_for_sport",
+            return_value=payload,
+        ), patch(
+            "syndicate.features.shared.odds_control_plane.odds_history_path_status_for_sport",
+            return_value={"active_path": "fake/path.json"},
+        ):
+            response = self.client.get(
+                "/api/ops/odds-history/inspect?sport=wnba&date=2026-07-29",
+                headers={"X-Admin-Token": "secret-token"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertTrue(body["ok"])
+        self.assertEqual(body["market_count"], 3)
+        collisions = list(body["content_collisions"].values())
+        self.assertEqual(len(collisions), 1)
+        self.assertEqual(
+            set(collisions[0]),
+            {"WNBA:401857098:THREES:kahleah_copper:1.5", "WNBA:401857098:RA:alyssa_thomas:16.5"},
+        )
+
     def test_wnba_artifact_counts_requires_date(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
             response = self.client.get(
