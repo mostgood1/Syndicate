@@ -4,11 +4,49 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-28 (see "Reconciliation 2026-07-28").
+Last reconciled: 2026-07-29 (see "Reconciliation 2026-07-29" below; prior:
+"Reconciliation 2026-07-28").
 
-> **Next free ID: 140.** IDs are never reused. Closed items move to
+### Reconciliation 2026-07-29
+
+Closing this session for context reasons; another concurrent session (WNBA
+prop board/stat-label thread, #136/#138/#139) was active the same night on
+the same working directory. **This session's own arc, all shipped, pushed,
+and deployed unless noted**: #141 (WNBA hot-copy repair list — latent, not
+yet observed failing), #137 (steam moves integrated into the main board —
+required two follow-up production bugfixes after the first deploy looked
+fine but served zero steam candidates: an identity-dedup collision and an
+unconditional edge-quality gate; rail removed once confirmed working), and
+#140 (soccer matchup resolution + a permanently-missing schedule artifact +
+a dedicated MLS/soccer autorun — **the autorun's first real launch was not
+confirmed live before this session ended**, see #140's own follow-up note
+for the exact next check). No open PRs; all work landed directly on `main`
+per this repo's normal flow. `git log`/`origin main` confirmed in sync at
+session end — nothing of this session's own work was left uncommitted or
+unpushed. Cross-session ID collisions (#131, #139) were both caught and
+resolved without data loss, in both directions, via direct session-to-
+session messages rather than silent overwrites.
+
+> **Next free ID: 142.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
+
+- **New: #141** (filed, fixed, deployed, commit `f5efa674`) — cross-sport
+  comparison of WNBA's board pregame/props pipeline against MLB's (then just
+  fixed by #124/#128) found one real latent gap: WNBA was completely absent
+  from `_required_daily_artifact_paths` (`artifact_publisher.py`) — the
+  repair list that recovers a once-daily artifact that's missing outright
+  (not just stale) after a service's disk resets. `recommendations_slate_
+  <date>.json`/`props_recommendations_<date>.csv` (WNBA's sole pregame-props
+  source, `_WNBADataProvider.pregame_props`'s only real data path) is
+  generated the same once-a-day way as MLB's `daily_top_props`, read the
+  same way, and subject to the identical failure mode MLB hit three separate
+  times the same night (#124 items 2-3, #128). Added both, using
+  `processed_path_or_default` (already never-raises). Not yet observed
+  causing a real outage for WNBA specifically — latent, closed preemptively.
+  Tests: extended `MissingRequiredArtifactRepairTests`
+  (`test_artifact_publisher.py`) to isolate `SYNDICATE_WNBA_SOURCE_ROOT` and
+  updated the exact repair-request-count assertions; 46/46 pass.
 
 - **New: #139** (filed, fixed, deployed, and confirmed live this session) —
   direct continuation of #138 (recommendations_slate now regenerates) and
@@ -46,6 +84,105 @@ Last reconciled: 2026-07-28 (see "Reconciliation 2026-07-28").
   "abbreviation is unclear." Deployed on commit (this session, see git log)
   and confirmed live: production's `recommendations_slate_2026-07-29.json`
   now shows real stat codes instead of `"Prop"`.
+
+- **New: #140** (filed this session, **partially shipped, deployed, one part
+  still unverified**) — while verifying #137's steam-on-board fix for soccer,
+  found soccer's steam candidates couldn't resolve a real matchup (every row
+  showed "-"). Chasing that surfaced a much bigger, separate finding: **most
+  of MLS's current week has no sim coverage at all**, which the user then
+  asked to investigate directly ("define app rules for MLS sims"). Three
+  real fixes shipped and deployed, one architectural question still open:
+  1. **Matchup resolution for soccer steam moves** (`528d1c79`). Root cause:
+     soccer's steam events carry a real, consistent event_id, but it's an
+     OddsAPI hash — `dashboard_games` (the only lookup that existed) is
+     single-league-curated (`home.py`'s `_resolve_league` picks exactly one
+     league/day) AND keyed by the sim's own ESPN-numeric event_id, a
+     completely different id space (same mismatch already documented in
+     `soccer/market_board.py` for an unrelated join). Fixed two ways:
+     `_market_lifecycle_event` (`odds_refresh_tracking.py`) now stamps
+     `home_team`/`away_team` directly from the raw row for sports whose CSVs
+     carry those columns (soccer does) — every NEW steam event needs no
+     lookup at all; new `_soccer_steam_matchup_lookup` (`intelligence.py`)
+     reads the raw OddsAPI CSV rows (`game_odds_current.csv`/
+     `props/<date>.csv`) as a read-time fallback for events recorded before
+     the stamp existed. **Confirmed live**: all 131 MLS steam candidates
+     went from matchup `"-"` to real text ("Toronto FC @ New York City FC",
+     etc.).
+  2. **The actual blocker underneath that: soccer's season schedule
+     artifact was permanently missing on refresh-worker** (`c329b9f0`).
+     Confirmed live: refresh-worker's own overview build reported
+     `dashboard_games_count=0` for soccer on every cycle (both today and
+     tomorrow) while web's `/soccer/mls/api/cards` correctly showed 16 real
+     MLS games — refresh-worker never had a usable copy of
+     `schedule_<season>.json` (`week_matches`/`schedule_payload`,
+     `soccer/sources.py`) at all. Same root-cause class as #124/#128: a
+     once-a-season artifact, already allowlisted for the normal incremental
+     pull, but a `since=`-scoped pull can never repair a copy that never
+     arrived in the first place. Added to `_required_daily_artifact_paths`,
+     scoped to only the leagues actually in season for the date
+     (`active_leagues_for_date`).
+  3. **User's actual question: why isn't Saturday's MLS slate simulated yet,
+     given lines are already posted and the week already contains
+     Saturday?** Investigated end to end (`64bd0d03`). `default_week()`
+     already places Saturday inside "this week" today — no calendar gate is
+     blocking it, and `_soccer_artifact_scope_args` already resolves
+     `--week`/`--season` correctly. The real gap: soccer's pregame-only
+     steps (`soccer_{league}_schedule`/`odds`/`props`/`picks` —
+     `refresh_odds_sources.py`'s `_build_soccer_steps`,
+     `phases=("pregame",)`) never run anywhere in production, because
+     `live-odds-worker` — the only service with the live-odds refresh loop
+     enabled — is pinned to `phase=live` exclusively, and only
+     `soccer_{league}_artifacts` (`phases=("pregame","live")`) is tagged for
+     both. Confirmed live via `/soccer/mls/api/cards?date=2026-08-01`:
+     several of this week's later fixtures (Houston@Austin,
+     Minnesota@Vancouver, St.Louis@Colorado, SD@Dallas, LAFC@SKC,
+     Portland@RSL, San Jose@LA) all carried `is_unsimulated_placeholder:
+     true` — no real line, no sim, a hardcoded operator-instruction
+     placeholder — while earlier-week fixtures did not. Matches todo #52
+     exactly ("71% of MLS board has no sim projection at all"). **User's
+     explicit direction: give soccer its own dedicated trigger**, not fold
+     it into the existing NFL/NCAAF/NCAAB weekly-sports autorun
+     (`WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN`, confirmed already
+     `true`/live in production) — reusing that flag would have coupled
+     soccer's fix to a mechanism already active for three other sports as
+     an unwanted side effect. New `_launch_autorun_soccer_weekly_refresh`
+     (`scripts/run_refresh_worker.py`), gated by its own
+     `SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN` flag and
+     `SYNDICATE_SOCCER_WEEKLY_REFRESH_INTERVAL_SECONDS` interval (4h
+     default), wired into the same autorun priority chain right after the
+     weekly-sports one. Calls `launch_refresh_run(sports="soccer",
+     phase="all")` so pregame-only steps and pregame+live/live-only steps
+     all run together in one launch. Both new env vars set directly on the
+     live refresh-worker service (not just render.yaml) and deployed;
+     `/api/ops/version` confirms all 3 services on the deploying commit.
+     25 new/updated tests across `test_intelligence_steam_candidates.py`
+     (soccer matchup resolution), `test_artifact_publisher.py` (schedule
+     repair, exact-count assertions updated 6→7→ + per-league assertion),
+     and `test_refresh_worker.py` (soccer autorun launches when enabled,
+     skips when disabled) all pass.
+     ⚠️ **Still open, not verified live**: whether the new autorun has
+     actually fired a first launch. `soccer_weekly_autorun_status.json`
+     (the state file `_launch_autorun_soccer_weekly_refresh` writes) isn't
+     in the hot-artifact allowlist, so it can't be read remotely via the
+     ops export endpoint, and `_write_worker_status` writes state rather
+     than printing to logs, so there's no log line to grep for either. The
+     one general status endpoint found (`/api/ops/odds-refresh/status`)
+     still showed the last run as a WNBA-scoped one, not soccer, as of
+     session end — consistent with "hasn't had a free autorun-priority
+     cycle yet" (MLB/external-contract checks take priority in the same
+     `elif` chain) rather than evidence of a bug, but genuinely
+     unconfirmed. **Next session: check
+     `/soccer/mls/api/cards?date=2026-08-01` for `is_unsimulated_placeholder`
+     flipping to `false` on Saturday's fixtures once the sim actually
+     completes** (real wall-clock time after the trigger fires — fetching
+     odds, running the sim, building recommendations isn't instant). If
+     still unsimulated after a reasonable wait, check whether the autorun's
+     own priority position in the `elif` chain is starving it (e.g. MLB's
+     autorun or the external-contract check claiming every cycle) and
+     consider whether it needs a higher-priority slot or its own execution
+     lane (`launch_refresh_run`'s `lane=` param, currently unset/default,
+     same as the NFL/NCAAF pattern it was modeled on) so it can't be
+     indefinitely crowded out.
 
 - **New: #138** (filed, fixed, deployed, and confirmed live this session) —
   direct continuation of #136 (WNBA prop board stat labels). User reported live in
@@ -216,7 +353,8 @@ Last reconciled: 2026-07-28 (see "Reconciliation 2026-07-28").
      clean, `create_app()` loads all 316 routes, local browser preview
      shows zero `/api/board/steam` requests and correct fallback rendering,
      zero console errors. **This closes #137, including the rail
-     removal.**
+     removal.** (Verifying this for soccer specifically led into a much
+     bigger, separate finding about MLS sim scheduling — see #140.)
 
 - **New: #136** (filed and fixed this session, **NOT YET DEPLOYED**) — user
   screenshotted the `/intelligence` "Board" and reported WNBA prop rows with
