@@ -210,6 +210,75 @@ def _append_evaluation_ledger_record(path: Path, payload: Mapping[str, Any]) -> 
     _write_chunk_manifest(target, chunk_name=chunk_name, record_count=record_count)
 
 
+def _replace_ledger_line(file_path: Path, identity: str, payload: Mapping[str, Any]) -> bool:
+    try:
+        lines = file_path.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return False
+    replaced = False
+    new_lines: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if not replaced:
+            try:
+                existing = json.loads(stripped)
+            except Exception:
+                existing = None
+            if isinstance(existing, dict) and _ledger_record_identity(existing) == identity:
+                new_lines.append(_canonical_payload(dict(payload)))
+                replaced = True
+                continue
+        new_lines.append(stripped)
+    if not replaced:
+        return False
+    file_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+    return True
+
+
+def _update_evaluation_ledger_record(path: Path, payload: Mapping[str, Any]) -> None:
+    """Rewrite an existing ledger record in place, keyed by its identity.
+
+    `_append_evaluation_ledger_record` refuses to write once an identity is
+    already indexed, so settling a record (pending -> win/loss/push/void)
+    needs this separate update path instead of routing back through append.
+    """
+    target = Path(path)
+    record = dict(payload)
+    identity = _ledger_record_identity(record)
+    if not identity:
+        _append_evaluation_ledger_record(target, record)
+        return
+    if not _is_chunked_ledger_path(target):
+        if target.exists() and _replace_ledger_line(target, identity, record):
+            return
+        _append_jsonl(target, record)
+        return
+    index = _load_chunk_index(target)
+    existing = index.get(identity)
+    if isinstance(existing, dict):
+        chunk_name = str(existing.get("chunk") or "") or _ledger_record_chunk_name(record)
+        chunk_path_value = existing.get("path")
+        chunk_path = Path(str(chunk_path_value)) if chunk_path_value else _ledger_chunk_path(target, chunk_name)
+        if chunk_path.exists() and _replace_ledger_line(chunk_path, identity, record):
+            index[identity] = {"chunk": chunk_name, "path": str(chunk_path), "updated_at": _utc_now()}
+            _write_chunk_index(target, index)
+            return
+    # Safety net: identity not yet indexed (or the in-place replace failed) --
+    # append normally so the settled record is never silently dropped.
+    chunk_name = _ledger_record_chunk_name(record)
+    chunk_path = _ledger_chunk_path(target, chunk_name)
+    _append_jsonl(chunk_path, record)
+    index[identity] = {"chunk": chunk_name, "path": str(chunk_path), "updated_at": _utc_now()}
+    _write_chunk_index(target, index)
+    try:
+        record_count = sum(1 for _ in chunk_path.read_text(encoding="utf-8").splitlines() if _.strip())
+    except Exception:
+        record_count = 1
+    _write_chunk_manifest(target, chunk_name=chunk_name, record_count=record_count)
+
+
 def _load_chunked_ledger_records(path: Path) -> list[dict[str, Any]]:
     chunk_root = _ledger_chunk_root(path)
     if not chunk_root.exists():
@@ -776,7 +845,7 @@ def settle_result(*, record: Mapping[str, Any], result: Any, pnl: Any, closing_l
         "settled_at": settled_at or _utc_now(),
     }
     if persist:
-        _append_evaluation_ledger_record(Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH, settled_record)
+        _update_evaluation_ledger_record(Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH, settled_record)
     return settled_record
 
 
@@ -998,6 +1067,30 @@ def _recommendation_source(record: Mapping[str, Any]) -> dict[str, Any]:
     if recommendation:
         return recommendation
     return _copy_mapping(record)
+
+
+def _recommendation_publish_date(record: Mapping[str, Any]) -> str | None:
+    """The calendar date a record is "about", mirroring
+    _ledger_record_chunk_name's own date resolution -- so the `by_date`
+    performance bucket lines up with the chunk file the record actually
+    lives in, rather than the literal wall-clock instant it was written.
+    """
+    query = _copy_mapping(record.get("query"))
+    response = _copy_mapping(record.get("response"))
+    artifact_metadata = _copy_mapping(record.get("artifact_metadata"))
+    for value in (
+        query.get("selected_date"),
+        query.get("date"),
+        response.get("selected_date"),
+        response.get("date"),
+        artifact_metadata.get("selected_date"),
+        artifact_metadata.get("date"),
+    ):
+        text = str(value or "").strip()
+        if len(text) >= 10 and text[4] == "-" and text[7] == "-":
+            return text[:10]
+    timestamp = _recommendation_publish_timestamp(record)
+    return (timestamp or "")[:10] or None
 
 
 def _recommendation_publish_timestamp(record: Mapping[str, Any]) -> str | None:
@@ -1279,6 +1372,7 @@ def _normalized_performance_record(record: Mapping[str, Any]) -> dict[str, Any]:
         "confidence": confidence_value,
         "confidence_tier": _confidence_tier(confidence_value),
         "publish_timestamp": _recommendation_publish_timestamp(record),
+        "publish_date": _recommendation_publish_date(record),
         "result": result,
         "pnl": pnl,
         "stake": stake,
@@ -1395,10 +1489,75 @@ def build_recommendation_performance_analytics(*, records: Iterable[Mapping[str,
         "records": normalized_records,
         "by_sport": _aggregate_performance_rows(normalized_records, bucket_key="sport"),
         "by_market": _aggregate_performance_rows(normalized_records, bucket_key="market"),
+        "by_date": _aggregate_performance_rows(normalized_records, bucket_key="publish_date"),
         "by_confidence_tier": _aggregate_performance_rows(normalized_records, bucket_key="confidence_tier"),
         "by_edge_bucket": _aggregate_performance_rows(normalized_records, bucket_key="edge_bucket"),
         "by_recommendation_type": _aggregate_performance_rows(normalized_records, bucket_key="recommendation_type"),
     }
+
+
+def _dates_in_window(since: str, until: str) -> list[str]:
+    from datetime import date as _date, timedelta as _timedelta
+
+    since_token = str(since or "").strip()[:10]
+    until_token = str(until or "").strip()[:10]
+    try:
+        since_dt = _date.fromisoformat(since_token)
+        until_dt = _date.fromisoformat(until_token)
+    except Exception:
+        return []
+    if until_dt < since_dt:
+        since_dt, until_dt = until_dt, since_dt
+    dates: list[str] = []
+    current = since_dt
+    while current <= until_dt:
+        dates.append(current.isoformat())
+        current += _timedelta(days=1)
+    return dates
+
+
+def _load_chunk_records_for_window(since: str, until: str, ledger_path: Path | str | None = None) -> list[dict[str, Any]]:
+    """Read only the chunk files for dates within [since, until], instead of
+    the whole ledger history -- keeps a reporting query cheap as the ledger
+    grows, mirroring evaluation_settlement.py's date-scoped chunk reads.
+    """
+    target_path = Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH
+    if not _is_chunked_ledger_path(target_path):
+        return _iter_record_payloads(ledger_path=target_path)
+    records: list[dict[str, Any]] = []
+    for date_token in _dates_in_window(since, until):
+        chunk_path = _ledger_chunk_path(target_path, date_token)
+        if not chunk_path.exists():
+            continue
+        try:
+            content = chunk_path.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        for line in content.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except Exception:
+                continue
+            if isinstance(payload, dict):
+                records.append(payload)
+    return records
+
+
+def build_recommendation_performance_analytics_for_window(
+    *,
+    since: str,
+    until: str,
+    sport: str | None = None,
+    ledger_path: Path | str | None = None,
+) -> dict[str, Any]:
+    records = _load_chunk_records_for_window(since, until, ledger_path)
+    sport_slug = str(sport or "").strip().lower() or None
+    if sport_slug:
+        records = [record for record in records if _record_sport(record) == sport_slug]
+    return build_recommendation_performance_analytics(records=records)
 
 
 def adjust_confidence(base_confidence: float, *, records: Iterable[Mapping[str, Any]] | None = None, ledger_path: Path | str | None = None, sport: str | None = None) -> tuple[float, dict[str, Any]]:

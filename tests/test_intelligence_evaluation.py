@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 from pathlib import Path
 import unittest
@@ -8,6 +9,7 @@ from unittest.mock import patch
 import syndicate.features.shared.intelligence_evaluation as intelligence_evaluation
 from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
 from syndicate.features.shared.intelligence_evaluation import build_recommendation_performance_analytics
+from syndicate.features.shared.intelligence_evaluation import build_recommendation_performance_analytics_for_window
 from syndicate.features.shared.intelligence_evaluation import adjust_confidence
 from syndicate.features.shared.intelligence_evaluation import compute_metrics
 from syndicate.features.shared.intelligence_evaluation import record_prediction
@@ -167,6 +169,51 @@ class IntelligenceEvaluationTests(unittest.TestCase):
         self.assertEqual({row["bucket"] for row in analytics["by_recommendation_type"]}, {"prop"})
         self.assertEqual(analytics["records"][0]["publish_timestamp"], "2026-06-11T12:00:00Z")
         self.assertIn("clv", analytics["records"][0])
+        self.assertEqual(len(analytics["by_date"]), 1)
+        self.assertEqual(analytics["by_date"][0]["bucket"], "2026-06-11")
+        self.assertEqual(analytics["by_date"][0]["publish_count"], 2)
+
+    def test_performance_analytics_for_window_scopes_by_date_and_sport(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            ledger_path = Path(tmp_dir) / "evaluation_ledger.jsonl"
+            with patch.object(intelligence_evaluation, "DEFAULT_LEDGER_PATH", ledger_path):
+                for date_str, sport in (
+                    ("2026-06-01", "mlb"),
+                    ("2026-06-05", "wnba"),
+                    ("2026-06-10", "mlb"),
+                ):
+                    prediction = record_prediction(
+                        query={"question": "test", "selected_date": date_str, "sport": sport},
+                        response={"selected_date": date_str, "recommendations": []},
+                        persist=True,
+                    )
+                    record_recommendation(
+                        prediction_record=prediction,
+                        recommendation={"name": "pick", "pick": "Over", "line": 1.5, "sport": sport},
+                        persist=True,
+                    )
+
+                # Each date writes one prediction record + one recommendation
+                # record; both survive _latest_by_recommendation_id (the
+                # prediction falls back to a prediction_id key), so 2
+                # in-window dates -> 4 normalized records.
+                windowed = build_recommendation_performance_analytics_for_window(
+                    since="2026-06-04", until="2026-06-10", ledger_path=ledger_path
+                )
+                self.assertEqual(windowed["summary"]["publish_count"], 4)
+                dates_seen = {row["publish_date"] for row in windowed["records"]}
+                self.assertEqual(dates_seen, {"2026-06-05", "2026-06-10"})
+
+                sport_scoped = build_recommendation_performance_analytics_for_window(
+                    since="2026-06-01", until="2026-06-10", sport="mlb", ledger_path=ledger_path
+                )
+                self.assertEqual(sport_scoped["summary"]["publish_count"], 4)
+                self.assertTrue(all(row.get("sport") == "mlb" for row in sport_scoped["records"] if "sport" in row))
+
+                empty_window = build_recommendation_performance_analytics_for_window(
+                    since="2026-07-01", until="2026-07-05", ledger_path=ledger_path
+                )
+                self.assertEqual(empty_window["summary"]["publish_count"], 0)
 
     def test_default_ledger_path_writes_chunked_records(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -472,6 +519,56 @@ class IntelligenceEvaluationTests(unittest.TestCase):
         self.assertAlmostEqual(metrics["roi"], -0.045, places=3)
         self.assertAlmostEqual(metrics["clv"], 0.0, places=3)
         self.assertAlmostEqual(metrics["calibration"]["mae"], 0.46, places=2)
+
+    def test_settle_result_persists_in_place_on_chunked_ledger(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            ledger_path = Path(tmp_dir) / "evaluation_ledger.jsonl"
+            with patch.object(intelligence_evaluation, "DEFAULT_LEDGER_PATH", ledger_path):
+                prediction = record_prediction(
+                    query={"question": "analyze Tatum tonight", "selected_date": "2026-06-08", "sport": "nba"},
+                    response={"selected_date": "2026-06-08", "recommendations": []},
+                    persist=True,
+                )
+                recommendation = record_recommendation(
+                    prediction_record=prediction,
+                    recommendation={"name": "Jayson Tatum Over 28.5", "pick": "Over 28.5", "line": 28.5, "model_probability": 0.63},
+                    persist=True,
+                )
+
+                chunk_file = ledger_path.parent / "evaluation_ledger_chunks" / "2026-06-08.jsonl"
+                pending_lines = chunk_file.read_text(encoding="utf-8").strip().splitlines()
+                self.assertEqual(len(pending_lines), 2)  # prediction + recommendation records
+                self.assertIn('"pending"', pending_lines[-1])
+
+                settled = settle_result(
+                    record=recommendation,
+                    result="win",
+                    pnl=0.91,
+                    closing_line=27.5,
+                    implied_probability=0.63,
+                    persist=True,
+                )
+
+                # persist=True must actually rewrite the on-disk record, not silently no-op
+                # because the identity was already present in evaluation_ledger_chunks/index.json.
+                settled_lines = chunk_file.read_text(encoding="utf-8").strip().splitlines()
+                self.assertEqual(len(settled_lines), 2)  # updated in place, no duplicate line
+                on_disk_recommendation = json.loads(settled_lines[-1])
+                self.assertEqual(on_disk_recommendation["result"], "win")
+                self.assertEqual(on_disk_recommendation["recommendation_id"], recommendation["recommendation_id"])
+
+                loaded_records = intelligence_evaluation._iter_record_payloads(ledger_path=ledger_path)
+                loaded_recommendation = next(
+                    r for r in loaded_records if r.get("recommendation_id") == recommendation["recommendation_id"]
+                )
+                self.assertEqual(loaded_recommendation["result"], "win")
+
+                metrics = compute_metrics(ledger_path=ledger_path)
+                self.assertEqual(metrics["settled_count"], 1)
+                self.assertEqual(metrics["win_rate"], 1.0)
+
+                profile = intelligence_evaluation.build_reliability_profile(ledger_path=ledger_path, sport="nba")
+                self.assertEqual(profile["sample_size"], 1)
 
     def test_adjust_confidence_penalizes_poor_calibration(self) -> None:
         adjusted, profile = adjust_confidence(

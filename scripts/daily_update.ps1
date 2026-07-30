@@ -115,6 +115,17 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Prediction reconciliation failed with exit code $LASTEXITCODE"
     }
+
+    $evaluationSettlementArgs = @(
+        $python, '-m', 'syndicate.features.shared.evaluation_settlement', '--date', $Date, '--sport', 'mlb', '--sport', 'wnba'
+    )
+    Write-Host '==> Evaluation-ledger settlement' -ForegroundColor Cyan
+    Write-Host ("    " + ($evaluationSettlementArgs -join ' ')) -ForegroundColor DarkGray
+    $evaluationSettlementInvocationArgs = @($evaluationSettlementArgs[1..($evaluationSettlementArgs.Length - 1)])
+    & $evaluationSettlementArgs[0] @evaluationSettlementInvocationArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "Evaluation-ledger settlement failed with exit code $LASTEXITCODE"
+    }
 }
 finally {
     Pop-Location

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Syndicate - Opportunity Board</title>
+  <meta name="description" content="Cross-sport recommendation hit-rate, ROI, and CLV tracking." />
+  <link rel="icon" href="data:,">
+  <meta http-equiv="Cache-Control" content="no-store" />
+  <meta name="color-scheme" content="dark light" />
+  <style>
+    :root{--bg:#080d1a;--card:#0d1426;--card2:#121b31;--text:#f5f7ff;--muted:#c3cee4;--border:#243356;--link:#b8d1ff;--pill-bg:#101a2e;--pill-br:#2a3a63}
+    body.light{--bg:#ffffff;--card:#f8fafc;--card2:#f1f5fb;--text:#0a1020;--muted:#475569;--border:#cbd5e1;--link:#1e3a8a;--pill-bg:#eef3fb;--pill-br:#94a3b8}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:var(--bg);color:var(--text)}
+    .container{max-width:1100px;margin:24px auto;padding:0 16px}
+    a{color:var(--link)} h1{margin:0 0 12px;font-size:26px} h2{font-size:18px}
+    .nav{font-size:14px;margin-bottom:10px} .nav a{color:var(--link);text-decoration:none;margin-right:10px}
+    .nav button.theme-toggle{background:var(--pill-bg);color:var(--text);border:1px solid var(--pill-br);border-radius:6px;padding:6px 10px;cursor:pointer}
+    .cards-summary{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0;align-items:stretch}
+    .card{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--border);border-radius:14px;padding:12px;box-shadow:0 10px 24px rgba(0,0,0,.35)}
+    .card-summary{flex:1;min-width:180px;padding:10px;background:linear-gradient(180deg,#132a52,#0d1426)}
+    .title-sm{font-size:14px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+    .title-lg{font-size:20px;font-weight:600} .title-md{font-size:18px;font-weight:600}
+    .muted-small{font-size:12px;color:var(--muted)}
+    table{width:100%;border-collapse:collapse} th,td{padding:8px} thead th{text-align:left;border-bottom:1px solid var(--border)} tbody tr{border-top:1px solid var(--border)}
+    .table-wrap{overflow-x:auto}
+    form.filters{margin:8px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    form.filters input,form.filters select{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:13px}
+    form.filters button{background:var(--pill-bg);color:var(--text);border:1px solid var(--pill-br);border-radius:6px;padding:6px 10px;font-size:13px;cursor:pointer}
+    .mt-1{margin-top:1rem} .mt-4{margin-top:4px}
+    details > summary{cursor:pointer}
+    .empty-note{background:var(--pill-bg);border:1px solid var(--pill-br);border-radius:10px;padding:10px 12px;margin:10px 0}
+    @media (max-width:760px){ .container{padding:0 10px;margin:12px auto} h1{font-size:20px} .nav{font-size:12px;overflow-x:auto;white-space:nowrap} table{font-size:12px} th,td{padding:6px 4px} }
+  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='shared/standalone_shell.css') }}" />
+</head>
+<body>
+  {% with active_sport_slug='', active_sport_name='' %}
+    {% include 'shared/_standalone_app_header.html' %}
+  {% endwith %}
+  <div class="container">
+    <div class="nav">
+      <a href="{{ back_href }}">{{ back_label }}</a> |
+      <a href="{{ self_href }}" aria-current="page">Opportunity Board</a> |
+      <button type="button" class="theme-toggle" id="themeToggle" title="Toggle light/dark">Toggle Theme</button>
+    </div>
+    <h1>Opportunity Board</h1>
+    <div class="muted-small">Recommendation hit-rate, ROI, and CLV across every intelligence-query recommendation, settled against each sport's own market-accuracy data.</div>
+
+    <form class="filters" id="filters" onsubmit="event.preventDefault(); loadAll();">
+      <label>Since: <input type="date" id="sincePicker" value="{{ since }}" /></label>
+      <label>Until: <input type="date" id="untilPicker" value="{{ until }}" /></label>
+      <label>Sport:
+        <select id="sportPicker">
+          <option value="">All sports</option>
+          <option value="mlb"{% if sport == 'mlb' %} selected{% endif %}>MLB</option>
+          <option value="wnba"{% if sport == 'wnba' %} selected{% endif %}>WNBA</option>
+        </select>
+      </label>
+      <button type="submit">Apply</button>
+    </form>
+
+    <div id="summaryRoot" class="cards-summary"></div>
+    <div id="emptyStateRoot"></div>
+
+    <h2 class="mt-1">By Sport</h2>
+    <div id="bySportRoot" class="table-wrap"></div>
+
+    <h2 class="mt-1">By Market</h2>
+    <div id="byMarketRoot" class="table-wrap"></div>
+
+    <h2 class="mt-1">By Date</h2>
+    <div id="byDateRoot" class="table-wrap"></div>
+
+    <details class="mt-1">
+      <summary>By confidence tier / edge bucket / recommendation type</summary>
+      <div id="byConfidenceRoot" class="table-wrap mt-4"></div>
+      <div id="byEdgeRoot" class="table-wrap mt-4"></div>
+      <div id="byTypeRoot" class="table-wrap mt-4"></div>
+    </details>
+  </div>
+
+  <script>
+    window.addEventListener('error', function(ev){try{const root=document.getElementById('summaryRoot');if(root){const msg=(ev&&ev.error&&ev.error.message)?ev.error.message:(ev&&ev.message?ev.message:'Unknown error');root.innerHTML=`<div class="card">An error occurred while rendering: ${String(msg)}</div>`;}}catch(_){}});
+    (function(){try{const body=document.body;const saved=localStorage.getItem('theme');if(saved==='light') body.classList.add('light');const t=document.getElementById('themeToggle');if(t){t.addEventListener('click',()=>{body.classList.toggle('light');localStorage.setItem('theme', body.classList.contains('light')?'light':'dark');});}}catch(_){}})();
+    function esc(s){const str=String(s==null?'':s);return str.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]||c));}
+    function fmtPct(x){try{if(x==null) return '—';const v=Number(x)*100;return Number.isFinite(v)?(v.toFixed(1)+'%'):'—';}catch(_){return '—';}}
+    function fmtNum(x, digits){try{if(x==null) return '—';const v=Number(x);return Number.isFinite(v)?v.toFixed(digits==null?3:digits):'—';}catch(_){return '—';}}
+
+    function renderSummary(summary){
+      const root=document.getElementById('summaryRoot'); if(!root) return; root.innerHTML='';
+      const tiles=[
+        ['Published', summary.publish_count||0],
+        ['Settled', summary.settled_count||0],
+        ['Win rate', fmtPct(summary.win_rate)],
+        ['ROI', fmtPct(summary.roi)],
+        ['CLV', fmtNum(summary.clv,3)],
+        ['Total P/L', fmtNum(summary.total_pnl,2)],
+      ];
+      tiles.forEach(([label,value])=>{const c=document.createElement('div');c.className='card card-summary';c.innerHTML=`<div class="title-sm">${esc(label)}</div><div class="mt-4 title-md">${esc(value)}</div>`;root.appendChild(c);});
+    }
+
+    function renderEmptyState(summary){
+      const root=document.getElementById('emptyStateRoot'); if(!root) return;
+      if ((summary.settled_count||0) > 0) { root.innerHTML=''; return; }
+      root.innerHTML = `<div class="empty-note">Awaiting grading -- ${esc(summary.publish_count||0)} recommendation(s) published in this window, 0 settled yet. Win rate, ROI, and CLV populate once evaluation-ledger settlement grades results for these dates.</div>`;
+    }
+
+    function renderBucketTable(rootId, rows, bucketLabel){
+      const root=document.getElementById(rootId); if(!root) return;
+      const items=Array.isArray(rows)?rows:[];
+      if(!items.length){ root.innerHTML='<div class="muted-small">No data in this window.</div>'; return; }
+      const body=items.map((row)=>`<tr><td>${esc(row.label||row.bucket||'')}</td><td>${esc(row.publish_count||0)}</td><td>${esc(row.settled_count||0)}</td><td>${esc(row.wins||0)}-${esc(row.losses||0)}-${esc(row.pushes||0)}</td><td>${fmtPct(row.win_rate)}</td><td>${fmtPct(row.roi)}</td><td>${fmtNum(row.clv,3)}</td></tr>`).join('');
+      root.innerHTML=`<table><thead><tr><th>${esc(bucketLabel)}</th><th>Published</th><th>Settled</th><th>W-L-P</th><th>Win rate</th><th>ROI</th><th>CLV</th></tr></thead><tbody>${body}</tbody></table>`;
+    }
+
+    async function loadAll(){
+      const summaryRoot=document.getElementById('summaryRoot');
+      if(summaryRoot) summaryRoot.innerHTML='<div class="card">Loading…</div>';
+      const since=document.getElementById('sincePicker').value;
+      const until=document.getElementById('untilPicker').value;
+      const sport=document.getElementById('sportPicker').value;
+      try{
+        const params=new URLSearchParams({since, until});
+        if(sport) params.set('sport', sport);
+        const res=await fetch(`{{ api_path }}?${params.toString()}`, {cache:'no-store'});
+        const js=await res.json();
+        if(!js||js.ok!==true){
+          const msg=js&&js.error?String(js.error):'Failed to load opportunity board.';
+          if(summaryRoot) summaryRoot.innerHTML=`<div class="card">${esc(msg)}</div>`;
+          return;
+        }
+        renderSummary(js.summary||{});
+        renderEmptyState(js.summary||{});
+        renderBucketTable('bySportRoot', js.by_sport, 'Sport');
+        renderBucketTable('byMarketRoot', js.by_market, 'Market');
+        renderBucketTable('byDateRoot', js.by_date, 'Date');
+        renderBucketTable('byConfidenceRoot', js.by_confidence_tier, 'Confidence tier');
+        renderBucketTable('byEdgeRoot', js.by_edge_bucket, 'Edge bucket');
+        renderBucketTable('byTypeRoot', js.by_recommendation_type, 'Recommendation type');
+      }catch(e){
+        const msg=(e&&e.message)?e.message:String(e||'Failed');
+        if(summaryRoot) summaryRoot.innerHTML=`<div class="card">Failed to load: ${esc(msg)}</div>`;
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', loadAll);
+  </script>
+</body>
+</html>

@@ -27,6 +27,7 @@ from syndicate.blueprints.ncaab import ncaab_bp
 from syndicate.blueprints.ncaaf import ncaaf_bp
 from syndicate.blueprints.nba import nba_bp
 from syndicate.blueprints.mlb import mlb_bp
+from syndicate.blueprints.opportunity_board import opportunity_board_bp
 from syndicate.blueprints.soccer import soccer_bp
 from syndicate.blueprints.sports import sports_bp
 from syndicate.blueprints.wnba import wnba_bp
@@ -278,6 +279,7 @@ def create_app() -> Flask:
 
     app.register_blueprint(home_bp)
     app.register_blueprint(intelligence_bp)
+    app.register_blueprint(opportunity_board_bp)
     app.register_blueprint(ask_the_syndicate_bp)
     app.register_blueprint(ops_bp)
     app.register_blueprint(mlb_bp)
