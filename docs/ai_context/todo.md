@@ -123,19 +123,42 @@ session messages rather than silent overwrites.
      tiebreak preserved on both sides). 324/324 passing across
      `tests/test_home.py`, `tests/test_soccer_cards.py`,
      `tests/test_soccer_market_board.py`, `tests/test_intelligence.py`,
-     `tests/test_intelligence_steam_candidates.py`. **Not yet verified**: the
-     props side (`home_rails.pregame/live.items` → `candidate_type="prop"`)
-     — soccer's prop rows already flow through the same generic
-     `_prop_rows_from_rank_cards`/`_prop_candidate_from_item` path every
-     other sport uses, and `_SoccerDataProvider.pregame_props` already
-     stamps `game_id`/`gamePk` from the props rank-card's `match_id`, which
-     `build_soccer_artifacts.py` sets to the real ESPN `event_id` when
-     available — reasoned to already work once hydration is fixed, but not
-     empirically confirmed against a real slate the way the game-candidate
-     path was. **Next step**: deploy, then re-run the same production
-     `/api/intelligence/query` check from #148's investigation and confirm
-     soccer now shows nonzero `candidate_type="game"`/`"prop"` counts (not
-     just `"steam"`), for both games and props.
+     `tests/test_intelligence_steam_candidates.py`. **Deployed and confirmed
+     live 2026-07-30** (commit `c2daaa11`, all 3 services): re-ran #148's own
+     production check (`/api/intelligence/query`, question="board",
+     sport="all") repeatedly as refresh-worker's background loop cycled —
+     soccer went from `{"steam": 126}` to `{"game": 6, "steam": 126}` within
+     ~5 minutes of deploy, stable across 4+ subsequent ticks. Also confirmed
+     directly against a real fetched production game
+     (`event_id=761695`, NYCFC vs Toronto FC): `game["betting"]` on
+     `/soccer/mls/api/cards` now carries the full extended shape
+     (`home_ml=-157`, `away_ml=390`, `home_puck_line=-0.5`,
+     `away_puck_line=0.5`, real `*_ev` fields), `_game_status_state` returns
+     `"scheduled"`, and `_build_sport_overview` hydrates all 16 of that
+     week's games into `dashboard_games` (patched the provider to return
+     the real fetched payload rather than the stale local mirror).
+     **Props confirmed NOT yet working, a separate, additional gap from
+     what this session fixed**: hydration itself is fine (18 real
+     `home_rails.pregame.items` came through in the same patched-real-data
+     test, correctly `game_id`-matched via `match_id`), but each item's
+     `market`/`line`/`odds`/`projected`/`edge` fields are all `null` —
+     soccer's player-prop rank cards (`syndicate/features/soccer/props.py`'s
+     `_prop_rank_card`) carry only the SIMULATED anytime-scorer/shots
+     probability, never a real market line or price, so
+     `_classify_candidate_with_reason`'s `missing_projection_or_odds` check
+     (needs a non-null `projection` or `odds`) rejects every one of them —
+     consistent with 4+ ticks of live confirmation never showing a `"prop"`
+     count for soccer. The real market prices for these exact markets
+     (anytime scorer, shots) already get captured by
+     `scripts/fetch_soccer_oddsapi_props_local.py` into
+     `{league}/props/{date}.csv` — they're just never joined into
+     `_prop_rank_card`/`build_props_page_context` the way
+     `build_soccer_picks.py` already joins game-market odds into
+     `_market_data_for_match`. **Next step, if the user wants full parity**:
+     mirror `_market_data_for_match`'s join pattern for player props — read
+     the captured props CSV, match by player name (or match_id + player),
+     and stamp real `line`/`odds`/`projected`/`edge` onto each rank card
+     before it reaches `_prop_item_from_rank_card`.
 
 - **New: #149** (root-caused, fixed, and unit-tested this session; **not yet
   committed/deployed/confirmed live** — next session or later this one should
