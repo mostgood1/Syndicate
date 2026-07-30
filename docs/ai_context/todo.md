@@ -59,9 +59,59 @@ unpushed. Cross-session ID collisions (#131, #139) were both caught and
 resolved without data loss, in both directions, via direct session-to-
 session messages rather than silent overwrites.
 
-> **Next free ID: 146.** IDs are never reused. Closed items move to
+> **Next free ID: 147.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
+
+- **New: #146** (root-caused and fixed this session, **NOT YET DEPLOYED**) —
+  user asked to verify soccer sims are actually happening, then whether they
+  include player prop data. Game-level sim confirmed working live (real
+  win/draw/loss, projected score/shots/corners for all 8 upcoming MLS
+  fixtures). Player props confirmed NOT working: `/soccer/mls/api/props`
+  showed `"Players": "0"`, every game card's `shared_prop_rows` showed the
+  identical placeholder ("No player-prop rows were available for this
+  match."), and this persisted even after manually triggering a fresh
+  full-mode soccer refresh. Root cause, traced end to end:
+  `scripts/build_soccer_artifacts.py`'s `_load_player_rows` reads
+  `{source_root}/{league}/players/players_{season}.csv` -- a real,
+  git-committed roster seed file (572 real MLS players, 8 leagues total:
+  belgian_pro_league/bundesliga/epl/eredivisie/la_liga/ligue_1/mls/serie_a)
+  -- and has **no error path** for a missing file: an empty `players/`
+  directory just silently returns `[]`, so `adapter.simulate_props()`
+  (correctly called, not the game-only `simulate_games()`) ran "successfully"
+  every cycle with zero player_outputs and nothing anywhere flagged it.
+  `_load_team_ratings` right next to it raises `SystemExit` on the
+  equivalent missing-data case -- this one silently degraded instead.
+  The actual gap: `refresh_odds_sources.py`'s soccer steps resolve
+  `--source-root` to the **Render persistent disk**
+  (`_local_source_bundle_root` -> `SYNDICATE_DATA_ROOT/soccer_source`), not
+  the git checkout -- and unlike web (`syndicate/app.py`'s
+  `_bootstrap_render_data`, gated by `SYNDICATE_BOOTSTRAP_ON_START`),
+  refresh-worker (a plain script, no Flask app, confirmed via
+  `grep bootstrap scripts/run_refresh_worker.py` returning nothing) never
+  ran ANY bootstrap sync from git onto its own disk at all. The committed
+  players CSVs were correct the whole time; refresh-worker's disk simply
+  never received them. **Fixed**: added
+  `_bootstrap_soccer_player_seed_files()` to `scripts/run_refresh_worker.py`,
+  called once at boot (unconditional, no env var gate needed since it's
+  provably safe). Deliberately NOT reusing `bootstrap_data_root.py`'s broad
+  `data/soccer_source` sync -- that tree also holds committed daily
+  `recommendations_*.json`/schedule snapshots from past sessions, and its
+  copy-if-content-differs semantics would silently overwrite a
+  freshly-regenerated file with an older git-committed one sharing the same
+  filename. This fix is narrower and provably safe instead: it only ever
+  copies `players_*.csv` into a league's `players/` directory when that
+  directory has **none at all** yet, so it can never touch or replace
+  anything the pipeline has already written -- verified directly
+  (seeds all 8 leagues correctly, leaves a league with no committed seed
+  data alone, and a rerun after seeding is a complete no-op, confirmed via a
+  written sentinel value surviving a second call untouched). New test
+  `test_bootstrap_soccer_player_seed_files_backfills_missing_leagues_only`
+  in `tests/test_refresh_worker.py` — 24/24 passing in that file.
+  **Not yet deployed or re-verified against the live board** — next step:
+  deploy, wait for refresh-worker's boot log
+  (`SOCCER_PLAYER_SEED_BOOTSTRAPPED`), then a fresh soccer artifacts run,
+  then re-check `/soccer/mls/api/props` for non-zero `Players`.
 
 - **New: #145** (root-caused, fixed, deployed, and confirmed against the
   live board this session, distinct from #144) — verifying #142's Layer 2

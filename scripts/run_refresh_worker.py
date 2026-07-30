@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -39,6 +40,62 @@ def _refresh_state_store() -> dict[str, Any]:
         "reports_root": reports_root,
         "write_json_file": write_json_file,
     }
+
+
+def _bootstrap_soccer_player_seed_files() -> None:
+    # #145. Root-caused live 2026-07-30: soccer's per-league player-roster
+    # seed CSVs (data/soccer_source/{league}/players/players_{season}.csv --
+    # committed to git, e.g. 572 real MLS players) are what
+    # scripts/build_soccer_artifacts.py's _load_player_rows reads to run
+    # SoccerSim's player-props pass (simulate_props). That function has no
+    # error path at all for a missing file -- an empty players/ dir just
+    # silently returns [], so simulate_props() ran "successfully" every
+    # cycle producing real match-level sims (team ratings/history ARE
+    # present) but zero player projections, with no error anywhere to catch.
+    # Root cause: refresh_odds_sources.py's soccer steps resolve
+    # --source-root to the RENDER PERSISTENT DISK
+    # (_local_source_bundle_root -> SYNDICATE_DATA_ROOT/soccer_source), not
+    # the git checkout -- and unlike web (syndicate/app.py's
+    # _bootstrap_render_data, gated the same way), refresh-worker (a plain
+    # script, no Flask app) never ran ANY bootstrap sync from git onto its
+    # own disk. The committed players CSVs were real and correct the whole
+    # time; refresh-worker's disk just never received them.
+    #
+    # Deliberately NOT reusing bootstrap_data_root.py's broad
+    # data/soccer_source sync wholesale here: that tree also holds
+    # committed daily recommendations_*.json/schedule snapshots from past
+    # sessions, and its copy-if-content-differs semantics would silently
+    # overwrite a freshly-regenerated file with an older git-committed one
+    # sharing the same filename. This is deliberately narrower and
+    # provably safe: it only ever copies players_*.csv into a players/
+    # directory that has NONE at all yet, so it can never touch or replace
+    # anything the pipeline has already written.
+    try:
+        data_root = _refresh_state_store()["data_root"]()
+    except Exception as exc:
+        print(f"[refresh_worker] SOCCER_PLAYER_SEED_BOOTSTRAP_SKIPPED error={type(exc).__name__}: {exc}", flush=True)
+        return
+    source_root = REPO_ROOT / "data" / "soccer_source"
+    if not source_root.is_dir():
+        return
+    seeded_leagues: list[str] = []
+    for league_dir in sorted(source_root.iterdir()):
+        if not league_dir.is_dir():
+            continue
+        source_players_dir = league_dir / "players"
+        source_files = sorted(source_players_dir.glob("players_*.csv")) if source_players_dir.is_dir() else []
+        if not source_files:
+            continue
+        dest_players_dir = data_root / "soccer_source" / league_dir.name / "players"
+        existing = list(dest_players_dir.glob("players_*.csv")) if dest_players_dir.is_dir() else []
+        if existing:
+            continue
+        dest_players_dir.mkdir(parents=True, exist_ok=True)
+        for src_file in source_files:
+            shutil.copy2(src_file, dest_players_dir / src_file.name)
+        seeded_leagues.append(league_dir.name)
+    if seeded_leagues:
+        print(f"[refresh_worker] SOCCER_PLAYER_SEED_BOOTSTRAPPED leagues={seeded_leagues}", flush=True)
 
 
 def _default_latest_manifest_path() -> Path:
@@ -708,6 +765,7 @@ def main() -> int:
     print("[refresh_worker] BOOTED", flush=True)
     _diag_log_all_process_memory("boot")
     assert_refresh_state_backend_ready(process_name="refresh-worker")
+    _bootstrap_soccer_player_seed_files()
     if str(os.environ.get("SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP") or "").strip().lower() in {"1", "true", "yes", "on"}:
         print("[refresh_worker] INTELLIGENCE_LOOP_ENABLED calling start_intelligence_state_background_loop()", flush=True)
         loop_started = start_intelligence_state_background_loop()

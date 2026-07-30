@@ -23,6 +23,47 @@ class RefreshWorkerTests(unittest.TestCase):
         spec.loader.exec_module(module)
         return module
 
+    def test_bootstrap_soccer_player_seed_files_backfills_missing_leagues_only(self) -> None:
+        # #145. Root cause confirmed live 2026-07-30: build_soccer_artifacts.py's
+        # simulate_props() ran "successfully" every cycle (real match-level
+        # sims present) but produced zero player projections for every
+        # league, because refresh-worker's own disk never received the
+        # git-committed players_{season}.csv roster seed files -- unlike web
+        # (syndicate/app.py's _bootstrap_render_data), refresh-worker never
+        # ran any bootstrap sync from git at all.
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            fake_data_root = Path(tmp_dir) / "data_root"
+            fake_data_root.mkdir(parents=True)
+
+            with patch.object(module, "_refresh_state_store", return_value={"data_root": lambda: fake_data_root}):
+                module._bootstrap_soccer_player_seed_files()
+
+            mls_dest = fake_data_root / "soccer_source" / "mls" / "players" / "players_2026.csv"
+            self.assertTrue(mls_dest.exists())
+            source_mls = repo_root / "data" / "soccer_source" / "mls" / "players" / "players_2026.csv"
+            self.assertEqual(mls_dest.read_bytes(), source_mls.read_bytes())
+
+            epl_dest = fake_data_root / "soccer_source" / "epl" / "players"
+            self.assertEqual(
+                sorted(p.name for p in epl_dest.glob("players_*.csv")),
+                ["players_2024.csv", "players_2025.csv"],
+            )
+
+            # A league with no committed players/ dir at all (e.g.
+            # championship) must not get one manufactured out of nothing.
+            self.assertFalse((fake_data_root / "soccer_source" / "championship" / "players").exists())
+
+            # Never overwrites anything already on disk -- rerunning after a
+            # league already has real, freshly-generated data must be a
+            # complete no-op for that league.
+            mls_dest.write_text("SENTINEL-DO-NOT-OVERWRITE", encoding="utf-8")
+            with patch.object(module, "_refresh_state_store", return_value={"data_root": lambda: fake_data_root}):
+                module._bootstrap_soccer_player_seed_files()
+            self.assertEqual(mls_dest.read_text(encoding="utf-8"), "SENTINEL-DO-NOT-OVERWRITE")
+
     def test_has_pending_external_contract_requires_pending_state_and_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module = self._load_module(repo_root)
