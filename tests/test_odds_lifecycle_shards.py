@@ -65,6 +65,33 @@ class RecentHistoryRowsFilterTests(unittest.TestCase):
             rows = _recent_history_rows({"sport_slug": "wnba", "game_id": "GAME1", "candidate_type": "game"}, sport="wnba")
         self.assertEqual(len(rows), 3)
 
+    def test_placeholder_dash_fields_still_extract_subject_from_selection_text(self) -> None:
+        # Confirmed live 2026-07-30, right after deploying the fix above:
+        # some WNBA prop candidates ("Veronica Burton UNDER 19.5", "Alyssa
+        # Thomas UNDER 17.5") carry player="-" (this codebase's own
+        # _safe_text default="-" placeholder, a TRUTHY string) with
+        # entity/stat both None -- "-" short-circuited the `or` chain before
+        # ever reaching the selection-text fallback, so these candidates
+        # still fell into the "no subject" unfiltered branch and kept
+        # showing the exact cross-candidate collision this whole fix targets.
+        candidate = {
+            "candidate_type": "prop",
+            "player": "-",
+            "entity": None,
+            "stat": None,
+            "market": "PTS+AST",
+            "market_type": "PTS+AST",
+            "selection": "Veronica Burton UNDER 19.5",
+            "sport_slug": "wnba",
+            "game_id": "GAME1",
+        }
+        events = self._EVENTS + [
+            {"event_id": "GAME1", "game_id": "GAME1", "selection": "Veronica Burton UNDER 19.5", "market": "PTS+AST", "current_line": 19.5, "timestamp": "2026-07-30T00:03:00Z"},
+        ]
+        with patch("syndicate.features.shared.odds_lifecycle.load_recent_odds_events", return_value=events):
+            rows = _recent_history_rows(candidate, sport="wnba")
+        self.assertEqual([row.get("current_line") for row in rows], [19.5])
+
 
 class OddsLifecycleShardMergeTests(unittest.TestCase):
     def test_resolve_market_state_across_shards_merges_opening_and_closing(self) -> None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import uuid
 from collections import deque
 from datetime import date
@@ -354,6 +355,9 @@ def build_recent_market_history_index(events: Sequence[Mapping[str, Any]]) -> di
 # this path at 2000 rows/day, so the whole 7-day set is ~14k events and
 # rebuilding it 15 times is noise. The uncapped path was the odds-history
 # shards; see the payload_cache threading in simulation_adapter.py.
+_SELECTION_SUBJECT_RE = re.compile(r"^(.*?)\s+(?:OVER|UNDER)\b", re.IGNORECASE)
+
+
 def _subject_text_for_filtering(row: Mapping[str, Any]) -> str:
     # Mirrors _candidate_market_id's own entity fallback chain, plus the
     # schema aliases confirmed live 2026-07-29 for WNBA/NBA's live-lens rows
@@ -362,15 +366,48 @@ def _subject_text_for_filtering(row: Mapping[str, Any]) -> str:
     # (matching attach_market_id's own rule) -- a team-level match would
     # silently readmit the exact cross-player collision this filter exists
     # to prevent.
+    # "-" is this codebase's own placeholder for "no value" (_safe_text's
+    # default="-" convention) -- a truthy Python string that would otherwise
+    # short-circuit every `or` below before ever reaching a real value or the
+    # selection-text fallback, exactly the bug that let
+    # player="-"/entity=None/stat=None candidates slip through unfiltered.
+    def _real(value: Any) -> Any:
+        text = str(value or "").strip()
+        return value if text and text != "-" else None
+
+    entity = _real(row.get("entity")) or _real(row.get("player_name")) or _real(row.get("player"))
+    if not entity:
+        # Confirmed live 2026-07-30: some WNBA prop candidates (e.g.
+        # "Veronica Burton UNDER 19.5", "Alyssa Thomas UNDER 17.5") carry NO
+        # structured player field at all (entity/player_name/player all
+        # empty/"-") -- only the name embedded as free text in
+        # selection/display_pick/name/pick. Tried BEFORE the team fallback,
+        # and regardless of candidate_type (a raw odds-event row being
+        # matched against, as opposed to a candidate, never carries
+        # candidate_type at all): a selection that actually parses as
+        # "<name> OVER/UNDER ..." is an unambiguous per-player signal on
+        # either side of the comparison, and skipping it whenever
+        # candidate_type looked like "game" was exactly what let these
+        # candidates keep falling through to the unfiltered team-level path
+        # below and reproducing the cross-candidate collision this whole fix
+        # targets. Only applies when nothing structured was found, so it
+        # can't override a real, already-correct entity.
+        text = str(_real(row.get("selection")) or _real(row.get("display_pick")) or _real(row.get("name")) or _real(row.get("pick")) or "").strip()
+        match = _SELECTION_SUBJECT_RE.match(text)
+        if match:
+            entity = match.group(1).strip()
     is_prop = str(row.get("candidate_type") or "").strip().lower() == "prop"
-    entity = row.get("entity") or row.get("player_name") or row.get("player")
     if not entity and not is_prop:
-        entity = row.get("team") or row.get("team_tri") or row.get("selection")
+        entity = _real(row.get("team")) or _real(row.get("team_tri")) or _real(row.get("selection"))
     return str(entity or "").strip().lower()
 
 
 def _stat_text_for_filtering(row: Mapping[str, Any]) -> str:
-    return str(row.get("stat") or row.get("market_type") or row.get("market") or "").strip().lower()
+    for key in ("stat", "market_type", "market"):
+        text = str(row.get(key) or "").strip()
+        if text and text != "-":
+            return text.lower()
+    return ""
 
 
 def _recent_history_rows(candidate: Mapping[str, Any], *, sport: str | None = None, lookback_days: int = 7, end_date: str | None = None) -> list[dict[str, Any]]:

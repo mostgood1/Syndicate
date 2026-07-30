@@ -63,10 +63,11 @@ session messages rather than silent overwrites.
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
 
-- **New: #145** (root-caused and fixed this session, distinct from #144,
-  **NOT YET DEPLOYED**) — verifying #142's Layer 2 mini-card fix surfaced a
-  live production bug: every MLB steam-move candidate built from hitter/
-  pitcher prop rows (name pattern "`<player>` `<market>` steam move", e.g.
+- **New: #145** (root-caused, fixed, deployed, and confirmed against the
+  live board this session, distinct from #144) — verifying #142's Layer 2
+  mini-card fix surfaced a live production bug: every MLB steam-move
+  candidate built from hitter/pitcher prop rows (name pattern
+  "`<player>` `<market>` steam move", e.g.
   "Nick Sogard Home runs steam move") had `game_id=""`, `gamePk=None`,
   `event_id="-"`, `matchup="-"` — fully unresolved, all landing under one
   shared `mlb|-` grouping key on the Games mini-card strip
@@ -99,20 +100,36 @@ session messages rather than silent overwrites.
   was needed — it flows straight into the existing lookup built for every
   other sport. 6 new tests in `tests/test_intelligence_steam_candidates.py`
   (`MlbSteamGameIdResolutionTests`, `MlbPlayerGameLookupForDateTests`), all
-  passing; full file 16/16. **Not yet verified against the live production
-  board** (`/api/intelligence/query`, sport=mlb) — that requires deploying,
-  which per this repo's own operational rule kills any in-flight MLB sim, so
-  it needs a sim-status check first; deferred to whoever picks this up next
-  (or the same session, once the user confirms it's safe to deploy).
+  passing; full file 16/16 (broader `test_intelligence.py` + this file:
+  193/193). Committed as `7d38c0ba` and deployed to all three services
+  (web `srv-d88ahvrbc2fs73eodu30`, refresh-worker `srv-d91dpertqb8s73co8ls0`,
+  live-odds-worker `srv-d91dpertqb8s73co8lt0`) — this interrupted an
+  in-flight `tip_off_window` scoped resim (single game, `game_pk 823924`)
+  on refresh-worker, judged acceptable per this repo's own precedent for
+  that run class (not irreplaceable, re-triggers on the next fingerprint
+  change). **Confirmed live** via `/api/intelligence/query`
+  (`force_refresh: true`, date `2026-07-29`): "Nick Sogard Home runs steam
+  move" now carries `game_id="824973"`/`game_pk=824973`/
+  `matchup="BOS @ ATH"` (previously `""`/`None`/`"-"`); same for "Taylor
+  Trammell" candidates (`824002`, `HOU @ LAA`) and the two other player-prop
+  steam candidates on that date. One thing worth noting for whoever next
+  debugs a similarly "fixed but still showing old data" symptom: the first
+  post-deploy query still showed the stale unresolved candidates even
+  though `state_last_updated` had already ticked past the refresh-worker's
+  deploy-live timestamp — a second query ~90s later showed the fix. Root
+  cause not fully pinned down (most likely an in-progress recompute cycle
+  straddling the deploy cutover), so **don't trust a single post-deploy
+  query as proof of a fix living or dying** — requery once more a minute or
+  two later before concluding either way.
 
-- **New: #144** (root-caused and fixed this session, direct follow-on to
-  #143, **NOT YET DEPLOYED**) — user reported live, right after #143
-  deployed: the Layer 2 board STILL showed Kahleah Copper's identical wrong
-  `Line 9.5 → 24.5` movement, even with `force_refresh: true` on the query.
-  #143's fix was real (confirmed: the odds-history "markets" dict went from
-  2 shared entries to 67 correctly player+stat-scoped ones, zero
-  `content_collisions`) but turned out to fix a store the board's read path
-  never actually reads from. Confirmed via
+- **New: #144** (root-caused, fixed, deployed, and confirmed against the
+  live board this session, direct follow-on to #143) — user reported live,
+  right after #143 deployed: the Layer 2 board STILL showed Kahleah Copper's
+  identical wrong `Line 9.5 → 24.5` movement, even with `force_refresh: true`
+  on the query. #143's fix was real (confirmed: the odds-history "markets"
+  dict went from 2 shared entries to 67 correctly player+stat-scoped ones,
+  zero `content_collisions`) but turned out to fix a store the board's read
+  path never actually reads from. Confirmed via
   `/api/ops/odds-history/inspect`: every entry's top-level `stored_market_id`
   is `null` -- `_market_state_from_payload`'s exact-key lookup (both the
   primary `markets.get(market_id)` and the embedded-field fallback) can
@@ -139,17 +156,45 @@ session messages rather than silent overwrites.
   returning the unfiltered game-wide set. A candidate with no real subject
   (a team-level ATS/Total pick) still gets the unfiltered game-level rows,
   since there's nothing to filter by and that's the correct existing
-  behavior. Verified directly with the real production row shapes: Kahleah
-  Copper's own rows now show only her 9.5→24.5 sequence, Alyssa Thomas's
-  only her 8.5 entry -- confirmed both fail without the fix (returns all 3
-  merged) and pass with it, via git-stash revert-and-rerun. New tests in
-  `tests/test_odds_lifecycle_shards.py`
-  (`RecentHistoryRowsFilterTests`) — 6/6 passing in that file.
-  **Not yet deployed or re-verified against the live board** — next step is
-  the same deploy-and-query loop used for #143
-  (`/api/intelligence/query` for Kahleah Copper's candidate,
-  `force_refresh: true`, confirm `line_odds_movement` is no longer the
-  stale 9.5→24.5 shared value).
+  behavior. Verified directly with the real production row shapes,
+  git-stash-confirmed fail-without/pass-with. Deployed on `0cc487fb`.
+
+  **Post-deploy discovery #1**: querying the board immediately after deploy
+  still showed the stale value even with `force_refresh: true` --
+  `/api/intelligence/query`'s `force_refresh` on Render only QUEUES a
+  background recompute (`_safe_queue_intelligence_state_refresh`) and
+  returns the existing cached snapshot immediately with `queued_refresh:
+  true` tacked on (`syndicate/blueprints/intelligence.py:1487-1515`) --
+  correctly matching this repo's "web never computes" rule, but meaning the
+  fix only shows up once refresh-worker's own background loop (60s
+  interval, confirmed alive by polling `/api/ops/intelligence/candidate-trace?read_only=true`'s
+  `state_read_updated_at`, which WAS advancing) actually cycles. Waited for
+  a genuine post-deploy cycle, then a plain (non-force) query confirmed:
+  Kahleah Copper's threes prop showed real, flat `1.5 → 1.5` movement, and
+  Alyssa Thomas/Veronica Burton/Gabby Williams's own simple props (market
+  keys like `ast`/`reb`/`threes`) also independently correct.
+
+  **Post-deploy discovery #2, fixed same session**: one candidate shape
+  still showed the stale collision after the above --
+  `"PTS+AST Veronica Burton UNDER 19.5"` / `"Points Alyssa Thomas UNDER
+  17.5"`-style candidates, which carry `player: "-"`, `entity: None`,
+  `stat: None` -- no structured identifying field at all, only the player's
+  name embedded as free text in `selection`. Root cause:
+  `_subject_text_for_filtering`'s `or` chain treated `"-"` (this codebase's
+  own `_safe_text` "no value" placeholder) as a truthy real value, so it
+  short-circuited before ever reaching the selection-text fallback. Fixed
+  with a `_real()` helper that treats `"-"` as empty everywhere in both
+  `_subject_text_for_filtering` and `_stat_text_for_filtering`, and
+  reordered the selection-text regex extraction (`^(.*?)\s+(?:OVER|UNDER)\b`)
+  to run BEFORE the team-fallback branch and independent of
+  `candidate_type` (a raw odds-event row being matched against never
+  carries that field at all, unlike an actual candidate, so gating the
+  regex on `candidate_type` silently skipped it for every event-row
+  comparison). New test
+  `test_placeholder_dash_fields_still_extract_subject_from_selection_text`
+  in `tests/test_odds_lifecycle_shards.py` — 7/7 passing in that file.
+  **Deployed and re-verifying against the live board now** — see whether
+  this session closes it out or whether another edge case surfaces.
 
 - **New: #143** (root-caused, fixed, and confirmed against production data
   this session) — user reported live on the WNBA board: multiple
