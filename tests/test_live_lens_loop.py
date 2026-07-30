@@ -28,6 +28,20 @@ class LiveLensLoopTests(unittest.TestCase):
         with patch.dict(os.environ, {"SYNDICATE_LIVE_LENS_INTERVAL_SECONDS": "90"}, clear=False):
             self.assertEqual(live_lens_loop._live_lens_loop_interval_seconds(), 90)
 
+    def test_min_headroom_defaults_to_300mb(self) -> None:
+        # #124 root cause (2026-07-30): the old 1800MB default was
+        # copy-pasted from live_refresh_loop.py's odds-refresh gate, which is
+        # calibrated to a much heavier operation (~1528MB worst-case WNBA
+        # odds-refresh spike). That left only 248MB of a 2048MB container
+        # "allowed" to be in use, which live-odds-worker's steady-state
+        # baseline (~700-900MB) never satisfied -- production logs showed
+        # 33/33 sampled tick failures over 40h were reason=low_headroom, zero
+        # exceptions. Paired before/after-build memory snapshots showed
+        # estimate_live's real per-tick cost is 0-13MB. A silent regression
+        # back toward 1800 would reintroduce the near-permanent failure rate.
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(live_lens_loop._mlb_live_lens_min_headroom_bytes(), 300 * 1024 * 1024)
+
     def test_pull_enabled_by_default(self) -> None:
         # #128: live-odds-worker had no mechanism to pull hot artifacts from
         # web at all (that only ran inside the intelligence-state loop,

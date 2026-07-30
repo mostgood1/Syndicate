@@ -12,6 +12,8 @@ from syndicate.features.shared.refresh_state_store import data_root
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
 from syndicate.features.shared.timezone import central_today_iso
+from syndicate.features.wnba.cards import _WNBA_REGULATION_MINUTES
+from syndicate.features.wnba.cards import _margin_win_prob
 from syndicate.features.wnba.cards import build_cards_page_context
 from syndicate.features.wnba.cards import build_live_lines_payload
 from syndicate.features.wnba.sources import build_module_links
@@ -45,6 +47,102 @@ def _live_line_value(game: dict[str, Any]) -> float | None:
     if lines.get("total") is not None:
         return _safe_number(lines.get("total"))
     return None
+
+
+def _wnba_elapsed_minutes(period: Any, clock: Any) -> float | None:
+    # #124/Phase 4: WNBA quarters are 10 min each (regulation = 40, not NBA's
+    # 48); OT periods are 5 min each. Returns total minutes elapsed since
+    # tip-off (can exceed 40 in OT) so callers can derive a live/pregame
+    # blend weight -- None on any unparseable input, so callers fall back to
+    # pregame-only rather than guessing.
+    try:
+        period_int = int(period)
+    except (TypeError, ValueError):
+        return None
+    if period_int < 1:
+        return None
+    parts = str(clock or "").strip().split(":")
+    if len(parts) != 2:
+        return None
+    try:
+        minutes_left = int(parts[0])
+        seconds_left = int(parts[1])
+    except ValueError:
+        return None
+    if minutes_left < 0 or not (0 <= seconds_left < 60):
+        return None
+    period_length = 10.0 if period_int <= 4 else 5.0
+    remaining_in_period = max(0.0, min(period_length, minutes_left + seconds_left / 60.0))
+    elapsed_in_period = period_length - remaining_in_period
+    prior_minutes = (period_int - 1) * 10.0 if period_int <= 4 else (4 * 10.0 + (period_int - 5) * 5.0)
+    return prior_minutes + elapsed_in_period
+
+
+def _wnba_live_margin_win_prob(
+    pregame_p_home_win: float | None,
+    live_margin: float | None,
+    elapsed_min: float | None,
+) -> float | None:
+    # #124/Phase 4: adapts the pattern already proven working in the vendored
+    # WNBA live tick (vendor/wnba_betting_repo/app.py's moneyline section) --
+    # a time-decaying scale (shrinks as time runs out, so a fixed margin maps
+    # to a more extreme probability late) feeding the same logistic
+    # win-prob-from-margin function WNBA already uses pregame
+    # (_margin_win_prob), blended toward the pregame probability by elapsed
+    # fraction of regulation. These constants are ported as a starting point,
+    # not backtested against real WNBA outcomes yet -- revisit once Phase
+    # 1/2's settlement pipeline has graded enough live WNBA recommendations
+    # to calibrate against (Phase 5).
+    if pregame_p_home_win is None:
+        return None
+    if live_margin is None or elapsed_min is None:
+        return pregame_p_home_win
+    min_left = max(0.0, _WNBA_REGULATION_MINUTES - elapsed_min)
+    scale = 6.0 + 0.35 * min_left
+    live_win_prob = _margin_win_prob(live_margin, scale=scale)
+    if live_win_prob is None:
+        return pregame_p_home_win
+    blend_w = max(0.0, min(1.0, elapsed_min / _WNBA_REGULATION_MINUTES))
+    return ((1.0 - blend_w) * pregame_p_home_win) + (blend_w * live_win_prob)
+
+
+def _build_wnba_game_lens(game: dict[str, Any]) -> list[dict[str, Any]]:
+    # #124/Phase 4: WNBA's native gameLens-equivalent -- deliberately a
+    # single whole-game lane (not MLB's six innings-based segments; a
+    # basketball quarter/half segmentation is a plausible future extension,
+    # not this phase). Reuses the "live_projection"/"pregame" source
+    # vocabulary MLB's frontend already knows about rather than inventing a
+    # new label, so both sports' payloads stay conceptually consistent even
+    # though only MLB has a dedicated UI for it today.
+    betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
+    live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+    pregame_p_home_win = _safe_number(betting.get("p_home_win"))
+    home_pts = _safe_number(live_state.get("home_pts"))
+    away_pts = _safe_number(live_state.get("away_pts"))
+    live_margin = (home_pts - away_pts) if home_pts is not None and away_pts is not None else None
+    elapsed_min = _wnba_elapsed_minutes(live_state.get("period"), live_state.get("clock"))
+    is_final = bool(live_state.get("final")) or str(game.get("status") or "").strip().lower() == "final"
+    is_live = bool(live_state.get("in_progress")) and not is_final
+    if is_live:
+        model_home_win_prob = _wnba_live_margin_win_prob(pregame_p_home_win, live_margin, elapsed_min)
+    else:
+        model_home_win_prob = pregame_p_home_win
+    source = "live_projection" if (is_live and live_margin is not None and elapsed_min is not None) else "pregame"
+    return [
+        {
+            "key": "live",
+            "label": "Live",
+            "source": source,
+            "closed": is_final,
+            "projection": {
+                "homeMargin": live_margin,
+                "homeScore": home_pts,
+                "awayScore": away_pts,
+            },
+            "modelHomeWinProb": model_home_win_prob,
+            "baselineHomeWinProb": pregame_p_home_win,
+        }
+    ]
 
 
 def _run_wnba_live_lens_tick(selected_date: str) -> dict[str, Any] | None:
@@ -233,6 +331,8 @@ def build_live_lens_snapshot(selected_date: str, *, limit: int = 50) -> dict[str
         cards_context = {}
     resolved_date = str(cards_context.get("date") or selected_date).strip() or selected_date
     games = [dict(game) for game in (cards_context.get("games") if isinstance(cards_context.get("games"), list) else []) if isinstance(game, dict)]
+    for game in games:
+        game["gameLens"] = _build_wnba_game_lens(game)
     event_ids = [str(game.get("event_id") or "").strip() for game in games if str(game.get("event_id") or "").strip()]
     live_line_by_event_id: dict[str, float] = {}
     if event_ids:
@@ -439,6 +539,14 @@ def _rank_card(game: dict[str, Any], selected_date: str, *, live_line: float | N
     badge = _safe_text((((top_rows or [None])[0] or {}).get("value") if top_rows else None), "Watch")
     href = str(game.get("href") or f"/wnba/cards?date={selected_date}").strip()
     metrics = _metric_rows(game)
+    game_lens = game.get("gameLens") if isinstance(game.get("gameLens"), list) else []
+    live_lens_row = game_lens[0] if game_lens and isinstance(game_lens[0], dict) else {}
+    model_home_win_prob = _safe_number(live_lens_row.get("modelHomeWinProb"))
+    live_home_margin = _safe_number((live_lens_row.get("projection") or {}).get("homeMargin")) if isinstance(live_lens_row.get("projection"), dict) else None
+    if model_home_win_prob is not None:
+        metrics = [{"label": "Win probability", "value": f"{model_home_win_prob * 100:.1f}%"}] + metrics
+    if live_home_margin is not None:
+        metrics = [{"label": "Model margin", "value": f"{live_home_margin:+.1f}"}] + metrics
     if current_total is not None:
         metrics = [{"label": "Total pts", "value": str(int(round(current_total)))}] + metrics
     if live_total is not None:

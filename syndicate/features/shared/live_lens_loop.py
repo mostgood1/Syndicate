@@ -170,11 +170,24 @@ def _mlb_live_lens_memory_gate_enabled() -> bool:
 
 
 def _mlb_live_lens_min_headroom_bytes() -> int:
+	# #124 root cause (2026-07-30): this used to default to 1800, copy-pasted
+	# from live_refresh_loop.py's _odds_refresh_min_headroom_bytes(), which is
+	# deliberately calibrated to the worst WNBA-refresh-leg RSS spike measured
+	# in production (~1528MB) -- a much heavier operation than this gate
+	# guards. 1800MB required headroom on a 2048MB container left only 248MB
+	# of the whole container "allowed" to be in use at any time, which
+	# live-odds-worker's steady-state baseline (~700-900MB) never satisfied --
+	# hence the ~80%+ tick-failure rate, all of it reason=low_headroom (33/33
+	# sampled failures over 40h, zero exceptions/invalid_snapshot). Paired 100
+	# real before/after-build memory snapshots the same day: estimate_live's
+	# actual per-tick cost was 0-13MB. 300MB keeps the same "worst measured +
+	# margin" calibration philosophy, just applied to what this gate actually
+	# guards instead of a different, heavier operation's number.
 	raw = str(os.environ.get("SYNDICATE_LIVE_LENS_MIN_HEADROOM_MB") or "").strip()
 	try:
-		value = int(raw or 1800)
+		value = int(raw or 300)
 	except Exception:
-		value = 1800
+		value = 300
 	return max(0, value) * 1024 * 1024
 
 
@@ -186,6 +199,15 @@ def _mlb_live_lens_headroom_snapshot() -> dict[str, Any] | None:
 	# unnecessary staleness risk without a matching memory benefit -- the same
 	# over-scoping mistake already made (and reverted) for the WNBA
 	# odds-refresh mutex.
+	#
+	# Phase 4 (2026-07-30): WNBA's builder now also computes a real live
+	# win-probability (_build_wnba_game_lens/_wnba_live_margin_win_prob in
+	# wnba/live_lens.py), but deliberately still isn't gated here -- that
+	# computation is a clock parse + one logistic call + one blend, not a
+	# sampling loop, so its cost is expected to be negligible like NBA's. If
+	# real measurement ever shows otherwise, calibrate a WNBA-specific gate
+	# from that measurement -- never copy this function's number (that's
+	# the exact #124 mistake this file's own history already made once).
 	if not _mlb_live_lens_memory_gate_enabled():
 		return None
 	return memory_headroom_snapshot(_mlb_live_lens_min_headroom_bytes())
