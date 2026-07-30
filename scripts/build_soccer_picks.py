@@ -366,6 +366,13 @@ def build_prop_picks(league: str, iso_date: str, *, source_root: Path) -> pd.Dat
                 "ev": _ev(model_prob, price),
             }
         )
+    # TEMP DIAGNOSTIC (#151 investigation, remove after root cause found).
+    print(
+        f"[build_soccer_picks] SOCCER_PROP_PICKS_BUILD_DEBUG_151 league={league} date={iso_date} "
+        f"player_props_in={len(player_props)} props_rows_all={len(props_rows_all)} odds_by_key={len(odds_by_key)} "
+        f"matched_rows={len(rows)} sample_odds_keys={list(odds_by_key)[:3]}",
+        flush=True,
+    )
     return pd.DataFrame(rows)
 
 
