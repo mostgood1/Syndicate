@@ -234,11 +234,10 @@ session messages rather than silent overwrites.
      and stamp real `line`/`odds`/`projected`/`edge` onto each rank card
      before it reaches `_prop_item_from_rank_card`.
 
-- **New: #149** (root-caused and fixed this session, with one real
-  self-correction along the way; deployed to refresh-worker, resim
-  re-triggered post-deploy — **row-count confirmation on the live board still
-  pending** as of writing) — user reported MLB's K Targets and pitcher Top
-  Props boards empty for 2026-07-30. Two distinct bugs, found in sequence:
+- **New: #149** (root-caused, fixed, deployed, and **confirmed live** this
+  session, with one real self-correction along the way) — user reported
+  MLB's K Targets and pitcher Top Props boards empty for 2026-07-30. Two
+  distinct bugs, found in sequence:
 
   1. **Timing gap (real, but not this date's main blocker)**: production's
      only MLB sim run for the date launched at 05:33 UTC (00:33 CDT,
@@ -315,23 +314,35 @@ session messages rather than silent overwrites.
      the copy lands under the override path and NOT under
      `vendor_cwd/data` — the exact distinction the first attempt missed:
      [`tests/test_run_mlb_daily_sim_job.py`](tests/test_run_mlb_daily_sim_job.py)
-     (8 tests, all passing). Committed as a second commit, pushed, and
-     redeployed to refresh-worker; a resim was force-triggered again
-     post-deploy for all 10 of today's game_pks. **As of writing, that
-     resim's own log tail had not yet been re-checked and
-     `/mlb/api/k-ladder-targets?date=2026-07-30` still needs a final
-     row-count check** — do that next, and note today's own gap happened
-     before either fix was live, so 2026-07-30 may need one more forced
-     resim even after the corrected fix is confirmed working; a cleaner test
-     is a *later* date's first-ever sim run. **Full local test suite was
-     not re-run this session** — worth a `python -m pytest tests/` pass.
-     **Also noted, not touched**: while working in this checkout, unrelated
+     (8 tests, all passing). Committed as a second commit (`c0a04d0d`),
+     pushed, and redeployed to refresh-worker
+     (`dep-d9lnauoae00c73aoqm8g`); a resim was force-triggered again for all
+     10 of today's game_pks, but production's normal per-game
+     `reason=tip_off_window` triggers (games approaching first pitch) ran
+     ahead of it on their own — irrelevant either way, since every
+     `run_mlb_daily_sim_job.py` invocation runs the hydration step and the
+     full multi-profile pass for the whole date regardless of which
+     game_pks it's scoped to. **Confirmed live** after one of those runs
+     finished: `/mlb/api/k-ladder-targets?date=2026-07-30` →
+     `header_stats` Rows `5` (real data, not the empty-state payload);
+     `/mlb/api/top-props?date=2026-07-30` → Rows `12`, `rank_cards` length
+     `12`. Both gaps from the original report are closed. **Full local test
+     suite was not re-run this session** — worth a `python -m pytest
+     tests/` pass. **Cross-session coordination**: mid-verification, a
+     concurrent session (working in this same shared local checkout —
+     confirmed by their `#151` commits already showing up in `git log`
+     without ever being pulled/merged locally) messaged asking to deploy a
+     soccer-only fix to all three services and offered to hold off if it
+     would interrupt anything. Replied asking them to hold refresh-worker
+     specifically (their change didn't touch MLB files, so web/live-odds-
+     worker were fine to proceed) until the K-targets fix was confirmed;
+     they agreed, deployed web + live-odds-worker only, and were pinged
+     back once K Targets/Top Props were confirmed live so they could
+     deploy refresh-worker too. **Also noted, not touched**: unrelated
      uncommitted local changes to `syndicate/features/mlb/cards.py` and
      `syndicate/features/mlb/live_lens.py` (removing `first7` segment
-     support) appeared mid-session from what looks like a concurrent session
-     sharing this working directory — left entirely alone and excluded from
-     both of this entry's commits; whoever owns that change still needs to
-     commit/reconcile it separately.
+     support) appeared mid-session from that same concurrent session —
+     left entirely alone and excluded from both of this entry's commits.
 
 - **New: #148** (root-caused, fixed, tested, and deployed this session) —
   user asked for a full soccer architecture
