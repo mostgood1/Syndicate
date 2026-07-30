@@ -3295,9 +3295,38 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(len(candidates), 1)
         candidate = candidates[0]
         self.assertEqual(candidate.get("model_probability"), 0.241)
+        self.assertEqual(candidate.get("actual"), "-")
         classified, reason = _classify_candidate_with_reason(candidate)
         self.assertIsNone(reason)
         self.assertIsNotNone(classified)
+
+    def test_mlb_prop_candidate_from_artifact_row_defaults_actual_to_dash(self) -> None:
+        # Layer 2 board follow-up: this is the PRIMARY pregame source for
+        # MLB "Hitter X"/"Pitcher X" prop candidates, and it never set an
+        # "actual" field at all -- only _mlb_hydrate_live_prop_projection
+        # (a separate overlay that runs once a game goes live) ever added
+        # one. Before this game goes live (or in any cycle where hydration
+        # doesn't find a match), "actual" serialized as a raw None instead
+        # of this board's universal "-" placeholder.
+        from syndicate.features.intelligence import _mlb_prop_candidate_from_artifact_row
+
+        row = {
+            "ownerName": "Yordan Alvarez",
+            "stat": "hitter_total_bases",
+            "statLabel": "Total Bases",
+            "mean": 2.1,
+            "line": 1.5,
+            "selectionLabel": "Over",
+            "gamePk": 824003,
+        }
+        candidate = _mlb_prop_candidate_from_artifact_row(
+            {"slug": "mlb", "name": "MLB"},
+            row,
+            selected_date="2026-07-29",
+        )
+
+        self.assertIsNotNone(candidate)
+        self.assertEqual(candidate.get("actual"), "-")
 
     def test_mlb_home_run_candidates_carry_the_game_id_the_artifact_row_has(self) -> None:
         # Without game_id/gamePk/event_id, intelligence.html's gameKey() falls

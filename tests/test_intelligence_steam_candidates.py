@@ -226,6 +226,62 @@ class SteamMatchupResolutionTests(unittest.TestCase):
             self.assertEqual(_soccer_steam_matchup_lookup("2026-07-29"), {})
 
 
+class SteamCandidateActualFieldTests(unittest.TestCase):
+    # Layer 2 board follow-up: production showed `"actual": null` (raw
+    # None, not the "-" placeholder) for game-level steam candidates --
+    # this candidate type never set an "actual" field at all, unlike
+    # every other candidate builder on the board.
+    def test_game_level_steam_candidate_uses_combined_score_as_actual(self) -> None:
+        sport = _sport(slug="mlb")
+        sport["dashboard_games"] = [
+            {
+                "gamePk": 823598,
+                "away": {"abbr": "SEA", "score": 3},
+                "home": {"abbr": "LAD", "score": 5},
+            }
+        ]
+        with patch(
+            "syndicate.features.intelligence._load_steam_events_for_date",
+            return_value=[PREGAME_TEAM_STEAM_EVENT],
+        ):
+            candidates = _steam_candidates_for_sport(sport)
+
+        self.assertEqual(len(candidates), 1, candidates)
+        self.assertEqual(candidates[0]["actual"], "8.0")
+
+    def test_game_level_steam_candidate_actual_stays_dash_without_a_score(self) -> None:
+        sport = _sport(slug="mlb")
+        sport["dashboard_games"] = []
+        with patch(
+            "syndicate.features.intelligence._load_steam_events_for_date",
+            return_value=[PREGAME_TEAM_STEAM_EVENT],
+        ):
+            candidates = _steam_candidates_for_sport(sport)
+
+        self.assertEqual(len(candidates), 1, candidates)
+        self.assertEqual(candidates[0]["actual"], "-")
+
+    def test_player_prop_steam_candidate_actual_stays_dash(self) -> None:
+        # No per-player live box-score lookup exists at this layer -- must
+        # never fabricate one from the game's combined score.
+        sport = _sport(slug="mlb")
+        sport["dashboard_games"] = [
+            {
+                "gamePk": 824003,
+                "away": {"abbr": "HOU", "score": 3},
+                "home": {"abbr": "LAA", "score": 5},
+            }
+        ]
+        with patch(
+            "syndicate.features.intelligence._load_steam_events_for_date",
+            return_value=[LIVE_PROP_STEAM_EVENT],
+        ):
+            candidates = _steam_candidates_for_sport(sport)
+
+        self.assertEqual(len(candidates), 1, candidates)
+        self.assertEqual(candidates[0]["actual"], "-")
+
+
 MLB_PROP_STEAM_EVENT_NO_GAME_ID = {
     "capture_phase": "closing",
     "timestamp": "2026-07-30T22:00:00+00:00",

@@ -4034,6 +4034,15 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
     # identity-dedup fix above no longer depends on it), just avoids a
     # universal "-" on every steam row.
     matchup_by_game_id: dict[str, str] = {}
+    # Same "actual" concept as _append_game_bet_candidate's game-level
+    # fallback (home.py's _game_current_combined_score) -- the current
+    # combined score, the one signal meaningful across every game-level
+    # market type (moneyline/spread/total). Steam candidates had no
+    # "actual" field at all before this (unlike props, which already
+    # carry one from odds tracking), so every game-level steam candidate
+    # serialized it as a raw None instead of the "-" placeholder every
+    # other unresolvable field on this board uses.
+    actual_by_game_id: dict[str, float] = {}
     for game in sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []:
         if not isinstance(game, dict):
             continue
@@ -4046,6 +4055,19 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
         home_label = _safe_text(home.get("abbr") or home.get("name"), "") or _safe_text(game.get("home_label"), "")
         if away_label or home_label:
             matchup_by_game_id[game_key] = f"{away_label or '-'} @ {home_label or '-'}"
+        live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+        away_score = _numeric_hint(away.get("score"))
+        if away_score is None:
+            away_score = _numeric_hint(live_state.get("away_pts"))
+        if away_score is None:
+            away_score = _numeric_hint(game.get("away_score"))
+        home_score = _numeric_hint(home.get("score"))
+        if home_score is None:
+            home_score = _numeric_hint(live_state.get("home_pts"))
+        if home_score is None:
+            home_score = _numeric_hint(game.get("home_score"))
+        if away_score is not None and home_score is not None:
+            actual_by_game_id[game_key] = away_score + home_score
     # Confirmed live: soccer's steam moves showed a real, consistent
     # OddsAPI-hash game_id but every one still landed on "-" -- dashboard_games
     # can't resolve it (single-league-curated, _resolve_league picks exactly
@@ -4201,6 +4223,11 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
                 "confidence": f"{implied_prob * 100.0:.1f}%" if implied_prob is not None else "-",
                 "model_probability": implied_prob,
                 "edge": "-",
+                "actual": (
+                    f"{actual_by_game_id[game_id]:.1f}"
+                    if market_key in _GAME_SIDE_MARKETS and game_id in actual_by_game_id
+                    else "-"
+                ),
                 "is_live": is_live,
                 "lane": lane,
                 "line_odds_movement": {
@@ -4328,6 +4355,7 @@ def _mlb_home_run_candidates_from_artifact(sport: dict[str, Any]) -> list[dict[s
                 # model-computed hit probability, not a workaround.
                 "model_probability": hr_probability,
                 "edge": "-",
+                "actual": "-",
                 "score": score,
                 "href": f"/mlb/hr-targets?date={selected_date}",
                 "href_label": "Open HR board",
@@ -4438,6 +4466,13 @@ def _mlb_prop_candidate_from_artifact_row(
         "projected": projected_text,
         "confidence": confidence_text,
         "edge": edge_text,
+        # Baseline placeholder, never left absent -- _mlb_hydrate_live_
+        # prop_projection overwrites this with a real value once the game
+        # is live and a matching live-lens row exists; without this default,
+        # a candidate whose game hasn't gone live yet (or hasn't been
+        # hydrated in this cycle) serialized "actual" as a raw None instead
+        # of the "-" placeholder every other unresolvable field uses.
+        "actual": "-",
         "score": score,
         "href": f"/mlb/cards?date={selected_date}",
         "href_label": "Open board",
