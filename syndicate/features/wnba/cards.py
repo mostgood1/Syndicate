@@ -2497,8 +2497,19 @@ def _supplement_games_with_live_state(
             merged["event_id"] = live_event_id
         if live_state_row:
             merged["live_state"] = dict(live_state_row)
-            away_pts = _safe_float(live_state_row.get("away_pts"))
-            home_pts = _safe_float(live_state_row.get("home_pts"))
+            # away_pts/home_pts fall back to the SmartSim *projected* point
+            # total whenever no real ESPN boxscore row has matched yet (the
+            # normal pregame state) -- see _build_live_state_payload_uncached
+            # / _apply_wnba_live_scores (home.py) for the same pattern.
+            # Unconditionally copying it into "score" here, upstream of
+            # every other WNBA game-list consumer (including the board's
+            # /api/board/game-chips scoreboard chips), showed a fabricated
+            # decimal "score" like 91.81-91.17 on a game that hadn't tipped
+            # off (#160). Only a real, in-progress-or-final game's points
+            # belong in "score".
+            is_game_underway = bool(live_game.get("in_progress")) or bool(live_game.get("final"))
+            away_pts = _safe_float(live_state_row.get("away_pts")) if is_game_underway else None
+            home_pts = _safe_float(live_state_row.get("home_pts")) if is_game_underway else None
             if away_pts is not None and home_pts is not None:
                 away_team = merged.get("away") if isinstance(merged.get("away"), dict) else {}
                 home_team = merged.get("home") if isinstance(merged.get("home"), dict) else {}

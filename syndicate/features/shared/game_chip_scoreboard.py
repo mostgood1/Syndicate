@@ -218,6 +218,56 @@ def _scheduled_status_token(game: dict[str, Any]) -> str | None:
     return None
 
 
+_START_TIME_ISO_FIELDS = (
+    "scheduled_start_utc",
+    "start_time_utc",
+    "gameDate",
+    "game_date",
+    "scheduled",
+    "scheduled_start",
+    "commence_time",
+)
+
+
+def _resolve_scheduled_start_utc(game: dict[str, Any]) -> datetime | None:
+    # A game's ORIGINAL scheduled start, independent of its current
+    # live/final/pregame state -- used to order the Games mini-card strip
+    # by kickoff time (requested: live games front of the rail sorted by
+    # when they started, pregame games in start-time order) rather than by
+    # opportunity count, which had no relationship to chronology at all.
+    for key in _START_TIME_ISO_FIELDS:
+        text = _text(game.get(key))
+        if not text or "T" not in text:
+            continue
+        normalized = text.replace("Z", "+00:00")
+        try:
+            parsed = datetime.fromisoformat(normalized)
+        except Exception:
+            continue
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    # No ISO timestamp -- same plain-date-plus-formatted-clock fallback as
+    # _scheduled_status_token's own fallback (MLB's cards payload shape).
+    date_text = _text(game.get("game_date") or game.get("gameDate"))
+    if not date_text:
+        return None
+    try:
+        date_value = datetime.strptime(date_text[:10], "%Y-%m-%d").date()
+    except Exception:
+        return None
+    clock_text = _text(game.get("startTime") or game.get("start_time") or game.get("start_time_local"))
+    match = _CLOCK_TIME_RE.match(clock_text)
+    hour, minute = 12, 0
+    if match:
+        hour = int(match.group(1)) % 12
+        minute = int(match.group(2))
+        if match.group(3).upper() == "P":
+            hour += 12
+    local_dt = datetime(date_value.year, date_value.month, date_value.day, hour, minute, tzinfo=CENTRAL_TIMEZONE)
+    return local_dt.astimezone(timezone.utc)
+
+
 def _game_key(game: dict[str, Any]) -> str:
     for key in ("gamePk", "game_id", "event_id", "game_pk", "id"):
         value = _text(game.get(key))
@@ -267,6 +317,7 @@ def build_game_chip(sport: str, game: dict[str, Any]) -> dict[str, Any]:
         except Exception:
             leader = None
 
+    start_time_utc = _resolve_scheduled_start_utc(game)
     return {
         "sport": sport_slug,
         "game_key": _game_key(game),
@@ -276,6 +327,7 @@ def build_game_chip(sport: str, game: dict[str, Any]) -> dict[str, Any]:
         "state": state,
         "status_token": status_token,
         "leader": leader,
+        "start_time_utc": start_time_utc.isoformat() if start_time_utc else None,
     }
 
 

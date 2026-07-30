@@ -80,6 +80,49 @@ field (should be a middle-dot "· Steam" separator) — likely a non-UTF-8
 file read/write somewhere upstream of `_steam_candidates_for_sport`, not
 investigated.
 
+**Follow-up after first deploy (same session):** user reported the live
+board still showed the unnamed "-" card and WNBA decimal scores after
+deploy. Root-caused two things the first pass missed:
+
+- **WNBA decimal scores weren't actually fixed.** The `home.py`
+  `_apply_wnba_live_scores` gate from the first pass sits on a secondary
+  overlay path; the primary one is `wnba/cards.py`'s
+  `_supplement_games_with_live_state` (used by `build_cards_page_context`,
+  which every WNBA game-list consumer — including `/api/board/game-chips`
+  — reads), which had the exact same unconditional
+  away_pts/home_pts-as-score bug. Fixed with the same in_progress/final
+  gate. Added `test_pregame_game_does_not_inherit_projected_score` /
+  `test_live_game_keeps_real_score` in `tests/test_wnba_cards_merge_aliases.py`.
+- **The "-" unnamed-game suppression didn't fire.** Server-side, an
+  unresolved steam candidate's `event_id` is the literal string `"-"`, not
+  empty — `Boolean("-")` is `true` in JS, so the `deriveGameCards()` id
+  check treated it as a real id and let the phantom card back in. Fixed
+  with an `isRealId()` helper that also rejects `"-"`.
+
+**New in the same follow-up (user request): Games-strip ordering.** The
+mini-card strip previously sorted live-first then by opportunity count,
+which had no relationship to chronology. Now: live games front of the
+rail sorted by their original scheduled start time, pregame games in
+start-time order too. Required a new sortable field —
+`game_chip_scoreboard.py`'s `build_game_chip()` now returns
+`start_time_utc` (via new `_resolve_scheduled_start_utc()`, same
+ISO-timestamp-then-plain-date-fallback resolution as
+`_scheduled_status_token`, but independent of game state so a *live*
+game still reports when it *started*, not "now"). `intelligence.html`'s
+`deriveGameCards()` attaches each group's chip up front and sorts on
+`start_time_utc`. Tests added in `tests/test_game_chip_scoreboard.py`
+(`test_start_time_utc_resolved_from_iso_timestamp_for_a_live_game`,
+`..._from_date_and_display_time_fallback`, `..._is_none_without_any_resolvable_field`).
+
+Full re-run after this follow-up: `test_game_chip_scoreboard.py` (14),
+`test_wnba_cards_merge_aliases.py` (20), `test_home.py`,
+`test_intelligence_steam_candidates.py`, `test_soccer_cards.py`,
+`test_game_board_simulation_contract.py`,
+`test_game_board_contract_prop_team.py` (150 total) plus
+`test_wnba_cards_artifact_first.py` / `_evidence_pack.py` /
+`_keyvalue_backend.py`, `test_wnba_live_lens_game_shape.py`,
+`test_wnba_props_live_overlay.py` (40) — all green.
+
 ### Reconciliation 2026-07-30 (tuning-loop wiring / Phase 5)
 
 Closing this session's own 5-phase arc (#153/#155/#124/#158, this one:

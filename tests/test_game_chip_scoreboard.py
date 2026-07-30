@@ -159,6 +159,54 @@ class GameChipBuilderTests(unittest.TestCase):
         self.assertEqual(chip["status_token"], "P2 12:34")
         self.assertEqual(chip["leader"], "away")
 
+    def test_start_time_utc_resolved_from_iso_timestamp_for_a_live_game(self) -> None:
+        # #160 follow-up: the Games mini-card strip sorts by each game's
+        # ORIGINAL scheduled start, not its current live clock -- a live
+        # game must still carry the timestamp it started at, not "now".
+        game = {
+            "gamePk": 823759,
+            "away": {"abbr": "NYY", "score": 4},
+            "home": {"abbr": "BOS", "score": 2},
+            "status": {"abstract": "Live", "detailed": "In Progress - Top 7th"},
+            "scheduled_start_utc": "2026-07-30T23:10:00Z",
+        }
+
+        chip = build_game_chip("mlb", game)
+
+        self.assertEqual(chip["state"], "live")
+        self.assertEqual(chip["start_time_utc"], "2026-07-30T23:10:00+00:00")
+
+    def test_start_time_utc_resolved_from_date_and_display_time_fallback(self) -> None:
+        # Same pre-formatted-local-time-only shape as
+        # test_pregame_chip_falls_back_to_display_start_time -- no ISO
+        # timestamp, only a plain date plus a "3:10 PM" display string.
+        game = {
+            "gamePk": 6,
+            "away": {"abbr": "COL"},
+            "home": {"abbr": "MIL"},
+            "status": {"abstract": "Preview", "detailed": "Pre-Game"},
+            "gameDate": "2026-07-24",
+            "startTime": "3:10 PM",
+        }
+
+        with patch("syndicate.features.shared.game_chip_scoreboard.central_today_iso", return_value="2026-07-24"):
+            chip = build_game_chip("mlb", game)
+
+        # 3:10 PM Central == 20:10 UTC during daylight saving time.
+        self.assertEqual(chip["start_time_utc"], "2026-07-24T20:10:00+00:00")
+
+    def test_start_time_utc_is_none_without_any_resolvable_field(self) -> None:
+        game = {
+            "gamePk": 9,
+            "away": {"abbr": "COL"},
+            "home": {"abbr": "MIL"},
+            "status": {"abstract": "Preview", "detailed": "Pre-Game"},
+        }
+
+        chip = build_game_chip("mlb", game)
+
+        self.assertIsNone(chip["start_time_utc"])
+
 
 class BuildGameChipsTests(unittest.TestCase):
     def test_build_game_chips_reads_registered_providers(self) -> None:

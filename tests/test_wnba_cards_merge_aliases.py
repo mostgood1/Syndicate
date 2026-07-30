@@ -131,6 +131,95 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         self.assertEqual(len(merged_games), 1)
         self.assertEqual(merged_games[0]["away_tri"], "LAS")
 
+    def test_pregame_game_does_not_inherit_projected_score(self) -> None:
+        # #160: away_pts/home_pts on the live-state row fall back to the
+        # SmartSim *projected* point total whenever no real ESPN boxscore
+        # row has matched yet -- the normal state for a game that hasn't
+        # tipped off. A pregame game must not surface that projection as
+        # if it were a real "score".
+        processed_games = [
+            {
+                "gamePk": "1",
+                "event_id": "",
+                "away_tri": "NYL",
+                "home_tri": "LVA",
+                "status": "Scheduled",
+                "detail": "2026-07-30T23:00:00Z",
+            }
+        ]
+        live_games = [
+            {
+                "gamePk": "NYL@LVA",
+                "event_id": "",
+                "away_tri": "NYL",
+                "home_tri": "LVA",
+                "status": "Scheduled",
+                "detail": "Scheduled",
+                "in_progress": False,
+                "final": False,
+                "live_state": {
+                    "away": "NYL",
+                    "home": "LVA",
+                    "away_pts": 91.81,
+                    "home_pts": 91.17,
+                    "in_progress": False,
+                    "final": False,
+                },
+            }
+        ]
+
+        with patch(
+            "syndicate.features.wnba.cards._games_from_live_state_fallback",
+            return_value=(live_games, "espn_live_fetch"),
+        ):
+            merged_games, _, _, _ = _supplement_games_with_live_state(processed_games, "2026-07-30")
+
+        self.assertEqual(len(merged_games), 1)
+        self.assertNotIn("score", merged_games[0].get("away", {}))
+        self.assertNotIn("score", merged_games[0].get("home", {}))
+
+    def test_live_game_keeps_real_score(self) -> None:
+        processed_games = [
+            {
+                "gamePk": "1",
+                "event_id": "",
+                "away_tri": "NYL",
+                "home_tri": "LVA",
+                "status": "Scheduled",
+                "detail": "2026-07-30T23:00:00Z",
+            }
+        ]
+        live_games = [
+            {
+                "gamePk": "NYL@LVA",
+                "event_id": "",
+                "away_tri": "NYL",
+                "home_tri": "LVA",
+                "status": "Live",
+                "detail": "Q3",
+                "in_progress": True,
+                "final": False,
+                "live_state": {
+                    "away": "NYL",
+                    "home": "LVA",
+                    "away_pts": 61,
+                    "home_pts": 64,
+                    "in_progress": True,
+                    "final": False,
+                },
+            }
+        ]
+
+        with patch(
+            "syndicate.features.wnba.cards._games_from_live_state_fallback",
+            return_value=(live_games, "espn_live_fetch"),
+        ):
+            merged_games, _, _, _ = _supplement_games_with_live_state(processed_games, "2026-07-30")
+
+        self.assertEqual(len(merged_games), 1)
+        self.assertEqual(merged_games[0]["away"]["score"], 61)
+        self.assertEqual(merged_games[0]["home"]["score"], 64)
+
     def test_live_state_fallback_keeps_old_zero_zero_rows_scheduled(self) -> None:
         live_games = [
             {
