@@ -4,8 +4,40 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-29 (see "Reconciliation 2026-07-29" below; prior:
-"Reconciliation 2026-07-28").
+Last reconciled: 2026-07-29 (see "Reconciliation 2026-07-29 (soccer tricodes /
+Layer 2 session)" below; prior same-date session: "Reconciliation 2026-07-29"
+further down; before that: "Reconciliation 2026-07-28").
+
+### Reconciliation 2026-07-29 (soccer tricodes / Layer 2 session)
+
+Closing this session. Own arc, all shipped, pushed, and deployed, confirmed
+live: **#142** (soccer tricodes across all 10 leagues + a day/date indicator
+on Layer 2 compact cards — commit `5e539d9e`; confirmed live via
+`/api/board/game-chips?sports=soccer` going from 0 chips to a real 16-chip
+MLS matchday with tricodes correctly overridden) and its same-session
+**follow-up** (three more bugs the user found by screenshot right after
+#142 deployed — duplicate Layer 2 mini-cards from `_mlb_home_run_
+candidates_from_artifact` missing `game_id`/`gamePk`/`event_id`, MLB scores
+rendering "-" instead of 0 on one side of some live/final games, soccer
+steam-move candidates showing full club names instead of tricodes — commit
+`87e57f52`; confirmed live via a production `/api/intelligence/query` check
+finding zero duplicate-matchup mini-card groups for MLB). No open PRs; both
+commits landed directly on `main`. `git log`/`origin main` confirmed in
+sync at session end.
+
+While verifying the follow-up in production, found a fourth, distinct,
+deeper issue (MLB steam-move candidates missing `game_id`/matchup entirely,
+a write-side gap rather than a grouping bug) and spawned it as a separate
+task rather than pulling it into this session's scope — the user started
+that task in its own session, which filed and fixed it as **#145**
+(commit `7d38c0ba`, per its own entry below: **not yet deployed**, and not
+this session's responsibility to deploy or verify). Two other concurrent
+sessions were also active on `main` the same night: the WNBA odds-history
+thread (**#143**, commits `f8193f40`/`3547950a`, deployed) and its direct
+follow-on **#144** (commit `0cc487fb`, not yet deployed per its own entry).
+No ID collisions this session; `git fetch` was re-checked immediately
+before every push and before writing this reconciliation to catch any
+newer concurrent commit first.
 
 ### Reconciliation 2026-07-29
 
@@ -234,8 +266,8 @@ session messages rather than silent overwrites.
   chips to a real 16-chip MLS matchday with tricodes correctly overridden
   (`LAF` for LAFC, `NYR` for Red Bull New York).
 
-  **#142 follow-up (same session, fixed, NOT YET COMMITTED/DEPLOYED)** —
-  user sent a screenshot of the Layer 2 "Games" mini-card strip
+  **#142 follow-up (same session, fixed, committed `87e57f52`, deployed,
+  confirmed live)** — user sent a screenshot of the Layer 2 "Games" mini-card strip
   (`/intelligence`) right after the above deployed, showing three more bugs
   in the same strip, not all soccer-specific:
   1. **Duplicate cards for one real game** (`CHC @ STL` and `KC @ MIN` each
@@ -282,10 +314,11 @@ session messages rather than silent overwrites.
   MLBLiveScoreFallbackTests` (new, 3 cases), updated
   `test_intelligence_steam_candidates.py`'s
   `test_event_level_home_away_team_wins_over_dashboard_lookup` for the new
-  tricode output. 270+99 relevant tests passing. Needs a commit + push +
-  Render deploy, and a follow-up look at the live board to confirm the
-  duplicate-card and dash-score symptoms are actually gone in production
-  before this closes out.
+  tricode output. 270+99 relevant tests passing. Committed `87e57f52`,
+  pushed, deployed, and confirmed live: a production `/api/intelligence/
+  query` check (sport=mlb) found zero duplicate-matchup mini-card groups.
+  Verifying this in production is what surfaced #145 (a distinct, deeper,
+  still-open issue — see that entry). Closeable to `todo_closed.md`.
 
 - **New: #141** (filed, fixed, deployed, commit `f5efa674`) — cross-sport
   comparison of WNBA's board pregame/props pipeline against MLB's (then just
