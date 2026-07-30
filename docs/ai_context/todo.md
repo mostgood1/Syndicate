@@ -4,9 +4,231 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (MLB/WNBA live-lens
-test flakiness)" below; prior session: "Reconciliation 2026-07-29 (soccer
-tricodes / Layer 2 session)" further down).
+Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (portfolio
+reconciliation)" below; prior session: "Reconciliation 2026-07-30
+(evaluation-ledger settlement / Phase 1)" further down).
+
+### Reconciliation 2026-07-30 (portfolio reconciliation)
+
+Closing this session. Own arc, all shipped, pushed, and deployed unless
+noted. A concurrent session ("evaluation-ledger settlement / Phase 1",
+its own entry immediately below) was confirmed active on
+`scripts/run_refresh_worker.py` at the same time — coordinated directly via
+`send_message` before committing; confirmed non-conflicting (their new
+`_launch_autorun_evaluation_settlement` function/elif branch is additive,
+off-by-default, in a completely different region of the file from this
+session's changes). That session's own uncommitted work was sitting in the
+same working tree at commit time and is included verbatim in this session's
+commit for that one file (`scripts/run_refresh_worker.py` only — every
+other file this session touched was scoped to its own explicit `git add`
+list, never a blanket add). Two further concurrent sessions ("Fix MLB steam
+candidates missing game_id/matchup" and "MLB missing props, opps, K
+targets", per the evaluation-settlement session's own note) were also
+active on `syndicate/features/mlb/cards.py`/`live_lens.py` — untouched by
+this session, left alone entirely per the standing "leave other sessions'
+files alone" rule.
+
+**New: #154.** User reported: "the portfolio never reconciles - everything
+is just pending." Confirmed live via `/api/portfolio/summary`: 12 pending
+MLB/parlay bets, all a week old, `settled_count: 0`. Root-caused to three
+compounding bugs:
+
+1. `_launch_autorun_reconciliation` (`scripts/run_refresh_worker.py`) only
+   ever reconciled a hardcoded yesterday/today pair — any prediction dated
+   outside that 2-day rolling window could never be retried again, no
+   matter how long the app kept running. Fixed by adding
+   `pending_prediction_dates()` (`syndicate/features/prediction_
+   reconciliation.py`) and unioning it into the reconciled date set every
+   cycle (still cheap — `reconcile_prediction_results_for_date` is already
+   a no-op for anything already settled).
+2. MLB had no "actuals" writer at all — `RECONCILIATION_PATTERNS`
+   recognizes six specific result-file names, and nothing in this repo
+   wrote any of them for MLB, so even an in-window MLB prediction had
+   nothing to match against. Added `scripts/build_mlb_actuals.py` +
+   `syndicate/features/mlb/box_score_stats.py`: reads `daily_top_props`
+   (confirmed to persist on disk far longer than any live-only artifact —
+   still present a full week back) for player/market/line, resolves each
+   player's final stat from the game's cached `feed/live` box score (with
+   a live-fetch fallback if the cache has aged out), and writes
+   `props_actuals_{date}.csv` — `.csv`, not `.json`, since
+   `RECONCILIATION_PATTERNS` only recognizes the CSV variant for this
+   filename (a mismatch the original plan got wrong and caught before
+   shipping). Deliberately does not precompute win/loss itself (no
+   reliable way to know the wagered side at that layer) — leaves grading
+   to `_row_outcome` using the actual/line it supplies plus the
+   prediction's own captured pick.
+3. The bet slip (`syndicate/static/shared/bet_slip.js`) captured but never
+   sent the wagered Over/Under side or market line — `addToSlip` read
+   `data-syndicate-prop-line` into a local var and dropped it before the
+   POST, and never read `data-syndicate-selection` (the real pick,
+   distinct from `data-syndicate-name`, the player's display title) at
+   all. Server-side, `portfolio_bets_api` only ever stored
+   `{"recommendation_id": ...}` as `features_snapshot`. Consequently
+   `_row_outcome` — which needs an explicit result column *or* an
+   actual-vs-line comparison combined with over/under text parsed from
+   the prediction's own `selection` — could never resolve an outcome for
+   a straight prop bet even with #2 fixed, since `selection` is the
+   player's name, not a side. Fixed the full chain: card/blotter markup
+   already had `data-syndicate-selection`/`-prop-line`, just needed
+   reading; added new `data-syndicate-event-id`/`-game-date` attributes;
+   wired all four through `bet_slip.js` → `portfolio_bets_api` →
+   `features_snapshot.pick/line/event_id/game_date`; taught
+   `_row_outcome` to prefer `features_snapshot.pick` over the legacy
+   selection-text heuristic (unchanged for predictions logged before this
+   fix).
+
+Also fixed along the way: `reconcile_prediction_results_for_date`'s
+default `result_roots` pointed at the **ephemeral code checkout**
+(`_repo_root()/data`), not the **persistent Render disk**
+(`data_root()`/`SYNDICATE_DATA_ROOT`) any real writer's output actually
+lives on — on Render these are different filesystem trees entirely, so
+even a perfectly-correct writer's output would never have been found.
+Now passed explicitly (`result_roots=[data_root()]`) from the autorun
+call site; the CLI/GHA-pipeline entrypoint keeps its original
+repo-relative default, unaffected.
+
+Added a manual delete action (`POST /portfolio/bets/<id>/delete`,
+`prediction_ledger.delete_prediction`, a plain HTML form on
+`/portfolio` — that page is 100% server-rendered with no JS at all, so
+no fetch-based flow was added) for the 12 already-pending bets, which
+**cannot be recovered automatically**: the retained daily
+intelligence-state snapshot that could have supplied their original
+pick/line context (`reports/intelligence/intelligence_state_2026-07-23.json`)
+no longer exists on the production disk (confirmed via
+`/api/ops/artifacts/export`: `count: 0`). Told the user this plainly
+rather than promising an automated fix that can't actually deliver.
+
+New `RECONCILIATION_ENABLE_MLB_ACTUALS_WRITER`/
+`RECONCILIATION_MLB_ACTUALS_WRITER_INTERVAL_SECONDS` env vars
+(`render.yaml`, default on/3600s, mirrors the existing reconciliation-
+autorun flag's pattern).
+
+**Verified**: 351 tests passing (69 new/updated across
+`tests/test_prediction_reconciliation.py`,
+`tests/test_refresh_worker.py`, new `tests/test_build_mlb_actuals.py` +
+`tests/test_mlb_box_score_stats.py`, `tests/test_prediction_ledger.py`,
+plus 291 broader regression across `test_home.py`/`test_intelligence.py`/
+`test_mlb_refresh_runner.py`). Live browser verification via the
+`run-syndicate` skill: staged a real bet-slip leg, clicked "Log to
+portfolio", confirmed the actual POSTed request body carried
+`pick`/`line`/`event_id`/`game_date`; on `/portfolio`, confirmed the
+delete button's `confirm()` guard correctly blocks submission when
+declined (sandbox suppresses native dialogs → `false`, proving the guard
+fires) and, submitting directly, confirmed the position is fully removed
+end-to-end. Committed as `56aeafec`, pushed. **Not yet deployed or
+verified against live production** — next step is the same deploy →
+`/api/portfolio/summary` check used for prior fixes this session, plus
+confirming a *newly*-logged bet's `features_snapshot` on production
+carries the new fields before relying on it (the 12 legacy bets can't
+prove the fix; only a fresh bet through the real flow can).
+
+One item flagged by the evaluation-settlement session, worth a look next
+session rather than solving now: once this is live, there will be two
+independent MLB-actuals consumers running in parallel —
+`build_mlb_actuals.py`/`box_score_stats.py` (raw box-score extraction,
+this session, feeds `prediction_ledger.json` via
+`prediction_reconciliation.py`) and their `evaluation_settlement.py`
+(reuses `market_accuracy.py`'s aggregated `season_betting_day` artifact,
+feeds `evaluation_ledger_chunks`). Their own assessment: this session's
+raw-box-score source is likely the materially better long-term one: worth
+consolidating onto a single MLB settlement path eventually rather than
+maintaining both indefinitely.
+
+> **Next free ID: 155.** IDs are never reused. Closed items move to
+> [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
+> free, and run the shipped-work check in Operational notes before reconciling.
+
+### Reconciliation 2026-07-30 (evaluation-ledger settlement / Phase 1)
+
+Not closing yet — this session's own arc, **not committed or pushed**. Two
+other sessions ("Fix MLB steam candidates missing game_id/matchup" and "MLB
+missing props, opps, K targets") were confirmed actively editing this same
+working directory concurrently (uncommitted changes to
+`syndicate/features/mlb/cards.py`, `syndicate/features/mlb/live_lens.py`,
+`syndicate/features/prediction_reconciliation.py`,
+`syndicate/blueprints/intelligence.py` sitting alongside this session's own
+files) — both were messaged via `send_message` to flag file overlap before
+any further edits; no reply required before this note was written. Only this
+session's own files were touched: `syndicate/features/shared/
+intelligence_evaluation.py`, `syndicate/features/shared/live_lens_local.py`,
+`scripts/run_refresh_worker.py`, `scripts/daily_update.ps1`, new
+`syndicate/features/shared/evaluation_settlement.py`, new
+`tests/test_evaluation_settlement.py`, `tests/test_intelligence_evaluation.py`.
+
+**New: #153.** User asked for a full survey of MLB/WNBA accuracy tracking,
+opportunity tracking, live modeling, and tuning infrastructure, then asked to
+fix all of it. Survey found the evaluation/tuning code mostly exists but
+never actually runs: `intelligence_evaluation.py`'s `settle_result()` had no
+caller anywhere in production, so every ledger record stays `"pending"`
+forever, which makes `adjust_confidence()`/`build_reliability_profile()`/
+`recommendation_engine.py`'s policy-promotion gate permanently inert for both
+sports (`sample_size`/`settled_count` always 0). Agreed a 5-phase roadmap
+with the user; this item is **Phase 1 only** (settlement) — Phases 2-5
+(opportunity/hit-rate tracking, MLB live-lens ~80% tick-failure rate per
+#124, WNBA native live-lens/game-shape modeling to replace the vendored
+`wnba_betting_repo` in-game tick, and revisiting the tuning thresholds once
+real settled data exists) are still open and not started.
+
+Phase 1 root-caused a second, deeper bug beyond "nothing calls
+`settle_result`": `settle_result(persist=True)` was **itself non-functional**
+against the real chunked ledger — `_append_evaluation_ledger_record`'s
+identity-already-in-`index.json` guard silently no-ops any attempt to
+persist a settled record, since every record's identity was already indexed
+at creation time. Fixed by adding `_update_evaluation_ledger_record`/
+`_replace_ledger_line` (in-place chunk-file line rewrite + index touch,
+`intelligence_evaluation.py`) and rewiring `settle_result` to use it. Added a
+regression test — the existing suite only ever called
+`settle_result(persist=False)`, so this had zero coverage before.
+
+Added `syndicate/features/shared/evaluation_settlement.py`
+(`settle_ledger_for_date`/`settle_ledger_for_dates`, CLI:
+`python -m syndicate.features.shared.evaluation_settlement --date YYYY-MM-DD
+--sport mlb --sport wnba [--dry-run]`) which grades pending ledger records
+against each sport's own already-graded market-accuracy rows — deliberately
+reusing MLB's `market_accuracy.py` and WNBA's `live_lens_local.py` rather
+than inventing a new recon-file reader (that reader in
+`prediction_reconciliation.py` targets a different, apparently-unpopulated-
+locally file set; not investigated further since it's out of scope once
+existing per-sport grading was found to be reusable). WNBA's shared
+`live_lens_local._score_market_games_day`/`_score_market_props_day` computed
+per-row win/loss/push internally but never returned it (only aggregate
+buckets) — added a `rows` key exposing the already-computed detail,
+additive-only, benefits NBA too since it shares the same functions. Matching
+mirrors (does not import) `prediction_reconciliation.py`'s loose
+shared-token + market-family match, using
+`intelligence_evaluation._record_market_family`'s same keyword-bucketing
+rules (own copy, since exact-string market equality e.g. "totals" vs "total"
+failed match in testing).
+
+Wired invocation two ways, both **off by default**: a new
+`_launch_autorun_evaluation_settlement` in `scripts/run_refresh_worker.py`
+gated behind `EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN` (mirrors
+the existing, also-off-by-default `RECONCILIATION_ENABLE_REFRESH_WORKER_
+AUTORUN` pattern), and a CLI call added to `scripts/daily_update.ps1`
+alongside the existing `prediction_reconciliation` call (GHA-only path).
+
+**Verified**: 22/22 new + existing tests passing in
+`tests/test_intelligence_evaluation.py` + `tests/test_evaluation_settlement.py`;
+28/28 passing in `tests/test_live_lens_local.py` + `tests/test_market_accuracy_
+local.py` (confirms the `rows` addition didn't regress either). **Not
+verified**: real match rates against production data. Local checkout has no
+date where both an evaluation-ledger chunk AND a populated MLB
+`season_betting_day_*_retuned.json` artifact coexist (`data/mlb_source/
+source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned/` has
+exactly one local file, `season_betting_day_2026_06_25.json`, and it has zero
+games in it — a genuinely empty artifact, not a bug) — so the dry-run
+(`--dry-run`) could only be proven to run cleanly end-to-end (correct
+no-op on empty/no-match data), not to produce a real match-rate number.
+**Next step before flipping the autorun flag on**: run
+`python -m syndicate.features.shared.evaluation_settlement --date <a real
+recent date> --sport mlb --sport wnba --dry-run` against Render's actual
+data (worker shell or a pulled mirror with real recent artifacts) and inspect
+`matched`/`unmatched` counts before trusting it to write. **Not committed,
+deployed, or verified live.**
+
+> **Next free ID: 154.** IDs are never reused. Closed items move to
+> [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
+> free, and run the shipped-work check in Operational notes before reconciling.
 
 ### Reconciliation 2026-07-30 (MLB/WNBA live-lens test flakiness)
 
