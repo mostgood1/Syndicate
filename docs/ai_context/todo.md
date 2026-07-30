@@ -6,9 +6,60 @@ list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-07-28 (see "Reconciliation 2026-07-28").
 
-> **Next free ID: 138.** IDs are never reused. Closed items move to
+> **Next free ID: 139.** IDs are never reused. Closed items move to
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
+
+- **New: #138** (filed and fixed this session, **NOT YET DEPLOYED**) — direct
+  continuation of #136 (WNBA prop board stat labels). User reported live in
+  production: prop rows on the combined board still showed generic "PROPS"
+  with no stat category and no projection/odds after #136 deployed. Traced via
+  the actual `/api/intelligence/query` response (not speculation): the
+  candidate itself had `market: "PROPS"`, `market_key: "props"`,
+  `market_focuses: []`, `selection: "{player} OVER -"` with no stat anywhere —
+  confirmed via production's `/api/ops/wnba/artifact-counts?date=...` that
+  `recommendations_slate_2026-07-29.json` (where #136's `market: stat_label`
+  fix lives, `scripts/refresh_wnba_oddsapi_props.py`'s
+  `_build_local_recommendations_slate_artifact`) was **not regenerating**
+  even after a real, successful full-mode refresh (`props_recommendations_*.csv`
+  and `props_recommendations_top_by_game_*.json` both genuinely grew with
+  fresh data in the same run; `recommendations_slate_*.json` stayed
+  byte-for-byte identical). Root cause: `_export_recommendations_slate_snapshot`
+  and `_export_top_by_game_snapshot` (`scripts/refresh_wnba_oddsapi_props.py`)
+  both call `_copy_existing_processed_artifact` first and return early if
+  *any* prior file for that date exists with "meaningful content" — with no
+  freshness check and, unlike `_export_cards_sim_detail_snapshot`
+  (`scripts/refresh_wnba_oddsapi_props.py:4513`, already fixed for this exact
+  class of bug), no `force_refresh` escape hatch at all. So once
+  `recommendations_slate_{date}.json` existed once, it could never be rebuilt
+  again for that date, no matter how many times the underlying
+  props/predictions data changed or `--force-refresh` was passed. **Fixed**:
+  added `force_refresh: bool = False` to both exporters (same bypass pattern
+  as `cards_sim_detail`), threaded `force_refresh=bool(force_refresh)` through
+  from their `_materialize_artifact_bundle` call sites (which already receives
+  a real `force_refresh` from `main()`). Updated `tests/test_wnba_refresh_runner.py`'s
+  existing mocks to accept the new kwarg and added
+  `test_force_refresh_bypasses_stale_recommendations_slate_and_top_by_game_reuse`
+  to lock in both the old (no force_refresh: stale file wins, builder never
+  called) and new (force_refresh=True: builder always called) behavior.
+  65/65 passing. **Also discovered and worth remembering for future ops
+  work**: `/api/ops/odds-refresh/run` hardcodes `mode="fast"` server-side
+  (`syndicate/blueprints/ops.py:1117`, ignores any `mode` in the POST body) —
+  "fast" mode skips predictions/edges generation entirely
+  (`refresh_wnba_oddsapi_props.py:3734` gates that whole step on
+  `refresh_mode == "full"`), so requesting `--do-edges` through that endpoint
+  reliably fails in ~5-9s (the script's own exit check demands
+  `edges_rows > 0` whenever `do_edges` is set). `/api/ops/full-refresh/run`
+  is the correct endpoint for a real regeneration — it calls the same
+  launcher with `mode="full"` and defaults `launch_mode=manifest_only` so a
+  worker claims it instead of whichever service answered the HTTP request.
+  Learned this the hard way: an earlier attempt through the wrong endpoint on
+  `SYNDICATE_LIVE_ODDS_REFRESH_MODE`-less `/api/ops/odds-refresh/run` ran
+  directly on **web** itself (`launch_owner: web_process`), pushing web to
+  94.3% container memory — recovered fine, no crash, but a reminder that any
+  future ops-triggered refresh must pass `launch_mode=manifest_only` (or use
+  `/api/ops/full-refresh/run`) to keep compute off the web service, per the
+  load-bearing web/worker split rule.
 
 - **New: #137** (filed and shipped this session, **NOT YET DEPLOYED**) — user
   asked to integrate steam (sharp/steam line-movement detection) into the

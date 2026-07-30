@@ -4376,25 +4376,40 @@ def _build_optional_player_recon_artifacts(*, source_root: Path, date_str: str, 
     return copied
 
 
-def _export_top_by_game_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+def _export_top_by_game_snapshot(*, source_root: Path, date_str: str, processed_root: Path, force_refresh: bool = False) -> str | None:
     existing = _copy_existing_processed_artifact(
         source_root=source_root,
         processed_root=processed_root,
         file_name=f"props_recommendations_top_by_game_{date_str}.json",
     )
-    if existing:
+    # Same reuse-forever bug as cards_sim_detail (see the force_refresh comment
+    # on _export_cards_sim_detail_snapshot): any prior file for this date
+    # short-circuited a rebuild forever, even when the props_recommendations
+    # CSV it's derived from was just refreshed with new odds/EV in this same
+    # run. force_refresh bypasses the stale copy so a forced refresh actually
+    # regenerates this snapshot instead of silently re-serving old data.
+    if existing and not force_refresh:
         return existing
     _, out_path = _build_local_top_by_game_snapshot(processed_root=processed_root, date_str=date_str)
     return str(out_path) if out_path is not None else None
 
 
-def _export_recommendations_slate_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+def _export_recommendations_slate_snapshot(*, source_root: Path, date_str: str, processed_root: Path, force_refresh: bool = False) -> str | None:
     existing = _copy_existing_processed_artifact(
         source_root=source_root,
         processed_root=processed_root,
         file_name=f"recommendations_slate_{date_str}.json",
     )
-    if existing:
+    # #136 fixed this artifact's own market label (stat_label instead of the
+    # generic literal "PROPS"), but this reuse-check meant that fix could
+    # never actually reach the board for a date whose recommendations_slate
+    # file already existed from an earlier run this session -- confirmed
+    # live: a full-mode force-refresh regenerated props_recommendations_*.csv
+    # and props_recommendations_top_by_game_*.json with real new data, yet
+    # this file stayed byte-for-byte identical because this reuse check found
+    # "already there" and never called _build_local_recommendations_slate_artifact
+    # at all. Same force_refresh bypass as cards_sim_detail/top_by_game above.
+    if existing and not force_refresh:
         return existing
     _, out_path = _build_local_recommendations_slate_artifact(processed_root=processed_root, date_str=date_str)
     return str(out_path) if out_path is not None else None
@@ -4849,7 +4864,7 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         recon_props_path = _export_recon_props_artifact(source_root=effective_source_root, date_str=date_text, processed_root=processed_root)
         if recon_props_path:
             copied["recon_props_path"] = recon_props_path
-        recommendations_slate_path = _export_recommendations_slate_snapshot(source_root=effective_source_root, date_str=date_text, processed_root=processed_root)
+        recommendations_slate_path = _export_recommendations_slate_snapshot(source_root=effective_source_root, date_str=date_text, processed_root=processed_root, force_refresh=bool(force_refresh))
         if recommendations_slate_path:
             copied["recommendations_slate_path"] = recommendations_slate_path
         cards_props_snapshot_path = _export_cards_props_snapshot(source_root=effective_source_root, date_str=date_text, processed_root=processed_root)
@@ -4858,7 +4873,7 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         cards_sim_detail_path = _export_cards_sim_detail_snapshot(source_root=effective_source_root, date_str=date_text, processed_root=processed_root, force_refresh=bool(force_refresh))
         if cards_sim_detail_path:
             copied["cards_sim_detail_path"] = cards_sim_detail_path
-        top_by_game_path = _export_top_by_game_snapshot(source_root=effective_source_root, date_str=date_text, processed_root=processed_root)
+        top_by_game_path = _export_top_by_game_snapshot(source_root=effective_source_root, date_str=date_text, processed_root=processed_root, force_refresh=bool(force_refresh))
         if top_by_game_path:
             copied["top_by_game_path"] = top_by_game_path
         copied.update(_export_live_lens_artifacts(source_root=effective_source_root, date_str=date_text, processed_root=processed_root, live_lens_root=live_lens_root))

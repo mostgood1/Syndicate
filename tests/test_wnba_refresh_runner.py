@@ -1844,6 +1844,48 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 self.assertEqual(copied["live_lens_tuning_override_path"], str(processed_root / "live_lens_tuning_override.json"))
                 self.assertEqual(copied["live_lens_tuning_override_live_lens_path"], str(live_lens_root / "live_lens_tuning_override.json"))
 
+    def test_force_refresh_bypasses_stale_recommendations_slate_and_top_by_game_reuse(self) -> None:
+        # #136 fixed recommendations_slate's own market label, but that fix
+        # could never reach a date whose file already existed from an earlier
+        # run this session -- confirmed live in production: a full-mode
+        # force-refresh regenerated props_recommendations_*.csv with real new
+        # data, yet recommendations_slate_*.json stayed byte-for-byte
+        # identical because _export_recommendations_slate_snapshot's reuse
+        # check found "already there" and never rebuilt. force_refresh=True
+        # must bypass that reuse for both snapshot exporters that share this
+        # pattern (recommendations_slate, top_by_game).
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            processed_source = source_root / "data" / "processed"
+            processed_source.mkdir(parents=True)
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            date_str = "2026-05-22"
+
+            stale_slate_path = processed_source / f"recommendations_slate_{date_str}.json"
+            stale_slate_path.write_text('{"stale": true}\n', encoding="utf-8")
+            stale_top_path = processed_source / f"props_recommendations_top_by_game_{date_str}.json"
+            stale_top_path.write_text('{"stale": true}\n', encoding="utf-8")
+
+            with patch.object(module, "_build_local_recommendations_slate_artifact", return_value=(1, processed_root / f"recommendations_slate_{date_str}.json")) as fake_slate_builder, \
+                 patch.object(module, "_build_local_top_by_game_snapshot", return_value=(1, processed_root / f"props_recommendations_top_by_game_{date_str}.json")) as fake_top_builder:
+                # Default (force_refresh=False): matches
+                # test_app_backed_exports_prefer_existing_processed_files --
+                # the stale existing file wins, the real builder never runs.
+                module._export_recommendations_slate_snapshot(source_root=source_root, date_str=date_str, processed_root=processed_root)
+                module._export_top_by_game_snapshot(source_root=source_root, date_str=date_str, processed_root=processed_root)
+                fake_slate_builder.assert_not_called()
+                fake_top_builder.assert_not_called()
+
+                # force_refresh=True: the stale file must not win -- the real
+                # builder has to run so fresh underlying data actually lands.
+                module._export_recommendations_slate_snapshot(source_root=source_root, date_str=date_str, processed_root=processed_root, force_refresh=True)
+                module._export_top_by_game_snapshot(source_root=source_root, date_str=date_str, processed_root=processed_root, force_refresh=True)
+                fake_slate_builder.assert_called_once_with(processed_root=processed_root, date_str=date_str)
+                fake_top_builder.assert_called_once_with(processed_root=processed_root, date_str=date_str)
+
     def test_live_lens_tuning_export_uses_local_builder(self) -> None:
         module = self._load_module()
 
@@ -3020,7 +3062,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 out_path.write_text('{"games": []}\n', encoding="utf-8")
                 return str(out_path)
 
-            def _fake_recommendations_slate_artifact(*, source_root, date_str, processed_root):
+            def _fake_recommendations_slate_artifact(*, source_root, date_str, processed_root, force_refresh=False):
                 out_path = processed_root / f"recommendations_slate_{date_str}.json"
                 out_path.write_text('{"counts": {"games": 1, "picks": 1}, "per_game": []}\n', encoding="utf-8")
                 return str(out_path)
@@ -3030,7 +3072,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 out_path.write_text('{"games": []}\n', encoding="utf-8")
                 return str(out_path)
 
-            def _fake_top_by_game_artifact(*, source_root, date_str, processed_root):
+            def _fake_top_by_game_artifact(*, source_root, date_str, processed_root, force_refresh=False):
                 out_path = processed_root / f"props_recommendations_top_by_game_{date_str}.json"
                 out_path.write_text('{"data": []}\n', encoding="utf-8")
                 return str(out_path)
