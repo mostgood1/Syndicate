@@ -31,8 +31,8 @@ session messages rather than silent overwrites.
 > [`todo_closed.md`](todo_closed.md) — check there before assuming a number is
 > free, and run the shipped-work check in Operational notes before reconciling.
 
-- **New: #143** (in progress, diagnostic tool added and deployed, **root cause
-  NOT yet confirmed**) — user reported live on the WNBA board: multiple
+- **New: #143** (root-caused, fixed, and confirmed against production data
+  this session) — user reported live on the WNBA board: multiple
   distinct prop candidates in the SAME game (GSV @ PHX, event `401857098`) —
   Kahleah Copper 3PM, Gabby Williams 3PM, Alyssa Thomas PTS+AST, Veronica
   Burton Assists, GSV team ATS — all showed the byte-identical `Line 9.5 →
@@ -64,17 +64,44 @@ session messages rather than silent overwrites.
   signal, survives a JSON round-trip). New tests
   `test_odds_history_inspect_requires_sport_and_date` and
   `test_odds_history_inspect_flags_content_collisions`
-  (`tests/test_ops.py`) — 102/102 passing. **Next step for whoever picks
-  this up**: call `/api/ops/odds-history/inspect?sport=wnba&date=2026-07-29`
-  on production once deployed, look at `content_collisions` for event
-  `401857098` — a non-empty result there confirms a write-side collision (fix
-  in `odds_refresh_tracking.py`); an empty result means the bug is actually
-  upstream of the odds-history file entirely (something attaching the same
-  `market_features`/`line_odds_movement` dict onto multiple candidates
-  during the scoring pass in `recommendation_engine.py`'s `filter_candidates`
-  loop, ~line 1080 — not yet ruled out, since a fresh look at that candidate
-  loop's `market_profile_cache`/`odds_payload_cache` reuse pattern is the
-  next place to check if the odds-history data itself turns out clean).
+  (`tests/test_ops.py`) — 102/102 passing.
+
+  **Root cause confirmed** by calling the new endpoint against production
+  (`/api/ops/odds-history/inspect?sport=wnba&date=2026-07-29`): the entire
+  odds-history file for the date had only **2 markets total**, across every
+  game and every player, keyed like
+  `"game_id=044c05d0bdf345dc1b2a2eef1bff78ce3|market=player_prop"` — no
+  player, no stat, no line. Every prop for a game was appended into ONE
+  shared history bucket. Source: `data/processed/live_lens_projections_*.jsonl`
+  (WNBA/NBA's vendored pregame-signal logger,
+  `vendor/wnba_betting_repo/tools/log_pregame_prop_signals.py`), a
+  completely different ingestion path from the OddsAPI raw props feed this
+  investigation initially traced (which was fine all along). The real bug:
+  `_odds_history_market_key` (`syndicate/features/shared/odds_refresh_tracking.py:655`)
+  builds its fallback key from a fixed field-name list
+  (`home_team`/`away_team`/`player_name`/`team`/`team_key`) that never
+  matches this schema's actual field names (`home`/`away`/`player`/`entity`/
+  `team_tri`), and never checked `stat` (the specific points/rebounds/assists
+  code) at all — only the generic `market="player_prop"` category. Every
+  identifying field silently missed, leaving just `game_id`+`market` as the
+  key, so all props for one game collapsed into one bucket; whichever
+  player's snapshot landed last determined the shared, wrong movement every
+  other candidate in that game displayed. **Fixed**: added the missing
+  field aliases (`home`, `away`, `player`, `entity`, `team_tri`, `stat`) to
+  `_odds_history_market_key`'s field list. Verified directly:
+  `_odds_history_market_key` now produces distinct keys for
+  Kahleah-Copper-PRA vs Alyssa-Thomas-AST vs Kahleah-Copper-PTS (all in the
+  same game) where before all three collapsed to the identical key. Two new
+  tests in `tests/test_odds_refresh_tracking.py`
+  (`OddsHistoryMarketKeyTests`) reproduce the exact real row shape and
+  confirm both fail without the fix and pass with it (stash-verified).
+  35/35 passing in that file. **Not yet verified**: whether the live board
+  actually shows correct per-prop movement after this deploys and the
+  odds-history file gets fresh writes under the new, correct keys — the
+  OLD 2-entry file with its pre-existing collision is still on disk until
+  new snapshots land under the new keys; check
+  `/api/ops/odds-history/inspect?sport=wnba&date=<today>` again after the
+  next live-lens tick to confirm `market_count` actually grows past 2.
 
 - **New: #142** (filed and fixed this session, **NOT YET COMMITTED/DEPLOYED**)
   — user asked for soccer tricodes across all leagues so compact/Layer-2

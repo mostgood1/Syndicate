@@ -9,8 +9,49 @@ from unittest.mock import patch
 
 from syndicate.features.shared.odds_refresh_tracking import sync_post_refresh_tracking_for_source_root
 from syndicate.features.shared.odds_refresh_tracking import refresh_impacted_recommendations_for_tracking
+from syndicate.features.shared.odds_refresh_tracking import _odds_history_market_key
 from syndicate.features.shared.odds_lifecycle import load_odds_lifecycle_events
 from tests.test_refresh_state_store import _FakeKeyValueClient
+
+
+class OddsHistoryMarketKeyTests(unittest.TestCase):
+    # Confirmed live 2026-07-29: WNBA's live_lens_projections_*.jsonl rows
+    # (log_pregame_prop_signals.py, the vendored pregame signal logger) use
+    # "home"/"away"/"player"/"entity"/"team_tri" -- none of which matched
+    # _odds_history_market_key's field list (home_team/away_team/player_name/
+    # team/team_key), and "stat" (the actual points/rebounds/assists code)
+    # wasn't checked at all, only the generic "market" category
+    # ("player_prop"). Every real field silently missed, leaving only
+    # game_id+market -- every player's every prop for one game collapsed
+    # into a single history entry, showing several different props (and
+    # players) with the identical, wrong line movement on the board.
+    def _wnba_live_lens_row(self, *, player: str, stat: str, line: float) -> dict[str, object]:
+        return {
+            "away": "GSV",
+            "home": "PHX",
+            "event_id": "044c05d0bdf345dc1b2a2eef1bff78ce3",
+            "game_id": "044c05d0bdf345dc1b2a2eef1bff78ce3",
+            "entity": player,
+            "player": player,
+            "market": "player_prop",
+            "stat": stat,
+            "team_tri": "PHX",
+            "line": line,
+        }
+
+    def test_distinct_players_in_the_same_game_get_distinct_keys(self) -> None:
+        kahleah = _odds_history_market_key(self._wnba_live_lens_row(player="Kahleah Copper", stat="pra", line=23.5))
+        alyssa = _odds_history_market_key(self._wnba_live_lens_row(player="Alyssa Thomas", stat="ast", line=8.5))
+        self.assertIsNotNone(kahleah)
+        self.assertIsNotNone(alyssa)
+        self.assertNotEqual(kahleah, alyssa)
+
+    def test_same_player_different_stat_gets_distinct_keys(self) -> None:
+        pra = _odds_history_market_key(self._wnba_live_lens_row(player="Kahleah Copper", stat="pra", line=23.5))
+        pts = _odds_history_market_key(self._wnba_live_lens_row(player="Kahleah Copper", stat="pts", line=17.5))
+        self.assertIsNotNone(pra)
+        self.assertIsNotNone(pts)
+        self.assertNotEqual(pra, pts)
 
 
 class OddsRefreshTrackingTests(unittest.TestCase):

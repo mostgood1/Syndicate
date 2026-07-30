@@ -669,11 +669,34 @@ def _odds_history_market_key(row: Mapping[str, Any]) -> str | None:
         "matchup",
         "home_team",
         "away_team",
+        # WNBA/NBA's live_lens_projections_*.jsonl rows (log_pregame_prop_signals.py,
+        # the vendored live-lens pregame signal logger) use "home"/"away" for
+        # team names, not "home_team"/"away_team" -- confirmed live 2026-07-29:
+        # without these, every player prop for the same game collapsed onto
+        # the same history entry (every distinguishing field below silently
+        # missed too), showing several different players' line movement as
+        # one shared, wrong movement badge on the board.
+        "home",
+        "away",
         "player_key",
         "player_name",
+        # Same schema mismatch as home/away above -- these rows carry the
+        # player under "player" or "entity", never "player_name".
+        "player",
+        "entity",
         "team_key",
         "team",
+        # "team_tri" (e.g. "PHX") is this schema's own team-code field --
+        # "team"/"team_key" above never match it.
+        "team_tri",
         "market",
+        # The generic "market" value on these rows is just the category
+        # ("player_prop"), not the specific stat -- "stat" (e.g. "pra"/"pts")
+        # is what actually distinguishes one player's several simultaneous
+        # props from each other. Without it, a player's points prop and
+        # rebounds prop would still collide even after the player-name fix
+        # above.
+        "stat",
         "selection",
         # Soccer's raw game-odds CSV (scripts/fetch_soccer_oddsapi_odds_local.py)
         # names its selection column "side" (home/draw/away, over/under)
