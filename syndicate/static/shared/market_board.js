@@ -404,6 +404,19 @@
     return `${row.odds_previous} → ${row.odds_last} ${arrow}`;
   }
 
+  // closing_line/closing_price are stamped once, at the market's real
+  // pregame->live transition, and stay fixed from then on -- distinct from
+  // line_last/odds_last above, which keep moving for the rest of the game.
+  // Absent (null/undefined) until that transition has actually happened, so
+  // a still-pregame market shows nothing here rather than a misleading value.
+  function formatClosingLine(row) {
+    if (row.closing_line === null || row.closing_line === undefined) return null;
+    if (row.closing_price === null || row.closing_price === undefined) {
+      return `${row.closing_line}`;
+    }
+    return `${row.closing_line} (${row.closing_price})`;
+  }
+
   // live_projection/live_actual come from the live-lens report as raw
   // projected/actual stat values (e.g. rest-of-game projected total bases,
   // current in-game count) -- not 0-1 fractions like sim_projection, so
@@ -431,6 +444,7 @@
     const liveActualValue = formatLiveValue(row.live_actual);
     const lineMovementValue = formatLineMovement(row);
     const oddsMovementValue = formatOddsMovement(row);
+    const closingLineValue = formatClosingLine(row);
     // For a prop row the title is already the player's name, so the prop
     // line needs the market too ("Over 17.5 · Pitcher Outs"); for a
     // game-level row (entity=None) the title already IS the market
@@ -461,6 +475,7 @@
           ${projectedValue !== null ? `<div><div class="board-card__fact-label">Projected</div><div class="board-card__fact-value">${escapeHtml(projectedValue)}</div></div>` : ""}
           ${lineMovementValue !== null ? `<div><div class="board-card__fact-label">Line move</div><div class="board-card__fact-value">${escapeHtml(lineMovementValue)}</div></div>` : ""}
           ${oddsMovementValue !== null ? `<div><div class="board-card__fact-label">Odds move</div><div class="board-card__fact-value">${escapeHtml(oddsMovementValue)}</div></div>` : ""}
+          ${closingLineValue !== null ? `<div><div class="board-card__fact-label">Closing</div><div class="board-card__fact-value">${escapeHtml(closingLineValue)}</div></div>` : ""}
           ${liveProjectionValue !== null ? `<div><div class="board-card__fact-label">Live proj.</div><div class="board-card__fact-value">${escapeHtml(liveProjectionValue)}</div></div>` : ""}
           ${liveActualValue !== null ? `<div><div class="board-card__fact-label">Live actual</div><div class="board-card__fact-value">${escapeHtml(liveActualValue)}</div></div>` : ""}
         </div>
@@ -515,6 +530,7 @@
     ].filter(Boolean).join(" / ");
     const lineMovementValue = formatLineMovement(row);
     const oddsMovementValue = formatOddsMovement(row);
+    const closingLineValue = formatClosingLine(row);
     const title = row.entity || row.market || "Market";
     const sideLabel = titleCase(row.side);
     const propLine = row.entity
@@ -537,6 +553,7 @@
         <td>${projectedValue !== null ? escapeHtml(projectedValue) : "&mdash;"}</td>
         <td>${lineMovementValue !== null ? escapeHtml(lineMovementValue) : "&mdash;"}</td>
         <td>${oddsMovementValue !== null ? escapeHtml(oddsMovementValue) : "&mdash;"}</td>
+        <td>${closingLineValue !== null ? escapeHtml(closingLineValue) : "&mdash;"}</td>
         <td class="${rowIsModelFavored(row) ? "board-blotter__model-cell--favored" : ""}">${modelValue ? escapeHtml(modelValue) : "&mdash;"}${rowIsModelFavored(row) ? ' <span class="board-badge board-badge--model-favored" title="The sim favors this side">Model</span>' : ""}</td>
         <td>${liveText ? escapeHtml(liveText) : "&mdash;"}</td>
         <td>${badgeForJoinStatus(row.join_status, row.join_note)}</td>
@@ -569,7 +586,7 @@
       <div class="board-blotter-wrap">
         <table class="board-blotter">
           <thead>
-            <tr><th>State</th><th>Player / Market</th><th>Pick</th><th>Odds</th><th>Projected</th><th>Line move</th><th>Odds move</th><th>Model</th><th>Live</th><th>Status</th><th></th></tr>
+            <tr><th>State</th><th>Player / Market</th><th>Pick</th><th>Odds</th><th>Projected</th><th>Line move</th><th>Odds move</th><th>Closing</th><th>Model</th><th>Live</th><th>Status</th><th></th></tr>
           </thead>
           <tbody>${rows.join("")}</tbody>
         </table>

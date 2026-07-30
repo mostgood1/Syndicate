@@ -5745,6 +5745,12 @@ def _mlb_hydrate_market_board_line_movement(row: dict[str, Any], entries: list[d
             delta = None
     row["line_delta"] = delta
     row["line_trend"] = entry.get("movement") or "flat"
+    # Stamped once at the market's real pregame->live transition
+    # (odds_refresh_tracking.py) -- absent (None) for a market that's never
+    # gone live yet, or one first observed already live with no pregame
+    # value to record. Distinct from line_last, which keeps moving all game.
+    row["closing_line"] = entry.get("closing_line")
+    row["closing_price"] = entry.get("closing_price")
 
 
 def _mlb_odds_history_entries_for_player(
@@ -5833,6 +5839,11 @@ def _mlb_hydrate_market_board_prop_movement(row: dict[str, Any], entries: list[d
             odds_delta = None
     row["odds_delta"] = odds_delta
     row["odds_trend"] = "flat" if odds_delta in (None, 0) else ("up" if odds_delta > 0 else "down")
+    # See _mlb_hydrate_market_board_line_movement's matching comment --
+    # stamped once at the market's real pregame->live transition, absent for
+    # a market that hasn't gone live yet.
+    row["closing_line"] = entry.get("closing_line")
+    row["closing_price"] = entry.get("closing_price")
 
 
 def _mlb_player_id_lookup_for_game(selected_date: str, game_pk: Any) -> dict[str, int]:

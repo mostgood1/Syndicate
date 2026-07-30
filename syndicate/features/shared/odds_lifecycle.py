@@ -120,6 +120,8 @@ def _resolve_market_state_across_shards(*, sport: str, market_id: str | None, sh
     # The real cost was the odds_events read in _load_jsonl_rows, not here.
     shard_keys = [shard_key] + odds_history_lookback_shard_keys(sport, shard_key, shard_lookback)
     merged_history: list[dict[str, Any]] = []
+    closing_line: float | None = None
+    closing_price: float | None = None
     found = False
     for key in shard_keys:
         state = _market_state_from_payload(load_odds_history_payload_for_sport(sport, key, cache=payload_cache), market_id=market_id)
@@ -129,9 +131,16 @@ def _resolve_market_state_across_shards(*, sport: str, market_id: str | None, sh
         if isinstance(history, list):
             merged_history.extend(item for item in history if isinstance(item, Mapping))
             found = True
+        # closing_line/closing_price are stamped once, at the market's real
+        # pregame->live transition (odds_refresh_tracking.py), and belong to
+        # market_state itself rather than any single history entry -- carry
+        # them through even though this loop otherwise only extracts history.
+        if closing_line is None and state.get("closing_line") is not None:
+            closing_line = _coerce_float(state.get("closing_line"))
+            closing_price = _coerce_float(state.get("closing_price"))
     if not found:
         return None
-    return {"history": merged_history}
+    return {"history": merged_history, "closing_line": closing_line, "closing_price": closing_price}
 
 
 def _utc_now() -> str:
@@ -831,10 +840,23 @@ def build_market_history_view(candidate: Mapping[str, Any] | None = None, *, spo
 
     opening_line = _event_line(opening_entry)
     latest_line = _event_line(latest_entry)
-    closing_line = _event_line(closing_entry)
     opening_price = _event_price(opening_entry)
     latest_price = _event_price(latest_entry)
-    closing_price = _event_price(closing_entry)
+    # market_state's own closing_line/closing_price (stamped once, at the
+    # real pregame->live transition -- odds_refresh_tracking.py) is the true
+    # closing snapshot. history-entry event_type tags ("close"/"final") only
+    # ever appear on the separate day-based lifecycle log, never on
+    # market_state's own history rows, so closing_entry above silently
+    # resolves to latest_entry whenever market_state (the normal, preferred
+    # source) is what supplied history_rows -- fall back to that scan only
+    # when no real stamp exists (e.g. the lifecycle-log-sourced fallback
+    # path, which DOES carry event_type on its rows).
+    if isinstance(market_state, Mapping) and market_state.get("closing_line") is not None:
+        closing_line = _coerce_float(market_state.get("closing_line"))
+        closing_price = _coerce_float(market_state.get("closing_price"))
+    else:
+        closing_line = _event_line(closing_entry)
+        closing_price = _event_price(closing_entry)
 
     movement_delta = None
     if opening_line is not None and latest_line is not None:

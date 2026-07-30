@@ -1255,6 +1255,22 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             if is_live_row and market_key not in seen_live_market_keys:
                 event_type = "live"
                 seen_live_market_keys.add(market_key)
+                # Stamp the true closing line/price exactly once, on the
+                # transition into live, using the value observed the tick
+                # BEFORE this one (previous_line/previous_odds) -- not
+                # current_line/current_odds, which is already the in-play
+                # number. Guarded on closing_line being unset rather than on
+                # seen_live_market_keys (which is rebuilt empty every call to
+                # this function, so it cannot by itself prove "first ever"
+                # across ticks) -- market_state itself persists across ticks
+                # via the shard file, so this is the only check that actually
+                # makes the stamp idempotent. Left unset (never backfilled)
+                # when previous_line is None -- e.g. a market first observed
+                # already live has no real pregame value to record.
+                if market_state.get("closing_line") is None and previous_line is not None:
+                    market_state["closing_line"] = previous_line
+                    market_state["closing_price"] = previous_odds
+                    market_state["closing_captured_at"] = now
             elif is_final_row:
                 event_type = "final"
             elif previous_market_type is not None and str(normalized_entry.get("market_type") or "").strip().lower() != previous_market_type:

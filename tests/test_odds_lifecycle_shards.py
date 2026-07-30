@@ -13,14 +13,27 @@ from syndicate.features.shared.odds_lifecycle import build_market_features
 from syndicate.features.shared.odds_lifecycle import build_market_history_view
 
 
-def _write_shard(root: Path, *, sport: str, shard_key: str, market_id: str, history: list[dict]) -> None:
+def _write_shard(
+    root: Path,
+    *,
+    sport: str,
+    shard_key: str,
+    market_id: str,
+    history: list[dict],
+    closing_line: float | None = None,
+    closing_price: float | None = None,
+) -> None:
     path = root / "odds_control_plane" / "odds_history" / sport / f"{shard_key}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
+    market_state = {"history": history, "last_line": history[-1]["current_line"] if history else None}
+    if closing_line is not None:
+        market_state["closing_line"] = closing_line
+        market_state["closing_price"] = closing_price
     payload = {
         "schema_version": 1,
         "sport": sport,
         "shard_key": shard_key,
-        "markets": {market_id: {"history": history, "last_line": history[-1]["current_line"] if history else None}},
+        "markets": {market_id: market_state},
     }
     path.write_text(json.dumps(payload), encoding="utf-8")
 
@@ -163,6 +176,48 @@ class OddsLifecycleShardMergeTests(unittest.TestCase):
             features = build_market_features(candidate, sport="mlb")
             self.assertEqual(features["opening_line"], -3.0)
             self.assertEqual(features["closing_line"], -3.5)
+
+    def test_stamped_closing_line_wins_over_latest_when_history_has_no_event_type(self) -> None:
+        # odds_refresh_tracking.py's own market_state.history entries never
+        # carry an "event_type" key (only the separate day-based lifecycle
+        # log does) -- so the closing_entry scan in build_market_history_view
+        # silently falls back to latest_entry for any market resolved via
+        # this (normal, preferred) shard path. Confirmed live: this made
+        # closing_line a bare alias for the still-moving latest_line for
+        # every in-play market. The fix stamps closing_line/closing_price
+        # directly onto market_state once, at the real pregame->live
+        # transition -- this must win over the (here, non-matching) scan.
+        with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(
+            "os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports")}, clear=False
+        ):
+            reports_root = Path(tmp_dir) / "reports"
+            candidate = {
+                "sport": "mlb",
+                "event_id": "Away@Home",
+                "market_type": "moneyline",
+                "entity": "Home",
+                "line": -150.0,
+                "date": "2026-06-08",
+            }
+            market_id = _candidate_market_id(candidate, sport="mlb")
+            self.assertIsNotNone(market_id)
+
+            _write_shard(
+                reports_root,
+                sport="mlb",
+                shard_key="2026-06-08",
+                market_id=market_id,
+                history=[
+                    {"current_line": -150.0, "captured_at": "2026-06-08T17:00:00Z"},
+                    {"current_line": -180.0, "captured_at": "2026-06-08T20:00:00Z"},
+                ],
+                closing_line=-150.0,
+                closing_price=-150.0,
+            )
+
+            view = build_market_history_view(candidate, sport="mlb")
+            self.assertEqual(view["latest_line"], -180.0)
+            self.assertEqual(view["closing_line"], -150.0)
 
     def test_price_delta_and_direction_tracked_independently_from_line(self) -> None:
         # 2026-07-24 fix: opening_price/latest_price were already recorded

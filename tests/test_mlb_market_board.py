@@ -924,6 +924,20 @@ class MlbHydrateMarketBoardLineMovementTests(unittest.TestCase):
         self.assertEqual(row["line_delta"], -0.5)
         self.assertEqual(row["line_trend"], "down")
 
+    def test_hydrates_closing_line_when_market_has_gone_live(self) -> None:
+        row: dict[str, object] = {}
+        entries = [{"last_line": 8.5, "previous_line": 9.0, "delta": -0.5, "movement": "down", "closing_line": 9.0, "closing_price": -115.0}]
+        _mlb_hydrate_market_board_line_movement(row, entries)
+        self.assertEqual(row["closing_line"], 9.0)
+        self.assertEqual(row["closing_price"], -115.0)
+
+    def test_closing_line_is_none_when_market_still_pregame(self) -> None:
+        row: dict[str, object] = {}
+        entries = [{"last_line": 8.5, "previous_line": 9.0, "delta": -0.5, "movement": "down"}]
+        _mlb_hydrate_market_board_line_movement(row, entries)
+        self.assertIsNone(row["closing_line"])
+        self.assertIsNone(row["closing_price"])
+
     def test_computes_delta_when_missing(self) -> None:
         row: dict[str, object] = {}
         entries = [{"last_line": 8.5, "previous_line": 9.0, "delta": None, "movement": "flat"}]
@@ -1032,6 +1046,8 @@ class BuildMlbMarketBoardLineMovementWiringTests(unittest.TestCase):
                     "previous_line": -200.0,
                     "delta": -29.0,
                     "movement": "down",
+                    "closing_line": -200.0,
+                    "closing_price": -200.0,
                 }
             }
         }
@@ -1043,6 +1059,12 @@ class BuildMlbMarketBoardLineMovementWiringTests(unittest.TestCase):
         row = board["games"][0]["rows"][0]
         self.assertEqual(row["line_last"], -229.0)
         self.assertEqual(row["line_trend"], "down")
+        # The market has already gone live (this fixture's numbers moved
+        # from -200 to -229), so a real closing snapshot should have been
+        # stamped and must reach the board row, distinct from the still-
+        # moving line_last above.
+        self.assertEqual(row["closing_line"], -200.0)
+        self.assertEqual(row["closing_price"], -200.0)
 
     def test_prop_row_is_not_hydrated_with_line_movement(self) -> None:
         fake_games = [

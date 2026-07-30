@@ -4,17 +4,65 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (#160, Games-strip
-board bugs)" below; prior session: "Reconciliation 2026-07-30 (tuning-loop
-wiring / Phase 5)" further down; before that: "Reconciliation 2026-07-30
-(soccer cross-sport opportunities integration, #150/#151)"; before that:
-"Reconciliation 2026-07-30 (WNBA native live-lens game-shape / Phase
+Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (#161, Layer 1
+closing-line fix)" below; prior session: "Reconciliation 2026-07-30 (#160,
+Games-strip board bugs)" further down; before that: "Reconciliation
+2026-07-30 (tuning-loop wiring / Phase 5)"; before that: "Reconciliation
+2026-07-30 (soccer cross-sport opportunities integration, #150/#151)"; before
+that: "Reconciliation 2026-07-30 (WNBA native live-lens game-shape / Phase
 4)"; before that: "Reconciliation 2026-07-30 (MLB evening next-day sim
 headroom gate)"; before that: "Reconciliation 2026-07-30 (MLB live-lens
 headroom gate / Phase 3)"; before that: "Reconciliation 2026-07-30
 (opportunity board / Phase 2)"; before that: "Reconciliation 2026-07-30
 (steam candidates, Layer 2 projection, portfolio reconciliation)"; before
 that: "Reconciliation 2026-07-30 (evaluation-ledger settlement / Phase 1)").
+
+### Reconciliation 2026-07-30 (#161, Layer 1 closing-line fix)
+
+User asked whether the Layer 1 betting board should freeze at game start
+with a closing line, since prices keep updating through live games. Traced
+it: the live update behavior is intentional (`live_refresh_loop.py`'s
+whole-slate 60s live cadence deliberately keeps sweeping odds for
+in-progress games once any game in a sport goes live), but the CLV/closing-
+line concept underneath it was already silently broken:
+
+1. **closing_line was a bare alias for latest_line.** `build_market_history_view`
+   (`odds_lifecycle.py`) picked the closing entry by scanning history for
+   `event_type in {"close", "final"}`, but `market_state["history"]` entries
+   (the shard-based source, written by `odds_refresh_tracking.py`, and the
+   PREFERRED path whenever `sport` is known) never carry an `event_type` key
+   at all — only the separate day-based lifecycle jsonl does. The scan
+   always fell through to `latest_entry`, so every consumer of
+   `closing_line`/`closing_edge`/CLV (Layer 2 intelligence, evaluation) was
+   silently computing "distance from the current live number," never
+   "distance from the close" — for MLB/NBA/WNBA alike (shared plumbing).
+2. **Fix.** `odds_refresh_tracking.py` now stamps
+   `market_state["closing_line"]`/`["closing_price"]` once, at the market's
+   real pregame→live transition, using the tick-BEFORE value
+   (`previous_line`/`previous_odds`, not the in-play number itself), guarded
+   on `closing_line` being unset — this makes it survive across ticks even
+   though `seen_live_market_keys` is rebuilt empty on every call and can't
+   by itself prove "first observation ever." `_resolve_market_state_across_shards`
+   (`odds_lifecycle.py`) now carries these fields through its shard merge
+   (previously it only ever extracted `history`). `build_market_history_view`
+   now prefers the stamped fields, falling back to the old event_type scan
+   only for the lifecycle-log-sourced path (which does carry real
+   event_type tags).
+3. **MLB Layer 1 board.** `_mlb_hydrate_market_board_line_movement` /
+   `_mlb_hydrate_market_board_prop_movement` (`mlb/cards.py`) now expose
+   `closing_line`/`closing_price` on rows; `market_board.js` renders a
+   "Closing" fact (card view) and column (blotter view) alongside the
+   existing live "Line move"/"Odds move".
+4. **Tested, not yet committed/pushed/deployed.** New unit tests in
+   `test_odds_refresh_tracking.py` (stamp-once-on-first-live, idempotent
+   across later live ticks), `test_odds_lifecycle_shards.py` (stamped value
+   wins over the always-latest scan), `test_mlb_market_board.py`
+   (propagation to board rows). Full targeted suite green (109 passed).
+5. **Deliberately NOT done this pass:** NBA/WNBA's Layer 1 board
+   (`basketball_market_board.py`) has no odds-history hydration wired in at
+   all for game-level markets today — only MLB threads `odds_history`
+   through its board rows. Closing-line display for NBA/WNBA needs that
+   plumbing added first; scoped out rather than half-implemented.
 
 ### Reconciliation 2026-07-30 (#160, Games-strip board bugs)
 
@@ -3986,7 +4034,9 @@ endpoints out of prod · **22** stop retrying 4xx in vendor clients
 ## Feature work
 
 **26** NBA/WNBA board parity (ESPN athlete IDs, headshots, live projection/line
-movement — mirror `288d1e5e`, `604f96f6`, `83315e5c`) · **27** Layer 1 Phase 5:
+movement — mirror `288d1e5e`, `604f96f6`, `83315e5c`; also now covers
+closing-line display added for MLB in #161 — `basketball_market_board.py`
+has no odds-history hydration wired in for game markets at all yet) · **27** Layer 1 Phase 5:
 Layer 2 consumes Layer 1 · **28** Layer 1 Phase 6: market board → NHL, then
 NFL/NCAAF/NCAAB · **32–36** NHL revamp Phases 6–10 · **52** MLS: 1432 `unmatched_no_sim_coverage`
 rows (~71% of the board have no sim projection at all — separate from #44) ·
