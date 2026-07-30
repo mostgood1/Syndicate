@@ -723,6 +723,10 @@ def api_ops_odds_history_inspect() -> Any:
             "history_points": len(history),
             "history_first": history[0] if history else None,
             "history_last": history[-1] if history else None,
+            "is_live": value.get("is_live"),
+            "closing_line": value.get("closing_line"),
+            "closing_price": value.get("closing_price"),
+            "closing_captured_at": value.get("closing_captured_at"),
         }
         seen_object_ids.setdefault(id(value), []).append(key)
         # id()-based collision only catches a shared in-memory reference within
