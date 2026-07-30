@@ -195,14 +195,40 @@ session messages rather than silent overwrites.
   live-odds-worker) — this interrupted an in-flight scoped
   `fingerprint_change` resim (single game, `game_pk 824973`), judged
   acceptable per the same precedent as #145's deploy (not irreplaceable,
-  re-triggers on the next fingerprint change). **Known pre-existing gap,
-  NOT introduced or fixed by this session**: MLB's "Hitter X"/"Pitcher X"
-  game-market-recommendation-sourced prop candidates (home.py's
-  `game_recs`/`hitterProps`/`pitcherProps` loops, distinct from the two
-  prop paths this session fixed) still show `actual: null` in the API
-  response rather than `"-"` — never wired to any actual-value source and
-  out of this session's approved scope; worth a follow-up if the user
-  wants full `actual` coverage across every MLB prop candidate source.
+  re-triggers on the next fingerprint change).
+
+  **Follow-up, same session, also deployed and confirmed live** (commit
+  `30a6cff9`): user asked to fix a remaining gap this entry originally
+  flagged (MLB "Hitter X"/"Pitcher X" candidates showing `actual: null`).
+  Re-investigation found the original diagnosis was wrong on two counts:
+  (1) `home.py`'s `game_recs`/`hitterProps`/`pitcherProps` loops (originally
+  blamed) were already correct — `_append_game_bet_candidate` already
+  defaults `actual` to `"-"` for non-game-level markets, confirmed by
+  requerying production a little later and finding those exact candidates
+  already `"-"`, matching the same "first post-deploy query can catch a
+  stale snapshot" pattern documented earlier in this entry; (2) the
+  GENUINELY unfixed gaps were two different candidate builders entirely,
+  neither previously identified: `_steam_candidates_for_sport`
+  (`intelligence.py`) never set `actual` at all for game-level
+  (moneyline/spread/total) steam candidates — fixed by adding a
+  `game_id -> combined score` lookup built from the same `dashboard_games`
+  loop that already resolves matchup text (player-prop steam candidates
+  correctly stay `"-"`, no per-player live box score available at this
+  layer); and `_mlb_prop_candidate_from_artifact_row` (the PRIMARY pregame
+  source for MLB "Hitter X"/"Pitcher X" props, not the home.py loop) never
+  set a baseline `actual` at all — only `_mlb_hydrate_live_prop_projection`
+  (a separate live-only overlay) ever added one, so a candidate never
+  hydrated in a given cycle serialized `actual: null`. Added the same
+  baseline fix to `_mlb_home_run_candidates_from_artifact` for consistency.
+  9 new/updated tests; 274/274 passing across `test_intelligence.py`,
+  `test_intelligence_steam_candidates.py`, and `test_home.py`. Confirmed
+  live post-deploy (second query, after the same stale-snapshot pattern
+  hit the first one again): 0 candidates anywhere in the board response
+  show a raw `null` for `actual` — steam candidates now show real
+  resolvable game_ids' combined scores where the id space matches
+  `dashboard_games` (gamePk-keyed) and honest `"-"` where it doesn't (the
+  OddsAPI-hash-keyed steam events also seen on this board, same id-space
+  mismatch already documented for soccer/#140).
 
 - **New: #146** (root-caused and fixed this session, **NOT YET DEPLOYED**) —
   user asked to verify soccer sims are actually happening, then whether they
