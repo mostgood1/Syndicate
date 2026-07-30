@@ -4,14 +4,41 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (portfolio
-reconciliation)" below; prior session: "Reconciliation 2026-07-30
-(evaluation-ledger settlement / Phase 1)" further down).
+Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (steam
+candidates, Layer 2 projection, portfolio reconciliation)" below; prior
+session: "Reconciliation 2026-07-30 (evaluation-ledger settlement / Phase
+1)" further down).
 
-### Reconciliation 2026-07-30 (portfolio reconciliation)
+### Reconciliation 2026-07-30 (steam candidates, Layer 2 projection, portfolio reconciliation)
 
-Closing this session. Own arc, all shipped, pushed, and deployed unless
-noted. A concurrent session ("evaluation-ledger settlement / Phase 1",
+Closing this session. Three-item arc, all shipped, pushed, and deployed,
+each confirmed live against production before moving to the next:
+
+- **#145** (commit `7d38c0ba`) — MLB steam-move candidates (player props)
+  had `game_id=""`/`matchup="-"` because the raw hitter/pitcher prop rows
+  they're built from carry no game linkage at all. Fixed by cross-
+  referencing the per-game roster snapshot files
+  (`mlb_player_game_lookup_for_date`, `hr_targets.py`) to resolve a real
+  `game_pk` from the player's own name. Confirmed live via
+  `/api/intelligence/query`: previously-orphaned steam candidates now
+  group under their real game's mini-card.
+- **#147** (commits `f76e65f0`, `30a6cff9`) — the Layer 2 board conflated
+  pregame projection / live projection / live actual into one or two
+  values across several candidate builders (MLB live-lens props, NBA/WNBA
+  `sim_mu`/`sim_mu_adjusted`, game ML/Total's `live_projection` silently
+  falling back to the current score). Fixed all three paths to keep the
+  values honestly distinct (`"-"` rather than fabricated when no real
+  live-sim source exists), then a same-day follow-up fixed two further
+  spots (`_steam_candidates_for_sport`, `_mlb_prop_candidate_from_
+  artifact_row`) that shipped with `actual: null` instead of the board's
+  `"-"` placeholder. Confirmed live both times via `/api/intelligence/
+  query` showing genuinely distinct, non-null values.
+- **#154** (commit `56aeafec`, detailed below) — portfolio bets stuck
+  permanently pending; root-caused to three compounding bugs and fixed.
+
+`git log`/`origin main` confirmed in sync at session end (`HEAD` ==
+`origin/main`); nothing of this session's own work left uncommitted or
+unpushed. A concurrent session ("evaluation-ledger settlement / Phase 1",
 its own entry immediately below) was confirmed active on
 `scripts/run_refresh_worker.py` at the same time — coordinated directly via
 `send_message` before committing; confirmed non-conflicting (their new
@@ -21,12 +48,16 @@ session's changes). That session's own uncommitted work was sitting in the
 same working tree at commit time and is included verbatim in this session's
 commit for that one file (`scripts/run_refresh_worker.py` only — every
 other file this session touched was scoped to its own explicit `git add`
-list, never a blanket add). Two further concurrent sessions ("Fix MLB steam
-candidates missing game_id/matchup" and "MLB missing props, opps, K
-targets", per the evaluation-settlement session's own note) were also
-active on `syndicate/features/mlb/cards.py`/`live_lens.py` — untouched by
-this session, left alone entirely per the standing "leave other sessions'
-files alone" rule.
+list, never a blanket add). The evaluation-settlement session's own note
+(below) also names "Fix MLB steam candidates missing game_id/matchup" as a
+third concurrent session it observed — that was actually this session's own
+#145 work, seen from their side before either session knew it was the same
+conversation; no separate session to reconcile. A genuinely separate
+concurrent session ("MLB missing props, opps, K targets", plus whichever
+session(s) landed #148-#152 in the git log during this session's runtime)
+was also active on `syndicate/features/mlb/cards.py`/`live_lens.py` —
+untouched by this session, left alone entirely per the standing "leave
+other sessions' files alone" rule.
 
 **New: #154.** User reported: "the portfolio never reconciles - everything
 is just pending." Confirmed live via `/api/portfolio/summary`: 12 pending
