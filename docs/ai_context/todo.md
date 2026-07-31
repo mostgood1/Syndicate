@@ -4,9 +4,11 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (#163, Ask The
-Syndicate MLB player history + advanced analytics)" below; prior session:
-"Reconciliation 2026-07-30 (#162, soccer league display)"; before that:
+Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (#164/#165,
+WNBA missing props + duplicate MLB mini-cards)" below; prior session:
+"Reconciliation 2026-07-30 (#163, Ask The Syndicate MLB player history +
+advanced analytics)"; before that: "Reconciliation 2026-07-30 (#162, soccer
+league display)"; before that:
 "Reconciliation 2026-07-30 (#161, Layer 1 closing-line fix)"; before that:
 "Reconciliation 2026-07-30 (#160, Games-strip board bugs)" further down;
 before that: "Reconciliation 2026-07-30 (tuning-loop wiring / Phase 5)";
@@ -19,6 +21,63 @@ that: "Reconciliation 2026-07-30 (opportunity board / Phase 2)"; before that:
 "Reconciliation 2026-07-30 (steam candidates, Layer 2 projection, portfolio
 reconciliation)"; before that: "Reconciliation 2026-07-30 (evaluation-ledger
 settlement / Phase 1)").
+
+### Reconciliation 2026-07-30 (#164/#165, WNBA missing props + duplicate MLB mini-cards)
+
+Follow-up to #160-#162's Games-strip work: user reported (mid-session,
+against production) two more real bugs on the same board.
+
+**#164 -- WNBA pregame props missing entirely for today's slate.** Board
+showed zero player-prop candidates for any of today's 3 WNBA games (only
+game-level ATS/Total/Moneyline), while tomorrow's look-ahead slate had real
+props. Traced with a live artifact pull (`recommendations_slate_2026-07-
+30.json` had 15 real picks across all 3 games -- the data existed) down to
+`_prop_item_from_rank_card` (home.py): every WNBA rank-card-sourced prop
+row (`wnba/picks.py`'s `_card_from_pick`) carries `matchup`/`away_label`/
+`home_label` text but never a `game_id`/`gamePk`/`event_id`. Downstream,
+`_build_sport_overview`'s hydration step filters
+`pregame_prop_items` down to `_game_identifier(item) in hydrated_game_ids`
+-- with no id at all, every real WNBA prop for today got silently dropped.
+(An existing `_home_prop_matched_game`/`_home_prop_game_index` mechanism in
+`_finalize_home_prop_rows` looked like it should already solve this;
+didn't chase why it wasn't catching these rows -- adding a earlier,
+independent backfill was more certain than debugging why that one wasn't
+firing.) Fix: new `_backfill_prop_row_game_id(rows, home_games)` in
+home.py, matching each row's `away_label`/`home_label` against
+`home_games`' team abbreviations (same pattern as soccer's steam-candidate
+`game_id_by_team_abbrs` from #160) -- wired into `_WNBADataProvider.
+pregame_props` for both the betting-card and CSV sources.
+
+**#165 -- duplicate MLB mini-cards for a live game.** Confirmed live: 89
+"WSH @ ATL" MLB candidates carried `game_id=824894` (the real, chip-
+matching id), one stray "game"-type candidate carried `824892` -- a
+mismatched/stale gamePk from a different refresh cycle, cause not chased
+further (single stray candidate, not worth the dig). `deriveGameCards`
+groups strictly by id, so that one candidate got its own group, and since
+its matchup text was byte-identical to the real group's, both
+independently chip-matched to the same live scoreboard chip -- two
+identical-looking cards. Fixed generically rather than chasing the stray
+id: `deriveGameCards` (intelligence.html) now merges any groups sharing
+the same sport+matchup text, preferring whichever one's id actually
+resolves a live chip as canonical. `matchesFilters` resolves through a new
+`gameKeyMergeMap` so clicking either duplicate's card selects the one
+group that renders; `renderBoardBody` now derives game cards before the
+client-side filter runs so the map is warm in time.
+
+Note: mid-investigation, also discovered the raw `top_opportunities`
+"sport" field has ALWAYS been lowercased for every sport (`_recommendation_
+card` in intelligence_board.py, `.lower()` at the final board-contract
+step) -- initially looked like it broke #162's soccer league-display fix,
+but it doesn't: the frontend already `.toUpperCase()`s `item.sport`
+everywhere it's displayed, so "mls" -> "MLS" renders correctly regardless.
+Pre-existing, harmless, not touched.
+
+Verified live 2026-07-30: not yet deployed as of this reconciliation --
+84 tests passing in tests/test_home.py plus a manual JS syntax check on
+intelligence.html's script block, pending commit+deploy. Landed alongside
+a concurrent session's own #161/#163 work in the same shared checkout --
+coordinated via send_message before pushing/deploying rather than
+overwriting their in-flight changes.
 
 ### Reconciliation 2026-07-30 (#163, Ask The Syndicate MLB player history + advanced analytics)
 

@@ -719,7 +719,14 @@
       if (state.gameState === "live" && itemState !== "live") return false;
       if (state.gameState === "pregame" && itemState !== "pregame") return false;
     }
-    if (state.game !== "all" && gameKey(item) !== state.game) return false;
+    if (state.game !== "all") {
+      // #165: resolve through the merge map so a candidate whose own id
+      // got merged away into another group's card still matches a click
+      // on the (single, now-canonical) card actually rendered.
+      const rawKey = gameKey(item);
+      const canonicalKey = gameKeyMergeMap.get(rawKey) || rawKey;
+      if (canonicalKey !== state.game) return false;
+    }
     return true;
   }
 
@@ -878,6 +885,19 @@
   let gameChipsById = new Map();
   let gameChipsByMatchup = new Map();
 
+  // #165: two candidates for the SAME real game can carry two different
+  // ids -- confirmed live: 89 "WSH @ ATL" MLB candidates on 824894, one
+  // stray "game" candidate on 824892 (a stale/mismatched gamePk from a
+  // different refresh cycle). deriveGameCards groups strictly by id when
+  // present, so that one candidate got its own mini-card group, and since
+  // its matchup text is byte-identical to the real group's, both
+  // independently chip-matched to the same live scoreboard chip -- a
+  // second card with identical content. Populated by deriveGameCards:
+  // raw group key -> the canonical key of whichever group shares its
+  // sport+matchup text, so matchesFilters can resolve a click on either
+  // duplicate's card to the one group actually rendered.
+  let gameKeyMergeMap = new Map();
+
   async function loadGameChips() {
     try {
       const dateParam = state.date ? `date=${encodeURIComponent(state.date)}&` : "";
@@ -977,6 +997,47 @@
       const itemState = recommendationState(item);
       if (itemState === "live") group.hasLive = true;
       if (itemState !== "final") group.allFinal = false;
+    }
+    // #165: collapse groups that share the same sport+matchup text into
+    // one -- two different ids for the literal same real game (a stray
+    // stale gamePk on one candidate, or one candidate missing an id
+    // entirely) otherwise render as two identical-looking mini-cards. The
+    // canonical group is whichever one's id actually resolves a live
+    // scoreboard chip (the more trustworthy id); ties/no-chip-match fall
+    // back to the group with more opportunities. gameKeyMergeMap lets
+    // matchesFilters treat a click on either duplicate's card as selecting
+    // the one group that actually renders.
+    gameKeyMergeMap = new Map();
+    const matchupIndex = new Map();
+    for (const group of groups.values()) {
+      const matchupIndexKey = `${group.sport.toLowerCase()}|${group.matchup.trim().toLowerCase()}`;
+      if (!matchupIndex.has(matchupIndexKey)) matchupIndex.set(matchupIndexKey, []);
+      matchupIndex.get(matchupIndexKey).push(group.key);
+    }
+    for (const groupKeys of matchupIndex.values()) {
+      if (groupKeys.length < 2) continue;
+      let canonicalKey = groupKeys[0];
+      let canonicalHasChip = Boolean(chipForGame(groups.get(canonicalKey)));
+      for (const candidateKey of groupKeys.slice(1)) {
+        const candidateGroup = groups.get(candidateKey);
+        const candidateHasChip = Boolean(chipForGame(candidateGroup));
+        const better = (candidateHasChip && !canonicalHasChip) || (candidateHasChip === canonicalHasChip && candidateGroup.count > groups.get(canonicalKey).count);
+        if (better) {
+          canonicalKey = candidateKey;
+          canonicalHasChip = candidateHasChip;
+        }
+      }
+      const canonicalGroup = groups.get(canonicalKey);
+      for (const mergedKey of groupKeys) {
+        gameKeyMergeMap.set(mergedKey, canonicalKey);
+        if (mergedKey === canonicalKey) continue;
+        const mergedGroup = groups.get(mergedKey);
+        canonicalGroup.count += mergedGroup.count;
+        canonicalGroup.hasLive = canonicalGroup.hasLive || mergedGroup.hasLive;
+        canonicalGroup.allFinal = canonicalGroup.allFinal && mergedGroup.allFinal;
+        canonicalGroup.fallbackDate = canonicalGroup.fallbackDate || mergedGroup.fallbackDate;
+        groups.delete(mergedKey);
+      }
     }
     const gamesList = Array.from(groups.values());
     // Attach each group's live-scoreboard chip up front (chipForGame is a
@@ -1235,6 +1296,11 @@
   }
 
   function renderBoardBody() {
+    // #165: deriveGameCards populates gameKeyMergeMap as a side effect --
+    // must run before matchesFilters (which reads it) is used below. Both
+    // calls see the same date-filtered item list, so this warm-up and
+    // renderGameCards' own internal derivation stay consistent.
+    deriveGameCards(lastRenderItems.filter(matchesDateFilter));
     const clientFiltered = lastRenderItems.filter(matchesFilters).filter(matchesClientFilters);
     renderGameCards(lastRenderItems.filter(matchesDateFilter));
     renderTopStrip(clientFiltered);

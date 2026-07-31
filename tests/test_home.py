@@ -23,6 +23,7 @@ from syndicate.blueprints.home import _game_status_state
 from syndicate.blueprints.home import _prop_item_from_rank_card
 from syndicate.blueprints.home import _is_game_level_rank_card_market
 from syndicate.blueprints.home import _pregame_prop_rows_from_betting_card
+from syndicate.blueprints.home import _backfill_prop_row_game_id
 from syndicate.blueprints.home import _team_for_side_hint
 from syndicate.blueprints.home import _compact_prop_rows
 from syndicate.blueprints.home import _game_sim_vs_line_reasoning
@@ -428,6 +429,57 @@ class HomePageCommandCenterTests(unittest.TestCase):
         self.assertNotIn("Minnesota Lynx -15.5", names)
         self.assertNotIn("Under 184.0", names)
         self.assertIn("Gabby Williams OVER 1.5", names)
+
+    def test_backfill_prop_row_game_id_matches_by_team_abbr(self) -> None:
+        # #164: confirmed live -- WNBA's rank-card-sourced props
+        # (_prop_item_from_rank_card) carry no game_id/gamePk/event_id at
+        # all, only away_label/home_label text ("NYL"/"LVA"). Downstream,
+        # _build_sport_overview's hydration step drops any pregame_prop_item
+        # whose _game_identifier() doesn't match a real game id -- with no
+        # id at all, every real WNBA prop for today's slate was silently
+        # dropped even though the underlying picks were real.
+        rows = [{"name": "Breanna Stewart OVER 21.5 PTS", "away_label": "NYL", "home_label": "LVA", "matchup": "NYL @ LVA"}]
+        home_games = [{"gamePk": "401857900", "away": {"abbr": "NYL"}, "home": {"abbr": "LVA"}}]
+
+        result = _backfill_prop_row_game_id(rows, home_games)
+
+        self.assertEqual(result[0]["game_id"], "401857900")
+        self.assertEqual(result[0]["gamePk"], "401857900")
+        self.assertEqual(result[0]["event_id"], "401857900")
+
+    def test_backfill_prop_row_game_id_leaves_existing_id_untouched(self) -> None:
+        rows = [{"name": "Real prop", "game_id": "existing-id", "away_label": "NYL", "home_label": "LVA"}]
+        home_games = [{"gamePk": "401857900", "away": {"abbr": "NYL"}, "home": {"abbr": "LVA"}}]
+
+        result = _backfill_prop_row_game_id(rows, home_games)
+
+        self.assertEqual(result[0]["game_id"], "existing-id")
+
+    def test_backfill_prop_row_game_id_no_match_leaves_row_unchanged(self) -> None:
+        rows = [{"name": "Unmatched prop", "away_label": "ZZZ", "home_label": "YYY"}]
+        home_games = [{"gamePk": "401857900", "away": {"abbr": "NYL"}, "home": {"abbr": "LVA"}}]
+
+        result = _backfill_prop_row_game_id(rows, home_games)
+
+        self.assertNotIn("game_id", result[0])
+
+    def test_wnba_pregame_props_backfills_game_id_from_rank_card_rows(self) -> None:
+        # End-to-end version of the above through the actual provider
+        # method the home-page overview and the intelligence board both
+        # call -- confirms the wiring, not just the helper in isolation.
+        from syndicate.features.shared.sport_data_provider import get_sport_data_provider
+
+        home_games = [{"gamePk": "401857900", "away": {"abbr": "NYL"}, "home": {"abbr": "LVA"}}]
+        rank_card_rows = [{"name": "Breanna Stewart OVER 21.5 PTS", "away_label": "NYL", "home_label": "LVA", "matchup": "NYL @ LVA"}]
+        provider = get_sport_data_provider("wnba")
+        self.assertIsNotNone(provider)
+        context = provider.resolve_context(requested_date="2026-07-30")
+
+        with patch("syndicate.blueprints.home._pregame_prop_rows_from_betting_card", return_value=rank_card_rows):
+            rows = provider.pregame_props(context, home_games, is_active_today=True)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["game_id"], "401857900")
 
     def test_load_home_pregame_prop_items_uses_mlb_top_props_when_betting_card_is_empty(self) -> None:
         home_games = [{"gamePk": 1, "away": {"abbr": "AWY"}, "home": {"abbr": "HME"}}]

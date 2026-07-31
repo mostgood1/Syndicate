@@ -4011,6 +4011,46 @@ def _is_game_level_rank_card_market(market_text: Any) -> bool:
     return any(keyword in lowered for keyword in _GAME_LEVEL_RANK_CARD_MARKET_KEYWORDS)
 
 
+# #164: confirmed live -- WNBA's rank-card-sourced pregame props
+# (_card_from_pick, wnba/picks.py) carry no game_id/gamePk/event_id at all
+# (only "matchup"/"away_label"/"home_label" text), so _game_identifier()
+# always returned None for them. _build_sport_overview's hydration step
+# (home_games) then filters pregame_prop_items down to
+# `_game_identifier(item) in hydrated_game_ids` -- with no id to match,
+# EVERY real WNBA prop for today's slate was silently dropped, even though
+# the underlying picks were real (recommendations_slate_<date>.json had 15
+# real picks across all 3 of today's games). Backfill the real gamePk via
+# team-abbreviation match against home_games, the same pattern already used
+# for soccer's steam candidates (game_id_by_team_abbrs, intelligence.py).
+def _backfill_prop_row_game_id(rows: list[dict[str, Any]], home_games: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    game_id_by_abbrs: dict[str, str] = {}
+    for game in home_games:
+        if not isinstance(game, dict):
+            continue
+        game_id = _game_identifier(game)
+        if not game_id:
+            continue
+        away = game.get("away") if isinstance(game.get("away"), dict) else {}
+        home = game.get("home") if isinstance(game.get("home"), dict) else {}
+        away_abbr = _safe_text(game.get("away_tri") or away.get("abbr"), "").upper()
+        home_abbr = _safe_text(game.get("home_tri") or home.get("abbr"), "").upper()
+        if away_abbr and home_abbr:
+            game_id_by_abbrs[f"{away_abbr}|{home_abbr}"] = game_id
+    if not game_id_by_abbrs:
+        return rows
+    for row in rows:
+        if not isinstance(row, dict) or _game_identifier(row):
+            continue
+        away_abbr = _safe_text(row.get("away_label"), "").upper()
+        home_abbr = _safe_text(row.get("home_label"), "").upper()
+        game_id = game_id_by_abbrs.get(f"{away_abbr}|{home_abbr}")
+        if game_id:
+            row["game_id"] = game_id
+            row["gamePk"] = game_id
+            row["event_id"] = game_id
+    return rows
+
+
 def _pregame_prop_rows_from_betting_card(
     slug: str,
     *,
@@ -4677,10 +4717,10 @@ class _WNBADataProvider(_HomeSportDataProviderBase):
     def pregame_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
         wnba_rows = _pregame_prop_rows_from_betting_card("wnba", context_label=context.context_label, season=context.season, week=context.week)
         if wnba_rows:
-            return wnba_rows
+            return _backfill_prop_row_game_id(wnba_rows, home_games)
         csv_rows = _prop_rows_from_props_recommendations_csv("wnba", context_label=context.context_label, fallback_href=f"/wnba/cards?date={context.context_label}")
         if csv_rows:
-            return csv_rows
+            return _backfill_prop_row_game_id(csv_rows, home_games)
         return _compact_prop_rows(home_games)
 
     def live_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
