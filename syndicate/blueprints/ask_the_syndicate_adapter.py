@@ -129,6 +129,87 @@ def _supporting_evidence_sections(result: Any, structured_response: dict[str, An
     return fallback_sections
 
 
+_MAX_SUPPORTING_POINTS = 6
+
+
+def _evidence_bullets(evidence: dict[str, Any]) -> list[str]:
+    """Flatten an Evidence-shaped dict (title/summary/detail/items[]/sections[])
+    into short strings. Falls back to the bare title only when nothing more
+    specific is present -- title-only evidence (e.g. {"kind": "bundle",
+    "title": "Brief"}) is common (see pipeline/evidence_builder.py's own
+    nested-container extraction, which treats title the same way).
+    """
+    bullets: list[str] = []
+    for key in ("summary", "detail"):
+        text = str(evidence.get(key) or "").strip()
+        if text:
+            bullets.append(text)
+    items = evidence.get("items")
+    if isinstance(items, list):
+        for item in items:
+            if isinstance(item, dict):
+                text = str(item.get("note") or item.get("label") or item.get("title") or item.get("summary") or "").strip()
+            else:
+                text = str(item or "").strip()
+            if text:
+                bullets.append(text)
+    sections = evidence.get("sections")
+    if isinstance(sections, list):
+        for section in sections:
+            if isinstance(section, dict):
+                text = str(section.get("title") or section.get("summary") or section.get("label") or "").strip()
+                if text:
+                    bullets.append(text)
+    if not bullets:
+        title = str(evidence.get("title") or "").strip()
+        if title:
+            bullets.append(title)
+    return bullets
+
+
+def _supporting_points(explanation: dict[str, Any]) -> list[str]:
+    """Flatten reasoning_steps/analysis_brief/supporting_evidence/board_notes into
+    plain-text bullets for the bet-analysis "supporting detail" chip row.
+
+    reasoning_steps is structurally empty for almost every Ask the Syndicate
+    query (gated behind enable_reasoning_steps=False and a compound-question
+    heuristic single-player questions never satisfy), but analysis_brief /
+    supporting_evidence / board_notes are populated on real snapshots -- this
+    is what lets the chip row show real content instead of a fixed
+    "No supporting steps returned" placeholder.
+    """
+    points: list[str] = []
+    steps = explanation.get("reasoning_steps")
+    if isinstance(steps, list):
+        for step in steps:
+            if isinstance(step, dict):
+                text = str(step.get("note") or step.get("reasoning") or step.get("label") or step.get("title") or "").strip()
+            else:
+                text = str(step or "").strip()
+            if text:
+                points.append(text)
+
+    analysis_brief = explanation.get("analysis_brief")
+    if isinstance(analysis_brief, dict):
+        points.extend(_evidence_bullets(analysis_brief))
+
+    supporting_evidence = explanation.get("supporting_evidence")
+    if isinstance(supporting_evidence, dict):
+        points.extend(_evidence_bullets(supporting_evidence))
+
+    board_notes = explanation.get("board_notes")
+    if isinstance(board_notes, list):
+        points.extend(str(note).strip() for note in board_notes if str(note or "").strip())
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for point in points:
+        if point not in seen:
+            seen.add(point)
+            deduped.append(point)
+    return deduped[:_MAX_SUPPORTING_POINTS]
+
+
 def _bet_analysis_schema(result: Any) -> dict[str, Any]:
     top = _first_recommendation(result)
     explanation = _explanation_payload(result)
@@ -147,6 +228,7 @@ def _bet_analysis_schema(result: Any) -> dict[str, Any]:
             "analysis_brief": explanation.get("analysis_brief", {}),
             "supporting_evidence": explanation.get("supporting_evidence", {}),
             "reasoning_steps": explanation.get("reasoning_steps", []),
+            "supporting_points": _supporting_points(explanation),
             "board_notes": explanation.get("board_notes", []),
             "readiness_gate": explanation.get("readiness_gate", {}),
             "top_candidate": top,

@@ -358,7 +358,7 @@
 
   function renderBetAnalysis(schema) {
     const explanation = schema.explanation || {};
-    const steps = Array.isArray(explanation.reasoning_steps) ? explanation.reasoning_steps : [];
+    const points = Array.isArray(explanation.supporting_points) ? explanation.supporting_points : [];
     return `
       <div class="schema-header">
         <div>
@@ -379,8 +379,10 @@
         <div class="soft-card">
           <div class="syndicate-section-title">Explanation</div>
           <p class="mini-note">${esc(safeText(explanation.summary, schema.recommendation || ""))}</p>
+          ${points.length ? `
           <div class="schema-divider"></div>
-          <div class="chip-row">${steps.length ? steps.map((item) => `<span class="chip">${esc(item.note || item.reasoning || item.label || item.title || item)}</span>`).join("") : '<span class="chip">No supporting steps returned</span>'}</div>
+          <div class="chip-row">${points.map((item) => `<span class="chip">${esc(item)}</span>`).join("")}</div>
+          ` : ""}
         </div>
       </div>
     `;

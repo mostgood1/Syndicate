@@ -385,6 +385,62 @@ class AskTheSyndicateApiTests(unittest.TestCase):
         self.assertEqual(payload["schema"]["explanation"]["analysis_brief"]["title"], "Brief")
         self.assertEqual(payload["schema"]["explanation"]["supporting_evidence"]["title"], "Evidence")
 
+    def test_bet_analysis_supporting_points_falls_back_to_evidence_when_reasoning_steps_empty(self) -> None:
+        # reasoning_steps is structurally empty for almost every Ask the
+        # Syndicate query (gated behind enable_reasoning_steps=False and a
+        # compound-question heuristic single-subject questions never
+        # satisfy) -- the frontend used to render a fixed "No supporting
+        # steps returned" chip whenever that happened. supporting_points
+        # must carry real content from analysis_brief/supporting_evidence/
+        # board_notes instead.
+        result = IntelligenceResult.from_raw(
+            {
+                "query_type": "bet_analysis",
+                "recommendations": [{"name": "Los Angeles Dodgers steam move", "confidence": 0.7}],
+                "analysis_brief": {"kind": "bundle", "title": "Steam move detected"},
+                "supporting_evidence": {"kind": "bundle", "summary": "Line moved +425.0 and price moved +425."},
+                "board_notes": ["This response was generated from local-only data."],
+                "reasoning_steps": [],
+            }
+        )
+
+        payload = build_syndicate_query_response(
+            question="Los Angeles Dodgers steam move",
+            context={"sport": "mlb"},
+            decision=RouteDecision(intent="bet_analysis", handler_name="handle_bet_analysis", matched_terms=(), score=0),
+            result=result,
+        )
+
+        points = payload["schema"]["explanation"]["supporting_points"]
+        self.assertEqual(
+            points,
+            [
+                "Steam move detected",
+                "Line moved +425.0 and price moved +425.",
+                "This response was generated from local-only data.",
+            ],
+        )
+
+    def test_bet_analysis_supporting_points_empty_when_nothing_returned(self) -> None:
+        # The degenerate case (nothing at all populated) must produce an
+        # empty list, not a placeholder string claiming something is missing
+        # -- the frontend renders no chip row at all when this is empty.
+        result = IntelligenceResult.from_raw(
+            {
+                "query_type": "bet_analysis",
+                "recommendations": [{"name": "Some Pick", "confidence": 0.5}],
+            }
+        )
+
+        payload = build_syndicate_query_response(
+            question="Some Pick",
+            context={"sport": "mlb"},
+            decision=RouteDecision(intent="bet_analysis", handler_name="handle_bet_analysis", matched_terms=(), score=0),
+            result=result,
+        )
+
+        self.assertEqual(payload["schema"]["explanation"]["supporting_points"], [])
+
     def test_adapter_exposes_routing_context_and_context_awareness(self) -> None:
         result = IntelligenceResult.from_raw(
             {
@@ -1023,6 +1079,138 @@ class AskTheSyndicateFocusedEvidenceTests(unittest.TestCase):
         park_table = next(t for t in result["tables"] if "Park/weather" in t["title"])
         self.assertIn(["Park HR mult", "1.05"], park_table["rows"])
         self.assertIn(["Weather HR mult", "0.97"], park_table["rows"])
+
+    def _write_matchup_fixtures(self) -> None:
+        """hr_targets (with team/opponent/game_pk + season rates on both
+        sides), a per-game roster snapshot carrying the opponent's bullpen,
+        and a daily_summary with hitter_props_likelihood_topn -- covers the
+        new bullpen-matchup and per-player simulated-probability tables.
+        """
+        daily_dir = os.path.join(self.root, "mlb", "daily")
+        os.makedirs(daily_dir, exist_ok=True)
+        hr_targets = {
+            "games": [
+                {
+                    "game_pk": 823358,
+                    "targets": [
+                        {
+                            "player_name": "Jackson Chourio", "batter_id": 694192,
+                            "team": "MIL", "opponent": "PIT", "game_pk": 823358,
+                            "opponent_pitcher_id": 694973, "opponent_pitcher_name": "Paul Skenes",
+                            "batter_k_rate": 0.21, "batter_bb_rate": 0.08, "batter_hr_rate": 0.045, "batter_inplay_hit_rate": 0.31,
+                            "pitcher_k_rate": 0.31, "pitcher_bb_rate": 0.05, "pitcher_hr_rate": 0.02, "pitcher_inplay_hit_rate": 0.29,
+                            "p_hr_1plus": 0.08, "park_hr_mult": 0.95, "weather_hr_mult": 1.02,
+                        },
+                        {
+                            "player_name": "Other Brewer", "batter_id": 700001,
+                            "team": "MIL", "opponent": "PIT", "game_pk": 823358,
+                            "opponent_pitcher_id": 694973, "opponent_pitcher_name": "Paul Skenes",
+                        },
+                    ],
+                }
+            ]
+        }
+        with open(os.path.join(daily_dir, "daily_summary_2026_07_12_hr_targets.json"), "w", encoding="utf-8") as f:
+            json.dump(hr_targets, f)
+
+        summary = {
+            "date": "2026-07-12",
+            "outputs": [
+                {
+                    "game_pk": 823358, "away": "MIL", "home": "PIT",
+                    "hitter_props_likelihood_topn": {
+                        "hits_1plus": [
+                            {"batter_id": 694192, "name": "Jackson Chourio", "team": "MIL", "p_h_1plus": 0.72, "p_h_1plus_cal": 0.70},
+                        ],
+                        "total_bases_1plus": [
+                            {"batter_id": 694192, "name": "Jackson Chourio", "team": "MIL", "p_tb_1plus": 0.55, "p_tb_1plus_cal": 0.55},
+                        ],
+                        "doubles_1plus": [
+                            {"batter_id": 700001, "name": "Other Brewer", "team": "MIL", "p_2b_1plus": 0.2, "p_2b_1plus_cal": 0.2},
+                        ],
+                    },
+                }
+            ],
+        }
+        with open(os.path.join(daily_dir, "daily_summary_2026_07_12.json"), "w", encoding="utf-8") as f:
+            json.dump(summary, f)
+
+        snapshot_dir = os.path.join(self.root, "mlb", "daily", "snapshots", "2026-07-12")
+        os.makedirs(snapshot_dir, exist_ok=True)
+        roster = {
+            # "team" is a nested object in real snapshots (2026-06-04,
+            # 2026-07-12 mirrored data), not a plain abbreviation string --
+            # matching that shape here is what caught _mlb_side_team_abbr
+            # originally assuming a flat string during manual verification.
+            "away": {"team": {"team_id": 158, "name": "Milwaukee Brewers", "abbreviation": "MIL"}, "bullpen_profiles": []},
+            "home": {
+                "team": {"team_id": 134, "name": "Pittsburgh Pirates", "abbreviation": "PIT"},
+                "bullpen_profiles": [
+                    {"id": 555111, "name": "Setup Man", "role": "SU", "leverage_skill": 0.7, "availability_mult": 1.0, "k_rate": 0.3, "bb_rate": 0.08, "hbp_rate": 0.01, "hr_rate": 0.02, "inplay_hit_rate": 0.28},
+                    {"id": 555222, "name": "Closer Guy", "role": "CL", "leverage_skill": 0.9, "availability_mult": 0.8, "k_rate": 0.35, "bb_rate": 0.07, "hbp_rate": 0.0, "hr_rate": 0.015, "inplay_hit_rate": 0.25},
+                ],
+            },
+        }
+        with open(os.path.join(snapshot_dir, "roster_0_MIL_at_PIT_pk823358_g1.json"), "w", encoding="utf-8") as f:
+            json.dump(roster, f)
+
+    def test_mlb_bvp_batter_question_includes_matchup_probabilities_and_bullpen(self) -> None:
+        self._write_matchup_fixtures()
+        ask_data._BVP_CACHE.clear()
+        ask_data._ROSTER_PAYLOAD_CACHE.clear()
+        with patch.dict(os.environ, {"MLB_BETTING_DATA_ROOT": os.path.join(self.root, "mlb")}):
+            result = ask_data._mlb_bvp_evidence("How does Jackson Chourio fare vs Skenes?", {})
+
+        self.assertIsNotNone(result)
+        table_titles = [t["title"] for t in result["tables"]]
+
+        topn_table = next(t for t in result["tables"] if "simulated matchup probabilities" in t["title"])
+        self.assertIn(["Hits 1+", "70.0%"], topn_table["rows"])  # calibrated prob preferred over raw
+        self.assertIn(["Total Bases 1+", "55.0%"], topn_table["rows"])
+        self.assertEqual(result["evidence"]["topn_probabilities"]["hits_1plus"], 0.70)
+
+        season_table = next(t for t in result["tables"] if "Season tendencies" in t["title"])
+        self.assertIn(["Strikeout rate", "21.0%", "31.0%"], season_table["rows"])
+
+        bullpen_table = next(t for t in result["tables"] if "Opposing bullpen" in t["title"])
+        # Sorted by leverage_skill desc: Closer Guy (0.9) before Setup Man (0.7).
+        self.assertEqual(bullpen_table["rows"][0][0], "Closer Guy (CL)")
+        self.assertEqual(bullpen_table["rows"][0][4], "no recorded history")
+        bullpen_names = [row["pitcher"] for row in result["evidence"]["opposing_bullpen"]]
+        self.assertEqual(bullpen_names, ["Closer Guy", "Setup Man"])
+        self.assertNotIn("Other Brewer", table_titles)  # sanity: didn't match the wrong batter
+
+    def test_mlb_bvp_pitcher_question_resolves_reliever_via_slate_search(self) -> None:
+        # "Closer Guy" is a bullpen arm, not a probable starter -- he never
+        # appears as any hr_targets row's opponent_pitcher_name, so the
+        # existing starter-only match must fall back to a bullpen-wide search
+        # instead of returning None.
+        self._write_matchup_fixtures()
+        ask_data._BVP_CACHE.clear()
+        ask_data._ROSTER_PAYLOAD_CACHE.clear()
+        with patch.dict(os.environ, {"MLB_BETTING_DATA_ROOT": os.path.join(self.root, "mlb")}):
+            result = ask_data._mlb_bvp_evidence("How does the lineup hit against Closer Guy?", {})
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["evidence"]["pitcher"], "Closer Guy")
+        self.assertEqual(result["evidence"]["role"], "CL")
+        probs_table = next(t for t in result["tables"] if "opposing lineup" in t["title"] and "simulated probabilities" in t["title"])
+        self.assertIn("Jackson Chourio", [row[0] for row in probs_table["rows"]])
+        self.assertEqual(result["evidence"]["lineup_topn_probabilities"]["Jackson Chourio"]["hits_1plus"], 0.70)
+
+    def test_mlb_bvp_pitcher_question_for_named_starter_still_works(self) -> None:
+        # Regression guard: a probable-starter lookup must still resolve via
+        # the original hr_targets opponent_pitcher_name match, not the new
+        # reliever-search fallback.
+        self._write_matchup_fixtures()
+        ask_data._BVP_CACHE.clear()
+        ask_data._ROSTER_PAYLOAD_CACHE.clear()
+        with patch.dict(os.environ, {"MLB_BETTING_DATA_ROOT": os.path.join(self.root, "mlb")}):
+            result = ask_data._mlb_bvp_evidence("How does the lineup hit against Paul Skenes?", {})
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["evidence"]["pitcher"], "Paul Skenes")
+        self.assertIsNone(result["evidence"]["role"])
 
     def _write_accuracy_fixtures(self) -> None:
         eval_dir = os.path.join(self.root, "mlb", "eval", "batches", "season_2026_ui_daily_live")

@@ -994,6 +994,213 @@ def _bvp_rate_row(label: str, counts: dict[str, int]) -> list[Any]:
     return [label, pa, hits, hr, bb, so, f"{hits / avg_denominator:.3f}" if pa else "—"]
 
 
+# ---------------------------------------------------------------------------
+# MLB bullpen + per-player simulated-probability lookups
+#
+# These read the same per-game roster snapshots and daily_summary outputs the
+# rest of this module already reads, self-contained rather than importing
+# syndicate.features.mlb.hr_targets's private loaders (see module docstring).
+# ---------------------------------------------------------------------------
+
+_ROSTER_PAYLOAD_CACHE_LOCK = threading.Lock()
+_ROSTER_PAYLOAD_CACHE: dict[tuple[str, int], dict[str, Any]] = {}
+_ROSTER_PAYLOAD_CACHE_MAX = 32
+
+
+def _mlb_snapshot_root() -> str:
+    return os.path.join(_mlb_data_root(), "daily", "snapshots")
+
+
+def _mlb_roster_payload_for_game(selected_date: str, game_pk: int | None) -> dict[str, Any]:
+    """Per-game roster snapshot (lineup/bench/starter/bullpen per side)."""
+    if not selected_date or game_pk is None:
+        return {}
+    cache_key = (selected_date, int(game_pk))
+    with _ROSTER_PAYLOAD_CACHE_LOCK:
+        if cache_key in _ROSTER_PAYLOAD_CACHE:
+            return _ROSTER_PAYLOAD_CACHE[cache_key]
+
+    snapshot_dir = os.path.join(_mlb_snapshot_root(), selected_date)
+    payload: dict[str, Any] = {}
+    # Flat layout first: confirmed live (2026-07-27, hr_targets.py) that
+    # production writes the full roster snapshot (bullpen_profiles etc.)
+    # directly under snapshots/<date>/, not into roster_objs/ -- but a local
+    # mirror can still have a roster_objs/roster_obj_*.json that matches the
+    # same *pk<game_pk>*.json glob with only a minimal lineup/team payload
+    # (no bullpen_profiles), which would silently shadow the real data if
+    # checked first.
+    for candidate_dir in (snapshot_dir, os.path.join(snapshot_dir, "roster_objs")):
+        matches = sorted(glob.glob(os.path.join(candidate_dir, f"*pk{int(game_pk)}*.json")))
+        if not matches:
+            continue
+        try:
+            loaded = _load_json(matches[0])
+        except Exception:
+            continue
+        if isinstance(loaded, dict) and any(
+            isinstance(loaded.get(side), dict) and "bullpen_profiles" in loaded[side]
+            for side in ("away", "home")
+        ):
+            payload = loaded
+            break
+        if isinstance(loaded, dict) and not payload:
+            payload = loaded  # keep the best candidate seen so far, prefer one with bullpen data
+
+    with _ROSTER_PAYLOAD_CACHE_LOCK:
+        if len(_ROSTER_PAYLOAD_CACHE) >= _ROSTER_PAYLOAD_CACHE_MAX:
+            _ROSTER_PAYLOAD_CACHE.pop(next(iter(_ROSTER_PAYLOAD_CACHE)), None)
+        _ROSTER_PAYLOAD_CACHE[cache_key] = payload
+    return payload
+
+
+def _mlb_side_team_abbr(side_doc: dict[str, Any]) -> str:
+    """A roster-snapshot side's team abbreviation. `team` is a nested object
+    ({"team_id", "name", "abbreviation"}) in production snapshots, not a
+    plain string -- confirmed against real mirrored data (2026-06-04,
+    2026-07-12), unlike the flat string every other team field in this
+    module uses (hr_targets' target["team"]/["opponent"]).
+    """
+    if not isinstance(side_doc, dict):
+        return ""
+    team = side_doc.get("team")
+    if isinstance(team, dict):
+        return str(team.get("abbreviation") or team.get("abbr") or "").strip().upper()
+    return str(team or "").strip().upper()
+
+
+def _mlb_bullpen_profiles_for_team(roster_payload: dict[str, Any], team_abbr: str) -> list[dict[str, Any]]:
+    """The named team's bullpen_profiles list (role/leverage/availability/own
+    season rates per reliever) from a roster snapshot payload.
+    """
+    team_abbr = str(team_abbr or "").strip().upper()
+    if not team_abbr or not isinstance(roster_payload, dict):
+        return []
+    for side in ("away", "home"):
+        side_doc = roster_payload.get(side)
+        if isinstance(side_doc, dict) and _mlb_side_team_abbr(side_doc) == team_abbr:
+            profiles = side_doc.get("bullpen_profiles")
+            return [p for p in profiles if isinstance(p, dict)] if isinstance(profiles, list) else []
+    return []
+
+
+def _mlb_find_reliever_in_slate(selected_date: str, words: set[str]) -> tuple[int, str, str, dict[str, Any]] | None:
+    """Best bullpen-arm name match across today's whole slate.
+
+    Returns (game_pk, team, opponent_team, reliever_profile). Fallback for
+    pitcher questions that don't match any probable starter -- the BvP
+    pitcher branch below only searches starters via hr_targets'
+    opponent_pitcher_name, which never includes relief arms.
+    """
+    if not selected_date:
+        return None
+    snapshot_dir = os.path.join(_mlb_snapshot_root(), selected_date)
+    if not os.path.isdir(snapshot_dir):
+        return None
+    best: tuple[int, tuple[int, str, str, dict[str, Any]]] | None = None
+    for path in sorted(glob.glob(os.path.join(snapshot_dir, "roster_*_pk*.json"))):
+        match = re.search(r"pk(\d+)", os.path.basename(path), re.IGNORECASE)
+        if not match:
+            continue
+        game_pk = int(match.group(1))
+        try:
+            payload = _load_json(path)
+        except Exception:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        sides = {
+            side: _mlb_side_team_abbr(payload.get(side))
+            for side in ("away", "home")
+            if isinstance(payload.get(side), dict)
+        }
+        for side, team in sides.items():
+            if not team:
+                continue
+            opponent_team = sides.get("home" if side == "away" else "away", "")
+            for profile in _mlb_bullpen_profiles_for_team(payload, team):
+                score = _person_matches(str(profile.get("name") or ""), words)
+                if score and (best is None or score > best[0]):
+                    best = (score, (game_pk, team, opponent_team, profile))
+    return best[1] if best else None
+
+
+_TOPN_MARKET_BASE_LABELS: dict[str, str] = {
+    "hits": "Hits",
+    "total_bases": "Total Bases",
+    "rbi": "RBIs",
+    "runs": "Runs Scored",
+    "doubles": "Doubles",
+    "triples": "Triples",
+    "sb": "Stolen Bases",
+    "hits_runs_rbis": "Hits+Runs+RBIs",
+}
+_TOPN_PROP_KEY_RE = re.compile(r"^(?P<base>.+)_(?P<threshold>\d+)plus$")
+
+
+def _topn_market_label(prop_key: str) -> str:
+    match = _TOPN_PROP_KEY_RE.match(str(prop_key or ""))
+    if not match:
+        return str(prop_key or "").replace("_", " ").title()
+    label = _TOPN_MARKET_BASE_LABELS.get(match.group("base"), match.group("base").replace("_", " ").title())
+    return f"{label} {match.group('threshold')}+"
+
+
+def _topn_entry_probability(entry: dict[str, Any]) -> float | None:
+    """A topn entry's probability field name isn't derivable from its prop_key
+    (p_h_1plus for "hits_1plus", p_2b_1plus for "doubles_1plus", etc.) -- find
+    it generically instead, preferring the calibrated variant when present.
+    """
+    cal_key = next((k for k in entry if k.startswith("p_") and k.endswith("_cal")), None)
+    if cal_key:
+        value = _to_float(entry.get(cal_key))
+        if value is not None:
+            return value
+    plain_key = next((k for k in entry if k.startswith("p_") and not k.endswith("_cal")), None)
+    return _to_float(entry.get(plain_key)) if plain_key else None
+
+
+def _mlb_topn_probabilities_by_batter(outputs: Any) -> dict[int, dict[str, float]]:
+    """One pass over daily_summary outputs -> {batter_id: {prop_key: probability}}
+    across every hitter_props_likelihood_topn market, not just the 8 markets
+    registered in _MLB_MARKET_REGISTRY (that registry only feeds the
+    ranking/leaderboard fetcher, not a specific-player lookup).
+    """
+    by_batter: dict[int, dict[str, float]] = {}
+    if not isinstance(outputs, list):
+        return by_batter
+    for game in outputs:
+        if not isinstance(game, dict):
+            continue
+        topn = game.get("hitter_props_likelihood_topn")
+        if not isinstance(topn, dict):
+            continue
+        for prop_key, entries in topn.items():
+            if prop_key == "n" or not isinstance(entries, list):
+                continue
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                try:
+                    batter_id = int(entry.get("batter_id"))
+                except (TypeError, ValueError):
+                    continue
+                probability = _topn_entry_probability(entry)
+                if probability is None:
+                    continue
+                by_batter.setdefault(batter_id, {})[prop_key] = probability
+    return by_batter
+
+
+def _mlb_hitter_topn_probabilities(selected_date: str | None, batter_id: int | None) -> dict[str, float]:
+    if batter_id is None:
+        return {}
+    loaded = _mlb_daily_summary(selected_date)
+    if not loaded:
+        return {}
+    summary, _iso_date = loaded
+    return _mlb_topn_probabilities_by_batter(summary.get("outputs") or []).get(int(batter_id), {})
+
+
 def _mlb_bvp_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
     loaded = _mlb_slate_targets(str(context.get("selected_date") or "") or None)
     if not loaded:
@@ -1046,6 +1253,99 @@ def _mlb_bvp_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] 
                 "columns": ["Factor", "Value"],
                 "rows": profile_rows,
             })
+
+        # Real worker-blended matchup probabilities for this exact game --
+        # not season rates, the sim's own P(outcome) for hits/TB/RBI/runs/etc.
+        topn_probs = _mlb_hitter_topn_probabilities(iso_date, batter_id)
+        if topn_probs:
+            topn_rows = [
+                [_topn_market_label(key), f"{prob * 100:.1f}%"]
+                for key, prob in sorted(topn_probs.items(), key=lambda kv: kv[1], reverse=True)
+            ]
+            tables.append({
+                "title": f"Today's simulated matchup probabilities — {batter_name} ({iso_date})",
+                "columns": ["Market", "Probability"],
+                "rows": topn_rows,
+            })
+
+        # Both sides' own season per-PA tendencies, side by side -- component
+        # rates, not a blended matchup probability (no worker-computed blend
+        # exists for K/BB/in-play-out; see the market-probability table above
+        # for the outcomes the sim does blend).
+        season_rows: list[list[Any]] = []
+        for label, batter_key, pitcher_key in (
+            ("Strikeout rate", "batter_k_rate", "pitcher_k_rate"),
+            ("Walk rate", "batter_bb_rate", "pitcher_bb_rate"),
+            ("Home run rate", "batter_hr_rate", "pitcher_hr_rate"),
+            ("In-play hit rate", "batter_inplay_hit_rate", "pitcher_inplay_hit_rate"),
+        ):
+            b_val = _to_float(target.get(batter_key))
+            p_val = _to_float(target.get(pitcher_key))
+            if b_val is None and p_val is None:
+                continue
+            season_rows.append([
+                label,
+                f"{b_val * 100:.1f}%" if b_val is not None else "—",
+                f"{p_val * 100:.1f}%" if p_val is not None else "—",
+            ])
+        if season_rows:
+            tables.append({
+                "title": f"Season tendencies (own rates, not matchup-blended) — {batter_name} vs {pitcher_name}",
+                "columns": ["Outcome", batter_name, pitcher_name],
+                "rows": season_rows,
+            })
+
+        # Opposing bullpen: same career-BvP lookup used for the starter above,
+        # generalized to any pitcher id, plus each arm's own season rates.
+        bullpen_rows: list[list[Any]] = []
+        bullpen_evidence: list[dict[str, Any]] = []
+        opponent_team = str(target.get("opponent") or "").strip()
+        try:
+            game_pk = int(target.get("game_pk"))
+        except (TypeError, ValueError):
+            game_pk = None
+        if game_pk is not None and opponent_team:
+            roster_payload = _mlb_roster_payload_for_game(iso_date, game_pk)
+            bullpen = _mlb_bullpen_profiles_for_team(roster_payload, opponent_team)
+            bullpen.sort(
+                key=lambda p: (_to_float(p.get("leverage_skill")) or 0.0, _to_float(p.get("availability_mult")) or 0.0),
+                reverse=True,
+            )
+            for profile in bullpen[:6]:
+                try:
+                    reliever_id = int(profile.get("id"))
+                except (TypeError, ValueError):
+                    reliever_id = None
+                reliever_name = str(profile.get("name") or "Reliever")
+                role = str(profile.get("role") or "RP")
+                career = _bvp_counts_for_pitcher(reliever_id).get(batter_id) if reliever_id is not None else None
+                history = (
+                    f"{career['pa']} PA, {career['hits']} H, {career['hr']} HR"
+                    if career and (career.get("pa") or 0) > 0
+                    else "no recorded history"
+                )
+                bullpen_rows.append([
+                    f"{reliever_name} ({role})",
+                    f"{(_to_float(profile.get('k_rate')) or 0) * 100:.1f}%",
+                    f"{(_to_float(profile.get('bb_rate')) or 0) * 100:.1f}%",
+                    f"{(_to_float(profile.get('hr_rate')) or 0) * 100:.1f}%",
+                    history,
+                ])
+                bullpen_evidence.append({
+                    "pitcher": reliever_name,
+                    "role": role,
+                    "k_rate": _to_float(profile.get("k_rate")),
+                    "bb_rate": _to_float(profile.get("bb_rate")),
+                    "hr_rate": _to_float(profile.get("hr_rate")),
+                    "career_bvp": career or {"pa": 0},
+                })
+        if bullpen_rows:
+            tables.append({
+                "title": f"Opposing bullpen — vs {batter_name} ({iso_date})",
+                "columns": ["Reliever (role)", "K rate", "BB rate", "HR rate", "Career vs batter"],
+                "rows": bullpen_rows,
+            })
+
         evidence = {
             "source": "mlb_bvp",
             "as_of": iso_date,
@@ -1057,18 +1357,43 @@ def _mlb_bvp_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] 
                 for key in ("batter_k_rate", "batter_hr_rate", "batter_inplay_hit_rate", "p_hr_1plus", "park_hr_mult", "weather_hr_mult")
                 if _to_float(target.get(key)) is not None
             },
+            "topn_probabilities": topn_probs,
+            "opposing_bullpen": bullpen_evidence,
         }
         return {"evidence": evidence, "tables": tables, "charts": [], "as_of": iso_date, "sport": "mlb"}
 
     # Pitcher question: his history vs today's opposing lineup.
     pitcher_rows = [t for t in targets if _person_matches(str(t.get("opponent_pitcher_name") or ""), words) > 0]
-    if not pitcher_rows:
-        return None
-    pitcher_name = str(pitcher_rows[0].get("opponent_pitcher_name") or "Pitcher")
-    try:
-        pitcher_id = int(pitcher_rows[0].get("opponent_pitcher_id"))
-    except (TypeError, ValueError):
-        return None
+    reliever_role: str | None = None
+    if pitcher_rows:
+        pitcher_name = str(pitcher_rows[0].get("opponent_pitcher_name") or "Pitcher")
+        try:
+            pitcher_id = int(pitcher_rows[0].get("opponent_pitcher_id"))
+        except (TypeError, ValueError):
+            return None
+    else:
+        # Not a probable starter -- this fetcher's usual matching only covers
+        # starters via hr_targets' opponent_pitcher_name, so a bullpen arm
+        # would otherwise silently return nothing. Search relievers across
+        # the whole slate before giving up.
+        reliever_hit = _mlb_find_reliever_in_slate(iso_date, words)
+        if reliever_hit is None:
+            return None
+        _game_pk, _reliever_team, opponent_team, reliever_profile = reliever_hit
+        pitcher_name = str(reliever_profile.get("name") or "Pitcher")
+        reliever_role = str(reliever_profile.get("role") or "RP")
+        try:
+            pitcher_id = int(reliever_profile.get("id"))
+        except (TypeError, ValueError):
+            return None
+        # The opposing lineup for a bullpen arm is every batter target row on
+        # the opponent team today (their own opponent_pitcher_* fields belong
+        # to their starter, not this reliever, but batter_id/player_name and
+        # the game-level park/weather multipliers are still correct since
+        # it's the same game_pk/ballpark).
+        pitcher_rows = [t for t in targets if str(t.get("team") or "").strip().upper() == opponent_team]
+        if not pitcher_rows:
+            return None
     counts_by_batter = _bvp_counts_for_pitcher(pitcher_id)
     lineup: list[tuple[str, dict[str, int]]] = []
     seen: set[int] = set()
@@ -1100,6 +1425,38 @@ def _mlb_bvp_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] 
             "rows": [[f"No recorded plate appearances vs today's lineup yet — {pitcher_name}'s career BvP sample here is limited."]],
         }]
 
+    # Today's opposing lineup's real worker-blended matchup probabilities --
+    # one load + one pass shared across every batter, not a per-batter
+    # daily_summary reload (this lineup can be 9+ hitters).
+    lineup_topn_leaders: list[tuple[str, str, float]] = []
+    lineup_topn_evidence: dict[str, dict[str, float]] = {}
+    daily_summary_loaded = _mlb_daily_summary(iso_date)
+    if daily_summary_loaded:
+        topn_by_batter = _mlb_topn_probabilities_by_batter((daily_summary_loaded[0] or {}).get("outputs") or [])
+        seen_names: set[int] = set()
+        for target in pitcher_rows:
+            try:
+                batter_id = int(target.get("batter_id"))
+            except (TypeError, ValueError):
+                continue
+            if batter_id in seen_names:
+                continue
+            seen_names.add(batter_id)
+            probs = topn_by_batter.get(batter_id)
+            if not probs:
+                continue
+            name = str(target.get("player_name") or batter_id)
+            lineup_topn_evidence[name] = probs
+            top_market, top_prob = max(probs.items(), key=lambda kv: kv[1])
+            lineup_topn_leaders.append((name, _topn_market_label(top_market), top_prob))
+    if lineup_topn_leaders:
+        lineup_topn_leaders.sort(key=lambda item: item[2], reverse=True)
+        tables.append({
+            "title": f"Today's opposing lineup — simulated probabilities vs {pitcher_name} ({iso_date})",
+            "columns": ["Batter", "Best market", "Probability"],
+            "rows": [[name, market, f"{prob * 100:.1f}%"] for name, market, prob in lineup_topn_leaders[:10]],
+        })
+
     # Park/weather multipliers are game-level, not batter-specific, so any
     # matched target row carries them -- same fields the batter-direction
     # branch above already surfaces via profile_rows.
@@ -1122,10 +1479,12 @@ def _mlb_bvp_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] 
         "source": "mlb_bvp",
         "as_of": iso_date,
         "pitcher": pitcher_name,
+        "role": reliever_role,
         "lineup_bvp": [
             {"batter": name, **counts} for name, counts in lineup[:10]
         ],
         "lineup_bvp_pa_total": sum(counts.get("pa") or 0 for _, counts in lineup),
+        "lineup_topn_probabilities": lineup_topn_evidence,
     }
     return {"evidence": evidence, "tables": tables, "charts": [], "as_of": iso_date, "sport": "mlb"}
 
