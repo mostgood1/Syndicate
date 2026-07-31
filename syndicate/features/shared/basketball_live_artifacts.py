@@ -37,13 +37,127 @@ def _normalize_name(value: Any) -> str:
     # cross-source spelling mismatch (a name typed/encoded with accents in
     # one artifact, without in another) that needed it there is equally
     # possible here, since this key is shared, generic infra used by both
-    # WNBA and NBA. No nickname-alias table added: MLB's was added
-    # reactively after a real observed miss, and no equivalent mismatch has
-    # been observed for WNBA/NBA rosters yet -- don't invent aliases without
-    # evidence they're needed.
+    # WNBA and NBA.
     text = " ".join(str(value or "").strip().upper().split())
     normalized = unicodedata.normalize("NFKD", text)
     return "".join(ch for ch in normalized if not unicodedata.combining(ch))
+
+
+# Follow-up to the above: proactive hardening, not (yet) wired to a live
+# matcher. No cross-source basketball player-name matching exists in this
+# codebase today (confirmed while investigating the Layer 2 WNBA/NBA prop
+# identity gap this session) -- but the same class of mismatch
+# mlb/cards.py's _market_name_variants already had to fix in production (a
+# nickname spelled differently across two data sources) is just as possible
+# here, and this module is exactly where a future matcher (e.g. resolving a
+# free-text-parsed prop name against a roster/boxscore) would reach for it.
+# Rather than wait for a real miss the way MLB's table did, this gets built
+# now -- with real, well-established English nickname pairs, not guessed
+# player-specific nicknames.
+#
+# Several of these are genuinely ambiguous between a men's and a women's
+# full name, since this module covers both NBA and WNBA rosters -- e.g.
+# "Steph" is short for Stephanie in the WNBA, but for NBA guard Stephen
+# Curry, "Steph" is short for Stephen, not Stephanie. Picking one expansion
+# and forcing it would be WRONG for the other league's player of the same
+# nickname. So ambiguous entries map to every plausible expansion (a tuple,
+# not a single string) -- a real matcher must check each variant against
+# the specific roster it's resolving against and only accept whichever one
+# actually exists there, never assume the first entry.
+_BASKETBALL_FIRST_NAME_ALIASES: dict[str, tuple[str, ...]] = {
+    "mike": ("michael",),
+    "michael": ("mike",),
+    "nick": ("nicholas",),
+    "nicholas": ("nick",),
+    "matt": ("matthew",),
+    "matthew": ("matt",),
+    "will": ("william",),
+    "william": ("will",),
+    "tony": ("anthony",),
+    "anthony": ("tony",),
+    "zach": ("zachary",),
+    "zack": ("zachary",),
+    "zachary": ("zach",),
+    "josh": ("joshua",),
+    "joshua": ("josh",),
+    "rob": ("robert",),
+    "bob": ("robert",),
+    "robert": ("rob", "bob"),
+    "cam": ("cameron",),
+    "cameron": ("cam",),
+    "jen": ("jennifer",),
+    "jennifer": ("jen",),
+    "liz": ("elizabeth",),
+    "beth": ("elizabeth",),
+    "elizabeth": ("liz", "beth", "eliza"),
+    "abby": ("abigail",),
+    "abigail": ("abby",),
+    "gabby": ("gabrielle", "gabriela"),
+    "gabrielle": ("gabby",),
+    "gabriela": ("gabby",),
+    "maddie": ("madison",),
+    "madison": ("maddie",),
+    "vic": ("victoria",),
+    "tori": ("victoria",),
+    "victoria": ("vic", "tori"),
+    "jackie": ("jacqueline",),
+    "jacqueline": ("jackie",),
+    "becca": ("rebecca",),
+    "rebecca": ("becca",),
+    "kenzie": ("mackenzie",),
+    "mackenzie": ("kenzie",),
+    "katie": ("katherine", "kathryn"),
+    "kate": ("katherine", "kathryn"),
+    "katherine": ("katie", "kate"),
+    "kathryn": ("katie", "kate"),
+    # Genuinely ambiguous between two (or more) real full names -- see the
+    # module comment above. Every plausible expansion is listed; none is
+    # preferred over another.
+    "alex": ("alexander", "alexandra", "alexis"),
+    "alexander": ("alex",),
+    "alexandra": ("alex",),
+    "alexis": ("alex",),
+    "chris": ("christopher", "christina", "christine"),
+    "christopher": ("chris",),
+    "christina": ("chris",),
+    "christine": ("chris",),
+    "sam": ("samuel", "samantha"),
+    "samuel": ("sam",),
+    "samantha": ("sam",),
+    "steph": ("stephanie", "stephen", "stephon"),
+    "stephanie": ("steph",),
+    "stephen": ("steph",),
+    "stephon": ("steph",),
+    "dom": ("dominic", "dominique"),
+    "dominic": ("dom",),
+    "dominique": ("dom",),
+    "pat": ("patrick", "patricia"),
+    "patrick": ("pat",),
+    "patricia": ("pat",),
+}
+
+
+def _name_variants(value: Any) -> list[str]:
+    """Normalized name plus plausible nickname/full-name variants.
+
+    Mirrors mlb/cards.py's _market_name_variants shape (normalized base +
+    swapped-first-token variants) so a future matcher can try each
+    candidate against a known name the same way MLB already does -- see
+    _BASKETBALL_FIRST_NAME_ALIASES above for why some entries expand to
+    more than one candidate.
+    """
+    base = _normalize_name(value)
+    if not base:
+        return []
+    variants = [base]
+    tokens = base.split()
+    if len(tokens) >= 2:
+        first_token = tokens[0].lower()
+        for candidate in _BASKETBALL_FIRST_NAME_ALIASES.get(first_token, ()):
+            variant = " ".join([candidate.upper()] + tokens[1:])
+            if variant not in variants:
+                variants.append(variant)
+    return variants
 
 
 def _canonical_stat(value: Any) -> str:

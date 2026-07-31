@@ -153,9 +153,36 @@ never match a player-prop row anyway. 2 new tests in `tests/test_intelligence.py
 (hydrates for player-prop steam, does not hydrate for game-level steam).
 184/184 `test_intelligence.py` passing, no regressions.
 
-Phase B/C and both these follow-ups are committed, pushed, and (Phase B/C +
-`#168`) deployed; the Steam-candidate fix deploys next. No live WNBA game
-was available to verify Phase B's `markets` dict end-to-end in production
+**Follow-up, same session: proactive nickname-alias table for
+`basketball_live_artifacts.py`.** User: "attack the name alias — could
+become a larger issue" (in response to the Phase C decision to defer this
+pending an observed mismatch, the way MLB's own table was added reactively).
+Built `_BASKETBALL_FIRST_NAME_ALIASES` + `_name_variants(value)` (mirrors
+`mlb/cards.py:_market_name_variants`'s shape: normalized base + swapped-
+first-token variants) — real, well-established English nickname pairs, not
+guessed player-specific nicknames. Confirmed no cross-source basketball
+name-matcher exists in this codebase yet (checked during Phase C), so this
+is deliberately proactive infrastructure, ready for whenever one gets
+built, not yet wired into `_latest_projection_rows`' existing dedup (that
+dedup is within a single source's own rows, where the same producer
+already spells a given player consistently — the real cross-source risk
+this hardens against doesn't apply there). **Important design point**:
+since this module covers both WNBA and NBA, several common nicknames are
+genuinely ambiguous between a men's and a women's full name — e.g. "Steph"
+is Stephanie in the WNBA but NBA guard Stephen Curry's own nickname, not a
+guess. Rather than pick one and risk being wrong for the other league,
+ambiguous entries (`alex`, `chris`, `sam`, `steph`, `dom`, `pat`) expand to
+every plausible full name; a future matcher must check each against the
+specific roster it's resolving against rather than assume the first entry.
+8 new tests in `tests/test_basketball_live_artifacts.py`. 52 tests passing
+across `test_basketball_live_artifacts.py` + adjacent WNBA prop/live-lens
+files, no regressions.
+
+Phase B/C and all three follow-ups (`#168`, Steam-candidate hydration,
+nickname-alias table) are committed, pushed, and deployed (web +
+refresh-worker; `#168` and the Steam-candidate fix confirmed live via
+Render deploy polling). No live WNBA game was available to verify Phase
+B's `markets` dict end-to-end in production
 at the time it was implemented/tested — verify against a real live WNBA
 game next time one is running.
 
