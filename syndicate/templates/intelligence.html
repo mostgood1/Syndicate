@@ -998,15 +998,18 @@
       if (itemState === "live") group.hasLive = true;
       if (itemState !== "final") group.allFinal = false;
     }
-    // #165: collapse groups that share the same sport+matchup text AND
-    // resolve to the same date into one -- two different ids for the
-    // literal same real game (a stray stale gamePk on one candidate, or one
-    // candidate missing an id entirely) otherwise render as two identical-
-    // looking mini-cards. The canonical group is whichever one's id
-    // actually resolves a live scoreboard chip (the more trustworthy id);
-    // ties/no-chip-match fall back to the group with more opportunities.
-    // gameKeyMergeMap lets matchesFilters treat a click on either
-    // duplicate's card as selecting the one group that actually renders.
+    // #165: collapse groups that share the same sport+matchup text AND are
+    // confirmed to be the same real game (same live-scoreboard chip, or a
+    // compatible date when neither resolves a chip) into one -- two
+    // different ids for the literal same real game (a stray stale gamePk
+    // on one candidate, or one candidate missing an id entirely) otherwise
+    // render as two identical-looking mini-cards. The canonical group is
+    // whichever one's id actually resolves a live scoreboard chip (the more
+    // trustworthy id); ties/no-chip-match fall back to the group with more
+    // opportunities. gameKeyMergeMap lets matchesFilters treat a click on
+    // either duplicate's card as selecting the one group that actually
+    // renders. See the numbered follow-ups below for how this settled on
+    // "chip identity first, date-compatibility as fallback."
     //
     // #165 follow-up #1, confirmed live: keying strictly on sport+matchup
     // alone, with no date check, collapsed two REAL, different games (the
@@ -1020,11 +1023,21 @@
     // resolvable fallbackDate (one has real game_date/source_board_date,
     // the other has neither), so exact-matching on date treated the
     // dateless one as a third, different "date" and stopped merging them.
-    // Cluster by date instead of exact-matching: a dateless group is only
-    // ambiguous when TWO OR MORE distinct real dates exist for the same
-    // matchup (which one would it belong to?) -- with zero or one real
-    // date in play, it unambiguously joins that date's cluster (or the
-    // other dateless group(s), the original scenario this fix targets).
+    //
+    // #165 follow-up #3, confirmed live: date-clustering (dateless joins
+    // the one real date in play) fixed most cases but not WSH @ ATL's --
+    // its stray duplicate candidate carries its OWN resolvable but WRONG
+    // date (824892 stamped "2026-07-31" while showing the exact same live
+    // score/inning as the real game, 824894, dated "2026-07-30" -- an
+    // upstream data bug, not a missing field). No candidate-level date can
+    // be trusted here. chipForGame(group) is more authoritative: it's
+    // real-time scoreboard state, not a candidate-pipeline field, and
+    // gameChipsByMatchup's fallback lookup means both groups resolve to
+    // the literal SAME chip object when their ids don't independently
+    // match a chip (see chipForGame's own fallback). Two groups sharing
+    // that identical chip object are unambiguously the same real game
+    // regardless of what their own date fields claim -- checked first,
+    // date-clustering only applies to groups with no chip at all.
     gameKeyMergeMap = new Map();
     const matchupIndex = new Map();
     for (const group of groups.values()) {
@@ -1034,22 +1047,38 @@
     }
     for (const groupKeys of matchupIndex.values()) {
       if (groupKeys.length < 2) continue;
-      const realDates = [...new Set(groupKeys.map((key) => groups.get(key).fallbackDate).filter(Boolean))];
-      const clusters = new Map();
+      const chipClusters = new Map();
+      const chiplessKeys = [];
       for (const key of groupKeys) {
-        const date = groups.get(key).fallbackDate;
-        // A dateless group joins the one real date in play when there's
-        // exactly one (the original same-day scenario this fix targets --
-        // one candidate has a resolvable date, its duplicate doesn't).
-        // Zero real dates: dateless groups cluster together. Two or more
-        // real dates: which real game would a dateless one belong to? Don't
-        // guess -- leave it as its own singleton instead of risking a wrong
-        // merge across two genuinely different games.
-        const clusterKey = date || (realDates.length === 0 ? "__dateless__" : realDates.length === 1 ? realDates[0] : key);
-        if (!clusters.has(clusterKey)) clusters.set(clusterKey, []);
-        clusters.get(clusterKey).push(key);
+        const chip = chipForGame(groups.get(key));
+        if (chip) {
+          if (!chipClusters.has(chip)) chipClusters.set(chip, []);
+          chipClusters.get(chip).push(key);
+        } else {
+          chiplessKeys.push(key);
+        }
       }
-      for (const clusterKeys of clusters.values()) {
+      const clusters = [...chipClusters.values()];
+      if (chiplessKeys.length) {
+        const realDates = [...new Set(chiplessKeys.map((key) => groups.get(key).fallbackDate).filter(Boolean))];
+        const dateClusters = new Map();
+        for (const key of chiplessKeys) {
+          const date = groups.get(key).fallbackDate;
+          // A dateless group joins the one real date in play when there's
+          // exactly one (the original same-day scenario this fix targets
+          // -- one candidate has a resolvable date, its duplicate
+          // doesn't). Zero real dates: dateless groups cluster together.
+          // Two or more real dates: which real game would a dateless one
+          // belong to? Don't guess -- leave it as its own singleton
+          // instead of risking a wrong merge across two genuinely
+          // different games.
+          const clusterKey = date || (realDates.length === 0 ? "__dateless__" : realDates.length === 1 ? realDates[0] : key);
+          if (!dateClusters.has(clusterKey)) dateClusters.set(clusterKey, []);
+          dateClusters.get(clusterKey).push(key);
+        }
+        clusters.push(...dateClusters.values());
+      }
+      for (const clusterKeys of clusters) {
         if (clusterKeys.length < 2) continue;
         let canonicalKey = clusterKeys[0];
         let canonicalHasChip = Boolean(chipForGame(groups.get(canonicalKey)));
