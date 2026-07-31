@@ -7213,3 +7213,69 @@ class PostDedupeAndClassifyTraceTests(unittest.TestCase):
                 _classify_candidate_with_reason({"type": "game", "selection": "Home ML", "projection": empty})[1],
                 "missing_projection_or_odds",
             )
+
+
+class VersionedResponseJsonSafetyTests(unittest.TestCase):
+    """Found live 2026-07-31: the Layer 2 board was stuck on "Loading
+    board..." forever, with zero console errors and every network request
+    returning 200. Root cause: a raw Python float('nan') reached the
+    response somewhere in the candidate/movement pipeline (a pandas-derived
+    line/odds value read without the same NaN guard _line_number already
+    applies defensively elsewhere). json.dumps serializes NaN as the bare
+    token `NaN` -- valid to Python's own lenient json.loads, but not valid
+    JSON per spec, so the browser's strict JSON.parse threw a SyntaxError on
+    the ENTIRE 78MB payload the instant it hit that one token, anywhere in
+    the tree. The fetch itself succeeded; only response.json() failed,
+    inside a catch block that left the page's "Loading board..." status
+    text stuck. Rather than chase every possible NaN producer across every
+    sport's candidate-building code, _versioned_query_response now
+    sanitizes once, centrally -- every response path funnels through it.
+    """
+
+    def test_json_safe_value_replaces_nan_and_infinity_with_none(self) -> None:
+        from syndicate.blueprints.intelligence import _json_safe_value
+
+        payload = {
+            "a": float("nan"),
+            "b": [1, float("inf"), {"c": float("-inf")}],
+            "d": "ok",
+            "e": 3.5,
+            "f": (float("nan"), 2),
+        }
+        safe = _json_safe_value(payload)
+        self.assertIsNone(safe["a"])
+        self.assertEqual(safe["b"][0], 1)
+        self.assertIsNone(safe["b"][1])
+        self.assertIsNone(safe["b"][2]["c"])
+        self.assertEqual(safe["d"], "ok")
+        self.assertEqual(safe["e"], 3.5)
+        self.assertEqual(safe["f"], [None, 2])
+
+    def test_versioned_query_response_output_is_valid_strict_json(self) -> None:
+        from syndicate.blueprints.intelligence import _versioned_query_response
+
+        versioned = _versioned_query_response(
+            {
+                "recommendations": [{"pick": "Home ML", "away_line": float("nan"), "edge": 0.05}],
+                "ranked_all": [{"pick": "Over 2.5", "line_odds_movement": float("inf")}],
+            }
+        )
+        encoded = json.dumps(versioned)
+        # json.loads is lenient the same way Python's producer is -- the
+        # real regression test is that the string contains no bare NaN/
+        # Infinity/-Infinity tokens, which is exactly what a strict
+        # (browser) JSON parser rejects.
+        for forbidden in ("NaN", "Infinity", "-Infinity"):
+            self.assertNotIn(forbidden, encoded)
+        reparsed = json.loads(encoded)
+        self.assertIsNone(reparsed["response"]["recommendations"][0]["away_line"])
+        self.assertIsNone(reparsed["response"]["ranked_all"][0]["line_odds_movement"])
+
+    def test_finite_numbers_pass_through_unchanged(self) -> None:
+        from syndicate.blueprints.intelligence import _json_safe_value
+
+        self.assertEqual(_json_safe_value(0.0), 0.0)
+        self.assertEqual(_json_safe_value(-12.5), -12.5)
+        self.assertEqual(_json_safe_value(42), 42)
+        self.assertIsNone(_json_safe_value(None))
+        self.assertEqual(_json_safe_value("text"), "text")

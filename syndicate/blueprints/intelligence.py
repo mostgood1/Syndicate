@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import hashlib
 import json
+import math
 import os
 import time
 from datetime import datetime, timezone
@@ -215,12 +216,41 @@ def _query_bool(value: object) -> bool:
     return normalized in {"1", "true", "t", "yes", "y", "on"}
 
 
+def _json_safe_value(value: object) -> object:
+    # Found live 2026-07-31: the Layer 2 board was stuck on "Loading board..."
+    # forever with zero console errors and zero failed network requests --
+    # every fetch returned 200. Root cause: some upstream numeric field
+    # (a pandas-derived line/odds value read without the NaN guard
+    # _line_number already has to apply defensively elsewhere in this
+    # pipeline) reached the response as a real Python float('nan'). Python's
+    # json.dumps happily serializes that as the bareword `NaN` -- valid to
+    # Python's own (lenient) json.loads, but not valid JSON per spec, so
+    # Chrome's strict JSON.parse threw a SyntaxError on the entire payload
+    # the instant it hit that one token, anywhere in the tree. The fetch
+    # itself succeeded; only .json() failed, silently, inside a catch block
+    # that never got a chance to run before hasRenderedIntelligence was
+    # already (wrongly) considered set. Rather than chase every possible
+    # NaN producer across every sport's candidate-building code, sanitize
+    # once here -- every response path funnels through
+    # _versioned_query_response before being jsonified.
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {key: _json_safe_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_safe_value(item) for item in value]
+    if isinstance(value, tuple):
+        return [_json_safe_value(item) for item in value]
+    return value
+
+
 def _response_hash(payload: dict[str, object]) -> str:
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _versioned_query_response(response_payload: dict[str, object]) -> dict[str, object]:
+    response_payload = _json_safe_value(dict(response_payload))
     payload_hash = _response_hash(dict(response_payload))
     return {
         "version": payload_hash,
