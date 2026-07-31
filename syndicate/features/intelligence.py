@@ -3995,6 +3995,17 @@ def _soccer_schedule_kickoff_dates(league: str) -> list[tuple[str, str, str]]:
     naming, for fuzzy-matching against OddsAPI's differently-spelled
     home_team/away_team on a raw odds row (#165: see
     _soccer_steam_matchup_lookup's docstring for why this exists at all).
+
+    schedule_<season>.json's own "matches" rows carry home_team/away_team
+    as TOP-LEVEL fields ({"event_id": ..., "date": "2026-02-21T19:30Z",
+    "home_team": "St. Louis CITY SC", "away_team": "Charlotte FC", ...}) --
+    confirmed against the real artifact. Do NOT copy _match_to_game's
+    match.get("matchup", {}).get("home_team") pattern here: that reads a
+    DIFFERENT structure (SoccerSim's recommendations_payload output,
+    cards.py's week_games()), not this raw schedule row -- copying it
+    silently returned zero rows (a dict.get() miss, not an exception) and
+    shipped a no-op fix once already.
+
     Never raises -- schedule_payload already degrades to None on any read
     failure.
     """
@@ -4011,23 +4022,33 @@ def _soccer_schedule_kickoff_dates(league: str) -> list[tuple[str, str, str]]:
     for match in matches:
         if not isinstance(match, dict):
             continue
-        matchup = match.get("matchup") if isinstance(match.get("matchup"), dict) else {}
-        home = _safe_text(matchup.get("home_team"), "")
-        away = _safe_text(matchup.get("away_team"), "")
+        home = _safe_text(match.get("home_team"), "")
+        away = _safe_text(match.get("away_team"), "")
         date_text = _safe_text(match.get("date"), "")[:10]
         if home and away and date_text:
             rows.append((home, away, date_text))
     return rows
 
 
-def _soccer_event_kickoff_date(league: str, odds_home: str, odds_away: str, schedule_rows: list[tuple[str, str, str]]) -> str | None:
+def _soccer_event_kickoff_date(league: str, odds_home: str, odds_away: str, schedule_rows: list[tuple[str, str, str]], *, reference_date: str | None = None) -> str | None:
     """Fuzzy-match an odds row's home_team/away_team (OddsAPI's naming,
     e.g. "LA Galaxy") against the ESPN-sourced season schedule's naming
     (e.g. "Los Angeles Galaxy") to resolve that specific match's real
     kickoff date -- same cross-source name mismatch market_board.py's
     _soccer_odds_event_for_match already solves for a different purpose,
     reused here since this function's need (one real per-event date) is
-    smaller than importing that one's full event-id resolution."""
+    smaller than importing that one's full event-id resolution.
+
+    A regular MLS season has each team pair meet more than once
+    (confirmed live: Nashville SC @ D.C. United appear together on both a
+    real May date and a real August date this season) -- taking the first
+    schedule match for that pair silently returned a match from months
+    earlier instead of the imminent one a live steam event is actually
+    about. With reference_date supplied (the board's own requested/scan
+    date), the candidate closest to it wins; without one, falls back to
+    the earliest (previous behavior, still correct for the common
+    single-meeting-in-window case).
+    """
     if not schedule_rows:
         return None
     try:
@@ -4043,10 +4064,16 @@ def _soccer_event_kickoff_date(league: str, odds_home: str, odds_away: str, sche
     matched_away = match_team_name(odds_away, away_names) if odds_away else None
     if matched_away is None:
         return None
-    for home, away, date_text in candidates:
-        if away == matched_away:
-            return date_text
-    return None
+    matching_dates = [date_text for home, away, date_text in candidates if away == matched_away]
+    if not matching_dates:
+        return None
+    if reference_date:
+        try:
+            ref = date.fromisoformat(reference_date[:10])
+            return min(matching_dates, key=lambda text: abs((date.fromisoformat(text) - ref).days))
+        except Exception:
+            pass
+    return min(matching_dates)
 
 
 def _soccer_steam_matchup_lookup(selected_date: str) -> dict[str, dict[str, str]]:
@@ -4106,7 +4133,7 @@ def _soccer_steam_matchup_lookup(selected_date: str) -> dict[str, dict[str, str]
                 away_abbr = _soccer_team_abbr(league, away) if away else "-"
                 home_abbr = _soccer_team_abbr(league, home) if home else "-"
                 entry = {"matchup": f"{away_abbr} @ {home_abbr}", "league_display": league_display_name(league)}
-                kickoff_date = _soccer_event_kickoff_date(league, home, away, schedule_rows)
+                kickoff_date = _soccer_event_kickoff_date(league, home, away, schedule_rows, reference_date=selected_date)
                 if kickoff_date:
                     entry["game_date"] = kickoff_date
                 lookup[event_id] = entry
