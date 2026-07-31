@@ -16,6 +16,17 @@ work takes the next free number (see the counter at the top of `todo.md`).
 
 ---
 
+## Closed 2026-07-30 — Games-strip/soccer-league session (#162, #164, #165, #166)
+
+| # | What shipped |
+|---|---|
+| **162** | Soccer candidates show the real league ("MLS", "La Liga") instead of the generic "Soccer" sport label — `home.py`'s `_append_game_bet_candidate` and `intelligence.py`'s `_steam_candidates_for_sport` both prefer `game.get("league_display")` (stamped by `soccer/cards.py`'s game-dict constructors) over the static per-sport config name. |
+| **164** | WNBA pregame props were silently dropped for TODAY's slate (real picks existed in `recommendations_slate_<date>.json` but zero reached the board) — root cause: `_prop_item_from_rank_card` (home.py) never set a `game_id`/`gamePk`/`event_id`, so `_build_sport_overview`'s hydration-intersection filter excluded every one of them. New `_backfill_prop_row_game_id` matches each row's team abbreviations against `home_games`, wired into `_WNBADataProvider.pregame_props`. |
+| **165** | Duplicate Games-strip mini-cards for the same live game — went through 3 live-broken versions (matchup-only merge hid a real different-date game; exact date-key broke the original same-day merge; date-clustering still missed a candidate whose date field was itself wrong, not missing) before landing on clustering by **live-chip identity** first, date-compatibility only for chip-less groups. See the Operational note in `todo.md` — this one is worth reading, not just the summary here. |
+| **166** | Soccer steam candidates' `game_date` was the board's scan date, not the individual match's real kickoff date (e.g. 7 real Saturday MLS matches all showed "Fri Jul 31"). First fix (season-schedule fuzzy team-name cross-reference) shipped with two real bugs of its own (wrong field-access pattern reading a different structure's shape; no disambiguation for team pairs meeting twice in a season) before being replaced entirely — the raw OddsAPI odds row already carries its own `commence_time` column directly, no cross-referencing needed at all. See the Operational note in `todo.md`. |
+
+Commits: `8ea2d8b1` (#162) · `409677df`+`fa7d0426`+`cd5b6714`+`940024f2` (#164/#165 + 3 follow-ups) · `2f926f40`+`99293914`+`969e8a44` (#166 + 2 follow-ups). All verified live in production (not just tests) before this session ended, including a full re-check of the rendered board after each fix. Landed alongside two other concurrently-active sessions in the same shared checkout (`#161` Layer 1 closing-line, `#163` Ask The Syndicate player history) — coordinated via send_message rather than colliding on files.
+
 ## Closed in the 2026-07-25/26 session
 
 | # | What shipped |

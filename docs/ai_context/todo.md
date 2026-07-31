@@ -4,16 +4,17 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (WNBA live
-boxscore/actuals stuck at zero, missing staleness+content gates)" below;
-prior session: "Reconciliation 2026-07-30 (#165 follow-ups + #166,
-Games-strip merge correctness + soccer steam game_date)"; before that:
-"Reconciliation 2026-07-30 (WNBA live-lens status/live_state key bug, full
-#124/Phase-4 live verification)"; before that: "Reconciliation
-2026-07-30 (#164/#165, WNBA missing props + duplicate MLB mini-cards)"; before that:
-"Reconciliation 2026-07-30 (#163, Ask The Syndicate MLB player history +
-advanced analytics)"; before that: "Reconciliation 2026-07-30 (#162, soccer
-league display)"; before that:
+Last reconciled: 2026-07-30. **#162/#164/#165/#166 archived** to
+`todo_closed.md` (Games-strip/soccer-league session, fully shipped and
+live-verified -- see the closed-items table there for the final,
+corrected summary of each; their prose write-ups here were stale/
+superseded by later same-session fixes, not worth keeping in the active
+list). See "Reconciliation 2026-07-30 (WNBA live boxscore/actuals stuck at
+zero, missing staleness+content gates)" below for the next-most-recent
+still-active session; before that: "Reconciliation 2026-07-30 (WNBA
+live-lens status/live_state key bug, full #124/Phase-4 live
+verification)"; before that: "Reconciliation 2026-07-30 (#163, Ask The
+Syndicate MLB player history + advanced analytics)"; before that:
 "Reconciliation 2026-07-30 (#161, Layer 1 closing-line fix)"; before that:
 "Reconciliation 2026-07-30 (#160, Games-strip board bugs)" further down;
 before that: "Reconciliation 2026-07-30 (tuning-loop wiring / Phase 5)";
@@ -83,69 +84,6 @@ name, same 4 call sites, same missing gate) — likely the same bug, NBA side
 never checked or fixed this pass. The segment-win-prob UI labeling issue in
 `cards-parity.js` (see above) also remains open — needs a product/UI
 decision, not a math fix.
-
-### Reconciliation 2026-07-30 (#165 follow-ups + #166, Games-strip merge correctness + soccer steam game_date)
-
-Continued live verification of #164/#165 (asked to "check the board once
-more for any other issues" after that round shipped) surfaced two more
-real, confirmed-live bugs -- both fixed and reshipped same session.
-
-**#165 was wrong twice before it was right.** The original fix (merge
-Games-strip groups sharing sport+matchup text) shipped, then immediately
-regressed live: WSH @ ATL is a real back-to-back two-day series, and
-merging purely on matchup text collapsed today's and tomorrow's game into
-ONE card, silently hiding one of them. Follow-up #1 added an exact
-sport+matchup+date key -- which then broke the ORIGINAL same-day merge
-again (WSH @ ATL's stray duplicate-causing candidate has no resolvable
-date, so it was ineligible to merge with the real dated one). Follow-up #2
-switched to date-clustering (dateless groups join the one real date in
-play) -- still didn't fix WSH @ ATL, because its stray candidate carries
-its OWN resolvable but WRONG date (an upstream bug, not a missing field).
-Follow-up #3 (the one that stuck): cluster by **live-chip identity**
-first -- chipForGame(group)'s matchup-text fallback means two groups
-resolve to the literal same chip object when their ids don't
-independently match one, which is authoritative regardless of what either
-candidate's own date field claims. Date-clustering only applies to groups
-with no chip at all. Verified with a standalone Node simulation of the
-clustering algorithm against 5 scenarios (including the exact bug shape:
-two disagreeing real dates, same resolved chip) before each reshipment --
-worth doing before shipping algorithmically subtle client-side logic a
-fourth time, not after.
-
-**#166 -- soccer steam candidates' game_date was the scan date, not the
-match's real date.** User: "MLS only has one game tomorrow the rest are on
-Saturday so these dates seem wrong" -- correct. `/api/board/game-chips`
-confirmed only ONE real MLS match is Friday (TOR @ NYC); seven are
-Saturday. But every soccer steam candidate showed `game_date`/
-`source_board_date`/`context_label` all equal to the SAME value (the
-board's requested date) -- because `active_leagues_for_date`/
-`game_odds_rows`/`props_odds_rows` read a rolling odds feed covering MANY
-upcoming matches across several real calendar days at once, and
-`_steam_candidates_for_sport` stamped every one of them with
-"the date this scan ran for," not the individual match's real kickoff
-date. Fixed by resolving each event's real kickoff date from the season
-schedule: new `_soccer_schedule_kickoff_dates(league)` loads the whole
-season's `matches` (not just one week), new `_soccer_event_kickoff_date`
-fuzzy-matches an odds row's home_team/away_team (OddsAPI's naming, e.g.
-"LA Galaxy") against the schedule's naming (e.g. "Los Angeles Galaxy") via
-the same `match_team_name` cross-source matcher market_board.py's
-`_soccer_odds_event_for_match` already uses for a different purpose.
-`_soccer_steam_matchup_lookup` now returns a resolved `game_date` per
-event when available; `_steam_candidates_for_sport` prefers it over
-`selected_date`. Also backfilled `game_date_by_game_id` from
-`dashboard_games`' own date fields for the non-steam ("game"-type) path,
-for symmetry (lower-confidence fix, dashboard_games' dates looked
-plausible already but weren't independently re-verified).
-
-Verified live 2026-07-30: 208 tests passing (test_intelligence.py,
-test_intelligence_steam_candidates.py, soccer sources/branding suites),
-pending commit+deploy as of this reconciliation. This entire round landed
-alongside multiple other concurrently-active sessions in the same shared
-checkout (coordinated via send_message per #164/#165's entry) -- worth
-noting for whoever reads this next: HEAD moved out from under this session
-repeatedly (verify `git log --oneline -1 HEAD` vs `origin/main` fresh
-before every commit and deploy trigger, don't assume the state from five
-minutes ago still holds).
 
 ### Reconciliation 2026-07-30 (WNBA live-lens status/live_state key bug, full #124/Phase-4 live verification)
 
@@ -404,62 +342,6 @@ Four gaps found and closed, not one:
     the refresh-worker's disk. The Statcast weekly refresh (point 9) has no
     automatic path to production at all yet — regenerating it there is
     manual-only until that's wired into the real worker loop.
-
-### Reconciliation 2026-07-30 (#162, soccer league display)
-
-User asked for soccer's Games-strip/board cards to show the actual league
-("MLS", "La Liga") instead of the generic "Soccer"/"SOCCER" sport label,
-since soccer covers several leagues at once.
-
-Traced the single choke point every sport's game-level candidate passes
-through (`home.py`'s `_append_game_bet_candidate`) and the soccer-specific
-steam-candidate builder (`intelligence.py`'s `_steam_candidates_for_sport`).
-Both stamped `"sport"` from the static per-sport config name ("Soccer"),
-with no per-match league information available at that point.
-
-1. **Source fields.** `soccer/cards.py`'s two game-dict constructors
-   (`_match_to_game`, `_unsimulated_game`) now stamp `"league"` (slug, e.g.
-   `"mls"`) and `"league_display"` (`"MLS"`) directly on every game dict,
-   using the already-resolved `league` the caller passes in (soccer is
-   week-keyed per league; the home-page provider resolves exactly one
-   active league per call today, preferring MLS).
-2. **Game-level candidates.** `home.py`'s `_append_game_bet_candidate` now
-   prefers `game.get("league_display")` over the generic sport name when
-   present -- a no-op for every other sport (the field is soccer-only), and
-   `sport_slug` is untouched, so sport-tab filtering and game-chip
-   id-matching (both keyed on the slug, never the display name) are
-   unaffected.
-3. **Steam candidates.** `_steam_candidates_for_sport` now also builds a
-   `league_display_by_game_id` map (from `dashboard_games`' own
-   `league_display` field, and from `_soccer_steam_matchup_lookup`'s
-   per-league raw-odds-row scan, which already iterated per league but
-   discarded that fact -- now returns `{"matchup": ..., "league_display":
-   ...}` per event_id) and uses it to override `"sport"` on soccer steam
-   candidates the same way.
-4. **Chip payload.** `game_chip_scoreboard.py`'s `build_game_chip` now
-   passes through `league`/`league_display` from the game dict (additive,
-   `None` for every other sport) for API completeness -- not required for
-   the fix itself, since the Games-strip badge reads `item.sport`
-   (already fixed above), not the chip directly.
-
-Net effect: everywhere a soccer candidate's sport badge renders (Games
-strip, Board table, Best-opportunities strip) now shows "MLS"/"La Liga"/etc.
-instead of "SOCCER", with zero JS changes needed (`intelligence.html`'s
-`deriveGameCards()` already derives its badge from `item.sport`).
-
-**Coverage gap, not fixed this pass:** player-prop candidates
-(`_prop_candidate_from_item`/`_build_prop_dashboard_row`) still stamp the
-generic sport name unconditionally -- soccer has little/no prop volume on
-this board today so it wasn't prioritized, but if that changes the same
-`game.get("league_display")`-preference pattern should be applied there too.
-Also: `_soccer_steam_matchup_lookup`'s per-league resolution only covers
-whichever leagues `active_leagues_for_date` returns as calendar-active, same
-scope as the existing matchup-text resolution it was already doing --  no
-new limitation introduced.
-
-Verified live 2026-07-30: not yet deployed as of this reconciliation --
-209 tests passing locally (soccer/home/intelligence/game-chip suites plus
-the two broader intelligence/soccer-sources suites), pending commit+deploy.
 
 ### Reconciliation 2026-07-30 (#161, Layer 1 closing-line fix)
 
@@ -4573,6 +4455,30 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
 
 ## Operational notes worth not rediscovering
 
+- **A client-side dedup/merge heuristic that "fixed" one case can silently
+  break a different one — verify against real production data, not just
+  synthetic test fixtures, before each reshipment.** (#165) The Games-strip
+  duplicate-card merge went through 3 live-broken versions before it was
+  correct: matchup-only key wrongly merged two REAL different-date games
+  into one (hiding a real game); switching to an exact date key then broke
+  the original same-day merge it was meant to fix (one duplicate-causing
+  candidate had no resolvable date); date-*clustering* fixed most cases but
+  missed the one where a candidate's date field was itself wrong (not
+  missing) while genuinely resolving to the same live scoreboard chip as
+  the real game — chip identity, not any candidate-level date, turned out
+  to be the authoritative signal. Every version passed its own synthetic
+  unit tests; only checking the actual rendered board caught each break.
+  Write the standalone-simulation/unit test either way, but treat it as
+  necessary, not sufficient, for algorithmically subtle client-side logic.
+- **Before building cross-referencing/fuzzy-matching logic to derive a
+  field, check whether the raw data you already have carries it directly.**
+  (#166) Needed each soccer steam candidate's real per-match kickoff date;
+  built an elaborate season-schedule fuzzy team-name matcher (two more real
+  bugs before it even ran correctly) before discovering the raw OddsAPI
+  odds row being processed already has a `commence_time` column — a
+  one-line fix with no matching ambiguity at all. Skim the actual source
+  artifact/CSV/API response being read before reaching for a heavier
+  derivation; the field you need is often already sitting there.
 - **A top-level `from module import name` freezes that name at import time —
   patching the module attribute later never reaches an already-bound copy in
   another module.** (#121) `syndicate/blueprints/intelligence.py` imported
