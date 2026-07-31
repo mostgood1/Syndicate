@@ -228,6 +228,116 @@ defensive net at the response boundary, not a fix to whichever upstream
 producer is still emitting NaN today. If this recurs, the underlying
 producer is still there to find.
 
+### Reconciliation 2026-07-31 (Layer 2 board audit: steam-move odds collision, uninformative props, MLB odds gap, MLB props timing)
+
+User: "audit the board UI - tons of blanks, moves that dont make sense, and
+MLB is missing props completely. WNBA has props w/o saying what they
+actually are." Five parallel research agents traced each symptom against
+live production data before any code changed; user approved a 3-phase plan
+("Yes, go ahead in that order").
+
+**Phase 1 — shipped, deployed.** Two independent bugs, both confirmed live
+via direct API pulls before fixing:
+1. **Soccer steam-move deltas were nonsensical** (120 candidates, mostly
+   identical ±0.25 deltas, 27 at exactly 0.0). Root cause:
+   `_candidate_odds_history_match_score`'s cross-market anti-collision gate
+   (`intelligence.py`, added 2026-07-24 for a Sugano-prop/Brewers-moneyline
+   collision) only ever applied to `candidate_type == "prop"`. Steam
+   candidates hit the identical failure but were never covered — worse,
+   `candidate_subject` was computed via `_candidate_subject_key()`, which
+   *by its own design* returns `None` for anything but `"prop"`, so the
+   gate's `candidate_subject` was always empty for steam and silently
+   passed everything. Confirmed live: all 120 soccer steam candidates on
+   the day's board had converged onto ONE unrelated game's (NYCFC/Toronto
+   FC) odds history via the soft matchup-text/line-proximity scoring alone.
+   Fixed by giving `_candidate_odds_history_match_score` a real subject for
+   steam too (falls back to `candidate.get("subject_key"/"player_name"/
+   "entity")`, all set by `_steam_candidates_for_sport`) and extending the
+   gate to `("prop", "steam")`. 3 new tests in
+   `tests/test_intelligence_prop_dedup_and_movement.py` (game-level steam
+   candidates still correctly match their own game — subject can be a team
+   name, not just a player).
+2. **Uninformative prop rows reaching the board.** Two shapes of the same
+   defect: WNBA picks whose upstream `recommendations_slate` recommendation
+   never had a priced market surfaced as `"Courtney Vandersloot OVER -"`
+   (market `"PROP"` — a fallback placeholder from `wnba/sources.py`'s
+   `market_label()`, since the raw pick had no real market code either);
+   MLB's HR-targets narrative shelf got scraped into a fake "prop" (pick
+   was a full sentence, "His underlying HR-quality profile is running
+   above baseline.", market was a team abbreviation "NYY"). **First attempt
+   at a fix was too broad and got reverted**: a blanket "suppress when
+   line/odds/projected are all absent" guard inside
+   `_append_game_bet_candidate` (home.py) also killed
+   `shared_top_play_rows`' legitimate candidates, which intentionally never
+   set those three params, relying on their own upstream side/price/edge
+   regex gate instead (2 test failures caught this before it shipped).
+   Rescoped narrowly: the completeness check now lives only in the
+   `game_market_recommendations` loop inside `_game_bet_candidates_from_game`
+   (home.py) for WNBA's shape, and separately inside
+   `_prop_candidate_from_item` (intelligence.py, now returns `None` to
+   suppress) for MLB's HR-targets shape — not a rule inside the shared
+   append function. 5 new tests across `tests/test_home.py` and
+   `tests/test_intelligence.py` (including one confirming a real line with
+   no odds yet still surfaces — the guard only fires when line, odds, AND
+   projection are all absent).
+
+208 total tests passing (`test_intelligence_prop_dedup_and_movement.py` +
+`test_home.py` + `test_intelligence.py` + `test_game_board_contract_prop_team.py`),
+no regressions. Committed, pushed, deploy queued behind an in-flight MLB
+sim (see Operational notes).
+
+**Phase 2 — shipped, deployed.** MLB Layer 2 game candidates (Moneyline/
+Total) showed `odds: null`/`american_odds: null` for every single game,
+even though the model's own win probability was present and correct.
+Confirmed via Layer 1 (`/mlb/api/market-board`), which showed real odds for
+the identical games right now — so this was a real code bug, not a data
+gap. Root cause: `_MLBDataProvider.games()` (home.py) builds Layer 2's MLB
+games via `build_cards_page_context()` directly, then feeds them straight
+to `_mlb_game_market_recommendation_rows()`. Layer 1's market board
+(`build_mlb_market_board`) calls that same `build_cards_page_context()` but
+then ADDITIONALLY wraps it through `source_cards_api_payload()`, which
+backfills `markets["ml"/"totals"/"spreads"]` from the tracked game-lines
+odds artifact whenever a game's own markets are empty (the common case —
+real book odds only ever land in `markets["ml"]` directly for games the
+recommendation engine happened to flag). Layer 2 skipped that enrichment
+step entirely. Extracted the enrichment into its own function,
+`_enrich_games_with_tracked_market_lines` (`mlb/cards.py`), rather than
+folding `source_cards_api_payload`'s full body into Layer 2 (that function
+also does HR/K-target shelf reshaping, live-lens merging, and workflow
+summaries Layer 2 doesn't need, and is a cache-sensitive, heavily-used
+function not worth risking a regression in) — so Layer 2 now calls just
+that one piece before deriving `game_market_recommendations`. 4 new tests
+in `tests/test_mlb_market_board.py` (backfills when empty, does NOT
+overwrite an existing recommendation-engine market, no-artifact and
+non-dict-entry edge cases). 165 tests passing across
+`test_mlb_market_board.py` + `test_home.py` +
+`test_mlb_tracked_game_lines_doubleheader.py`, no regressions. Committed,
+pushed, deploy queued behind the same in-flight sim as Phase 1.
+
+**Phase 3 — investigated, no code fix needed.** The original "MLB props
+missing completely" symptom (only one, non-real, narrative-scraped "prop"
+candidate on the board at the time it was first observed) was suspected to
+be a stale/missing `daily_top_props_<date>.json` artifact, based on the
+local mirror's last copy being 2+ weeks old. **That theory was checked
+against production directly (per this repo's own standing rule: local is
+never complete) and was wrong**: `/mlb/api/top-props?date=2026-07-31`
+returned 12 real, current pitcher rows, `using_sample_data: false`, and a
+fresh re-pull of the Layer 2 board (`/api/intelligence/query`,
+`sport=mlb`) showed **167 real prop candidates** with real markets, lines,
+and odds (e.g. "Jeff McNeil — Hits — Under 0.5 — odds 170"). The artifact
+was almost certainly just not yet refreshed for today's slate at the exact
+moment the original symptom was observed (props likely populate/firm up
+over the course of the day as games approach), and has since caught up via
+the normal refresh cycle — not a pipeline bug. No code change made for
+this item; the one real defect found along the way (MLB's HR-targets
+narrative row leaking onto the board as a fake "prop") was already fixed
+under Phase 1's completeness guard. If MLB props ever show as *durably*
+(not just momentarily) empty again, that would be the next place to look —
+this session's finding does not rule out a genuine timing/cadence gap in
+whatever job populates `daily_top_props_<date>.json` on days with an
+unusual schedule, only that today's specific occurrence resolved on its
+own before any code was touched.
+
 ### Reconciliation 2026-07-31 (#161 part 2: NBA/WNBA closing line, plus a production outage found and fixed along the way)
 
 User asked to extend #161's MLB closing-line fix to NBA/WNBA's Layer 1
