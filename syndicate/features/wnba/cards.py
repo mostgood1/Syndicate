@@ -26,6 +26,7 @@ from syndicate.features.shared.basketball_live_artifacts import build_live_playe
 from syndicate.features.shared.basketball_live_artifacts import _canonical_game_id
 from syndicate.features.shared.basketball_live_artifacts import resolve_event_ids_from_games
 from syndicate.features.shared.game_board_contract import _sim_payload
+from syndicate.features.shared.basketball_market_board import basketball_odds_history_payload
 from syndicate.features.shared.basketball_market_board import build_basketball_market_board
 from syndicate.features.shared.basketball_market_board import parse_raw_basketball_player_props_rows
 from syndicate.features.shared.memory_observability import log_runtime_memory
@@ -2641,6 +2642,7 @@ def build_wnba_market_board(selected_date: str) -> dict[str, Any]:
         raw_player_props=_wnba_raw_player_props_for_date(selected_date),
         games=games,
         live_player_lens_payload=live_player_lens_payload,
+        odds_history=basketball_odds_history_payload("wnba", selected_date),
     )
 
 

@@ -21,6 +21,22 @@ import math
 from typing import Any
 
 from syndicate.features.shared.market_inventory import join_odds_to_sim
+from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
+from syndicate.features.shared.odds_control_plane import resolve_current_shard_key
+
+# Internal join-key market names (basketball_market_board_rows_for_game's
+# own vocabulary) -> the odds_history market vocabulary
+# _flatten_basketball_game_cards writes (matching MLB's h2h/spreads/totals
+# convention -- see that function's own docstring in
+# odds_refresh_tracking.py). Mirrors MLB cards.py's
+# _MLB_MARKET_BOARD_TO_ODDS_HISTORY_MARKET.
+_BASKETBALL_MARKET_BOARD_TO_ODDS_HISTORY_MARKET: dict[str, str] = {
+    "moneyline_home": "h2h",
+    "moneyline_away": "h2h",
+    "spread_home": "spreads",
+    "spread_away": "spreads",
+    "total": "totals",
+}
 
 # Stat codes the sim artifact actually carries a mean/sd pair for (confirmed
 # 2026-07-27 against real cards_sim_detail_<date>.json for both NBA and
@@ -438,6 +454,122 @@ def basketball_market_board_rows_for_game(
     return odds_rows, sim_rows
 
 
+def basketball_odds_history_payload(sport_slug: str, selected_date: str) -> dict[str, Any]:
+    """Mirrors MLB cards.py's `_mlb_odds_history_payload` -- the shard-based
+    odds-history control-plane artifact, keyed generically by sport slug
+    (`odds_control_plane.py` has no MLB-specific handling, confirmed
+    2026-07-31), so this works unchanged for "nba"/"wnba".
+    """
+    shard_key = resolve_current_shard_key(sport_slug, selected_date)
+    payload = load_odds_history_payload_for_sport(sport_slug, shard_key)
+    return payload if isinstance(payload, dict) else {}
+
+
+def _basketball_parse_odds_history_market_key(market_key: Any) -> dict[str, str]:
+    parsed: dict[str, str] = {}
+    for part in str(market_key or "").split("|"):
+        if "=" not in part:
+            continue
+        key, value = part.split("=", 1)
+        parsed[key.strip().lower()] = value.strip().lower()
+    return parsed
+
+
+def _basketball_odds_history_entries_for_teams(odds_history: dict[str, Any], away_team: str, home_team: str, history_market_type: str) -> list[dict[str, Any]]:
+    """Every tracked entry for this exact game + market type -- mirrors
+    MLB cards.py's `_mlb_odds_history_entries_for_teams` exactly (same
+    key=value|key=value market-key shape, same equality-match approach,
+    since _flatten_basketball_game_cards writes home_team/away_team as
+    full team names, matching what the board's own game data carries in
+    away.get("name")/home.get("name") -- confirmed both derive from the
+    same "home_team"/"visitor_team" source columns, 2026-07-31).
+    """
+    markets = odds_history.get("markets") if isinstance(odds_history.get("markets"), dict) else {}
+    away_key = str(away_team or "").strip().lower()
+    home_key = str(home_team or "").strip().lower()
+    if not isinstance(markets, dict) or not markets or not away_key or not home_key:
+        return []
+    entries: list[dict[str, Any]] = []
+    for market_key, state in markets.items():
+        if not isinstance(state, dict):
+            continue
+        parsed = _basketball_parse_odds_history_market_key(market_key)
+        if parsed.get("market") != history_market_type:
+            continue
+        if parsed.get("away_team") != away_key or parsed.get("home_team") != home_key:
+            continue
+        entries.append(state)
+    return entries
+
+
+def _basketball_hydrate_market_board_line_movement(row: dict[str, Any], entries: list[dict[str, Any]]) -> None:
+    if not entries:
+        return
+    entry = next((candidate for candidate in entries if candidate.get("last_line") is not None or candidate.get("previous_line") is not None), None)
+    if entry is None:
+        return
+    last_line = entry.get("last_line")
+    previous_line = entry.get("previous_line")
+    row["line_last"] = last_line
+    row["line_previous"] = previous_line
+    delta = entry.get("delta")
+    if delta is None and last_line is not None and previous_line is not None:
+        try:
+            delta = float(last_line) - float(previous_line)
+        except (TypeError, ValueError):
+            delta = None
+    row["line_delta"] = delta
+    row["line_trend"] = entry.get("movement") or "flat"
+    # Stamped once at the market's real pregame->live transition
+    # (odds_refresh_tracking.py) -- see MLB cards.py's matching comment.
+    row["closing_line"] = entry.get("closing_line")
+    row["closing_price"] = entry.get("closing_price")
+
+
+def _basketball_odds_history_entries_for_player(odds_history: dict[str, Any], player_name: str, stat_code: str) -> list[dict[str, Any]]:
+    """Player-prop equivalent of _basketball_odds_history_entries_for_teams
+    -- matched by player + stat CODE (e.g. "pts"/"pra"), not the display
+    label, since the raw feed's own market key carries "stat" as a short
+    code (confirmed against real production live-lens rows, 2026-07-31),
+    the same vocabulary _canonical_stat_code already produces/consumes.
+    """
+    markets = odds_history.get("markets") if isinstance(odds_history.get("markets"), dict) else {}
+    player_key = _canonical_player_key(player_name)
+    stat_key = str(stat_code or "").strip().lower()
+    if not isinstance(markets, dict) or not markets or not player_key or not stat_key:
+        return []
+    entries: list[dict[str, Any]] = []
+    for market_key, state in markets.items():
+        if not isinstance(state, dict):
+            continue
+        parsed = _basketball_parse_odds_history_market_key(market_key)
+        row_player = _canonical_player_key(parsed.get("player") or parsed.get("player_name") or parsed.get("entity") or "")
+        if not row_player or row_player != player_key:
+            continue
+        if str(parsed.get("stat") or "").strip().lower() != stat_key:
+            continue
+        entries.append(state)
+    return entries
+
+
+def _basketball_hydrate_market_board_prop_movement(row: dict[str, Any], entries: list[dict[str, Any]]) -> None:
+    # Unlike MLB's prop hydration, entries aren't filtered by over/under
+    # side here -- the raw live-lens feed's own side/selection field isn't
+    # consistently present across every basketball prop source (confirmed
+    # research 2026-07-31), and a market's line/closing_line don't differ
+    # by side anyway (only which side a given price applies to would), so
+    # this is a deliberate simplification, not an oversight.
+    if not entries:
+        return
+    entry = next((candidate for candidate in entries if candidate.get("last_line") is not None or candidate.get("previous_line") is not None), None)
+    if entry is None:
+        return
+    row["line_last"] = entry.get("last_line")
+    row["line_previous"] = entry.get("previous_line")
+    row["closing_line"] = entry.get("closing_line")
+    row["closing_price"] = entry.get("closing_price")
+
+
 def _canonical_player_key(value: Any) -> str:
     return str(value or "").strip().casefold()
 
@@ -508,6 +640,7 @@ def build_basketball_market_board(
     games: list[dict[str, Any]],
     live_player_lens_payload: dict[str, Any] | None = None,
     raw_player_props: dict[str, dict[str, dict[str, Any]]] | None = None,
+    odds_history: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     live_by_event = live_rows_by_event_id(live_player_lens_payload)
     board_games: list[dict[str, Any]] = []
@@ -520,6 +653,12 @@ def build_basketball_market_board(
         home = game.get("home") if isinstance(game.get("home"), dict) else {}
         away_abbr = str(away.get("abbr") or game.get("away_tri") or "AWY").strip().upper()
         home_abbr = str(home.get("abbr") or game.get("home_tri") or "HME").strip().upper()
+        # Full team names -- what _flatten_basketball_game_cards stores as
+        # home_team/away_team in the odds-history market key (both derive
+        # from the same home_team/visitor_team source columns, confirmed
+        # 2026-07-31), so this is what closing-line matching keys off.
+        away_name = str(away.get("name") or away_abbr).strip()
+        home_name = str(home.get("name") or home_abbr).strip()
         betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
         prop_recommendations = game.get("prop_recommendations") if isinstance(game.get("prop_recommendations"), dict) else {}
         sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
@@ -535,6 +674,7 @@ def build_basketball_market_board(
         inventory = join_odds_to_sim(odds_rows, sim_rows)
         for row in inventory:
             market = row.get("market")
+            raw_market_key = market if isinstance(market, str) else None
             if row.get("market_type") == "prop" and isinstance(market, str) and "::" in market:
                 # Prop rows carry a disambiguated join key
                 # (_prop_join_market_key) so needs-resim detection can't
@@ -542,6 +682,18 @@ def build_basketball_market_board(
                 # strip it back to the clean label for display.
                 market = market.split("::", 1)[0]
             row["market"] = _DISPLAY_LABELS.get(market, market)
+            if odds_history:
+                if row.get("market_type") == "prop":
+                    entity_name = row.get("entity")
+                    if entity_name:
+                        stat_code = _canonical_stat_code(row.get("market"))
+                        entries = _basketball_odds_history_entries_for_player(odds_history, entity_name, stat_code)
+                        _basketball_hydrate_market_board_prop_movement(row, entries)
+                elif row.get("market_type") == "game":
+                    history_market_type = _BASKETBALL_MARKET_BOARD_TO_ODDS_HISTORY_MARKET.get(raw_market_key or "")
+                    if history_market_type:
+                        entries = _basketball_odds_history_entries_for_teams(odds_history, away_name, home_name, history_market_type)
+                        _basketball_hydrate_market_board_line_movement(row, entries)
         if event_id in live_by_event:
             hydrate_live_prop_rows(inventory, live_by_event[event_id])
 

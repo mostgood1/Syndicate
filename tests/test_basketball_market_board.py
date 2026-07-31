@@ -9,6 +9,10 @@ from syndicate.features.shared.basketball_market_board import hydrate_live_prop_
 from syndicate.features.shared.basketball_market_board import live_rows_by_event_id
 from syndicate.features.shared.basketball_market_board import parse_raw_basketball_player_props_rows
 from syndicate.features.shared.basketball_market_board import player_stat_distributions_from_sim
+from syndicate.features.shared.basketball_market_board import _basketball_odds_history_entries_for_teams
+from syndicate.features.shared.basketball_market_board import _basketball_odds_history_entries_for_player
+from syndicate.features.shared.basketball_market_board import _basketball_hydrate_market_board_line_movement
+from syndicate.features.shared.basketball_market_board import _basketball_hydrate_market_board_prop_movement
 from syndicate.features.shared.market_inventory import JOIN_STATUS_MATCHED
 from syndicate.features.shared.market_inventory import JOIN_STATUS_NEEDS_RESIM
 from syndicate.features.shared.market_inventory import JOIN_STATUS_NO_SIM_COVERAGE
@@ -223,6 +227,138 @@ class BuildBasketballMarketBoardTests(unittest.TestCase):
         self.assertEqual(len(rows), 2)
         for row in rows:
             self.assertEqual(row["join_status"], JOIN_STATUS_NO_SIM_COVERAGE)
+
+
+class BasketballOddsHistoryEntriesForTeamsTests(unittest.TestCase):
+    def test_matches_by_team_names_and_market(self) -> None:
+        odds_history = {
+            "markets": {
+                "event_id=1|home_team=San Antonio Spurs|away_team=New York Knicks|market=h2h|bookmaker=oddsapi_consensus": {"last_line": -250.0},
+                "event_id=1|home_team=San Antonio Spurs|away_team=New York Knicks|market=totals|bookmaker=oddsapi_consensus": {"last_line": 216.5},
+            }
+        }
+        entries = _basketball_odds_history_entries_for_teams(odds_history, "New York Knicks", "San Antonio Spurs", "h2h")
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["last_line"], -250.0)
+
+    def test_no_match_returns_empty_list(self) -> None:
+        odds_history = {"markets": {"event_id=1|home_team=San Antonio Spurs|away_team=New York Knicks|market=h2h|bookmaker=oddsapi_consensus": {"last_line": -250.0}}}
+        self.assertEqual(_basketball_odds_history_entries_for_teams(odds_history, "Golden State Warriors", "Boston Celtics", "h2h"), [])
+
+
+class BasketballOddsHistoryEntriesForPlayerTests(unittest.TestCase):
+    def test_matches_by_player_and_stat_code(self) -> None:
+        odds_history = {
+            "markets": {
+                "player=Miles McBride|market=player_prop|stat=threes": {"last_line": 1.5},
+                "player=Miles McBride|market=player_prop|stat=pts": {"last_line": 14.5},
+            }
+        }
+        entries = _basketball_odds_history_entries_for_player(odds_history, "Miles McBride", "threes")
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["last_line"], 1.5)
+
+
+class BasketballHydrateMarketBoardLineMovementTests(unittest.TestCase):
+    def test_hydrates_closing_line_and_movement(self) -> None:
+        row: dict[str, object] = {}
+        entries = [{"last_line": -250.0, "previous_line": -173.5, "movement": "down", "closing_line": -173.5, "closing_price": -173.5}]
+        _basketball_hydrate_market_board_line_movement(row, entries)
+        self.assertEqual(row["line_last"], -250.0)
+        self.assertEqual(row["line_trend"], "down")
+        self.assertEqual(row["closing_line"], -173.5)
+
+    def test_no_entries_does_not_hydrate(self) -> None:
+        row: dict[str, object] = {}
+        _basketball_hydrate_market_board_line_movement(row, [])
+        self.assertEqual(row, {})
+
+
+class BasketballHydrateMarketBoardPropMovementTests(unittest.TestCase):
+    def test_hydrates_closing_line(self) -> None:
+        row: dict[str, object] = {}
+        entries = [{"last_line": 1.5, "previous_line": 0.5, "closing_line": 0.5, "closing_price": -105.0}]
+        _basketball_hydrate_market_board_prop_movement(row, entries)
+        self.assertEqual(row["closing_line"], 0.5)
+        self.assertEqual(row["closing_price"], -105.0)
+
+    def test_no_entries_does_not_hydrate(self) -> None:
+        row: dict[str, object] = {}
+        _basketball_hydrate_market_board_prop_movement(row, [])
+        self.assertEqual(row, {})
+
+
+class BuildBasketballMarketBoardOddsHistoryHydrationTests(unittest.TestCase):
+    def test_game_market_row_hydrated_with_closing_line(self) -> None:
+        games = [
+            {
+                "gamePk": "1",
+                "away": {"abbr": "NYK", "name": "New York Knicks"},
+                "home": {"abbr": "SAS", "name": "San Antonio Spurs"},
+                "status": "Live",
+                "betting": {"home_ml": -250.0, "away_ml": 210.0, "p_home_win": 0.7, "p_away_win": 0.3},
+            }
+        ]
+        odds_history = {
+            "markets": {
+                "event_id=1|home_team=San Antonio Spurs|away_team=New York Knicks|market=h2h|bookmaker=oddsapi_consensus": {
+                    "last_line": -250.0,
+                    "previous_line": -173.5,
+                    "closing_line": -173.5,
+                    "closing_price": -173.5,
+                    "movement": "down",
+                    "is_live": True,
+                }
+            }
+        }
+        board = build_basketball_market_board(sport_slug="nba", selected_date="2026-07-23", games=games, odds_history=odds_history)
+        game_row = next(r for r in board["games"][0]["rows"] if r["market_type"] == "game")
+        self.assertEqual(game_row["closing_line"], -173.5)
+        self.assertEqual(game_row["closing_price"], -173.5)
+        self.assertEqual(game_row["line_last"], -250.0)
+
+    def test_prop_row_hydrated_with_closing_line(self) -> None:
+        games = [
+            {
+                "gamePk": "1",
+                "away": {"abbr": "NYK", "name": "New York Knicks"},
+                "home": {"abbr": "SAS", "name": "San Antonio Spurs"},
+                "status": "Live",
+                "prop_recommendations": {
+                    "away": [{"player": "Miles McBride", "market": "threes", "side": "over", "line": 0.5, "price": -105.0, "p_win": 0.6}],
+                    "home": [],
+                },
+            }
+        ]
+        odds_history = {
+            "markets": {
+                "player=Miles McBride|market=player_prop|stat=threes": {
+                    "last_line": 1.5,
+                    "previous_line": 0.5,
+                    "closing_line": 0.5,
+                    "closing_price": -105.0,
+                    "is_live": True,
+                }
+            }
+        }
+        board = build_basketball_market_board(sport_slug="nba", selected_date="2026-07-23", games=games, odds_history=odds_history)
+        prop_row = next(r for r in board["games"][0]["rows"] if r["market_type"] == "prop")
+        self.assertEqual(prop_row["closing_line"], 0.5)
+        self.assertEqual(prop_row["closing_price"], -105.0)
+
+    def test_no_odds_history_leaves_rows_unhydrated(self) -> None:
+        games = [
+            {
+                "gamePk": "1",
+                "away": {"abbr": "SAS"},
+                "home": {"abbr": "NYK"},
+                "status": "Scheduled",
+                "betting": {"home_ml": -180.0, "away_ml": 155.0},
+            }
+        ]
+        board = build_basketball_market_board(sport_slug="nba", selected_date="2026-07-23", games=games)
+        for row in board["games"][0]["rows"]:
+            self.assertNotIn("closing_line", row)
 
 
 class LiveRowsByEventIdTests(unittest.TestCase):

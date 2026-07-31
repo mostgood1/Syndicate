@@ -10,6 +10,8 @@ from unittest.mock import patch
 from syndicate.features.shared.odds_refresh_tracking import sync_post_refresh_tracking_for_source_root
 from syndicate.features.shared.odds_refresh_tracking import refresh_impacted_recommendations_for_tracking
 from syndicate.features.shared.odds_refresh_tracking import _odds_history_market_key
+from syndicate.features.shared.odds_refresh_tracking import _flatten_basketball_game_cards
+from syndicate.features.shared.odds_refresh_tracking import _row_elapsed_game_time_indicates_live
 from syndicate.features.shared.odds_lifecycle import load_odds_lifecycle_events
 from tests.test_refresh_state_store import _FakeKeyValueClient
 
@@ -625,6 +627,7 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertEqual(market_state["closing_line"], -110.0)
             self.assertEqual(market_state["last_line"], -150.0)
 
+
     def test_sync_nfl_tracking_reads_source_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False):
             root = Path(tmpdir)
@@ -1079,6 +1082,140 @@ class OddsRefreshTrackingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class FlattenBasketballGameCardsTests(unittest.TestCase):
+    # game_cards_{date}.csv is one row per GAME with all 3 markets as
+    # columns (confirmed against real production files, 2026-07-31) --
+    # the generic per-row odds-history parser can only ever surface one
+    # market per row, so this melts each row into up to 3 output rows.
+    def test_melts_one_row_into_three_market_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "game_cards_2026-06-13.csv"
+            path.write_text(
+                "date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri\n"
+                "2026-06-13,1,San Antonio Spurs,New York Knicks,2026-06-14T00:40:00Z,-173.5,173.5,-5.5,5.5,216.5,oddsapi_consensus,SAS,NYK\n",
+                encoding="utf-8",
+            )
+            records = _flatten_basketball_game_cards(path).to_dict("records")
+            self.assertEqual(len(records), 3)
+            by_market = {r["market"]: r for r in records}
+            self.assertEqual(set(by_market.keys()), {"h2h", "spreads", "totals"})
+            for record in records:
+                self.assertEqual(record["home_team"], "San Antonio Spurs")
+                self.assertEqual(record["away_team"], "New York Knicks")
+                self.assertEqual(record["commence_time"], "2026-06-14T00:40:00Z")
+                self.assertEqual(record["entity"], "San Antonio Spurs")
+            self.assertEqual(by_market["h2h"]["line"], -173.5)
+            self.assertEqual(by_market["h2h"]["home_odds"], -173.5)
+            self.assertEqual(by_market["h2h"]["away_odds"], 173.5)
+            self.assertEqual(by_market["spreads"]["line"], -5.5)
+            self.assertEqual(by_market["totals"]["line"], 216.5)
+
+    def test_missing_team_names_are_skipped(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "game_cards_2026-06-13.csv"
+            path.write_text(
+                "date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri\n"
+                "2026-06-13,1,,,2026-06-14T00:40:00Z,-173.5,173.5,-5.5,5.5,216.5,oddsapi_consensus,SAS,NYK\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(_flatten_basketball_game_cards(path).to_dict("records"), [])
+
+
+class RowElapsedGameTimeIndicatesLiveTests(unittest.TestCase):
+    def test_zero_elapsed_is_pregame(self) -> None:
+        self.assertFalse(_row_elapsed_game_time_indicates_live({"elapsed": 0, "remaining": 40}))
+
+    def test_positive_elapsed_is_live(self) -> None:
+        self.assertTrue(_row_elapsed_game_time_indicates_live({"elapsed": 12, "remaining": 28}))
+
+    def test_missing_elapsed_is_not_live(self) -> None:
+        self.assertFalse(_row_elapsed_game_time_indicates_live({"remaining": 40}))
+
+
+class OddsRefreshTrackingBasketballTests(unittest.TestCase):
+    def test_sync_nba_tracking_stamps_closing_line_for_game_markets_via_commence_time(self) -> None:
+        # Mirrors the MLB commence-time test above: NBA/WNBA's game_cards
+        # feed has real team names + commence_time but (confirmed live
+        # 2026-07-31) no live/in-play text either, so the same
+        # commence_time-vs-now signal is what drives the transition here.
+        fixed_now = "2026-06-13T12:00:00Z"
+        shard_date = "2026-06-13"
+        future_commence = "2026-06-13T12:10:00Z"
+        past_commence = "2026-06-13T11:50:00Z"
+        fixed_instant = datetime.fromisoformat(fixed_now.replace("Z", "+00:00"))
+
+        class _FrozenDatetime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return fixed_instant.astimezone(tz) if tz is not None else fixed_instant.replace(tzinfo=None)
+
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict(
+            "os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False
+        ), patch("syndicate.features.shared.odds_refresh_tracking.datetime", _FrozenDatetime):
+            root = Path(tmpdir)
+            processed_root = root / "data" / "processed"
+            processed_root.mkdir(parents=True)
+            game_cards_path = processed_root / f"game_cards_{shard_date}.csv"
+
+            def _write(*, home_ml: str, commence_time: str) -> None:
+                game_cards_path.write_text(
+                    "date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri\n"
+                    f"{shard_date},1,San Antonio Spurs,New York Knicks,{commence_time},{home_ml},173.5,-5.5,5.5,216.5,oddsapi_consensus,SAS,NYK\n",
+                    encoding="utf-8",
+                )
+
+            _write(home_ml="-173.5", commence_time=future_commence)
+            pregame_result = sync_post_refresh_tracking_for_source_root(sport="nba", source_root=root, date_str=shard_date)
+            self.assertTrue(pregame_result["ok"])
+
+            _write(home_ml="-250.0", commence_time=past_commence)
+            live_result = sync_post_refresh_tracking_for_source_root(sport="nba", source_root=root, date_str=shard_date)
+            self.assertTrue(live_result["ok"])
+
+            history_payload = json.loads((root / "tracking" / "odds_history" / f"{shard_date}.json").read_text(encoding="utf-8"))
+            markets = history_payload["markets"]
+            market_key = next(key for key in markets if "market=h2h" in key)
+            market_state = markets[market_key]
+            self.assertTrue(market_state.get("is_live"))
+            self.assertEqual(market_state["closing_line"], -173.5)
+            self.assertEqual(market_state["last_line"], -250.0)
+
+    def test_sync_wnba_tracking_stamps_closing_line_for_prop_via_elapsed_signal(self) -> None:
+        # Props have no commence_time at all (confirmed live 2026-07-31),
+        # so this exercises the OTHER new signal: elapsed game-clock time.
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict(
+            "os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False
+        ):
+            root = Path(tmpdir)
+            processed_root = root / "data" / "processed"
+            processed_root.mkdir(parents=True)
+            signals_path = processed_root / "live_lens_signals_2026-06-07.jsonl"
+
+            signals_path.write_text(
+                json.dumps({"market": "player_prop", "stat": "pra", "game_id": "2", "home": "LAS", "away": "POR", "entity": "Kahleah Copper", "player": "Kahleah Copper", "line": 23.5, "elapsed": 0, "remaining": 40}) + "\n",
+                encoding="utf-8",
+            )
+            pregame_result = sync_post_refresh_tracking_for_source_root(sport="wnba", source_root=root, date_str="2026-06-07")
+            self.assertTrue(pregame_result["ok"])
+
+            signals_path.write_text(
+                json.dumps({"market": "player_prop", "stat": "pra", "game_id": "2", "home": "LAS", "away": "POR", "entity": "Kahleah Copper", "player": "Kahleah Copper", "line": 27.5, "elapsed": 12, "remaining": 28}) + "\n",
+                encoding="utf-8",
+            )
+            live_result = sync_post_refresh_tracking_for_source_root(sport="wnba", source_root=root, date_str="2026-06-07")
+            self.assertTrue(live_result["ok"])
+
+            history_payload = json.loads((root / "tracking" / "odds_history" / "2026-06-07.json").read_text(encoding="utf-8"))
+            markets = history_payload["markets"]
+            # _odds_history_market_key preserves original case (no
+            # lowercasing) -- match case-insensitively.
+            market_key = next(key for key in markets if "player=kahleah copper" in key.lower() and "stat=pra" in key.lower())
+            market_state = markets[market_key]
+            self.assertTrue(market_state.get("is_live"))
+            self.assertEqual(market_state["closing_line"], 23.5)
+            self.assertEqual(market_state["last_line"], 27.5)
+
 
 class CapturePhaseTests(unittest.TestCase):
     """#82 Phase 3. Opening/closing lines become lookups, not timestamp

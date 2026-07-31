@@ -484,6 +484,23 @@ def _row_commence_time_has_passed(row: Mapping[str, Any], *, now_iso: str) -> bo
     return now_dt >= commence_dt
 
 
+def _row_elapsed_game_time_indicates_live(row: Mapping[str, Any]) -> bool:
+    """True when a row carries a real, nonzero in-game elapsed-time signal.
+
+    Confirmed live 2026-07-31: NBA/WNBA's player-prop and live-lens feeds
+    (live_lens_signals_*.jsonl etc.) carry no commence_time at all -- unlike
+    game_cards.csv's game-level rows -- so _row_commence_time_has_passed
+    can't help them. Those rows DO carry "elapsed"/"remaining" (minutes
+    played / minutes left in the game), e.g. {"elapsed": 0, "remaining": 40}
+    for a still-pregame WNBA row observed directly against production data.
+    elapsed > 0 is a reasonable proxy for "the game has actually tipped
+    off" -- same role commence_time plays for game markets, just sourced
+    from the game clock instead of the schedule.
+    """
+    elapsed = _line_number(row.get("elapsed"))
+    return elapsed is not None and elapsed > 0
+
+
 def _line_number(value: Any) -> float | None:
     if value in (None, "", "-"):
         return None
@@ -911,6 +928,18 @@ def _odds_history_snapshot_paths(*, sport: str, source_root: Path, date_str: str
             add(*rel_parts, "live_snapshots", f"live_lines_{date_str}.jsonl")
             add(*rel_parts, f"live_lens_signals_{date_str}.jsonl")
             add(*rel_parts, f"live_lens_projections_{date_str}.jsonl")
+            # game_cards_{date}.csv (confirmed live 2026-07-31: home_team/
+            # visitor_team/commence_time/home_ml/away_ml/home_spread/
+            # away_spread/total/bookmaker/home_tri/away_tri) is the ONLY one
+            # of these four sources that carries real game-level lines with
+            # commence_time and full team names -- the other three (checked
+            # against real production files the same session) either
+            # produce zero rows through the generic per-row parser (nested
+            # scalar "lines" dict, or a "live_line" key the parser doesn't
+            # recognize) or are player-prop-only. Routed through
+            # _flatten_basketball_game_cards below, not the generic CSV
+            # reader, since one CSV row here holds 3 markets as columns.
+            add(*rel_parts, f"game_cards_{date_str}.csv")
         return [path for path in candidates if path.exists() and path.is_file()]
 
     if slug == "nhl":
@@ -973,6 +1002,10 @@ def _mlb_props_root_key_for_path(path: Path) -> str | None:
     return None
 
 
+def _is_basketball_game_cards_path(path: Path) -> bool:
+    return path.name.startswith("game_cards_") and path.suffix.lower() == ".csv"
+
+
 def _parse_game_date_token(value: Any) -> date | None:
     text = str(value or "").strip()
     if not text:
@@ -991,6 +1024,12 @@ def _parse_game_date_token(value: Any) -> date | None:
 def _row_game_date(row: Mapping[str, Any], *, sport: str) -> date | None:
     slug = str(sport or "").strip().lower()
     if slug == "mlb":
+        return _parse_game_date_token(row.get("commence_time"))
+    if slug in {"nba", "wnba"}:
+        # Only game_cards_*.csv rows (_flatten_basketball_game_cards) carry
+        # commence_time -- prop/live-lens rows have none, so this falls
+        # through to date_str for them (_shard_key_for_row's existing
+        # behavior), same as any other sport with no game-date signal.
         return _parse_game_date_token(row.get("commence_time"))
     if slug == "nhl":
         return _parse_game_date_token(row.get("commence_time") or row.get("gameDate"))
@@ -1172,6 +1211,13 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             # teach the generic parser a second nesting level that no other
             # sport's shape needs.
             rows = _flatten_mlb_props(candidate, mlb_props_root_key).to_dict("records")
+        elif slug in {"nba", "wnba"} and _is_basketball_game_cards_path(candidate):
+            # game_cards_{date}.csv holds 3 markets per row as columns --
+            # see _flatten_basketball_game_cards's own docstring. Without
+            # this, the generic CSV reader would only ever surface one
+            # market per game (whichever column _primary_line_value checks
+            # first), silently dropping the other two.
+            rows = _flatten_basketball_game_cards(candidate).to_dict("records")
         elif suffix == ".csv":
             rows = _odds_history_rows_from_csv(candidate)
         elif suffix == ".jsonl":
@@ -1260,7 +1306,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             # event_type="live" tagging and count_live/count_pregame below --
             # a real fix for those too (they had the identical blind spot),
             # not scope creep.
-            row_is_live_cheap = _is_live_odds_row(row) or _row_commence_time_has_passed(row, now_iso=now)
+            row_is_live_cheap = _is_live_odds_row(row) or _row_commence_time_has_passed(row, now_iso=now) or _row_elapsed_game_time_indicates_live(row)
             market_state["is_live"] = True if (row_is_live_cheap or market_state.get("is_live") is True) else False
 
             if previous_line is not None and current_line == previous_line and previous_odds is not None and current_odds == previous_odds and previous_snapshot_ts == row_snapshot_ts and history:
@@ -2197,6 +2243,57 @@ def _flatten_mlb_props(path: Path, root_key: str) -> pd.DataFrame:
                     "price": price,
                     "snapshot_ts": snapshot_ts,
                 })
+    return pd.DataFrame(rows)
+
+
+def _flatten_basketball_game_cards(path: Path) -> pd.DataFrame:
+    """game_cards_{date}.csv is one row per GAME with all 3 game markets as
+    columns (home_ml/away_ml, home_spread/away_spread, total) -- unlike
+    every other odds snapshot this file's generic per-row parser handles
+    (one row = one market), so each source row melts into up to 3 output
+    rows here, one per market, matching MLB's h2h/spreads/totals vocabulary
+    and entity=home_team convention so the same downstream matching logic
+    (_odds_history_market_key, board-side team-name hydration) works
+    unchanged for basketball.
+    """
+    df = _read_csv(path)
+    if df.empty:
+        return df
+    fallback_ts = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat(timespec="seconds")
+    snapshot_ts = _to_snapshot_ts(df, fallback_ts=fallback_ts)
+    rows: list[dict[str, Any]] = []
+    def _clean_str(value: Any) -> str:
+        # A blank CSV cell reads back from pandas as float NaN, not None/""
+        # -- str(nan) is the truthy string "nan", which would otherwise
+        # silently pass through as a real (wrong) team name.
+        if value is None or (isinstance(value, float) and value != value):
+            return ""
+        return str(value).strip()
+
+    for index, record in enumerate(df.to_dict(orient="records")):
+        home_team = _clean_str(record.get("home_team"))
+        away_team = _clean_str(record.get("visitor_team")) or _clean_str(record.get("away_team"))
+        if not home_team or not away_team:
+            continue
+        row_snapshot_ts = str(snapshot_ts.iloc[index]) if index < len(snapshot_ts) else fallback_ts
+        base = {
+            "event_id": record.get("game_id"),
+            "home_team": home_team,
+            "away_team": away_team,
+            "commence_time": record.get("commence_time"),
+            "entity": home_team,
+            "bookmaker": str(record.get("bookmaker") or "").strip() or "oddsapi_consensus",
+            "snapshot_ts": row_snapshot_ts,
+        }
+        home_ml = _line_number(record.get("home_ml"))
+        if home_ml is not None:
+            rows.append({**base, "market": "h2h", "market_type": "h2h", "line": home_ml, "home_odds": home_ml, "away_odds": _line_number(record.get("away_ml"))})
+        home_spread = _line_number(record.get("home_spread"))
+        if home_spread is not None:
+            rows.append({**base, "market": "spreads", "market_type": "spreads", "line": home_spread, "home_line": home_spread, "away_line": _line_number(record.get("away_spread"))})
+        total = _line_number(record.get("total"))
+        if total is not None:
+            rows.append({**base, "market": "totals", "market_type": "totals", "line": total})
     return pd.DataFrame(rows)
 
 
