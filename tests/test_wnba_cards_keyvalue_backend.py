@@ -109,5 +109,63 @@ class WnbaCardsKeyvalueBackendTests(unittest.TestCase):
         self.assertEqual(result["games"][0]["players"], payload["games"][0]["players"])
 
 
+class WnbaGameCardsLastKnownGoodFallbackTests(unittest.TestCase):
+    """Board audit follow-up, 2026-07-31: root-caused live -- a transient
+    keyvalue-backend read failure (e.g. a Redis connection hiccup) was
+    silently indistinguishable from "no games today" (read_text_file
+    collapsed both to None), which wiped WNBA's entire game/prop candidate
+    pool off the Layer 2 board for that whole refresh cycle, intermittently,
+    with zero visibility. Fixed by (1) read_text_file_result distinguishing
+    the two cases and (2) this last-known-good fallback, so a genuine read
+    FAILURE serves the most recent real data instead of nothing, while a
+    genuine confirmed-empty result (real, not a failure) is still trusted
+    as-is.
+    """
+
+    def setUp(self) -> None:
+        wnba_cards._LAST_GOOD_GAME_CARDS_ROWS_BY_DATE.clear()
+
+    def tearDown(self) -> None:
+        wnba_cards._LAST_GOOD_GAME_CARDS_ROWS_BY_DATE.clear()
+
+    def test_successful_read_is_remembered_as_last_known_good(self) -> None:
+        with patch(
+            "syndicate.features.wnba.cards._keyvalue_read_text_file_result",
+            return_value=("date,game_id\n2026-07-31,401\n", True),
+        ):
+            rows = wnba_cards._load_game_cards_csv_rows_from_keyvalue("2026-07-31")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(wnba_cards._LAST_GOOD_GAME_CARDS_ROWS_BY_DATE.get("2026-07-31"), rows)
+
+    def test_read_failure_falls_back_to_last_known_good_rows(self) -> None:
+        wnba_cards._LAST_GOOD_GAME_CARDS_ROWS_BY_DATE["2026-07-31"] = [{"date": "2026-07-31", "game_id": "401"}]
+        with patch(
+            "syndicate.features.wnba.cards._keyvalue_read_text_file_result",
+            return_value=(None, False),
+        ):
+            rows = wnba_cards._load_game_cards_csv_rows_from_keyvalue("2026-07-31")
+        self.assertEqual(rows, [{"date": "2026-07-31", "game_id": "401"}])
+
+    def test_read_failure_with_no_prior_good_rows_returns_empty(self) -> None:
+        with patch(
+            "syndicate.features.wnba.cards._keyvalue_read_text_file_result",
+            return_value=(None, False),
+        ):
+            rows = wnba_cards._load_game_cards_csv_rows_from_keyvalue("2026-07-31")
+        self.assertEqual(rows, [])
+
+    def test_genuine_confirmed_empty_result_is_trusted_not_overridden(self) -> None:
+        # A real "no games" result (read succeeded, key just isn't set) must
+        # NOT be masked by a stale last-known-good entry from an earlier date
+        # -- only a genuine read FAILURE should fall back.
+        wnba_cards._LAST_GOOD_GAME_CARDS_ROWS_BY_DATE["2026-07-31"] = [{"date": "2026-07-31", "game_id": "401"}]
+        with patch(
+            "syndicate.features.wnba.cards._keyvalue_read_text_file_result",
+            return_value=(None, True),
+        ):
+            rows = wnba_cards._load_game_cards_csv_rows_from_keyvalue("2026-07-31")
+        self.assertEqual(rows, [])
+
+
 if __name__ == "__main__":
     unittest.main()

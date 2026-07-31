@@ -308,6 +308,51 @@ class RefreshStateStoreTests(unittest.TestCase):
         self.assertIsNone(payload)
         self.assertFalse(ok)
 
+    def test_read_text_file_result_distinguishes_absent_from_read_failure(self) -> None:
+        # Board audit follow-up, 2026-07-31: read_text_file had the exact
+        # same "absent vs. failed" ambiguity read_json_file_result was
+        # already built to fix, just never given the same treatment --
+        # root-caused live as the reason a transient keyvalue hiccup wiped
+        # WNBA's entire game/prop candidate pool off the board instead of
+        # being distinguishable from a real "no data" result.
+        with TemporaryDirectory() as tmp_dir:
+            missing_path = Path(tmp_dir) / "does_not_exist.csv"
+            text, ok = refresh_state_store.read_text_file_result(missing_path)
+            self.assertIsNone(text)
+            self.assertTrue(ok)
+
+            good_path = Path(tmp_dir) / "good.csv"
+            good_path.write_text("a,b\n1,2\n", encoding="utf-8")
+            text, ok = refresh_state_store.read_text_file_result(good_path)
+            self.assertEqual(text, "a,b\n1,2")
+            self.assertTrue(ok)
+
+    def test_read_text_file_result_reports_keyvalue_backend_failures(self) -> None:
+        with TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue",
+                "SYNDICATE_REFRESH_STATE_URL": "redis://example",
+            },
+            clear=False,
+        ), patch(
+            "syndicate.features.shared.refresh_state_store._get_keyvalue_client",
+            side_effect=RuntimeError("connection reset"),
+        ):
+            path = Path(tmp_dir) / "data" / "processed" / "game_cards_2026-07-31.csv"
+            text, ok = refresh_state_store.read_text_file_result(path)
+
+        self.assertIsNone(text)
+        self.assertFalse(ok)
+
+    def test_read_text_file_unchanged_behavior_still_collapses_to_none(self) -> None:
+        # read_text_file itself (the pre-existing, still-used-elsewhere
+        # entry point) must keep returning bare None for both cases --
+        # only the new _result variant exposes the distinction.
+        with TemporaryDirectory() as tmp_dir:
+            missing_path = Path(tmp_dir) / "does_not_exist.csv"
+            self.assertIsNone(refresh_state_store.read_text_file(missing_path))
+
     def test_ops_status_reads_latest_manifest_and_artifacts_from_keyvalue_backend(self) -> None:
         fake_client = _FakeKeyValueClient()
         with TemporaryDirectory() as tmp_dir:

@@ -361,18 +361,37 @@ def read_json_file_result(path: Path) -> tuple[dict[str, Any] | None, bool]:
 
 
 def read_text_file(path: Path) -> str | None:
+    return read_text_file_result(path)[0]
+
+
+def read_text_file_result(path: Path) -> tuple[str | None, bool]:
+    # Board audit follow-up, 2026-07-31: mirrors read_json_file_result's
+    # already-proven fix for the identical ambiguity (see its docstring) --
+    # read_text_file collapsed "key genuinely doesn't exist" and "the read
+    # failed" into the same None, so a caller had no way to tell a real,
+    # confirmed-empty result from a transient keyvalue-backend hiccup.
+    # Root-caused live: WNBA's game_cards.csv keyvalue read
+    # (_load_game_cards_csv_rows_from_keyvalue) silently treated a failed
+    # read the same as "no games today," and with no fallback for that
+    # caller, wiped every WNBA game/prop candidate off the Layer 2 board
+    # for that entire refresh cycle -- intermittently, with zero visibility
+    # (no exception surfaced, no distinguishing signal), which is exactly
+    # what made this take real log archaeology to trace instead of being
+    # obvious from the first failure.
     if _state_backend_kind() == "keyvalue":
         try:
             payload_text = _execute_keyvalue_operation(lambda client: client.get(_state_key_for_path(path)))
         except Exception:
-            return None
+            return None, False
         if payload_text is None:
-            return None
-        return str(payload_text).strip()
+            return None, True
+        return str(payload_text).strip(), True
     try:
-        return path.read_text(encoding="utf-8").strip()
+        return path.read_text(encoding="utf-8").strip(), True
+    except FileNotFoundError:
+        return None, True
     except Exception:
-        return None
+        return None, False
 
 
 class KeyValuePayloadTooLarge(ValueError):

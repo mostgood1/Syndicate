@@ -37,6 +37,7 @@ from syndicate.features.shared.source_roots import preferred_source_roots
 from syndicate.features.shared.team_branding import read_team_branding_snapshot
 from syndicate.features.shared.team_branding import team_branding_index_by_abbreviation
 from syndicate.features.shared.refresh_state_store import read_text_file as _keyvalue_read_text_file
+from syndicate.features.shared.refresh_state_store import read_text_file_result as _keyvalue_read_text_file_result
 from syndicate.features.shared.refresh_state_store import write_text_file as _keyvalue_write_text_file
 from syndicate.features.wnba.sources import available_dates
 from syndicate.features.wnba.sources import build_module_links
@@ -330,14 +331,41 @@ def _game_cards_keyvalue_path(selected_date: str) -> Path:
     return _refresh_state_data_root() / "wnba_source" / "data" / "processed" / f"game_cards_{selected_date}.csv"
 
 
+# Board audit follow-up, 2026-07-31: last confirmed-good game_cards.csv
+# rows per date, kept only so a transient keyvalue-read FAILURE (backend
+# error -- see read_text_file_result) can serve the most recent real data
+# instead of silently wiping every WNBA game/prop candidate off the board
+# for that whole refresh cycle. Root-caused live: this exact failure mode,
+# intermittent and invisible (no exception surfaced, no distinguishing
+# signal from "no games today"), zeroed dashboard_games_count for today's
+# real 3-game slate multiple times in one session. Deliberately NOT used
+# for a confirmed-empty result (success=True, no rows) -- that's real
+# data, not a failure, and must be trusted as-is. Small and self-bounding
+# (a handful of in-flight dates at most), no TTL needed -- it only ever
+# substitutes for a failed read, never overrides a fresh successful one.
+_LAST_GOOD_GAME_CARDS_ROWS_BY_DATE: dict[str, list[dict[str, str]]] = {}
+
+
 def _load_game_cards_csv_rows_from_keyvalue(selected_date: str) -> list[dict[str, str]]:
-    text = _keyvalue_read_text_file(_game_cards_keyvalue_path(selected_date))
+    text, read_ok = _keyvalue_read_text_file_result(_game_cards_keyvalue_path(selected_date))
+    if not read_ok:
+        fallback_rows = _LAST_GOOD_GAME_CARDS_ROWS_BY_DATE.get(selected_date)
+        print(
+            f"[WNBA_GAME_CARDS_KEYVALUE_READ_FAILED] date={selected_date} "
+            f"using_last_known_good={'yes' if fallback_rows else 'no'} "
+            f"last_known_good_row_count={len(fallback_rows) if fallback_rows else 0}",
+            flush=True,
+        )
+        return list(fallback_rows) if fallback_rows else []
     if not text or not text.strip():
         return []
     try:
-        return [dict(row) for row in csv.DictReader(io.StringIO(text))]
+        rows = [dict(row) for row in csv.DictReader(io.StringIO(text))]
     except Exception:
         return []
+    if rows:
+        _LAST_GOOD_GAME_CARDS_ROWS_BY_DATE[selected_date] = rows
+    return rows
 
 
 def _recommendation_index(summary: dict[str, Any] | None) -> dict[tuple[str, str], list[dict[str, Any]]]:
