@@ -167,6 +167,18 @@ class HotArtifactAllowlistTests(unittest.TestCase):
         self.assertTrue(is_hot_artifact_relative_path("nba_source/source_artifacts/data/processed/oddsapi_player_props_2026-07-23.csv"))
         self.assertTrue(is_hot_artifact_relative_path("wnba_source/data/processed/oddsapi_player_props_2026-07-23.csv"))
 
+    def test_accepts_mlb_player_game_log_and_statcast_features(self) -> None:
+        # #163: written by refresh-worker (run_mlb_daily_sim_job.py's post-sim
+        # hook / the Statcast regen), read on web by Ask The Syndicate --
+        # confirmed live 2026-07-30 that omitting these left a real production
+        # query ("Eury Perez outs") with no visuals at all post-deploy.
+        self.assertTrue(is_hot_artifact_relative_path("mlb_source/source_artifacts/data/processed/mlb_pitcher_game_log.csv"))
+        self.assertTrue(is_hot_artifact_relative_path("mlb_source/data/processed/mlb_pitcher_game_log.csv"))
+        self.assertTrue(is_hot_artifact_relative_path("mlb_source/source_artifacts/data/processed/mlb_batter_game_log.csv"))
+        self.assertTrue(is_hot_artifact_relative_path("mlb_source/data/processed/mlb_batter_game_log.csv"))
+        self.assertTrue(is_hot_artifact_relative_path("mlb_source/source_artifacts/data/statcast/features/player_features_latest.json"))
+        self.assertTrue(is_hot_artifact_relative_path("mlb_source/data/statcast/features/player_features_latest.json"))
+
     def test_accepts_soccer_raw_odds_props_and_picks(self) -> None:
         # 2026-07-24 fix: the fetch/picks scripts have been scheduled in
         # refresh_odds_sources.py for a while and run successfully (confirmed

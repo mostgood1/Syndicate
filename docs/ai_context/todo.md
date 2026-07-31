@@ -233,21 +233,54 @@ Four gaps found and closed, not one:
    the `run-syndicate` skill: asking "Eury Perez outs" now renders "Last 4
    starts — Eury Pérez", "Advanced Statcast profile — Eury Pérez", and an
    actual-strikeouts chart alongside the existing bet-analysis panel.
-8. **Not yet committed/pushed/deployed** — implementation + tests + local
-   verification complete, awaiting explicit go-ahead per this repo's
-   destructive/deploy-action norms (deploy also risks killing an in-flight
-   sim — check for one first).
-9. **Manual follow-up for production, deliberately not assumed/done here**:
-   `data/mlb_source/source_artifacts/` is per-environment disk state (broadly
-   gitignored, not synced through git) — production's refresh-worker has its
-   own independently-accumulated `feed_live` history and its own
-   `player_features_latest.json`, separate from this local dev mirror. The
-   new daily-job hook and weekly staleness-gated refresh self-heal in
-   production going forward regardless, but for immediate full-season
-   coverage post-deploy, `scripts/build_mlb_player_game_log.py` and
-   `scripts/refresh_mlb_statcast_features.py --force` would need one manual
-   run each directly against the refresh-worker's disk (e.g. a Render
-   one-off job/shell).
+8. **Committed (`fdb6861a`), pushed, and deployed** to web + refresh-worker
+   (live-odds-worker untouched by this work). Deploy interrupted an
+   in-flight refresh-worker scoped resim (fingerprint_change, expected/
+   accepted per prior precedent for scoped-not-coldstart runs).
+9. **Correction to point 3 above**: `scripts/unified_daily_update.ps1` is
+   **not** part of the live production pipeline — checked `render.yaml` and
+   found refresh-worker's actual `startCommand` is
+   `python scripts/run_refresh_worker.py` (the persistent `live_refresh_loop.py`
+   loop, which is what launches `run_mlb_daily_sim_job.py` on fingerprint
+   change). `unified_daily_update.ps1` isn't referenced anywhere in
+   `render.yaml` or `.github/workflows/*.yml` — it's a legacy/local
+   Windows orchestrator only. **The weekly Statcast refresh step added
+   there will not run in production as written.** Not yet fixed — needs
+   wiring into `live_refresh_loop.py`/`run_refresh_worker.py` (the real
+   persistent worker) with its own staleness gate, or accepted as a
+   manual-only operation. Flagging rather than assuming either way.
+10. **Real bug found and fixed post-deploy, via the user's own live test**:
+    "Eury Perez outs" against production returned no visuals at all even
+    after both new deploys landed cleanly. Root cause: Render gives web and
+    refresh-worker separate, non-shared disks (`syndicate/features/shared/
+    artifact_publisher.py`'s whole reason for existing) — anything a worker
+    writes has to be explicitly allowlisted in `HOT_ARTIFACT_PATTERNS` to
+    ever reach web's disk, and the new `mlb_pitcher_game_log.csv`/
+    `mlb_batter_game_log.csv`/`player_features_latest.json` paths were never
+    added, so they'd build correctly forever on refresh-worker and never
+    once reach the service that actually answers Ask The Syndicate
+    questions. This is the exact same gap class documented for WNBA/NHL's
+    boxscore CSVs and MLB live-lens props elsewhere in this same allowlist's
+    comments — should have been caught by cross-referencing those existing
+    comments before shipping. Fixed: added both to `HOT_ARTIFACT_PATTERNS`
+    (`artifact_publisher.py`), and reordered `run_mlb_daily_sim_job.py` so
+    `bootstrap_mlb_player_game_log()` runs BEFORE `publish_changed_hot_artifacts()`
+    (the publish call only picks up files already on disk with a newer mtime
+    than the job's start epoch — building the CSV after publishing would
+    have deferred the push to whatever run happens next instead of this
+    one). New regression test in `test_artifact_publisher.py`. This second
+    fix still needs its own commit/deploy/verify pass.
+11. **Manual follow-up for production, deliberately not assumed/done here**:
+    `data/mlb_source/source_artifacts/` is per-environment disk state
+    (broadly gitignored, not synced through git) — production's
+    refresh-worker has its own independently-accumulated `feed_live` history
+    and its own `player_features_latest.json`, separate from this local dev
+    mirror. The daily-job hook (now correctly publishing, per point 10)
+    self-heals going forward, but for immediate full-season coverage,
+    `scripts/build_mlb_player_game_log.py` would need one manual run against
+    the refresh-worker's disk. The Statcast weekly refresh (point 9) has no
+    automatic path to production at all yet — regenerating it there is
+    manual-only until that's wired into the real worker loop.
 
 ### Reconciliation 2026-07-30 (#162, soccer league display)
 

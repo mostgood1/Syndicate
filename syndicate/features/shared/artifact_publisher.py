@@ -193,6 +193,30 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "wnba_source/data/processed/boxscores_history.csv",
     "nhl_source/source_artifacts/data/raw/player_game_stats.csv",
     "nhl_source/data/raw/player_game_stats.csv",
+    # #163's MLB player game-log index (last-N starts/games, history vs
+    # opponent -- syndicate/features/mlb/player_game_log.py, read by
+    # ask_the_syndicate_data.py's _mlb_player_history_evidence) is the same
+    # category as WNBA/NHL's boxscore/game-stats CSVs two lines up and was
+    # missed when those were added: written by refresh-worker
+    # (run_mlb_daily_sim_job.py's post-sim hook) but read on web, so without
+    # this entry it would build correctly forever on refresh-worker's disk
+    # and never once reach the service that answers Ask The Syndicate
+    # questions -- confirmed live 2026-07-30 (a real "Eury Perez outs" query
+    # against production returned no visuals at all post-deploy). Small
+    # per-season CSVs (thousands of rows, not the NBA-scale ~20MB case that
+    # rides the git+bootstrap lane instead).
+    "mlb_source/source_artifacts/data/processed/mlb_pitcher_game_log.csv",
+    "mlb_source/data/processed/mlb_pitcher_game_log.csv",
+    "mlb_source/source_artifacts/data/processed/mlb_batter_game_log.csv",
+    "mlb_source/data/processed/mlb_batter_game_log.csv",
+    # #163's MLB advanced Statcast profile (whiff/barrel/xwOBA/pitch-mix --
+    # syndicate/features/intelligence.py's _mlb_statcast_feature_payload,
+    # read on web by both Ask The Syndicate and other MLB features). Same
+    # gap as the two entries above: worker-written, web-read, never
+    # allowlisted. ~9-10MB, bounded (one curated feature file per season, not
+    # a growing/unbounded tree like data/cache or data/raw/statcast).
+    "mlb_source/source_artifacts/data/statcast/features/player_features_latest.json",
+    "mlb_source/data/statcast/features/player_features_latest.json",
     # Soccer has no source_artifacts/data/processed nesting -- build_soccer_artifacts.py,
     # poll_soccer_live_state.py, build_soccer_schedule.py, fetch_soccer_oddsapi_odds_local.py,
     # fetch_soccer_oddsapi_props_local.py, and build_soccer_picks.py all write directly

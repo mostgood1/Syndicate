@@ -272,18 +272,24 @@ def main() -> int:
     except Exception:
         pass
 
-    published_count = 0
-    try:
-        published_count = publish_changed_hot_artifacts(started_epoch)
-    except Exception:
-        published_count = 0
-
+    # Runs BEFORE publish_changed_hot_artifacts (not after) so a game log
+    # rebuilt/extended by this run is caught by that call's own mtime scan
+    # and pushed to web in the same job -- publish_changed_hot_artifacts
+    # only sees files whose mtime is already newer than started_epoch at the
+    # moment it runs, so building the CSV after publishing would silently
+    # defer the push to whatever run happens next.
     game_log_summary: dict | None = None
     try:
         game_log_summary = bootstrap_mlb_player_game_log(str(_vendor_mlb_data_dir(vendor_cwd)))
         print(f"MLB_PLAYER_GAME_LOG {game_log_summary}", flush=True)
     except Exception as exc:
         print(f"MLB_PLAYER_GAME_LOG_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+    published_count = 0
+    try:
+        published_count = publish_changed_hot_artifacts(started_epoch)
+    except Exception:
+        published_count = 0
 
     status_payload = {
         "ok": ok,
