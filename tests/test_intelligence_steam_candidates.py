@@ -7,8 +7,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 from syndicate.features.intelligence import _classify_candidate_with_reason
-from syndicate.features.intelligence import _soccer_event_kickoff_date
-from syndicate.features.intelligence import _soccer_schedule_kickoff_dates
 from syndicate.features.intelligence import _steam_candidates_for_sport
 from syndicate.features.mlb.hr_targets import mlb_player_game_lookup_for_date
 
@@ -285,66 +283,43 @@ class SteamMatchupResolutionTests(unittest.TestCase):
             candidates = _steam_candidates_for_sport(sport)
         self.assertEqual(candidates[0]["game_date"], "2026-07-31")
 
-    def test_soccer_event_kickoff_date_fuzzy_matches_oddsapi_naming(self) -> None:
-        # OddsAPI and the ESPN-sourced season schedule spell team names
-        # differently ("LA Galaxy" vs "Los Angeles Galaxy") -- must still
-        # resolve via fuzzy match_team_name, not an exact string compare.
-        schedule_rows = [
-            ("Los Angeles Galaxy", "Real Salt Lake", "2026-08-01"),
-            ("Nashville SC", "D.C. United", "2026-08-01"),
-        ]
-        resolved = _soccer_event_kickoff_date("mls", "LA Galaxy", "Real Salt Lake", schedule_rows)
-        self.assertEqual(resolved, "2026-08-01")
+    def test_soccer_steam_matchup_lookup_reads_commence_time_from_the_raw_odds_row(self) -> None:
+        # #166: first fix attempt cross-referenced the season schedule via
+        # fuzzy team-name matching -- unnecessary complexity, and buggy
+        # besides (wrong field-access pattern, then no disambiguation for
+        # team pairs meeting more than once in a season; still didn't work
+        # end-to-end in production for reasons not fully chased down).
+        # Confirmed against the real production odds CSV: the raw odds row
+        # already carries its own kickoff timestamp directly --
+        # "league,event_id,home_team,away_team,commence_time,market,side,
+        # line,price,book" -- so this needs nothing beyond reading that
+        # column off the same row already being processed.
+        from syndicate.features.intelligence import _soccer_steam_matchup_lookup
 
-    def test_soccer_event_kickoff_date_returns_none_when_unmatched(self) -> None:
-        schedule_rows = [("Los Angeles Galaxy", "Real Salt Lake", "2026-08-01")]
-        self.assertIsNone(_soccer_event_kickoff_date("mls", "Totally Unknown FC", "Also Unknown", schedule_rows))
-        self.assertIsNone(_soccer_event_kickoff_date("mls", "Los Angeles Galaxy", "Real Salt Lake", []))
-
-    def test_soccer_event_kickoff_date_picks_the_meeting_nearest_reference_date(self) -> None:
-        # #166 follow-up, confirmed live against the real schedule artifact:
-        # a full MLS season has each team pair meet more than once (D.C.
-        # United @ Nashville SC play on both 2026-05-10 and 2026-08-01) --
-        # without picking the meeting nearest the current scan, this
-        # resolved a steam event about an imminent match to one from three
-        # months earlier instead.
-        schedule_rows = [
-            ("D.C. United", "Nashville SC", "2026-05-10"),
-            ("D.C. United", "Nashville SC", "2026-08-01"),
-        ]
-        resolved = _soccer_event_kickoff_date("mls", "D.C. United", "Nashville SC", schedule_rows, reference_date="2026-07-31")
-        self.assertEqual(resolved, "2026-08-01")
-
-    def test_soccer_schedule_kickoff_dates_reads_top_level_team_fields(self) -> None:
-        # #166, confirmed against the real schedule_<season>.json artifact:
-        # each "matches" row carries home_team/away_team as TOP-LEVEL
-        # fields, not nested under a "matchup" sub-dict (that shape belongs
-        # to a DIFFERENT structure -- SoccerSim's recommendations_payload
-        # output, read by _match_to_game in soccer/cards.py). Copying that
-        # nested-access pattern here silently returned zero rows (a dict
-        # .get() miss, not an exception) and shipped a no-op fix once.
-        payload = {
-            "matches": [
-                {"event_id": "1", "date": "2026-08-01T23:30Z", "home_team": "D.C. United", "away_team": "Nashville SC"},
-                {"event_id": "2", "date": "2026-07-31T23:30Z", "home_team": "New York City FC", "away_team": "Toronto FC"},
-            ]
-        }
-        with patch("syndicate.features.soccer.sources.default_season", return_value=2026), patch(
-            "syndicate.features.soccer.sources.schedule_payload", return_value=payload
-        ):
-            rows = _soccer_schedule_kickoff_dates("mls")
-        self.assertEqual(
-            set(rows),
-            {("D.C. United", "Nashville SC", "2026-08-01"), ("New York City FC", "Toronto FC", "2026-07-31")},
+        odds_rows = (
+            {
+                "event_id": "abc123",
+                "home_team": "D.C. United",
+                "away_team": "Nashville SC",
+                "commence_time": "2026-08-01T23:30:00Z",
+                "market": "h2h",
+            },
         )
+        with patch("syndicate.features.soccer.sources.active_leagues_for_date", return_value=["mls"]), patch(
+            "syndicate.features.soccer.sources.game_odds_rows", return_value=odds_rows
+        ), patch("syndicate.features.soccer.sources.props_odds_rows", return_value=()):
+            lookup = _soccer_steam_matchup_lookup("2026-07-31")
+        self.assertEqual(lookup["abc123"]["game_date"], "2026-08-01")
 
-    def test_soccer_event_kickoff_date_falls_back_to_earliest_without_a_reference_date(self) -> None:
-        schedule_rows = [
-            ("D.C. United", "Nashville SC", "2026-08-01"),
-            ("D.C. United", "Nashville SC", "2026-05-10"),
-        ]
-        resolved = _soccer_event_kickoff_date("mls", "D.C. United", "Nashville SC", schedule_rows)
-        self.assertEqual(resolved, "2026-05-10")
+    def test_soccer_steam_matchup_lookup_omits_game_date_without_commence_time(self) -> None:
+        from syndicate.features.intelligence import _soccer_steam_matchup_lookup
+
+        odds_rows = ({"event_id": "abc123", "home_team": "D.C. United", "away_team": "Nashville SC"},)
+        with patch("syndicate.features.soccer.sources.active_leagues_for_date", return_value=["mls"]), patch(
+            "syndicate.features.soccer.sources.game_odds_rows", return_value=odds_rows
+        ), patch("syndicate.features.soccer.sources.props_odds_rows", return_value=()):
+            lookup = _soccer_steam_matchup_lookup("2026-07-31")
+        self.assertNotIn("game_date", lookup["abc123"])
 
     def test_soccer_matchup_lookup_never_raises_when_soccer_sources_unavailable(self) -> None:
         from syndicate.features.intelligence import _soccer_steam_matchup_lookup
