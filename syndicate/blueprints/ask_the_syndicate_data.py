@@ -2256,8 +2256,25 @@ def _fetchers_for_sport(sport: str, question: str) -> list:
     if sport == "":
         if _is_ranking_intent_question(_question_words(question)):
             return [_mlb_top_candidates_evidence]
-        # No sport hint: cheap fetchers only.
-        return [_mlb_accuracy_evidence, _mlb_focused_evidence, _mlb_player_history_evidence, _wnba_focused_evidence]
+        # No sport hint: cheap fetchers only. This is the common case for a
+        # typed question, not a rare fallback -- context.sport only gets set
+        # from a `?sport=` URL query param or a recognized team/league
+        # keyword in the question text (_infer_sport), so a plain player
+        # name (e.g. "antony volpe bet analysis") never sets it. Confirmed
+        # live (2026-07-31): this silently skipped _mlb_bvp_evidence
+        # entirely for that exact question even after it was fixed to
+        # resolve any batter/pitcher, because it was never in this list.
+        # It belongs here alongside the other per-player MLB fetchers
+        # already run unconditionally in this branch (_mlb_player_history_evidence
+        # already matches an arbitrary player name with no sport hint) --
+        # it's cheap on a non-match (name-matching short-circuits fast).
+        return [
+            _mlb_accuracy_evidence,
+            _mlb_focused_evidence,
+            _mlb_player_history_evidence,
+            _mlb_bvp_evidence,
+            _wnba_focused_evidence,
+        ]
     return []
 
 
