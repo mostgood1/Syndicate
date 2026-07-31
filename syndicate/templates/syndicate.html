@@ -415,6 +415,26 @@
     const edges = Array.isArray(schema.key_edges) ? schema.key_edges : [];
     const teams = Array.isArray(schema.teams) ? schema.teams : [];
     const hidden = Array.isArray(schema.hidden_factors) ? schema.hidden_factors : [];
+
+    if (schema.relevance_matched === false) {
+      // No board recommendation matches the question's subject at all --
+      // don't show an unrelated pick's win probability/edges as if they
+      // answered the question (same fix as renderBetAnalysis).
+      return `
+        <div class="schema-header">
+          <div>
+            <p class="schema-type">Matchup Analysis</p>
+            <h2 class="schema-question">No matching recommendation</h2>
+          </div>
+        </div>
+        <div class="schema-body">
+          <div class="soft-card">
+            <p class="mini-note">${esc(safeText(sim.summary, "No board recommendation matches this question."))}</p>
+          </div>
+        </div>
+      `;
+    }
+
     return `
       <div class="schema-header">
         <div>

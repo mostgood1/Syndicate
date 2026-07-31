@@ -291,7 +291,26 @@ def _teams_from_question(question: str, result: Any) -> list[str]:
     return teams[:2]
 
 
-def _matchup_analysis_schema(question: str, result: Any) -> dict[str, Any]:
+def _matchup_analysis_schema(question: str, result: Any, *, relevance_matched: bool | None = None) -> dict[str, Any]:
+    if relevance_matched is False:
+        # Same bug class as _bet_analysis_schema, same fix: the question
+        # named something specific but nothing in today's recommendations
+        # mentions it. _first_recommendation(result) below would otherwise
+        # feed an unrelated pick's matchup/win-probability/edges straight
+        # into this schema as if they answered the question.
+        note = f"No board recommendation matches “{question.strip()}” specifically — nothing to show for this question."
+        return {
+            "schema_type": "matchup_analysis",
+            "teams": [],
+            "win_probability": None,
+            "key_edges": [],
+            "simulation_summary": {"summary": note, "top_candidate": {}, "analysis_focus": None, "rows_considered": 0},
+            "hidden_factors": [],
+            "market_insight": {"summary": note, "analysis_views": {}, "supporting_evidence": {}},
+            "relevance_matched": False,
+            "explanation": _explanation_payload(result),
+        }
+
     top = _first_recommendation(result)
     rows = _analysis_rows(result)
     explanation = _explanation_payload(result)
@@ -336,11 +355,12 @@ def _matchup_analysis_schema(question: str, result: Any) -> dict[str, Any]:
             "analysis_views": analysis_views,
             "supporting_evidence": explanation.get("supporting_evidence", {}),
         },
+        "relevance_matched": relevance_matched,
         "explanation": explanation,
     }
 
 
-def _market_summary_schema(result: Any) -> dict[str, Any]:
+def _market_summary_schema(result: Any, *, question: str = "", relevance_matched: bool | None = None) -> dict[str, Any]:
     recommendations = _items_to_dicts(_result_value(result, "recommendations", ()))
     top_opportunities: list[dict[str, Any]] = []
     for item in recommendations[:5]:
@@ -358,11 +378,22 @@ def _market_summary_schema(result: Any) -> dict[str, Any]:
         )
 
     explanation = _explanation_payload(result)
+    summary_text = _result_value(result, "summary", None)
+    if relevance_matched is False:
+        # Unlike bet_analysis/matchup_analysis (a single framed "answer"),
+        # a market summary is inherently a plural "here's today's board" --
+        # less likely to be misread as being about the question's subject,
+        # so the opportunities list stays. Still say plainly that none of
+        # them are specifically about what was asked, rather than silently
+        # implying they are.
+        note = f"No board opportunity matches “{question.strip()}” specifically — showing today's top opportunities instead."
+        summary_text = f"{note} {summary_text}".strip() if summary_text else note
     return {
         "schema_type": "market_summary",
         "top_opportunities": top_opportunities,
+        "relevance_matched": relevance_matched,
         "rationale_summary": {
-            "summary": _result_value(result, "summary", None),
+            "summary": summary_text,
             "analysis_brief": explanation.get("analysis_brief", {}),
             "board_notes": explanation.get("board_notes", []),
             "supporting_evidence": explanation.get("supporting_evidence", {}),
@@ -463,9 +494,9 @@ def build_syndicate_query_response(*, question: str, context: dict[str, Any], de
             result["recommendations"] = reordered
 
     if decision.intent in {"matchup_analysis", "comparison"}:
-        schema = _matchup_analysis_schema(question, result)
+        schema = _matchup_analysis_schema(question, result, relevance_matched=relevance_matched)
     elif decision.intent == "market_summary":
-        schema = _market_summary_schema(result)
+        schema = _market_summary_schema(result, question=question, relevance_matched=relevance_matched)
     else:
         schema = _bet_analysis_schema(result, question=question, relevance_matched=relevance_matched)
 

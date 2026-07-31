@@ -2268,12 +2268,18 @@ def _fetchers_for_sport(sport: str, question: str) -> list:
         # already run unconditionally in this branch (_mlb_player_history_evidence
         # already matches an arbitrary player name with no sport hint) --
         # it's cheap on a non-match (name-matching short-circuits fast).
+        # Same reasoning extends to NBA/NHL: _SPORT_HINTS keyword sets don't
+        # cover every way of asking about a player (e.g. "How's Jokic
+        # looking tonight" has no NBA keyword at all), so their per-player
+        # fetchers belong here too, not just under their own sport branch.
         return [
             _mlb_accuracy_evidence,
             _mlb_focused_evidence,
             _mlb_player_history_evidence,
             _mlb_bvp_evidence,
             _wnba_focused_evidence,
+            lambda q, c: _basketball_last10_evidence(q, c, "nba"),
+            _nhl_last10_evidence,
         ]
     return []
 

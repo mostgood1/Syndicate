@@ -361,6 +361,61 @@ class AskTheSyndicateApiTests(unittest.TestCase):
         self.assertIn("No board recommendation matches", schema["explanation"]["summary"])
         self.assertIn("antony volpe bet analysis", schema["explanation"]["summary"])
 
+    def test_matchup_analysis_suppresses_unrelated_fallback_pick(self) -> None:
+        # Same bug class as bet_analysis, same fix, different schema
+        # (reported: "check all sports for the issue" -- relevance_matched
+        # was computed but never wired into _matchup_analysis_schema at
+        # all, so an unrelated pick's win probability/edges could be shown
+        # as if they answered a matchup_analysis-routed question, for any
+        # sport).
+        snapshot = {
+            "query_type": "matchup_analysis",
+            "recommendations": [
+                {"selection": "Los Angeles Dodgers steam move", "matchup": "LAD @ SF", "confidence": 0.7, "model_probability": 1.0},
+            ],
+        }
+
+        payload = build_syndicate_query_response(
+            question="how does nikola jokic look tonight",
+            context={"sport": "nba"},
+            decision=RouteDecision(intent="matchup_analysis", handler_name="handle_matchup_analysis", matched_terms=(), score=0),
+            result=dict(snapshot),
+        )
+
+        schema = payload["schema"]
+        self.assertFalse(schema["relevance_matched"])
+        self.assertEqual(schema["teams"], [])  # not ["LAD", "SF"] from the unrelated pick's matchup
+        self.assertIsNone(schema["win_probability"])
+        self.assertEqual(schema["key_edges"], [])
+        self.assertIn("No board recommendation matches", schema["simulation_summary"]["summary"])
+
+    def test_market_summary_notes_unrelated_question_but_keeps_opportunities(self) -> None:
+        # Different treatment than bet_analysis/matchup_analysis on purpose:
+        # a market summary is inherently a plural "here's today's board",
+        # not a single framed answer, so the opportunities list stays --
+        # but it must say plainly that none of them are about what was
+        # asked rather than silently implying they are.
+        snapshot = {
+            "query_type": "market_summary",
+            "summary": "Top edges are concentrated in NBA props.",
+            "recommendations": [
+                {"selection": "Jayson Tatum Over 28.5", "confidence": 0.6},
+            ],
+        }
+
+        payload = build_syndicate_query_response(
+            question="how does nikola jokic look tonight",
+            context={"sport": "nba"},
+            decision=RouteDecision(intent="market_summary", handler_name="handle_market_summary", matched_terms=(), score=0),
+            result=dict(snapshot),
+        )
+
+        schema = payload["schema"]
+        self.assertFalse(schema["relevance_matched"])
+        self.assertEqual(schema["top_opportunities"][0]["selection"], "Jayson Tatum Over 28.5")  # still shown
+        self.assertIn("No board opportunity matches", schema["rationale_summary"]["summary"])
+        self.assertIn("Top edges are concentrated in NBA props.", schema["rationale_summary"]["summary"])
+
     def test_adapter_relevance_reorder_preserves_pipeline_context_on_intelligence_result(self) -> None:
         # IntelligenceResult.to_dict() does not serialize pipeline_context
         # (repr=False field) -- the reorder must extract routing_context
@@ -1014,6 +1069,38 @@ class AskTheSyndicateFocusedEvidenceTests(unittest.TestCase):
         self.assertIn("Nathan MacKinnon", result["tables"][0]["title"])
         self.assertEqual(result["evidence"][0]["role"], "skater")
         self.assertEqual(len(result["evidence"][0]["last_games"]), 10)
+
+    def test_no_sport_hint_still_matches_nba_and_nhl_players(self) -> None:
+        # Regression guard ("check all sports for the issue", 2026-07-31):
+        # a plain player-name question with no `?sport=` param and no
+        # _SPORT_HINTS keyword (e.g. "How's Jokic looking tonight" has no
+        # NBA keyword at all) lands in _fetchers_for_sport("") -- that
+        # branch used to only cover MLB/WNBA, silently returning nothing
+        # for NBA/NHL players even though their fetchers work fine when
+        # sport is explicitly set. context={} (no sport key at all) is
+        # exactly what a plain typed question with no URL param produces.
+        self._write_nhl_fixtures()
+        nba_processed = os.path.join(self.root, "nba", "processed")
+        os.makedirs(nba_processed, exist_ok=True)
+        header = "game_id,gameId,TEAM_ABBREVIATION,PLAYER_ID,PLAYER_NAME,MIN,PTS,REB,AST,STL,BLK,TOV,OREB,DREB,PF,FGM,FGA,FG3M,FG3A,FTM,FTA,PLUS_MINUS,STARTER,START_POSITION,source,date"
+        rows = [
+            f"g{i},g{i},DEN,203999,Nikola Jokic,32.0,{25 + i},{11 + (i % 3)},9,1,1,3,3,8,2,10,18,1,3,4,5,8,True,C,espn,2026-07-{i + 1:02d}"
+            for i in range(11)
+        ]
+        with open(os.path.join(nba_processed, "boxscores_history.csv"), "w", encoding="utf-8") as f:
+            f.write(header + "\n" + "\n".join(rows) + "\n")
+
+        with patch.dict(os.environ, {
+            "NBA_BETTING_DATA_ROOT": os.path.join(self.root, "nba"),
+            "NHL_DATA_DIR": os.path.join(self.root, "nhl"),
+        }):
+            nba_result = ask_data.collect_focused_evidence("How's Jokic looking tonight", {})
+            nhl_result = ask_data.collect_focused_evidence("How's MacKinnon trending", {})
+
+        self.assertIsNotNone(nba_result)
+        self.assertIn("Nikola Jokic", nba_result["tables"][0]["title"])
+        self.assertIsNotNone(nhl_result)
+        self.assertIn("Nathan MacKinnon", nhl_result["tables"][0]["title"])
 
     def _write_bvp_fixtures(self) -> None:
         bvp_dir = os.path.join(self.root, "mlb", "cache", "statcast", "bvp", "statcast_bvp_file_daily")
