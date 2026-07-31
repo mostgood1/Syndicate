@@ -998,55 +998,81 @@
       if (itemState === "live") group.hasLive = true;
       if (itemState !== "final") group.allFinal = false;
     }
-    // #165: collapse groups that share the same sport+matchup text (AND
-    // date) into one -- two different ids for the literal same real game (a
-    // stray stale gamePk on one candidate, or one candidate missing an id
-    // entirely) otherwise render as two identical-looking mini-cards. The
-    // canonical group is whichever one's id actually resolves a live
-    // scoreboard chip (the more trustworthy id); ties/no-chip-match fall
-    // back to the group with more opportunities. gameKeyMergeMap lets
-    // matchesFilters treat a click on either duplicate's card as selecting
-    // the one group that actually renders.
+    // #165: collapse groups that share the same sport+matchup text AND
+    // resolve to the same date into one -- two different ids for the
+    // literal same real game (a stray stale gamePk on one candidate, or one
+    // candidate missing an id entirely) otherwise render as two identical-
+    // looking mini-cards. The canonical group is whichever one's id
+    // actually resolves a live scoreboard chip (the more trustworthy id);
+    // ties/no-chip-match fall back to the group with more opportunities.
+    // gameKeyMergeMap lets matchesFilters treat a click on either
+    // duplicate's card as selecting the one group that actually renders.
     //
-    // #165 follow-up, confirmed live: the first version of this merge keyed
-    // on sport+matchup alone, with no date check -- two REAL, different
-    // games (the same two teams playing on consecutive days, e.g. a WSH @
-    // ATL series, or several MLS matchups repeating today and tomorrow)
-    // collapsed into a single mini-card, silently hiding one of the two
-    // games from the Games strip entirely. fallbackDate disambiguates: two
-    // groups only merge when they resolve to the same date (including both
-    // being date-less, the original single-game-two-ids scenario this fix
-    // targets).
+    // #165 follow-up #1, confirmed live: keying strictly on sport+matchup
+    // alone, with no date check, collapsed two REAL, different games (the
+    // same two teams playing on consecutive days, e.g. a WSH @ ATL series,
+    // or several MLS matchups repeating today and tomorrow) into a single
+    // mini-card -- silently hiding one of the two games entirely.
+    //
+    // #165 follow-up #2, confirmed live: switching to an exact-match
+    // sport+matchup+date key broke the ORIGINAL same-day case again --
+    // WSH @ ATL's two duplicate-causing candidates don't both carry a
+    // resolvable fallbackDate (one has real game_date/source_board_date,
+    // the other has neither), so exact-matching on date treated the
+    // dateless one as a third, different "date" and stopped merging them.
+    // Cluster by date instead of exact-matching: a dateless group is only
+    // ambiguous when TWO OR MORE distinct real dates exist for the same
+    // matchup (which one would it belong to?) -- with zero or one real
+    // date in play, it unambiguously joins that date's cluster (or the
+    // other dateless group(s), the original scenario this fix targets).
     gameKeyMergeMap = new Map();
     const matchupIndex = new Map();
     for (const group of groups.values()) {
-      const matchupIndexKey = `${group.sport.toLowerCase()}|${group.matchup.trim().toLowerCase()}|${group.fallbackDate || ""}`;
+      const matchupIndexKey = `${group.sport.toLowerCase()}|${group.matchup.trim().toLowerCase()}`;
       if (!matchupIndex.has(matchupIndexKey)) matchupIndex.set(matchupIndexKey, []);
       matchupIndex.get(matchupIndexKey).push(group.key);
     }
     for (const groupKeys of matchupIndex.values()) {
       if (groupKeys.length < 2) continue;
-      let canonicalKey = groupKeys[0];
-      let canonicalHasChip = Boolean(chipForGame(groups.get(canonicalKey)));
-      for (const candidateKey of groupKeys.slice(1)) {
-        const candidateGroup = groups.get(candidateKey);
-        const candidateHasChip = Boolean(chipForGame(candidateGroup));
-        const better = (candidateHasChip && !canonicalHasChip) || (candidateHasChip === canonicalHasChip && candidateGroup.count > groups.get(canonicalKey).count);
-        if (better) {
-          canonicalKey = candidateKey;
-          canonicalHasChip = candidateHasChip;
-        }
+      const realDates = [...new Set(groupKeys.map((key) => groups.get(key).fallbackDate).filter(Boolean))];
+      const clusters = new Map();
+      for (const key of groupKeys) {
+        const date = groups.get(key).fallbackDate;
+        // A dateless group joins the one real date in play when there's
+        // exactly one (the original same-day scenario this fix targets --
+        // one candidate has a resolvable date, its duplicate doesn't).
+        // Zero real dates: dateless groups cluster together. Two or more
+        // real dates: which real game would a dateless one belong to? Don't
+        // guess -- leave it as its own singleton instead of risking a wrong
+        // merge across two genuinely different games.
+        const clusterKey = date || (realDates.length === 0 ? "__dateless__" : realDates.length === 1 ? realDates[0] : key);
+        if (!clusters.has(clusterKey)) clusters.set(clusterKey, []);
+        clusters.get(clusterKey).push(key);
       }
-      const canonicalGroup = groups.get(canonicalKey);
-      for (const mergedKey of groupKeys) {
-        gameKeyMergeMap.set(mergedKey, canonicalKey);
-        if (mergedKey === canonicalKey) continue;
-        const mergedGroup = groups.get(mergedKey);
-        canonicalGroup.count += mergedGroup.count;
-        canonicalGroup.hasLive = canonicalGroup.hasLive || mergedGroup.hasLive;
-        canonicalGroup.allFinal = canonicalGroup.allFinal && mergedGroup.allFinal;
-        canonicalGroup.fallbackDate = canonicalGroup.fallbackDate || mergedGroup.fallbackDate;
-        groups.delete(mergedKey);
+      for (const clusterKeys of clusters.values()) {
+        if (clusterKeys.length < 2) continue;
+        let canonicalKey = clusterKeys[0];
+        let canonicalHasChip = Boolean(chipForGame(groups.get(canonicalKey)));
+        for (const candidateKey of clusterKeys.slice(1)) {
+          const candidateGroup = groups.get(candidateKey);
+          const candidateHasChip = Boolean(chipForGame(candidateGroup));
+          const better = (candidateHasChip && !canonicalHasChip) || (candidateHasChip === canonicalHasChip && candidateGroup.count > groups.get(canonicalKey).count);
+          if (better) {
+            canonicalKey = candidateKey;
+            canonicalHasChip = candidateHasChip;
+          }
+        }
+        const canonicalGroup = groups.get(canonicalKey);
+        for (const mergedKey of clusterKeys) {
+          gameKeyMergeMap.set(mergedKey, canonicalKey);
+          if (mergedKey === canonicalKey) continue;
+          const mergedGroup = groups.get(mergedKey);
+          canonicalGroup.count += mergedGroup.count;
+          canonicalGroup.hasLive = canonicalGroup.hasLive || mergedGroup.hasLive;
+          canonicalGroup.allFinal = canonicalGroup.allFinal && mergedGroup.allFinal;
+          canonicalGroup.fallbackDate = canonicalGroup.fallbackDate || mergedGroup.fallbackDate;
+          groups.delete(mergedKey);
+        }
       }
     }
     const gamesList = Array.from(groups.values());
