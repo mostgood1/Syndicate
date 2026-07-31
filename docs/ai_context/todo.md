@@ -4,8 +4,10 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (#164/#165,
-WNBA missing props + duplicate MLB mini-cards)" below; prior session:
+Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (WNBA live-lens
+status/live_state key bug, full #124/Phase-4 live verification)" below;
+prior session: "Reconciliation 2026-07-30 (#164/#165, WNBA missing props +
+duplicate MLB mini-cards)"; before that:
 "Reconciliation 2026-07-30 (#163, Ask The Syndicate MLB player history +
 advanced analytics)"; before that: "Reconciliation 2026-07-30 (#162, soccer
 league display)"; before that:
@@ -22,7 +24,71 @@ that: "Reconciliation 2026-07-30 (opportunity board / Phase 2)"; before that:
 reconciliation)"; before that: "Reconciliation 2026-07-30 (evaluation-ledger
 settlement / Phase 1)").
 
-### Reconciliation 2026-07-30 (#164/#165, WNBA missing props + duplicate MLB mini-cards)
+### Reconciliation 2026-07-30 (WNBA live-lens status/live_state key bug, full #124/Phase-4 live verification)
+
+Closing the loop on #124/Phase 4 (evaluation-ledger settlement session's own
+arc, #153/#155/#124/#158/#159) — user asked for production regression
+verification after deploy, then specifically to watch for MLB and WNBA both
+live to confirm end-to-end. **Found and fixed one real bug during that
+verification**, committed `d59ad61a`, deployed to `web` + `live-odds-worker`.
+
+**#124's headroom fix (previous entry) is fully confirmed working live**:
+watched a genuine in-progress MLB game (824488, Top 1, tied 0-0) produce a
+`"live"` gameLens lane with `source: "live_mc"` — the actual 120-sim Monte
+Carlo resim, not just the deterministic fallback — with real market
+recommendations (moneyline/spread/total picks, edges, natural-language
+reasons). This is the exact tier that was failing ~80% of the time before
+the fix. Also had to apply the fix a second way: editing `render.yaml` +
+deploying code does **not** sync env vars to an already-running Render
+service (only a Blueprint sync or the single-key env var API does) — the
+live service was still running on `1000` (itself a different, earlier,
+undeployed attempt at this same fix) until set directly via
+`PUT /v1/services/{id}/env-vars/{key}`, then redeployed. Worth remembering
+generally: **a render.yaml edit alone proves nothing about production
+behavior** — always confirm via `GET .../env-vars/{key}` against the live
+service.
+
+**Found live, while verifying WNBA's side**: a real in-progress WNBA game
+(CON @ CHI, real score 9-10, `in_progress: True`) still showed
+`source: "pregame"` with a null margin. Root cause:
+`_build_wnba_game_lens()` (Phase 4's own new code) read `period`/`clock`
+from `game["live_state"]`, but the real shape `build_cards_page_context`
+returns only carries `{away_pts, final, home_pts, in_progress, status}`
+there — period/clock live on the **separate** `game["status"]` dict. This
+silently forced `elapsed_min` (and therefore `source`) back to `"pregame"`
+forever, regardless of how live the game actually was, even though the
+margin itself was fully computable. The bug shipped untested because the
+test fixture (`tests/test_wnba_live_lens_game_shape.py`) had put
+period/clock under `live_state` too — a self-consistent but wrong
+assumption, not caught until checked against real production data. Fixed to
+read from `status` (with `live_state` as a defensive fallback), fixed
+`is_final`/`is_live` to read `status`'s own fields directly instead of
+stringifying a dict that was never a string in the real shape, corrected
+the test fixture, and added a regression test using the exact real-world
+shape observed live. **General lesson, matching this session's other
+finding** (safety thresholds copy-pasted from the wrong context, now in
+Operational notes): a synthetic test fixture built from *assumption* rather
+than a captured real payload can pass cleanly while encoding the exact bug
+it should catch — worth checking a new fixture against one real production
+response before trusting it, especially for anything reading a nested dict
+shape from another module's output.
+
+**Fully verified live end-to-end, both sports, real games, post-fix**:
+- MLB 824488: `source: "live_mc"`, `modelHomeWinProb: 0.575`.
+- WNBA MIN @ TOR (home up 14-6): `source: "live_projection"`,
+  `homeMargin: 8.0`, `modelHomeWinProb: 0.207` (correctly risen from
+  pregame's 0.156 baseline).
+- WNBA CON @ CHI (away up 21-17): `source: "live_projection"`,
+  `homeMargin: -4.0`, `modelHomeWinProb: 0.609` (correctly dropped from
+  pregame's 0.649 baseline).
+- WNBA NYL @ LVA (not yet tipped off): correctly still `source: "pregame"`.
+
+19/19 `test_wnba_live_lens_game_shape.py` passing (18 prior + 1 new), 67/67
+broader WNBA live-lens tests passing. Both #124 and Phase 4 can now be
+considered genuinely done, not just deployed — verified against real live
+games for both sports, not merely "no exceptions in logs."
+
+
 
 Follow-up to #160-#162's Games-strip work: user reported (mid-session,
 against production) two more real bugs on the same board.
@@ -300,7 +366,36 @@ line concept underneath it was already silently broken:
    AFTER this deploy (2026-07-30 ~22:48 UTC) — tonight's remaining pregame
    slate is the first real chance to confirm it end-to-end; not yet
    re-verified against a live transition.
-6. **Deliberately NOT done this pass:** NBA/WNBA's Layer 1 board
+6. **Second follow-up, found live-verifying #5 against three games that
+   tipped off after the deploy (PIT@CIN, MIA@NYM, WSH@ATL):** still
+   `rows_with_closing_line: 0` after ~15 minutes of real live play. Added
+   `is_live`/`closing_line`/`closing_price` to `/api/ops/odds-history/inspect`
+   (previously a hardcoded 5-field summary that couldn't surface either
+   new field) and confirmed directly against production: `_is_live_odds_row`
+   returns **False** for MLB's actual `h2h`/`spreads`/`totals` feed rows EVEN
+   WHILE THE GAME IS LIVE — that row shape (team names, numbers, `market`/
+   `market_type` only) carries no status/state/period/selection text at
+   all, so the heuristic's text markers structurally can never match it.
+   This is a PRE-EXISTING gap (also silently broke `count_live`/
+   `count_pregame` and `event_type="live"` lifecycle tagging for these same
+   markets, not just today's closing-line feature). Fixed by adding
+   `_row_commence_time_has_passed()` (row's own `commence_time` vs real
+   now) as a second signal, OR'd into `is_live_row` itself (not scoped
+   narrowly to just the closing-line stamp — a first attempt at that
+   narrower scoping turned out unworkable, since the stamp lives inside
+   the `is_live_row` branch and the two checks have to agree). Doubles as
+   arguably the more correct definition of "closing line" anyway (last
+   price before scheduled kickoff, independent of any feed's live-tagging).
+   New test: `test_sync_mlb_tracking_stamps_closing_line_via_commence_time_when_no_live_text_marker_exists`
+   (uses a frozen `datetime` subclass rather than real wall-clock offsets,
+   after two earlier versions flaked: real `+/-10min` offsets crossed a
+   UTC-midnight shard boundary once, and patching only `_utc_now` still
+   left the separate market-eviction sweep's own `datetime.now(timezone.utc)`
+   call reading real time against a fixed historical `market_last_updated`,
+   evicting the market before the second tick's stamp could run).
+   **Still not yet re-verified against a real live transition post-deploy**
+   — do that before considering #161 fully closed.
+7. **Deliberately NOT done this pass:** NBA/WNBA's Layer 1 board
    (`basketball_market_board.py`) has no odds-history hydration wired in at
    all for game-level markets today — only MLB threads `odds_history`
    through its board rows. Closing-line display for NBA/WNBA needs that
