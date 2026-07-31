@@ -261,6 +261,24 @@ def api_ops_memory() -> Any:
     return jsonify({"ok": True, "memory": get_all_process_memory_snapshot()})
 
 
+@ops_bp.get("/api/ops/keyvalue/diagnostics")
+def api_ops_keyvalue_diagnostics() -> Any:
+    # Board audit follow-up, 2026-07-31: read-only Redis INFO stats for the
+    # shared keyvalue backend (one Redis instance, "starter" plan, shared
+    # across web + refresh-worker + live-odds-worker) -- built to answer,
+    # with real numbers instead of guessing, whether WNBA's intermittent
+    # dashboard_games_count=0 (and the same-instant zero seen across every
+    # other sport in one refresh cycle) is memory-pressure eviction
+    # (evicted_keys climbing), connection exhaustion (rejected_connections
+    # climbing, connected_clients near a plan ceiling), or something else.
+    from syndicate.features.shared.refresh_state_store import keyvalue_diagnostics
+
+    diagnostics = keyvalue_diagnostics()
+    if diagnostics is None:
+        return jsonify({"ok": False, "error": "SYNDICATE_REFRESH_STATE_BACKEND is not keyvalue on this service."})
+    return jsonify(diagnostics)
+
+
 @ops_bp.get("/api/ops/intelligence/memory-diagnostics")
 def api_ops_intelligence_memory_diagnostics() -> Any:
     # /api/ops/memory above only ever reports the CALLING service's own

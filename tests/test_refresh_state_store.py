@@ -30,6 +30,22 @@ class _FakeKeyValueClient:
     def delete(self, key: str) -> int:
         return 1 if self.store.pop(key, None) is not None else 0
 
+    def info(self) -> dict[str, object]:
+        return {
+            "used_memory": 1234567,
+            "used_memory_human": "1.18M",
+            "maxmemory": 26214400,
+            "maxmemory_human": "25.00M",
+            "maxmemory_policy": "allkeys_lru",
+            "evicted_keys": 42,
+            "expired_keys": 3,
+            "connected_clients": 5,
+            "rejected_connections": 0,
+            "role": "master",
+            "redis_version": "8.1.4",
+            "db0": {"keys": 100, "expires": 10, "avg_ttl": 0},
+        }
+
 
 class RefreshStateStoreTests(unittest.TestCase):
     def tearDown(self) -> None:
@@ -352,6 +368,42 @@ class RefreshStateStoreTests(unittest.TestCase):
         with TemporaryDirectory() as tmp_dir:
             missing_path = Path(tmp_dir) / "does_not_exist.csv"
             self.assertIsNone(refresh_state_store.read_text_file(missing_path))
+
+    def test_keyvalue_diagnostics_returns_none_on_filesystem_backend(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_REFRESH_STATE_BACKEND": "filesystem"}, clear=False):
+            self.assertIsNone(refresh_state_store.keyvalue_diagnostics())
+
+    def test_keyvalue_diagnostics_reports_real_info_stats(self) -> None:
+        # Board audit follow-up, 2026-07-31: built to answer, with real
+        # numbers, whether WNBA's (and every other sport's, at the same
+        # instant) intermittent dashboard_games_count=0 is keyvalue memory
+        # eviction, connection exhaustion, or something else.
+        fake_client = _FakeKeyValueClient()
+        with patch.dict(
+            os.environ,
+            {"SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue", "SYNDICATE_REFRESH_STATE_URL": "redis://example"},
+            clear=False,
+        ), patch("syndicate.features.shared.refresh_state_store._get_keyvalue_client", return_value=fake_client):
+            diagnostics = refresh_state_store.keyvalue_diagnostics()
+
+        self.assertTrue(diagnostics["ok"])
+        self.assertEqual(diagnostics["stats"]["evicted_keys"], 42)
+        self.assertEqual(diagnostics["stats"]["maxmemory_policy"], "allkeys_lru")
+        self.assertEqual(diagnostics["keyspace"]["db0"]["keys"], 100)
+
+    def test_keyvalue_diagnostics_reports_connection_failure(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue", "SYNDICATE_REFRESH_STATE_URL": "redis://example"},
+            clear=False,
+        ), patch(
+            "syndicate.features.shared.refresh_state_store._get_keyvalue_client",
+            side_effect=RuntimeError("connection reset"),
+        ):
+            diagnostics = refresh_state_store.keyvalue_diagnostics()
+
+        self.assertFalse(diagnostics["ok"])
+        self.assertIn("connection reset", diagnostics["error"])
 
     def test_ops_status_reads_latest_manifest_and_artifacts_from_keyvalue_backend(self) -> None:
         fake_client = _FakeKeyValueClient()

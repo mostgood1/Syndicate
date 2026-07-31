@@ -581,6 +581,53 @@ def path_exists(path: Path) -> bool:
     return path.exists()
 
 
+# Board audit follow-up, 2026-07-31: read-only diagnostic for the exact
+# question this session's WNBA-props-vanishing investigation couldn't
+# answer from the app side alone -- is the shared keyvalue backend (one
+# Redis instance, "starter" plan, allkeys_lru eviction, shared across web +
+# refresh-worker + live-odds-worker) actually under memory/connection
+# pressure? A high evicted_keys count would mean confirmed-good data is
+# being silently pushed out under memory pressure (a genuine "successful"
+# read of a key that's no longer there, not a connection failure --
+# read_text_file_result's failure/absence distinction can't catch this,
+# since Redis returning "key not found" for an evicted key is
+# indistinguishable at the protocol level from a key that was never set).
+_KEYVALUE_INFO_FIELDS = (
+    "used_memory",
+    "used_memory_human",
+    "maxmemory",
+    "maxmemory_human",
+    "maxmemory_policy",
+    "evicted_keys",
+    "expired_keys",
+    "connected_clients",
+    "blocked_clients",
+    "rejected_connections",
+    "total_connections_received",
+    "total_commands_processed",
+    "instantaneous_ops_per_sec",
+    "keyspace_hits",
+    "keyspace_misses",
+    "role",
+    "redis_version",
+    "uptime_in_seconds",
+)
+
+
+def keyvalue_diagnostics() -> dict[str, Any] | None:
+    if _state_backend_kind() != "keyvalue":
+        return None
+    try:
+        info = _execute_keyvalue_operation(lambda client: client.info())
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+    if not isinstance(info, dict):
+        return {"ok": False, "error": "unexpected INFO response shape"}
+    stats = {field: info.get(field) for field in _KEYVALUE_INFO_FIELDS if field in info}
+    keyspace = {key: value for key, value in info.items() if str(key).startswith("db")}
+    return {"ok": True, "stats": stats, "keyspace": keyspace}
+
+
 def path_size(path: Path) -> int:
     if _state_backend_kind() == "keyvalue":
         try:
