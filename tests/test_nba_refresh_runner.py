@@ -22,6 +22,38 @@ class NbaRefreshRunnerTests(unittest.TestCase):
         spec.loader.exec_module(module)
         return module
 
+    def test_payload_has_snapshot_content_rejects_all_zero_boxscore(self) -> None:
+        # Regression for the same bug found and fixed live on WNBA's copy of
+        # this check (scripts/refresh_wnba_oddsapi_props.py) 2026-07-30: a
+        # boxscore captured right at tip-off has real players listed but
+        # every stat is legitimately 0 and minutes blank -- the old check
+        # (players list non-empty) treated that as "already has content"
+        # forever, so the refresh loop never re-fetched once a game was
+        # actually underway.
+        module = self._load_module()
+
+        all_zero = {
+            "games": [
+                {
+                    "event_id": "401859964",
+                    "players": [
+                        {"player": "Bench One", "pts": 0, "reb": 0, "ast": 0, "mp": "--"},
+                        {"player": "Bench Two", "pts": 0, "reb": 0, "ast": 0, "mp": "0:00"},
+                    ],
+                }
+            ]
+        }
+        self.assertFalse(module._payload_has_snapshot_content("live_player_boxscore", all_zero))
+
+        empty_players = {"games": [{"event_id": "401859964", "players": []}]}
+        self.assertFalse(module._payload_has_snapshot_content("live_player_boxscore", empty_players))
+
+        real_points = {"games": [{"event_id": "401859964", "players": [{"player": "Starter", "pts": 4, "reb": 0, "ast": 0, "mp": "6:12"}]}]}
+        self.assertTrue(module._payload_has_snapshot_content("live_player_boxscore", real_points))
+
+        real_minutes_no_stats_yet = {"games": [{"event_id": "401859964", "players": [{"player": "Starter", "pts": 0, "reb": 0, "ast": 0, "mp": "2:15"}]}]}
+        self.assertTrue(module._payload_has_snapshot_content("live_player_boxscore", real_minutes_no_stats_yet))
+
     def test_main_calls_syndicate_cli_refresh_path(self) -> None:
         module = self._load_module()
 
