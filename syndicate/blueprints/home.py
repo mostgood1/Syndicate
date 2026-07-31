@@ -5275,7 +5275,20 @@ def _load_mlb_home_hr_target_items(context_label: str, *, limit: int = 10) -> li
                 "matchup": matchup,
                 "detail": reasons[0] if reasons else _safe_text(target.get("summary"), "No HR-target summary available."),
                 "writeup": writeup or _safe_text(target.get("summary"), "No HR-target summary available."),
-                "line": _safe_text(target.get("support"), "-"),
+                # Board audit follow-up, found live 2026-07-31: "support" is
+                # hr_targets.py's own model support/confidence score
+                # (_support_score_display, hr_targets.py:533) -- an unrelated
+                # metric, not a betting line -- but stuffing it into "line"
+                # made an HR-target narrative row LOOK like it had a real
+                # numeric line (e.g. 106.0) to _prop_candidate_from_item's
+                # completeness guard, letting a non-bettable narrative pick
+                # ("His underlying HR-quality profile is running above
+                # baseline.") slip onto the Layer 2 board as a fake "prop"
+                # even after that guard shipped. HR-target picks have no
+                # real market line at all (they're a probability-of-a-HR
+                # pick, not an over/under), so this key should stay genuinely
+                # empty rather than borrow an unrelated number.
+                "line": "-",
                 "team": _safe_text(target.get("team"), "-"),
                 "opponent": _safe_text(target.get("opponent"), "-"),
                 "away_label": away_label,

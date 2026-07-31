@@ -3739,6 +3739,14 @@ class HomeBoardTests(unittest.TestCase):
         self.assertEqual(rows[0]["home_label"], "MIL")
         self.assertEqual(rows[0]["away_logo"], "https://example.test/sf.png")
         self.assertEqual(rows[0]["home_logo"], "https://example.test/mil.png")
+        # Board audit follow-up, found live 2026-07-31: this row's "line"
+        # used to be stamped from the target's "support" score (a model
+        # confidence metric, not a betting line) -- a real, non-None value
+        # that let a non-bettable HR-target narrative slip past
+        # _prop_candidate_from_item's completeness guard, since the guard
+        # only checks whether line/odds/projected are None. HR-target picks
+        # have no real market line at all; this key must stay empty.
+        self.assertEqual(rows[0]["line"], "-")
 
     def test_mlb_pregame_hitter_rows_keep_game_pk_for_live_actual_lookup(self) -> None:
         from syndicate.blueprints import home as home_module
