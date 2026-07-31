@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import os
 import unittest
 from unittest.mock import patch
@@ -988,6 +989,41 @@ class AskTheSyndicateFocusedEvidenceTests(unittest.TestCase):
         self.assertIn("today's lineup vs Paul Skenes", result["tables"][0]["title"])
         self.assertEqual(result["evidence"]["lineup_bvp"][0]["batter"], "Jackson Chourio")
 
+    def test_mlb_bvp_pitcher_question_with_no_career_history_returns_note_not_none(self) -> None:
+        # Regression guard for a young pitcher (e.g. Eury Pérez) whose career
+        # BvP sample against today's lineup is empty -- the section used to
+        # vanish silently (return None); it must now explain itself and
+        # still surface the park/weather context.
+        daily_dir = os.path.join(self.root, "mlb", "daily")
+        os.makedirs(daily_dir, exist_ok=True)
+        hr_targets = {
+            "games": [
+                {
+                    "game_pk": 1,
+                    "targets": [
+                        {
+                            "player_name": "Some Batter", "batter_id": 1,
+                            "opponent_pitcher_id": 777777, "opponent_pitcher_name": "Rookie Ace",
+                            "park_hr_mult": 1.05, "weather_hr_mult": 0.97,
+                        }
+                    ],
+                }
+            ]
+        }
+        with open(os.path.join(daily_dir, "daily_summary_2026_07_12_hr_targets.json"), "w", encoding="utf-8") as f:
+            json.dump(hr_targets, f)
+        ask_data._BVP_CACHE.clear()
+        with patch.dict(os.environ, {"MLB_BETTING_DATA_ROOT": os.path.join(self.root, "mlb")}):
+            result = ask_data._mlb_bvp_evidence("How does the lineup hit against Rookie Ace?", {})
+
+        self.assertIsNotNone(result)
+        note_table = result["tables"][0]
+        self.assertIn("today's lineup vs Rookie Ace", note_table["title"])
+        self.assertIn("No recorded plate appearances", note_table["rows"][0][0])
+        park_table = next(t for t in result["tables"] if "Park/weather" in t["title"])
+        self.assertIn(["Park HR mult", "1.05"], park_table["rows"])
+        self.assertIn(["Weather HR mult", "0.97"], park_table["rows"])
+
     def _write_accuracy_fixtures(self) -> None:
         eval_dir = os.path.join(self.root, "mlb", "eval", "batches", "season_2026_ui_daily_live")
         os.makedirs(eval_dir, exist_ok=True)
@@ -1257,6 +1293,127 @@ class AskTheSyndicateTopCandidatesTests(unittest.TestCase):
             result = ask_data.collect_focused_evidence(
                 "who are the best targets today", {"sport": "mlb"}
             )
+        self.assertIsNone(result)
+
+
+class AskTheSyndicateMlbPlayerHistoryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = self._tmp.name
+        self.processed_dir = os.path.join(self.root, "mlb", "processed")
+        os.makedirs(self.processed_dir, exist_ok=True)
+
+    def _env(self) -> dict:
+        return {"MLB_BETTING_DATA_ROOT": os.path.join(self.root, "mlb")}
+
+    def _write_pitcher_log(self, rows: list[dict]) -> None:
+        from syndicate.features.mlb.player_game_log import PITCHER_FIELDS
+        from syndicate.features.mlb.player_game_log import PITCHER_LOG_FILENAME
+
+        with open(os.path.join(self.processed_dir, PITCHER_LOG_FILENAME), "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=PITCHER_FIELDS)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({field: row.get(field, "") for field in PITCHER_FIELDS})
+
+    def _write_batter_log(self, rows: list[dict]) -> None:
+        from syndicate.features.mlb.player_game_log import BATTER_FIELDS
+        from syndicate.features.mlb.player_game_log import BATTER_LOG_FILENAME
+
+        with open(os.path.join(self.processed_dir, BATTER_LOG_FILENAME), "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=BATTER_FIELDS)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({field: row.get(field, "") for field in BATTER_FIELDS})
+
+    def _write_slate_game(self) -> None:
+        daily_dir = os.path.join(self.root, "mlb", "daily")
+        os.makedirs(daily_dir, exist_ok=True)
+        summary = {
+            "date": "2026-07-12",
+            "outputs": [{
+                "game_pk": 823358, "away": "MIL", "home": "PIT",
+                "starter_names": {"away": "Jacob Misiorowski", "home": "Paul Skenes"},
+                "full": {"home_win_prob": 0.5, "away_win_prob": 0.5, "away_runs_mean": 4.0, "home_runs_mean": 4.0, "total_runs_dist": {"5": 10}, "run_margin_dist": {"1": 5}},
+                "pitcher_props": {},
+            }],
+        }
+        with open(os.path.join(daily_dir, "daily_summary_2026_07_12.json"), "w", encoding="utf-8") as f:
+            json.dump(summary, f)
+
+    def test_pitcher_last_n_starts_and_advanced_profile(self) -> None:
+        self._write_pitcher_log([
+            {"date": "2026-07-01", "game_pk": 1, "player_id": 694973, "player_name": "Paul Skenes", "team": "PIT", "opponent": "CHC", "is_starter": 1, "ip": "6.0", "outs": 18, "pitches": 95, "k": 9, "bb": 1, "er": 1, "h": 3, "r": 1, "hr": 0},
+            {"date": "2026-07-07", "game_pk": 2, "player_id": 694973, "player_name": "Paul Skenes", "team": "PIT", "opponent": "STL", "is_starter": 1, "ip": "7.0", "outs": 21, "pitches": 101, "k": 10, "bb": 0, "er": 0, "h": 2, "r": 0, "hr": 0},
+            # A reliever appearance for a different pitcher must not leak in.
+            {"date": "2026-07-08", "game_pk": 3, "player_id": 111111, "player_name": "Someone Else", "team": "PIT", "opponent": "STL", "is_starter": 0, "ip": "1.0", "outs": 3, "pitches": 10, "k": 1, "bb": 0, "er": 0, "h": 0, "r": 0, "hr": 0},
+        ])
+        profile = {
+            "pitcher": {
+                "ev_mean_allowed": 86.0, "barrel_rate_allowed": 0.08, "hardhit_rate_allowed": 0.33,
+                "xwoba_allowed": 0.29, "hr_mult": 0.9, "k_mult": 1.15, "inplay_mult": 0.95,
+                "top_pitch_mix": [{"pitch_type": "FF", "share": 0.55}],
+            },
+            "generated_at": "2026-07-30T00:00:00",
+        }
+        with patch.dict(os.environ, self._env()):
+            with patch("syndicate.features.intelligence._mlb_statcast_profile_from_ids", return_value=profile):
+                result = ask_data._mlb_player_history_evidence("How has Paul Skenes looked lately?", {"sport": "mlb"})
+
+        self.assertIsNotNone(result)
+        last_n_table = result["tables"][0]
+        self.assertIn("Last 2 starts", last_n_table["title"])
+        self.assertIn("Paul Skenes", last_n_table["title"])
+        # Most recent start first.
+        self.assertEqual(last_n_table["rows"][0][0], "2026-07-07")
+        self.assertEqual(last_n_table["rows"][0][3], "10")  # K column
+        self.assertEqual(last_n_table["rows"][-1][0], "L2 avg")
+        self.assertTrue(any("Actual strikeouts" in c["title"] for c in result["charts"]))
+        advanced_table = next(t for t in result["tables"] if "Advanced Statcast profile" in t["title"])
+        self.assertIn(["Barrel% allowed", "8.0%"], advanced_table["rows"])
+        self.assertIn(["Top pitch mix", "FF 55%"], advanced_table["rows"])
+
+    def test_pitcher_history_vs_todays_opponent_when_game_matched(self) -> None:
+        self._write_slate_game()
+        self._write_pitcher_log([
+            {"date": "2026-06-01", "game_pk": 1, "player_id": 694973, "player_name": "Paul Skenes", "team": "PIT", "opponent": "MIL", "is_starter": 1, "ip": "6.0", "outs": 18, "pitches": 95, "k": 9, "bb": 1, "er": 1, "h": 3, "r": 1, "hr": 0},
+            {"date": "2026-07-07", "game_pk": 2, "player_id": 694973, "player_name": "Paul Skenes", "team": "PIT", "opponent": "STL", "is_starter": 1, "ip": "7.0", "outs": 21, "pitches": 101, "k": 10, "bb": 0, "er": 0, "h": 2, "r": 0, "hr": 0},
+        ])
+        with patch.dict(os.environ, self._env()):
+            with patch("syndicate.features.intelligence._mlb_statcast_profile_from_ids", return_value=None):
+                result = ask_data._mlb_player_history_evidence("How does Paul Skenes do against the Brewers tonight?", {"sport": "mlb"})
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["evidence"]["vs_opponent_starts"], 1)
+        vs_table = next(t for t in result["tables"] if "History vs MIL" in t["title"])
+        self.assertEqual(vs_table["rows"][0][0], "2026-06-01")
+
+    def test_batter_last_n_games_no_vs_opponent_table(self) -> None:
+        self._write_batter_log([
+            {"date": "2026-07-01", "game_pk": 1, "player_id": 694192, "player_name": "Jackson Chourio", "team": "MIL", "opponent": "PIT", "ab": 4, "h": 2, "r": 1, "rbi": 1, "hr": 1, "bb": 0, "so": 1, "tb": 6},
+            {"date": "2026-07-02", "game_pk": 2, "player_id": 694192, "player_name": "Jackson Chourio", "team": "MIL", "opponent": "PIT", "ab": 3, "h": 0, "r": 0, "rbi": 0, "hr": 0, "bb": 1, "so": 2, "tb": 0},
+        ])
+        with patch.dict(os.environ, self._env()):
+            with patch("syndicate.features.intelligence._mlb_statcast_profile_from_ids", return_value=None):
+                result = ask_data._mlb_player_history_evidence("How has Jackson Chourio been hitting?", {"sport": "mlb"})
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["evidence"]["role"], "batter")
+        self.assertIn("Last 2 games", result["tables"][0]["title"])
+        self.assertFalse(any("History vs" in t["title"] for t in result["tables"]))
+
+    def test_no_csv_returns_none(self) -> None:
+        with patch.dict(os.environ, self._env()):
+            result = ask_data._mlb_player_history_evidence("How has Paul Skenes looked lately?", {"sport": "mlb"})
+        self.assertIsNone(result)
+
+    def test_unmatched_player_returns_none(self) -> None:
+        self._write_pitcher_log([
+            {"date": "2026-07-01", "game_pk": 1, "player_id": 694973, "player_name": "Paul Skenes", "team": "PIT", "opponent": "CHC", "is_starter": 1, "ip": "6.0", "outs": 18, "pitches": 95, "k": 9, "bb": 1, "er": 1, "h": 3, "r": 1, "hr": 0},
+        ])
+        with patch.dict(os.environ, self._env()):
+            result = ask_data._mlb_player_history_evidence("What's the weather like today?", {"sport": "mlb"})
         self.assertIsNone(result)
 
 

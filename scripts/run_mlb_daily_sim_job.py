@@ -27,6 +27,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from syndicate.features.mlb.player_game_log import bootstrap_mlb_player_game_log
 from syndicate.features.mlb.sources import daily_snapshot_oddsapi_game_lines_path
 from syndicate.features.mlb.sources import daily_snapshot_oddsapi_hitter_props_path
 from syndicate.features.mlb.sources import daily_snapshot_oddsapi_pitcher_props_path
@@ -276,6 +277,13 @@ def main() -> int:
         published_count = publish_changed_hot_artifacts(started_epoch)
     except Exception:
         published_count = 0
+
+    game_log_summary: dict | None = None
+    try:
+        game_log_summary = bootstrap_mlb_player_game_log(str(_vendor_mlb_data_dir(vendor_cwd)))
+        print(f"MLB_PLAYER_GAME_LOG {game_log_summary}", flush=True)
+    except Exception as exc:
+        print(f"MLB_PLAYER_GAME_LOG_FAILED {type(exc).__name__}: {exc}", flush=True)
 
     status_payload = {
         "ok": ok,

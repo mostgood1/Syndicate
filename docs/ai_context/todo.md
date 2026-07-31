@@ -4,19 +4,125 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (#162, soccer
-league display)" below; prior session: "Reconciliation 2026-07-30 (#161,
-Layer 1 closing-line fix)"; before that: "Reconciliation 2026-07-30 (#160,
-Games-strip board bugs)" further down; before that: "Reconciliation
-2026-07-30 (tuning-loop wiring / Phase 5)"; before that: "Reconciliation
-2026-07-30 (soccer cross-sport opportunities integration, #150/#151)"; before
-that: "Reconciliation 2026-07-30 (WNBA native live-lens game-shape / Phase
-4)"; before that: "Reconciliation 2026-07-30 (MLB evening next-day sim
-headroom gate)"; before that: "Reconciliation 2026-07-30 (MLB live-lens
-headroom gate / Phase 3)"; before that: "Reconciliation 2026-07-30
-(opportunity board / Phase 2)"; before that: "Reconciliation 2026-07-30
-(steam candidates, Layer 2 projection, portfolio reconciliation)"; before
-that: "Reconciliation 2026-07-30 (evaluation-ledger settlement / Phase 1)").
+Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (#163, Ask The
+Syndicate MLB player history + advanced analytics)" below; prior session:
+"Reconciliation 2026-07-30 (#162, soccer league display)"; before that:
+"Reconciliation 2026-07-30 (#161, Layer 1 closing-line fix)"; before that:
+"Reconciliation 2026-07-30 (#160, Games-strip board bugs)" further down;
+before that: "Reconciliation 2026-07-30 (tuning-loop wiring / Phase 5)";
+before that: "Reconciliation 2026-07-30 (soccer cross-sport opportunities
+integration, #150/#151)"; before that: "Reconciliation 2026-07-30 (WNBA
+native live-lens game-shape / Phase 4)"; before that: "Reconciliation
+2026-07-30 (MLB evening next-day sim headroom gate)"; before that:
+"Reconciliation 2026-07-30 (MLB live-lens headroom gate / Phase 3)"; before
+that: "Reconciliation 2026-07-30 (opportunity board / Phase 2)"; before that:
+"Reconciliation 2026-07-30 (steam candidates, Layer 2 projection, portfolio
+reconciliation)"; before that: "Reconciliation 2026-07-30 (evaluation-ledger
+settlement / Phase 1)").
+
+### Reconciliation 2026-07-30 (#163, Ask The Syndicate MLB player history + advanced analytics)
+
+User asked for Ask The Syndicate's MLB answers to show real player history
+(recent form, history vs the opponent) and advanced matchup analytics
+alongside the existing sim-only tables, using a screenshot of "Eury Perez
+outs" (only SmartSim/sim tables, no real data) as the motivating example.
+Four gaps found and closed, not one:
+
+1. **No MLB recent-form index existed at all** (NBA/NHL have
+   `boxscores_history.csv`/`player_game_stats.csv`; MLB had only raw
+   per-game `feed_live` blobs, no index). New worker artifact:
+   `syndicate/features/mlb/player_game_log.py` (`bootstrap_mlb_player_game_log`)
+   scans mirrored `feed_live` files and writes
+   `data/mlb_source/.../processed/mlb_pitcher_game_log.csv` /
+   `mlb_batter_game_log.csv`, incremental by `(game_pk, player_id)`.
+   `scripts/build_mlb_player_game_log.py` is the CLI/backfill entrypoint;
+   `scripts/run_mlb_daily_sim_job.py` now calls it (best-effort) after
+   `publish_changed_hot_artifacts()` so refresh-worker keeps it current
+   automatically. Local backfill run: 618 `feed_live` files -> 5,089 pitcher
+   rows / 12,185 batter rows.
+2. **`_mlb_bvp_evidence`'s pitcher-direction branch failed silently** when a
+   pitcher (e.g. a rookie) has no career BvP PAs against today's lineup —
+   exactly why the Eury Pérez screenshot showed nothing from it. Now returns
+   an explanatory note table instead of `None`, and surfaces park/weather
+   multipliers on the pitcher path too (previously only the batter-direction
+   branch had them).
+3. **Advanced Statcast profile data existed but was stale and unused by Ask
+   The Syndicate**: `data/mlb_source/.../statcast/features/player_features_latest.json`
+   (whiff/barrel/hardhit/xwOBA/pitch-mix), already loaded by
+   `syndicate/features/intelligence.py`'s `_mlb_statcast_profile_from_ids`
+   for other features, was season-2025-only, generated 2026-05-12, never
+   scheduled. Regenerated now for 2026-03-01..2026-07-30 (via
+   `vendor/mlb_bettingv2/tools/statcast/fetch_statcast_raw_pitches_x64.py` +
+   `tools/datasets/build_statcast_player_feature_set.py` — note: despite the
+   filename, no `.venv_x64` was needed on this AMD64 dev box, only on an
+   actual ARM64 one). New `scripts/refresh_mlb_statcast_features.py` wraps
+   that two-stage pipeline with a staleness gate (7 days) and copies the
+   vendor-repo output into both `mlb_source` artifact-root candidates; wired
+   as a new (self-gating, safe-to-run-daily) step in
+   `scripts/unified_daily_update.ps1`'s MLB block.
+4. **New evidence fetcher** `_mlb_player_history_evidence`
+   (`syndicate/blueprints/ask_the_syndicate_data.py`) adds "Last N starts/
+   games", "History vs {opponent}" (pitcher only — scoped out for batters,
+   see below), an actual-strikeouts/hits bar chart, and an "Advanced
+   Statcast profile" table; registered in `_fetchers_for_sport` next to
+   `_mlb_focused_evidence`. `MAX_TABLES`/`MAX_CHARTS` raised 5->8 / 4->5 to
+   fit the new sections alongside the existing ones (rendering is cheap;
+   only file-scan cost matters for the web/worker split, and none of this
+   adds request-time scanning — everything reads a small pre-built CSV/JSON).
+5. **Found and fixed while building this**: `_name_matches`/`_person_matches`
+   (`ask_the_syndicate_data.py`) tokenized names with an ASCII-only
+   `[a-z0-9']+` regex with no diacritic folding — "Pérez" split into `["p",
+   "rez"]` (the `len>=3` filter drops the lone "p"), so a question asking
+   about "Perez" never matched a *stored* "Pérez" (MLB Stats API returns some
+   names accented, others not — "Eury Pérez" vs "Salvador Perez" — so this
+   bug was invisible until this exact example). Fixed with an NFKD-fold
+   helper (`_fold_diacritics`) before tokenizing, matching the pattern
+   `cards.py`'s `_normalize_live_name` already used elsewhere. This was a
+   real pre-existing bug affecting every fetcher that name-matches, not
+   something new.
+6. **Also found, NOT fixed (masked in production, out of scope here)**:
+   `syndicate/features/shared/source_roots.py`'s `repo_root_from(file_path)`
+   does `Path(file_path).resolve().parents[3]`, which is correct for callers
+   3 subdirectories deep (e.g. `syndicate/features/mlb/sources.py`) but
+   overshoots the repo root by one directory for `syndicate/features/
+   intelligence.py` itself (only 2 subdirectories deep) when called with its
+   own `__file__` — `_mlb_statcast_feature_payload()`'s `_mlb_repo_artifact_path`
+   call hits this. Locally this silently returns an empty Statcast payload
+   unless `SYNDICATE_DATA_ROOT` or `SYNDICATE_MLB_SOURCE_ROOT` is set (both
+   scripts/tests in this repo already set one or the other, and production
+   sets `SYNDICATE_MLB_SOURCE_ROOT` on all three services per existing code
+   comments, so this doesn't bite prod) — but it's a real latent bug for any
+   local dev session without that env var, worth fixing generically in
+   `source_roots.py` rather than per-caller if it bites again.
+7. **Tests**: `tests/test_mlb_player_game_log.py` (new, 5 tests) +
+   `tests/test_ask_the_syndicate.py` (7 new tests: BvP no-history-note,
+   pitcher last-N + advanced profile, vs-opponent table, batter last-N,
+   missing-CSV, unmatched-player). Full file 57/57 passing; targeted MLB
+   suite (`test_ask_the_syndicate.py` + `test_mlb_player_game_log.py` +
+   `test_mlb_box_score_stats.py` + `test_run_mlb_daily_sim_job.py` +
+   `test_mlb_cards_freshness.py`) 83/83; CI's actual gate
+   (`python -m unittest tests.test_archives`) 379/383 passing, the 4
+   failures are pre-existing WNBA live-lens/home-poll-JS tests untouched by
+   this work (confirmed via grep — none reference `ask_the_syndicate`,
+   `player_game_log`, or MLB). End-to-end verified live in the browser via
+   the `run-syndicate` skill: asking "Eury Perez outs" now renders "Last 4
+   starts — Eury Pérez", "Advanced Statcast profile — Eury Pérez", and an
+   actual-strikeouts chart alongside the existing bet-analysis panel.
+8. **Not yet committed/pushed/deployed** — implementation + tests + local
+   verification complete, awaiting explicit go-ahead per this repo's
+   destructive/deploy-action norms (deploy also risks killing an in-flight
+   sim — check for one first).
+9. **Manual follow-up for production, deliberately not assumed/done here**:
+   `data/mlb_source/source_artifacts/` is per-environment disk state (broadly
+   gitignored, not synced through git) — production's refresh-worker has its
+   own independently-accumulated `feed_live` history and its own
+   `player_features_latest.json`, separate from this local dev mirror. The
+   new daily-job hook and weekly staleness-gated refresh self-heal in
+   production going forward regardless, but for immediate full-season
+   coverage post-deploy, `scripts/build_mlb_player_game_log.py` and
+   `scripts/refresh_mlb_statcast_features.py --force` would need one manual
+   run each directly against the refresh-worker's disk (e.g. a Render
+   one-off job/shell).
 
 ### Reconciliation 2026-07-30 (#162, soccer league display)
 

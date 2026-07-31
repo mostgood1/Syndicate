@@ -24,6 +24,7 @@ import logging
 import os
 import re
 import threading
+import unicodedata
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -31,8 +32,8 @@ logger = logging.getLogger(__name__)
 MAX_CHART_POINTS = 30
 MAX_LOOKBACK_FILES = 10
 LAST_N_GAMES = 10
-MAX_TABLES = 5
-MAX_CHARTS = 4
+MAX_TABLES = 8
+MAX_CHARTS = 5
 
 _WNBA_TEAM_NAMES: dict[str, str] = {
     "ATL": "Atlanta Dream",
@@ -61,9 +62,20 @@ def _clip(text: Any, limit: int) -> str:
     return value if len(value) <= limit else value[: limit - 1] + "…"
 
 
+def _fold_diacritics(text: str) -> str:
+    """Strip accents so "Pérez" tokenizes to "perez" instead of splitting into
+    ["p", "rez"] under the ASCII-only [a-z0-9']+ pattern below -- MLB Stats
+    API returns some player names accented and others not (e.g. "Eury Pérez"
+    vs "Salvador Perez"), so name matching has to be accent-insensitive to be
+    consistent regardless of which convention a given data source used.
+    """
+    normalized = unicodedata.normalize("NFKD", str(text or ""))
+    return "".join(ch for ch in normalized if not unicodedata.combining(ch))
+
+
 def _name_matches(name: str, words: set[str]) -> bool:
     """True when a multi-word name is plausibly referenced by the question."""
-    parts = [p for p in re.findall(r"[a-z0-9']+", str(name or "").lower()) if len(p) >= 3]
+    parts = [p for p in re.findall(r"[a-z0-9']+", _fold_diacritics(str(name or "")).lower()) if len(p) >= 3]
     if not parts:
         return False
     # Last name alone is enough for people; any distinctive word for teams.
@@ -72,7 +84,7 @@ def _name_matches(name: str, words: set[str]) -> bool:
 
 def _person_matches(name: str, words: set[str]) -> int:
     """Match score for a person's name: 0 = no, 1 = last name only, 2 = first+last."""
-    parts = [p for p in re.findall(r"[a-z0-9']+", str(name or "").lower()) if len(p) >= 3]
+    parts = [p for p in re.findall(r"[a-z0-9']+", _fold_diacritics(str(name or "")).lower()) if len(p) >= 3]
     if not parts or parts[-1] not in words:
         return 0
     return 2 if len(parts) > 1 and parts[0] in words else 1
@@ -249,7 +261,12 @@ def _mlb_game_matches(question: str, words: set[str], game: dict[str, Any], name
     return False
 
 
-def _mlb_focused_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
+def _mlb_match_game(question: str, context: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], str] | None:
+    """The slate game (plus its name-context) the question is about, shared
+    by every MLB evidence fetcher that needs "which game/pitcher/team" --
+    same matching `_mlb_focused_evidence` always used, factored out so
+    `_mlb_player_history_evidence` doesn't have to re-derive it.
+    """
     loaded = _mlb_daily_summary(str(context.get("selected_date") or "") or None)
     if not loaded:
         return None
@@ -260,8 +277,6 @@ def _mlb_focused_evidence(question: str, context: dict[str, Any]) -> dict[str, A
     name_context = _mlb_name_context(iso_date)
     words = _question_words(question)
 
-    matched: dict[str, Any] | None = None
-    matched_names: dict[str, Any] = {}
     for game in outputs:
         if not isinstance(game, dict):
             continue
@@ -271,11 +286,16 @@ def _mlb_focused_evidence(question: str, context: dict[str, Any]) -> dict[str, A
             game_pk = -1
         names = name_context.get(game_pk, {})
         if _mlb_game_matches(question, words, game, names):
-            matched = game
-            matched_names = names
-            break
-    if matched is None:
+            return game, names, iso_date
+    return None
+
+
+def _mlb_focused_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
+    found = _mlb_match_game(question, context)
+    if found is None:
         return None
+    matched, matched_names, iso_date = found
+    words = _question_words(question)
 
     full = matched.get("full") or {}
     away_label = matched_names.get("away_name") or str(matched.get("away") or "Away")
@@ -1063,14 +1083,41 @@ def _mlb_bvp_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] 
         counts = counts_by_batter.get(batter_id)
         if counts and (counts.get("pa") or 0) > 0:
             lineup.append((str(target.get("player_name") or batter_id), counts))
-    if not lineup:
-        return None
     lineup.sort(key=lambda item: item[1].get("pa") or 0, reverse=True)
-    tables = [{
-        "title": f"BvP — today's lineup vs {pitcher_name} (career, through {iso_date})",
-        "columns": ["Batter", "PA", "H", "HR", "BB", "SO", "AVG"],
-        "rows": [_bvp_rate_row(name, counts) for name, counts in lineup[:10]],
-    }]
+
+    if lineup:
+        tables = [{
+            "title": f"BvP — today's lineup vs {pitcher_name} (career, through {iso_date})",
+            "columns": ["Batter", "PA", "H", "HR", "BB", "SO", "AVG"],
+            "rows": [_bvp_rate_row(name, counts) for name, counts in lineup[:10]],
+        }]
+    else:
+        # Sparse/no career history (common for young pitchers) isn't the
+        # same as "nothing to show" -- say so instead of silently vanishing.
+        tables = [{
+            "title": f"BvP — today's lineup vs {pitcher_name} (career, through {iso_date})",
+            "columns": ["Note"],
+            "rows": [[f"No recorded plate appearances vs today's lineup yet — {pitcher_name}'s career BvP sample here is limited."]],
+        }]
+
+    # Park/weather multipliers are game-level, not batter-specific, so any
+    # matched target row carries them -- same fields the batter-direction
+    # branch above already surfaces via profile_rows.
+    park_weather_rows: list[list[Any]] = []
+    for label, key, fmt in (
+        ("Park HR mult", "park_hr_mult", "{:.2f}"),
+        ("Weather HR mult", "weather_hr_mult", "{:.2f}"),
+    ):
+        value = _to_float(pitcher_rows[0].get(key))
+        if value is not None:
+            park_weather_rows.append([label, fmt.format(value)])
+    if park_weather_rows:
+        tables.append({
+            "title": f"Park/weather — {pitcher_name} ({iso_date})",
+            "columns": ["Factor", "Value"],
+            "rows": park_weather_rows,
+        })
+
     evidence = {
         "source": "mlb_bvp",
         "as_of": iso_date,
@@ -1078,8 +1125,224 @@ def _mlb_bvp_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] 
         "lineup_bvp": [
             {"batter": name, **counts} for name, counts in lineup[:10]
         ],
+        "lineup_bvp_pa_total": sum(counts.get("pa") or 0 for _, counts in lineup),
     }
     return {"evidence": evidence, "tables": tables, "charts": [], "as_of": iso_date, "sport": "mlb"}
+
+
+# ---------------------------------------------------------------------------
+# MLB recent-form game log + advanced Statcast profile
+# ---------------------------------------------------------------------------
+
+
+def _mlb_processed_dir() -> str:
+    return os.path.join(_mlb_data_root(), "processed")
+
+
+def _mlb_match_player_in_log(filename: str, words: set[str]) -> tuple[str, int, list[dict[str, Any]]] | None:
+    """Best name match in a pitcher/batter game-log CSV -> (label, player_id,
+    that player's rows sorted most-recent-first). Same "score by name, break
+    ties on recency" shape as `_boxscore_last_n`, just against a per-player
+    CSV instead of a name column mixed in with every other stat.
+    """
+    path = os.path.join(_mlb_processed_dir(), filename)
+    if not os.path.exists(path):
+        return None
+    by_player: dict[int, list[dict[str, Any]]] = {}
+    names: dict[int, str] = {}
+    try:
+        with open(path, newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                try:
+                    player_id = int(row.get("player_id") or 0)
+                except (TypeError, ValueError):
+                    continue
+                if player_id <= 0:
+                    continue
+                by_player.setdefault(player_id, []).append(row)
+                names[player_id] = str(row.get("player_name") or names.get(player_id) or "")
+    except Exception:
+        return None
+    if not by_player:
+        return None
+
+    best_id: int | None = None
+    best_score = 0
+    best_date = ""
+    for player_id, rows in by_player.items():
+        score = _person_matches(names.get(player_id, ""), words)
+        if score == 0:
+            continue
+        latest_date = max((str(r.get("date") or "") for r in rows), default="")
+        if score > best_score or (score == best_score and latest_date > best_date):
+            best_id, best_score, best_date = player_id, score, latest_date
+    if best_id is None:
+        return None
+    rows = sorted(by_player[best_id], key=lambda r: str(r.get("date") or ""), reverse=True)
+    return names.get(best_id) or "Player", best_id, rows
+
+
+def _mlb_advanced_profile_table(label: str, player_id: int, role: str) -> dict[str, Any] | None:
+    from syndicate.features.intelligence import _mlb_statcast_profile_from_ids
+
+    if role == "pitcher":
+        profile = _mlb_statcast_profile_from_ids(batter_id=None, pitcher_id=player_id)
+        factors = (profile or {}).get("pitcher") if profile else None
+        field_specs = [
+            ("EV allowed", "ev_mean_allowed", "{:.1f} mph"),
+            ("Barrel% allowed", "barrel_rate_allowed", "{:.1%}"),
+            ("HardHit% allowed", "hardhit_rate_allowed", "{:.1%}"),
+            ("xwOBA allowed", "xwoba_allowed", "{:.3f}"),
+            ("HR mult", "hr_mult", "{:.2f}"),
+            ("K mult", "k_mult", "{:.2f}"),
+            ("In-play mult", "inplay_mult", "{:.2f}"),
+        ]
+    else:
+        profile = _mlb_statcast_profile_from_ids(batter_id=player_id, pitcher_id=None)
+        factors = (profile or {}).get("batter") if profile else None
+        field_specs = [
+            ("Exit velocity", "ev_mean", "{:.1f} mph"),
+            ("Barrel%", "barrel_rate", "{:.1%}"),
+            ("HardHit%", "hardhit_rate", "{:.1%}"),
+            ("xwOBA", "xwoba", "{:.3f}"),
+            ("Pulled-air rate", "pulled_air_rate", "{:.1%}"),
+            ("HR mult", "hr_mult", "{:.2f}"),
+            ("K mult", "k_mult", "{:.2f}"),
+        ]
+    if not factors:
+        return None
+
+    rows: list[list[Any]] = []
+    for row_label, key, fmt in field_specs:
+        value = factors.get(key)
+        if value is not None:
+            rows.append([row_label, fmt.format(value)])
+    if role == "pitcher":
+        top_mix = factors.get("top_pitch_mix") or []
+        mix_text = ", ".join(
+            f"{item.get('pitch_type')} {float(item.get('share') or 0):.0%}"
+            for item in top_mix if isinstance(item, dict) and item.get("pitch_type")
+        )
+        if mix_text:
+            rows.append(["Top pitch mix", mix_text])
+    if not rows:
+        return None
+
+    generated_at = str((profile or {}).get("generated_at") or "")
+    season_note = f" (Statcast sample as of {generated_at[:10]})" if generated_at else ""
+    return {
+        "title": f"Advanced Statcast profile — {label}{season_note}",
+        "columns": ["Factor", "Value"],
+        "rows": rows,
+    }
+
+
+def _mlb_player_history_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
+    from syndicate.features.mlb.player_game_log import BATTER_LOG_FILENAME
+    from syndicate.features.mlb.player_game_log import PITCHER_LOG_FILENAME
+
+    words = _question_words(question)
+
+    pitcher_match = _mlb_match_player_in_log(PITCHER_LOG_FILENAME, words)
+    role = "pitcher" if pitcher_match else None
+    match = pitcher_match
+    if match is None:
+        match = _mlb_match_player_in_log(BATTER_LOG_FILENAME, words)
+        role = "batter" if match else None
+    if match is None:
+        return None
+    label, player_id, all_rows = match
+
+    tables: list[dict[str, Any]] = []
+    charts: list[dict[str, Any]] = []
+    evidence: dict[str, Any] = {"source": "mlb_player_game_log", "player": label, "role": role}
+
+    if role == "pitcher":
+        starts = [r for r in all_rows if str(r.get("is_starter") or "0") == "1"]
+        if not starts:
+            return None
+        last_n = starts[:LAST_N_GAMES]
+        as_of = last_n[0].get("date") or ""
+        rows = [
+            [r.get("date"), r.get("opponent"), r.get("ip"), r.get("k"), r.get("bb"), r.get("er"), r.get("pitches")]
+            for r in last_n
+        ]
+        count = len(last_n)
+        avg = lambda key: sum(float(r.get(key) or 0) for r in last_n) / count  # noqa: E731
+        rows.append([f"L{count} avg", "", f"{avg('outs') / 3.0:.1f}", f"{avg('k'):.1f}", f"{avg('bb'):.1f}", f"{avg('er'):.1f}", f"{avg('pitches'):.0f}"])
+        tables.append({
+            "title": f"Last {count} starts — {label} (through {as_of})",
+            "columns": ["Date", "Opponent", "IP", "K", "BB", "ER", "Pitches"],
+            "rows": rows,
+        })
+        chronological = list(reversed(last_n))
+        charts.append({
+            "type": "bar",
+            "title": f"Actual strikeouts — last {count} starts — {label}",
+            "x_label": "Start date",
+            "y_label": "K",
+            "points": [{"x": str(r.get("date") or "")[5:], "y": float(r.get("k") or 0)} for r in chronological],
+        })
+        evidence["last_starts"] = [
+            {k: r.get(k) for k in ("date", "opponent", "ip", "k", "bb", "er", "pitches")} for r in last_n
+        ]
+
+        found = _mlb_match_game(question, context)
+        opponent_abbr = None
+        if found is not None:
+            matched, _names, _iso = found
+            starters = matched.get("starter_names") or {}
+            for side in ("away", "home"):
+                if starters.get(side) and _name_matches(str(starters.get(side)), words):
+                    opponent_abbr = str(matched.get("home" if side == "away" else "away") or "")
+                    break
+        if opponent_abbr:
+            vs_team = [r for r in starts if str(r.get("opponent") or "") == opponent_abbr]
+            evidence["vs_opponent_starts"] = len(vs_team)
+            if vs_team:
+                vs_rows = [
+                    [r.get("date"), r.get("ip"), r.get("k"), r.get("bb"), r.get("er")]
+                    for r in vs_team
+                ]
+                tables.append({
+                    "title": f"History vs {opponent_abbr} — {label}",
+                    "columns": ["Date", "IP", "K", "BB", "ER"],
+                    "rows": vs_rows,
+                })
+    else:
+        last_n = all_rows[:LAST_N_GAMES]
+        as_of = last_n[0].get("date") or ""
+        rows = [
+            [r.get("date"), r.get("opponent"), r.get("ab"), r.get("h"), r.get("hr"), r.get("rbi"), r.get("bb"), r.get("so")]
+            for r in last_n
+        ]
+        count = len(last_n)
+        avg = lambda key: sum(float(r.get(key) or 0) for r in last_n) / count  # noqa: E731
+        rows.append([f"L{count} avg", "", f"{avg('ab'):.1f}", f"{avg('h'):.1f}", f"{avg('hr'):.2f}", f"{avg('rbi'):.1f}", f"{avg('bb'):.1f}", f"{avg('so'):.1f}"])
+        tables.append({
+            "title": f"Last {count} games — {label} (through {as_of})",
+            "columns": ["Date", "Opponent", "AB", "H", "HR", "RBI", "BB", "SO"],
+            "rows": rows,
+        })
+        chronological = list(reversed(last_n))
+        charts.append({
+            "type": "bar",
+            "title": f"Actual hits — last {count} games — {label}",
+            "x_label": "Game date",
+            "y_label": "H",
+            "points": [{"x": str(r.get("date") or "")[5:], "y": float(r.get("h") or 0)} for r in chronological],
+        })
+        evidence["last_games"] = [
+            {k: r.get(k) for k in ("date", "opponent", "ab", "h", "hr", "rbi", "bb", "so")} for r in last_n
+        ]
+
+    advanced_table = _mlb_advanced_profile_table(label, player_id, role)
+    if advanced_table:
+        tables.append(advanced_table)
+
+    if not tables:
+        return None
+    return {"evidence": evidence, "tables": tables, "charts": charts, "as_of": as_of, "sport": "mlb"}
 
 
 # ---------------------------------------------------------------------------
@@ -1389,6 +1652,7 @@ def _fetchers_for_sport(sport: str, question: str) -> list:
         return [
             _mlb_accuracy_evidence,
             _mlb_focused_evidence,
+            _mlb_player_history_evidence,
             _mlb_bvp_evidence,
         ]
     if sport == "wnba":
@@ -1407,7 +1671,7 @@ def _fetchers_for_sport(sport: str, question: str) -> list:
         if _is_ranking_intent_question(_question_words(question)):
             return [_mlb_top_candidates_evidence]
         # No sport hint: cheap fetchers only.
-        return [_mlb_accuracy_evidence, _mlb_focused_evidence, _wnba_focused_evidence]
+        return [_mlb_accuracy_evidence, _mlb_focused_evidence, _mlb_player_history_evidence, _wnba_focused_evidence]
     return []
 
 

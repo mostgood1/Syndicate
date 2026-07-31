@@ -4075,6 +4075,25 @@ if (Test-SportEnabled 'MLB') {
         EnvironmentOverrides = $mlbEnvOverrides
         RuntimePolicy = $runtimePolicy.MLB
     }
+    # Statcast player-feature refresh (whiff/barrel/xwOBA/pitch-mix) -- the
+    # underlying Baseball Savant scrape is too slow/heavy for a daily job, so
+    # this step is run every day but is a no-op unless the file is already
+    # more than a week stale (see refresh_mlb_statcast_features.py's own
+    # staleness gate); that self-heals instead of depending on which day of
+    # the week the pipeline happens to run.
+    $sourceSteps += [pscustomobject]@{
+        Sport = 'mlb'
+        Name = 'MLB Statcast player-feature refresh (weekly, staleness-gated)'
+        Workflow = 'syndicate_refresh'
+        Command = @(
+            (Resolve-Python $repoRoot),
+            'scripts\refresh_mlb_statcast_features.py',
+            '--end-date', $Date
+        )
+        WorkingDirectory = $repoRoot
+        EnvironmentOverrides = $mlbEnvOverrides
+        RuntimePolicy = $runtimePolicy.MLB
+    }
 }
 if (Test-SportEnabled 'NBA') {
     $nbaVendoredRoot = Resolve-VendoredRepoPath -RelativePath 'vendor\nba_betting_repo'
