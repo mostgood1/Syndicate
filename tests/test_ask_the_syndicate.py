@@ -330,19 +330,19 @@ class AskTheSyndicateApiTests(unittest.TestCase):
 
         self.assertEqual(payload["schema"]["top_opportunities"][0]["selection"], "Courtney Williams OVER 1.5")
 
-    def test_bet_analysis_flags_unrelated_fallback_pick(self) -> None:
+    def test_bet_analysis_suppresses_unrelated_fallback_pick(self) -> None:
         # Regression guard (reported live, 2026-07-31): asking about a
         # specific player who has no matching recommendation on today's
         # board used to silently return an unrelated top-of-board pick
-        # (e.g. a Dodgers steam move) with nothing indicating it wasn't
-        # about the question at all -- easy to misread as an answer about
-        # the named player. The question clearly names a subject ("antony
-        # volpe") that matches nothing in this recommendation list, so the
-        # fallback must say so.
+        # (e.g. a Dodgers steam move) as if it answered the question. An
+        # explanatory note alone (first fix attempt) still wasn't enough --
+        # a bettor skimming "100% model probability" under a player's name
+        # could still misread it, so the unrelated pick's data must not be
+        # presented at all, only a clear "nothing found" explanation.
         snapshot = {
             "query_type": "bet_analysis",
             "recommendations": [
-                {"selection": "Los Angeles Dodgers steam move", "confidence": 0.7, "summary": "Steam move: line moved."},
+                {"selection": "Los Angeles Dodgers steam move", "confidence": 0.7, "summary": "Steam move: line moved.", "model_probability": 1.0},
             ],
         }
 
@@ -354,8 +354,10 @@ class AskTheSyndicateApiTests(unittest.TestCase):
         )
 
         schema = payload["schema"]
-        self.assertEqual(schema["selection"], "Los Angeles Dodgers steam move")  # still the only pick available
         self.assertFalse(schema["relevance_matched"])
+        self.assertIsNone(schema["selection"])
+        self.assertIsNone(schema["model_probability"])
+        self.assertIsNone(schema["recommendation"])
         self.assertIn("No board recommendation matches", schema["explanation"]["summary"])
         self.assertIn("antony volpe bet analysis", schema["explanation"]["summary"])
 

@@ -211,21 +211,43 @@ def _supporting_points(explanation: dict[str, Any]) -> list[str]:
 
 
 def _bet_analysis_schema(result: Any, *, question: str = "", relevance_matched: bool | None = None) -> dict[str, Any]:
-    top = _first_recommendation(result)
     explanation = _explanation_payload(result)
-    selection = top.get("selection") or top.get("pick") or top.get("name") or top.get("label")
-    summary_text = explanation.get("summary")
-    if relevance_matched is False and selection:
+
+    if relevance_matched is False:
         # The question named something specific (a player/team/market) but
-        # nothing in today's actual board recommendations mentions it --
-        # `selection` here is just the board's default top pick, not an
-        # answer to the question. Say so up front, prominently, instead of
-        # silently presenting it as if it were relevant (a bettor skimming
-        # "Los Angeles Dodgers steam move — 100% model probability" right
-        # under a question about a specific player could easily read it as
-        # being about that player; see _reorder_by_relevance).
-        note = f"No board recommendation matches “{question.strip()}” specifically — showing today's top overall pick instead."
-        summary_text = f"{note} {summary_text}".strip() if summary_text else note
+        # nothing in today's actual board recommendations mentions it. Don't
+        # show the board's unrelated top pick as if it were the answer --
+        # a bettor skimming "Los Angeles Dodgers steam move — 100% model
+        # probability" right under a question about a specific player could
+        # easily read it as being about that player (reported live,
+        # 2026-07-31: annotating the pick with a caveat note still wasn't
+        # enough -- it needs to not be presented as the answer at all).
+        # See _reorder_by_relevance.
+        note = f"No board recommendation matches “{question.strip()}” specifically — nothing to show for this question."
+        return {
+            "schema_type": "bet_analysis",
+            "selection": None,
+            "model_probability": None,
+            "market_probability": None,
+            "edge": None,
+            "EV": None,
+            "confidence": None,
+            "recommendation": None,
+            "relevance_matched": False,
+            "explanation": {
+                "summary": note,
+                "analysis_brief": {},
+                "supporting_evidence": {},
+                "reasoning_steps": [],
+                "supporting_points": [],
+                "board_notes": explanation.get("board_notes", []),
+                "readiness_gate": explanation.get("readiness_gate", {}),
+                "top_candidate": {},
+            },
+        }
+
+    top = _first_recommendation(result)
+    selection = top.get("selection") or top.get("pick") or top.get("name") or top.get("label")
     return {
         "schema_type": "bet_analysis",
         "selection": selection,
@@ -237,7 +259,7 @@ def _bet_analysis_schema(result: Any, *, question: str = "", relevance_matched: 
         "recommendation": top.get("summary") or top.get("rationale") or top.get("writeup") or top.get("why") or explanation.get("summary"),
         "relevance_matched": relevance_matched,
         "explanation": {
-            "summary": summary_text,
+            "summary": explanation.get("summary"),
             "analysis_brief": explanation.get("analysis_brief", {}),
             "supporting_evidence": explanation.get("supporting_evidence", {}),
             "reasoning_steps": explanation.get("reasoning_steps", []),
@@ -361,6 +383,18 @@ _ASK_RELEVANCE_STOPWORDS = {
     "for", "with", "this", "that", "today", "tonight", "look", "looks", "looking",
     "will", "get", "and", "against", "vs", "versus", "in", "on", "at", "to", "a", "an",
     "about", "best", "top", "good", "any", "some", "there", "it", "its", "was", "were",
+    # Generic betting/question vocabulary -- present in almost every question
+    # regardless of subject, so it must not count as "names something
+    # specific" (see _relevance_matched below: without this, "What do you
+    # think of this spread?" leaves "spread" as the only word, which
+    # doesn't match any recommendation and wrongly reads as "the question
+    # named a subject that isn't on the board" instead of "generic
+    # question, leave the board's top pick alone" -- confirmed live,
+    # 2026-07-31).
+    "spread", "spreads", "bet", "bets", "betting", "pick", "picks", "line", "lines",
+    "odds", "moneyline", "total", "totals", "analysis", "game", "games", "match",
+    "matchup", "over", "under", "player", "players", "team", "teams", "market",
+    "markets", "edge", "edges", "prop", "props",
 }
 
 

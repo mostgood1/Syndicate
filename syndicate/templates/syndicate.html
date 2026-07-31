@@ -359,6 +359,27 @@
   function renderBetAnalysis(schema) {
     const explanation = schema.explanation || {};
     const points = Array.isArray(explanation.supporting_points) ? explanation.supporting_points : [];
+
+    if (schema.relevance_matched === false) {
+      // No board recommendation matches the question's subject at all --
+      // don't show an unrelated pick's stats as if it answered the
+      // question (reported live, 2026-07-31). Any matchup tables the
+      // question DID match (renderVisuals, above this block) still show.
+      return `
+        <div class="schema-header">
+          <div>
+            <p class="schema-type">Bet Analysis</p>
+            <h2 class="schema-question">No matching recommendation</h2>
+          </div>
+        </div>
+        <div class="schema-body">
+          <div class="soft-card">
+            <p class="mini-note">${esc(safeText(explanation.summary, "No board recommendation matches this question."))}</p>
+          </div>
+        </div>
+      `;
+    }
+
     return `
       <div class="schema-header">
         <div>
