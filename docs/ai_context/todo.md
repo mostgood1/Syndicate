@@ -338,6 +338,56 @@ whatever job populates `daily_top_props_<date>.json` on days with an
 unusual schedule, only that today's specific occurrence resolved on its
 own before any code was touched.
 
+**Phase 4 — cross-sport prop/steam duplicate reconciliation, shipped,
+deployed, commit `dd5e79a5`.** User sanity-checked a live NYY@CHC board and
+flagged numbers that didn't add up, then asked to treat it as a cross-sport
+problem needing "a logical, best in class solution around betting edge,
+accuracy, and profitability" rather than a one-off patch. Root cause: the
+identical real-world bet (same player/market/line/side) can be produced
+independently by the analytical "top props" pipeline (`candidate_type ==
+"prop"`) and the continuous line-movement/steam-detection pipeline
+(`candidate_type == "steam"`), and nothing reconciled them — confirmed
+live, Miguel Amaya Over 0.5 Hits showed simultaneously as -123 (prop, no
+live_projection) and +100 (steam, live_projection 1.1). The existing final
+dedup pass in `_collect_candidates` (~line 6210) couldn't catch this: its
+identity tuple starts with `candidate_type` itself, so a prop and a steam
+row can never collide as duplicates by design.
+
+Rather than build a new mechanism, extended the existing 2026-07-24
+prop-vs-prop merge (`_prop_merge_dedup_key`/`_merge_duplicate_prop_
+candidates`, originally built for a Tomoyuki Sugano double-listing) to
+also cover `"steam"`. Policy: price and its dependent fields (odds/line/
+live_projection/actual/is_live/edge/confidence/model_probability) always
+move together from ONE source — steam's price wins whenever a steam
+candidate is in the group, since tracking the current line is steam's
+whole reason for existing, while a prop's price has no comparable
+freshness guarantee; analytical fields (projected/detail/writeup/
+headshot) keep the existing "most complete wins, backfill the rest" logic
+prop-only groups already had, since steam candidates never carry these. A
+merged row is tagged `is_steam_confirmed` and takes `candidate_type:
+"steam"` so the steam-only filter still surfaces it; `player_name`
+survives so the player-props filter (which keys off truthy `player_name`,
+not `candidate_type`) keeps finding it too. `merged_from` records which
+pipelines contributed. Genuinely different lines (e.g. a pitcher's
+strikeout prop at 3.5 pregame vs 6.5 once the game is live) are
+deliberately left unmerged — a real, different market quote, not a
+duplicate to hide.
+
+9 new tests in `tests/test_intelligence_prop_dedup_and_movement.py`
+(`MergeSteamAndPropCandidatesTests`) using the real Miguel Amaya
+production shape. 253 tests passing across `test_intelligence.py` +
+`test_intelligence_prop_dedup_and_movement.py` +
+`test_intelligence_steam_candidates.py` +
+`test_intelligence_board_contract.py`, no regressions. Verified live
+post-deploy: re-scanned the full board across all sports for genuine
+duplicates (same subject+market+line-bucket+direction) — zero remain,
+down from 7+ confirmed live before the fix; 30 candidates were actually
+merged on that pull. One thing NOT done this pass: no attempt to
+recompute a from-scratch "true" edge/win% for merged rows beyond taking
+whichever source's price won — that price's own accompanying
+edge/confidence is what ships, never a mix of one source's price with
+another's edge.
+
 ### Reconciliation 2026-07-31 (#161 part 2: NBA/WNBA closing line, plus a production outage found and fixed along the way)
 
 User asked to extend #161's MLB closing-line fix to NBA/WNBA's Layer 1
