@@ -4482,6 +4482,17 @@ def _build_cards_sim_detail_from_local_smart_sim(*, processed_root: Path, date_s
         away_players = [row for row in (players.get("away") or []) if isinstance(row, dict)]
         if not home_tri or not away_tri:
             continue
+        # The vendor sim's per-player rows never carried team/opponent (only
+        # this game-level home_tri/away_tri did) -- backfill them here too,
+        # defensively, so this aggregation step self-heals even for
+        # already-written smart_sim_*.json files that predate the sim-side
+        # fix, without needing to re-run the simulation itself.
+        for row in home_players:
+            row.setdefault("team", home_tri)
+            row.setdefault("opponent", away_tri)
+        for row in away_players:
+            row.setdefault("team", away_tri)
+            row.setdefault("opponent", home_tri)
         missing = payload.get("missing_prop_players") if isinstance(payload.get("missing_prop_players"), dict) else {}
         injuries = payload.get("injuries") if isinstance(payload.get("injuries"), dict) else {}
         players_summary = payload.get("players_summary") if isinstance(payload.get("players_summary"), dict) else {}

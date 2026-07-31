@@ -3531,6 +3531,29 @@ def _period_lines_from_processed(date_str: str, home_tri: str, away_tri: str) ->
         return None
 
 
+def _stamp_team_opponent(players: Dict[str, List[Dict[str, Any]]], *, home_tri: str, away_tri: str) -> Dict[str, List[Dict[str, Any]]]:
+    """Stamp team/opponent tri-codes onto each per-player summary row.
+
+    _team_player_summaries() never set these (it only ever receives raw
+    per-name stat stores, not the game's tri-codes), so every downstream
+    consumer that keys off an individual player row -- rather than the
+    game-level home_tri/away_tri this function already has in scope --
+    saw an empty team/opponent (confirmed live: Ask the Syndicate's
+    player-lookup path went blank while its team-lookup path, which reads
+    home_tri/away_tri directly, worked fine).
+    """
+    home_u, away_u = str(home_tri or "").upper().strip(), str(away_tri or "").upper().strip()
+    for row in players.get("home") or []:
+        if isinstance(row, dict):
+            row.setdefault("team", home_u)
+            row.setdefault("opponent", away_u)
+    for row in players.get("away") or []:
+        if isinstance(row, dict):
+            row.setdefault("team", away_u)
+            row.setdefault("opponent", home_u)
+    return players
+
+
 def simulate_smart_game(
     date_str: str,
     home_tri: str,
@@ -4896,8 +4919,12 @@ def simulate_smart_game(
             "p_home_cover": p_home_cover,
             "p_total_over": p_total_over,
         },
-        "players": {
-            "home": _team_player_summaries(home_store, home_store_q, home_store_s, home_name_to_id, minutes_by_name=home_minutes_by_name),
-            "away": _team_player_summaries(away_store, away_store_q, away_store_s, away_name_to_id, minutes_by_name=away_minutes_by_name),
-        },
+        "players": _stamp_team_opponent(
+            {
+                "home": _team_player_summaries(home_store, home_store_q, home_store_s, home_name_to_id, minutes_by_name=home_minutes_by_name),
+                "away": _team_player_summaries(away_store, away_store_q, away_store_s, away_name_to_id, minutes_by_name=away_minutes_by_name),
+            },
+            home_tri=home_tri,
+            away_tri=away_tri,
+        ),
     }
