@@ -491,6 +491,17 @@ services:
       # this must go back to "false" or the crash loop returns.
       - key: SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER
         value: "true"
+      # #163 follow-up: refresh-worker is the only service that should ever
+      # launch this (same ownership rule as the sim trigger above) -- the
+      # underlying scrape is slow/heavy but genuinely rare (weekly-cadence,
+      # gated by scripts/refresh_mlb_statcast_features.py's own is_stale()
+      # check), so it's safe to leave on rather than dark-launch like the
+      # sim trigger was. Originally wired into scripts/unified_daily_update.ps1,
+      # which turned out to never run in production at all -- confirmed live
+      # 2026-07-30 the feature file stayed stuck on its 2026-05-12
+      # generation date through two full deploys.
+      - key: SYNDICATE_ENABLE_MLB_STATCAST_REFRESH_TRIGGER
+        value: "true"
       - key: SYNDICATE_EVENT_SIM_FORCE_WINDOW_MINUTES
         value: "30"
       - key: SYNDICATE_MLB_SIM_CHECK_INTERVAL_SECONDS
@@ -708,6 +719,9 @@ services:
       - key: SYNDICATE_SOCCER_PREGAME_REFRESH_INTERVAL_SECONDS
         value: "14400"
       - key: SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER
+        value: "false"
+      # #163 follow-up: owned by refresh-worker, same as the sim trigger above.
+      - key: SYNDICATE_ENABLE_MLB_STATCAST_REFRESH_TRIGGER
         value: "false"
       - key: SYNDICATE_LOOK_AHEAD_ENABLED
         value: "false"

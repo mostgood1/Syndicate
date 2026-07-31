@@ -1826,6 +1826,161 @@ def _launch_mlb_daily_sim(date_str: str, decision: dict[str, Any]) -> dict[str, 
 
 
 # ---------------------------------------------------------------------------
+# MLB Statcast player-feature refresh (whiff/barrel/xwOBA/pitch-mix -- #163).
+# Weekly-cadence, not tick-cadence: the underlying scrape (pybaseball hitting
+# Baseball Savant) is slow/heavy and network-bound, unlike the sim gate above.
+# scripts/refresh_mlb_statcast_features.py's own is_stale() check means the
+# per-tick cost the rest of the time is one cheap local file read -- this
+# only actually launches a subprocess when the feature file is genuinely
+# more than SYNDICATE_MLB_STATCAST_REFRESH_MAX_AGE_DAYS old (default 7).
+# Originally wired into scripts/unified_daily_update.ps1, which turned out
+# to never run in production at all (not referenced by render.yaml or any
+# GHA workflow -- confirmed live 2026-07-30 the file stayed stuck on a
+# 2026-05-12 generation date through two full deploys). Gated behind
+# SYNDICATE_ENABLE_MLB_STATCAST_REFRESH_TRIGGER (default off), same
+# dark-launch pattern as the daily-sim trigger above.
+# ---------------------------------------------------------------------------
+
+_MLB_STATCAST_REFRESH_PROCESS: subprocess.Popen | None = None
+_MLB_STATCAST_REFRESH_MAX_RUNTIME_SECONDS = 90 * 60
+
+
+def _mlb_statcast_refresh_enabled() -> bool:
+	return _env_bool("SYNDICATE_ENABLE_MLB_STATCAST_REFRESH_TRIGGER", default=False)
+
+
+def _mlb_statcast_refresh_check_interval_seconds() -> int:
+	raw = str(os.environ.get("SYNDICATE_MLB_STATCAST_REFRESH_CHECK_INTERVAL_SECONDS") or "").strip()
+	try:
+		value = int(raw or 3600)
+	except Exception:
+		value = 3600
+	return max(300, value)
+
+
+def _mlb_statcast_refresh_max_age_days() -> int:
+	raw = str(os.environ.get("SYNDICATE_MLB_STATCAST_REFRESH_MAX_AGE_DAYS") or "").strip()
+	try:
+		value = int(raw or 7)
+	except Exception:
+		value = 7
+	return max(1, value)
+
+
+def _mlb_statcast_refresh_status_path() -> Path:
+	return _meta_dir() / "mlb_statcast_refresh_status.json"
+
+
+def _mlb_statcast_refresh_process_still_running() -> bool:
+	global _MLB_STATCAST_REFRESH_PROCESS
+	if _MLB_STATCAST_REFRESH_PROCESS is not None:
+		# Fast path: this worker holds the actual Popen handle for a refresh
+		# it launched itself.
+		try:
+			still_running = _MLB_STATCAST_REFRESH_PROCESS.poll() is None
+		except Exception:
+			still_running = False
+		if not still_running:
+			return_code = _MLB_STATCAST_REFRESH_PROCESS.returncode
+			try:
+				write_json_file(_mlb_statcast_refresh_status_path(), {
+					"state": "completed" if return_code == 0 else "error",
+					"returnCode": return_code,
+					"epoch": datetime.now(timezone.utc).timestamp(),
+					"finishedAt": _utc_now(),
+				})
+			except Exception:
+				pass
+			_MLB_STATCAST_REFRESH_PROCESS = None
+			return False
+		return True
+	# No local handle -- either this worker never launched one, or a
+	# container restart wiped the in-memory state. Fall back to the
+	# persisted status file, PID-verified, same shape as the MLB sim's
+	# shared pointer (just without a separate cross-service "active" file --
+	# this job is rare enough that the runtime ceiling below is sufficient).
+	status = read_json_file(_mlb_statcast_refresh_status_path())
+	if not isinstance(status, dict) or status.get("state") != "running":
+		return False
+	if not _process_exists(status.get("pid")):
+		return False
+	started_epoch = float(status.get("epoch") or 0.0)
+	return started_epoch > 0.0 and (datetime.now(timezone.utc).timestamp() - started_epoch) <= _MLB_STATCAST_REFRESH_MAX_RUNTIME_SECONDS
+
+
+def _mlb_statcast_refresh_decision(*, now_epoch: float) -> dict[str, Any]:
+	if not _mlb_statcast_refresh_enabled():
+		return {"launch": False, "reason": "disabled"}
+	status = read_json_file(_mlb_statcast_refresh_status_path())
+	last_epoch = float((status or {}).get("epoch") or 0.0)
+	interval = _mlb_statcast_refresh_check_interval_seconds()
+	if last_epoch > 0.0 and (now_epoch - last_epoch) < interval:
+		return {"launch": False, "reason": "within_check_interval"}
+	if _mlb_statcast_refresh_process_still_running():
+		return {"launch": False, "reason": "already_running"}
+	try:
+		from scripts.refresh_mlb_statcast_features import is_stale
+	except Exception as exc:
+		return {"launch": False, "reason": f"import_failed:{type(exc).__name__}"}
+	if not is_stale(_mlb_statcast_refresh_max_age_days()):
+		return {"launch": False, "reason": "not_stale"}
+	if _mlb_daily_sim_process_still_running():
+		# Don't stack a slow external scrape on top of a resident sim
+		# subprocess -- both draw from the same tight memory headroom.
+		return {"launch": False, "reason": "sim_active"}
+	headroom = _mlb_sim_memory_headroom_snapshot()
+	if headroom is not None and not headroom.get("sufficient", True):
+		return {"launch": False, "reason": "low_memory_headroom", "headroom": headroom}
+	return {"launch": True, "reason": "stale"}
+
+
+def _launch_mlb_statcast_refresh() -> dict[str, Any]:
+	global _MLB_STATCAST_REFRESH_PROCESS
+	command = [
+		sys.executable if (sys.executable and Path(sys.executable).exists()) else "python",
+		str(REPO_ROOT / "scripts" / "refresh_mlb_statcast_features.py"),
+		"--max-age-days", str(_mlb_statcast_refresh_max_age_days()),
+	]
+	popen_kwargs: dict[str, Any] = {"cwd": str(REPO_ROOT)}
+	if os.name == "nt":
+		popen_kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+	else:
+		popen_kwargs["start_new_session"] = True
+	log_path = _meta_dir() / "mlb_statcast_refresh.log"
+	log_handle: Any = None
+	try:
+		log_handle = open(log_path, "wb")
+		popen_kwargs["stdout"] = log_handle
+		popen_kwargs["stderr"] = subprocess.STDOUT
+	except Exception:
+		log_handle = None
+	status_path = _mlb_statcast_refresh_status_path()
+	try:
+		process = subprocess.Popen(command, **popen_kwargs)
+		_MLB_STATCAST_REFRESH_PROCESS = process
+		write_json_file(status_path, {
+			"pid": process.pid,
+			"command": command,
+			"state": "running",
+			"epoch": datetime.now(timezone.utc).timestamp(),
+			"startedAt": _utc_now(),
+		})
+		print(f"[live_refresh_loop] MLB_STATCAST_REFRESH_TRIGGERED pid={process.pid}", flush=True)
+		return {"ok": True, "launched": True, "pid": process.pid}
+	except Exception as exc:
+		if log_handle is not None:
+			try:
+				log_handle.close()
+			except Exception:
+				pass
+		try:
+			write_json_file(status_path, {"state": "error", "epoch": datetime.now(timezone.utc).timestamp(), "error": f"{type(exc).__name__}: {exc}"})
+		except Exception:
+			pass
+		return {"ok": False, "launched": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
+# ---------------------------------------------------------------------------
 # Evening next-day sim: with the GHA daily-update cron reduced to backup-only,
 # nothing simmed tomorrow's slate until the date-rollover first_appearance
 # gate fired after midnight Central -- fine for correctness, but it meant
@@ -2955,6 +3110,19 @@ def _run_mlb_sim_tick() -> dict[str, Any]:
 	meta: dict[str, Any] = {}
 	if not _mlb_sim_tick_owner_here():
 		return meta
+
+	# Independent of the three sim sub-features' early-return below -- this
+	# doesn't need _any_tracked_sport_game_live() and should run on its own
+	# cadence regardless of whether daily-sim/look-ahead/evening-sim are on.
+	try:
+		statcast_decision = _mlb_statcast_refresh_decision(now_epoch=datetime.now(timezone.utc).timestamp())
+		if statcast_decision.get("launch"):
+			meta["mlbStatcastRefresh"] = _launch_mlb_statcast_refresh()
+		else:
+			meta["mlbStatcastRefresh"] = {"launched": False, "reason": statcast_decision.get("reason")}
+	except Exception as exc:
+		meta["mlbStatcastRefresh"] = {"launched": False, "error": f"{type(exc).__name__}: {exc}"}
+
 	if not (_mlb_daily_sim_enabled() or _look_ahead_enabled() or _mlb_evening_next_day_sim_enabled()):
 		# None of the three sub-features are on -- skip _any_tracked_sport_game_live()
 		# entirely rather than paying for its real per-sport live-status

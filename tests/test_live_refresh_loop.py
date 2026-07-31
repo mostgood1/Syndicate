@@ -37,6 +37,11 @@ class LiveRefreshLoopTests(unittest.TestCase):
         live_refresh_loop._MLB_SIM_RUN_META = None
         live_refresh_loop._MLB_SIM_LOG_HANDLE = None
         live_refresh_loop._MLB_SIM_LOG_PATH = None
+        live_refresh_loop._MLB_STATCAST_REFRESH_PROCESS = None
+        try:
+            live_refresh_loop._mlb_statcast_refresh_status_path().unlink(missing_ok=True)
+        except Exception:
+            pass
 
     def test_mlb_sim_still_running_true_when_recent_and_polling_none(self) -> None:
         # A live, recently-launched sim subprocess should still report
@@ -1249,6 +1254,61 @@ class LiveRefreshLoopTests(unittest.TestCase):
 
         command = mocked_popen.call_args[0][0]
         self.assertNotIn("--only-game-pks", command)
+
+    def test_mlb_statcast_refresh_decision_disabled_by_default(self) -> None:
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("SYNDICATE_ENABLE_MLB_STATCAST_REFRESH_TRIGGER", None)
+            decision = live_refresh_loop._mlb_statcast_refresh_decision(now_epoch=2000.0)
+        self.assertEqual(decision, {"launch": False, "reason": "disabled"})
+
+    def test_mlb_statcast_refresh_decision_launches_when_stale_and_no_sim_active(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_ENABLE_MLB_STATCAST_REFRESH_TRIGGER": "true"}, clear=False), patch(
+            "scripts.refresh_mlb_statcast_features.is_stale", return_value=True
+        ), patch.object(live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False), patch.object(
+            live_refresh_loop, "_mlb_sim_memory_headroom_snapshot", return_value=None
+        ):
+            decision = live_refresh_loop._mlb_statcast_refresh_decision(now_epoch=2000.0)
+        self.assertEqual(decision["launch"], True)
+        self.assertEqual(decision["reason"], "stale")
+
+    def test_mlb_statcast_refresh_decision_skips_when_not_stale(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_ENABLE_MLB_STATCAST_REFRESH_TRIGGER": "true"}, clear=False), patch(
+            "scripts.refresh_mlb_statcast_features.is_stale", return_value=False
+        ), patch.object(live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False):
+            decision = live_refresh_loop._mlb_statcast_refresh_decision(now_epoch=2000.0)
+        self.assertEqual(decision, {"launch": False, "reason": "not_stale"})
+
+    def test_mlb_statcast_refresh_decision_skips_when_sim_active(self) -> None:
+        # Never stack the slow external scrape on top of a resident sim
+        # subprocess -- both draw from the same tight memory headroom.
+        with patch.dict(os.environ, {"SYNDICATE_ENABLE_MLB_STATCAST_REFRESH_TRIGGER": "true"}, clear=False), patch(
+            "scripts.refresh_mlb_statcast_features.is_stale", return_value=True
+        ), patch.object(live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=True):
+            decision = live_refresh_loop._mlb_statcast_refresh_decision(now_epoch=2000.0)
+        self.assertEqual(decision, {"launch": False, "reason": "sim_active"})
+
+    def test_mlb_statcast_refresh_decision_skips_when_low_memory_headroom(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_ENABLE_MLB_STATCAST_REFRESH_TRIGGER": "true"}, clear=False), patch(
+            "scripts.refresh_mlb_statcast_features.is_stale", return_value=True
+        ), patch.object(live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False), patch.object(
+            live_refresh_loop, "_mlb_sim_memory_headroom_snapshot", return_value={"sufficient": False}
+        ):
+            decision = live_refresh_loop._mlb_statcast_refresh_decision(now_epoch=2000.0)
+        self.assertEqual(decision["launch"], False)
+        self.assertEqual(decision["reason"], "low_memory_headroom")
+
+    def test_launch_mlb_statcast_refresh_writes_running_status_and_command(self) -> None:
+        with patch.object(live_refresh_loop.subprocess, "Popen") as mocked_popen:
+            mocked_popen.return_value.pid = 5150
+            result = live_refresh_loop._launch_mlb_statcast_refresh()
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["pid"], 5150)
+        command = mocked_popen.call_args[0][0]
+        self.assertIn("refresh_mlb_statcast_features.py", command[1])
+        status = live_refresh_loop.read_json_file(live_refresh_loop._mlb_statcast_refresh_status_path())
+        self.assertEqual(status["state"], "running")
+        self.assertEqual(status["pid"], 5150)
 
     def test_run_tick_uses_live_phase_and_short_interval_when_a_game_is_live(self) -> None:
         with patch.dict(
