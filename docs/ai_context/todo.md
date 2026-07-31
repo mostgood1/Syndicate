@@ -128,17 +128,36 @@ home.py/intelligence.py files, no regressions.
    tests in `tests/test_home.py`. 268 tests passing across `test_home.py` +
    `test_intelligence.py`, no regressions.
 
-**Not done this pass, explicitly out of scope**: the Steam-candidate
-`candidate_type == "prop"` gate and `actual: "-"` behavior (a separate,
-already-deliberate, already-documented gap, `30a6cff9`); #168 above; any
-richer WNBA-native possession-level live modeling (Phase 4, already shipped
-separately, deliberately stayed non-MC per that session's scope).
+**Follow-up, same session: `#168` fixed** (see the Platform/correctness
+table entry — root cause was the vendor daily-update's raw feed_live cache
+only ever getting written for the PRIOR day, never today; fixed by reusing
+`home.py`'s existing `_mlb_feed_live_payload` live-fetch fallback). Deployed
+and confirmed live on web + refresh-worker.
 
-**Nothing from Phase B/C committed or deployed yet** — Phase A already is
-(see above). Next session (or later this one): commit, then deploy
-refresh-worker once no MLB sim is in flight, then re-verify against a real
-live WNBA game in production (no live WNBA game was available at the time
-this phase was implemented/tested locally).
+**Follow-up, same session: the Steam-candidate `candidate_type == "prop"`
+gate — fixed.** `_apply_live_state_context_to_candidates`'s live-projection
+hydration (`intelligence.py` ~5306) was hardcoded to `candidate_type ==
+"prop"` alone, so a player-prop Steam candidate (`candidate_type ==
+"steam"`, which gets a real `player_name` whenever its market isn't a
+game-side market — see `_steam_candidates_for_sport`'s own assignment) never
+got `live_projection`/`actual` hydrated from the live-lens report, even
+while genuinely live — the exact gap `30a6cff9` documented as deliberate at
+the time. Broadened the gate to `candidate_type == "prop" or
+(candidate_type == "steam" and candidate.get("player_name"))`; confirmed via
+a direct read of `_mlb_hydrate_live_prop_projection`'s matching logic that
+Steam's `"· Steam"` market-label suffix and string-typed `line` field don't
+break the existing substring/numeric matching. Game-level Steam candidates
+(no `player_name`) correctly stay excluded — they already get an `actual`
+from `_steam_candidates_for_sport`'s own combined-score fallback and would
+never match a player-prop row anyway. 2 new tests in `tests/test_intelligence.py`
+(hydrates for player-prop steam, does not hydrate for game-level steam).
+184/184 `test_intelligence.py` passing, no regressions.
+
+Phase B/C and both these follow-ups are committed, pushed, and (Phase B/C +
+`#168`) deployed; the Steam-candidate fix deploys next. No live WNBA game
+was available to verify Phase B's `markets` dict end-to-end in production
+at the time it was implemented/tested — verify against a real live WNBA
+game next time one is running.
 
 ### Reconciliation 2026-07-31 (#161 part 2: NBA/WNBA closing line, plus a production outage found and fixed along the way)
 

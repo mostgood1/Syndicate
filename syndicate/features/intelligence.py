@@ -5303,7 +5303,24 @@ def _apply_live_state_context_to_candidates(
         resolved_status_display = live_state.get("status_display")
         if resolved_status_display not in (None, ""):
             candidate["game_state"] = resolved_status_display
-        if bool(candidate.get("is_live")) and _safe_text(candidate.get("candidate_type"), "") == "prop":
+        # A player-prop Steam candidate (_steam_candidates_for_sport,
+        # candidate_type="steam") has the exact same name/market/line shape
+        # a "prop"-type candidate does -- it only ever gets player_name set
+        # when market_key is NOT a game-side market (moneyline/spread/
+        # total), see that function's own player_name assignment -- but this
+        # gate was hardcoded to candidate_type == "prop" alone, so every
+        # player-prop steam candidate's live_projection/actual stayed "-"
+        # even when live, regardless of how fresh the live-lens report was.
+        # Confirmed a real, already-documented gap (30a6cff9). Game-level
+        # steam candidates (moneyline/spread/total moves, no player_name)
+        # correctly stay excluded -- they'd never match a player-prop row
+        # anyway, and already get an "actual" value from
+        # _steam_candidates_for_sport's own combined-score fallback.
+        candidate_type_text = _safe_text(candidate.get("candidate_type"), "")
+        is_prop_shaped_candidate = candidate_type_text == "prop" or (
+            candidate_type_text == "steam" and bool(candidate.get("player_name"))
+        )
+        if bool(candidate.get("is_live")) and is_prop_shaped_candidate:
             live_rows = _mlb_live_lens_prop_rows_for_game(context_label, int(game_pk), mlb_live_lens_cache)
             _mlb_hydrate_live_prop_projection(candidate, live_rows)
 

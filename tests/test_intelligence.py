@@ -6893,6 +6893,52 @@ class MlbLivePropProjectionHydrationTests(unittest.TestCase):
         self.assertEqual(candidate.get("live_projection"), "-")
         mocked_load.assert_not_called()
 
+    def test_apply_live_state_hydrates_player_prop_steam_candidates(self) -> None:
+        # Real, already-documented gap (30a6cff9): _steam_candidates_for_sport
+        # (candidate_type="steam") builds player-prop steam candidates with
+        # the exact same name/market/line shape a "prop"-type candidate has
+        # -- it only sets player_name at all when the market is NOT a
+        # game-side market (moneyline/spread/total) -- but this hydration
+        # gate was hardcoded to candidate_type == "prop" alone, so every
+        # player-prop steam candidate's live_projection/actual stayed "-"
+        # even while genuinely live.
+        from syndicate.features.intelligence import _apply_live_state_context_to_candidates
+
+        candidate = self._sale_candidate(candidate_type="steam", player_name="Chris Sale")
+        with patch(
+            "syndicate.features.intelligence._mlb_actual_payload_for_candidate",
+            return_value=self._live_actual_payload(),
+        ), patch(
+            "syndicate.features.intelligence.mlb_load_json_file",
+            return_value=self._live_lens_report(),
+        ):
+            _apply_live_state_context_to_candidates([candidate])
+
+        self.assertTrue(candidate.get("is_live"))
+        self.assertEqual(candidate.get("live_projection"), "6.9")
+        self.assertEqual(candidate.get("actual"), "3.0")
+
+    def test_apply_live_state_does_not_hydrate_game_level_steam_candidates(self) -> None:
+        # A game-level steam move (moneyline/spread/total) never gets
+        # player_name set (_steam_candidates_for_sport's own assignment) --
+        # confirm those stay excluded, since they'd never match a
+        # player-prop row in the live-lens report anyway.
+        from syndicate.features.intelligence import _apply_live_state_context_to_candidates
+
+        candidate = self._sale_candidate(candidate_type="steam", player_name=None)
+        with patch(
+            "syndicate.features.intelligence._mlb_actual_payload_for_candidate",
+            return_value=self._live_actual_payload(),
+        ), patch(
+            "syndicate.features.intelligence.mlb_load_json_file",
+            return_value=self._live_lens_report(),
+        ) as mocked_load:
+            _apply_live_state_context_to_candidates([candidate])
+
+        self.assertTrue(candidate.get("is_live"))
+        self.assertEqual(candidate.get("live_projection"), "-")
+        mocked_load.assert_not_called()
+
 
 class RepoArtifactPathFallbackTests(unittest.TestCase):
     # _mlb_repo_artifact_path/_wnba_repo_artifact_path used to resolve via
