@@ -1249,6 +1249,47 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
             state = _mlb_feed_live_state("2026-07-27", 123456)
         self.assertTrue(state["in_progress"])
 
+    def test_mlb_actual_payload_for_game_falls_back_to_live_fetch_for_todays_game(self) -> None:
+        # #168: raw_feed_live_path's cached file is only ever written by the
+        # vendor daily-update's PRIOR-day reconciliation step (confirmed via
+        # a direct read of vendor/mlb_bettingv2/tools/daily_update.py -- it
+        # is never called for today's date), so for a currently-live game
+        # this file structurally does not exist yet. This used to leave
+        # _mlb_actual_payload_for_game (and therefore
+        # _apply_live_state_context_to_candidates' whole correction pass)
+        # silently returning None for every live game, even though
+        # /mlb/api/live-lens's own status check (a real HTTP fetch) had the
+        # correct answer the whole time. Now reuses _mlb_feed_live_payload,
+        # which already falls back to a live fetch for today's date when the
+        # cache is empty -- confirm that fallback is actually exercised.
+        from syndicate.blueprints.home import _mlb_actual_payload_for_game
+        from syndicate.features.shared.timezone import central_today_iso
+
+        live_payload = {
+            "gameData": {"status": {"abstractGameState": "Live", "detailedState": "In Progress"}},
+            "liveData": {"linescore": {"teams": {}}},
+        }
+        with patch("syndicate.blueprints.home.load_json_or_gz_file", return_value=None), patch(
+            "syndicate.blueprints.home._fetch_mlb_feed_live", return_value=live_payload
+        ) as mock_fetch:
+            payload = _mlb_actual_payload_for_game(central_today_iso(), 123456, {})
+        mock_fetch.assert_called_once_with(123456)
+        self.assertEqual(payload, live_payload)
+
+    def test_mlb_actual_payload_for_game_does_not_live_fetch_for_a_past_date(self) -> None:
+        # The live-fetch fallback is deliberately scoped to today's date
+        # only (mirrors _mlb_feed_live_payload's own scoping) -- a past date
+        # with no cached file means the game was never backfilled, not that
+        # it's currently live, so there is nothing to fetch live.
+        from syndicate.blueprints.home import _mlb_actual_payload_for_game
+
+        with patch("syndicate.blueprints.home.load_json_or_gz_file", return_value=None), patch(
+            "syndicate.blueprints.home._fetch_mlb_feed_live"
+        ) as mock_fetch:
+            payload = _mlb_actual_payload_for_game("2020-01-01", 123456, {})
+        mock_fetch.assert_not_called()
+        self.assertIsNone(payload)
+
     def test_first_present_text_treats_numeric_zero_as_present(self) -> None:
         # #100: str(value or "") is truthiness-based, so a legitimate numeric
         # 0 (a projected total of 0, a model mean of 0.0) used to fall through

@@ -1529,11 +1529,25 @@ def _int_or_none(value: Any) -> int | None:
 
 
 def _mlb_actual_payload_for_game(context_label: str, game_pk: int, cache: dict[int, dict[str, Any]]) -> dict[str, Any] | None:
+    # #168: this used to read ONLY the cached raw_feed_live_path file, which
+    # is written by the vendor daily-update's prior-day reconciliation step
+    # (vendor/mlb_bettingv2/tools/daily_update.py:_refresh_feed_live_cache_for_date,
+    # called with date_str=prior_date -- confirmed via direct read, it never
+    # runs for TODAY's date at all) -- so for a currently-live game, this file
+    # structurally does not exist yet; it only gets backfilled the day after
+    # the game goes final, once it's moot for live-status purposes. That left
+    # _apply_live_state_context_to_candidates' correction pass silently
+    # inert for live games while /mlb/api/live-lens stayed correct, because
+    # that page's own status refresh (_refresh_current_date_live_statuses,
+    # mlb/live_lens.py) does a real HTTP fetch instead of only reading this
+    # cache. _mlb_feed_live_payload (below) already does exactly that same
+    # cache-then-live-fetch-for-today fallback for a different caller
+    # (_mlb_feed_live_state) -- reuse it here instead of a second, narrower
+    # copy that only had the file-read half.
     if game_pk in cache:
         return cache[game_pk]
     try:
-        path = raw_feed_live_path(context_label, int(game_pk))
-        payload = load_json_or_gz_file(path)
+        payload = _mlb_feed_live_payload(context_label, int(game_pk))
     except Exception:
         payload = None
     cache[game_pk] = payload if isinstance(payload, dict) else None
