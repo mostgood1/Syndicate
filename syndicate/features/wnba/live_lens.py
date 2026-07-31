@@ -116,13 +116,24 @@ def _build_wnba_game_lens(game: dict[str, Any]) -> list[dict[str, Any]]:
     # though only MLB has a dedicated UI for it today.
     betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
     live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+    # `status` (not `live_state`) is where period/clock actually live on the
+    # game dict `build_cards_page_context` returns -- confirmed live 2026-07-30
+    # via a real in-progress game whose live_state carried only
+    # {away_pts, final, home_pts, in_progress, status}, no period/clock at
+    # all, which silently forced elapsed_min (and therefore source) to fall
+    # back to pregame forever even with a genuine, computable live margin.
+    # `live_state` is checked first only as a defensive fallback in case some
+    # other caller ever populates it there; `status` is the confirmed source.
+    status = game.get("status") if isinstance(game.get("status"), dict) else {}
     pregame_p_home_win = _safe_number(betting.get("p_home_win"))
     home_pts = _safe_number(live_state.get("home_pts"))
     away_pts = _safe_number(live_state.get("away_pts"))
     live_margin = (home_pts - away_pts) if home_pts is not None and away_pts is not None else None
-    elapsed_min = _wnba_elapsed_minutes(live_state.get("period"), live_state.get("clock"))
-    is_final = bool(live_state.get("final")) or str(game.get("status") or "").strip().lower() == "final"
-    is_live = bool(live_state.get("in_progress")) and not is_final
+    period = live_state.get("period") if live_state.get("period") is not None else status.get("period")
+    clock = live_state.get("clock") if live_state.get("clock") is not None else status.get("clock")
+    elapsed_min = _wnba_elapsed_minutes(period, clock)
+    is_final = bool(live_state.get("final")) or bool(status.get("final"))
+    is_live = (bool(live_state.get("in_progress")) or bool(status.get("in_progress"))) and not is_final
     if is_live:
         model_home_win_prob = _wnba_live_margin_win_prob(pregame_p_home_win, live_margin, elapsed_min)
     else:

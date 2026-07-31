@@ -72,16 +72,29 @@ class WnbaLiveMarginWinProbTests(unittest.TestCase):
 
 class BuildWnbaGameLensTests(unittest.TestCase):
     def _game(self, **overrides) -> dict:
+        # Matches the real shape build_cards_page_context returns (confirmed
+        # live 2026-07-30): period/clock live under `status`, NOT
+        # `live_state` -- live_state only carries home_pts/away_pts/
+        # in_progress/final/a text status label. A synthetic fixture that
+        # put period/clock under live_state (this test's own shape prior to
+        # the 2026-07-30 fix) would have masked the exact bug that fix
+        # addressed, since it never exercised the real lookup path.
         base = {
-            "status": "in progress",
+            "status": {
+                "detail": "5:00 - 3rd",
+                "final": False,
+                "in_progress": True,
+                "period": 3,
+                "clock": "5:00",
+                "status": "Live",
+            },
             "betting": {"p_home_win": 0.6},
             "live_state": {
                 "home_pts": 55,
                 "away_pts": 50,
-                "period": 3,
-                "clock": "5:00",
                 "in_progress": True,
                 "final": False,
+                "status": "5:00 - 3rd",
             },
         }
         base.update(overrides)
@@ -98,8 +111,30 @@ class BuildWnbaGameLensTests(unittest.TestCase):
         self.assertEqual(row["baselineHomeWinProb"], 0.6)
         self.assertIsNotNone(row["modelHomeWinProb"])
 
+    def test_real_production_shape_without_period_clock_in_live_state(self) -> None:
+        # Regression test for the 2026-07-30 bug found live: a genuinely
+        # in-progress game whose live_state carried only
+        # {away_pts, final, home_pts, in_progress, status} -- no period/clock
+        # at all -- silently fell back to source="pregame" forever, even
+        # though margin was fully computable, because elapsed_min could never
+        # resolve. This is the *exact* dict shape observed in production.
+        game = {
+            "status": {"clock": "5:54", "detail": "5:54 - 1st", "final": False, "in_progress": True, "period": 1, "status": "Live"},
+            "betting": {"p_home_win": 0.65},
+            "live_state": {"away_pts": 9.0, "final": False, "home_pts": 10.0, "in_progress": True, "status": "5:54 - 1st"},
+        }
+        lens = _build_wnba_game_lens(game)
+        row = lens[0]
+        self.assertEqual(row["source"], "live_projection")
+        self.assertEqual(row["projection"]["homeMargin"], 1.0)
+        self.assertIsNotNone(row["modelHomeWinProb"])
+        self.assertNotEqual(row["modelHomeWinProb"], 0.65)
+
     def test_pregame_only_game_falls_back_to_pregame_source(self) -> None:
-        game = self._game(live_state={"home_pts": None, "away_pts": None, "period": None, "clock": None, "in_progress": False, "final": False})
+        game = self._game(
+            status={"detail": "Scheduled", "final": False, "in_progress": False, "period": None, "clock": None, "status": "Scheduled"},
+            live_state={"home_pts": None, "away_pts": None, "in_progress": False, "final": False},
+        )
         lens = _build_wnba_game_lens(game)
         row = lens[0]
         self.assertEqual(row["source"], "pregame")
@@ -107,7 +142,10 @@ class BuildWnbaGameLensTests(unittest.TestCase):
         self.assertIsNone(row["projection"]["homeMargin"])
 
     def test_final_game_is_closed(self) -> None:
-        game = self._game(live_state={"home_pts": 80, "away_pts": 70, "period": 4, "clock": "0:00", "in_progress": False, "final": True})
+        game = self._game(
+            status={"detail": "Final", "final": True, "in_progress": False, "period": 4, "clock": "0:00", "status": "Final"},
+            live_state={"home_pts": 80, "away_pts": 70, "in_progress": False, "final": True},
+        )
         lens = _build_wnba_game_lens(game)
         self.assertTrue(lens[0]["closed"])
 
