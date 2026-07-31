@@ -539,6 +539,92 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertIsNone(market_state.get("closing_line"))
             self.assertIsNone(market_state.get("closing_price"))
 
+    def test_sync_mlb_tracking_stamps_closing_line_via_commence_time_when_no_live_text_marker_exists(self) -> None:
+        # Confirmed live 2026-07-30, same deploy: MLB's real oddsapi_game_lines
+        # feed (h2h/spreads/totals) carries no status/state/period/selection
+        # text on the row at all -- only team names and numbers -- so
+        # _is_live_odds_row's text-marker heuristic returns False EVEN WHILE
+        # THE GAME IS ACTUALLY LIVE, and the closing-line stamp could never
+        # fire for the market type the board actually displays. This needs a
+        # second signal: the row's own commence_time versus real now.
+        #
+        # Shard bucketing for MLB keys off the row's own commence_time date
+        # (_row_game_date), so both ticks must share the same calendar date --
+        # a first version used real +/-10-minute offsets from wall-clock now
+        # and flaked exactly this way when the suite ran within ~10 minutes
+        # of UTC midnight (one tick's commence_time rolled into the next
+        # day, landing in a different shard entirely). A second version
+        # patched only _utc_now to a fixed historical string and instead
+        # tripped the market-eviction sweep (_odds_history_market_staleness_
+        # ceiling_seconds, a SEPARATE real datetime.now(timezone.utc) call
+        # never routed through _utc_now): tick 1's market_last_updated got
+        # stamped with that fixed (months-old, relative to real wall-clock
+        # test-run time) value, so tick 2's eviction check saw it as stale
+        # and deleted it before tick 2's stamp logic ever ran. Freezing the
+        # `datetime` name itself (a real subclass, only .now() overridden --
+        # fromisoformat and everything else stays genuine) makes every
+        # "now" in the module agree, sidestepping both failure modes.
+        fixed_now = "2026-06-07T12:00:00Z"
+        shard_date = "2026-06-07"
+        future_commence = "2026-06-07T12:10:00Z"
+        past_commence = "2026-06-07T11:50:00Z"
+        fixed_instant = datetime.fromisoformat(fixed_now.replace("Z", "+00:00"))
+
+        class _FrozenDatetime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return fixed_instant.astimezone(tz) if tz is not None else fixed_instant.replace(tzinfo=None)
+
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict(
+            "os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False
+        ), patch("syndicate.features.shared.odds_refresh_tracking.datetime", _FrozenDatetime):
+            root = Path(tmpdir)
+            snapshot_root = root / "source_artifacts" / "data" / "daily" / "snapshots" / shard_date
+            snapshot_root.mkdir(parents=True)
+            game_lines_path = snapshot_root / f"oddsapi_game_lines_{shard_date.replace('-', '_')}.json"
+
+            def _write_game_lines(*, home_odds: str, commence_time: str) -> None:
+                game_lines_path.write_text(
+                    json.dumps(
+                        {
+                            "retrieved_at": fixed_now,
+                            "games": [
+                                {
+                                    "away_team": "Away",
+                                    "home_team": "Home",
+                                    "bookmaker": "draftkings",
+                                    "commence_time": commence_time,
+                                    "markets": {
+                                        "h2h": {"home_odds": home_odds, "away_odds": "+120"},
+                                    },
+                                }
+                            ],
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+
+            # Tick 1: kickoff 10 minutes after the (fixed) "now" -- genuinely
+            # pregame, no live text present either (matching the real row
+            # shape exactly).
+            _write_game_lines(home_odds="-110", commence_time=future_commence)
+            pregame_result = sync_post_refresh_tracking_for_source_root(sport="mlb", source_root=root, date_str=shard_date)
+            self.assertTrue(pregame_result["ok"])
+
+            # Tick 2: kickoff 10 minutes before "now" -- the game has
+            # started, line has moved, still no live text on the row at all.
+            _write_game_lines(home_odds="-150", commence_time=past_commence)
+            live_result = sync_post_refresh_tracking_for_source_root(sport="mlb", source_root=root, date_str=shard_date)
+            self.assertTrue(live_result["ok"])
+
+            history_payload = json.loads((root / "tracking" / "odds_history" / f"{shard_date}.json").read_text(encoding="utf-8"))
+            markets = history_payload["markets"]
+            market_key = next(key for key in markets if "market=h2h" in key and "bookmaker=draftkings" in key)
+            market_state = markets[market_key]
+            self.assertTrue(market_state.get("is_live"))
+            self.assertEqual(market_state["closing_line"], -110.0)
+            self.assertEqual(market_state["last_line"], -150.0)
+
     def test_sync_nfl_tracking_reads_source_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False):
             root = Path(tmpdir)

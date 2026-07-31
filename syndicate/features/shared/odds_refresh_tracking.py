@@ -462,6 +462,28 @@ def _is_live_odds_row(row: Mapping[str, Any], normalized_entry: Mapping[str, Any
     return any(marker in text for marker in ("live", "in_play", "in play", "in-progress", "in progress"))
 
 
+def _row_commence_time_has_passed(row: Mapping[str, Any], *, now_iso: str) -> bool:
+    """True once a row's own scheduled start time is at or before `now_iso`.
+
+    Fallback signal for _is_live_odds_row -- see its caller's comment for
+    why MLB's standard game-line feed needs this at all (no live/in-play
+    text of any kind on that row shape, live game or not).
+    """
+    commence_raw = row.get("commence_time") or row.get("commenceTime") or row.get("start_time") or row.get("startTime")
+    if not commence_raw:
+        return False
+    try:
+        commence_dt = datetime.fromisoformat(str(commence_raw).replace("Z", "+00:00"))
+        now_dt = datetime.fromisoformat(str(now_iso).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return False
+    if commence_dt.tzinfo is None:
+        commence_dt = commence_dt.replace(tzinfo=timezone.utc)
+    if now_dt.tzinfo is None:
+        now_dt = now_dt.replace(tzinfo=timezone.utc)
+    return now_dt >= commence_dt
+
+
 def _line_number(value: Any) -> float | None:
     if value in (None, "", "-"):
         return None
@@ -1217,7 +1239,28 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             # otherwise the transition tick, when the line finally DOES
             # move, would find no prior "is_live: False" to trust.
             was_confirmed_pregame = market_state.get("is_live") is False
-            row_is_live_cheap = _is_live_odds_row(row)
+            # Confirmed live 2026-07-30, same deploy: _is_live_odds_row returns
+            # False for MLB's standard game-line feed (h2h/spreads/totals)
+            # EVEN WHILE THE GAME IS ACTUALLY LIVE -- that row shape carries
+            # no status/state/period/selection text at all, only team names
+            # and numbers, so the heuristic's text markers structurally never
+            # match it. Without a second signal the closing-line stamp could
+            # never fire for the exact market type the board displays.
+            # commence_time vs now is not just a workaround here -- "the last
+            # line before scheduled kickoff" is the textbook definition of a
+            # closing line anyway, arguably more correct than gating on a
+            # feed-specific live tag at all. A first version of this fix
+            # scoped the new signal to JUST this is_live tracking, on the
+            # theory that broadening it further was a separate, larger
+            # change -- that turned out to be unworkable: the stamp lives
+            # inside the `is_live_row and ...` branch below, so a market
+            # this signal alone marks is_live could still never actually
+            # reach the stamp while is_live_row (unchanged) stayed False.
+            # The two checks have to agree, so this now also feeds
+            # event_type="live" tagging and count_live/count_pregame below --
+            # a real fix for those too (they had the identical blind spot),
+            # not scope creep.
+            row_is_live_cheap = _is_live_odds_row(row) or _row_commence_time_has_passed(row, now_iso=now)
             market_state["is_live"] = True if (row_is_live_cheap or market_state.get("is_live") is True) else False
 
             if previous_line is not None and current_line == previous_line and previous_odds is not None and current_odds == previous_odds and previous_snapshot_ts == row_snapshot_ts and history:
@@ -1261,7 +1304,12 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
                 odds=current_odds,
                 selection=str(row.get("selection") or "").strip() or None,
             )
-            is_live_row = _is_live_odds_row(row, normalized_entry)
+            # row_is_live_cheap (commence_time-aware, computed above) covers
+            # the blind spot _is_live_odds_row alone has for MLB's standard
+            # game-line feed -- OR'd in here too so a market past its own
+            # kickoff is treated as live for tagging/counting purposes even
+            # when the row itself carries no live/in-play text at all.
+            is_live_row = _is_live_odds_row(row, normalized_entry) or row_is_live_cheap
             is_final_row = _is_final_status_row(row, normalized_entry)
             if is_live_row:
                 count_live += 1
