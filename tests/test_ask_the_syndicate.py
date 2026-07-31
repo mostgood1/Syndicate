@@ -1009,6 +1009,79 @@ class AskTheSyndicateFocusedEvidenceTests(unittest.TestCase):
         sim_section = next(s for s in result["evidence"] if s["source"] == "wnba_sim_detail")
         self.assertEqual(sim_section["top_projections"][0]["player"], "Kamilla Cardoso")
 
+    def _write_wnba_matchup_fixtures(self) -> None:
+        """Team pace/defense CSV + boxscore history with a real CHI-vs-SEA
+        prior meeting -- extends _write_wnba_fixtures' CHI/SEA/Kamilla
+        Cardoso sim-detail fixture with the two new data sources.
+        """
+        processed = os.path.join(self.root, "wnba", "processed")
+        os.makedirs(processed, exist_ok=True)
+        with open(os.path.join(processed, "team_advanced_stats_2026_asof_20260715.csv"), "w", encoding="utf-8") as f:
+            f.write("team,pace,off_rtg,def_rtg,efg_pct,tov_pct,orb_pct,ft_rate,fg3a_rate,fg3_pct,ts_pct,ast_per_100\n")
+            f.write("CHI,83.3,100.9,99.1,0.459,0.114,0.223,0.387,0.312,0.271,0.517,21.8\n")
+            f.write("SEA,81.5,100.0,100.6,0.491,0.160,0.250,0.300,0.280,0.350,0.556,20.0\n")
+        header = "game_id,gameId,TEAM_ABBREVIATION,PLAYER_ID,PLAYER_NAME,MIN,PTS,REB,AST,STL,BLK,TOV,OREB,DREB,PF,FGM,FGA,FG3M,FG3A,FTM,FTA,PLUS_MINUS,STARTER,START_POSITION,source,date"
+        rows = [
+            # 2026-06-01: CHI @ SEA -- a real prior meeting for the vs-opponent-history table.
+            "g1,g1,CHI,4433405,Kamilla Cardoso,25.0,12,7,3,1,0,2,2,4,2,5,10,0,0,2,3,4,True,C,espn,2026-06-01",
+            "g1,g1,SEA,999,Other Storm Player,22.0,14,5,4,0,1,1,1,2,1,5,9,1,2,3,4,-4,True,G,espn,2026-06-01",
+            # 2026-06-10: CHI @ PHX -- a different opponent, must NOT count as a CHI/SEA meeting.
+            "g2,g2,CHI,4433405,Kamilla Cardoso,26.0,10,8,2,0,0,1,2,4,2,4,9,0,0,2,2,2,True,C,espn,2026-06-10",
+            "g2,g2,PHX,888,Other Suns Player,24.0,16,4,5,1,0,2,0,3,1,6,11,1,3,3,4,4,True,G,espn,2026-06-10",
+        ]
+        with open(os.path.join(processed, "boxscores_history.csv"), "w", encoding="utf-8") as f:
+            f.write(header + "\n" + "\n".join(rows) + "\n")
+
+    def test_wnba_player_question_includes_pace_defense_and_vs_opponent_history(self) -> None:
+        # Additional matchup context requested alongside the WNBA feasibility
+        # research: team pace/def_rtg (already computed upstream but never
+        # surfaced to Ask the Syndicate) and this-season vs-opponent box
+        # scores (derived by self-join, since boxscores_history.csv carries
+        # no opponent column) -- the two pieces that ARE buildable from data
+        # already on disk, unlike a true multi-season BvP-style archive.
+        self._write_wnba_fixtures()
+        self._write_wnba_matchup_fixtures()
+        with patch.dict(os.environ, {"WNBA_BETTING_DATA_ROOT": os.path.join(self.root, "wnba")}):
+            result = ask_data.collect_focused_evidence(
+                "What is the outlook for Kamilla Cardoso tonight?", {"sport": "wnba"}
+            )
+
+        self.assertIsNotNone(result)
+        table_titles = [t["title"] for t in result["tables"]]
+
+        pace_table = next(t for t in result["tables"] if "Team pace & defense" in t["title"])
+        self.assertIn(["Pace", "83.3", "81.5"], pace_table["rows"])
+
+        vs_opp_table = next(t for t in result["tables"] if "vs Seattle Storm this season" in t["title"])
+        self.assertIn("1 meeting", vs_opp_table["title"])
+        self.assertEqual(vs_opp_table["rows"][0], ["2026-06-01", "25", "12", "7", "3"])
+        self.assertNotIn("2026-06-10", [row[0] for row in vs_opp_table["rows"]])  # the PHX game must not leak in
+
+        sim_section = next(s for s in result["evidence"] if s["source"] == "wnba_sim_detail")
+        self.assertEqual(len(sim_section["vs_opponent_this_season"]), 1)
+        self.assertEqual(sim_section["team_pace_defense"]["team"]["pace"], 83.3)
+
+    def test_wnba_player_question_notes_no_meetings_yet_this_season(self) -> None:
+        self._write_wnba_fixtures()
+        self._write_wnba_matchup_fixtures()
+        os.remove(os.path.join(self.root, "wnba", "processed", "boxscores_history.csv"))
+        header = "game_id,gameId,TEAM_ABBREVIATION,PLAYER_ID,PLAYER_NAME,MIN,PTS,REB,AST,STL,BLK,TOV,OREB,DREB,PF,FGM,FGA,FG3M,FG3A,FTM,FTA,PLUS_MINUS,STARTER,START_POSITION,source,date"
+        rows = [
+            "g2,g2,CHI,4433405,Kamilla Cardoso,26.0,10,8,2,0,0,1,2,4,2,4,9,0,0,2,2,2,True,C,espn,2026-06-10",
+            "g2,g2,PHX,888,Other Suns Player,24.0,16,4,5,1,0,2,0,3,1,6,11,1,3,3,4,4,True,G,espn,2026-06-10",
+        ]
+        with open(os.path.join(self.root, "wnba", "processed", "boxscores_history.csv"), "w", encoding="utf-8") as f:
+            f.write(header + "\n" + "\n".join(rows) + "\n")
+
+        with patch.dict(os.environ, {"WNBA_BETTING_DATA_ROOT": os.path.join(self.root, "wnba")}):
+            result = ask_data.collect_focused_evidence(
+                "What is the outlook for Kamilla Cardoso tonight?", {"sport": "wnba"}
+            )
+
+        self.assertIsNotNone(result)
+        vs_opp_table = next(t for t in result["tables"] if "vs Seattle Storm this season" in t["title"])
+        self.assertIn("No meetings between these teams yet this season", vs_opp_table["rows"][0][0])
+
     def test_unmatched_question_returns_none(self) -> None:
         self._write_mlb_fixtures()
         with patch.dict(os.environ, {"MLB_BETTING_DATA_ROOT": os.path.join(self.root, "mlb")}):

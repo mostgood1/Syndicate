@@ -465,6 +465,145 @@ def _wnba_player_lines(props_payload: Any, player_name: str) -> list[dict[str, A
     return lines
 
 
+_WNBA_TEAM_ADVANCED_STAT_FIELDS = ("pace", "off_rtg", "def_rtg", "efg_pct", "tov_pct", "orb_pct", "ft_rate", "fg3a_rate", "fg3_pct", "ts_pct", "ast_per_100")
+
+
+def _wnba_team_advanced_stats(selected_date: str | None) -> dict[str, dict[str, float]]:
+    """Per-team pace/off_rtg/def_rtg/etc. snapshot at or before selected_date
+    (or the most recent available). Confirmed against real mirrored data
+    (team_advanced_stats_2026_asof_20260715.csv) that this already feeds
+    the SmartSim projections upstream (basketball_props_smart_sim.py) but
+    was never surfaced to Ask the Syndicate -- the closest WNBA analog to
+    MLB's "opposing pitcher's own season rates" table, since there's no
+    defender-assignment or bullpen-style concept anywhere in WNBA data.
+    """
+    target = str(selected_date or "").replace("-", "")
+    # Same directory-priority reduce as _wnba_latest above: pick each
+    # directory's own best candidate, then only replace the running best on
+    # a STRICTLY later date, so a tie keeps the first (highest-priority,
+    # e.g. WNBA_BETTING_DATA_ROOT) directory's file rather than whichever
+    # candidate happens to sort last alphabetically across all directories.
+    best: tuple[str, str] | None = None  # (asof_yyyymmdd, path)
+    for directory in _wnba_processed_dirs():
+        directory_candidates: list[tuple[str, str]] = []
+        for path in glob.glob(os.path.join(directory, "team_advanced_stats_*_asof_*.csv")):
+            match = re.search(r"_asof_(\d{8})\.csv$", path)
+            if not match:
+                continue
+            try:
+                if os.path.getsize(path) <= 0:
+                    continue  # a 0-byte file has been observed in production for the non-asof variant
+            except OSError:
+                continue
+            directory_candidates.append((match.group(1), path))
+        if not directory_candidates:
+            continue
+        eligible = [c for c in directory_candidates if not target or c[0] <= target] or directory_candidates
+        eligible.sort()
+        candidate = eligible[-1]
+        if best is None or candidate[0] > best[0]:
+            best = candidate
+    if best is None:
+        return {}
+    _, path = best
+    stats: dict[str, dict[str, float]] = {}
+    try:
+        with open(path, encoding="utf-8", newline="") as handle:
+            for row in csv.DictReader(handle):
+                team = str(row.get("team") or "").strip().upper()
+                if not team:
+                    continue
+                parsed = {
+                    key: _to_float(row.get(key))
+                    for key in _WNBA_TEAM_ADVANCED_STAT_FIELDS
+                    if _to_float(row.get(key)) is not None
+                }
+                if parsed:
+                    stats[team] = parsed
+    except Exception:
+        return {}
+    return stats
+
+
+def _wnba_team_pace_defense_table(team_tri: str, team_label: str, opponent_tri: str, opponent_label: str, stats_by_team: dict[str, dict[str, float]]) -> dict[str, Any] | None:
+    team_stats = stats_by_team.get(str(team_tri or "").strip().upper())
+    opp_stats = stats_by_team.get(str(opponent_tri or "").strip().upper())
+    if not team_stats and not opp_stats:
+        return None
+    rows: list[list[Any]] = []
+    for label, key, fmt in (
+        ("Pace", "pace", "{:.1f}"),
+        ("Off rating", "off_rtg", "{:.1f}"),
+        ("Def rating", "def_rtg", "{:.1f}"),
+        ("eFG%", "efg_pct", "{:.1%}"),
+        ("TOV%", "tov_pct", "{:.1%}"),
+        ("TS%", "ts_pct", "{:.1%}"),
+    ):
+        t_val = (team_stats or {}).get(key)
+        o_val = (opp_stats or {}).get(key)
+        if t_val is None and o_val is None:
+            continue
+        rows.append([label, fmt.format(t_val) if t_val is not None else "—", fmt.format(o_val) if o_val is not None else "—"])
+    if not rows:
+        return None
+    return {
+        "title": f"Team pace & defense — {team_label} vs {opponent_label}",
+        "columns": ["Factor", team_label, opponent_label],
+        "rows": rows,
+    }
+
+
+def _wnba_vs_opponent_history(player_name: str, team_tri: str, opponent_tri: str) -> list[dict[str, Any]]:
+    """This player's box score line in every game this season where their
+    team faced this specific opponent, self-joined by game_id since
+    boxscores_history.csv has no opponent column.
+
+    Not a BvP-style multi-season archive -- confirmed against real data
+    that this repo's WNBA boxscore history only starts ~2026-04-25 (this
+    season) and WNBA teams only meet 2-4 times/season, so the sample here
+    is thin by construction, not a bug.
+    """
+    path = next(
+        (os.path.join(d, "boxscores_history.csv") for d in _wnba_processed_dirs()
+         if os.path.exists(os.path.join(d, "boxscores_history.csv"))),
+        None,
+    )
+    if not path:
+        return []
+    team_tri = str(team_tri or "").strip().upper()
+    opponent_tri = str(opponent_tri or "").strip().upper()
+    target_name = str(player_name or "").strip().lower()
+    if not team_tri or not opponent_tri or not target_name:
+        return []
+
+    by_game: dict[str, list[dict[str, Any]]] = {}
+    with open(path, encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            game_id = str(row.get("game_id") or row.get("gameId") or "").strip()
+            if game_id:
+                by_game.setdefault(game_id, []).append(row)
+
+    results: list[dict[str, Any]] = []
+    for rows in by_game.values():
+        teams_in_game = {str(r.get("TEAM_ABBREVIATION") or "").strip().upper() for r in rows}
+        if team_tri not in teams_in_game or opponent_tri not in teams_in_game:
+            continue
+        for row in rows:
+            if str(row.get("TEAM_ABBREVIATION") or "").strip().upper() != team_tri:
+                continue
+            if str(row.get("PLAYER_NAME") or "").strip().lower() != target_name:
+                continue
+            results.append({
+                "date": str(row.get("date") or ""),
+                "min": _to_float(row.get("MIN")),
+                "pts": _to_float(row.get("PTS")),
+                "reb": _to_float(row.get("REB")),
+                "ast": _to_float(row.get("AST")),
+            })
+    results.sort(key=lambda r: r["date"], reverse=True)
+    return results
+
+
 def _wnba_focused_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
     selected_date = str(context.get("selected_date") or "") or None
     loaded = _wnba_latest("cards_sim_detail", selected_date)
@@ -554,6 +693,40 @@ def _wnba_focused_evidence(question: str, context: dict[str, Any]) -> dict[str, 
                 ],
             })
 
+        team_tri = str(matched_player.get("team") or "")
+        opponent_tri = str(matched_player.get("opponent") or "")
+
+        # This player's box score in every meeting vs this exact opponent
+        # this season -- thin same-season sample (WNBA teams meet 2-4x/yr),
+        # not a BvP-style archive, but real derived data, not guesswork.
+        vs_opponent_games = _wnba_vs_opponent_history(name, team_tri, opponent_tri)
+        if vs_opponent_games:
+            tables.append({
+                "title": f"{name} vs {opponent} this season ({len(vs_opponent_games)} meeting{'s' if len(vs_opponent_games) != 1 else ''})",
+                "columns": ["Date", "MIN", "PTS", "REB", "AST"],
+                "rows": [
+                    [
+                        g["date"],
+                        f"{g['min']:.0f}" if g.get("min") is not None else "—",
+                        f"{g['pts']:.0f}" if g.get("pts") is not None else "—",
+                        f"{g['reb']:.0f}" if g.get("reb") is not None else "—",
+                        f"{g['ast']:.0f}" if g.get("ast") is not None else "—",
+                    ]
+                    for g in vs_opponent_games
+                ],
+            })
+        else:
+            tables.append({
+                "title": f"{name} vs {opponent} this season",
+                "columns": ["Note"],
+                "rows": [[f"No meetings between these teams yet this season, or {name} didn't play in them — WNBA teams only face each other a handful of times a year."]],
+            })
+
+        team_stats_by_tri = _wnba_team_advanced_stats(iso_date)
+        pace_table = _wnba_team_pace_defense_table(team_tri, team, opponent_tri, opponent, team_stats_by_tri)
+        if pace_table:
+            tables.append(pace_table)
+
         evidence = {
             "source": "wnba_sim_detail",
             "as_of": iso_date,
@@ -563,6 +736,11 @@ def _wnba_focused_evidence(question: str, context: dict[str, Any]) -> dict[str, 
             "minutes_mean": minutes,
             "projections": evidence_stats,
             "market_lines": market_lines[:8],
+            "vs_opponent_this_season": vs_opponent_games,
+            "team_pace_defense": {
+                "team": team_stats_by_tri.get(team_tri.upper()),
+                "opponent": team_stats_by_tri.get(opponent_tri.upper()),
+            },
         }
         return {"evidence": evidence, "tables": tables, "charts": charts, "as_of": iso_date, "sport": "wnba"}
 
@@ -616,6 +794,14 @@ def _wnba_focused_evidence(question: str, context: dict[str, Any]) -> dict[str, 
                 for p in top
             ],
         }]
+
+        team_stats_by_tri = _wnba_team_advanced_stats(iso_date)
+        pace_table = _wnba_team_pace_defense_table(
+            away_tri, _wnba_team_label(away_tri), home_tri, _wnba_team_label(home_tri), team_stats_by_tri
+        )
+        if pace_table:
+            tables.append(pace_table)
+
         evidence = {
             "source": "wnba_sim_detail",
             "as_of": iso_date,
