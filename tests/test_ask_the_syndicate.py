@@ -330,6 +330,35 @@ class AskTheSyndicateApiTests(unittest.TestCase):
 
         self.assertEqual(payload["schema"]["top_opportunities"][0]["selection"], "Courtney Williams OVER 1.5")
 
+    def test_bet_analysis_flags_unrelated_fallback_pick(self) -> None:
+        # Regression guard (reported live, 2026-07-31): asking about a
+        # specific player who has no matching recommendation on today's
+        # board used to silently return an unrelated top-of-board pick
+        # (e.g. a Dodgers steam move) with nothing indicating it wasn't
+        # about the question at all -- easy to misread as an answer about
+        # the named player. The question clearly names a subject ("antony
+        # volpe") that matches nothing in this recommendation list, so the
+        # fallback must say so.
+        snapshot = {
+            "query_type": "bet_analysis",
+            "recommendations": [
+                {"selection": "Los Angeles Dodgers steam move", "confidence": 0.7, "summary": "Steam move: line moved."},
+            ],
+        }
+
+        payload = build_syndicate_query_response(
+            question="antony volpe bet analysis",
+            context={"sport": "mlb"},
+            decision=RouteDecision(intent="bet_analysis", handler_name="handle_bet_analysis", matched_terms=(), score=0),
+            result=dict(snapshot),
+        )
+
+        schema = payload["schema"]
+        self.assertEqual(schema["selection"], "Los Angeles Dodgers steam move")  # still the only pick available
+        self.assertFalse(schema["relevance_matched"])
+        self.assertIn("No board recommendation matches", schema["explanation"]["summary"])
+        self.assertIn("antony volpe bet analysis", schema["explanation"]["summary"])
+
     def test_adapter_relevance_reorder_preserves_pipeline_context_on_intelligence_result(self) -> None:
         # IntelligenceResult.to_dict() does not serialize pipeline_context
         # (repr=False field) -- the reorder must extract routing_context

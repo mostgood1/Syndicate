@@ -210,10 +210,22 @@ def _supporting_points(explanation: dict[str, Any]) -> list[str]:
     return deduped[:_MAX_SUPPORTING_POINTS]
 
 
-def _bet_analysis_schema(result: Any) -> dict[str, Any]:
+def _bet_analysis_schema(result: Any, *, question: str = "", relevance_matched: bool | None = None) -> dict[str, Any]:
     top = _first_recommendation(result)
     explanation = _explanation_payload(result)
     selection = top.get("selection") or top.get("pick") or top.get("name") or top.get("label")
+    summary_text = explanation.get("summary")
+    if relevance_matched is False and selection:
+        # The question named something specific (a player/team/market) but
+        # nothing in today's actual board recommendations mentions it --
+        # `selection` here is just the board's default top pick, not an
+        # answer to the question. Say so up front, prominently, instead of
+        # silently presenting it as if it were relevant (a bettor skimming
+        # "Los Angeles Dodgers steam move — 100% model probability" right
+        # under a question about a specific player could easily read it as
+        # being about that player; see _reorder_by_relevance).
+        note = f"No board recommendation matches “{question.strip()}” specifically — showing today's top overall pick instead."
+        summary_text = f"{note} {summary_text}".strip() if summary_text else note
     return {
         "schema_type": "bet_analysis",
         "selection": selection,
@@ -223,8 +235,9 @@ def _bet_analysis_schema(result: Any) -> dict[str, Any]:
         "EV": _to_float(top.get("expected_value") or top.get("ev_current") or top.get("ev")),
         "confidence": _to_pct(top.get("confidence") or top.get("model_probability")),
         "recommendation": top.get("summary") or top.get("rationale") or top.get("writeup") or top.get("why") or explanation.get("summary"),
+        "relevance_matched": relevance_matched,
         "explanation": {
-            "summary": explanation.get("summary"),
+            "summary": summary_text,
             "analysis_brief": explanation.get("analysis_brief", {}),
             "supporting_evidence": explanation.get("supporting_evidence", {}),
             "reasoning_steps": explanation.get("reasoning_steps", []),
@@ -371,15 +384,26 @@ def _recommendation_relevance_score(item: dict[str, Any], words: set[str]) -> in
     return score
 
 
-def _reorder_by_relevance(items: list[dict[str, Any]], question: str) -> list[dict[str, Any]]:
+def _reorder_by_relevance(items: list[dict[str, Any]], question: str) -> tuple[list[dict[str, Any]], bool | None]:
+    """Returns (items, matched).
+
+    matched is None when the question had no specific-subject words to
+    check (generic question, e.g. "best bets today" -- leave board order
+    alone, nothing to flag). False when the question named something
+    specific but NOTHING in today's recommendations mentions it at all --
+    the caller should say so rather than silently presenting an unrelated
+    board pick as if it answered the question (confirmed live, 2026-07-31:
+    "antony volpe bet analysis" silently returned an unrelated Dodgers
+    steam move with no indication it wasn't about Volpe at all).
+    """
     words = _relevance_words(question)
     if not words or not items:
-        return items
+        return items, None
     scored = [(item, _recommendation_relevance_score(item, words)) for item in items]
     if max(score for _, score in scored) <= 0:
-        return items  # nothing in the snapshot names anything from the question -- leave as-is
+        return items, False  # nothing in the snapshot names anything from the question -- leave as-is
     ranked = sorted(scored, key=lambda pair: pair[1], reverse=True)  # stable: ties keep board order
-    return [item for item, _ in ranked]
+    return [item for item, _ in ranked], True
 
 
 def build_syndicate_query_response(*, question: str, context: dict[str, Any], decision: RouteDecision, result: Any) -> dict[str, Any]:
@@ -397,8 +421,9 @@ def build_syndicate_query_response(*, question: str, context: dict[str, Any], de
     # the payload conversion this triggers (IntelligenceResult.to_dict() does
     # not serialize pipeline_context, for one).
     recommendations = _items_to_dicts(_result_value(result, "recommendations", ()))
+    relevance_matched: bool | None = None
     if recommendations:
-        reordered = _reorder_by_relevance(recommendations, question)
+        reordered, relevance_matched = _reorder_by_relevance(recommendations, question)
         if reordered is not recommendations:
             result = _result_payload(result)
             result["recommendations"] = reordered
@@ -408,7 +433,7 @@ def build_syndicate_query_response(*, question: str, context: dict[str, Any], de
     elif decision.intent == "market_summary":
         schema = _market_summary_schema(result)
     else:
-        schema = _bet_analysis_schema(result)
+        schema = _bet_analysis_schema(result, question=question, relevance_matched=relevance_matched)
 
     return {
         "ok": True,
