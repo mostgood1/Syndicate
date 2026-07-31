@@ -4,7 +4,9 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-30. **#162/#164/#165/#166 archived** to
+Last reconciled: 2026-07-31 (see "Reconciliation 2026-07-31 (#161 part 2:
+NBA/WNBA closing line, plus a production outage found and fixed along the
+way)" below). Prior session: 2026-07-30. **#162/#164/#165/#166 archived** to
 `todo_closed.md` (Games-strip/soccer-league session, fully shipped and
 live-verified -- see the closed-items table there for the final,
 corrected summary of each; their prose write-ups here were stale/
@@ -27,6 +29,104 @@ that: "Reconciliation 2026-07-30 (opportunity board / Phase 2)"; before that:
 "Reconciliation 2026-07-30 (steam candidates, Layer 2 projection, portfolio
 reconciliation)"; before that: "Reconciliation 2026-07-30 (evaluation-ledger
 settlement / Phase 1)").
+
+### Reconciliation 2026-07-31 (#161 part 2: NBA/WNBA closing line, plus a production outage found and fixed along the way)
+
+User asked to extend #161's MLB closing-line fix to NBA/WNBA's Layer 1
+board. Turned out to be a genuinely bigger job than MLB's (two new
+ingestion mechanisms needed, not reuse) and, in the middle of it, surfaced
+and fixed a real ~10-minute production outage caused by a shared-git-index
+collision with a concurrent session. All shipped, tested (164 tests
+passing across the touched files), and deployed to all 3 services as of
+commit `c44c02cc`.
+
+1. **Game markets (moneyline/spread/total) never reached odds_history at
+   all.** Research confirmed `_odds_history_snapshot_paths`'s existing
+   nba/wnba candidates (`live_lines_*.jsonl`, `live_lens_signals_*.jsonl`,
+   `live_lens_projections_*.jsonl`) produce **zero rows** for game-level
+   markets through the generic per-row parser — `live_lines` nests
+   `home_ml`/`away_ml` as flat scalars in a `lines` dict the recursive
+   walker never descends into, and `live_lens_signals` uses `live_line`
+   instead of any key the parser recognizes. Confirmed against real
+   production files; even the pre-existing WNBA shard only ever had stale
+   player-prop entries, never a single game market.
+   **Fix:** added `game_cards_{date}.csv` (full team names, `commence_time`,
+   flat `home_ml/away_ml/home_spread/away_spread/total`) as a new candidate,
+   routed through a new `_flatten_basketball_game_cards()` (one CSV row =
+   3 markets as columns, melted into up to 3 rows — h2h/spreads/totals,
+   matching MLB's own vocabulary) since the generic per-row parser can only
+   ever surface one market per row. Also added nba/wnba to `_row_game_date`
+   (shards by the row's own commence_time, same as MLB).
+2. **Player props have no `commence_time` at all** (confirmed against real
+   `live_lens_signals` rows) — MLB's commence-time signal can't help them.
+   They DO carry `elapsed`/`remaining` (minutes played / left), e.g.
+   `{"elapsed": 0, "remaining": 40}` pregame. Added
+   `_row_elapsed_game_time_indicates_live()` (elapsed > 0) as a second new
+   signal, OR'd into `is_live_row` alongside commence_time and the original
+   text heuristic.
+3. **Board-side hydration**: added `basketball_odds_history_payload()`,
+   `_basketball_odds_history_entries_for_teams`/`_for_player`, and
+   `_basketball_hydrate_market_board_line_movement`/`_prop_movement` to
+   `basketball_market_board.py` (mirrors MLB cards.py's equivalents almost
+   exactly), threaded a new `odds_history` param through
+   `build_basketball_market_board`, and wired `build_nba_market_board`/
+   `build_wnba_market_board` (nba/wnba `cards.py`) to load and pass it.
+   Frontend needed zero changes — `market_board.js`'s "Closing" fact/column
+   from #161 part 1 is already sport-agnostic.
+4. **Production outage found and fixed mid-session (real incident, not
+   hypothetical):** a concurrent session's commit `0159333a` ("Fix NBA
+   live boxscore stuck at zero" — unrelated topic) swept up this session's
+   *uncommitted* one-line edit to `nba/cards.py` (the `basketball_odds_
+   history_payload` import + call) via the shared git index/working tree,
+   without the matching function definition (still local, uncommitted,
+   in `basketball_market_board.py` at the time). That landed on `main` and
+   got deployed, and the web service crash-looped on every boot
+   (`ImportError: cannot import name 'basketball_odds_history_payload'`)
+   for several minutes — confirmed via the actual gunicorn traceback the
+   user pasted from Render's deploy log, and via `/` and `/nba/api/
+   market-board` both returning 502 with the web service's own deploy
+   status reading `update_failed`. **Fixed** by completing the other half
+   (committing the rest of this same NBA/WNBA closing-line work, which
+   happened to already contain the missing function) and deploying to all
+   3 services immediately — confirmed recovered via 200s on `/`, `/nba/
+   api/market-board`, `/wnba/api/market-board`, `/mlb/api/market-board`.
+   **Lesson, now doubly-confirmed** (see [[project-concurrent-parallel-sessions]]):
+   an uncommitted edit sitting in the shared working tree is not inert —
+   another session's broad `git add` can sweep it into an unrelated commit
+   and ship it half-finished. The existing guidance ("stage explicit paths,
+   check `git diff --cached --stat` right before committing") protects
+   *your own* commits; it does nothing to stop *another* session's commit
+   from absorbing *your* uncommitted file. No new mitigation adopted this
+   session beyond noticing and fixing it fast — flagging for whoever next
+   works on cross-session safety.
+5. **Tested:** new tests for `_flatten_basketball_game_cards` (melt +
+   NaN-safe team-name handling — pandas reads blank CSV cells as float
+   NaN, and `str(nan)` is the truthy string `"nan"`), the elapsed-signal
+   helper, full sync integration tests for both new signals (NBA game
+   market via commence_time, WNBA prop via elapsed), and board-hydration
+   tests (team-match, player-match, full `build_basketball_market_board`
+   wiring with and without `odds_history`). 164 total passing across
+   `test_odds_refresh_tracking.py`/`test_odds_lifecycle_shards.py`/
+   `test_mlb_market_board.py`/`test_basketball_market_board.py`.
+6. **Not yet confirmed live for NBA/WNBA specifically** (unlike MLB's
+   #161 part 1, which got a real live PIT@CIN transition to point at): as
+   of this write-up, production's WNBA odds_history shard has real props
+   (A'ja Wilson pra/pts/reb/threes etc., all `is_live: false`, correctly
+   NOT stamped with a fake closing_line) but zero `h2h`/`spreads`/`totals`
+   entries yet, and no WNBA game had gone live during the verification
+   window to prove the elapsed-based prop signal fires for real. Confirm
+   both (a game_cards-sourced game market with a real `closing_line`, and
+   a prop's `is_live` flipping true with `elapsed > 0`) against production
+   next time WNBA games are live before calling this fully closed the way
+   #161 part 1 is.
+7. **One test failure encountered along the way that is NOT related to
+   this work:** `tests/test_refresh_odds_sources.py::
+   test_wnba_uses_combined_game_and_player_prop_markets_while_other_
+   basketball_sports_keep_interval_defaults` fails on current `main`
+   (confirmed via `git stash` — fails identically with none of this
+   session's changes applied) because `_build_wnba_steps` now requests
+   `spreads_h1,totals_h1,spreads_h2,totals_h2` markets the test doesn't
+   expect. Pre-existing, unrelated, not touched this session.
 
 ### Reconciliation 2026-07-30 (WNBA live boxscore/actuals stuck at zero, missing staleness+content gates)
 
