@@ -3222,6 +3222,117 @@ def _merge_duplicate_prop_candidates(candidates: list[dict[str, Any]]) -> list[d
     return result
 
 
+def _game_side_merge_dedup_key(candidate: dict[str, Any]) -> tuple[str, str, str, str, float | None] | None:
+    """Board audit follow-up, 2026-07-31: a team-level (moneyline/spread)
+    steam candidate had no merge counterpart with an equivalent "game"-type
+    Moneyline/Spread candidate for the same real bet -- a gap the
+    prop/steam merge above doesn't cover, since it excludes candidate_type
+    == "game" entirely and a team-level steam candidate's player_name is
+    deliberately nulled (a team-total steam move must not masquerade as a
+    "player prop"), leaving it with no subject _prop_merge_dedup_key can
+    resolve. Zero live occurrences confirmed at the time this was built
+    (flagged, then fixed proactively), but the gap was real.
+
+    Deliberately a SEPARATE function/pass from _prop_merge_dedup_key rather
+    than folding "game" into that gate directly: a team abbreviation is
+    materially weaker identity than a player's full name (e.g. "NYY" isn't
+    unique the way "Miguel Amaya" is -- two different games could plausibly
+    share a team/market/line at some point), so this REQUIRES the real game
+    (gamePk/game_id/event_id) to match too, not just team+market+line --
+    unlike the player-prop path, where subject alone is strong enough on
+    its own without a game-identity requirement. Total markets (no team
+    side at all) are excluded entirely: merging by market+line alone with
+    no team and no per-side identity would risk conflating two unrelated
+    games that happen to share a total line.
+    """
+    candidate_type = _safe_text(candidate.get("candidate_type"), "")
+    if candidate_type not in ("game", "steam"):
+        return None
+    sport_slug = _safe_text(candidate.get("sport_slug"), "").lower()
+    if not sport_slug:
+        return None
+    game_identity = _safe_text(candidate.get("gamePk") or candidate.get("game_id") or candidate.get("event_id"), "")
+    if not game_identity:
+        return None
+    market = _market_key_from_text(candidate.get("market"), allow_fallback=True)
+    if market not in ("moneyline", "spread"):
+        return None
+    team = _candidate_team_key(candidate)
+    if not team:
+        return None
+    line = _numeric_hint(candidate.get("line"))
+    line_bucket = round(line * 2.0) / 2.0 if line is not None else None
+    return (sport_slug, game_identity, market, team, line_bucket)
+
+
+def _merge_duplicate_game_side_candidates(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    # Mirrors _merge_duplicate_prop_candidates' merge policy exactly (same
+    # completeness-first analytical base, same "steam price always wins"
+    # rule -- see _STEAM_PRICE_OVERRIDE_FIELDS' docstring for why) against
+    # groups formed by _game_side_merge_dedup_key instead. Kept as its own
+    # pass rather than folding into the function above so the
+    # already-verified prop/steam merge path is never touched by this
+    # newer, more narrowly-scoped extension.
+    groups: dict[tuple, list[int]] = {}
+    for index, candidate in enumerate(candidates):
+        if not isinstance(candidate, dict):
+            continue
+        key = _game_side_merge_dedup_key(candidate)
+        if key is None:
+            continue
+        groups.setdefault(key, []).append(index)
+
+    merged_at: dict[int, dict[str, Any]] = {}
+    dropped: set[int] = set()
+    for indices in groups.values():
+        if len(indices) < 2:
+            continue
+        steam_index = next(
+            (i for i in indices if _safe_text(candidates[i].get("candidate_type"), "") == "steam"),
+            None,
+        )
+        analytical_indices = [i for i in indices if i != steam_index] if steam_index is not None else list(indices)
+        if not analytical_indices:
+            analytical_indices = [steam_index]
+        ordered = sorted(analytical_indices, key=lambda i: _prop_candidate_completeness_score(candidates[i]), reverse=True)
+        primary_index = ordered[0]
+        merged = dict(candidates[primary_index])
+        for other_index in ordered[1:]:
+            other = candidates[other_index]
+            for field in _PROP_MERGE_BACKFILL_FIELDS:
+                if _field_is_blank(merged.get(field)) and not _field_is_blank(other.get(field)):
+                    merged[field] = other.get(field)
+            for field in _PROP_MERGE_PREFER_LONGER_TEXT_FIELDS:
+                other_text = _safe_text(other.get(field), "")
+                merged_text = _safe_text(merged.get(field), "")
+                if len(other_text) > len(merged_text):
+                    merged[field] = other.get(field)
+        if steam_index is not None and steam_index != primary_index:
+            steam_candidate = candidates[steam_index]
+            for field in _STEAM_PRICE_OVERRIDE_FIELDS:
+                value = steam_candidate.get(field)
+                if not _field_is_blank(value):
+                    merged[field] = value
+            merged["candidate_type"] = "steam"
+            merged["is_steam_confirmed"] = True
+        merged["merged_from"] = sorted(
+            {_safe_text(candidates[i].get("candidate_type"), "") for i in indices if _safe_text(candidates[i].get("candidate_type"), "")}
+        )
+        for i in indices:
+            if i != primary_index:
+                dropped.add(i)
+        merged_at[primary_index] = merged
+
+    if not dropped:
+        return candidates
+    result: list[dict[str, Any]] = []
+    for index, candidate in enumerate(candidates):
+        if index in dropped:
+            continue
+        result.append(merged_at.get(index, candidate))
+    return result
+
+
 def _enrich_candidates_with_odds_history(candidates: list[dict[str, Any]], odds_history_by_sport: dict[str, dict[str, Any]] | None) -> list[dict[str, Any]]:
     enriched: list[dict[str, Any]] = []
     # Indexed once per sport rather than re-scanning the full odds-history
@@ -4354,6 +4465,19 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
         # built once above -- most direct, no join needed.
         event_home = _safe_text(event.get("home_team"), "")
         event_away = _safe_text(event.get("away_team"), "")
+        # Board audit follow-up, 2026-07-31: a team-level (moneyline/spread)
+        # steam candidate had no counterpart in the prop/steam merge above
+        # -- its player_name is deliberately nulled just below (a team-total
+        # steam move must not masquerade as a "player prop"), so it carried
+        # no comparable identity for _game_side_merge_dedup_key to resolve
+        # against a "game"-type Moneyline/Spread candidate's own resolved
+        # team abbreviation (home.py's _game_team_label, which prefers
+        # payload["abbr"]). Resolved here, once, using the SAME abbreviation
+        # lookup already computed below for matchup_text, rather than a
+        # second resolution pass -- only for moneyline/spread (a Total bet
+        # has no team side; deliberately not stamped for it, since a
+        # generic "-" team value would be unsafe to merge on).
+        team_side_value: str | None = None
         if event_home or event_away:
             if sport_slug == "soccer":
                 # Steam events carry OddsAPI's full team names -- convert to
@@ -4382,6 +4506,11 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
             else:
                 away_text, home_text = event_away or "-", event_home or "-"
             matchup_text = f"{away_text} @ {home_text}"
+            if market_key in ("moneyline", "spread") and player_name:
+                if event_home and player_name.strip().lower() == event_home.strip().lower():
+                    team_side_value = home_text
+                elif event_away and player_name.strip().lower() == event_away.strip().lower():
+                    team_side_value = away_text
         else:
             matchup_text = matchup_by_game_id.get(game_id, "-")
         # player_name and selection were previously OR'd into a single slot
@@ -4442,6 +4571,12 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
                 # wrongly show up under "Player props" and disappear from
                 # "Game markets".
                 "player_name": (player_name or None) if market_key not in _GAME_SIDE_MARKETS else None,
+                # Board audit follow-up: same field name home.py's
+                # _game_team_label stamps on a "game"-type Moneyline/Spread
+                # candidate (which also prefers the resolved abbreviation),
+                # so _game_side_merge_dedup_key can compare the two without
+                # a second, disagreeing team-identity convention.
+                "team": team_side_value,
                 "market": f"{market_label} · Steam",
                 "market_key": market_key,
                 "pick": pick_text,
@@ -6223,6 +6358,11 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
     candidates = _merge_duplicate_prop_candidates(candidates)
     if len(candidates) != before_merge_count:
         _log_candidate_stage(pipeline_name="collect_candidates", stage="prop_duplicate_merge", before=[], after=candidates)
+
+    before_game_side_merge_count = len(candidates)
+    candidates = _merge_duplicate_game_side_candidates(candidates)
+    if len(candidates) != before_game_side_merge_count:
+        _log_candidate_stage(pipeline_name="collect_candidates", stage="game_side_duplicate_merge", before=[], after=candidates)
 
     stage_started_at = time.perf_counter()
     odds_history_by_sport = _odds_history_payloads_by_sport(overview)

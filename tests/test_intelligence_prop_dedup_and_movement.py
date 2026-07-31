@@ -196,6 +196,102 @@ class MergeSteamAndPropCandidatesTests(unittest.TestCase):
         self.assertEqual(merged[0].get("headshot_url"), "https://example.test/amaya.png")
 
 
+class MergeGameSideAndSteamCandidatesTests(unittest.TestCase):
+    """Board audit follow-up, 2026-07-31: a team-level (moneyline/spread)
+    steam candidate had no merge counterpart with an equivalent "game"-type
+    candidate for the same real bet -- found proactively while auditing
+    other duplicate shapes after the prop/steam merge shipped, with zero
+    live occurrences at the time (the gap was structural, not yet
+    triggered). Fixed via a dedicated pass (_game_side_merge_dedup_key /
+    _merge_duplicate_game_side_candidates) rather than folding "game" into
+    the prop/steam merge, since a team abbreviation needs the real game id
+    to match too (unlike a player's full name, which is strong identity on
+    its own).
+    """
+
+    def _game_style_candidate(self, **overrides) -> dict:
+        base = {
+            "candidate_type": "game",
+            "sport_slug": "mlb",
+            "gamePk": 823271,
+            "matchup": "NYY @ CHC",
+            "market": "Moneyline",
+            "pick": "Away ML",
+            "team": "NYY",
+            "line": "-",
+            "odds": "-143",
+            "projected": "58.5%",
+            "detail": "Model win probability 58.5%.",
+            "is_live": False,
+        }
+        base.update(overrides)
+        return base
+
+    def _steam_style_candidate(self, **overrides) -> dict:
+        base = {
+            "candidate_type": "steam",
+            "sport_slug": "mlb",
+            "game_id": "823271",
+            "event_id": "823271",
+            "game_pk": 823271,
+            "matchup": "NYY @ CHC",
+            "market": "Moneyline · Steam",
+            "pick": "New York Yankees steam move",
+            "team": "NYY",
+            "line": "-",
+            "odds": "-150",
+            "is_live": True,
+        }
+        base.update(overrides)
+        return base
+
+    def test_merges_game_and_steam_moneyline_for_the_same_team_into_one_row(self) -> None:
+        merged = intelligence._merge_duplicate_game_side_candidates(
+            [self._game_style_candidate(), self._steam_style_candidate()]
+        )
+        self.assertEqual(len(merged), 1)
+
+    def test_merged_row_takes_price_and_live_state_from_steam(self) -> None:
+        row = intelligence._merge_duplicate_game_side_candidates(
+            [self._game_style_candidate(), self._steam_style_candidate()]
+        )[0]
+        self.assertEqual(row.get("odds"), "-150")
+        self.assertTrue(row.get("is_live"))
+        self.assertEqual(row.get("candidate_type"), "steam")
+        self.assertEqual(row.get("merged_from"), ["game", "steam"])
+
+    def test_merged_row_keeps_the_games_analytical_detail_and_projection(self) -> None:
+        row = intelligence._merge_duplicate_game_side_candidates(
+            [self._game_style_candidate(), self._steam_style_candidate()]
+        )[0]
+        self.assertEqual(row.get("projected"), "58.5%")
+        self.assertIn("win probability", row.get("detail", ""))
+
+    def test_different_teams_in_the_same_game_are_not_merged(self) -> None:
+        home_side = self._game_style_candidate(pick="Home ML", team="CHC")
+        away_steam = self._steam_style_candidate()
+        merged = intelligence._merge_duplicate_game_side_candidates([home_side, away_steam])
+        self.assertEqual(len(merged), 2)
+
+    def test_same_team_and_market_in_different_games_are_not_merged(self) -> None:
+        other_game_steam = self._steam_style_candidate(gamePk=999999, game_id="999999", event_id="999999", game_pk=999999)
+        merged = intelligence._merge_duplicate_game_side_candidates([self._game_style_candidate(), other_game_steam])
+        self.assertEqual(len(merged), 2)
+
+    def test_total_market_is_never_merged_via_this_path(self) -> None:
+        # Total has no team side -- merging it here (team="-" or absent)
+        # would be unsafe (a total line recurs across unrelated games).
+        total_game = self._game_style_candidate(market="Total", pick="Over 8.5", team=None, line="8.5")
+        total_steam = self._steam_style_candidate(market="Total · Steam", pick="NYY/CHC total steam move", team=None, line="8.5")
+        merged = intelligence._merge_duplicate_game_side_candidates([total_game, total_steam])
+        self.assertEqual(len(merged), 2)
+
+    def test_prop_type_candidates_are_left_untouched_by_this_pass(self) -> None:
+        prop = {"candidate_type": "prop", "sport_slug": "mlb", "gamePk": 823271, "market": "Moneyline", "team": "NYY", "player_name": "Someone"}
+        merged = intelligence._merge_duplicate_game_side_candidates([prop, dict(prop)])
+        self.assertEqual(len(merged), 2)
+
+
 class OddsHistoryMatchScoreCrossMarketGuardTests(unittest.TestCase):
     """2026-07-24 fix: a player-prop candidate must never adopt a GAME-level
     market's odds history (h2h/spreads/totals) just because it shares the
