@@ -87,6 +87,115 @@ class MergeDuplicatePropCandidatesTests(unittest.TestCase):
         self.assertEqual(len(merged), 2)
 
 
+class MergeSteamAndPropCandidatesTests(unittest.TestCase):
+    """Board audit follow-up, 2026-07-31: the identical real-world bet was
+    showing up TWICE on the board -- once as a "prop" (from the analytical
+    top-props pipeline) and once as a "steam" candidate (from continuous
+    line-movement detection) -- with different, unreconciled prices, and
+    only the steam copy had live data. Confirmed live: Miguel Amaya Over 0.5
+    Hits showed -123 (prop, no live_projection) alongside +100 (steam,
+    live_projection 1.1) at the same time.
+    """
+
+    def _prop_style_candidate(self) -> dict:
+        return {
+            "candidate_type": "prop",
+            "sport_slug": "mlb",
+            "player_name": "Miguel Amaya",
+            "market": "hits",
+            "pick": "OVER Miguel Amaya",
+            "name": "OVER Miguel Amaya",
+            "line": "0.5",
+            "odds": "-123",
+            "projected": "1.0",
+            "live_projection": "-",
+            "actual": "-",
+            "detail": "Miguel Amaya top prop: over 0.5 hits.",
+        }
+
+    def _steam_style_candidate(self) -> dict:
+        return {
+            "candidate_type": "steam",
+            "sport_slug": "mlb",
+            "player_name": "Miguel Amaya",
+            "market": "Hits · Steam",
+            "pick": "Miguel Amaya over 0.5",
+            "name": "Miguel Amaya Hits steam move",
+            "selection": "Miguel Amaya over 0.5",
+            "line": "0.5",
+            "odds": "+100",
+            "projected": "-",
+            "live_projection": "1.1",
+            "actual": "-",
+            "confidence": "62.0%",
+            "edge": "9.4%",
+            "is_live": True,
+            "line_odds_movement": {"opening_line": 0.5, "latest_line": 0.5},
+            "steam": {"capture_phase": "live", "line_delta": 0.0},
+        }
+
+    def test_merges_prop_and_steam_for_the_same_bet_into_one_row(self) -> None:
+        candidates = [self._prop_style_candidate(), self._steam_style_candidate()]
+        merged = intelligence._merge_duplicate_prop_candidates(candidates)
+        self.assertEqual(len(merged), 1)
+
+    def test_merged_row_takes_price_and_live_data_from_steam(self) -> None:
+        candidates = [self._prop_style_candidate(), self._steam_style_candidate()]
+        row = intelligence._merge_duplicate_prop_candidates(candidates)[0]
+        self.assertEqual(row.get("odds"), "+100")
+        self.assertEqual(row.get("live_projection"), "1.1")
+        self.assertEqual(row.get("confidence"), "62.0%")
+        self.assertEqual(row.get("edge"), "9.4%")
+        self.assertTrue(row.get("is_live"))
+
+    def test_merged_row_keeps_the_props_analytical_detail_and_projection(self) -> None:
+        candidates = [self._prop_style_candidate(), self._steam_style_candidate()]
+        row = intelligence._merge_duplicate_prop_candidates(candidates)[0]
+        self.assertEqual(row.get("projected"), "1.0")
+        self.assertIn("top prop", row.get("detail", ""))
+
+    def test_merged_row_is_tagged_steam_confirmed_and_discoverable_via_steam_filter(self) -> None:
+        candidates = [self._prop_style_candidate(), self._steam_style_candidate()]
+        row = intelligence._merge_duplicate_prop_candidates(candidates)[0]
+        self.assertEqual(row.get("candidate_type"), "steam")
+        self.assertTrue(row.get("is_steam_confirmed"))
+        # player_name survives so the board's player-props filter (which
+        # keys off truthy player_name, not candidate_type) still finds it.
+        self.assertEqual(row.get("player_name"), "Miguel Amaya")
+
+    def test_merged_from_lists_both_contributing_pipelines(self) -> None:
+        candidates = [self._prop_style_candidate(), self._steam_style_candidate()]
+        row = intelligence._merge_duplicate_prop_candidates(candidates)[0]
+        self.assertEqual(row.get("merged_from"), ["prop", "steam"])
+
+    def test_different_lines_between_prop_and_steam_are_not_merged(self) -> None:
+        # A genuinely different line is a different market quote, not a
+        # duplicate -- confirmed live for Will Warren's strikeouts prop
+        # (3.5 from top-props vs 5.5 from steam).
+        steam = self._steam_style_candidate()
+        steam["line"] = "5.5"
+        candidates = [self._prop_style_candidate(), steam]
+        merged = intelligence._merge_duplicate_prop_candidates(candidates)
+        self.assertEqual(len(merged), 2)
+
+    def test_over_and_under_steam_for_the_same_line_are_not_merged_together(self) -> None:
+        under = self._steam_style_candidate()
+        under["pick"] = "Miguel Amaya under 0.5"
+        under["selection"] = "Miguel Amaya under 0.5"
+        under["name"] = "Miguel Amaya Hits steam move"
+        candidates = [self._steam_style_candidate(), under]
+        merged = intelligence._merge_duplicate_prop_candidates(candidates)
+        self.assertEqual(len(merged), 2)
+
+    def test_steam_only_duplicates_still_merge_using_existing_completeness_logic(self) -> None:
+        first = self._steam_style_candidate()
+        second = self._steam_style_candidate()
+        second["headshot_url"] = "https://example.test/amaya.png"
+        merged = intelligence._merge_duplicate_prop_candidates([first, second])
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0].get("headshot_url"), "https://example.test/amaya.png")
+
+
 class OddsHistoryMatchScoreCrossMarketGuardTests(unittest.TestCase):
     """2026-07-24 fix: a player-prop candidate must never adopt a GAME-level
     market's odds history (h2h/spreads/totals) just because it shares the

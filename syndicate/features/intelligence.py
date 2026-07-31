@@ -3020,7 +3020,18 @@ def _candidate_odds_history_context(
 
 
 def _prop_merge_dedup_key(candidate: dict[str, Any]) -> tuple[str, str, str, float | None, int] | None:
-    if _safe_text(candidate.get("candidate_type"), "") != "prop":
+    # Board audit, 2026-07-31: widened from "prop" only to also cover
+    # "steam" -- a steam candidate and a prop candidate can describe the
+    # identical real-world bet (same player/market/line/side), sourced from
+    # two entirely independent pipelines (steam = continuous line-movement
+    # detection, prop = the analytical "top props"/recommendation
+    # artifacts), and neither dedupes against the other. Confirmed live:
+    # the same Miguel Amaya Over 0.5 Hits bet showed simultaneously as
+    # "-123" (prop, no live_projection) and "+100" (steam, live_projection
+    # 1.1) -- two different, unreconciled prices for one real bet. See
+    # _merge_duplicate_prop_candidates for the merge policy once these
+    # share an identity.
+    if _safe_text(candidate.get("candidate_type"), "") not in ("prop", "steam"):
         return None
     sport_slug = _safe_text(candidate.get("sport_slug"), "").lower()
     subject = _normalized_market_text(_safe_text(candidate.get("player_name"), "")) or _normalized_market_text(
@@ -3075,6 +3086,39 @@ _PROP_MERGE_BACKFILL_FIELDS = (
 # keep whichever is longer rather than only filling in when blank.
 _PROP_MERGE_PREFER_LONGER_TEXT_FIELDS = ("detail", "writeup", "summary")
 
+# Board audit, 2026-07-31: unlike the backfill-if-blank fields above, these
+# must come from the steam candidate in a merged group WHENEVER one exists
+# -- even overwriting a non-blank value already on the prop side. A prop
+# candidate's price/live-state fields have no freshness guarantee (the
+# "top props" artifact refreshes on its own cadence, unrelated to real-time
+# market movement); a steam candidate's whole reason for existing is
+# tracking the CURRENT sportsbook line via continuous odds polling. Backfill
+# -if-blank would leave a stale-but-present prop price untouched even when a
+# fresher steam price is sitting right there in the same group -- exactly
+# the Miguel Amaya Over 0.5 Hits case (-123 prop vs +100 steam) that
+# motivated this. Price and its dependent fields (edge/confidence/win%)
+# always move together from the same source, so a merged row never pairs
+# one source's price with a different source's edge computed against a
+# different price.
+_STEAM_PRICE_OVERRIDE_FIELDS = (
+    "odds",
+    "american_odds",
+    "line",
+    "live_projection",
+    "actual",
+    "is_live",
+    "status_display",
+    "game_state",
+    "line_odds_movement",
+    "steam",
+    "edge",
+    "edge_pct",
+    "confidence",
+    "model_probability",
+    "implied_probability",
+    "adjusted_edge",
+)
+
 
 def _field_is_blank(value: Any) -> bool:
     if value is None:
@@ -3100,6 +3144,19 @@ def _merge_duplicate_prop_candidates(candidates: list[dict[str, Any]]) -> list[d
     # wholesale: keep the more complete candidate as the base and backfill
     # any of its blank fields from the dropped duplicate, so nothing
     # (projection, reasoning, headshot, etc.) is lost either way.
+    #
+    # Board audit, 2026-07-31: widened to also merge a "steam" candidate
+    # sharing the same identity (_prop_merge_dedup_key now covers both
+    # types). Steam and prop disagree on which field should win: steam's
+    # price/live-state is always the fresher one (see
+    # _STEAM_PRICE_OVERRIDE_FIELDS), while prop's analytical fields
+    # (projected/detail/writeup/headshot) are what steam candidates never
+    # carry in the first place. So a mixed group merges in two passes: the
+    # existing "most complete analytical candidate wins, backfill the rest"
+    # logic runs first (unchanged, and it already correctly ignores a steam
+    # candidate for this purpose -- steam's projected/detail are always
+    # blank, so its own completeness score is always low), then the steam
+    # candidate's price fields are applied on top, unconditionally.
     groups: dict[tuple, list[int]] = {}
     for index, candidate in enumerate(candidates):
         if not isinstance(candidate, dict):
@@ -3114,7 +3171,14 @@ def _merge_duplicate_prop_candidates(candidates: list[dict[str, Any]]) -> list[d
     for indices in groups.values():
         if len(indices) < 2:
             continue
-        ordered = sorted(indices, key=lambda i: _prop_candidate_completeness_score(candidates[i]), reverse=True)
+        steam_index = next(
+            (i for i in indices if _safe_text(candidates[i].get("candidate_type"), "") == "steam"),
+            None,
+        )
+        analytical_indices = [i for i in indices if i != steam_index] if steam_index is not None else list(indices)
+        if not analytical_indices:
+            analytical_indices = [steam_index]
+        ordered = sorted(analytical_indices, key=lambda i: _prop_candidate_completeness_score(candidates[i]), reverse=True)
         primary_index = ordered[0]
         merged = dict(candidates[primary_index])
         for other_index in ordered[1:]:
@@ -3127,7 +3191,25 @@ def _merge_duplicate_prop_candidates(candidates: list[dict[str, Any]]) -> list[d
                 merged_text = _safe_text(merged.get(field), "")
                 if len(other_text) > len(merged_text):
                     merged[field] = other.get(field)
-            dropped.add(other_index)
+        if steam_index is not None and steam_index != primary_index:
+            steam_candidate = candidates[steam_index]
+            for field in _STEAM_PRICE_OVERRIDE_FIELDS:
+                value = steam_candidate.get(field)
+                if not _field_is_blank(value):
+                    merged[field] = value
+            # A merged row IS a confirmed real-time price move on a real
+            # prop -- reflect that in candidate_type so the board's
+            # steam-only filter still finds it (the player-props filter is
+            # unaffected: it keys off truthy player_name, not
+            # candidate_type, so this candidate keeps showing there too).
+            merged["candidate_type"] = "steam"
+            merged["is_steam_confirmed"] = True
+        merged["merged_from"] = sorted(
+            {_safe_text(candidates[i].get("candidate_type"), "") for i in indices if _safe_text(candidates[i].get("candidate_type"), "")}
+        )
+        for i in indices:
+            if i != primary_index:
+                dropped.add(i)
         merged_at[primary_index] = merged
 
     if not dropped:
