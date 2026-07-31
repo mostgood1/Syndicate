@@ -1237,6 +1237,83 @@ def _mlb_advanced_profile_table(label: str, player_id: int, role: str) -> dict[s
     }
 
 
+def _mlb_pitcher_chart_stat(words: set[str]) -> tuple[str, str, str]:
+    """(row_key, y_label, chart-title phrase) for whichever pitching stat the
+    question actually asked about -- a bare "wants_pitching" check (any of
+    K/outs/pitches/innings) isn't enough to know WHICH one to chart; this
+    picks among the columns already in the last-starts table.
+    """
+    if "outs" in words and not (words & {"strikeout", "strikeouts", "k", "ks"}):
+        return "outs", "Outs", "outs recorded"
+    if words & {"walk", "walks"}:
+        return "bb", "BB", "walks"
+    if "er" in words or "earned" in words:
+        return "er", "ER", "earned runs"
+    if words & {"pitch", "pitches"}:
+        return "pitches", "Pitches", "pitch count"
+    return "k", "K", "strikeouts"
+
+
+def _mlb_opposing_lineup_statcast_table(question: str, context: dict[str, Any], pitcher_label: str) -> dict[str, Any] | None:
+    """Today's opposing lineup's own Statcast approach (xwOBA/barrel/hard-hit/
+    K-mult) -- distinct from _mlb_advanced_profile_table, which is the
+    PITCHER's own stuff. Answers "how does the lineup match up against him"
+    using the same today's-lineup batter list _mlb_bvp_evidence's pitcher
+    branch already derives from hr_targets, just against the batter's own
+    Statcast profile instead of career BvP counts.
+    """
+    loaded = _mlb_slate_targets(str(context.get("selected_date") or "") or None)
+    if not loaded:
+        return None
+    targets, iso_date = loaded
+    words = _question_words(question)
+    pitcher_rows = [t for t in targets if _person_matches(str(t.get("opponent_pitcher_name") or ""), words) > 0]
+    if not pitcher_rows:
+        return None
+
+    from syndicate.features.intelligence import _mlb_statcast_profile_from_ids
+
+    seen: set[int] = set()
+    entries: list[tuple[str, dict[str, Any]]] = []
+    for target in pitcher_rows:
+        try:
+            batter_id = int(target.get("batter_id"))
+        except (TypeError, ValueError):
+            continue
+        if batter_id in seen:
+            continue
+        seen.add(batter_id)
+        profile = _mlb_statcast_profile_from_ids(batter_id=batter_id, pitcher_id=None)
+        factors = (profile or {}).get("batter") if profile else None
+        if not factors or all(value is None for value in factors.values()):
+            continue
+        name = str(target.get("player_name") or batter_id)
+        entries.append((name, factors))
+    if not entries:
+        return None
+
+    # Strongest matchup threat first (highest expected production).
+    entries.sort(key=lambda item: _to_float(item[1].get("xwoba")) or -1.0, reverse=True)
+    rows: list[list[Any]] = []
+    for name, factors in entries[:9]:
+        xwoba = _to_float(factors.get("xwoba"))
+        barrel = _to_float(factors.get("barrel_rate"))
+        hardhit = _to_float(factors.get("hardhit_rate"))
+        k_mult = _to_float(factors.get("k_mult"))
+        rows.append([
+            name,
+            f"{xwoba:.3f}" if xwoba is not None else "—",
+            f"{barrel:.1%}" if barrel is not None else "—",
+            f"{hardhit:.1%}" if hardhit is not None else "—",
+            f"{k_mult:.2f}" if k_mult is not None else "—",
+        ])
+    return {
+        "title": f"Opposing lineup Statcast approach vs {pitcher_label} (through {iso_date})",
+        "columns": ["Batter", "xwOBA", "Barrel%", "HardHit%", "K mult"],
+        "rows": rows,
+    }
+
+
 def _mlb_player_history_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
     from syndicate.features.mlb.player_game_log import BATTER_LOG_FILENAME
     from syndicate.features.mlb.player_game_log import PITCHER_LOG_FILENAME
@@ -1276,12 +1353,13 @@ def _mlb_player_history_evidence(question: str, context: dict[str, Any]) -> dict
             "rows": rows,
         })
         chronological = list(reversed(last_n))
+        stat_key, stat_y_label, stat_phrase = _mlb_pitcher_chart_stat(words)
         charts.append({
             "type": "bar",
-            "title": f"Actual strikeouts — last {count} starts — {label}",
+            "title": f"Actual {stat_phrase} — last {count} starts — {label}",
             "x_label": "Start date",
-            "y_label": "K",
-            "points": [{"x": str(r.get("date") or "")[5:], "y": float(r.get("k") or 0)} for r in chronological],
+            "y_label": stat_y_label,
+            "points": [{"x": str(r.get("date") or "")[5:], "y": float(r.get(stat_key) or 0)} for r in chronological],
         })
         evidence["last_starts"] = [
             {k: r.get(k) for k in ("date", "opponent", "ip", "k", "bb", "er", "pitches")} for r in last_n
@@ -1339,6 +1417,11 @@ def _mlb_player_history_evidence(question: str, context: dict[str, Any]) -> dict
     advanced_table = _mlb_advanced_profile_table(label, player_id, role)
     if advanced_table:
         tables.append(advanced_table)
+
+    if role == "pitcher":
+        lineup_table = _mlb_opposing_lineup_statcast_table(question, context, label)
+        if lineup_table:
+            tables.append(lineup_table)
 
     if not tables:
         return None

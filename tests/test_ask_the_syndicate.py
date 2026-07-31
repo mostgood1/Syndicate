@@ -1374,6 +1374,70 @@ class AskTheSyndicateMlbPlayerHistoryTests(unittest.TestCase):
         self.assertIn(["Barrel% allowed", "8.0%"], advanced_table["rows"])
         self.assertIn(["Top pitch mix", "FF 55%"], advanced_table["rows"])
 
+    def test_pitcher_chart_stat_selection(self) -> None:
+        # Regression guard: a question about outs must chart outs, not
+        # default to strikeouts just because it's an MLB pitcher question.
+        self.assertEqual(ask_data._mlb_pitcher_chart_stat({"eury", "perez", "outs"}), ("outs", "Outs", "outs recorded"))
+        self.assertEqual(ask_data._mlb_pitcher_chart_stat({"how", "many", "strikeouts"}), ("k", "K", "strikeouts"))
+        self.assertEqual(ask_data._mlb_pitcher_chart_stat({"walks", "today"}), ("bb", "BB", "walks"))
+        self.assertEqual(ask_data._mlb_pitcher_chart_stat({"pitch", "count"}), ("pitches", "Pitches", "pitch count"))
+        # "outs" alongside an explicit K word is still a strikeouts question
+        # ("K's recorded via outs" reads as ambiguous English but the K
+        # keyword should win since it's the more specific signal).
+        self.assertEqual(ask_data._mlb_pitcher_chart_stat({"strikeout", "outs"}), ("k", "K", "strikeouts"))
+
+    def test_pitcher_last_n_starts_charts_outs_when_asked(self) -> None:
+        self._write_pitcher_log([
+            {"date": "2026-07-01", "game_pk": 1, "player_id": 694973, "player_name": "Paul Skenes", "team": "PIT", "opponent": "CHC", "is_starter": 1, "ip": "6.0", "outs": 18, "pitches": 95, "k": 9, "bb": 1, "er": 1, "h": 3, "r": 1, "hr": 0},
+        ])
+        with patch.dict(os.environ, self._env()):
+            with patch("syndicate.features.intelligence._mlb_statcast_profile_from_ids", return_value=None):
+                result = ask_data._mlb_player_history_evidence("Paul Skenes outs", {"sport": "mlb"})
+
+        self.assertIsNotNone(result)
+        chart = next(c for c in result["charts"] if "last 1 starts" in c["title"])
+        self.assertIn("outs recorded", chart["title"])
+        self.assertEqual(chart["y_label"], "Outs")
+        self.assertEqual(chart["points"][0]["y"], 18.0)
+
+    def test_opposing_lineup_statcast_table_present_for_matched_pitcher(self) -> None:
+        self._write_pitcher_log([
+            {"date": "2026-07-01", "game_pk": 1, "player_id": 694973, "player_name": "Paul Skenes", "team": "PIT", "opponent": "CHC", "is_starter": 1, "ip": "6.0", "outs": 18, "pitches": 95, "k": 9, "bb": 1, "er": 1, "h": 3, "r": 1, "hr": 0},
+        ])
+        daily_dir = os.path.join(self.root, "mlb", "daily")
+        os.makedirs(daily_dir, exist_ok=True)
+        hr_targets = {
+            "games": [{
+                "game_pk": 1,
+                "targets": [
+                    {"player_name": "Big Bat", "batter_id": 1, "opponent_pitcher_id": 694973, "opponent_pitcher_name": "Paul Skenes"},
+                    {"player_name": "Second Bat", "batter_id": 2, "opponent_pitcher_id": 694973, "opponent_pitcher_name": "Paul Skenes"},
+                ],
+            }]
+        }
+        with open(os.path.join(daily_dir, "daily_summary_2026_07_12_hr_targets.json"), "w", encoding="utf-8") as f:
+            json.dump(hr_targets, f)
+
+        def fake_profile(*, batter_id=None, pitcher_id=None):
+            if batter_id == 1:
+                return {"batter": {"xwoba": 0.400, "barrel_rate": 0.15, "hardhit_rate": 0.45, "k_mult": 0.9,
+                                    "ev_mean": None, "la_mean": None, "hr_per_bip": None, "pulled_air_rate": None, "hr_mult": None, "inplay_mult": None}}
+            if batter_id == 2:
+                return {"batter": {"xwoba": 0.250, "barrel_rate": 0.05, "hardhit_rate": 0.20, "k_mult": 1.2,
+                                    "ev_mean": None, "la_mean": None, "hr_per_bip": None, "pulled_air_rate": None, "hr_mult": None, "inplay_mult": None}}
+            return None
+
+        with patch.dict(os.environ, self._env()):
+            with patch("syndicate.features.intelligence._mlb_statcast_profile_from_ids", side_effect=fake_profile):
+                result = ask_data._mlb_player_history_evidence("How has Paul Skenes looked lately?", {"sport": "mlb"})
+
+        self.assertIsNotNone(result)
+        lineup_table = next(t for t in result["tables"] if "Opposing lineup Statcast approach" in t["title"])
+        # Higher xwOBA (bigger threat) sorts first.
+        self.assertEqual(lineup_table["rows"][0][0], "Big Bat")
+        self.assertEqual(lineup_table["rows"][0][1], "0.400")
+        self.assertEqual(lineup_table["rows"][1][0], "Second Bat")
+
     def test_pitcher_history_vs_todays_opponent_when_game_matched(self) -> None:
         self._write_slate_game()
         self._write_pitcher_log([
