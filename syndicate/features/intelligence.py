@@ -5290,6 +5290,19 @@ def _apply_live_state_context_to_candidates(
         for key, value in live_state.items():
             if value not in {None, ""}:
                 candidate[key] = value
+        # Root-caused 2026-07-31: _mlb_candidate_live_state never returns a
+        # "game_state" key, but candidates carry a separate `game_state`
+        # field stamped by whichever builder created them (e.g.
+        # _prop_candidate_from_item, from a slower/differently-cadenced
+        # dashboard artifact) -- so this pass could correct `is_live`/
+        # `status_display` while leaving a stale/disagreeing `game_state`
+        # untouched on the same row. Confirmed live against production: a
+        # candidate whose `game_state` literally showed
+        # {'abstract': 'Live', ...} while `is_live`/`status_display` still
+        # said "Scheduled". Force both to the same freshly-resolved value.
+        resolved_status_display = live_state.get("status_display")
+        if resolved_status_display not in (None, ""):
+            candidate["game_state"] = resolved_status_display
         if bool(candidate.get("is_live")) and _safe_text(candidate.get("candidate_type"), "") == "prop":
             live_rows = _mlb_live_lens_prop_rows_for_game(context_label, int(game_pk), mlb_live_lens_cache)
             _mlb_hydrate_live_prop_projection(candidate, live_rows)
@@ -6001,12 +6014,36 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
                 artifact_subject = _candidate_subject_key(artifact_candidate)
                 artifact_market = _candidate_market_key(artifact_candidate)
                 artifact_pick = _safe_text(artifact_candidate.get("pick"), "")
-                if any(
-                    _candidate_subject_key(existing) == artifact_subject
-                    and _candidate_market_key(existing) == artifact_market
-                    and _safe_text(existing.get("pick"), "") == artifact_pick
-                    for existing in candidates
-                ):
+                existing_match = next(
+                    (
+                        existing
+                        for existing in candidates
+                        if _candidate_subject_key(existing) == artifact_subject
+                        and _candidate_market_key(existing) == artifact_market
+                        and _safe_text(existing.get("pick"), "") == artifact_pick
+                    ),
+                    None,
+                )
+                if existing_match is not None:
+                    # Root-caused 2026-07-31 against real production data:
+                    # this used to silently drop the fresh, correctly-live
+                    # live-lens candidate in favor of whichever stale
+                    # home_rails/dashboard candidate for the same
+                    # subject/market/pick was already in the pool -- the
+                    # same live gamePk produced a mix of correctly-"live"
+                    # and incorrectly-"Pre-Game" rows depending purely on
+                    # insertion order. The live-lens artifact row is always
+                    # the freshest available data for a live game (it's
+                    # rebuilt continuously and hardcodes is_live=True when
+                    # reached, see the #128 comment above), so merge its
+                    # live-relevant fields into the existing candidate in
+                    # place rather than discarding it -- preserves the
+                    # existing candidate's position/identity for anything
+                    # downstream that depends on it, while fixing the
+                    # is_live/status_display/game_state/actual mismatch.
+                    for key in ("is_live", "is_final", "status_display", "game_state", "actual", "live_projection"):
+                        if artifact_candidate.get(key) is not None:
+                            existing_match[key] = artifact_candidate[key]
                     continue
                 candidates.append(artifact_candidate)
                 live_lens_prop_candidates.append(artifact_candidate)

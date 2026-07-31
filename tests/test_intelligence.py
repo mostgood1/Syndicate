@@ -3559,6 +3559,143 @@ class IntelligenceBlueprintTests(unittest.TestCase):
 
         self.assertEqual(len(candidates), 1, candidates)
 
+    def test_collect_candidates_merges_fresh_live_lens_data_into_stale_home_rails_duplicate(self) -> None:
+        # Root-caused 2026-07-31 against real production data: gamePk
+        # 823271/824974/823595 (all confirmed live) each produced a MIX of
+        # correctly-"live" and incorrectly-"Pre-Game" candidate rows for the
+        # SAME game, because the in-pool dedup in _collect_candidates
+        # silently dropped the fresh, correctly-hydrated
+        # _mlb_live_lens_prop_candidates_from_artifact row whenever a
+        # matching stale candidate (from the slower home_rails path) was
+        # already in the pool for the same subject+market+pick. This
+        # reproduces that exact scenario: a stale pregame-shaped home_rails
+        # item for "Yordan Alvarez Under 4.5 Hitter Total Bases" alongside a
+        # fresh, genuinely-live live-lens artifact row for the same
+        # player/market/pick -- the surviving candidate must show the fresh
+        # values, not the stale ones, and there must be exactly one.
+        overview = [
+            {
+                "slug": "mlb",
+                "name": "MLB",
+                "context_label": "2026-07-30",
+                "active_today": True,
+                "data_health": "healthy",
+                "data_warnings": [],
+                "home_rails": {
+                    "pregame": {
+                        "title": "Pregame props",
+                        "items": [
+                            {
+                                "name": "Yordan Alvarez Under 4.5 Hitter Total Bases",
+                                "market": "Hitter Total Bases",
+                                "pick": "Under 4.5",
+                                "matchup": "HOU at LAA",
+                                "projected": 4.6,
+                                "line": 4.5,
+                                "odds": "-120",
+                                "confidence": "60%",
+                                "edge": "+2.0%",
+                                "writeup": "Pregame projection.",
+                                "detail": "Under 4.5 Hitter Total Bases",
+                                "summary": "Pregame projection.",
+                                "href": "/mlb/cards?date=2026-07-30",
+                                "game_pk": 824003,
+                                "is_live": False,
+                                "status_display": "Pre-Game",
+                                "game_state": "Pre-Game",
+                                "actual": "-",
+                            }
+                        ],
+                    },
+                    "live": {"title": "Top Live Props", "items": []},
+                    "compact": {"items": []},
+                },
+                "dashboard_games": [],
+            }
+        ]
+        live_lens_payload = {
+            "games": [
+                {
+                    "gamePk": 824003,
+                    "status": {"abstract": "Live", "detailed": "In Progress"},
+                    "matchup": {"away": {"abbr": "HOU"}, "home": {"abbr": "LAA"}},
+                    "trackedProps": [
+                        {
+                            "playerName": "Yordan Alvarez",
+                            "market": "hitter_total_bases",
+                            "marketLabel": "Hitter Total Bases",
+                            "selection": "Under",
+                            "line": 4.5,
+                            "odds": "-120",
+                            "estimatedWinProb": 0.837,
+                            "liveProjection": 3.9,
+                            "actual": 1.0,
+                        }
+                    ],
+                }
+            ]
+        }
+        preferences = _query_preferences("top edges today", mode="recommendation", sport="all", timing="all", include_props=True, include_games=True)
+        with patch(
+            "syndicate.features.intelligence._mlb_live_lens_report_cached",
+            return_value=live_lens_payload,
+        ):
+            candidates = collect_candidates(overview, preferences)
+
+        matching = [
+            candidate
+            for candidate in candidates
+            if "yordan alvarez" in str(candidate.get("name") or "").lower()
+        ]
+        self.assertEqual(len(matching), 1, matching)
+        merged = matching[0]
+        # The live-lens artifact candidate is the one and only source of
+        # is_live/actual/live_projection here (it doesn't carry status_display/
+        # game_state at all -- those come from a separate pass,
+        # _apply_live_state_context_to_candidates, covered by its own test
+        # below since it needs the raw MLB feed mocked, not the live-lens
+        # artifact). Before the fix, this candidate would have kept the
+        # stale home_rails values (is_live=False, actual="-") because the
+        # fresh artifact row was silently dropped by the old dedup.
+        self.assertTrue(merged.get("is_live"))
+        self.assertEqual(merged.get("actual"), "1.0")
+        self.assertEqual(merged.get("live_projection"), "3.9")
+
+    def test_apply_live_state_context_syncs_game_state_with_status_display(self) -> None:
+        # Root-caused 2026-07-31 against real production data: a candidate
+        # could show a correct, freshly-resolved `status_display` while its
+        # separate `game_state` field (stamped by whichever builder created
+        # the candidate, from a different/slower artifact) stayed stale --
+        # confirmed live as a row with game_state literally containing
+        # {'abstract': 'Live', ...} while is_live/status_display still said
+        # "Scheduled". _mlb_candidate_live_state never returns a game_state
+        # key at all, so the two fields could permanently disagree on the
+        # same row until this fix forced them to the same resolved value.
+        from syndicate.features.intelligence import _apply_live_state_context_to_candidates
+
+        candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "prop",
+            "context_label": "2026-07-30",
+            "game_pk": 823271,
+            "is_live": False,
+            "status_display": "Scheduled",
+            "game_state": {"abstract": "Live", "detailed": "In Progress"},
+        }
+        with patch(
+            "syndicate.features.intelligence._mlb_actual_payload_for_candidate",
+            return_value={"gameData": {"status": {"abstractGameState": "Live", "detailedState": "In Progress"}}},
+        ), patch(
+            "syndicate.features.intelligence._mlb_candidate_live_state",
+            return_value={"is_live": True, "is_final": False, "status_display": "In Progress"},
+        ):
+            _apply_live_state_context_to_candidates([candidate])
+
+        self.assertTrue(candidate.get("is_live"))
+        self.assertEqual(candidate.get("status_display"), "In Progress")
+        self.assertEqual(candidate.get("game_state"), "In Progress")
+        self.assertEqual(candidate.get("game_state"), candidate.get("status_display"))
+
     def test_mlb_pregame_game_market_candidate_survives_classification(self) -> None:
         # #98/#100: a pregame MLB moneyline/total candidate carries a real
         # model win probability (game["markets"]["ml"/"totals"]["model_prob"])
