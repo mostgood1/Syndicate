@@ -490,8 +490,25 @@ line concept underneath it was already silently broken:
    left the separate market-eviction sweep's own `datetime.now(timezone.utc)`
    call reading real time against a fixed historical `market_last_updated`,
    evicting the market before the second tick's stamp could run).
-   **Still not yet re-verified against a real live transition post-deploy**
-   — do that before considering #161 fully closed.
+   **Confirmed live 2026-07-31 ~01:16 UTC** (commit `940024f2`, deployed to
+   all 3 services): 6 markets across PIT@CIN and WSH@ATL correctly
+   transitioned to `is_live: true` with a real stamped `closing_line`
+   distinct from the wildly-swinging `last_line` — e.g. PIT@CIN moneyline
+   (fanduel) `closing_line=-245.0` (a sane pregame number) vs.
+   `last_line=-113.0` (in-play). **#161 is now fully closed**: closing line
+   correctly captured at the real pregame→live transition, for the actual
+   market type the board displays, verified end-to-end against production.
+   One operational note from getting here: right after this deploy, odds
+   refresh stalled entirely with `"A refresh run is already active
+   (pid=N)"` — a stale manifest lock left over from the container restart
+   (recorded PIDs 43/139/304/334 across different lanes, none actually
+   still running). Cleared via `POST /api/ops/odds-refresh/cancel` (with
+   and without `?lane=`) for each stuck lane; each call safely detected
+   "PID not running" and marked the manifest failed rather than sending a
+   kill signal. Worth remembering: **a deploy can leave a stale refresh
+   lock behind** — check `/api/ops/live-refresh/state`'s `latest_tick.error`
+   after a deploy, not just deploy status, before assuming the refresh loop
+   is healthy again.
 7. **Deliberately NOT done this pass:** NBA/WNBA's Layer 1 board
    (`basketball_market_board.py`) has no odds-history hydration wired in at
    all for game-level markets today — only MLB threads `odds_history`
