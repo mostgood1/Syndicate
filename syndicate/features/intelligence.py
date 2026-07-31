@@ -3989,22 +3989,96 @@ def _mlb_team_abbr_any(team_name: str) -> str:
     return abbreviation or _soccer_abbr_from_name(text)
 
 
+def _soccer_schedule_kickoff_dates(league: str) -> list[tuple[str, str, str]]:
+    """[(home_team, away_team, date)] across the WHOLE season for one
+    league (not just one week) -- the ESPN-sourced schedule's own team
+    naming, for fuzzy-matching against OddsAPI's differently-spelled
+    home_team/away_team on a raw odds row (#165: see
+    _soccer_steam_matchup_lookup's docstring for why this exists at all).
+    Never raises -- schedule_payload already degrades to None on any read
+    failure.
+    """
+    try:
+        from syndicate.features.soccer.sources import default_season, schedule_payload
+    except Exception:
+        return []
+    try:
+        payload = schedule_payload(league, default_season(league)) or {}
+    except Exception:
+        return []
+    matches = payload.get("matches") if isinstance(payload.get("matches"), list) else []
+    rows: list[tuple[str, str, str]] = []
+    for match in matches:
+        if not isinstance(match, dict):
+            continue
+        matchup = match.get("matchup") if isinstance(match.get("matchup"), dict) else {}
+        home = _safe_text(matchup.get("home_team"), "")
+        away = _safe_text(matchup.get("away_team"), "")
+        date_text = _safe_text(match.get("date"), "")[:10]
+        if home and away and date_text:
+            rows.append((home, away, date_text))
+    return rows
+
+
+def _soccer_event_kickoff_date(league: str, odds_home: str, odds_away: str, schedule_rows: list[tuple[str, str, str]]) -> str | None:
+    """Fuzzy-match an odds row's home_team/away_team (OddsAPI's naming,
+    e.g. "LA Galaxy") against the ESPN-sourced season schedule's naming
+    (e.g. "Los Angeles Galaxy") to resolve that specific match's real
+    kickoff date -- same cross-source name mismatch market_board.py's
+    _soccer_odds_event_for_match already solves for a different purpose,
+    reused here since this function's need (one real per-event date) is
+    smaller than importing that one's full event-id resolution."""
+    if not schedule_rows:
+        return None
+    try:
+        from syndicate.features.soccer.features.team_names import match_team_name
+    except Exception:
+        return None
+    home_names = [row[0] for row in schedule_rows]
+    matched_home = match_team_name(odds_home, home_names) if odds_home else None
+    if matched_home is None:
+        return None
+    candidates = [row for row in schedule_rows if row[0] == matched_home]
+    away_names = [row[1] for row in candidates]
+    matched_away = match_team_name(odds_away, away_names) if odds_away else None
+    if matched_away is None:
+        return None
+    for home, away, date_text in candidates:
+        if away == matched_away:
+            return date_text
+    return None
+
+
 def _soccer_steam_matchup_lookup(selected_date: str) -> dict[str, dict[str, str]]:
-    """event_id -> {"matchup": "Away @ Home", "league_display": "MLS"} for
-    soccer, built from the raw OddsAPI fetch rows (game_odds_current.csv +
-    today's props/<date>.csv per active league) -- the only place a steam
-    event's real OddsAPI-hash event_id can actually be resolved to team
-    names for events recorded before odds_refresh_tracking.py started
-    stamping home_team/away_team directly. Cheap: a full day across all
-    active leagues is dozens of rows (a single rolling "current odds" file
-    per league), not hundreds. Never raises -- game_odds_rows/props_odds_rows
-    already degrade to () on any read failure, matching this whole
-    function's best-effort/cosmetic purpose.
+    """event_id -> {"matchup": "Away @ Home", "league_display": "MLS",
+    "game_date": "2026-08-01"} for soccer, built from the raw OddsAPI fetch
+    rows (game_odds_current.csv + today's props/<date>.csv per active
+    league) -- the only place a steam event's real OddsAPI-hash event_id
+    can actually be resolved to team names for events recorded before
+    odds_refresh_tracking.py started stamping home_team/away_team
+    directly. Cheap: a full day across all active leagues is dozens of
+    rows (a single rolling "current odds" file per league), not hundreds.
+    Never raises -- game_odds_rows/props_odds_rows already degrade to ()
+    on any read failure, matching this whole function's best-effort/
+    cosmetic purpose.
 
     #162: this loop already walks per-league, so the league that resolved
     each event_id is known right here -- stamped alongside matchup so
     _steam_candidates_for_sport can show "MLS"/"La Liga" instead of the
     generic "Soccer" sport label every other steam candidate got before.
+
+    #165 follow-up, confirmed live: every steam candidate's game_date got
+    stamped with the board's own requested date (selected_date/
+    context_label -- "when this scan ran"), not the individual match's
+    real kickoff date. active_leagues_for_date/game_odds_rows/
+    props_odds_rows read a rolling odds feed that covers MANY upcoming
+    matches across several actual calendar days at once (a single MLS odds
+    file mixes this-weekend's whole slate), so every one of those matches
+    got mislabeled with the SAME wrong date on the Games strip (e.g. seven
+    real Saturday MLS matches all showing "Fri Jul 31"). Resolve each
+    event's real kickoff date from the season schedule (fuzzy team-name
+    match, since OddsAPI and ESPN spell team names differently) so
+    _steam_candidates_for_sport can stamp a real per-game date instead.
     """
     try:
         from syndicate.features.soccer.sources import active_leagues_for_date, game_odds_rows, league_display_name, props_odds_rows
@@ -4021,6 +4095,7 @@ def _soccer_steam_matchup_lookup(selected_date: str) -> dict[str, dict[str, str]
             rows = (*game_odds_rows(league), *props_odds_rows(league, selected_date))
         except Exception:
             continue
+        schedule_rows = _soccer_schedule_kickoff_dates(league)
         for row in rows:
             event_id = _safe_text(row.get("event_id"), "")
             if not event_id or event_id in lookup:
@@ -4030,7 +4105,11 @@ def _soccer_steam_matchup_lookup(selected_date: str) -> dict[str, dict[str, str]
             if home or away:
                 away_abbr = _soccer_team_abbr(league, away) if away else "-"
                 home_abbr = _soccer_team_abbr(league, home) if home else "-"
-                lookup[event_id] = {"matchup": f"{away_abbr} @ {home_abbr}", "league_display": league_display_name(league)}
+                entry = {"matchup": f"{away_abbr} @ {home_abbr}", "league_display": league_display_name(league)}
+                kickoff_date = _soccer_event_kickoff_date(league, home, away, schedule_rows)
+                if kickoff_date:
+                    entry["game_date"] = kickoff_date
+                lookup[event_id] = entry
     return lookup
 
 
@@ -4089,6 +4168,14 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
     # candidates can show the real league instead of the generic "Soccer"
     # sport label every other candidate type on this board already fixed.
     league_display_by_game_id: dict[str, str] = {}
+    # #165 follow-up: soccer steam candidates otherwise got game_date
+    # stamped with `selected_date` (the board's own requested date, i.e.
+    # "when this scan ran") -- wrong for any match not actually happening
+    # that day, since the raw odds feed a single scan reads covers many
+    # upcoming matches across several real calendar days at once. Real
+    # per-event kickoff dates (resolved via the season schedule, see
+    # _soccer_steam_matchup_lookup) go here.
+    game_date_by_game_id: dict[str, str] = {}
     for game in sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []:
         if not isinstance(game, dict):
             continue
@@ -4104,6 +4191,9 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
         league_display_val = _safe_text(game.get("league_display"), "")
         if league_display_val:
             league_display_by_game_id[game_key] = league_display_val
+        game_date_val = _safe_text(game.get("game_date") or game.get("scheduled_start_utc"), "")[:10]
+        if game_date_val:
+            game_date_by_game_id[game_key] = game_date_val
         away_abbr_val = _safe_text(away.get("abbr"), "").upper()
         home_abbr_val = _safe_text(home.get("abbr"), "").upper()
         if away_abbr_val and home_abbr_val:
@@ -4136,6 +4226,9 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
             league_display_val = lookup_entry.get("league_display")
             if league_display_val:
                 league_display_by_game_id.setdefault(event_id, league_display_val)
+            game_date_val = lookup_entry.get("game_date")
+            if game_date_val:
+                game_date_by_game_id.setdefault(event_id, game_date_val)
 
     # Confirmed live: MLB steam candidates built from hitter/pitcher prop
     # rows (_flatten_mlb_props) had NO game_id at all -- unlike soccer's raw
@@ -4291,6 +4384,15 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
                 "event_id": game_id,
                 "game_pk": _safe_int(game_id),
                 "context_label": selected_date,
+                # #165 follow-up: game_date_by_game_id carries each soccer
+                # match's real per-event kickoff date (resolved via the
+                # season schedule) when available -- context_label alone is
+                # "the date this scan ran for," not this specific match's
+                # real date, and the frontend's Games-strip date badge
+                # (intelligence.html's fallbackDate) reads game_date/
+                # source_board_date before falling back to context_label.
+                "game_date": game_date_by_game_id.get(game_id) or selected_date,
+                "source_board_date": game_date_by_game_id.get(game_id) or selected_date,
                 "line": f"{current_line:.1f}" if current_line is not None else "-",
                 "odds": odds_text,
                 "projected": "-",

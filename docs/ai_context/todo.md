@@ -4,10 +4,11 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (WNBA live-lens
-status/live_state key bug, full #124/Phase-4 live verification)" below;
-prior session: "Reconciliation 2026-07-30 (#164/#165, WNBA missing props +
-duplicate MLB mini-cards)"; before that:
+Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (#165 follow-ups
++ #166, Games-strip merge correctness + soccer steam game_date)" below;
+prior session: "Reconciliation 2026-07-30 (WNBA live-lens status/live_state
+key bug, full #124/Phase-4 live verification)"; before that: "Reconciliation
+2026-07-30 (#164/#165, WNBA missing props + duplicate MLB mini-cards)"; before that:
 "Reconciliation 2026-07-30 (#163, Ask The Syndicate MLB player history +
 advanced analytics)"; before that: "Reconciliation 2026-07-30 (#162, soccer
 league display)"; before that:
@@ -23,6 +24,69 @@ that: "Reconciliation 2026-07-30 (opportunity board / Phase 2)"; before that:
 "Reconciliation 2026-07-30 (steam candidates, Layer 2 projection, portfolio
 reconciliation)"; before that: "Reconciliation 2026-07-30 (evaluation-ledger
 settlement / Phase 1)").
+
+### Reconciliation 2026-07-30 (#165 follow-ups + #166, Games-strip merge correctness + soccer steam game_date)
+
+Continued live verification of #164/#165 (asked to "check the board once
+more for any other issues" after that round shipped) surfaced two more
+real, confirmed-live bugs -- both fixed and reshipped same session.
+
+**#165 was wrong twice before it was right.** The original fix (merge
+Games-strip groups sharing sport+matchup text) shipped, then immediately
+regressed live: WSH @ ATL is a real back-to-back two-day series, and
+merging purely on matchup text collapsed today's and tomorrow's game into
+ONE card, silently hiding one of them. Follow-up #1 added an exact
+sport+matchup+date key -- which then broke the ORIGINAL same-day merge
+again (WSH @ ATL's stray duplicate-causing candidate has no resolvable
+date, so it was ineligible to merge with the real dated one). Follow-up #2
+switched to date-clustering (dateless groups join the one real date in
+play) -- still didn't fix WSH @ ATL, because its stray candidate carries
+its OWN resolvable but WRONG date (an upstream bug, not a missing field).
+Follow-up #3 (the one that stuck): cluster by **live-chip identity**
+first -- chipForGame(group)'s matchup-text fallback means two groups
+resolve to the literal same chip object when their ids don't
+independently match one, which is authoritative regardless of what either
+candidate's own date field claims. Date-clustering only applies to groups
+with no chip at all. Verified with a standalone Node simulation of the
+clustering algorithm against 5 scenarios (including the exact bug shape:
+two disagreeing real dates, same resolved chip) before each reshipment --
+worth doing before shipping algorithmically subtle client-side logic a
+fourth time, not after.
+
+**#166 -- soccer steam candidates' game_date was the scan date, not the
+match's real date.** User: "MLS only has one game tomorrow the rest are on
+Saturday so these dates seem wrong" -- correct. `/api/board/game-chips`
+confirmed only ONE real MLS match is Friday (TOR @ NYC); seven are
+Saturday. But every soccer steam candidate showed `game_date`/
+`source_board_date`/`context_label` all equal to the SAME value (the
+board's requested date) -- because `active_leagues_for_date`/
+`game_odds_rows`/`props_odds_rows` read a rolling odds feed covering MANY
+upcoming matches across several real calendar days at once, and
+`_steam_candidates_for_sport` stamped every one of them with
+"the date this scan ran for," not the individual match's real kickoff
+date. Fixed by resolving each event's real kickoff date from the season
+schedule: new `_soccer_schedule_kickoff_dates(league)` loads the whole
+season's `matches` (not just one week), new `_soccer_event_kickoff_date`
+fuzzy-matches an odds row's home_team/away_team (OddsAPI's naming, e.g.
+"LA Galaxy") against the schedule's naming (e.g. "Los Angeles Galaxy") via
+the same `match_team_name` cross-source matcher market_board.py's
+`_soccer_odds_event_for_match` already uses for a different purpose.
+`_soccer_steam_matchup_lookup` now returns a resolved `game_date` per
+event when available; `_steam_candidates_for_sport` prefers it over
+`selected_date`. Also backfilled `game_date_by_game_id` from
+`dashboard_games`' own date fields for the non-steam ("game"-type) path,
+for symmetry (lower-confidence fix, dashboard_games' dates looked
+plausible already but weren't independently re-verified).
+
+Verified live 2026-07-30: 208 tests passing (test_intelligence.py,
+test_intelligence_steam_candidates.py, soccer sources/branding suites),
+pending commit+deploy as of this reconciliation. This entire round landed
+alongside multiple other concurrently-active sessions in the same shared
+checkout (coordinated via send_message per #164/#165's entry) -- worth
+noting for whoever reads this next: HEAD moved out from under this session
+repeatedly (verify `git log --oneline -1 HEAD` vs `origin/main` fresh
+before every commit and deploy trigger, don't assume the state from five
+minutes ago still holds).
 
 ### Reconciliation 2026-07-30 (WNBA live-lens status/live_state key bug, full #124/Phase-4 live verification)
 

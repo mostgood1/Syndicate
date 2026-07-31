@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from syndicate.features.intelligence import _classify_candidate_with_reason
+from syndicate.features.intelligence import _soccer_event_kickoff_date
 from syndicate.features.intelligence import _steam_candidates_for_sport
 from syndicate.features.mlb.hr_targets import mlb_player_game_lookup_for_date
 
@@ -243,6 +244,61 @@ class SteamMatchupResolutionTests(unittest.TestCase):
             candidates = _steam_candidates_for_sport(sport)
         self.assertEqual(len(candidates), 1, candidates)
         self.assertEqual(candidates[0]["sport"], "La Liga")
+
+    def test_soccer_steam_candidate_uses_resolved_kickoff_date_from_lookup(self) -> None:
+        # #165 follow-up: confirmed live -- every soccer steam candidate's
+        # game_date got stamped with the board's own requested date ("when
+        # this scan ran"), not the individual match's real kickoff date, so
+        # several genuinely-Saturday MLS matches all showed "Fri Jul 31" on
+        # the Games strip. _soccer_steam_matchup_lookup resolving a real
+        # per-event game_date (season-schedule fuzzy match) must flow
+        # through to the candidate instead of the blanket selected_date.
+        event = dict(LIVE_PROP_STEAM_EVENT, sport="soccer", game_id="deadbeef")
+        event.pop("home_team", None)
+        event.pop("away_team", None)
+        sport = _sport(slug="soccer", context_label="2026-07-31")
+        sport["dashboard_games"] = []
+        with patch("syndicate.features.intelligence._load_steam_events_for_date", return_value=[event]), patch(
+            "syndicate.features.intelligence._soccer_steam_matchup_lookup",
+            return_value={"deadbeef": {"matchup": "NSH @ DC", "league_display": "MLS", "game_date": "2026-08-01"}},
+        ):
+            candidates = _steam_candidates_for_sport(sport)
+        self.assertEqual(len(candidates), 1, candidates)
+        self.assertEqual(candidates[0]["game_date"], "2026-08-01")
+        self.assertEqual(candidates[0]["source_board_date"], "2026-08-01")
+        # context_label stays the scan date -- only game_date/
+        # source_board_date (what the frontend's date badge actually reads
+        # first) change.
+        self.assertEqual(candidates[0]["context_label"], "2026-07-31")
+
+    def test_soccer_steam_candidate_falls_back_to_selected_date_without_a_resolved_kickoff(self) -> None:
+        event = dict(LIVE_PROP_STEAM_EVENT, sport="soccer", game_id="deadbeef")
+        event.pop("home_team", None)
+        event.pop("away_team", None)
+        sport = _sport(slug="soccer", context_label="2026-07-31")
+        sport["dashboard_games"] = []
+        with patch("syndicate.features.intelligence._load_steam_events_for_date", return_value=[event]), patch(
+            "syndicate.features.intelligence._soccer_steam_matchup_lookup",
+            return_value={"deadbeef": {"matchup": "NSH @ DC", "league_display": "MLS"}},
+        ):
+            candidates = _steam_candidates_for_sport(sport)
+        self.assertEqual(candidates[0]["game_date"], "2026-07-31")
+
+    def test_soccer_event_kickoff_date_fuzzy_matches_oddsapi_naming(self) -> None:
+        # OddsAPI and the ESPN-sourced season schedule spell team names
+        # differently ("LA Galaxy" vs "Los Angeles Galaxy") -- must still
+        # resolve via fuzzy match_team_name, not an exact string compare.
+        schedule_rows = [
+            ("Los Angeles Galaxy", "Real Salt Lake", "2026-08-01"),
+            ("Nashville SC", "D.C. United", "2026-08-01"),
+        ]
+        resolved = _soccer_event_kickoff_date("mls", "LA Galaxy", "Real Salt Lake", schedule_rows)
+        self.assertEqual(resolved, "2026-08-01")
+
+    def test_soccer_event_kickoff_date_returns_none_when_unmatched(self) -> None:
+        schedule_rows = [("Los Angeles Galaxy", "Real Salt Lake", "2026-08-01")]
+        self.assertIsNone(_soccer_event_kickoff_date("mls", "Totally Unknown FC", "Also Unknown", schedule_rows))
+        self.assertIsNone(_soccer_event_kickoff_date("mls", "Los Angeles Galaxy", "Real Salt Lake", []))
 
     def test_soccer_matchup_lookup_never_raises_when_soccer_sources_unavailable(self) -> None:
         from syndicate.features.intelligence import _soccer_steam_matchup_lookup
