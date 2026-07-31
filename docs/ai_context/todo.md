@@ -113,12 +113,20 @@ commit `c44c02cc`.
    of this write-up, production's WNBA odds_history shard has real props
    (A'ja Wilson pra/pts/reb/threes etc., all `is_live: false`, correctly
    NOT stamped with a fake closing_line) but zero `h2h`/`spreads`/`totals`
-   entries yet, and no WNBA game had gone live during the verification
-   window to prove the elapsed-based prop signal fires for real. Confirm
-   both (a game_cards-sourced game market with a real `closing_line`, and
-   a prop's `is_live` flipping true with `elapsed > 0`) against production
-   next time WNBA games are live before calling this fully closed the way
-   #161 part 1 is.
+   entries yet. NYL@LVA (`game_id=086a42225bc8fb8c6d5c57f0732338c65`) DID
+   flip to live (`game-chips` state) partway through the verification
+   window, but its props were still `is_live: false` several minutes
+   later, unchanged — the elapsed-signal-driven sync hadn't caught up by
+   session end, so this is still open, not confirmed working. Two
+   concrete things to re-check next time WNBA games are live: (a) does
+   `NYL@LVA`'s player-prop `is_live` eventually flip true with a real
+   `closing_line` stamped, or does it stay stuck at false indefinitely
+   (which would mean the elapsed-based sync isn't actually reaching this
+   game's props on production — a real bug, not just "hasn't ticked yet"),
+   and (b) does any game_cards-sourced `h2h`/`spreads`/`totals` market ever
+   appear at all (confirms the new CSV ingestion path is actually being
+   fetched/reached in production, not just correct in isolation). Neither
+   is confirmed — don't treat #161 part 2 as fully closed until both are.
 7. **One test failure encountered along the way that is NOT related to
    this work:** `tests/test_refresh_odds_sources.py::
    test_wnba_uses_combined_game_and_player_prop_markets_while_other_
