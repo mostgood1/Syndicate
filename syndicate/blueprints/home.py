@@ -2306,17 +2306,50 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
     for row in game_recs:
         if not isinstance(row, dict):
             continue
+        row_market_text = _first_present_text(row.get("market_label"), row.get("market"), row.get("label")) or "Game bet"
+        row_line = row.get("line") if row.get("line") is not None else row.get("market_line")
+        row_odds = _first_present_text(row.get("odds"), row.get("price"), row.get("american_odds"))
+        row_projected = (
+            row.get("projected")
+            if row.get("projected") is not None
+            else row.get("projection") if row.get("projection") is not None else row.get("model") if row.get("model") is not None else row.get("mean")
+        )
+        # Board audit follow-up, found live 2026-07-31: a game_market_
+        # recommendations pick with no real line, no real odds, and no real
+        # model projection has nothing bettable to show -- confirmed live: a
+        # WNBA bench-player pick whose upstream recommendation never had a
+        # priced market surfaced as "Courtney Vandersloot OVER -" (market
+        # "PROP" -- a fallback placeholder from wnba/sources.py's
+        # market_label(), since the raw pick had no real market code
+        # either). Scoped to non-game-level rows only via the SAME shared
+        # classifier _append_game_bet_candidate itself uses below (not a
+        # second, disagreeing copy) -- game-level Moneyline/Spread/Total
+        # rows can legitimately lack a "line" (a Moneyline pick has none),
+        # and other loops in this function (shared_top_play_rows, gameLens)
+        # intentionally omit line/projected too, relying on their OWN
+        # upstream validity gates instead -- this check is scoped to just
+        # this one loop's rows, not a blanket rule inside
+        # _append_game_bet_candidate itself, which broke those other loops
+        # when tried.
+        try:
+            from syndicate.features.intelligence import _is_game_level_market as _shared_is_game_level_market_for_row
+
+            row_is_game_level = _shared_is_game_level_market_for_row(row_market_text.strip().lower())
+        except Exception:
+            row_is_game_level = not (row_market_text.strip().lower().startswith("hitter ") or row_market_text.strip().lower().startswith("pitcher "))
+        if not row_is_game_level and row_line is None and not row_odds and row_projected is None:
+            continue
         _append_game_bet_candidate(
             candidates,
             sport=sport,
             game=game,
-            market=_first_present_text(row.get("market_label"), row.get("market"), row.get("label")) or "Game bet",
+            market=row_market_text,
             pick=_first_present_text(row.get("display_pick"), row.get("selection"), row.get("pick")) or "-",
-            line=row.get("line") if row.get("line") is not None else row.get("market_line"),
-            odds=_first_present_text(row.get("odds"), row.get("price"), row.get("american_odds")),
+            line=row_line,
+            odds=row_odds,
             edge=row.get("ev_pct") if row.get("ev_pct") is not None else row.get("edge"),
             confidence=row.get("p_win") if row.get("p_win") is not None else row.get("confidence"),
-            projected=row.get("projected") if row.get("projected") is not None else row.get("projection") if row.get("projection") is not None else row.get("model") if row.get("model") is not None else row.get("mean"),
+            projected=row_projected,
             live_projection=row.get("live_projection") if row.get("live_projection") is not None else row.get("liveProjection") if row.get("liveProjection") is not None else row.get("live_proj") if row.get("live_proj") is not None else row.get("projected_live"),
             detail=_first_present_text(row.get("summary"), row.get("reason"), game.get("summary")),
             fallback_epoch=fallback_epoch,

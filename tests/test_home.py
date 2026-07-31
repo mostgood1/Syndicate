@@ -1039,6 +1039,34 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         prop_candidate = next(c for c in candidates if c["market"] == "PTS")
         self.assertEqual(prop_candidate["entity"], "Kelsey Mitchell")
 
+    def test_prop_with_no_line_odds_or_projection_is_suppressed(self) -> None:
+        # Board audit follow-up, found live 2026-07-31: recommendations_slate
+        # picks for bench/role players with no real priced market
+        # (model_probability 0.5, no OddsAPI line yet) produced a board
+        # candidate reading "Courtney Vandersloot OVER -" -- name resolved
+        # fine (Phase C), but market/line/odds were all genuinely absent
+        # upstream. Nothing bettable to show, so this must not reach the
+        # board at all rather than display as a broken row.
+        game = self._sample_game(
+            game_market_recommendations=[
+                {"market_label": "PROP", "display_pick": "Courtney Vandersloot OVER -", "selection": "Courtney Vandersloot OVER -"},
+            ],
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "wnba"}, game, fallback_epoch=0.0)
+        self.assertFalse(any(c["market"] == "PROP" for c in candidates))
+
+    def test_prop_with_a_real_line_but_no_odds_yet_still_surfaces(self) -> None:
+        # The completeness guard should only suppress a prop when line,
+        # odds, AND projection are ALL absent -- a real line with odds not
+        # yet posted is still informative and must not be silently dropped.
+        game = self._sample_game(
+            game_market_recommendations=[
+                {"market_label": "PTS", "display_pick": "Kelsey Mitchell OVER 14.5", "selection": "OVER 14.5", "line": 14.5},
+            ],
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "wnba"}, game, fallback_epoch=0.0)
+        self.assertTrue(any(c["market"] == "PTS" for c in candidates))
+
     def test_spread_candidates_get_team_projected_and_confidence(self) -> None:
         game = self._sample_game(
             betting={

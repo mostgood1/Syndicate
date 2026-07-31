@@ -36,6 +36,7 @@ from syndicate.features.intelligence import _basketball_source_summary_score
 from syndicate.features.intelligence import _candidate_market_fit
 from syndicate.features.intelligence import _game_candidates_for_sport
 from syndicate.features.intelligence import _is_game_level_market
+from syndicate.features.intelligence import _prop_candidate_from_item
 from syndicate.features.intelligence import collect_candidates
 from syndicate.features.intelligence import classify_candidate
 from syndicate.features.intelligence import is_valid_candidate
@@ -6718,6 +6719,56 @@ class GameLevelMarketClassificationTests(unittest.TestCase):
         self.assertTrue(any("total bases" in market.lower() for market in prop_markets), prop_markets)
         self.assertNotIn("Hitter Total bases", game_markets)
         self.assertTrue(any(market == "Moneyline" for market in game_markets), game_markets)
+
+
+class PropCandidateFromItemCompletenessGuardTests(unittest.TestCase):
+    """Board audit follow-up, found live 2026-07-31: MLB's HR-targets
+    narrative shelf (_load_mlb_home_hr_target_items, home.py) scrapes prose
+    writeup/reasons text into a home_rails pregame item with no real
+    market, no line, no odds, and no model projection -- just a sentence
+    ("His underlying HR-quality profile is running above baseline.") and a
+    team abbreviation stamped into "market". _prop_candidate_from_item must
+    suppress (return None for) any item with nothing bettable, the same
+    shape of completeness guard added to _append_game_bet_candidate for
+    WNBA's equivalent symptom.
+    """
+
+    def test_narrative_only_item_with_no_line_odds_or_projection_returns_none(self) -> None:
+        sport = {"slug": "mlb", "context_label": "2026-07-31"}
+        item = {
+            "name": "Ben Rice",
+            "team": "NYY",
+            "pick": "His underlying HR-quality profile is running above baseline.",
+            "detail": "His underlying HR-quality profile is running above baseline.",
+        }
+        candidate = _prop_candidate_from_item(sport, item, surface_key="pregame", surface_title="Pregame props")
+        self.assertIsNone(candidate)
+
+    def test_real_prop_with_a_line_and_odds_still_returns_a_candidate(self) -> None:
+        sport = {"slug": "mlb", "context_label": "2026-07-31"}
+        item = {
+            "name": "Aaron Judge",
+            "market": "Hitter Total Bases",
+            "pick": "OVER 1.5",
+            "line": 1.5,
+            "odds": -120,
+            "projected": 1.8,
+        }
+        candidate = _prop_candidate_from_item(sport, item, surface_key="pregame", surface_title="Pregame props")
+        self.assertIsNotNone(candidate)
+        self.assertEqual(candidate["candidate_type"], "prop")
+
+    def test_real_prop_with_only_a_projection_and_no_priced_odds_yet_still_returns_a_candidate(self) -> None:
+        sport = {"slug": "mlb", "context_label": "2026-07-31"}
+        item = {
+            "name": "Aaron Judge",
+            "market": "Hitter Total Bases",
+            "pick": "OVER 1.5",
+            "line": 1.5,
+            "projected": 1.8,
+        }
+        candidate = _prop_candidate_from_item(sport, item, surface_key="pregame", surface_title="Pregame props")
+        self.assertIsNotNone(candidate)
 
 
 class ScoreCandidatesPipelineTaggingTests(unittest.TestCase):

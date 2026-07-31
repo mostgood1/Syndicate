@@ -2790,7 +2790,16 @@ def _candidate_odds_history_match_score(candidate: dict[str, Any], market_key: A
     score = 0.0
     candidate_matchup = _normalized_market_text(_safe_text(candidate.get("matchup"), ""))
     candidate_market = _normalized_market_text(_safe_text(candidate.get("market"), ""))
-    candidate_subject = _normalized_market_text(_safe_text(_candidate_subject_key(candidate), ""))
+    # _candidate_subject_key() only ever returns non-None for candidate_type
+    # == "prop" (by its own explicit design, since its other callers --
+    # dedup, correlated-parlay-leg matching -- are prop-specific too; not
+    # touched here to avoid widening those). Steam candidates carry their
+    # own real subject under "subject_key"/"player_name"/"entity" instead
+    # (set in _steam_candidates_for_sport) -- fall back to those so the
+    # cross-market guard below has real identity text to check for BOTH
+    # candidate types, not just props.
+    subject_source = _candidate_subject_key(candidate) or candidate.get("subject_key") or candidate.get("player_name") or candidate.get("entity")
+    candidate_subject = _normalized_market_text(_safe_text(subject_source, ""))
     candidate_team = _normalized_market_text(_safe_text(_candidate_team_key(candidate), ""))
     candidate_selection = _candidate_selection_text(candidate)
     candidate_selection_direction = _candidate_selection_direction(candidate)
@@ -2816,7 +2825,19 @@ def _candidate_odds_history_match_score(candidate: dict[str, Any], market_key: A
     # "Moneyline" vs raw API type "h2h"), so that comparison was always a
     # soft bonus, not a hard requirement -- only props need this extra gate,
     # since only props have a real player identity to check against.
-    if _safe_text(candidate.get("candidate_type"), "") == "prop" and entry_market.strip().lower() in _GAME_ONLY_ODDS_HISTORY_MARKET_TYPES:
+    #
+    # Confirmed live 2026-07-31: soccer "steam move" candidates hit the
+    # identical failure this gate was built for, just via candidate_type ==
+    # "steam" instead of "prop" -- all 120 steam candidates on one day's
+    # board converged onto a single unrelated game's odds history (one
+    # NYCFC/Toronto FC entry), because "steam" was never covered here and
+    # the soft matchup-text bonus alone was enough to clear the >0.0
+    # threshold for candidates with no real overlap at all. A steam
+    # candidate's own subject (_candidate_subject_key) is exactly as real an
+    # identity as a prop's -- it's a player name for a player-level steam
+    # move, or a team name for a game-level one -- so the same hard gate
+    # applies equally well to both.
+    if _safe_text(candidate.get("candidate_type"), "") in ("prop", "steam") and entry_market.strip().lower() in _GAME_ONLY_ODDS_HISTORY_MARKET_TYPES:
         if not candidate_subject or candidate_subject not in entry_event:
             return 0.0
 
@@ -3843,10 +3864,25 @@ def _requested_date_requires_active_sports(preferences: dict[str, Any]) -> bool:
         return False
 
 
-def _prop_candidate_from_item(sport: dict[str, Any], item: dict[str, Any], *, surface_key: str, surface_title: str) -> dict[str, Any]:
+def _prop_candidate_from_item(sport: dict[str, Any], item: dict[str, Any], *, surface_key: str, surface_title: str) -> dict[str, Any] | None:
     row = _build_prop_dashboard_row(sport, item, default_surface=surface_title)
     projected_value = _numeric_hint(row.get("projected"))
     line_value = _numeric_hint(row.get("line"))
+    # Board audit follow-up, found live 2026-07-31: MLB's HR-targets shelf
+    # scrapes narrative writeup/reasons text into a home_rails pregame item
+    # (_load_mlb_home_hr_target_items, home.py) that has no real market, no
+    # real line, no odds, and no model projection -- just a prose sentence
+    # ("His underlying HR-quality profile is running above baseline.") and a
+    # team abbreviation stamped into "market". That's not a bettable prop;
+    # it leaked onto the Layer 2 board as one, the only "prop" MLB showed at
+    # all on a day its real structured props artifact was stale. Same shape
+    # as the completeness guard added to _append_game_bet_candidate
+    # (home.py) for WNBA's equivalent symptom -- a prop candidate with no
+    # real line, no real odds, and no real projection has nothing bettable
+    # to show, regardless of which pipeline produced it.
+    odds_value = _numeric_hint(row.get("odds"))
+    if projected_value is None and line_value is None and odds_value is None:
+        return None
     if projected_value is not None and line_value is not None:
         row["score"] = float(row.get("score", 0.0)) + abs(projected_value - line_value) * 3.0
     advanced_signals = _advanced_signals_from_item(item)
@@ -5961,6 +5997,8 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
                         surface_key="pregame",
                         surface_title=_safe_text(pregame.get("title"), "Pregame props"),
                     )
+                    if candidate is None:
+                        continue
                     candidates.append(candidate)
                     pregame_candidates.append(candidate)
             if pregame_candidates:
@@ -5975,6 +6013,8 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
                         surface_key="live",
                         surface_title=_safe_text(live.get("title"), "Top Live Props"),
                     )
+                    if candidate is None:
+                        continue
                     candidates.append(candidate)
                     live_candidates.append(candidate)
             if live_candidates:

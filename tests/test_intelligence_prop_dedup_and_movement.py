@@ -131,6 +131,55 @@ class OddsHistoryMatchScoreCrossMarketGuardTests(unittest.TestCase):
         score = intelligence._candidate_odds_history_match_score(game_candidate, market_key, state)
         self.assertGreater(score, 0.0)
 
+    def _steam_candidate(self) -> dict:
+        # Real shape from _steam_candidates_for_sport: a player-level steam
+        # candidate carries subject_key/player_name/entity, not the
+        # prop-only "OVER Name" pick text _candidate_subject_key() parses.
+        return {
+            "candidate_type": "steam",
+            "matchup": "SSF @ PT",
+            "market": "Shots · Steam",
+            "name": "Gage Guerra Shots steam move",
+            "pick": "Gage Guerra steam move",
+            "selection": "Gage Guerra steam move",
+            "subject_key": "gage guerra",
+            "player_name": "Gage Guerra",
+            "entity": "Gage Guerra",
+            "line": "2.5",
+        }
+
+    def test_steam_candidate_rejects_unrelated_games_game_level_market(self) -> None:
+        # Confirmed live 2026-07-31: 120 soccer steam candidates all
+        # converged onto ONE unrelated game's (NYCFC/Toronto FC) odds
+        # history because "steam" wasn't covered by this gate at all.
+        market_key = "event_id=52ee1a58|home_team=New York City FC|away_team=Toronto FC|market=spreads|bookmaker=draftkings"
+        state = {"last_line": -0.25}
+        score = intelligence._candidate_odds_history_match_score(self._steam_candidate(), market_key, state)
+        self.assertEqual(score, 0.0)
+
+    def test_steam_candidate_accepts_its_own_players_prop_market(self) -> None:
+        market_key = "event_id=abc|player_name=Gage Guerra|market=player_shots_on_target|bookmaker=draftkings"
+        state = {"last_line": 2.5}
+        score = intelligence._candidate_odds_history_match_score(self._steam_candidate(), market_key, state)
+        self.assertGreater(score, 0.0)
+
+    def test_game_level_steam_candidate_still_matches_its_own_game(self) -> None:
+        game_steam_candidate = {
+            "candidate_type": "steam",
+            "matchup": "SSF @ PT",
+            "market": "Moneyline · Steam",
+            "name": "San Francisco FC steam move",
+            "pick": "San Francisco FC steam move",
+            "subject_key": "san francisco fc",
+            "player_name": "San Francisco FC",
+            "entity": "San Francisco FC",
+            "line": "-120",
+        }
+        market_key = "event_id=xyz|home_team=San Francisco FC|away_team=Portland Timbers|market=h2h|bookmaker=draftkings"
+        state = {"last_line": -120.0}
+        score = intelligence._candidate_odds_history_match_score(game_steam_candidate, market_key, state)
+        self.assertGreater(score, 0.0)
+
 
 class OddsHistoryPlayerIndexTests(unittest.TestCase):
     """2026-07-24 fix: _candidate_odds_history_state used to linear-scan
