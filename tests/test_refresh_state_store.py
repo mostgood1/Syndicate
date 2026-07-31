@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import unittest
+from datetime import date
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -16,19 +17,49 @@ from syndicate.features.shared.source_roots import preferred_source_roots
 class _FakeKeyValueClient:
     def __init__(self) -> None:
         self.store: dict[str, str] = {}
+        self.ttls: dict[str, int] = {}
+        self.last_ex: int | None = None
 
     def get(self, key: str) -> str | None:
         return self.store.get(key)
 
-    def set(self, key: str, value: str) -> bool:
+    def set(self, key: str, value: str, ex: int | None = None) -> bool:
         self.store[key] = str(value)
+        self.last_ex = ex
+        if ex is not None:
+            self.ttls[key] = ex
+        else:
+            self.ttls.pop(key, None)
         return True
 
     def exists(self, key: str) -> int:
         return 1 if key in self.store else 0
 
     def delete(self, key: str) -> int:
+        self.ttls.pop(key, None)
         return 1 if self.store.pop(key, None) is not None else 0
+
+    def scan(self, cursor: int = 0, match: str | None = None, count: int | None = None):
+        import fnmatch
+
+        pattern = str(match or "*")
+        matched = [key for key in self.store.keys() if fnmatch.fnmatch(key, pattern)]
+        return 0, matched
+
+    def ttl(self, key: str) -> int:
+        if key not in self.store:
+            return -2
+        return self.ttls.get(key, -1)
+
+    def memory_usage(self, key: str) -> int | None:
+        value = self.store.get(key)
+        return len(value.encode("utf-8")) if value is not None else None
+
+    def expire(self, key: str, seconds: int) -> bool:
+        if key not in self.store:
+            return False
+        self.ttls[key] = seconds
+        return True
 
     def info(self) -> dict[str, object]:
         return {
@@ -390,6 +421,133 @@ class RefreshStateStoreTests(unittest.TestCase):
         self.assertEqual(diagnostics["stats"]["evicted_keys"], 42)
         self.assertEqual(diagnostics["stats"]["maxmemory_policy"], "allkeys_lru")
         self.assertEqual(diagnostics["keyspace"]["db0"]["keys"], 100)
+
+    def test_default_ttl_detects_hyphenated_and_underscored_date_tokens(self) -> None:
+        # Board audit follow-up, 2026-07-31: root-caused live -- the shared
+        # keyvalue store had expired_keys=0 despite sitting at 96% of its
+        # 256MB cap with 34,529 LRU evictions and a 44% miss rate. Most
+        # keyvalue-backed artifacts are scoped to one calendar date embedded
+        # in their own filename but never got a TTL, so old, dead dates
+        # competed with today's actively-needed keys for the same fixed
+        # memory forever.
+        self.assertEqual(
+            refresh_state_store._default_keyvalue_ttl_seconds(Path("game_cards_2026-07-31.csv")),
+            refresh_state_store._KEYVALUE_DATE_SCOPED_TTL_SECONDS,
+        )
+        self.assertEqual(
+            refresh_state_store._default_keyvalue_ttl_seconds(Path("live_lens_report_2026_07_31.json")),
+            refresh_state_store._KEYVALUE_DATE_SCOPED_TTL_SECONDS,
+        )
+
+    def test_default_ttl_is_none_for_paths_with_no_date_token(self) -> None:
+        self.assertIsNone(refresh_state_store._default_keyvalue_ttl_seconds(Path("refresh_state.json")))
+        self.assertIsNone(refresh_state_store._default_keyvalue_ttl_seconds(Path("intelligence_state.json")))
+
+    def test_default_ttl_is_none_for_an_invalid_date_like_token(self) -> None:
+        # A "2026-13-99"-shaped substring isn't a real date -- must not
+        # crash or false-positive into applying a TTL.
+        self.assertIsNone(refresh_state_store._default_keyvalue_ttl_seconds(Path("weird_2026-13-99_file.json")))
+
+    def test_write_json_file_passes_the_detected_ttl_to_the_keyvalue_set_call(self) -> None:
+        fake_client = _FakeKeyValueClient()
+        with patch.dict(
+            os.environ,
+            {"SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue", "SYNDICATE_REFRESH_STATE_URL": "redis://example"},
+            clear=False,
+        ), patch("syndicate.features.shared.refresh_state_store._get_keyvalue_client", return_value=fake_client):
+            refresh_state_store.write_json_file(Path("game_cards_2026-07-31.csv"), {"ok": True})
+        self.assertEqual(fake_client.last_ex, refresh_state_store._KEYVALUE_DATE_SCOPED_TTL_SECONDS)
+
+    def test_write_json_file_passes_no_ttl_for_a_non_date_scoped_path(self) -> None:
+        fake_client = _FakeKeyValueClient()
+        with patch.dict(
+            os.environ,
+            {"SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue", "SYNDICATE_REFRESH_STATE_URL": "redis://example"},
+            clear=False,
+        ), patch("syndicate.features.shared.refresh_state_store._get_keyvalue_client", return_value=fake_client):
+            refresh_state_store.write_json_file(Path("refresh_state.json"), {"ok": True})
+        self.assertIsNone(fake_client.last_ex)
+
+    def test_write_text_file_passes_the_detected_ttl_to_the_keyvalue_set_call(self) -> None:
+        fake_client = _FakeKeyValueClient()
+        with patch.dict(
+            os.environ,
+            {"SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue", "SYNDICATE_REFRESH_STATE_URL": "redis://example"},
+            clear=False,
+        ), patch("syndicate.features.shared.refresh_state_store._get_keyvalue_client", return_value=fake_client):
+            refresh_state_store.write_text_file(Path("game_cards_2026-07-31.csv"), "a,b\n1,2\n")
+        self.assertEqual(fake_client.last_ex, refresh_state_store._KEYVALUE_DATE_SCOPED_TTL_SECONDS)
+
+    def _seed_sweep_fixture(self, fake_client: _FakeKeyValueClient) -> None:
+        prefix = refresh_state_store._keyvalue_namespace_key_prefix()
+        # A stale date (>= 10 days old), no TTL -- should be reported/swept.
+        fake_client.store[f"{prefix}/wnba_source/data/processed/game_cards_2026-07-01.csv"] = "a" * 100
+        # A fresh, recent date -- must NOT be touched.
+        fake_client.store[f"{prefix}/wnba_source/data/processed/game_cards_2026-07-30.csv"] = "b" * 50
+        # A stale date that ALREADY has a TTL (e.g. written after the Phase 1
+        # fix shipped) -- must not be double-counted/touched again.
+        stale_but_ttl_key = f"{prefix}/wnba_source/data/processed/recommendations_slate_2026-07-05.json"
+        fake_client.store[stale_but_ttl_key] = "c" * 30
+        fake_client.ttls[stale_but_ttl_key] = 500000
+        # No date token at all -- must be excluded from staleness entirely.
+        fake_client.store[f"{prefix}/reports/refresh_state.json"] = "d" * 20
+
+    def test_sweep_preview_reports_stale_no_ttl_keys_without_mutating_anything(self) -> None:
+        fake_client = _FakeKeyValueClient()
+        self._seed_sweep_fixture(fake_client)
+        with patch.dict(
+            os.environ,
+            {"SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue", "SYNDICATE_REFRESH_STATE_URL": "redis://example"},
+            clear=False,
+        ), patch("syndicate.features.shared.refresh_state_store._get_keyvalue_client", return_value=fake_client), patch(
+            "syndicate.features.shared.refresh_state_store.datetime"
+        ) as fake_datetime:
+            fake_datetime.now.return_value.date.return_value = date(2026, 7, 31)
+            preview = refresh_state_store.keyvalue_sweep_preview(stale_after_days=10)
+
+        self.assertTrue(preview["ok"])
+        self.assertEqual(preview["total_keys_scanned"], 4)
+        self.assertEqual(preview["stale_no_ttl_key_count"], 1)
+        self.assertEqual(preview["stale_no_ttl_estimated_bytes"], 100)
+        self.assertEqual(preview["fresh_or_already_ttl_keys"], 2)
+        self.assertEqual(preview["no_date_token_keys"], 1)
+        # Read-only: nothing in the fake store should have changed.
+        self.assertEqual(len(fake_client.store), 4)
+        self.assertNotIn(
+            f"{refresh_state_store._keyvalue_namespace_key_prefix()}/wnba_source/data/processed/game_cards_2026-07-01.csv",
+            fake_client.ttls,
+        )
+
+    def test_sweep_apply_sets_grace_period_ttl_only_on_stale_no_ttl_keys(self) -> None:
+        fake_client = _FakeKeyValueClient()
+        self._seed_sweep_fixture(fake_client)
+        prefix = refresh_state_store._keyvalue_namespace_key_prefix()
+        stale_key = f"{prefix}/wnba_source/data/processed/game_cards_2026-07-01.csv"
+        fresh_key = f"{prefix}/wnba_source/data/processed/game_cards_2026-07-30.csv"
+
+        with patch.dict(
+            os.environ,
+            {"SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue", "SYNDICATE_REFRESH_STATE_URL": "redis://example"},
+            clear=False,
+        ), patch("syndicate.features.shared.refresh_state_store._get_keyvalue_client", return_value=fake_client), patch(
+            "syndicate.features.shared.refresh_state_store.datetime"
+        ) as fake_datetime:
+            fake_datetime.now.return_value.date.return_value = date(2026, 7, 31)
+            result = refresh_state_store.keyvalue_sweep_apply(stale_after_days=10, grace_period_seconds=3600)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["keys_touched"], 1)
+        self.assertEqual(result["estimated_bytes_reclaimed"], 100)
+        # The stale key now has the grace-period TTL; nothing else was touched.
+        self.assertEqual(fake_client.ttls.get(stale_key), 3600)
+        self.assertNotIn(fresh_key, fake_client.ttls)
+        # Still present (not deleted) -- readers get their grace period.
+        self.assertIn(stale_key, fake_client.store)
+
+    def test_sweep_functions_return_none_on_filesystem_backend(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_REFRESH_STATE_BACKEND": "filesystem"}, clear=False):
+            self.assertIsNone(refresh_state_store.keyvalue_sweep_preview())
+            self.assertIsNone(refresh_state_store.keyvalue_sweep_apply())
 
     def test_keyvalue_diagnostics_reports_connection_failure(self) -> None:
         with patch.dict(

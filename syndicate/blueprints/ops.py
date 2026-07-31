@@ -279,6 +279,56 @@ def api_ops_keyvalue_diagnostics() -> Any:
     return jsonify(diagnostics)
 
 
+def _stale_after_days_param() -> int:
+    raw = str(request.args.get("stale_after_days") or "").strip()
+    try:
+        value = int(raw) if raw else 10
+    except ValueError:
+        value = 10
+    return max(1, value)
+
+
+@ops_bp.get("/api/ops/keyvalue/sweep-preview")
+def api_ops_keyvalue_sweep_preview() -> Any:
+    # Board audit follow-up, 2026-07-31: read-only -- reports how many
+    # date-scoped keys are stale (older than stale_after_days, default 10)
+    # AND currently carry no TTL, i.e. exactly what api_ops_keyvalue_sweep
+    # below would touch if called with the same stale_after_days. Mutates
+    # nothing; safe to call any time to see the current backlog before
+    # deciding whether/when to actually sweep it.
+    from syndicate.features.shared.refresh_state_store import keyvalue_sweep_preview
+
+    preview = keyvalue_sweep_preview(stale_after_days=_stale_after_days_param())
+    if preview is None:
+        return jsonify({"ok": False, "error": "SYNDICATE_REFRESH_STATE_BACKEND is not keyvalue on this service."})
+    return jsonify(preview)
+
+
+@ops_bp.post("/api/ops/keyvalue/sweep")
+def api_ops_keyvalue_sweep() -> Any:
+    # Board audit follow-up, 2026-07-31: mutating -- sets a short
+    # grace-period EXPIRE (default 1 hour, ?grace_period_seconds=) on every
+    # stale (older than ?stale_after_days=, default 10), currently-TTL-less,
+    # date-scoped key -- reclaiming the pre-existing backlog the TTL fix on
+    # new writes (write_json_file/write_text_file) can't touch by itself.
+    # Deliberately POST (not GET) since this mutates production state, and
+    # deliberately EXPIRE rather than DELETE -- see
+    # refresh_state_store.keyvalue_sweep_apply's own docstring.
+    from syndicate.features.shared.refresh_state_store import keyvalue_sweep_apply
+
+    grace_raw = str(request.args.get("grace_period_seconds") or "").strip()
+    try:
+        grace_period_seconds = int(grace_raw) if grace_raw else 3600
+    except ValueError:
+        grace_period_seconds = 3600
+    grace_period_seconds = max(60, grace_period_seconds)
+
+    result = keyvalue_sweep_apply(stale_after_days=_stale_after_days_param(), grace_period_seconds=grace_period_seconds)
+    if result is None:
+        return jsonify({"ok": False, "error": "SYNDICATE_REFRESH_STATE_BACKEND is not keyvalue on this service."})
+    return jsonify(result)
+
+
 @ops_bp.get("/api/ops/intelligence/memory-diagnostics")
 def api_ops_intelligence_memory_diagnostics() -> Any:
     # /api/ops/memory above only ever reports the CALLING service's own

@@ -2440,7 +2440,7 @@ class RefreshRunPerServiceLaneTests(unittest.TestCase):
         def _get(key: str) -> str | None:
             return fake_store.get(key)
 
-        def _set(key: str, value: str) -> bool:
+        def _set(key: str, value: str, ex: int | None = None) -> bool:
             fake_store[key] = str(value)
             return True
 

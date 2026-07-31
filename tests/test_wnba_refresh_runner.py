@@ -20,7 +20,7 @@ class _FakeKeyValueClient:
     def get(self, key: str) -> str | None:
         return self.store.get(key)
 
-    def set(self, key: str, value: str) -> bool:
+    def set(self, key: str, value: str, ex: int | None = None) -> bool:
         self.store[key] = str(value)
         return True
 

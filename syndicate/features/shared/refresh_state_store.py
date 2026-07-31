@@ -12,10 +12,14 @@ Constraints:
 
 from __future__ import annotations
 
+from datetime import date
+from datetime import datetime
+from datetime import timezone
 from functools import lru_cache
 import hashlib
 import json
 import os
+import re
 import uuid
 from pathlib import Path
 from typing import Any
@@ -129,6 +133,40 @@ def _normalize_state_path(path: Path) -> str:
 
 def _state_key_for_path(path: Path) -> str:
     return f"{_state_namespace()}:refresh-state:{_normalize_state_path(path)}"
+
+
+# Board audit follow-up, 2026-07-31: root-caused live -- the shared keyvalue
+# backend (one Redis instance, 256MB "starter" plan, shared across web +
+# refresh-worker + live-odds-worker) was at 96% memory usage with 34,529
+# LRU-evicted keys and a 44% keyspace miss rate, and (the key finding)
+# `expired_keys: 0` -- literally nothing written here has ever carried a
+# TTL. Most keyvalue-backed artifacts are scoped to one calendar date
+# embedded in their own filename (game_cards_<date>.csv,
+# recommendations_slate_<date>.json, live_state_<date>.jsonl, sim/props
+# snapshots, refresh_status manifests, ...) and have no ongoing value once
+# that date is genuinely old, but with no TTL they sat in memory forever,
+# competing with today's actively-needed keys for the same fixed 256MB
+# until LRU eventually evicted SOMETHING -- not necessarily the stale
+# entry, since LRU evicts whichever key hasn't been touched most recently,
+# not whichever is oldest by date. A plan upgrade isn't available, so this
+# gives any recognizably date-scoped key a TTL, generous enough to cover
+# every legitimate prev/next-day lookback and same-week ops/debugging use
+# this codebase does, so Redis reclaims genuinely dead data on its own
+# instead of relying entirely on LRU to eventually get to it.
+_KEYVALUE_DATE_TOKEN_RE = re.compile(r"(?P<y>20\d{2})[-_]?(?P<m>\d{2})[-_]?(?P<d>\d{2})")
+_KEYVALUE_DATE_SCOPED_TTL_SECONDS = 10 * 24 * 60 * 60  # 10 days
+
+
+def _default_keyvalue_ttl_seconds(path: Path) -> int | None:
+    normalized = _normalize_state_path(path)
+    match = _KEYVALUE_DATE_TOKEN_RE.search(normalized)
+    if not match:
+        return None
+    try:
+        date(int(match.group("y")), int(match.group("m")), int(match.group("d")))
+    except ValueError:
+        return None
+    return _KEYVALUE_DATE_SCOPED_TTL_SECONDS
 
 
 def _history_index_key() -> str:
@@ -530,9 +568,10 @@ def write_json_file(path: Path, payload: dict[str, Any]) -> None:
         # below keep indentation -- those are read by people.
         serialized = json.dumps(normalized_payload, separators=(",", ":"))
         _guard_keyvalue_payload_size(path, serialized, normalized_payload)
+        ttl_seconds = _default_keyvalue_ttl_seconds(path)
 
         def _write_json(client):
-            client.set(_state_key_for_path(path), serialized)
+            client.set(_state_key_for_path(path), serialized, ex=ttl_seconds)
             _record_refresh_status_history(path)
 
         _execute_keyvalue_operation(_write_json)
@@ -544,7 +583,8 @@ def write_text_file(path: Path, payload: str) -> None:
     if _state_backend_kind() == "keyvalue":
         serialized = str(payload or "")
         _guard_keyvalue_payload_size(path, serialized)
-        _execute_keyvalue_operation(lambda client: client.set(_state_key_for_path(path), serialized))
+        ttl_seconds = _default_keyvalue_ttl_seconds(path)
+        _execute_keyvalue_operation(lambda client: client.set(_state_key_for_path(path), serialized, ex=ttl_seconds))
         return
     _atomic_write_text(path, payload)
 
@@ -626,6 +666,145 @@ def keyvalue_diagnostics() -> dict[str, Any] | None:
     stats = {field: info.get(field) for field in _KEYVALUE_INFO_FIELDS if field in info}
     keyspace = {key: value for key, value in info.items() if str(key).startswith("db")}
     return {"ok": True, "stats": stats, "keyspace": keyspace}
+
+
+def _keyvalue_namespace_key_prefix() -> str:
+    return f"{_state_namespace()}:refresh-state:"
+
+
+def _keyvalue_scan_namespace_keys(client, *, max_keys: int = 20000) -> list[str]:
+    # SCAN, not KEYS -- KEYS blocks the whole server for the duration of the
+    # scan, which would be a genuinely bad thing to run against a shared
+    # production Redis instance three services depend on continuously.
+    prefix = _keyvalue_namespace_key_prefix()
+    keys: list[str] = []
+    cursor = 0
+    while True:
+        cursor, batch = client.scan(cursor=cursor, match=f"{prefix}*", count=500)
+        keys.extend(batch)
+        if len(keys) >= max_keys or cursor == 0:
+            break
+    return keys[:max_keys]
+
+
+def _keyvalue_key_staleness(key: str, *, today: date, stale_after_days: int) -> tuple[bool, bool]:
+    """Returns (has_date_token, is_stale) for one key."""
+    match = _KEYVALUE_DATE_TOKEN_RE.search(key)
+    if not match:
+        return False, False
+    try:
+        token_date = date(int(match.group("y")), int(match.group("m")), int(match.group("d")))
+    except ValueError:
+        return False, False
+    return True, (today - token_date).days >= stale_after_days
+
+
+# Board audit follow-up, 2026-07-31: the TTL fix above only applies to
+# NEW writes going forward -- it does nothing for the roughly 245MB/2,736
+# keys already sitting in the store today, many of which are old, dead
+# dates from before this fix existed and will never be rewritten (a
+# finished date's game_cards.csv has no future writer). A plan upgrade
+# isn't available, so reclaiming THAT existing backlog needs an active
+# sweep, not just waiting for organic rewrites. Preview (read-only, safe to
+# run any time) and apply (mutating) are deliberately separate functions --
+# see keyvalue_sweep_apply's own docstring for why apply sets a grace-
+# period TTL rather than deleting outright.
+def keyvalue_sweep_preview(*, stale_after_days: int = 10) -> dict[str, Any] | None:
+    if _state_backend_kind() != "keyvalue":
+        return None
+
+    def _scan(client):
+        keys = _keyvalue_scan_namespace_keys(client)
+        today = datetime.now(timezone.utc).date()
+        no_date_token_keys = 0
+        fresh_or_already_ttl_keys = 0
+        stale_no_ttl_keys: list[str] = []
+        stale_no_ttl_bytes = 0
+        sample_stale_keys: list[str] = []
+        for key in keys:
+            has_date_token, is_stale = _keyvalue_key_staleness(key, today=today, stale_after_days=stale_after_days)
+            if not has_date_token:
+                no_date_token_keys += 1
+                continue
+            if not is_stale:
+                fresh_or_already_ttl_keys += 1
+                continue
+            try:
+                ttl = client.ttl(key)
+            except Exception:
+                ttl = -1
+            if ttl is not None and ttl >= 0:
+                fresh_or_already_ttl_keys += 1
+                continue
+            stale_no_ttl_keys.append(key)
+            try:
+                size = client.memory_usage(key) or 0
+            except Exception:
+                size = 0
+            stale_no_ttl_bytes += size
+            if len(sample_stale_keys) < 20:
+                sample_stale_keys.append(key)
+        return {
+            "total_keys_scanned": len(keys),
+            "no_date_token_keys": no_date_token_keys,
+            "fresh_or_already_ttl_keys": fresh_or_already_ttl_keys,
+            "stale_no_ttl_key_count": len(stale_no_ttl_keys),
+            "stale_no_ttl_estimated_bytes": stale_no_ttl_bytes,
+            "stale_after_days": stale_after_days,
+            "sample_stale_keys": sample_stale_keys,
+        }
+
+    try:
+        return {"ok": True, **_execute_keyvalue_operation(_scan)}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+def keyvalue_sweep_apply(*, stale_after_days: int = 10, grace_period_seconds: int = 3600) -> dict[str, Any] | None:
+    # Sets a short grace-period EXPIRE (default 1 hour) rather than
+    # deleting outright -- any reader mid-flight against a stale key still
+    # gets its answer, while the memory is reclaimed promptly on the same
+    # timescale LRU eviction would have gotten to it anyway, just
+    # deliberately and measurably instead of at random. Uses the exact same
+    # staleness logic as keyvalue_sweep_preview (same stale_after_days
+    # default), so a preview call immediately before an apply call
+    # describes what apply is about to do.
+    if _state_backend_kind() != "keyvalue":
+        return None
+
+    def _sweep(client):
+        keys = _keyvalue_scan_namespace_keys(client)
+        today = datetime.now(timezone.utc).date()
+        keys_touched = 0
+        estimated_bytes_reclaimed = 0
+        for key in keys:
+            has_date_token, is_stale = _keyvalue_key_staleness(key, today=today, stale_after_days=stale_after_days)
+            if not has_date_token or not is_stale:
+                continue
+            try:
+                ttl = client.ttl(key)
+            except Exception:
+                ttl = -1
+            if ttl is not None and ttl >= 0:
+                continue
+            try:
+                size = client.memory_usage(key) or 0
+            except Exception:
+                size = 0
+            client.expire(key, grace_period_seconds)
+            keys_touched += 1
+            estimated_bytes_reclaimed += size
+        return {
+            "keys_touched": keys_touched,
+            "estimated_bytes_reclaimed": estimated_bytes_reclaimed,
+            "stale_after_days": stale_after_days,
+            "grace_period_seconds": grace_period_seconds,
+        }
+
+    try:
+        return {"ok": True, **_execute_keyvalue_operation(_sweep)}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
 
 def path_size(path: Path) -> int:
