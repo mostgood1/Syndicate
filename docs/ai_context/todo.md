@@ -4,10 +4,12 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (#165 follow-ups
-+ #166, Games-strip merge correctness + soccer steam game_date)" below;
-prior session: "Reconciliation 2026-07-30 (WNBA live-lens status/live_state
-key bug, full #124/Phase-4 live verification)"; before that: "Reconciliation
+Last reconciled: 2026-07-30 (see "Reconciliation 2026-07-30 (WNBA live
+boxscore/actuals stuck at zero, missing staleness+content gates)" below;
+prior session: "Reconciliation 2026-07-30 (#165 follow-ups + #166,
+Games-strip merge correctness + soccer steam game_date)"; before that:
+"Reconciliation 2026-07-30 (WNBA live-lens status/live_state key bug, full
+#124/Phase-4 live verification)"; before that: "Reconciliation
 2026-07-30 (#164/#165, WNBA missing props + duplicate MLB mini-cards)"; before that:
 "Reconciliation 2026-07-30 (#163, Ask The Syndicate MLB player history +
 advanced analytics)"; before that: "Reconciliation 2026-07-30 (#162, soccer
@@ -24,6 +26,63 @@ that: "Reconciliation 2026-07-30 (opportunity board / Phase 2)"; before that:
 "Reconciliation 2026-07-30 (steam candidates, Layer 2 projection, portfolio
 reconciliation)"; before that: "Reconciliation 2026-07-30 (evaluation-ledger
 settlement / Phase 1)").
+
+### Reconciliation 2026-07-30 (WNBA live boxscore/actuals stuck at zero, missing staleness+content gates)
+
+User caught this live, against real production, while looking at a genuinely
+in-progress WNBA game (MIN @ TOR, real score 62-45): every player in the
+"LIVE BOX" panel showed 0 pts/reb/ast and "--" minutes, while the adjacent
+"SIM BOX" (projected) panel showed real numbers. Also asked "how do we have
+multiple versions?" after screenshots showed a rich per-game dashboard
+(box scores, period/half/full-game "Game Lens" segments, official card with
+live prop combos) that turned out to be a **separate, pre-existing,
+independently-evolved system** (`syndicate/static/wnba/cards-parity.js`, a
+~6,200-line client-side engine feeding `/wnba/cards` and confusingly also
+`/wnba/live-lens` — both render `wnba/cards_source.html`) that this
+session's earlier Phase 4 work (`_build_wnba_game_lens` in `live_lens.py`)
+never discovered existed and is not consumed by at all — confirmed via grep,
+zero references to `gameLens` in `cards-parity.js`. That Phase 4 work is
+real and correct on its own terms (verified against `/wnba/api/live-lens`
+directly with real live games) but is invisible on the actual page users
+look at. User's explicit direction: keep Phase 4's work rather than delete
+it, and separately fix the two real bugs found. **The segment-math
+"inconsistency" (13.9%/24.9%/39.0%/39%) was investigated and is not a bug**
+— current-period/current-half/full-game are three different quantities
+(who wins this quarter vs. who wins the game), each internally correct for
+what it measures, just displayed with no labeling to distinguish them — a
+UI/copy issue, not fixed this pass.
+
+**Root-caused and fixed** (commit `8d8cccfc`, deployed to `web` +
+`live-odds-worker`, confirmed live against two real live games — 19/21 and
+19/19 players showing real non-zero stats): `build_live_player_boxscore_
+payload` (`syndicate/features/wnba/cards.py:5152`) had no staleness gate on
+its cached local snapshot, unlike its siblings (`build_live_player_lens_
+payload`, `build_live_lines_payload`, `build_live_state_payload`) which all
+already discard a local payload older than ~20 min for today's date. A
+boxscore captured near tip-off — real players listed, legitimately 0 stats
+at that instant — satisfied the old "players list non-empty" check forever
+and was served indefinitely, never re-fetched, while `live_state` (which
+already had this gate) kept ticking with the real score. Same bug, same
+"non-empty list is not evidence" class, on the write side too:
+`_payload_has_snapshot_content`'s `"live_player_boxscore"` branch
+(`scripts/refresh_wnba_oddsapi_props.py:263-264`) — its own file has this
+*exact* bug already fixed for `"live_state"` two months ago (`1c6d2ccc`,
+2026-06-03), just never backported to boxscore. Fixed both: staleness gate
+on read, "meaningful content" (real non-zero stat or actual minutes played)
+check on write. Same root cause was also responsible for the market-board's
+missing "actuals" — `build_wnba_market_board` → `build_live_player_lens_
+payload` → `_hydrate_live_player_lens_payload` derives `actual_value` from
+this exact same broken function, one root cause, two symptoms.
+
+112 tests passing across the two touched test files (3 new regression
+tests using the exact all-zero-boxscore shape observed live).
+
+**Not fixed, flagged for follow-up**: `syndicate/features/nba/cards.py` has
+an identical `_payload_has_live_boxscore_players` pattern (same function
+name, same 4 call sites, same missing gate) — likely the same bug, NBA side
+never checked or fixed this pass. The segment-win-prob UI labeling issue in
+`cards-parity.js` (see above) also remains open — needs a product/UI
+decision, not a math fix.
 
 ### Reconciliation 2026-07-30 (#165 follow-ups + #166, Games-strip merge correctness + soccer steam game_date)
 
