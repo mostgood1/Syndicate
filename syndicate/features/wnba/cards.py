@@ -5165,7 +5165,24 @@ def build_live_player_boxscore_payload(
         )
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
-    local_payload = _filtered_local_live_snapshot_payload("live_player_boxscore", resolved_date, normalized_event_ids)
+    # Mirrors build_live_player_lens_payload's own staleness gate (same file)
+    # -- without it, a local snapshot captured near tip-off (real players
+    # listed, legitimately 0 pts/reb/ast/min at that instant) satisfies
+    # _payload_has_live_boxscore_players forever and is served indefinitely,
+    # never re-fetched, while live_state (which already had this gate) keeps
+    # ticking with the real score. Confirmed live 2026-07-30: a genuinely
+    # in-progress game (62-45) still showing every player at 0/-- in the box.
+    is_today = str(selected_date).strip() == central_today_iso()
+
+    def _discard_if_stale(payload: dict[str, Any] | None) -> dict[str, Any] | None:
+        if not is_today or payload is None:
+            return payload
+        timestamp = _parse_payload_timestamp(payload.get("odds_refreshed_at") or payload.get("generated_at"))
+        if timestamp is not None and (datetime.now(timezone.utc) - timestamp) > timedelta(minutes=20):
+            return None
+        return payload
+
+    local_payload = _discard_if_stale(_filtered_local_live_snapshot_payload("live_player_boxscore", resolved_date, normalized_event_ids))
     if _payload_has_live_boxscore_players(local_payload):
         return _attach_odds_refresh_timestamp(local_payload)
 
@@ -5176,7 +5193,7 @@ def build_live_player_boxscore_payload(
     game_index = _resolve_games_for_event_ids(resolved_date, normalized_event_ids)
     resolved_event_ids = resolve_event_ids_from_games(game_index, normalized_event_ids)
     if resolved_event_ids:
-        local_payload = _filtered_local_live_snapshot_payload("live_player_boxscore", resolved_date, resolved_event_ids)
+        local_payload = _discard_if_stale(_filtered_local_live_snapshot_payload("live_player_boxscore", resolved_date, resolved_event_ids))
         if _payload_has_live_boxscore_players(local_payload):
             return _attach_odds_refresh_timestamp(local_payload)
 

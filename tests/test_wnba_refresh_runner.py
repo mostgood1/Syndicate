@@ -2523,6 +2523,37 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         live_no_evidence = {"games": [{"event_id": "401857065", "status": "Live", "final": False, "in_progress": True, "home_pts": None, "away_pts": None, "period": None, "clock": ""}]}
         self.assertFalse(module._payload_has_snapshot_content("live_state", live_no_evidence))
 
+    def test_payload_has_snapshot_content_rejects_all_zero_boxscore(self) -> None:
+        # Regression for a real bug found live 2026-07-30: a boxscore
+        # captured right at tip-off has real players listed but every stat
+        # is legitimately 0 and minutes blank -- the old check (players list
+        # non-empty) treated that as "already has content" forever, so the
+        # refresh loop never re-fetched once a game was actually underway.
+        # Same class of bug as live_state above, just never backported here.
+        module = self._load_module()
+
+        all_zero = {
+            "games": [
+                {
+                    "event_id": "401857064",
+                    "players": [
+                        {"player": "Bench One", "pts": 0, "reb": 0, "ast": 0, "mp": "--"},
+                        {"player": "Bench Two", "pts": 0, "reb": 0, "ast": 0, "mp": "0:00"},
+                    ],
+                }
+            ]
+        }
+        self.assertFalse(module._payload_has_snapshot_content("live_player_boxscore", all_zero))
+
+        empty_players = {"games": [{"event_id": "401857064", "players": []}]}
+        self.assertFalse(module._payload_has_snapshot_content("live_player_boxscore", empty_players))
+
+        real_points = {"games": [{"event_id": "401857064", "players": [{"player": "Starter", "pts": 4, "reb": 0, "ast": 0, "mp": "6:12"}]}]}
+        self.assertTrue(module._payload_has_snapshot_content("live_player_boxscore", real_points))
+
+        real_minutes_no_stats_yet = {"games": [{"event_id": "401857064", "players": [{"player": "Starter", "pts": 0, "reb": 0, "ast": 0, "mp": "2:15"}]}]}
+        self.assertTrue(module._payload_has_snapshot_content("live_player_boxscore", real_minutes_no_stats_yet))
+
     def test_export_live_snapshot_artifacts_overwrites_empty_lens_snapshot_with_local_build(self) -> None:
         module = self._load_module()
 

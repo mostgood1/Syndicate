@@ -18,6 +18,7 @@ from syndicate.features.wnba.cards import build_live_pbp_stats_payload
 from syndicate.features.wnba.cards import build_live_player_boxscore_payload
 from syndicate.features.wnba.cards import build_live_player_lens_payload
 from syndicate.features.wnba.cards import build_live_state_payload
+from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.wnba.props import _summary_from_props_recommendations_rows
 
 
@@ -53,6 +54,61 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
 
         self.assertEqual([game.get("event_id") for game in payload.get("games") or []], ["evt-2"])
         self.assertEqual(((payload.get("games") or [{}])[0]).get("players"), [{"player": "Two"}])
+
+    def test_live_player_boxscore_payload_discards_stale_local_snapshot_for_today(self) -> None:
+        # Regression test for a real bug found live 2026-07-30: a local
+        # live_player_boxscore snapshot captured near tip-off (real players,
+        # legitimately 0 pts/reb/ast at that instant) satisfied the old
+        # "players list non-empty" check forever and was served indefinitely
+        # for a genuinely in-progress game, unlike its sibling
+        # build_live_player_lens_payload, which already discards a stale
+        # local payload for today's date. A stale local snapshot for today
+        # must fall through to a fresh (here, mocked) public fetch instead.
+        today = central_today_iso()
+        stale_local = {
+            "ok": True,
+            "date": today,
+            "generated_at": "2020-01-01T00:00:00Z",
+            "games": [{"event_id": "evt-9", "players": [{"player": "Stale", "pts": 0, "reb": 0, "ast": 0}]}],
+        }
+        fresh_public = {
+            "ok": True,
+            "date": today,
+            "games": [{"event_id": "evt-9", "players": [{"player": "Fresh", "pts": 12}]}],
+        }
+        with patch("syndicate.features.wnba.cards.build_cards_page_context", return_value={"date": today}), patch(
+            "syndicate.features.wnba.cards._filtered_local_live_snapshot_payload",
+            return_value=stale_local,
+        ), patch(
+            "syndicate.features.wnba.cards._public_live_player_boxscore_payload",
+            return_value=fresh_public,
+        ) as mock_public, patch(
+            "syndicate.features.wnba.cards._maybe_persist_current_day_live_snapshot_artifact",
+            side_effect=lambda kind, date, payload: payload,
+        ):
+            payload = build_live_player_boxscore_payload(today, ["evt-9"], ttl=20)
+
+        mock_public.assert_called()
+        self.assertEqual(((payload.get("games") or [{}])[0]).get("players"), [{"player": "Fresh", "pts": 12}])
+
+    def test_live_player_boxscore_payload_keeps_fresh_local_snapshot_for_today(self) -> None:
+        today = central_today_iso()
+        fresh_local = {
+            "ok": True,
+            "date": today,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "games": [{"event_id": "evt-9", "players": [{"player": "Live", "pts": 0}]}],
+        }
+        with patch("syndicate.features.wnba.cards.build_cards_page_context", return_value={"date": today}), patch(
+            "syndicate.features.wnba.cards._filtered_local_live_snapshot_payload",
+            return_value=fresh_local,
+        ), patch(
+            "syndicate.features.wnba.cards._public_live_player_boxscore_payload",
+        ) as mock_public:
+            payload = build_live_player_boxscore_payload(today, ["evt-9"], ttl=20)
+
+        mock_public.assert_not_called()
+        self.assertEqual(((payload.get("games") or [{}])[0]).get("players"), [{"player": "Live", "pts": 0}])
 
     def test_build_live_state_payload_caches_within_ttl_window(self) -> None:
         # Confirmed live 2026-07-23: every caller in one refresh-worker tick

@@ -261,7 +261,24 @@ def _payload_has_snapshot_content(kind: str, payload: dict[str, object] | None) 
     if normalized_kind == "live_player_lens":
         return any(isinstance(game, dict) and bool(game.get("rows")) for game in games)
     if normalized_kind == "live_player_boxscore":
-        return any(isinstance(game, dict) and bool(game.get("players")) for game in games)
+        # A non-empty players list alone isn't enough here either -- same
+        # class of bug as live_state below. Every player can legitimately
+        # show 0 pts/reb/ast and no minutes right at tip-off, which made a
+        # payload captured in that instant look "already has content"
+        # forever, so the refresh loop kept reusing it instead of re-fetching
+        # once the game was actually underway. Confirmed live 2026-07-30.
+        return any(
+            isinstance(game, dict)
+            and any(
+                isinstance(player, dict)
+                and (
+                    any((_float_or_none(player.get(key)) or 0.0) > 0 for key in ("pts", "reb", "ast", "threes_made"))
+                    or str(player.get("mp") or "").strip().lower() not in ("", "0", "0:00", "00:00", "--", "-")
+                )
+                for player in (game.get("players") or [])
+            )
+            for game in games
+        )
     if normalized_kind == "live_lines":
         return any(
             isinstance(game, dict)
