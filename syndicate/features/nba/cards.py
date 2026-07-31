@@ -28,6 +28,7 @@ from syndicate.features.nba.sources import processed_path
 from syndicate.features.nba.sources import live_snapshot_path
 from syndicate.features.shared.basketball_live_artifacts import build_live_lines_payload_from_artifacts
 from syndicate.features.shared.basketball_live_artifacts import build_live_player_lens_payload_from_artifacts
+from syndicate.features.shared.basketball_market_board import basketball_odds_history_payload
 from syndicate.features.shared.basketball_market_board import build_basketball_market_board
 from syndicate.features.shared.basketball_market_board import parse_raw_basketball_player_props_rows
 from syndicate.features.shared.basketball_live_artifacts import resolve_event_ids_from_games
@@ -2447,6 +2448,7 @@ def build_nba_market_board(selected_date: str) -> dict[str, Any]:
         games=games,
         live_player_lens_payload=live_player_lens_payload,
         raw_player_props=_nba_raw_player_props_for_date(selected_date),
+        odds_history=basketball_odds_history_payload("nba", selected_date),
     )
 
 
