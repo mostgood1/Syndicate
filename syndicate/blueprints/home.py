@@ -4669,9 +4669,18 @@ class _MLBDataProvider(_HomeSportDataProviderBase):
 
     def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
         from syndicate.features.mlb.cards import build_cards_page_context
+        from syndicate.features.mlb.cards import _enrich_games_with_tracked_market_lines
 
         payload = build_cards_page_context(context.context_label)
         games = list(payload.get("games") or [])
+        # Board audit, found live 2026-07-31: without this, markets["ml"/
+        # "totals"] only ever carries real odds for games the recommendation
+        # engine happened to flag -- every other game's Layer 2 Moneyline/
+        # Total candidate showed odds=null despite real market odds existing
+        # in production right now. Layer 1's market board already backfills
+        # from this same odds artifact (source_cards_api_payload); this is
+        # that identical enrichment, reused rather than duplicated inline.
+        games = _enrich_games_with_tracked_market_lines(games, context.context_label)
         for game in games:
             if isinstance(game, dict) and not game.get("game_market_recommendations"):
                 rows = _mlb_game_market_recommendation_rows(game)

@@ -2192,6 +2192,71 @@ def _game_from_live_lens_row(row: dict[str, Any], *, selected_date: str) -> dict
     }
 
 
+def _enrich_games_with_tracked_market_lines(games: list[dict[str, Any]], selected_date: str) -> list[dict[str, Any]]:
+    """Backfills real moneyline/total/spread odds into each game's
+    markets["ml"/"totals"/"spreads"] from the tracked game-lines odds
+    artifact, whenever the game's own markets dict lacks them entirely
+    (e.g. no recommendation-engine pick was ever attached to this game).
+
+    This is the same enrichment source_cards_api_payload already performs
+    inline for Layer 1's market board (build_mlb_market_board reads its
+    output) -- extracted out as its own small function, deliberately NOT
+    folded into a source_cards_api_payload refactor, so Layer 2's candidate
+    path (_MLBDataProvider.games(), home.py) can reuse just this piece
+    without inheriting that function's other, unrelated work (HR/K-target
+    shelf reshaping, live-lens merging, workflow/lineup health summaries)
+    or risking a regression in an already-correct, cache-sensitive function.
+
+    Board audit, found live 2026-07-31: every MLB Layer 2 Moneyline/Total
+    candidate showed odds=null even though the model's own win probability
+    was present and real market odds existed in production right now --
+    confirmed via Layer 1, which already reads this same odds artifact and
+    shows them correctly for the identical games.
+    """
+    today_iso = central_today_iso()
+    render_web_dyno = _render_web_dyno()
+    game_lines_path = daily_snapshot_oddsapi_game_lines_path(selected_date) if selected_date else None
+    game_lines_doc = load_json_file(game_lines_path) if game_lines_path else None
+    shared_game_lines_doc = (
+        load_odds_history_payload_for_sport("mlb", resolve_current_shard_key("mlb", selected_date))
+        if selected_date == today_iso and not render_web_dyno
+        else None
+    )
+    if isinstance(shared_game_lines_doc, dict):
+        shared_game_lines_games = shared_game_lines_doc.get("games") if isinstance(shared_game_lines_doc.get("games"), list) else []
+        shared_game_lines_date = str(shared_game_lines_doc.get("date") or shared_game_lines_doc.get("selected_date") or "").strip()
+        shared_game_lines_mode = str(shared_game_lines_doc.get("mode") or shared_game_lines_doc.get("generation_mode") or "").strip().lower()
+        shared_game_lines_retrieved_at = str(shared_game_lines_doc.get("retrieved_at") or shared_game_lines_doc.get("retrievedAt") or "").strip()
+        if shared_game_lines_games and (
+            shared_game_lines_date in {"", selected_date}
+            or shared_game_lines_mode in {"live", "refresh", "latest"}
+            or shared_game_lines_retrieved_at
+        ):
+            game_lines_doc = shared_game_lines_doc
+    game_lines_index = _tracked_game_lines_index(game_lines_doc)
+    enriched_games: list[dict[str, Any]] = []
+    for game in games:
+        if not isinstance(game, dict):
+            enriched_games.append(game)
+            continue
+        tracked_lines = _tracked_game_lines_for_source_card(game, game_lines_index)
+        merged_game = dict(game)
+        merged_game["trackedGameLines"] = tracked_lines
+        existing_markets = merged_game.get("markets") if isinstance(merged_game.get("markets"), dict) else {}
+        tracked_markets = _markets_from_tracked_game_lines(tracked_lines)
+        if tracked_markets:
+            merged_markets = dict(existing_markets)
+            for key in ("ml", "totals", "spreads"):
+                if isinstance(merged_markets.get(key), dict) and merged_markets.get(key):
+                    continue
+                candidate = tracked_markets.get(key)
+                if isinstance(candidate, dict) and candidate:
+                    merged_markets[key] = candidate
+            merged_game["markets"] = merged_markets
+        enriched_games.append(merged_game)
+    return enriched_games
+
+
 def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
     games = context.get("games") if isinstance(context.get("games"), list) else []
     hr_targets = context.get("hr_targets_shelf") if isinstance(context.get("hr_targets_shelf"), dict) else None

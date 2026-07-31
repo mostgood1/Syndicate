@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
+from syndicate.features.mlb.cards import _enrich_games_with_tracked_market_lines
 from syndicate.features.mlb.cards import _mlb_headshot_url
 from syndicate.features.mlb.cards import _mlb_hydrate_market_board_line_movement
 from syndicate.features.mlb.cards import _mlb_hydrate_market_board_live_projection
@@ -1136,6 +1137,81 @@ class MlbNeedsResimGamePksTests(unittest.TestCase):
         with patch("syndicate.features.mlb.cards.build_mlb_market_board", return_value=fake_board):
             result = mlb_needs_resim_game_pks("2026-07-23")
         self.assertEqual(result, ["100", "300"])
+
+
+class EnrichGamesWithTrackedMarketLinesTests(unittest.TestCase):
+    """Board audit follow-up, found live 2026-07-31: Layer 2's MLB game
+    candidates (_MLBDataProvider.games(), home.py) only ever got real odds
+    for games the recommendation engine happened to flag -- every other
+    game showed odds=null despite real market odds existing in production.
+    Layer 1's market board already backfills markets["ml"/"totals"] from
+    this same tracked-game-lines odds artifact (source_cards_api_payload);
+    _enrich_games_with_tracked_market_lines extracts that same enrichment
+    so Layer 2 can reuse it too.
+    """
+
+    def _game_lines_doc(self) -> dict:
+        return {
+            "date": "2026-07-23",
+            "retrieved_at": "2026-07-23T20:00:00Z",
+            "games": [
+                {
+                    "away_team": "Detroit Tigers",
+                    "home_team": "Athletics",
+                    "commence_time": "2026-07-23T22:41:00Z",
+                    "markets": {
+                        "h2h": {"home_odds": 119, "away_odds": -143},
+                        "totals": {"line": 8.5, "over_odds": -110, "under_odds": -110},
+                    },
+                }
+            ],
+        }
+
+    def _game(self) -> dict:
+        return {
+            "gamePk": 824651,
+            "gameDate": "2026-07-23T22:41:00Z",
+            "away": {"abbr": "DET", "name": "Detroit Tigers"},
+            "home": {"abbr": "ATH", "name": "Athletics"},
+            "markets": {},
+        }
+
+    def test_backfills_moneyline_and_total_odds_when_markets_are_empty(self) -> None:
+        with patch("syndicate.features.mlb.cards.daily_snapshot_oddsapi_game_lines_path", return_value="fake/path.json"), patch(
+            "syndicate.features.mlb.cards.load_json_file", return_value=self._game_lines_doc()
+        ):
+            enriched = _enrich_games_with_tracked_market_lines([self._game()], "2026-07-23")
+
+        self.assertEqual(len(enriched), 1)
+        markets = enriched[0]["markets"]
+        self.assertEqual(markets["ml"]["home_odds"], 119)
+        self.assertEqual(markets["ml"]["away_odds"], -143)
+        self.assertEqual(markets["totals"]["over_odds"], -110)
+        self.assertEqual(markets["totals"]["line"], 8.5)
+
+    def test_does_not_overwrite_an_existing_recommendation_engine_market(self) -> None:
+        game = self._game()
+        game["markets"] = {"ml": {"selection": "home", "model_prob": 0.695, "odds": "-229"}}
+        with patch("syndicate.features.mlb.cards.daily_snapshot_oddsapi_game_lines_path", return_value="fake/path.json"), patch(
+            "syndicate.features.mlb.cards.load_json_file", return_value=self._game_lines_doc()
+        ):
+            enriched = _enrich_games_with_tracked_market_lines([game], "2026-07-23")
+
+        # Already non-empty markets["ml"] must win -- a reco-engine pick is
+        # real, priced data, not something a generic odds backfill should
+        # ever replace.
+        self.assertEqual(enriched[0]["markets"]["ml"], {"selection": "home", "model_prob": 0.695, "odds": "-229"})
+
+    def test_no_odds_artifact_leaves_games_unchanged(self) -> None:
+        game = self._game()
+        with patch("syndicate.features.mlb.cards.daily_snapshot_oddsapi_game_lines_path", return_value=None):
+            enriched = _enrich_games_with_tracked_market_lines([game], "2026-07-23")
+        self.assertEqual(enriched[0]["markets"], {})
+
+    def test_non_dict_game_entries_pass_through_unchanged(self) -> None:
+        with patch("syndicate.features.mlb.cards.daily_snapshot_oddsapi_game_lines_path", return_value=None):
+            enriched = _enrich_games_with_tracked_market_lines([None, "not a game"], "2026-07-23")
+        self.assertEqual(enriched, [None, "not a game"])
 
 
 if __name__ == "__main__":
