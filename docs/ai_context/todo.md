@@ -186,6 +186,48 @@ B's `markets` dict end-to-end in production
 at the time it was implemented/tested — verify against a real live WNBA
 game next time one is running.
 
+**Same-session production outage, found and fixed: Layer 2 board stuck on
+"Loading board..." forever.** User reported it right after the follow-up
+deploys above landed. Initial investigation down the wrong path first —
+the `/api/intelligence/query` response was a genuinely startling 78MB for
+a `sport=all, limit=50` request (per-candidate `movement`/`market_data`/
+`precomputed_features` diagnostic fields are real but heavy, and
+`_attach_intelligence_response_aliases` plus a `response.response`
+backward-compat self-nest roughly triples/quadruples that before it ever
+reaches the wire) — but that duplication turned out to be old,
+pre-existing architecture (last touched by an unrelated `#142`/portfolio
+commit), not something from tonight. **Real root cause**, found by
+executing the page's own fetch call directly in a live browser tab rather
+than reasoning from the raw payload: a raw Python `float('nan')` reached
+the response (a pandas-derived line/odds value read without the same NaN
+guard `_line_number` already applies defensively elsewhere in
+`odds_refresh_tracking.py`). `json.dumps` serializes `NaN` as the bare
+token `NaN` — valid to Python's own lenient `json.loads`, but not valid
+JSON per spec — so Chrome's strict `JSON.parse` threw a `SyntaxError` on
+the entire payload the instant it hit that one token, anywhere in the
+tree. Every network request still returned 200 and nothing logged to
+console, which is exactly why this read as a hang rather than an error:
+the fetch succeeded, only `response.json()` failed, inside a catch block
+that left `intelligence.html`'s "Loading board..." status stuck forever
+with no visible error. Fixed centrally rather than by chasing the specific
+NaN producer: `syndicate/blueprints/intelligence.py`'s
+`_versioned_query_response` (the one function every response path funnels
+through before `jsonify`) now runs the payload through a new
+`_json_safe_value` recursive sanitizer that replaces any non-finite float
+(`NaN`/`Infinity`/`-Infinity`) with `None`. 3 new tests in
+`tests/test_intelligence.py` (`VersionedResponseJsonSafetyTests`); 161
+tests passing across the full `test_intelligence.py` blueprint-adjacent
+subset, no regressions. Deployed to web + refresh-worker, verified live in
+a real browser tab: board now renders 161 real candidates across
+MLB/WNBA/MLS with a normal "Updated ..." status instead of the stuck
+spinner, zero console errors. **Not chased further this session**: the
+specific pandas-derived field that was actually NaN today (whichever one
+produced the `away_line`-shaped token the browser choked on) was not
+individually root-caused/fixed at its source — the sanitizer is a
+defensive net at the response boundary, not a fix to whichever upstream
+producer is still emitting NaN today. If this recurs, the underlying
+producer is still there to find.
+
 ### Reconciliation 2026-07-31 (#161 part 2: NBA/WNBA closing line, plus a production outage found and fixed along the way)
 
 User asked to extend #161's MLB closing-line fix to NBA/WNBA's Layer 1
