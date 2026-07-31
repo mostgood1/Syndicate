@@ -1128,6 +1128,9 @@ class AskTheSyndicateFocusedEvidenceTests(unittest.TestCase):
                         "doubles_1plus": [
                             {"batter_id": 700001, "name": "Other Brewer", "team": "MIL", "p_2b_1plus": 0.2, "p_2b_1plus_cal": 0.2},
                         ],
+                        "runs_1plus": [
+                            {"batter_id": 700099, "name": "Bench Regular", "team": "MIL", "p_r_1plus": 0.4, "p_r_1plus_cal": 0.4},
+                        ],
                     },
                 }
             ],
@@ -1142,13 +1145,23 @@ class AskTheSyndicateFocusedEvidenceTests(unittest.TestCase):
             # 2026-07-12 mirrored data), not a plain abbreviation string --
             # matching that shape here is what caught _mlb_side_team_abbr
             # originally assuming a flat string during manual verification.
-            "away": {"team": {"team_id": 158, "name": "Milwaukee Brewers", "abbreviation": "MIL"}, "bullpen_profiles": []},
+            "away": {
+                "team": {"team_id": 158, "name": "Milwaukee Brewers", "abbreviation": "MIL"},
+                "bullpen_profiles": [],
+                # A full-lineup batter who is NOT one of hr_targets' curated
+                # ~30 HR-candidate rows -- covers the fallback path.
+                "lineup": [
+                    {"id": 700099, "name": "Bench Regular", "pos": "2B", "bat": "R", "throw": "R", "k_rate": 0.18, "bb_rate": 0.09, "hbp_rate": 0.01, "hr_rate": 0.02, "inplay_hit_rate": 0.33},
+                ],
+            },
             "home": {
                 "team": {"team_id": 134, "name": "Pittsburgh Pirates", "abbreviation": "PIT"},
                 "bullpen_profiles": [
                     {"id": 555111, "name": "Setup Man", "role": "SU", "leverage_skill": 0.7, "availability_mult": 1.0, "k_rate": 0.3, "bb_rate": 0.08, "hbp_rate": 0.01, "hr_rate": 0.02, "inplay_hit_rate": 0.28},
                     {"id": 555222, "name": "Closer Guy", "role": "CL", "leverage_skill": 0.9, "availability_mult": 0.8, "k_rate": 0.35, "bb_rate": 0.07, "hbp_rate": 0.0, "hr_rate": 0.015, "inplay_hit_rate": 0.25},
                 ],
+                "starter": {"id": 694973, "name": "Paul Skenes", "role": "SP"},
+                "starter_profile": {"id": 694973, "name": "Paul Skenes", "k_rate": 0.31, "bb_rate": 0.05, "hr_rate": 0.02, "inplay_hit_rate": 0.29},
             },
         }
         with open(os.path.join(snapshot_dir, "roster_0_MIL_at_PIT_pk823358_g1.json"), "w", encoding="utf-8") as f:
@@ -1180,6 +1193,31 @@ class AskTheSyndicateFocusedEvidenceTests(unittest.TestCase):
         self.assertEqual(bullpen_names, ["Closer Guy", "Setup Man"])
         self.assertNotIn("Other Brewer", table_titles)  # sanity: didn't match the wrong batter
 
+    def test_mlb_bvp_batter_question_resolves_via_full_lineup_when_not_an_hr_target(self) -> None:
+        # Regression guard (reported live, 2026-07-31): hr_targets only
+        # carries the ~30 HR-candidate batters leaguewide/day, so a batter
+        # who isn't one of them (e.g. a real-world report about Anthony
+        # Volpe) used to make this entire fetcher return None -- no BvP, no
+        # matchup probabilities, no bullpen table, nothing. "Bench Regular"
+        # here is deliberately NOT one of the hr_targets rows written by
+        # _write_matchup_fixtures, only present in the roster snapshot's
+        # full lineup, to prove the fallback resolves it.
+        self._write_matchup_fixtures()
+        ask_data._BVP_CACHE.clear()
+        ask_data._ROSTER_PAYLOAD_CACHE.clear()
+        with patch.dict(os.environ, {"MLB_BETTING_DATA_ROOT": os.path.join(self.root, "mlb")}):
+            result = ask_data._mlb_bvp_evidence("How does Bench Regular fare vs Skenes?", {})
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["evidence"]["batter"], "Bench Regular")
+        self.assertEqual(result["evidence"]["pitcher"], "Paul Skenes")
+        table_titles = [t["title"] for t in result["tables"]]
+        self.assertTrue(any("BvP" in t for t in table_titles))
+        season_table = next(t for t in result["tables"] if "Season tendencies" in t["title"])
+        self.assertIn(["Strikeout rate", "18.0%", "31.0%"], season_table["rows"])
+        bullpen_table = next(t for t in result["tables"] if "Opposing bullpen" in t["title"])
+        self.assertEqual(bullpen_table["rows"][0][0], "Closer Guy (CL)")
+
     def test_mlb_bvp_pitcher_question_resolves_reliever_via_slate_search(self) -> None:
         # "Closer Guy" is a bullpen arm, not a probable starter -- he never
         # appears as any hr_targets row's opponent_pitcher_name, so the
@@ -1194,9 +1232,14 @@ class AskTheSyndicateFocusedEvidenceTests(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result["evidence"]["pitcher"], "Closer Guy")
         self.assertEqual(result["evidence"]["role"], "CL")
+        # The opposing lineup now comes from the full roster snapshot lineup
+        # (MIL's "Bench Regular"), not hr_targets' curated HR-candidate rows
+        # (Jackson Chourio/Other Brewer) -- confirmed against real mirrored
+        # data that hr_targets can be entirely empty for a team even when
+        # the opponent's pitcher IS represented there.
         probs_table = next(t for t in result["tables"] if "opposing lineup" in t["title"] and "simulated probabilities" in t["title"])
-        self.assertIn("Jackson Chourio", [row[0] for row in probs_table["rows"]])
-        self.assertEqual(result["evidence"]["lineup_topn_probabilities"]["Jackson Chourio"]["hits_1plus"], 0.70)
+        self.assertIn("Bench Regular", [row[0] for row in probs_table["rows"]])
+        self.assertEqual(result["evidence"]["lineup_topn_probabilities"]["Bench Regular"]["runs_1plus"], 0.4)
 
     def test_mlb_bvp_pitcher_question_for_named_starter_still_works(self) -> None:
         # Regression guard: a probable-starter lookup must still resolve via

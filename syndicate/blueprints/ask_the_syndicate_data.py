@@ -1083,13 +1083,37 @@ def _mlb_bullpen_profiles_for_team(roster_payload: dict[str, Any], team_abbr: st
     return []
 
 
-def _mlb_find_reliever_in_slate(selected_date: str, words: set[str]) -> tuple[int, str, str, dict[str, Any]] | None:
-    """Best bullpen-arm name match across today's whole slate.
+def _mlb_side_pitching_staff(side_doc: dict[str, Any]) -> list[dict[str, Any]]:
+    """A team's starter plus bullpen, as a single list of pitcher profiles.
 
-    Returns (game_pk, team, opponent_team, reliever_profile). Fallback for
-    pitcher questions that don't match any probable starter -- the BvP
-    pitcher branch below only searches starters via hr_targets'
-    opponent_pitcher_name, which never includes relief arms.
+    The starter comes from starter_profile (season rates included) when
+    present, else the thinner `starter` dict (id/name/role only).
+    """
+    if not isinstance(side_doc, dict):
+        return []
+    staff: list[dict[str, Any]] = []
+    starter_profile = side_doc.get("starter_profile")
+    starter = side_doc.get("starter")
+    if isinstance(starter_profile, dict) and starter_profile.get("id") is not None:
+        staff.append(starter_profile)
+    elif isinstance(starter, dict) and starter.get("id") is not None:
+        staff.append({**starter, "role": starter.get("role") or "SP"})
+    bullpen_profiles = side_doc.get("bullpen_profiles")
+    if isinstance(bullpen_profiles, list):
+        staff.extend(p for p in bullpen_profiles if isinstance(p, dict))
+    return staff
+
+
+def _mlb_find_pitcher_in_slate(selected_date: str, words: set[str]) -> tuple[int, str, str, dict[str, Any]] | None:
+    """Best pitcher name match (starter OR reliever) across today's whole
+    slate. Returns (game_pk, team, opponent_team, pitcher_profile).
+
+    Fallback for pitcher questions that don't match hr_targets'
+    opponent_pitcher_name -- confirmed against real mirrored data that many
+    games only have ONE side's starter represented there (whichever team
+    happened to have an HR-candidate batter that game), so the other
+    starter -- not just relief arms -- can be entirely unreachable through
+    the primary hr_targets-based match.
     """
     if not selected_date:
         return None
@@ -1117,10 +1141,87 @@ def _mlb_find_reliever_in_slate(selected_date: str, words: set[str]) -> tuple[in
             if not team:
                 continue
             opponent_team = sides.get("home" if side == "away" else "away", "")
-            for profile in _mlb_bullpen_profiles_for_team(payload, team):
+            for profile in _mlb_side_pitching_staff(payload.get(side)):
                 score = _person_matches(str(profile.get("name") or ""), words)
                 if score and (best is None or score > best[0]):
                     best = (score, (game_pk, team, opponent_team, profile))
+    return best[1] if best else None
+
+
+def _mlb_lineup_batters(side_doc: dict[str, Any]) -> list[dict[str, Any]]:
+    lineup = side_doc.get("lineup") if isinstance(side_doc, dict) else None
+    if isinstance(lineup, dict) and isinstance(lineup.get("batters"), list):
+        return [row for row in lineup["batters"] if isinstance(row, dict)]
+    if isinstance(lineup, list):
+        return [row for row in lineup if isinstance(row, dict)]
+    return []
+
+
+def _mlb_find_batter_in_slate(selected_date: str, words: set[str]) -> dict[str, Any] | None:
+    """Best batter-name match across every team's full starting lineup for
+    the date, returned in the same shape as an hr_targets target row.
+
+    hr_targets only carries the ~30 HR-candidate batters leaguewide per day
+    (confirmed against real mirrored data -- most starters, e.g. a leadoff
+    or bottom-of-order hitter, are absent from it entirely), which silently
+    made the whole BvP/matchup-probability/bullpen fetcher below a no-op
+    for anyone not flagged as an HR candidate that day. This searches the
+    full per-game lineup instead, so any starting batter resolves.
+    """
+    if not selected_date:
+        return None
+    snapshot_dir = os.path.join(_mlb_snapshot_root(), selected_date)
+    if not os.path.isdir(snapshot_dir):
+        return None
+    best: tuple[int, dict[str, Any]] | None = None
+    for path in sorted(glob.glob(os.path.join(snapshot_dir, "roster_*_pk*.json"))):
+        match = re.search(r"pk(\d+)", os.path.basename(path), re.IGNORECASE)
+        if not match:
+            continue
+        game_pk = int(match.group(1))
+        try:
+            payload = _load_json(path)
+        except Exception:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        for side in ("away", "home"):
+            side_doc = payload.get(side)
+            if not isinstance(side_doc, dict):
+                continue
+            opponent_doc = payload.get("home" if side == "away" else "away")
+            opponent_doc = opponent_doc if isinstance(opponent_doc, dict) else {}
+            team = _mlb_side_team_abbr(side_doc)
+            opponent_team = _mlb_side_team_abbr(opponent_doc)
+            starter = opponent_doc.get("starter") if isinstance(opponent_doc.get("starter"), dict) else {}
+            starter_profile = opponent_doc.get("starter_profile") if isinstance(opponent_doc.get("starter_profile"), dict) else {}
+            for batter in _mlb_lineup_batters(side_doc):
+                name = str(batter.get("name") or "")
+                score = _person_matches(name, words)
+                if not score or (best is not None and score <= best[0]):
+                    continue
+                try:
+                    batter_id = int(batter.get("id"))
+                except (TypeError, ValueError):
+                    continue
+                target = {
+                    "player_name": name,
+                    "batter_id": batter_id,
+                    "team": team,
+                    "opponent": opponent_team,
+                    "game_pk": game_pk,
+                    "opponent_pitcher_id": starter.get("id") if starter.get("id") is not None else starter_profile.get("id"),
+                    "opponent_pitcher_name": str(starter.get("name") or starter_profile.get("name") or ""),
+                    "batter_k_rate": batter.get("k_rate"),
+                    "batter_bb_rate": batter.get("bb_rate"),
+                    "batter_hr_rate": batter.get("hr_rate"),
+                    "batter_inplay_hit_rate": batter.get("inplay_hit_rate"),
+                    "pitcher_k_rate": starter_profile.get("k_rate"),
+                    "pitcher_bb_rate": starter_profile.get("bb_rate"),
+                    "pitcher_hr_rate": starter_profile.get("hr_rate"),
+                    "pitcher_inplay_hit_rate": starter_profile.get("inplay_hit_rate"),
+                }
+                best = (score, target)
     return best[1] if best else None
 
 
@@ -1208,11 +1309,19 @@ def _mlb_bvp_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] 
     targets, iso_date = loaded
     words = _question_words(question)
 
-    # Batter question: their history vs today's opposing starter.
+    # Batter question: their history vs today's opposing starter. hr_targets
+    # only carries the ~30 HR-candidate batters leaguewide/day (confirmed
+    # against real mirrored data -- most starters, e.g. a leadoff or
+    # bottom-of-order hitter, are absent from it entirely), so fall back to
+    # the full per-game lineup when the curated list doesn't have the name.
     batter_rows = [t for t in targets if _person_matches(str(t.get("player_name") or ""), words) > 0]
     if batter_rows:
         batter_rows.sort(key=lambda t: _person_matches(str(t.get("player_name") or ""), words), reverse=True)
         target = batter_rows[0]
+    else:
+        target = _mlb_find_batter_in_slate(iso_date, words)
+
+    if target is not None:
         batter_name = str(target.get("player_name") or "Batter")
         pitcher_name = str(target.get("opponent_pitcher_name") or "opposing starter")
         try:
@@ -1365,35 +1474,69 @@ def _mlb_bvp_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] 
     # Pitcher question: his history vs today's opposing lineup.
     pitcher_rows = [t for t in targets if _person_matches(str(t.get("opponent_pitcher_name") or ""), words) > 0]
     reliever_role: str | None = None
+    game_pk: int | None = None
+    opponent_team = ""
+    park_weather_row: dict[str, Any] = {}
     if pitcher_rows:
-        pitcher_name = str(pitcher_rows[0].get("opponent_pitcher_name") or "Pitcher")
+        matched_row = pitcher_rows[0]
+        pitcher_name = str(matched_row.get("opponent_pitcher_name") or "Pitcher")
         try:
-            pitcher_id = int(pitcher_rows[0].get("opponent_pitcher_id"))
+            pitcher_id = int(matched_row.get("opponent_pitcher_id"))
         except (TypeError, ValueError):
             return None
+        try:
+            game_pk = int(matched_row.get("game_pk"))
+        except (TypeError, ValueError):
+            game_pk = None
+        opponent_team = str(matched_row.get("team") or "").strip().upper()
+        park_weather_row = matched_row  # game-level fields live directly on this row
     else:
-        # Not a probable starter -- this fetcher's usual matching only covers
-        # starters via hr_targets' opponent_pitcher_name, so a bullpen arm
-        # would otherwise silently return nothing. Search relievers across
-        # the whole slate before giving up.
-        reliever_hit = _mlb_find_reliever_in_slate(iso_date, words)
-        if reliever_hit is None:
+        # Not found via hr_targets' opponent_pitcher_name -- confirmed
+        # against real mirrored data that hr_targets only represents
+        # whichever side happened to have an HR-candidate batter that game,
+        # so this can be a bullpen arm OR the *other* team's starter.
+        # Search the full slate (starters + bullpens) before giving up.
+        pitcher_hit = _mlb_find_pitcher_in_slate(iso_date, words)
+        if pitcher_hit is None:
             return None
-        _game_pk, _reliever_team, opponent_team, reliever_profile = reliever_hit
-        pitcher_name = str(reliever_profile.get("name") or "Pitcher")
-        reliever_role = str(reliever_profile.get("role") or "RP")
+        game_pk, _pitcher_team, opponent_team, found_profile = pitcher_hit
+        pitcher_name = str(found_profile.get("name") or "Pitcher")
+        reliever_role = str(found_profile.get("role") or "").strip() or None
         try:
-            pitcher_id = int(reliever_profile.get("id"))
+            pitcher_id = int(found_profile.get("id"))
         except (TypeError, ValueError):
             return None
-        # The opposing lineup for a bullpen arm is every batter target row on
-        # the opponent team today (their own opponent_pitcher_* fields belong
-        # to their starter, not this reliever, but batter_id/player_name and
-        # the game-level park/weather multipliers are still correct since
-        # it's the same game_pk/ballpark).
+        # No hr_targets row named this pitcher at all -- best-effort look for
+        # any target sharing this game_pk for park/weather context (they're
+        # game-level, not batter-specific, so any target from the same game
+        # carries the same values).
+        park_weather_row = next((t for t in targets if t.get("game_pk") == game_pk), {}) if game_pk is not None else {}
+
+    # The opposing lineup is every batter in the full per-game roster
+    # lineup, not hr_targets' team-filtered rows -- confirmed against real
+    # mirrored data that hr_targets can carry ZERO rows for a team even
+    # when its starter IS represented (it only lists the handful of
+    # HR-candidate batters per game, never a full lineup), so it can't be
+    # the lineup source for either match path above.
+    pitcher_rows = []
+    if game_pk is not None and opponent_team:
+        roster_payload = _mlb_roster_payload_for_game(iso_date, game_pk)
+        for side in ("away", "home"):
+            side_doc = roster_payload.get(side)
+            if isinstance(side_doc, dict) and _mlb_side_team_abbr(side_doc) == opponent_team:
+                for batter in _mlb_lineup_batters(side_doc):
+                    try:
+                        batter_id = int(batter.get("id"))
+                    except (TypeError, ValueError):
+                        continue
+                    pitcher_rows.append({"batter_id": batter_id, "player_name": str(batter.get("name") or "")})
+                break
+    if not pitcher_rows:
+        # Fall back to whatever hr_targets happens to carry for this team
+        # rather than surfacing nothing at all (e.g. roster snapshot missing).
         pitcher_rows = [t for t in targets if str(t.get("team") or "").strip().upper() == opponent_team]
-        if not pitcher_rows:
-            return None
+    if not pitcher_rows:
+        return None
     counts_by_batter = _bvp_counts_for_pitcher(pitcher_id)
     lineup: list[tuple[str, dict[str, int]]] = []
     seen: set[int] = set()
@@ -1457,15 +1600,16 @@ def _mlb_bvp_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] 
             "rows": [[name, market, f"{prob * 100:.1f}%"] for name, market, prob in lineup_topn_leaders[:10]],
         })
 
-    # Park/weather multipliers are game-level, not batter-specific, so any
-    # matched target row carries them -- same fields the batter-direction
-    # branch above already surfaces via profile_rows.
+    # Park/weather multipliers are game-level, not batter-specific -- only
+    # carried on hr_targets rows (park_weather_row, captured above; the
+    # pitcher_rows rebuilt below come from the roster lineup instead, which
+    # doesn't have these fields at all).
     park_weather_rows: list[list[Any]] = []
     for label, key, fmt in (
         ("Park HR mult", "park_hr_mult", "{:.2f}"),
         ("Weather HR mult", "weather_hr_mult", "{:.2f}"),
     ):
-        value = _to_float(pitcher_rows[0].get(key))
+        value = _to_float(park_weather_row.get(key))
         if value is not None:
             park_weather_rows.append([label, fmt.format(value)])
     if park_weather_rows:
