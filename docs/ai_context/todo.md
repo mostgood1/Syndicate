@@ -4,9 +4,11 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-31 (see "Reconciliation 2026-07-31 (Layer 2 board:
-MLB live-status dedup fix + WNBA game/prop wiring, Phase A-C)" below). Before
-that: "Reconciliation 2026-07-31 (#161 part 2: NBA/WNBA closing line, plus a
+Last reconciled: 2026-07-31 (see "Reconciliation 2026-07-31 (keyvalue capacity
+remediation: TTL + reclaim sweep, WNBA props/games vanishing root cause)"
+below). Before that: "Reconciliation 2026-07-31 (Layer 2 board: MLB
+live-status dedup fix + WNBA game/prop wiring, Phase A-C)". Before that:
+"Reconciliation 2026-07-31 (#161 part 2: NBA/WNBA closing line, plus a
 production outage found and fixed along the way)". Prior session: 2026-07-30.
 **#162/#164/#165/#166 and #163
 archived** to `todo_closed.md` (#163: Ask The Syndicate MLB player history +
@@ -31,6 +33,102 @@ that: "Reconciliation 2026-07-30 (opportunity board / Phase 2)"; before that:
 "Reconciliation 2026-07-30 (steam candidates, Layer 2 projection, portfolio
 reconciliation)"; before that: "Reconciliation 2026-07-30 (evaluation-ledger
 settlement / Phase 1)").
+
+### Reconciliation 2026-07-31 (keyvalue capacity remediation: TTL + reclaim sweep, WNBA props/games vanishing root cause)
+
+User reported "I see no wnba props at all right now." Root-caused through
+three layers, each one a real bug, not a repeat of #112/#116:
+
+**1. `read_text_file` couldn't distinguish "confirmed absent" from "read
+failed."** `_load_game_cards_csv_rows_from_keyvalue`
+(`syndicate/features/wnba/cards.py`) called `refresh_state_store.read_text_file`,
+which collapsed both a genuine "no key" and a transient Redis error into the
+same `None` — and this caller runs with `allow_stored_date_fallback=False`,
+so a transient hiccup meant zero games/props with no ESPN fallback to catch
+it. **Fix:** added `read_text_file_result(path) -> tuple[str|None, bool]`
+(mirrors the existing `read_json_file_result` pattern exactly — success flag
+distinct from value), made `read_text_file` a thin wrapper over it (fully
+backward compatible), and rewrote the WNBA loader to use the new function:
+on a confirmed read failure it now falls back to an in-process
+`_LAST_GOOD_GAME_CARDS_ROWS_BY_DATE` cache (last known good rows for that
+date) instead of returning empty, logging
+`WNBA_GAME_CARDS_KEYVALUE_READ_FAILED`. A genuine confirmed-empty result
+(real "no games today") is still trusted, not masked.
+
+**2. The real, system-wide cause: the shared keyvalue Redis instance
+(`red-d88bvljbc2fs73epfhhg`, 256MB "starter" plan) was at 96% capacity,
+34,529 evicted keys, 44% miss rate, and critically `expired_keys: 0` —
+nothing ever carried a TTL, so dead data competed with live data for the
+same fixed memory until LRU evicted something, and LRU evicts by
+recency-of-touch, not by age.** User clarified the architecture history
+before I could act on a false assumption: there was never a wholesale
+keyvalue→artifact migration; only `intelligence_state`/`board_snapshot`
+(#43) and `odds_history` shards (#108/#112/#116) moved to a
+keyvalue-with-artifact-fallback pattern, and that was driven by a **per-key
+size ceiling** (~8-9MB, where Render's managed Key Value service physically
+closes the connection above that size), not a total-capacity problem.
+`game_cards.csv` and friends were deliberately kept keyvalue-primary — WNBA
+needs it as the cross-service-consistent source of live game status. **User
+explicit instruction: a plan upgrade is not an option — remedy in code.**
+
+**3. Fix, shipped and deployed (`50a093b9`):** `syndicate/features/shared/refresh_state_store.py`
+now auto-applies a TTL to any keyvalue write whose path contains a
+recognizable date token (`_KEYVALUE_DATE_TOKEN_RE`, validated via real
+`date()` construction so a `2026-13-99`-shaped substring can't false-positive),
+via `_default_keyvalue_ttl_seconds()` wired into both `write_json_file`
+and `write_text_file` (`ex=` param on the `SET`, `None` for non-date-scoped
+paths — a true no-op, confirmed safe). Also shipped `keyvalue_diagnostics()`
+(real Redis `INFO` stats) and a manual reclaim mechanism —
+`keyvalue_sweep_preview`/`keyvalue_sweep_apply`, both SCAN-based (never
+`KEYS`, to avoid blocking the shared production instance) — exposed via
+three new ADMIN_TOKEN-gated endpoints in `syndicate/blueprints/ops.py`:
+`GET /api/ops/keyvalue/diagnostics`, `GET /api/ops/keyvalue/sweep-preview`,
+`POST /api/ops/keyvalue/sweep`. The apply path sets a grace-period `EXPIRE`
+(default 3600s) rather than deleting immediately, so any in-flight reader
+still gets its answer.
+
+**Ran the preview against real production at multiple thresholds — this
+changed the design.** A 10-day threshold found **zero** stale keys, which
+was surprising given the 96% pressure. At 3 days: 4 keys/8MB. At 1 day:
+**1,337 keys / ~56MB.** This proved the actual bloat is NOT one-key-per-date
+artifacts (`game_cards_<date>.csv` etc. — at most one active key per date,
+safe on a long TTL) but **one-key-per-RUN** paths under
+`reports/refresh_status/<date>/<run_id>/`, `reports/migration_runs/<date>/odds_refresh_<timestamp>/`,
+and `reports/live_refresh_loop/mlb_sim_runs/` — every single
+refresh/odds-refresh/sim tick writes a brand-new, never-reused key. Added a
+second, shorter TTL tier for these specifically
+(`_KEYVALUE_RUN_SCOPED_PATH_MARKERS` / `_KEYVALUE_RUN_SCOPED_TTL_SECONDS`,
+2 days vs. the 10-day default for genuinely date-scoped artifacts — a
+10-day TTL on the run-scoped category would let it re-accumulate to
+basically the same backlog within a day or two, given the write frequency),
+matched the sweep functions' own default `stale_after_days` down from 10 to
+2 to reflect this, and reconciled `ops.py`'s `_stale_after_days_param()`
+default to the same 2. New tests:
+`test_default_ttl_is_shorter_for_run_scoped_paths`,
+`test_default_ttl_stays_at_the_longer_default_for_non_run_scoped_date_paths`,
+plus the earlier read/diagnostics/TTL/sweep test batch (see
+`tests/test_refresh_state_store.py`). 218 tests passing across
+`test_refresh_state_store.py`/`test_ops.py`/`test_wnba_cards_keyvalue_backend.py`/`test_wnba_refresh_runner.py`
+(4 pre-existing fake keyvalue-client test doubles across these files needed
+a `ex: int | None = None` param added once real `set()` calls started
+always passing `ex=`).
+
+**Actually run against production**, not just shipped inert:
+`POST /api/ops/keyvalue/sweep?stale_after_days=1&grace_period_seconds=3600`
+returned `{"keys_touched": 1337, "estimated_bytes_reclaimed": 56058512}`;
+a follow-up `keyvalue_diagnostics()` call confirmed the keyspace showed
+`"expires": 1337` (grace-period TTL correctly applied to exactly those
+keys, freeing ~56MB once they actually expire).
+
+**Still open:** the run-scoped TTL refinement (2-day tier) was written and
+tested but had not yet been through a real production sweep-preview check
+by the end of this session to confirm fresh writes are actually picking up
+the shorter TTL going forward — worth a `keyvalue_diagnostics()`/sweep-preview
+spot-check on the next session touching this area. The underlying capacity
+constraint (256MB starter plan) is unchanged by any of this — TTLs and the
+manual sweep reduce the dead-data floor, they don't raise the ceiling; if
+real traffic growth outpaces what they reclaim, a plan upgrade is still the
+eventual answer, just not this session's to take.
 
 ### Reconciliation 2026-07-31 (Layer 2 board: MLB live-status dedup fix + WNBA game/prop wiring, Phase A-C)
 

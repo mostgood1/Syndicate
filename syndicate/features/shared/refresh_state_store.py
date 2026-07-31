@@ -156,6 +156,21 @@ def _state_key_for_path(path: Path) -> str:
 _KEYVALUE_DATE_TOKEN_RE = re.compile(r"(?P<y>20\d{2})[-_]?(?P<m>\d{2})[-_]?(?P<d>\d{2})")
 _KEYVALUE_DATE_SCOPED_TTL_SECONDS = 10 * 24 * 60 * 60  # 10 days
 
+# The first real-production sweep (2026-07-31) found the actual bloat
+# wasn't ONE-key-per-date artifacts (game_cards.csv and friends -- those
+# are safe with the longer default above, since there's at most one active
+# key per date) -- it was these ONE-key-per-RUN paths, where every single
+# refresh/odds-refresh/sim tick writes a brand-new, never-reused key
+# (e.g. reports/refresh_status/<date>/<run_id>/refresh_status_manifest.json,
+# reports/migration_runs/<date>/odds_refresh_<timestamp>/...). Confirmed
+# live: a 10-day TTL on this category alone would let it re-accumulate to
+# roughly the same ~56MB/1,337-key backlog the first sweep just reclaimed
+# within a day or two, given how often these run -- these need a much
+# shorter TTL specifically because they're write-once, never-reused keys,
+# not because the DATA is less important.
+_KEYVALUE_RUN_SCOPED_PATH_MARKERS = ("refresh_status/", "migration_runs/", "live_refresh_loop/")
+_KEYVALUE_RUN_SCOPED_TTL_SECONDS = 2 * 24 * 60 * 60  # 2 days
+
 
 def _default_keyvalue_ttl_seconds(path: Path) -> int | None:
     normalized = _normalize_state_path(path)
@@ -166,6 +181,8 @@ def _default_keyvalue_ttl_seconds(path: Path) -> int | None:
         date(int(match.group("y")), int(match.group("m")), int(match.group("d")))
     except ValueError:
         return None
+    if any(marker in normalized for marker in _KEYVALUE_RUN_SCOPED_PATH_MARKERS):
+        return _KEYVALUE_RUN_SCOPED_TTL_SECONDS
     return _KEYVALUE_DATE_SCOPED_TTL_SECONDS
 
 
@@ -709,7 +726,7 @@ def _keyvalue_key_staleness(key: str, *, today: date, stale_after_days: int) -> 
 # run any time) and apply (mutating) are deliberately separate functions --
 # see keyvalue_sweep_apply's own docstring for why apply sets a grace-
 # period TTL rather than deleting outright.
-def keyvalue_sweep_preview(*, stale_after_days: int = 10) -> dict[str, Any] | None:
+def keyvalue_sweep_preview(*, stale_after_days: int = 2) -> dict[str, Any] | None:
     if _state_backend_kind() != "keyvalue":
         return None
 
@@ -760,7 +777,7 @@ def keyvalue_sweep_preview(*, stale_after_days: int = 10) -> dict[str, Any] | No
         return {"ok": False, "error": str(exc)}
 
 
-def keyvalue_sweep_apply(*, stale_after_days: int = 10, grace_period_seconds: int = 3600) -> dict[str, Any] | None:
+def keyvalue_sweep_apply(*, stale_after_days: int = 2, grace_period_seconds: int = 3600) -> dict[str, Any] | None:
     # Sets a short grace-period EXPIRE (default 1 hour) rather than
     # deleting outright -- any reader mid-flight against a stale key still
     # gets its answer, while the memory is reclaimed promptly on the same

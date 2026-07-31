@@ -282,9 +282,9 @@ def api_ops_keyvalue_diagnostics() -> Any:
 def _stale_after_days_param() -> int:
     raw = str(request.args.get("stale_after_days") or "").strip()
     try:
-        value = int(raw) if raw else 10
+        value = int(raw) if raw else 2
     except ValueError:
-        value = 10
+        value = 2
     return max(1, value)
 
 

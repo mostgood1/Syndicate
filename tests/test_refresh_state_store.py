@@ -448,6 +448,47 @@ class RefreshStateStoreTests(unittest.TestCase):
         # crash or false-positive into applying a TTL.
         self.assertIsNone(refresh_state_store._default_keyvalue_ttl_seconds(Path("weird_2026-13-99_file.json")))
 
+    def test_default_ttl_is_shorter_for_run_scoped_paths(self) -> None:
+        # Board audit follow-up, 2026-07-31: the first real production sweep
+        # found the actual bloat wasn't one-key-per-date artifacts (those are
+        # safe on the 10-day default) -- it was one-key-per-RUN paths under
+        # refresh_status/, migration_runs/, and live_refresh_loop/, where
+        # every single refresh/odds-refresh/sim tick writes a brand-new,
+        # never-reused key. A 10-day TTL on this category alone would let it
+        # re-accumulate to the same ~56MB/1,337-key backlog within a day or
+        # two, so these get a much shorter TTL.
+        self.assertEqual(
+            refresh_state_store._default_keyvalue_ttl_seconds(
+                Path("reports/refresh_status/2026-07-31/run123/refresh_status_manifest.json")
+            ),
+            refresh_state_store._KEYVALUE_RUN_SCOPED_TTL_SECONDS,
+        )
+        self.assertEqual(
+            refresh_state_store._default_keyvalue_ttl_seconds(
+                Path("reports/migration_runs/2026-07-31/odds_refresh_20260731_120000/manifest.json")
+            ),
+            refresh_state_store._KEYVALUE_RUN_SCOPED_TTL_SECONDS,
+        )
+        self.assertEqual(
+            refresh_state_store._default_keyvalue_ttl_seconds(
+                Path("reports/live_refresh_loop/mlb_sim_runs/2026-07-31/tick_9.json")
+            ),
+            refresh_state_store._KEYVALUE_RUN_SCOPED_TTL_SECONDS,
+        )
+        self.assertLess(
+            refresh_state_store._KEYVALUE_RUN_SCOPED_TTL_SECONDS,
+            refresh_state_store._KEYVALUE_DATE_SCOPED_TTL_SECONDS,
+        )
+
+    def test_default_ttl_stays_at_the_longer_default_for_non_run_scoped_date_paths(self) -> None:
+        # A date-scoped path that doesn't match any run-scoped marker keeps
+        # the longer 10-day default -- the shorter TTL must not leak onto
+        # unrelated date-scoped artifacts like game_cards.csv.
+        self.assertEqual(
+            refresh_state_store._default_keyvalue_ttl_seconds(Path("game_cards_2026-07-31.csv")),
+            refresh_state_store._KEYVALUE_DATE_SCOPED_TTL_SECONDS,
+        )
+
     def test_write_json_file_passes_the_detected_ttl_to_the_keyvalue_set_call(self) -> None:
         fake_client = _FakeKeyValueClient()
         with patch.dict(
