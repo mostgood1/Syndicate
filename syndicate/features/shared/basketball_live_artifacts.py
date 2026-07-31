@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import unicodedata
 from datetime import datetime
 from datetime import timezone
 from pathlib import Path
@@ -31,7 +32,18 @@ def _canonical_tri(value: Any) -> str:
 
 
 def _normalize_name(value: Any) -> str:
-    return " ".join(str(value or "").strip().upper().split())
+    # Phase C (Layer 2 task): diacritic-stripping added to match
+    # mlb/cards.py's proven _normalize_live_name -- the same class of
+    # cross-source spelling mismatch (a name typed/encoded with accents in
+    # one artifact, without in another) that needed it there is equally
+    # possible here, since this key is shared, generic infra used by both
+    # WNBA and NBA. No nickname-alias table added: MLB's was added
+    # reactively after a real observed miss, and no equivalent mismatch has
+    # been observed for WNBA/NBA rosters yet -- don't invent aliases without
+    # evidence they're needed.
+    text = " ".join(str(value or "").strip().upper().split())
+    normalized = unicodedata.normalize("NFKD", text)
+    return "".join(ch for ch in normalized if not unicodedata.combining(ch))
 
 
 def _canonical_stat(value: Any) -> str:

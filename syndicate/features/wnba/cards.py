@@ -788,6 +788,212 @@ def _margin_win_prob(margin_mean: float | None, scale: float = 3.4) -> float | N
     return 1.0 / (1.0 + math.exp(exponent))
 
 
+def _wnba_elapsed_minutes(period: Any, clock: Any) -> float | None:
+    # #124/Phase 4, relocated here (Layer 2 task, Phase B) so both the
+    # standalone live-lens rank board and _build_cards_page_context_uncached
+    # (whose game dicts also feed the Layer 2 curated board via
+    # _game_bet_candidates_from_game) read the exact same computation instead
+    # of two copies drifting apart. WNBA quarters are 10 min each (regulation
+    # = 40, not NBA's 48); OT periods are 5 min each. Returns total minutes
+    # elapsed since tip-off (can exceed 40 in OT) so callers can derive a
+    # live/pregame blend weight -- None on any unparseable input, so callers
+    # fall back to pregame-only rather than guessing.
+    try:
+        period_int = int(period)
+    except (TypeError, ValueError):
+        return None
+    if period_int < 1:
+        return None
+    parts = str(clock or "").strip().split(":")
+    if len(parts) != 2:
+        return None
+    try:
+        minutes_left = int(parts[0])
+        seconds_left = int(parts[1])
+    except ValueError:
+        return None
+    if minutes_left < 0 or not (0 <= seconds_left < 60):
+        return None
+    period_length = 10.0 if period_int <= 4 else 5.0
+    remaining_in_period = max(0.0, min(period_length, minutes_left + seconds_left / 60.0))
+    elapsed_in_period = period_length - remaining_in_period
+    prior_minutes = (period_int - 1) * 10.0 if period_int <= 4 else (4 * 10.0 + (period_int - 5) * 5.0)
+    return prior_minutes + elapsed_in_period
+
+
+def _wnba_live_margin_win_prob(
+    pregame_p_home_win: float | None,
+    live_margin: float | None,
+    elapsed_min: float | None,
+) -> float | None:
+    # #124/Phase 4, relocated (Layer 2 task, Phase B). Adapts the pattern
+    # already proven working in the vendored WNBA live tick (vendor/
+    # wnba_betting_repo/app.py's moneyline section) -- a time-decaying scale
+    # (shrinks as time runs out, so a fixed margin maps to a more extreme
+    # probability late) feeding the same logistic win-prob-from-margin
+    # function WNBA already uses pregame (_margin_win_prob), blended toward
+    # the pregame probability by elapsed fraction of regulation. These
+    # constants are ported as a starting point, not backtested against real
+    # WNBA outcomes yet -- revisit once Phase 1/2's settlement pipeline has
+    # graded enough live WNBA recommendations to calibrate against (Phase 5).
+    if pregame_p_home_win is None:
+        return None
+    if live_margin is None or elapsed_min is None:
+        return pregame_p_home_win
+    min_left = max(0.0, _WNBA_REGULATION_MINUTES - elapsed_min)
+    scale = 6.0 + 0.35 * min_left
+    live_win_prob = _margin_win_prob(live_margin, scale=scale)
+    if live_win_prob is None:
+        return pregame_p_home_win
+    blend_w = max(0.0, min(1.0, elapsed_min / _WNBA_REGULATION_MINUTES))
+    return ((1.0 - blend_w) * pregame_p_home_win) + (blend_w * live_win_prob)
+
+
+def _wnba_metric_text(value: Any) -> str | None:
+    # Mirrors home.py's _prop_metric_text/_score_value formatting convention
+    # (whole numbers unadorned, one decimal otherwise) without importing
+    # from home.py -- home.py already imports from this module, and the
+    # reverse would be circular.
+    number = _safe_float(value)
+    if number is None:
+        return None
+    if number.is_integer():
+        return str(int(number))
+    return f"{number:.1f}"
+
+
+def _wnba_game_lens_markets(
+    betting: dict[str, Any],
+    *,
+    live_home_win_prob: float | None,
+    live_margin: float | None,
+    pace_total: float | None,
+) -> dict[str, dict[str, Any]]:
+    # Phase B (Layer 2 task): home.py's gameLens consumer
+    # (_game_bet_candidates_from_game, lines ~2384-2453) is already sport-
+    # agnostic -- it just needs each market's pick/line/odds/edge/p_win
+    # sourced from *something*. Derived here from the same `betting` dict
+    # _source_game_market_recommendations/_stamp_game_level_projected already
+    # populate, so this doesn't invent a second source of truth for
+    # odds/lines -- only the win/cover/over probabilities are recomputed
+    # live (via the blended win prob above, and the same margin/total-vs-
+    # line logistic _source_betting already uses pregame, fed with live
+    # inputs instead of pregame ones).
+    markets: dict[str, dict[str, Any]] = {}
+
+    home_ml = betting.get("home_ml")
+    away_ml = betting.get("away_ml")
+    if live_home_win_prob is not None and (home_ml is not None or away_ml is not None):
+        home_favored = live_home_win_prob >= 0.5
+        markets["moneyline"] = {
+            "pick": "Home ML" if home_favored else "Away ML",
+            "selection": "home" if home_favored else "away",
+            "odds": home_ml if home_favored else away_ml,
+            "edge": betting.get("home_ml_ev") if home_favored else betting.get("away_ml_ev"),
+            "p_win": live_home_win_prob if home_favored else (1.0 - live_home_win_prob),
+        }
+
+    home_spread = betting.get("home_spread")
+    if home_spread is not None and live_margin is not None:
+        live_home_cover_prob = _margin_win_prob(live_margin + home_spread, scale=7.5)
+        markets["spread"] = {
+            "pick": f"Home {_wnba_metric_text(home_spread) or ''}".strip(),
+            "selection": "home",
+            "homeLine": home_spread,
+            "edge": betting.get("home_spread_ev"),
+            "p_win": live_home_cover_prob if live_home_cover_prob is not None else betting.get("p_home_cover"),
+        }
+
+    total_line = betting.get("total")
+    if total_line is not None:
+        live_total_over_prob = _margin_win_prob(pace_total - total_line, scale=10.5) if pace_total is not None else None
+        markets["total"] = {
+            "pick": f"Over {_wnba_metric_text(total_line) or ''}".strip(),
+            "line": total_line,
+            "edge": betting.get("over_ev"),
+            "p_win": live_total_over_prob if live_total_over_prob is not None else betting.get("p_total_over"),
+        }
+
+    return markets
+
+
+def _build_wnba_game_lens(game: dict[str, Any]) -> list[dict[str, Any]]:
+    # #124/Phase 4: WNBA's native gameLens-equivalent -- deliberately a
+    # single whole-game lane (not MLB's six innings-based segments; a
+    # basketball quarter/half segmentation is a plausible future extension,
+    # not this phase). Reuses the "live_projection"/"pregame" source
+    # vocabulary MLB's frontend already knows about rather than inventing a
+    # new label, so both sports' payloads stay conceptually consistent even
+    # though only MLB has a dedicated UI for it today.
+    #
+    # Phase B (Layer 2 task) extends this with a `markets` dict so
+    # home.py's already-generic gameLens consumer can build live Moneyline/
+    # Spread/Total candidates for the Layer 2 board, the same way MLB's
+    # innings-segment gameLens already does.
+    betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
+    live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+    # `status` (not `live_state`) is where period/clock actually live on the
+    # game dict `build_cards_page_context` returns -- confirmed live 2026-07-30
+    # via a real in-progress game whose live_state carried only
+    # {away_pts, final, home_pts, in_progress, status}, no period/clock at
+    # all, which silently forced elapsed_min (and therefore source) to fall
+    # back to pregame forever even with a genuine, computable live margin.
+    # `live_state` is checked first only as a defensive fallback in case some
+    # other caller ever populates it there; `status` is the confirmed source.
+    status = game.get("status") if isinstance(game.get("status"), dict) else {}
+    pregame_p_home_win = _safe_float(betting.get("p_home_win"))
+    home_pts = _safe_float(live_state.get("home_pts"))
+    away_pts = _safe_float(live_state.get("away_pts"))
+    live_margin = (home_pts - away_pts) if home_pts is not None and away_pts is not None else None
+    period = live_state.get("period") if live_state.get("period") is not None else status.get("period")
+    clock = live_state.get("clock") if live_state.get("clock") is not None else status.get("clock")
+    elapsed_min = _wnba_elapsed_minutes(period, clock)
+    is_final = bool(live_state.get("final")) or bool(status.get("final"))
+    is_live = (bool(live_state.get("in_progress")) or bool(status.get("in_progress"))) and not is_final
+    if is_live:
+        model_home_win_prob = _wnba_live_margin_win_prob(pregame_p_home_win, live_margin, elapsed_min)
+    else:
+        model_home_win_prob = pregame_p_home_win
+    source = "live_projection" if (is_live and live_margin is not None and elapsed_min is not None) else "pregame"
+    current_total = (home_pts + away_pts) if home_pts is not None and away_pts is not None else None
+    pace_total: float | None = None
+    if source == "live_projection" and current_total is not None and elapsed_min:
+        elapsed_fraction = max(0.05, min(1.0, elapsed_min / _WNBA_REGULATION_MINUTES))
+        pace_total = current_total / elapsed_fraction
+    # Only populate markets for a genuinely live row -- a pregame-only game
+    # already gets plain betting-dict-sourced Moneyline/Spread/Total
+    # candidates straight from home.py; gameLens markets exist to carry an
+    # additional *live* update on top, not to duplicate the pregame ones
+    # under a second, redundant "Live ..." label.
+    markets = (
+        _wnba_game_lens_markets(
+            betting,
+            live_home_win_prob=model_home_win_prob,
+            live_margin=live_margin,
+            pace_total=pace_total,
+        )
+        if source == "live_projection"
+        else {}
+    )
+    return [
+        {
+            "key": "live",
+            "label": "Live",
+            "source": source,
+            "closed": is_final,
+            "projection": {
+                "homeMargin": live_margin,
+                "homeScore": home_pts,
+                "awayScore": away_pts,
+                "total": pace_total,
+            },
+            "modelHomeWinProb": model_home_win_prob,
+            "baselineHomeWinProb": pregame_p_home_win,
+            "markets": markets,
+        }
+    ]
+
+
 def _quarter_values(players: list[dict[str, Any]], stat_key: str, quarter_index: int) -> list[float | None]:
     values: list[float | None] = []
     for row in players:
@@ -2879,6 +3085,18 @@ def _build_cards_page_context_uncached(selected_date: str, *, allow_stored_date_
     prev_date = (parsed_date - timedelta(days=1)).isoformat()
     next_date = (parsed_date + timedelta(days=1)).isoformat()
     using_sample_data = False
+
+    # Phase B (Layer 2 task): attach gameLens here, once, where every game
+    # dict already carries both `betting` (_source_betting, set upstream at
+    # merge time) and `live_state` (_supplement_games_with_live_state, called
+    # above) -- both this page's own consumers and the Layer 2 curated board
+    # (via home.py's already sport-agnostic _game_bet_candidates_from_game)
+    # read these same dicts, so there is no separate attachment needed for
+    # either. Mirrors MLB's gameLens, which is likewise attached once by its
+    # own card-building path rather than per-consumer.
+    for game in games:
+        if isinstance(game, dict):
+            game["gameLens"] = _build_wnba_game_lens(game)
 
     scoreboard_items = [
         {

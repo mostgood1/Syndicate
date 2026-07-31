@@ -1795,6 +1795,15 @@ def _mlb_live_total_text(actual_payload: dict[str, Any] | None) -> str | None:
 
 
 _PROP_PICK_SELECTION_PREFIX_RE = re.compile(r"^(?:over|under)\s+(.+)$", re.IGNORECASE)
+# Phase C (Layer 2 task): WNBA's recommendations_slate PROPS picks use the
+# opposite word order from MLB's panels -- "Kelsey Mitchell OVER 1.5", name
+# first -- confirmed via a direct read of a real recommendations_slate_*.json
+# artifact (every PROPS entry's display_pick follows this shape, and carries
+# no separate player/player_id field at all). The prefix regex above never
+# matches this shape (it requires over/under to lead), so this was silently
+# returning None for every WNBA/NBA prop candidate built from this path --
+# not a name-formatting bug, a total non-match.
+_PROP_PICK_SELECTION_SUFFIX_RE = re.compile(r"^(.+?)\s+(?:over|under)\s+[\d.,+-]+\s*$", re.IGNORECASE)
 
 
 def _player_name_from_prop_pick_text(pick_text: str) -> str | None:
@@ -1808,17 +1817,25 @@ def _player_name_from_prop_pick_text(pick_text: str) -> str | None:
     # pitcher candidate built from this path showed a blank entity and a
     # blank Projected value, and (worse) looked identical to a genuinely
     # entity-less duplicate from another pipeline.
-    match = _PROP_PICK_SELECTION_PREFIX_RE.match(str(pick_text or "").strip())
-    if not match:
-        return None
-    name = match.group(1).strip()
-    if not name or re.fullmatch(r"[\d.,+-]+", name):
-        # Other callers use this same "Over <line>" convention for the pick
-        # text (e.g. game_market_recommendations rows), where the remainder
-        # is a numeric line, not a player name -- never mistake one for the
-        # other.
-        return None
-    return name
+    text = str(pick_text or "").strip()
+    match = _PROP_PICK_SELECTION_PREFIX_RE.match(text)
+    if match:
+        name = match.group(1).strip()
+        if not name or re.fullmatch(r"[\d.,+-]+", name):
+            # Other callers use this same "Over <line>" convention for the pick
+            # text (e.g. game_market_recommendations rows), where the remainder
+            # is a numeric line, not a player name -- never mistake one for the
+            # other.
+            return None
+        return name
+    # WNBA/NBA convention ("<Player Name> OVER/UNDER <line>") -- see the
+    # regex's own comment above.
+    suffix_match = _PROP_PICK_SELECTION_SUFFIX_RE.match(text)
+    if suffix_match:
+        name = suffix_match.group(1).strip()
+        if name:
+            return name
+    return None
 
 
 def _market_label_from_pick_text(text: str) -> str:
@@ -2149,11 +2166,31 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
     # every hitter/pitcher prop candidate for that game regardless of stat
     # type, so completely different props (total bases, hits, for different
     # players) all showed the identical number. The combined score is only
-    # meaningful for genuine game-level markets. Mirrors the same "Hitter "/
-    # "Pitcher " prefix check intelligence.py's _is_game_level_market already
-    # uses to distinguish these.
+    # meaningful for genuine game-level markets.
+    #
+    # Phase C (Layer 2 task), found live 2026-07-31: this used to be a local
+    # "starts with Hitter /Pitcher " check -- an MLB-only naming convention.
+    # WNBA/NBA player props are labeled by short stat code ("PTS", "REB",
+    # "PRA", ...) or the generic "PROPS", none of which start with "Hitter "/
+    # "Pitcher ", so this check misclassified every non-MLB player prop as a
+    # GAME-level market: it suppressed player_name extraction below AND
+    # stamped the game's combined score as "actual" on real player props
+    # (e.g. a WNBA points prop candidate showing the game's total score
+    # instead of "-"/the real per-player stat) -- the exact bug class the
+    # comment above already documents, just not caught for other sports.
+    # intelligence.py's own `_is_game_level_market` already gets this right
+    # (a keyword allowlist -- moneyline/spread/total/etc -- rather than an
+    # MLB-specific denylist), so reuse it here instead of a second,
+    # narrower copy that only worked for MLB. Deferred import: intelligence.py
+    # imports from this module already, so a module-level import here would
+    # be circular.
     market_text_lower = _safe_text(market, "").strip().lower()
-    is_game_level_market = not (market_text_lower.startswith("hitter ") or market_text_lower.startswith("pitcher "))
+    try:
+        from syndicate.features.intelligence import _is_game_level_market as _shared_is_game_level_market
+
+        is_game_level_market = _shared_is_game_level_market(market_text_lower)
+    except Exception:
+        is_game_level_market = not (market_text_lower.startswith("hitter ") or market_text_lower.startswith("pitcher "))
     live_projection_text = _prop_metric_text(live_projection) if live_projection is not None else "-"
     # The current combined score is real, live GAME STATE -- not a
     # projection of anything -- so it belongs in "actual", never as a

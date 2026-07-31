@@ -4,9 +4,11 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-31 (see "Reconciliation 2026-07-31 (#161 part 2:
-NBA/WNBA closing line, plus a production outage found and fixed along the
-way)" below). Prior session: 2026-07-30. **#162/#164/#165/#166 and #163
+Last reconciled: 2026-07-31 (see "Reconciliation 2026-07-31 (Layer 2 board:
+MLB live-status dedup fix + WNBA game/prop wiring, Phase A-C)" below). Before
+that: "Reconciliation 2026-07-31 (#161 part 2: NBA/WNBA closing line, plus a
+production outage found and fixed along the way)". Prior session: 2026-07-30.
+**#162/#164/#165/#166 and #163
 archived** to `todo_closed.md` (#163: Ask The Syndicate MLB player history +
 advanced analytics, fully shipped/deployed/live-verified across four
 commits in one continuous session -- see the closed-items table there for
@@ -29,6 +31,114 @@ that: "Reconciliation 2026-07-30 (opportunity board / Phase 2)"; before that:
 "Reconciliation 2026-07-30 (steam candidates, Layer 2 projection, portfolio
 reconciliation)"; before that: "Reconciliation 2026-07-30 (evaluation-ledger
 settlement / Phase 1)").
+
+### Reconciliation 2026-07-31 (Layer 2 board: MLB live-status dedup fix + WNBA game/prop wiring, Phase A-C)
+
+User reported WNBA had no live scoring/prop updates on the main curated
+Betting Board (Layer 2), and asked for it to be wired the same way MLB is
+(sim proj / live proj / live actual, games and props), "done carefully to
+ensure props and names are matched correctly." Mid-investigation a second,
+independent bug surfaced and was folded into the same pass per explicit user
+approval: live MLB games showing a mix of correctly-live and stale
+"Pre-Game" rows for the same `gamePk`.
+
+**Phase A (MLB dedup/game_state bug) — shipped, deployed, commit `18d0d096`.**
+Two real bugs in `syndicate/features/intelligence.py`: (1) `_collect_candidates`'
+dedup step (~line 6000) silently discarded a fresh, correctly-live
+`_mlb_live_lens_prop_candidates_from_artifact` row whenever it matched an
+existing stale candidate by subject+market+pick, instead of merging the
+fresh fields in — now merges `is_live`/`status_display`/`game_state`/`actual`/
+`live_projection` into the existing row rather than dropping it. (2)
+`_apply_live_state_context_to_candidates` (line 5261) corrected `is_live`/
+`status_display` but never `game_state`, so the two fields could disagree on
+the same row — now both are forced to the same resolved value. 2 new tests
+in `tests/test_intelligence.py`. Verified live post-deploy: gamePks that
+previously showed mixed `is_live` values within the same game now show one
+consistent value throughout.
+
+**#168 — a second, distinct root cause behind the same symptom, found while
+verifying Phase A live, NOT fixed.** See the Platform/correctness table
+below. Even post-deploy, some live gamePks' `prop`-type candidates still
+show uniformly stale `is_live: false` — traced to
+`_apply_live_state_context_to_candidates` → `_mlb_actual_payload_for_game` →
+`raw_feed_live_path`, which requires a per-game raw feed snapshot file that
+isn't always present when needed. Different mechanism from Phase A's fix
+(uniform staleness, not mixed-within-a-game); not chased further this
+session — flagged for a follow-up.
+
+**Phase B (WNBA game-level live projection) — done, uncommitted.**
+`home.py:_game_bet_candidates_from_game`'s gameLens consumer (lines
+~2384-2453) was already sport-agnostic; WNBA simply never set `game["gameLens"]`
+at all. Relocated tonight's `_wnba_elapsed_minutes`/`_wnba_live_margin_win_prob`
+(previously only in `wnba/live_lens.py`, feeding just the standalone
+`/wnba/api/live-lens` page) into `syndicate/features/wnba/cards.py`, and
+extended `_build_wnba_game_lens` with: a `_wnba_game_lens_markets()` helper
+deriving moneyline/spread/total `pick`/`odds`/`edge`/`p_win` from the game's
+existing `betting` dict (live win prob for ML, a live-margin-adjusted cover
+prob for Spread via the same logistic `_source_betting` already uses
+pregame, fed live inputs instead), and a pace-extrapolated `projection.total`
+(`current_total / elapsed_fraction`) so Total's live_projection fallback has
+a real live value. Markets are only populated when the row is genuinely live
+(`source == "live_projection"`) — a pregame-only game already gets plain
+betting-dict-sourced candidates from `home.py`; gameLens markets exist to add
+a live update on top, not duplicate the pregame ones under a redundant
+"Live ..." label. Attached once, in `_build_cards_page_context_uncached`,
+right where every game dict already carries both `betting` and `live_state`.
+`wnba/live_lens.py`'s own `_rank_card` reads `game["gameLens"]` generically
+and needed no changes. 29 tests in `tests/test_wnba_live_lens_game_shape.py`
+(imports updated from `live_lens.py` to `cards.py`, extended with markets-dict
+coverage). Verified against real local game-shape data (period/clock/score) —
+`source`/pace-total compute correctly; local `betting` dict for the one
+available live-shaped fixture had no odds data at all (a local-data gap, not
+a code defect — matches the standing "local checkout is never complete"
+note), so `markets` verification rests on unit tests, not a live local
+integration check. 388 tests passing across all touched/adjacent WNBA and
+home.py/intelligence.py files, no regressions.
+
+**Phase C (prop-matching hardening) — done, uncommitted.**
+1. `syndicate/features/shared/basketball_live_artifacts.py:_normalize_name` —
+   added NFKD diacritic-stripping, mirroring `mlb/cards.py:_normalize_live_name`'s
+   proven approach (shared WNBA/NBA infra, same cross-source spelling-mismatch
+   risk). No nickname-alias table added — MLB's was added reactively after a
+   real observed miss; none observed yet for WNBA/NBA. 6 new tests in
+   `tests/test_basketball_live_artifacts.py`.
+2. Read the raw `recommendations_slate_*.json` artifact directly (both WNBA
+   and NBA, several real dates) to settle whether PROPS picks carry
+   structured player identity: **confirmed they do not** — only free-text
+   `display_pick`/`selection` (e.g. "Kelsey Mitchell OVER 1.5"), no `player`/
+   `player_id` field at all, consistently across every date checked.
+3. Two real bugs found and fixed in `syndicate/blueprints/home.py` as a
+   result: (a) `_append_game_bet_candidate`'s `is_game_level_market` check
+   was a local "starts with Hitter /Pitcher " test — an MLB-only naming
+   convention. WNBA/NBA player props are labeled by short stat code ("PTS",
+   "PRA", ...) or the generic "PROPS", never "Hitter "/"Pitcher ", so this
+   misclassified every non-MLB player prop as game-level: it suppressed
+   player-name extraction AND stamped the game's combined score onto
+   "actual" for real player props (e.g. a WNBA points prop showing the
+   game's total score instead of "-"). Now reuses intelligence.py's real
+   classifier (`_is_game_level_market`, a keyword allowlist rather than an
+   MLB-specific denylist) via a deferred import (module-level would be
+   circular — intelligence.py already imports from home.py), with the old
+   check kept only as a defensive fallback. (b) `_player_name_from_prop_pick_text`'s
+   regex only matched MLB's "OVER/UNDER <Name>" word order; WNBA's
+   `display_pick` puts the name FIRST ("<Name> OVER/UNDER <line>") — the
+   opposite order — so it silently returned `None` for every WNBA/NBA prop,
+   not a formatting bug but a total non-match. Added a second regex for the
+   name-first convention, tried as a fallback after the existing one. 2 new
+   tests in `tests/test_home.py`. 268 tests passing across `test_home.py` +
+   `test_intelligence.py`, no regressions.
+
+**Not done this pass, explicitly out of scope**: the Steam-candidate
+`candidate_type == "prop"` gate and `actual: "-"` behavior (a separate,
+already-deliberate, already-documented gap, `30a6cff9`); #168 above; any
+richer WNBA-native possession-level live modeling (Phase 4, already shipped
+separately, deliberately stayed non-MC per that session's scope).
+
+**Nothing from Phase B/C committed or deployed yet** — Phase A already is
+(see above). Next session (or later this one): commit, then deploy
+refresh-worker once no MLB sim is in flight, then re-verify against a real
+live WNBA game in production (no live WNBA game was available at the time
+this phase was implemented/tested locally).
 
 ### Reconciliation 2026-07-31 (#161 part 2: NBA/WNBA closing line, plus a production outage found and fixed along the way)
 
@@ -109,24 +219,40 @@ commit `c44c02cc`.
    `test_odds_refresh_tracking.py`/`test_odds_lifecycle_shards.py`/
    `test_mlb_market_board.py`/`test_basketball_market_board.py`.
 6. **Not yet confirmed live for NBA/WNBA specifically** (unlike MLB's
-   #161 part 1, which got a real live PIT@CIN transition to point at): as
-   of this write-up, production's WNBA odds_history shard has real props
-   (A'ja Wilson pra/pts/reb/threes etc., all `is_live: false`, correctly
-   NOT stamped with a fake closing_line) but zero `h2h`/`spreads`/`totals`
-   entries yet. NYL@LVA (`game_id=086a42225bc8fb8c6d5c57f0732338c65`) DID
-   flip to live (`game-chips` state) partway through the verification
-   window, but its props were still `is_live: false` several minutes
-   later, unchanged — the elapsed-signal-driven sync hadn't caught up by
-   session end, so this is still open, not confirmed working. Two
-   concrete things to re-check next time WNBA games are live: (a) does
-   `NYL@LVA`'s player-prop `is_live` eventually flip true with a real
-   `closing_line` stamped, or does it stay stuck at false indefinitely
-   (which would mean the elapsed-based sync isn't actually reaching this
-   game's props on production — a real bug, not just "hasn't ticked yet"),
-   and (b) does any game_cards-sourced `h2h`/`spreads`/`totals` market ever
-   appear at all (confirms the new CSV ingestion path is actually being
-   fetched/reached in production, not just correct in isolation). Neither
-   is confirmed — don't treat #161 part 2 as fully closed until both are.
+   #161 part 1, which got a real live PIT@CIN transition to point at):
+   NYL@LVA (`game_id=086a42225bc8fb8c6d5c57f0732338c65`, 2026-07-30) flipped
+   to live in `game-chips`, but its props (A'ja Wilson pra/pts/reb/threes
+   etc.) stayed `is_live: false` with byte-identical `last_line` values for
+   24+ hours, well past the game going final -- checked again the next
+   day, still unchanged. Root-caused: **confirmed real gap, not lag.**
+   `history_last.row` for this market (fetched 2026-07-31T04:13:42Z, hours
+   into/after the game) still reads `"elapsed": 0`, and its `source_path`
+   is `data/processed/live_lens_projections_2026-07-30.jsonl` -- a
+   different file than the one this session's original research sampled
+   (`live_lens_signals_*.jsonl`, which DOES carry real varying elapsed/
+   remaining values). `live_lens_projections` looks to be a rest-of-game
+   *projection* feed that reports a static `elapsed: 0` regardless of
+   actual game state, and it's what actually populates this player's
+   market entry (signals apparently doesn't cover every player/stat, so
+   projections wins whichever file processes this market_key last). The
+   elapsed-based signal (`_row_elapsed_game_time_indicates_live`,
+   odds_refresh_tracking.py) is working correctly on the data it's given --
+   the gap is one layer upstream, in `live_lens_projections` never
+   reflecting real elapsed time. **Follow-up, not done this session:**
+   either find a genuine per-game live-clock signal that `live_lens_
+   projections` rows actually carry (check other fields on that row
+   shape beyond elapsed/remaining -- `context.pregame_game_total_ratio`
+   etc. suggest there may be a "pregame" vs "live" distinction encoded
+   some other way), or make the sync prefer `live_lens_signals`' entry
+   for a given market_key over `live_lens_projections`' when both exist
+   for the same market, since signals' elapsed field is the one that
+   actually moves.
+   Separately, no `h2h`/`spreads`/`totals` (game_cards-sourced) market has
+   appeared for nba/wnba in production yet either -- still unconfirmed
+   whether that ingestion path is actually being reached day-to-day
+   (config/schedule reasons, or a real gap) versus just not yet observed.
+   **Don't treat #161 part 2 as fully closed** until at least one of these
+   two live-transition paths is confirmed working end-to-end.
 7. **One test failure encountered along the way that is NOT related to
    this work:** `tests/test_refresh_odds_sources.py::
    test_wnba_uses_combined_game_and_player_prop_markets_while_other_
@@ -4230,6 +4356,7 @@ were resolved and nine already-closed rows removed from the open tables.
 
 | # | Item |
 |---|---|
+| **168** | 🟡 **A second, distinct root cause behind the same symptom #? (Layer 2 MLB dedup/game_state fix, this session) already partly fixed.** Confirmed live 2026-07-31, ~03:15 UTC, *after* that fix was deployed: three confirmed-live gamePks (824974, 823271, 823921 — verified independently via `/mlb/api/live-lens`, `abstractGameState: Live`) still show **every** `prop`-type Layer 2 candidate as `is_live: false`, `status_display: "Scheduled"` (steam-type candidates are a separate, already-documented, deliberately-unfixed gap — see `_apply_live_state_context_to_candidates`'s `candidate_type == "prop"` gate). This is a *uniformly* stale result, not the mixed-within-a-gamePk symptom the dedup fix targeted, so it's a different mechanism. Traced to `_apply_live_state_context_to_candidates` (`syndicate/features/intelligence.py:5261`) → `_mlb_actual_payload_for_candidate` → `home.py:_mlb_actual_payload_for_game` → `raw_feed_live_path(context_label, game_pk)` (`syndicate/features/mlb/sources.py:268`), which requires a **per-game raw feed snapshot file** to physically exist at `data/raw/statsapi/feed_live/<season>/<date>/<game_pk>.json[.gz]` under the worker's artifact root; if that specific file hasn't been fetched yet, the lookup returns `None` and the whole correction silently no-ops (leaving whatever stale `is_live`/`status_display`/`game_state` the candidate was born with, from `_prop_candidate_from_item`'s home_rails source). Confirmed the board response itself was freshly recomputed at the time (`snapshot_generated_at` matched the check within ~3 min), so this isn't simple worker-tick lag — the per-game raw feed fetch cadence looks independently slower/gappier than whatever backs `/mlb/api/live-lens`'s own status (a different, evidently more current, data source). **Not yet root-caused further or fixed** — next step is to find what actually populates `data/raw/statsapi/feed_live/.../<game_pk>.json` (which job, what cadence) and compare its freshness against the live-lens report's own source, before deciding whether to add a fallback live-state source or fix the fetch cadence directly. |
 | **167** | `syndicate/features/shared/source_roots.py`'s `repo_root_from(file_path)` does `Path(file_path).resolve().parents[3]` — correct for callers 3 subdirectories deep (e.g. `syndicate/features/mlb/sources.py`) but overshoots the repo root by one directory for a caller only 2 subdirectories deep (e.g. `syndicate/features/intelligence.py` calling it with its own `__file__`, which `_mlb_repo_artifact_path`/`_mlb_statcast_feature_payload` do). Found 2026-07-30 (#163 session) debugging why the Statcast profile silently returned empty locally. Masked in production because `SYNDICATE_MLB_SOURCE_ROOT` is set on all three services (the env-var branch short-circuits before `repo_root_from` ever runs) — but a real trap for any local dev session without that var set, and will misresolve identically for any other 2-deep caller that starts using this helper. Fix generically (compute depth from `file_path` instead of hardcoding `parents[3]`) rather than patching per-caller. |
 | **62** | **A re-pricing path that refreshes edges without a full Monte Carlo.** Behind #48. `run_mlb_daily_sim_job.py` only takes `--only-game-pks`, and `daily_update.py`'s only skip mechanism is `--preserve-started` (games past Preview), so there is no way to react to a price move except re-simulating. #48 removed prices from the sim fingerprint because the sim summary row is pure model output — win probabilities, run distributions, HR/prop likelihoods, **no odds and no edges** — and the market board joins odds at *read* time. That is correct for the board, but any artifact that *does* bake prices at sim time now goes stale until a lineup/line/tip-off trigger. Architectural, #27/#28 territory. |
 | **42** | `source_cards_api_payload`'s cache can never hit — keyed on the file it rewrites. **Third instance of this pattern** (`build_mlb_market_board` fixed in `34c9427d`; avoided deliberately in `build_soccer_market_board`). Worth a rule, not three one-off fixes. |

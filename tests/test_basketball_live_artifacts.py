@@ -5,7 +5,34 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from syndicate.features.shared.basketball_live_artifacts import _latest_projection_rows
+from syndicate.features.shared.basketball_live_artifacts import _normalize_name
 from syndicate.features.shared.basketball_live_artifacts import build_live_player_lens_payload_from_artifacts
+
+
+class NormalizeNameTests(unittest.TestCase):
+    # Phase C (Layer 2 task): mirrors mlb/cards.py's _normalize_live_name
+    # diacritic-stripping fix, applied here since this is shared WNBA/NBA
+    # infra with the same cross-source spelling-mismatch risk.
+    def test_strips_diacritics(self) -> None:
+        self.assertEqual(_normalize_name("Luka Dončić"), _normalize_name("Luka Doncic"))
+
+    def test_collapses_whitespace_and_uppercases(self) -> None:
+        self.assertEqual(_normalize_name("  angel   reese "), "ANGEL REESE")
+
+    def test_none_returns_empty_string(self) -> None:
+        self.assertEqual(_normalize_name(None), "")
+
+
+class LatestProjectionRowsDiacriticDedupTests(unittest.TestCase):
+    def test_accented_and_unaccented_spellings_of_the_same_player_dedupe(self) -> None:
+        rows = [
+            {"market": "player_prop", "name_key": "Luka Doncic", "stat": "points", "game_id_canon": "123", "line": 25.5},
+            {"market": "player_prop", "name_key": "Luka Dončić", "stat": "points", "game_id_canon": "123", "line": 26.5},
+        ]
+        result = _latest_projection_rows(rows)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["line"], 26.5)
 
 
 class BuildLivePlayerLensPayloadSimMuTests(unittest.TestCase):

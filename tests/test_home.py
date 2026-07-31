@@ -995,6 +995,50 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
             self.assertEqual(candidate["live_projection"], "-")
             self.assertEqual(candidate["actual"], "-")
 
+    def test_wnba_player_prop_candidates_do_not_get_game_combined_score_as_actual(self) -> None:
+        # Phase C (Layer 2 task), found live 2026-07-31: is_game_level_market
+        # used to be a local "starts with Hitter /Pitcher " check -- an
+        # MLB-only naming convention. WNBA player props are labeled by short
+        # stat code ("PTS", "PRA", ...) or the generic "PROPS"
+        # (_source_game_market_recommendations/market_label), never
+        # "Hitter "/"Pitcher ", so every WNBA player prop candidate was
+        # misclassified as game-level: it got the game's combined score
+        # stamped onto "actual" (meaningless for an individual player's
+        # points prop) exactly like the MLB bug above, just never caught for
+        # this sport. Now reuses intelligence.py's real classifier, which
+        # gets "PTS"/"PROPS" right.
+        game = self._sample_game(
+            shared_is_live=True,
+            status={"in_progress": True},
+            away={"name": "Golden State Valkyries", "score": 61},
+            home={"name": "Indiana Fever", "score": 58},
+            game_market_recommendations=[
+                {"market_label": "PTS", "display_pick": "Kelsey Mitchell OVER 1.5", "selection": "OVER 1.5", "line": 1.5},
+                {"market_label": "PROPS", "display_pick": "Caitlin Clark OVER 14.5", "selection": "OVER 14.5", "line": 14.5},
+            ],
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "wnba"}, game, fallback_epoch=0.0)
+        prop_candidates = [c for c in candidates if c["market"] in ("PTS", "PROPS")]
+        self.assertEqual(len(prop_candidates), 2)
+        for candidate in prop_candidates:
+            self.assertTrue(candidate["is_live"])
+            self.assertEqual(candidate["actual"], "-")
+
+    def test_wnba_player_prop_pick_text_extracts_name_first_convention(self) -> None:
+        # recommendations_slate's own display_pick puts the player's name
+        # FIRST ("Kelsey Mitchell OVER 1.5"), the opposite order from MLB's
+        # panels ("OVER Bryce Eldridge") -- confirmed via a direct read of a
+        # real recommendations_slate_*.json artifact. Player identity should
+        # now resolve for this convention too, not just MLB's.
+        game = self._sample_game(
+            game_market_recommendations=[
+                {"market_label": "PTS", "display_pick": "Kelsey Mitchell OVER 1.5", "selection": "OVER 1.5", "line": 1.5},
+            ],
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "wnba"}, game, fallback_epoch=0.0)
+        prop_candidate = next(c for c in candidates if c["market"] == "PTS")
+        self.assertEqual(prop_candidate["entity"], "Kelsey Mitchell")
+
     def test_spread_candidates_get_team_projected_and_confidence(self) -> None:
         game = self._sample_game(
             betting={
