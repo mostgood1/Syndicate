@@ -4,9 +4,13 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-31 (see "Reconciliation 2026-07-31 part 2 (NCAAF Ask
-the Syndicate evidence fetchers)" below -- ran concurrently with the MLB
-pitcher strikeout-prop investigation session, different files throughout).
+Last reconciled: 2026-07-31 (see "Reconciliation 2026-07-31 part 3 (MLB
+pitcher-prop prototype fixes: K-rate log5 blend + TTO3 quality scaling)"
+below -- ran concurrently with the NCAAF Ask the Syndicate evidence-fetchers
+session, different files throughout).
+Before that: "Reconciliation 2026-07-31 part 2 (NCAAF Ask
+the Syndicate evidence fetchers)" -- ran concurrently with the MLB
+pitcher strikeout-prop investigation session, different files throughout.
 Before that: "Reconciliation 2026-07-31 (MLB pitcher
 strikeout-prop accuracy investigation: top-end pitcher K-rate is
 structurally underprojected)".
@@ -22,6 +26,106 @@ cause)". Before that: "Reconciliation 2026-07-31 (Layer 2 board: MLB
 live-status dedup fix + WNBA game/prop wiring, Phase A-C)". Before that:
 "Reconciliation 2026-07-31 (#161 part 2: NBA/WNBA closing line, plus a
 production outage found and fixed along the way)". Prior session: 2026-07-30.
+
+### Reconciliation 2026-07-31 part 3 (MLB pitcher-prop prototype fixes: K-rate log5 blend + TTO3 quality scaling)
+
+Follow-up to #176 (same session, continued). User asked for a prototype fix
+for the strikeout gap, plus an accuracy check on pitch count/workload, since
+outs drives how many PAs a starter accumulates and therefore his K/BB/H
+counting totals too.
+
+**Correction to #176 before anything else**: the 46-date backtest batch used
+there (`tuning_weather_park_weights/20260718_230212/baseline/`) was generated
+2026-07-18 23:08 -- *before* two other sessions' promotions on 2026-07-19/20
+(`starter_hook_add_pitches: -13`, `starter_hook_stamina_excess_weight: 0.75`,
+and the HR/inplay log5 promotion). The K-rate flat-average bug is confirmed
+**still live in production today** (no `k_combine_log5_weight` key exists in
+`data/tuning/pitch_model_overrides/forward_start_2026_04_14_v1.json`), so
+that finding stands unchanged. But the **outs-bias numbers logged in #176
+(elite +0.97 .. back-end +4.14) are pre-promotion and stale** -- the -13
+flat offset almost certainly improved the *average* bias since (per that
+promotion's own holdout sweep data, ~9.7 -> ~0.4-1.9), but a flat global
+offset cannot by construction fix a bias that varies by tier, so the
+underlying shape of the problem (structurally longer/shorter outings than
+real quality would predict) is very likely still present -- just centered
+differently now. A fresh backtest against the current live config is needed
+before trusting exact current numbers; queued but did not finish before this
+session ended (see "Not done" below).
+
+**New: #178** (two prototype fixes shipped, both off-by-default/zero
+production risk as committed -- neither has been backtested/tuned/promoted
+yet):
+
+1. **K-rate combiner shrinkage-log5 blend** --
+   `vendor/mlb_bettingv2/sim_engine/pitch_model.py`. Added `_combined_k()`
+   plus two new `PitchModelConfig` fields: `k_combine_log5_weight` (0.0
+   default = exact prior flat-average behavior; 1.0 = pure log5, matching
+   how HR/inplay_hit already combine) and `k_league_rate` (0.223 default).
+   Verified analytically before writing any code: flat average of an elite
+   pitcher (k=0.35) vs. a league-average batter (0.223) gives 0.2865 (the
+   compression bug); full log5 correctly recovers 0.35; a weight=0.6 blend
+   gives 0.325 -- meaningfully closer to true skill without going all the
+   way to the log5 setting that was already tried and reverted once for
+   hurting full-game totals (see #176's `_combined()` comment). 11 new unit
+   tests in `tests/test_mlb_pitcher_k_combine.py` (default-reproduces-old-
+   behavior, full-weight-matches-log5, monotonic direction for both elite
+   and back-end pitchers, clamping, custom league-rate, plus 2
+   `simulate_pitch`-level whiff-rate integration checks).
+
+2. **Starter TTO3 (times-through-order) penalty quality scaling** --
+   `vendor/mlb_bettingv2/sim_engine/simulate.py`. New helper
+   `_starter_tto_quality_mult()` plus three new `manager_pitching_overrides`
+   keys (`starter_tto_quality_scaling` 0.0 default = no-op,
+   `starter_tto_quality_league_k`, `starter_tto_quality_spread`), wired into
+   both consumers of `pull_starter_third_time_penalty` (the pull-probability
+   logit in `_select_pitcher_v2` and the K/BB/HR/inplay rate degradation in
+   `_adjust_pitcher_day_rates_v2`). Root cause this targets (confirmed via a
+   dedicated research pass): the flat, per-team
+   `pull_starter_third_time_penalty` (ManagerProfile, 0.04) is applied
+   identically to every starter regardless of quality -- no K-rate/ERA/any
+   rate-quality signal reads into the hook/pull decision anywhere, even
+   though the *opposing*-lineup-quality-aware analog
+   (`_starter_matchup_hook_adjustment`) has existed all along. This is a
+   distinct mechanism from the K-rate bug (a uniform-treatment gap, not an
+   averaging-formula artifact) but produces the same "compression toward
+   the middle" symptom for outs/workload. 9 tests + 8 subtests in
+   `tests/test_mlb_starter_tto_quality.py`.
+
+**Verification**: `python -m pytest tests/test_mlb_pitcher_k_combine.py
+tests/test_mlb_starter_tto_quality.py -v` all pass. Full
+`python -m pytest tests/ -k "mlb or sim"` (987 passed, 1 skipped) run against
+fix #1 alone with zero regressions (confirms the default/off behavior is
+byte-for-byte unchanged); a second full run covering both fixes together was
+queued at session end (see "Not done").
+
+**Not done this session (explicitly flagged, not silently dropped)**:
+- Neither knob has been backtested/tuned yet. Both need a real run through
+  `vendor/mlb_bettingv2/tools/eval/eval_sim_day_vs_actual.py` (or the same
+  `daily_update_multi_profile.py` batch tooling used for the
+  weather/park-weight and manager-hook tuning sweeps already in this repo)
+  across a real historical date range, sweeping `k_combine_log5_weight` and
+  `starter_tto_quality_scaling` to find values that close the tier gap
+  without regressing full-game totals accuracy (the same tradeoff the
+  original `_combined()` HR/inplay_hit log5 promotion and the
+  `starter_hook_add_pitches`/`starter_hook_stamina_excess_weight` promotions
+  both had to navigate) -- then promote the winners into
+  `data/tuning/pitch_model_overrides/forward_start_2026_04_14_v1.json` /
+  `data/tuning/manager_pitching_overrides/forward_start_2026_04_14_v1.json`.
+- A real single-date re-simulation smoke test (`eval_sim_day_vs_actual.py
+  --date 2026-07-10 --sims-per-game 20`, letting forward-tuning
+  auto-resolve the live production config) was launched to validate the K
+  fix against actual box scores end-to-end, not just analytically -- it had
+  not finished by session end (unclear whether it's genuinely slow at this
+  sims-per-game/jobs setting or needs uncached raw data fetched over
+  network); check
+  `vendor/mlb_bettingv2/data/eval/_prototype_test/sim_vs_actual_2026-07-10_smoke.json`
+  for whether it completed, and re-run the full mlb/sim pytest sweep once
+  more if simulate.py changes further.
+- No tier-aware groupby was added to any eval/report tool (still true per
+  #176) -- worth doing before the tuning sweep above so the sweep itself can
+  optimize against the tier gap directly instead of only an aggregate MAE/
+  bias number that (per #176) can look fine while masking this exact
+  problem.
 
 ### Reconciliation 2026-07-31 part 2 (NCAAF Ask the Syndicate evidence fetchers)
 
@@ -5153,27 +5257,42 @@ were resolved and nine already-closed rows removed from the open tables.
      'totals_h2',...]` — event-matching and market discovery now genuinely
      work for the first time tonight.
 
-     **Still open**: even with discovery now succeeding and picking up
-     real keys (`totals_q4`/`spreads_q4`/`totals_h2`/`spreads_h2` were all
-     discovered for tonight's Q4-in-progress game), `/wnba/api/live_lines`
-     still returns `period_totals: {}` / `period_spreads: {}` and the UI
-     still shows "No live period market yet." So the bug is one step
-     further in: the same function's step 3 (`app.py:715+`, the actual
-     `/v4/sports/{sport}/events/{event_id}/odds` fetch + outcome
-     extraction into `period_pts`/`period_home_spreads`) isn't surfacing
-     values even though `want`/`picked`/`req_markets` should include
-     `q4`/`q4_spread` per the discovered keys. Two things worth checking
-     first, in order: (a) whether the `/odds` fetch itself is erroring
-     (caught silently at `app.py:732-733`, `obj = None`) — add a one-line
-     diagnostic there next, mirroring the discovery diagnostic's pattern;
-     (b) separately, note `period_pts`/`period_home_spreads`
-     (`app.py:737-738`) are hardcoded to `["h1","q1","q2","q3","q4"]` —
-     **"h2" has no slot anywhere in the extraction/aggregation dicts**, and
-     `want` (`app.py:678-692`) has no `"h2"`/`"h2_spread"` entries either,
-     even though the book was actively quoting `totals_h2`/`spreads_h2`
-     tonight. That's a second, smaller, definitely-real gap (second-half
-     markets are simply never requested) worth fixing alongside whatever
-     is found in (a) — don't stop at q4 once diagnosing this further.
+     **Second real gap found and fixed the same session (commit
+     `d31cab25`)**: even with discovery succeeding, `want` (`app.py:
+     678-692`) and the aggregation dicts (`period_pts`/`period_home_
+     spreads`, `app.py:737-738`, plus their label-set checks) only ever
+     had slots for `h1`/`q1`-`q4` — **`h2` (second half) had no slot
+     anywhere**, even though the book was actively quoting `totals_h2`/
+     `spreads_h2` for tonight's game. Added `h2`/`h2_spread` throughout.
+     Also added a `PERIOD_MARKET_ODDS_FETCH_EMPTY` diagnostic for the
+     remaining case (discovery finds real keys but the `/odds` fetch
+     itself still yields nothing) to distinguish a fetch-level bug from
+     the book simply pulling a market between the discovery call and the
+     odds call.
+
+     **Not fully confirmed end-to-end — ran out of live game to test
+     against, not ran out of leads.** After both fixes deployed, discovery
+     kept succeeding every 1-2 min with real period keys present
+     (confirmed via logs at 04:10/04:11/04:13), and the diagnostic never
+     fired (meaning it never hit the "discovery found keys but the odds
+     fetch came back empty" case) — but `/wnba/api/live_lines`'s own served
+     artifact stayed stuck on a `generated_at` far behind real time (its
+     write cadence is roughly every ~20 minutes, confirmed via two
+     `generated_at` samples 20 minutes apart), and by the next write after
+     my deploy, tonight's game had reached 22.6 seconds left in the 4th —
+     enough time for the book to have pulled its period markets entirely
+     (discovered_keys at 04:16 no longer included any `totals_h2`/
+     `totals_q4`/`spreads_*` at all, only `h2h`/`odd_even`, matching normal
+     late-blowout book behavior) before the ~20-min writer could capture a
+     window where both a real market existed AND a write happened to run.
+     **Both fixes are real and confirmed correct at the source** (event
+     match + market selection); whether they produce a populated
+     `period_totals`/`period_spreads` in the actual served artifact needs
+     checking against the *next* live WNBA game, ideally with the writer's
+     ~20-min cadence also revisited (a period line that only gets a chance
+     to write once every 20 minutes will always be racing against books
+     pulling markets late in close periods) — that cadence question is a
+     new, separate, not-yet-scoped item, not part of this fix.
 
 - **#23 — Make the MLB daily sim memory-safe, then re-enable its trigger.**
   - ✅ *Validated 2026-07-25*: `daily_summary_2026_07_25.json` lands (15 sim artifacts
