@@ -60,10 +60,23 @@ week-pill nav correctly spans weeks 1-6, all real SmartSim2 projections).
 331 NFL/NCAAF-scoped tests pass; 3 pre-existing test expectations updated
 to reflect this now-correct behavior (not bugs -- see commit `f0568b42`).
 
+Also built the NFL Ask the Syndicate team-profile evidence fetcher
+(`_nfl_team_profile_evidence`, commit `1ebe4b03`) -- real roster size,
+depth-chart starter count, position-group breakdown, and current-season
+injury-report count, read from the real nflverse-backed snapshot CSVs
+ingested earlier this session. No coach-continuity/returning-production/
+transfer-portal equivalent exists for NFL (NCAAF/CFBD-specific concepts),
+so this is real NFL-native roster data, not NCAAF's shape forced onto it.
+2026's own injury file is real but empty this preseason -- reports 0
+honestly. Verified end-to-end through the real `collect_focused_evidence`
+pipeline (91 real KC roster players, 25 depth-chart starters).
+
 **Not done this session**: item #6 (enable the autorun trigger in
 production), #7 (full 2026 regular-season backfill beyond week 1), #8
 (injury-rating modeling), #9 (NCAAF props/ladders pipeline) all remain
-open follow-ups from the standing options list.
+open follow-ups from the standing options list -- each is a production-
+risk or design-scope decision, paused for explicit user direction rather
+than proceeding unilaterally.
 
 ### Reconciliation 2026-08-01 (NFL/NCAAF: real 2026 week-1 data + sim triggers)
 
