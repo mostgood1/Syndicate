@@ -7,6 +7,7 @@ from syndicate.features.ncaaf.archive import build_archive_page_context
 from syndicate.features.ncaaf.cards import build_cards_page_context
 from syndicate.features.ncaaf.cards import build_ncaaf_market_board
 from syndicate.features.ncaaf.cards import build_smartsim_cards_page_context
+from syndicate.features.ncaaf.cards import _resolve_ncaaf_active_season_and_weeks
 from syndicate.features.ncaaf.game_detail import build_game_detail_page_context
 from syndicate.features.ncaaf.live_lens import build_live_lens_page_context
 from syndicate.features.ncaaf.live_lens import build_smartsim_live_lens_page_context
@@ -33,11 +34,30 @@ def _selected_week() -> int:
 
 @ncaaf_bp.get("/hub")
 def hub():
-    weeks = week_summaries()
-    available = [week for week in weeks if week["has_data"]]
-    unavailable = [week for week in weeks if not week["has_data"]]
-    launch_week = available[-1]["week"] if available else default_week()
-    launch_season = default_season()
+    # week_summaries() keeps its own per-week "season" tag (a real,
+    # tested capability: different tracked weeks can belong to different
+    # seasons) -- preserved as-is. Merged in on top: the real active
+    # season/week (unions the legacy engine's own weeks with real
+    # SmartSim2 projection-artifact weeks, same resolver cards.py/
+    # picks.py already use), for any week not already covered by
+    # week_summaries(). Needed because week_summaries() is tied to the
+    # old, single-season summary-index pipeline and would otherwise never
+    # surface a real active season (e.g. 2026) week_summaries() has never
+    # heard of -- confirmed a real season/week mismatch risk while fixing
+    # default_season() (pairing a correct active season with a week
+    # number that only ever made sense for the old index's own season).
+    legacy_weeks = week_summaries()
+    available = [dict(week) for week in legacy_weeks if week["has_data"]]
+    unavailable = [week for week in legacy_weeks if not week["has_data"]]
+
+    active_season, active_real_weeks = _resolve_ncaaf_active_season_and_weeks()
+    already_covered = {(entry.get("week"), entry.get("season")) for entry in available}
+    for week in active_real_weeks:
+        if (week, active_season) not in already_covered:
+            available.append({"week": week, "season": active_season, "has_data": True})
+
+    launch_week = active_real_weeks[-1] if active_real_weeks else (available[-1]["week"] if available else default_week())
+    launch_season = active_season or default_season()
     return render_template(
         "ncaaf/hub.html",
         launch_season=launch_season,
@@ -46,7 +66,7 @@ def hub():
         unavailable_weeks=unavailable,
         summary_stats=[
             {"label": "Weeks with data", "value": str(len(available))},
-            {"label": "Tracked weeks", "value": str(len(weeks))},
+            {"label": "Tracked weeks", "value": str(len(legacy_weeks) or len(available))},
         ],
     )
 

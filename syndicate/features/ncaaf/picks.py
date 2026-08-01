@@ -15,13 +15,16 @@ from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.discrete_nav import resolve_selected_value
 from syndicate.features.shared.rank_board import build_rank_page_context
 from syndicate.features.ncaaf.smartsim2_projection import LEGACY_ENGINE_SOURCE_LABEL
+from syndicate.features.ncaaf.smartsim2_projection import SMARTSIM2_PUBLIC_LABEL
 from syndicate.features.ncaaf.smartsim2_trial_monitoring import record_trial_page_view
 
+from syndicate.features.ncaaf.cards import _engine_rows_for_season_week
 from syndicate.features.ncaaf.cards import _prediction_source_path
-from syndicate.features.ncaaf.cards import _prediction_weeks
 from syndicate.features.ncaaf.cards import _normalize_probability
+from syndicate.features.ncaaf.cards import _resolve_ncaaf_active_season_and_weeks
 from syndicate.features.ncaaf.cards import _runtime_scoreboard_projection
 from syndicate.features.ncaaf.cards import _runtime_prediction_rows
+from syndicate.features.ncaaf.cards import _smartsim2_standalone_rows
 
 
 def _stake_text(value: Any) -> str:
@@ -221,17 +224,137 @@ def _clamp_week(selected_week: int) -> int:
     return resolve_selected_value(selected_week, available_weeks(), 1)
 
 
+def _standalone_smartsim2_pick_cards(season: int, week: int) -> list[dict[str, Any]]:
+    """Same real-data fallback build_cards_page_context already has for
+    itself (via _smartsim2_standalone_rows) -- picks never had this wired
+    in, so a season the legacy engine has no predicted-totals rows for
+    (e.g. 2026, confirmed: college_football_schedule_*_predicted_totals_enhanced*.csv
+    is 2025-only) fell all the way through to the historical
+    summary-artifact path below instead of showing the real SmartSim 2.0
+    projections cards.py already renders for that same week."""
+    standalone_rows = _smartsim2_standalone_rows(season, week)
+    cards: list[dict[str, Any]] = []
+    for row in standalone_rows:
+        projection = row.get("projection")
+        if projection is None:
+            continue
+        home_team = str(row.get("home_team") or "Home").strip() or "Home"
+        away_team = str(row.get("away_team") or "Away").strip() or "Away"
+        home_points = round(projection.home_score_mean, 1)
+        away_points = round(projection.away_score_mean, 1)
+        total_points = round(projection.total_mean, 1)
+        margin = projection.margin_mean
+        if margin > 0:
+            spread_label = f"{home_team} by {abs(margin):.1f}"
+        elif margin < 0:
+            spread_label = f"{away_team} by {abs(margin):.1f}"
+        else:
+            spread_label = "Pick'em"
+        win_probability = format_pct(projection.home_win_rate)
+        score = abs(projection.home_win_rate - 0.5) * 100.0 + abs(margin) + (total_points / 100.0)
+        cards.append(
+            {
+                "score": score,
+                "card": {
+                    "title": f"{home_team} vs {away_team} {SMARTSIM2_PUBLIC_LABEL} candidate",
+                    "eyebrow": SMARTSIM2_PUBLIC_LABEL,
+                    "badge": f"{win_probability} win prob",
+                    "meta": f"{away_team} at {home_team}",
+                    "metrics": [
+                        {"label": "Home mean", "value": home_points},
+                        {"label": "Away mean", "value": away_points},
+                        {"label": "Spread", "value": spread_label},
+                        {"label": "Total", "value": total_points},
+                    ],
+                    "summary": (
+                        f"{SMARTSIM2_PUBLIC_LABEL} projects {home_team} {home_points} - {away_points} {away_team} "
+                        f"with a projected total of {total_points} and a home win probability of {win_probability}. "
+                        f"{LEGACY_ENGINE_SOURCE_LABEL} has no prediction for this game yet."
+                    ),
+                    "list_items": [
+                        f"Projected spread: {spread_label}",
+                        f"Home mean: {home_points}",
+                        f"Away mean: {away_points}",
+                        f"Projection source: {SMARTSIM2_PUBLIC_LABEL}",
+                    ],
+                },
+            }
+        )
+    cards.sort(key=lambda item: item["score"], reverse=True)
+    return [item["card"] for item in cards[:12]]
+
+
+def _standalone_smartsim2_picks_context(*, season: int, resolved_week: int, weeks: list[int]) -> dict[str, Any] | None:
+    standalone_cards = _standalone_smartsim2_pick_cards(season, resolved_week)
+    if not standalone_cards:
+        return None
+    prev_week, next_week = neighboring_values(weeks, resolved_week, fallback=resolved_week)
+    return {
+        **build_rank_page_context(
+            selected_date=_selected_date_token(resolved_week, season=season),
+            route_path="/ncaaf/picks",
+            intro_title="NCAAF Picks",
+            intro_body=f"No {LEGACY_ENGINE_SOURCE_LABEL} data exists for this week yet, so this board shows {SMARTSIM2_PUBLIC_LABEL}'s own projections directly, unblended.",
+            aria_label="NCAAF picks board",
+            source_path=f"NCAAF {SMARTSIM2_PUBLIC_LABEL} standalone projections",
+            source_title=f"NCAAF {SMARTSIM2_PUBLIC_LABEL} picks runtime",
+            source_date_display=f"Week {resolved_week}",
+            rank_cards=standalone_cards,
+            using_sample_data=False,
+            header_stats=[
+                {"label": "Cards", "value": str(len(standalone_cards))},
+                {"label": "Candidates", "value": str(len(standalone_cards))},
+                {"label": "Weeks", "value": str(len(weeks) or "-")},
+            ],
+            module_links=build_module_links(resolved_week, "Picks"),
+            control_label="Week",
+            control_type="number",
+            control_name="week",
+            control_value=str(resolved_week),
+            prev_href=f"/ncaaf/picks?week={prev_week}",
+            next_href=f"/ncaaf/picks?week={next_week}",
+            empty_state=None,
+            warning_panel={
+                "eyebrow": SMARTSIM2_PUBLIC_LABEL,
+                "title": f"No {LEGACY_ENGINE_SOURCE_LABEL} data yet for this week",
+                "body": f"This week has no {LEGACY_ENGINE_SOURCE_LABEL} predicted-totals row yet, so these candidates come directly from {SMARTSIM2_PUBLIC_LABEL}'s own projection, unblended.",
+                "list_items": [
+                    "Candidate rows are built from home_mean, away_mean, win_probability, and projected_spread/total.",
+                    f"Will automatically switch to the blended {LEGACY_ENGINE_SOURCE_LABEL}+{SMARTSIM2_PUBLIC_LABEL} view once the engine has real data for this week.",
+                ],
+            },
+        ),
+        "week": resolved_week,
+        "available_weeks": weeks,
+        "season": season,
+    }
+
+
 def build_smartsim_picks_page_context(selected_week: int) -> dict[str, Any]:
-    season = default_season()
-    runtime_weeks = _prediction_weeks()
-    if not runtime_weeks:
+    season, active_weeks = _resolve_ncaaf_active_season_and_weeks()
+    if not active_weeks:
         return build_picks_page_context(selected_week)
-    requested_week = int(selected_week or runtime_weeks[-1])
-    resolved_week = resolve_selected_value(requested_week, runtime_weeks, runtime_weeks[-1])
+    requested_week = int(selected_week or active_weeks[-1])
+    resolved_week = resolve_selected_value(requested_week, active_weeks, active_weeks[-1])
+
+    # _prediction_weeks()/_runtime_prediction_rows() (used by the engine
+    # path below) filter ONLY by week, never by season -- confirmed a real
+    # bug: the (single, non-season-partitioned) predicted-totals CSV still
+    # has old season's rows for week 1, which would otherwise get served
+    # up as if they were this season's real picks. _engine_rows_for_season_week
+    # (already used by cards.py's own engine/smartsim2 split) is the
+    # season-aware check that avoids this.
+    engine_rows = _engine_rows_for_season_week(season, resolved_week)
+    if not engine_rows:
+        standalone_context = _standalone_smartsim2_picks_context(season=season, resolved_week=resolved_week, weeks=active_weeks)
+        if standalone_context is not None:
+            return standalone_context
+        return build_picks_page_context(selected_week)
+
     cards = _runtime_pick_cards(resolved_week, season=season)
     if not cards:
         return build_picks_page_context(selected_week)
-    weeks = runtime_weeks
+    weeks = active_weeks
     prev_week, next_week = neighboring_values(weeks, resolved_week, fallback=resolved_week)
     source_path = _prediction_source_path()
     empty_state = None
@@ -349,24 +472,21 @@ def build_picks_page_context(selected_week: int) -> dict[str, Any]:
     }
 
 def build_betting_card_page_context(season: int, selected_week: int) -> dict[str, Any]:
-    context = dict(build_picks_page_context(selected_week))
+    # Was unconditionally build_picks_page_context() (the pure-historical,
+    # summary-artifact-only path), documented at the time as deliberate
+    # ("without inventing new live data plumbing while the source feed
+    # remains offseason-empty") -- that plumbing now exists
+    # (build_smartsim_picks_page_context's real-engine/SmartSim2-standalone
+    # split), so this reuses it instead of staying historical-only forever.
+    context = dict(build_smartsim_picks_page_context(selected_week))
     resolved_week = int(context.get("week") or selected_week)
     context["route_path"] = f"/ncaaf/season/{int(season)}/betting-card"
     context["intro_title"] = f"NCAAF {int(season)} Betting Card"
-    context["intro_body"] = "This historical NCAAF betting-card view reuses the stored weekly recommendations summary lane under an MLB-shaped season betting-card route family."
-    context["source_title"] = "NCAAF season betting-card summary"
+    context["intro_body"] = "This NCAAF betting-card view reuses whatever real picks-board data is currently available (engine, SmartSim2 standalone, or the stored weekly summary lane) under an MLB-shaped season betting-card route family."
+    context["source_title"] = "NCAAF season betting-card"
     context["source_date_display"] = f"{int(season)} Week {resolved_week}"
     context["module_links"] = build_module_links(resolved_week, "Betting Card", season=int(season))
     context["prev_href"] = f"/ncaaf/season/{int(season)}/betting-card?week={context.get('prev_href', '').split('=')[-1] or resolved_week}"
     context["next_href"] = f"/ncaaf/season/{int(season)}/betting-card?week={context.get('next_href', '').split('=')[-1] or resolved_week}"
-    context["warning_panel"] = {
-        "eyebrow": "Historical mode",
-        "title": "NCAAF betting card currently reuses weekly summary artifacts",
-        "body": "This route gives NCAAF an MLB-shaped betting-card family without inventing new live data plumbing while the source feed remains offseason-empty.",
-        "list_items": [
-            "Week navigation follows the stored summary weeks already present in the source repo.",
-            "The ranked cards on this page are the same recommendation artifacts surfaced on the picks board.",
-        ],
-    }
     context["season"] = int(season)
     return context

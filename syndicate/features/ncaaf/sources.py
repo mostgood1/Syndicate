@@ -82,7 +82,13 @@ def load_summary_index() -> dict[str, Any] | None:
     return load_json(data_path("recommendations_summary", "index.json"))
 
 
-def default_season() -> int:
+def _legacy_default_season_from_summary_index() -> int | None:
+    """The original default_season() implementation -- a regex scan over
+    the recommendations-summary index's fetch stdout/stderr text, tied to
+    the same old data pipeline as week_summaries(). Kept as a fallback
+    only (see default_season() below) since it has no way to see real
+    SmartSim2-only seasons (e.g. 2026, which the legacy engine has no
+    recs data for at all)."""
     payload = load_summary_index() or {}
     weeks = payload.get("weeks") if isinstance(payload.get("weeks"), list) else []
     for week in weeks:
@@ -99,7 +105,27 @@ def default_season() -> int:
     generated_utc = payload.get("generated_utc")
     if isinstance(generated_utc, str) and len(generated_utc) >= 4 and generated_utc[:4].isdigit():
         return int(generated_utc[:4])
-    return 2025
+    return None
+
+
+def default_season() -> int:
+    """Real active season -- delegates to cards.py's
+    _resolve_ncaaf_active_season_and_weeks() (unions the legacy engine's
+    own weeks with real SmartSim2 projection-artifact weeks, so a season
+    the engine has no recs data for -- e.g. 2026 -- still resolves
+    correctly once real SmartSim2 projections exist for it). Confirmed
+    real bug this was fixing: before this, default_season() (used by
+    /ncaaf/hub, picks.py, build_module_links) returned 2025 even though
+    cards.py's own separate resolver already found 2026 -- the two were
+    never wired together. Local import to avoid a circular import (cards.py
+    imports several functions from this module at load time); by the time
+    anything actually CALLS default_season(), cards.py is already loaded."""
+    from syndicate.features.ncaaf.cards import _resolve_ncaaf_active_season_and_weeks
+
+    active_season, _weeks = _resolve_ncaaf_active_season_and_weeks()
+    if active_season:
+        return active_season
+    return _legacy_default_season_from_summary_index() or 2025
 
 
 def week_summaries() -> list[dict[str, Any]]:

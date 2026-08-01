@@ -13,6 +13,7 @@ from syndicate.features.ncaaf.sources import available_weeks
 from syndicate.features.ncaaf.sources import build_module_links
 from syndicate.features.ncaaf.sources import default_ncaaf_source_root
 from syndicate.features.ncaaf.sources import default_season
+from syndicate.features.ncaaf.sources import _legacy_default_season_from_summary_index
 from syndicate.features.ncaaf.sources import default_week
 from syndicate.features.ncaaf.sources import format_moneyline
 from syndicate.features.ncaaf.sources import format_num
@@ -187,7 +188,9 @@ def _resolve_ncaaf_active_season_and_weeks() -> tuple[int, list[int]]:
     smartsim2_seasons = _smartsim2_standalone_seasons_and_weeks()
     all_seasons = set(engine_seasons) | set(smartsim2_seasons)
     if not all_seasons:
-        return default_season(), []
+        # Not default_season() -- that now calls back into this function,
+        # which would recurse forever when neither source has any data.
+        return (_legacy_default_season_from_summary_index() or 2025), []
     active_season = max(all_seasons)
     weeks = sorted(set(engine_seasons.get(active_season, [])) | set(smartsim2_seasons.get(active_season, [])))
     return active_season, weeks
