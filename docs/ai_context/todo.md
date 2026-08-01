@@ -4,8 +4,11 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 (NFL: full 2026
-backfill both sports + real injury-rating adjustment, backtested)" below).
+Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 (Layer 2 board:
+full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
+decided removal added, shipped and deployed)" below).
+Before that: "Reconciliation 2026-08-01 (NFL: full 2026
+backfill both sports + real injury-rating adjustment, backtested)".
 Before that: "Reconciliation 2026-08-01 part 2 (Layer 2
 board: the real root cause of the Alyssa Thomas duplicate -- a fallback-
 pool union whose identity hash misses cross-pipeline duplicates -- found
@@ -18,6 +21,83 @@ Before that: "Reconciliation 2026-08-01 (NFL/NCAAF:
 make real 2026 week-1 data the actual default)".
 Before that: "Reconciliation 2026-08-01 (NFL/NCAAF:
 real 2026 week-1 data + sim triggers)".
+
+### Reconciliation 2026-08-01 (Layer 2 board: full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-decided removal added, shipped and deployed)
+
+User asked for a full pass over the Layer 2 board's blank opportunity
+fields across all sports, plus a way to remove/designate a candidate once
+a player is out of the game or a prop has already hit. Quantified audit
+of the real live board (296 cards: 281 MLB, 12 NFL, 3 MLS) found
+`live_projection` blank on 98% and `actual` blank on 97% of MLB's live
+candidates -- both real bugs with a single root cause, now fixed and
+confirmed live.
+
+**Root cause, confirmed via direct artifact inspection**:
+`scripts/refresh_mlb_oddsapi.py` always requests the live-lens report in
+slim mode (`slim=True` locally, `slim=on` over the remote-fetch branch --
+both branches, no non-slim path exists). Slim mode strips every game down
+to `{gamePk, startTime, status}` before persisting it as
+`live_lens_report_<date>.json`, the only file
+`_mlb_live_lens_prop_candidates_from_artifact` reads `trackedProps` from.
+Confirmed live: all 15 of that day's games, including all 3 live ones,
+had zero `trackedProps` in the saved artifact -- this has silently been
+the case since slim mode was introduced (commit `5c12acf2`, "Apply MLB
+slim payload refresh", 2026-07-11), which was itself a deliberate fix for
+a real prior OOM/disk-size incident (that commit shrank one date's report
+from 3091 lines to a stub).
+
+Given that history, did **not** revert slim mode wholesale (confirmed
+with the user first -- real crash risk, and refresh-worker's memory
+headroom couldn't be confirmed at investigation time, the cross-service
+`/api/ops/intelligence/memory-diagnostics` endpoint was 502ing). Instead,
+added `_enrich_slim_live_lens_payload_with_live_props`
+(`scripts/refresh_mlb_oddsapi.py`): after the slim payload is built, it
+backfills real `trackedProps` for just the games that are actually live
+right now (typically 1-5, not the full 15-game slate) via
+`_live_props_from_game_detail` (`syndicate/features/mlb/live_lens.py`) --
+a function whose own docstring says "it belongs on the live-lens worker
+tick" and hard-refuses to run inside a web request; this refresh script
+runs with no Flask request context so that guard never fires. Confirmed
+live post-deploy: `liveLensLiveGamesEnriched: 3` in the artifact, real
+`liveProjection`/`actual` values (e.g. "Trevor Larnach Total Bases
+liveProjection=4.664 actual=4.0"), and on the actual board query MLB's
+live-prop blank rate dropped from 98%/97% to 45%/79% (the remainder is a
+separate, smaller player-name/game-matching gap between builders, not
+this root cause -- worth a follow-up if it recurs).
+
+**"Prop has already hit" -- new, didn't exist anywhere before.** No code
+compared a live prop's `actual` against its `line` to recognize a decided
+outcome. Every player-prop market here is a monotonic per-game counting
+stat (hits, points, assists, shots, ...), so once `actual` crosses `line`
+the result can't revert for the rest of that game regardless of which
+side was recommended. Added `_candidate_prop_outcome_decided`
+(`syndicate/features/intelligence.py`), wired into the existing
+`state_invalid` removal path (`_apply_candidate_state_guard`) that
+already silently drops final-game and (in principle) inactive-player
+candidates the same way -- a hit/missed prop is now excluded from the
+board rather than lingering as if still live and actionable. 6 new tests
+cover hit/missed/still-undecided/no-data-yet.
+
+**Existing removal mechanisms, audited while investigating**:
+- **Final-game exclusion**: already works. Confirmed live -- this is
+  exactly why WNBA showed 0 board candidates mid-investigation (both of
+  that day's games were Final).
+- **Player-inactive-status exclusion**: the code
+  (`_CANDIDATE_INACTIVE_PLAYER_TOKENS`, scanning for "inactive"/"out"/
+  "dnp"/"suspended" in status text) exists but was dead code -- confirmed
+  live, no candidate builder ever writes real injury/inactive text into
+  any of the fields it scans. **Partial exception found**: MLB starting
+  pitchers ARE covered by a separate, already-wired mechanism
+  (`_mlb_candidate_live_state` detects a probable starter being pulled
+  mid-game via the live boxscore and excludes that candidate correctly).
+  Nothing else -- MLB hitters, and every other sport's players leaving a
+  game -- is covered. Flagged as a real gap, not fixed this session (would
+  need real per-sport injury/lineup-change data sources investigated
+  first; bigger scope than this session's time allowed).
+
+Shipped: `d74265fd` (scripts/refresh_mlb_oddsapi.py,
+syndicate/features/intelligence.py + tests). Deployed to all three
+services, verified live post-deploy as described above.
 
 ### Reconciliation 2026-08-01 (NFL: full 2026 backfill both sports + real injury-rating adjustment, backtested)
 
