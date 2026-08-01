@@ -1316,6 +1316,24 @@ def _source_market_label(value: Any) -> str:
     }.get(code, market_label(value))
 
 
+# recommendations_slate_<date>.json's per-game "picks" list is a mixed bag --
+# it legitimately carries player-prop picks (pts/reb/ast/...) alongside real
+# team-level game markets (ATS/Total), the same shape #93 already found on the
+# props side (_pregame_prop_rows_from_betting_card pulling a fully mixed
+# ranked list). This is that same bug's mirror image: _source_game_market_
+# recommendations converts EVERY pick it's handed into a "game market
+# recommendation" row with no market filter at all, so any player-prop pick
+# that's also present here duplicates onto the board -- once (correctly) via
+# prop_recommendations (sourced separately, from props_recommendations_top_
+# by_game_<date>.json) and again (mislabeled) via game_market_recommendations.
+# Confirmed live 2026-08-01: Chelsea Gray's real 3PM prop, Natasha Cloud's
+# PTS+REB prop, and Jackie Young's PTS+AST prop each appeared twice on the
+# same game card -- identical score/price/line both times, one instance typed
+# as a game market. Same code set _source_market_label/market_label already
+# use to recognize a player-stat market.
+_WNBA_PLAYER_PROP_MARKET_CODES = frozenset({"pts", "reb", "ast", "pra", "pa", "pr", "ra", "threes", "blk", "stl", "bs"})
+
+
 _RECOMMENDATION_LINE_RE = re.compile(r"(-?\d+(?:\.\d+)?)\s*$")
 
 
@@ -1344,6 +1362,8 @@ def _source_game_market_recommendations(picks: list[dict[str, Any]]) -> list[dic
     rows: list[dict[str, Any]] = []
     for pick in picks:
         if not isinstance(pick, dict):
+            continue
+        if str(pick.get("market") or "").strip().lower() in _WNBA_PLAYER_PROP_MARKET_CODES:
             continue
         line_value = _safe_float(pick.get("line"))
         if line_value is None:

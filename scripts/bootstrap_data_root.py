@@ -124,10 +124,26 @@ def _bootstrap_root_pairs(repo_root: Path, data_root: Path) -> list[tuple[Path, 
 
 
 def _sync_bootstrap_roots(repo_root: Path, data_root: Path) -> Dict[str, int]:
+    # Each root synced independently, on purpose: app.py's caller wraps the
+    # whole of main() in a bare `except Exception: pass`, so one unhandled
+    # exception here used to silently abort every root after it in
+    # BOOTSTRAP_ROOTS -- confirmed live 2026-08-01: soccer_source (listed
+    # last among the per-sport roots, after mlb/nba/nhl/nfl/ncaaf/ncaab) was
+    # never reaching web's disk, including its players_<season>.csv roster
+    # seed -- degrading MLS player-prop generation to zero rows with no
+    # error visible anywhere (build_soccer_artifacts.py's own
+    # SOCCER_PLAYER_ROWS_MISSING print exists for exactly this shape, but
+    # never printed because the sync never got that far). Nothing upstream
+    # of soccer was ever proven to be the actual failure; isolating each
+    # root removes the whole class of "root N's failure hides root N+1..end"
+    # bug regardless of which root eventually throws.
     counters: Dict[str, int] = {}
     for source_root, destination_root, key in _bootstrap_root_pairs(repo_root, data_root):
         logger.info("Syncing %s -> %s", source_root, destination_root)
-        _sync_tree(source_root, destination_root, counters, key)
+        try:
+            _sync_tree(source_root, destination_root, counters, key)
+        except Exception as exc:
+            logger.warning("Bootstrap sync failed for root %s (%s -> %s): %s", key, source_root, destination_root, exc)
     return counters
 
 

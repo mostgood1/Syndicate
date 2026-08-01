@@ -1212,6 +1212,98 @@ def _mlb_join_mismatch_game_pks(date_str: str) -> list[str]:
 		return []
 
 
+def _mlb_props_regen_marker_path() -> Path:
+	return _meta_dir() / "last_mlb_props_regen_attempt.json"
+
+
+def _mlb_props_regen_cooldown_seconds() -> int:
+	raw = str(os.environ.get("SYNDICATE_MLB_PROPS_REGEN_COOLDOWN_SECONDS") or "").strip()
+	try:
+		value = int(raw or 3600)
+	except Exception:
+		value = 3600
+	return max(60, value)
+
+
+def _mlb_top_props_candidate_total(payload: dict[str, Any]) -> int:
+	total = 0
+	groups = payload.get("groups") if isinstance(payload, dict) else None
+	if not isinstance(groups, dict):
+		return 0
+	for group in groups.values():
+		if not isinstance(group, dict):
+			continue
+		summary = group.get("summary")
+		if isinstance(summary, dict):
+			try:
+				total += int(summary.get("candidateCount") or 0)
+			except (TypeError, ValueError):
+				continue
+	return total
+
+
+def _mlb_oddsapi_props_snapshot_has_entries(path: Path, key: str) -> bool:
+	payload = read_json_file(path)
+	if not isinstance(payload, dict):
+		return False
+	entries = payload.get(key)
+	return isinstance(entries, dict) and len(entries) > 0
+
+
+def _mlb_props_now_available_needs_regen(*, now_epoch: float, date_str: str) -> bool:
+	"""daily_top_props_<date>.json is written once (or a few times) a day, as
+	a side effect of the same daily-sim job this whole decision function
+	gates -- it is the sole pregame source for every MLB prop candidate (see
+	the comment on _mlb_live_lens_prop_candidates_from_artifact in
+	syndicate/features/intelligence.py). The fingerprint diff above only
+	reacts to roster/lineup changes, so a run that landed BEFORE OddsAPI
+	posted today's player-prop lines (e.g. the previous evening's
+	pre-generation for tomorrow's slate) produces a genuinely empty artifact
+	and then has no reason to ever rerun -- lineups don't change just because
+	a sportsbook posted a line. Confirmed live 2026-08-01: daily_top_props
+	was generated 18:10 CT the prior evening with zero rows in every
+	pitcher/hitter section, while real pitcher-prop odds sat on disk from
+	08:37 CT that morning, untouched, for hours, because nothing else was
+	watching for "odds landed after the empty write" as a trigger.
+	"""
+	try:
+		from syndicate.features.mlb.sources import daily_top_props_path
+		from syndicate.features.mlb.sources import daily_snapshot_oddsapi_hitter_props_path
+		from syndicate.features.mlb.sources import daily_snapshot_oddsapi_pitcher_props_path
+	except Exception:
+		return False
+
+	top_props = read_json_file(daily_top_props_path(date_str))
+	if not isinstance(top_props, dict):
+		# No artifact at all yet -- first_appearance/coldstart above already
+		# covers a slate with no daily_summary; this trigger only exists for
+		# the "ran, but props came back completely empty" case.
+		return False
+	if _mlb_top_props_candidate_total(top_props) > 0:
+		return False
+
+	has_pitcher_odds = _mlb_oddsapi_props_snapshot_has_entries(
+		daily_snapshot_oddsapi_pitcher_props_path(date_str), "pitcher_props"
+	)
+	has_hitter_odds = _mlb_oddsapi_props_snapshot_has_entries(
+		daily_snapshot_oddsapi_hitter_props_path(date_str), "hitter_props"
+	)
+	if not has_pitcher_odds and not has_hitter_odds:
+		# Odds genuinely aren't posted yet -- the artifact being empty is
+		# correct, not stale. Nothing to regenerate against.
+		return False
+
+	marker_path = _mlb_props_regen_marker_path()
+	last = read_json_file(marker_path)
+	last_epoch = float((last or {}).get("epoch") or 0.0) if isinstance(last, dict) else 0.0
+	last_date = str((last or {}).get("date") or "") if isinstance(last, dict) else ""
+	if last_epoch > 0.0 and last_date == date_str and (now_epoch - last_epoch) < _mlb_props_regen_cooldown_seconds():
+		return False
+
+	write_json_file(marker_path, {"epoch": now_epoch, "date": date_str, "reason": "props_now_available"})
+	return True
+
+
 def _intelligence_pipeline_busy() -> bool:
 	# #55, sim side. The pipeline yielding to a resident sim is only half the
 	# bound: at boot the pipeline starts FIRST and this gate fires ~5s later,
@@ -1442,13 +1534,28 @@ def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any
 	else:
 		join_mismatch_game_pks = _mlb_join_mismatch_game_pks(date_str)
 
-	if changed_game_pks or join_mismatch_game_pks:
+	# Cheapest trigger last, and only checked when nothing above already
+	# found a reason to resim -- a few small JSON reads, no market-board
+	# build, but no point paying even that when we're launching anyway.
+	props_regen_game_pks: list[str] = []
+	if not changed_game_pks and not join_mismatch_game_pks:
+		if _mlb_props_now_available_needs_regen(now_epoch=now_epoch, date_str=date_str):
+			props_regen_game_pks = sorted(current_fingerprints.keys())
+
+	if changed_game_pks or join_mismatch_game_pks or props_regen_game_pks:
 		_record_mlb_sim_check(now_epoch, date_str, current_fingerprints, launched=True)
-		merged_game_pks = sorted(set(changed_game_pks) | set(join_mismatch_game_pks))
-		reason = "fingerprint_change" if changed_game_pks else "join_mismatch_needs_resim"
+		merged_game_pks = sorted(set(changed_game_pks) | set(join_mismatch_game_pks) | set(props_regen_game_pks))
+		if changed_game_pks:
+			reason = "fingerprint_change"
+		elif join_mismatch_game_pks:
+			reason = "join_mismatch_needs_resim"
+		else:
+			reason = "props_now_available"
 		result: dict[str, Any] = {"force": True, "reason": reason, "game_pks": merged_game_pks}
 		if join_mismatch_game_pks:
 			result["join_mismatch_game_pks"] = join_mismatch_game_pks
+		if props_regen_game_pks:
+			result["props_regen_game_pks"] = props_regen_game_pks
 		return result
 
 	_record_mlb_sim_check(now_epoch, date_str, current_fingerprints, launched=False)

@@ -88,6 +88,23 @@ class SourceGameMarketRecommendationsTests(unittest.TestCase):
         rows = _source_game_market_recommendations([ATS_PICK, TOTAL_PICK])
         self.assertTrue(all(row["projected"] is None for row in rows))
 
+    def test_player_prop_market_codes_excluded_to_avoid_board_duplication(self) -> None:
+        # Confirmed live 2026-08-01: recommendations_slate's per-game "picks"
+        # list mixes real game markets (ATS/TOTAL) with player-prop picks
+        # coded by stat (pts/reb/ast/pra/pa/pr/ra/threes/blk/stl/bs) -- this
+        # function used to convert every one of them into a "game market
+        # recommendation" row with no filter, duplicating whatever
+        # prop_recommendations (a separate artifact) already surfaced
+        # correctly for the same player/market/line. A player-prop pick must
+        # never reach this list.
+        player_prop_picks = [
+            {**PROP_PICK, "market": code}
+            for code in ("pts", "reb", "ast", "pra", "pa", "pr", "ra", "threes", "blk", "stl", "bs")
+        ]
+        rows = _source_game_market_recommendations([ATS_PICK, TOTAL_PICK, *player_prop_picks])
+        self.assertEqual(len(rows), 2)
+        self.assertEqual({row["market_label"] for row in rows}, {"ATS", "TOTAL"})
+
 
 class StampGameLevelProjectedTests(unittest.TestCase):
     def test_stamps_margin_mean_onto_ats_and_total_mean_onto_total(self) -> None:

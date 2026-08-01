@@ -1174,6 +1174,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
         ), patch.object(
             live_refresh_loop, "_mlb_join_mismatch_game_pks", return_value=[]
         ), patch.object(
+            live_refresh_loop, "_mlb_props_now_available_needs_regen", return_value=False
+        ), patch.object(
             live_refresh_loop, "_record_mlb_sim_check"
         ) as mocked_record:
             mocked_summary_path.return_value.exists.return_value = True
@@ -1191,6 +1193,138 @@ class LiveRefreshLoopTests(unittest.TestCase):
         with patch("syndicate.features.mlb.cards.mlb_needs_resim_game_pks", side_effect=RuntimeError("boom")):
             result = live_refresh_loop._mlb_join_mismatch_game_pks("2026-07-19")
         self.assertEqual(result, [])
+
+    def test_mlb_daily_sim_decision_props_now_available_forces_full_slate_when_no_other_trigger(self) -> None:
+        # 2026-08-01 production symptom: daily_top_props was written the
+        # prior evening before OddsAPI posted player-prop lines, so every
+        # section came back empty. Lineups/rosters didn't change (no
+        # fingerprint diff, no join mismatch), but real prop odds landed on
+        # disk hours later with nothing watching for it -- this trigger is
+        # the fix.
+        events = [
+            live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None),
+            live_refresh_loop.ScheduleEvent(sport="mlb", event_id="200", home="C", away="D", start_time_utc=None),
+        ]
+        with patch.dict(os.environ, {"SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER": "true"}, clear=False), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(live_refresh_loop, "is_refresh_run_active", return_value=False), patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=events
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path, patch.object(
+            live_refresh_loop, "events_starting_within", return_value=[]
+        ), patch.object(
+            live_refresh_loop, "_read_last_mlb_sim_check", return_value={"epoch": 1000.0, "date": "2026-08-01", "fingerprints": {"100": "aaa", "200": "bbb"}}
+        ), patch.object(
+            live_refresh_loop, "_fetch_mlb_injuries", return_value=True
+        ), patch.object(
+            live_refresh_loop, "_mlb_sim_input_fingerprint_by_game", return_value={"100": "aaa", "200": "bbb"}
+        ), patch.object(
+            live_refresh_loop, "_mlb_join_mismatch_game_pks", return_value=[]
+        ), patch.object(
+            live_refresh_loop, "_mlb_props_now_available_needs_regen", return_value=True
+        ), patch.object(
+            live_refresh_loop, "_record_mlb_sim_check"
+        ) as mocked_record:
+            mocked_summary_path.return_value.exists.return_value = True
+            decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=2000.0, date_str="2026-08-01")
+
+        self.assertTrue(decision["force"])
+        self.assertEqual(decision["reason"], "props_now_available")
+        self.assertEqual(decision["game_pks"], ["100", "200"])
+        self.assertEqual(decision["props_regen_game_pks"], ["100", "200"])
+        mocked_record.assert_called_once_with(2000.0, "2026-08-01", {"100": "aaa", "200": "bbb"}, launched=True)
+
+    def test_mlb_daily_sim_decision_skips_props_check_when_fingerprint_already_triggers(self) -> None:
+        # The props-regen check is cheap but still shouldn't run (and
+        # shouldn't spend its own cooldown marker) when another trigger
+        # already forces a resim this tick.
+        events = [live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None)]
+        with patch.dict(os.environ, {"SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER": "true"}, clear=False), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(live_refresh_loop, "is_refresh_run_active", return_value=False), patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=events
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path, patch.object(
+            live_refresh_loop, "events_starting_within", return_value=[]
+        ), patch.object(
+            live_refresh_loop, "_read_last_mlb_sim_check", return_value={"epoch": 1000.0, "date": "2026-08-01", "fingerprints": {"100": "aaa"}}
+        ), patch.object(
+            live_refresh_loop, "_fetch_mlb_injuries", return_value=True
+        ), patch.object(
+            live_refresh_loop, "_mlb_sim_input_fingerprint_by_game", return_value={"100": "CHANGED"}
+        ), patch.object(
+            live_refresh_loop, "_mlb_join_mismatch_game_pks", return_value=[]
+        ), patch.object(
+            live_refresh_loop, "_mlb_props_now_available_needs_regen"
+        ) as mocked_props_check, patch.object(live_refresh_loop, "_record_mlb_sim_check"):
+            mocked_summary_path.return_value.exists.return_value = True
+            decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=2000.0, date_str="2026-08-01")
+
+        self.assertEqual(decision["reason"], "fingerprint_change")
+        mocked_props_check.assert_not_called()
+
+    def test_mlb_props_now_available_needs_regen_false_when_top_props_already_has_candidates(self) -> None:
+        with patch.object(
+            live_refresh_loop, "read_json_file", return_value={"groups": {"pitcher": {"summary": {"candidateCount": 4}}}}
+        ):
+            result = live_refresh_loop._mlb_props_now_available_needs_regen(now_epoch=2000.0, date_str="2026-08-01")
+        self.assertFalse(result)
+
+    def test_mlb_props_now_available_needs_regen_false_when_no_odds_posted_yet(self) -> None:
+        empty_top_props = {"groups": {"pitcher": {"summary": {"candidateCount": 0}}, "hitter": {"summary": {"candidateCount": 0}}}}
+
+        def _fake_read(path: Any) -> Any:
+            if "top_props" in str(path):
+                return empty_top_props
+            return {"pitcher_props": {}}
+
+        with patch.object(live_refresh_loop, "read_json_file", side_effect=_fake_read):
+            result = live_refresh_loop._mlb_props_now_available_needs_regen(now_epoch=2000.0, date_str="2026-08-01")
+        self.assertFalse(result)
+
+    def test_mlb_props_now_available_needs_regen_true_when_odds_landed_after_empty_write(self) -> None:
+        empty_top_props = {"groups": {"pitcher": {"summary": {"candidateCount": 0}}, "hitter": {"summary": {"candidateCount": 0}}}}
+
+        def _fake_read(path: Any) -> Any:
+            if "top_props" in str(path):
+                return empty_top_props
+            if "pitcher_props" in str(path):
+                return {"pitcher_props": {"kevin gausman": {"strikeouts": {"line": 5.5}}}}
+            return {"hitter_props": {}}
+
+        with patch.object(live_refresh_loop, "read_json_file", side_effect=_fake_read), patch.object(
+            live_refresh_loop, "write_json_file"
+        ) as mocked_write:
+            result = live_refresh_loop._mlb_props_now_available_needs_regen(now_epoch=2000.0, date_str="2026-08-01")
+        self.assertTrue(result)
+        mocked_write.assert_called_once()
+
+    def test_mlb_props_now_available_needs_regen_respects_cooldown(self) -> None:
+        empty_top_props = {"groups": {"pitcher": {"summary": {"candidateCount": 0}}}}
+
+        def _fake_read(path: Any) -> Any:
+            if "top_props" in str(path):
+                return empty_top_props
+            if "pitcher_props" in str(path):
+                return {"pitcher_props": {"kevin gausman": {"strikeouts": {"line": 5.5}}}}
+            return {}
+
+        marker = {"epoch": 1000.0, "date": "2026-08-01"}
+
+        def _fake_read_with_marker(path: Any) -> Any:
+            if "last_mlb_props_regen_attempt" in str(path):
+                return marker
+            return _fake_read(path)
+
+        with patch.object(live_refresh_loop, "read_json_file", side_effect=_fake_read_with_marker), patch.object(
+            live_refresh_loop, "write_json_file"
+        ) as mocked_write:
+            # now_epoch is only 500s after the marker; default cooldown is 3600s.
+            result = live_refresh_loop._mlb_props_now_available_needs_regen(now_epoch=1500.0, date_str="2026-08-01")
+        self.assertFalse(result)
+        mocked_write.assert_not_called()
 
     def test_mlb_daily_sim_decision_tip_off_window_returns_only_starting_soon_game_pks(self) -> None:
         all_events = [

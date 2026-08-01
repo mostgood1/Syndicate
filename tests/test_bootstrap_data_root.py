@@ -93,6 +93,46 @@ class BootstrapDataRootTests(unittest.TestCase):
             self.assertEqual(dest_file.read_text(encoding="utf-8"), '{"ok": true}\n')
             copy_mock.assert_not_called()
 
+    def test_sync_bootstrap_roots_isolates_a_failing_root_from_later_ones(self) -> None:
+        # Confirmed live 2026-08-01: main() has no try/except around this
+        # loop, and app.py's caller wraps the whole call in a bare `except
+        # Exception: pass` -- so one root throwing used to silently abort
+        # every root listed after it in BOOTSTRAP_ROOTS, with zero error
+        # surfaced anywhere. soccer_source (last among the per-sport roots)
+        # never reached web's disk as a result, degrading MLS player-prop
+        # generation to zero rows. Each root must sync independently.
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as src_dir, tempfile.TemporaryDirectory() as dst_dir:
+            src_root = Path(src_dir)
+            dst_root = Path(dst_dir)
+            (src_root / "mlb_source").mkdir(parents=True, exist_ok=True)
+            (src_root / "soccer_source" / "mls" / "players").mkdir(parents=True, exist_ok=True)
+            players_file = src_root / "soccer_source" / "mls" / "players" / "players_2026.csv"
+            players_file.write_text("player_id,name\n1,Real Player\n", encoding="utf-8")
+
+            real_sync_tree = module._sync_tree
+
+            def _flaky_sync_tree(source, destination, counters, key):
+                if key == "mlb_source":
+                    raise OSError("simulated disk failure syncing mlb_source")
+                return real_sync_tree(source, destination, counters, key)
+
+            with patch.object(
+                module,
+                "_bootstrap_root_pairs",
+                return_value=[
+                    (src_root / "mlb_source", dst_root / "mlb_source", "mlb_source"),
+                    (src_root / "soccer_source", dst_root / "soccer_source", "soccer_source"),
+                ],
+            ), patch.object(module, "_sync_tree", side_effect=_flaky_sync_tree):
+                counters = module._sync_bootstrap_roots(src_root, dst_root)
+
+            copied_players_file = dst_root / "soccer_source" / "mls" / "players" / "players_2026.csv"
+            self.assertTrue(copied_players_file.exists(), "soccer_source must still sync after mlb_source fails")
+            self.assertEqual(copied_players_file.read_text(encoding="utf-8"), "player_id,name\n1,Real Player\n")
+            self.assertNotIn("mlb_source", counters)
+            self.assertEqual(counters.get("soccer_source"), 1)
+
     def test_bootstrap_roots_include_render_critical_paths(self) -> None:
         module = _load_module()
         with tempfile.TemporaryDirectory() as temp_dir:
