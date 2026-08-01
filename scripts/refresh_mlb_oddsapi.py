@@ -618,6 +618,68 @@ def _refresh_source_artifacts(*, odds_module, source_root: Path, date_str: str, 
     }
 
 
+def _enrich_slim_live_lens_payload_with_live_props(*, payload: dict[str, object], date_str: str) -> dict[str, object]:
+    """The report this module persists to disk is always the slim shape
+    (see slim=True/slim=on below) -- {gamePk, startTime, status} only, no
+    trackedProps -- because a full non-slim payload for the whole slate was
+    the direct cause of a prior incident this repo already paid down once
+    (commit 5c12acf2, "Apply MLB slim payload refresh": that date's report
+    alone shrank from 3091 lines to a stub, alongside several other MLB
+    artifact files). But trackedProps is the ONLY thing MLB's live-lens
+    prop-candidate backfill (_mlb_live_lens_prop_candidates_from_artifact,
+    syndicate/features/intelligence.py) reads from this file, and it only
+    ever looks at LIVE games -- so slim mode silently zeroed out
+    live_projection/actual for every MLB prop candidate board-wide,
+    confirmed live 2026-08-01 (98% blank across 281 live-board candidates).
+
+    Rather than reverting slim mode for the whole slate (same OOM/disk-size
+    risk as before), this backfills real trackedProps for just the handful
+    of games that are actually live right now via
+    _live_props_from_game_detail -- whose own docstring says "it belongs on
+    the live-lens worker tick": this IS that tick. That function hard-
+    refuses to run inside a web request (refuse_if_compute_in_request_path),
+    but this module is a plain script with no Flask app, so
+    has_request_context() is always False here regardless of which Render
+    service happens to execute it -- the guard cannot fire.
+    """
+    report = payload.get("latestReport") if isinstance(payload.get("latestReport"), dict) else None
+    if not isinstance(report, dict):
+        return payload
+    games = report.get("games") if isinstance(report.get("games"), list) else None
+    if not games:
+        return payload
+    try:
+        from syndicate.features.mlb.live_lens import _live_props_from_game_detail
+    except Exception:
+        return payload
+    enriched_count = 0
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        status = game.get("status") if isinstance(game.get("status"), dict) else {}
+        abstract = str(status.get("abstract") or "").strip()
+        detailed = str(status.get("detailed") or "").strip()
+        if not mlb_status_is_live(abstract, detailed):
+            continue
+        game_pk = game.get("gamePk")
+        if not game_pk:
+            continue
+        try:
+            live_rows = _live_props_from_game_detail(str(date_str), int(game_pk))
+        except Exception:
+            continue
+        if live_rows:
+            game["trackedProps"] = live_rows
+            game["props"] = live_rows
+            game["liveProps"] = live_rows
+            enriched_count += 1
+    if enriched_count:
+        counts = report.get("counts") if isinstance(report.get("counts"), dict) else {}
+        counts["liveLensLiveGamesEnriched"] = enriched_count
+        report["counts"] = counts
+    return payload
+
+
 def _refresh_live_lens_artifacts(*, source_root: Path, date_str: str, trigger: str) -> dict[str, object]:
     def _coerce_report_payload(payload: dict[str, object] | None) -> dict[str, object]:
         if not isinstance(payload, dict):
@@ -651,6 +713,7 @@ def _refresh_live_lens_artifacts(*, source_root: Path, date_str: str, trigger: s
         try:
             live_lens_payload = _fetch_live_lens_reports_payload(base_url=base_url, token=token, date_str=date_str, timeout_seconds=45)
             if _payload_is_usable(live_lens_payload):
+                live_lens_payload = _enrich_slim_live_lens_payload_with_live_props(payload=live_lens_payload, date_str=date_str)
                 live_lens = _write_live_lens_reports_payload(source_root=source_root, date_str=date_str, payload=live_lens_payload, trigger=trigger)
             else:
                 errors.append("remote live-lens payload was degraded or empty")
@@ -660,6 +723,7 @@ def _refresh_live_lens_artifacts(*, source_root: Path, date_str: str, trigger: s
         try:
             live_lens_payload = _build_local_live_lens_reports_payload(source_root=source_root, date_str=date_str)
             if _payload_is_usable(live_lens_payload):
+                live_lens_payload = _enrich_slim_live_lens_payload_with_live_props(payload=live_lens_payload, date_str=date_str)
                 live_lens = _write_live_lens_reports_payload(source_root=source_root, date_str=date_str, payload=live_lens_payload, trigger=trigger)
             else:
                 errors.append("local live-lens payload was degraded or empty")

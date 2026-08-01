@@ -5559,6 +5559,34 @@ def _bind_candidate_state(candidate: dict[str, Any]) -> None:
         candidate["status_context"] = _safe_text(candidate.get("status_display"), "")
 
 
+def _candidate_prop_outcome_decided(candidate: dict[str, Any]) -> str | None:
+    """"hit" or "missed" once a live prop's outcome is already
+    mathematically locked in, else None (still undecided, or not enough
+    data to tell).
+
+    Every player-prop market on this board is a monotonic, non-decreasing
+    counting stat within a single game (hits, points, assists, strikeouts,
+    shots, ...) -- once the live actual crosses the line, the outcome can
+    never revert for the rest of that game, regardless of which side
+    (over/under) was originally recommended. Board audit 2026-08-01: user
+    asked for a settled prop to be removed or clearly designated rather
+    than left showing as if it were still a live opportunity -- there was
+    previously no code anywhere comparing actual against line at all.
+    """
+    if _safe_text(candidate.get("candidate_type"), "").lower() != "prop":
+        return None
+    line_value = _numeric_hint(candidate.get("line"))
+    actual_value = _numeric_hint(candidate.get("actual"))
+    if line_value is None or actual_value is None or actual_value <= line_value:
+        return None
+    pick_text = _safe_text(candidate.get("pick"), "").strip().lower()
+    if pick_text.startswith("over"):
+        return "hit"
+    if pick_text.startswith("under"):
+        return "missed"
+    return None
+
+
 def _apply_candidate_state_guard(candidate: dict[str, Any]) -> None:
     _bind_candidate_state(candidate)
     if _candidate_is_final(candidate):
@@ -5570,6 +5598,12 @@ def _apply_candidate_state_guard(candidate: dict[str, Any]) -> None:
         candidate.setdefault("state_note", "Stale live-state data excluded (no update in over 8 hours).")
         return
     if _safe_text(candidate.get("candidate_type"), "").lower() != "prop":
+        return
+    prop_outcome = _candidate_prop_outcome_decided(candidate)
+    if prop_outcome is not None:
+        candidate["state_invalid"] = True
+        candidate.setdefault("state_note", f"Prop already {prop_outcome} -- outcome decided, no longer a live opportunity.")
+        candidate["prop_outcome"] = prop_outcome
         return
     status_text = _candidate_state_text(candidate)
     if any(re.search(rf"(?<![a-z]){re.escape(token)}(?![a-z])", status_text) for token in _CANDIDATE_INACTIVE_PLAYER_TOKENS):

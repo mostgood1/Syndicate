@@ -1634,6 +1634,96 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIn("inactive", str(scored.get("state_note") or "").lower())
         self.assertNotIn("score", scored)
 
+    def test_score_candidate_excludes_over_prop_that_already_hit(self) -> None:
+        # 2026-08-01 board audit: user asked for a prop to be removed (or
+        # designated) once its outcome is already decided, e.g. mid-game
+        # with the actual already past the line. No code anywhere compared
+        # actual against line before this.
+        candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "prop",
+            "pick": "Over 1.5",
+            "name": "Steven Kwan Over 1.5 Hits",
+            "market": "Hits",
+            "line": "1.5",
+            "actual": "3",
+            "is_live": True,
+            "status_display": "In Progress",
+            "projection": 1.7,
+            "odds": "+110",
+            "edge": 0.1,
+            "source_strength": 0.5,
+        }
+
+        scored = score_candidate(candidate)
+
+        self.assertTrue(scored.get("state_invalid"))
+        self.assertEqual(scored.get("prop_outcome"), "hit")
+        self.assertIn("hit", str(scored.get("state_note") or "").lower())
+
+    def test_score_candidate_excludes_under_prop_that_already_missed(self) -> None:
+        candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "prop",
+            "pick": "Under 1.5",
+            "name": "Steven Kwan Under 1.5 Hits",
+            "market": "Hits",
+            "line": "1.5",
+            "actual": "2",
+            "is_live": True,
+            "status_display": "In Progress",
+            "projection": 1.7,
+            "odds": "+110",
+            "edge": 0.1,
+            "source_strength": 0.5,
+        }
+
+        scored = score_candidate(candidate)
+
+        self.assertTrue(scored.get("state_invalid"))
+        self.assertEqual(scored.get("prop_outcome"), "missed")
+
+    def test_score_candidate_keeps_prop_still_undecided(self) -> None:
+        candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "prop",
+            "pick": "Over 1.5",
+            "name": "Steven Kwan Over 1.5 Hits",
+            "market": "Hits",
+            "line": "1.5",
+            "actual": "1",
+            "is_live": True,
+            "status_display": "In Progress",
+            "projection": 1.7,
+            "odds": "+110",
+            "edge": 0.1,
+            "source_strength": 0.5,
+        }
+
+        scored = score_candidate(candidate)
+
+        self.assertFalse(scored.get("state_invalid"))
+        self.assertNotIn("prop_outcome", scored)
+
+    def test_score_candidate_keeps_prop_with_no_actual_yet(self) -> None:
+        candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "prop",
+            "pick": "Over 1.5",
+            "name": "Steven Kwan Over 1.5 Hits",
+            "market": "Hits",
+            "line": "1.5",
+            "actual": "-",
+            "projection": 1.7,
+            "odds": "+110",
+            "edge": 0.1,
+            "source_strength": 0.5,
+        }
+
+        scored = score_candidate(candidate)
+
+        self.assertFalse(scored.get("state_invalid"))
+
     def test_candidate_live_claim_is_stale_trusts_missing_timestamp(self) -> None:
         # updated_epoch is only ever populated by home.py's
         # _game_row_updated_epoch, which falls back to a hardcoded 0.0

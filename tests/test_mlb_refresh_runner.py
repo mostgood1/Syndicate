@@ -1684,3 +1684,63 @@ class MlbRefreshRunnerTests(unittest.TestCase):
             "http://example.test/api/cron/warm-cards-cache",
         ])
         self.assertEqual(calls[0]["params"], {"refreshMarkets": "off"})
+
+    def test_enrich_slim_live_lens_payload_backfills_trackedprops_for_live_games_only(self) -> None:
+        # 2026-08-01 board audit: the slim payload this module persists to
+        # disk carries {gamePk, startTime, status} only -- no trackedProps
+        # for any game, live or not -- which silently zeroed out
+        # live_projection/actual for every MLB prop candidate board-wide.
+        # This enrichment must backfill real props for the live game and
+        # leave the pregame/final games' already-empty state untouched
+        # (deliberately not spending the per-game box-score fetch on games
+        # that will never surface a live prop candidate anyway).
+        module = self._load_module()
+        payload = {
+            "latestReport": {
+                "date": "2026-08-01",
+                "counts": {"games": 3, "live": 1, "final": 1, "pregame": 1},
+                "games": [
+                    {"gamePk": 111, "startTime": "3:10 PM", "status": {"abstract": "Live", "detailed": "In Progress"}},
+                    {"gamePk": 222, "startTime": "1:10 PM", "status": {"abstract": "Final", "detailed": "Final"}},
+                    {"gamePk": 333, "startTime": "7:10 PM", "status": {"abstract": "Preview", "detailed": "Scheduled"}},
+                ],
+            }
+        }
+        live_rows = [{"playerName": "Real Player", "marketLabel": "Hits", "liveProjection": 1.4, "actual": 1.0}]
+
+        def _fake_live_props(date_str: str, game_pk: int) -> list[dict[str, object]]:
+            self.assertEqual(date_str, "2026-08-01")
+            self.assertEqual(game_pk, 111)
+            return live_rows
+
+        with patch("syndicate.features.mlb.live_lens._live_props_from_game_detail", side_effect=_fake_live_props):
+            enriched = module._enrich_slim_live_lens_payload_with_live_props(payload=payload, date_str="2026-08-01")
+
+        games_by_pk = {game["gamePk"]: game for game in enriched["latestReport"]["games"]}
+        self.assertEqual(games_by_pk[111]["trackedProps"], live_rows)
+        self.assertNotIn("trackedProps", games_by_pk[222])
+        self.assertNotIn("trackedProps", games_by_pk[333])
+        self.assertEqual(enriched["latestReport"]["counts"]["liveLensLiveGamesEnriched"], 1)
+
+    def test_enrich_slim_live_lens_payload_is_a_noop_without_latest_report(self) -> None:
+        module = self._load_module()
+        payload = {"games": [{"gamePk": 1}]}
+
+        with patch("syndicate.features.mlb.live_lens._live_props_from_game_detail") as fake:
+            result = module._enrich_slim_live_lens_payload_with_live_props(payload=payload, date_str="2026-08-01")
+
+        fake.assert_not_called()
+        self.assertEqual(result, payload)
+
+    def test_enrich_slim_live_lens_payload_survives_per_game_fetch_failure(self) -> None:
+        module = self._load_module()
+        payload = {
+            "latestReport": {
+                "games": [{"gamePk": 111, "status": {"abstract": "Live", "detailed": "In Progress"}}],
+            }
+        }
+
+        with patch("syndicate.features.mlb.live_lens._live_props_from_game_detail", side_effect=RuntimeError("boom")):
+            result = module._enrich_slim_live_lens_payload_with_live_props(payload=payload, date_str="2026-08-01")
+
+        self.assertNotIn("trackedProps", result["latestReport"]["games"][0])
