@@ -4,17 +4,87 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 (Ask the Syndicate
-matchup features + Layer 2 live-candidate-stuck-at-pregame bug)" below).
-Before that: "Reconciliation 2026-08-01 (soccer player-props root cause
-confirmed, board propagation still gapped)". Before that: "Reconciliation
-2026-07-31 (soccer live-lens fast-tick engine)". Before that: "Reconciliation
-2026-07-31 (keyvalue capacity remediation: TTL + reclaim sweep, WNBA
-props/games vanishing root cause)". Before that: "Reconciliation 2026-07-31
-(Layer 2 board: MLB live-status dedup fix + WNBA game/prop wiring, Phase
-A-C)". Before that: "Reconciliation 2026-07-31 (#161 part 2: NBA/WNBA
-closing line, plus a production outage found and fixed along the way)".
-Prior session: 2026-07-30.
+Last reconciled: 2026-07-31 (see "Reconciliation 2026-07-31 (NCAAF Layer 1
+market board -- foundation-scope build)" below).
+Before that: "Reconciliation 2026-08-01 (Ask the Syndicate matchup features
++ Layer 2 live-candidate-stuck-at-pregame bug)". Before that: "Reconciliation
+2026-08-01 (soccer player-props root cause confirmed, board propagation
+still gapped)". Before that: "Reconciliation 2026-07-31 (soccer live-lens
+fast-tick engine)". Before that: "Reconciliation 2026-07-31 (keyvalue
+capacity remediation: TTL + reclaim sweep, WNBA props/games vanishing root
+cause)". Before that: "Reconciliation 2026-07-31 (Layer 2 board: MLB
+live-status dedup fix + WNBA game/prop wiring, Phase A-C)". Before that:
+"Reconciliation 2026-07-31 (#161 part 2: NBA/WNBA closing line, plus a
+production outage found and fixed along the way)". Prior session: 2026-07-30.
+
+### Reconciliation 2026-07-31 (NCAAF Layer 1 market board -- foundation-scope build)
+
+User asked to "get college football wired up fully based on MLB." A gap
+analysis against the MLB reference module found this to be genuinely
+multi-session work spanning routes, an entire props/ladders pipeline,
+Ask the Syndicate evidence fetchers, and evaluation-layer tagging -- the
+user chose to scope this session to the foundation layer (routes/hub/
+game_board_contract) rather than attempt everything at once. Digging into
+that scope concretely (not assumed) found `game_board_contract` usage and
+the `/hub` route were already correct/present for NCAAF -- the one real,
+confirmed-absent piece was Layer 1 (`/market-board`, every quoted line
+independent of any recommendation engine's picks), which MLB/NBA/WNBA all
+have and NCAAF didn't.
+
+**New: #175** (filed and closed same session) — built
+`/ncaaf/market-board` + `/ncaaf/api/market-board`: a week-scoped game-market
+inventory board (moneyline, spread, total -- no player props, since that
+pipeline doesn't exist for NCAAF yet, a separate future phase) mirroring
+`syndicate/features/mlb/cards.py:build_mlb_market_board`. Real market lines
+(`cfbd_lines_{season}_wk{n}.json`, already partially used for spread/total)
+extended to also capture moneyline; joined against the model's own signal
+(blended margin/total, degrading to SmartSim 2.0, degrading to the legacy
+Enhanced Totals Engine) via the existing sport-agnostic
+`shared.market_inventory.join_odds_to_sim` -- untouched, reused as-is.
+Registered in the cross-sport `/market-board` hub and the shared board's
+sport-tab bar.
+
+Two real bugs found and fixed via actual browser verification against
+production data, not just passing unit tests:
+1. First render showed "0 lines" for all 16 real week-1 games despite the
+   API returning real inventory -- `syndicate/static/shared/market_board.js`
+   reads a game's line rows from `game.rows` (confirmed by reading MLB's own
+   `build_mlb_market_board`, which returns `"rows": inventory`); the new
+   NCAAF builder had named the same key `"inventory"`. Fixed by renaming
+   to `rows`.
+2. After that fix, spread/total rows displayed nonsensical "Model"
+   percentages (5786.7%, 396.0%) -- the board always renders
+   `sim_projection` as a 0-1 probability, but the initial implementation put
+   the raw model point estimate (e.g. 57.9 projected total points) directly
+   into that field. Real fix: added `_ncaaf_cover_probability` (Normal-CDF
+   over `market_line` using the model's own mean/stdev, stdlib
+   `statistics.NormalDist`, no new dependency) so `sim_projection` is only
+   ever a genuine cover/over probability when SmartSim 2.0 stdev data is
+   available; the raw point estimate now goes in `projected_value` (the
+   field the contract already reserves for exactly this), and
+   `smartsim2_margin_stdev`/`smartsim2_total_stdev` were added (additive)
+   to the standalone-projection scoreboard path, which didn't carry them
+   before. Confirmed live: `NC @ TCU` now shows Home 6.5 / Projected 4.0 /
+   Model 42.5% (model favors home by less than the line, so under 50% to
+   cover -- correct), Total Over 49.5 / Projected 57.9 / Model 74.0%.
+
+Commit: (see git log for this session's commit hash on
+`syndicate/features/ncaaf/cards.py`, `syndicate/blueprints/ncaaf.py`,
+`syndicate/templates/ncaaf/market_board.html`,
+`syndicate/static/shared/market_board.js`, `syndicate/blueprints/home.py`,
+`tests/test_ncaaf_market_board.py`). Verified: 8 new unit tests + all 200
+existing NCAAF tests + MLB's own market-board suite (125 total) pass;
+`python -m pytest tests/ -k ncaaf` green; browser-driven check of
+`/ncaaf/market-board`, `/ncaaf/api/market-board`, and the cross-sport
+`/market-board` hub against real 2026 week-1 data.
+
+**Not done this session (explicitly out of scope, flagged for a future
+session)**: NCAAF still has no props/ladders pipeline, no Ask the Syndicate
+evidence fetchers or sport-keywords (still 0 `ncaaf` references in
+`ask_the_syndicate_data.py` as of #171), and no evaluation-layer
+recommendations tagged `sport="ncaaf"` yet (the evaluation ledger itself
+is sport-agnostic and ready per #171's finding, just has nothing to ingest
+for NCAAF today). Each is its own from-scratch build, not a wiring fix.
 
 ### Reconciliation 2026-08-01 (Ask the Syndicate matchup features + Layer 2 live-candidate-stuck-at-pregame bug)
 
@@ -4810,6 +4880,57 @@ were resolved and nine already-closed rows removed from the open tables.
 | **114** | 🟢 **A third, still-live instance of #111/#113's "two sources" shape — user said directly "we need ONE source" after seeing the stale chip again post-#113 — SHIPPED and deployed 2026-07-28.** #113 fixed the *stale browser-restored input* trigger; this is a completely different trigger for the identical downstream symptom (an explicit date silently bypassing `read_combined_intelligence_response`'s `not explicit_date` gate, falling back to the older single-date `snapshot_read` mechanism), reachable through **ordinary, correct use of the Today/Tomorrow day tabs** rather than any stale/leftover state. Root-caused by re-reading `renderFilterTabs`' own day-tab click handler in `intelligence.html`: clicking "Today" sets `state.date = TODAY_ISO` for **client-side filtering only** (per #93's own established design — the day tabs narrow one shared "All" fetch, they were never supposed to trigger a new server round trip) and correctly does NOT call `loadIntelligence()` itself. But the **next scheduled background poll** (`SyndicatePolling`, 60s interval) calls `intelligenceQueryPayload()`, which forwarded `state.date` to the server whenever it was truthy with no way to tell "day-tab client filter" apart from "deliberate explicit-date override" — so every background refresh after clicking Today/Tomorrow silently carried an explicit date from then on, permanently routing that tab's session away from the actively-maintained combined-board window onto the same slower-to-warm single-date snapshot mechanism #113 described. Confirmed **no exception path** was involved first (checked Render's log API for `COMBINED_BOARD_RESPONSE_FAILURE` over the full queryable week — zero hits — ruling out the "combined reader throws, falls through" branch as the cause) before tracing to this mechanism instead. **Fix:** added `state.explicitDateOverride`, a boolean tracked separately from `state.date` itself — `true` only when seeded from an explicit `?date=` URL param on load (an intentional deep link, matching #113's own reasoning) or set by the free-text `#board-date` input's toolbar-submit handler (an intentional user override); explicitly set `false` by the day-tab click handler. `intelligenceQueryPayload()` now gates on `state.date && state.explicitDateOverride` instead of `state.date` alone. Verified via `node --check` (syntax) and a live local-server browser check with a `window.fetch` interceptor: after clicking "Today" (date input populated to today's date, confirming the client-side filter still works), the next captured background-poll request body had `background:true` and **no `date` key at all**; a subsequent free-text-input + Refresh submit correctly still sent an explicit `date` with `force_refresh:true`. No automated test added, same reasoning as #113 (DOM/timer interaction, not meaningfully unit-testable without a real browser harness). **If this resurfaces a fourth time**: check `loadGameChips`/`loadSteam`'s own date handling next — they were deliberately left alone here (already real per-date server fetches by design, not client-filtered), but worth confirming they don't have an analogous "explicit vs. filter" ambiguity of their own. |
 
 ## In progress
+
+- **New — WNBA live score fabrication, root-caused and fixed, deployed and
+  confirmed live 2026-08-01.** User reported three symptoms in one message:
+  Layer 2 board not matching live WNBA data, the WNBA page and main page
+  both "running super behind," and the WNBA live-lens being inaccurate for
+  1H/Q3. All three traced to **one shared root cause**:
+  `build_live_state_payload`'s web-dyno branch
+  (`syndicate/features/wnba/cards.py`, the `_render_web_dyno()` branch of
+  `_build_live_state_payload_uncached`) always set `home_pts`/`away_pts` from
+  `sim_score.get("home_mean"/"away_mean")` whenever a game was live or final
+  — the sim's **static projected-final score**, constant all game, not real
+  points scored so far. The earlier #160 fix only gated *whether* that value
+  was shown (None for pregame, the sim mean for live/final) — it never
+  fixed that the live-game value itself was wrong. Confirmed live:
+  `/wnba/api/live_state` reported IND 107.11 - POR 86.55 for a game
+  genuinely at 47-44 with 2:37 left in the 2nd quarter (verified against
+  ESPN's own scoreboard and against this exact game's own
+  `live_state.away_pts`/`home_pts` field, which this branch never read at
+  all despite having it in scope).
+
+  This one function is the shared source for **four** consumers, which is
+  why one bug produced three seemingly-different symptoms: the WNBA page's
+  live score header + `cards-parity.js`'s quarter/half/full-game live-lens
+  blend (via `/wnba/api/live_state` → `state.liveStates`, which takes
+  precedence over the correctly-populated embedded `game.live_state`), the
+  home/main page's WNBA score display (`_apply_wnba_live_scores`,
+  `home.py:3310`), and the Layer 2 board's WNBA live-state matching
+  (`_wnba_live_state_games`, `home.py:640`) — all four call
+  `build_live_state_payload` and trust its `away_pts`/`home_pts` fields
+  directly.
+
+  **Fix**: prefer the real live/final points already resolved onto the game
+  object by `build_cards_page_context`'s own live-state hydration
+  (`game.live_state.away_pts`/`home_pts`), falling back to the sim mean only
+  when real points genuinely aren't available yet. New regression test
+  (`test_live_state_payload_render_prefers_real_points_over_sim_mean_for_live_game`,
+  `tests/test_wnba_live_snapshots_local.py`) encodes the exact production
+  values found live. 195 targeted tests passing, no regressions in the
+  existing #160 tests (their fixtures never included real `away_pts`/
+  `home_pts` in `live_state`, so they still correctly exercise the
+  fallback-to-sim-mean path).
+
+  Committed `8e1af441`, deployed to all 3 services, **confirmed live**:
+  `/wnba/api/live_state` now reports IND 56 - POR 47 at Halftime, exactly
+  matching ESPN. **Not yet independently confirmed**: the Layer 2 board's
+  own candidate snapshot picking this up — its first post-deploy recompute
+  cycle showed only 7 scheduled (non-live) WNBA candidates for what looked
+  like a different date window than today's live game, so whether
+  `_wnba_live_state_games`'s now-correct data actually reaches a live board
+  candidate row needs a follow-up check against a live WNBA game once one
+  is in progress and the board has had a full natural compute cycle.
 
 - **#23 — Make the MLB daily sim memory-safe, then re-enable its trigger.**
   - ✅ *Validated 2026-07-25*: `daily_summary_2026_07_25.json` lands (15 sim artifacts
