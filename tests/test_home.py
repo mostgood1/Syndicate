@@ -463,6 +463,32 @@ class HomePageCommandCenterTests(unittest.TestCase):
 
         self.assertNotIn("game_id", result[0])
 
+    def test_backfill_prop_row_game_id_keeps_game_id_and_event_id_distinct(self) -> None:
+        # Board-alignment audit, found live 2026-08-01 against a real live
+        # WNBA game: a game dict can carry game_id (odds-pipeline hash) and
+        # event_id (ESPN's numeric scoreboard id) as genuinely distinct
+        # fields (wnba/cards.py's game-contract builders set both
+        # independently). This used to stamp all three of
+        # row["game_id"]/["gamePk"]/["event_id"] with _game_identifier()'s
+        # single result, which prefers game_id over event_id -- collapsing
+        # the two id spaces and breaking every live-actual lookup (keyed by
+        # the real ESPN event_id) for the backfilled row.
+        rows = [{"name": "Natasha Cloud OVER 13.5 PTS+REB", "away_label": "LVA", "home_label": "CHI"}]
+        home_games = [
+            {
+                "game_id": "0d113b66ed1649d47506a6434e06bd1b6",
+                "event_id": "401857105",
+                "away": {"abbr": "LVA"},
+                "home": {"abbr": "CHI"},
+            }
+        ]
+
+        result = _backfill_prop_row_game_id(rows, home_games)
+
+        self.assertEqual(result[0]["game_id"], "0d113b66ed1649d47506a6434e06bd1b6")
+        self.assertEqual(result[0]["gamePk"], "0d113b66ed1649d47506a6434e06bd1b6")
+        self.assertEqual(result[0]["event_id"], "401857105")
+
     def test_wnba_pregame_props_backfills_game_id_from_rank_card_rows(self) -> None:
         # End-to-end version of the above through the actual provider
         # method the home-page overview and the intelligence board both
@@ -923,12 +949,21 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         # plain "betting" dict -- conflating real game state with a
         # projection. NBA has no live re-sim, so live_projection correctly
         # stays "-"; the combined score now surfaces honestly as "actual".
+        #
+        # Board-alignment audit, found live 2026-08-01: this used to assert
+        # Moneyline's "actual" was the combined score (8.0) -- confirmed
+        # against a real live WNBA game that this told a Moneyline/ATS
+        # bettor nothing about which side was actually ahead (every
+        # game-level market for the same game showed the identical
+        # combined number). Moneyline/Spread/ATS now get the real
+        # away-home scoreline instead; Total (below) keeps the combined
+        # number, since that's the one market genuinely comparable to it.
         game = self._sample_game(
             shared_is_live=True,
             status={"in_progress": True},
             away={"name": "Boston Celtics", "score": 3},
             home={"name": "New York Knicks", "score": 5},
-            betting={"away_ml": -120, "home_ml": 105, "p_away_win": 0.55, "p_home_win": 0.45},
+            betting={"away_ml": -120, "home_ml": 105, "p_away_win": 0.55, "p_home_win": 0.45, "total": 210.5, "over_ev": 0.05, "under_ev": -0.03, "p_total_over": 0.52, "p_total_under": 0.48},
         )
         candidates = _game_bet_candidates_from_game({"slug": "nba"}, game, fallback_epoch=0.0)
         moneyline_candidates = [c for c in candidates if c["market"] == "Moneyline"]
@@ -936,7 +971,10 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         for candidate in moneyline_candidates:
             self.assertTrue(candidate["is_live"])
             self.assertEqual(candidate["live_projection"], "-")
-            self.assertNotEqual(candidate["actual"], "-")
+            self.assertEqual(candidate["actual"], "3-5")
+        total_candidates = [c for c in candidates if c["market"] == "Total"]
+        self.assertTrue(total_candidates)
+        for candidate in total_candidates:
             self.assertEqual(float(candidate["actual"]), 8.0)
 
     def test_pregame_candidates_leave_live_column_blank(self) -> None:

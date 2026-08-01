@@ -2039,6 +2039,35 @@ def _game_current_combined_score(game: dict[str, Any]) -> float | None:
     return away_score + home_score
 
 
+def _game_current_scoreline(game: dict[str, Any]) -> str | None:
+    # Board-alignment audit, found live 2026-08-01 against a real live WNBA
+    # game: _game_current_combined_score's away+home sum is the right
+    # "actual" for a Total candidate (directly comparable to the total
+    # line) but was ALSO being used, unchanged, for Moneyline/Spread/ATS
+    # candidates -- every game-level market for the same live game showed
+    # the identical combined number (e.g. "120") regardless of market,
+    # which tells a Moneyline/ATS bettor nothing about which side is
+    # actually ahead. Same score-field fallback chain as
+    # _game_current_combined_score, just returned as "away-home" instead
+    # of summed.
+    away = game.get("away") if isinstance(game.get("away"), dict) else {}
+    home = game.get("home") if isinstance(game.get("home"), dict) else {}
+    live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+    away_score = _numeric_value(away.get("score"))
+    if away_score is None:
+        away_score = _numeric_value(live_state.get("away_pts"))
+    if away_score is None:
+        away_score = _numeric_value(game.get("away_score"))
+    home_score = _numeric_value(home.get("score"))
+    if home_score is None:
+        home_score = _numeric_value(live_state.get("home_pts"))
+    if home_score is None:
+        home_score = _numeric_value(game.get("home_score"))
+    if away_score is None or home_score is None:
+        return None
+    return f"{away_score:.0f}-{home_score:.0f}"
+
+
 def _gamelens_matching_pregame_value(candidates: list[dict[str, Any]], *, market_family: str, pick_text: str, field: str = "projected") -> Any:
     # A gameLens segment never carries a genuine PREGAME value of its own --
     # everything on it (segment_projection, per-market overrides) reflects
@@ -2212,7 +2241,14 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
     # under one label, implying a sim result that was actually just the
     # scoreboard).
     if actual is None and is_live and is_game_level_market:
-        actual = _game_current_combined_score(game)
+        # Total is the one market genuinely comparable to a combined
+        # away+home number -- every other game-level market (Moneyline,
+        # Spread/ATS) gets the actual scoreline instead, so "actual" means
+        # something for the side that market is actually about.
+        if "total" in market_text_lower:
+            actual = _game_current_combined_score(game)
+        else:
+            actual = _game_current_scoreline(game)
     actual_text = _prop_metric_text(actual) if actual is not None else "-"
     player_name = None if is_game_level_market else _player_name_from_prop_pick_text(pick_text)
     edge_value = _pct_number(edge_text)
@@ -4107,31 +4143,47 @@ def _is_game_level_rank_card_market(market_text: Any) -> bool:
 # team-abbreviation match against home_games, the same pattern already used
 # for soccer's steam candidates (game_id_by_team_abbrs, intelligence.py).
 def _backfill_prop_row_game_id(rows: list[dict[str, Any]], home_games: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    game_id_by_abbrs: dict[str, str] = {}
+    # Confirmed live 2026-08-01 against a real live WNBA game: a game dict
+    # can carry game_id (the odds-pipeline hash) and event_id (ESPN's
+    # numeric scoreboard id) as genuinely distinct fields at once (see
+    # wnba/cards.py's own game-contract builders, which set both
+    # independently). This used to collapse them -- stamping
+    # row["event_id"] with _game_identifier(game)'s single result, which
+    # prefers game_id over event_id -- so a backfilled row's event_id
+    # became the odds hash instead of the real ESPN id. Every downstream
+    # live-actual/live-projection lookup that matches candidates against
+    # live_state by event_id (ESPN-keyed) then silently failed for these
+    # rows, leaving live_projection/actual stuck at "-" even while the row
+    # correctly showed is_live=True and a real status_display. Track and
+    # stamp game_id and event_id separately so each keeps its own real
+    # value instead of one clobbering the other.
+    ids_by_abbrs: dict[str, tuple[str, str]] = {}
     for game in home_games:
         if not isinstance(game, dict):
             continue
         game_id = _game_identifier(game)
         if not game_id:
             continue
+        event_id = _safe_text(game.get("event_id"), "") or game_id
         away = game.get("away") if isinstance(game.get("away"), dict) else {}
         home = game.get("home") if isinstance(game.get("home"), dict) else {}
         away_abbr = _safe_text(game.get("away_tri") or away.get("abbr"), "").upper()
         home_abbr = _safe_text(game.get("home_tri") or home.get("abbr"), "").upper()
         if away_abbr and home_abbr:
-            game_id_by_abbrs[f"{away_abbr}|{home_abbr}"] = game_id
-    if not game_id_by_abbrs:
+            ids_by_abbrs[f"{away_abbr}|{home_abbr}"] = (game_id, event_id)
+    if not ids_by_abbrs:
         return rows
     for row in rows:
         if not isinstance(row, dict) or _game_identifier(row):
             continue
         away_abbr = _safe_text(row.get("away_label"), "").upper()
         home_abbr = _safe_text(row.get("home_label"), "").upper()
-        game_id = game_id_by_abbrs.get(f"{away_abbr}|{home_abbr}")
-        if game_id:
+        ids = ids_by_abbrs.get(f"{away_abbr}|{home_abbr}")
+        if ids:
+            game_id, event_id = ids
             row["game_id"] = game_id
             row["gamePk"] = game_id
-            row["event_id"] = game_id
+            row["event_id"] = event_id
     return rows
 
 
