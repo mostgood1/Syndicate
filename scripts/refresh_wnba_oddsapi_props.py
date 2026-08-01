@@ -4410,10 +4410,27 @@ def _run_playoff_transition_if_needed(*, source_root: Path, date_str: str) -> di
 
 
 def _load_source_app(source_root: Path):
-    app_path = source_root / "app.py"
-    if not app_path.exists() or not app_path.is_file():
-        return None
-    return _load_module_from_path("syndicate_wnba_source_app", app_path)
+    # Root-caused live 2026-08-01: on Render, refresh_odds_sources.py's
+    # _basketball_source_root("wnba", "wnba_betting_repo") always returns the
+    # HOSTED DATA root (e.g. /opt/render/project/data/wnba_source) whenever
+    # _render_data_root_text() is truthy -- which it always is on Render --
+    # regardless of whether that directory has a vendored app.py at all. The
+    # vendor-code fallback branch inside that function is only ever reached
+    # locally, off Render. So source_root here is legitimately the DATA
+    # root, not the vendor CODE root, and app_path below never existed on
+    # Render -- _load_source_app has been returning None on every single
+    # production call for as long as this data/code root split has existed,
+    # meaning _live_oddsapi_period_totals_for_game (the function two earlier
+    # fixes this session confirmed correct in isolation) could never be
+    # reached from this call chain at all. Confirmed via a live diagnostic:
+    # source_app_loaded=false, source_app_has_period_fn=false, attempted=false
+    # for a real in-progress game, every cycle.
+    candidate_roots = [source_root, REPO_ROOT / "vendor" / "wnba_betting_repo"]
+    for candidate in candidate_roots:
+        app_path = candidate / "app.py"
+        if app_path.exists() and app_path.is_file():
+            return _load_module_from_path("syndicate_wnba_source_app", app_path)
+    return None
 
 
 def _build_optional_player_recon_artifacts(*, source_root: Path, date_str: str, processed_root: Path) -> dict[str, str]:

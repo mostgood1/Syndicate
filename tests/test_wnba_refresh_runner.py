@@ -4,6 +4,7 @@ import csv
 import importlib.util
 import json
 import os
+import sys
 import tempfile
 import types
 import unittest
@@ -32,6 +33,7 @@ class _FakeKeyValueClient:
 class WnbaRefreshRunnerTests(unittest.TestCase):
     def tearDown(self) -> None:
         refresh_state_store.reset_state_store_caches()
+        sys.modules.pop("syndicate_wnba_source_app", None)
 
     def _load_module(self):
         repo_root = Path(__file__).resolve().parents[1]
@@ -40,6 +42,22 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
+        # _load_source_app's REPO_ROOT/vendor/wnba_betting_repo fallback
+        # (added 2026-08-01) means every existing test's fake source_root
+        # (which has no app.py) no longer safely gets None back the way
+        # they all assumed when written -- it now finds and execs THIS
+        # repo's real, 40000+-line vendored Flask app, registering it in
+        # sys.modules with whatever top-level side effects that module has,
+        # which measurably leaked into unrelated later tests in the same
+        # process (confirmed live: test_optional_tool_exports_use_local_
+        # vendored_builders only failed when an earlier test's real load
+        # was allowed to happen -- tracking down every individual call site
+        # one at a time kept surfacing new ones). Default every fresh
+        # module to a safe no-op here instead, preserving the real
+        # implementation under a different name so the tests that actually
+        # want to exercise it (test_load_source_app_*) still can.
+        module._real_load_source_app = module._load_source_app
+        module._load_source_app = lambda source_root: None
         return module
 
     def test_main_calls_syndicate_cli_refresh_path(self) -> None:
@@ -2584,7 +2602,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 module,
                 "_build_local_live_snapshot_payload",
                 side_effect=_fake_local_payload,
-            ):
+            ), patch.object(module, "_load_source_app", return_value=None):
                 copied = module._export_live_snapshot_artifacts(
                     source_root=source_root,
                     date_str="2026-06-05",
@@ -2594,6 +2612,82 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             self.assertIn("live_player_lens_path", copied)
             payload = module._read_live_snapshot_payload(processed_root / "live_snapshots" / "live_player_lens_2026-06-05.jsonl")
             self.assertEqual((((payload or {}).get("games") or [{}])[0].get("rows") or [{}])[0].get("player"), "Aneesah Morrow")
+
+    def test_load_source_app_falls_back_to_the_vendor_code_root(self) -> None:
+        # Root-caused live 2026-08-01: refresh_odds_sources.py's
+        # _basketball_source_root always returns the HOSTED DATA root on
+        # Render (e.g. /opt/render/project/data/wnba_source), never the
+        # vendor CODE root, whenever the Render data-root env var is set --
+        # regardless of whether that directory actually has a vendored
+        # app.py. _load_source_app used to check ONLY source_root / "app.py",
+        # so it silently returned None on every single production call,
+        # meaning _live_oddsapi_period_totals_for_game (confirmed correct in
+        # isolation by two earlier fixes this session) could never be
+        # reached from this process at all. Confirmed via a live diagnostic:
+        # source_app_loaded=false for a real in-progress game, every cycle.
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            data_root_without_app = tmp_root / "data_root"
+            data_root_without_app.mkdir(parents=True, exist_ok=True)
+            fake_repo_root = tmp_root / "repo"
+            vendor_dir = fake_repo_root / "vendor" / "wnba_betting_repo"
+            vendor_dir.mkdir(parents=True, exist_ok=True)
+            (vendor_dir / "app.py").write_text("MARKER = 'real_vendor_app'\n", encoding="utf-8")
+
+            try:
+                with patch.object(module, "REPO_ROOT", fake_repo_root):
+                    loaded = module._real_load_source_app(data_root_without_app)
+
+                self.assertIsNotNone(loaded)
+                self.assertEqual(getattr(loaded, "MARKER", None), "real_vendor_app")
+            finally:
+                # _load_module_from_path registers this fake module under a
+                # fixed, shared name (sys.modules["syndicate_wnba_source_app"])
+                # -- leaving it there would leak into every other test in
+                # this process that checks sys.modules for that key instead
+                # of calling _load_source_app fresh.
+                sys.modules.pop("syndicate_wnba_source_app", None)
+
+    def test_load_source_app_prefers_source_root_when_it_has_its_own_app(self) -> None:
+        # Local/dev case: source_root IS the vendor root (the fallback
+        # branch of _basketball_source_root that's only reached off
+        # Render) -- must still work exactly as before, not just fall
+        # through to REPO_ROOT/vendor unconditionally.
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root_with_app = tmp_root / "source_root_is_vendor"
+            source_root_with_app.mkdir(parents=True, exist_ok=True)
+            (source_root_with_app / "app.py").write_text("MARKER = 'source_root_app'\n", encoding="utf-8")
+            fake_repo_root = tmp_root / "repo"
+            (fake_repo_root / "vendor" / "wnba_betting_repo").mkdir(parents=True, exist_ok=True)
+
+            try:
+                with patch.object(module, "REPO_ROOT", fake_repo_root):
+                    loaded = module._real_load_source_app(source_root_with_app)
+
+                self.assertIsNotNone(loaded)
+                self.assertEqual(getattr(loaded, "MARKER", None), "source_root_app")
+            finally:
+                sys.modules.pop("syndicate_wnba_source_app", None)
+
+    def test_load_source_app_returns_none_when_neither_root_has_an_app(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            empty_source_root = tmp_root / "empty_source"
+            empty_source_root.mkdir(parents=True, exist_ok=True)
+            fake_repo_root = tmp_root / "repo"
+            (fake_repo_root / "vendor" / "wnba_betting_repo").mkdir(parents=True, exist_ok=True)
+
+            with patch.object(module, "REPO_ROOT", fake_repo_root):
+                loaded = module._real_load_source_app(empty_source_root)
+
+            self.assertIsNone(loaded)
 
     def test_export_live_snapshot_artifacts_populates_diagnostic_sink_for_live_lines(self) -> None:
         # Found live 2026-08-01: every print() diagnostic inside main() is
@@ -2686,7 +2780,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 module,
                 "_build_local_live_snapshot_payload",
                 return_value=None,
-            ):
+            ), patch.object(module, "_load_source_app", return_value=None):
                 copied = module._export_live_snapshot_artifacts(
                     source_root=source_root,
                     date_str="2026-06-05",
@@ -2746,7 +2840,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             cards_module._local_live_state_payload.cache_clear()
             with patch.dict(os.environ, {"SYNDICATE_WNBA_SOURCE_ROOT": str(tmp_root / "bundle")}), patch.object(
                 module, "_source_app_fallback_enabled", return_value=False
-            ), patch(
+            ), patch.object(module, "_load_source_app", return_value=None), patch(
                 "syndicate.features.wnba.cards.build_live_player_boxscore_payload",
                 return_value={"games": [{"event_id": "401856963", "players": []}]},
             ):
