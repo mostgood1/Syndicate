@@ -5330,6 +5330,7 @@ def main() -> int:
             # regardless of fast/full mode or whether the rest of this run reused a
             # cached bundle. Without this, live snapshots only ever get written once,
             # since _materialize_artifact_bundle below is skipped entirely in fast mode.
+            export_diag: dict[str, object] = {"date": str(target_date)}
             try:
                 export_result = _export_live_snapshot_artifacts(
                     source_root=source_root,
@@ -5341,8 +5342,32 @@ def main() -> int:
                     f"copied_keys={sorted(export_result.keys())}",
                     flush=True,
                 )
+                export_diag["ok"] = True
+                export_diag["copied_keys"] = sorted(export_result.keys())
             except Exception as exc:
                 print(f"[refresh_wnba_oddsapi_props] LIVE_SNAPSHOT_REFRESH_FAILED date={target_date} error={type(exc).__name__}: {exc}", flush=True)
+                export_diag["ok"] = False
+                export_diag["error"] = f"{type(exc).__name__}: {exc}"
+            # This whole step's own print() output is silently discarded --
+            # confirmed live 2026-08-01: subprocess.run(capture_output=True)
+            # in refresh_odds_sources.py's _run_command captures this
+            # process's stdout into a string that's never re-emitted for a
+            # SUCCESSFUL step (only a bounded stderr tail survives for a
+            # FAILED one, per _compact_step_result), so no print here can
+            # ever reach Render's logs for a normal, successful run --
+            # that's why every earlier diagnostic print in this function
+            # showed zero hits despite the step completing with return_code=0
+            # every cycle. Writing a small state file through the same
+            # keyvalue-aware path every other cross-service artifact in this
+            # codebase uses is the only channel that's actually observable.
+            try:
+                export_diag["generated_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
+                _keyvalue_write_json_file(
+                    artifact_root_path / "data" / "processed" / "_live_lines_export_diag.json",
+                    export_diag,
+                )
+            except Exception:
+                pass
         if not fast_mode and artifact_root_path and source_root is not None and not state.get("reused_existing_artifact_bundle"):
             copied = _materialize_artifact_bundle(
                 state=state,
