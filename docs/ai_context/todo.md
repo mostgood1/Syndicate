@@ -583,6 +583,112 @@ Temp validation artifacts added this part, same directory as part 6:
 `_roster_dump_pass/` (the 46-date roster-artifact generation pass used
 for the regression) and `full46_qualityhook_v2_w10/`.
 
+**Both fixes deployed to production** same session: pushed already landed
+on `origin/main` via a concurrent session's push (confirmed
+`4b374d4d` reachable from `origin/main`); triggered the actual Render
+deploy of refresh-worker (`srv-d91dpertqb8s73co8ls0`, deploy
+`dep-d9n3offqj5pc73e5rdl0`) after confirming no in-flight MLB sim via
+`GET /api/ops/live-refresh/state` (`sim_run_status` absent/not running --
+see `[[project-syndicate-deploy-kills-inflight-sim]]`). Deploy went live
+on commit `6ba844a9` (~3.5 min build+rollout); cross-checked via
+`/api/ops/version` on the web service, same commit. **Both promoted
+fixes are live in production now**, not just committed.
+
+### Scope for next session: MLB pitcher-prop accuracy work still open (part 8)
+
+User's original ask was "evaluate MLB pitcher props for accuracy **and
+for betting accuracy**... check accuracy around pitch count which
+impacts pitcher outs and can impact strikeouts, **walks, and hits
+allowed**." Parts 3-7 addressed strikeouts and outs/workload with real
+statistical bias/MAE backtesting, and shipped two validated, modest
+fixes. Everything below is still open. Ordered by recommended priority,
+not urgency -- none of this is time-sensitive.
+
+1. **Validate the two promoted fixes together, full scale (cheap, do
+   this first -- ~15-20 min).** Both `k_combine_log5_weight=1.0` and
+   `starter_quality_hook_weight=1.0` were validated *independently*
+   against `full46_baseline`; they've never been run together in the
+   same batch. Re-run the standard 46-date/100-sim batch with both
+   overrides active (`--pitch-model-overrides
+   '{"k_combine_log5_weight":1.0}' --manager-pitching-overrides
+   '{"starter_hook_add_pitches":-13,"starter_hook_stamina_excess_weight":
+   0.75,"starter_quality_hook_weight":1.0}'`) and confirm the tier
+   biases roughly sum (no surprising interaction) before trusting the
+   combined production behavior at face value.
+
+2. **Walks and hits-allowed were never actually measured -- the eval
+   harness doesn't even capture them yet.** Checked
+   `sim_vs_actual_*.json`'s `pitcher_props[side].actual`/`.pred` shape
+   directly: only `{so, outs, pitches}` / `{so_mean, outs_mean,
+   pitches_mean}` exist. No `bb`/`hits_allowed` fields at all, either
+   real or predicted. Before any walks/hits accuracy claim can be made:
+   - Extend `eval_sim_day_vs_actual.py`'s pitcher-props builder to pull
+     real BB/hits-allowed from the same boxscore feed already used for
+     SO/outs, and to surface the sim's own per-PA `bb_tgt`/`inplay_hit`
+     aggregates as `bb_mean`/`hits_mean` (the underlying per-PA
+     computation already exists in `pitch_model.py`'s `simulate_pitch`
+     -- it's an aggregation/plumbing gap in the *report*, not a missing
+     sim capability).
+   - Re-run the same 46-date backtest, same tier-bucketing methodology
+     (bucket by market K line, or by the market's own BB/hits lines if
+     those exist in the OddsAPI pitcher-props artifact) for these two
+     stats, baseline vs. both-fixes-active. Since BB/H allowed also
+     scale with batters faced, the promoted outs fixes may have already
+     helped them incidentally -- or there may be a distinct BB/H-specific
+     defect (e.g. `bb_tgt`'s flat-average combination, never touched by
+     any of tonight's fixes, per `_combined()`'s comment in
+     `pitch_model.py` -- explicitly untouched because switching it to
+     log5 alongside k/hbp was the change that regressed full-game totals
+     when tried previously).
+
+3. **"Betting accuracy" specifically was never evaluated -- only
+   statistical bias/MAE.** This is the literal second half of the
+   original ask and is currently fully unaddressed. Statistical bias
+   improving does not guarantee better bets: a model can reduce MAE
+   while never flipping which side of a close market line it would have
+   picked. Needs a new grading harness (doesn't exist yet):
+   - For each real market O/U line already available
+     (`oddsapi_pitcher_props_*.json`, matched via
+     `normalize_pitcher_name` -- same join logic already proven out this
+     session), grade the actual outcome (over/under/push) against both
+     the model's implied pick (so_mean/outs_mean vs. the line, or a
+     direct P(over) if the sim exposes one) and, if multiple line
+     snapshots exist per date, CLV.
+   - Compute hit rate (and CLV if feasible) tier-by-tier, baseline vs.
+     with-fixes, across the same 46 dates. This is the only way to
+     honestly answer "did tonight's fixes actually make the props more
+     bettable," as opposed to "did they reduce average prediction
+     error."
+
+4. **The diagnosed gaps are still mostly open even after both fixes.**
+   Elite-tier strikeout bias closed ~3% (part 6); outs/workload bias
+   closed ~12-26% per tier (this part). Two structural levers were fully
+   exhausted (K-rate combination already tested at its theoretical
+   maximum, log5=1.0; the quality-hook fix is now properly calibrated
+   against a real regression, not a guess) -- further closing likely
+   needs either a different signal entirely (recent-start/trending
+   workload rather than season-average stamina; a proper starter-quality
+   composite rather than K-BB% alone) or accepting diminishing returns
+   from mechanism-level fixes given the individual-pitcher regression's
+   weak R^2 (5.6%) -- most per-start variance genuinely is game noise,
+   not a projectable pitcher-quality signal.
+   - Also unexplained and small: the quality-hook fix improved mid-high
+     tier's *outs* bias but slightly worsened its *strikeout* bias
+     (-1.062 -> -1.115). Worth understanding before assuming the two
+     stats always move together.
+
+5. **Lower priority, worth floating rather than mandating**: given two
+   rounds of "fix the underlying mechanism" work each closed less than a
+   third of their respective gaps, a market-line-blending approach (
+   shrinking the model's own prediction toward the real market line,
+   which already encodes information the sim doesn't have -- late
+   scratches, injury/workload news, weather, bullpen state) might close
+   substantially more of the remaining gap for much less engineering
+   effort. Trade-off: it's "riding the market" rather than fixing the
+   model, and would need its own honest evaluation (does it actually
+   improve betting accuracy, or just cosmetically shrink the bias
+   number by regressing toward what the market already knows).
+
 ### Reconciliation 2026-07-31 part 5 (MLB pitcher-prop prototype fixes: real-scale backtest results -- effect much weaker than diagnosed, do not promote)
 
 Direct continuation of #178 (part 3, same session). User asked to keep working
