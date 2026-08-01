@@ -4,8 +4,14 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-31 (see "Reconciliation 2026-07-31 (NCAAF Layer 1
-market board -- foundation-scope build)" below).
+Last reconciled: 2026-07-31 (see "Reconciliation 2026-07-31 part 2 (NCAAF Ask
+the Syndicate evidence fetchers)" below -- ran concurrently with the MLB
+pitcher strikeout-prop investigation session, different files throughout).
+Before that: "Reconciliation 2026-07-31 (MLB pitcher
+strikeout-prop accuracy investigation: top-end pitcher K-rate is
+structurally underprojected)".
+Before that: "Reconciliation 2026-07-31 (NCAAF Layer 1
+market board -- foundation-scope build)".
 Before that: "Reconciliation 2026-08-01 (Ask the Syndicate matchup features
 + Layer 2 live-candidate-stuck-at-pregame bug)". Before that: "Reconciliation
 2026-08-01 (soccer player-props root cause confirmed, board propagation
@@ -16,6 +22,160 @@ cause)". Before that: "Reconciliation 2026-07-31 (Layer 2 board: MLB
 live-status dedup fix + WNBA game/prop wiring, Phase A-C)". Before that:
 "Reconciliation 2026-07-31 (#161 part 2: NBA/WNBA closing line, plus a
 production outage found and fixed along the way)". Prior session: 2026-07-30.
+
+### Reconciliation 2026-07-31 part 2 (NCAAF Ask the Syndicate evidence fetchers)
+
+Continuation of the same "wire up NCAAF fully based on MLB" session (part 1
+below shipped the Layer 1 market board). User asked to keep going on the
+deferred pieces; chose the narrowest one first: Ask the Syndicate had **zero**
+NCAAF evidence fetchers (confirmed in #171 and re-confirmed here — 130 `mlb`
+references in `ask_the_syndicate_data.py`, 0 `ncaaf`), so it could not answer
+any NCAAF question with real data.
+
+**New: #177** (filed and closed same session) — added three NCAAF evidence
+fetchers to `syndicate/blueprints/ask_the_syndicate_data.py`
+(`_ncaaf_team_profile_evidence`: coach continuity/returning production/
+transfer portal/roster, read directly off the same processed CSVs
+`ncaaf/cards.py`'s `_team_context` uses; `_ncaaf_matchup_projection_evidence`:
+SmartSim 2.0 projection + real CFBD market line for a named matchup;
+`_ncaaf_ats_evidence`: a team's real against-the-spread record computed from
+`smartsim2_performance_log.jsonl`'s `market_margin`/`actual_margin` pairs, a
+number nothing in the codebase previously exposed). Registered under both an
+explicit `"ncaaf"` branch and the `sport == ""` fallback in
+`_fetchers_for_sport`, plus an `"ncaaf"` tuple in `_SPORT_HINTS`
+(`ask_the_syndicate.py`) placed **before** `"nfl"` (order matters — `_infer_sport`
+returns on first match, and NFL's keyword list is generic football vocabulary
+a college question uses just as often).
+
+Three real bugs found and fixed via testing against real production data,
+not just fixture-based unit tests:
+1. Team-name matching originally reused `_name_matches` (word-set overlap,
+   the same helper every other fetcher uses for player names) — with ~680
+   FBS/FCS schools in the registry, this matched "Kansas State vs Iowa
+   State" against every unrelated "\* State" school. Fixed to require the
+   full normalized school name as a bounded substring of the question.
+2. That fix's first pass added a >=4-character minimum on the matched
+   name, which silently excluded real short school names — TCU's actual
+   `school_name` field is literally "TCU" — so "North Carolina vs TCU"
+   only resolved one team. Lowered to >=3, safe because the substring
+   match is already bounded (not the loose word-overlap check #1 fixed).
+3. The matchup/team-profile fetchers initially used
+   `syndicate.features.ncaaf.sources.default_season()` for "the current
+   season" — confirmed live that this returns 2025 (tracks a different,
+   stale recommendation-summary artifact) while the actual live game slate
+   `cards.py` serves is 2026 (`_resolve_ncaaf_active_season_and_weeks()`).
+   Team-profile data (coach/roster/returning-production CSVs) genuinely
+   only has 2025 rows today (a separate, pre-existing pipeline gap — even
+   `cards.py`'s own `_team_context` returns "Coach continuity unavailable"
+   for every team when called with season 2026), so that fetcher now reads
+   the latest season actually present in its own CSV rather than trusting
+   either stale accessor; the matchup fetcher now imports
+   `_resolve_ncaaf_active_season_and_weeks` from `cards.py` directly (tries
+   the active season first, prior season as fallback) so it looks at the
+   real current slate.
+
+Verified against real data end-to-end, not just unit tests: `python -m
+pytest tests/test_ask_the_syndicate.py` (82 passed, confirms the
+`_SPORT_HINTS` reorder didn't regress NFL/MLB/NBA/NHL routing) plus 10 new
+fetcher tests; then drove the live `/syndicate` page and
+`/api/syndicate/query` in a real browser. "How has Alabama performed
+against the spread in college football this season?" (no explicit sport
+param) correctly auto-detected `ncaaf` and returned two real tables (team
+profile + an 11-game ATS log). Passing `context: {sport: "ncaaf"}`
+explicitly surfaced all three fetchers together for a real North
+Carolina/TCU matchup, matching the market board's own numbers from part 1
+(spread 6.5, total 49.5) exactly.
+
+**Not fixed, flagged as pre-existing and out of scope**: some natural
+phrasings ("who wins X vs Y", "what's the projected spread for X") don't
+trigger focused-evidence collection at all even though `_infer_sport`
+correctly resolves the sport in isolation — confirmed this is a
+sport-agnostic quirk in the router's own intent classification (these
+phrasings land in a general "explanation"/"recommendation" mode that
+apparently skips evidence collection for every sport, not an NCAAF-specific
+gap) — a real seam worth investigating separately, not something this
+session's fetcher work caused or could fix by itself.
+
+### Reconciliation 2026-07-31 (MLB pitcher strikeout-prop accuracy investigation: top-end pitcher K-rate is structurally underprojected)
+
+User reported "a gap with top-end pitchers, accuracy seems off" for MLB
+pitcher props. Investigated with real data rather than guessing: backtested
+the vendored sim engine (`vendor/mlb_bettingv2`) against its own historical
+`sim_vs_actual_*.json` reports (46 real dates, 2026-05-28..2026-07-12, from
+the `tuning_weather_park_weights/.../baseline` batch -- the production-config
+run in that tuning sweep) joined against real historical OddsAPI strikeout
+lines (`data/mlb_source/.../oddsapi_pitcher_props_*.json`), 1209 starts,
+881 with a matched market line.
+
+**New: #176** (investigation only, no fix applied yet) — confirmed the gap is
+real, quantified it, and found the root cause in code:
+- Aggregate SO accuracy looks fine (MAE 2.02, bias +0.25) -- this is what
+  masked the problem; it only shows up when segmented by pitcher quality.
+- Bucketing starts by the *market's* strikeout line (a well-calibrated
+  ground-truth proxy for pregame quality -- each tier's actual-SO mean
+  matched its market-line mean almost exactly) shows the model's own
+  `so_mean` barely moves (~5.0-5.6) across the entire quality spectrum while
+  reality spans 3.4-7.8:
+  - Elite tier (market line >= 7.0, avg 7.81): model predicts avg 5.16 ->
+    bias -2.40, MAE 2.96 (worst of any tier). Model's own P(over line)
+    averaged just 9.7% and never once crossed 50% in this sample (n=39) --
+    the model would never surface an OVER recommendation on an ace's K prop,
+    even though the real over-rate was 41% and the market itself was much
+    better calibrated there (market brier 0.24 vs model brier 0.35).
+  - Back-end tier (market line < 4.0, avg 3.44): model predicts avg 4.98 ->
+    bias +1.23 (over-projects weak starters). Model fired OVER on 100% of
+    these (168/168) for a mediocre 55.4% hit rate -- likely a wash or
+    slightly -EV at typical vig, not a source of edge.
+  - Mid tier (4.0-5.49) is the only well-calibrated band.
+- Root cause: `vendor/mlb_bettingv2/sim_engine/pitch_model.py:187-202`
+  (`_combined()`). HR and in-play-hit rates combine pitcher/batter via log5
+  (odds-ratio), which preserves skill extremity. K/BB/HBP explicitly fall
+  back to a flat 50/50 average (`clamp01(0.5*a + 0.5*b)`, line 202) -- the
+  code comment (190-199) says log5 was tried for k/bb/hbp too and reverted
+  because it hurt full-game total-runs accuracy in a holdout backtest (see
+  `mlb_sim_accuracy_assessment_and_optimization_plan.md` if it still exists
+  in the vendor repo's history). A flat average pulls an ace's true K rate
+  (30-38%+) halfway toward the batter's own (~league-average, 20-24%) rate
+  on every single plate appearance, which caps how far a projected game K
+  total can deviate from average over ~20-25 batters faced -- this is the
+  direct mechanism producing the tier-by-tier bias above.
+- Compounding, secondary factor: `vendor/mlb_bettingv2/sim_engine/simulate.py:231`
+  hard-clamps the Statcast-derived pitcher K "shape" multiplier to
+  `[0.88, 1.12]` (+-12%) regardless of how extreme the underlying
+  velocity/CSW/zone-rate signal is -- a second lever narrowing the band.
+- Ruled out as a live cause (worth recording so it isn't re-suspected): the
+  probability-calibration layer (`prob_calibration.py`, `tail_shrink` mode)
+  is NOT currently active in production -- its default config path
+  (`data/tuning/so_calibration/default.json`, referenced at
+  `daily_update_multi_profile.py:6013-6014`) does not exist on disk, and
+  `_load_json_cfg` fails closed to `None` for a missing file, so
+  `apply_prob_calibration` is a no-op today. The bias is baked into the raw
+  simulated `so_dist` itself (upstream of any probability post-processing).
+- Also checked: no existing evaluation surface (Syndicate-side
+  `intelligence_evaluation.py`/`market_accuracy.py`/`live_lens_daily_accuracy.py`,
+  or vendor-side `tools/eval/*`) segments pitcher-prop accuracy by pitcher
+  quality/tier at all -- every one segments by market/date/sport/confidence-
+  bucket/edge-bucket/in-game-progress instead, which is why this gap could
+  persist without being visible in any standing report.
+
+**Not done this session (explicitly out of scope / needs a decision before
+touching sim internals)**: no fix applied. Naively re-enabling log5 for K
+was already tried once and reverted for hurting full-game totals accuracy,
+so a real fix likely needs either (a) a shrinkage-weighted blend between
+flat-average and log5 for K specifically, or (b) decoupling the strikeout-
+prop-facing distribution from the plate-appearance outcome feed used for
+run-environment totals, plus re-fitting/re-validating the K-ladder support-
+score thresholds (`daily_update_multi_profile.py`'s
+`_K_LADDER_TARGET_POLICY_PRESETS`) against whatever new distribution comes
+out. Any change here has zero test coverage today --
+`vendor/mlb_bettingv2` has no `tests/` directory at all for the sim engine
+(`PitcherProfile`, `pitcher_distributions.py`, `_statcast_shape_rate_mults`,
+`prob_calibration.py`) -- so a fix should ship with new unit tests using
+synthetic elite-pitcher inputs, not just a rerun of the historical backtest.
+Also flagged: no existing report/aggregation groups pitcher-prop accuracy by
+quality tier, so this exact regression could silently reappear after a fix
+unless a tier-aware check is added to `summarize_pitcher_props_day.py` or
+`intelligence_evaluation.py`'s `_aggregate_performance_rows`.
 
 ### Reconciliation 2026-07-31 (NCAAF Layer 1 market board -- foundation-scope build)
 
@@ -4961,31 +5121,59 @@ were resolved and nine already-closed rows removed from the open tables.
      already fixed once this session for `game_cards.csv` — worth checking
      whether a SIMILAR (but not yet fixed) read path feeds this specific
      "has live games today" check.
-  2. **Live quarter/half betting LINES (not projections) are empty**:
-     `/wnba/api/live_lines` returns real game-level lines (moneyline,
-     spread, total) but `period_totals`/`period_spreads` are always `{}`,
-     even with `include_period_totals=true`. Confirmed NOT a missing-market
-     gap in principle — `vendor/wnba_betting_repo/app.py:
-     _live_oddsapi_period_totals_for_game` correctly discovers real
-     per-event OddsAPI market keys dynamically (worked fine 2026-07-29,
-     `PERIOD_MARKET_DISCOVERY_DIAG` log showed real `totals_h1`/`totals_q1`
-     etc. keys found) — but that diagnostic line **never appears at all**
-     tonight despite a live game in progress, meaning the function is
-     hitting one of its silent early-returns (`app.py:536-538` missing API
-     key — ruled out, `ODDS_API_KEY` is confirmed set and working
-     elsewhere; `app.py:610-613` **no matching OddsAPI event found** for
-     this matchup — not yet confirmed why, plausible lead: `POR` is
-     "Portland Fire," a newer/renamed franchise the vendored
-     `_canonical_team_tri` tricode table may not recognize, causing
-     event-matching against OddsAPI's home_team/away_team text to fail
-     silently). Confirmed the writer process IS alive and ticking
-     (`live_lines` `generated_at` advances normally, ~every 20 min), so
-     this isn't a dead process — it's specifically the period-market path
-     inside it failing silently. Next session: add a one-line diagnostic
-     print right before the `if not event_id: return {}` at
-     `vendor/wnba_betting_repo/app.py:610` (matchup + raw OddsAPI events
-     list team names) to confirm/refute the tricode-mismatch theory before
-     touching the vendored canonicalization table.
+  2. **Live quarter/half betting LINES (not projections) are empty —
+     event-matching root cause FOUND and FIXED this session; a second,
+     deeper gap remains, not yet fixed.**
+
+     **Fixed (commit `51e890a1`, confirmed live)**: added a diagnostic
+     print right before `vendor/wnba_betting_repo/app.py`'s
+     `if not event_id: return {}` early return (`_live_oddsapi_period_
+     totals_for_game`) and deployed it — confirmed the real cause:
+     `discovered_keys` were never even attempted, because event-matching
+     against OddsAPI's own events list failed for this matchup despite the
+     correct event being right there in the response
+     (`home_team="Portland Fire", away_team="Indiana Fever"`). Root cause:
+     `_load_team_maps()`'s WNBA full-team-name → tricode list
+     (`"Indiana Fever": "IND"`, etc.) lived only inside the `except
+     Exception:` branch, so it silently never ran whenever the primary
+     `nba_api.stats.static.teams.get_teams()` call succeeded (the normal
+     case — that call is NBA-only, returns zero WNBA teams).
+     `_canonical_team_tri("Indiana Fever")` fell through to the raw
+     uppercased string instead of "IND", so it could never match. Only the
+     5 explicitly-aliased renamed/relocated franchises (Sparks/Aces/
+     Valkyries/Tempo/**Fire**) ever worked — "Portland Fire" matched by
+     luck, "Indiana Fever" (and every other established WNBA team) didn't.
+     The `teams_wnba.json` fallback this code also attempts can't rescue
+     it either — that file doesn't exist in this vendored checkout. Fix:
+     always merge the WNBA name→tricode list into the mapping, not gated
+     on the nba_api call's outcome. Verified locally (nba_api stubbed to
+     return only NBA teams, matching prod) and confirmed live:
+     `PERIOD_MARKET_DISCOVERY_DIAG matchup=POR@IND event_id=79a00262...
+     discover_status=200 discovered_keys=[...'totals_q4','spreads_h2',
+     'totals_h2',...]` — event-matching and market discovery now genuinely
+     work for the first time tonight.
+
+     **Still open**: even with discovery now succeeding and picking up
+     real keys (`totals_q4`/`spreads_q4`/`totals_h2`/`spreads_h2` were all
+     discovered for tonight's Q4-in-progress game), `/wnba/api/live_lines`
+     still returns `period_totals: {}` / `period_spreads: {}` and the UI
+     still shows "No live period market yet." So the bug is one step
+     further in: the same function's step 3 (`app.py:715+`, the actual
+     `/v4/sports/{sport}/events/{event_id}/odds` fetch + outcome
+     extraction into `period_pts`/`period_home_spreads`) isn't surfacing
+     values even though `want`/`picked`/`req_markets` should include
+     `q4`/`q4_spread` per the discovered keys. Two things worth checking
+     first, in order: (a) whether the `/odds` fetch itself is erroring
+     (caught silently at `app.py:732-733`, `obj = None`) — add a one-line
+     diagnostic there next, mirroring the discovery diagnostic's pattern;
+     (b) separately, note `period_pts`/`period_home_spreads`
+     (`app.py:737-738`) are hardcoded to `["h1","q1","q2","q3","q4"]` —
+     **"h2" has no slot anywhere in the extraction/aggregation dicts**, and
+     `want` (`app.py:678-692`) has no `"h2"`/`"h2_spread"` entries either,
+     even though the book was actively quoting `totals_h2`/`spreads_h2`
+     tonight. That's a second, smaller, definitely-real gap (second-half
+     markets are simply never requested) worth fixing alongside whatever
+     is found in (a) — don't stop at q4 once diagnosing this further.
 
 - **#23 — Make the MLB daily sim memory-safe, then re-enable its trigger.**
   - ✅ *Validated 2026-07-25*: `daily_summary_2026_07_25.json` lands (15 sim artifacts
@@ -5408,6 +5596,31 @@ were resolved and nine already-closed rows removed from the open tables.
 > from #16 (closed) + #106 (engineering) together — no open product decision
 > is blocking anything right now. Re-check once football season adds
 > sport-count pressure — this reading is MLB-season-only load.
+
+> **Billing-period rollover observed 2026-08-01T00:01:51Z**: `baseline.used`
+> reset from 2,294,171 to 0, `remaining` reset to **15,000,000** (not 5M —
+> reconfirms the known 15M-vs-5M discrepancy noted in
+> [[project-oddsapi-call-budget]]; the vendor plan is still provisioned at
+> 15M even though 5M remains the real target). `by_sport`/`by_market_family`
+> are cumulative accumulators that do NOT reset on rollover, so as of this
+> reading they cover the full ~4 days since `aggregates_started_at`
+> (2026-07-28), not just the new period.
+>
+> **Fresh-period reading, 2026-08-01T03:34Z (3.54h post-rollover — short
+> window, per this doc's own "full-day windows only" lesson treat as
+> provisional):**
+>
+> | Window | Burned | /hour | Projected 30d | vs 5M target |
+> |---|---|---|---|---|
+> | 12,742s (62,595 obs) | 12,290 | 3,472.1 | **2.50M** | **50.0%** |
+>
+> Broadly consistent with the 07-30 reading (2.88M), trending slightly better.
+> **First NFL calls appeared this window** (150 calls / 45 credits, cumulative
+> since 07-28) — preseason ramp starting; watch this as the sport-count-pressure
+> flag raised in the prior reading. Cumulative `by_market_family` since 07-28
+> (284,976cr total): props still dominates at 186,390cr (65.4%), segment
+> 57,986cr (20.3%), alternate 29,007cr (10.2%), full_game 11,118cr (3.9%) —
+> same shape as before, props remains the lever if headroom ever tightens.
 
 **16** 🟢 **CLOSED 2026-07-25** (`1986caf6`, "Drop F7 markets; standard line
 wins, alternates kept as a ladder") — **do not treat this as an open decision**,
