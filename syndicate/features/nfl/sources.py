@@ -13,6 +13,7 @@ from syndicate.features.shared.source_roots import repo_root_from
 
 
 _SNAPSHOT_RE = re.compile(r"^upcoming_recs_(?P<season>\d{4})_wk(?P<week>\d+)(?P<publish>_publish)?\.csv$")
+_SMARTSIM2_PROJECTION_FILENAME_RE = re.compile(r"^smartsim2_projections_(?P<season>\d{4})_wk(?P<week>\d+)\.csv$")
 
 
 def _source_roots() -> list[Path]:
@@ -66,6 +67,30 @@ def tracked_week() -> dict[str, int] | None:
     return {"season": season, "week": week}
 
 
+def _smartsim2_standalone_seasons_and_weeks() -> dict[int, list[int]]:
+    """Every real (season, week) with an already-generated real Monte
+    Carlo projection artifact on disk -- independent of whether
+    upcoming_recs_*.csv (the older recommendation-snapshot pipeline) has
+    anything for that season. Mirrors
+    syndicate.features.ncaaf.cards._smartsim2_standalone_seasons_and_weeks
+    exactly, same real reason: upcoming_recs_*.csv is only ever refreshed
+    for whichever season that older pipeline still tracks (confirmed:
+    2025-only), so a newer season (2026) with real projections but no
+    real recs snapshot needs a second, independent real signal."""
+    source_root = default_nfl_source_root()
+    result: dict[int, list[int]] = {}
+    for path in source_root.glob("smartsim2_projections_*_wk*.csv"):
+        match = _SMARTSIM2_PROJECTION_FILENAME_RE.match(path.name)
+        if not match:
+            continue
+        season = int(match.group("season"))
+        week = int(match.group("week"))
+        result.setdefault(season, []).append(week)
+    for season in result:
+        result[season] = sorted(set(result[season]))
+    return result
+
+
 def week_summaries() -> list[dict[str, Any]]:
     grouped: dict[tuple[int, int], dict[str, Any]] = {}
     source_root = default_nfl_source_root()
@@ -100,6 +125,25 @@ def week_summaries() -> list[dict[str, Any]]:
             if not summary["has_full"]:
                 summary["path"] = str(path)
                 summary["count"] = row_count
+
+    # Union in real projection-artifact weeks not already covered by
+    # upcoming_recs_*.csv -- keeps latest_season()/available_weeks()/
+    # default_week() (all downstream of this function) consistent with
+    # the real data cards.py/picks.py actually render, instead of only
+    # ever seeing the older recs-snapshot pipeline's own seasons.
+    for season, weeks in _smartsim2_standalone_seasons_and_weeks().items():
+        for week in weeks:
+            key = (season, week)
+            if key not in grouped:
+                grouped[key] = {
+                    "season": season,
+                    "week": week,
+                    "count": 1,
+                    "path": str(source_root / f"smartsim2_projections_{season}_wk{week}.csv"),
+                    "has_publish": False,
+                    "has_full": True,
+                }
+
     return sorted(grouped.values(), key=lambda item: (item["season"], item["week"]))
 
 

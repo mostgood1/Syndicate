@@ -6,8 +6,11 @@ from datetime import datetime
 from typing import Any
 from urllib.parse import urlencode
 
+from syndicate.features.nfl.smartsim2_projection import SMARTSIM2_PUBLIC_LABEL
+from syndicate.features.nfl.smartsim2_projection import read_projection_artifact
 from syndicate.features.nfl.sources import available_weeks
 from syndicate.features.nfl.sources import build_module_links
+from syndicate.features.nfl.sources import default_nfl_source_root
 from syndicate.features.nfl.sources import default_week
 from syndicate.features.nfl.sources import format_odds
 from syndicate.features.nfl.sources import latest_season
@@ -214,6 +217,116 @@ def _group_rows(rows: list[dict[str, Any]], sort_value: str) -> dict[str, list[d
     return groups
 
 
+def _standalone_smartsim2_pick_cards(season: int, week: int) -> list[dict[str, Any]]:
+    """Real-data fallback for a (season, week) with no stored
+    upcoming_recs_*.csv snapshot but a real generated SmartSimNflProjection
+    artifact -- mirrors cards.py's own _game_from_smartsim_projection
+    fallback and syndicate.features.ncaaf.picks._standalone_smartsim2_pick_cards,
+    same real reason: a new season (2026) the older recs-snapshot pipeline
+    has never been refreshed for still has real SmartSim 2.0 projections
+    on disk."""
+    projections = read_projection_artifact(season=season, week=week, data_root=default_nfl_source_root())
+    scored_cards: list[tuple[float, dict[str, Any]]] = []
+    for projection in projections:
+        home_team = str(projection.home_team or "Home").strip() or "Home"
+        away_team = str(projection.away_team or "Away").strip() or "Away"
+        home_points = round(projection.home_score_mean, 1)
+        away_points = round(projection.away_score_mean, 1)
+        total_points = round(projection.total_mean, 1)
+        margin = projection.margin_mean
+        if margin > 0:
+            spread_label = f"{home_team} by {abs(margin):.1f}"
+        elif margin < 0:
+            spread_label = f"{away_team} by {abs(margin):.1f}"
+        else:
+            spread_label = "Pick'em"
+        win_probability = format_pct(projection.home_win_rate)
+        score = abs(projection.home_win_rate - 0.5) * 100.0 + abs(margin) + (total_points / 100.0)
+        scored_cards.append(
+            (
+                score,
+                {
+                    "title": f"{home_team} vs {away_team} {SMARTSIM2_PUBLIC_LABEL} candidate",
+                    "eyebrow": SMARTSIM2_PUBLIC_LABEL,
+                    "badge": f"{win_probability} win prob",
+                    "meta": f"{away_team} at {home_team}",
+                    "metrics": [
+                        {"label": "Home mean", "value": home_points},
+                        {"label": "Away mean", "value": away_points},
+                        {"label": "Spread", "value": spread_label},
+                        {"label": "Total", "value": total_points},
+                    ],
+                    "summary": (
+                        f"{SMARTSIM2_PUBLIC_LABEL} projects {home_team} {home_points} - {away_points} {away_team} "
+                        f"with a projected total of {total_points} and a home win probability of {win_probability}. "
+                        f"No stored NFL weekly recommendation snapshot exists for this week yet."
+                    ),
+                    "list_items": [
+                        f"Projected spread: {spread_label}",
+                        f"Home mean: {home_points}",
+                        f"Away mean: {away_points}",
+                        f"Projection source: {SMARTSIM2_PUBLIC_LABEL}",
+                    ],
+                },
+            )
+        )
+    scored_cards.sort(key=lambda item: item[0], reverse=True)
+    return [card for _score, card in scored_cards[:12]]
+
+
+def _standalone_smartsim2_picks_context(*, season: int, resolved_week: int, weeks: list[int]) -> dict[str, Any] | None:
+    standalone_cards = _standalone_smartsim2_pick_cards(season, resolved_week)
+    if not standalone_cards:
+        return None
+    prev_week, next_week = neighboring_values(weeks, resolved_week, fallback=resolved_week)
+    return {
+        **build_rank_page_context(
+            selected_date=f"{season}-01-{resolved_week:02d}",
+            route_path="/nfl/picks",
+            intro_title="NFL Picks",
+            intro_body=f"No stored NFL weekly recommendation snapshot exists for this week yet, so this board shows {SMARTSIM2_PUBLIC_LABEL}'s own projections directly, unblended.",
+            aria_label="NFL picks board",
+            source_path=str(default_nfl_source_root() / f"smartsim2_projections_{season}_wk{resolved_week}.csv"),
+            source_title=f"NFL {SMARTSIM2_PUBLIC_LABEL} standalone projections",
+            source_date_display=f"{season} Week {resolved_week}",
+            rank_cards=standalone_cards,
+            using_sample_data=False,
+            header_stats=[
+                {"label": "Cards", "value": str(len(standalone_cards))},
+                {"label": "Candidates", "value": str(len(standalone_cards))},
+                {"label": "Weeks", "value": str(len(weeks) or "-")},
+            ],
+            module_links=build_module_links(resolved_week, "Picks", season=season),
+            control_label="Week",
+            control_type="number",
+            control_name="week",
+            control_value=str(resolved_week),
+            submit_label="Apply",
+            prev_href=_nav_href("/nfl/picks", season, prev_week, ""),
+            next_href=_nav_href("/nfl/picks", season, next_week, ""),
+            reset_href=f"/nfl/picks?season={season}",
+            hidden_fields=[{"name": "season", "value": str(season)}],
+            empty_state=None,
+            warning_panel={
+                "eyebrow": SMARTSIM2_PUBLIC_LABEL,
+                "title": "No stored recommendation snapshot yet for this week",
+                "body": f"This week has no upcoming_recs_*.csv snapshot yet, so these candidates come directly from {SMARTSIM2_PUBLIC_LABEL}'s own real projection, unblended.",
+                "list_items": [
+                    "Candidate rows are built from home_mean, away_mean, win_probability, and projected_spread/total.",
+                    "Will automatically switch to the stored recommendation snapshot once it is generated for this week.",
+                ],
+            },
+        ),
+        "week": resolved_week,
+        "available_weeks": weeks,
+        "season": season,
+        "rows": len(standalone_cards),
+        "data": [],
+        "groups": {},
+        "have_data": bool(standalone_cards),
+    }
+
+
 def build_picks_page_context(selected_week: int, *, season: int | None = None, sort: str = "") -> dict[str, Any]:
     resolved_season = int(season or latest_season())
     weeks = available_weeks(resolved_season)
@@ -227,6 +340,16 @@ def build_picks_page_context(selected_week: int, *, season: int | None = None, s
     ordered_rows = [row for group in grouped_rows.values() for row in group]
     cards = _build_cards(rows, limit=None, sort_value=normalized_sort)
     using_sample_data = False
+
+    if not cards and not explicit_missing_week:
+        # No stored upcoming_recs_*.csv snapshot for this (season, week) --
+        # real, e.g. for a season the older recs-snapshot pipeline has never
+        # been refreshed for (2026) -- fall back to the real generated
+        # SmartSim 2.0 projection artifact before giving up to an empty
+        # state, mirroring cards.py's own engine/SmartSim2-standalone split.
+        standalone_context = _standalone_smartsim2_picks_context(season=resolved_season, resolved_week=resolved_week, weeks=weeks)
+        if standalone_context is not None:
+            return standalone_context
 
     prev_week, next_week = neighboring_values(weeks, resolved_week, fallback=resolved_week)
     tracked = tracked_week()

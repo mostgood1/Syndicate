@@ -2312,7 +2312,14 @@ class AskTheSyndicateNflEvidenceTests(unittest.TestCase):
             margin_stdev=14.0, total_stdev=11.4, home_win_rate=0.533, seeds_used=300,
             profile_name="nfl_v1", rating_source="test", generated_at="2026-01-01T00:00:00Z",
         )
-        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}):
+        # latest_season() now also scans real smartsim2_projections_*.csv
+        # (this session's own fix, so a season the real production repo
+        # has data for -- e.g. 2026 -- isn't invisible to it) -- pin it to
+        # this fixture's own season so the test doesn't depend on
+        # whatever real data happens to exist on disk outside the fixture.
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}), patch(
+            "syndicate.features.nfl.sources.latest_season", return_value=2025,
+        ):
             self._write_branding()
             write_projection_artifact([projection], season=2025, week=10, data_root=Path(self.nfl_root))
             self._write_real_lines(2025, "11_09", {
@@ -2335,7 +2342,10 @@ class AskTheSyndicateNflEvidenceTests(unittest.TestCase):
             self.assertIsNone(ask_data._nfl_matchup_evidence("how good are the Seattle Seahawks", {}))
 
     def test_ats_evidence_covers_losses_and_perspective_flip(self) -> None:
-        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}):
+        # Same real-vs-fixture season isolation as test_matchup_evidence_pairs_model_and_market above.
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}), patch(
+            "syndicate.features.nfl.sources.latest_season", return_value=2025,
+        ):
             self._write_branding()
             self._write_pbp(2025, [
                 # Home game for SEA: covers (actual 10 > line -1.5, wait use simple numbers)

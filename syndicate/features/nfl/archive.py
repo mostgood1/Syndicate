@@ -19,6 +19,10 @@ def _resolved_week(selected_week: int, *, season: int) -> int:
     return resolve_selected_value(int(selected_week or default_week(season)), available_weeks(season), default_week(season))
 
 
+def _is_smartsim2_only_summary(summary: dict[str, Any]) -> bool:
+    return "smartsim2_projections_" in str(summary.get("path") or "")
+
+
 def _archive_card(summary: dict[str, Any]) -> dict[str, Any]:
     season = int(summary.get("season") or latest_season())
     week = int(summary.get("week") or 0)
@@ -26,6 +30,26 @@ def _archive_card(summary: dict[str, Any]) -> dict[str, Any]:
     publish_count = int(summary.get("publish_count") or 0)
     has_full = bool(summary.get("has_full"))
     has_publish = bool(summary.get("has_publish"))
+    smartsim2_only = _is_smartsim2_only_summary(summary)
+    if smartsim2_only:
+        return {
+            "title": f"{season} Week {week}",
+            "eyebrow": "SmartSim 2.0 projection",
+            "badge": f"{count or 1} games",
+            "meta": "No stored recommendation snapshot yet",
+            "metrics": [
+                {"label": "Season", "value": str(season)},
+                {"label": "Week", "value": str(week)},
+                {"label": "Source", "value": "SmartSim 2.0"},
+            ],
+            "summary": "This archived NFL week has no stored weekly recommendation snapshot yet, so it is backed directly by a real SmartSim 2.0 projection artifact.",
+            "list_items": [
+                f"Projection file: smartsim2_projections_{season}_wk{week}.csv",
+                "Archive cards jump directly into the betting-card board for the same week.",
+            ],
+            "href": f"/nfl/season/{season}/betting-card?week={week}",
+            "href_label": "Open betting card",
+        }
     return {
         "title": f"{season} Week {week}",
         "eyebrow": "Weekly snapshot",
@@ -58,14 +82,22 @@ def build_archive_page_context(selected_week: int, *, season: int | None = None)
     prev_week, next_week = neighboring_values(weeks, resolved_week, fallback=resolved_week)
     tracked = tracked_week()
 
+    resolved_summary = next((item for item in summaries if int(item.get("week") or 0) == resolved_week), None)
+    if resolved_summary is not None and _is_smartsim2_only_summary(resolved_summary):
+        source_path = resolved_summary.get("path")
+        source_title = "NFL SmartSim 2.0 standalone projections"
+    else:
+        source_path = recommendation_path(resolved_week, season=resolved_season)
+        source_title = "NFL weekly archive snapshot" if cards else "NFL archive unavailable"
+
     context = build_rank_page_context(
         selected_date=f"{resolved_season}-01-{resolved_week:02d}",
         route_path="/nfl/archive",
         intro_title="NFL Daily Archive",
         intro_body="This archive board turns stored NFL weekly recommendation snapshots into a historical launch lane, so archived weeks can reopen the existing module family from real artifacts.",
         aria_label="NFL daily archive",
-        source_path=recommendation_path(resolved_week, season=resolved_season),
-        source_title="NFL weekly archive snapshot" if cards else "NFL archive unavailable",
+        source_path=source_path,
+        source_title=source_title,
         rank_cards=cards,
         using_sample_data=False,
         header_stats=[

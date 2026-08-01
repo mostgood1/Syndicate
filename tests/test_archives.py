@@ -7455,7 +7455,12 @@ class ArchiveRouteTests(unittest.TestCase):
         mocked_payload.assert_called_once_with("date=2026-05-19&market=GOALS")
 
     def test_nfl_picks_api_exposes_rank_board_navigation_metadata(self) -> None:
-        response = self.client.get("/nfl/api/picks?week=21")
+        # Explicit season=2025 -- week 21 only has a stored recommendation
+        # snapshot under 2025; the default season now correctly resolves to
+        # 2026 (the real active season, once real 2026 SmartSim 2.0
+        # projections exist), so this test pins the season it actually
+        # needs instead of relying on the now-changed default.
+        response = self.client.get("/nfl/api/picks?season=2025&week=21")
         payload = response.get_json()
 
         self.assertEqual(response.status_code, 200)
@@ -7517,24 +7522,31 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertEqual(context.get("source_title"), "NFL cards unavailable")
         self.assertEqual((context.get("empty_state") or {}).get("title"), "No game cards were available for this week")
 
-    def test_nfl_cards_api_resolves_unmirrored_week_to_last_available_snapshot(self) -> None:
+    def test_nfl_cards_api_renders_week_22_from_real_smartsim2_projection(self) -> None:
+        # Week 22 2025 has no upcoming_recs_*.csv snapshot but does have a
+        # real generated smartsim2_projections_2025_wk22.csv artifact (built
+        # for Super Bowl props work this session), so cards.py's standalone
+        # SmartSim 2.0 fallback now renders it directly instead of falling
+        # back to week 21 -- week 22 is real, available data, not missing.
         response = self.client.get("/nfl/api/cards?season=2025&week=22")
         payload = response.get_json()
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(payload.get("date"), "2025 Week 21")
+        self.assertEqual(payload.get("date"), "2025 Week 22")
         self.assertEqual(payload.get("requested_date"), "2025 Week 22")
-        self.assertEqual(payload.get("control_value"), "21")
-        self.assertTrue(str(payload.get("source_path") or "").endswith("upcoming_recs_2025_wk21.csv"))
+        self.assertEqual(payload.get("control_value"), "22")
+        self.assertTrue(str(payload.get("source_path") or "").endswith("smartsim2_projections_2025_wk22.csv"))
 
-    def test_nfl_live_lens_api_resolves_unmirrored_week_to_last_available_snapshot(self) -> None:
+    def test_nfl_live_lens_api_renders_week_22_from_real_smartsim2_projection(self) -> None:
+        # Same real fallback as cards -- week 22 2025 renders directly from
+        # the real SmartSim 2.0 projection artifact instead of falling back.
         response = self.client.get("/nfl/api/live-lens?season=2025&week=22")
         payload = response.get_json()
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(payload.get("week"), 21)
-        self.assertEqual(payload.get("control_value"), "21")
-        self.assertTrue(str(payload.get("source_path") or "").endswith("upcoming_recs_2025_wk21.csv"))
+        self.assertEqual(payload.get("week"), 22)
+        self.assertEqual(payload.get("control_value"), "22")
+        self.assertTrue(str(payload.get("source_path") or "").endswith("smartsim2_projections_2025_wk22.csv"))
 
     def test_nfl_game_detail_page_preserves_explicit_season_in_week_form(self) -> None:
         context = build_nfl_cards_page_context(21, season=2025)

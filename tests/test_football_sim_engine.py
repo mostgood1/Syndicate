@@ -102,14 +102,22 @@ class FootballSimEngineTests(unittest.TestCase):
         self.assertEqual(NflAdapter().build().sport, "nfl")
         self.assertEqual(NcaafAdapter().build().sport, "ncaaf")
 
-    def test_nfl_loader_falls_back_to_latest_available_season(self) -> None:
+    def test_nfl_loader_uses_the_requested_season_when_real_data_exists(self) -> None:
+        # Was named "...falls_back_to_latest_available_season" and asserted
+        # a hardcoded fallback to 2025 -- that was only ever true because
+        # available_weeks(2026) used to be empty (no real 2026 data
+        # existed anywhere). Real 2026 data now exists (this session's
+        # NFL projection engine work), so load_features's own
+        # `if available_weeks(requested_season): ...` branch (adapters.py)
+        # now genuinely resolves 2026 -- confirmed live: 16 real games,
+        # matching the real week-1 2026 projection artifact.
         adapter = NflAdapter().build()
 
         simulation_input = adapter.load_features(date="2026-07-12", selection=12, season=2026)
 
         self.assertEqual(simulation_input.sport, "nfl")
         self.assertGreaterEqual(len(simulation_input.games), 0)
-        self.assertEqual(simulation_input.metadata.get("season") if isinstance(simulation_input.metadata, dict) else None, 2025)
+        self.assertEqual(simulation_input.metadata.get("season") if isinstance(simulation_input.metadata, dict) else None, 2026)
 
     def test_feature_builder_normalizes_game_payload(self) -> None:
         game = {

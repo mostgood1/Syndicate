@@ -21,6 +21,7 @@ from syndicate.features.nfl.sources import latest_season
 from syndicate.features.nfl.sources import recommendation_path
 from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.discrete_nav import resolve_selected_value
+from syndicate.features.shared.formatters import format_pct
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.shared.market_inventory import join_odds_to_sim
 from syndicate.features.shared.team_branding import read_team_branding_snapshot
@@ -320,6 +321,91 @@ def _game_from_snapshot_bundle(bundle: dict[str, Any], season: int, week: int) -
     }
 
 
+def _game_from_smartsim_projection(projection: Any, season: int, week: int) -> dict[str, Any]:
+    """Real-data fallback for a week with no upcoming_recs_*.csv snapshot
+    but a real generated SmartSimNflProjection (e.g. a new season the
+    older recs-snapshot pipeline has never been refreshed for) -- mirrors
+    _game_from_snapshot_bundle's exact output shape, mirroring
+    syndicate.features.ncaaf.cards's own engine/SmartSim2-standalone
+    split for the same reason."""
+    away_team = str(projection.away_team or "Away").strip() or "Away"
+    home_team = str(projection.home_team or "Home").strip() or "Home"
+    away_branding = _resolve_branding(away_team)
+    home_branding = _resolve_branding(home_team)
+    away_abbr = away_branding.abbreviation if away_branding else _team_abbr(away_team)
+    home_abbr = home_branding.abbreviation if home_branding else _team_abbr(home_team)
+    away_name = away_branding.display_name if away_branding else away_team
+    home_name = home_branding.display_name if home_branding else home_team
+    margin = projection.margin_mean
+    if margin > 0:
+        spread_label = f"{home_name} by {abs(margin):.1f}"
+    elif margin < 0:
+        spread_label = f"{away_name} by {abs(margin):.1f}"
+    else:
+        spread_label = "Pick'em"
+    win_probability = format_pct(projection.home_win_rate)
+    game_pk = str(projection.game_id or f"{season}-{week}-{away_abbr}-{home_abbr}").replace(" ", "-")
+    summary = (
+        f"SmartSim 2.0 projects {home_name} {round(projection.home_score_mean, 1)} - {round(projection.away_score_mean, 1)} {away_name} "
+        f"with a projected total of {round(projection.total_mean, 1)} and a home win probability of {win_probability}. "
+        f"No stored recommendation snapshot exists for this week yet."
+    )
+    return {
+        "gamePk": game_pk,
+        "card_variant": "shared_default",
+        "away": {
+            "abbr": away_abbr,
+            "name": away_name,
+            "logo_url": away_branding.logo_url if away_branding else None,
+            "primary_color": away_branding.primary_color if away_branding else None,
+            "secondary_color": away_branding.secondary_color if away_branding else None,
+        },
+        "home": {
+            "abbr": home_abbr,
+            "name": home_name,
+            "logo_url": home_branding.logo_url if home_branding else None,
+            "primary_color": home_branding.primary_color if home_branding else None,
+            "secondary_color": home_branding.secondary_color if home_branding else None,
+        },
+        "href": f"/nfl/game/{game_pk}?season={season}&week={week}",
+        "href_label": "Open NFL game detail",
+        "status": f"Week {week}",
+        "detail": "SmartSim 2.0",
+        "summary": summary,
+        "metrics": [
+            {"label": "Home mean", "value": round(projection.home_score_mean, 1)},
+            {"label": "Away mean", "value": round(projection.away_score_mean, 1)},
+            {"label": "Projected spread", "value": spread_label},
+            {"label": "Win probability", "value": win_probability},
+        ],
+        "shared_top_play_rows": [],
+        "panels": [
+            {
+                "eyebrow": "SmartSim 2.0",
+                "title": "Projection contract",
+                "body": "No stored NFL weekly recommendation snapshot exists for this week yet, so this card shows SmartSim 2.0's own real Monte Carlo projection directly, unblended.",
+                "items": [
+                    f"Home mean: {round(projection.home_score_mean, 1)}",
+                    f"Away mean: {round(projection.away_score_mean, 1)}",
+                    f"Projected spread: {spread_label}",
+                    f"Projected total: {round(projection.total_mean, 1)}",
+                    f"Win probability: {win_probability}",
+                ],
+            },
+            {
+                "eyebrow": "Game context",
+                "title": f"{season} Week {week}",
+                "body": f"{away_name} at {home_name}.",
+                "items": [
+                    f"Teams: {away_name} at {home_name}",
+                    f"Projection source: SmartSim 2.0 ({projection.rating_source})",
+                    f"Real game id: {game_pk}",
+                ],
+            },
+        ],
+    }
+
+
 def build_cards_page_context(selected_week: int, *, season: int | None = None, sort: str = "date") -> dict[str, Any]:
     resolved_season = int(season or latest_season())
     resolved_week = _resolved_week(selected_week or default_week(resolved_season), season=resolved_season)
@@ -327,6 +413,18 @@ def build_cards_page_context(selected_week: int, *, season: int | None = None, s
     rows = list(_read_snapshot_rows(season, resolved_week))
     bundles = _sort_bundles(_group_snapshot_rows(rows), sort)
     games = [_game_from_snapshot_bundle(bundle, season, resolved_week) for bundle in bundles]
+    using_smartsim_fallback = False
+    if not games:
+        # No stored recs snapshot for this (season, week) -- real, e.g.
+        # for a season the older recs-snapshot pipeline has never been
+        # refreshed for (2026) -- fall back to the real generated
+        # SmartSim2 projection artifact before giving up to an empty
+        # state, mirroring NCAAF cards.py's own engine/SmartSim2-standalone
+        # split.
+        projections = read_projection_artifact(season=season, week=resolved_week, data_root=default_nfl_source_root())
+        if projections:
+            games = [_game_from_smartsim_projection(projection, season, resolved_week) for projection in projections]
+            using_smartsim_fallback = True
     using_sample_data = False
 
     weeks = _available_card_weeks(season)
@@ -339,7 +437,12 @@ def build_cards_page_context(selected_week: int, *, season: int | None = None, s
         }
         for game in games
     ]
-    source_path = _snapshot_source_path(season, resolved_week)
+    if using_smartsim_fallback:
+        source_path = str(default_nfl_source_root() / f"smartsim2_projections_{season}_wk{resolved_week}.csv")
+        source_title = "NFL SmartSim 2.0 standalone projections"
+    else:
+        source_path = _snapshot_source_path(season, resolved_week)
+        source_title = "NFL weekly recommendation snapshot" if games else "NFL cards unavailable"
     return apply_game_board_contract(
         {
             "date": f"{season} Week {resolved_week}",
@@ -358,11 +461,11 @@ def build_cards_page_context(selected_week: int, *, season: int | None = None, s
             "games": games,
             "scoreboard_items": scoreboard_items,
             "source_path": source_path,
-            "source_title": "NFL weekly recommendation snapshot" if games else "NFL cards unavailable",
+            "source_title": source_title,
             "empty_state": {
                 "eyebrow": "NFL cards",
                 "title": "No game cards were available for this week",
-                "body": "The cards board only renders stored NFL weekly recommendation snapshots, and none were available for the requested season and week.",
+                "body": "Neither a stored NFL weekly recommendation snapshot nor a real SmartSim 2.0 projection artifact was available for the requested season and week.",
                 "list_items": [
                     f"Season: {season}",
                     f"Week: {selected_week}",
@@ -371,7 +474,7 @@ def build_cards_page_context(selected_week: int, *, season: int | None = None, s
             "using_sample_data": using_sample_data,
             "route_path": "/nfl/cards",
             "intro_title": "NFL Cards",
-            "intro_body": "NFL cards now aggregate stored weekly recommendation snapshots into a shared matchup board, so cards, game detail, and live lens can run from the local mirror lane.",
+            "intro_body": "NFL cards now aggregate stored weekly recommendation snapshots into a shared matchup board, so cards, game detail, and live lens can run from the local mirror lane. Falls back to real SmartSim 2.0 projections when no stored snapshot exists for a week yet.",
             "cards_control_links": [
                 {"label": "Betting Card", "href": f"/nfl/season/{season}/betting-card?week={resolved_week}"},
                 {"label": "Picks", "href": f"/nfl/picks?season={season}&week={resolved_week}"},
@@ -381,7 +484,7 @@ def build_cards_page_context(selected_week: int, *, season: int | None = None, s
                 {"label": "Games", "value": str(len(games))},
                 {"label": "Season", "value": str(season)},
                 {"label": "Week", "value": str(resolved_week)},
-                {"label": "Source", "value": "Snapshot" if games else "No data"},
+                {"label": "Source", "value": "SmartSim 2.0" if using_smartsim_fallback else ("Snapshot" if games else "No data")},
             ],
             "cards_stylesheet": None,
             "cards_grid_class": "cards-grid",
