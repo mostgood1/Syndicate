@@ -4,13 +4,96 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 (Layer 2 board
+Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 part 2 (Layer 2
+board: the real root cause of the Alyssa Thomas duplicate -- a fallback-
+pool union whose identity hash misses cross-pipeline duplicates -- found
+and fixed, shipped and deployed)" below).
+Before that: "Reconciliation 2026-08-01 (Layer 2 board
 alignment: WNBA prop id-space collision + game-market actual semantics,
-shipped and deployed)" below).
+shipped and deployed)".
 Before that: "Reconciliation 2026-08-01 (NFL/NCAAF:
 make real 2026 week-1 data the actual default)".
 Before that: "Reconciliation 2026-08-01 (NFL/NCAAF:
 real 2026 week-1 data + sim triggers)".
+
+### Reconciliation 2026-08-01 part 2 (Layer 2 board: the real root cause of the Alyssa Thomas duplicate, shipped and deployed)
+
+Direct continuation of the reconciliation below. After shipping the
+id-space and actual-semantics fixes, user asked "is this fixed now?" --
+re-checked live and found the residual "Alyssa Thomas" duplicate (one
+correctly live-hydrated, one permanently stuck at "-"/"-") was still
+there. What followed was a long, genuinely difficult trace (~2 hours,
+several dead-end hypotheses fully ruled out before finding the real
+answer) -- worth recording in detail since the wrong-turn list is exactly
+what the next person chasing a similar "candidate never gets live data
+even though its twin does" bug needs to skip past:
+
+- **Ruled out**: `_prop_item_from_rank_card` (home.py) -- fixed its
+  missing `player_name` field (real bug, shipped, commit `f33e6113`,
+  worth keeping), but proved via the raw `market_id` field embedding the
+  mislabeled text that this specific candidate's `entity`/`player_name`
+  wasn't corrupted by anything in that function.
+- **Ruled out**: in-memory candidate-pool caching
+  (`IntelligenceStateService._build_candidate_pool`, keyed by
+  `(date, source_fingerprint)`) -- plausible in theory, but the
+  candidate_id changed across checks (proving fresh rebuilds were
+  happening), and the wrong value persisted through TWO independent
+  process restarts (two different deploys, two different
+  `render_instance_id`s).
+- **Ruled out**: `_append_game_bet_candidate`'s player-name derivation --
+  correctly extracts "Alyssa Thomas" from "Alyssa Thomas UNDER 8.5" via
+  `_player_name_from_prop_pick_text`'s suffix regex; not the source.
+- **Confirmed clean**: the raw source artifact
+  (`recommendations_slate_<date>.json`) has `display_pick: "Alyssa Thomas
+  UNDER 8.5"` with no market suffix and no entity/player_name field at
+  all -- the corruption is NOT baked into the sim/recommendation output.
+
+**The actual root cause**: `collect_candidates_with_fallback_merge`
+(intelligence.py) unions `collect_candidates`' primary result with
+`collect_all_recommendations`' richer fallback pipeline -- triggered
+whenever the primary pool looks "thin" (`_THIN_CANDIDATE_POOL_THRESHOLD =
+20`; a small 2-game WNBA slate qualifies easily). The union dedupes by
+`candidate_identity_key`, a strict hash of exact field text (selection/
+line/odds verbatim) -- by design meant to catch a pipeline re-running
+itself, not to reconcile two DIFFERENT pipelines' representations of the
+same real-world bet. "Alyssa Thomas UNDER 8.5" (one pipeline's
+`selection` text) and "UNDER" (the other pipeline's) hash to different
+keys even for the identical player/market/line, so the union's
+`merged_by_id.setdefault(key, candidate)` kept whichever candidate it
+happened to see first and permanently discarded the other -- no backfill,
+no reconciliation. It happened to discard the correctly-live-hydrated
+one and keep the mislabeled, never-live one.
+
+Also found and fixed along the way (a real, general bug independent of
+the union issue): `_prop_merge_dedup_key` (the identity used by
+`_merge_duplicate_prop_candidates`, `_collect_candidates`' OWN internal
+dedup) trusted `candidate.get("player_name")` unconditionally whenever
+truthy -- even when it held the entire pick text instead of just a
+player's name. A real player name is never itself "... over ..."/
+"... under ..." text, so that's now a safe, general tell: when detected,
+fall back to `_candidate_subject_key`'s more careful "split on over/
+under" parse of the "name" field instead.
+
+**Fix, deliberately scoped to avoid the ledger**: re-run
+`_merge_duplicate_prop_candidates` (now correct) on the union's output in
+`collect_candidates_with_fallback_merge`, rather than loosening
+`candidate_identity_key` itself -- that function also backs the
+persistent evaluation ledger's candidate IDs
+(`IntelligenceStateService._candidate_id`), where a looser hash would
+risk conflating genuinely different historical bets. Three commits,
+shipped and deployed, confirmed against the live game after the final
+one: `f33e6113` (player_name on rank-card props), `c0a98faa`
+(`_prop_merge_dedup_key` tolerates corrupted player_name), `0907154f`
+(re-merge after the fallback-pool union). Verified live: the duplicate
+collapsed to one candidate carrying `live_projection: 9`, `actual: 7`,
+`is_live: true` (from the live side) and `projected: 5.6` (from the
+richer analytical side) -- the reconciliation the whole session was
+chasing.
+
+**Also part of this reconciliation** (see the entry directly below for
+full detail): the id-space collision and game-market actual-semantics
+fixes (`b4e6d2c6`, `8b8187fa`) shipped just before this, confirmed
+working and holding.
 
 ### Reconciliation 2026-08-01 (Layer 2 board alignment: WNBA prop id-space collision + game-market actual semantics, shipped and deployed)
 
