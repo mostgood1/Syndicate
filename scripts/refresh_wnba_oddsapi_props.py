@@ -429,6 +429,7 @@ def _build_source_live_lines_payload(
     processed_root: Path,
     date_str: str,
     state_payload: dict[str, object] | None,
+    diagnostic_sink: dict[str, object] | None = None,
 ) -> dict[str, object] | None:
     games = state_payload.get("games") if isinstance(state_payload, dict) and isinstance(state_payload.get("games"), list) else []
     if not games:
@@ -437,6 +438,10 @@ def _build_source_live_lines_payload(
     odds_by_matchup = _load_game_odds_rows_by_matchup(source_root=source_root, processed_root=processed_root, date_str=date_str)
     period_by_matchup = _load_period_lines_rows_by_matchup(source_root=source_root, processed_root=processed_root, date_str=date_str)
     source_app = _load_source_app(source_root)
+    if diagnostic_sink is not None:
+        diagnostic_sink["source_app_loaded"] = source_app is not None
+        diagnostic_sink["source_app_has_period_fn"] = bool(source_app is not None and hasattr(source_app, "_live_oddsapi_period_totals_for_game"))
+        diagnostic_sink["per_game"] = {}
 
     out_games: list[dict[str, object]] = []
     for game in games:
@@ -451,11 +456,19 @@ def _build_source_live_lines_payload(
         pregame_lines = dict(odds_by_matchup.get(matchup_key) or {})
         period_lines = dict(period_by_matchup.get(matchup_key) or {})
         live_lines = {}
+        game_diag: dict[str, object] = {"in_progress": bool(game.get("in_progress")), "attempted": False}
         if bool(game.get("in_progress")) and source_app is not None and hasattr(source_app, "_live_oddsapi_period_totals_for_game"):
+            game_diag["attempted"] = True
             try:
                 live_lines = source_app._live_oddsapi_period_totals_for_game(date_str, home_tri, away_tri) or {}
-            except Exception:
+                game_diag["raw_period_totals"] = live_lines.get("period_totals")
+                game_diag["raw_period_spreads"] = live_lines.get("period_spreads")
+            except Exception as exc:
                 live_lines = {}
+                game_diag["error"] = f"{type(exc).__name__}: {exc}"
+                game_diag["traceback"] = traceback.format_exc()[-2000:]
+        if diagnostic_sink is not None:
+            diagnostic_sink["per_game"][event_id] = game_diag
         game_lines = live_lines.get("game_lines") if isinstance(live_lines.get("game_lines"), dict) else {}
         period_totals = live_lines.get("period_totals") if isinstance(live_lines.get("period_totals"), dict) else None
         period_spreads = live_lines.get("period_spreads") if isinstance(live_lines.get("period_spreads"), dict) else None
@@ -759,11 +772,13 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
                 query = f"{query}&include_period_totals=1"
             payload = _fetch_json(query)
         if kind == "live_lines":
+            source_payload_diag: dict[str, object] = {}
             source_payload = _build_source_live_lines_payload(
                 source_root=source_root,
                 processed_root=processed_root,
                 date_str=date_str,
                 state_payload=state_payload,
+                diagnostic_sink=source_payload_diag,
             )
             payload = _prefer_live_lines_payload(payload, source_payload)
         local_payload = _build_local_live_snapshot_payload(kind=kind, date_str=date_str, event_ids=event_ids)
@@ -793,6 +808,7 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
                     "bundle_payload_interval_count": _live_lines_interval_count(bundle_payload),
                     "final_payload_interval_count": _live_lines_interval_count(payload),
                     "source_payload_games": (source_payload or {}).get("games"),
+                    "source_payload_diag": source_payload_diag,
                 }
         elif not _payload_has_snapshot_content(kind, payload):
             payload = bundle_payload
