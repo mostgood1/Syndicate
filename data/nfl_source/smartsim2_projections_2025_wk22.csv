@@ -1,0 +1,2 @@
+game_id,season,week,home_team,away_team,home_score_mean,away_score_mean,margin_mean,total_mean,margin_stdev,total_stdev,home_win_rate,seeds_used,profile_name,rating_source,generated_at
+2025_22_SEA_NE,2025,22,NE,SEA,24.65,21.837,2.813,46.487,13.683,11.811,0.5767,300,nfl_v1,nflverse_pbp_epa_rolling[current_season_rolling/current_season_rolling],2026-08-01T16:00:32.616849+00:00

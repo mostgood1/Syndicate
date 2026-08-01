@@ -11,6 +11,8 @@ from syndicate.features.nfl.game_detail import build_game_detail_page_context
 from syndicate.features.nfl.live_lens import build_live_lens_page_context
 from syndicate.features.nfl.picks import build_betting_card_page_context
 from syndicate.features.nfl.picks import build_picks_page_context
+from syndicate.features.nfl.props import build_nfl_props_page_context
+from syndicate.features.nfl.props import nfl_props_available_weeks
 from syndicate.features.nfl.sources import available_weeks
 from syndicate.features.nfl.sources import default_week
 from syndicate.features.nfl.sources import latest_season
@@ -228,3 +230,32 @@ def market_board():
 def api_market_board():
     season = _selected_season()
     return jsonify(build_nfl_market_board(season, _selected_market_board_week(season)))
+
+
+def _selected_props_week(season: int) -> int:
+    weeks = nfl_props_available_weeks(season)
+    raw = (request.args.get("week") or "").strip()
+    if raw:
+        try:
+            requested = int(raw)
+            if requested in weeks:
+                return requested
+        except ValueError:
+            pass
+    return weeks[-1] if weeks else default_week(season)
+
+
+@nfl_bp.get("/props")
+def props():
+    season = _selected_season()
+    context = build_nfl_props_page_context(season, _selected_props_week(season))
+    return render_template("shared/rank_board.html", **context)
+
+
+@nfl_bp.get("/api/props")
+def api_props():
+    season = _selected_season()
+    context = build_nfl_props_page_context(season, _selected_props_week(season))
+    payload = build_rank_api_payload(context)
+    payload["season"] = season
+    return jsonify(payload)

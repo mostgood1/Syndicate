@@ -127,7 +127,15 @@ def team_rating(
 def week_schedule(season: int, week: int, plays: list[tuple[int, str, str, str, float]]) -> list[dict[str, str]]:
     """One entry per real game at this week, derived from the pbp's own
     home/away columns -- read once here directly (not via load_pbp_plays,
-    which strips those columns) since only this function needs them."""
+    which strips those columns) since only this function needs them.
+
+    Includes POST (playoff) games, unlike the team-rating computation
+    itself (team_rating/_mean_epa read load_pbp_plays, which stays
+    REG-only -- a playoff team's rating should reflect their real regular
+    season, not be diluted by a small number of playoff plays). This
+    schedule lookup is a separate concern: which real games exist for a
+    given week, and playoff games are real games a board should be able
+    to show."""
     path = _pbp_path(season)
     if not path.exists():
         return []
@@ -135,7 +143,7 @@ def week_schedule(season: int, week: int, plays: list[tuple[int, str, str, str, 
     with path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         for row in reader:
-            if row.get("season_type") != "REG":
+            if row.get("season_type") not in ("REG", "POST"):
                 continue
             try:
                 row_week = int(row.get("week") or 0)

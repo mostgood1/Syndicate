@@ -56,6 +56,30 @@ class TeamRatingTests(unittest.TestCase):
         self.assertEqual(source, "neutral_no_data")
 
 
+class WeekScheduleTests(unittest.TestCase):
+    def test_includes_post_season_games(self) -> None:
+        import csv
+        import os
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            pbp_dir = os.path.join(tmp, "tracking", "nflverse", "pbp")
+            os.makedirs(pbp_dir, exist_ok=True)
+            fieldnames = ["season_type", "week", "game_id", "home_team", "away_team"]
+            with open(os.path.join(pbp_dir, "pbp_2025.csv"), "w", encoding="utf-8", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerow({"season_type": "POST", "week": "22", "game_id": "2025_22_SEA_NE", "home_team": "NE", "away_team": "SEA"})
+                writer.writerow({"season_type": "PRE", "week": "22", "game_id": "2025_22_XX_YY", "home_team": "YY", "away_team": "XX"})
+
+            with patch.object(gen, "DATA_ROOT", Path(tmp)):
+                rows = gen.week_schedule(2025, 22, [])
+
+        self.assertEqual(rows, [{"game_id": "2025_22_SEA_NE", "home_team": "NE", "away_team": "SEA"}])
+
+
 class BuildProjectionTests(unittest.TestCase):
     def test_seeded_output_is_deterministic_and_shaped_correctly(self) -> None:
         current = [

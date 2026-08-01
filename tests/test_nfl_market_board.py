@@ -142,6 +142,48 @@ class NflMarketBoardBuilderTests(unittest.TestCase):
         markets = sorted({row["market"] for row in game["rows"]})
         self.assertEqual(markets, sorted(set(_NFL_MARKET_BOARD_DISPLAY_LABELS.values())))
 
+    def test_build_nfl_market_board_folds_in_prop_rows(self) -> None:
+        projection = SmartSimNflProjection(
+            game_id="2025_22_SEA_NE", season=2025, week=22, home_team="NE", away_team="SEA",
+            home_score_mean=23.2, away_score_mean=21.9, margin_mean=1.3, total_mean=45.1,
+            margin_stdev=14.0, total_stdev=11.4, home_win_rate=0.533, seeds_used=300,
+            profile_name="nfl_v1", rating_source="test", generated_at="2026-01-01T00:00:00Z",
+        )
+
+        class FakeBranding:
+            def __init__(self, abbr, name):
+                self.abbreviation = abbr
+                self.display_name = name
+                self.logo_url = f"https://example.test/{abbr}.png"
+
+        def fake_resolve_branding(code):
+            return {"NE": FakeBranding("NE", "New England Patriots"), "SEA": FakeBranding("SEA", "Seattle Seahawks")}.get(code)
+
+        props_key = "Seattle Seahawks|New England Patriots"
+        fake_props_odds = [{"game_id": props_key, "market": "passing_yards", "period": "full_game", "entity": "Drake Maye", "side": "over", "line": 230.5, "odds": -110.0, "market_type": "prop"}]
+        fake_props_sim = [{"game_id": props_key, "market": "passing_yards", "period": "full_game", "entity": "Drake Maye", "sim_projection": 0.55, "projected_value": 240.0, "sim_source": "nfl_season_rate"}]
+
+        with patch(
+            "syndicate.features.nfl.cards.read_projection_artifact", return_value=(projection,),
+        ), patch(
+            "syndicate.features.nfl.cards.nfl_projection_available_weeks", return_value=[22],
+        ), patch(
+            "syndicate.features.nfl.cards._nfl_real_lines_for_matchup", return_value=None,
+        ), patch(
+            "syndicate.features.nfl.cards._resolve_branding", side_effect=fake_resolve_branding,
+        ), patch(
+            "syndicate.features.nfl.cards.nfl_props_rows_for_week", return_value=(fake_props_odds, fake_props_sim),
+        ):
+            board = build_nfl_market_board(2025, 22)
+
+        game = board["games"][0]
+        prop_rows = [row for row in game["rows"] if row["market_type"] == "prop"]
+        self.assertEqual(len(prop_rows), 1)
+        self.assertEqual(prop_rows[0]["entity"], "Drake Maye")
+        self.assertEqual(prop_rows[0]["market"], "passing_yards")
+        self.assertEqual(prop_rows[0]["game_id"], "2025_22_SEA_NE")
+        self.assertEqual(prop_rows[0]["sim_projection"], 0.55)
+
 
 if __name__ == "__main__":
     unittest.main()

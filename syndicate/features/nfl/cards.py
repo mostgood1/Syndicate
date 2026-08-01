@@ -9,6 +9,8 @@ import statistics
 from functools import lru_cache
 from typing import Any
 
+from syndicate.features.nfl.props import nfl_props_key
+from syndicate.features.nfl.props import nfl_props_rows_for_week
 from syndicate.features.nfl.smartsim2_projection import read_projection_artifact
 from syndicate.features.nfl.sources import available_weeks
 from syndicate.features.nfl.sources import build_module_links
@@ -518,13 +520,18 @@ def _nfl_market_board_rows_for_game(
 
 def build_nfl_market_board(season: int, week: int) -> dict[str, Any]:
     """Layer 1 market/odds inventory for NFL game markets (moneyline,
-    spread, total) -- mirrors syndicate.features.ncaaf.cards.build_ncaaf_market_board.
-    Games and the model signal both come from the real SmartSim 2.0
-    projection artifact for this (season, week) -- see
+    spread, total) plus player props -- mirrors
+    syndicate.features.ncaaf.cards.build_ncaaf_market_board. Games and the
+    game-market model signal come from the real SmartSim 2.0 projection
+    artifact for this (season, week) -- see
     scripts/generate_smartsim2_nfl_projections.py; real market lines come
-    from _nfl_real_lines_index. No player props."""
+    from _nfl_real_lines_index; player-prop rows come from
+    syndicate.features.nfl.props (real quoted lines joined against a real
+    season-to-date player rate, not a trained model -- see that module's
+    docstring)."""
     projections = read_projection_artifact(season=season, week=week, data_root=default_nfl_source_root())
     weeks = nfl_projection_available_weeks(season)
+    props_odds_rows, props_sim_rows = nfl_props_rows_for_week(season, week)
 
     board_games: list[dict[str, Any]] = []
     for projection in projections:
@@ -552,9 +559,23 @@ def build_nfl_market_board(season: int, week: int) -> dict[str, Any]:
             model_total_stdev=projection.total_stdev,
             home_win_probability=projection.home_win_rate,
         )
+
+        # Attach this game's player-prop rows -- matched by real team full
+        # names (the props feed carries no game id of its own), then
+        # remapped onto this game's real game_id so join_odds_to_sim treats
+        # them as one game's full inventory alongside the game markets.
+        props_key = nfl_props_key(away_full_name, home_full_name)
+        for row in props_odds_rows:
+            if row.get("game_id") == props_key:
+                odds_rows.append({**row, "game_id": projection.game_id})
+        for row in props_sim_rows:
+            if row.get("game_id") == props_key:
+                sim_rows.append({**row, "game_id": projection.game_id})
+
         inventory = join_odds_to_sim(odds_rows, sim_rows)
         for row in inventory:
-            row["market"] = _NFL_MARKET_BOARD_DISPLAY_LABELS.get(row.get("market"), row.get("market"))
+            if row.get("market_type") != "prop":
+                row["market"] = _NFL_MARKET_BOARD_DISPLAY_LABELS.get(row.get("market"), row.get("market"))
 
         board_games.append(
             {
