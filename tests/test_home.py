@@ -1417,6 +1417,22 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         item = _prop_item_from_rank_card(card, sport_slug="nba")
         self.assertEqual(item["team"], "BOS")
 
+    def test_prop_item_from_rank_card_stamps_real_player_name_not_full_title(self) -> None:
+        # Board-alignment audit, found live 2026-08-01 against a real live
+        # WNBA game: this row never carried its own "player_name" -- only
+        # "name" (== the full pick title, e.g. "Alyssa Thomas UNDER 8.5").
+        # _prop_candidate_from_item (intelligence.py) falls back to "name"
+        # when "player_name" is missing, so the pick text became the
+        # dedup-merge "subject" -- a rank-card-sourced pregame duplicate
+        # for the same player+market never matched its correctly-live-wired
+        # twin (real subject "Alyssa Thomas") from a different pipeline, so
+        # the two never merged and the pregame duplicate stayed stuck with
+        # no live_projection/actual even once its game went live.
+        card = {"title": "Alyssa Thomas UNDER 8.5", "meta": "NYL @ PHX", "eyebrow": "PHX"}
+        item = _prop_item_from_rank_card(card, sport_slug="wnba")
+        self.assertEqual(item["player_name"], "Alyssa Thomas")
+        self.assertEqual(item["name"], "Alyssa Thomas UNDER 8.5")
+
     def test_prop_item_from_rank_card_derives_team_from_eyebrow(self) -> None:
         # wnba/picks.py and nba/picks.py's _card_from_pick() put the pick's
         # team abbreviation in "eyebrow" (falling back to the market label

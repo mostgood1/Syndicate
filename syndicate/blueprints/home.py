@@ -3646,15 +3646,30 @@ def _prop_item_from_rank_card(
             if candidate_label and candidate_label.lower() in haystack:
                 team_value = candidate_label
                 break
+    # Board-alignment audit, found live 2026-08-01 against a real live WNBA
+    # game: this row never carried its own "player_name" field -- only
+    # "name" (== title, the full pick text, e.g. "Alyssa Thomas UNDER 8.5").
+    # _prop_candidate_from_item (intelligence.py) falls back to "name" when
+    # "player_name" is missing, so the pick text ended up AS the subject
+    # used by _merge_duplicate_prop_candidates' dedup key -- a
+    # rank-card-sourced pregame duplicate for the same player+market
+    # ("Alyssa Thomas UNDER 8.5 AST", subject "Alyssa Thomas UNDER 8.5 AST")
+    # never matched its correctly-live-wired twin ("Alyssa Thomas AST",
+    # subject "Alyssa Thomas") produced by a different pipeline, so they
+    # never merged and the pregame duplicate stayed permanently stuck with
+    # no live_projection/actual even once its own game went live. Computed
+    # unconditionally now (not just when resolving a missing headshot) and
+    # stamped onto the row so dedup can find the real subject.
+    player_name = _player_name_from_prop_title(title) or _safe_text(card.get("summary"), None)
     headshot_url = card.get("headshot_url") or card.get("photo") or card.get("player_photo")
     if not headshot_url and sport_slug in {"nba", "wnba"}:
-        player_name = _player_name_from_prop_title(title) or _safe_text(card.get("summary"), None)
         resolved_player_id = _basketball_resolve_player_id(sport_slug, player_name=player_name, team_tri=away_label)
         headshot_url = _basketball_best_headshot_url(player_id=resolved_player_id)
     return {
         "matchup": meta,
         "heading": _safe_text(heading_override or card.get("eyebrow"), "Props"),
         "name": title,
+        "player_name": player_name,
         "detail": detail,
         "value": value,
         "photo": headshot_url,
