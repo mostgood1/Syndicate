@@ -196,6 +196,106 @@ class MergeSteamAndPropCandidatesTests(unittest.TestCase):
         self.assertEqual(merged[0].get("headshot_url"), "https://example.test/amaya.png")
 
 
+class MergeLiveLensPropAndStalePropCandidatesTests(unittest.TestCase):
+    """Board audit, 2026-07-31: reported live -- game cards correctly showed
+    "LIVE" with real scores for many simultaneously-live MLB/WNBA games, but
+    almost every prop candidate for those same games stayed stuck at lane
+    "pregame" with blank live/actual columns. Root cause confirmed against
+    real production data (Andrew Painter, PHI @ BAL, live 4-2): the stale
+    top-props candidate (status_display="Warmup", is_live=False, from a
+    once/day snapshot) and the fresh live-lens duplicate for the identical
+    bet (candidate_type="prop" like every other prop -- NOT "steam" -- from
+    _mlb_live_lens_prop_candidates_from_artifact, is_live=True, real
+    actual/live_projection) correctly matched and merged via
+    _prop_merge_dedup_key, but the merge kept the stale candidate as primary
+    (it has detail/headshot text, giving it a higher completeness score --
+    a live-lens row never carries those) and then dropped the live-lens
+    row's freshness entirely, because the existing "freshest source wins"
+    override only ever fired for a "steam"-typed group member.
+    """
+
+    def _stale_top_props_candidate(self) -> dict:
+        return {
+            "candidate_type": "prop",
+            "sport_slug": "mlb",
+            "player_name": "Andrew Painter",
+            "market": "Hits Allowed",
+            "pick": "Over 5+",
+            "name": "Over 5+",
+            "line": "4.5",
+            "odds": "-110",
+            "projected": "8.2",
+            "detail": "Over 5+ Hits Allowed | Pitcher top props",
+            "headshot_url": "https://example.test/painter.png",
+            "is_live": False,
+            "status_display": "Warmup",
+            "game_state": "Warmup",
+            "live_projection": "-",
+            "actual": "-",
+        }
+
+    def _fresh_live_lens_candidate(self) -> dict:
+        return {
+            "candidate_type": "prop",
+            "sport_slug": "mlb",
+            "player_name": "Andrew Painter",
+            "market": "Hits Allowed",
+            "pick": "Over 4.5",
+            "name": "Andrew Painter Over 4.5 Hits Allowed",
+            "line": "4.5",
+            "odds": "-130",
+            "projected": "-",
+            "is_live": True,
+            "status_display": "In Progress",
+            "game_state": "In Progress",
+            "live_projection": "5.0",
+            "actual": "3.0",
+        }
+
+    def test_merges_live_lens_and_stale_prop_for_the_same_bet_into_one_row(self) -> None:
+        merged = intelligence._merge_duplicate_prop_candidates(
+            [self._stale_top_props_candidate(), self._fresh_live_lens_candidate()]
+        )
+        self.assertEqual(len(merged), 1)
+
+    def test_merged_row_takes_live_state_from_the_live_lens_duplicate(self) -> None:
+        row = intelligence._merge_duplicate_prop_candidates(
+            [self._stale_top_props_candidate(), self._fresh_live_lens_candidate()]
+        )[0]
+        self.assertTrue(row.get("is_live"))
+        self.assertEqual(row.get("status_display"), "In Progress")
+        self.assertEqual(row.get("game_state"), "In Progress")
+        self.assertEqual(row.get("live_projection"), "5.0")
+        self.assertEqual(row.get("actual"), "3.0")
+
+    def test_merged_row_keeps_the_stale_candidates_analytical_detail_and_pick(self) -> None:
+        # Unlike the steam merge, a live-lens duplicate doesn't confirm a
+        # fresher PRICE the way a steam candidate does -- only fresher
+        # live-state -- so pick/odds/detail/projected stay from whichever
+        # candidate won on analytical completeness.
+        row = intelligence._merge_duplicate_prop_candidates(
+            [self._stale_top_props_candidate(), self._fresh_live_lens_candidate()]
+        )[0]
+        self.assertEqual(row.get("pick"), "Over 5+")
+        self.assertEqual(row.get("odds"), "-110")
+        self.assertEqual(row.get("projected"), "8.2")
+        self.assertIn("top props", row.get("detail", ""))
+        # And candidate_type must NOT get reclassified to "steam" -- that
+        # relabeling is steam-specific (a confirmed real-time price move),
+        # not implied by live-state alone.
+        self.assertEqual(row.get("candidate_type"), "prop")
+
+    def test_two_stale_props_with_no_live_duplicate_are_unaffected(self) -> None:
+        first = self._stale_top_props_candidate()
+        second = self._stale_top_props_candidate()
+        second["headshot_url"] = "https://example.test/painter2.png"
+        second["detail"] = ""
+        merged = intelligence._merge_duplicate_prop_candidates([first, second])
+        self.assertEqual(len(merged), 1)
+        self.assertFalse(merged[0].get("is_live"))
+        self.assertEqual(merged[0].get("status_display"), "Warmup")
+
+
 class MergeGameSideAndSteamCandidatesTests(unittest.TestCase):
     """Board audit follow-up, 2026-07-31: a team-level (moneyline/spread)
     steam candidate had no merge counterpart with an equivalent "game"-type
@@ -290,6 +390,18 @@ class MergeGameSideAndSteamCandidatesTests(unittest.TestCase):
         prop = {"candidate_type": "prop", "sport_slug": "mlb", "gamePk": 823271, "market": "Moneyline", "team": "NYY", "player_name": "Someone"}
         merged = intelligence._merge_duplicate_game_side_candidates([prop, dict(prop)])
         self.assertEqual(len(merged), 2)
+
+    def test_merges_live_state_from_a_non_steam_live_duplicate_too(self) -> None:
+        # Same gap/fix as MergeLiveLensPropAndStalePropCandidatesTests, for
+        # this function's own analogous steam-override block.
+        stale = self._game_style_candidate(is_live=False)
+        fresh_non_steam = self._game_style_candidate(
+            candidate_type="game", odds="-999", is_live=True, status_display="In Progress"
+        )
+        row = intelligence._merge_duplicate_game_side_candidates([stale, fresh_non_steam])[0]
+        self.assertTrue(row.get("is_live"))
+        self.assertEqual(row.get("status_display"), "In Progress")
+        self.assertEqual(row.get("candidate_type"), "game")  # not reclassified to "steam"
 
 
 class OddsHistoryMatchScoreCrossMarketGuardTests(unittest.TestCase):

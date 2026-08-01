@@ -3119,6 +3119,36 @@ _STEAM_PRICE_OVERRIDE_FIELDS = (
     "adjusted_edge",
 )
 
+# Board audit follow-up, 2026-07-31: a live-lens-sourced "prop" candidate
+# (_mlb_live_lens_prop_candidates_from_artifact -- candidate_type="prop"
+# like every other prop, not "steam") is just as fresh an authority on
+# live-state as a steam candidate -- it's built directly from the same
+# continuously-refreshed live-lens report -- but the override treatment
+# above only ever triggered when the group's live member happened to be
+# typed "steam". Confirmed live: a stale top-props candidate
+# (status_display="Warmup", is_live=False, from a once/day snapshot) and a
+# fresh live-lens duplicate for the identical bet (same subject/market/
+# line/direction, is_live=True, real actual/live_projection) merged via
+# this function, kept the stale one as primary (it has detail/headshot text
+# giving it a higher completeness score -- a live-lens row never carries
+# those), and then silently dropped the live-lens row's freshness because
+# none of these fields are in the blank-only backfill list above. Board
+# symptom: games the board's own game chips correctly showed live still
+# showed nearly every prop candidate stuck at lane "pregame". Unlike the
+# steam fields above, deliberately NOT bundling price/edge/confidence here
+# -- a live-lens row isn't a confirmed fresher price the way a steam
+# candidate is, only fresher live-state. Same field subset
+# _apply_live_state_context_to_candidates already trusts for this exact
+# purpose on a single (non-duplicate-merged) candidate.
+_LIVE_STATE_ONLY_OVERRIDE_FIELDS = (
+    "is_live",
+    "is_final",
+    "status_display",
+    "game_state",
+    "live_projection",
+    "actual",
+)
+
 
 def _field_is_blank(value: Any) -> bool:
     if value is None:
@@ -3204,6 +3234,16 @@ def _merge_duplicate_prop_candidates(candidates: list[dict[str, Any]]) -> list[d
             # candidate_type, so this candidate keeps showing there too).
             merged["candidate_type"] = "steam"
             merged["is_steam_confirmed"] = True
+        live_index = next(
+            (i for i in indices if i != primary_index and bool(candidates[i].get("is_live"))),
+            None,
+        )
+        if live_index is not None:
+            live_candidate = candidates[live_index]
+            for field in _LIVE_STATE_ONLY_OVERRIDE_FIELDS:
+                value = live_candidate.get(field)
+                if not _field_is_blank(value):
+                    merged[field] = value
         merged["merged_from"] = sorted(
             {_safe_text(candidates[i].get("candidate_type"), "") for i in indices if _safe_text(candidates[i].get("candidate_type"), "")}
         )
@@ -3315,6 +3355,20 @@ def _merge_duplicate_game_side_candidates(candidates: list[dict[str, Any]]) -> l
                     merged[field] = value
             merged["candidate_type"] = "steam"
             merged["is_steam_confirmed"] = True
+        # Same gap as _merge_duplicate_prop_candidates' identical block --
+        # a live-lens-sourced game-level candidate can be just as fresh an
+        # authority on live-state as a steam candidate without being typed
+        # "steam" itself.
+        live_index = next(
+            (i for i in indices if i != primary_index and bool(candidates[i].get("is_live"))),
+            None,
+        )
+        if live_index is not None:
+            live_candidate = candidates[live_index]
+            for field in _LIVE_STATE_ONLY_OVERRIDE_FIELDS:
+                value = live_candidate.get(field)
+                if not _field_is_blank(value):
+                    merged[field] = value
         merged["merged_from"] = sorted(
             {_safe_text(candidates[i].get("candidate_type"), "") for i in indices if _safe_text(candidates[i].get("candidate_type"), "")}
         )
