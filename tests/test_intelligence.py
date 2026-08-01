@@ -7187,6 +7187,84 @@ class MlbLivePropProjectionHydrationTests(unittest.TestCase):
         self.assertIsNotNone(key)
         self.assertEqual(key[1], "alyssa thomas")
 
+    def test_fallback_merge_reconciles_union_duplicate_the_identity_hash_missed(self) -> None:
+        # Board-alignment audit, found live 2026-08-01 against a real live
+        # WNBA game -- the actual end-to-end root cause of the "Alyssa
+        # Thomas" duplicate. collect_candidates_with_fallback_merge unions
+        # collect_candidates' primary result with collect_all_recommendations'
+        # richer fallback (triggered whenever the primary pool looks "thin",
+        # e.g. a small 2-game WNBA slate) using candidate_identity_key -- a
+        # strict hash of exact field text (selection/line/odds verbatim),
+        # by design meant to dedupe a pipeline against re-running itself,
+        # not to reconcile two DIFFERENT pipelines' representations of the
+        # same real-world bet. "Alyssa Thomas UNDER 8.5" (selection text)
+        # vs "UNDER" hash to different keys even for the identical player/
+        # market/line, so setdefault() kept the mislabeled, never-live
+        # candidate and permanently discarded its correctly-live-hydrated
+        # twin -- no backfill, no reconciliation. Running
+        # _merge_duplicate_prop_candidates (already fixed above to tolerate
+        # a corrupted player_name) again on the union catches exactly this.
+        from syndicate.features.intelligence import collect_candidates_with_fallback_merge
+
+        live_hydrated = {
+            "candidate_type": "prop",
+            "sport_slug": "wnba",
+            "sport": "wnba",
+            "player_name": "Alyssa Thomas",
+            "name": "Alyssa Thomas AST",
+            "pick": "UNDER",
+            "market": "ast",
+            "line": 8.5,
+            "is_live": True,
+            "live_projection": "8.4",
+            "actual": "5",
+            "event_id": "401857106",
+            "odds": "-150",
+        }
+        mislabeled = {
+            "candidate_type": "prop",
+            "sport_slug": "wnba",
+            "sport": "wnba",
+            "player_name": "Alyssa Thomas UNDER 8.5 AST",
+            "name": "Alyssa Thomas UNDER 8.5 AST",
+            "pick": "Alyssa Thomas UNDER 8.5",
+            "market": "Ast",
+            "line": 8.5,
+            "projected": 5.6,
+            "detail": "Rich pregame detail with real reasoning.",
+            "is_live": False,
+            "event_id": "401857106",
+            "odds": "100",
+        }
+        filler = [
+            {
+                "candidate_type": "prop",
+                "sport_slug": "wnba",
+                "sport": "wnba",
+                "player_name": f"Filler Player {i}",
+                "name": f"Filler Player {i} OVER 10.0",
+                "pick": "OVER",
+                "market": "pts",
+                "line": 10.0,
+                "event_id": "401857106",
+                "odds": "-110",
+            }
+            for i in range(25)
+        ]
+        with patch(
+            "syndicate.features.intelligence.collect_candidates", return_value=[live_hydrated]
+        ), patch(
+            "syndicate.features.intelligence.collect_all_recommendations",
+            return_value=[live_hydrated, mislabeled, *filler],
+        ):
+            result = collect_candidates_with_fallback_merge([], {}, apply_edge_filter=False)
+
+        thomas = [c for c in result if "Thomas" in str(c.get("name") or "")]
+        self.assertEqual(len(thomas), 1, thomas)
+        self.assertEqual(thomas[0].get("live_projection"), "8.4")
+        self.assertEqual(thomas[0].get("actual"), "5")
+        self.assertEqual(thomas[0].get("projected"), 5.6)
+
 
 class RepoArtifactPathFallbackTests(unittest.TestCase):
     # _mlb_repo_artifact_path/_wnba_repo_artifact_path used to resolve via

@@ -8952,6 +8952,30 @@ def collect_candidates_with_fallback_merge(
                     key = identity or f"_unkeyed_{id(candidate)}"
                     merged_by_id.setdefault(key, candidate)
             raw_candidates = list(merged_by_id.values())
+            # Board-alignment audit, found live 2026-08-01 against a real
+            # live WNBA game: candidate_identity_key hashes exact field text
+            # (selection/line/odds verbatim, not normalized) -- by design,
+            # it's meant to dedupe a pipeline against re-running itself, not
+            # to reconcile two DIFFERENT pipelines' representations of the
+            # same real-world bet ("Alyssa Thomas UNDER 8.5" vs "UNDER" as
+            # selection text hash to different keys even for the identical
+            # player/market/line). setdefault() above keeps whichever
+            # candidate it saw first and permanently discards the other --
+            # no backfill, no reconciliation -- so when raw_candidates (the
+            # primary, correctly-live-hydrated pipeline) and richer_candidates
+            # (the fallback/analytical pipeline) both cover the same real
+            # prop, exactly which one survives is arbitrary, and the loser's
+            # live_projection/actual is gone even though a live-hydrated
+            # twin existed. _merge_duplicate_prop_candidates' looser,
+            # cross-pipeline-aware identity (_prop_merge_dedup_key) already
+            # solves exactly this for _collect_candidates' own output --
+            # running it again here catches the union-introduced duplicates
+            # candidate_identity_key's stricter hash lets through. Never
+            # touch candidate_identity_key itself for this: the same
+            # function backs the persistent evaluation ledger's candidate
+            # IDs (IntelligenceStateService._candidate_id), where a looser
+            # hash would risk conflating genuinely different historical bets.
+            raw_candidates = _merge_duplicate_prop_candidates(raw_candidates)
 
     return [candidate for candidate in raw_candidates if isinstance(candidate, Mapping)]
 
