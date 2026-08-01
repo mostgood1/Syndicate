@@ -155,6 +155,49 @@ class MlbMarketBoardRowsTests(unittest.TestCase):
         self.assertEqual(by_side["over"]["join_status"], JOIN_STATUS_MATCHED)
         self.assertEqual(by_side["under"]["join_status"], JOIN_STATUS_MATCHED)
 
+    def test_moneyline_projected_value_is_each_sides_own_runs_mean(self) -> None:
+        # 2026-08-01 board audit: game-market rows carried win probability
+        # (sim_projection) but never the actual projected score -- unlike
+        # every prop row, which also carries projected_value. Each side's
+        # own runs mean is a real, already-computed sim output
+        # (_source_predictions), just never passed through before.
+        markets = {"ml": {"away_odds": "+250", "home_odds": "-350"}}
+        odds_rows, sim_rows = _mlb_market_board_rows_for_game(
+            game_pk=1,
+            markets=markets,
+            home_win_prob=0.78,
+            away_win_prob=0.22,
+            home_runs_mean=4.6,
+            away_runs_mean=3.1,
+        )
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+        by_side = {row["side"]: row for row in inventory}
+        self.assertAlmostEqual(by_side["home"]["projected_value"], 4.6)
+        self.assertAlmostEqual(by_side["away"]["projected_value"], 3.1)
+
+    def test_moneyline_projected_value_is_none_without_runs_mean(self) -> None:
+        markets = {"ml": {"away_odds": "+250", "home_odds": "-350"}}
+        odds_rows, sim_rows = _mlb_market_board_rows_for_game(
+            game_pk=1, markets=markets, home_win_prob=0.78, away_win_prob=0.22
+        )
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+        for row in inventory:
+            self.assertIsNone(row["projected_value"])
+
+    def test_totals_projected_value_is_sum_of_both_runs_means(self) -> None:
+        markets = {"totals": {"line": 8.5, "over_odds": "-120", "under_odds": "-110"}}
+        total_runs_dist = {"7": 0.2, "8": 0.2, "9": 0.3, "10": 0.3}
+        odds_rows, sim_rows = _mlb_market_board_rows_for_game(
+            game_pk=1,
+            markets=markets,
+            total_runs_dist=total_runs_dist,
+            home_runs_mean=4.6,
+            away_runs_mean=3.9,
+        )
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+        for row in inventory:
+            self.assertAlmostEqual(row["projected_value"], 8.5)
+
     def test_totals_falls_back_to_shared_model_prob_when_no_dist_supplied(self) -> None:
         # Prior behavior preserved exactly when the caller doesn't have sim
         # distribution data handy (e.g. an older caller, or genuinely none).

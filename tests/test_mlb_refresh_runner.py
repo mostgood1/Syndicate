@@ -1744,3 +1744,48 @@ class MlbRefreshRunnerTests(unittest.TestCase):
             result = module._enrich_slim_live_lens_payload_with_live_props(payload=payload, date_str="2026-08-01")
 
         self.assertNotIn("trackedProps", result["latestReport"]["games"][0])
+
+    def test_live_lens_report_has_unenriched_live_game_detects_the_gap(self) -> None:
+        # 2026-08-01 follow-up: should_recompute's input hash only covers
+        # odds snapshot files, blind to a game going live between ticks --
+        # a quiet-odds tick would otherwise reuse this exact stale report
+        # forever, skipping enrichment for every game that went live since
+        # the last real recompute.
+        module = self._load_module()
+        payload = {
+            "games": [
+                {"gamePk": 1, "status": {"abstract": "Live", "detailed": "In Progress"}, "trackedProps": [{"playerName": "A"}]},
+                {"gamePk": 2, "status": {"abstract": "Live", "detailed": "In Progress"}},
+                {"gamePk": 3, "status": {"abstract": "Preview", "detailed": "Scheduled"}},
+            ]
+        }
+        self.assertTrue(module._live_lens_report_has_unenriched_live_game(payload))
+
+    def test_live_lens_report_has_unenriched_live_game_false_when_all_live_games_enriched(self) -> None:
+        module = self._load_module()
+        payload = {
+            "games": [
+                {"gamePk": 1, "status": {"abstract": "Live", "detailed": "In Progress"}, "trackedProps": [{"playerName": "A"}]},
+                {"gamePk": 2, "status": {"abstract": "Final", "detailed": "Final"}},
+            ]
+        }
+        self.assertFalse(module._live_lens_report_has_unenriched_live_game(payload))
+
+    def test_reuse_existing_live_lens_tick_forces_recompute_when_a_live_game_is_unenriched(self) -> None:
+        module = self._load_module()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir)
+            date_str = "2026-08-01"
+            date_slug = "2026_08_01"
+            report_path = source_root / "data" / "live_lens" / f"live_lens_report_{date_slug}.json"
+            log_path = source_root / "data" / "live_lens" / f"live_lens_{date_slug}.jsonl"
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            report_path.write_text(
+                json.dumps({"games": [{"gamePk": 1, "status": {"abstract": "Live", "detailed": "In Progress"}}]}),
+                encoding="utf-8",
+            )
+            log_path.write_text('{"gamePk": 1}\n', encoding="utf-8")
+
+            result = module._reuse_existing_live_lens_tick(source_root=source_root, date_str=date_str, trigger="test")
+
+        self.assertIsNone(result)

@@ -475,6 +475,36 @@ def _bootstrap_live_lens_artifacts(*, source_root: Path, date_str: str, trigger:
     return _write_live_lens_reports_payload(source_root=source_root, date_str=date_str, payload=report_payload, trigger=trigger)
 
 
+def _live_lens_report_has_unenriched_live_game(payload: dict[str, object]) -> bool:
+    """True if the cached report has a game whose status is Live but which
+    carries no trackedProps yet.
+
+    _live_lens_input_hash (should_recompute's gate above this function's
+    only caller) hashes odds snapshot files only -- it has no idea a game
+    just went live, so a quiet-odds tick reuses this exact stale report
+    forever once should_recompute says "unchanged", even as new games
+    start. Confirmed live 2026-08-01: 5 games that went live between
+    recompute ticks sat with zero trackedProps (never enriched by
+    _enrich_slim_live_lens_payload_with_live_props) because every tick
+    since they went live took this reuse path instead of recomputing.
+    Forcing a recompute whenever this is true is cheap -- it only ever
+    matters while at least one game is newly live, a handful of times a
+    day, not on every tick.
+    """
+    games = payload.get("games") if isinstance(payload, dict) else None
+    if not isinstance(games, list):
+        return False
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        status = game.get("status") if isinstance(game.get("status"), dict) else {}
+        abstract = str(status.get("abstract") or "").strip()
+        detailed = str(status.get("detailed") or "").strip()
+        if mlb_status_is_live(abstract, detailed) and not game.get("trackedProps"):
+            return True
+    return False
+
+
 def _reuse_existing_live_lens_tick(*, source_root: Path, date_str: str, trigger: str) -> dict[str, object] | None:
     report_path = _live_lens_report_path(source_root=source_root, date_str=date_str)
     log_path = _live_lens_log_path(source_root=source_root, date_str=date_str)
@@ -488,6 +518,8 @@ def _reuse_existing_live_lens_tick(*, source_root: Path, date_str: str, trigger:
     except Exception:
         payload = {}
     if isinstance(payload, dict) and not payload.get("games"):
+        return None
+    if isinstance(payload, dict) and _live_lens_report_has_unenriched_live_game(payload):
         return None
     counts = payload.get("counts") if isinstance(payload, dict) and isinstance(payload.get("counts"), dict) else None
     meta = {

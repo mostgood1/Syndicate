@@ -5205,6 +5205,8 @@ def _mlb_market_board_rows_for_game(
     home_win_prob: Any = None,
     away_win_prob: Any = None,
     total_runs_dist: Any = None,
+    home_runs_mean: Any = None,
+    away_runs_mean: Any = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Raw odds + sim rows for one game's moneyline/total markets.
 
@@ -5215,18 +5217,30 @@ def _mlb_market_board_rows_for_game(
     numbers that must each match their own side's odds. Relabeled back to
     "Moneyline" for display once the join is done.
 
-    home_win_prob/away_win_prob/total_runs_dist are the full-sim values
-    (see _source_predictions), unconditional on any recommendation-engine
-    pick -- when supplied, they take priority over markets["ml"/"totals"]'s
-    own model_prob, which only exists for games the reco engine flagged.
-    Callers that don't have sim data handy (or older tests) can omit them
-    and get the prior reco-gated-only behavior unchanged.
+    home_win_prob/away_win_prob/total_runs_dist/home_runs_mean/
+    away_runs_mean are the full-sim values (see _source_predictions),
+    unconditional on any recommendation-engine pick -- when supplied, they
+    take priority over markets["ml"/"totals"]'s own model_prob, which only
+    exists for games the reco engine flagged. Callers that don't have sim
+    data handy (or older tests) can omit them and get the prior
+    reco-gated-only behavior unchanged.
+
+    Board audit 2026-08-01: game-market rows only ever carried a win
+    probability (sim_projection) -- unlike every prop row, which also
+    carries projected_value (the actual projected stat count), game rows
+    left projected_value permanently null. Moneyline's projected_value is
+    each side's own projected runs mean (home_runs_mean/away_runs_mean);
+    Total's is the sum of both, the natural "projected total runs" number
+    -- both already computed by the sim and passed through, just never
+    surfaced here.
     """
     odds_rows: list[dict[str, Any]] = []
     sim_rows: list[dict[str, Any]] = []
 
     sim_home_prob = _safe_float(home_win_prob)
     sim_away_prob = _safe_float(away_win_prob)
+    sim_home_runs = _safe_float(home_runs_mean)
+    sim_away_runs = _safe_float(away_runs_mean)
 
     moneyline = markets.get("ml") if isinstance(markets.get("ml"), dict) else None
     if isinstance(moneyline, dict) and moneyline:
@@ -5249,8 +5263,8 @@ def _mlb_market_board_rows_for_game(
             odds_rows.append({"game_id": game_pk, "market": "moneyline_home", "period": "full_game", "entity": None, "side": "home", "odds": home_odds, "market_type": "game"})
         if sim_home_prob is not None and sim_away_prob is not None:
             model_side = "home" if sim_home_prob >= sim_away_prob else "away"
-            sim_rows.append({"game_id": game_pk, "market": "moneyline_home", "period": "full_game", "entity": None, "sim_projection": sim_home_prob, "model_side": model_side, "sim_source": "mlb_sim"})
-            sim_rows.append({"game_id": game_pk, "market": "moneyline_away", "period": "full_game", "entity": None, "sim_projection": sim_away_prob, "model_side": model_side, "sim_source": "mlb_sim"})
+            sim_rows.append({"game_id": game_pk, "market": "moneyline_home", "period": "full_game", "entity": None, "sim_projection": sim_home_prob, "projected_value": sim_home_runs, "model_side": model_side, "sim_source": "mlb_sim"})
+            sim_rows.append({"game_id": game_pk, "market": "moneyline_away", "period": "full_game", "entity": None, "sim_projection": sim_away_prob, "projected_value": sim_away_runs, "model_side": model_side, "sim_source": "mlb_sim"})
         elif model_prob is not None and selection in ("home", "away"):
             sim_rows.append(
                 {
@@ -5271,6 +5285,7 @@ def _mlb_market_board_rows_for_game(
         under_odds = totals.get("under_odds")
         model_prob = totals.get("model_prob")
         model_prob_over = _dist_prob_over_line(total_runs_dist, line_value) if line_value is not None else None
+        projected_total_runs = sim_home_runs + sim_away_runs if sim_home_runs is not None and sim_away_runs is not None else None
         if over_odds is not None:
             odds_rows.append({"game_id": game_pk, "market": "total", "period": "full_game", "entity": None, "side": "over", "line": line, "odds": over_odds, "market_type": "game"})
         if under_odds is not None:
@@ -5280,7 +5295,7 @@ def _mlb_market_board_rows_for_game(
             # (same join key, no side component) -- join_odds_to_sim derives
             # each side's complementary probability from model_prob_over
             # using the ODDS row's own side.
-            sim_rows.append({"game_id": game_pk, "market": "total", "period": "full_game", "entity": None, "model_prob_over": model_prob_over, "sim_source": "mlb_sim"})
+            sim_rows.append({"game_id": game_pk, "market": "total", "period": "full_game", "entity": None, "model_prob_over": model_prob_over, "projected_value": projected_total_runs, "sim_source": "mlb_sim"})
         elif model_prob is not None:
             sim_rows.append({"game_id": game_pk, "market": "total", "period": "full_game", "entity": None, "sim_projection": model_prob, "sim_source": "mlb_recommendation_engine"})
 
@@ -6028,6 +6043,8 @@ def build_mlb_market_board(selected_date: str) -> dict[str, Any]:
             home_win_prob=predictions_full.get("home_win_prob"),
             away_win_prob=predictions_full.get("away_win_prob"),
             total_runs_dist=predictions_full.get("total_runs_dist"),
+            home_runs_mean=predictions_full.get("home_runs_mean"),
+            away_runs_mean=predictions_full.get("away_runs_mean"),
         )
         prop_odds_rows, prop_sim_rows = _mlb_market_board_prop_rows_for_game(
             game_pk=game_pk,
