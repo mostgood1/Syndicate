@@ -6675,6 +6675,49 @@ were resolved and nine already-closed rows removed from the open tables.
      pulling markets late in close periods) — that cadence question is a
      new, separate, not-yet-scoped item, not part of this fix.
 
+     **Confirmed end-to-end against the next live game (2026-08-01, NYL@PHX)
+     — both fixes above are genuinely correct at the source, and a THIRD,
+     final gap was found and fixed in the read path.** A dedicated ops
+     endpoint (`/api/ops/wnba/live-lines-export-diag`, reading
+     `_live_lines_export_diag.json` via `read_json_file`) confirmed the
+     vendored function computed real period data for NYL@PHX mid-game:
+     `raw_period_totals: {"h2": 89.0, "q3": 44.5, "q4": 43.5}`,
+     `raw_period_spreads: {"h2": -0.5, "q3": -1.5, "q4": 1.0}`,
+     `source_app_loaded: true`. But `/wnba/api/live_lines` kept serving a
+     stale snapshot (`generated_at` stuck ~4.5 minutes behind the diag's own
+     fresher write) with `period_totals: {}`/`period_spreads: {}`. Root
+     cause: the earlier same-day alternate-root fallback fix (commit
+     `8a47bdc9`, see the entry above) only checked alternate candidate roots
+     when the *primary* `processed_root()` lookup returned `None` — but here
+     the primary root had a **present-but-stale** payload from an earlier
+     write cycle, so the fallback never triggered even though a genuinely
+     fresher payload with real period data existed on the other candidate
+     root (the one `refresh_wnba_oddsapi_props.py`'s own `--artifact-root`
+     had resolved to for that cycle). **Fix** (`wnba/cards.py`,
+     `_local_live_snapshot_payload`): now compares `generated_at`/
+     `odds_refreshed_at` timestamps across every candidate root and keeps
+     whichever payload is actually freshest, not just whichever answers
+     first. New regression test
+     (`test_local_live_snapshot_payload_prefers_fresher_alternate_root_over_stale_primary`,
+     `tests/test_wnba_live_snapshots_local.py`) reproduces the exact
+     stale-primary/fresher-alt scenario with real production values.
+     428/428 targeted WNBA/ops/archive tests pass. Committed (swept into an
+     automated `github-actions[bot]` commit alongside an unrelated NFL
+     backfill — this environment runs a periodic auto-commit over the whole
+     working tree, worth remembering next session before assuming a diff is
+     uncommitted), deployed to web (`dep-d9n6d43l550s739d0ltg`, confirmed
+     `status=live`). **Not independently re-confirmed against a live period
+     market post-deploy**: both of today's WNBA games (CHI@LV, NYL@PHX)
+     went final right as the deploy rolled out, so the served endpoint's
+     `period_totals`/`period_spreads` being empty post-deploy reflects the
+     correct end-of-game state, not a re-test of the freshness fix. Next
+     session (or later today's follow-up): re-check
+     `/wnba/api/live_lines?date=2026-08-02` against tomorrow's MIN@IND game
+     (tips off ~17:00 UTC) once it's live and past one write cycle, to get
+     a real post-deploy confirmation of the freshness-comparison logic
+     specifically (the unit test covers the mechanism; only a live game
+     covers the real end-to-end path).
+
 - **#23 — Make the MLB daily sim memory-safe, then re-enable its trigger.**
   - ✅ *Validated 2026-07-25*: `daily_summary_2026_07_25.json` lands (15 sim artifacts
     published; `/mlb/api/cards` returns 15 cards via `_games_from_daily_summary`,
