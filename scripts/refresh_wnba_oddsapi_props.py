@@ -673,7 +673,7 @@ def _export_team_advanced_stats_artifacts(*, source_root: Path, processed_root: 
     return copied
 
 
-def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, processed_root: Path) -> dict[str, str]:
+def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, processed_root: Path, diagnostic_sink: dict[str, object] | None = None) -> dict[str, str]:
     live_snapshots_root = processed_root / "live_snapshots"
     snapshot_specs = (
         ("live_state", None),
@@ -779,6 +779,21 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
         )
         if kind == "live_lines":
             payload = _prefer_live_lines_payload(payload, bundle_payload)
+            if diagnostic_sink is not None:
+                # Answers the question print-based diagnostics couldn't
+                # (their stdout is discarded for a successful subprocess
+                # step -- see the comment above the state-file write in
+                # main()): exactly which of the three candidate live_lines
+                # payloads had real period_totals/period_spreads this
+                # cycle, and which one _prefer_live_lines_payload actually
+                # picked as the final written result.
+                diagnostic_sink["live_lines_candidates"] = {
+                    "source_payload_interval_count": _live_lines_interval_count(source_payload),
+                    "local_payload_interval_count": _live_lines_interval_count(local_payload),
+                    "bundle_payload_interval_count": _live_lines_interval_count(bundle_payload),
+                    "final_payload_interval_count": _live_lines_interval_count(payload),
+                    "source_payload_games": (source_payload or {}).get("games"),
+                }
         elif not _payload_has_snapshot_content(kind, payload):
             payload = bundle_payload
         if kind == "live_player_lens" and not _payload_has_snapshot_content(kind, payload):
@@ -5336,6 +5351,7 @@ def main() -> int:
                     source_root=source_root,
                     date_str=str(target_date),
                     processed_root=artifact_root_path / "data" / "processed",
+                    diagnostic_sink=export_diag,
                 )
                 print(
                     f"[refresh_wnba_oddsapi_props] LIVE_SNAPSHOT_EXPORT_RESULT date={target_date} "

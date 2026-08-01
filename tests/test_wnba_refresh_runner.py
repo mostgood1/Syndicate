@@ -8,6 +8,7 @@ import tempfile
 import types
 import unittest
 from pathlib import Path
+from unittest.mock import ANY
 from unittest.mock import patch
 
 from syndicate.features.shared import refresh_state_store
@@ -2594,6 +2595,69 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             payload = module._read_live_snapshot_payload(processed_root / "live_snapshots" / "live_player_lens_2026-06-05.jsonl")
             self.assertEqual((((payload or {}).get("games") or [{}])[0].get("rows") or [{}])[0].get("player"), "Aneesah Morrow")
 
+    def test_export_live_snapshot_artifacts_populates_diagnostic_sink_for_live_lines(self) -> None:
+        # Found live 2026-08-01: every print() diagnostic inside main() is
+        # unobservable for a successful subprocess step (its stdout is
+        # captured and discarded by refresh_odds_sources.py's _run_command,
+        # confirmed via Render logs staying empty across many real cycles
+        # despite return_code=0). diagnostic_sink is the replacement --
+        # it must report which candidate payload (source/local/bundle) had
+        # real period_totals/period_spreads and which one was finally
+        # written, without depending on any print output surviving.
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            source_snapshots = source_root / "data" / "processed" / "live_snapshots"
+            source_snapshots.mkdir(parents=True, exist_ok=True)
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            processed_root.mkdir(parents=True, exist_ok=True)
+
+            module._write_live_snapshot_payload(
+                source_snapshots / "live_state_2026-06-05.jsonl",
+                {"ok": True, "games": [{"event_id": "401856963", "status": "Live", "in_progress": True}]},
+            )
+
+            fake_source_payload = {
+                "ok": True,
+                "games": [
+                    {
+                        "event_id": "401856963",
+                        "found": True,
+                        "lines": {
+                            "total": 165.5,
+                            "period_totals": {"q3": 41.5},
+                            "period_spreads": {},
+                        },
+                    }
+                ],
+            }
+
+            with patch.object(module, "_source_app_fallback_enabled", return_value=False), patch.object(
+                module,
+                "_build_source_live_lines_payload",
+                return_value=fake_source_payload,
+            ), patch.object(
+                module,
+                "_build_local_live_snapshot_payload",
+                return_value=None,
+            ):
+                diagnostic_sink: dict[str, object] = {}
+                copied = module._export_live_snapshot_artifacts(
+                    source_root=source_root,
+                    date_str="2026-06-05",
+                    processed_root=processed_root,
+                    diagnostic_sink=diagnostic_sink,
+                )
+
+            self.assertIn("live_lines_path", copied)
+            candidates = diagnostic_sink.get("live_lines_candidates")
+            self.assertIsInstance(candidates, dict)
+            self.assertEqual(candidates["source_payload_interval_count"], 1)
+            self.assertEqual(candidates["final_payload_interval_count"], 1)
+            self.assertEqual(candidates["source_payload_games"], fake_source_payload["games"])
+
     def test_export_live_snapshot_artifacts_skips_empty_shells_without_replacement(self) -> None:
         module = self._load_module()
 
@@ -3366,6 +3430,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 source_root=source_root.resolve(),
                 date_str=date_str,
                 processed_root=(artifact_root / "data" / "processed").resolve(),
+                diagnostic_sink=ANY,
             )
 
     def test_main_skips_live_snapshot_refresh_without_source_root(self) -> None:
