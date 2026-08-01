@@ -64,6 +64,38 @@ class RefreshWorkerTests(unittest.TestCase):
                 module._bootstrap_soccer_player_seed_files()
             self.assertEqual(mls_dest.read_text(encoding="utf-8"), "SENTINEL-DO-NOT-OVERWRITE")
 
+    def test_bootstrap_soccer_schedule_seed_files_backfills_missing_leagues_only(self) -> None:
+        # #170 follow-up. Root-caused live 2026-08-01: a missing
+        # schedule_{season}.json on refresh-worker's own disk makes
+        # default_week() fall back to week 1 (always in the past), so
+        # week_date_list() returns an empty date list and the entire
+        # player-props pipeline silently produces zero rank cards --
+        # regardless of how correct the picks/recommendations data is. Same
+        # missing-bootstrap shape as #145/#146, just for schedule instead of
+        # player rosters, and schedule_2026.json has no date suffix so
+        # pull_hot_artifacts's per-cycle date-scoped pull can never reach it
+        # either.
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            fake_data_root = Path(tmp_dir) / "data_root"
+            fake_data_root.mkdir(parents=True)
+
+            with patch.object(module, "_refresh_state_store", return_value={"data_root": lambda: fake_data_root}):
+                module._bootstrap_soccer_schedule_seed_files()
+
+            mls_dest = fake_data_root / "soccer_source" / "mls" / "api" / "schedule" / "schedule_2026.json"
+            self.assertTrue(mls_dest.exists())
+            source_mls = repo_root / "data" / "soccer_source" / "mls" / "api" / "schedule" / "schedule_2026.json"
+            self.assertEqual(mls_dest.read_bytes(), source_mls.read_bytes())
+
+            # Never overwrites anything already on disk.
+            mls_dest.write_text("SENTINEL-DO-NOT-OVERWRITE", encoding="utf-8")
+            with patch.object(module, "_refresh_state_store", return_value={"data_root": lambda: fake_data_root}):
+                module._bootstrap_soccer_schedule_seed_files()
+            self.assertEqual(mls_dest.read_text(encoding="utf-8"), "SENTINEL-DO-NOT-OVERWRITE")
+
     def test_has_pending_external_contract_requires_pending_state_and_contract(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module = self._load_module(repo_root)

@@ -42,6 +42,41 @@ def _refresh_state_store() -> dict[str, Any]:
     }
 
 
+def _bootstrap_soccer_seed_files(*, relative_subdir: str, glob_pattern: str) -> list[str]:
+    # Shared by _bootstrap_soccer_player_seed_files (#145) and
+    # _bootstrap_soccer_schedule_seed_files (#170 follow-up) -- same
+    # deliberately narrow, provably safe pattern: only ever copies files
+    # into a subdirectory that has NONE matching yet, so it can never touch
+    # or replace anything the real pipeline has already written. See
+    # _bootstrap_soccer_player_seed_files's own comment for why this doesn't
+    # reuse bootstrap_data_root.py's broad copy-if-content-differs sync.
+    try:
+        data_root = _refresh_state_store()["data_root"]()
+    except Exception as exc:
+        print(f"[refresh_worker] SOCCER_SEED_BOOTSTRAP_SKIPPED subdir={relative_subdir} error={type(exc).__name__}: {exc}", flush=True)
+        return []
+    source_root = REPO_ROOT / "data" / "soccer_source"
+    if not source_root.is_dir():
+        return []
+    seeded_leagues: list[str] = []
+    for league_dir in sorted(source_root.iterdir()):
+        if not league_dir.is_dir():
+            continue
+        source_dir = league_dir / relative_subdir
+        source_files = sorted(source_dir.glob(glob_pattern)) if source_dir.is_dir() else []
+        if not source_files:
+            continue
+        dest_dir = data_root / "soccer_source" / league_dir.name / relative_subdir
+        existing = list(dest_dir.glob(glob_pattern)) if dest_dir.is_dir() else []
+        if existing:
+            continue
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        for src_file in source_files:
+            shutil.copy2(src_file, dest_dir / src_file.name)
+        seeded_leagues.append(league_dir.name)
+    return seeded_leagues
+
+
 def _bootstrap_soccer_player_seed_files() -> None:
     # #145. Root-caused live 2026-07-30: soccer's per-league player-roster
     # seed CSVs (data/soccer_source/{league}/players/players_{season}.csv --
@@ -60,42 +95,33 @@ def _bootstrap_soccer_player_seed_files() -> None:
     # script, no Flask app) never ran ANY bootstrap sync from git onto its
     # own disk. The committed players CSVs were real and correct the whole
     # time; refresh-worker's disk just never received them.
-    #
-    # Deliberately NOT reusing bootstrap_data_root.py's broad
-    # data/soccer_source sync wholesale here: that tree also holds
-    # committed daily recommendations_*.json/schedule snapshots from past
-    # sessions, and its copy-if-content-differs semantics would silently
-    # overwrite a freshly-regenerated file with an older git-committed one
-    # sharing the same filename. This is deliberately narrower and
-    # provably safe: it only ever copies players_*.csv into a players/
-    # directory that has NONE at all yet, so it can never touch or replace
-    # anything the pipeline has already written.
-    try:
-        data_root = _refresh_state_store()["data_root"]()
-    except Exception as exc:
-        print(f"[refresh_worker] SOCCER_PLAYER_SEED_BOOTSTRAP_SKIPPED error={type(exc).__name__}: {exc}", flush=True)
-        return
-    source_root = REPO_ROOT / "data" / "soccer_source"
-    if not source_root.is_dir():
-        return
-    seeded_leagues: list[str] = []
-    for league_dir in sorted(source_root.iterdir()):
-        if not league_dir.is_dir():
-            continue
-        source_players_dir = league_dir / "players"
-        source_files = sorted(source_players_dir.glob("players_*.csv")) if source_players_dir.is_dir() else []
-        if not source_files:
-            continue
-        dest_players_dir = data_root / "soccer_source" / league_dir.name / "players"
-        existing = list(dest_players_dir.glob("players_*.csv")) if dest_players_dir.is_dir() else []
-        if existing:
-            continue
-        dest_players_dir.mkdir(parents=True, exist_ok=True)
-        for src_file in source_files:
-            shutil.copy2(src_file, dest_players_dir / src_file.name)
-        seeded_leagues.append(league_dir.name)
+    seeded_leagues = _bootstrap_soccer_seed_files(relative_subdir="players", glob_pattern="players_*.csv")
     if seeded_leagues:
         print(f"[refresh_worker] SOCCER_PLAYER_SEED_BOOTSTRAPPED leagues={seeded_leagues}", flush=True)
+
+
+def _bootstrap_soccer_schedule_seed_files() -> None:
+    # #170 follow-up, root-caused 2026-08-01: soccer's per-league schedule
+    # artifact (data/soccer_source/{league}/api/schedule/schedule_{season}.json
+    # -- committed to git) is what syndicate/features/soccer/sources.py's
+    # schedule_payload/available_weeks/default_week read to resolve "which
+    # week is today" for the props/picks pipeline (build_props_page_context,
+    # week-keyed not date-keyed). default_week() has an explicit fallback
+    # (`if not weeks: return 1`) for exactly the missing-schedule case, but
+    # week 1 is always in the past for an in-season league, so
+    # week_date_list(league, season, 1) resolves to an empty date list --
+    # every player-prop rank card silently comes back empty regardless of
+    # how fresh or correct the underlying picks/recommendations data is.
+    # Confirmed by direct local reproduction: build_props_page_context('mls',
+    # None, None) produced 0 rank cards against a source root missing only
+    # schedule_2026.json, and 36 real rank cards once it was added back --
+    # everything else (player_props, picks.csv PROP rows) was already
+    # correct. Same missing-bootstrap root cause as #145/#146, just for a
+    # different file that per-cycle pull_hot_artifacts's date-scoped pattern
+    # match can never reach either (schedule_2026.json has no date suffix).
+    seeded_leagues = _bootstrap_soccer_seed_files(relative_subdir="api/schedule", glob_pattern="schedule_*.json")
+    if seeded_leagues:
+        print(f"[refresh_worker] SOCCER_SCHEDULE_SEED_BOOTSTRAPPED leagues={seeded_leagues}", flush=True)
 
 
 def _default_latest_manifest_path() -> Path:
@@ -944,6 +970,7 @@ def main() -> int:
     _diag_log_all_process_memory("boot")
     assert_refresh_state_backend_ready(process_name="refresh-worker")
     _bootstrap_soccer_player_seed_files()
+    _bootstrap_soccer_schedule_seed_files()
     if str(os.environ.get("SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP") or "").strip().lower() in {"1", "true", "yes", "on"}:
         print("[refresh_worker] INTELLIGENCE_LOOP_ENABLED calling start_intelligence_state_background_loop()", flush=True)
         loop_started = start_intelligence_state_background_loop()

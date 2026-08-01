@@ -4,13 +4,97 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-31 (see "Reconciliation 2026-07-31 (soccer live-lens
-fast-tick engine)" below). Before that: "Reconciliation 2026-07-31 (keyvalue
-capacity remediation: TTL + reclaim sweep, WNBA props/games vanishing root
-cause)". Before that: "Reconciliation 2026-07-31 (Layer 2 board: MLB
-live-status dedup fix + WNBA game/prop wiring, Phase A-C)". Before that:
-"Reconciliation 2026-07-31 (#161 part 2: NBA/WNBA closing line, plus a
-production outage found and fixed along the way)". Prior session: 2026-07-30.
+Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 (soccer player-props
+root cause confirmed, board propagation still gapped)" below). Before that:
+"Reconciliation 2026-07-31 (soccer live-lens fast-tick engine)". Before that:
+"Reconciliation 2026-07-31 (keyvalue capacity remediation: TTL + reclaim
+sweep, WNBA props/games vanishing root cause)". Before that: "Reconciliation
+2026-07-31 (Layer 2 board: MLB live-status dedup fix + WNBA game/prop wiring,
+Phase A-C)". Before that: "Reconciliation 2026-07-31 (#161 part 2: NBA/WNBA
+closing line, plus a production outage found and fixed along the way)".
+Prior session: 2026-07-30.
+
+### Reconciliation 2026-08-01 (soccer player-props root cause confirmed, board propagation still gapped)
+
+Continuation of the same-day soccer player-props investigation. **The actual
+simulation/matching pipeline is confirmed NOT broken** — this contradicts my
+own earlier hypothesis (recorded in the previous entry) that roster data or
+team-name matching was at fault.
+
+**What was actually wrong**: nothing in the code. MLS's `recommendations_2026-07-31.json`
+and `picks_2026-07-31.csv` on production simply hadn't been regenerated
+recently enough to reflect real, present, correctly-matching data — both the
+committed roster CSV (571 rows, team names matching today's NYCFC @ Toronto
+FC fixture exactly) and the captured OddsAPI anytime-goalscorer odds (32 real
+rows, real player names/prices) were already correct and present; the
+pipeline just hadn't been re-run against them since some earlier, apparently
+bad, cycle.
+
+**Proof, step by step**:
+1. Downloaded the real production `recommendations_2026-07-31.json` +
+   `props/2026-07-31.csv` and called `build_prop_picks('mls', '2026-07-31', ...)`
+   locally, unmodified — produced 21 correctly-matched PROP rows immediately.
+   This ruled out a code bug in the join/matching logic.
+2. Used the existing `/api/ops/odds-refresh/run` ops endpoint (admin-token
+   gated, already built for exactly this "manual on-demand refresh" purpose)
+   to force a real, scoped (`sports=soccer`, MLS only) rebuild on production.
+   Previewed via `/api/ops/odds-refresh/plan` first to confirm it only
+   touched MLS pregame steps (schedule/artifacts/odds/props/picks) before
+   running for real.
+3. **Confirmed live**: after that forced rebuild completed (~90s), production's
+   `recommendations_2026-07-31.json` showed 36 real player_props (matching
+   my local prediction exactly: 17 NYCFC + 19 Toronto FC), and
+   `picks_2026-07-31.csv` showed **23 real PROP rows** with real odds/model
+   probabilities/edges (e.g. Kai Trewin +950, Malachi Jones +255).
+
+**Board propagation gap — root-caused and fixed in the same session.** Even
+after the confirmed-correct picks/recommendations data landed on the web
+service's disk, the Layer 2 board (`/api/intelligence/query?sport=mls`)
+still didn't reflect it after 15+ minutes and multiple confirmed-successful
+`pull_hot_artifacts` cycles (`PULL_OK ... written=13`, etc.). Ruled out:
+`_HOME_OVERVIEW_CACHE` (10s TTL, far too short), `picks_rows()` caching
+(confirmed uncached). Real cause, reproduced directly: `build_props_page_context`
+is **week-keyed, not date-keyed** — it resolves `default_week()` via
+`schedule_payload(league, season)`, which reads
+`data/soccer_source/{league}/api/schedule/schedule_{season}.json`.
+`default_week()` has an explicit `if not weeks: return 1` fallback for a
+missing schedule file, but week 1 is always in the past for an in-season
+league, so `week_date_list(league, season, 1)` resolves to an **empty date
+list** — every player-prop rank card silently comes back empty regardless of
+how correct the underlying picks/recommendations data is, for every date,
+every cycle. Confirmed by direct local reproduction: `build_props_page_context('mls',
+None, None)` against a source root with everything EXCEPT
+`schedule_2026.json` produced 0 rank cards; adding just that one file back
+produced 36 real ones.
+
+This is the same missing-bootstrap root cause as #145/#146 — refresh-worker
+(a plain script, no Flask app, no git-bootstrap sync of its own) almost
+certainly never had `schedule_2026.json` on its own disk at all, since it's
+not date-suffixed and `pull_hot_artifacts`'s per-cycle date-scoped pattern
+match structurally can never reach it (documented as a known limitation in
+that function's own docstring — "a handful of non-dated files... are out of
+scope for this per-cycle pull"), and the existing #145/#146 bootstrap only
+ever seeded `players_*.csv`, not schedule files.
+
+**Fixed**: refactored `_bootstrap_soccer_player_seed_files()`
+(`scripts/run_refresh_worker.py`) into a shared, parameterized
+`_bootstrap_soccer_seed_files(relative_subdir, glob_pattern)` helper (same
+provably-safe "only seed a subdirectory that has none at all yet" contract),
+and added a sibling `_bootstrap_soccer_schedule_seed_files()` seeding
+`api/schedule/schedule_*.json` the same way, called alongside the existing
+player-seed bootstrap at refresh-worker boot. New test
+`test_bootstrap_soccer_schedule_seed_files_backfills_missing_leagues_only`
+in `tests/test_refresh_worker.py`, mirroring the existing player-seed test
+(seeds correctly, never overwrites). 66/66 tests passing across
+`test_refresh_worker.py`/`test_soccer_sources.py`/`test_build_soccer_artifacts.py`/
+`test_soccer_props.py`/`test_soccer_blueprint_routes.py`.
+
+**Verification still needed next session** (not done yet as of this entry):
+deploy, confirm `SOCCER_SCHEDULE_SEED_BOOTSTRAPPED` in refresh-worker's boot
+log, then re-check `/api/intelligence/query?sport=mls` for real `prop`-type
+candidates. Also worth a broader look at whether OTHER non-date-suffixed
+soccer artifacts (team ratings/history files, etc.) have the same gap —
+this session only confirmed and fixed the specific one blocking props.
 
 ### Reconciliation 2026-07-31 (soccer live-lens fast-tick engine)
 
