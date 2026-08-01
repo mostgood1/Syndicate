@@ -325,6 +325,12 @@ def main() -> int:
         help="Weight for pitcher recency blend (passed through).",
     )
     ap.add_argument(
+        "--starter-stamina-shrink-n0",
+        type=float,
+        default=10.0,
+        help="Prior pseudo-starts of weight for starter stamina_pitches shrink-to-prior (passed through).",
+    )
+    ap.add_argument(
         "--weather-hr-weight",
         type=float,
         default=1.0,
@@ -558,6 +564,7 @@ def main() -> int:
         "batter_recency_weight": float(args.batter_recency_weight),
         "pitcher_recency_games": int(args.pitcher_recency_games),
         "pitcher_recency_weight": float(args.pitcher_recency_weight),
+        "starter_stamina_shrink_n0": float(args.starter_stamina_shrink_n0),
         "weather_hr_weight": float(args.weather_hr_weight),
         "weather_inplay_hit_weight": float(args.weather_inplay_hit_weight),
         "weather_xb_share_weight": float(args.weather_xb_share_weight),
@@ -676,6 +683,8 @@ def main() -> int:
                 str(int(args.pitcher_recency_games)),
                 "--pitcher-recency-weight",
                 str(float(args.pitcher_recency_weight)),
+                "--starter-stamina-shrink-n0",
+                str(float(args.starter_stamina_shrink_n0)),
                 "--weather-hr-weight",
                 str(float(args.weather_hr_weight)),
                 "--weather-inplay-hit-weight",

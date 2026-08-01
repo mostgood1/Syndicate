@@ -48,7 +48,7 @@ _STATCAST_QUALITY_CACHE_BY_SEASON: Dict[int, Dict[str, Any]] = {}
 
 _STATCAST_FEATURES_CACHE_BY_SEASON: Dict[int, Dict[str, Any]] = {}
 
-_STATCAST_PROFILE_CACHE_VERSION = 3
+_STATCAST_PROFILE_CACHE_VERSION = 4
 
 
 def _apply_statsapi_pitch_arsenal(
@@ -584,11 +584,25 @@ def _derive_stamina_pitches_from_season_stats(
     pstat: Dict[str, Any],
     *,
     force_starter: bool = False,
+    starter_shrink_n0: float = 10.0,
 ) -> int:
     """Estimate per-appearance pitch stamina from season workload.
 
     Uses season-level pitchesThrown divided by GS (starter) or G (reliever) with shrink-to-prior.
     If workload stats are missing, returns a conservative role-based prior.
+
+    `starter_shrink_n0` controls how many "prior pseudo-starts" of weight the
+    sp_prior=92 baseline carries against a starter's own observed gs starts
+    (n0=10.0 reproduces the long-standing default). Diagnosed 2026-08-01: at
+    n0=10, mid-season starters (gs ~15-20) still get ~35-40% of their pitch
+    estimate pulled toward the flat prior, which compresses the whole
+    league's stamina_pitches into a narrow band regardless of true workload
+    differences -- confirmed via real roster snapshots where a workhorse
+    (Chris Sale) and a short-outing arm (Nick Martinez) both derived to the
+    same value. That compression caps how deep an ace can be projected to
+    pitch (and how short a back-end arm gets pulled), which caps every
+    counting stat downstream of batters-faced -- K, BB, H allowed alike. See
+    todo.md #178.
     """
     # StatsAPI tends to return these keys for season pitching; tolerate variants.
     total_pitches = _safe_float(pstat.get("pitchesThrown"), 0.0)
@@ -620,7 +634,7 @@ def _derive_stamina_pitches_from_season_stats(
     def _starter_estimate() -> float:
         if total_pitches > 0 and gs >= 1 and start_purity >= 0.5:
             obs = total_pitches / max(1.0, gs)
-            return _shrink_to_prior(obs, sp_prior, n=gs, n0=10.0)
+            return _shrink_to_prior(obs, sp_prior, n=gs, n0=float(starter_shrink_n0))
         return sp_prior
 
     if force_starter:
@@ -1595,6 +1609,7 @@ def build_team_roster(
     batter_recency_weight: float = 0.15,
     pitcher_recency_games: int = 6,
     pitcher_recency_weight: float = 0.15,
+    starter_stamina_shrink_n0: float = 10.0,
     fallback_roster_types: Optional[List[str]] = None,
     injured_player_ids: Optional[List[int]] = None,
     exclude_injured: bool = True,
@@ -1826,6 +1841,7 @@ def build_team_roster(
                         derived_stamina = _derive_stamina_pitches_from_season_stats(
                             workload_pstat,
                             force_starter=bool(probable_pitcher_id and int(pid) == int(probable_pitcher_id)),
+                            starter_shrink_n0=float(starter_stamina_shrink_n0),
                         )
                         try:
                             prof.stamina_pitches = int(max(float(getattr(prof, "stamina_pitches", 0) or 0.0), float(derived_stamina)))
@@ -1856,6 +1872,7 @@ def build_team_roster(
                 stamina_pitches = _derive_stamina_pitches_from_season_stats(
                     workload_pstat,
                     force_starter=bool(probable_pitcher_id and int(pid) == int(probable_pitcher_id)),
+                    starter_shrink_n0=float(starter_stamina_shrink_n0),
                 )
 
                 prof = PitcherProfile(

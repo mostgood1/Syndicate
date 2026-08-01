@@ -1893,6 +1893,12 @@ def main() -> int:
         help="Weight for pitcher recency blend (0.0=off, 1.0=all recent).",
     )
     ap.add_argument(
+        "--starter-stamina-shrink-n0",
+        type=float,
+        default=10.0,
+        help="Prior pseudo-starts of weight for starter stamina_pitches shrink-to-prior (lower = trust observed season pitches/start sooner).",
+    )
+    ap.add_argument(
         "--weather-hr-weight",
         type=float,
         default=1.0,
@@ -2460,6 +2466,7 @@ def main() -> int:
                 batter_recency_weight=float(args.batter_recency_weight),
                 pitcher_recency_games=int(args.pitcher_recency_games),
                 pitcher_recency_weight=float(args.pitcher_recency_weight),
+                starter_stamina_shrink_n0=float(args.starter_stamina_shrink_n0),
             )
             home_roster = build_team_roster(
                 client,
@@ -2482,6 +2489,7 @@ def main() -> int:
                 batter_recency_weight=float(args.batter_recency_weight),
                 pitcher_recency_games=int(args.pitcher_recency_games),
                 pitcher_recency_weight=float(args.pitcher_recency_weight),
+                starter_stamina_shrink_n0=float(args.starter_stamina_shrink_n0),
             )
 
             if str(getattr(args, "write_roster_artifacts", "off")) == "on":

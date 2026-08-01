@@ -67,6 +67,14 @@ class PitchModelConfig:
     k_logit_mult: float = 0.95
     k_logit_bias: float = 0.0
 
+    # How much log5 (odds-ratio) character to blend into the batter-K-rate
+    # vs. pitcher-K-rate combination, vs. the plain 50/50 average.
+    # 0.0 = plain average (current/default, unchanged behavior).
+    # 1.0 = pure log5 (same treatment HR/inplay_hit already get).
+    # See `_combined_k` in this module for why this exists.
+    k_combine_log5_weight: float = 0.0
+    k_league_rate: float = 0.223
+
     # Mapping from PA-level HR target to per-ball-in-play HR probability.
     # Keep conservative; tuning this affects run environment materially.
     hr_on_ball_in_play_factor: float = 0.62
@@ -177,6 +185,7 @@ class PitchModelConfig:
 _LEAGUE_RATE = {
     "hr": 0.03,
     "inplay_hit": 0.275,
+    "k": 0.223,
 }
 
 
@@ -200,6 +209,33 @@ def _combined(a: float, b: float, league_key: Optional[str] = None) -> float:
     if league_key in _LEAGUE_RATE:
         return _combined_log5(a, b, _LEAGUE_RATE[league_key])
     return clamp01(0.5 * float(a) + 0.5 * float(b))
+
+
+def _combined_k(a: float, b: float, cfg: "PitchModelConfig") -> float:
+    """PA-level strikeout target: batter K rate vs. pitcher K rate.
+
+    Plain 50/50 averaging (the `_combined` default above) pulls a pitcher's
+    true strikeout talent halfway toward the batter's own (roughly
+    league-average) rate on every PA, which is why elite/ace strikeout
+    projections came in structurally low and back-end starters' came in
+    structurally high (diagnosed via a 46-date, 1209-start backtest against
+    real market strikeout lines: elite tier bias -2.40 SO/start, back-end
+    tier bias +1.23 SO/start -- see todo.md #176). Full log5 was already
+    tried for k/bb/hbp and reverted for regressing full-game totals (see the
+    comment on `_combined` above), so this is a *shrinkage blend* between the
+    two -- `k_combine_log5_weight=0.0` reproduces the old flat-average
+    behavior exactly (the safe, backward-compatible default); `1.0` is pure
+    log5. Intermediate weights let a fix be tuned/backtested without
+    re-litigating the all-or-nothing choice that was already rejected once.
+    """
+    weight = _cfg_float(cfg, "k_combine_log5_weight", 0.0)
+    weight = max(0.0, min(1.0, weight))
+    flat = clamp01(0.5 * float(a) + 0.5 * float(b))
+    if weight <= 0.0:
+        return flat
+    league = _cfg_float(cfg, "k_league_rate", _LEAGUE_RATE["k"])
+    log5 = _combined_log5(a, b, league)
+    return clamp01((1.0 - weight) * flat + weight * log5)
 
 
 _BB_PRIOR = {
@@ -356,7 +392,7 @@ def simulate_pitch(
             return PitchResult(pitch_type=pitch_type, call=PitchCall.FOUL, is_strike=True, is_ball=False, in_play=False)
 
     # Combine rates (PA-level priors)
-    k_tgt = _combined(batter_k_rate, pitcher_k_rate)
+    k_tgt = _combined_k(batter_k_rate, pitcher_k_rate, cfg)
     bb_tgt = _combined(batter_bb_rate, pitcher_bb_rate)
     hbp_tgt = _combined(batter_hbp_rate, pitcher_hbp_rate)
     hr_tgt = _combined(float(batter_hr_rate) * float(batter_pt_hr_mult), float(pitcher_hr_rate) * float(pitcher_pt_hr_mult), "hr")

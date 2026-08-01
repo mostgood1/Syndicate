@@ -26,8 +26,23 @@
       "holdout_games": 11,
       "tune_games": 35,
       "sweep_artifacts": "vendor/mlb_bettingv2/data/eval/batches/tuning_pm_xb_share_mult/20260719_101830"
+    },
+    "k_combine_log5_weight": {
+      "generated_at": "2026-08-01",
+      "description": "Diagnosed via a 46-date/1209-start backtest against real market strikeout lines that batter-K-rate-vs-pitcher-K-rate combination used a plain 50/50 average, which structurally pulls every pitcher's per-PA strikeout target halfway toward the batter's (near-league-average) rate -- suppressing elite/ace projections and inflating back-end ones. Added k_combine_log5_weight as a shrinkage-weighted blend toward log5 (odds-ratio) combination, the same treatment hr/inplay_hit already get (see the _combined() comment in sim_engine/pitch_model.py). Validated at full backtest scale (same 46 tune+holdout dates, 100 sims/game, 1210 starts, 882 matched to real market K lines) via run_batch_eval_days.py, weight=1.0 (full log5) vs weight=0.0 (prior default).",
+      "selected_value": 1.0,
+      "rationale": "Real, correctly-directioned, statistically credible effect: corr(market_K_line, per-start prediction delta) = 0.283 (a smaller same-day sample without market-line control showed only 0.06 -- this is genuinely the signal, not noise). All four market-line tiers move the right way: elite bias -2.659->-2.585, mid-high -1.062->-1.046, mid +0.335->+0.274, back-end +1.048->+0.957. Full-game side effects at this scale are negligible-to-favorable (brier_home_win 0.2224->0.2245 flat, mae_total_runs 3.742->3.641 improved, mae_run_margin 3.323->3.370 flat) -- unlike the prior full k/bb/hbp log5 attempt that regressed full-game totals (see _combined()'s comment), applying log5 to K alone at real scale does not carry that cost. IMPORTANT CAVEAT: this only closes ~3% of the diagnosed elite-tier gap (-2.659 -> -2.585 out of ~2.66 SO deficit). The bulk of the elite-pitcher strikeout gap is not from this per-PA-rate formula and is believed to come from workload/PA-count projection compression (stamina_pitches shrinkage toward a fixed prior) rather than K-rate combination -- see todo.md #178 for the open follow-up.",
+      "baseline_k_combine_log5_weight": 0.0,
+      "baseline_elite_tier_so_bias": -2.659,
+      "selected_elite_tier_so_bias": -2.585,
+      "elite_tier_n": 39,
+      "matched_market_line_starts": 882,
+      "holdout_games": 11,
+      "tune_games": 35,
+      "batch_artifacts": "vendor/mlb_bettingv2/data/eval/_prototype_test/full46_baseline and full46_k10"
     }
   },
   "hr_rate_mult": 1.10,
-  "xb_share_mult": 1.10
+  "xb_share_mult": 1.10,
+  "k_combine_log5_weight": 1.0
 }

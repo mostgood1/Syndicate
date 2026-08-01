@@ -1459,6 +1459,49 @@ def _starter_matchup_hook_adjustment(
     }
 
 
+def _starter_tto_quality_mult(pitcher_prof: Any, overrides: Dict[str, Any]) -> float:
+    """Scale the flat, per-team TTO3 (times-through-order) penalty by the
+    starter's own K-rate.
+
+    `pull_starter_third_time_penalty` (ManagerProfile, default 0.04) and its
+    two consumers -- the pull-probability logit in `_select_pitcher_v2` and
+    the K/BB/HR/inplay rate degradation in `_adjust_pitcher_day_rates_v2` --
+    apply the exact same penalty to every starter regardless of quality,
+    while `_starter_matchup_hook_adjustment` (above) already does this kind
+    of quality-aware scaling for the *opposing* lineup. Real aces generally
+    face a milder TTO3 penalty than league average (better stuff holds up
+    facing a lineup a third time); real back-end starters generally face a
+    steeper one. Backtesting a 46-date/1209-start sample against real market
+    strikeout lines and box scores found the model over-projects innings/outs
+    for every starter, but far worse for below-average ones than for elite
+    ones (bias +0.97 outs for market K-line >= 7.0 vs. +4.14 outs for
+    market K-line < 4.0) -- consistent with a uniform TTO/hook treatment that
+    doesn't let real workhorses hold up and real short-outing arms fade on
+    schedule. See todo.md #176/#177.
+
+    `starter_tto_quality_scaling=0.0` (the default) returns 1.0 unconditionally,
+    reproducing the prior uniform-penalty behavior exactly.
+    """
+
+    def _ov_f(key: str, default: float) -> float:
+        v = overrides.get(key) if isinstance(overrides, dict) else None
+        try:
+            return float(default) if v is None else float(v)
+        except Exception:
+            return float(default)
+
+    scaling = max(0.0, min(1.0, _ov_f("starter_tto_quality_scaling", 0.0)))
+    if scaling <= 0.0:
+        return 1.0
+    league_k = _ov_f("starter_tto_quality_league_k", 0.223)
+    spread = max(1e-6, _ov_f("starter_tto_quality_spread", 0.06))
+    k_rate = float(getattr(pitcher_prof, "k_rate", league_k) or league_k)
+    delta = max(-1.0, min(1.0, (k_rate - league_k) / spread))
+    # Elite (k_rate > league, delta > 0) -> mult < 1 (softer penalty).
+    # Below-average (delta < 0) -> mult > 1 (steeper penalty).
+    return max(0.3, min(1.6, 1.0 - scaling * delta))
+
+
 def _select_pitcher_v2(roster: TeamRoster, state: GameState, rng: random.Random, batting_roster: Optional[TeamRoster] = None) -> int:
     """V2 manager hook with probabilistic pull decisions.
 
@@ -1657,7 +1700,8 @@ def _select_pitcher_v2(roster: TeamRoster, state: GameState, rng: random.Random,
         x += 0.6 * float(runner_pressure)
         x += float(inning_hook_pressure)
         if third_time:
-            x += float(roster.manager.pull_starter_third_time_penalty) * 8.0 * float(starter_third_time_scale)
+            tto_quality_mult = _starter_tto_quality_mult(starter_prof, overrides)
+            x += float(roster.manager.pull_starter_third_time_penalty) * tto_quality_mult * 8.0 * float(starter_third_time_scale)
         x += float(matchup_hook.get("pull_delta", 0.0) or 0.0)
         if blowout:
             x -= 0.8  # leave him in during blowouts
@@ -1806,6 +1850,8 @@ def _adjust_pitcher_day_rates_v2(
     )
     third_time = (bf >= 18) if is_starter else False
     tto_pen = float(getattr(roster.manager, "pull_starter_third_time_penalty", 0.0) or 0.0)
+    if is_starter:
+        tto_pen *= _starter_tto_quality_mult(pitcher_prof, overrides)
 
     # Convert fatigue/TTO into small rate multipliers.
     # These are intentionally conservative.
