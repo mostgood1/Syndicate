@@ -961,6 +961,90 @@ Temp validation artifacts, `vendor/mlb_bettingv2/data/eval/_prototype_test/`:
 the name). Analysis scripts (not part of the repo, scratchpad only):
 `betting_accuracy.py`, `market_blend_eval.py`.
 
+### Reconciliation 2026-08-01 (MLB pitcher-prop prototype fixes part 10: hits-allowed root-caused and fixed -- promoted, third fix this session)
+
+Direct continuation of part 9 item 6. User asked to move on to the
+hits-allowed defect. **This is the biggest, cleanest win of the
+session** -- bigger than the K-rate or quality-hook fixes, and it fixed
+two other diagnosed problems as a side effect.
+
+**Diagnosis**: checked TEAM-level hits (all pitchers, not just the
+starters parts 3-7 focused on) to separate "per-PA rate problem" from
+"innings-attribution/workload problem." Team-level hits over-projection
+(+1.48/game, 17.6% relative, n=1224 team-games) was nearly identical in
+magnitude to the starter-attributed number from part 9 -- ruling out
+this session's workload fixes as the (sole) cause and pointing at the
+shared per-PA `inplay_hit` combination itself. That combination was
+moved from flat average to log5 on 2026-07-19 specifically for HR/
+extra-base-hit under-projection (see `hr_rate_mult`/`xb_share_mult`'s
+`_meta` entries) -- that promotion's own backtest validated HR rate and
+total_bases_4plus/5plus, never the overall hit-rate level, leaving a
+real gap open. Hypothesis: log5 combines two *noisy per-player
+estimates* (not true talent), inflating output variance; since
+inplay_hit sits near 0 (~0.275) and far from 1, that variance has more
+room to push values up toward the ceiling than down toward the floor
+before `clamp01` cuts it off, shifting the *mean* up even though log5 is
+theoretically unbiased for true (noise-free) talent.
+
+Added `_combined_inplay_hit` (mirrors `_combined_k`'s shrinkage-blend
+pattern in reverse: `inplay_hit_combine_log5_weight=1.0` is the default,
+reproducing the current promoted full-log5 behavior exactly; `0.0`
+reverts to the pre-2026-07-19 flat average). 8 new unit tests -- one
+caught and fixed a real bug (a `weight>=1.0` fast-path was silently
+ignoring a custom league-rate override; removed the special case,
+verified the general blend formula is exact at the boundary anyway).
+Full regression sweep clean (1066 passed / 1 skipped).
+
+**Result at full scale (46 dates, 100 sims, weight=0.0 vs. current
+production weight=1.0, both other promoted fixes held constant)**:
+broadly and consistently positive, not a narrow trade-off.
+
+- Team-level hits bias: **+1.482 -> +0.821** (44.6% of the gap closed,
+  n=1224). Every market-line tier improves too: elite +1.164 -> +1.027,
+  mid-high +1.421 -> +1.105, mid +1.322 -> +0.922, back-end
+  +1.567 -> +1.049.
+- **Unexpectedly also improves the metrics log5 was promoted to fix**:
+  hr_avg_p 0.1392 -> 0.1305 (empirical target 0.1218 -- moves closer, not
+  further), total_bases_4plus avg_p 0.1923 -> 0.1639 (target 0.1488,
+  closer), total_bases_5plus avg_p 0.0924 -> 0.0775 (target 0.0683,
+  closer). This means the 2026-07-19 log5 promotion has been
+  over-shooting these targets for a while now (plausibly since --
+  season progression, or interaction with fixes promoted after it),
+  not just under-shooting hits allowed as newly diagnosed.
+- Full-game total-runs MAE improves meaningfully: 3.771 -> 3.471.
+- Real, smaller costs: full-game brier_home_win worsens slightly
+  (0.2241 -> 0.2295), run_margin MAE worsens slightly
+  (3.365 -> 3.442), and outs bias worsens modestly in 3 of 4 tiers
+  (mid-high +0.732 -> +0.905, mid +1.782 -> +1.991, back-end
+  +2.659 -> +2.975) -- a real, understood mechanical interaction (fewer
+  hits allowed means more balls in play become outs, so a pitcher at the
+  same simulated pitch count now racks up more outs before hitting
+  `eff_hook`), not a flaw in this change. Strikeouts essentially
+  unaffected either direction, as expected (`inplay_hit` doesn't touch
+  K mechanics).
+
+**Promoted** `inplay_hit_combine_log5_weight: 0.0` to
+`pitch_model_overrides/forward_start_2026_04_14_v1.json` with full
+provenance. This is the **third** fix promoted to production this
+session, alongside `k_combine_log5_weight` (part 6) and
+`starter_quality_hook_weight` (part 7). Not yet deployed to Render --
+the first two were deployed earlier this session (`dep-d9n3offqj5pc73e
+5rdl0`, commit `6ba844a9`); this one landed after that deploy and is
+only live in the repo, not in production, until deployed again.
+
+**Open follow-up for whoever picks this up next**: the outs-bias
+side effect (worse in 3/4 tiers) suggests `starter_hook_add_pitches`/
+`starter_hook_stamina_excess_weight` may need re-tuning now that the
+hit-rate baseline has shifted -- those were fit against the old
+(over-)hit-rate environment. Also worth understanding why the July log5
+promotion is now over-shooting its own original targets -- season
+progression since the original 35/11-date tune split, or an interaction
+with fixes promoted after it (this session's K-fix/quality-hook, or
+`hr_rate_mult`/`xb_share_mult` themselves) are both plausible and
+untested.
+
+Temp validation artifacts, same directory: `full46_inplayflat_v1/`.
+
 ### Reconciliation 2026-07-31 part 5 (MLB pitcher-prop prototype fixes: real-scale backtest results -- effect much weaker than diagnosed, do not promote)
 
 Direct continuation of #178 (part 3, same session). User asked to keep working
