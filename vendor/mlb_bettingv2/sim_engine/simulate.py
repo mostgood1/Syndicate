@@ -1504,7 +1504,7 @@ def _starter_tto_quality_mult(pitcher_prof: Any, overrides: Dict[str, Any]) -> f
 
 def _starter_quality_hook_delta(pitcher_prof: Any, overrides: Dict[str, Any]) -> int:
     """Additive pitch-count adjustment to eff_hook based on the starter's own
-    K-rate, independent of workload history.
+    quality, independent of workload history.
 
     `eff_hook` (`_starter_effective_hook`, above) is driven entirely by
     stamina_pitches -- a season pitches-per-start average that reflects
@@ -1523,6 +1523,27 @@ def _starter_quality_hook_delta(pitcher_prof: Any, overrides: Dict[str, Any]) ->
     pitcher's own quality the same, additively on top of the
     workload-derived eff_hook.
 
+    First cut used raw K-rate deviation from a fixed league constant, hand-
+    tuned by weight; real 46-date backtesting showed it real but badly
+    miscalibrated (overshot elite, made mid-high *worse*). Root cause: an
+    OLS fit of real per-start outs bias (n=1210, from the same 46-date
+    baseline batch) against raw K-rate had corr=-0.130 / R^2=0.017 -- weak,
+    and its zero-crossing (0.497) is unrealistically high for any real
+    starter. K-rate minus BB-rate (K-BB%, a standard real sabermetric
+    quality proxy) fit meaningfully better: corr=-0.236, R^2=0.056,
+    zero-crossing at 0.307, slope -15.29 outs per unit of (k_rate-bb_rate)
+    deviation. Still a weak *individual-pitcher* signal (94% of per-start
+    variance is other things -- game noise, bullpen availability, blowouts)
+    -- the real, larger tier-level gaps reflect that weak effect summed
+    across many starts, not a strong per-pitcher relationship, so even a
+    well-calibrated version of this fix should only close a modest
+    fraction of the tier gap, not all of it. This version replaces the
+    hand-tuned K-rate-only formula with that regression directly: default
+    `starter_quality_hook_reference`/`_slope` are the fitted zero-crossing
+    and slope, so `starter_quality_hook_weight=1.0` applies (a capped
+    version of) the actual regression-implied correction rather than an
+    arbitrary hand-picked magnitude.
+
     `starter_quality_hook_weight=0.0` (the default) returns 0
     unconditionally, reproducing prior (quality-blind) behavior exactly.
     See todo.md #178.
@@ -1538,12 +1559,18 @@ def _starter_quality_hook_delta(pitcher_prof: Any, overrides: Dict[str, Any]) ->
     weight = max(0.0, min(1.0, _ov_f("starter_quality_hook_weight", 0.0)))
     if weight <= 0.0:
         return 0
-    league_k = _ov_f("starter_quality_hook_league_k", 0.223)
-    spread = max(1e-6, _ov_f("starter_quality_hook_spread", 0.06))
-    max_pitches = max(0.0, _ov_f("starter_quality_hook_max_pitches", 15.0))
-    k_rate = float(getattr(pitcher_prof, "k_rate", league_k) or league_k)
-    delta = max(-1.0, min(1.0, (k_rate - league_k) / spread))
-    return int(round(weight * delta * max_pitches))
+    k_rate = getattr(pitcher_prof, "k_rate", None)
+    if not isinstance(k_rate, (int, float)):
+        return 0
+    bb_rate = getattr(pitcher_prof, "bb_rate", None)
+    bb_rate = float(bb_rate) if isinstance(bb_rate, (int, float)) else 0.08
+    quality_signal = float(k_rate) - bb_rate
+    reference = _ov_f("starter_quality_hook_reference", 0.307)
+    slope = _ov_f("starter_quality_hook_slope", 15.29)
+    max_pitches = max(0.0, _ov_f("starter_quality_hook_max_pitches", 10.0))
+    raw_delta = float(slope) * (quality_signal - reference)
+    capped = max(-max_pitches, min(max_pitches, raw_delta))
+    return int(round(weight * capped))
 
 
 def _select_pitcher_v2(roster: TeamRoster, state: GameState, rng: random.Random, batting_roster: Optional[TeamRoster] = None) -> int:
