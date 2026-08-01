@@ -3470,6 +3470,20 @@ def _local_live_snapshot_payload_cached(kind: str, resolved_date: str, snapshot_
     return _read_jsonl_snapshot_payload(path)
 
 
+def _alternate_live_snapshot_processed_roots() -> list[Path]:
+    try:
+        from syndicate.features.shared.source_roots import preferred_artifact_roots
+    except Exception:
+        return []
+    try:
+        return [
+            candidate / "data" / "processed"
+            for candidate in preferred_artifact_roots(__file__, env_var="SYNDICATE_WNBA_SOURCE_ROOT", local_dir_name="wnba_source")
+        ]
+    except Exception:
+        return []
+
+
 def _local_live_snapshot_payload(kind: str, selected_date: str) -> dict[str, Any] | None:
     resolved_date = str(selected_date or "").strip()
     if not resolved_date:
@@ -3477,9 +3491,34 @@ def _local_live_snapshot_payload(kind: str, selected_date: str) -> dict[str, Any
     path = _live_snapshot_artifact_path(kind, resolved_date)
     try:
         stat = path.stat()
+        payload = _local_live_snapshot_payload_cached(kind, resolved_date, int(stat.st_mtime_ns), int(stat.st_size))
     except Exception:
-        return _local_live_snapshot_payload_cached(kind, resolved_date, None, None)
-    return _local_live_snapshot_payload_cached(kind, resolved_date, int(stat.st_mtime_ns), int(stat.st_size))
+        payload = _local_live_snapshot_payload_cached(kind, resolved_date, None, None)
+    if payload is not None:
+        return payload
+    # Found live 2026-08-01: processed_root() (current_odds_root_for_sport)
+    # always prefers the "source_artifacts" candidate root whether or not
+    # that location actually has anything written to it -- the same
+    # mismatch /api/ops/wnba/artifact-counts was built to surface for other
+    # WNBA artifacts, never fixed at the source for this read path.
+    # refresh_wnba_oddsapi_props.py's own --artifact-root can legitimately
+    # resolve to the OTHER candidate root, so a real, fresh write can sit
+    # under a completely different keyvalue key than this default read ever
+    # checks. Confirmed live: the writer's own diagnostic showed a real
+    # period_totals write succeeding while this read kept returning the same
+    # stale snapshot. Try every other candidate root before giving up --
+    # bypasses the lru_cache above deliberately (only reached when the
+    # default lookup already failed, so the extra keyvalue round-trip is
+    # not a hot-path cost).
+    default_root = processed_root()
+    file_name = f"{str(kind or '').strip().lower()}_{resolved_date}.jsonl"
+    for alt_root in _alternate_live_snapshot_processed_roots():
+        if alt_root == default_root:
+            continue
+        alt_payload = _read_jsonl_snapshot_payload(alt_root / "live_snapshots" / file_name)
+        if alt_payload is not None:
+            return alt_payload
+    return None
 
 
 _local_live_snapshot_payload.cache_clear = _local_live_snapshot_payload_cached.cache_clear  # type: ignore[attr-defined]

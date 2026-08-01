@@ -574,6 +574,48 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual(card["top_play"]["market"], "points")
         self.assertEqual(card["team_tricode"], "LVA")
 
+    def test_local_live_snapshot_payload_falls_back_to_an_alternate_candidate_root(self) -> None:
+        # Root-caused live 2026-08-01: processed_root() (current_odds_root_
+        # for_sport) always prefers the "source_artifacts" candidate root,
+        # whether or not that location has anything written to it -- the
+        # same mismatch /api/ops/wnba/artifact-counts was built to surface
+        # for other WNBA artifacts, but this specific read path never had
+        # an equivalent fix. refresh_wnba_oddsapi_props.py's own
+        # --artifact-root can legitimately resolve to the OTHER candidate,
+        # so a real, fresh live_lines write can sit under a completely
+        # different root than this default read ever checked. Confirmed
+        # live: a writer-side diagnostic showed a real period_totals write
+        # succeeding while /wnba/api/live_lines kept serving the same stale,
+        # empty snapshot.
+        with TemporaryDirectory() as temp_dir:
+            tmp_root = Path(temp_dir)
+            default_root = tmp_root / "source_artifacts"
+            default_root.mkdir(parents=True, exist_ok=True)
+            alt_root = tmp_root / "data_processed_root"
+            self._write_snapshot(
+                alt_root,
+                "live_lines",
+                {
+                    "ok": True,
+                    "date": "2026-05-21",
+                    "games": [{"event_id": "evt-1", "found": True, "lines": {"total": 165.5, "period_totals": {"q3": 41.5}}}],
+                },
+            )
+
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[default_root]), patch(
+                "syndicate.features.shared.odds_control_plane.preferred_artifact_roots", return_value=[default_root]
+            ), patch(
+                "syndicate.features.shared.source_roots.preferred_artifact_roots",
+                return_value=[default_root, alt_root],
+            ):
+                _local_live_snapshot_payload.cache_clear()
+                payload = build_live_lines_payload("2026-05-21", ["evt-1"], ttl=20, include_period_totals=True)
+                _local_live_snapshot_payload.cache_clear()
+
+        game = (payload.get("games") or [{}])[0]
+        self.assertEqual(game.get("event_id"), "evt-1")
+        self.assertEqual(((game.get("lines") or {}).get("period_totals") or {}).get("q3"), 41.5)
+
     def test_live_state_payload_falls_back_to_cards_context(self) -> None:
         with patch(
             "syndicate.features.wnba.cards.build_cards_page_context",
