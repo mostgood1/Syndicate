@@ -5088,6 +5088,19 @@ def _mlb_live_lens_prop_candidates_from_artifact(sport: dict[str, Any]) -> list[
         status_text = f"{_safe_text(status.get('abstract'), '')} {_safe_text(status.get('detailed'), '')}".strip().lower()
         if not any(token in status_text for token in ("live", "in progress", "warmup")):
             continue
+        # 2026-07-31 board-audit follow-up: these candidates never carried
+        # status_display/game_state at all, only is_live=True below. Fine
+        # for a brand-new standalone candidate (_recommendation_lane's own
+        # fallback already treats is_live=True + no status text as "live"),
+        # but it left nothing correct for the prop-merge dedup pass
+        # (_merge_duplicate_prop_candidates) to override a stale
+        # duplicate's status_display WITH -- so a merged row could end up
+        # is_live=True yet status_display still "Warmup"/"scheduled" from
+        # the stale side, and _recommendation_lane checks status text
+        # first, landing back on lane="pregame" despite is_live=True.
+        # Confirmed live. Stamp the real resolved status here since it's
+        # already known for this exact game.
+        resolved_status_display = _safe_text(status.get("detailed"), _safe_text(status.get("abstract"), ""))
         game_pk = _safe_int(game.get("gamePk"))
         rows = game.get("trackedProps") if isinstance(game.get("trackedProps"), list) else None
         if not rows:
@@ -5165,6 +5178,9 @@ def _mlb_live_lens_prop_candidates_from_artifact(sport: dict[str, Any]) -> list[
                     "live_projection": live_projection_text,
                     "actual": f"{actual_value:.1f}" if actual_value is not None else "-",
                     "is_live": True,
+                    "is_final": False,
+                    "status_display": resolved_status_display,
+                    "game_state": resolved_status_display,
                     "selection_direction": selection_direction,
                     "score": score,
                     "href": f"/mlb/live-lens?date={selected_date}",
