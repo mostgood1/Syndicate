@@ -878,6 +878,42 @@ def api_ops_wnba_artifact_counts() -> Any:
     )
 
 
+@ops_bp.get("/api/ops/wnba/live-lines-export-diag")
+def api_ops_wnba_live_lines_export_diag() -> Any:
+    # Protected endpoint: requires admin token (enforced by before_request)
+    # Found live 2026-08-01: every print() diagnostic added inside
+    # scripts/refresh_wnba_oddsapi_props.py's main() is unobservable for a
+    # successful run -- refresh_odds_sources.py's _run_command runs this
+    # whole script via subprocess.run(capture_output=True), and a
+    # successful step's captured stdout is discarded entirely (only a
+    # bounded stderr tail survives for a FAILED step). That script now
+    # writes a small _live_lines_export_diag.json state file through the
+    # keyvalue-aware write_json_file instead, so this endpoint reads it
+    # back through the same backend (read_json_file, NOT the filesystem-
+    # only /api/ops/artifacts/export, which can never see a keyvalue-only
+    # write) -- this is the only way to observe whether that step's
+    # _export_live_snapshot_artifacts call actually ran and what it wrote.
+    try:
+        from syndicate.features.shared.source_roots import preferred_artifact_roots
+        from syndicate.features.wnba.sources import processed_root as wnba_processed_root
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"ImportError: {type(exc).__name__}: {exc}"}), 500
+
+    candidate_roots = [
+        candidate / "data" / "processed"
+        for candidate in preferred_artifact_roots(__file__, env_var="SYNDICATE_WNBA_SOURCE_ROOT", local_dir_name="wnba_source")
+    ]
+    results = [
+        {
+            "root": str(root),
+            "is_processed_root_default": root == wnba_processed_root(),
+            "payload": read_json_file(root / "_live_lines_export_diag.json"),
+        }
+        for root in candidate_roots
+    ]
+    return jsonify({"ok": True, "candidate_roots": [str(root) for root in candidate_roots], "results": results})
+
+
 @ops_bp.get("/api/ops/wnba/status-trace")
 def api_ops_wnba_status_trace() -> Any:
     # Protected endpoint: requires admin token (enforced by before_request)
