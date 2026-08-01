@@ -1392,7 +1392,65 @@ Temp validation artifacts, same directory:
 `full46_hookoffset_m16/` (the ruled-out uniform-offset sweep),
 `full46_ttorate_w10/`.
 
-### Reconciliation 2026-07-31 part 5 (MLB pitcher-prop prototype fixes: real-scale backtest results -- effect much weaker than diagnosed, do not promote)
+### Reconciliation 2026-08-01 (MLB pitcher-prop prototype fixes part 12: betting-accuracy harness finally run -- part 10's hits-allowed fix REVERTED, statistical-bias wins don't imply betting-accuracy wins)
+
+Direct continuation of part 11. User asked to walk the still-open threads
+list; ran `walks accuracy` (fixed the same stale-fallback-list bug noted
+in part 11 -- real signal, ~0.19-0.26 BB/start under-projection, fairly
+uniform across tiers rather than top-end-specific) and finally *ran* the
+betting-accuracy harness (`betting_accuracy.py`, built earlier, never
+executed) against pre-fix vs. current-production. Result surfaced a
+genuinely important, session-changing finding: pooled hit rate
+(n=882) improved for strikeouts (52.49%->53.85%) but got meaningfully
+**worse** for hits_allowed (55.66%->52.44%) and outs (57.75%->55.19%),
+despite both of those markets' *statistical* bias having measurably
+improved this session. User asked to find the "accuracy happy place."
+
+**Isolated the culprit using data already on disk (zero new sim runs)**:
+tonight's batches form a clean incremental chain (nothing -> +K-fix
++quality-hook -> +inplay-hit revert -> +TTO-scaling), and
+`full46_baseline_v2` (thought to be redundant, turned out to be the
+missing link: k=1.0 + quality-hook=1.0 with inplay_hit still at its
+*original* log5 default, hits/bb captured) let the whole chain be graded
+against real betting outcomes:
+
+| checkpoint | strikeouts | hits_allowed | outs |
+|---|---|---|---|
+| nothing promoted | 52.49% | 55.66% | 57.75% |
+| **+K-fix +quality-hook** | **55.78%** | 54.63% | **59.54%** |
+| +inplay-hit revert (part 10) | 53.74% | 53.08% | 55.83% |
+| +TTO-scaling (part 11, current prod) | 53.85% | 52.44% | 55.19% |
+
+The K-fix + quality-hook checkpoint is strictly the best of all four for
+betting accuracy -- it beats even the pre-session baseline on strikeouts
+and outs. **The inplay-hit revert (part 10) is the primary driver of the
+regression**, dragging down all three markets (SO -2.0pp, hits -1.55pp,
+outs -3.71pp) despite being the single biggest statistical-bias win of
+the session (+1.482 -> +0.821 team-level hits bias, 44.6% closed).
+Reducing mean-prediction error did not translate into better bets --
+exactly the failure mode `market_blend_eval.py`'s docstring predicted
+analytically, earlier in the session, before it was ever empirically
+confirmed.
+
+**Reverted** `inplay_hit_combine_log5_weight` back to `1.0` (undoing
+part 10's promotion) in `pitch_model_overrides/forward_start_2026_04_14
+_v1.json`, with the full betting-accuracy evidence documented in a
+`REVERTED_2026-08-01` field alongside the original (now-superseded)
+statistical rationale, kept for the record. **Process lesson, stated
+plainly for next time**: grade any pitch_model/manager_pitching change
+against `betting_accuracy.py` *before* promoting a fix, not after --
+statistical bias/MAE improvements can trade away real betting edge, and
+this session had the harness built and sitting idle for hours before it
+was actually run.
+
+**Still open**: TTO-scaling's effect (part 11) was only tested stacked
+on top of the already-reverted inplay-flat state, where it looked small
+and mixed. Testing it stacked on the (better) k+quality-hook+inplay-log5
+checkpoint instead, to see if it's worth keeping, worth reverting, or
+genuinely neutral in that context -- in progress
+(`full46_happyplace_test/`). The mid-high tier's contrarian pattern (part
+9, part 11) remains unexplained. Walks accuracy has a real, uniform
+~0.2-BB/start under-projection signal now but no fix attempted.
 
 Direct continuation of #178 (part 3, same session). User asked to keep working
 on validating the prototype fixes. This section's finding is the important

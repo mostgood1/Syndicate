@@ -43,21 +43,24 @@
     },
     "inplay_hit_combine_log5_weight": {
       "generated_at": "2026-08-01",
-      "description": "Diagnosed (todo.md part 9) that TEAM-level hits allowed -- all pitchers, not just starters -- are over-projected by +1.48/game (17.6% relative, n=1224 team-games, 46-date/100-sims backtest against current production, which already includes k_combine_log5_weight=1.0 and starter_quality_hook_weight=1.0), ruling out this session's other two fixes (workload/K-rate) as the cause. inplay_hit was moved from flat average to log5 on 2026-07-19 specifically to fix HR/extra-base-hit under-projection (see xb_share_mult/hr_rate_mult entries above and _combined()'s comment in pitch_model.py) -- that promotion's own backtest validated HR rate and total_bases_4plus/5plus, not the overall hit-rate level. Tested reverting inplay_hit fully back to flat average (weight=0.0) via the same 46-date/100-sims batch tooling, holding both other promoted fixes constant, isolating this one variable.",
-      "selected_value": 0.0,
-      "rationale": "Broadly and consistently positive, not a narrow trade-off: TEAM-level hits bias improves from +1.482 to +0.821 (44.6% of the gap closed, n=1224). Every market-line tier improves too (starter-attributed hits bias: elite +1.164->+1.027, mid-high +1.421->+1.105, mid +1.322->+0.922, back-end +1.567->+1.049). Unexpectedly, this ALSO improves the exact metrics log5 was promoted to fix in the first place -- hr_avg_p 0.1392->0.1305 (empirical target 0.1218, moves closer not further), total_bases_4plus avg_p 0.1923->0.1639 (target 0.1488, moves closer), total_bases_5plus avg_p 0.0924->0.0775 (target 0.0683, moves closer) -- suggesting the original log5 promotion has been over-shooting these targets for a while, not just under-shooting hits. Full-game total-runs MAE improves meaningfully (3.771->3.471). Real, small costs: full-game brier_home_win worsens slightly (0.2241->0.2295), run_margin MAE worsens slightly (3.365->3.442), and outs bias worsens modestly in 3 of 4 tiers (mid-high +0.732->+0.905, mid +1.782->+1.991, back-end +2.659->+2.975) -- a real mechanical interaction (fewer hits allowed means more balls in play become outs, so a pitcher at the same pitch count now racks up more outs before hitting eff_hook) rather than a flaw in this specific change. Net effect judged clearly favorable given the size of the primary gains vs. the size of the secondary costs.",
+      "description": "Diagnosed (todo.md part 9) that TEAM-level hits allowed -- all pitchers, not just starters -- are over-projected by +1.48/game (17.6% relative, n=1224 team-games). Tested reverting inplay_hit fully back to flat average (weight=0.0) via 46-date/100-sims backtesting, holding the other promoted fixes constant.",
+      "selected_value": 1.0,
+      "REVERTED_2026-08-01": "Promoted to 0.0 first (see 'superseded_rationale' below), then reverted back to the original 1.0 (log5) the same session after building and finally running the betting-accuracy harness (grades the model's own P(over) against real market lines, not just mean-vs-actual bias -- built earlier in the session but not actually run until after this fix was already promoted). At weight=0.0 (flat average, what was briefly promoted), pooled real-money hit rate WORSENS on every market vs. the k_combine_log5_weight=1.0 + starter_quality_hook_weight=1.0 checkpoint that came right before it: strikeouts 55.78%->53.74%, hits_allowed 54.63%->53.08%, outs 59.54%->55.83% (n=882 each). That checkpoint (k+quality-hook, inplay still at log5) is strictly the best of all four tested states for betting accuracy -- it beats even the pre-session 'nothing promoted' baseline on strikeouts (52.49%) and outs (57.75%). The statistical-bias win (reducing mean hits-allowed error) is real, but it does not translate into better bets, and for a betting-intelligence platform the metric that actually matters is hit rate against the market's real lines, not mean-prediction bias in isolation. Lesson for next time: grade any pitch_model/manager_pitching change against betting_accuracy.py BEFORE promoting, not after -- bias/MAE improvements can trade away real edge (see market_blend_eval.py's docstring, which predicted this exact failure mode analytically before this fix was ever tested against it).",
+      "superseded_rationale": "Broadly and consistently positive on STATISTICAL accuracy, not a narrow trade-off: TEAM-level hits bias improved from +1.482 to +0.821 (44.6% of the gap closed, n=1224), every market-line tier improved, and it unexpectedly also improved HR/total-bases calibration and full-game total-runs MAE. Real, small statistical costs: outs bias worsened modestly in 3 of 4 tiers, a mechanical interaction (fewer hits allowed -> more balls in play become outs -> pitcher reaches eff_hook sooner in outs terms). This looked like a clear net positive until graded against real betting outcomes.",
       "baseline_inplay_hit_combine_log5_weight": 1.0,
       "team_hits_n": 1224,
       "baseline_team_hits_bias": 1.482,
-      "selected_team_hits_bias": 0.821,
+      "flat_avg_team_hits_bias": 0.821,
+      "betting_hit_rate_at_k_plus_qualityhook_checkpoint": {"strikeouts": 0.5578, "hits_allowed": 0.5463, "outs": 0.5954},
+      "betting_hit_rate_after_inplay_revert": {"strikeouts": 0.5374, "hits_allowed": 0.5308, "outs": 0.5583},
       "matched_market_line_starts": 882,
       "holdout_games": 11,
       "tune_games": 35,
-      "batch_artifacts": "vendor/mlb_bettingv2/data/eval/_prototype_test/full46_baseline_v2 and full46_inplayflat_v1"
+      "batch_artifacts": "vendor/mlb_bettingv2/data/eval/_prototype_test/full46_baseline_v2, full46_inplayflat_v1, full46_ttorate_w10; betting_accuracy.py"
     }
   },
   "hr_rate_mult": 1.10,
   "xb_share_mult": 1.10,
   "k_combine_log5_weight": 1.0,
-  "inplay_hit_combine_log5_weight": 0.0
+  "inplay_hit_combine_log5_weight": 1.0
 }
