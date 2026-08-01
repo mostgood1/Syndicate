@@ -4,9 +4,12 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 (Layer 2 board:
+Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 part 2 (NFL:
+injury adjustment root-caused and defaulted OFF)" below).
+Before that: "Reconciliation 2026-08-01 (Layer 2 board:
 full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
-decided removal added, shipped and deployed)" below).
+decided removal added, shipped and deployed)" -- ran concurrently, different
+files throughout.
 Before that: "Reconciliation 2026-08-01 (NFL: full 2026
 backfill both sports + real injury-rating adjustment, backtested)".
 Before that: "Reconciliation 2026-08-01 part 2 (Layer 2
@@ -98,6 +101,46 @@ cover hit/missed/still-undecided/no-data-yet.
 Shipped: `d74265fd` (scripts/refresh_mlb_oddsapi.py,
 syndicate/features/intelligence.py + tests). Deployed to all three
 services, verified live post-deploy as described above.
+
+### Reconciliation 2026-08-01 part 2 (NFL: injury adjustment root-caused and defaulted OFF)
+
+Direct continuation of #183 below. User asked to investigate the -1.1pt
+backtest regression before deciding a default. New
+`scripts/analyze_nfl_injury_adjustment_sides.py` isolates offense vs.
+defense against the real 264 2025 games with a modeled injury:
+
+| variant | accuracy |
+|---|---|
+| off | 161/264 = 60.98% |
+| offense only | 149/264 = 56.44% |
+| defense only | 157/264 = 59.47% |
+| both | 149/264 = 56.44% (identical to offense-only) |
+
+**Root cause confirmed**: the offense adjustment causes the whole
+regression; defense alone is much closer to neutral but still not an
+improvement, and its effect doesn't compound with offense's (both ==
+offense-only). Both offense methods (excluding a player's plays; comparing
+starter-vs-backup rates) are simple historical averages, not causal
+estimates -- vulnerable to confounding with opponent strength/game script.
+Confirmed directly in the real data: Darren Waller (MIA TE1) ruled out
+showed a *positive* offense-rating delta, and J.J. McCarthy (MIN QB1) ruled
+out showed a +0.28 delta -- implausible read literally as "this player
+hurts the offense," explainable as confounding (presence/absence isn't
+randomly distributed across games).
+
+**Decision (commit `36cd8a5c`)**: `build_projection()`'s
+`apply_injury_adjustment` now defaults to `False` (was `True`); CLI flag
+renamed `--injury-adjustment` (opt-in, was `--no-injury-adjustment` opt-out)
+to match. Code, tests, and both analysis scripts stay in the repo as a
+validated, tested, but not-yet-beneficial experiment -- available to
+refine later (e.g. requiring a larger real substitution sample before
+trusting an exclusion delta, or a variance-shrinkage approach), not
+deleted.
+
+**Not done this session**: item #6/#52 (enable the autorun trigger in
+production) still not acted on -- now unblocked by this decision (autorun
+would use the new, safe OFF-by-default behavior), but still needs its own
+explicit go-ahead before an actual Render deploy per standing process.
 
 ### Reconciliation 2026-08-01 (NFL: full 2026 backfill both sports + real injury-rating adjustment, backtested)
 
