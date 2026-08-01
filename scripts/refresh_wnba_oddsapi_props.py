@@ -5224,6 +5224,19 @@ def main() -> int:
     parser.add_argument("--started-at")
     parser.add_argument("--mode", choices=("fast", "full"), default="full")
     args = parser.parse_args()
+    # Diagnostic added 2026-08-01: confirms this process is genuinely
+    # reached at all for a given invocation, and with what flags -- the
+    # LIVE_SNAPSHOT_EXPORT_GATE print further down in this same main()
+    # never fired once across multiple confirmed-live adaptive-tick cycles
+    # (per Render logs), which is only possible if main() itself either
+    # isn't reached, exits before that line, or PERIOD_MARKET_DISCOVERY_DIAG
+    # is coming from an entirely different call path than assumed.
+    print(
+        f"[refresh_wnba_oddsapi_props] MAIN_ENTRY date={args.date} mode={args.mode} "
+        f"do_edges={bool(args.do_edges)} do_export={bool(args.do_export)} do_push={bool(args.do_push)} "
+        f"days_ahead={args.days_ahead}",
+        flush=True,
+    )
 
     source_root_arg = str(args.source_root or "").strip()
     source_root = Path(source_root_arg).resolve() if source_root_arg else None
