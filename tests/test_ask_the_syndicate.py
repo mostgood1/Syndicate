@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import os
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from flask import Flask
@@ -1951,6 +1952,302 @@ class AskTheSyndicateEngineTests(unittest.TestCase):
         self.assertTrue(limiter.allow())
         self.assertTrue(limiter.allow())
         self.assertFalse(limiter.allow())
+
+
+class AskTheSyndicateNcaafEvidenceTests(unittest.TestCase):
+    """Real bug found while building this against production data (not just
+    unit fixtures): _ncaaf_teams_in_question originally reused _name_matches
+    (word-set overlap), which matched "Kansas State vs Iowa State" against
+    every "* State" school in the ~680-row registry since they all share
+    the word "state". Fixed to require the full school name as a bounded
+    substring of the question instead. A second real bug: a >=4-character
+    minimum on that substring silently excluded real short school names
+    (TCU's school_name is literally "TCU"), so "North Carolina vs TCU"
+    resolved only one team. Both are covered below alongside the season-
+    resolution fix (sources.default_season() reports a different, stale
+    season than the live game slate cards.py is actually on)."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = self._tmp.name
+        self.processed = os.path.join(self.root, "ncaaf_source", "source_artifacts", "data", "processed")
+        self.data_dir = os.path.join(self.root, "ncaaf_source", "data")
+        os.makedirs(self.data_dir, exist_ok=True)
+
+    def _write_csv(self, subdir: str, filename: str, fieldnames: list[str], rows: list[dict]) -> None:
+        directory = os.path.join(self.processed, subdir)
+        os.makedirs(directory, exist_ok=True)
+        with open(os.path.join(directory, filename), "w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow(row)
+
+    def _write_registry(self) -> None:
+        fields = ["team_id", "canonical_team_name", "abbreviation", "conference", "subdivision", "aliases", "display_name", "conference_short_name", "school_name", "mascot_name", "source_system", "source_snapshot_date"]
+        self._write_csv("team_registry", "ncaaf_team_registry.csv", fields, [
+            {"team_id": "100", "canonical_team_name": "Kansas State", "abbreviation": "KSU", "conference": "Big 12", "subdivision": "FBS", "aliases": "kansas state|wildcats", "display_name": "Kansas State", "conference_short_name": "", "school_name": "Kansas State", "mascot_name": "Wildcats", "source_system": "cfbd", "source_snapshot_date": "2026-07-01"},
+            {"team_id": "101", "canonical_team_name": "Iowa State", "abbreviation": "ISU", "conference": "Big 12", "subdivision": "FBS", "aliases": "iowa state|cyclones", "display_name": "Iowa State", "conference_short_name": "", "school_name": "Iowa State", "mascot_name": "Cyclones", "source_system": "cfbd", "source_snapshot_date": "2026-07-01"},
+            {"team_id": "102", "canonical_team_name": "Adams State", "abbreviation": "ADM", "conference": "RMAC", "subdivision": "FCS", "aliases": "adams state", "display_name": "Adams State", "conference_short_name": "", "school_name": "Adams State", "mascot_name": "Grizzlies", "source_system": "cfbd", "source_snapshot_date": "2026-07-01"},
+            {"team_id": "103", "canonical_team_name": "TCU", "abbreviation": "TCU", "conference": "Big 12", "subdivision": "FBS", "aliases": "horned frogs|tcu", "display_name": "TCU", "conference_short_name": "", "school_name": "TCU", "mascot_name": "Horned Frogs", "source_system": "cfbd", "source_snapshot_date": "2026-07-01"},
+        ])
+
+    def test_teams_in_question_matches_full_phrase_not_shared_words(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}):
+            self._write_registry()
+            teams = ask_data._ncaaf_teams_in_question("Kansas State vs Iowa State")
+            names = {t["school_name"] for t in teams}
+        self.assertEqual(names, {"Kansas State", "Iowa State"})
+        self.assertNotIn("Adams State", names)
+
+    def test_teams_in_question_matches_short_school_name(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}):
+            self._write_registry()
+            teams = ask_data._ncaaf_teams_in_question("who wins TCU this week")
+        self.assertEqual([t["school_name"] for t in teams], ["TCU"])
+
+    def test_teams_in_question_no_match_returns_empty(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}):
+            self._write_registry()
+            self.assertEqual(ask_data._ncaaf_teams_in_question("what is the weather like"), [])
+
+    def test_team_profile_evidence_reads_real_fields(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}):
+            self._write_registry()
+            self._write_csv("returning_production", "ncaaf_returning_production_snapshot.csv",
+                ["team_id", "team_name", "season", "returning_starter_estimate", "percent_ppa"],
+                [{"team_id": "100", "team_name": "Kansas State", "season": "2025", "returning_starter_estimate": "5.5", "percent_ppa": "0.6"}])
+            self._write_csv("coach_continuity", "ncaaf_coach_continuity_snapshot.csv",
+                ["team_id", "team_name", "season", "head_coach_name", "coach_changed", "coach_tenure_years", "continuity_score"],
+                [{"team_id": "100", "team_name": "Kansas State", "season": "2025", "head_coach_name": "Chris Klieman", "coach_changed": "0", "coach_tenure_years": "6", "continuity_score": "1"}])
+            self._write_csv("transfers", "ncaaf_transfer_portal_snapshot.csv",
+                ["player_id", "origin_team_id", "destination_team_id", "season"],
+                [{"player_id": "1", "origin_team_id": "999", "destination_team_id": "100", "season": "2025"},
+                 {"player_id": "2", "origin_team_id": "100", "destination_team_id": "999", "season": "2025"},
+                 {"player_id": "3", "origin_team_id": "100", "destination_team_id": "999", "season": "2025"}])
+            self._write_csv("roster", "ncaaf_roster_snapshot.csv",
+                ["player_id", "team_id", "season", "roster_status"],
+                [{"player_id": "1", "team_id": "100", "season": "2025", "roster_status": "active"},
+                 {"player_id": "2", "team_id": "100", "season": "2025", "roster_status": "active"},
+                 {"player_id": "3", "team_id": "100", "season": "2025", "roster_status": "inactive"}])
+
+            result = ask_data._ncaaf_team_profile_evidence("tell me about Kansas State", {})
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["sport"], "ncaaf")
+        evidence = result["evidence"]
+        self.assertEqual(evidence["head_coach"], "Chris Klieman")
+        self.assertEqual(evidence["returning_starter_estimate"], 5.5)
+        self.assertEqual(evidence["transfers_in"], 1)
+        self.assertEqual(evidence["transfers_out"], 2)
+        self.assertEqual(evidence["transfers_net"], -1)
+        self.assertEqual(evidence["active_roster_count"], 2)
+
+    def test_team_profile_evidence_none_when_no_team_named(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}):
+            self._write_registry()
+            self.assertIsNone(ask_data._ncaaf_team_profile_evidence("what a great day for sports", {}))
+
+    def test_matchup_projection_evidence_pairs_model_and_market(self) -> None:
+        from syndicate.features.ncaaf.smartsim2_projection import SmartSimNcaafProjection
+        from syndicate.features.ncaaf.smartsim2_projection import write_projection_artifact
+
+        projection = SmartSimNcaafProjection(
+            game_id="g1", season=2026, week=1, home_team="Kansas State", away_team="Iowa State",
+            home_score_mean=30.0, away_score_mean=24.0, margin_mean=6.0, total_mean=54.0,
+            margin_stdev=13.5, total_stdev=9.0, home_win_rate=0.62, seeds_used=500,
+            profile_name="test", rating_source="test", generated_at="2026-07-01T00:00:00Z",
+        )
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}), patch(
+            "syndicate.features.ncaaf.cards._resolve_ncaaf_active_season_and_weeks", return_value=(2026, [1]),
+        ):
+            self._write_registry()
+            write_projection_artifact([projection], season=2026, week=1, data_root=Path(self.data_dir))
+            lines_payload = [{
+                "homeTeam": "Kansas State", "awayTeam": "Iowa State",
+                "lines": [{"spread": -6.5, "overUnder": 52.5, "homeMoneyline": -250, "awayMoneyline": 210}],
+            }]
+            with open(os.path.join(self.data_dir, "cfbd_lines_2026_wk1.json"), "w", encoding="utf-8") as handle:
+                json.dump(lines_payload, handle)
+
+            result = ask_data._ncaaf_matchup_projection_evidence("who wins Kansas State vs Iowa State", {})
+
+        self.assertIsNotNone(result)
+        evidence = result["evidence"]
+        self.assertEqual(evidence["season"], 2026)
+        self.assertEqual(evidence["week"], 1)
+        self.assertEqual(evidence["model_margin"], 6.0)
+        self.assertEqual(evidence["market_margin"], 6.5)
+        self.assertEqual(evidence["market_total"], 52.5)
+
+    def test_matchup_projection_evidence_none_with_only_one_team(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}), patch(
+            "syndicate.features.ncaaf.cards._resolve_ncaaf_active_season_and_weeks", return_value=(2026, [1]),
+        ):
+            self._write_registry()
+            self.assertIsNone(ask_data._ncaaf_matchup_projection_evidence("how good is Kansas State", {}))
+
+    def test_ats_evidence_covers_losses_and_perspective_flip(self) -> None:
+        rows = [
+            # Home game: covers (actual 10 > market line 3)
+            {"home_team": "Kansas State", "away_team": "Iowa State", "week": 1, "market_margin": 3.0, "actual_margin": 10.0},
+            # Away game for Kansas State: market_margin/actual_margin are
+            # from the HOME team's perspective (Iowa State here), so
+            # Kansas State's own line/actual must be sign-flipped -- market
+            # margin 5 (Iowa State favored by 5) flips to Kansas State's
+            # line of -5; actual margin -2 (Iowa State won by 2) flips to
+            # Kansas State's actual of +2, so Kansas State beat its own
+            # line of -5 by covering (2 > -5).
+            {"home_team": "Iowa State", "away_team": "Kansas State", "week": 2, "market_margin": 5.0, "actual_margin": -2.0},
+            # Home game: loses the cover outright (actual -10 < market line 3)
+            {"home_team": "Kansas State", "away_team": "TCU", "week": 3, "market_margin": 3.0, "actual_margin": -10.0},
+            # Unrelated game, must be excluded
+            {"home_team": "TCU", "away_team": "Iowa State", "week": 3, "market_margin": 1.0, "actual_margin": 1.0},
+        ]
+        log_path = os.path.join(self.data_dir, "smartsim2_performance_log.jsonl")
+        with open(log_path, "w", encoding="utf-8") as handle:
+            for row in rows:
+                handle.write(json.dumps(row) + "\n")
+
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}):
+            self._write_registry()
+            result = ask_data._ncaaf_ats_evidence("how has Kansas State done against the spread", {})
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["evidence"]["ats_record"], {"covers": 2, "losses": 1, "pushes": 0})
+        self.assertEqual(len(result["tables"][0]["rows"]), 3)
+
+    def test_infer_sport_routes_ncaaf_and_leaves_nfl_unaffected(self) -> None:
+        self.assertEqual(ask_module._infer_sport("who wins the college football game this week", {}), "ncaaf")
+        self.assertEqual(ask_module._infer_sport("cfb picks for saturday", {}), "ncaaf")
+        self.assertEqual(ask_module._infer_sport("rushing touchdowns prop", {}), "nfl")
+
+    def test_fetchers_for_sport_registers_ncaaf(self) -> None:
+        fetchers = ask_data._fetchers_for_sport("ncaaf", "any question")
+        self.assertIn(ask_data._ncaaf_team_profile_evidence, fetchers)
+        self.assertIn(ask_data._ncaaf_matchup_projection_evidence, fetchers)
+        self.assertIn(ask_data._ncaaf_ats_evidence, fetchers)
+
+
+class AskTheSyndicateNflEvidenceTests(unittest.TestCase):
+    """NFL has no external team-rating API (unlike NCAAF's CFBD) and no
+    performance-log equivalent -- these fetchers derive everything from
+    real nflverse play-by-play (final scores, for ATS) and the real
+    smartsim2_projections_{season}_wk{week}.csv artifact (for the model
+    side of a matchup), joined against real_betting_lines_*.json for the
+    market side. Fixtures below mirror those three real file shapes."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = self._tmp.name
+        self.nfl_root = os.path.join(self.root, "nfl_source")
+        os.makedirs(self.nfl_root, exist_ok=True)
+
+    def _write_branding(self) -> None:
+        directory = os.path.join(self.nfl_root, "source_artifacts", "data", "processed", "team_branding")
+        os.makedirs(directory, exist_ok=True)
+        with open(os.path.join(directory, "nfl_team_branding.csv"), "w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=["team_id", "abbreviation", "location", "display_name", "primary_color", "secondary_color", "logo_url", "source_snapshot_date"])
+            writer.writeheader()
+            writer.writerow({"team_id": "1", "abbreviation": "SEA", "location": "Seattle", "display_name": "Seattle Seahawks", "primary_color": "#000", "secondary_color": "#fff", "logo_url": "x", "source_snapshot_date": "2026-01-01"})
+            writer.writerow({"team_id": "2", "abbreviation": "ARI", "location": "Arizona", "display_name": "Arizona Cardinals", "primary_color": "#000", "secondary_color": "#fff", "logo_url": "x", "source_snapshot_date": "2026-01-01"})
+            writer.writerow({"team_id": "3", "abbreviation": "DEN", "location": "Denver", "display_name": "Denver Broncos", "primary_color": "#000", "secondary_color": "#fff", "logo_url": "x", "source_snapshot_date": "2026-01-01"})
+
+    def _write_real_lines(self, season: int, date: str, lines: dict) -> None:
+        path = os.path.join(self.nfl_root, f"real_betting_lines_{season}_{date}.json")
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump({"lines": lines}, handle)
+
+    def _write_pbp(self, season: int, rows: list[dict]) -> None:
+        directory = os.path.join(self.nfl_root, "tracking", "nflverse", "pbp")
+        os.makedirs(directory, exist_ok=True)
+        fieldnames = ["season_type", "game_id", "week", "home_team", "away_team", "home_score", "away_score"]
+        with open(os.path.join(directory, f"pbp_{season}.csv"), "w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow(row)
+
+    def test_teams_in_question_matches_full_names(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}):
+            self._write_branding()
+            teams = ask_data._nfl_teams_in_question("Arizona Cardinals at Seattle Seahawks preview")
+        self.assertEqual(set(teams), {"Arizona Cardinals", "Seattle Seahawks"})
+
+    def test_teams_in_question_no_match_returns_empty(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}):
+            self._write_branding()
+            self.assertEqual(ask_data._nfl_teams_in_question("what a great day"), [])
+
+    def test_matchup_evidence_pairs_model_and_market(self) -> None:
+        from syndicate.features.nfl.smartsim2_projection import SmartSimNflProjection
+        from syndicate.features.nfl.smartsim2_projection import write_projection_artifact
+
+        projection = SmartSimNflProjection(
+            game_id="2025_10_ARI_SEA", season=2025, week=10, home_team="SEA", away_team="ARI",
+            home_score_mean=23.2, away_score_mean=21.9, margin_mean=1.3, total_mean=45.1,
+            margin_stdev=14.0, total_stdev=11.4, home_win_rate=0.533, seeds_used=300,
+            profile_name="nfl_v1", rating_source="test", generated_at="2026-01-01T00:00:00Z",
+        )
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}):
+            self._write_branding()
+            write_projection_artifact([projection], season=2025, week=10, data_root=Path(self.nfl_root))
+            self._write_real_lines(2025, "11_09", {
+                "Arizona Cardinals @ Seattle Seahawks": {"moneyline": {"home": -125, "away": 105}, "run_line": {"home": -1.5}, "total_runs": {"line": 45.5}},
+            })
+
+            result = ask_data._nfl_matchup_evidence("who wins Arizona Cardinals vs Seattle Seahawks", {})
+
+        self.assertIsNotNone(result)
+        evidence = result["evidence"]
+        self.assertEqual(evidence["season"], 2025)
+        self.assertEqual(evidence["week"], 10)
+        self.assertEqual(evidence["model_margin"], 1.3)
+        self.assertEqual(evidence["market_spread"], -1.5)
+        self.assertEqual(evidence["market_total"], 45.5)
+
+    def test_matchup_evidence_none_with_only_one_team(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}):
+            self._write_branding()
+            self.assertIsNone(ask_data._nfl_matchup_evidence("how good are the Seattle Seahawks", {}))
+
+    def test_ats_evidence_covers_losses_and_perspective_flip(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}):
+            self._write_branding()
+            self._write_pbp(2025, [
+                # Home game for SEA: covers (actual 10 > line -1.5, wait use simple numbers)
+                {"season_type": "REG", "game_id": "2025_01_ARI_SEA", "week": "1", "home_team": "SEA", "away_team": "ARI", "home_score": "24", "away_score": "17"},
+                # Away game for SEA (home=DEN): SEA is away
+                {"season_type": "REG", "game_id": "2025_02_SEA_DEN", "week": "2", "home_team": "DEN", "away_team": "SEA", "home_score": "10", "away_score": "20"},
+                # Unrelated game, must be excluded
+                {"season_type": "REG", "game_id": "2025_03_ARI_DEN", "week": "3", "home_team": "DEN", "away_team": "ARI", "home_score": "14", "away_score": "14"},
+            ])
+            self._write_real_lines(2025, "09_07", {
+                "Arizona Cardinals @ Seattle Seahawks": {"run_line": {"home": -3.0}},
+            })
+            self._write_real_lines(2025, "09_14", {
+                "Seattle Seahawks @ Denver Broncos": {"run_line": {"home": 2.0}},
+            })
+
+            result = ask_data._nfl_ats_evidence("how has the Seattle Seahawks done against the spread", {})
+
+        self.assertIsNotNone(result)
+        # Game 1: SEA home, line -3.0, actual margin 24-17=7 -> 7 > -3 -> cover
+        # Game 2: SEA away, home line +2.0 -> SEA's own line = -2.0, actual (away perspective) = 20-10=10 -> 10 > -2 -> cover
+        self.assertEqual(result["evidence"]["ats_record"], {"covers": 2, "losses": 0, "pushes": 0})
+        self.assertEqual(len(result["tables"][0]["rows"]), 2)
+
+    def test_ats_evidence_none_when_no_team_named(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}):
+            self._write_branding()
+            self.assertIsNone(ask_data._nfl_ats_evidence("what a great day for football", {}))
+
+    def test_fetchers_for_sport_registers_nfl(self) -> None:
+        fetchers = ask_data._fetchers_for_sport("nfl", "any question")
+        self.assertIn(ask_data._nfl_matchup_evidence, fetchers)
+        self.assertIn(ask_data._nfl_ats_evidence, fetchers)
 
 
 if __name__ == "__main__":

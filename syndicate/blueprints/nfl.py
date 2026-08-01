@@ -5,14 +5,18 @@ from flask import Blueprint, jsonify, render_template, request
 from syndicate.features.nfl.archive import build_archive_api_payload
 from syndicate.features.nfl.archive import build_archive_page_context
 from syndicate.features.nfl.cards import build_cards_page_context
+from syndicate.features.nfl.cards import build_nfl_market_board
+from syndicate.features.nfl.cards import nfl_projection_available_weeks
 from syndicate.features.nfl.game_detail import build_game_detail_page_context
 from syndicate.features.nfl.live_lens import build_live_lens_page_context
 from syndicate.features.nfl.picks import build_betting_card_page_context
 from syndicate.features.nfl.picks import build_picks_page_context
+from syndicate.features.nfl.sources import available_weeks
 from syndicate.features.nfl.sources import default_week
 from syndicate.features.nfl.sources import latest_season
 from syndicate.features.nfl.sources import tracked_week
 from syndicate.features.nfl.sources import week_summaries
+from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
 from syndicate.features.shared.rank_board import build_rank_api_payload
 
@@ -186,3 +190,41 @@ def api_betting_card(season: int):
     payload["groups"] = context.get("groups", {})
     payload["have_data"] = context.get("have_data", False)
     return jsonify(payload)
+
+
+def _selected_market_board_week(season: int) -> int:
+    weeks = nfl_projection_available_weeks(season)
+    raw = (request.args.get("week") or "").strip()
+    if raw:
+        try:
+            requested = int(raw)
+            if requested in weeks:
+                return requested
+        except ValueError:
+            pass
+    return weeks[-1] if weeks else default_week(season)
+
+
+@nfl_bp.get("/market-board")
+def market_board():
+    season = _selected_season()
+    selected_week = _selected_market_board_week(season)
+    weeks = nfl_projection_available_weeks(season)
+    prev_week, next_week = neighboring_values(weeks, selected_week, fallback=selected_week)
+    return render_template(
+        "nfl/market_board.html",
+        sport_label="NFL",
+        sport_slug="nfl",
+        api_endpoint=f"/nfl/api/market-board?season={season}&week={selected_week}",
+        season=season,
+        selected_week=selected_week,
+        prev_week=prev_week,
+        next_week=next_week,
+        cards_href=f"/nfl/cards?season={season}&week={selected_week}",
+    )
+
+
+@nfl_bp.get("/api/market-board")
+def api_market_board():
+    season = _selected_season()
+    return jsonify(build_nfl_market_board(season, _selected_market_board_week(season)))

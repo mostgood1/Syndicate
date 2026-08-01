@@ -5,6 +5,7 @@ from flask import Blueprint, jsonify, render_template, request
 from syndicate.features.ncaaf.archive import build_archive_api_payload
 from syndicate.features.ncaaf.archive import build_archive_page_context
 from syndicate.features.ncaaf.cards import build_cards_page_context
+from syndicate.features.ncaaf.cards import build_ncaaf_market_board
 from syndicate.features.ncaaf.cards import build_smartsim_cards_page_context
 from syndicate.features.ncaaf.game_detail import build_game_detail_page_context
 from syndicate.features.ncaaf.live_lens import build_live_lens_page_context
@@ -15,6 +16,7 @@ from syndicate.features.ncaaf.picks import build_smartsim_picks_page_context
 from syndicate.features.ncaaf.sources import default_season
 from syndicate.features.ncaaf.sources import default_week
 from syndicate.features.ncaaf.sources import week_summaries
+from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
 from syndicate.features.shared.rank_board import build_rank_api_payload
 
@@ -143,3 +145,25 @@ def api_picks():
     payload["week"] = context["week"]
     payload["available_weeks"] = context["available_weeks"]
     return jsonify(payload)
+
+
+@ncaaf_bp.get("/market-board")
+def market_board():
+    selected_week = _selected_week()
+    weeks = [week["week"] for week in week_summaries()]
+    prev_week, next_week = neighboring_values(weeks, selected_week, fallback=selected_week)
+    return render_template(
+        "ncaaf/market_board.html",
+        sport_label="NCAAF",
+        sport_slug="ncaaf",
+        api_endpoint=f"/ncaaf/api/market-board?week={selected_week}",
+        selected_week=selected_week,
+        prev_week=prev_week,
+        next_week=next_week,
+        cards_href=f"/ncaaf/cards?week={selected_week}",
+    )
+
+
+@ncaaf_bp.get("/api/market-board")
+def api_market_board():
+    return jsonify(build_ncaaf_market_board(_selected_week()))

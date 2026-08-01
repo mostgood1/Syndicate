@@ -31,6 +31,7 @@ from syndicate.features.ncaaf.smartsim2_trial_monitoring import record_trial_pag
 from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.discrete_nav import resolve_selected_value
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
+from syndicate.features.shared.market_inventory import join_odds_to_sim
 from syndicate.features.shared.team_branding import read_team_branding_snapshot
 from syndicate.features.shared.team_branding import team_branding_index_by_id
 
@@ -213,8 +214,25 @@ def _smartsim2_standalone_market_lines(season: int, week: int) -> dict[tuple[str
         totals = [line["overUnder"] for line in lines if isinstance(line, dict) and line.get("overUnder") is not None]
         market_margin = -statistics.mean(spreads) if spreads else None
         market_total = statistics.mean(totals) if totals else None
+        # Moneyline prices aren't averaged across providers the way
+        # spread/total are (American odds don't average meaningfully) --
+        # take the first provider line that actually quotes both sides.
+        home_moneyline = None
+        away_moneyline = None
+        for line in lines:
+            if not isinstance(line, dict):
+                continue
+            if line.get("homeMoneyline") is not None and line.get("awayMoneyline") is not None:
+                home_moneyline = line.get("homeMoneyline")
+                away_moneyline = line.get("awayMoneyline")
+                break
         key = (_normalize_text(game.get("homeTeam")), _normalize_text(game.get("awayTeam")))
-        index[key] = {"market_margin": market_margin, "market_total": market_total}
+        index[key] = {
+            "market_margin": market_margin,
+            "market_total": market_total,
+            "home_moneyline": home_moneyline,
+            "away_moneyline": away_moneyline,
+        }
     return index
 
 
@@ -258,6 +276,176 @@ def _smartsim2_standalone_rows(season: int, week: int) -> list[dict[str, Any]]:
             }
         )
     return rows
+
+
+_NCAAF_MARKET_BOARD_DISPLAY_LABELS = {
+    "moneyline_home": "Moneyline",
+    "moneyline_away": "Moneyline",
+    "spread": "Spread",
+    "total": "Total",
+}
+
+
+def _ncaaf_cover_probability(*, line: float, mean: float | None, stdev: float | None) -> float | None:
+    """P(actual > line) under a Normal(mean, stdev) model -- used for both
+    "home covers this spread" and "game goes over this total". None when
+    there's no real distribution to draw the probability from (no stdev
+    available yet, e.g. no SmartSim 2.0 shadow data for this game), rather
+    than fabricating one from the point estimate alone: a raw margin/total
+    point value (e.g. 57.9 projected points) is not a probability and must
+    never be dropped into a 0-1 field the board renders as a percentage.
+    """
+    if mean is None or stdev is None or stdev <= 0:
+        return None
+    return 1.0 - statistics.NormalDist(mean, stdev).cdf(line)
+
+
+def _ncaaf_market_board_rows_for_game(
+    *,
+    game_id: Any,
+    market_margin: Any,
+    market_total: Any,
+    home_moneyline: Any,
+    away_moneyline: Any,
+    model_margin: Any,
+    model_total: Any,
+    model_margin_stdev: Any = None,
+    model_total_stdev: Any = None,
+    home_win_probability: Any,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Raw odds + sim rows for one NCAAF game's moneyline/spread/total
+    markets -- mirrors syndicate.features.mlb.cards._mlb_market_board_rows_for_game.
+
+    No player-prop rows: NCAAF has no props pipeline yet (a separate,
+    not-yet-built phase). model_margin/model_total should already reflect
+    whatever the caller considers the best available model signal (blended
+    margin/total when present, degrading to SmartSim 2.0 or the legacy
+    engine's own projection) -- this function doesn't itself choose between
+    sources, only shapes whatever it's given into inventory rows.
+
+    sim_projection on a spread/total row is only ever a real cover/over
+    probability (via _ncaaf_cover_probability, when a stdev is available) --
+    never the raw point projection, which belongs in projected_value
+    instead (same contract MLB/NBA already use: sim_projection is always a
+    0-1 fraction the board renders as a percent, projected_value is the raw
+    count).
+    """
+    odds_rows: list[dict[str, Any]] = []
+    sim_rows: list[dict[str, Any]] = []
+
+    home_prob = _safe_float(home_win_probability)
+    if home_moneyline is not None and away_moneyline is not None:
+        odds_rows.append({"game_id": game_id, "market": "moneyline_home", "period": "full_game", "entity": None, "side": "home", "odds": home_moneyline, "market_type": "game"})
+        odds_rows.append({"game_id": game_id, "market": "moneyline_away", "period": "full_game", "entity": None, "side": "away", "odds": away_moneyline, "market_type": "game"})
+        if home_prob is not None:
+            model_side = "home" if home_prob >= 0.5 else "away"
+            sim_rows.append({"game_id": game_id, "market": "moneyline_home", "period": "full_game", "entity": None, "sim_projection": home_prob, "model_side": model_side, "sim_source": "ncaaf_model"})
+            sim_rows.append({"game_id": game_id, "market": "moneyline_away", "period": "full_game", "entity": None, "sim_projection": 1.0 - home_prob, "model_side": model_side, "sim_source": "ncaaf_model"})
+
+    margin_line = _safe_float(market_margin)
+    if margin_line is not None:
+        odds_rows.append({"game_id": game_id, "market": "spread", "period": "full_game", "entity": None, "side": "home", "line": margin_line, "market_type": "game"})
+        model_margin_value = _safe_float(model_margin)
+        if model_margin_value is not None:
+            cover_prob = _ncaaf_cover_probability(line=margin_line, mean=model_margin_value, stdev=_safe_float(model_margin_stdev))
+            sim_rows.append({"game_id": game_id, "market": "spread", "period": "full_game", "entity": None, "sim_projection": cover_prob, "projected_value": model_margin_value, "sim_source": "ncaaf_model"})
+
+    total_line = _safe_float(market_total)
+    if total_line is not None:
+        odds_rows.append({"game_id": game_id, "market": "total", "period": "full_game", "entity": None, "side": "over", "line": total_line, "market_type": "game"})
+        model_total_value = _safe_float(model_total)
+        if model_total_value is not None:
+            over_prob = _ncaaf_cover_probability(line=total_line, mean=model_total_value, stdev=_safe_float(model_total_stdev))
+            sim_rows.append({"game_id": game_id, "market": "total", "period": "full_game", "entity": None, "sim_projection": over_prob, "projected_value": model_total_value, "sim_source": "ncaaf_model"})
+
+    return odds_rows, sim_rows
+
+
+def build_ncaaf_market_board(week: int) -> dict[str, Any]:
+    """Layer 1 market/odds inventory for NCAAF game markets (moneyline,
+    spread, total), one entry per game -- mirrors
+    syndicate.features.mlb.cards.build_mlb_market_board. No player props:
+    that pipeline doesn't exist for NCAAF yet.
+
+    Reuses the same assembled game data build_smartsim_cards_page_context
+    already produces for /ncaaf/cards -- not a new data source. Market
+    lines are looked up independently per game via
+    _smartsim2_standalone_market_lines (real CFBD sportsbook lines) rather
+    than trusting whatever the upstream card-contract happened to attach,
+    since the legacy-engine card path doesn't carry market_margin/
+    market_total on its own scoreboard.
+    """
+    season, weeks = _resolve_ncaaf_active_season_and_weeks()
+    resolved_week = resolve_selected_value(int(week or 0), weeks, weeks[-1] if weeks else default_week())
+    context = build_smartsim_cards_page_context(resolved_week)
+    games = context.get("games") if isinstance(context.get("games"), list) else []
+    lines_index = _smartsim2_standalone_market_lines(season, resolved_week)
+
+    board_games: list[dict[str, Any]] = []
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        ncaaf_card = game.get("ncaaf_card") if isinstance(game.get("ncaaf_card"), dict) else {}
+        scoreboard = ncaaf_card.get("scoreboard") if isinstance(ncaaf_card.get("scoreboard"), dict) else {}
+        away = game.get("away") if isinstance(game.get("away"), dict) else {}
+        home = game.get("home") if isinstance(game.get("home"), dict) else {}
+        away_name = str(away.get("name") or "").strip()
+        home_name = str(home.get("name") or "").strip()
+        away_abbr = str(away.get("abbr") or "AWY").strip().upper()
+        home_abbr = str(home.get("abbr") or "HME").strip().upper()
+        game_pk = game.get("gamePk")
+        teams = ncaaf_card.get("teams") if isinstance(ncaaf_card.get("teams"), dict) else {}
+        away_team_ctx = teams.get("away") if isinstance(teams.get("away"), dict) else {}
+        home_team_ctx = teams.get("home") if isinstance(teams.get("home"), dict) else {}
+
+        market = lines_index.get((_normalize_text(home_name), _normalize_text(away_name)), {})
+        model_margin = scoreboard.get("blend_margin")
+        if model_margin is None:
+            model_margin = scoreboard.get("smartsim2_margin")
+        model_total = scoreboard.get("blend_total")
+        if model_total is None:
+            model_total = scoreboard.get("smartsim2_total_points") or scoreboard.get("total_points")
+
+        odds_rows, sim_rows = _ncaaf_market_board_rows_for_game(
+            game_id=game_pk,
+            market_margin=market.get("market_margin") if market.get("market_margin") is not None else scoreboard.get("market_margin"),
+            market_total=market.get("market_total") if market.get("market_total") is not None else scoreboard.get("market_total"),
+            home_moneyline=market.get("home_moneyline"),
+            away_moneyline=market.get("away_moneyline"),
+            model_margin=model_margin,
+            model_total=model_total,
+            model_margin_stdev=scoreboard.get("smartsim2_margin_stdev"),
+            model_total_stdev=scoreboard.get("smartsim2_total_stdev"),
+            home_win_probability=scoreboard.get("home_win_probability"),
+        )
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+        for row in inventory:
+            row["market"] = _NCAAF_MARKET_BOARD_DISPLAY_LABELS.get(row.get("market"), row.get("market"))
+
+        board_games.append(
+            {
+                "gamePk": game_pk,
+                "matchup": f"{away_abbr} @ {home_abbr}",
+                "away_abbr": away_abbr,
+                "home_abbr": home_abbr,
+                "away_logo": away_team_ctx.get("logo_url"),
+                "home_logo": home_team_ctx.get("logo_url"),
+                "game_state": "live" if game.get("shared_is_live") else "pregame",
+                "detail": game.get("detail"),
+                "rows": inventory,
+            }
+        )
+
+    return {
+        "date": context.get("date") or f"week_{resolved_week}",
+        "requested_date": context.get("date") or f"week_{resolved_week}",
+        "week": resolved_week,
+        "season": season,
+        "available_weeks": weeks,
+        "games": board_games,
+        "using_sample_data": bool(context.get("using_sample_data")),
+        "source_path": context.get("source_path"),
+    }
 
 
 def _prediction_weeks() -> list[int]:
@@ -519,6 +707,9 @@ def _runtime_scoreboard_projection(row: dict[str, Any], week: int) -> dict[str, 
         "total_points": _format_decimal(total_points, places=1),
         "spread_label": spread_label,
         "win_probability": format_pct(win_probability),
+        # Raw 0-1 float, additive alongside the formatted string above --
+        # the market board needs a real number to join against, not display text.
+        "home_win_probability": win_probability,
         "source_label": LEGACY_ENGINE_SOURCE_LABEL,
         "kickoff": kickoff,
         "venue": venue,
@@ -1625,8 +1816,13 @@ def _build_smartsim2_standalone_ncaaf_card_contract(row: dict[str, Any], week: i
         "smartsim2_available": True,
         "smartsim2_margin": projection.margin_mean,
         "smartsim2_total_points": projection.total_mean,
+        "smartsim2_margin_stdev": projection.margin_stdev,
+        "smartsim2_total_stdev": projection.total_stdev,
         "market_margin": market_margin,
         "market_total": market_total,
+        # Raw 0-1 float, additive alongside the formatted "win_probability"
+        # string above -- the market board needs a real number to join against.
+        "home_win_probability": projection.home_win_rate,
     }
 
     summary_text = (

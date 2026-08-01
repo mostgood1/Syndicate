@@ -80,6 +80,24 @@ _SPORT_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
         ),
     ),
     (
+        # Must come before "nfl" below -- _infer_sport returns on the first
+        # tuple match, and "nfl"'s keyword list (passing/rushing/receiving/
+        # touchdowns/tds/football) is generic football vocabulary a college
+        # football question uses just as often. Keep these terms distinctive
+        # to college ball specifically -- no team/school names here (a name
+        # list would risk colliding with NBA/NFL/NHL team names that are
+        # also city/state names); team identification for NCAAF questions
+        # happens inside the fetchers themselves via the team registry.
+        "ncaaf",
+        (
+            "college football",
+            "ncaaf",
+            "cfb",
+            "fbs",
+            "heisman",
+        ),
+    ),
+    (
         "nfl",
         (
             "passing",

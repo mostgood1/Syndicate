@@ -1,0 +1,65 @@
+{% extends "shared/base.html" %}
+
+{% block title %}{{ sport_label }} Market Board — Week {{ selected_week }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/dense_cards.css') }}" />
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/board_cards.css') }}" />
+{% endblock %}
+
+{% block content %}
+<main class="board-page">
+  <form id="board-toolbar" class="cards-control-card board-toolbar" method="get">
+    <input type="hidden" name="season" value="{{ season }}" />
+    <div class="board-toolbar-row">
+      <div class="board-tabs cards-tabs" id="board-sport-tabs" role="tablist" aria-label="Sport"></div>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <a class="cards-nav-pill" href="?season={{ season }}&week={{ prev_week }}">&larr; Week {{ prev_week }}</a>
+        <span class="board-date-input" style="display:inline-flex; align-items:center; padding:0 10px;">{{ season }} Week {{ selected_week }}</span>
+        <a class="cards-nav-pill" href="?season={{ season }}&week={{ next_week }}">Week {{ next_week }} &rarr;</a>
+        <button type="submit" class="cards-submit-button">Refresh</button>
+      </div>
+    </div>
+    <div class="board-toolbar-row">
+      <div class="board-tabs cards-tabs" id="board-state-tabs" role="tablist" aria-label="Game state filter"></div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <div id="board-refresh-status" class="board-refresh-status" role="status" aria-live="polite"></div>
+        <a class="cards-nav-pill" href="{{ cards_href }}">Back to Cards</a>
+      </div>
+    </div>
+    <div class="board-toolbar-row">
+      <div class="board-tabs cards-tabs" id="board-market-tabs" role="tablist" aria-label="Market family filter"></div>
+      <div class="board-tabs cards-tabs" id="board-view-tabs" role="tablist" aria-label="Board view"></div>
+    </div>
+  </form>
+
+  <div id="board-summary-strip" class="board-summary-strip" hidden></div>
+
+  <section>
+    <div id="board-game-cards"></div>
+  </section>
+
+  <div class="board-layout">
+    <div class="board-main">
+      <section>
+        <div id="board-game-groups"></div>
+      </section>
+    </div>
+    <aside class="board-rail">
+      <section>
+        <h2 class="board-section-title">Bet slip</h2>
+        <div id="bet-slip-panel"></div>
+      </section>
+    </aside>
+  </div>
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='shared/bet_slip.js') }}"></script>
+<script
+  src="{{ url_for('static', filename='shared/market_board.js') }}"
+  data-api-endpoint="{{ api_endpoint }}"
+  data-sport-slug="{{ sport_slug }}"
+></script>
+{% endblock %}

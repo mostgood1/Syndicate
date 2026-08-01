@@ -4,10 +4,16 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-31 (see "Reconciliation 2026-07-31 part 3 (MLB
+Last reconciled: 2026-07-31 (see "Reconciliation 2026-07-31 part 5 (MLB
+pitcher-prop prototype fixes: real-scale backtest results -- effect much
+weaker than diagnosed, do not promote)" below -- ran concurrently with the
+NFL SmartSim/market-board session, different files throughout).
+Before that: "Reconciliation 2026-07-31 part 4 (NFL:
+real SmartSim 2.0 projection engine + market board + Ask the Syndicate)".
+Before that: "Reconciliation 2026-07-31 part 3 (MLB
 pitcher-prop prototype fixes: K-rate log5 blend + TTO3 quality scaling)"
-below -- ran concurrently with the NCAAF Ask the Syndicate evidence-fetchers
-session, different files throughout).
+-- ran concurrently with the NCAAF Ask the Syndicate evidence-fetchers
+session, different files throughout.
 Before that: "Reconciliation 2026-07-31 part 2 (NCAAF Ask
 the Syndicate evidence fetchers)" -- ran concurrently with the MLB
 pitcher strikeout-prop investigation session, different files throughout.
@@ -26,6 +32,188 @@ cause)". Before that: "Reconciliation 2026-07-31 (Layer 2 board: MLB
 live-status dedup fix + WNBA game/prop wiring, Phase A-C)". Before that:
 "Reconciliation 2026-07-31 (#161 part 2: NBA/WNBA closing line, plus a
 production outage found and fixed along the way)". Prior session: 2026-07-30.
+
+### Reconciliation 2026-07-31 part 5 (MLB pitcher-prop prototype fixes: real-scale backtest results -- effect much weaker than diagnosed, do not promote)
+
+Direct continuation of #178 (part 3, same session). User asked to keep working
+on validating the prototype fixes. This section's finding is the important
+one: **real-scale backtesting does not support promoting either fix as
+currently valued.** Read this before touching `k_combine_log5_weight` or
+`starter_tto_quality_scaling` again.
+
+**Method**: used the actual production batch tool
+(`vendor/mlb_bettingv2/tools/eval/run_batch_eval_days.py`, the same driver
+that produced the pre-existing weather/park and manager-hook tuning
+batches) to re-simulate real historical dates end-to-end (real rosters, real
+box scores) under different config variants, all auto-resolving today's live
+`forward_start_2026_04_14_v1.json` manager-pitching baseline (`-13` hook
+offset, `0.75` stamina-excess-weight) so every comparison is apples-to-apples
+against current production, not the stale pre-promotion numbers in #176.
+
+**Results, by phase**:
+1. Single date (2026-07-10, n=30), weight=0.6 vs. baseline: looked
+   encouraging in isolation -- corr(pred SO, actual SO) 0.378 -> 0.501, and
+   4 of the day's 5 highest-strikeout starts moved the correct direction
+   (Hunter Greene 4.70->5.30 pred vs. actual 12; Sandy Alcantara 3.75->4.40
+   vs. actual 8). This is the number quoted at the end of part 3 -- **it did
+   not hold up**, see below.
+2. Expanded to 16 dates / 368 matched real starts (market-line-tier bucketed,
+   same methodology as #176): weight=0.6 barely moved tier bias at all
+   (elite -3.196 -> -3.158; mid-high -0.961 -> -0.950; mid +0.385 -> +0.382;
+   back-end +1.232 -> +1.209 -- all deltas under 0.04, i.e. noise-level).
+   Per-start delta vs. market line correlation: 0.059 (~zero).
+3. Ran the *combined* K-fix + TTO-fix together (weight=0.6,
+   `starter_tto_quality_scaling=0.5`) across the same 12 dates to test
+   whether the two bugs compound (hypothesis: total SO = per-PA rate x PAs
+   faced, so fixing only the rate while PAs-faced stays compressed caps the
+   benefit) -- **also no meaningful movement**, and outs-bias by tier was
+   essentially identical across baseline/k06/both configs (elite outs bias
+   -1.218 -> -1.368 -> -1.164; back-end +4.021 -> +4.110 -> +3.961).
+4. Ran the K-fix at its theoretical **maximum** (`k_combine_log5_weight=1.0`,
+   pure log5, the most aggressive setting possible) across the same 12
+   dates as a decisive test of "wrong dose vs. wrong mechanism" -- **still
+   no net tier-level effect** (elite bias -2.859 -> -2.895, i.e. slightly
+   worse; corr(market_line, delta) still ~0.06). Confirms this isn't a
+   dosing problem.
+
+**Root-cause dig (why does full log5 not move the needle)**: dumped real
+`PitcherProfile.k_rate` values feeding the sim directly from serialized
+roster artifacts (`--write-roster-artifacts on`, one date, sims=1 for
+speed) -- confirmed the season "true talent" k_rate INPUT genuinely is
+well-differentiated (0.116 Nick Martinez .. 0.336 Chris Sale on
+2026-07-10, matching real-world expectation), ruling out "the input itself
+is already flattened upstream" as the explanation. Also dumped each
+starter's real opposing-lineup average batter k_rate the same way and found
+it varies almost as much game-to-game as pitcher quality does (0.157-0.267
+across one day's slate) -- e.g. Chris Sale (k=0.336, elite) drew an
+unusually contact-heavy lineup that day (opp avg 0.198), which is exactly
+why his projection moved the *wrong* direction under more log5 weight in
+the single-date preview (#1 above) -- log5 was correctly reacting to a real
+matchup signal, not malfunctioning. This is a legitimate, structural source
+of per-game noise (opposing-lineup quality) that both configs are equally
+subject to, and it plausibly swamps the pitcher-quality-tier signal at a
+12-16-date/265-368-start sample size, especially for the thin elite bucket
+(n=11-13).
+
+**Honest conclusion**: the K-rate combiner mechanism is mathematically
+correct (verified by unit test) and mechanically wired in correctly
+(verified by direct roster-artifact inspection and per-pitch integration
+tests), but **real-scale validation does not show it closing the
+originally-diagnosed gap at any tested weight, including the maximum
+possible one.** Two live possibilities, neither ruled out yet: (a) 12-16
+dates at sims-per-game=20 is genuinely underpowered given how much real
+opposing-lineup noise exists per start -- the original #176 diagnostic used
+46 dates/1209 starts, ~3-4x more data, which may be the actual minimum
+needed to see this signal above the noise floor; or (b) something else
+between `_combined_k`'s output and the final aggregated `so_mean` is
+neutralizing the differentiation that hasn't been found yet (not yet
+disproven, just not yet located). **Do not promote either
+`k_combine_log5_weight` or `starter_tto_quality_scaling` to the live
+`forward_start_2026_04_14_v1.json` configs based on current evidence** --
+the safe, honest state is: fixes committed, off by default, zero regression
+risk, real-world benefit unconfirmed.
+
+**Not done / concrete next step for whoever picks this up**: reproduce the
+original #176 diagnostic's exact scale -- same 46 dates
+(`tuning_weather_park_weights/20260718_230212/{baseline,holdout}` date
+lists), `sims_per_game=100` (not 20), with `k_combine_log5_weight` swept
+across a real batch (0.0/0.4/0.6/0.8/1.0) via `run_batch_eval_days.py`. This
+is a multi-hour, likely multi-batch-run undertaking (each of this session's
+12-date/sims=20 batches took ~5-10 min once caches were warm; a
+46-date/sims=100 run is meaningfully larger) best run unattended/overnight
+via the same batch tooling, not hand-looped one date at a time. Until that
+lands with a clear signal, treat #178's fixes as an instrumented,
+safely-shippable experiment platform, not a validated bug fix.
+
+Temp validation artifacts (not committed; safe to delete or keep for
+reference): `vendor/mlb_bettingv2/data/eval/_prototype_test/` (single-date
+runs, `dates_batch2.txt`, `batch2_baseline/`, `batch2_k06/`,
+`batch2_both_fixes/`, `batch2_k10/`, `_debug_roster_check.json` +
+`data/daily/snapshots/2026-07-10/roster_objs/` from the k_rate sanity
+check).
+
+### Reconciliation 2026-07-31 part 4 (NFL: real SmartSim 2.0 projection engine + market board + Ask the Syndicate)
+
+Continuation of the same "wire up NFL fully based on MLB" session (parts 1-2
+below did the same for NCAAF). First pass scoped this down to "real market
+odds only, no model column" given NFL had no forward-looking projection
+anywhere in the repo — user explicitly rejected that scope, asking for the
+same real end-to-end alignment NCAAF got. Re-researched rather than
+re-arguing for the smaller scope, and found the actual gap was narrower
+than first assessed: the shared Monte Carlo engine
+(`syndicate/features/football/sim_engine/smartsim2/game_simulator.py`) is
+already fully sport-generic and its `NFL_CALIBRATION_PROFILE` is already
+the module's own default (confirmed: `NCAAF_CALIBRATION_PROFILE` is the
+one that overrides ~13 constants away from it — NFL needed zero new
+calibration work). The one real missing piece was a pre-game, rolling,
+per-team EPA/play rating — nothing in the repo computed "team X's rating
+entering week W" (only a retrospective "this specific game's own EPA," via
+`build_nflverse_game_metrics()`, useless for predicting a future game).
+
+**New: #179** (filed and closed same session) — built the missing piece:
+- `scripts/generate_smartsim2_nfl_projections.py` — new generation script,
+  structurally mirroring `generate_smartsim2_ncaaf_projections.py` (same
+  300-seed Monte Carlo loop, `statistics.fmean`/`pstdev` aggregation) but
+  deriving both the schedule AND team ratings directly from real nflverse
+  play-by-play (`data/nfl_source/tracking/nflverse/pbp/pbp_{season}.csv`,
+  confirmed real, 372 columns) rather than an external API — no CFBD-style
+  rating API exists for the NFL. Rolling rating = mean EPA on a team's own
+  offensive plays in all weeks before the target week (pass/run only,
+  regular season only); defense = negated mean EPA allowed. Falls back to
+  the entire prior season when the current season has no qualifying plays
+  yet (week 1), same idea as the NCAAF script's season-level PPA fallback.
+  Validated against real results before anything downstream depended on
+  it: generated real 2025 week 9-10 projections, checked straight-up
+  winner-pick accuracy against real final scores (also derived from pbp)
+  — 9/14 (64%), a real, modest, non-fabricated signal, not degenerate.
+- `syndicate/features/nfl/smartsim2_projection.py` — near-verbatim mirror
+  of the NCAAF module (the dataclass/reader/writer contract was already
+  sport-agnostic, confirmed by code review before copying).
+- `/nfl/market-board` + `/nfl/api/market-board` (`build_nfl_market_board`
+  in `syndicate/features/nfl/cards.py`) — now a genuine model-vs-market
+  board: real odds from `real_betting_lines_{season}_*.json` (confirmed
+  real, 159 daily files, previously unused by any NFL feature module)
+  joined against the new real projections via the same `join_odds_to_sim`
+  every sport's board already uses, plus the same Normal-CDF
+  cover-probability helper (`_nfl_cover_probability`) built for NCAAF
+  earlier this session — reused the pattern exactly rather than
+  reinventing it, including the same "never put a raw point estimate in
+  the probability-shaped field" rule that fix protected.
+- Ask the Syndicate: `_nfl_matchup_evidence` (real projection + real
+  market line for a named matchup) and `_nfl_ats_evidence` (a team's real
+  against-the-spread record — final scores derived from pbp, no
+  performance-log equivalent exists for NFL, market line from
+  `real_betting_lines_*.json`, same perspective-flip cover/loss/push logic
+  as NCAAF's ATS fetcher). Registered under a new `"nfl"` branch in
+  `_fetchers_for_sport` and the `""` fallback; `_SPORT_HINTS`'s `"nfl"`
+  tuple already existed and already routed correctly, no change needed.
+  **No team-profile fetcher** — confirmed (again) that NFL roster/depth
+  data on disk is a 2-row demo stub (`"Alpha Player"`/`"Beta Player"`),
+  not real; building a profile fetcher from it would mean presenting
+  fabricated content as real.
+- Registered in the cross-sport `/market-board` hub and the shared board's
+  sport-tab bar (`_MARKET_BOARD_HUB_SPORTS` in `home.py`,
+  `SPORT_TABS` in `market_board.js`).
+
+Verified end-to-end against real data, not just unit tests: 363 tests
+green across the touched files (new: 7 generation-script tests, 7
+market-board tests, 8 Ask-the-Syndicate tests); then drove the live
+`/nfl/market-board` page and `/api/syndicate/query` in a real browser —
+real odds/spread/total/moneyline rendering with populated Model
+percentages (not `—` everywhere), the cross-sport hub listing NFL, and
+two real NFL questions (an ATS question with zero explicit sport param,
+and an explicit matchup question) both surfacing genuine, non-fabricated
+tables matching the market board's own numbers exactly.
+
+**Not done this session (explicitly out of scope, flagged for a future
+session)**: the rating model is a first pass (simple rolling EPA/play mean,
+no opponent adjustment, no calibration tuning against a full season's
+worth of results) — real future work if betting-grade accuracy is the
+goal, not claimed here. Only 2025 weeks 9-10 have generated projection
+artifacts; a full-season backfill (weeks 1-18) would need ~18 more runs
+at ~2-3 minutes each. NFL props/ladders pipeline and a full-season ATS/
+calibration report are still not built (same class of gap flagged for
+NCAAF in part 1).
 
 ### Reconciliation 2026-07-31 part 3 (MLB pitcher-prop prototype fixes: K-rate log5 blend + TTO3 quality scaling)
 

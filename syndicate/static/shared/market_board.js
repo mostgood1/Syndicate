@@ -30,6 +30,8 @@
     { value: "mlb", label: "MLB", path: "/mlb/market-board" },
     { value: "nba", label: "NBA", path: "/nba/market-board" },
     { value: "wnba", label: "WNBA", path: "/wnba/market-board" },
+    { value: "nfl", label: "NFL", path: "/nfl/market-board" },
+    { value: "ncaaf", label: "NCAAF", path: "/ncaaf/market-board" },
     { value: "soccer", label: "Soccer (MLS)", path: "/soccer/mls/market-board" },
   ];
   const activeSportTabValue = SOCCER_LEAGUE_SLUGS.has(sportSlug) ? "soccer" : sportSlug;

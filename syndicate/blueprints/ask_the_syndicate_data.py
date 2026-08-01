@@ -2407,6 +2407,577 @@ def _mlb_accuracy_evidence(question: str, context: dict[str, Any]) -> dict[str, 
 
 
 # ---------------------------------------------------------------------------
+# NCAAF
+# ---------------------------------------------------------------------------
+
+
+def _ncaaf_processed_csv_rows(subdir: str, filename: str) -> list[dict[str, Any]]:
+    path = os.path.join(_syndicate_data_root(), "ncaaf_source", "source_artifacts", "data", "processed", subdir, filename)
+    try:
+        with open(path, "r", encoding="utf-8", newline="") as handle:
+            return [dict(row) for row in csv.DictReader(handle)]
+    except Exception:
+        return []
+
+
+def _ncaaf_team_registry_rows() -> list[dict[str, Any]]:
+    return _ncaaf_processed_csv_rows("team_registry", "ncaaf_team_registry.csv")
+
+
+def _ncaaf_teams_in_question(question: str) -> list[dict[str, Any]]:
+    """Registry rows whose school/display name is plausibly referenced by
+    the question.
+
+    Deliberately NOT _name_matches (word-set overlap) -- real bug hit
+    while testing this live: with ~680 FBS/FCS schools in the registry,
+    dozens share a common word ("State", "Tech", "A&M"), so "Kansas State
+    vs Iowa State" word-overlap-matched every "* State" school in the
+    registry (Adams State, Alabama State, ...) instead of just the two
+    actually named. Requires the FULL normalized school/display name as a
+    contiguous phrase in the normalized question instead -- multi-word
+    names can only match their own exact phrase this way. mascot_name/
+    abbreviation are excluded entirely: mascots ("Wildcats", "Tigers") are
+    shared by dozens of schools and abbreviations are too short (2-4
+    letters) to be a safe substring match. Deduped by team_id, longest
+    name matched first so a longer specific name (e.g. "Ohio State") is
+    tried before a shorter substring of it could coincidentally match
+    something else.
+    """
+    normalized_question = f" {_normalize_ncaaf_name(question)} "
+    candidates: list[tuple[str, dict[str, Any]]] = []
+    for row in _ncaaf_team_registry_rows():
+        for field in ("school_name", "display_name"):
+            name = row.get(field)
+            if not name:
+                continue
+            normalized_name = _normalize_ncaaf_name(name)
+            # >=3, not >=4: several real FBS school_name values ARE short
+            # acronyms (TCU, USC, SMU, BYU, LSU) -- confirmed live that a
+            # >=4 cutoff silently excluded TCU entirely, turning "North
+            # Carolina vs TCU" into a single-team (no-op) match. Safe at 3
+            # because this still requires the bounded whole-word/whole-
+            # phrase substring match below, not a loose word-overlap check.
+            if len(normalized_name) < 3:
+                continue
+            candidates.append((normalized_name, row))
+    seen: set[str] = set()
+    matches: list[dict[str, Any]] = []
+    for normalized_name, row in sorted(candidates, key=lambda item: len(item[0]), reverse=True):
+        team_id = str(row.get("team_id") or "").strip()
+        if not team_id or team_id in seen:
+            continue
+        if f" {normalized_name} " in normalized_question:
+            seen.add(team_id)
+            matches.append(row)
+    return matches[:4]
+
+
+def _ncaaf_first_row_for_team(rows: list[dict[str, Any]], *, team_id: str, season: int) -> dict[str, Any] | None:
+    season_text = str(season)
+    fallback: dict[str, Any] | None = None
+    for row in rows:
+        if str(row.get("team_id") or "").strip() != team_id:
+            continue
+        if fallback is None:
+            fallback = row
+        if str(row.get("season") or "").strip() == season_text:
+            return row
+    return fallback
+
+
+def _ncaaf_latest_csv_season(rows: list[dict[str, Any]]) -> int | None:
+    """Most recent season actually present in a processed CSV.
+
+    Deliberately NOT sources.default_season() (which tracks the recommendation-
+    summary artifact's season, currently 2025) -- confirmed live that these
+    team-context CSVs (coach continuity, returning production, roster) only
+    ever carry season 2025 rows even though the live game slate has already
+    moved on to 2026 (cards.py's own _team_context, called with the active
+    2026 season, returns "Coach continuity unavailable"/empty for every team
+    today -- a real, separate, pre-existing pipeline gap, not something to
+    paper over here). Reading the season straight off the data means this
+    fetcher keeps working, unchanged, whenever that pipeline catches up.
+    """
+    seasons = [int(row["season"]) for row in rows if str(row.get("season") or "").strip().isdigit()]
+    return max(seasons) if seasons else None
+
+
+def _ncaaf_team_profile_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
+    """Coach continuity, returning production, transfer-portal activity, and
+    roster size for a team named in the question -- reads the same four
+    processed CSVs syndicate/features/ncaaf/cards.py's _team_context reads,
+    directly (this module never imports sport feature modules; every other
+    section here reads its own artifacts the same way)."""
+    teams = _ncaaf_teams_in_question(question)
+    if not teams:
+        return None
+    team = teams[0]
+    team_id = str(team.get("team_id") or "").strip()
+    team_name = str(team.get("school_name") or team.get("display_name") or "").strip()
+    returning_rows = _ncaaf_processed_csv_rows("returning_production", "ncaaf_returning_production_snapshot.csv")
+    season = _ncaaf_latest_csv_season(returning_rows)
+    if season is None:
+        return None
+
+    returning = _ncaaf_first_row_for_team(returning_rows, team_id=team_id, season=season) or {}
+    coach = _ncaaf_first_row_for_team(_ncaaf_processed_csv_rows("coach_continuity", "ncaaf_coach_continuity_snapshot.csv"), team_id=team_id, season=season) or {}
+    transfers = _ncaaf_processed_csv_rows("transfers", "ncaaf_transfer_portal_snapshot.csv")
+    incoming = sum(1 for row in transfers if str(row.get("destination_team_id") or "").strip() == team_id and str(row.get("season") or "").strip() == str(season))
+    outgoing = sum(1 for row in transfers if str(row.get("origin_team_id") or "").strip() == team_id and str(row.get("season") or "").strip() == str(season))
+    roster = _ncaaf_processed_csv_rows("roster", "ncaaf_roster_snapshot.csv")
+    active_roster_count = sum(1 for row in roster if str(row.get("team_id") or "").strip() == team_id and str(row.get("season") or "").strip() == str(season) and str(row.get("roster_status") or "").strip().lower() == "active")
+
+    evidence = {
+        "source": "ncaaf_team_profile",
+        "team": team_name,
+        "conference": team.get("conference"),
+        "season": season,
+        "head_coach": coach.get("head_coach_name"),
+        "coach_tenure_years": _to_float(coach.get("coach_tenure_years")),
+        "coach_continuity_score": _to_float(coach.get("continuity_score")),
+        "coach_changed_this_season": str(coach.get("coach_changed") or "").strip() not in ("", "0", "false", "False"),
+        "returning_starter_estimate": _to_float(returning.get("returning_starter_estimate")),
+        "returning_production_percent_ppa": _to_float(returning.get("percent_ppa")),
+        "transfers_in": incoming,
+        "transfers_out": outgoing,
+        "transfers_net": incoming - outgoing,
+        "active_roster_count": active_roster_count,
+    }
+    table = {
+        "title": f"{team_name} team profile ({season})",
+        "columns": ["Metric", "Value"],
+        "rows": [
+            ["Head coach", evidence["head_coach"] or "-"],
+            ["Coach tenure (years)", evidence["coach_tenure_years"]],
+            ["Coach continuity score", evidence["coach_continuity_score"]],
+            ["Coaching change this season", "Yes" if evidence["coach_changed_this_season"] else "No"],
+            ["Returning starter estimate", evidence["returning_starter_estimate"]],
+            ["Returning production (% PPA)", evidence["returning_production_percent_ppa"]],
+            ["Transfers in / out / net", f"{incoming} / {outgoing} / {incoming - outgoing}"],
+            ["Active roster size", active_roster_count],
+        ],
+    }
+    return {"evidence": evidence, "tables": [table], "charts": [], "as_of": f"{season} season", "sport": "ncaaf"}
+
+
+def _ncaaf_matchup_projection_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
+    """SmartSim 2.0's own projection plus the real market line for a
+    scheduled matchup between two teams named in the question. Searches
+    across the season's weeks for a projection naming both teams, rather
+    than assuming "this week", since a question may reference any
+    scheduled game."""
+    from syndicate.features.ncaaf.cards import _resolve_ncaaf_active_season_and_weeks
+    from syndicate.features.ncaaf.sources import default_ncaaf_source_root
+    from syndicate.features.ncaaf.smartsim2_projection import read_projection_artifact
+
+    teams = _ncaaf_teams_in_question(question)
+    if len(teams) < 2:
+        return None
+    team_a_names = {_normalize_ncaaf_name(v) for v in (teams[0].get("school_name"), teams[0].get("display_name")) if v}
+    team_b_names = {_normalize_ncaaf_name(v) for v in (teams[1].get("school_name"), teams[1].get("display_name")) if v}
+
+    # The active season (this week's real slate) is tried first, then the
+    # prior season as a fallback for a question about an already-completed
+    # matchup -- confirmed live that sources.default_season() (which tracks
+    # a different, stale artifact) can disagree with the season the actual
+    # game board is on, so this resolves the same way cards.py's own
+    # /ncaaf/cards route does rather than via that separate accessor.
+    active_season, _weeks = _resolve_ncaaf_active_season_and_weeks()
+    data_root = default_ncaaf_source_root() / "data"
+    projection = None
+    season = None
+    week = None
+    for candidate_season in (active_season, active_season - 1):
+        for candidate_week in range(1, 21):
+            for row in read_projection_artifact(season=candidate_season, week=candidate_week, data_root=data_root):
+                home_norm = _normalize_ncaaf_name(row.home_team)
+                away_norm = _normalize_ncaaf_name(row.away_team)
+                if (home_norm in team_a_names and away_norm in team_b_names) or (home_norm in team_b_names and away_norm in team_a_names):
+                    projection = row
+                    season = candidate_season
+                    week = candidate_week
+                    break
+            if projection is not None:
+                break
+        if projection is not None:
+            break
+    if projection is None:
+        return None
+
+    market_margin = None
+    market_total = None
+    lines_path = data_root / f"cfbd_lines_{season}_wk{week}.json"
+    try:
+        with lines_path.open("r", encoding="utf-8") as handle:
+            games = json.load(handle)
+        for game in games:
+            if not isinstance(game, dict):
+                continue
+            if _normalize_ncaaf_name(game.get("homeTeam")) != _normalize_ncaaf_name(projection.home_team):
+                continue
+            if _normalize_ncaaf_name(game.get("awayTeam")) != _normalize_ncaaf_name(projection.away_team):
+                continue
+            lines = game.get("lines") if isinstance(game.get("lines"), list) else []
+            spreads = [line["spread"] for line in lines if isinstance(line, dict) and line.get("spread") is not None]
+            totals = [line["overUnder"] for line in lines if isinstance(line, dict) and line.get("overUnder") is not None]
+            if spreads:
+                market_margin = -(sum(spreads) / len(spreads))
+            if totals:
+                market_total = sum(totals) / len(totals)
+            break
+    except Exception:
+        pass
+
+    evidence = {
+        "source": "ncaaf_smartsim2_projection",
+        "season": season,
+        "week": week,
+        "home_team": projection.home_team,
+        "away_team": projection.away_team,
+        "model_home_points": round(projection.home_score_mean, 1),
+        "model_away_points": round(projection.away_score_mean, 1),
+        "model_margin": round(projection.margin_mean, 1),
+        "model_total": round(projection.total_mean, 1),
+        "model_home_win_probability": round(projection.home_win_rate, 3),
+        "market_margin": market_margin,
+        "market_total": market_total,
+    }
+    table = {
+        "title": f"{projection.away_team} @ {projection.home_team} — Week {week} projection",
+        "columns": ["Metric", "Model", "Market"],
+        "rows": [
+            ["Home margin", evidence["model_margin"], market_margin],
+            ["Total points", evidence["model_total"], market_total],
+            ["Home win probability", evidence["model_home_win_probability"], None],
+        ],
+    }
+    return {"evidence": evidence, "tables": [table], "charts": [], "as_of": f"{season} week {week}", "sport": "ncaaf"}
+
+
+def _normalize_ncaaf_name(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    text = text.replace("&", " and ")
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]+", " ", text)).strip()
+
+
+def _ncaaf_ats_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
+    """A team's real against-the-spread record this season, computed
+    directly from smartsim2_performance_log.jsonl's market_margin/
+    actual_margin pairs -- independent of any model pick, the same
+    "what would a neutral bettor have seen" record a sportsbook history
+    page would show."""
+    from syndicate.features.ncaaf.sources import default_ncaaf_source_root
+
+    teams = _ncaaf_teams_in_question(question)
+    if not teams:
+        return None
+    team = teams[0]
+    team_name = str(team.get("school_name") or team.get("display_name") or "").strip()
+    team_norm = _normalize_ncaaf_name(team_name)
+
+    log_path = default_ncaaf_source_root() / "data" / "smartsim2_performance_log.jsonl"
+    covers = losses = pushes = 0
+    games: list[dict[str, Any]] = []
+    try:
+        with log_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except Exception:
+                    continue
+                home_norm = _normalize_ncaaf_name(row.get("home_team"))
+                away_norm = _normalize_ncaaf_name(row.get("away_team"))
+                is_home = home_norm == team_norm
+                is_away = away_norm == team_norm
+                if not is_home and not is_away:
+                    continue
+                market_margin = _to_float(row.get("market_margin"))
+                actual_margin = _to_float(row.get("actual_margin"))
+                if market_margin is None or actual_margin is None:
+                    continue
+                team_line = market_margin if is_home else -market_margin
+                team_actual = actual_margin if is_home else -actual_margin
+                if team_actual > team_line:
+                    covers += 1
+                    result = "cover"
+                elif team_actual < team_line:
+                    losses += 1
+                    result = "loss"
+                else:
+                    pushes += 1
+                    result = "push"
+                games.append({
+                    "opponent": row.get("away_team") if is_home else row.get("home_team"),
+                    "week": row.get("week"),
+                    "line": team_line,
+                    "actual_margin": team_actual,
+                    "result": result,
+                })
+    except Exception:
+        return None
+    if not games:
+        return None
+    table = {
+        "title": f"{team_name} against the spread this season",
+        "columns": ["Week", "Opponent", "Line", "Actual margin", "Result"],
+        "rows": [[g["week"], g["opponent"], g["line"], g["actual_margin"], g["result"]] for g in games],
+    }
+    evidence = {
+        "source": "ncaaf_smartsim2_performance_log",
+        "team": team_name,
+        "ats_record": {"covers": covers, "losses": losses, "pushes": pushes},
+    }
+    return {"evidence": evidence, "tables": [table], "charts": [], "as_of": "season to date", "sport": "ncaaf"}
+
+
+# ---------------------------------------------------------------------------
+# NFL
+# ---------------------------------------------------------------------------
+
+
+def _nfl_team_branding_rows() -> list[dict[str, Any]]:
+    path = os.path.join(_syndicate_data_root(), "nfl_source", "source_artifacts", "data", "processed", "team_branding", "nfl_team_branding.csv")
+    try:
+        with open(path, "r", encoding="utf-8", newline="") as handle:
+            return [dict(row) for row in csv.DictReader(handle)]
+    except Exception:
+        return []
+
+
+def _nfl_teams_in_question(question: str) -> list[str]:
+    """Real full team names (e.g. "Kansas City Chiefs") plausibly referenced
+    by the question -- bounded whole-phrase substring match, same approach
+    _ncaaf_teams_in_question uses (and for the same reason: NFL team names
+    are always City/State + Mascot, so no NCAAF-style shared-word collision
+    risk, but a plain word-set overlap check would still be needlessly
+    fragile). Only 32 real teams, so no short-acronym edge case either."""
+    normalized_question = f" {_normalize_ncaaf_name(question)} "
+    names = sorted(
+        {str(row.get("display_name") or "").strip() for row in _nfl_team_branding_rows() if row.get("display_name")},
+        key=len,
+        reverse=True,
+    )
+    matches: list[str] = []
+    for name in names:
+        normalized_name = _normalize_ncaaf_name(name)
+        if len(normalized_name) < 3:
+            continue
+        if f" {normalized_name} " in normalized_question and name not in matches:
+            matches.append(name)
+    return matches[:4]
+
+
+def _nfl_real_lines_for_matchup(season: int, *, away_full_name: str, home_full_name: str) -> dict[str, Any] | None:
+    pattern = os.path.join(_syndicate_data_root(), "nfl_source", f"real_betting_lines_{season}_*.json")
+    key = f"{away_full_name} @ {home_full_name}"
+    for path in sorted(glob.glob(pattern)):
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+        except Exception:
+            continue
+        lines = payload.get("lines") if isinstance(payload, dict) else None
+        if isinstance(lines, dict) and key in lines:
+            return lines[key]
+    return None
+
+
+def _nfl_projection_weeks(season: int) -> list[int]:
+    pattern = os.path.join(_syndicate_data_root(), "nfl_source", f"smartsim2_projections_{season}_wk*.csv")
+    weeks: list[int] = []
+    for path in glob.glob(pattern):
+        match = re.search(r"_wk(\d+)\.csv$", path)
+        if match:
+            weeks.append(int(match.group(1)))
+    return sorted(set(weeks))
+
+
+def _nfl_matchup_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
+    """Real SmartSim 2.0 projection (scripts/generate_smartsim2_nfl_projections.py)
+    plus the real market line for a scheduled matchup between two teams
+    named in the question. Searches every week that actually has a
+    generated projection artifact -- there's no single "current week"
+    concept to assume here any more than there was for NCAAF."""
+    from syndicate.features.nfl.smartsim2_projection import read_projection_artifact
+    from syndicate.features.nfl.sources import default_nfl_source_root
+    from syndicate.features.nfl.sources import latest_season
+
+    teams = _nfl_teams_in_question(question)
+    if len(teams) < 2:
+        return None
+    team_a = _normalize_ncaaf_name(teams[0])
+    team_b = _normalize_ncaaf_name(teams[1])
+
+    season = latest_season()
+    data_root = default_nfl_source_root()
+    projection = None
+    week = None
+    for candidate_week in _nfl_projection_weeks(season):
+        for row in read_projection_artifact(season=season, week=candidate_week, data_root=data_root):
+            home_norm = _normalize_ncaaf_name(row.home_team)
+            away_norm = _normalize_ncaaf_name(row.away_team)
+            # Projection rows carry short team codes ("KC"), not the full
+            # names matched above -- compare via containment either way
+            # since a code is always a substring/prefix relationship isn't
+            # guaranteed, so match on whichever of the two identified full
+            # names' branding row resolves to this code instead.
+            home_full = _nfl_code_to_full_name(row.home_team)
+            away_full = _nfl_code_to_full_name(row.away_team)
+            if {_normalize_ncaaf_name(home_full), _normalize_ncaaf_name(away_full)} == {team_a, team_b}:
+                projection = row
+                week = candidate_week
+                break
+        if projection is not None:
+            break
+    if projection is None:
+        return None
+
+    home_full_name = _nfl_code_to_full_name(projection.home_team)
+    away_full_name = _nfl_code_to_full_name(projection.away_team)
+    lines_entry = _nfl_real_lines_for_matchup(season, away_full_name=away_full_name, home_full_name=home_full_name) or {}
+    moneyline = lines_entry.get("moneyline") or {}
+    run_line = lines_entry.get("run_line") or {}
+    total_runs = lines_entry.get("total_runs") or {}
+
+    evidence = {
+        "source": "nfl_smartsim2_projection",
+        "season": season,
+        "week": week,
+        "home_team": home_full_name,
+        "away_team": away_full_name,
+        "model_home_points": round(projection.home_score_mean, 1),
+        "model_away_points": round(projection.away_score_mean, 1),
+        "model_margin": round(projection.margin_mean, 1),
+        "model_total": round(projection.total_mean, 1),
+        "model_home_win_probability": round(projection.home_win_rate, 3),
+        "market_home_moneyline": moneyline.get("home"),
+        "market_away_moneyline": moneyline.get("away"),
+        "market_spread": run_line.get("home"),
+        "market_total": total_runs.get("line"),
+    }
+    table = {
+        "title": f"{away_full_name} @ {home_full_name} — Week {week} projection",
+        "columns": ["Metric", "Model", "Market"],
+        "rows": [
+            ["Home margin", evidence["model_margin"], evidence["market_spread"]],
+            ["Total points", evidence["model_total"], evidence["market_total"]],
+            ["Home win probability", evidence["model_home_win_probability"], None],
+            ["Home moneyline", None, evidence["market_home_moneyline"]],
+            ["Away moneyline", None, evidence["market_away_moneyline"]],
+        ],
+    }
+    return {"evidence": evidence, "tables": [table], "charts": [], "as_of": f"{season} week {week}", "sport": "nfl"}
+
+
+def _nfl_code_to_full_name(code: str) -> str:
+    for row in _nfl_team_branding_rows():
+        if str(row.get("abbreviation") or "").strip().upper() == str(code or "").strip().upper():
+            return str(row.get("display_name") or code).strip()
+    return str(code or "").strip()
+
+
+def _nfl_completed_games_for_team(team_full_name: str, season: int) -> list[dict[str, Any]]:
+    """Real completed games for one team this season, with real final
+    scores -- read directly from nflverse play-by-play (the first row per
+    game_id already carries home_team/away_team/home_score/away_score,
+    constant for the whole game, so no need to scan to the end of each
+    game). No performance-log equivalent exists for NFL (unlike NCAAF's
+    smartsim2_performance_log.jsonl) -- this derives the same real
+    information straight from the raw data."""
+    path = os.path.join(_syndicate_data_root(), "nfl_source", "tracking", "nflverse", "pbp", f"pbp_{season}.csv")
+    team_code = None
+    for row in _nfl_team_branding_rows():
+        if _normalize_ncaaf_name(row.get("display_name")) == _normalize_ncaaf_name(team_full_name):
+            team_code = str(row.get("abbreviation") or "").strip().upper()
+            break
+    if not team_code:
+        return []
+    games: dict[str, dict[str, Any]] = {}
+    try:
+        with open(path, "r", encoding="utf-8", newline="") as handle:
+            for row in csv.DictReader(handle):
+                if row.get("season_type") != "REG":
+                    continue
+                game_id = (row.get("game_id") or "").strip()
+                if not game_id or game_id in games:
+                    continue
+                home_team = (row.get("home_team") or "").strip()
+                away_team = (row.get("away_team") or "").strip()
+                if team_code not in (home_team, away_team):
+                    continue
+                try:
+                    home_score = float(row.get("home_score") or "")
+                    away_score = float(row.get("away_score") or "")
+                    week = int(row.get("week") or 0)
+                except (TypeError, ValueError):
+                    continue
+                games[game_id] = {"home_team": home_team, "away_team": away_team, "home_score": home_score, "away_score": away_score, "week": week, "team_code": team_code}
+    except Exception:
+        return []
+    return list(games.values())
+
+
+def _nfl_ats_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
+    """A team's real against-the-spread record this season, computed from
+    real completed games (final scores from nflverse play-by-play) vs. the
+    real closing market line (real_betting_lines_*.json) -- same
+    perspective-flip cover/loss/push logic as _ncaaf_ats_evidence."""
+    from syndicate.features.nfl.sources import latest_season
+
+    teams = _nfl_teams_in_question(question)
+    if not teams:
+        return None
+    team_full_name = teams[0]
+    season = latest_season()
+    completed_games = _nfl_completed_games_for_team(team_full_name, season)
+    if not completed_games:
+        return None
+
+    covers = losses = pushes = 0
+    rows: list[dict[str, Any]] = []
+    for game in completed_games:
+        is_home = game["home_team"] == game["team_code"]
+        home_full = _nfl_code_to_full_name(game["home_team"])
+        away_full = _nfl_code_to_full_name(game["away_team"])
+        lines_entry = _nfl_real_lines_for_matchup(season, away_full_name=away_full, home_full_name=home_full) or {}
+        market_margin = _to_float((lines_entry.get("run_line") or {}).get("home"))
+        if market_margin is None:
+            continue
+        actual_margin = game["home_score"] - game["away_score"]
+        team_line = market_margin if is_home else -market_margin
+        team_actual = actual_margin if is_home else -actual_margin
+        if team_actual > team_line:
+            covers += 1
+            result = "cover"
+        elif team_actual < team_line:
+            losses += 1
+            result = "loss"
+        else:
+            pushes += 1
+            result = "push"
+        opponent = away_full if is_home else home_full
+        rows.append({"week": game["week"], "opponent": opponent, "line": team_line, "actual_margin": team_actual, "result": result})
+
+    if not rows:
+        return None
+    rows.sort(key=lambda r: r["week"])
+    table = {
+        "title": f"{team_full_name} against the spread this season",
+        "columns": ["Week", "Opponent", "Line", "Actual margin", "Result"],
+        "rows": [[r["week"], r["opponent"], r["line"], r["actual_margin"], r["result"]] for r in rows],
+    }
+    evidence = {
+        "source": "nfl_pbp_vs_real_betting_lines",
+        "team": team_full_name,
+        "ats_record": {"covers": covers, "losses": losses, "pushes": pushes},
+    }
+    return {"evidence": evidence, "tables": [table], "charts": [], "as_of": f"{season} season to date", "sport": "nfl"}
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -2439,6 +3010,10 @@ def _fetchers_for_sport(sport: str, question: str) -> list:
         ]
     if sport == "nhl":
         return [_nhl_last10_evidence]
+    if sport == "ncaaf":
+        return [_ncaaf_matchup_projection_evidence, _ncaaf_team_profile_evidence, _ncaaf_ats_evidence]
+    if sport == "nfl":
+        return [_nfl_matchup_evidence, _nfl_ats_evidence]
     if sport == "":
         if _is_ranking_intent_question(_question_words(question)):
             return [_mlb_top_candidates_evidence]
@@ -2466,6 +3041,11 @@ def _fetchers_for_sport(sport: str, question: str) -> list:
             _wnba_focused_evidence,
             lambda q, c: _basketball_last10_evidence(q, c, "nba"),
             _nhl_last10_evidence,
+            _ncaaf_matchup_projection_evidence,
+            _ncaaf_team_profile_evidence,
+            _ncaaf_ats_evidence,
+            _nfl_matchup_evidence,
+            _nfl_ats_evidence,
         ]
     return []
 
