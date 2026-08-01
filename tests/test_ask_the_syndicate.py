@@ -2375,9 +2375,82 @@ class AskTheSyndicateNflEvidenceTests(unittest.TestCase):
             self._write_branding()
             self.assertIsNone(ask_data._nfl_ats_evidence("what a great day for football", {}))
 
+    def _write_roster(self, season: int, rows: list[dict]) -> None:
+        directory = os.path.join(self.nfl_root, "source_artifacts", "data", "processed", "rosters")
+        os.makedirs(directory, exist_ok=True)
+        fieldnames = ["team_abbr", "position_group"]
+        with open(os.path.join(directory, f"roster_{season}_snapshot.csv"), "w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow(row)
+
+    def _write_depth(self, season: int, rows: list[dict]) -> None:
+        directory = os.path.join(self.nfl_root, "source_artifacts", "data", "processed", "depth")
+        os.makedirs(directory, exist_ok=True)
+        fieldnames = ["team", "depth_rank"]
+        with open(os.path.join(directory, f"depth_{season}_snapshot.csv"), "w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow(row)
+
+    def _write_injuries(self, season: int, rows: list[dict]) -> None:
+        directory = os.path.join(self.nfl_root, "tracking", "nflverse", "injuries")
+        os.makedirs(directory, exist_ok=True)
+        fieldnames = ["team", "report_status"]
+        with open(os.path.join(directory, f"injuries_{season}.csv"), "w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow(row)
+
+    def test_team_profile_evidence_reads_real_roster_depth_and_injuries(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}):
+            self._write_branding()
+            self._write_roster(2026, [
+                {"team_abbr": "SEA", "position_group": "WR"},
+                {"team_abbr": "SEA", "position_group": "WR"},
+                {"team_abbr": "SEA", "position_group": "QB"},
+                {"team_abbr": "ARI", "position_group": "QB"},
+            ])
+            self._write_depth(2026, [
+                {"team": "SEA", "depth_rank": "1"},
+                {"team": "SEA", "depth_rank": "1"},
+                {"team": "SEA", "depth_rank": "2"},
+                {"team": "ARI", "depth_rank": "1"},
+            ])
+            self._write_injuries(2026, [
+                {"team": "SEA", "report_status": "Questionable"},
+                {"team": "SEA", "report_status": ""},
+                {"team": "ARI", "report_status": "Out"},
+            ])
+
+            result = ask_data._nfl_team_profile_evidence("Seattle Seahawks team profile", {})
+
+        self.assertIsNotNone(result)
+        evidence = result["evidence"]
+        self.assertEqual(evidence["team"], "Seattle Seahawks")
+        self.assertEqual(evidence["season"], 2026)
+        self.assertEqual(evidence["roster_count"], 3)
+        self.assertEqual(evidence["depth_chart_starters"], 2)
+        self.assertEqual(evidence["current_season_injury_report_count"], 1)
+        self.assertEqual(evidence["position_group_counts"].get("WR"), 2)
+
+    def test_team_profile_evidence_none_when_no_team_named(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}):
+            self._write_branding()
+            self.assertIsNone(ask_data._nfl_team_profile_evidence("what a great day for football", {}))
+
+    def test_team_profile_evidence_none_without_any_snapshot(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}):
+            self._write_branding()
+            self.assertIsNone(ask_data._nfl_team_profile_evidence("Seattle Seahawks team profile", {}))
+
     def test_fetchers_for_sport_registers_nfl(self) -> None:
         fetchers = ask_data._fetchers_for_sport("nfl", "any question")
         self.assertIn(ask_data._nfl_matchup_evidence, fetchers)
+        self.assertIn(ask_data._nfl_team_profile_evidence, fetchers)
         self.assertIn(ask_data._nfl_ats_evidence, fetchers)
 
 

@@ -25,6 +25,7 @@ import os
 import re
 import threading
 import unicodedata
+from collections import Counter
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -2996,6 +2997,103 @@ def _nfl_completed_games_for_team(team_full_name: str, season: int) -> list[dict
     return list(games.values())
 
 
+def _nfl_latest_snapshot_rows(subdir: str, filename_prefix: str) -> tuple[int | None, list[dict[str, Any]]]:
+    """Real rows from the most recent season's `{filename_prefix}_{season}_snapshot.csv`
+    (roster_snapshot_builder.py / depth_chart_snapshot_builder.py's own real
+    naming convention -- season-parameterized, not fixed to any one year).
+    Globs rather than hardcoding a season, same reason as _nfl_projection_weeks:
+    this module deliberately never imports sport feature modules, so it can't
+    just ask nfl.sources.latest_season() -- every section here reads its own
+    artifacts directly."""
+    pattern = os.path.join(_syndicate_data_root(), "nfl_source", "source_artifacts", "data", "processed", subdir, f"{filename_prefix}_*_snapshot.csv")
+    seasons: dict[int, str] = {}
+    for path in glob.glob(pattern):
+        match = re.search(rf"{filename_prefix}_(\d{{4}})_snapshot\.csv$", os.path.basename(path))
+        if match:
+            seasons[int(match.group(1))] = path
+    if not seasons:
+        return None, []
+    latest = max(seasons)
+    try:
+        with open(seasons[latest], "r", encoding="utf-8", newline="") as handle:
+            return latest, [dict(row) for row in csv.DictReader(handle)]
+    except Exception:
+        return latest, []
+
+
+def _nfl_injury_report_count(team_code: str, season: int) -> int:
+    path = os.path.join(_syndicate_data_root(), "nfl_source", "tracking", "nflverse", "injuries", f"injuries_{season}.csv")
+    count = 0
+    try:
+        with open(path, "r", encoding="utf-8", newline="") as handle:
+            for row in csv.DictReader(handle):
+                if str(row.get("team") or "").strip().upper() == team_code:
+                    if str(row.get("report_status") or "").strip():
+                        count += 1
+    except Exception:
+        return 0
+    return count
+
+
+def _nfl_team_profile_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
+    """Real roster size, depth-chart starter count, and current-season
+    injury-report count for a team named in the question -- reads the same
+    real nflverse-backed snapshot CSVs syndicate.features.football.ingestion
+    writes (roster_snapshot_builder.py / depth_chart_snapshot_builder.py),
+    directly (this module never imports sport feature modules). No
+    coach-continuity/returning-production/transfer-portal equivalent exists
+    for NFL (those are NCAAF/CFBD-specific concepts), so this is real NFL
+    roster/depth/injury data, not a re-shaped copy of NCAAF's team profile."""
+    teams = _nfl_teams_in_question(question)
+    if not teams:
+        return None
+    team_name = teams[0]
+    team_code = None
+    for row in _nfl_team_branding_rows():
+        if _normalize_ncaaf_name(row.get("display_name")) == _normalize_ncaaf_name(team_name):
+            team_code = str(row.get("abbreviation") or "").strip().upper()
+            break
+    if not team_code:
+        return None
+
+    roster_season, roster_rows = _nfl_latest_snapshot_rows("rosters", "roster")
+    depth_season, depth_rows = _nfl_latest_snapshot_rows("depth", "depth")
+    if roster_season is None and depth_season is None:
+        return None
+
+    team_roster = [row for row in roster_rows if str(row.get("team_abbr") or row.get("team") or "").strip().upper() == team_code]
+    team_depth = [row for row in depth_rows if str(row.get("team") or "").strip().upper() == team_code]
+    starters = sum(1 for row in team_depth if str(row.get("depth_rank") or "").strip() == "1")
+    position_group_counts = Counter(str(row.get("position_group") or row.get("position") or "").strip() for row in team_roster if row.get("position_group") or row.get("position"))
+
+    # 2026's own injury file is real but empty this preseason (no
+    # practices/games yet) -- reporting 0 honestly rather than falling back
+    # to a prior season and presenting it as "current."
+    current_season = roster_season or depth_season
+    injury_count = _nfl_injury_report_count(team_code, current_season) if current_season else 0
+
+    evidence = {
+        "source": "nfl_team_profile",
+        "team": team_name,
+        "season": current_season,
+        "roster_count": len(team_roster),
+        "depth_chart_starters": starters,
+        "position_group_counts": dict(position_group_counts.most_common(6)),
+        "current_season_injury_report_count": injury_count,
+    }
+    table = {
+        "title": f"{team_name} team profile ({current_season})",
+        "columns": ["Metric", "Value"],
+        "rows": [
+            ["Roster size", evidence["roster_count"]],
+            ["Depth-chart starters listed", evidence["depth_chart_starters"]],
+            ["Players on this week's injury report", evidence["current_season_injury_report_count"]],
+            *[[f"{group} on roster", count] for group, count in position_group_counts.most_common(6)],
+        ],
+    }
+    return {"evidence": evidence, "tables": [table], "charts": [], "as_of": f"{current_season} season" if current_season else "unknown season", "sport": "nfl"}
+
+
 def _nfl_ats_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
     """A team's real against-the-spread record this season, computed from
     real completed games (final scores from nflverse play-by-play) vs. the
@@ -3089,7 +3187,7 @@ def _fetchers_for_sport(sport: str, question: str) -> list:
     if sport == "ncaaf":
         return [_ncaaf_matchup_projection_evidence, _ncaaf_team_profile_evidence, _ncaaf_ats_evidence]
     if sport == "nfl":
-        return [_nfl_matchup_evidence, _nfl_ats_evidence]
+        return [_nfl_matchup_evidence, _nfl_team_profile_evidence, _nfl_ats_evidence]
     if sport == "":
         if _is_ranking_intent_question(_question_words(question)):
             return [_mlb_top_candidates_evidence]
@@ -3121,6 +3219,7 @@ def _fetchers_for_sport(sport: str, question: str) -> list:
             _ncaaf_team_profile_evidence,
             _ncaaf_ats_evidence,
             _nfl_matchup_evidence,
+            _nfl_team_profile_evidence,
             _nfl_ats_evidence,
         ]
     return []
