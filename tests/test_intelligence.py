@@ -3560,6 +3560,93 @@ class IntelligenceBlueprintTests(unittest.TestCase):
 
         self.assertEqual(len(candidates), 1, candidates)
 
+    def test_soccer_live_lens_prop_candidates_generated_from_live_state(self) -> None:
+        # Confirmed live 2026-08-01: _SoccerDataProvider.live_props()
+        # (syndicate/blueprints/home.py) is hardcoded `return []` -- soccer
+        # never produced a single live prop candidate on the Layer 2 board.
+        # Fixture shape matches the real LivePlayerPropProjection.to_dict()
+        # output (syndicate/features/soccer/features/live_lens.py).
+        from syndicate.features.intelligence import _soccer_live_lens_prop_candidates_from_artifact
+
+        live_state_payload_value = {
+            "league": "mls",
+            "date": "2026-08-01",
+            "games": {
+                "761699": {
+                    "home_team": "D.C. United",
+                    "away_team": "Nashville SC",
+                    "live_player_props": [
+                        {
+                            "player_id": "p1",
+                            "player_name": "Christian Benteke",
+                            "side": "home",
+                            "shots_so_far": 2,
+                            "projected_remainder_shots": 1.1,
+                            "projected_final_shots": 3.1,
+                            "shots_over_probabilities": {"0.5": 0.91, "1.5": 0.74, "2.5": 0.52, "3.5": 0.28},
+                        }
+                    ],
+                }
+            },
+        }
+        with patch(
+            "syndicate.features.soccer.sources.active_leagues_for_date", return_value=["mls"]
+        ), patch(
+            "syndicate.features.soccer.sources.live_state_payload", return_value=live_state_payload_value
+        ):
+            candidates = _soccer_live_lens_prop_candidates_from_artifact({"slug": "soccer", "context_label": "MLS 2026 Week 18"})
+
+        self.assertEqual(len(candidates), 1, candidates)
+        candidate = candidates[0]
+        self.assertEqual(candidate.get("player_name"), "Christian Benteke")
+        self.assertEqual(candidate.get("candidate_type"), "prop")
+        self.assertEqual(candidate.get("market"), "Shots")
+        # 3.5 is the shot line closest to the model's own 3.1 projection
+        # (distance 0.4 vs 2.5's 0.6) -- not the shortest (0.5) line.
+        self.assertEqual(candidate.get("pick"), "Over 3.5")
+        self.assertAlmostEqual(candidate.get("model_probability"), 0.28)
+        self.assertEqual(candidate.get("projected"), "3.1")
+        self.assertEqual(candidate.get("live_projection"), "3.1")
+        self.assertEqual(candidate.get("actual"), "2")
+        self.assertTrue(candidate.get("is_live"))
+        self.assertEqual(candidate.get("team"), "D.C. United")
+        self.assertEqual(candidate.get("matchup"), "Nashville SC @ D.C. United")
+
+    def test_soccer_live_lens_prop_candidates_empty_for_non_soccer_sport(self) -> None:
+        from syndicate.features.intelligence import _soccer_live_lens_prop_candidates_from_artifact
+
+        self.assertEqual(_soccer_live_lens_prop_candidates_from_artifact({"slug": "mlb"}), [])
+
+    def test_soccer_live_lens_prop_candidates_empty_when_no_active_leagues(self) -> None:
+        from syndicate.features.intelligence import _soccer_live_lens_prop_candidates_from_artifact
+
+        with patch("syndicate.features.soccer.sources.active_leagues_for_date", return_value=[]):
+            candidates = _soccer_live_lens_prop_candidates_from_artifact({"slug": "soccer", "context_label": "MLS 2026 Week 18"})
+        self.assertEqual(candidates, [])
+
+    def test_soccer_live_lens_prop_candidates_dedupe_same_player_line(self) -> None:
+        from syndicate.features.intelligence import _soccer_live_lens_prop_candidates_from_artifact
+
+        row = {
+            "player_id": "p2",
+            "player_name": "Kei Kamara",
+            "side": "away",
+            "shots_so_far": 1,
+            "projected_final_shots": 1.4,
+            "shots_over_probabilities": {"0.5": 0.7, "1.5": 0.4},
+        }
+        live_state_payload_value = {
+            "games": {"761700": {"home_team": "FC Cincinnati", "away_team": "San Jose", "live_player_props": [dict(row), dict(row)]}}
+        }
+        with patch(
+            "syndicate.features.soccer.sources.active_leagues_for_date", return_value=["mls"]
+        ), patch(
+            "syndicate.features.soccer.sources.live_state_payload", return_value=live_state_payload_value
+        ):
+            candidates = _soccer_live_lens_prop_candidates_from_artifact({"slug": "soccer", "context_label": "MLS 2026 Week 18"})
+
+        self.assertEqual(len(candidates), 1, candidates)
+
     def test_collect_candidates_merges_fresh_live_lens_data_into_stale_home_rails_duplicate(self) -> None:
         # Root-caused 2026-07-31 against real production data: gamePk
         # 823271/824974/823595 (all confirmed live) each produced a MIX of

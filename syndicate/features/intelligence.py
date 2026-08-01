@@ -2401,7 +2401,16 @@ def _query_preferences(
         if match:
             requested_limit = int(match.group(1))
     if requested_limit <= 0:
-        requested_limit = 5
+        # 2026-08-01: was 5. The main board grid (board_contract.cards) was
+        # never actually bound by this -- it renders the full ranked pool
+        # unbounded (rank_global_recommendations(..., limit=None)) -- but
+        # any caller that omits an explicit limit (Ask the Syndicate, direct
+        # API callers) fell through to this default for the separate
+        # "recommendations"/"top_opportunities" list, which is small enough
+        # to silently make a single dominant sport (e.g. MLB once its props
+        # are flowing) look like the entire board. Raised to reflect a
+        # broader default slice of the real pool rather than a top-5 sliver.
+        requested_limit = 300
 
     plus_money_only = any(token in lowered for token in ("plus money", "plus-money", "plus odds"))
     favorite_floor = None
@@ -5204,6 +5213,148 @@ def _mlb_live_lens_prop_candidates_from_artifact(sport: dict[str, Any]) -> list[
     return candidates
 
 
+def _soccer_live_lens_prop_candidates_from_artifact(sport: dict[str, Any]) -> list[dict[str, Any]]:
+    """Soccer's mirror of _mlb_live_lens_prop_candidates_from_artifact above.
+
+    Confirmed live 2026-08-01: _SoccerDataProvider.live_props()
+    (syndicate/blueprints/home.py) is hardcoded `return []` -- soccer has
+    never produced a single live prop candidate on the Layer 2 board no
+    matter how many real matches were in progress, even though the live-lens
+    loop (scripts/poll_soccer_live_state.py, wired into live_lens_loop.py
+    2026-07-31) has been writing real per-match live_player_props all along.
+    The market itself differs from soccer's pregame prop (anytime-goalscorer
+    probability): live tracking only ever projects total SHOTS per player
+    (project_live_player_props, syndicate/features/soccer/features/
+    live_lens.py) -- there is no live-updated anytime-goalscorer number to
+    align against a pregame one, so this surfaces "Shots" as its own market
+    rather than forcing a false match onto the pregame prop's market.
+
+    Soccer is week-keyed and tracks several leagues at once (see
+    _SoccerDataProvider), unlike MLB's single date+sport -- sport's own
+    context_label here is a week string ("MLS 2026 Week 18"), not a date, so
+    this resolves today's real calendar date directly and scans every
+    active league for it rather than trying to parse one out of the label.
+    """
+    if _safe_text(sport.get("slug"), "").lower() != "soccer":
+        return []
+    try:
+        from syndicate.features.soccer.sources import active_leagues_for_date
+        from syndicate.features.soccer.sources import league_display_name
+        from syndicate.features.soccer.sources import live_state_payload
+    except Exception:
+        return []
+
+    today = central_today_iso()
+    try:
+        leagues = active_leagues_for_date(today)
+    except Exception:
+        leagues = []
+    if not leagues:
+        return []
+
+    candidates: list[dict[str, Any]] = []
+    seen_keys: set[tuple[str, str, str]] = set()
+    for league in leagues:
+        try:
+            payload = live_state_payload(league, today)
+        except Exception:
+            continue
+        games = payload.get("games") if isinstance(payload, dict) else None
+        if not isinstance(games, dict):
+            continue
+        league_label = league_display_name(league)
+        for event_id, game in games.items():
+            if not isinstance(game, dict):
+                continue
+            live_props = game.get("live_player_props") if isinstance(game.get("live_player_props"), list) else []
+            if not live_props:
+                continue
+            home_team = _safe_text(game.get("home_team"), "")
+            away_team = _safe_text(game.get("away_team"), "")
+            matchup_text = f"{away_team} @ {home_team}" if away_team or home_team else "-"
+            for row in live_props:
+                if not isinstance(row, dict):
+                    continue
+                player_name = _safe_text(row.get("player_name"), "")
+                if not player_name:
+                    continue
+                side = _safe_text(row.get("side"), "").strip().lower()
+                team = away_team if side == "away" else home_team if side == "home" else "-"
+                shots_so_far = _numeric_hint(row.get("shots_so_far"))
+                projected_final = _numeric_hint(row.get("projected_final_shots"))
+                over_probs = row.get("shots_over_probabilities") if isinstance(row.get("shots_over_probabilities"), dict) else {}
+                # Pick the shot line closest to the model's own projected
+                # final mean -- a stable, model-anchored choice rather than
+                # always defaulting to the shortest (near-certain) line.
+                best_line: float | None = None
+                best_prob: float | None = None
+                reference = projected_final if projected_final is not None else 0.0
+                for line_text, prob in over_probs.items():
+                    line_value = _numeric_hint(line_text)
+                    prob_value = _numeric_hint(prob)
+                    if line_value is None or prob_value is None:
+                        continue
+                    if best_line is None or abs(line_value - reference) < abs(best_line - reference):
+                        best_line = line_value
+                        best_prob = prob_value
+                if best_line is None:
+                    continue
+                dedupe_key = (_normalized_market_text(player_name), _safe_text(event_id, ""), f"{best_line:.1f}")
+                if dedupe_key in seen_keys:
+                    continue
+                seen_keys.add(dedupe_key)
+                confidence_text = f"{best_prob * 100.0:.1f}%" if best_prob is not None else "-"
+                projected_text = f"{projected_final:.1f}" if projected_final is not None else "-"
+                candidates.append(
+                    {
+                        "candidate_type": "prop",
+                        "sport": league_label,
+                        "sport_slug": "soccer",
+                        "surface_key": "live",
+                        "surface_title": "Live lens props",
+                        "name": f"{player_name} Over {best_line:.1f} Shots",
+                        "market": "Shots",
+                        "market_key": "shots",
+                        "pick": f"Over {best_line:.1f}",
+                        "player_name": player_name,
+                        "matchup": matchup_text,
+                        "team": team,
+                        "context_label": today,
+                        "game_id": _safe_text(event_id, ""),
+                        "event_id": _safe_text(event_id, ""),
+                        "line": f"{best_line:.1f}",
+                        "odds": "-",
+                        "projected": projected_text,
+                        "model_probability": best_prob,
+                        "confidence": confidence_text,
+                        "live_projection": projected_text,
+                        "actual": f"{shots_so_far:.0f}" if shots_so_far is not None else "-",
+                        "is_live": True,
+                        "is_final": False,
+                        "status_display": "Live",
+                        "game_state": "Live",
+                        "selection_direction": 1,
+                        "score": max(0.0, float(best_prob or 0.0)) * 60.0,
+                        "href": f"/soccer/{league}/live-lens",
+                        "href_label": "Open live lens",
+                        "writeup": (
+                            f"Live lens shots view for {player_name}."
+                            + (f" Model over probability {best_prob * 100.0:.1f}%." if best_prob is not None else "")
+                        ),
+                        "display_pills": [
+                            pill
+                            for pill in (
+                                f"Line {best_line:.1f}",
+                                f"Sim% {confidence_text}" if confidence_text != "-" else "",
+                                f"So far {shots_so_far:.0f}" if shots_so_far is not None else "",
+                            )
+                            if pill
+                        ],
+                    }
+                )
+    return candidates
+
+
 _GAME_LEVEL_MARKET_KEYWORDS = ("moneyline", "spread", "total", "puck line", "puck_line", "run line", "run_line", "game bet")
 
 
@@ -6393,6 +6544,41 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
                 live_lens_prop_candidates.append(artifact_candidate)
             if live_lens_prop_candidates:
                 _log_candidate_stage(pipeline_name="collect_candidates", stage="mlb_live_lens_prop_backfill", before=[], after=live_lens_prop_candidates)
+        if sport_slug == "soccer":
+            # Soccer's own live-lens-prop mirror of the MLB backfill above.
+            # Confirmed live 2026-08-01: _SoccerDataProvider.live_props()
+            # (syndicate/blueprints/home.py) is hardcoded `return []` --
+            # soccer has never produced a single live prop candidate on the
+            # Layer 2 board, regardless of how many real live matches are in
+            # progress. Same unconditional/dedup-merge shape as MLB's block
+            # above, just against soccer's live_state artifact (already
+            # ticking on its own ~60s live-lens loop, see
+            # scripts/poll_soccer_live_state.py) instead of MLB's live-lens
+            # report.
+            soccer_live_lens_candidates: list[dict[str, Any]] = []
+            for artifact_candidate in _soccer_live_lens_prop_candidates_from_artifact(sport):
+                artifact_subject = _candidate_subject_key(artifact_candidate)
+                artifact_market = _candidate_market_key(artifact_candidate)
+                artifact_pick = _safe_text(artifact_candidate.get("pick"), "")
+                existing_match = next(
+                    (
+                        existing
+                        for existing in candidates
+                        if _candidate_subject_key(existing) == artifact_subject
+                        and _candidate_market_key(existing) == artifact_market
+                        and _safe_text(existing.get("pick"), "") == artifact_pick
+                    ),
+                    None,
+                )
+                if existing_match is not None:
+                    for key in ("is_live", "is_final", "status_display", "game_state", "actual", "live_projection"):
+                        if artifact_candidate.get(key) is not None:
+                            existing_match[key] = artifact_candidate[key]
+                    continue
+                candidates.append(artifact_candidate)
+                soccer_live_lens_candidates.append(artifact_candidate)
+            if soccer_live_lens_candidates:
+                _log_candidate_stage(pipeline_name="collect_candidates", stage="soccer_live_lens_prop_backfill", before=[], after=soccer_live_lens_candidates)
         if wants_ranked_mlb_market_backfill:
             backfill_candidates: list[dict[str, Any]] = []
             for artifact_candidate in _mlb_market_prop_candidates_from_artifact(sport, preferences):
