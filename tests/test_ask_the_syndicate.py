@@ -1719,6 +1719,81 @@ class AskTheSyndicateTopCandidatesTests(unittest.TestCase):
         self.assertIsNone(result)
 
 
+class AskTheSyndicateNameDisambiguationTests(unittest.TestCase):
+    """Regression coverage for the 2026-08-01 report: asking about "Yordan
+    Alvarez" pulled in an unrelated game because a different starting
+    pitcher on the slate ("Jose Alvarez") also matched on last name alone.
+    """
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = self._tmp.name
+        self.daily_dir = os.path.join(self.root, "mlb", "daily")
+        os.makedirs(self.daily_dir, exist_ok=True)
+
+    def _write_daily_summary(self) -> None:
+        # Game 1 sorts first in `outputs` and has a starter whose last name
+        # collides with the batter the question is actually about. Game 2
+        # is Houston's game but carries no team/starter text the question
+        # mentions -- a bare "Yordan Alvarez" question shouldn't resolve to
+        # either game via last-name-only matching.
+        summary = {
+            "date": "2026-08-01",
+            "outputs": [
+                {
+                    "game_pk": 1,
+                    "away": "LAA",
+                    "home": "SEA",
+                    "starter_names": {"away": "Jose Alvarez", "home": "Someone Else"},
+                    "full": {"home_win_prob": 0.5, "away_win_prob": 0.5, "away_runs_mean": 4.0, "home_runs_mean": 4.0, "total_runs_dist": {"5": 10}, "run_margin_dist": {"1": 5}},
+                    "pitcher_props": {},
+                },
+                {
+                    "game_pk": 2,
+                    "away": "HOU",
+                    "home": "TEX",
+                    "starter_names": {"away": "Framber Valdez", "home": "Someone Else Too"},
+                    "full": {"home_win_prob": 0.45, "away_win_prob": 0.55, "away_runs_mean": 4.5, "home_runs_mean": 3.9, "total_runs_dist": {"5": 10}, "run_margin_dist": {"1": 5}},
+                    "pitcher_props": {},
+                },
+            ],
+        }
+        with open(os.path.join(self.daily_dir, "daily_summary_2026_08_01.json"), "w", encoding="utf-8") as f:
+            json.dump(summary, f)
+
+    def _env(self) -> dict:
+        return {"MLB_BETTING_DATA_ROOT": os.path.join(self.root, "mlb")}
+
+    def test_full_name_question_does_not_match_unrelated_last_name_starter(self) -> None:
+        self._write_daily_summary()
+        with patch.dict(os.environ, self._env()):
+            found = ask_data._mlb_match_game("What does Yordan Alvarez look like tonight?", {"sport": "mlb"})
+        # Must not lock onto game 1 just because "Alvarez" (Jose Alvarez,
+        # the starter) substring-matches -- that game has nothing to do
+        # with Yordan Alvarez.
+        self.assertIsNone(found)
+
+    def test_full_starter_name_still_matches_its_own_game(self) -> None:
+        self._write_daily_summary()
+        with patch.dict(os.environ, self._env()):
+            found = ask_data._mlb_match_game("How many strikeouts for Jose Alvarez tonight?", {"sport": "mlb"})
+        self.assertIsNotNone(found)
+        game, _names, _iso = found
+        self.assertEqual(game["game_pk"], 1)
+
+    def test_game_score_ranks_full_name_starter_above_last_name_only_starter(self) -> None:
+        words = ask_data._question_words("What does Yordan Alvarez look like tonight?")
+        game_with_collision = {"away": "LAA", "home": "SEA", "starter_names": {"away": "Jose Alvarez", "home": "Someone Else"}}
+        game_unrelated = {"away": "HOU", "home": "TEX", "starter_names": {"away": "Framber Valdez", "home": "Someone Else Too"}}
+        collision_score = ask_data._mlb_game_score("What does Yordan Alvarez look like tonight?", words, game_with_collision, {})
+        unrelated_score = ask_data._mlb_game_score("What does Yordan Alvarez look like tonight?", words, game_unrelated, {})
+        # Last-name-only collision scores low, and neither game should
+        # outright win a question about a player who isn't on either slate.
+        self.assertLess(collision_score, 90)
+        self.assertEqual(unrelated_score, 0)
+
+
 class AskTheSyndicateMlbPlayerHistoryTests(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()

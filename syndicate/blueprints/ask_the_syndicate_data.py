@@ -90,6 +90,34 @@ def _person_matches(name: str, words: set[str]) -> int:
     return 2 if len(parts) > 1 and parts[0] in words else 1
 
 
+_NAME_BIGRAM_RE = re.compile(r"\b([A-Z][a-zA-Z'.-]+)\s+([A-Z][a-zA-Z'.-]+)\b")
+
+
+def _question_name_bigrams(question: str) -> set[tuple[str, str]]:
+    """Capitalized "First Last"-shaped word pairs in the raw question, used to
+    tell a genuine full-name mention apart from a bare surname mention.
+    """
+    return {
+        (_fold_diacritics(a).lower(), _fold_diacritics(b).lower())
+        for a, b in _NAME_BIGRAM_RE.findall(str(question or ""))
+    }
+
+
+def _person_conflicts_with_question_name(name: str, question_bigrams: set[tuple[str, str]]) -> bool:
+    """True when the question pairs this person's surname with a different
+    first name (e.g. "Yordan Alvarez" in the question vs. a candidate named
+    "Jose Alvarez") -- a bare surname match should not count as this person
+    when the question itself names someone else with that surname.
+    """
+    if not question_bigrams:
+        return False
+    parts = [p for p in re.findall(r"[a-z0-9']+", _fold_diacritics(str(name or "")).lower()) if len(p) >= 3]
+    if len(parts) < 2:
+        return False
+    first, last = parts[0], parts[-1]
+    return any(b == last and a != first for a, b in question_bigrams)
+
+
 def _question_lines(question: str) -> list[float]:
     """Numbers in the question that look like prop lines (e.g. 28.5, 8.5)."""
     return [float(m) for m in re.findall(r"\b(\d{1,3}\.5)\b", str(question or ""))]
@@ -243,29 +271,48 @@ def _mlb_name_context(iso_date: str) -> dict[int, dict[str, Any]]:
     return context
 
 
-def _mlb_game_matches(question: str, words: set[str], game: dict[str, Any], names: dict[str, Any]) -> bool:
+def _mlb_game_score(question: str, words: set[str], game: dict[str, Any], names: dict[str, Any]) -> int:
+    """Score how well this game matches the question. Team/tricode hits and a
+    full first+last starter match outrank a last-name-only starter match, so
+    an unrelated pitcher who happens to share a batter's last name (e.g. two
+    different "Alvarez"es on the same slate) never outscores -- and can't
+    displace -- the team/person the question actually named.
+    """
+    best = 0
     for team_text in (
         names.get("away_name"), names.get("home_name"),
         game.get("away"), game.get("home"),
     ):
         if team_text and _name_matches(str(team_text), words):
-            return True
+            best = max(best, 100)
     # Tricodes are matched against the raw question to respect case (NYY, PIT).
     for tri in (str(game.get("away") or ""), str(game.get("home") or "")):
         if len(tri) >= 2 and re.search(rf"\b{re.escape(tri)}\b", question):
-            return True
+            best = max(best, 100)
     starters = game.get("starter_names") or {}
+    question_bigrams = _question_name_bigrams(question)
     for starter in (starters.get("away"), starters.get("home")):
-        if starter and _name_matches(str(starter), words):
-            return True
-    return False
+        if not starter:
+            continue
+        starter = str(starter)
+        if _person_conflicts_with_question_name(starter, question_bigrams):
+            continue
+        score = _person_matches(starter, words)
+        if score == 2:
+            best = max(best, 90)
+        elif score == 1:
+            best = max(best, 10)
+    return best
 
 
 def _mlb_match_game(question: str, context: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], str] | None:
     """The slate game (plus its name-context) the question is about, shared
     by every MLB evidence fetcher that needs "which game/pitcher/team" --
     same matching `_mlb_focused_evidence` always used, factored out so
-    `_mlb_player_history_evidence` doesn't have to re-derive it.
+    `_mlb_player_history_evidence` doesn't have to re-derive it. Picks the
+    best-scoring game across the whole slate rather than the first hit, so
+    slate order can't accidentally pick an unrelated game over the real
+    match (see `_mlb_game_score`).
     """
     loaded = _mlb_daily_summary(str(context.get("selected_date") or "") or None)
     if not loaded:
@@ -277,6 +324,8 @@ def _mlb_match_game(question: str, context: dict[str, Any]) -> tuple[dict[str, A
     name_context = _mlb_name_context(iso_date)
     words = _question_words(question)
 
+    best_score = 0
+    best: tuple[dict[str, Any], dict[str, Any], str] | None = None
     for game in outputs:
         if not isinstance(game, dict):
             continue
@@ -285,9 +334,11 @@ def _mlb_match_game(question: str, context: dict[str, Any]) -> tuple[dict[str, A
         except (TypeError, ValueError):
             game_pk = -1
         names = name_context.get(game_pk, {})
-        if _mlb_game_matches(question, words, game, names):
-            return game, names, iso_date
-    return None
+        score = _mlb_game_score(question, words, game, names)
+        if score > best_score:
+            best_score = score
+            best = (game, names, iso_date)
+    return best
 
 
 def _mlb_focused_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
@@ -346,7 +397,7 @@ def _mlb_focused_evidence(question: str, context: dict[str, Any]) -> dict[str, A
     pitcher_props = matched.get("pitcher_props") or {}
     wants_pitching = bool(
         words & {"strikeout", "strikeouts", "k", "ks", "pitcher", "outs", "pitches", "innings"}
-    ) or any(_name_matches(str(s), words) for s in starters.values() if s)
+    ) or any(_person_matches(str(s), words) > 0 for s in starters.values() if s)
     if wants_pitching and isinstance(pitcher_props, dict):
         pitcher_rows: list[list[Any]] = []
         pitcher_evidence: list[dict[str, Any]] = []
@@ -378,7 +429,7 @@ def _mlb_focused_evidence(question: str, context: dict[str, Any]) -> dict[str, A
                 "innings_mean": round((_to_float(props.get("outs_mean")) or 0) / 3.0, 2),
                 "pitches_mean": _to_float(props.get("pitches_mean")),
             })
-            named = _name_matches(str(label), words)
+            named = _person_matches(str(label), words) > 0
             if named or len(side_order) == 1:
                 so_chart = _dist_chart(
                     props.get("so_dist") or {},
@@ -615,9 +666,15 @@ def _wnba_focused_evidence(question: str, context: dict[str, Any]) -> dict[str, 
         return None
     words = _question_words(question)
 
-    # Player question takes priority over team question.
+    # Player question takes priority over team question. Score every player
+    # across the whole slate and keep the best match rather than the first
+    # hit, so a last-name-only match on an unrelated player (e.g. two
+    # players sharing a surname) can't win just by appearing earlier in the
+    # game/side iteration order.
     matched_player: dict[str, Any] | None = None
     matched_game: dict[str, Any] | None = None
+    best_score = 0
+    question_bigrams = _question_name_bigrams(question)
     for game in games:
         if not isinstance(game, dict):
             continue
@@ -625,14 +682,16 @@ def _wnba_focused_evidence(question: str, context: dict[str, Any]) -> dict[str, 
         players = sim.get("players") or {}
         for side in ("home", "away"):
             for player in players.get(side) or []:
-                if isinstance(player, dict) and _name_matches(str(player.get("player_name") or ""), words):
+                if not isinstance(player, dict):
+                    continue
+                player_name = str(player.get("player_name") or "")
+                if _person_conflicts_with_question_name(player_name, question_bigrams):
+                    continue
+                score = _person_matches(player_name, words)
+                if score > best_score:
+                    best_score = score
                     matched_player = player
                     matched_game = game
-                    break
-            if matched_player:
-                break
-        if matched_player:
-            break
 
     if matched_player is not None and matched_game is not None:
         name = str(matched_player.get("player_name") or "Player")
