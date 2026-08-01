@@ -131,6 +131,24 @@ class SoccerSimulationAdapter:
         for side, team_name in (("home", match.home_team), ("away", match.away_team)):
             players = self._players_for_side(simulation_input, team_name)
             if not players:
+                # #170: silent zero otherwise -- this fires both when the
+                # league's whole roster source is missing/empty (see
+                # build_soccer_artifacts.py's SOCCER_PLAYER_ROWS_MISSING,
+                # which already covers that case for every match at once)
+                # and, distinctly, when the roster source has data but none
+                # of it resolves to *this* match's team name (a single
+                # promoted/relegated club, rename, or spelling gap -- see
+                # loaders.py's SOCCER_PLAYER_ROWS_UNMATCHED_TEAM for the
+                # per-row detail). Either way, this match's props end up
+                # empty while the match-level sim still fully populates, so
+                # a signal here is the only place that distinguishes it from
+                # every other reason a match could have zero player_props.
+                print(
+                    f"[soccer_adapter] SOCCER_MATCH_PLAYER_PROPS_EMPTY league={self.league} "
+                    f"match_id={match.match_id} side={side} team={team_name!r} "
+                    f"total_players_loaded={len(simulation_input.players)}",
+                    flush=True,
+                )
                 continue
             rows = [
                 {

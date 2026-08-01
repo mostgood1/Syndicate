@@ -42,6 +42,7 @@ from syndicate.features.soccer.ingestion.espn_lineups import LEAGUE_ESPN_SLUGS
 from syndicate.features.soccer.ingestion.espn_lineups import fetch_events
 from syndicate.features.soccer.ingestion.espn_lineups import fetch_match_summary
 from syndicate.features.soccer.ingestion.espn_live_state import build_live_state
+from syndicate.features.soccer.sources import active_leagues_for_date
 
 _GOAL_WINDOWS_SECONDS = {"next_10_min": 600.0, "next_5_min": 300.0}
 
@@ -136,6 +137,63 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
     out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(f"wrote {out_path} ({len(games)} live games)")
     return payload
+
+
+def poll_active_leagues_for_tick(
+    iso_date: str, *, source_root: Path, out_root: Path, simulations: int
+) -> dict[str, Any]:
+    # Fast-tick entrypoint for live_lens_loop.py (syndicate/features/shared/
+    # live_lens_loop.py), which ticks MLB/NBA/WNBA every ~60s but had no
+    # soccer entry at all -- soccer's only "live" refresh used to be this
+    # same poll_league(), invoked once per league every 4h by
+    # refresh_odds_sources.py's slow SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_
+    # AUTORUN cadence. A 90-minute match could go an entire half with no
+    # live-state update under that cadence.
+    #
+    # Unlike MLB/NBA/WNBA (one sport, one snapshot file), soccer is
+    # multi-league -- this loops every currently-in-season league
+    # (active_leagues_for_date, same month-window heuristic build_soccer_
+    # artifacts.py's pregame path already uses) and calls the existing,
+    # unmodified poll_league() per league, which writes that league's own
+    # real live_state_{date}.json directly (soccer/sources.py's
+    # live_state_payload() reads those per-league files already -- this
+    # requires zero changes to the read side). The dict this function
+    # returns is a flattened cross-league summary for live_lens_loop's own
+    # bookkeeping/validation snapshot only, not a replacement for the real
+    # per-league artifacts.
+    #
+    # Explicit loop (not a comprehension) so one league's exception doesn't
+    # silently drop every other league's tick this cycle -- same reasoning
+    # build_intelligence_overview (intelligence.py) already documents for
+    # per-sport iteration.
+    games: list[dict[str, Any]] = []
+    leagues_checked: list[str] = []
+    leagues_with_games: list[str] = []
+    errors: dict[str, str] = {}
+    for league in active_leagues_for_date(iso_date):
+        leagues_checked.append(league)
+        try:
+            payload = poll_league(
+                league, iso_date, source_root=source_root, out_root=out_root, simulations=simulations
+            )
+        except Exception as error:
+            errors[league] = f"{type(error).__name__}: {error}"
+            continue
+        league_games = payload.get("games") if isinstance(payload, dict) else None
+        if isinstance(league_games, dict) and league_games:
+            leagues_with_games.append(league)
+            for event_id, game in league_games.items():
+                if isinstance(game, dict):
+                    games.append({"league": league, "event_id": event_id, **game})
+    return {
+        "date": iso_date,
+        "generated_at": pd.Timestamp.now("UTC").isoformat(),
+        "leagues_checked": leagues_checked,
+        "leagues_with_games": leagues_with_games,
+        "count": len(games),
+        "games": games,
+        "errors": errors,
+    }
 
 
 def main() -> int:

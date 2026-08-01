@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import unittest
+from io import StringIO
+from unittest.mock import patch
 
 from syndicate.features.soccer.adapters import build_soccer_simulation_adapter
 from syndicate.features.soccer.contracts import SoccerMatchFeatures
@@ -101,6 +103,46 @@ class SoccerSimulationAdapterTests(unittest.TestCase):
         winger = by_id["liv_11"]
         self.assertEqual(winger["side"], "away")
         self.assertEqual(winger["match_id"], "epl_ars_liv_2026_08_15")
+
+    def test_simulate_props_logs_when_one_sides_players_are_unmatched(self) -> None:
+        # #170: a single match with zero player props for one side (real
+        # roster data loaded overall, but nothing resolves to *this* team --
+        # e.g. a fixture team name the roster source doesn't carry) must
+        # leave a visible trace instead of silently degrading that match's
+        # props to nothing with no signal anywhere. Confirmed live 2026-07-31
+        # against production: MLS's one match of the day had a fully
+        # populated match-level sim (win probability, projected score) but
+        # `player_props: []`/`top_props: []`, indistinguishable in the logs
+        # from every other reason player props can come back empty.
+        simulation_input = _simulation_input()
+        match = SoccerMatchFeatures(
+            league="epl",
+            date="2026-08-15",
+            match_id="epl_tor_liv_2026_08_15",
+            home_team="TOR",  # not present in simulation_input.players at all
+            away_team="LIV",
+        )
+        simulation_input = SoccerSimulationInput(
+            league=simulation_input.league,
+            date=simulation_input.date,
+            matches=(match,),
+            players=simulation_input.players,
+            metadata=simulation_input.metadata,
+        )
+        adapter = build_soccer_simulation_adapter("epl")
+        with patch("sys.stdout", new_callable=StringIO) as captured_stdout:
+            output = adapter.simulate_props(simulation_input)
+
+        # LIV's winger still gets projected -- only TOR's (unmatched) side is empty.
+        self.assertEqual(len(output.player_outputs), 1)
+        self.assertEqual(output.player_outputs[0]["side"], "away")
+
+        log_output = captured_stdout.getvalue()
+        self.assertIn("SOCCER_MATCH_PLAYER_PROPS_EMPTY", log_output)
+        self.assertIn("match_id=epl_tor_liv_2026_08_15", log_output)
+        self.assertIn("side=home", log_output)
+        self.assertIn("team='TOR'", log_output)
+        self.assertNotIn("side=away", log_output)
 
     def test_build_artifacts_surfaces_top_scorer_props(self) -> None:
         adapter = build_soccer_simulation_adapter("epl")

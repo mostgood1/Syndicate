@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from syndicate.features.soccer.sources import available_weeks
@@ -14,6 +15,28 @@ from syndicate.features.soccer.sources import week_date_list
 from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
 from syndicate.features.shared.rank_board import build_rank_api_payload
 from syndicate.features.shared.rank_board import build_rank_page_context
+from syndicate.features.shared.refresh_state_store import data_root
+
+
+def live_lens_snapshot_path() -> Path:
+    # Bookkeeping/validation snapshot only for live_lens_loop.py's own tick
+    # status -- the real per-league live data lives at soccer/sources.py's
+    # live_state_path(league, date) (soccer_source/{league}/api/live_state/
+    # live_state_{date}.json), written directly by poll_league() inside
+    # scripts/poll_soccer_live_state.py's poll_active_leagues_for_tick(),
+    # unlike MLB/NBA/WNBA where this path IS the real snapshot the page
+    # reads. Mirrors the {sport}_live_lens.json naming convention those
+    # three already use, purely so live_lens_loop.py's generic tick/write/
+    # validate flow needs no soccer-specific branching.
+    return data_root() / "live" / "soccer_live_lens.json"
+
+
+def validate_live_lens_snapshot(snapshot: Any) -> bool:
+    if not isinstance(snapshot, dict):
+        return False
+    if not str(snapshot.get("date") or "").strip():
+        return False
+    return isinstance(snapshot.get("games"), list)
 
 
 def _fmt_pct(value: Any) -> str:

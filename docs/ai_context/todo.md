@@ -4,12 +4,96 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-07-31 (see "Reconciliation 2026-07-31 (keyvalue capacity
-remediation: TTL + reclaim sweep, WNBA props/games vanishing root cause)"
-below). Before that: "Reconciliation 2026-07-31 (Layer 2 board: MLB
+Last reconciled: 2026-07-31 (see "Reconciliation 2026-07-31 (soccer live-lens
+fast-tick engine)" below). Before that: "Reconciliation 2026-07-31 (keyvalue
+capacity remediation: TTL + reclaim sweep, WNBA props/games vanishing root
+cause)". Before that: "Reconciliation 2026-07-31 (Layer 2 board: MLB
 live-status dedup fix + WNBA game/prop wiring, Phase A-C)". Before that:
 "Reconciliation 2026-07-31 (#161 part 2: NBA/WNBA closing line, plus a
 production outage found and fixed along the way)". Prior session: 2026-07-30.
+
+### Reconciliation 2026-07-31 (soccer live-lens fast-tick engine)
+
+User reported soccer had no live polling or live-lens on the Betting Board.
+Confirmed real: `syndicate/features/shared/live_lens_loop.py` (the ~60s tick
+that keeps MLB/NBA/WNBA live state fresh) had zero soccer branches at all --
+soccer's only "live" refresh rode the same 4-hour cadence as its pregame
+steps (`SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN`,
+`scripts/refresh_odds_sources.py`'s `soccer_{league}_live_state` step), so a
+90-minute match could go an entire half with zero updates.
+
+**Shipped**: soccer is now a fourth entry in `live_lens_loop.py`'s per-sport
+dispatch table, ticking on the same ~60s cadence as MLB/NBA/WNBA.
+- `scripts/poll_soccer_live_state.py`: new `poll_active_leagues_for_tick(iso_date, *, source_root, out_root, simulations)`,
+  which loops `active_leagues_for_date()` (the same in-season month-window
+  heuristic `build_soccer_artifacts.py`'s pregame path already uses) and
+  calls the existing, unmodified `poll_league()` per active league. Each
+  league's own real `live_state_{date}.json` gets written directly by
+  `poll_league()` -- **zero changes needed to the read side**
+  (`syndicate/features/soccer/sources.py`'s `live_state_payload()` already
+  reads those per-league files uncached, on every call). The returned dict
+  is a flattened cross-league summary for the tick loop's own bookkeeping.
+- `syndicate/features/soccer/live_lens.py`: added `live_lens_snapshot_path()`
+  (`data_root()/"live"/"soccer_live_lens.json"`, bookkeeping-only -- the real
+  per-league artifacts are what the standalone `/soccer/{league}/live-lens`
+  page actually reads) and `validate_live_lens_snapshot()`, matching the
+  other three sports' module contract.
+- `syndicate/features/shared/live_lens_loop.py`: added soccer to
+  `_LIVE_LENS_SPORTS`/`_LIVE_LENS_BUILDERS`/`_LIVE_LENS_VALIDATORS`/
+  `_LIVE_LENS_SNAPSHOT_PATHS`. Soccer's tick is architecturally like MLB's
+  (a real per-tick Monte Carlo cost), not WNBA/NBA's cheap deterministic
+  blend: `poll_league()` runs 4 separate 300-sim passes per live match
+  (`project_live_match`, 2x `goal_in_window_probability`,
+  `project_live_player_props`). Two mitigations, mirroring the #124 MLB
+  precedent: (1) a lower simulation count specifically for the frequent tick
+  (`SYNDICATE_SOCCER_LIVE_LENS_TICK_SIMULATIONS`, default 80, vs. the
+  standalone script's own unchanged `--simulations 300` CLI default), and
+  (2) a soccer-specific memory-headroom gate
+  (`SYNDICATE_SOCCER_LIVE_LENS_MIN_HEADROOM_MB`, default 300MB) --
+  **explicitly flagged as an unbacktested starting point**, not a real
+  measurement like MLB's 300MB (which came from paired before/after
+  production RSS snapshots) -- there was no live match in progress to
+  measure against while building this. Revisit with a real
+  `log_all_process_memory` measurement once matches are actually running
+  through this path in production.
+- One deliberate cross-boundary import: `live_lens_loop.py` imports
+  `poll_active_leagues_for_tick` from `scripts.poll_soccer_live_state`
+  (this codebase's usual direction is scripts depending on syndicate, not
+  the reverse) -- soccer's live Monte Carlo orchestration already lives
+  there sharing helpers with `scripts/build_soccer_artifacts.py`;
+  duplicating ~250 lines of sim-input-building logic into `syndicate/` would
+  cost more than the one documented exception. Confirmed safe: every
+  process that loads this module already inserts `REPO_ROOT` onto
+  `sys.path` at its own entrypoint (e.g. `run_refresh_worker.py`).
+- Verified end-to-end against a real local run (not just unit tests):
+  `_run_live_lens_tick_for_sport("soccer", "2026-07-31")` correctly found a
+  genuinely live MLS match via a real ESPN call and wrote its real
+  `live_state_2026-07-31.json`, completing in ~1s.
+- New tests: `tests/test_poll_soccer_live_state.py` (multi-league
+  flattening, one-league-exception-doesn't-block-others, no-active-leagues
+  shape), `tests/test_soccer_live_lens_snapshot.py` (path/validator shape),
+  plus soccer coverage added to `tests/test_live_lens_loop.py` (dispatch
+  registration, headroom-default, tick-simulations-default, gate
+  skip/proceed, build-wrapper argument resolution). One pre-existing test
+  (`test_one_sport_failure_does_not_block_others`) updated for the new
+  4th dispatch entry. 31/31 new+touched tests passing; broader soccer
+  regression sweep (`test_soccer_live_lens.py`,
+  `test_soccer_blueprint_routes.py`, `test_build_soccer_artifacts.py`)
+  also passing, no collateral breakage.
+
+**Explicitly out of scope for this pass, flagged rather than silently
+partial**: this makes `/soccer/{league}/live-lens` and its per-league
+`live_state_{date}.json` artifacts fresh on a real live cadence, but does
+**not** wire that fresher data into the Layer 2 curated Betting Board's
+candidates. Confirmed via grep: neither `intelligence.py` nor `home.py` has
+any soccer `live_state` read path at all -- MLB/NBA/WNBA all have dedicated
+live-state-to-candidate plumbing (`_mlb_candidate_live_state`,
+`_apply_live_state_context_to_candidates`, `_nba_live_state_games`,
+`_wnba_live_state_games`) that soccer has no equivalent of. Building that
+(a `_soccer_live_state_games`-style helper plus a correction pass) is a
+separate, real piece of work -- next session, once this tick engine has run
+untouched through a few real live matches to confirm the headroom gate and
+reduced-simulation tick are actually sufficient in production.
 **#162/#164/#165/#166 and #163
 archived** to `todo_closed.md` (#163: Ask The Syndicate MLB player history +
 advanced analytics, fully shipped/deployed/live-verified across four

@@ -21,10 +21,26 @@ from syndicate.features.shared.memory_observability import memory_headroom_snaps
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
+from syndicate.features.shared.source_roots import preferred_source_roots
 from syndicate.features.shared.timezone import central_today_iso
+from syndicate.features.soccer.live_lens import live_lens_snapshot_path as _soccer_snapshot_path
+from syndicate.features.soccer.live_lens import validate_live_lens_snapshot as _soccer_validate
 from syndicate.features.wnba.live_lens import build_live_lens_snapshot as _wnba_build
 from syndicate.features.wnba.live_lens import live_lens_snapshot_path as _wnba_snapshot_path
 from syndicate.features.wnba.live_lens import validate_live_lens_snapshot as _wnba_validate
+
+# Deliberate exception to this codebase's usual scripts-depend-on-syndicate
+# direction: soccer's live-tick Monte Carlo orchestration (poll_league,
+# _load_player_rows/_load_team_ratings reuse) already lives in
+# scripts/poll_soccer_live_state.py, sharing helpers with
+# scripts/build_soccer_artifacts.py -- duplicating that into syndicate/ would
+# cost more (two copies of the sim-input-building logic to keep in sync)
+# than importing the one entrypoint function back. Safe at runtime: every
+# process that loads this module (run_refresh_worker.py / the live-odds-worker
+# equivalent) already inserts REPO_ROOT onto sys.path at its own startCommand
+# entrypoint, so `scripts` resolves as an importable package by the time this
+# import executes.
+from scripts.poll_soccer_live_state import poll_active_leagues_for_tick as _soccer_poll_active_leagues
 
 try:
 	import fcntl  # type: ignore
@@ -55,24 +71,57 @@ def _wnba_build_wrapper(date_str: str) -> dict[str, Any]:
 	return _wnba_build(date_str, limit=50)
 
 
-_LIVE_LENS_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba")
+def _soccer_live_lens_tick_simulations() -> int:
+	# Soccer's live tick (poll_league -> project_live_match + 2x
+	# goal_in_window_probability + project_live_player_props, 4 separate
+	# Monte Carlo passes per in-progress match) is architecturally the
+	# soccer analog of MLB's 120-sim live resim, not WNBA/NBA's cheap
+	# deterministic blend -- see _soccer_live_lens_headroom_snapshot below.
+	# The standalone script's own --simulations CLI default (300, for a
+	# manual/dedicated one-off run) stays unchanged; this is a separate,
+	# lower default specifically for the frequent 60s-cadence tick, to keep
+	# per-tick cost bounded when multiple leagues/matches are live at once.
+	raw = str(os.environ.get("SYNDICATE_SOCCER_LIVE_LENS_TICK_SIMULATIONS") or "").strip()
+	try:
+		value = int(raw or 80)
+	except Exception:
+		value = 80
+	return max(20, value)
+
+
+def _soccer_source_root() -> Path:
+	roots = preferred_source_roots(__file__, env_var="SYNDICATE_SOCCER_SOURCE_ROOT", local_dir_name="soccer_source")
+	return roots[0]
+
+
+def _soccer_build_wrapper(date_str: str) -> dict[str, Any]:
+	root = _soccer_source_root()
+	return _soccer_poll_active_leagues(
+		date_str, source_root=root, out_root=root, simulations=_soccer_live_lens_tick_simulations()
+	)
+
+
+_LIVE_LENS_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba", "soccer")
 
 _LIVE_LENS_BUILDERS: dict[str, Callable[[str], dict[str, Any]]] = {
 	"mlb": _mlb_build_wrapper,
 	"nba": _nba_build_wrapper,
 	"wnba": _wnba_build_wrapper,
+	"soccer": _soccer_build_wrapper,
 }
 
 _LIVE_LENS_VALIDATORS: dict[str, Callable[[Any], bool]] = {
 	"mlb": _mlb_validate,
 	"nba": _nba_validate,
 	"wnba": _wnba_validate,
+	"soccer": _soccer_validate,
 }
 
 _LIVE_LENS_SNAPSHOT_PATHS: dict[str, Callable[[], Path]] = {
 	"mlb": _mlb_snapshot_path,
 	"nba": _nba_snapshot_path,
 	"wnba": _wnba_snapshot_path,
+	"soccer": _soccer_snapshot_path,
 }
 
 
@@ -191,6 +240,38 @@ def _mlb_live_lens_min_headroom_bytes() -> int:
 	return max(0, value) * 1024 * 1024
 
 
+def _soccer_live_lens_memory_gate_enabled() -> bool:
+	return _env_bool("SYNDICATE_SOCCER_LIVE_LENS_MEMORY_GATE_ENABLED", default=True)
+
+
+def _soccer_live_lens_min_headroom_bytes() -> int:
+	# Soccer's tick (poll_active_leagues_for_tick -> poll_league per active
+	# league) runs up to 4 separate Monte Carlo passes per in-progress match
+	# (project_live_match, 2x goal_in_window_probability,
+	# project_live_player_props), same class of per-tick cost as MLB's real
+	# resim -- unlike WNBA/NBA's cheap logistic blend, which stays ungated.
+	# 300MB starts from the same calibration philosophy #124 already
+	# established for MLB (worst-measured-cost + margin), but this specific
+	# number is NOT yet backed by a real production measurement of soccer's
+	# per-tick RSS delta the way MLB's is -- there was no live match in
+	# progress to measure against when this was built. Revisit with a real
+	# measurement (log_all_process_memory before/after a live soccer tick)
+	# once matches are actually running through this path in production;
+	# do not let this number silently drift into being treated as measured.
+	raw = str(os.environ.get("SYNDICATE_SOCCER_LIVE_LENS_MIN_HEADROOM_MB") or "").strip()
+	try:
+		value = int(raw or 300)
+	except Exception:
+		value = 300
+	return max(0, value) * 1024 * 1024
+
+
+def _soccer_live_lens_headroom_snapshot() -> dict[str, Any] | None:
+	if not _soccer_live_lens_memory_gate_enabled():
+		return None
+	return memory_headroom_snapshot(_soccer_live_lens_min_headroom_bytes())
+
+
 def _mlb_live_lens_headroom_snapshot() -> dict[str, Any] | None:
 	# Guards the MLB builder only: it's the one sport whose build reaches
 	# estimate_live (a real Monte Carlo resim, 120 sims per live game,
@@ -262,6 +343,14 @@ def _run_live_lens_tick_for_sport(sport: str, date_str: str) -> dict[str, Any]:
 				# measured failing ticks). print, not logger.info. Remove
 				# once the actual failure mode is confirmed.
 				print(f"[LIVE_LENS_TICK_DIAG] sport={sport} ok=False reason=low_headroom headroom={headroom_snapshot}", flush=True)
+				return meta
+		if sport == "soccer":
+			headroom_snapshot = _soccer_live_lens_headroom_snapshot()
+			if headroom_snapshot is not None and not headroom_snapshot["sufficient"]:
+				meta["ok"] = False
+				meta["skipped"] = True
+				meta["reason"] = "low_headroom"
+				meta["memoryHeadroom"] = headroom_snapshot
 				return meta
 		builder = _LIVE_LENS_BUILDERS[sport]
 		validator = _LIVE_LENS_VALIDATORS[sport]

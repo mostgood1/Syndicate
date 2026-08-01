@@ -123,19 +123,21 @@ class LiveLensLoopTests(unittest.TestCase):
                 "mlb": _raise,
                 "nba": lambda date_str: {"date": date_str},
                 "wnba": lambda date_str: {"date": date_str},
+                "soccer": lambda date_str: {"date": date_str, "games": []},
             },
         ), patch.dict(
             live_lens_loop._LIVE_LENS_VALIDATORS,
-            {"nba": lambda payload: True, "wnba": lambda payload: True},
+            {"nba": lambda payload: True, "wnba": lambda payload: True, "soccer": lambda payload: True},
         ), patch.object(live_lens_loop, "write_json_file") as mocked_write:
             meta = live_lens_loop._run_live_lens_tick()
 
         self.assertFalse(meta["results"]["mlb"]["ok"])
         self.assertTrue(meta["results"]["nba"]["ok"])
         self.assertTrue(meta["results"]["wnba"]["ok"])
+        self.assertTrue(meta["results"]["soccer"]["ok"])
         self.assertFalse(meta["ok"])
-        # nba, wnba snapshot writes + the tick-summary write itself.
-        self.assertEqual(mocked_write.call_count, 3)
+        # nba, wnba, soccer snapshot writes + the tick-summary write itself.
+        self.assertEqual(mocked_write.call_count, 4)
 
     def test_start_live_lens_loop_noop_when_disabled(self) -> None:
         with patch.dict(os.environ, {"SYNDICATE_ENABLE_LIVE_LENS_LOOP": "false"}, clear=False):
@@ -223,6 +225,74 @@ class LiveLensLoopTests(unittest.TestCase):
             live_lens_loop._run_live_lens_tick_for_sport("wnba", "2026-07-20")
 
         mocked_gate.assert_not_called()
+
+    def test_soccer_registered_in_dispatch_tables(self) -> None:
+        # Feature build (2026-07-31): soccer previously had no fast-tick live
+        # polling at all -- only a 4h-cadence refresh via refresh_odds_
+        # sources.py, same as its pregame steps. This confirms it now shares
+        # the same ~60s dispatch every other live_lens_loop sport gets.
+        self.assertIn("soccer", live_lens_loop._LIVE_LENS_SPORTS)
+        self.assertIn("soccer", live_lens_loop._LIVE_LENS_BUILDERS)
+        self.assertIn("soccer", live_lens_loop._LIVE_LENS_VALIDATORS)
+        self.assertIn("soccer", live_lens_loop._LIVE_LENS_SNAPSHOT_PATHS)
+
+    def test_soccer_min_headroom_defaults_to_300mb(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(live_lens_loop._soccer_live_lens_min_headroom_bytes(), 300 * 1024 * 1024)
+
+    def test_soccer_tick_simulations_defaults_to_eighty(self) -> None:
+        # Deliberately lower than poll_soccer_live_state.py's own CLI default
+        # of 300 -- soccer's tick runs 4 separate Monte Carlo passes per live
+        # match (project_live_match + 2 goal windows + player props), so a
+        # 60s-cadence tick needs a smaller per-call simulation count to keep
+        # cost bounded, while a manual/dedicated one-off run keeps the
+        # heavier 300 default unchanged.
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(live_lens_loop._soccer_live_lens_tick_simulations(), 80)
+
+    def test_soccer_tick_skips_build_when_headroom_insufficient(self) -> None:
+        builder = Mock(return_value={"date": "2026-07-31", "games": []})
+        with patch.dict(
+            live_lens_loop._LIVE_LENS_BUILDERS, {"soccer": builder}
+        ), patch.object(
+            live_lens_loop,
+            "_soccer_live_lens_headroom_snapshot",
+            return_value={"current_mb": 1900.0, "max_mb": 2048.0, "headroom_mb": 148.0, "min_required_mb": 300.0, "sufficient": False},
+        ), patch.object(live_lens_loop, "write_json_file") as mocked_write:
+            result = live_lens_loop._run_live_lens_tick_for_sport("soccer", "2026-07-31")
+
+        self.assertFalse(result["ok"])
+        self.assertTrue(result["skipped"])
+        self.assertEqual(result["reason"], "low_headroom")
+        builder.assert_not_called()
+        mocked_write.assert_not_called()
+
+    def test_soccer_tick_proceeds_when_headroom_sufficient_or_unmeasurable(self) -> None:
+        snapshot = {"date": "2026-07-31", "games": []}
+        for headroom_return in (
+            {"current_mb": 100.0, "max_mb": 2048.0, "headroom_mb": 1948.0, "min_required_mb": 300.0, "sufficient": True},
+            None,
+        ):
+            with patch.dict(
+                live_lens_loop._LIVE_LENS_BUILDERS, {"soccer": lambda date_str: dict(snapshot)}
+            ), patch.object(
+                live_lens_loop, "_soccer_live_lens_headroom_snapshot", return_value=headroom_return
+            ), patch.object(live_lens_loop, "write_json_file") as mocked_write:
+                result = live_lens_loop._run_live_lens_tick_for_sport("soccer", "2026-07-31")
+
+            self.assertTrue(result["ok"])
+            mocked_write.assert_called_once()
+
+    def test_soccer_build_wrapper_resolves_source_root_and_reduced_simulations(self) -> None:
+        with patch.object(live_lens_loop, "_soccer_source_root", return_value=Path("/tmp/soccer_source")), patch.object(
+            live_lens_loop, "_soccer_poll_active_leagues", return_value={"date": "2026-07-31", "games": []}
+        ) as mocked_poll:
+            result = live_lens_loop._soccer_build_wrapper("2026-07-31")
+
+        mocked_poll.assert_called_once_with(
+            "2026-07-31", source_root=Path("/tmp/soccer_source"), out_root=Path("/tmp/soccer_source"), simulations=80
+        )
+        self.assertEqual(result, {"date": "2026-07-31", "games": []})
 
 
 if __name__ == "__main__":

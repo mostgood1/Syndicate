@@ -73,10 +73,36 @@ def _load_team_ratings(league: str, source_root: Path) -> dict[str, dict[str, fl
 
 def _load_player_rows(league: str, source_root: Path) -> list[dict[str, Any]]:
     players_dir = source_root / league / "players"
-    frames = [pd.read_csv(path) for path in sorted(players_dir.glob("players_*.csv"))]
-    if not frames:
+    player_csv_paths = sorted(players_dir.glob("players_*.csv"))
+    if not player_csv_paths:
+        # #170 follow-up to #146/#148: this was a silent `return []` with no
+        # trace anywhere -- the same "no error path for missing/empty data"
+        # shape as both of those fixes, just one call earlier in the chain.
+        # A league whose runtime disk never received (or lost) its
+        # players_{season}.csv roster seed degrades to zero player props for
+        # every match, every cycle, indistinguishable in the logs from a
+        # league that genuinely has no roster data source yet. Print so the
+        # next incident is a five-second log grep instead of a multi-hour
+        # trace through the adapter and sim engine to rule out everything
+        # downstream first.
+        print(
+            f"[build_soccer_artifacts] SOCCER_PLAYER_ROWS_MISSING league={league} "
+            f"players_dir={players_dir} (no players_*.csv found; player props "
+            "will be empty for every fixture this build)",
+            flush=True,
+        )
         return []
+    frames = [pd.read_csv(path) for path in player_csv_paths]
     combined = pd.concat(frames, ignore_index=True)
+    if combined.empty:
+        print(
+            f"[build_soccer_artifacts] SOCCER_PLAYER_ROWS_MISSING league={league} "
+            f"players_dir={players_dir} files={[p.name for p in player_csv_paths]} "
+            "(files exist but contain zero rows; player props will be empty for "
+            "every fixture this build)",
+            flush=True,
+        )
+        return []
     # A player who appears in more than one season's file (the common case)
     # otherwise gets one row per season here -- build_usage_profiles treats
     # each row as a distinct squad member, so a duplicated player dilutes
