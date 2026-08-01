@@ -4,11 +4,113 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 (NFL: real
-player-props/ladders pipeline)" below).
+Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 (MLB props root
+cause + WNBA board duplication + soccer bootstrap/live-props gap, shipped
+and deployed)" below).
+Before that: "Reconciliation 2026-08-01 (NFL: real
+player-props/ladders pipeline)".
 Before that: "Reconciliation 2026-08-01 (Ask the
 Syndicate player-name disambiguation bug: last-name-only substring match
 picked the wrong same-surname player)".
+
+### Reconciliation 2026-08-01 (MLB props root cause + WNBA board duplication + soccer bootstrap/live-props gap, shipped and deployed)
+
+User reported MLB/WNBA/soccer props missing/thin (only ~50 candidates
+across all three sports) and asked for a full pregame/live, game/prop,
+source-to-board inspection. Four distinct, real issues found and fixed;
+all shipped and deployed (`da69cb57`, `4e628c5f`) across all three
+services, confirmed live.
+
+1. **MLB props were completely empty for the day.**
+   `daily_top_props_<date>.json` (the sole pregame source for every MLB
+   prop candidate) is written once, or a few times, per day by the
+   daily-sim job -- confirmed live: the day's run landed 18:10 CT the
+   prior evening, before OddsAPI posted any player-prop lines, so every
+   pitcher/hitter section came back `found: false`, zero rows. Real
+   pitcher-prop odds sat on disk from 08:37 CT that morning untouched for
+   hours, because the sim-rerun trigger (`_mlb_daily_sim_decision`,
+   `syndicate/features/shared/live_refresh_loop.py`) only reacts to
+   roster/lineup fingerprint changes -- "player-prop odds just landed" was
+   never a trigger. Fixed: added `_mlb_props_now_available_needs_regen`,
+   a new trigger reason (`props_now_available`) that fires once when the
+   artifact is completely empty but real odds exist, with its own 1h
+   cooldown marker so it can't loop. Unblocked today's board immediately
+   via the existing `/api/ops/live-refresh/force-mlb-resim` lever (scoped
+   to all 15 games) -- confirmed landed: MLB went 28 -> 225 candidates.
+2. **WNBA board was showing every player prop twice.**
+   `_source_game_market_recommendations` (`syndicate/features/wnba/
+   cards.py`) had no market filter -- `recommendations_slate_<date>.json`'s
+   per-game `picks` list legitimately mixes team-level markets (ATS/TOTAL)
+   with player-prop picks (pts/reb/ast/pra/pa/pr/ra/threes/blk/stl/bs),
+   and every player-prop pick got promoted onto the board a second time,
+   mislabeled as a game market, alongside its correct entry via
+   `prop_recommendations` (a separate artifact). Confirmed live: Chelsea
+   Gray's 3PM prop, Natasha Cloud's PTS+REB prop, Jackie Young's PTS+AST
+   prop each showed twice with identical score/price/line. Fixed by
+   filtering out the known player-stat market codes before building
+   game-market rows. What looked like "WNBA props are limited" after the
+   fix is not a bug -- confirmed the underlying artifact has full real
+   coverage (18 unique players) for today's 2-game slate; the count just
+   isn't padded by duplicates anymore.
+3. **Soccer (MLS) player props were zero despite real odds existing.**
+   Root cause, confirmed by tracing the whole chain: `scripts/
+   bootstrap_data_root.py`'s `main()` has no exception isolation between
+   `BOOTSTRAP_ROOTS` entries, and `syndicate/app.py`'s caller wraps the
+   whole bootstrap call in a bare `except Exception: pass` -- one root
+   throwing (most likely MLB's large tree, synced first) could silently
+   abort every root listed after it, including soccer's `players_
+   <season>.csv` roster seed (last in the list). Without that seed file,
+   `build_soccer_artifacts.py`'s player-props sim pass degrades to zero
+   player projections every cycle (the exact #145/#170 failure shape,
+   which already has its own `SOCCER_PLAYER_ROWS_MISSING` print -- it just
+   never printed because the sync never reached that far). Fixed by
+   isolating each root's sync in its own try/except. Confirmed live
+   immediately post-deploy: `recommendations_2026-08-01.json`'s
+   `player_props` went from `[]` to 647 real anytime-goalscorer entries,
+   `picks_2026-08-01.csv` went from 0 to 248 real PROP rows.
+4. **Soccer never produced a single live prop candidate on the Layer 2
+   board.** `_SoccerDataProvider.live_props()` (`syndicate/blueprints/
+   home.py`) is hardcoded `return []` -- unlike MLB/WNBA, soccer has no
+   live-lens-sourced prop-candidate path at all, regardless of how many
+   real matches are in progress. Added
+   `_soccer_live_lens_prop_candidates_from_artifact`
+   (`syndicate/features/intelligence.py`), mirroring MLB's
+   `_mlb_live_lens_prop_candidates_from_artifact`, sourced from the
+   live-lens loop's `live_state_payload` (already ticking on its own
+   ~60s cadence since the 2026-07-31 soccer live-lens session). Live
+   soccer tracking is shots-based (`project_live_player_props`), not the
+   pregame anytime-goalscorer market, so this surfaces "Shots" as its own
+   market rather than forcing a false alignment against the pregame prop.
+   **Not yet verified against a real live match** -- no MLS game was in
+   progress at build time (first kickoff was 6:30pm CT that evening).
+   Next session: confirm real live candidates appear once a match goes
+   live, using `read_state.date`'s live_state artifact + a candidate-trace
+   pull for `slug=soccer`.
+
+**Bonus/incidental fix**: `_query_preferences`' bare default limit (used
+by any caller that omits an explicit one, e.g. Ask the Syndicate) raised
+from 5 to 300, at user's explicit request after observing MLB's
+newly-unlocked prop volume dominate a limit-bound "top edges" view (45/50
+slots). The main board grid itself (`board_contract.cards`) was already
+unbounded by this -- confirmed the real full board renders 160 real
+cards (149 MLB, 8 WNBA, 3 MLS) with no artificial cap; MLB's dominance
+there is real ranked-edge behavior, not a limit bug, and is worth
+revisiting if it becomes a user complaint (see #`cd71339a`'s existing
+market-level anti-crowding work -- no sport-level equivalent exists yet).
+
+**Operational notes**: an errant `git stash`/`stash pop` mid-session
+briefly reverted 6 files and conflicted with a concurrent session's
+in-progress NFL work (`syndicate/features/nfl/{cards,player_stats,
+props}.py`, new test files) -- recovered cleanly via `git checkout
+stash@{N} -- <only-the-6-files>` rather than force-resolving the stash
+pop, leaving the concurrent session's WIP and all generated-report churn
+untouched. Also mis-scoped one ops trigger (`/api/ops/odds-refresh/run`
+reads its `sports`/`phase` filter from the POST body, not query params --
+a query-string call silently falls through to a broader default job) --
+corrected on retry, no lasting effect (the class of job launched is
+routine/low-risk). Two full deploys this session (`da69cb57`, then
+`4e628c5f`) -- no in-flight sim was active either time (checked
+`/api/ops/live-refresh/state`'s `anyLive`/`last_mlb_sim_check` first).
 Before that: "Reconciliation 2026-07-31 part 5 (MLB
 pitcher-prop prototype fixes: real-scale backtest results -- effect much
 weaker than diagnosed, do not promote)" -- ran concurrently with the
