@@ -7077,6 +7077,43 @@ class MlbLivePropProjectionHydrationTests(unittest.TestCase):
         self.assertEqual(candidate.get("live_projection"), "-")
         mocked_load.assert_not_called()
 
+    def test_steam_candidates_game_side_markets_get_scoreline_not_combined_score(self) -> None:
+        # Board-alignment audit, found live 2026-08-01 against a real live
+        # WNBA game: every game-side steam candidate (moneyline/spread) for
+        # the same live game showed the identical combined away+home score
+        # as "actual", which tells nothing about which side is actually
+        # ahead. Only "total" (the market genuinely comparable to a
+        # combined number) should keep it -- moneyline/spread get the real
+        # scoreline instead.
+        from syndicate.features.intelligence import _steam_candidates_for_sport
+
+        base_event = {
+            "sport": "wnba",
+            "steam": {"capture_phase": "live", "previous_line": -8.0, "previous_odds": -110, "line_delta": 2.0, "odds_delta": 5.0},
+            "game_id": "GAME1",
+            "price": -150,
+            "implied_prob": 0.6,
+            "player_name": "",
+            "selection": "Away",
+            "is_live": True,
+            "timestamp": "2026-08-01T18:00:00Z",
+        }
+        events = [
+            {**base_event, "market_type": "moneyline", "line": -6.0},
+            {**base_event, "market_type": "total", "line": 184.0, "selection": "Under"},
+        ]
+        sport = {
+            "slug": "wnba",
+            "context_label": "2026-08-01",
+            "dashboard_games": [{"gamePk": "GAME1", "away": {"abbr": "LVA", "score": 78}, "home": {"abbr": "CHI", "score": 77}}],
+        }
+        with patch("syndicate.features.intelligence._load_steam_events_for_date", return_value=events):
+            candidates = _steam_candidates_for_sport(sport)
+
+        by_market_key = {c.get("market_key"): c for c in candidates}
+        self.assertEqual(by_market_key["moneyline"]["actual"], "78-77")
+        self.assertEqual(by_market_key["total"]["actual"], "155.0")
+
 
 class RepoArtifactPathFallbackTests(unittest.TestCase):
     # _mlb_repo_artifact_path/_wnba_repo_artifact_path used to resolve via

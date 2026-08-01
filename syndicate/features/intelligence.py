@@ -4404,6 +4404,16 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
     # serialized it as a raw None instead of the "-" placeholder every
     # other unresolvable field on this board uses.
     actual_by_game_id: dict[str, float] = {}
+    # Board-alignment audit, found live 2026-08-01 against a real live WNBA
+    # game: actual_by_game_id's combined score is right for "total" (the
+    # one market_key in _GAME_SIDE_MARKETS genuinely comparable to it) but
+    # was ALSO being shown for "moneyline"/"spread" steam candidates --
+    # every game-side steam candidate for the same live game showed the
+    # identical combined number regardless of which side/market it was
+    # actually about. Tracked separately so moneyline/spread candidates can
+    # show the real away-home scoreline instead (see the render site
+    # below).
+    scoreline_by_game_id: dict[str, str] = {}
     # #162: soccer's game dicts (soccer/cards.py) stamp league_display
     # ("MLS", "La Liga", ...) directly -- carried through so steam
     # candidates can show the real league instead of the generic "Soccer"
@@ -4452,6 +4462,7 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
             home_score = _numeric_hint(game.get("home_score"))
         if away_score is not None and home_score is not None:
             actual_by_game_id[game_key] = away_score + home_score
+            scoreline_by_game_id[game_key] = f"{away_score:.0f}-{home_score:.0f}"
     # Confirmed live: soccer's steam moves showed a real, consistent
     # OddsAPI-hash game_id but every one still landed on "-" -- dashboard_games
     # can't resolve it (single-league-curated, _resolve_league picks exactly
@@ -4666,7 +4677,9 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
                 "edge": "-",
                 "actual": (
                     f"{actual_by_game_id[game_id]:.1f}"
-                    if market_key in _GAME_SIDE_MARKETS and game_id in actual_by_game_id
+                    if market_key == "total" and game_id in actual_by_game_id
+                    else scoreline_by_game_id.get(game_id, "-")
+                    if market_key in _GAME_SIDE_MARKETS
                     else "-"
                 ),
                 "is_live": is_live,
