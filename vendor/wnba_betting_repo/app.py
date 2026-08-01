@@ -9788,63 +9788,44 @@ def _load_team_maps() -> dict[str, str]:
                 except Exception:
                     pass
     except Exception:
-        # Fallback: built-in full_name -> abbreviation map without the stats API.
-        built_in = [
-            ("Atlanta Hawks", "ATL"),
-            ("Boston Celtics", "BOS"),
-            ("Brooklyn Nets", "BKN"),
-            ("Charlotte Hornets", "CHA"),
-            ("Chicago Bulls", "CHI"),
-            ("Cleveland Cavaliers", "CLE"),
-            ("Dallas Mavericks", "DAL"),
-            ("Denver Nuggets", "DEN"),
-            ("Detroit Pistons", "DET"),
-            ("Golden State Warriors", "GSW"),
-            ("Houston Rockets", "HOU"),
-            ("Indiana Pacers", "IND"),
-            ("Los Angeles Clippers", "LAC"),
-            ("LA Clippers", "LAC"),
-            ("Los Angeles Lakers", "LAL"),
-            ("Memphis Grizzlies", "MEM"),
-            ("Miami Heat", "MIA"),
-            ("Milwaukee Bucks", "MIL"),
-            ("Minnesota Timberwolves", "MIN"),
-            ("New Orleans Pelicans", "NOP"),
-            ("New York Knicks", "NYK"),
-            ("Oklahoma City Thunder", "OKC"),
-            ("Orlando Magic", "ORL"),
-            ("Philadelphia 76ers", "PHI"),
-            ("Phoenix Suns", "PHX"),
-            ("Portland Trail Blazers", "POR"),
-            ("Sacramento Kings", "SAC"),
-            ("San Antonio Spurs", "SAS"),
-            ("Toronto Raptors", "TOR"),
-            ("Utah Jazz", "UTA"),
-            ("Washington Wizards", "WAS"),
-            ("Atlanta Dream", "ATL"),
-            ("Chicago Sky", "CHI"),
-            ("Connecticut Sun", "CON"),
-            ("Dallas Wings", "DAL"),
-            ("Golden State Valkyries", "GSV"),
-            ("Indiana Fever", "IND"),
-            ("Los Angeles Sparks", "LAS"),
-            ("LA", "LAS"),
-            ("LAS", "LAS"),
-            ("Las Vegas Aces", "LVA"),
-            ("LVA", "LVA"),
-            ("Minnesota Lynx", "MIN"),
-            ("New York Liberty", "NYL"),
-            ("Phoenix Mercury", "PHX"),
-            ("Portland Fire", "POR"),
-            ("Seattle Storm", "SEA"),
-            ("Toronto Tempo", "TOR"),
-            ("Washington Mystics", "WSH"),
-        ]
-        mapping = {}
-        for full, abbr in built_in:
-            mapping[str(full).strip().lower()] = str(abbr).strip().upper()
-            mapping[str(abbr).strip().lower()] = str(abbr).strip().upper()
-        abbr_to_id = {}
+        pass
+    # Bug found live 2026-08-01: this WNBA full_name -> abbreviation list used
+    # to live only inside the `except` branch above, so it silently never ran
+    # whenever the nba_api import succeeded (the normal case) -- nba_api's
+    # static teams list is NBA-only, so `mapping` ended up with zero WNBA
+    # full-team-name entries beyond the 5 explicitly aliased in
+    # _get_tricode() (Sparks/Aces/Valkyries/Tempo/Fire). Confirmed live:
+    # _canonical_team_tri("Indiana Fever") fell through to the raw uppercased
+    # string "INDIANA FEVER" instead of "IND", so _live_oddsapi_period_totals_
+    # for_game's own event-matching against real OddsAPI events silently
+    # failed for every established (non-renamed) WNBA team, even though the
+    # correct event was right there in the response. The teams_wnba.json
+    # fallback below can't rescue this either -- that file doesn't exist in
+    # this vendored checkout. Always merge this list in (not gated on the
+    # nba_api call's outcome) so every WNBA team resolves regardless.
+    wnba_built_in = [
+        ("Atlanta Dream", "ATL"),
+        ("Chicago Sky", "CHI"),
+        ("Connecticut Sun", "CON"),
+        ("Dallas Wings", "DAL"),
+        ("Golden State Valkyries", "GSV"),
+        ("Indiana Fever", "IND"),
+        ("Los Angeles Sparks", "LAS"),
+        ("LA", "LAS"),
+        ("LAS", "LAS"),
+        ("Las Vegas Aces", "LVA"),
+        ("LVA", "LVA"),
+        ("Minnesota Lynx", "MIN"),
+        ("New York Liberty", "NYL"),
+        ("Phoenix Mercury", "PHX"),
+        ("Portland Fire", "POR"),
+        ("Seattle Storm", "SEA"),
+        ("Toronto Tempo", "TOR"),
+        ("Washington Mystics", "WSH"),
+    ]
+    for full, abbr in wnba_built_in:
+        mapping.setdefault(str(full).strip().lower(), str(abbr).strip().upper())
+        mapping.setdefault(str(abbr).strip().lower(), str(abbr).strip().upper())
     try:
         wnba_rows = json.loads((WEB_DIR / "assets" / "teams_wnba.json").read_text(encoding="utf-8"))
     except Exception:
