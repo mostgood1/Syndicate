@@ -4,10 +4,13 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 part 2 (Layer 2
+Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 (NFL: full 2026
+backfill both sports + real injury-rating adjustment, backtested)" below).
+Before that: "Reconciliation 2026-08-01 part 2 (Layer 2
 board: the real root cause of the Alyssa Thomas duplicate -- a fallback-
 pool union whose identity hash misses cross-pipeline duplicates -- found
-and fixed, shipped and deployed)" below).
+and fixed, shipped and deployed)" -- ran concurrently, different files
+throughout.
 Before that: "Reconciliation 2026-08-01 (Layer 2 board
 alignment: WNBA prop id-space collision + game-market actual semantics,
 shipped and deployed)".
@@ -15,6 +18,81 @@ Before that: "Reconciliation 2026-08-01 (NFL/NCAAF:
 make real 2026 week-1 data the actual default)".
 Before that: "Reconciliation 2026-08-01 (NFL/NCAAF:
 real 2026 week-1 data + sim triggers)".
+
+### Reconciliation 2026-08-01 (NFL: full 2026 backfill both sports + real injury-rating adjustment, backtested)
+
+**New: #183** (filed, real injury-adjustment result documented above --
+not closed, since the backtest gate means it's not yet production-ready
+as built; revisit before enabling by default).
+
+Continuation of the same NFL/NCAAF session. User chose to proceed on three
+of the four remaining options from the standing list: full 2026 backfill
+(both sports), enabling the autorun trigger in production, and designing
+real injury-rating modeling (NCAAF props/ladders was not selected).
+
+**Full 2026 backfill (commits `c5f06500` NFL + gitignored NCAAF artifacts)**:
+NFL now has real generated SmartSim 2.0 projections for the entire 272-game
+regular season (weeks 1-18, was week 1 + one playoff week only). NCAAF now
+has real projections for every week its schedule has (1-13, 15 -- no week
+14 exists; week 15 is conference-championship weekend, correctly thin).
+NCAAF's artifacts live under the gitignored `data/ncaaf_source/data/` path
+(an existing convention, not something new) so nothing to commit there;
+NFL's live directly under `data/nfl_source/` and are committed. Both
+verified rendering real data end-to-end (`build_cards_page_context`/
+`build_smartsim_cards_page_context` for spot-checked mid/late-season
+weeks) and the full NFL/NCAAF test suites pass (132 + 218).
+
+**Real, data-driven NFL injury-rating adjustment** (commit `306e997f`,
+new `syndicate/features/nfl/injury_adjustment.py`): walked the user through
+the real data constraints first (per-play EPA attribution only exists for
+QB/RB/WR/TE via real passer/rusher/receiver ids; defense has no full
+per-snap attribution, only sparse sack/INT/TFL/forced-fumble/pass-defense
+credit columns) -- user chose the fullest scope (all positions, both
+offense and defense) with that asymmetry made explicit. Offense: recomputes
+the team rating excluding a real `Out`/`Doubtful` player's own plays when a
+real in-season substitution sample exists (>=20 plays), falling back to the
+real depth-chart backup's own real EPA rate when it doesn't (the
+starting-QB case). Defense: subtracts the player's own real credited
+splash-play value. No real signal anywhere -> no adjustment, never a guess.
+14 new unit tests, wired into `generate_smartsim2_nfl_projections.py` via a
+new `--no-injury-adjustment` flag for A/B comparison; diagnostics write to
+a sibling `*_injury_notes.json`, not the CSV contract (so existing readers
+of the projection artifact are unaffected).
+
+**Backtest result, reported honestly per the plan's own instruction not to
+hide a bad number**: `scripts/backtest_nfl_injury_adjustment.py` regenerated
+the real, completed 2025 season in memory (150 seeds, on vs. off, skipping
+games with no modeled injury since those are provably identical) --
+**adjustment OFF: 160/271 = 59.04% win accuracy; adjustment ON: 157/271 =
+57.93%**. The adjustment very slightly *hurts* full-season accuracy (-1.1
+points, 47 games flipped). Per the plan's own gate ("confirm the
+adjustment doesn't make accuracy worse before treating it as production-
+ready"), this means the adjustment is **not yet production-ready as
+built** -- it's real, tested, and mechanically correct, but the net effect
+across a season is a wash-to-slightly-negative rather than an improvement.
+Left wired in behind `--no-injury-adjustment` defaulting to *apply*
+(matches the plan's original default), so this needs an explicit decision
+before relying on it, not a silent "ship it anyway."
+
+**Real incident, mid-session**: an accidental `git commit` (mine) swept in
+a concurrent session's staged-but-uncommitted WNBA live-snapshot fix
+(`syndicate/features/wnba/cards.py` + its test) because I checked
+`git status` scoped to one directory instead of the full staged diff
+before committing -- confirmed via `git show --stat HEAD` after the fact.
+Nothing was lost (content is real and correct, just under the wrong
+commit message) and nothing was pushed, but by the time this was caught
+the concurrent session had already built two more commits on top, so a
+safe `reset --soft` was no longer possible without rewriting commits
+other work now depends on -- left as-is rather than risk a rebase.
+**New operational lesson**: always run a full, unscoped `git status`/
+`git diff --cached` immediately before every commit, not a directory-
+scoped one, even when you believe you know exactly what you staged.
+
+**Not done this session**: item #6 (enable the autorun trigger in
+production) -- not yet acted on, paused pending the injury-adjustment
+backtest result above and a decision on whether autorun should default
+the adjustment on or off; #9 (NCAAF props/ladders pipeline) remains open,
+not selected this session.
 
 ### Reconciliation 2026-08-01 part 2 (Layer 2 board: the real root cause of the Alyssa Thomas duplicate, shipped and deployed)
 
