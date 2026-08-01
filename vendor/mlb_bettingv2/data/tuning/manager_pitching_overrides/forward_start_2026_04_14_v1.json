@@ -46,18 +46,21 @@
     "starter_tto_quality_scaling": {
       "generated_at": "2026-08-01",
       "description": "_starter_tto_quality_mult (sim_engine/simulate.py) scales pull_starter_third_time_penalty (the flat, per-team 3rd-time-through-order penalty) by the starter's own K-rate. It has TWO consumers: the pull-probability logit in _select_pitcher_v2 (tested first, part 3, and found to have no measurable real-scale effect on outs) and a K/BB/HR/inplay RATE-degradation multiplier in _adjust_pitcher_day_rates_v2 (simulate.py:1936) that was never separately isolated -- every starter's simulated K-rate gets knocked down by the same flat amount once fatigued past bf>=18, elite arms included, even though real aces are known to hold their stuff better through the order. The part-3 test (weight=0.5, 12 dates, before k_combine_log5_weight or starter_quality_hook_weight were promoted) was underpowered by the same margin that made the K-rate combiner itself look like a dead end at 12-16 dates before the full 46-date/882-start test revealed a real corr=0.283 signal -- re-tested at full scale on top of the three already-promoted fixes.",
-      "selected_value": 1.0,
-      "rationale": "Real, small, consistently-signed effect confirmed at n=882: all four market-line SO tiers move the correct direction (elite -2.618->-2.555, mid-high -1.131->-1.100, mid +0.161->+0.147, back-end +0.827->+0.789), and elite outs bias improves meaningfully (-0.422->-0.202). One blemish: mid-high outs bias worsens slightly (+0.905->+1.011) -- the same tier that has responded oppositely to every hook-related change tested tonight (uniform hook-offset sweep, this fix). Full-game side effects flat (brier_home_win 0.2295->0.2305, mae_total_runs 3.471->3.467, mae_run_margin 3.442->3.446). Modest magnitude -- closes roughly 2-3% of the elite SO gap, the same order as the K-rate combiner fix -- but real, correctly directioned, and stacks additively with the other three promoted fixes at no meaningful cost.",
+      "selected_value": 0.0,
+      "REVERTED_2026-08-01": "Promoted to 1.0 first (see 'superseded_rationale'), then reverted the same session once tested against the betting-accuracy harness properly -- part 11's test was stacked on top of the already-reverted inplay_hit_combine_log5_weight=0.0 state; retested stacked on the correct (inplay=log5) happy-place checkpoint instead (full46_baseline_v2 vs full46_happyplace_test, n=882 pooled hit rate): strikeouts 55.78%->54.65% (WORSE -- this is the exact market the fix was built to help, via the K-rate decay mechanism, and it made real-money accuracy worse there), hits_allowed 54.63%->56.43% (better), outs 59.54%->59.15% (slightly worse). Net effect across the three markets is roughly a wash at best, and it degrades the one market it specifically targeted. Given the session's core lesson (statistical-bias improvements do not reliably translate to betting-accuracy improvements -- see inplay_hit_combine_log5_weight's REVERTED note above), a fix with mixed/ambiguous real-money evidence and a per-tier statistical benefit of only ~2-3% doesn't clear the bar. Reverted to 0.0 (unconditional no-op, reproducing pre-session behavior exactly).",
+      "superseded_rationale": "Real, small, consistently-signed STATISTICAL effect confirmed at n=882: all four market-line SO tiers moved the correct direction (elite -2.618->-2.555, mid-high -1.131->-1.100, mid +0.161->+0.147, back-end +0.827->+0.789), and elite outs bias improved meaningfully (-0.422->-0.202). One blemish: mid-high outs bias worsened slightly. Full-game side effects flat. This looked like a clean, safe, small win until graded against real betting outcomes in the correct (non-confounded) context.",
       "starter_tto_quality_league_k": 0.223,
       "starter_tto_quality_spread": 0.06,
       "matched_market_line_starts": 882,
       "holdout_games": 11,
       "tune_games": 35,
-      "batch_artifacts": "vendor/mlb_bettingv2/data/eval/_prototype_test/full46_inplayflat_v1 and full46_ttorate_w10"
+      "betting_hit_rate_without_tto": {"strikeouts": 0.5578, "hits_allowed": 0.5463, "outs": 0.5954},
+      "betting_hit_rate_with_tto": {"strikeouts": 0.5465, "hits_allowed": 0.5643, "outs": 0.5915},
+      "batch_artifacts": "vendor/mlb_bettingv2/data/eval/_prototype_test/full46_baseline_v2, full46_happyplace_test; betting_accuracy.py"
     }
   },
   "starter_hook_add_pitches": -13,
   "starter_hook_stamina_excess_weight": 0.75,
   "starter_quality_hook_weight": 1.0,
-  "starter_tto_quality_scaling": 1.0
+  "starter_tto_quality_scaling": 0.0
 }

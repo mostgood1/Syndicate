@@ -1549,6 +1549,73 @@ runs, `dates_batch2.txt`, `batch2_baseline/`, `batch2_k06/`,
 `data/daily/snapshots/2026-07-10/roster_objs/` from the k_rate sanity
 check).
 
+### Reconciliation 2026-08-01 (MLB pitcher-prop prototype fixes part 13: happy-place found -- TTO-scaling also reverted, session's final state is 2-of-4 fixes)
+
+Direct continuation of part 12. Part 12 left one open question: does
+`starter_tto_quality_scaling=1.0` (part 11) still help when stacked on
+the *correct* checkpoint (k-fix + quality-hook, inplay at its original
+log5) instead of the already-reverted inplay-flat state it was
+originally tested against? Ran `full46_happyplace_test`
+(k=1.0, quality-hook=1.0, inplay=log5, tto=1.0) and graded it with
+`betting_accuracy.py` against `full46_baseline_v2` (the same config
+minus tto):
+
+| checkpoint | strikeouts | hits_allowed | outs |
+|---|---|---|---|
+| k+quality-hook (no TTO) | 55.78% | 54.63% | 59.54% |
+| +TTO-scaling stacked on top | **54.65%** (worse) | 56.43% (better) | 59.15% (slightly worse) |
+
+Mixed, and net negative on the one market the fix was specifically built
+to help (strikeouts, via the K-rate fatigue-decay mechanism). Given the
+session's now-established lesson -- a small statistical win (~2-3% of
+the elite SO gap) is not sufficient justification when the real-money
+evidence is ambiguous-to-negative -- reverted
+`starter_tto_quality_scaling` back to `0.0` (unconditional no-op) in
+`manager_pitching_overrides/forward_start_2026_04_14_v1.json`, full
+evidence documented in a `REVERTED_2026-08-01` field.
+
+**This lands the production config on exactly `full46_baseline_v2`'s
+configuration** (k_combine_log5_weight=1.0,
+starter_quality_hook_weight=1.0, everything else at pre-session
+defaults) -- already fully validated on both statistical accuracy (parts
+6-7) and betting accuracy (part 12) with no further testing needed.
+
+**Session's final resolution, of four fixes prototyped and promoted
+tonight, two survived contact with real betting outcomes**:
+- KEPT: `k_combine_log5_weight=1.0` (part 6) -- strikeout per-PA rate
+  log5 blend.
+- KEPT: `starter_quality_hook_weight=1.0` (part 7) -- quality-aware
+  pull-decision hook.
+- REVERTED: `inplay_hit_combine_log5_weight` back to `1.0` (part 10's
+  fix reverted, part 12) -- hits-allowed statistical fix, real betting
+  cost.
+- REVERTED: `starter_tto_quality_scaling` back to `0.0` (part 11's fix
+  reverted, this part) -- TTO K-rate-decay scaling, mixed/net-negative
+  betting evidence, including on its own target market.
+
+At this final state vs. the pre-session baseline (`full46_prefix_v2`,
+n=882 pooled): strikeouts 52.49% -> 55.78% (+3.29pp, a real, clean win),
+hits_allowed 55.66% -> 54.63% (-1.03pp, small regression -- the
+k-fix/quality-hook combination itself has a modest betting-accuracy cost
+on this market even without the two reverted fixes, not yet isolated
+further), outs 57.75% -> 59.54% (+1.79pp, a real win). Net: two markets
+meaningfully better, one market very slightly worse, none of it deployed
+to Render yet (only the original two-fix state was deployed earlier
+this session, commit `6ba844a9`).
+
+**Not yet done**: isolate whether the small hits_allowed betting-accuracy
+regression at the final state (-1.03pp vs. pre-session) traces to
+`k_combine_log5_weight` or `starter_quality_hook_weight` specifically --
+both change PA-count/rate mechanics that could plausibly leak into hits
+allowed the same way `inplay_hit_combine_log5_weight` did. Given the
+regression is small (-1.03pp, vs. the ~3-4pp swings the reverted fixes
+caused) this wasn't chased further tonight, but it's the natural next
+step if this thread is picked back up. Walks accuracy still has no
+attempted fix. The mid-high tier's contrarian pattern across every
+hook-related test tonight remains unexplained.
+
+Temp validation artifacts, same directory: `full46_happyplace_test/`.
+
 ### Reconciliation 2026-07-31 part 4 (NFL: real SmartSim 2.0 projection engine + market board + Ask the Syndicate)
 
 Continuation of the same "wire up NFL fully based on MLB" session (parts 1-2
