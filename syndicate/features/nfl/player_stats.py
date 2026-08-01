@@ -40,6 +40,23 @@ _PLAY_COLUMNS = (
     "receiving_yards",
     "complete_pass",
     "touchdown",
+    # Added for syndicate.features.nfl.injury_adjustment -- real per-play
+    # team/value attribution, not used by any stat extractor above.
+    "posteam",
+    "defteam",
+    "epa",
+    "sack_player_id",
+    "half_sack_1_player_id",
+    "half_sack_2_player_id",
+    "interception_player_id",
+    "tackle_for_loss_1_player_id",
+    "tackle_for_loss_2_player_id",
+    "forced_fumble_player_1_player_id",
+    "forced_fumble_player_2_player_id",
+    "fumble_recovery_1_player_id",
+    "fumble_recovery_2_player_id",
+    "pass_defense_1_player_id",
+    "pass_defense_2_player_id",
 )
 
 

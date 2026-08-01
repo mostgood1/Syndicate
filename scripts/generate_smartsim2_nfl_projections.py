@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import statistics
 import sys
 import time
@@ -42,6 +43,7 @@ if str(REPO_ROOT) not in sys.path:
 from syndicate.features.football.sim_engine.smartsim2.calibration_profile import NFL_CALIBRATION_PROFILE
 from syndicate.features.football.sim_engine.smartsim2.contracts import SmartSim2SimulationInput
 from syndicate.features.football.sim_engine.smartsim2.game_simulator import simulate_game
+from syndicate.features.nfl.injury_adjustment import adjust_team_rating_for_injuries
 from syndicate.features.nfl.smartsim2_projection import SmartSimNflProjection
 from syndicate.features.nfl.smartsim2_projection import write_projection_artifact
 from syndicate.features.nfl.sources import default_nfl_source_root
@@ -207,10 +209,21 @@ def build_projection(
     current_plays: list[tuple[int, str, str, str, float]],
     prior_plays: list[tuple[int, str, str, str, float]] | None,
     seeds: int = SEEDS_PER_GAME,
-) -> SmartSimNflProjection:
+    apply_injury_adjustment: bool = True,
+) -> tuple[SmartSimNflProjection, list[dict]]:
     home_off, home_def, home_source = team_rating(home_team, week=week, current_plays=current_plays, prior_plays=prior_plays)
     away_off, away_def, away_source = team_rating(away_team, week=week, current_plays=current_plays, prior_plays=prior_plays)
     rating_source = f"nflverse_pbp_epa_rolling[{home_source}/{away_source}]"
+
+    injury_diagnostics: list[dict] = []
+    if apply_injury_adjustment:
+        home_off, home_off_notes = adjust_team_rating_for_injuries(season=season, week=week, team=home_team, side="offense", base_rating=home_off)
+        home_def, home_def_notes = adjust_team_rating_for_injuries(season=season, week=week, team=home_team, side="defense", base_rating=home_def)
+        away_off, away_off_notes = adjust_team_rating_for_injuries(season=season, week=week, team=away_team, side="offense", base_rating=away_off)
+        away_def, away_def_notes = adjust_team_rating_for_injuries(season=season, week=week, team=away_team, side="defense", base_rating=away_def)
+        for team_name, notes in ((home_team, home_off_notes + home_def_notes), (away_team, away_off_notes + away_def_notes)):
+            for note in notes:
+                injury_diagnostics.append({"game_id": game_id, "team": team_name, **note})
 
     home_scores: list[int] = []
     away_scores: list[int] = []
@@ -232,7 +245,7 @@ def build_projection(
     totals = [h + a for h, a in zip(home_scores, away_scores)]
     home_win_rate = sum(1 for m in margins if m > 0) / seeds
 
-    return SmartSimNflProjection(
+    projection = SmartSimNflProjection(
         game_id=game_id,
         season=season,
         week=week,
@@ -250,6 +263,7 @@ def build_projection(
         rating_source=rating_source,
         generated_at=datetime.now(timezone.utc).isoformat(),
     )
+    return projection, injury_diagnostics
 
 
 def main() -> None:
@@ -258,6 +272,7 @@ def main() -> None:
     parser.add_argument("--week", type=int, required=True)
     parser.add_argument("--seeds", type=int, default=SEEDS_PER_GAME)
     parser.add_argument("--progress-log", type=Path, default=None)
+    parser.add_argument("--no-injury-adjustment", action="store_true", help="Skip the real injury-rating adjustment (syndicate.features.nfl.injury_adjustment) -- for backtesting on/off comparisons.")
     args = parser.parse_args()
 
     def log(message: str) -> None:
@@ -281,8 +296,9 @@ def main() -> None:
     log(f"SCHEDULE rows={len(schedule_rows)} used_real_schedule_fallback={used_real_schedule_fallback}")
 
     projections: list[SmartSimNflProjection] = []
+    all_injury_diagnostics: list[dict] = []
     for row in schedule_rows:
-        projection = build_projection(
+        projection, injury_diagnostics = build_projection(
             season=args.season,
             week=args.week,
             home_team=row["home_team"],
@@ -291,16 +307,24 @@ def main() -> None:
             current_plays=current_plays,
             prior_plays=prior_plays,
             seeds=args.seeds,
+            apply_injury_adjustment=not args.no_injury_adjustment,
         )
         projections.append(projection)
+        all_injury_diagnostics.extend(injury_diagnostics)
         log(f"PROJECTED {row['away_team']} @ {row['home_team']} -> {projection.home_score_mean:.1f}-{projection.away_score_mean:.1f}")
 
     path = write_projection_artifact(projections, season=args.season, week=args.week, data_root=DATA_ROOT)
+    injury_notes_path = DATA_ROOT / f"smartsim2_projections_{args.season}_wk{args.week}_injury_notes.json"
+    if all_injury_diagnostics:
+        injury_notes_path.write_text(json.dumps(all_injury_diagnostics, indent=2), encoding="utf-8")
+    elif injury_notes_path.exists():
+        injury_notes_path.unlink()
     elapsed = time.time() - start
 
-    log(f"WRITE_DONE path={path} projections={len(projections)} elapsed={elapsed:.1f}s")
+    log(f"WRITE_DONE path={path} projections={len(projections)} elapsed={elapsed:.1f}s injury_adjustments={len(all_injury_diagnostics)}")
     print(f"schedule_rows={len(schedule_rows)}")
     print(f"used_real_schedule_fallback={used_real_schedule_fallback}")
+    print(f"injury_adjustments_applied={len(all_injury_diagnostics)}")
     print(f"projections_written={len(projections)}")
     print(f"elapsed_seconds={elapsed:.1f}")
     print(f"artifact_path={path}")

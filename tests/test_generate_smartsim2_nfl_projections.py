@@ -149,15 +149,28 @@ class BuildProjectionTests(unittest.TestCase):
             _play(1, "DEN", "KC", "pass", 0.1),
             _play(1, "KC", "DEN", "run", -0.05),
         ]
-        kwargs = dict(season=2025, week=2, home_team="KC", away_team="DEN", game_id="2025_02_DEN_KC", current_plays=current, prior_plays=None, seeds=25)
-        first = gen.build_projection(**kwargs)
-        second = gen.build_projection(**kwargs)
+        kwargs = dict(season=2025, week=2, home_team="KC", away_team="DEN", game_id="2025_02_DEN_KC", current_plays=current, prior_plays=None, seeds=25, apply_injury_adjustment=False)
+        first, first_notes = gen.build_projection(**kwargs)
+        second, second_notes = gen.build_projection(**kwargs)
         self.assertEqual(first.home_score_mean, second.home_score_mean)
         self.assertEqual(first.seeds_used, 25)
         self.assertEqual(first.profile_name, "nfl_v1")
         self.assertTrue(0.0 <= first.home_win_rate <= 1.0)
         self.assertGreater(first.total_mean, 0)
         self.assertGreaterEqual(first.margin_stdev, 0)
+        self.assertEqual(first_notes, [])
+        self.assertEqual(second_notes, [])
+
+    def test_injury_adjustment_disabled_by_default_flag_skips_lookup(self) -> None:
+        current = [
+            _play(1, "KC", "DEN", "pass", 0.3),
+            _play(1, "DEN", "KC", "run", -0.1),
+        ]
+        projection, notes = gen.build_projection(
+            season=2025, week=2, home_team="KC", away_team="DEN", game_id="2025_02_DEN_KC",
+            current_plays=current, prior_plays=None, seeds=5, apply_injury_adjustment=False,
+        )
+        self.assertEqual(notes, [])
 
 
 if __name__ == "__main__":
