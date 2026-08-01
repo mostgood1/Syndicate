@@ -579,6 +579,26 @@ table.board-blotter th {
   background: rgba(15, 30, 47, 0.9);
 }
 
+table.board-blotter th.board-blotter__sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+table.board-blotter th.board-blotter__sortable:hover {
+  color: var(--cards-text-soft);
+}
+
+table.board-blotter th.board-blotter__sortable--active {
+  color: var(--cards-text);
+}
+
+.board-blotter__sort-arrow {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 9px;
+}
+
 table.board-blotter td {
   padding: 9px 12px;
   border-bottom: 1px solid var(--cards-line);

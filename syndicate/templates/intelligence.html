@@ -197,6 +197,13 @@
     view: urlParams.get("view") === "cards" ? "cards" : "blotter",
     game: urlParams.get("game") || "all",
     steamOnly: urlParams.get("steam") === "1",
+    // Blotter column sort, client-side only (not persisted to the URL --
+    // this is a viewing preference for the current session, not a
+    // shareable board configuration like sport/date/filters are). null
+    // means "use the default" (Edge, descending), matching the blotter's
+    // original hardcoded behavior before sorting was configurable.
+    sortColumn: null,
+    sortDirection: "desc",
   };
   {
     const dateInput = document.getElementById("board-date");
@@ -1263,6 +1270,67 @@
     wireSlipButtons(container);
   }
 
+  function movementSortValue(item) {
+    const structured = item.line_odds_movement && typeof item.line_odds_movement === "object" ? item.line_odds_movement : null;
+    if (structured) {
+      const lineDelta = numericValue(structured.line_delta);
+      if (lineDelta !== null) return Math.abs(lineDelta);
+      const priceDelta = numericValue(structured.price_delta);
+      if (priceDelta !== null) return Math.abs(priceDelta);
+    }
+    const movement = item.movement && typeof item.movement === "object" ? item.movement : {};
+    const delta = numericValue(movement.delta);
+    return delta !== null ? Math.abs(delta) : null;
+  }
+
+  // One entry per sortable blotter column, in table order. getValue returns
+  // a raw comparable primitive (not the display string) so e.g. odds sort
+  // numerically (-150 before +200) rather than lexicographically. The
+  // trailing action-button column has no entry -- it isn't sortable.
+  const BLOTTER_COLUMNS = [
+    { key: "lane", label: "Lane", type: "number", getValue: (item) => (recommendationState(item) === "live" ? 1 : 0) },
+    { key: "matchup", label: "Matchup", type: "string", getValue: (item) => displayTitle(item).toLowerCase() },
+    { key: "pick", label: "Pick", type: "string", getValue: (item) => (propLine(item) || "").toLowerCase() },
+    { key: "odds", label: "Odds", type: "number", getValue: (item) => {
+        const raw = Number(item.odds ?? item.odds_current);
+        return Number.isFinite(raw) ? raw : null;
+      } },
+    { key: "projected", label: "Projected", type: "number", getValue: (item) => {
+        const raw = Number(item.sim_projection ?? item.projected ?? item.projected_sim);
+        return Number.isFinite(raw) ? raw : null;
+      } },
+    { key: "live", label: "Live", type: "number", getValue: (item) => {
+        if (recommendationState(item) !== "live") return null;
+        const candidateType = String(item.candidate_type || item.type || "").trim().toLowerCase();
+        const isProp = candidateType === "prop" || Boolean(item.player_name || item.player_id);
+        const raw = Number(isProp ? item.live_projection : (item.live_projection ?? item.live_total));
+        return Number.isFinite(raw) ? raw : null;
+      } },
+    { key: "actual", label: "Actual", type: "number", getValue: (item) => {
+        if (recommendationState(item) !== "live") return null;
+        const raw = Number(item.actual);
+        return Number.isFinite(raw) ? raw : null;
+      } },
+    { key: "winpct", label: "Win%", type: "number", getValue: (item) => confidenceValue(item) },
+    { key: "edge", label: "Edge", type: "number", getValue: (item) => edgeValue(item) },
+    { key: "move", label: "Move", type: "number", getValue: movementSortValue },
+  ];
+
+  // Missing values always sort to the bottom regardless of direction --
+  // a "--" row racing to the top of an ascending sort would read as broken,
+  // not as "smallest value first".
+  function compareBlotterItems(a, b, column, direction) {
+    const va = column.getValue(a);
+    const vb = column.getValue(b);
+    const aMissing = va === null || va === undefined || va === "";
+    const bMissing = vb === null || vb === undefined || vb === "";
+    if (aMissing && bMissing) return 0;
+    if (aMissing) return 1;
+    if (bMissing) return -1;
+    const cmp = column.type === "string" ? String(va).localeCompare(String(vb)) : va - vb;
+    return direction === "asc" ? cmp : -cmp;
+  }
+
   function renderBlotter(items) {
     const container = document.getElementById("board-cards");
     if (!container) return;
@@ -1270,12 +1338,19 @@
       container.innerHTML = `<div class="board-empty">No opportunities match the current filters.</div>`;
       return;
     }
-    const sorted = items.slice().sort((a, b) => edgeValue(b) - edgeValue(a));
+    const activeColumn = BLOTTER_COLUMNS.find((col) => col.key === state.sortColumn) || BLOTTER_COLUMNS.find((col) => col.key === "edge");
+    const sortDirection = state.sortColumn ? state.sortDirection : "desc";
+    const sorted = items.slice().sort((a, b) => compareBlotterItems(a, b, activeColumn, sortDirection));
+    const headerCells = BLOTTER_COLUMNS.map((col) => {
+      const active = col.key === activeColumn.key && Boolean(state.sortColumn);
+      const arrow = active ? `<span class="board-blotter__sort-arrow">${sortDirection === "asc" ? "▲" : "▼"}</span>` : "";
+      return `<th class="board-blotter__sortable${active ? " board-blotter__sortable--active" : ""}" data-sort-key="${col.key}">${escapeHtml(col.label)}${arrow}</th>`;
+    }).join("");
     container.innerHTML = `
       <div class="board-blotter-wrap">
         <table class="board-blotter">
           <thead>
-            <tr><th>Lane</th><th>Matchup</th><th>Pick</th><th>Odds</th><th>Projected</th><th>Live</th><th>Actual</th><th>Win%</th><th>Edge</th><th>Move</th><th></th></tr>
+            <tr>${headerCells}<th></th></tr>
           </thead>
           <tbody>
             ${sorted.map((item) => {
@@ -1355,6 +1430,22 @@
           prediction_id: row.getAttribute("data-syndicate-prediction-id") || "",
           recommendation_id: row.getAttribute("data-syndicate-recommendation-id") || "",
         });
+      });
+    });
+    container.querySelectorAll("th[data-sort-key]").forEach((headerCell) => {
+      headerCell.addEventListener("click", () => {
+        const key = headerCell.getAttribute("data-sort-key");
+        const column = BLOTTER_COLUMNS.find((col) => col.key === key);
+        if (!column) return;
+        if (state.sortColumn === key) {
+          state.sortDirection = state.sortDirection === "asc" ? "desc" : "asc";
+        } else {
+          state.sortColumn = key;
+          // Numeric columns read best highest-first (biggest edge, biggest
+          // move); text columns read best A-to-Z on a first click.
+          state.sortDirection = column.type === "string" ? "asc" : "desc";
+        }
+        renderBoardBody();
       });
     });
     wireSlipButtons(container);
