@@ -3484,6 +3484,12 @@ def _alternate_live_snapshot_processed_roots() -> list[Path]:
         return []
 
 
+def _live_snapshot_payload_timestamp(payload: dict[str, Any] | None) -> datetime | None:
+    if not isinstance(payload, dict):
+        return None
+    return _parse_payload_timestamp(payload.get("odds_refreshed_at") or payload.get("generated_at"))
+
+
 def _local_live_snapshot_payload(kind: str, selected_date: str) -> dict[str, Any] | None:
     resolved_date = str(selected_date or "").strip()
     if not resolved_date:
@@ -3494,8 +3500,6 @@ def _local_live_snapshot_payload(kind: str, selected_date: str) -> dict[str, Any
         payload = _local_live_snapshot_payload_cached(kind, resolved_date, int(stat.st_mtime_ns), int(stat.st_size))
     except Exception:
         payload = _local_live_snapshot_payload_cached(kind, resolved_date, None, None)
-    if payload is not None:
-        return payload
     # Found live 2026-08-01: processed_root() (current_odds_root_for_sport)
     # always prefers the "source_artifacts" candidate root whether or not
     # that location actually has anything written to it -- the same
@@ -3504,21 +3508,29 @@ def _local_live_snapshot_payload(kind: str, selected_date: str) -> dict[str, Any
     # refresh_wnba_oddsapi_props.py's own --artifact-root can legitimately
     # resolve to the OTHER candidate root, so a real, fresh write can sit
     # under a completely different keyvalue key than this default read ever
-    # checks. Confirmed live: the writer's own diagnostic showed a real
-    # period_totals write succeeding while this read kept returning the same
-    # stale snapshot. Try every other candidate root before giving up --
-    # bypasses the lru_cache above deliberately (only reached when the
-    # default lookup already failed, so the extra keyvalue round-trip is
-    # not a hot-path cost).
+    # checks. Originally this only checked alternates when the primary
+    # lookup returned None -- but confirmed live 2026-08-01 (NYL@PHX,
+    # generated_at stuck at 15:18:08 while the writer's own diagnostic
+    # showed a fresh, real period_totals write at 15:22:38) that the
+    # primary root can return a STALE-but-present payload written by an
+    # earlier cycle, which short-circuited the fallback entirely. Compare
+    # freshness across every candidate root and keep whichever is newest,
+    # not just whichever answers first.
     default_root = processed_root()
     file_name = f"{str(kind or '').strip().lower()}_{resolved_date}.jsonl"
+    best_payload = payload
+    best_timestamp = _live_snapshot_payload_timestamp(payload)
     for alt_root in _alternate_live_snapshot_processed_roots():
         if alt_root == default_root:
             continue
         alt_payload = _read_jsonl_snapshot_payload(alt_root / "live_snapshots" / file_name)
-        if alt_payload is not None:
-            return alt_payload
-    return None
+        if alt_payload is None:
+            continue
+        alt_timestamp = _live_snapshot_payload_timestamp(alt_payload)
+        if best_payload is None or (alt_timestamp is not None and (best_timestamp is None or alt_timestamp > best_timestamp)):
+            best_payload = alt_payload
+            best_timestamp = alt_timestamp
+    return best_payload
 
 
 _local_live_snapshot_payload.cache_clear = _local_live_snapshot_payload_cached.cache_clear  # type: ignore[attr-defined]

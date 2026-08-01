@@ -1,0 +1,17 @@
+game_id,season,week,home_team,away_team,home_score_mean,away_score_mean,margin_mean,total_mean,margin_stdev,total_stdev,home_win_rate,seeds_used,profile_name,rating_source,generated_at
+2026_16_HOU_PHI,2026,16,PHI,HOU,21.48,20.777,0.703,42.257,14.021,11.372,0.5267,300,nfl_v1,nflverse_pbp_epa_rolling[prior_season_fallback/prior_season_fallback],2026-08-01T20:18:10.006208+00:00
+2026_16_GB_CHI,2026,16,CHI,GB,24.303,23.163,1.14,47.467,13.545,12.174,0.5333,300,nfl_v1,nflverse_pbp_epa_rolling[prior_season_fallback/prior_season_fallback],2026-08-01T20:18:27.542145+00:00
+2026_16_BUF_DEN,2026,16,DEN,BUF,22.313,22.47,-0.157,44.783,13.859,11.601,0.4933,300,nfl_v1,nflverse_pbp_epa_rolling[prior_season_fallback/prior_season_fallback],2026-08-01T20:18:43.204769+00:00
+2026_16_LA_SEA,2026,16,SEA,LA,21.757,21.82,-0.063,43.577,13.404,11.506,0.4933,300,nfl_v1,nflverse_pbp_epa_rolling[prior_season_fallback/prior_season_fallback],2026-08-01T20:19:03.617344+00:00
+2026_16_TB_ATL,2026,16,ATL,TB,22.613,21.667,0.947,44.28,14.3,12.057,0.5133,300,nfl_v1,nflverse_pbp_epa_rolling[prior_season_fallback/prior_season_fallback],2026-08-01T20:19:23.663956+00:00
+2026_16_CLE_BAL,2026,16,BAL,CLE,22.493,19.537,2.957,42.03,13.721,11.935,0.5867,300,nfl_v1,nflverse_pbp_epa_rolling[prior_season_fallback/prior_season_fallback],2026-08-01T20:19:40.178116+00:00
+2026_16_CIN_IND,2026,16,IND,CIN,24.803,21.787,3.017,46.59,13.306,11.001,0.59,300,nfl_v1,nflverse_pbp_epa_rolling[prior_season_fallback/prior_season_fallback],2026-08-01T20:19:59.475401+00:00
+2026_16_LAC_MIA,2026,16,MIA,LAC,22.15,22.45,-0.3,44.6,14.838,11.145,0.4533,300,nfl_v1,nflverse_pbp_epa_rolling[prior_season_fallback/prior_season_fallback],2026-08-01T20:20:14.583069+00:00
+2026_16_WAS_MIN,2026,16,MIN,WAS,21.673,19.13,2.543,40.803,14.152,10.853,0.5767,300,nfl_v1,nflverse_pbp_epa_rolling[prior_season_fallback/prior_season_fallback],2026-08-01T20:20:34.391921+00:00
+2026_16_ARI_NO,2026,16,NO,ARI,21.357,20.063,1.293,41.42,14.483,11.303,0.5267,300,nfl_v1,nflverse_pbp_epa_rolling[prior_season_fallback/prior_season_fallback],2026-08-01T20:20:55.677339+00:00
+2026_16_NE_NYJ,2026,16,NYJ,NE,19.89,24.247,-4.357,44.137,13.393,12.006,0.3767,300,nfl_v1,nflverse_pbp_epa_rolling[prior_season_fallback/prior_season_fallback],2026-08-01T20:21:14.745955+00:00
+2026_16_CAR_PIT,2026,16,PIT,CAR,23.203,22.047,1.157,45.25,14.873,11.554,0.5333,300,nfl_v1,nflverse_pbp_epa_rolling[prior_season_fallback/prior_season_fallback],2026-08-01T20:21:33.981716+00:00
+2026_16_TEN_LV,2026,16,LV,TEN,20.117,18.47,1.647,38.587,12.629,10.931,0.5467,300,nfl_v1,nflverse_pbp_epa_rolling[prior_season_fallback/prior_season_fallback],2026-08-01T20:21:52.596407+00:00
+2026_16_SF_KC,2026,16,KC,SF,23.09,22.353,0.737,45.443,13.77,11.366,0.51,300,nfl_v1,nflverse_pbp_epa_rolling[prior_season_fallback/prior_season_fallback],2026-08-01T20:22:13.729589+00:00
+2026_16_JAX_DAL,2026,16,DAL,JAX,23.25,24.44,-1.19,47.69,13.524,13.152,0.43,300,nfl_v1,nflverse_pbp_epa_rolling[prior_season_fallback/prior_season_fallback],2026-08-01T20:22:34.522293+00:00
+2026_16_NYG_DET,2026,16,DET,NYG,24.603,21.903,2.7,46.507,13.232,12.046,0.5867,300,nfl_v1,nflverse_pbp_epa_rolling[prior_season_fallback/prior_season_fallback],2026-08-01T20:22:53.206388+00:00
