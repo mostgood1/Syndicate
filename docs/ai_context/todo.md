@@ -689,6 +689,147 @@ not urgency -- none of this is time-sensitive.
    improve betting accuracy, or just cosmetically shrink the bias
    number by regressing toward what the market already knows).
 
+### Reconciliation 2026-08-01 (MLB pitcher-prop prototype fixes part 9: all five part-8 items completed -- one new major finding, one approach ruled out with real data)
+
+Direct continuation of part 8. User asked to proceed with all five scoped
+items in one pass. Results below. **Biggest outcome: a previously
+unmeasured, much larger defect was found (hits-allowed over-projection),
+and the market-blending idea floated in part 8 item 5 is empirically
+ruled out with real data, not just argued analytically.**
+
+**Methodology correction caught before it mattered**: both promoted fixes
+(part 6/7) are now the production defaults in the forward-tuning override
+files, so a batch run *without* explicit `--pitch-model-overrides`/
+`--manager-pitching-overrides` flags now picks up both fixes
+automatically via `should_use_forward_tuning`. First attempt at a
+"combined-fixes" batch was therefore redundant with what should have
+been the plain baseline -- caught by comparing the two, stopped the
+redundant run, and used **explicit `k_combine_log5_weight=0.0` /
+`starter_quality_hook_weight=0.0` overrides** to reconstruct a genuine
+pre-fix baseline (`full46_prefix_v2`) instead. `full46_baseline_v2` (no
+explicit overrides) is therefore the **with-both-fixes** state, not a
+true baseline -- don't reuse that name's apparent meaning without
+checking which config was actually in effect at the time it was run.
+
+**Item 1 (validate both fixes together)**: satisfied by the above --
+`full46_baseline_v2` *is* the combined-both-fixes state at full scale
+(46 dates, 100 sims, both promoted overrides active simultaneously). No
+separate run needed once the naming was corrected.
+
+**Item 2 (walks and hits-allowed, plumbing + real accuracy)**:
+extended `eval_sim_day_vs_actual.py` to capture real BB/hits-allowed
+(`_parse_actual_starter_pitching`, reading `baseOnBalls`/`hits` off the
+real StatsAPI boxscore -- already available, just never wired in) and
+predicted `bb_mean`/`hits_mean` (`prop_acc` accumulator, mirroring the
+existing so/outs/pitches pattern -- the sim already tracks `pr["BB"]`/
+`pr["H"]` per game, this was a report-plumbing gap only). Smoke-tested
+before any full run. Committed (`2dd98087`). Real tier-bucketed bias,
+pre-fix vs. with-fixes (46 dates, 882 matched starts):
+
+| tier | walks actual | pre-fix bias | with-fixes bias | hits actual | pre-fix bias | with-fixes bias |
+|---|---|---|---|---|---|---|
+| elite | 1.79 | -0.275 | -0.263 | 4.59 | **+1.267** | +1.164 |
+| mid-high | 1.76 | -0.149 | -0.171 | 4.88 | **+1.498** | +1.421 |
+| mid | 1.85 | -0.197 | -0.247 | 5.22 | **+1.424** | +1.322 |
+| back-end | 1.68 | -0.022 | -0.091 | 5.44 | **+1.655** | +1.567 |
+
+Walks: mildly under-projected everywhere, and the promoted fixes make it
+slightly *worse* in 3 of 4 tiers (neither fix touches `bb_tgt`'s
+combination, which is still the plain flat average -- see `_combined()`'s
+comment in `pitch_model.py`, explicitly left alone because log5 there
+previously regressed full-game totals). Small effect, not alarming.
+
+**Hits-allowed is the real finding: the model over-projects hits allowed
+by more than a full hit per start, in every single tier, even the best
+one.** This dwarfs anything chased tonight (the elite strikeout gap was
+~2.6 SO; this is 1.27-1.66 *hits*, on a stat where the total is usually
+only 4-7). The promoted fixes only close ~5-8% of it (a side effect of
+reducing outs over-projection, since fewer simulated PAs means fewer
+simulated hit opportunities -- consistent with the tier pattern: back-end
+had both the biggest outs over-projection *and* the biggest hits
+over-projection). But even elite tier, whose outs are *under*-projected
+(-0.42 to -0.46 bias, the opposite direction), still shows the largest
+relative hits over-projection of all four tiers in raw terms --
+meaning this is not purely the same workload mechanism; there's a
+separate, additive per-PA hit-rate defect layered on top, most likely in
+`inplay_hit_rate_mult=1.03` or the underlying inplay-hit combination
+itself, unrelated to anything fixed this session. **Not investigated
+further this session -- flagged for the next one, see the new item 6
+below.**
+
+**Item 3 (real betting-accuracy grading)**: built a new harness
+(`betting_accuracy.py`, scratchpad -- computes P(over) directly from
+each pitcher's predicted outcome *distribution*, not just mean-vs-line,
+graded against real market lines/odds for the three markets that
+actually exist in this data source: `strikeouts`, `hits_allowed`,
+`outs` -- confirmed no `walks` market exists anywhere in the OddsAPI
+pitcher-props file, so betting accuracy for walks specifically cannot be
+evaluated with available data). Hit rate, pre-fix -> with-fixes (46
+dates, real market lines/odds):
+
+| market | elite | mid-high | mid | back-end |
+|---|---|---|---|---|
+| strikeouts | 0.590 -> 0.590 | 0.514 -> 0.514 | 0.513 -> **0.605** | 0.556 -> 0.556 |
+| hits_allowed | 0.500 -> 0.469 | 0.549 -> 0.527 | 0.594 -> 0.597 | 0.514 -> 0.507 |
+| outs | 0.676 -> 0.676 | 0.601 -> 0.604 | 0.539 -> **0.568** | 0.575 -> **0.610** |
+
+Mixed, honest picture: strikeouts and outs show real, if modest,
+hit-rate improvement (best case: mid-tier strikeouts +9.2pp, back-end
+outs +3.5pp) or stay flat -- consistent with the fixes actually helping
+where they're targeted. **Hits-allowed hit rate got *worse* in 3 of 4
+tiers** (elite -3.1pp, mid-high -2.2pp, back-end -0.7pp) -- consistent
+with item 2's finding that neither fix touches the hits-allowed
+mechanism and the underlying defect there is untouched/separate.
+
+**Item 4 (remaining gap)**: substantially answered by items 2/3 above --
+the single largest remaining gap in MLB pitcher props is hits-allowed,
+not strikeouts or outs (which is what parts 3-7 focused on). The
+mid-high SO-vs-outs divergence noted in part 7 was not separately
+re-investigated this pass; superseded in priority by the hits-allowed
+finding.
+
+**Item 5 (market-line blending) -- tested empirically, ruled out.** Built
+`market_blend_eval.py` (scratchpad): shifts each pitcher's predicted
+outcome distribution toward the real market line by
+`alpha * (line - model_mean)` for alpha in {0, 0.3, 0.6, 1.0}, recomputes
+both statistical bias/MAE and betting hit-rate/Brier/edge at each alpha.
+**Confirms the hypothesis stated in part 8 exactly**: MAE improves
+monotonically with alpha (e.g. strikeouts/back-end: 1.735 -> 1.587;
+hits_allowed/back-end: 2.077 -> 1.717) -- expected almost by
+construction, since blending toward the market's own line trivially
+looks more "correct" on average. But real betting hit rate *degrades* at
+higher alpha in most cells, sometimes sharply: strikeouts/elite hit rate
+collapses from 0.590 (flat through alpha=0.6) to **0.385** at alpha=1.0
+(worse than a coin flip); outs/back-end from 0.610 (peak at alpha=0.3)
+down to 0.539 at full blend; several other cells show the same shape.
+Brier score often improves alongside MAE even as hit rate collapses --
+that's not a contradiction, it's the mechanism: forcing P(over) toward
+0.5 minimizes squared error against outcomes that are naturally close to
+50/50 (a well-set market line implies exactly that) while destroying any
+actual discriminative signal. **Conclusion: do not pursue market
+blending.** It would make props look statistically better while making
+them *less* bettable -- the opposite of the stated goal. This line of
+work is closed, not just deprioritized.
+
+**New item 6 for whoever picks this up next**: diagnose and fix the
+hits-allowed over-projection (+1.27 to +1.66 per start across every
+tier) -- this is now the largest known real defect in MLB pitcher props,
+bigger than anything addressed in parts 3-7. Suggested starting points:
+`inplay_hit_rate_mult=1.03` (a flat deterministic multiplier, never
+independently swept) and the underlying `_combined(..., "inplay_hit")`
+log5 combination itself (promoted 2026-07-19 for a different, smaller
+diagnosed gap -- worth checking whether that promotion's own backtest
+actually validated the *absolute* hit-rate level, or only relative
+movement). Use the same rigor as parts 3-7: real 46-date/100-sim
+backtests, not single-day samples; check full-game side effects before
+promoting anything.
+
+Temp validation artifacts, `vendor/mlb_bettingv2/data/eval/_prototype_test/`:
+`full46_prefix_v2/` (genuine pre-fix baseline, walks/hits-capable),
+`full46_baseline_v2/` (with-both-fixes state, walks/hits-capable, despite
+the name). Analysis scripts (not part of the repo, scratchpad only):
+`betting_accuracy.py`, `market_blend_eval.py`.
+
 ### Reconciliation 2026-07-31 part 5 (MLB pitcher-prop prototype fixes: real-scale backtest results -- effect much weaker than diagnosed, do not promote)
 
 Direct continuation of #178 (part 3, same session). User asked to keep working
