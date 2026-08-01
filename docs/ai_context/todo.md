@@ -4,15 +4,192 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 (soccer player-props
-root cause confirmed, board propagation still gapped)" below). Before that:
-"Reconciliation 2026-07-31 (soccer live-lens fast-tick engine)". Before that:
-"Reconciliation 2026-07-31 (keyvalue capacity remediation: TTL + reclaim
-sweep, WNBA props/games vanishing root cause)". Before that: "Reconciliation
-2026-07-31 (Layer 2 board: MLB live-status dedup fix + WNBA game/prop wiring,
-Phase A-C)". Before that: "Reconciliation 2026-07-31 (#161 part 2: NBA/WNBA
+Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 (Ask the Syndicate
+matchup features + Layer 2 live-candidate-stuck-at-pregame bug)" below).
+Before that: "Reconciliation 2026-08-01 (soccer player-props root cause
+confirmed, board propagation still gapped)". Before that: "Reconciliation
+2026-07-31 (soccer live-lens fast-tick engine)". Before that: "Reconciliation
+2026-07-31 (keyvalue capacity remediation: TTL + reclaim sweep, WNBA
+props/games vanishing root cause)". Before that: "Reconciliation 2026-07-31
+(Layer 2 board: MLB live-status dedup fix + WNBA game/prop wiring, Phase
+A-C)". Before that: "Reconciliation 2026-07-31 (#161 part 2: NBA/WNBA
 closing line, plus a production outage found and fixed along the way)".
 Prior session: 2026-07-30.
+
+### Reconciliation 2026-08-01 (Ask the Syndicate matchup features + Layer 2 live-candidate-stuck-at-pregame bug)
+
+Ran concurrently with the soccer player-props session below (different
+files throughout — coordinated via `send_message` before every
+refresh-worker deploy; see Coordination note at the end). Two threads: (1)
+a feature build for Ask the Syndicate that surfaced a chain of real coverage
+bugs along the way, and (2) a user-reported live-production board outage,
+root-caused and fixed in two parts. All 10 commits below confirmed present
+in `git log`/`git merge-base --is-ancestor` against current HEAD before
+writing this, working tree clean against every file touched (`git diff HEAD`
+empty) — not just taking the session's own word for "shipped."
+
+**New: #169** (filed and closed same session) — "Ask the Syndicate"
+(`/syndicate`) showed a hardcoded "No supporting steps returned" chip on
+literally every bet-analysis response. Root cause: `reasoning_steps` is
+gated behind `enable_reasoning_steps=False` (nothing in the
+`ask_the_syndicate*` blueprint family ever sets it) plus a compound-question
+heuristic ordinary single-subject questions never satisfy —
+structurally always empty (confirmed: 0 of 70+ occurrences in
+`reports/intelligence/query_response_cache.json` were non-empty). Fixed:
+`ask_the_syndicate_adapter.py` now flattens `analysis_brief`/
+`supporting_evidence`/`board_notes` (which *are* populated) into
+`explanation.supporting_points`; the chip row simply doesn't render when
+that's empty too, instead of a placeholder claiming something is missing.
+Commit `f93f9c67`.
+
+**New: #170** (filed and closed same session) — user asked to determine
+"exact likely outcomes in at bats" (hitter-vs-pitcher matchup) via Ask the
+Syndicate; MLB had no such lookup at all. Shipped a real batter↔pitcher
+matchup fetcher (`ask_the_syndicate_data.py`, extending `_mlb_bvp_evidence`)
+covering career BvP, today's worker-blended matchup probabilities (hits/TB/
+RBI/runs — real sim output, not a web-layer-computed blend, per an explicit
+design decision to avoid duplicating the sim's own modeling), both players'
+season K/BB/HR/in-play rates, and opposing-bullpen role/leverage/season
+rates. Found and fixed two coverage bugs surfaced while verifying against
+real production data (not just local fixtures) rather than declaring done
+after unit tests passed:
+- `hr_targets.json` only carries the ~30 daily HR-candidate batters
+  leaguewide, so the fetcher only worked for those — added a full-slate
+  roster-lineup fallback (`_mlb_find_batter_in_slate`) and a full-slate
+  pitcher search covering both starters and bullpen arms
+  (`_mlb_find_pitcher_in_slate`, generalized from a reliever-only search).
+- The fetcher was entirely unreachable through normal typed questions:
+  `context.sport` is only set from a `?sport=` URL param or a matched
+  `_SPORT_HINTS` keyword, so a plain player-name question (the common case)
+  landed in `_fetchers_for_sport("")`, whose "cheap fetchers only" list
+  never included the new matchup fetcher. Confirmed live before AND after
+  the fix (curl + Browser tool driving the actual page, not just the API).
+Commits `34d90f6b`, `2cf602c7`.
+
+**New: #171** (filed and closed same session) — same-day audit ("check all
+sports for the issue") of two more instances of bug classes already fixed
+for MLB/bet_analysis specifically:
+- The board could silently present an unrelated top-of-board pick as if it
+  answered a specific question (e.g. asking about a player with no board
+  recommendation returned a random unrelated steam move with "100% model
+  probability" right under their name — reported live, easy to misread as
+  the answer). First fix (annotate with a caveat) was insufficient per user
+  feedback — a bettor skimming stats could still misread it. Final fix:
+  `_bet_analysis_schema` suppresses the unrelated pick entirely when
+  `_reorder_by_relevance` finds the question named a specific subject
+  nothing on the board matches, showing a plain "No matching recommendation"
+  state instead. A stopword-list expansion was needed alongside this (generic
+  betting vocabulary like "spread"/"bet"/"line" was being treated as "the
+  question names something specific", incorrectly suppressing ordinary
+  generic questions like "what do you think of this spread"). Generalized
+  the same suppression to `_matchup_analysis_schema`/`_market_summary_schema`
+  (only ever wired into `_bet_analysis_schema`, so the bug was still live for
+  every other schema type/sport) — `market_summary` deliberately keeps its
+  opportunity list (plural board overview, not a single framed answer) but
+  now says plainly when nothing matches.
+- `_fetchers_for_sport("")` only covered MLB/WNBA; NBA/NHL have working
+  per-player fetchers that were silently skipped for any plain-typed
+  question lacking a `_SPORT_HINTS` keyword — same class of gap as #170's
+  second bug. Added both. NFL/NCAAF/NCAAB/soccer have **no** evidence
+  fetchers or sport-keywords at all — flagged, not built (a from-scratch
+  feature build per sport, not a wiring fix).
+Commits `15f39a63`, `9cc23e07`, `8e7ef573`.
+
+**New: #172** (filed and closed same session) — user asked whether WNBA has
+similar matchup/history data available. Researched honestly rather than
+assuming parity with MLB: WNBA has **no** multi-season BvP-style archive
+(boxscore history in this repo starts ~2026-04-25) and **no**
+bullpen/defender-assignment concept anywhere in the code or the vendored
+sim repo — a true MLB-equivalent isn't buildable from data on disk today.
+Shipped the two pieces that *are* real and buildable: team pace/off_rtg/
+def_rtg/eFG%/TOV%/TS% (`team_advanced_stats_*_asof_*.csv` — already computed
+and already feeding the SmartSim projections upstream, but never surfaced to
+Ask the Syndicate), and this-season vs-opponent box-score history (derived
+by self-joining `boxscores_history.csv` on `game_id`, since it carries no
+opponent column — thin by construction given WNBA teams only meet 2-4x/
+season, with an honest "no meetings yet" note rather than vanishing
+silently). Commit `b851387b`.
+
+**New: #173** (filed and closed same session) — found while verifying #172
+against real production data: every WNBA player's `team`/`opponent` field
+in `cards_sim_detail_*.json` was empty for a *specific-player* lookup (a
+*team*-level lookup worked, since that reads `home_tri`/`away_tri` off the
+game object directly). Root cause: `vendor/wnba_betting_repo`'s
+`_team_player_summaries()` builds each player row from raw per-name stat
+stores alone — never given the game's tri-codes, so it structurally cannot
+stamp them. Fixed at both points that already have the tri-codes in scope:
+`simulate_smart_game()` (new `_stamp_team_opponent()` helper) and
+`scripts/refresh_wnba_oddsapi_props.py`'s aggregation step (`setdefault`,
+non-destructive — self-heals already-written `smart_sim_*.json` files the
+next time `cards_sim_detail` gets rebuilt for a date, no re-simulation
+needed). Commit `89b430b6`. **Deploy note**: a refresh-worker deploy for
+this killed an in-flight MLB `tip_off_window` resim — held for user
+confirmation first (AskUserQuestion) rather than assuming; user said deploy
+now. New/existing already-published dates before this landed don't
+self-heal automatically (the reuse-forever guard in
+`_export_cards_sim_detail_snapshot` skips rebuilding a date that already has
+quarter content) — only dates generated fresh after the deploy pick up the
+fix.
+
+**New: #174** (filed and closed same session) — **user-reported live
+production outage**: "none of the live projections and actuals are working
+on the layer 2 board. live games are showing pre for the OPPs." Confirmed
+live: game cards correctly showed "● LIVE" with real scores for 8+
+simultaneously-live MLB/WNBA games, but nearly every prop/game candidate for
+those same games stayed stuck at lane "pregame" with blank live/actual
+columns. Root-caused in two parts, each confirmed against real production
+data (not guessed) before fixing:
+1. `_merge_duplicate_prop_candidates`/`_merge_duplicate_game_side_candidates`
+   correctly identify a stale top-props candidate and a fresh live-lens
+   duplicate as the same real-world bet (`_prop_merge_dedup_key`, normalized
+   by subject/market/line-bucket/direction, not exact pick-string match) and
+   correctly merge them, keeping the more analytically complete one as
+   primary — but the "freshest source wins on live-state fields" override
+   only ever fired when the group's live duplicate happened to be typed
+   "steam" (`_STEAM_PRICE_OVERRIDE_FIELDS`). A live-lens-sourced duplicate is
+   typed "prop" like every other prop, so its freshness was silently
+   dropped. Added `_LIVE_STATE_ONLY_OVERRIDE_FIELDS` (is_live/is_final/
+   status_display/game_state/live_projection/actual — deliberately NOT
+   bundling price/edge the way the steam override does, since a live-lens
+   row isn't a confirmed fresher *price*) that fires whenever ANY duplicate
+   in a merge group has `is_live=True`, regardless of `candidate_type`.
+   Applied to both merge functions (the game-side one had the identical
+   gap). Confirmed against real data: Andrew Painter (PHI@BAL, live 4-2)
+   had a matching live-lens row (`/mlb/api/live-lens`'s own `trackedProps`
+   for that exact game) that should have merged in but didn't.
+2. Verified live after part 1 deployed: `is_live`/`live_projection` now
+   correctly merged, but `lane` stayed "pregame" — `_recommendation_lane`
+   checks `status_display` text for pregame keywords *before* checking
+   `is_live`, and `_mlb_live_lens_prop_candidates_from_artifact` never set
+   `status_display`/`game_state` at all (fine standalone — no stale text to
+   conflict with — but nothing for part 1's override to pull a correct value
+   from once merged with a stale duplicate). Stamped the real resolved
+   status (already known for every game this function processes) onto both
+   fields.
+   Both parts have 5 new regression tests in
+   `tests/test_intelligence_prop_dedup_and_movement.py` (35/35 passing
+   including the pre-existing 30). **Confirmed converged in production**,
+   not just "deployed and assumed working": live-lane count went from ~2 →
+   31 → 67 across three checks over ~20 minutes as the background loop
+   completed successive cycles post-restart, and the specific broken pattern
+   (`is_live=true` with a stale pregame-sounding `status_display`) went to
+   **zero** occurrences on the final check. Commits `824dd0a8`, `8f25be15`.
+   **Deploy note**: both web and refresh-worker deployed twice for this
+   (once per part); the first deploy landed on top of an active
+   `tip_off_window` resim the user explicitly approved interrupting given
+   the live-production-outage urgency.
+
+**Coordination**: another session ("Check MLB WNBA Live Behavior") was
+active in the same shared working directory, working on soccer live-lens/
+keyvalue-capacity/earlier WNBA game-prop wiring in different files
+throughout. Messaged them directly (`send_message`) before touching
+`intelligence.py` given their same-day adjacent work there, confirmed no
+conflict and got useful context back (an earlier same-day Phase A fix to
+`_apply_live_state_context_to_candidates` I hadn't yet read) before
+proceeding. `git status`/`git diff --cached` checked before every commit
+this session; staged only this session's own files each time (this
+checkout had several other sessions' uncommitted WIP in `reports/`,
+`data/live/`, `data/soccer_source/` throughout — never touched).
 
 ### Reconciliation 2026-08-01 (soccer player-props root cause confirmed, board propagation still gapped)
 
@@ -5068,6 +5245,34 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
 
 ## Operational notes worth not rediscovering
 
+- **A "freshest source wins" merge/dedup override that's gated on
+  `candidate_type == "steam"` will miss any OTHER live-sourced candidate
+  type.** (#174) `_merge_duplicate_prop_candidates`/
+  `_merge_duplicate_game_side_candidates` already had exactly the right
+  fix pattern for steam candidates (`_STEAM_PRICE_OVERRIDE_FIELDS`,
+  unconditional override regardless of which duplicate the completeness
+  score picked as primary) — but a live-lens-sourced "prop" duplicate for
+  the identical bet needed the same treatment and didn't get it, because
+  the check was "is there a steam candidate in this group", not "is there
+  ANY live candidate in this group." If a future candidate source is
+  live-sourced but not typed "steam", check whether it needs the same
+  `is_live`-keyed override rather than assuming the steam-specific gate
+  already covers it. Related: a live-sourced candidate also needs to
+  actually SET `status_display`/`game_state` itself, not just `is_live` —
+  `_recommendation_lane` checks status text for pregame keywords before it
+  checks `is_live`, so `is_live=True` with a blank/stale status string
+  still resolves to lane "pregame".
+- **Ask the Syndicate's `context.sport` is empty for most real typed
+  questions, not a rare edge case.** (#170, #171) It's only set from a
+  `?sport=` URL query param or a question containing a recognized
+  `_SPORT_HINTS` team/league keyword — a plain player-name question ("How's
+  Jokic looking tonight") satisfies neither. Any new per-sport evidence
+  fetcher added to `_fetchers_for_sport` must be added to the `sport == ""`
+  branch explicitly too, or it is practically unreachable through normal
+  usage regardless of how well it works when `sport` happens to be set.
+  Confirmed live twice this session for two different fetchers (MLB's new
+  BvP matchup fetcher, then NBA/NHL's pre-existing last-10 fetchers) before
+  generalizing the fix.
 - **Any new file a worker writes that web needs to read must be added to
   `artifact_publisher.HOT_ARTIFACT_PATTERNS` explicitly — this is not
   optional and it is easy to forget, because the feature works perfectly
