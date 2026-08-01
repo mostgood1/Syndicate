@@ -2609,7 +2609,19 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(_infer_period_clock_from_status_text("45.8 - 4th"), (4, "0:45"))
         self.assertEqual(_infer_period_clock_from_status_text("2:34 - OT"), (5, "2:34"))
         self.assertEqual(_infer_period_clock_from_status_text("1:07 - 2OT"), (6, "1:07"))
-        self.assertEqual(_infer_period_clock_from_status_text("Halftime"), (None, ""))
+        # Found live 2026-08-01: "Halftime"/"End of Nth" carry no clock, so
+        # they never matched the clock-dash-ordinal pattern above and fell
+        # through to (None, "") -- which silently dropped the CURRENT
+        # PERIOD/CURRENT HALF live-lens segments during every between-period
+        # break, not just halftime. These now resolve to the just-completed
+        # period with the clock at 0:00, so the "upcoming quarter/half"
+        # fallback logic (which needs a finite current period) can correctly
+        # show Q3/2H as upcoming instead of nothing.
+        self.assertEqual(_infer_period_clock_from_status_text("Halftime"), (2, "0:00"))
+        self.assertEqual(_infer_period_clock_from_status_text("End of 1st"), (1, "0:00"))
+        self.assertEqual(_infer_period_clock_from_status_text("End of 3rd"), (3, "0:00"))
+        self.assertEqual(_infer_period_clock_from_status_text("End of OT"), (5, "0:00"))
+        self.assertEqual(_infer_period_clock_from_status_text("Scheduled"), (None, ""))
 
     def test_wnba_cards_live_state_supplement_sets_event_id_on_merged_game(self) -> None:
         artifact_game = {

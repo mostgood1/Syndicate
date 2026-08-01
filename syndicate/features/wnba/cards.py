@@ -5734,6 +5734,36 @@ def _infer_period_clock_from_status_text(status_text: Any) -> tuple[int | None, 
         return None, ""
     match = re.search(r"(?P<clock>\d{1,2}:\d{2}|\d{1,2}(?:\.\d)?)\s*-\s*(?P<period>(?:1st|2nd|3rd|4th|OT|\d+OT))", text, re.IGNORECASE)
     if not match:
+        # Between-period breaks (halftime, end-of-quarter) carry no clock at
+        # all -- ESPN's own scoreboard reports a real completed period here
+        # (e.g. period=2 at halftime), but this codebase's status text is
+        # the only period signal available in this branch, and neither
+        # "Halftime" nor "End of 1st" match the clock-dash-ordinal pattern
+        # above. Confirmed live 2026-08-01: a real halftime game showed
+        # period=null downstream, which silently dropped the CURRENT
+        # PERIOD/CURRENT HALF live-lens segments entirely (the "upcoming
+        # quarter/half" fallback needs a finite current period to resolve
+        # the next one from). Map the completed period explicitly, with the
+        # clock at 0:00 since the period/half in question has fully elapsed.
+        if re.search(r"half\s*time", text, re.IGNORECASE):
+            return 2, "0:00"
+        end_of_match = re.search(r"end of\s*(?:the\s*)?(?P<period>1st|2nd|3rd|4th|OT|\d+OT)", text, re.IGNORECASE)
+        if end_of_match:
+            period_label = str(end_of_match.group("period") or "").strip().upper()
+            if period_label == "1ST":
+                return 1, "0:00"
+            if period_label == "2ND":
+                return 2, "0:00"
+            if period_label == "3RD":
+                return 3, "0:00"
+            if period_label == "4TH":
+                return 4, "0:00"
+            if period_label == "OT":
+                return 5, "0:00"
+            overtime_match = re.fullmatch(r"(\d+)OT", period_label)
+            if overtime_match:
+                overtime_index = int(overtime_match.group(1) or 1)
+                return max(5, 4 + overtime_index), "0:00"
         return None, ""
     clock = _normalize_status_clock_text(match.group("clock"))
     period_label = str(match.group("period") or "").strip().upper()
