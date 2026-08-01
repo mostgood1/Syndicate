@@ -453,6 +453,45 @@ class MlbMarketBoardRawPropsFeedTests(unittest.TestCase):
         self.assertAlmostEqual(sim_rows[0]["model_prob_over"], 0.4)
         self.assertAlmostEqual(sim_rows[0]["projected_value"], 1.25)
 
+    def test_hits_runs_rbis_composite_prop_resolves_via_dist_config(self) -> None:
+        # 2026-08-01 board audit: _MLB_HITTER_PROP_DIST_CONFIG was missing
+        # this one entry entirely (the other 5 mirror vendor/mlb_bettingv2's
+        # HITTER_MARKET_SPECS exactly -- this one was never ported). Without
+        # it, _mlb_prop_dist_projection always returned (None, None) for
+        # this market, so it either showed no sim coverage at all, or fell
+        # back to _row_stat_mean_value's generic "first _mean-suffixed key"
+        # heuristic, which (confirmed live) could latch onto an unrelated
+        # field and show a nonsensical projected_value.
+        markets = {
+            "hitterProps": [
+                {
+                    "player_name": "Xavier Edwards",
+                    "market": "hitter_hits_runs_rbis",
+                    "prop": "batter_hits_runs_rbis",
+                    "selection": "over",
+                    "market_line": 1.5,
+                    "odds": "+225",
+                    "edge": 0.1,
+                }
+            ]
+        }
+        odds_rows, sim_rows = _mlb_market_board_prop_rows_for_game(
+            game_pk=1,
+            markets=markets,
+            hitter_props={
+                "669364": {
+                    "name": "Xavier Edwards",
+                    "hits_runs_rbis_dist": {"0": 0.2, "1": 0.3, "2": 0.3, "3": 0.2},
+                    "hrr_mean": 1.5,
+                }
+            },
+        )
+        self.assertEqual(len(sim_rows), 1)
+        # P(hrr > 1.5) = P(2) + P(3) = 0.5
+        self.assertAlmostEqual(sim_rows[0]["model_prob_over"], 0.5)
+        self.assertAlmostEqual(sim_rows[0]["projected_value"], 1.5)
+        self.assertEqual(sim_rows[0]["sim_source"], "mlb_sim")
+
     def test_probable_pitcher_gets_both_sides_for_a_stat_not_recommended(self) -> None:
         markets = {"pitcherProps": [{"pitcher_name": "Michael McGreevy", "prop": "outs", "selection": "over", "market_line": 17.5, "odds": "-145", "edge": 0.12}]}
         probable = {"home": {"fullName": "Michael McGreevy"}}

@@ -3248,6 +3248,19 @@ _MLB_HITTER_PROP_DIST_CONFIG: dict[str, dict[str, str]] = {
     "batter_rbis": {"label": "RBIs", "dist_key": "rbi_dist", "mean_key": "rbi_mean"},
     "batter_total_bases": {"label": "Total Bases", "dist_key": "total_bases_dist", "mean_key": "tb_mean"},
     "batter_home_runs": {"label": "Home Runs", "dist_key": "home_runs_dist", "mean_key": "hr_mean"},
+    # 2026-08-01 board audit: this composite market was missing from this
+    # dict entirely (the other 5 entries mirror vendor/mlb_bettingv2/tools/
+    # daily_update_multi_profile.py's HITTER_MARKET_SPECS exactly -- this
+    # one was just never ported over). Without it, _mlb_prop_dist_projection
+    # always returned (None, None), so Layer 1's "Hitter Hits Runs RBI" rows
+    # either showed unmatched_no_sim_coverage (77% of them) or, when a
+    # recommendation-engine row happened to exist, fell back to
+    # _row_stat_mean_value's first-"_mean"-key heuristic -- which, with no
+    # correctly-named "hrr_mean" being looked for specifically, could latch
+    # onto an unrelated "_mean" field on the same row and show a nonsensical
+    # projected_value (confirmed live: 85.79 for a single-game H+R+RBI
+    # projection, plausible only as some other stat entirely).
+    "batter_hits_runs_rbis": {"label": "Hits+Runs+RBIs", "dist_key": "hits_runs_rbis_dist", "mean_key": "hrr_mean"},
 }
 
 
