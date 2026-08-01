@@ -416,6 +416,83 @@ part-5-era 12/16-date batches and single-date debug artifacts
 (`_hookdebug.log`, `_debug_roster_check.json`,
 `data/daily/snapshots/2026-07-10/roster_objs/`).
 
+### Reconciliation 2026-08-01 (MLB pitcher-prop prototype fixes part 7: quality-hook recalibrated from real regression -- promoted)
+
+Direct continuation of part 6. User asked to keep going on the
+quality-hook calibration problem. **This closes out the outs/workload
+thread with a second promoted fix.**
+
+**Method**: the part-6 hand-tuned version (raw K-rate deviation from a
+fixed 0.223 constant, scaled by a guessed weight) was real but
+miscalibrated -- checked *why* by generating roster artifacts for all 46
+dates (`--write-roster-artifacts on --sims-per-game 1`, ~10s/date) and
+running an OLS regression of real per-start outs bias (pred_outs -
+actual_outs, n=1210, from the `full46_baseline` batch) against real
+K-rate. Result: corr=-0.130, R^2=0.017 -- weak, with a zero-crossing at an
+unrealistic 0.497 K-rate (no real starter is that high). K-rate minus
+BB-rate (K-BB%, a standard sabermetric quality proxy) fit meaningfully
+better: corr=-0.236, R^2=0.056, zero-crossing 0.307, slope -15.29
+outs/unit. Still weak at the individual-pitcher level (~94% of per-start
+variance is other things -- game noise, bullpen availability, blowouts),
+confirming the earlier tier-level correlations (0.624 at weight=0.7) were
+real but partly an artifact of aggregating across many starts, which
+smooths out that noise and reveals a real but genuinely modest systematic
+component.
+
+Rewrote `_starter_quality_hook_delta` (`sim_engine/simulate.py`) to use
+K-BB% and the fitted regression coefficients directly
+(`starter_quality_hook_reference=0.307`, `_slope=15.29`,
+`_max_pitches=10.0` as new code defaults) instead of the hand-tuned
+formula, so `starter_quality_hook_weight=1.0` now applies a capped
+version of the actual regression-implied correction. 13 new/rewritten
+unit tests (`tests/test_mlb_starter_quality_hook.py`), full regression
+sweep clean (1051 passed / 1 skipped, zero failures).
+
+**Result at full scale (46 dates, sims=100, weight=1.0)**: **every tier
+moved the correct direction or stayed flat** -- the exact thing the
+hand-tuned version failed to do:
+- elite outs bias: -0.416 -> -0.462 (flat)
+- mid-high outs bias: +0.993 -> **+0.732** (improved -- this is the tier
+  that got *worse* under both hand-tuned weights, 0.7 and 0.35)
+- mid outs bias: +2.125 -> +1.782 (improved)
+- back-end outs bias: +3.035 -> +2.659 (improved)
+Strikeouts show the same pattern (elite -2.659->-2.596, mid
++0.335->+0.180, back-end +1.048->+0.875; mid-high SO moved slightly the
+wrong way, -1.062->-1.115 -- a small inconsistency, worth noting
+honestly, though outs -- the primary target -- improved for that tier).
+Magnitude is modest (closes ~12-26% of each tier's gap per tier),
+consistent with the weak R^2, but safely and correctly shaped. Full-game
+side effects: small, consistent with the other promoted hook parameters
+(brier_home_win 0.2224->0.2241, mae_total_runs 3.742->3.771,
+mae_run_margin 3.323->3.365).
+
+**Promoted** `starter_quality_hook_weight: 1.0` to
+`vendor/mlb_bettingv2/data/tuning/manager_pitching_overrides/
+forward_start_2026_04_14_v1.json` with full provenance in its `_meta`
+block (including the discarded first attempt's numbers, so nobody
+re-derives the same miscalibrated version). `starter_quality_hook_
+reference`/`_slope`/`_max_pitches` are left at their new code defaults
+(not independently swept) -- promoting only the weight.
+
+**State of the outs/workload thread after three lever attempts**: TTO
+quality-scaling (part 3) -- built, shipped off, real bug but no
+measurable real-world effect. Stamina shrink-to-prior (part 6) -- ruled
+out, made things slightly worse. Quality-aware hook, this entry -- the
+one that worked, now promoted alongside `k_combine_log5_weight` (part 6).
+Together the two promoted fixes are real, validated, modest improvements
+-- not a complete fix for the diagnosed gap. Whoever picks this up next
+should re-run the full 46-date backtest with *both* promotions active
+together (not yet done this session) to confirm they don't interact
+badly, and treat "close the rest of the gap" as new, separate work rather
+than assuming these two exhaust the available levers.
+
+**Committed**: `e67c0575` (recalibrated fix code/tests) and this
+`_meta`-documented promotion (see commit following this todo.md entry).
+
+Temp validation artifacts added this part, same directory as part 6:
+`_roster_dump_pass/` (the 46-date roster-artifact generation pass used
+for the regression) and `full46_qualityhook_v2_w10/`.
+
 ### Reconciliation 2026-07-31 part 5 (MLB pitcher-prop prototype fixes: real-scale backtest results -- effect much weaker than diagnosed, do not promote)
 
 Direct continuation of #178 (part 3, same session). User asked to keep working
