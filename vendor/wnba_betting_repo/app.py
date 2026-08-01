@@ -675,12 +675,19 @@ def _live_oddsapi_period_totals_for_game(date_str: str, home_tri: str, away_tri:
         )
 
         # Candidate keys (OddsAPI period keys commonly use suffixes like _q1 and _h1)
+        # Found live 2026-08-01: "h2" (second half) had no entry here at all,
+        # even though books actively quote totals_h2/spreads_h2 once the
+        # first half ends -- confirmed via a real discovered_keys list for a
+        # live 4th-quarter game that included both. Every other period
+        # (h1/q1-q4) had a slot; h2 was simply missing.
         want: dict[str, list[str]] = {
             "game_total": ["totals"],
             "game_spreads": ["spreads"],
             "game_h2h": ["h2h"],
             "h1": ["totals_h1", "totals_1h", "totals_1st_half", "totals_first_half"],
             "h1_spread": ["spreads_h1", "spreads_1h", "spreads_1st_half", "spreads_first_half"],
+            "h2": ["totals_h2", "totals_2h", "totals_2nd_half", "totals_second_half"],
+            "h2_spread": ["spreads_h2", "spreads_2h", "spreads_2nd_half", "spreads_second_half"],
             "q1": ["totals_q1", "totals_1q", "totals_1st_quarter", "totals_first_quarter"],
             "q1_spread": ["spreads_q1", "spreads_1q", "spreads_1st_quarter", "spreads_first_quarter"],
             "q2": ["totals_q2", "totals_2q", "totals_2nd_quarter", "totals_second_quarter"],
@@ -716,6 +723,7 @@ def _live_oddsapi_period_totals_for_game(date_str: str, home_tri: str, away_tri:
         period_totals: dict[str, float] = {}
         period_spreads: dict[str, float] = {}
         game_lines: dict[str, float] = {}
+        odds_fetch_status = None
         try:
             r = requests.get(
                 f"{base}/v4/sports/{sport}/events/{event_id}/odds",
@@ -728,14 +736,15 @@ def _live_oddsapi_period_totals_for_game(date_str: str, home_tri: str, away_tri:
                 headers=headers,
                 timeout=timeout_s,
             )
+            odds_fetch_status = r.status_code
             obj = r.json() if r.ok else None
         except Exception:
             obj = None
 
         mk_to_label = {mkey: label for label, mkey in picked.items()}
         # Aggregate across bookmakers to avoid arbitrary "first book wins" volatility.
-        period_pts: dict[str, list[float]] = {k: [] for k in ["h1", "q1", "q2", "q3", "q4"]}
-        period_home_spreads: dict[str, list[float]] = {k: [] for k in ["h1", "q1", "q2", "q3", "q4"]}
+        period_pts: dict[str, list[float]] = {k: [] for k in ["h1", "h2", "q1", "q2", "q3", "q4"]}
+        period_home_spreads: dict[str, list[float]] = {k: [] for k in ["h1", "h2", "q1", "q2", "q3", "q4"]}
         game_total_pts: list[float] = []
         home_spreads: list[float] = []
         away_spreads: list[float] = []
@@ -762,7 +771,7 @@ def _live_oddsapi_period_totals_for_game(date_str: str, home_tri: str, away_tri:
                         if not isinstance(outs, list):
                             continue
 
-                        if label in {"h1", "q1", "q2", "q3", "q4"}:
+                        if label in {"h1", "h2", "q1", "q2", "q3", "q4"}:
                             for oc in outs:
                                 if not isinstance(oc, dict):
                                     continue
@@ -774,7 +783,7 @@ def _live_oddsapi_period_totals_for_game(date_str: str, home_tri: str, away_tri:
                                 except Exception:
                                     continue
 
-                        if label in {"h1_spread", "q1_spread", "q2_spread", "q3_spread", "q4_spread"}:
+                        if label in {"h1_spread", "h2_spread", "q1_spread", "q2_spread", "q3_spread", "q4_spread"}:
                             period_label = str(label).replace("_spread", "")
                             for oc in outs:
                                 if not isinstance(oc, dict):
@@ -872,6 +881,21 @@ def _live_oddsapi_period_totals_for_game(date_str: str, home_tri: str, away_tri:
                 game_lines["away_ml"] = float(np.median(np.asarray(away_mls, dtype=float)))
         except Exception:
             pass
+
+        if req_markets and not period_totals and not period_spreads:
+            # Diagnostic added 2026-08-01: discovery can find real period
+            # market keys (req_markets non-empty) yet the actual /odds fetch
+            # still yield nothing -- this print distinguishes a fetch-level
+            # failure (non-200/exception) from a response that came back
+            # fine but had no bookmaker actually offering the requested
+            # markets at fetch time (can legitimately happen if a book pulls
+            # a market between the discovery call and this one).
+            bookmaker_count = len(obj.get("bookmakers") or []) if isinstance(obj, dict) else None
+            print(
+                f"[wnba_live_lens] PERIOD_MARKET_ODDS_FETCH_EMPTY matchup={h}@{a} event_id={event_id} "
+                f"odds_fetch_status={odds_fetch_status} req_markets={req_markets} bookmaker_count={bookmaker_count}",
+                flush=True,
+            )
 
         out = {
             "source": "oddsapi_fast",
