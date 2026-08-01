@@ -7114,6 +7114,79 @@ class MlbLivePropProjectionHydrationTests(unittest.TestCase):
         self.assertEqual(by_market_key["moneyline"]["actual"], "78-77")
         self.assertEqual(by_market_key["total"]["actual"], "155.0")
 
+    def test_prop_merge_dedup_key_ignores_player_name_that_is_actually_pick_text(self) -> None:
+        # Board-alignment audit, found live 2026-08-01 against a real live
+        # WNBA game: a candidate whose upstream builder never set a real
+        # player_name (root source not yet pinned down) had the ENTIRE pick
+        # text ("Alyssa Thomas UNDER 8.5 AST") land in player_name instead
+        # of just "Alyssa Thomas". Since that value is truthy,
+        # _prop_merge_dedup_key always used it over _candidate_subject_key's
+        # careful "split on over/under" parse of the "name" field -- so this
+        # candidate's dedup key never matched its correctly-labeled twin
+        # (subject "Alyssa Thomas") from a different pipeline. They never
+        # merged, and the mislabeled one stayed permanently stuck with no
+        # live_projection/actual even once its game went live. A real
+        # player name is never itself "... over ..."/"... under ..." text,
+        # so that's a safe, general tell -- when detected, fall back to
+        # _candidate_subject_key's parse instead of trusting player_name.
+        from syndicate.features.intelligence import _merge_duplicate_prop_candidates, _prop_merge_dedup_key
+
+        mislabeled = {
+            "candidate_type": "prop",
+            "sport_slug": "wnba",
+            "player_name": "Alyssa Thomas UNDER 8.5 AST",
+            "name": "Alyssa Thomas UNDER 8.5 AST",
+            "pick": "Alyssa Thomas UNDER 8.5",
+            "market": "Ast",
+            "line": 8.5,
+            "projected": 5.6,
+            "detail": "Rich pregame detail with real reasoning behind the pick and model inputs.",
+            "is_live": False,
+        }
+        correctly_live = {
+            "candidate_type": "prop",
+            "sport_slug": "wnba",
+            "player_name": "Alyssa Thomas",
+            "name": "Alyssa Thomas AST",
+            "pick": "UNDER",
+            "market": "ast",
+            "line": 8.5,
+            "is_live": True,
+            "live_projection": "8.4",
+            "actual": "5",
+            "status_display": "37-27 | 5:49 - 2nd",
+        }
+        self.assertEqual(_prop_merge_dedup_key(mislabeled), _prop_merge_dedup_key(correctly_live))
+
+        merged = _merge_duplicate_prop_candidates([mislabeled, correctly_live])
+
+        self.assertEqual(len(merged), 1, merged)
+        self.assertEqual(merged[0].get("live_projection"), "8.4")
+        self.assertEqual(merged[0].get("actual"), "5")
+        self.assertTrue(merged[0].get("is_live"))
+        # The richer pregame candidate's own analytical fields must survive
+        # the merge too -- this is a reconciliation, not a one-sided win.
+        self.assertEqual(merged[0].get("projected"), 5.6)
+
+    def test_prop_merge_dedup_key_still_uses_a_real_player_name(self) -> None:
+        # Guard against the fix above being too aggressive -- a genuine,
+        # correctly-set player_name (no "over"/"under" substring) must keep
+        # winning over _candidate_subject_key, unchanged from before.
+        from syndicate.features.intelligence import _prop_merge_dedup_key
+
+        candidate = {
+            "candidate_type": "prop",
+            "sport_slug": "wnba",
+            "player_name": "Alyssa Thomas",
+            "name": "Alyssa Thomas AST",
+            "pick": "UNDER",
+            "market": "ast",
+            "line": 8.5,
+        }
+        key = _prop_merge_dedup_key(candidate)
+        self.assertIsNotNone(key)
+        self.assertEqual(key[1], "alyssa thomas")
+
 
 class RepoArtifactPathFallbackTests(unittest.TestCase):
     # _mlb_repo_artifact_path/_wnba_repo_artifact_path used to resolve via

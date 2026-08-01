@@ -3043,9 +3043,24 @@ def _prop_merge_dedup_key(candidate: dict[str, Any]) -> tuple[str, str, str, flo
     if _safe_text(candidate.get("candidate_type"), "") not in ("prop", "steam"):
         return None
     sport_slug = _safe_text(candidate.get("sport_slug"), "").lower()
-    subject = _normalized_market_text(_safe_text(candidate.get("player_name"), "")) or _normalized_market_text(
-        _safe_text(_candidate_subject_key(candidate), "")
-    )
+    player_name_text = _normalized_market_text(_safe_text(candidate.get("player_name"), ""))
+    # Board-alignment audit, found live 2026-08-01 against a real live WNBA
+    # game: a candidate whose upstream builder never set a real player_name
+    # (traced to a rank-card/pregame-only pipeline, not yet root-caused to
+    # its exact source) had the ENTIRE pick text ("Alyssa Thomas UNDER 8.5
+    # AST") land in player_name instead. Since that's truthy, it always won
+    # over _candidate_subject_key's careful "split on over/under" parse,
+    # so this candidate's dedup key never matched its correctly-labeled
+    # twin from a different pipeline (subject "Alyssa Thomas") -- they
+    # never merged, and the mislabeled one stayed stuck with no
+    # live_projection/actual even once its game went live. A real player
+    # name is never itself "... over ..."/"... under ..." text, so this is
+    # a safe, general tell that player_name actually holds pick text --
+    # in that case prefer _candidate_subject_key's parse of "name" instead
+    # of trusting the corrupted value.
+    if player_name_text and any(f" {marker} " in f" {player_name_text} " for marker in ("over", "under")):
+        player_name_text = ""
+    subject = player_name_text or _normalized_market_text(_safe_text(_candidate_subject_key(candidate), ""))
     if not subject:
         return None
     # Deliberately bypasses _candidate_market_key/_candidate_market_focuses
