@@ -4,10 +4,78 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 (NFL/NCAAF:
-make real 2026 week-1 data the actual default)" below).
+Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 (Layer 2 board
+alignment: WNBA prop id-space collision + game-market actual semantics,
+shipped and deployed)" below).
+Before that: "Reconciliation 2026-08-01 (NFL/NCAAF:
+make real 2026 week-1 data the actual default)".
 Before that: "Reconciliation 2026-08-01 (NFL/NCAAF:
 real 2026 week-1 data + sim triggers)".
+
+### Reconciliation 2026-08-01 (Layer 2 board alignment: WNBA prop id-space collision + game-market actual semantics, shipped and deployed)
+
+Direct follow-up to the MLB/WNBA/soccer props session above -- user asked
+to check live WNBA against the actual board right now. Verified live
+candidates against ESPN's real box score for the LVA @ CHI game in
+progress; found and fixed two more real bugs, both shipped and deployed
+(`b4e6d2c6`, `8b8187fa`), confirmed against the live game after each
+deploy.
+
+1. **`_backfill_prop_row_game_id` (home.py) collapsed two distinct id
+   spaces into one.** A WNBA game dict carries `game_id` (the
+   odds-pipeline hash) and `event_id` (ESPN's numeric scoreboard id) as
+   genuinely separate fields at once (wnba/cards.py's game-contract
+   builders set both independently) -- this function stamped
+   `row["game_id"]`/`["gamePk"]`/`["event_id"]` all with
+   `_game_identifier()`'s single result, which prefers `game_id` over
+   `event_id`, so a backfilled row's `event_id` became the odds hash
+   instead of the real ESPN id. Every downstream live-actual/
+   live-projection lookup (keyed by the real ESPN `event_id`) then
+   silently failed for those rows. Now tracks and stamps both ids
+   independently. Note: this fixed the general case, but two specific
+   candidates ("Natasha Cloud OVER 13.5 PTS+REB", "Jackie Young UNDER
+   27.5 PTS+AST") still showed the collision after deploy -- they get
+   their ids from a different, deeper source (WNBA's own betting-card
+   rank-card build, `wnba/picks.py`) that this backfill never touches
+   because the row already has *some* id by the time backfill runs. Not
+   yet root-caused; next place to look if this exact symptom recurs.
+2. **Game-level "actual" was market-blind in two separate places.**
+   `_append_game_bet_candidate` (home.py) and `_steam_candidates_for_sport`
+   (intelligence.py) both used the game's combined away+home score as
+   "actual" for every game-level market alike (Moneyline/Spread/ATS/Total)
+   -- confirmed live: every game-level candidate for the same live game
+   showed the identical combined number, telling a Moneyline/ATS bettor
+   nothing about which side was actually ahead. Total keeps the combined
+   score (the one market genuinely comparable to it); Moneyline/Spread/ATS
+   now get the real away-home scoreline instead. Fixed in both places
+   (same bug, two independent code paths) and confirmed live post-deploy:
+   ATS/Moneyline candidates for the live LVA@CHI game went from `actual:
+   120`/`155`/`159` (combined score, identical across every market) to
+   `actual: "83-84"` (real scoreline), while TOTAL correctly kept
+   `actual: 167` (combined).
+
+**Also confirmed working correctly, no fix needed**: the WNBA
+live-status-freezing symptom the user originally flagged ("End of 3rd"
+while the real game was in the 4th) was being actively chased by a
+concurrent session in the same live_state/live_lines files at the same
+time -- left untouched per explicit user direction, and confirmed
+resolved on its own by this session's second board pull (status correctly
+showed "78-77 | 2:37 - 4th", matching real time). Real per-player actual
+stats (A'ja Wilson, Jackie Young, etc.) also self-corrected once that
+landed -- cross-checked against ESPN's live box score and matched exactly
+mid-session.
+
+**Operational note**: hit a scary-looking `git status` false negative
+mid-session -- `syndicate/features/intelligence.py` briefly showed zero
+diff against HEAD despite the working-tree edit still being present on
+disk (confirmed via direct content read) and `git log` confirming no one
+else had committed to that file. Almost treated it as lost work and
+started re-deriving the fix from scratch. Root cause not confirmed, but
+most likely a transient read racing the concurrent session's simultaneous
+git activity on the same repo -- re-running `git status` moments later
+showed the diff correctly. If this happens again: verify with a direct
+content grep for the expected change before assuming work was lost, don't
+immediately re-apply blind.
 Before that: "Reconciliation 2026-08-01 (MLB props root
 cause + WNBA board duplication + soccer bootstrap/live-props gap, shipped
 and deployed)" -- ran concurrently, different files throughout.
