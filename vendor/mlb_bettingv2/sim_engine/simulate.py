@@ -1502,6 +1502,50 @@ def _starter_tto_quality_mult(pitcher_prof: Any, overrides: Dict[str, Any]) -> f
     return max(0.3, min(1.6, 1.0 - scaling * delta))
 
 
+def _starter_quality_hook_delta(pitcher_prof: Any, overrides: Dict[str, Any]) -> int:
+    """Additive pitch-count adjustment to eff_hook based on the starter's own
+    K-rate, independent of workload history.
+
+    `eff_hook` (`_starter_effective_hook`, above) is driven entirely by
+    stamina_pitches -- a season pitches-per-start average that reflects
+    workload history, not pitching quality -- so real starters with very
+    different true talent can derive to nearly the same eff_hook. Confirmed
+    2026-08-01 in a real slate: Chris Sale (.336 K-rate) and Nick Martinez
+    (.116 K-rate) both derived to stamina_pitches=89. A live pull-decision
+    trace on that same slate showed eff_hook does correctly drive real pull
+    timing (corr 0.51 with actual pitch-count-at-removal), so the mechanism
+    itself isn't broken -- it just has no channel for the pitcher's own
+    quality to matter, only their workload history. Real managers give
+    elite arms a longer leash because they're good, not only because
+    they've thrown a lot of pitches historically.
+    `_starter_matchup_hook_adjustment` (above) already gives the *opposing*
+    lineup's quality this kind of influence on the hook; this gives the
+    pitcher's own quality the same, additively on top of the
+    workload-derived eff_hook.
+
+    `starter_quality_hook_weight=0.0` (the default) returns 0
+    unconditionally, reproducing prior (quality-blind) behavior exactly.
+    See todo.md #178.
+    """
+
+    def _ov_f(key: str, default: float) -> float:
+        v = overrides.get(key) if isinstance(overrides, dict) else None
+        try:
+            return float(default) if v is None else float(v)
+        except Exception:
+            return float(default)
+
+    weight = max(0.0, min(1.0, _ov_f("starter_quality_hook_weight", 0.0)))
+    if weight <= 0.0:
+        return 0
+    league_k = _ov_f("starter_quality_hook_league_k", 0.223)
+    spread = max(1e-6, _ov_f("starter_quality_hook_spread", 0.06))
+    max_pitches = max(0.0, _ov_f("starter_quality_hook_max_pitches", 15.0))
+    k_rate = float(getattr(pitcher_prof, "k_rate", league_k) or league_k)
+    delta = max(-1.0, min(1.0, (k_rate - league_k) / spread))
+    return int(round(weight * delta * max_pitches))
+
+
 def _select_pitcher_v2(roster: TeamRoster, state: GameState, rng: random.Random, batting_roster: Optional[TeamRoster] = None) -> int:
     """V2 manager hook with probabilistic pull decisions.
 
@@ -1633,6 +1677,7 @@ def _select_pitcher_v2(roster: TeamRoster, state: GameState, rng: random.Random,
         stamina_hook = int(getattr(starter_prof, "stamina_pitches", base_hook) or base_hook)
         avail = _avail_pitcher(starter_prof)
         eff_hook = _starter_effective_hook(base_hook, stamina_hook, avail, starter_hook_stamina_excess_weight)
+        eff_hook += _starter_quality_hook_delta(starter_prof, overrides)
 
         if early_sample_scale > 0:
             eff_hook -= int(round(float(starter_early_sample_hook_delta_max) * float(early_sample_scale)))
