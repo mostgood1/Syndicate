@@ -944,6 +944,116 @@ def _mark_throttled_worker_status(*, worker_status_path: Path, latest_manifest_p
     )
 
 
+_SEASON_PROJECTION_SPORTS: tuple[str, ...] = ("nfl", "ncaaf")
+
+
+def _season_projection_auto_refresh_enabled() -> bool:
+    raw_value = str(os.environ.get("SEASON_PROJECTION_ENABLE_REFRESH_WORKER_AUTORUN") or "").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
+
+
+def _season_projection_refresh_interval_seconds() -> int:
+    raw_value = str(os.environ.get("SEASON_PROJECTION_REFRESH_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = int(raw_value or 86400)
+    except ValueError:
+        value = 86400
+    return max(1, value)
+
+
+def _season_projection_target_week(sport: str, season: int) -> int | None:
+    if sport == "nfl":
+        from syndicate.features.nfl.sources import nfl_target_week
+
+        return nfl_target_week(season)
+    if sport == "ncaaf":
+        from syndicate.features.ncaaf.sources import ncaaf_target_week
+
+        return ncaaf_target_week(season)
+    return None
+
+
+def _season_projection_artifact_path(sport: str, season: int, week: int) -> Path:
+    # NFL and NCAAF's projection artifacts live at different depths under
+    # their respective source roots (confirmed: data/nfl_source/
+    # smartsim2_projections_*.csv vs data/ncaaf_source/data/
+    # smartsim2_projections_*.csv) -- not a typo, each sport's own
+    # generation script already writes to its own established location.
+    data_root = _refresh_state_store()["data_root"]()
+    if sport == "nfl":
+        return data_root / "nfl_source" / f"smartsim2_projections_{season}_wk{week}.csv"
+    return data_root / "ncaaf_source" / "data" / f"smartsim2_projections_{season}_wk{week}.csv"
+
+
+def _season_projection_script_args(sport: str, season: int, week: int) -> list[str]:
+    script_path = Path(__file__).resolve().parent / f"generate_smartsim2_{sport}_projections.py"
+    return [sys.executable, str(script_path), "--season", str(season), "--week", str(week)]
+
+
+def _launch_autorun_season_projections(
+    *,
+    latest_manifest_path: Path,
+    worker_status_path: Path,
+    refresh_cycle: dict[str, int],
+) -> bool:
+    """Real per-week Monte Carlo projection generation for NFL/NCAAF --
+    added this session, mirrors the shape of every other autorun here
+    exactly (env-gated off by default, staleness via _file_age_seconds,
+    same as MLB's autorun above). Unlike the odds-pipeline autoruns, this
+    calls the generation scripts directly via subprocess (launch_refresh_run
+    is specifically the odds-refresh orchestrator's own dispatcher, not a
+    generic script launcher -- confirmed by reading it before reusing it
+    would have been wrong here). Claims and launches at most one sport per
+    tick, same "one job per invocation" spirit as every sibling autorun --
+    the next tick picks up whichever sport is still stale."""
+    if not _season_projection_auto_refresh_enabled():
+        return False
+    selected_date = central_today_iso()
+    active = {item.strip().lower() for item in _active_sports_for_date(selected_date).split(",") if item.strip()}
+    season = date.today().year  # calendar-year=season for both nfl/ncaaf, confirmed by this session's own real 2026 runs
+
+    for sport in _SEASON_PROJECTION_SPORTS:
+        if sport not in active:
+            continue
+        week = _season_projection_target_week(sport, season)
+        if week is None:
+            continue
+        artifact_path = _season_projection_artifact_path(sport, season, week)
+        age_seconds = _file_age_seconds(artifact_path)
+        if age_seconds is not None and age_seconds < float(_season_projection_refresh_interval_seconds()):
+            continue
+
+        try:
+            process = subprocess.Popen(_season_projection_script_args(sport, season, week))
+        except Exception as exc:
+            _write_worker_status(
+                worker_status_path=worker_status_path,
+                latest_manifest_path=latest_manifest_path,
+                state="error",
+                detail=f"Failed to auto-launch {sport} season-projection refresh (season={season} week={week}): {type(exc).__name__}: {exc}",
+                ran_job=False,
+                latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+                refresh_cycle=refresh_cycle,
+            )
+            continue
+
+        refresh_cycle["claimed_count"] = int(refresh_cycle.get("claimed_count") or 0) + 1
+        _write_worker_status(
+            worker_status_path=worker_status_path,
+            latest_manifest_path=latest_manifest_path,
+            state="launched",
+            detail=f"Auto-launched {sport} season-projection refresh (season={season} week={week}) because the artifact was stale/missing.",
+            ran_job=True,
+            run_exit_code=None,
+            latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+            launch_pid=int(getattr(process, "pid", 0) or 0) or None,
+            refresh_cycle=refresh_cycle,
+        )
+        return True
+
+    return False
+
+
 def _diag_log_all_process_memory(stage: str) -> None:
     # Temporary boot-crash diagnostic: the worker has been OOM-killed (2GB
     # limit) within seconds-to-minutes of boot even with the MLB daily-sim
@@ -1115,6 +1225,13 @@ def main() -> int:
             if args.run_once:
                 return 0
         elif _launch_autorun_evaluation_settlement(
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_season_projections(
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,

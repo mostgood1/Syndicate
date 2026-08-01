@@ -28,7 +28,16 @@ def fetch_week_lines(client: CfbdClient, *, season: int, week: int) -> list[dict
     return payload if isinstance(payload, list) else []
 
 
+def _load_env() -> None:
+    try:
+        from dotenv import load_dotenv  # type: ignore
+    except Exception:
+        return
+    load_dotenv()
+
+
 def main() -> None:
+    _load_env()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--season", type=int, default=2025)
     parser.add_argument("--weeks", type=str, required=True, help="Comma-separated week numbers")
@@ -40,7 +49,11 @@ def main() -> None:
 
     for week in [int(w) for w in args.weeks.split(",") if w.strip()]:
         games = fetch_week_lines(client, season=args.season, week=week)
-        out_path = args.out_dir / f"cfbd_lines_wk{week}.json"
+        # Must match _smartsim2_standalone_market_lines's real read path in
+        # syndicate/features/ncaaf/cards.py (cfbd_lines_{season}_wk{week}.json)
+        # -- the season-less name this used to write here was never read by
+        # anything downstream.
+        out_path = args.out_dir / f"cfbd_lines_{args.season}_wk{week}.json"
         with out_path.open("w", encoding="utf-8") as handle:
             json.dump(games, handle)
         print(f"week={week} games={len(games)} path={out_path}")

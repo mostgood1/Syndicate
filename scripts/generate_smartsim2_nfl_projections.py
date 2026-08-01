@@ -162,6 +162,41 @@ def week_schedule(season: int, week: int, plays: list[tuple[int, str, str, str, 
     return list(seen.values())
 
 
+def _real_schedule_path(season: int) -> Path:
+    return DATA_ROOT / f"schedule_{season}.csv"
+
+
+def week_schedule_from_real_schedule(season: int, week: int) -> list[dict[str, str]]:
+    """Fallback game list for a season with no pbp yet (the season hasn't
+    been played) -- data/nfl_source/schedule_{season}.csv is real (confirmed:
+    272 real 2026 games, real spread/total/moneyline already posted) but
+    isn't otherwise read by this script, which normally derives its game
+    list from real play-by-play. Same idea as
+    generate_smartsim2_ncaaf_projections.py's games_from_cfbd_when_engine_schedule_empty --
+    a second, independent real source, used only when the primary one is
+    empty, never silently blended with it."""
+    path = _real_schedule_path(season)
+    if not path.exists():
+        return []
+    rows: list[dict[str, str]] = []
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            try:
+                row_week = int(row.get("week") or 0)
+            except (TypeError, ValueError):
+                continue
+            if row_week != week:
+                continue
+            game_id = (row.get("game_id") or "").strip()
+            home_team = (row.get("home_team") or "").strip()
+            away_team = (row.get("away_team") or "").strip()
+            if not game_id or not home_team or not away_team:
+                continue
+            rows.append({"game_id": game_id, "home_team": home_team, "away_team": away_team})
+    return rows
+
+
 def build_projection(
     *,
     season: int,
@@ -238,7 +273,12 @@ def main() -> None:
     log(f"PBP_LOADED current_plays={len(current_plays)} prior_plays={len(prior_plays)}")
 
     schedule_rows = week_schedule(args.season, args.week, current_plays)
-    log(f"SCHEDULE rows={len(schedule_rows)}")
+    used_real_schedule_fallback = False
+    if not schedule_rows:
+        schedule_rows = week_schedule_from_real_schedule(args.season, args.week)
+        used_real_schedule_fallback = True
+        log(f"PBP_SCHEDULE_EMPTY falling back to real schedule_{args.season}.csv rows={len(schedule_rows)}")
+    log(f"SCHEDULE rows={len(schedule_rows)} used_real_schedule_fallback={used_real_schedule_fallback}")
 
     projections: list[SmartSimNflProjection] = []
     for row in schedule_rows:
@@ -260,6 +300,7 @@ def main() -> None:
 
     log(f"WRITE_DONE path={path} projections={len(projections)} elapsed={elapsed:.1f}s")
     print(f"schedule_rows={len(schedule_rows)}")
+    print(f"used_real_schedule_fallback={used_real_schedule_fallback}")
     print(f"projections_written={len(projections)}")
     print(f"elapsed_seconds={elapsed:.1f}")
     print(f"artifact_path={path}")

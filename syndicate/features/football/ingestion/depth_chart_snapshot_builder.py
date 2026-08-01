@@ -94,7 +94,7 @@ def _normalize_team(row: dict[str, Any]) -> str:
 
 
 def _normalize_position(row: dict[str, Any]) -> str:
-    return _safe_text(row.get("position") or row.get("position_group") or row.get("positional_group") or "")
+    return _safe_text(row.get("position") or row.get("position_group") or row.get("positional_group") or row.get("pos_abb") or "")
 
 
 def _normalize_depth_row(
@@ -104,12 +104,18 @@ def _normalize_depth_row(
     snapshot_date: str,
     source_file: str,
 ) -> dict[str, str]:
-    player_id = _safe_text(row.get("player_id") or row.get("source_player_id") or row.get("player_ref") or "")
     player_name = _normalize_player_name(row)
     team = _normalize_team(row)
     position = _normalize_position(row)
-    depth_rank = _safe_int_text(row.get("depth_rank") or row.get("depth_order") or row.get("rank") or "")
+    player_id = _safe_text(row.get("player_id") or row.get("source_player_id") or row.get("player_ref") or row.get("gsis_id") or "")
+    depth_rank = _safe_int_text(row.get("depth_rank") or row.get("depth_order") or row.get("rank") or row.get("pos_rank") or "")
     role = _safe_text(row.get("role") or row.get("depth_role") or row.get("starter_status") or "")
+    if not role and depth_rank:
+        # nflverse's real depth_charts release carries pos_rank (real
+        # 1-based depth-chart slot per position), not a starter/backup
+        # label directly -- derive the label from that real rank rather
+        # than leaving role empty (required by validate_depth_snapshot_rows).
+        role = "Starter" if depth_rank == "1" else f"Depth {depth_rank}"
     starter_flag = _safe_bool_text(row.get("starter_flag") or row.get("is_starter") or row.get("starter") or "")
     backup_flag = _safe_bool_text(row.get("backup_flag") or row.get("is_backup") or row.get("backup") or "")
     return {
@@ -182,6 +188,14 @@ def build_depth_snapshot_rows(
             if roster_match and roster_match.get("player_id"):
                 normalized["player_id"] = roster_match["player_id"]
                 normalized["source_player_id"] = roster_match["player_id"]
+            else:
+                # Real nflverse depth-chart rows for practice-squad/
+                # undrafted players sometimes have no gsis_id AND no
+                # roster-snapshot match (same real-data quirk as
+                # roster_snapshot_builder) -- derive a stable id from the
+                # same real fields rather than dropping a real player.
+                normalized["player_id"] = fallback_key
+                normalized["source_player_id"] = normalized["source_player_id"] or fallback_key
         elif normalized.get("player_id"):
             roster_match = roster_index.get(f"id:{normalized['player_id']}")
             if roster_match and not normalized.get("player_name"):

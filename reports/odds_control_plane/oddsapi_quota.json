@@ -1,0 +1,47 @@
+{
+  "baseline": {
+    "remaining": 14979678,
+    "used": 20322,
+    "last_cost": 3,
+    "sport": "nfl",
+    "endpoint": "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds?regions=us&markets=h2h%2Cspreads%2Ctotals&oddsFormat=american",
+    "observedAt": "2026-08-01T18:01:40.600+00:00"
+  },
+  "latest": {
+    "remaining": 14979644,
+    "used": 20356,
+    "last_cost": 3,
+    "sport": "ncaaf",
+    "endpoint": "https://api.the-odds-api.com/v4/sports/americanfootball_ncaaf/odds/?regions=us&markets=h2h%2Cspreads%2Ctotals&oddsFormat=american",
+    "observedAt": "2026-08-01T18:03:01.165+00:00"
+  },
+  "by_sport": {
+    "nfl": {
+      "calls": 1,
+      "credits": 3
+    },
+    "ncaaf": {
+      "calls": 1,
+      "credits": 3
+    }
+  },
+  "by_market_family": {
+    "full_game": {
+      "calls": 2,
+      "credits": 6.0
+    }
+  },
+  "by_hour_utc": {
+    "18": {
+      "calls": 2,
+      "credits": 6
+    }
+  },
+  "attribution_error_count": 0,
+  "last_attribution_error": null,
+  "race_detected_count": 0,
+  "last_race_detail": null,
+  "aggregates_started_at": "2026-08-01T18:01:40.600+00:00",
+  "observation_count": 2,
+  "updatedAt": "2026-08-01T13:03:01-05:00"
+}

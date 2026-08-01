@@ -142,3 +142,34 @@ def build_module_links(selected_week: int, active_label: str, *, season: int | N
 
 def format_odds(value: Any) -> str:
     return format_signed_price(value)
+
+
+def real_schedule_path(season: int) -> Path:
+    return data_path(f"schedule_{season}.csv")
+
+
+def nfl_target_week(season: int) -> int | None:
+    """Real calendar-driven "which week should we be preparing simulations
+    for right now" -- the lowest week number in the real schedule
+    (data/nfl_source/schedule_{season}.csv) with any game not yet played
+    (away_score/home_score both blank). None if the file doesn't exist, or
+    every loaded game already has a real final score (nothing left to
+    prepare for this season). Deliberately NOT calendar-arithmetic (e.g.
+    "today's date implies week N") -- real scores are the ground truth for
+    "has this week happened yet," not a date guess, since bye weeks and
+    schedule changes make date math unreliable."""
+    path = real_schedule_path(season)
+    if not path.exists():
+        return None
+    weeks_with_unplayed_games: set[int] = set()
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            try:
+                week = int(row.get("week") or 0)
+            except (TypeError, ValueError):
+                continue
+            home_score = (row.get("home_score") or "").strip()
+            away_score = (row.get("away_score") or "").strip()
+            if not home_score and not away_score:
+                weeks_with_unplayed_games.add(week)
+    return min(weeks_with_unplayed_games) if weeks_with_unplayed_games else None

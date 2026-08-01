@@ -80,6 +80,67 @@ class WeekScheduleTests(unittest.TestCase):
         self.assertEqual(rows, [{"game_id": "2025_22_SEA_NE", "home_team": "NE", "away_team": "SEA"}])
 
 
+class RealScheduleFallbackTests(unittest.TestCase):
+    def _write_real_schedule(self, tmp, season, rows):
+        import csv
+        import os
+
+        fieldnames = ["game_id", "season", "game_type", "week", "gameday", "gametime", "away_team", "home_team", "away_score", "home_score", "spread_line", "total_line", "away_moneyline", "home_moneyline", "stadium"]
+        with open(os.path.join(tmp, f"schedule_{season}.csv"), "w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in rows:
+                full = {key: "" for key in fieldnames}
+                full.update(row)
+                writer.writerow(full)
+
+    def test_reads_real_schedule_csv_for_requested_week(self) -> None:
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            self._write_real_schedule(tmp, 2026, [
+                {"game_id": "2026_01_NE_SEA", "week": "1", "home_team": "SEA", "away_team": "NE"},
+                {"game_id": "2026_02_X_Y", "week": "2", "home_team": "Y", "away_team": "X"},
+            ])
+            with patch.object(gen, "DATA_ROOT", Path(tmp)):
+                rows = gen.week_schedule_from_real_schedule(2026, 1)
+
+        self.assertEqual(rows, [{"game_id": "2026_01_NE_SEA", "home_team": "SEA", "away_team": "NE"}])
+
+    def test_missing_file_returns_empty(self) -> None:
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(gen, "DATA_ROOT", Path(tmp)):
+                rows = gen.week_schedule_from_real_schedule(2026, 1)
+
+        self.assertEqual(rows, [])
+
+    def test_main_falls_back_when_no_pbp_exists_yet(self) -> None:
+        import os
+        import sys
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            self._write_real_schedule(tmp, 2026, [
+                {"game_id": "2026_01_NE_SEA", "week": "1", "home_team": "SEA", "away_team": "NE"},
+            ])
+            with patch.object(gen, "DATA_ROOT", Path(tmp)), patch.object(
+                sys, "argv", ["generate_smartsim2_nfl_projections.py", "--season", "2026", "--week", "1", "--seeds", "2"],
+            ):
+                gen.main()
+            artifact_path = Path(tmp) / "smartsim2_projections_2026_wk1.csv"
+            self.assertTrue(artifact_path.exists())
+            content = artifact_path.read_text(encoding="utf-8")
+            self.assertIn("2026_01_NE_SEA", content)
+
+
 class BuildProjectionTests(unittest.TestCase):
     def test_seeded_output_is_deterministic_and_shaped_correctly(self) -> None:
         current = [

@@ -9,7 +9,7 @@ from typing import Any
 
 from syndicate.features.football.features.team_identity import canonical_team_abbr
 from syndicate.features.football.features.team_identity import canonical_team_metadata
-from syndicate.features.football.ingestion.nflverse_ingestion import load_nflverse_player_stats
+from syndicate.features.football.ingestion.nflverse_ingestion import load_nflverse_roster
 from syndicate.features.nfl.sources import default_nfl_source_root
 
 
@@ -69,11 +69,20 @@ def _normalize_source_row(
     snapshot_date: str,
     source_file: str,
 ) -> dict[str, str]:
-    player_id = _safe_text(row.get("player_id") or row.get("source_player_id") or "")
     player_name = _safe_text(row.get("player_display_name") or row.get("player_name") or row.get("full_name") or row.get("name") or "")
     team = canonical_team_abbr(row.get("team") or row.get("team_abbr") or row.get("team_name") or row.get("source_team_name") or "")
     position = _normalize_position(row)
     team_metadata = canonical_team_metadata(team)
+    player_id = _safe_text(row.get("player_id") or row.get("source_player_id") or row.get("gsis_id") or "")
+    if not player_id:
+        # Real nflverse roster rows for practice-squad/undrafted signees
+        # sometimes have no gsis_id assigned yet (confirmed: a real,
+        # known nflverse data quirk, not a parsing bug) -- rather than
+        # drop a real player or leave player_id empty (which fails
+        # validate_roster_snapshot_rows), derive a stable id from the
+        # same real fields the dedup grouping below already falls back
+        # to for these rows, so every real player still gets a row.
+        player_id = "|".join((player_name, team, position))
     return {
         "player_id": player_id,
         "player_name": player_name,
@@ -85,7 +94,7 @@ def _normalize_source_row(
         "team_name": team_metadata.get("team_name") or team,
         "player_display_name": _safe_text(row.get("player_display_name") or player_name),
         "position_group": _safe_text(row.get("position_group") or position),
-        "source_system": "nflverse_player_stats",
+        "source_system": "nflverse_roster",
         "source_file": source_file,
         "source_date": snapshot_date,
         "source_player_id": player_id,
@@ -107,8 +116,8 @@ def build_roster_snapshot_rows(
     source_rows: list[dict[str, Any]] | tuple[dict[str, Any], ...] | None = None,
 ) -> tuple[dict[str, str], ...]:
     snapshot_day = snapshot_date or date_type.today().isoformat()
-    source_file = str(default_nfl_source_root() / "tracking" / "nflverse" / "player_stats" / f"player_stats_{season}.csv")
-    rows = list(source_rows) if source_rows is not None else list(load_nflverse_player_stats(season))
+    source_file = str(default_nfl_source_root() / "tracking" / "nflverse" / "roster" / f"roster_{season}.csv")
+    rows = list(source_rows) if source_rows is not None else list(load_nflverse_roster(season))
     normalized_rows = [
         _normalize_source_row(row, season=season, snapshot_date=snapshot_day, source_file=source_file)
         for row in rows
@@ -181,5 +190,5 @@ def write_roster_snapshot_csv(
         for row in rows:
             writer.writerow({column: row.get(column, "") for column in ROSTER_SNAPSHOT_COLUMNS})
 
-    source_file = str(default_nfl_source_root() / "tracking" / "nflverse" / "player_stats" / f"player_stats_{season}.csv")
+    source_file = str(default_nfl_source_root() / "tracking" / "nflverse" / "roster" / f"roster_{season}.csv")
     return RosterSnapshotBuildResult(rows=rows, output_path=path, source_file=source_file, snapshot_date=snapshot_day)

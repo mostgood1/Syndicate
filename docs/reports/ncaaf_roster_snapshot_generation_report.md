@@ -7,7 +7,7 @@ Generated: yes
 Snapshot output: C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\ncaaf_source\source_artifacts\data\processed\roster\ncaaf_roster_snapshot.csv
 Identity snapshot input: C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\ncaaf_source\source_artifacts\data\processed\player_identity\ncaaf_player_identity_snapshot.csv
 Source system: cfbd
-Source snapshot date: 2026-07-21
+Source snapshot date: 2026-08-01
 
 ## Counts
 

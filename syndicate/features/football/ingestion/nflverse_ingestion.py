@@ -82,6 +82,38 @@ def _ftn_charting_rows(season: int) -> list[dict[str, Any]]:
     return _download_csv_rows(url, path)
 
 
+def _roster_rows(season: int) -> list[dict[str, Any]]:
+    """Real nflverse full-season rosters (team/position/depth per player)
+    -- distinct from _player_stats_rows above, which is per-game weekly
+    STATS (only populated once games are played, useless pre-season).
+    This is what an actual roster/depth-chart concept needs: who's on the
+    team right now, regardless of whether they've played yet."""
+    path = _release_cache_path("roster", season)
+    url = f"{NFLVERSE_BASE_URL}/rosters/roster_{season}.csv"
+    return _download_csv_rows(url, path)
+
+
+def _depth_chart_rows(season: int) -> list[dict[str, Any]]:
+    """Real nflverse depth charts (per-team position-slot rank per player)
+    -- confirmed live: real 2026 data already posted (dated 2026-08-01,
+    today), unlike CFBD's NCAAF roster which has nothing for 2026 yet.
+    No fetcher existed for this anywhere in the repo before; the previous
+    depth-chart builder had zero real-source wiring at all."""
+    path = _release_cache_path("depth_charts", season)
+    url = f"{NFLVERSE_BASE_URL}/depth_charts/depth_charts_{season}.csv"
+    return _download_csv_rows(url, path)
+
+
+def _injuries_rows(season: int) -> list[dict[str, Any]]:
+    """Real nflverse weekly injury reports (report/practice status per
+    player per week) -- no equivalent exists anywhere else in this repo
+    for NFL, and CFBD (the NCAAF data source) has no injuries endpoint at
+    all, so this is NFL-only."""
+    path = _release_cache_path("injuries", season)
+    url = f"{NFLVERSE_BASE_URL}/injuries/injuries_{season}.csv"
+    return _download_csv_rows(url, path)
+
+
 def load_nflverse_team_stats(season: int) -> tuple[dict[str, Any], ...]:
     return tuple(row for row in _team_stats_rows(season) if isinstance(row, dict))
 
@@ -92,6 +124,18 @@ def load_nflverse_player_stats(season: int) -> tuple[dict[str, Any], ...]:
 
 def load_nflverse_ftn_charting_rows(season: int) -> tuple[dict[str, Any], ...]:
     return tuple(row for row in _ftn_charting_rows(season) if isinstance(row, dict))
+
+
+def load_nflverse_roster(season: int) -> tuple[dict[str, Any], ...]:
+    return tuple(row for row in _roster_rows(season) if isinstance(row, dict))
+
+
+def load_nflverse_depth_chart(season: int) -> tuple[dict[str, Any], ...]:
+    return tuple(row for row in _depth_chart_rows(season) if isinstance(row, dict))
+
+
+def load_nflverse_injuries(season: int) -> tuple[dict[str, Any], ...]:
+    return tuple(row for row in _injuries_rows(season) if isinstance(row, dict))
 
 
 @lru_cache(maxsize=16)

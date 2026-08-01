@@ -15,7 +15,16 @@ def _default_report_path() -> Path:
     return Path(__file__).resolve().parents[1] / "docs" / "reports" / "ncaaf_roster_snapshot_generation_report.md"
 
 
+def _load_env() -> None:
+    try:
+        from dotenv import load_dotenv  # type: ignore
+    except Exception:
+        return
+    load_dotenv()
+
+
 def main() -> int:
+    _load_env()
     parser = argparse.ArgumentParser(description="Build the canonical NCAAF roster snapshot from CFBD-backed player identity data.")
     parser.add_argument("--season", type=int, required=True, help="Season year to fetch from CFBD.")
     parser.add_argument("--identity-output-path", type=Path, default=None, help="Optional player identity CSV output path.")

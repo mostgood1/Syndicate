@@ -197,7 +197,16 @@ def build_projection(
     )
 
 
+def _load_env() -> None:
+    try:
+        from dotenv import load_dotenv  # type: ignore
+    except Exception:
+        return
+    load_dotenv()
+
+
 def main() -> None:
+    _load_env()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--season", type=int, required=True)
     parser.add_argument("--week", type=int, required=True)

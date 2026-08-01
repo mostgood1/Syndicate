@@ -161,3 +161,30 @@ def build_module_links(selected_week: int, active_label: str, *, season: int | N
         ("Hub", "/ncaaf/hub"),
     ]
     return [{"label": label, "href": href, "active": label == active_label} for label, href in links]
+
+
+def ncaaf_target_week(season: int) -> int | None:
+    """Real calendar-driven "which week should we be preparing simulations
+    for right now" -- mirrors syndicate.features.nfl.sources.nfl_target_week
+    exactly: the lowest week number in the real schedule
+    (historical_truth/games_{season}.json.gz, via load_games_season) with
+    any game whose real `completed` field is False. None if the season
+    isn't loaded yet, or every loaded game is already marked completed."""
+    from syndicate.features.football.sim_engine.smartsim2.historical_truth.ncaaf_historical_loader import load_games_season
+
+    try:
+        games = load_games_season(season)
+    except Exception:
+        return None
+    weeks_with_unplayed_games: set[int] = set()
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        if game.get("completed"):
+            continue
+        week = game.get("week")
+        try:
+            weeks_with_unplayed_games.add(int(week))
+        except (TypeError, ValueError):
+            continue
+    return min(weeks_with_unplayed_games) if weeks_with_unplayed_games else None
