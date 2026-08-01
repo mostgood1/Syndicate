@@ -4,9 +4,11 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 (Ask the
+Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 (NFL: real
+player-props/ladders pipeline)" below).
+Before that: "Reconciliation 2026-08-01 (Ask the
 Syndicate player-name disambiguation bug: last-name-only substring match
-picked the wrong same-surname player)" below).
+picked the wrong same-surname player)".
 Before that: "Reconciliation 2026-07-31 part 5 (MLB
 pitcher-prop prototype fixes: real-scale backtest results -- effect much
 weaker than diagnosed, do not promote)" -- ran concurrently with the
@@ -35,6 +37,76 @@ cause)". Before that: "Reconciliation 2026-07-31 (Layer 2 board: MLB
 live-status dedup fix + WNBA game/prop wiring, Phase A-C)". Before that:
 "Reconciliation 2026-07-31 (#161 part 2: NBA/WNBA closing line, plus a
 production outage found and fixed along the way)". Prior session: 2026-07-30.
+
+### Reconciliation 2026-08-01 (NFL: real player-props/ladders pipeline)
+
+Continuation of the same "wire up NFL fully" session (part 4 built the
+game-level market board + projection engine; this closes the last major
+gap, player props). User explicitly asked for NFL props/ladders after
+NCAAF's equivalent was scoped out (NCAAF needs new CFBD player-stats
+integration first, no client method exists for it yet -- separate future
+work, not started this session).
+
+**New: #180** (filed and closed same session) — built:
+- `syndicate/features/nfl/player_stats.py`: real per-player game logs and
+  rolling season-to-date rates (passing/rushing yards, attempts, TDs,
+  receptions, anytime TD) from real nflverse play-by-play, same
+  no-lookahead "before this week" discipline as part 4's team ratings.
+  Bridges the two real data sources' different name conventions (odds
+  feed uses "Drake Maye", pbp uses "D.Maye") via a first-initial+surname
+  transform -- confirmed correct against real data before relying on it.
+- `syndicate/features/nfl/props.py`: real quoted player-prop odds
+  (`data/nfl_source/oddsapi_player_props_{season}_wk{week}.csv`) joined
+  against that rate baseline via the existing sport-agnostic
+  `join_odds_to_sim` contract -- **not a trained model**, honestly
+  labeled `sim_source="nfl_season_rate"` throughout (NBA/WNBA's real
+  props pipeline turns out to require training a per-player ONNX model,
+  confirmed via code read -- genuinely out of scope here, not attempted).
+- Folded prop rows into the existing `/nfl/market-board` alongside game
+  markets (mirrors MLB's own board, which does the same), plus a new
+  ranked `/nfl/props` ladder page (mirrors `hr_targets.py`'s shape).
+- Real player-prop odds are populated for only one week in the entire
+  dataset (2025 season, Super Bowl LX) — confirmed the fetch script only
+  hits the-odds-api's live/current-odds endpoint, no historical-backfill
+  capability, so this isn't fixable by re-running it. Fixed
+  `week_schedule()` in the projection generator (part 4's script) to
+  include POST (playoff) games, which it had excluded — needed to
+  generate a real game-level projection for that same week so the market
+  board could show both game markets and props together for it.
+- **Real bug found and fixed during live-browser verification** (not
+  caught by unit tests, which mocked the join step): every player sharing
+  a prop market (nearly all of them — every player has their own
+  `anytime_td` row) triggered a false `unmatched_needs_resim` status for
+  any player whose own rate didn't resolve, purely because a *different*
+  player at the same game had sim coverage under the same shared market
+  label. Exact same bug class MLB's hitter-RBI props already had a fix
+  for (`_mlb_prop_join_market_key`) — applied the identical pattern:
+  disambiguate the join key by player, relabel back to the clean stat
+  name for display after the join.
+- **Also found and fixed mid-session: uncommitted work was silently
+  reverted.** A concurrent session's git operation reset 5 already-tracked
+  files this session had uncommitted edits in (`nfl.py`, `cards.py`, the
+  generation script, two test files) back to their last-committed state —
+  confirmed by `git status`/`git diff` showing zero diff against HEAD
+  where edits should have been, and two new commits from a different
+  session in `git log`. New untracked files survived (git resets don't
+  touch untracked files). Redid the 5 lost edits from scratch and
+  committed immediately afterward rather than leaving further large
+  uncommitted diffs sitting around. **Operational lesson**: commit
+  meaningfully-sized progress promptly in this repo rather than batching
+  multiple pieces of work into one long uncommitted session — concurrent
+  sessions are a confirmed, real risk here, not theoretical.
+
+24 new tests (player_stats, props, market-board fold-in, a regression
+test for the needs-resim bug); 312 tests pass across NFL+NCAAF. Verified
+against real 2025 wk22 data in an actual running browser session both
+before and after the join-key fix.
+
+**Not done this session**: NCAAF props/ladders (needs new CFBD
+integration, separate scoping conversation), a settlement/grading report
+UI (the real actual-value lookup function exists,
+`player_stats.final_stat_value`, but nothing surfaces it yet), and an
+Ask the Syndicate player-prop evidence fetcher.
 
 ### Reconciliation 2026-08-01 (Ask the Syndicate player-name disambiguation bug: last-name-only substring match picked the wrong same-surname player)
 
