@@ -271,6 +271,26 @@ at ~2-3 minutes each. NFL props/ladders pipeline and a full-season ATS/
 calibration report are still not built (same class of gap flagged for
 NCAAF in part 1).
 
+**Follow-up (same day, immediately after)** — backfilled the remaining 16
+weeks (all of season 2025 now has a real generated projection artifact,
+`data/nfl_source/smartsim2_projections_2025_wk{1-18}.csv`) and ran the
+full-season accuracy check flagged above as not-yet-done. Real result
+against the full 272-game 2025 regular season (graded from real final
+scores in the same nflverse pbp data the model itself reads):
+**59.6% straight-up winner accuracy (162/272), mean absolute margin error
+10.6 points.** Context computed the same way from the same real data: a
+trivial "always pick the home team" baseline scores 53.7%; the real
+market's own closing-line favorite scores 66.0% (238 games with a
+resolvable line). So the model has genuine, non-fabricated signal (clears
+the home-field baseline) but is meaningfully behind the real market
+(expected for a v1 rolling-EPA rating with no opponent adjustment or
+calibration tuning) — an honest number to have on record before anyone
+treats this model's picks as betting-grade, not a promotion decision
+either way. Per-week accuracy ranges from 38% (week 16) to 77% (week 8),
+normal week-to-week variance at a 13-16 game sample size, not a sign of a
+week-specific bug. NFL props/ladders pipeline is still the next
+un-started piece if this module is to reach the same depth as MLB.
+
 ### Reconciliation 2026-07-31 part 3 (MLB pitcher-prop prototype fixes: K-rate log5 blend + TTO3 quality scaling)
 
 Follow-up to #176 (same session, continued). User asked for a prototype fix

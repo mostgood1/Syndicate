@@ -1,0 +1,17 @@
+game_id,season,week,home_team,away_team,home_score_mean,away_score_mean,margin_mean,total_mean,margin_stdev,total_stdev,home_win_rate,seeds_used,profile_name,rating_source,generated_at
+2025_02_ATL_MIN,2025,2,MIN,ATL,20.26,19.85,0.41,40.11,13.128,11.212,0.5033,300,nfl_v1,nflverse_pbp_epa_rolling[current_season_rolling/current_season_rolling],2026-08-01T14:58:54.486047+00:00
+2025_02_BUF_NYJ,2025,2,NYJ,BUF,29.783,25.813,3.97,55.597,13.606,13.003,0.6133,300,nfl_v1,nflverse_pbp_epa_rolling[current_season_rolling/current_season_rolling],2026-08-01T14:59:03.726584+00:00
+2025_02_CAR_ARI,2025,2,ARI,CAR,25.067,19.14,5.927,44.207,13.015,12.035,0.6833,300,nfl_v1,nflverse_pbp_epa_rolling[current_season_rolling/current_season_rolling],2026-08-01T14:59:12.551642+00:00
+2025_02_CHI_DET,2025,2,DET,CHI,21.013,23.537,-2.523,44.55,13.321,11.962,0.4233,300,nfl_v1,nflverse_pbp_epa_rolling[current_season_rolling/current_season_rolling],2026-08-01T14:59:22.745700+00:00
+2025_02_CLE_BAL,2025,2,BAL,CLE,29.3,25.71,3.59,55.01,13.444,13.206,0.6333,300,nfl_v1,nflverse_pbp_epa_rolling[current_season_rolling/current_season_rolling],2026-08-01T14:59:33.008467+00:00
+2025_02_DEN_IND,2025,2,IND,DEN,23.23,18.783,4.447,42.013,12.431,12.508,0.62,300,nfl_v1,nflverse_pbp_epa_rolling[current_season_rolling/current_season_rolling],2026-08-01T14:59:43.273244+00:00
+2025_02_JAX_CIN,2025,2,CIN,JAX,18.21,22.403,-4.193,40.613,13.096,11.528,0.3767,300,nfl_v1,nflverse_pbp_epa_rolling[current_season_rolling/current_season_rolling],2026-08-01T14:59:53.930781+00:00
+2025_02_LAC_LV,2025,2,LV,LAC,25.36,23.813,1.547,49.173,13.691,12.687,0.5367,300,nfl_v1,nflverse_pbp_epa_rolling[current_season_rolling/current_season_rolling],2026-08-01T15:00:03.229258+00:00
+2025_02_LA_TEN,2025,2,TEN,LA,14.26,16.907,-2.647,31.167,11.193,11.156,0.3833,300,nfl_v1,nflverse_pbp_epa_rolling[current_season_rolling/current_season_rolling],2026-08-01T15:00:14.419272+00:00
+2025_02_NE_MIA,2025,2,MIA,NE,20.007,22.423,-2.417,42.43,12.626,11.059,0.42,300,nfl_v1,nflverse_pbp_epa_rolling[current_season_rolling/current_season_rolling],2026-08-01T15:00:24.443967+00:00
+2025_02_NYG_DAL,2025,2,DAL,NYG,25.83,20.507,5.323,46.337,13.691,12.388,0.6433,300,nfl_v1,nflverse_pbp_epa_rolling[current_season_rolling/current_season_rolling],2026-08-01T15:00:35.501594+00:00
+2025_02_PHI_KC,2025,2,KC,PHI,27.73,28.14,-0.41,55.87,14.227,14.084,0.5133,300,nfl_v1,nflverse_pbp_epa_rolling[current_season_rolling/current_season_rolling],2026-08-01T15:00:46.069176+00:00
+2025_02_SEA_PIT,2025,2,PIT,SEA,27.653,22.78,4.873,50.433,13.518,13.137,0.6167,300,nfl_v1,nflverse_pbp_epa_rolling[current_season_rolling/current_season_rolling],2026-08-01T15:00:56.114582+00:00
+2025_02_SF_NO,2025,2,NO,SF,19.687,23.85,-4.163,43.537,13.574,12.147,0.3867,300,nfl_v1,nflverse_pbp_epa_rolling[current_season_rolling/current_season_rolling],2026-08-01T15:01:06.945877+00:00
+2025_02_TB_HOU,2025,2,HOU,TB,20.313,21.353,-1.04,41.667,13.112,11.476,0.4667,300,nfl_v1,nflverse_pbp_epa_rolling[current_season_rolling/current_season_rolling],2026-08-01T15:01:16.120802+00:00
+2025_02_WAS_GB,2025,2,GB,WAS,23.917,24.14,-0.223,48.057,14.089,12.269,0.4867,300,nfl_v1,nflverse_pbp_epa_rolling[current_season_rolling/current_season_rolling],2026-08-01T15:01:25.518254+00:00
