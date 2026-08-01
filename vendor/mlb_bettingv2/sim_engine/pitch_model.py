@@ -75,6 +75,14 @@ class PitchModelConfig:
     k_combine_log5_weight: float = 0.0
     k_league_rate: float = 0.223
 
+    # How much log5 character to blend into the batter/pitcher
+    # inplay_hit_rate combination, vs. the plain 50/50 average.
+    # 1.0 = pure log5 (current/default, the promoted 2026-07-19 behavior).
+    # 0.0 = plain average (the pre-promotion behavior).
+    # See `_combined_inplay_hit` in this module for why this is tunable.
+    inplay_hit_combine_log5_weight: float = 1.0
+    inplay_hit_league_rate: float = 0.275
+
     # Mapping from PA-level HR target to per-ball-in-play HR probability.
     # Keep conservative; tuning this affects run environment materially.
     hr_on_ball_in_play_factor: float = 0.62
@@ -209,6 +217,46 @@ def _combined(a: float, b: float, league_key: Optional[str] = None) -> float:
     if league_key in _LEAGUE_RATE:
         return _combined_log5(a, b, _LEAGUE_RATE[league_key])
     return clamp01(0.5 * float(a) + 0.5 * float(b))
+
+
+def _combined_inplay_hit(a: float, b: float, cfg: "PitchModelConfig") -> float:
+    """PA-level in-play-hit target: batter inplay_hit_rate vs. pitcher
+    inplay_hit_rate allowed.
+
+    Diagnosed 2026-08-01 (todo.md part 9): team-level total hits are
+    over-projected by +1.41/game (16.8% relative, n=1224 team-games,
+    46-date backtest) -- this is present even in TEAM totals (all
+    pitchers, not just the starter this session's other fixes touched),
+    so it isn't the same outs/workload mechanism diagnosed and partly
+    fixed in parts 3-7; it's a separate per-PA rate calibration issue.
+    `inplay_hit` was moved from flat average to log5 on 2026-07-19
+    specifically to fix HR/extra-base under-projection (see `_combined`'s
+    comment above) -- that promotion's own backtest validated HR rate and
+    total_bases_4plus/5plus, not the *overall* hit-rate level, leaving
+    open the possibility log5 fixed one gap while quietly opening another.
+    Plausible mechanism: log5 combines two *noisy per-player estimates*
+    (not true talent), which can inflate output variance relative to a
+    flat average; since inplay_hit sits close to 0 (~0.275) and far from
+    1, that extra variance has much more room to push values up toward
+    the ceiling than down toward the floor before `clamp01` cuts it off,
+    which can shift the *mean* up even though log5 itself is
+    theoretically unbiased for true (noise-free) talent.
+
+    Mirrors `_combined_k`'s shrinkage-blend pattern, but in reverse:
+    `inplay_hit_combine_log5_weight=1.0` (the default) reproduces the
+    current *promoted* (full log5) behavior exactly, so this is fully
+    backward compatible; `0.0` fully reverts to the pre-2026-07-19 flat
+    average, for backtesting whether that closes the hits-allowed gap
+    without reopening the HR/total-bases gap log5 was promoted to fix.
+    """
+    weight = _cfg_float(cfg, "inplay_hit_combine_log5_weight", 1.0)
+    weight = max(0.0, min(1.0, weight))
+    flat = clamp01(0.5 * float(a) + 0.5 * float(b))
+    if weight <= 0.0:
+        return flat
+    league = _cfg_float(cfg, "inplay_hit_league_rate", _LEAGUE_RATE["inplay_hit"])
+    log5 = _combined_log5(a, b, league)
+    return clamp01((1.0 - weight) * flat + weight * log5)
 
 
 def _combined_k(a: float, b: float, cfg: "PitchModelConfig") -> float:
@@ -396,7 +444,7 @@ def simulate_pitch(
     bb_tgt = _combined(batter_bb_rate, pitcher_bb_rate)
     hbp_tgt = _combined(batter_hbp_rate, pitcher_hbp_rate)
     hr_tgt = _combined(float(batter_hr_rate) * float(batter_pt_hr_mult), float(pitcher_hr_rate) * float(pitcher_pt_hr_mult), "hr")
-    inplay_hit = _combined(batter_inplay_hit_rate, pitcher_inplay_hit_rate, "inplay_hit")
+    inplay_hit = _combined_inplay_hit(batter_inplay_hit_rate, pitcher_inplay_hit_rate, cfg)
 
     # Optional K-target calibration (applied before translating k_tgt into call mix).
     k_mult = _cfg_float(cfg, "k_logit_mult", 1.0)
