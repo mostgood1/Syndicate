@@ -266,12 +266,51 @@ in `tests/test_refresh_worker.py`, mirroring the existing player-seed test
 `test_refresh_worker.py`/`test_soccer_sources.py`/`test_build_soccer_artifacts.py`/
 `test_soccer_props.py`/`test_soccer_blueprint_routes.py`.
 
-**Verification still needed next session** (not done yet as of this entry):
-deploy, confirm `SOCCER_SCHEDULE_SEED_BOOTSTRAPPED` in refresh-worker's boot
-log, then re-check `/api/intelligence/query?sport=mls` for real `prop`-type
-candidates. Also worth a broader look at whether OTHER non-date-suffixed
-soccer artifacts (team ratings/history files, etc.) have the same gap —
-this session only confirmed and fixed the specific one blocking props.
+**Verified after deploy — the schedule-bootstrap theory was wrong.** Deployed
+and checked refresh-worker's boot log: `SOCCER_SCHEDULE_SEED_BOOTSTRAPPED`
+never printed, because `schedule_2026.json` was **already present** on
+refresh-worker's disk (confirmed indirectly: the seed function only prints
+when it actually copies something). Pulled the real production
+`schedule_2026.json` via the web export endpoint and confirmed week 18
+correctly lists `2026-07-31T23:30Z New York City FC Toronto FC` among its 16
+matches — the schedule data itself was never the problem. Re-ran the local
+reproduction with the complete, correct fixture set (schedule + real
+recommendations + the fixed picks.csv) and `build_props_page_context('mls',
+None, None)` correctly produced 36 rank cards / 23 matched
+`Anytime Goalscorer` cards — proving the **entire pipeline is genuinely
+correct end to end** when fed real, current data. The schedule-bootstrap fix
+itself is still a real, safe defensive addition (same #145/#146 pattern,
+kept and shipped) — it just wasn't the active cause this time; my own
+earlier scratch-directory reproduction (0 cards without a schedule file) was
+an artifact of an incomplete test fixture, not a finding about production
+state. Flagged as a correction rather than silently amending the earlier
+claim.
+
+**Still genuinely open after 30+ minutes and multiple confirmed-successful
+`pull_hot_artifacts` cycles**: the board (`/api/intelligence/query?sport=mls`)
+still shows 0 `prop`-type candidates. The real production architecture for
+this artifact is a **three-hop chain**, not two: soccer's pregame steps
+(schedule/odds/props/picks) are owned by **live-odds-worker**
+(`SYNDICATE_ENABLE_SOCCER_PREGAME_REFRESH_AUTORUN`, per `render.yaml`'s own
+comments — refresh-worker's autorun deliberately excludes these, keeping
+only the sim+live_state), which presumably `publish_hot_artifact`s its output
+to **web**, which **refresh-worker** then `pull_hot_artifacts`s from. My
+manual fix ran the full step sequence directly against **web** (bypassing
+live-odds-worker entirely, since only web exposes the ops HTTP endpoint) —
+proven correct and present on web's disk, and `pull_hot_artifacts` logs show
+general successful syncs (`written=13`, `written=3`, etc.) after that fix
+landed. Whether `picks_2026-07-31.csv` specifically was among those synced
+files, and whether it's actually present on refresh-worker's own disk right
+now, could not be confirmed or denied from outside (no ops endpoint reads
+refresh-worker's disk directly). Next session: don't re-chase the sim or
+schedule layers, both proven correct. Instead (a) check whether
+live-odds-worker's own 4h pregame cadence has been failing/stale
+independent of anything this session touched (its own boot/cycle logs), and
+(b) consider adding a print of resolved file path + row count directly
+inside `_prop_picks_by_player`/`build_props_page_context` so the exact state
+on whichever service actually computes the board is observable from logs,
+instead of requiring more manual cross-service production round-trips to
+infer it.
 
 ### Reconciliation 2026-07-31 (soccer live-lens fast-tick engine)
 
