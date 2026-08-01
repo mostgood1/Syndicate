@@ -281,6 +281,141 @@ commit below) before calling this closed — do not trust a curl check
 against pass-1's deploy as evidence the bug is fixed; re-check after every
 deploy that actually contains the fix.
 
+### Reconciliation 2026-08-01 (MLB pitcher-prop prototype fixes part 6: 46-date/100-sim validation reverses part 5's verdict -- K-fix promoted, quality-hook lever found but needs calibration)
+
+Direct continuation of part 5 (below) and #176/#178. User asked to keep
+working; explicitly authorized the multi-hour full-scale run part 5 said
+was the necessary next step. **This changes part 5's "do not promote"
+conclusion for the K-fix** -- read this before touching
+`k_combine_log5_weight`, `starter_stamina_shrink_n0`, or
+`starter_quality_hook_weight`.
+
+**Method**: reproduced #176's original diagnostic exactly -- same 46 dates
+(`tuning_weather_park_weights/20260718_230212/{baseline,holdout}` date
+lists, saved as `dates_full46.txt`), `sims_per_game=100` (not part 5's 20),
+via `run_batch_eval_days.py`, all runs auto-resolving today's live
+`forward_start_2026_04_14_v1.json`/manager-pitching baseline so every
+comparison stays apples-to-apples against current production.
+
+**1. K-rate combiner (`k_combine_log5_weight`) -- PROMOTED to production.**
+At full scale (1210 starts, 882 matched to real market K lines), the
+"no effect" finding from part 5 reversed: corr(market_line, per-start
+delta) = 0.283 (vs. ~0.06 at the smaller 12-16-date sample) -- part 5's
+hypothesis (a) was correct, that sample size was genuinely underpowered.
+All four tiers moved the correct direction (elite SO bias -2.659 ->
+-2.585, back-end +1.048 -> +0.957); full-game side effects at full scale
+were neutral-to-favorable (brier_home_win 0.2224 -> 0.2245 flat,
+mae_total_runs 3.742 -> 3.641 improved, mae_run_margin 3.323 -> 3.370
+flat) -- unlike the historical full k/bb/hbp log5 attempt that regressed
+totals (see `_combined()`'s comment in pitch_model.py), log5 on K alone
+doesn't carry that cost at this scale. **Caveat, not a full fix**: only
+closes ~3% of the elite-tier gap (-2.659 -> -2.585 of a ~2.66 SO deficit)
+-- promoted `k_combine_log5_weight: 1.0` with full provenance in
+`vendor/mlb_bettingv2/data/tuning/pitch_model_overrides/
+forward_start_2026_04_14_v1.json`'s `_meta` block. The other ~97% of the
+gap is the workload/outs-projection issue below.
+
+**2. Stamina shrink-to-prior (`starter_stamina_shrink_n0`) -- ruled out,
+do not promote.** Hypothesis: `_derive_stamina_pitches_from_season_stats`
+(build_roster.py) shrinks every starter's observed pitches-per-start
+toward a flat 92-pitch prior with fixed `n0=10` weight, compressing
+workload projections regardless of true talent. Tested n0=3.0 (a large
+cut, mid-season trust in observed rate ~65% -> ~85%) across the full
+46 dates: barely moved anything, and 3 of 4 tiers got *slightly worse*
+(mid-high outs bias +0.993 -> +1.024, mid +2.125 -> +2.187, back-end
++3.035 -> +3.157; only elite improved marginally, -0.416 -> -0.378).
+Full-game side effects also degraded slightly across the board (brier
+0.2224 -> 0.2251, mae_total_runs 3.742 -> 3.770, mae_run_margin 3.323 ->
+3.370). Added the `starter_shrink_n0` knob (default 10.0, unchanged
+behavior, safely committed) but this specific lever is not the answer --
+don't re-test it without a new hypothesis for why it should work.
+
+**3. Root cause of the outs/workload compression, found via live trace.**
+Instrumented (temporarily -- `MLB_HOOK_DEBUG` env-gated prints, reverted
+before commit, `simulate.py` diff is clean) the actual pull-decision code
+path and ran a real single-date debug trace. Confirmed `eff_hook`
+(`_starter_effective_hook`) *does* correctly drive real pull timing --
+corr(eff_hook, actual pitch-count-at-removal) = 0.51 across 30 real
+starters, ruling out "the sigmoid/leash mechanism is broken." The real
+bug: `eff_hook` is fed *only* by `stamina_pitches` (a workload-history
+proxy), with no channel at all for the pitcher's own quality (K-rate) --
+confirmed via real roster-artifact dump: Chris Sale (.336 K-rate) and
+Nick Martinez (.116 K-rate) both derived to `stamina_pitches=89` on the
+same slate, nearly identical eff_hook despite wildly different true
+talent. `_starter_matchup_hook_adjustment` already gives the *opposing*
+lineup's quality this kind of influence on the hook; the pitcher's own
+quality had no equivalent.
+
+**4. New fix: `_starter_quality_hook_delta` (simulate.py) -- built,
+committed, real signal found, NOT YET CALIBRATED, do not promote yet.**
+Additive eff_hook adjustment by the starter's own K-rate deviation from
+league average (`starter_quality_hook_weight`, default 0.0 = unchanged;
+`starter_quality_hook_league_k`/`_spread`/`_max_pitches` also
+overridable). This is the strongest real signal found all session:
+weight=0.7 across the full 46 dates gave corr(market_line, outs_delta) =
+0.624 (vs. 0.283 for the K-fix and ~0.06 for both stamina attempts). But
+it's miscalibrated -- elite overshoots past zero into over-projection
+(outs bias -0.416 -> +1.113), mid-high gets *worse* (+0.993 -> +1.708,
+wrong direction), while mid and back-end genuinely improve (+2.125 ->
++1.853, +3.035 -> +2.037). Tested weight=0.35 (half): same qualitative
+shape, roughly half the magnitude everywhere (elite -0.416 -> +0.377,
+mid-high +0.993 -> +1.352 still worse, back-end +3.035 -> +2.586) --
+confirms the problem is the *shape* of the correction, not just its
+size. Full-game side effects at both weights: small, consistent slight
+regression (w=0.7: brier 0.2224->0.2263, mae_runs 3.742->3.781,
+mae_margin 3.323->3.368; w=0.35 roughly half that).
+
+**Likely reason mid-high gets worse at any positive weight**: the fix
+uses a fixed `league_k=0.223` (all-batters-faced league average,
+matching `_LEAGUE_RATE["k"]` in pitch_model.py) as its zero-point, but
+starters as a population skew meaningfully above the *all-pitchers*
+league average (which is dragged down by middle relievers) -- so most
+starters, including "mid-high" tier ones whose baseline bias is already
+positive (over-projected), get a positive quality-hook delta too,
+compounding rather than correcting. **Concrete next step for whoever
+picks this up**: recompute a *starter-population* league_k baseline
+(average K-rate across starters only, not all pitchers) and re-test, or
+fit the correction directly against the observed bias-vs-market-line
+curve (bias is roughly linear-decreasing in tier: elite -0.42 through
+back-end +3.04) rather than assuming K-rate deviation is a clean proxy
+for it. Re-run the same 46-date sweep once a candidate is chosen.
+
+**Operational note -- concurrent-session git collision, recovered
+cleanly**: mid-session, a concurrent session working in this same shared
+working tree ran a `git stash`/reset cycle (visible in reflog) that swept
+up all of this session's uncommitted MLB changes along with its own
+in-progress work into one stash entry. Recovered without disrupting the
+other session: inspected `git stash show -p --stat stash@{0}` (read-only,
+did not pop/drop it), confirmed it contained a mix of both sessions'
+files, then restored *only* the MLB files via `git checkout stash@{0} --
+<exact paths>` (leaves the stash entry itself untouched for the other
+session). Nothing was lost. Lesson: on a long-running session touching
+files in this shared repo, commit incrementally rather than
+accumulating a large uncommitted diff -- a mid-session collision is a
+real, observed risk, not theoretical (see `[[project_concurrent_parallel_
+sessions]]`-equivalent memory note).
+
+**Committed this session** (all new knobs default to exactly prior
+behavior; 1048 tests passed / 1 skipped across two full regression
+sweeps, zero failures from any of these changes):
+- `26074b2e` -- K-rate log5 blend (promoted), TTO3 quality-scaling
+  (not promoted), stamina shrink-to-prior knob (ruled out, not promoted),
+  `_STATCAST_PROFILE_CACHE_VERSION` 3->4 (needed because stamina_pitches
+  now depends on a param the disk cache key didn't distinguish -- without
+  the bump, A/B testing different `starter_shrink_n0` values would
+  silently read back stale cached profiles).
+- `3306258e` -- quality-aware starter hook adjustment (not promoted,
+  needs calibration per above).
+
+Temp validation artifacts (not committed; safe to delete or keep for
+reference), all under `vendor/mlb_bettingv2/data/eval/_prototype_test/`:
+`dates_full46.txt` (the reconstructed 46-date list), `full46_baseline/`,
+`full46_k10/` (K-fix weight=1.0), `full46_stamina_n03/`,
+`full46_qualityhook_w07/`, `full46_qualityhook_w035/`, plus the earlier
+part-5-era 12/16-date batches and single-date debug artifacts
+(`_hookdebug.log`, `_debug_roster_check.json`,
+`data/daily/snapshots/2026-07-10/roster_objs/`).
+
 ### Reconciliation 2026-07-31 part 5 (MLB pitcher-prop prototype fixes: real-scale backtest results -- effect much weaker than diagnosed, do not promote)
 
 Direct continuation of #178 (part 3, same session). User asked to keep working
