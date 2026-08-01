@@ -5294,6 +5294,23 @@ def main() -> int:
                 }
         if source_root is not None:
             state["playoff_transition"] = _run_playoff_transition_if_needed(source_root=source_root, date_str=target_date)
+        # Diagnostic added 2026-08-01: the live_lines artifact's own
+        # generated_at was observed stuck for 20+ minutes on a live WNBA game
+        # despite the outer adaptive tick relaunching this whole script every
+        # ~60-90s with anyLive=true/phase=live confirmed via /api/ops/
+        # live-refresh/state, and despite PERIOD_MARKET_DISCOVERY_DIAG
+        # showing real market keys found on nearly every cycle. This print
+        # settles whether _export_live_snapshot_artifacts is even reached
+        # every cycle (source_root/artifact_root_path could theoretically be
+        # None here, silently skipping the whole block with no error) and
+        # what it actually wrote, instead of continuing to infer from the
+        # read side alone.
+        print(
+            f"[refresh_wnba_oddsapi_props] LIVE_SNAPSHOT_EXPORT_GATE date={target_date} "
+            f"source_root={'set' if source_root is not None else 'None'} "
+            f"artifact_root_path={'set' if artifact_root_path is not None else 'None'}",
+            flush=True,
+        )
         if source_root is not None and artifact_root_path is not None:
             # Live game state (score/period/clock, ESPN-sourced) is cheap and has nothing
             # to do with whether odds/props inputs changed, so refresh it every tick
@@ -5301,10 +5318,15 @@ def main() -> int:
             # cached bundle. Without this, live snapshots only ever get written once,
             # since _materialize_artifact_bundle below is skipped entirely in fast mode.
             try:
-                _export_live_snapshot_artifacts(
+                export_result = _export_live_snapshot_artifacts(
                     source_root=source_root,
                     date_str=str(target_date),
                     processed_root=artifact_root_path / "data" / "processed",
+                )
+                print(
+                    f"[refresh_wnba_oddsapi_props] LIVE_SNAPSHOT_EXPORT_RESULT date={target_date} "
+                    f"copied_keys={sorted(export_result.keys())}",
+                    flush=True,
                 )
             except Exception as exc:
                 print(f"[refresh_wnba_oddsapi_props] LIVE_SNAPSHOT_REFRESH_FAILED date={target_date} error={type(exc).__name__}: {exc}", flush=True)
