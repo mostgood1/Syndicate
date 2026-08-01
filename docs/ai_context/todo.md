@@ -4,14 +4,104 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 (MLB props root
+Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 (NFL/NCAAF:
+real 2026 week-1 data + sim triggers)" below).
+Before that: "Reconciliation 2026-08-01 (MLB props root
 cause + WNBA board duplication + soccer bootstrap/live-props gap, shipped
-and deployed)" below).
+and deployed)" -- ran concurrently, different files throughout.
 Before that: "Reconciliation 2026-08-01 (NFL: real
 player-props/ladders pipeline)".
 Before that: "Reconciliation 2026-08-01 (Ask the
 Syndicate player-name disambiguation bug: last-name-only substring match
 picked the wrong same-surname player)".
+
+### Reconciliation 2026-08-01 (NFL/NCAAF: real 2026 week-1 data + sim triggers)
+
+Continuation of this session's NFL/NCAAF effort. User asked to confirm
+2026 schedules loaded, get both sports building toward real week-1 sims,
+and incorporate real odds/rosters/injuries/historic pbp. Both schedules
+were already real and on disk (NFL `schedule_2026.csv`, 272 games; NCAAF
+`historical_truth/games_2026.json.gz`, 888 games) -- nothing to "load."
+
+**New: #181** (filed and closed same session):
+- NFL projection generator (`scripts/generate_smartsim2_nfl_projections.py`)
+  couldn't project 2026 at all -- its schedule derivation reads real
+  play-by-play, which doesn't exist yet for a season that hasn't been
+  played. Added a fallback to `schedule_{season}.csv` (real, already had
+  spread/total/moneyline posted) when pbp is empty. Also fixed
+  `week_schedule()` to include POST (playoff) games -- needed to
+  generate a real week-22 projection for the one week with real
+  populated player-prop odds (Super Bowl LX), since team ratings stay
+  REG-only by design (a playoff team's rating shouldn't be diluted by a
+  handful of playoff plays).
+- New `nfl_target_week()`/`ncaaf_target_week()` (both in each sport's own
+  `sources.py`): real calendar-driven "which week to prep next" --
+  lowest week with any game not yet played, from real schedule data, not
+  date arithmetic (bye weeks/schedule changes make date math unreliable).
+- Generated real week-1 2026 projections for both sports (NFL: 16 games,
+  2025-fallback ratings; NCAAF: 51 games, CFBD-2025-fallback PPA).
+- Permanent `load_dotenv()` fix in 3 scripts
+  (`build_ncaaf_roster_snapshot.py`, `generate_smartsim2_ncaaf_projections.py`,
+  `fetch_cfbd_lines.py`) so the CFBD key the user added to `.env` is
+  picked up automatically, not just by scripts that already had this.
+- Real odds pulled live for both sports: NFL's full 272-game 2026 season
+  (confirms sportsbooks post lines much further ahead than assumed --
+  not just NCAAF week 1, real lines already exist for every 2026 game).
+  NCAAF week 1: 51/99 games already have real posted lines via CFBD.
+  **Found and fixed a real pre-existing bug**: `fetch_cfbd_lines.py` wrote
+  to `cfbd_lines_wk{week}.json` (no season) while the actual consumer
+  (`ncaaf/cards.py`) reads `cfbd_lines_{season}_wk{week}.json` -- nothing
+  downstream had ever read this script's output.
+- NFL roster (`data/nfl_source/.../rosters/roster_2026_snapshot.csv`) and
+  depth chart (`.../depth/depth_2026_snapshot.csv`) were confirmed fake
+  2-row demo-fixture stubs (verbatim test data, `source_system:
+  demo_depth_feed`). Built real fetchers
+  (`syndicate/features/football/ingestion/nflverse_ingestion.py`:
+  `load_nflverse_roster`, `load_nflverse_depth_chart`,
+  `load_nflverse_injuries`) against nflverse's real `rosters`/
+  `depth_charts`/`injuries` releases (same GitHub-releases host already
+  used for pbp/player-stats) and wired the first two into their existing
+  snapshot builders, replacing the fake data: **2,930 real 2026 players,
+  real depth-chart ranks** (confirmed live, dated today -- nflverse
+  tracks roster moves continuously, unlike CFBD's NCAAF rosters which
+  have nothing for 2026 yet). New CLI scripts:
+  `build_nfl_roster_snapshot.py`, `build_nfl_depth_chart_snapshot.py`.
+  Real injuries data confirmed available (2025: 6,068 real rows; 2026: 0
+  rows, expected -- no practices/games yet) but deliberately not wired
+  into anything downstream this session (data ingestion only -- no
+  rating/model adjustment exists anywhere in the engine for injuries, a
+  real design decision needing its own conversation, not a silent
+  invention). **No NCAAF injuries equivalent** -- confirmed CFBD's real
+  public API has no injuries endpoint.
+- New automated trigger in `scripts/run_refresh_worker.py`
+  (`_launch_autorun_season_projections`) that generates/refreshes season
+  projections for whichever sport/week is stale -- follows the exact
+  existing 5-sibling autorun idiom (env-gated off by default, same
+  staleness-via-file-age pattern as MLB's own autorun).
+  **Env-gated off, not enabled in production** -- this is a live Render
+  service; turning it on is left as an explicit follow-up decision, not
+  done silently.
+- **Real incident, caught and fixed**: mid-session, a concurrent
+  session's git operation silently reverted this session's uncommitted
+  edits to 5 already-tracked files back to their last-committed state
+  (confirmed via empty `git diff HEAD` where real edits should have
+  been, and new commits from a different session in `git log` at the
+  same moment). Untracked new files survived (checkout/reset doesn't
+  touch those). Redid the lost edits and committed immediately after,
+  rather than leaving large uncommitted diffs sitting around --
+  documented as a new variant in the `project-concurrent-parallel-sessions`
+  memory file for future sessions.
+
+37 new/changed tests, 356 relevant tests passing, verified end-to-end in
+a real browser session (both `/nfl/market-board?season=2026&week=1` and
+`/ncaaf/market-board?week=1` render real odds joined against real model
+output).
+
+**Not done this session**: injury data isn't wired into any rating/
+projection (deliberately -- ingestion only, no modeling decision made
+yet); the new autorun trigger isn't enabled in production; NCAAF's
+roster is still 2025 data (CFBD has nothing for 2026 yet, confirmed via
+a real API call, not a missing-key failure this time).
 
 ### Reconciliation 2026-08-01 (MLB props root cause + WNBA board duplication + soccer bootstrap/live-props gap, shipped and deployed)
 
