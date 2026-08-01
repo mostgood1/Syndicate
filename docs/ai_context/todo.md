@@ -1286,6 +1286,69 @@ untested.
 
 Temp validation artifacts, same directory: `full46_inplayflat_v1/`.
 
+### Reconciliation 2026-08-01 (MLB pitcher-prop prototype fixes part 11: TTO K-rate-decay quality scaling, re-tested at full scale -- fourth fix promoted)
+
+Direct continuation of part 10. User asked "any other threads to pull
+at? how much of a delta are we chasing?" -- see that reply in-session for
+the honest state-of-the-gap accounting (elite SO gap ~2.6, still ~97%
+open; back-end outs gap ~3.0, still ~90%+ open; hits-allowed the one big
+win at ~45% closed). Answer surfaced one concrete new lead:
+`starter_tto_quality_scaling` (part 3) has TWO consumers, not one --
+the pull-probability logit (already tested, no effect) and a separate
+K/BB/HR/inplay RATE-degradation multiplier in
+`_adjust_pitcher_day_rates_v2` (`simulate.py:1936`) that was never
+isolated. The part-3 test was 12 dates at weight=0.5, *before* any of
+this session's three fixes were promoted -- the same underpowered
+condition that made the K-rate combiner itself look dead at 12-16 dates
+before the 46-date/882-start retest found a real signal. User confirmed:
+"let's pursue it."
+
+Re-tested at weight=1.0, full scale (46 dates, 100 sims), stacked on top
+of all three now-promoted fixes. **Real, small, correctly-signed
+effect**: all four SO tiers move the right way (elite -2.618 -> -2.555,
+mid-high -1.131 -> -1.100, mid +0.161 -> +0.147, back-end
++0.827 -> +0.789); elite outs bias improves meaningfully
+(-0.422 -> -0.202). One blemish: mid-high outs bias worsens slightly
+(+0.905 -> +1.011) -- the same tier that reacted oppositely to every
+other hook-related change tested tonight (the uniform `-16` offset
+sweep, this fix). Full-game side effects flat (brier_home_win
+0.2295 -> 0.2305, mae_total_runs 3.471 -> 3.467, mae_run_margin
+3.442 -> 3.446).
+
+**Note**: the first pass at this comparison used a stale, truncated
+market-lookup fallback path list (2 duplicate entries instead of the
+full 5-path list used everywhere else this session) copy-pasted into a
+quick analysis script -- silently starved the match down to n=82 and
+looked like garbage before the bug was caught and fixed, restoring the
+expected n=882. Worth remembering: always diff a new analysis script's
+constants against a known-working one before trusting its output,
+especially anything copy-pasted under time pressure.
+
+**Promoted** `starter_tto_quality_scaling: 1.0` to
+`manager_pitching_overrides/forward_start_2026_04_14_v1.json` with full
+provenance. **Fourth fix promoted to production this session**,
+alongside `k_combine_log5_weight` (part 6), `starter_quality_hook_weight`
+(part 7), and `inplay_hit_combine_log5_weight` (part 10). Not yet
+deployed to Render -- only the first two were deployed
+(`dep-d9n3offqj5pc73e5rdl0`, commit `6ba844a9`); this and part 10's
+`inplay_hit` fix are only live in the repo.
+
+**Still-open threads, not yet pursued** (see the in-session reply to
+"any other threads" for full context): (1) betting-accuracy harness
+(`betting_accuracy.py`, scratchpad) and market-blending alpha-sweep
+(`market_blend_eval.py`, scratchpad) were both built but never actually
+run/reported -- this is the literal "betting accuracy" half of the
+session's original ask, still unanswered; (2) walks (BB) accuracy was
+never reliably measured -- the one attempt hit the same stale-fallback-
+list bug described above (n=82) and wasn't re-run after the fix; (3) the
+mid-high tier's consistent contrarian response to hook-related changes
+(this part, the `-16` offset sweep in part 9) is itself an unexplained
+pattern worth understanding before tuning that lever further.
+
+Temp validation artifacts, same directory:
+`full46_hookoffset_m16/` (the ruled-out uniform-offset sweep),
+`full46_ttorate_w10/`.
+
 ### Reconciliation 2026-07-31 part 5 (MLB pitcher-prop prototype fixes: real-scale backtest results -- effect much weaker than diagnosed, do not promote)
 
 Direct continuation of #178 (part 3, same session). User asked to keep working
