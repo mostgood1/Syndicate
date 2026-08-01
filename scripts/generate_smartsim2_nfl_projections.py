@@ -209,8 +209,22 @@ def build_projection(
     current_plays: list[tuple[int, str, str, str, float]],
     prior_plays: list[tuple[int, str, str, str, float]] | None,
     seeds: int = SEEDS_PER_GAME,
-    apply_injury_adjustment: bool = True,
+    apply_injury_adjustment: bool = False,
 ) -> tuple[SmartSimNflProjection, list[dict]]:
+    # Defaults OFF -- backtested against the real, completed 2025 season
+    # (scripts/backtest_nfl_injury_adjustment.py,
+    # scripts/analyze_nfl_injury_adjustment_sides.py) and confirmed to
+    # HURT full-season win accuracy (60.98% -> 56.44% on the 264 games
+    # with a modeled injury), driven almost entirely by the offense side:
+    # both its methods (excluding a player's plays, and comparing
+    # starter-vs-backup rates) are simple historical averages, not causal
+    # estimates, and get confounded by opponent strength / game script
+    # (e.g. Darren Waller ruled out showed a *positive* delta for MIA's
+    # offense in the real 2025 data -- implausible read literally, but
+    # explainable as confounding). Defense alone is much closer to neutral
+    # (59.47%) but still not an improvement. Left wired in and tested as a
+    # validated experiment, not deleted -- pass apply_injury_adjustment=True
+    # (or the CLI's --injury-adjustment flag) to opt back in.
     home_off, home_def, home_source = team_rating(home_team, week=week, current_plays=current_plays, prior_plays=prior_plays)
     away_off, away_def, away_source = team_rating(away_team, week=week, current_plays=current_plays, prior_plays=prior_plays)
     rating_source = f"nflverse_pbp_epa_rolling[{home_source}/{away_source}]"
@@ -272,7 +286,7 @@ def main() -> None:
     parser.add_argument("--week", type=int, required=True)
     parser.add_argument("--seeds", type=int, default=SEEDS_PER_GAME)
     parser.add_argument("--progress-log", type=Path, default=None)
-    parser.add_argument("--no-injury-adjustment", action="store_true", help="Skip the real injury-rating adjustment (syndicate.features.nfl.injury_adjustment) -- for backtesting on/off comparisons.")
+    parser.add_argument("--injury-adjustment", action="store_true", help="Apply the real injury-rating adjustment (syndicate.features.nfl.injury_adjustment) -- OFF by default, backtested to hurt full-season win accuracy (60.98%% -> 56.44%% on real 2025 games with a modeled injury). Opt in only for further experimentation.")
     args = parser.parse_args()
 
     def log(message: str) -> None:
@@ -307,7 +321,7 @@ def main() -> None:
             current_plays=current_plays,
             prior_plays=prior_plays,
             seeds=args.seeds,
-            apply_injury_adjustment=not args.no_injury_adjustment,
+            apply_injury_adjustment=args.injury_adjustment,
         )
         projections.append(projection)
         all_injury_diagnostics.extend(injury_diagnostics)

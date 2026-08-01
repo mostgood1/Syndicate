@@ -161,7 +161,7 @@ class BuildProjectionTests(unittest.TestCase):
         self.assertEqual(first_notes, [])
         self.assertEqual(second_notes, [])
 
-    def test_injury_adjustment_disabled_by_default_flag_skips_lookup(self) -> None:
+    def test_injury_adjustment_disabled_when_explicitly_off(self) -> None:
         current = [
             _play(1, "KC", "DEN", "pass", 0.3),
             _play(1, "DEN", "KC", "run", -0.1),
@@ -169,6 +169,26 @@ class BuildProjectionTests(unittest.TestCase):
         projection, notes = gen.build_projection(
             season=2025, week=2, home_team="KC", away_team="DEN", game_id="2025_02_DEN_KC",
             current_plays=current, prior_plays=None, seeds=5, apply_injury_adjustment=False,
+        )
+        self.assertEqual(notes, [])
+
+    def test_injury_adjustment_defaults_to_off(self) -> None:
+        # Backtested (scripts/backtest_nfl_injury_adjustment.py,
+        # scripts/analyze_nfl_injury_adjustment_sides.py) to HURT full-
+        # season win accuracy against real 2025 games -- defaults OFF, not
+        # just available as an opt-out. Real production injuries file
+        # doesn't exist under this tempdir-free call, so if the default
+        # were still True this would raise or silently look up the real
+        # production data on disk; confirm the default keeps that lookup
+        # out of the call path entirely by checking no diagnostics appear
+        # even though this fixture never patches DATA_ROOT/source_root.
+        current = [_play(1, "KC", "DEN", "pass", 0.3), _play(1, "DEN", "KC", "run", -0.1)]
+        import inspect
+        default_value = inspect.signature(gen.build_projection).parameters["apply_injury_adjustment"].default
+        self.assertFalse(default_value)
+        projection, notes = gen.build_projection(
+            season=2025, week=2, home_team="KC", away_team="DEN", game_id="2025_02_DEN_KC",
+            current_plays=current, prior_plays=None, seeds=5,
         )
         self.assertEqual(notes, [])
 
