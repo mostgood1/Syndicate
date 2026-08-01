@@ -5,7 +5,9 @@ read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 (NFL/NCAAF:
-real 2026 week-1 data + sim triggers)" below).
+make real 2026 week-1 data the actual default)" below).
+Before that: "Reconciliation 2026-08-01 (NFL/NCAAF:
+real 2026 week-1 data + sim triggers)".
 Before that: "Reconciliation 2026-08-01 (MLB props root
 cause + WNBA board duplication + soccer bootstrap/live-props gap, shipped
 and deployed)" -- ran concurrently, different files throughout.
@@ -14,6 +16,54 @@ player-props/ladders pipeline)".
 Before that: "Reconciliation 2026-08-01 (Ask the
 Syndicate player-name disambiguation bug: last-name-only substring match
 picked the wrong same-surname player)".
+
+### Reconciliation 2026-08-01 (NFL/NCAAF: make real 2026 week-1 data the actual default)
+
+**New: #182** (filed and closed same session):
+
+Continuation of the same NFL/NCAAF session (previous entry generated real
+week-1 2026 data and built ingestion; this entry made that data the
+actual *default* rendered by every page, not just reachable via explicit
+query params). Confirmed the real gap first: `/nfl`, `/nfl/cards`,
+`/nfl/picks`, `/ncaaf/hub`, `/ncaaf/picks`, and both betting-card routes
+still defaulted to stale 2025 data even though real 2026 week-1
+projections already existed on disk.
+
+Part A (NCAAF, commit `e5143d25`): moved the real active-season/week
+resolver out of `cards.py` into `sources.py` so `default_season()` could
+delegate to it without a circular import; fixed a real season-naive
+filtering bug (`_prediction_weeks()`/`_runtime_prediction_rows()` filtered
+by week only, never season, so stale 2025 rows could silently serve as
+"current" once season resolution was fixed elsewhere); wired
+`ncaaf/picks.py` and the betting-card route to the same real
+SmartSim2-standalone fallback `cards.py` already had for itself.
+
+Part B (NFL, commit `f0568b42`): ported the identical pattern to NFL,
+which had no equivalent resolver or fallback anywhere before this --
+`nfl/sources.py`'s `week_summaries()`/`latest_season()`/`available_weeks()`
+now union real `smartsim2_projections_*_wk*.csv` weeks with the older
+`upcoming_recs_*.csv` snapshot weeks; new `_game_from_smartsim_projection`
+(cards.py) and `_standalone_smartsim2_pick_cards` (picks.py) render real
+SmartSim 2.0 projections directly, unblended, whenever a week has no
+stored recommendation snapshot yet; `archive.py` got the same
+source-path/label branch so archived SmartSim2-only weeks don't claim to
+be a recs snapshot that doesn't exist.
+
+**Real, not cosmetic**: week 22 2025 previously mis-reported as
+"unavailable" (silently fell back to week 21) despite having a real
+generated `smartsim2_projections_2025_wk22.csv` on disk (built earlier
+this session for Super Bowl props work) -- now renders that real data
+directly. Verified in a real browser session with no query params:
+`/nfl/cards`, `/nfl/picks`, `/nfl/season/2026/betting-card`, `/nfl/hub`,
+`/ncaaf/hub` all render real week-1 2026 data by default (NCAAF hub's
+week-pill nav correctly spans weeks 1-6, all real SmartSim2 projections).
+331 NFL/NCAAF-scoped tests pass; 3 pre-existing test expectations updated
+to reflect this now-correct behavior (not bugs -- see commit `f0568b42`).
+
+**Not done this session**: item #6 (enable the autorun trigger in
+production), #7 (full 2026 regular-season backfill beyond week 1), #8
+(injury-rating modeling), #9 (NCAAF props/ladders pipeline) all remain
+open follow-ups from the standing options list.
 
 ### Reconciliation 2026-08-01 (NFL/NCAAF: real 2026 week-1 data + sim triggers)
 
