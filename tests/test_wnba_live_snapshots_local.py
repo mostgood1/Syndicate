@@ -765,6 +765,54 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual(game.get("away_pts"), 61.0)
         self.assertEqual(game.get("home_pts"), 64.0)
 
+    def test_live_state_payload_render_prefers_real_points_over_sim_mean_for_live_game(self) -> None:
+        # Found live 2026-08-01: the #160 fix above only ever gated WHEN
+        # sim_score.*_mean is used, it never fixed that it's the WRONG
+        # number for an in-progress game -- it's the sim's static
+        # projected-final mean (constant all game), not real points scored
+        # so far. Confirmed live: /wnba/api/live_state showed away_pts=107.11
+        # for a game genuinely at 47-44 with 2:37 left in Q2 (per ESPN and
+        # this same game's own `live_state.away_pts`/`home_pts`, which this
+        # branch never looked at). Real points must win whenever available.
+        with patch.dict("os.environ", {"RENDER": "1"}, clear=False), patch(
+            "syndicate.features.wnba.cards.central_today_iso",
+            return_value="2026-07-31",
+        ), patch(
+            "syndicate.features.wnba.cards._local_live_state_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value={
+                "games": [
+                    {
+                        "gamePk": "401857104",
+                        "event_id": "401857104",
+                        "away_tri": "IND",
+                        "home_tri": "POR",
+                        "away": {"abbr": "IND"},
+                        "home": {"abbr": "POR"},
+                        "status": "Live",
+                        "detail": "2:37 - 2nd",
+                        "live_state": {
+                            "in_progress": True,
+                            "final": False,
+                            "away_pts": 47.0,
+                            "home_pts": 44.0,
+                            "status": "2:37 - 2nd",
+                        },
+                        "sim": {"score": {"away_mean": 107.11, "home_mean": 86.55}},
+                    }
+                ]
+            },
+        ):
+            _local_live_state_payload.cache_clear()
+            payload = build_live_state_payload("2026-07-31", ttl=12)
+            _local_live_state_payload.cache_clear()
+
+        game = (payload.get("games") or [{}])[0]
+        self.assertEqual(game.get("away_pts"), 47.0)
+        self.assertEqual(game.get("home_pts"), 44.0)
+
     def test_live_state_payload_render_rejects_mixed_stale_snapshot(self) -> None:
         with patch.dict("os.environ", {"RENDER": "1"}, clear=False), patch(
             "syndicate.features.wnba.cards.central_today_iso",

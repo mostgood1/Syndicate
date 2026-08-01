@@ -5121,6 +5121,7 @@ def _build_live_state_payload_uncached(selected_date: str, ttl: int = 12, *, all
             away_info = game.get("away") if isinstance(game.get("away"), dict) else {}
             home_info = game.get("home") if isinstance(game.get("home"), dict) else {}
             sim_score = (_sim_payload(game).get("score") or {})
+            game_live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
             status_fields = _status_fields_from_value(
                 status_value=game.get("status"),
                 detail_value=game.get("detail"),
@@ -5142,14 +5143,30 @@ def _build_live_state_payload_uncached(selected_date: str, ttl: int = 12, *, all
             # gated this session, but both read (or overlay on top of) this
             # same out_games list, so the ungated value here overrode both.
             is_underway_or_final = bool(status_fields.get("in_progress")) or bool(status_fields.get("final"))
+            # Follow-up, found live 2026-08-01: the #160 fix above only ever
+            # gated WHEN sim_score.*_mean is used, never fixed that it's the
+            # WRONG number for an in-progress game -- it's the sim's static
+            # projected-final mean (constant all game), not real points
+            # scored so far. Confirmed live: /wnba/api/live_state showed
+            # away_pts=107.11 for a game genuinely at 47-44 with 2:37 left in
+            # Q2 (per ESPN and this same `game` dict's own `live_state`
+            # field), because this branch never looked at that field at all.
+            # Prefer the real live/final points already resolved onto `game`
+            # (by build_cards_page_context's own live-state hydration) and
+            # only fall back to the sim mean when real points genuinely
+            # aren't available yet (e.g. a brief live-state read hiccup).
+            real_home_pts = _safe_float(game_live_state.get("home_pts"))
+            real_away_pts = _safe_float(game_live_state.get("away_pts"))
+            fallback_home_pts = _safe_float(sim_score.get("home_mean")) if is_underway_or_final else None
+            fallback_away_pts = _safe_float(sim_score.get("away_mean")) if is_underway_or_final else None
             out_games.append(
                 {
                     "game_id": game.get("gamePk"),
                     "event_id": game.get("event_id"),
                     "home": game.get("home_tri") or home_info.get("abbr"),
                     "away": game.get("away_tri") or away_info.get("abbr"),
-                    "home_pts": _safe_float(sim_score.get("home_mean")) if is_underway_or_final else None,
-                    "away_pts": _safe_float(sim_score.get("away_mean")) if is_underway_or_final else None,
+                    "home_pts": real_home_pts if real_home_pts is not None else fallback_home_pts,
+                    "away_pts": real_away_pts if real_away_pts is not None else fallback_away_pts,
                     "status_id": None,
                     "status": status_fields["status"],
                     "period": status_fields.get("period"),
