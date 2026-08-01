@@ -4932,6 +4932,61 @@ were resolved and nine already-closed rows removed from the open tables.
   candidate row needs a follow-up check against a live WNBA game once one
   is in progress and the board has had a full natural compute cycle.
 
+  **Follow-up same session**: fixed a second, related bug —
+  `_infer_period_clock_from_status_text` (`wnba/cards.py`) only matched a
+  "clock - Nth" pattern, so between-period breaks ("Halftime", "End of
+  3rd") carried no clock and always resolved `period=None`, which silently
+  dropped the CURRENT PERIOD/CURRENT HALF game-lens segments entirely
+  during every quarter break (confirmed live: a real halftime game showed
+  `period=null` downstream despite ESPN's own scoreboard reporting
+  `period=2` at halftime). Now maps "Halftime"/"End of Nth" to the
+  just-completed period, clock "0:00". Committed `e4aaf9a5`, deployed to
+  web/live-odds-worker, refresh-worker deploy queued pending an in-flight
+  MLB sim clearing.
+
+  **Investigated further, NOT fixed this session — two real, separate open
+  gaps found**:
+  1. **Layer 2 board still shows zero WNBA candidates for the live game's
+     own date** (2026-07-31), only pregame candidates for tomorrow
+     (2026-08-01). Ruled out the known #93/#94/#95 date-rollover bug (an
+     explicit `date` param still returns 0) and `central_today_iso()` being
+     UTC-based (it's correctly Central-zoned). `/api/ops/intelligence/
+     candidate-trace` shows `board_snapshot.json` hasn't updated since
+     midnight (`2026-07-31T00:00:01`) while `query_state_cache.json` is
+     genuinely fresh (`updated_at` matches real time) — but the trace tool
+     itself reports `candidate_count: null` for both, so it doesn't cleanly
+     confirm the served path's real WNBA count. Best lead, not confirmed:
+     `_wnba_has_live_games`/`wnba_no_games_today` (home.py:680-685,
+     5817-5820) false-negative from the same keyvalue read-ambiguity class
+     already fixed once this session for `game_cards.csv` — worth checking
+     whether a SIMILAR (but not yet fixed) read path feeds this specific
+     "has live games today" check.
+  2. **Live quarter/half betting LINES (not projections) are empty**:
+     `/wnba/api/live_lines` returns real game-level lines (moneyline,
+     spread, total) but `period_totals`/`period_spreads` are always `{}`,
+     even with `include_period_totals=true`. Confirmed NOT a missing-market
+     gap in principle — `vendor/wnba_betting_repo/app.py:
+     _live_oddsapi_period_totals_for_game` correctly discovers real
+     per-event OddsAPI market keys dynamically (worked fine 2026-07-29,
+     `PERIOD_MARKET_DISCOVERY_DIAG` log showed real `totals_h1`/`totals_q1`
+     etc. keys found) — but that diagnostic line **never appears at all**
+     tonight despite a live game in progress, meaning the function is
+     hitting one of its silent early-returns (`app.py:536-538` missing API
+     key — ruled out, `ODDS_API_KEY` is confirmed set and working
+     elsewhere; `app.py:610-613` **no matching OddsAPI event found** for
+     this matchup — not yet confirmed why, plausible lead: `POR` is
+     "Portland Fire," a newer/renamed franchise the vendored
+     `_canonical_team_tri` tricode table may not recognize, causing
+     event-matching against OddsAPI's home_team/away_team text to fail
+     silently). Confirmed the writer process IS alive and ticking
+     (`live_lines` `generated_at` advances normally, ~every 20 min), so
+     this isn't a dead process — it's specifically the period-market path
+     inside it failing silently. Next session: add a one-line diagnostic
+     print right before the `if not event_id: return {}` at
+     `vendor/wnba_betting_repo/app.py:610` (matchup + raw OddsAPI events
+     list team names) to confirm/refute the tricode-mismatch theory before
+     touching the vendored canonicalization table.
+
 - **#23 — Make the MLB daily sim memory-safe, then re-enable its trigger.**
   - ✅ *Validated 2026-07-25*: `daily_summary_2026_07_25.json` lands (15 sim artifacts
     published; `/mlb/api/cards` returns 15 cards via `_games_from_daily_summary`,
