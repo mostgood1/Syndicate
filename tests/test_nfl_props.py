@@ -98,6 +98,45 @@ class NflPropsTests(unittest.TestCase):
         prob = props._nfl_prop_model_probability(stat="passing_yards", mean=250.0, stdev=20.0, n=1, line=230.0)
         self.assertIsNone(prob)
 
+    def test_join_market_key_disambiguates_by_player(self) -> None:
+        # Same bug class as MLB's hitter-RBI props (_mlb_prop_join_market_key):
+        # every player sharing a market label must not collide in the join.
+        key_a = props._nfl_prop_join_market_key("anytime_td", "Player One")
+        key_b = props._nfl_prop_join_market_key("anytime_td", "Player Two")
+        self.assertNotEqual(key_a, key_b)
+        self.assertEqual(props.nfl_prop_display_stat(key_a), "anytime_td")
+        self.assertEqual(props.nfl_prop_display_stat(key_b), "anytime_td")
+
+    def test_two_players_same_market_never_flag_needs_resim(self) -> None:
+        # Regression: before disambiguating the join market key, a player
+        # with no resolvable rate would be misclassified as
+        # unmatched_needs_resim (not unmatched_no_sim_coverage) purely
+        # because a DIFFERENT player at the same game had sim coverage for
+        # the same shared market label -- confirmed live on real 2025 wk22
+        # data (Brady Russell / Efton Chism III) before this fix.
+        from syndicate.features.shared.market_inventory import JOIN_STATUS_NEEDS_RESIM
+        from syndicate.features.shared.market_inventory import join_odds_to_sim
+
+        self._write_props(2025, 22, [
+            {"player": "Has Rate Guy", "market": "Anytime TD", "over_price": "250", "home_team": "NE", "away_team": "SEA"},
+            {"player": "No Rate Guy", "market": "Anytime TD", "over_price": "700", "home_team": "NE", "away_team": "SEA"},
+        ])
+        pbp_dir = os.path.join(self.nfl_root, "tracking", "nflverse", "pbp")
+        os.makedirs(pbp_dir, exist_ok=True)
+        fieldnames = ["game_id", "week", "season_type", "passer_player_id", "passer_player_name", "passing_yards", "pass_attempt", "pass_touchdown", "rusher_player_id", "rusher_player_name", "rushing_yards", "rush_attempt", "rush_touchdown", "receiver_player_id", "receiver_player_name", "receiving_yards", "complete_pass", "touchdown"]
+        with open(os.path.join(pbp_dir, "pbp_2025.csv"), "w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            for week in (1, 2):
+                writer.writerow({"game_id": f"2025_0{week}_X_Y", "week": str(week), "season_type": "REG", "rusher_player_id": "RATE1", "rusher_player_name": "H.Guy", "rushing_yards": "10", "rush_attempt": "1", "rush_touchdown": "1", "touchdown": "1"})
+
+        odds_rows, sim_rows = props.nfl_props_rows_for_week(2025, 22)
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+        no_rate_rows = [row for row in inventory if row["entity"] == "No Rate Guy"]
+        self.assertTrue(no_rate_rows)
+        for row in no_rate_rows:
+            self.assertNotEqual(row["join_status"], JOIN_STATUS_NEEDS_RESIM)
+
 
 if __name__ == "__main__":
     unittest.main()

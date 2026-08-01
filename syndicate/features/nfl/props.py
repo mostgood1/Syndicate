@@ -105,10 +105,37 @@ def _nfl_prop_model_probability(*, stat: str, mean: float | None, stdev: float |
     return 1.0 - statistics.NormalDist(mean, stdev).cdf(line)
 
 
+def _nfl_prop_join_market_key(stat: str, player_name: str) -> str:
+    """The DISPLAY stat ("receptions", "anytime_td") is shared by every
+    player who has that prop -- every player on the board legitimately has
+    their own anytime_td row simultaneously. If that shared stat were used
+    directly as the join key, market_inventory.join_odds_to_sim's
+    needs-resim check ("does a DIFFERENT entity have sim coverage for this
+    exact market?") would misfire for every player whose own rate didn't
+    resolve, as soon as ANY other player at the same game had one -- same
+    real bug class MLB's _mlb_prop_join_market_key was written to fix for
+    hitter RBI props (confirmed empirically there: 56 false "needs resim"
+    rows from two hitters sharing a market label). Disambiguate the JOIN
+    key by the player themselves (never the display label, which is
+    relabeled back after the join via nfl_prop_display_stat) -- no
+    reliable "slot" concept exists for NFL skill-position props the way
+    MLB's starting-pitcher side does, so every player simply gets their
+    own slot, same as MLB's hitter-prop case."""
+    return f"{stat}::{player_name.strip().casefold()}"
+
+
+def nfl_prop_display_stat(market_key: str) -> str:
+    """Strips the ::player disambiguator back off a joined row's market
+    field -- the inverse of _nfl_prop_join_market_key, called once after
+    join_odds_to_sim runs."""
+    return str(market_key or "").split("::", 1)[0]
+
+
 def nfl_props_rows_for_week(season: int, week: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Real odds + real-rate-based sim rows for every quoted player prop
     this week. Entity = player's real full name (as quoted by the odds
-    feed); market = the stat key. A real quoted line is always included
+    feed); market = the stat key disambiguated by player (see
+    _nfl_prop_join_market_key). A real quoted line is always included
     even when the player's rate can't be resolved yet (too few games,
     or a name the pbp data has no record of) -- never silently dropped."""
     odds_rows: list[dict[str, Any]] = []
@@ -118,6 +145,7 @@ def nfl_props_rows_for_week(season: int, week: int) -> tuple[list[dict[str, Any]
         if stat is None:
             continue
         player_name = str(row.get("player") or "").strip()
+        join_market = _nfl_prop_join_market_key(stat, player_name)
         # Keyed by real team full names (not a game_pk) -- this feed carries
         # no game id of its own, and callers that need to attach these rows
         # to a specific game-board entry (build_nfl_market_board) match on
@@ -130,12 +158,12 @@ def nfl_props_rows_for_week(season: int, week: int) -> tuple[list[dict[str, Any]
 
         if stat == "anytime_td":
             if over_odds is not None:
-                odds_rows.append({"game_id": game_id, "market": stat, "period": "full_game", "entity": player_name, "side": "over", "odds": over_odds, "market_type": "prop"})
+                odds_rows.append({"game_id": game_id, "market": join_market, "period": "full_game", "entity": player_name, "side": "over", "odds": over_odds, "market_type": "prop"})
         else:
             if over_odds is not None:
-                odds_rows.append({"game_id": game_id, "market": stat, "period": "full_game", "entity": player_name, "side": "over", "line": line, "odds": over_odds, "market_type": "prop"})
+                odds_rows.append({"game_id": game_id, "market": join_market, "period": "full_game", "entity": player_name, "side": "over", "line": line, "odds": over_odds, "market_type": "prop"})
             if under_odds is not None:
-                odds_rows.append({"game_id": game_id, "market": stat, "period": "full_game", "entity": player_name, "side": "under", "line": line, "odds": under_odds, "market_type": "prop"})
+                odds_rows.append({"game_id": game_id, "market": join_market, "period": "full_game", "entity": player_name, "side": "under", "line": line, "odds": under_odds, "market_type": "prop"})
 
         player_id = resolve_player_id(season, player_name)
         if player_id is None:
@@ -145,7 +173,7 @@ def nfl_props_rows_for_week(season: int, week: int) -> tuple[list[dict[str, Any]
         if model_prob is None:
             continue
         sim_rows.append({
-            "game_id": game_id, "market": stat, "period": "full_game", "entity": player_name,
+            "game_id": game_id, "market": join_market, "period": "full_game", "entity": player_name,
             "sim_projection": model_prob, "projected_value": mean, "sim_source": "nfl_season_rate",
         })
     return odds_rows, sim_rows
@@ -173,7 +201,7 @@ def build_nfl_props_page_context(season: int, week: int) -> dict[str, Any]:
             continue
         implied_prob = (100.0 / (odds + 100.0)) if odds > 0 else ((-odds) / ((-odds) + 100.0))
         edge = sim_projection - implied_prob
-        stat_label = _format_stat_label(row.get("market"))
+        stat_label = _format_stat_label(nfl_prop_display_stat(row.get("market")))
         side = str(row.get("side") or "").title()
         line = row.get("line")
         line_text = f"{line:g}" if isinstance(line, (int, float)) else "-"

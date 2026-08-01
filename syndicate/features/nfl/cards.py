@@ -9,6 +9,7 @@ import statistics
 from functools import lru_cache
 from typing import Any
 
+from syndicate.features.nfl.props import nfl_prop_display_stat
 from syndicate.features.nfl.props import nfl_props_key
 from syndicate.features.nfl.props import nfl_props_rows_for_week
 from syndicate.features.nfl.smartsim2_projection import read_projection_artifact
@@ -574,7 +575,13 @@ def build_nfl_market_board(season: int, week: int) -> dict[str, Any]:
 
         inventory = join_odds_to_sim(odds_rows, sim_rows)
         for row in inventory:
-            if row.get("market_type") != "prop":
+            if row.get("market_type") == "prop":
+                # Prop rows were joined on a ::player-disambiguated market
+                # key (see props.py's _nfl_prop_join_market_key -- same fix
+                # MLB's hitter props needed) -- strip it back to the clean
+                # stat name for display now that the join is done.
+                row["market"] = nfl_prop_display_stat(row.get("market"))
+            else:
                 row["market"] = _NFL_MARKET_BOARD_DISPLAY_LABELS.get(row.get("market"), row.get("market"))
 
         board_games.append(
