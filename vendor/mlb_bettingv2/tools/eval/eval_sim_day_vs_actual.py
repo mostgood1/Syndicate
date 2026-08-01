@@ -487,9 +487,13 @@ def _sim_many(
             "so": {},
             "outs": {},
             "pitches": {},
+            "bb": {},
+            "hits": {},
             "so_sum": 0.0,
             "outs_sum": 0.0,
             "pitches_sum": 0.0,
+            "bb_sum": 0.0,
+            "hits_sum": 0.0,
         }
 
     # Hitter/team stats (team-level aggregates; avoids per-player explosion)
@@ -725,13 +729,25 @@ def _sim_many(
                     pitches = int(round(float(row.get("P") or 0.0)))
                 except Exception:
                     pitches = 0
+                try:
+                    bb = int(round(float(row.get("BB") or 0.0)))
+                except Exception:
+                    bb = 0
+                try:
+                    hits = int(round(float(row.get("H") or 0.0)))
+                except Exception:
+                    hits = 0
                 acc = prop_acc[int(pid)]
                 acc["so"][so] = int(acc["so"].get(so, 0) + 1)
                 acc["outs"][outs] = int(acc["outs"].get(outs, 0) + 1)
                 acc["pitches"][pitches] = int(acc["pitches"].get(pitches, 0) + 1)
+                acc["bb"][bb] = int(acc["bb"].get(bb, 0) + 1)
+                acc["hits"][hits] = int(acc["hits"].get(hits, 0) + 1)
                 acc["so_sum"] = float(acc["so_sum"]) + float(so)
                 acc["outs_sum"] = float(acc["outs_sum"]) + float(outs)
                 acc["pitches_sum"] = float(acc["pitches_sum"]) + float(pitches)
+                acc["bb_sum"] = float(acc["bb_sum"]) + float(bb)
+                acc["hits_sum"] = float(acc["hits_sum"]) + float(hits)
 
         # Team batting stats
         bs = r.batter_stats or {}
@@ -890,9 +906,13 @@ def _sim_many(
                 "so_dist": {str(int(k)): int(v) for k, v in (acc.get("so") or {}).items()},
                 "outs_dist": {str(int(k)): int(v) for k, v in (acc.get("outs") or {}).items()},
                 "pitches_dist": {str(int(k)): int(v) for k, v in (acc.get("pitches") or {}).items()},
+                "bb_dist": {str(int(k)): int(v) for k, v in (acc.get("bb") or {}).items()},
+                "hits_dist": {str(int(k)): int(v) for k, v in (acc.get("hits") or {}).items()},
                 "so_mean": float(acc.get("so_sum", 0.0)) / float(max(1, sims)),
                 "outs_mean": float(acc.get("outs_sum", 0.0)) / float(max(1, sims)),
                 "pitches_mean": float(acc.get("pitches_sum", 0.0)) / float(max(1, sims)),
+                "bb_mean": float(acc.get("bb_sum", 0.0)) / float(max(1, sims)),
+                "hits_mean": float(acc.get("hits_sum", 0.0)) / float(max(1, sims)),
             }
             for pid, acc in prop_acc.items()
         },
@@ -1122,11 +1142,25 @@ def _parse_actual_starter_pitching(feed: Dict[str, Any], side: str, starter_id: 
         except Exception:
             pitches_i = None
 
+        bb = pitching.get("baseOnBalls")
+        try:
+            bb_i = int(float(bb)) if bb is not None else None
+        except Exception:
+            bb_i = None
+
+        hits = pitching.get("hits")
+        try:
+            hits_i = int(float(hits)) if hits is not None else None
+        except Exception:
+            hits_i = None
+
         return {
             "pitcher_id": int(pid),
             "so": int(float(so)),
             "outs": int(float(outs)),
             "pitches": int(pitches_i) if pitches_i is not None else None,
+            "bb": bb_i,
+            "hits": hits_i,
         }
     except Exception:
         return None
