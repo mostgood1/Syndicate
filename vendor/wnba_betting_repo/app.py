@@ -608,6 +608,21 @@ def _live_oddsapi_period_totals_for_game(date_str: str, home_tri: str, away_tri:
             swapped = best[2]
 
         if not event_id:
+            # Diagnostic added 2026-08-01: this early return happens silently
+            # (before PERIOD_MARKET_DISCOVERY_DIAG below), so a caller could
+            # never tell "no live game right now" apart from "a real live
+            # game whose OddsAPI event just isn't matching." Confirmed live:
+            # this branch fired all night for a genuinely in-progress WNBA
+            # game (IND@POR) while game-level lines (fetched through a
+            # separate, already-working odds path) were fine -- so this
+            # function's own /v4/sports/{sport}/events lookup+match is the
+            # suspect, not a genuine absence of the game from OddsAPI.
+            print(
+                f"[wnba_live_lens] PERIOD_MARKET_EVENT_MATCH_FAILED matchup={h}@{a} "
+                f"events_returned={len(events)} "
+                f"sample_events={[(ev.get('home_team'), ev.get('away_team'), ev.get('commence_time')) for ev in events[:8] if isinstance(ev, dict)]}",
+                flush=True,
+            )
             out = {}
             _live_oddsapi_period_cache[cache_key] = (now, out)
             return out
