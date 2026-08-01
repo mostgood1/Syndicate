@@ -82,15 +82,20 @@ def _name_matches(name: str, words: set[str]) -> bool:
     return any(part in words for part in parts)
 
 
-def _person_matches(name: str, words: set[str]) -> int:
-    """Match score for a person's name: 0 = no, 1 = last name only, 2 = first+last."""
-    parts = [p for p in re.findall(r"[a-z0-9']+", _fold_diacritics(str(name or "")).lower()) if len(p) >= 3]
-    if not parts or parts[-1] not in words:
-        return 0
-    return 2 if len(parts) > 1 and parts[0] in words else 1
-
-
 _NAME_BIGRAM_RE = re.compile(r"\b([A-Z][a-zA-Z'.-]+)\s+([A-Z][a-zA-Z'.-]+)\b")
+
+# Sentence-initial/interrogative words are capitalized purely by English
+# convention ("How's Jokic looking?", "Has Cardoso cleared..."), not because
+# they're a first name -- excluded so a bare last-name question doesn't
+# falsely register as a conflicting full-name mention.
+_NAME_BIGRAM_STOPWORDS = {
+    "how", "how's", "what", "what's", "who", "who's", "why", "when", "where",
+    "is", "isn't", "was", "were", "wasn't", "weren't", "has", "hasn't",
+    "have", "haven't", "having", "does", "doesn't", "did", "didn't", "do",
+    "don't", "can", "can't", "could", "couldn't", "will", "won't", "would",
+    "wouldn't", "should", "shouldn't", "tell", "give", "show", "let's",
+    "the", "a", "an", "this", "that", "and", "or", "but",
+}
 
 
 def _question_name_bigrams(question: str) -> set[tuple[str, str]]:
@@ -100,6 +105,7 @@ def _question_name_bigrams(question: str) -> set[tuple[str, str]]:
     return {
         (_fold_diacritics(a).lower(), _fold_diacritics(b).lower())
         for a, b in _NAME_BIGRAM_RE.findall(str(question or ""))
+        if _fold_diacritics(a).lower() not in _NAME_BIGRAM_STOPWORDS
     }
 
 
@@ -116,6 +122,24 @@ def _person_conflicts_with_question_name(name: str, question_bigrams: set[tuple[
         return False
     first, last = parts[0], parts[-1]
     return any(b == last and a != first for a, b in question_bigrams)
+
+
+def _person_matches(name: str, words: set[str], question: str = "") -> int:
+    """Match score for a person's name: 0 = no, 1 = last name only, 2 = first+last.
+
+    A last-name-only match is downgraded to 0 when `question` pairs that
+    surname with a different first name -- e.g. a question about "Yordan
+    Alvarez" must not resolve to a slate player named "Andrew Alvarez" just
+    because both end in "Alvarez" (reported production bug, 2026-08-01).
+    """
+    parts = [p for p in re.findall(r"[a-z0-9']+", _fold_diacritics(str(name or "")).lower()) if len(p) >= 3]
+    if not parts or parts[-1] not in words:
+        return 0
+    if len(parts) > 1 and parts[0] in words:
+        return 2
+    if question and _person_conflicts_with_question_name(name, _question_name_bigrams(question)):
+        return 0
+    return 1
 
 
 def _question_lines(question: str) -> list[float]:
@@ -290,14 +314,10 @@ def _mlb_game_score(question: str, words: set[str], game: dict[str, Any], names:
         if len(tri) >= 2 and re.search(rf"\b{re.escape(tri)}\b", question):
             best = max(best, 100)
     starters = game.get("starter_names") or {}
-    question_bigrams = _question_name_bigrams(question)
     for starter in (starters.get("away"), starters.get("home")):
         if not starter:
             continue
-        starter = str(starter)
-        if _person_conflicts_with_question_name(starter, question_bigrams):
-            continue
-        score = _person_matches(starter, words)
+        score = _person_matches(str(starter), words, question)
         if score == 2:
             best = max(best, 90)
         elif score == 1:
@@ -397,7 +417,7 @@ def _mlb_focused_evidence(question: str, context: dict[str, Any]) -> dict[str, A
     pitcher_props = matched.get("pitcher_props") or {}
     wants_pitching = bool(
         words & {"strikeout", "strikeouts", "k", "ks", "pitcher", "outs", "pitches", "innings"}
-    ) or any(_person_matches(str(s), words) > 0 for s in starters.values() if s)
+    ) or any(_person_matches(str(s), words, question) > 0 for s in starters.values() if s)
     if wants_pitching and isinstance(pitcher_props, dict):
         pitcher_rows: list[list[Any]] = []
         pitcher_evidence: list[dict[str, Any]] = []
@@ -429,7 +449,7 @@ def _mlb_focused_evidence(question: str, context: dict[str, Any]) -> dict[str, A
                 "innings_mean": round((_to_float(props.get("outs_mean")) or 0) / 3.0, 2),
                 "pitches_mean": _to_float(props.get("pitches_mean")),
             })
-            named = _person_matches(str(label), words) > 0
+            named = _person_matches(str(label), words, question) > 0
             if named or len(side_order) == 1:
                 so_chart = _dist_chart(
                     props.get("so_dist") or {},
@@ -674,7 +694,6 @@ def _wnba_focused_evidence(question: str, context: dict[str, Any]) -> dict[str, 
     matched_player: dict[str, Any] | None = None
     matched_game: dict[str, Any] | None = None
     best_score = 0
-    question_bigrams = _question_name_bigrams(question)
     for game in games:
         if not isinstance(game, dict):
             continue
@@ -685,9 +704,7 @@ def _wnba_focused_evidence(question: str, context: dict[str, Any]) -> dict[str, 
                 if not isinstance(player, dict):
                     continue
                 player_name = str(player.get("player_name") or "")
-                if _person_conflicts_with_question_name(player_name, question_bigrams):
-                    continue
-                score = _person_matches(player_name, words)
+                score = _person_matches(player_name, words, question)
                 if score > best_score:
                     best_score = score
                     matched_player = player
@@ -945,7 +962,7 @@ def _boxscore_row_stats(row: dict[str, str]) -> dict[str, Any] | None:
     }
 
 
-def _boxscore_last_n(directories: list[str], words: set[str], n: int) -> list[dict[str, Any]]:
+def _boxscore_last_n(directories: list[str], words: set[str], n: int, question: str = "") -> list[dict[str, Any]]:
     """Stream boxscore history and return the matched player's last n games."""
     path = next(
         (os.path.join(d, "boxscores_history.csv") for d in directories
@@ -964,7 +981,7 @@ def _boxscore_last_n(directories: list[str], words: set[str], n: int) -> list[di
             if not name:
                 continue
             if name not in scores:
-                scores[name] = _person_matches(name, words)
+                scores[name] = _person_matches(name, words, question)
             if scores[name] <= 0:
                 continue
             stats = _boxscore_row_stats(row)
@@ -995,7 +1012,7 @@ def _last10_hit_rates(games: list[dict[str, Any]], lines: list[float]) -> list[d
 def _basketball_last10_evidence(question: str, context: dict[str, Any], sport: str) -> dict[str, Any] | None:
     words = _question_words(question)
     directories = _wnba_processed_dirs() if sport == "wnba" else _nba_processed_dirs()
-    games = _boxscore_last_n(directories, words, LAST_N_GAMES)
+    games = _boxscore_last_n(directories, words, LAST_N_GAMES, question)
     if not games:
         return None
     name = games[0]["name"]
@@ -1071,7 +1088,7 @@ def _nhl_last10_evidence(question: str, context: dict[str, Any]) -> dict[str, An
             if not name:
                 continue
             if name not in scores:
-                scores[name] = _person_matches(name, words)
+                scores[name] = _person_matches(name, words, question)
             if scores[name] <= 0:
                 continue
             date = str(row.get("date") or "").strip()[:10]
@@ -1349,7 +1366,7 @@ def _mlb_side_pitching_staff(side_doc: dict[str, Any]) -> list[dict[str, Any]]:
     return staff
 
 
-def _mlb_find_pitcher_in_slate(selected_date: str, words: set[str]) -> tuple[int, str, str, dict[str, Any]] | None:
+def _mlb_find_pitcher_in_slate(selected_date: str, words: set[str], question: str = "") -> tuple[int, str, str, dict[str, Any]] | None:
     """Best pitcher name match (starter OR reliever) across today's whole
     slate. Returns (game_pk, team, opponent_team, pitcher_profile).
 
@@ -1387,7 +1404,7 @@ def _mlb_find_pitcher_in_slate(selected_date: str, words: set[str]) -> tuple[int
                 continue
             opponent_team = sides.get("home" if side == "away" else "away", "")
             for profile in _mlb_side_pitching_staff(payload.get(side)):
-                score = _person_matches(str(profile.get("name") or ""), words)
+                score = _person_matches(str(profile.get("name") or ""), words, question)
                 if score and (best is None or score > best[0]):
                     best = (score, (game_pk, team, opponent_team, profile))
     return best[1] if best else None
@@ -1402,7 +1419,7 @@ def _mlb_lineup_batters(side_doc: dict[str, Any]) -> list[dict[str, Any]]:
     return []
 
 
-def _mlb_find_batter_in_slate(selected_date: str, words: set[str]) -> dict[str, Any] | None:
+def _mlb_find_batter_in_slate(selected_date: str, words: set[str], question: str = "") -> dict[str, Any] | None:
     """Best batter-name match across every team's full starting lineup for
     the date, returned in the same shape as an hr_targets target row.
 
@@ -1442,7 +1459,7 @@ def _mlb_find_batter_in_slate(selected_date: str, words: set[str]) -> dict[str, 
             starter_profile = opponent_doc.get("starter_profile") if isinstance(opponent_doc.get("starter_profile"), dict) else {}
             for batter in _mlb_lineup_batters(side_doc):
                 name = str(batter.get("name") or "")
-                score = _person_matches(name, words)
+                score = _person_matches(name, words, question)
                 if not score or (best is not None and score <= best[0]):
                     continue
                 try:
@@ -1559,12 +1576,12 @@ def _mlb_bvp_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] 
     # against real mirrored data -- most starters, e.g. a leadoff or
     # bottom-of-order hitter, are absent from it entirely), so fall back to
     # the full per-game lineup when the curated list doesn't have the name.
-    batter_rows = [t for t in targets if _person_matches(str(t.get("player_name") or ""), words) > 0]
+    batter_rows = [t for t in targets if _person_matches(str(t.get("player_name") or ""), words, question) > 0]
     if batter_rows:
-        batter_rows.sort(key=lambda t: _person_matches(str(t.get("player_name") or ""), words), reverse=True)
+        batter_rows.sort(key=lambda t: _person_matches(str(t.get("player_name") or ""), words, question), reverse=True)
         target = batter_rows[0]
     else:
-        target = _mlb_find_batter_in_slate(iso_date, words)
+        target = _mlb_find_batter_in_slate(iso_date, words, question)
 
     if target is not None:
         batter_name = str(target.get("player_name") or "Batter")
@@ -1717,7 +1734,7 @@ def _mlb_bvp_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] 
         return {"evidence": evidence, "tables": tables, "charts": [], "as_of": iso_date, "sport": "mlb"}
 
     # Pitcher question: his history vs today's opposing lineup.
-    pitcher_rows = [t for t in targets if _person_matches(str(t.get("opponent_pitcher_name") or ""), words) > 0]
+    pitcher_rows = [t for t in targets if _person_matches(str(t.get("opponent_pitcher_name") or ""), words, question) > 0]
     reliever_role: str | None = None
     game_pk: int | None = None
     opponent_team = ""
@@ -1741,7 +1758,7 @@ def _mlb_bvp_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] 
         # whichever side happened to have an HR-candidate batter that game,
         # so this can be a bullpen arm OR the *other* team's starter.
         # Search the full slate (starters + bullpens) before giving up.
-        pitcher_hit = _mlb_find_pitcher_in_slate(iso_date, words)
+        pitcher_hit = _mlb_find_pitcher_in_slate(iso_date, words, question)
         if pitcher_hit is None:
             return None
         game_pk, _pitcher_team, opponent_team, found_profile = pitcher_hit
@@ -1887,7 +1904,7 @@ def _mlb_processed_dir() -> str:
     return os.path.join(_mlb_data_root(), "processed")
 
 
-def _mlb_match_player_in_log(filename: str, words: set[str]) -> tuple[str, int, list[dict[str, Any]]] | None:
+def _mlb_match_player_in_log(filename: str, words: set[str], question: str = "") -> tuple[str, int, list[dict[str, Any]]] | None:
     """Best name match in a pitcher/batter game-log CSV -> (label, player_id,
     that player's rows sorted most-recent-first). Same "score by name, break
     ties on recency" shape as `_boxscore_last_n`, just against a per-player
@@ -1918,7 +1935,7 @@ def _mlb_match_player_in_log(filename: str, words: set[str]) -> tuple[str, int, 
     best_score = 0
     best_date = ""
     for player_id, rows in by_player.items():
-        score = _person_matches(names.get(player_id, ""), words)
+        score = _person_matches(names.get(player_id, ""), words, question)
         if score == 0:
             continue
         latest_date = max((str(r.get("date") or "") for r in rows), default="")
@@ -2015,7 +2032,7 @@ def _mlb_opposing_lineup_statcast_table(question: str, context: dict[str, Any], 
         return None
     targets, iso_date = loaded
     words = _question_words(question)
-    pitcher_rows = [t for t in targets if _person_matches(str(t.get("opponent_pitcher_name") or ""), words) > 0]
+    pitcher_rows = [t for t in targets if _person_matches(str(t.get("opponent_pitcher_name") or ""), words, question) > 0]
     if not pitcher_rows:
         return None
 
@@ -2068,11 +2085,11 @@ def _mlb_player_history_evidence(question: str, context: dict[str, Any]) -> dict
 
     words = _question_words(question)
 
-    pitcher_match = _mlb_match_player_in_log(PITCHER_LOG_FILENAME, words)
+    pitcher_match = _mlb_match_player_in_log(PITCHER_LOG_FILENAME, words, question)
     role = "pitcher" if pitcher_match else None
     match = pitcher_match
     if match is None:
-        match = _mlb_match_player_in_log(BATTER_LOG_FILENAME, words)
+        match = _mlb_match_player_in_log(BATTER_LOG_FILENAME, words, question)
         role = "batter" if match else None
     if match is None:
         return None

@@ -40,54 +40,72 @@ production outage found and fixed along the way)". Prior session: 2026-07-30.
 
 **New: #180** (filed and closed same session) — user reported "Ask the
 Syndicate" returning data for the wrong player when asking about Yordan
-Alvarez (MLB has multiple "Alvarez" players — e.g. a different starting
-pitcher surnamed Alvarez on the same slate). Root cause:
-`syndicate/blueprints/ask_the_syndicate_data.py` had two name-matching
-primitives — `_name_matches` (boolean, any single name-part substring hit,
-first/last unchecked) and the properly-scored `_person_matches`
-(0/1/2 = no match / last-name-only / first+last) — but the MLB
+Alvarez (MLB has multiple "Alvarez" players). Two passes were needed; the
+first deploy did not actually fix the user-visible symptom — recorded here
+so a future session doesn't stop at pass 1 and declare victory.
+
+**Pass 1** — `syndicate/blueprints/ask_the_syndicate_data.py` had two
+name-matching primitives: `_name_matches` (boolean, any single name-part
+substring hit, first/last unchecked) and the properly-scored
+`_person_matches` (0/1/2 = no match / last-name-only / first+last). The MLB
 game-disambiguation path (`_mlb_game_matches` → `_mlb_match_game`, used by
-`_mlb_focused_evidence` for every "which game/pitcher" evidence lookup) used
-the boolean one, first-hit-wins with no scoring. A slate game whose starting
-pitcher happened to share only a surname with the actually-asked-about
-player would satisfy the boolean check and, if it sorted earlier than the
-correct game, `_mlb_match_game` locked onto it — polluting the LLM evidence
-pack with the wrong game/pitcher tables alongside the (separately, correctly
-matched) real player's batting log. The WNBA per-player evidence loop
-(`_wnba_focused_evidence`) had the identical first-hit-wins pattern for
-player name matching. Fixed:
-- `_mlb_game_matches` replaced with a scored `_mlb_game_score`
-  (team/tricode match and full first+last starter match both outrank a
-  last-name-only starter match); `_mlb_match_game` now picks the
-  best-scoring game across the whole slate instead of the first hit.
-- New `_question_name_bigrams`/`_person_conflicts_with_question_name`
-  helpers detect when the raw question pairs a surname with a *different*
-  first name (e.g. "Yordan Alvarez" in the question vs. a candidate named
-  "Jose Alvarez") and refuse to credit that candidate with even a
-  last-name-only match in that case — otherwise a real full-name question
-  could still fall back to an unrelated same-surname player when no
-  candidate on the slate achieves a full match. Wired into both
-  `_mlb_game_score` and the WNBA player loop.
-- `_wnba_focused_evidence`'s player-match loop now scores every
-  home/away player across every game (`_person_matches` + the same
-  conflict guard) and keeps the best match instead of returning on the
-  first substring hit.
-- Two lower-stakes call sites inside `_mlb_focused_evidence` (deciding
-  whether to show a starter-strikeout table/chart for an already-matched
-  game) switched from the boolean matcher to `_person_matches` for
-  consistency; left as-is rather than adding the conflict guard there since
-  they only choose *within* an already-correctly-matched game's two known
-  starters.
+`_mlb_focused_evidence`) used the boolean one, first-hit-wins with no
+scoring — fixed by replacing it with a scored `_mlb_game_score` and having
+`_mlb_match_game` keep the best-scoring game across the slate. Also fixed
+the identical first-hit-wins pattern in `_wnba_focused_evidence`'s
+per-player loop. Committed (`3482ec60`) and deployed to the web service
+(`srv-d88ahvrbc2fs73eodu30`, this code only runs web-side — confirmed via
+`grep` that no worker path imports `ask_the_syndicate_data`).
+
+**Verification of pass 1 against production caught it was incomplete**:
+`curl`ing the live `/api/syndicate/query` endpoint with the user's exact
+question ("What does Yordan Alvarez look like tonight?") still returned a
+table titled "Last 1 starts — Andrew Alvarez" (a real different pitcher)
+mixed in with the correct "BvP — Yordan Alvarez vs Jacob deGrom" table —
+i.e. pass 1's fix covered the game/team matcher but `_person_matches`
+itself still returns 1 (last-name-only match) whenever nothing achieves a
+full first+last match, and that weak match was being accepted uncritically
+by the ~10 *other* `_person_matches` call sites in the same file
+(`_mlb_match_player_in_log` — the one that actually produced "Andrew
+Alvarez" — plus `_mlb_find_pitcher_in_slate`, `_mlb_find_batter_in_slate`,
+`_mlb_bvp_evidence`'s two branches, `_mlb_opposing_lineup_statcast_table`,
+`_boxscore_last_n` (NBA/WNBA last-10), `_nhl_last10_evidence`). Pass 1 had
+only wired its new conflict-guard helper into 2 of these ~10 sites.
+
+**Pass 2** — moved the conflict check into `_person_matches` itself
+(new optional `question: str = ""` param, backward-compatible default) so
+every call site benefits without individually reimplementing it: a
+last-name-only match is downgraded from 1 to 0 when the raw question pairs
+that surname with a *different* first name (via `_question_name_bigrams`,
+regex over capitalized "First Last" pairs). Threaded `question` through
+all ~13 call sites and the 3 helper functions that needed a new parameter
+to carry it down (`_boxscore_last_n`, `_mlb_find_pitcher_in_slate`,
+`_mlb_find_batter_in_slate`, `_mlb_match_player_in_log`). This introduced a
+real false-positive caught by the existing test suite before it shipped:
+naive capitalized-bigram detection treated a sentence-initial word as a
+"first name" ("How's Jokic looking tonight?" → bigram `("how's",
+"jokic")` → falsely conflicts with "Nikola Jokic" and zeroes out an
+otherwise-correct bare-surname match) — broke 2 existing tests
+(`test_no_sport_hint_still_matches_nba_and_nhl_players`,
+`test_wnba_last10_game_log_and_hit_rate`). Fixed with a small stopword set
+(`_NAME_BIGRAM_STOPWORDS` — interrogatives/auxiliaries/articles) excluded
+from bigram detection.
+Added 8 tests total across `AskTheSyndicateNameDisambiguationTests` (game
+matcher collision + score ranking + the sentence-initial false-positive
+guard + `_person_matches` conflict-guard unit tests) and
+`AskTheSyndicateMlbPlayerHistoryTests` (the exact "Andrew Alvarez" /
+"Yordan Alvarez" player-log repro, plus confirming a genuine full-name
+pitcher question still matches its own log). Full
+`tests/test_ask_the_syndicate.py` suite green (96 passed).
 `_name_matches` remains in use for team-name matching only, where the
-first/last ambiguity doesn't apply.
-Added `AskTheSyndicateNameDisambiguationTests` (3 tests) to
-`tests/test_ask_the_syndicate.py` reproducing the exact collision (two
-slate games, one with a same-surname starter that isn't the asked-about
-player) and asserting the game matcher no longer resolves to it. Full
-`tests/test_ask_the_syndicate.py` suite green (92 passed) before and after.
-No other file in `syndicate/` defines a competing copy of this matching
-logic (`grep -r _name_matches\|_person_matches syndicate/` returns only
-this one file), so no sibling systems needed the same fix.
+first/last ambiguity doesn't apply. No other file in `syndicate/` defines a
+competing copy of this matching logic (`grep -r
+_name_matches\|_person_matches syndicate/` returns only this one file), so
+no sibling systems needed the same fix.
+**Re-verified against production after pass 2 redeploy** (see deploy
+commit below) before calling this closed — do not trust a curl check
+against pass-1's deploy as evidence the bug is fixed; re-check after every
+deploy that actually contains the fix.
 
 ### Reconciliation 2026-07-31 part 5 (MLB pitcher-prop prototype fixes: real-scale backtest results -- effect much weaker than diagnosed, do not promote)
 

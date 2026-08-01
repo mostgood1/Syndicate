@@ -1793,6 +1793,28 @@ class AskTheSyndicateNameDisambiguationTests(unittest.TestCase):
         self.assertLess(collision_score, 90)
         self.assertEqual(unrelated_score, 0)
 
+    def test_sentence_initial_capitalization_is_not_treated_as_a_first_name(self) -> None:
+        # Regression guard for a false positive introduced while fixing the
+        # Alvarez collision: English capitalizes the first word of a
+        # sentence regardless of whether it's a name ("How's Jokic looking
+        # tonight?", "Has Cardoso cleared 18.5 points?") -- that must not
+        # register as a conflicting "First Last" mention and zero out an
+        # otherwise-correct last-name-only match.
+        words = ask_data._question_words("How's Jokic looking tonight?")
+        self.assertEqual(ask_data._person_matches("Nikola Jokic", words, "How's Jokic looking tonight?"), 1)
+        words2 = ask_data._question_words("Has Cardoso cleared 18.5 points recently?")
+        self.assertEqual(ask_data._person_matches("Kamilla Cardoso", words2, "Has Cardoso cleared 18.5 points recently?"), 1)
+
+    def test_person_matches_conflict_guard(self) -> None:
+        words = ask_data._question_words("What does Yordan Alvarez look like tonight?")
+        question = "What does Yordan Alvarez look like tonight?"
+        # Full first+last match still scores 2 regardless of the question arg.
+        self.assertEqual(ask_data._person_matches("Yordan Alvarez", words, question), 2)
+        # A different same-surname person is downgraded from 1 to 0.
+        self.assertEqual(ask_data._person_matches("Jose Alvarez", words, question), 0)
+        # Without the question arg (back-compat), last-name-only still scores 1.
+        self.assertEqual(ask_data._person_matches("Jose Alvarez", words), 1)
+
 
 class AskTheSyndicateMlbPlayerHistoryTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -1839,6 +1861,30 @@ class AskTheSyndicateMlbPlayerHistoryTests(unittest.TestCase):
         }
         with open(os.path.join(daily_dir, "daily_summary_2026_07_12.json"), "w", encoding="utf-8") as f:
             json.dump(summary, f)
+
+    def test_full_name_batter_question_does_not_match_same_surname_pitcher_log(self) -> None:
+        # Exact production repro (reported 2026-08-01): a full-name question
+        # about a batter ("Yordan Alvarez") must not resolve to an unrelated
+        # pitcher in the log who merely shares the surname ("Andrew
+        # Alvarez") -- _mlb_player_history_evidence checks the pitcher log
+        # first, and a last-name-only match there used to win by default.
+        self._write_pitcher_log([
+            {"date": "2026-07-20", "game_pk": 1, "player_id": 555, "player_name": "Andrew Alvarez", "team": "COL", "opponent": "COL", "is_starter": 1, "ip": "4.1", "outs": 13, "pitches": 74, "k": 2, "bb": 3, "er": 3, "h": 5, "r": 3, "hr": 1},
+        ])
+        with patch.dict(os.environ, self._env()):
+            with patch("syndicate.features.intelligence._mlb_statcast_profile_from_ids", return_value=None):
+                result = ask_data._mlb_player_history_evidence("What does Yordan Alvarez look like tonight?", {"sport": "mlb"})
+        self.assertIsNone(result)
+
+    def test_full_name_pitcher_question_still_matches_its_own_log(self) -> None:
+        self._write_pitcher_log([
+            {"date": "2026-07-20", "game_pk": 1, "player_id": 555, "player_name": "Andrew Alvarez", "team": "COL", "opponent": "COL", "is_starter": 1, "ip": "4.1", "outs": 13, "pitches": 74, "k": 2, "bb": 3, "er": 3, "h": 5, "r": 3, "hr": 1},
+        ])
+        with patch.dict(os.environ, self._env()):
+            with patch("syndicate.features.intelligence._mlb_statcast_profile_from_ids", return_value=None):
+                result = ask_data._mlb_player_history_evidence("How has Andrew Alvarez looked?", {"sport": "mlb"})
+        self.assertIsNotNone(result)
+        self.assertIn("Andrew Alvarez", result["tables"][0]["title"])
 
     def test_pitcher_last_n_starts_and_advanced_profile(self) -> None:
         self._write_pitcher_log([
