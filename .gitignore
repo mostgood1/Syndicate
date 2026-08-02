@@ -36,26 +36,28 @@ data/*_source/source_artifacts/data/cache/
 data/*_source/source_artifacts/
 data/tmp_*/
 
-# Team-branding snapshots (logo URL + hex colors, ~few KB/sport, changes only
-# on a rebrand) are real Render deploy inputs -- unlike the rest of
-# source_artifacts/, which is bulky and regenerable, cards.py has no other
-# source for these and Render's persistent disk never runs the ESPN fetch
-# itself. Un-ignore just this one path per sport rather than the whole
-# source_artifacts/ tree.
+# NFL/NCAAF's processed/ snapshots (team branding, team registry, returning
+# production, coach continuity, transfer portal, roster, depth chart -- each
+# a few KB to ~1.7MB, ~3.25MB/1.4MB total) are real Render deploy inputs, not
+# bulky/regenerable caches: cards.py's _team_context (and friends) read them
+# directly in the request path, and Render's persistent disk has no
+# production job that regenerates any of them. Confirmed 2026-08-02 the
+# narrow team_branding-only exception this started as wasn't enough --
+# _resolve_branding's own team-name-to-id join depends on team_registry,
+# which was equally missing. Un-ignore the whole processed/ subtree per
+# sport rather than continuing to patch one missing file at a time; the
+# rest of source_artifacts/ (raw per-day fetch payloads, larger caches)
+# stays ignored.
 !data/nfl_source/source_artifacts/
 data/nfl_source/source_artifacts/*
 !data/nfl_source/source_artifacts/data/
 data/nfl_source/source_artifacts/data/*
 !data/nfl_source/source_artifacts/data/processed/
-data/nfl_source/source_artifacts/data/processed/*
-!data/nfl_source/source_artifacts/data/processed/team_branding/
 !data/ncaaf_source/source_artifacts/
 data/ncaaf_source/source_artifacts/*
 !data/ncaaf_source/source_artifacts/data/
 data/ncaaf_source/source_artifacts/data/*
 !data/ncaaf_source/source_artifacts/data/processed/
-data/ncaaf_source/source_artifacts/data/processed/*
-!data/ncaaf_source/source_artifacts/data/processed/team_branding/
 
 # SmartSim 2.0 historical-truth caches: regenerable via ncaaf_historical_loader.py /
 # nfl_historical_loader.py (CFBD API / nflverse release download); mirror caches, not source.
