@@ -957,6 +957,56 @@ def api_ops_wnba_live_lines_export_diag() -> Any:
     return jsonify({"ok": True, "candidate_roots": [str(root) for root in candidate_roots], "results": results})
 
 
+@ops_bp.get("/api/ops/wnba/live-lines-raw")
+def api_ops_wnba_live_lines_raw() -> Any:
+    # Protected endpoint: requires admin token (enforced by before_request)
+    # The export-diag endpoint above only shows what the writer script
+    # COMPUTED (source_payload_games) -- it doesn't prove that content
+    # actually landed in the real live_lines_<date>.jsonl snapshot file
+    # cards.py reads at request time. Reads the raw keyvalue-stored text
+    # for that file directly, across every candidate root, bypassing all
+    # of build_live_lines_payload's merge/fallback logic entirely -- the
+    # most direct way to tell a write-side gap from a read-side one.
+    date = str(request.args.get("date") or "").strip()
+    if not date:
+        return jsonify({"ok": False, "error": "date parameter required (YYYY-MM-DD)"}), 400
+    try:
+        from syndicate.features.shared.refresh_state_store import read_text_file as _state_read_text
+        from syndicate.features.shared.source_roots import preferred_artifact_roots
+        from syndicate.features.wnba.sources import processed_root as wnba_processed_root
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"ImportError: {type(exc).__name__}: {exc}"}), 500
+
+    candidate_roots = [
+        candidate / "data" / "processed"
+        for candidate in preferred_artifact_roots(__file__, env_var="SYNDICATE_WNBA_SOURCE_ROOT", local_dir_name="wnba_source")
+    ]
+    file_name = f"live_lines_{date}.jsonl"
+    results = []
+    for root in candidate_roots:
+        path = root / "live_snapshots" / file_name
+        raw_text = _state_read_text(path)
+        parsed_lines = []
+        for line in (raw_text or "").splitlines():
+            raw = line.strip()
+            if not raw:
+                continue
+            try:
+                parsed_lines.append(json.loads(raw))
+            except Exception as exc:
+                parsed_lines.append({"parse_error": f"{type(exc).__name__}: {exc}"})
+        results.append(
+            {
+                "root": str(path),
+                "is_processed_root_default": root == wnba_processed_root(),
+                "raw_text_length": len(raw_text) if raw_text is not None else None,
+                "line_count": len(parsed_lines),
+                "last_record": parsed_lines[-1] if parsed_lines else None,
+            }
+        )
+    return jsonify({"ok": True, "date": date, "results": results})
+
+
 @ops_bp.get("/api/ops/wnba/status-trace")
 def api_ops_wnba_status_trace() -> Any:
     # Protected endpoint: requires admin token (enforced by before_request)
