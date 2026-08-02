@@ -1652,6 +1652,99 @@ hook-related test tonight remains unexplained.
 
 Temp validation artifacts, same directory: `full46_happyplace_test/`.
 
+### Reconciliation 2026-08-01 (MLB pitcher/hitter statistical-model pilot: strikeouts clearly beat the sim, hits/outs/HR don't)
+
+Direct continuation of part 13. User asked, before deploying: "what about
+a pitcher level model?" -- i.e. should the sim's hand-fit rate-combination
+formulas (this whole session's subject) be replaced with a real
+statistical model trained on real outcomes, instead of continuing to
+patch formulas with weak individual-pitcher signal (quality-hook's own
+regression only had R^2=0.056). User confirmed pursuing a cheap pilot
+first, then a fuller build covering both pitchers and hitters.
+
+**Infrastructure check**: `scikit-learn`/`pandas`/`numpy`/`scipy` are
+already in `requirements.txt` but genuinely unused anywhere in the actual
+codebase -- confirmed via repo-wide search (only vendored library
+internals reference sklearn). This is new capability, not wiring up
+something half-built. Hitters share the pitcher side's exact
+architecture (`BatterProfile` rates feed the same `_combined()` family),
+so the same diagnosis and fix opportunity applies to both.
+
+**Pilot** (single Poisson regression, 5 features, static 35/11 tune/
+holdout split matching the season's established convention): strikeouts
+only, trained on data already on disk (no new sim runs). Result was
+immediately decisive -- holdout betting hit rate 52.21% (sim) vs 62.83%
+(model), tier bias closing 73-75% of the elite/back-end gap vs. the ~3%
+any single rule-based sim fix managed this session. Clear enough to
+justify the fuller build.
+
+**Fuller build**: expanded to 13 features (all pregame-legitimate: own
+season rates including hr_rate/inplay_hit_rate/hbp_rate, batters_faced,
+stamina_pitches, venue multiplier, home/away, opposing lineup's average
+rates), proper 5-fold `GroupKFold` cross-validation grouped by date (not
+a single static split -- prevents leakage from repeated within-date
+opponent/park effects, and pools out-of-fold predictions for much larger
+effective betting-accuracy samples than the pilot's n=113). Feature
+scaling (`StandardScaler`) was necessary -- `batters_faced` (~0-600) vs.
+`k_rate` (~0-0.4) caused real optimizer convergence failures before it
+was added; the scaled numbers below are the trustworthy ones. Covered
+all four pitcher markets (n=1210 each) plus a hitter HR model (n=11016,
+`hitter_hr_backtest.scored_overall`, logistic regression):
+
+| market | result |
+|---|---|
+| strikeouts | **Clear win**: bias -0.064->+0.0004, MAE 1.957->1.758, betting hit rate 54.65%->58.84% (n=882) |
+| walks | Small, genuine win: bias -0.120->-0.001, MAE 0.997->0.994 (no market to grade betting) |
+| hits allowed | Statistical win (bias +1.598->-0.0003, MAE 2.139->1.736), **betting-accuracy loss** (56.47%->54.31%) |
+| outs | Statistical win (bias +2.267->+0.003, MAE 3.566->3.109), **betting-accuracy loss** (58.62%->55.72%) |
+| hitter HR | Roughly a wash vs. already-calibrated production sim (Brier 0.1000 sim vs 0.1030 model, logloss ~tied) |
+
+**Important methodology correction made mid-analysis**: the sim's raw
+`p_hr_1plus` isn't what's served in production -- an existing
+`hitter_hr_calibration/default.json` band-aid (from an earlier session,
+predating this one) calibrates it to `p_hr_1plus_cal` first. The first
+HR comparison pass used the raw value and looked like an easy win; caught
+and corrected before drawing any conclusion. Worth remembering broadly:
+always check whether a "raw model output" field has a downstream
+calibration step before comparing against it.
+
+**The finding that matters most**: hits-allowed and outs hit the exact
+same statistical-accuracy-vs-betting-accuracy wall discovered with the
+rule-based `inplay_hit_combine_log5_weight` fix in part 12/13 -- and this
+is a *completely independent* model built from scratch, not a variant of
+the sim's own formulas. That rules out "it's a quirk of log5 combination"
+as the explanation. The more likely story: real market lines for those
+two markets already price in same-day information (bullpen plans,
+weather, exact injury status) that neither the sim nor a season-rate
+feature set has access to, so eliminating mean bias can remove an
+accidental alignment with what actually happened rather than adding real
+signal. Strikeouts and (probably) HR don't have this problem as
+severely, plausibly because per-PA K outcomes are less sensitive to
+same-day circumstantial info than balls-in-play outcomes are.
+
+**Not yet done / open for whoever continues this**: (1) integration
+decision for the validated strikeout win -- feed the model's rate back
+into the sim as a `pitcher.k_rate` replacement (preserves full-game
+correlated simulation) vs. a fully separate prop-serving path (cleaner
+separation, bigger lift) -- not yet chosen or implemented, this session
+stopped at "validated prototype," deliberately not touching production
+code without a real integration design first; (2) hits/outs/HR need
+either more features (the market-line-itself as an input feature is the
+most obvious untested idea) or acceptance that they're harder markets,
+not more of the same feature-engineering; (3) neither model has been
+graded against genuinely fresh, never-touched dates -- the 46-date
+tune/holdout split has now been reused across the entire session for
+every fix AND this pilot, so there's real risk of the whole session's
+worth of decisions collectively overfitting to this specific date range;
+a clean, never-before-used holdout set would be the right next validation
+step before any of tonight's work (rule-based fixes or this ML pilot)
+gets fully trusted.
+
+Prototype scripts (scratchpad, not part of the repo):
+`build_pitcher_dataset.py`, `train_pitcher_models.py`,
+`build_hitter_dataset.py`, `train_hitter_hr_model.py`, plus the earlier
+`pitcher_profiles.pkl`/`pitcher_dataset.pkl` from the initial pilot.
+
 ### Reconciliation 2026-07-31 part 4 (NFL: real SmartSim 2.0 projection engine + market board + Ask the Syndicate)
 
 Continuation of the same "wire up NFL fully based on MLB" session (parts 1-2
