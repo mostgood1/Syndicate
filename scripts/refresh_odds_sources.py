@@ -638,7 +638,21 @@ def _infer_nfl_context(source_root: Path | None, artifact_root: Path, season: in
         except Exception:
             payload = {}
     resolved_season = int(season if season is not None else payload.get("season") or datetime.now().year)
-    resolved_week = int(week if week is not None else payload.get("week") or 1)
+    if week is not None:
+        resolved_week = int(week)
+    else:
+        # current_week.json is rewritten by the NFL refresh runner itself
+        # (_ensure_current_week_file), so preferring it here is a fixed
+        # point that pins the whole autorun to the same week all season.
+        # The real schedule (first week with an unplayed game) outranks it.
+        target_week: int | None
+        try:
+            from syndicate.features.nfl.sources import nfl_target_week
+
+            target_week = nfl_target_week(resolved_season)
+        except Exception:
+            target_week = None
+        resolved_week = int(target_week if target_week is not None else payload.get("week") or 1)
     return resolved_season, resolved_week
 
 

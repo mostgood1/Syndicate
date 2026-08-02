@@ -164,6 +164,15 @@ def available_weeks() -> list[int]:
 
 def default_week() -> int:
     weeks = available_weeks()
+    # Mirror cards.py's _ncaaf_default_active_week: available_weeks() comes
+    # from the legacy recommendations_summary index, which can be empty for
+    # a season that has real SmartSim2 projections (confirmed live: an empty
+    # recommendations_summary/ directory pinned the Layer 2 NCAAF context to
+    # week 1 via the bare fallback below). The real schedule-driven target
+    # week outranks it whenever the schedule is loadable.
+    target = ncaaf_target_week(default_season())
+    if target is not None and (not weeks or target in weeks):
+        return target
     return weeks[-1] if weeks else 1
 
 

@@ -158,21 +158,22 @@ def available_weeks(season: int | None = None) -> list[int]:
 
 
 def default_week(season: int | None = None) -> int:
-    weeks = available_weeks(season)
-    if not weeks:
-        return 1
     resolved_season = int(season or latest_season())
+    weeks = available_weeks(resolved_season)
     # Prefer the real calendar-driven target week (the first real week with
     # an unplayed game) over "last available week" -- once a season's whole
     # schedule has real generated projections (e.g. this session's full 2026
     # backfill), "last available" degenerates to week 18/the season finale
-    # even during the preseason, which is a confusing default. Falls back to
-    # "last available" once every real game has a final score (nothing left
-    # to target) or the real schedule file doesn't exist for this season.
+    # even during the preseason, which is a confusing default. The target
+    # week also wins when no projection weeks exist yet (previously that
+    # early-returned 1, which understated a real mid-season target). Falls
+    # back to "last available" once every real game has a final score
+    # (nothing left to target) or the real schedule file doesn't exist for
+    # this season.
     target = nfl_target_week(resolved_season)
-    if target is not None and target in weeks:
+    if target is not None and (not weeks or target in weeks):
         return target
-    return weeks[-1]
+    return weeks[-1] if weeks else 1
 
 
 def recommendation_path(week: int, season: int | None = None) -> Path:

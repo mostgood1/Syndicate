@@ -208,6 +208,17 @@ def _resolve_source_data_root(*, source_root: str | None, artifact_root: Path) -
     return artifact_root
 
 
+def _schedule_target_week(season: int) -> int | None:
+    """Real schedule-driven week (first week with an unplayed game). None
+    when the real schedule isn't available in this environment."""
+    try:
+        from syndicate.features.nfl.sources import nfl_target_week
+
+        return nfl_target_week(int(season))
+    except Exception:
+        return None
+
+
 def _resolve_context(*, source_data_root: Path, season: int | None, week: int | None) -> tuple[int, int]:
     from datetime import datetime
 
@@ -219,7 +230,17 @@ def _resolve_context(*, source_data_root: Path, season: int | None, week: int | 
         except Exception:
             payload = {}
     resolved_season = int(season if season is not None else payload.get("season") or payload.get("current_season") or datetime.now().year)
-    resolved_week = int(week if week is not None else payload.get("week") or payload.get("current_week") or 1)
+    if week is not None:
+        resolved_week = int(week)
+    else:
+        # current_week.json is rewritten by _ensure_current_week_file after
+        # every run, so treating it as the week source of truth is a fixed
+        # point: read week 1, refresh week 1, write week 1 back, forever.
+        # The real schedule (first week with an unplayed game) outranks it;
+        # the tracked file is only a fallback for environments without the
+        # schedule artifact.
+        target_week = _schedule_target_week(resolved_season)
+        resolved_week = int(target_week if target_week is not None else payload.get("week") or payload.get("current_week") or 1)
     return resolved_season, resolved_week
 
 

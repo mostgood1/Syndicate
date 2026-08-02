@@ -5839,7 +5839,13 @@ def _build_sport_overview(
     elif slug == "nfl":
         season = nfl_latest_season()
         tracked = nfl_tracked_week() or {}
-        selected_week = int(tracked.get("week") or nfl_default_week(season))
+        # Schedule-driven default_week() outranks the tracked
+        # current_week.json: the tracked file is rewritten by the odds
+        # refresh itself, so preferring it pinned the Layer 2 NFL context
+        # to whatever week the file last held (a week-1 fixed point at
+        # season start). The tracked value is only a last resort when the
+        # schedule/projection artifacts are absent entirely.
+        selected_week = int(nfl_default_week(season) or tracked.get("week") or 1)
         links = build_nfl_module_links(selected_week, "Cards", season=season)
         context_label = f"{season} Week {selected_week}"
         primary_href = f"/nfl?season={season}&week={selected_week}"
