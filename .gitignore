@@ -59,8 +59,18 @@ data/ncaaf_source/source_artifacts/data/processed/*
 
 # SmartSim 2.0 historical-truth caches: regenerable via ncaaf_historical_loader.py /
 # nfl_historical_loader.py (CFBD API / nflverse release download); mirror caches, not source.
+# Exception: NCAAF's games_{season}.json.gz (schedule-level, ~40-95KB each,
+# not the bulky drives/plays play-by-play caches) IS a real Render deploy
+# input -- confirmed 2026-08-02: ncaaf/cards.py's _smartsim2_standalone_rows
+# calls load_games_season() directly in the request path (not just at
+# generation time), and Render's persistent disk has no production job that
+# ever runs ncaaf_historical_loader.py itself to regenerate this cache, so
+# without it committed the standalone SmartSim 2.0 cards/picks fallback
+# silently returns no rows for any season the legacy engine has no data for.
 data/nfl_source/historical_truth/
-data/ncaaf_source/historical_truth/
+!data/ncaaf_source/historical_truth/
+data/ncaaf_source/historical_truth/*
+!data/ncaaf_source/historical_truth/games_*.json.gz
 
 # Raw NFL tracking pulls (nflverse pbp, FTN charting): regenerable release
 # downloads, not source, and individual files run 90MB+ -- too large for
