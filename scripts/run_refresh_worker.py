@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -990,6 +991,63 @@ def _season_projection_script_args(sport: str, season: int, week: int) -> list[s
     return [sys.executable, str(script_path), "--season", str(season), "--week", str(week)]
 
 
+_SEASON_PROJECTION_MAX_RUNTIME_SECONDS = 45 * 60
+
+
+def _season_projection_launch_state_path(sport: str) -> Path:
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / f"season_projection_launch_{sport}.json"
+
+
+def _season_projection_process_still_running(sport: str) -> bool:
+    # Confirmed live 2026-08-02: this autorun had no "already running" guard
+    # at all -- unlike every sibling autorun here (MLB's daily sim, the
+    # weekly/soccer/reconciliation/evaluation launchers), which all check a
+    # persisted PID before launching. The staleness check just above (an
+    # artifact-age check) can't substitute for one: the artifact's mtime
+    # doesn't move until the subprocess finishes writing it, so every tick
+    # while a run is still in progress sees the SAME "stale" artifact and
+    # launches ANOTHER instance. Confirmed via
+    # /api/ops/intelligence/memory-diagnostics on refresh-worker: 18 ->
+    # 56+ concurrent generate_smartsim2_nfl_projections.py processes
+    # (all still `running`) piling up over ~2 hours, driving container
+    # memory from 31.6% to 53.8% of the 4GB limit and starving the actively
+    # running MLB Sunday-slate sim of CPU on the same container.
+    from syndicate.features.shared.live_refresh_loop import _process_exists
+
+    store = _refresh_state_store()
+    payload = store["read_json_file"](_season_projection_launch_state_path(sport))
+    if not isinstance(payload, dict):
+        return False
+    pid = payload.get("pid")
+    if not _process_exists(pid):
+        return False
+    started_at_epoch = float(payload.get("started_at_epoch") or 0.0)
+    if started_at_epoch > 0.0 and (time.time() - started_at_epoch) > _SEASON_PROJECTION_MAX_RUNTIME_SECONDS:
+        # Hung well past a generous ceiling for a single week's Monte Carlo
+        # projection run -- don't let a stuck process block this sport's
+        # autorun forever. Best-effort: a failed kill just means the next
+        # check tries again: it never blocks re-evaluating this gate.
+        try:
+            os.kill(int(pid), signal.SIGTERM)
+        except Exception:
+            pass
+        print(f"[refresh_worker] SEASON_PROJECTION_TIMEOUT sport={sport} pid={pid}", flush=True)
+        return False
+    return True
+
+
+def _record_season_projection_launch(sport: str, pid: int) -> None:
+    _refresh_state_store()["write_json_file"](
+        _season_projection_launch_state_path(sport),
+        {
+            "sport": sport,
+            "pid": int(pid),
+            "started_at_epoch": time.time(),
+            "started_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        },
+    )
+
+
 def _launch_autorun_season_projections(
     *,
     latest_manifest_path: Path,
@@ -1015,6 +1073,8 @@ def _launch_autorun_season_projections(
     for sport in _SEASON_PROJECTION_SPORTS:
         if sport not in active:
             continue
+        if _season_projection_process_still_running(sport):
+            continue
         week = _season_projection_target_week(sport, season)
         if week is None:
             continue
@@ -1037,6 +1097,7 @@ def _launch_autorun_season_projections(
             )
             continue
 
+        _record_season_projection_launch(sport, int(getattr(process, "pid", 0) or 0))
         refresh_cycle["claimed_count"] = int(refresh_cycle.get("claimed_count") or 0) + 1
         _write_worker_status(
             worker_status_path=worker_status_path,
