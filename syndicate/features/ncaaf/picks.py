@@ -95,6 +95,11 @@ def _collapse_results(summary: dict[str, Any], *, limit: int = 12) -> list[dict[
         cards.append(
             {
                 "title": f"{home_team} vs {away_team} {market} {side}",
+                # Team-level game bet, not a player prop. Without a "market"
+                # key, home.py's _is_game_level_rank_card_market returns
+                # False and these cards flow into pregame_props() mislabeled
+                # as player props (the exact WNBA 2026-07-27 bug class).
+                "market": market.lower() if market.lower() in ("moneyline", "spread", "total") else "game bet",
                 "eyebrow": provider,
                 "badge": f"{format_pct(row.get('edge'))} edge",
                 "meta": f"{away_team} at {home_team}",
@@ -170,6 +175,9 @@ def _runtime_pick_cards(week: int, *, season: int) -> list[dict[str, Any]]:
         cards.append(
             {
                 "title": f"{home_team} vs {away_team} {LEGACY_ENGINE_SOURCE_LABEL} candidate",
+                # Game-level projection candidate -- see _collapse_results'
+                # market-stamp note (keeps these out of pregame props).
+                "market": "game bet",
                 "eyebrow": LEGACY_ENGINE_SOURCE_LABEL,
                 "badge": f"{scoreboard.get('win_probability') or '-'} win prob",
                 "meta": f"{away_team} at {home_team}",
@@ -258,6 +266,9 @@ def _standalone_smartsim2_pick_cards(season: int, week: int) -> list[dict[str, A
                 "score": score,
                 "card": {
                     "title": f"{home_team} vs {away_team} {SMARTSIM2_PUBLIC_LABEL} candidate",
+                    # Game-level projection candidate -- see _collapse_results'
+                    # market-stamp note (keeps these out of pregame props).
+                    "market": "game bet",
                     "eyebrow": SMARTSIM2_PUBLIC_LABEL,
                     "badge": f"{win_probability} win prob",
                     "meta": f"{away_team} at {home_team}",

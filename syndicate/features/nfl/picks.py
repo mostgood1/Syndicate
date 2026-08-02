@@ -113,6 +113,11 @@ def _build_cards(rows: list[dict[str, Any]], *, limit: int | None = 12, sort_val
         cards.append(
             {
                 "title": f"{rec_type} | {away_team} at {home_team}",
+                # Team-level game bet, not a player prop. Without a "market"
+                # key, home.py's _is_game_level_rank_card_market returns
+                # False and these cards flow into pregame_props() mislabeled
+                # as player props (the exact WNBA 2026-07-27 bug class).
+                "market": rec_type.lower() if rec_type.lower() in ("moneyline", "spread", "total") else "game bet",
                 "eyebrow": f"{confidence} confidence",
                 "badge": f"{format_pct((float(row.get('ev_pct') or 0.0) / 100.0))} EV",
                 "meta": f"Week {week} | {away_team} at {home_team}",
@@ -247,6 +252,9 @@ def _standalone_smartsim2_pick_cards(season: int, week: int) -> list[dict[str, A
                 score,
                 {
                     "title": f"{home_team} vs {away_team} {SMARTSIM2_PUBLIC_LABEL} candidate",
+                    # Game-level projection candidate -- see _build_cards'
+                    # market-stamp note (keeps these out of pregame props).
+                    "market": "game bet",
                     "eyebrow": SMARTSIM2_PUBLIC_LABEL,
                     "badge": f"{win_probability} win prob",
                     "meta": f"{away_team} at {home_team}",
