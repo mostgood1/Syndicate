@@ -1212,6 +1212,40 @@ def _mlb_join_mismatch_game_pks(date_str: str) -> list[str]:
 		return []
 
 
+def _mlb_board_missing_game_pks(date_str: str, known_game_pks: set[str]) -> list[str]:
+	# Confirmed live 2026-08-02: a 15-game slate had current_fingerprints for
+	# all 15 games, but the daily summary's outputs only covered 7 -- the other
+	# 8 never got an initial sim (e.g. an early coldstart run whose own market
+	# read only saw a subset of the slate as ready). None of the existing
+	# triggers ever catch this: fingerprint_change only fires on a HASH DIFF
+	# against the last *recorded* value, and _record_mlb_sim_check stores a
+	# fingerprint for every scheduled game on every tick regardless of whether
+	# that game's sim actually ran or landed on the board -- so once a missing
+	# game's fingerprint has been recorded once, an unchanged market for it
+	# never diffs again, and it stays off the board forever. join_mismatch
+	# only looks at rows the market board actually built, which requires sim
+	# coverage to exist in the first place. This trigger is the direct
+	# complement: compare the schedule's known game pks against what the board
+	# itself will render (_games_from_daily_summary, the same function
+	# syndicate/features/mlb/cards.py uses to build the live board) and force
+	# a resim for anything genuinely absent. Best-effort like the other
+	# additive triggers -- any failure here must never break the
+	# fingerprint-based trigger that already works.
+	if not known_game_pks:
+		return []
+	try:
+		summary = read_json_file(_mlb_daily_summary_path(date_str))
+		if not isinstance(summary, dict):
+			return []
+		from syndicate.features.mlb.cards import _games_from_daily_summary
+
+		games = _games_from_daily_summary(summary)
+		board_game_pks = {str(game.get("gamePk") or "").strip() for game in games if isinstance(game, dict)}
+		return sorted(pk for pk in known_game_pks if pk and pk not in board_game_pks)
+	except Exception:
+		return []
+
+
 def _mlb_props_regen_marker_path() -> Path:
 	return _meta_dir() / "last_mlb_props_regen_attempt.json"
 
@@ -1556,26 +1590,41 @@ def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any
 	else:
 		join_mismatch_game_pks = _mlb_join_mismatch_game_pks(date_str)
 
+	# A JSON read + the same board-building function cards.py already calls --
+	# no market-board rebuild, so unlike join_mismatch above this is cheap
+	# enough to run every tick regardless of what the other triggers found.
+	# Deliberately NOT short-circuited by changed_game_pks: a game missing
+	# from the board can have an already-recorded, unchanged fingerprint (see
+	# _mlb_board_missing_game_pks docstring) and would otherwise never be
+	# rescued.
+	board_missing_game_pks = _mlb_board_missing_game_pks(date_str, set(current_fingerprints.keys()))
+
 	# Cheapest trigger last, and only checked when nothing above already
 	# found a reason to resim -- a few small JSON reads, no market-board
 	# build, but no point paying even that when we're launching anyway.
 	props_regen_game_pks: list[str] = []
-	if not changed_game_pks and not join_mismatch_game_pks:
+	if not changed_game_pks and not join_mismatch_game_pks and not board_missing_game_pks:
 		if _mlb_props_now_available_needs_regen(now_epoch=now_epoch, date_str=date_str):
 			props_regen_game_pks = sorted(current_fingerprints.keys())
 
-	if changed_game_pks or join_mismatch_game_pks or props_regen_game_pks:
+	if changed_game_pks or join_mismatch_game_pks or board_missing_game_pks or props_regen_game_pks:
 		_record_mlb_sim_check(now_epoch, date_str, current_fingerprints, launched=True)
-		merged_game_pks = sorted(set(changed_game_pks) | set(join_mismatch_game_pks) | set(props_regen_game_pks))
+		merged_game_pks = sorted(
+			set(changed_game_pks) | set(join_mismatch_game_pks) | set(board_missing_game_pks) | set(props_regen_game_pks)
+		)
 		if changed_game_pks:
 			reason = "fingerprint_change"
 		elif join_mismatch_game_pks:
 			reason = "join_mismatch_needs_resim"
+		elif board_missing_game_pks:
+			reason = "board_missing_games"
 		else:
 			reason = "props_now_available"
 		result: dict[str, Any] = {"force": True, "reason": reason, "game_pks": merged_game_pks}
 		if join_mismatch_game_pks:
 			result["join_mismatch_game_pks"] = join_mismatch_game_pks
+		if board_missing_game_pks:
+			result["board_missing_game_pks"] = board_missing_game_pks
 		if props_regen_game_pks:
 			result["props_regen_game_pks"] = props_regen_game_pks
 		return result

@@ -1125,6 +1125,73 @@ class LiveRefreshLoopTests(unittest.TestCase):
         self.assertEqual(decision["join_mismatch_game_pks"], ["200"])
         mocked_record.assert_called_once_with(2000.0, "2026-07-19", {"100": "aaa", "200": "bbb"}, launched=True)
 
+    def test_mlb_daily_sim_decision_board_missing_games_forces_resim_without_fingerprint_change(self) -> None:
+        # The safeguard itself, at the decision level: a game absent from the
+        # board must force a scoped resim even when its fingerprint hasn't
+        # changed and there's no join mismatch to catch it either.
+        events = [
+            live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None),
+            live_refresh_loop.ScheduleEvent(sport="mlb", event_id="200", home="C", away="D", start_time_utc=None),
+        ]
+        with patch.dict(os.environ, {"SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER": "true"}, clear=False), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(live_refresh_loop, "is_refresh_run_active", return_value=False), patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=events
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path, patch.object(
+            live_refresh_loop, "events_starting_within", return_value=[]
+        ), patch.object(
+            live_refresh_loop, "_read_last_mlb_sim_check", return_value={"epoch": 1000.0, "date": "2026-07-19", "fingerprints": {"100": "aaa", "200": "bbb"}}
+        ), patch.object(
+            live_refresh_loop, "_fetch_mlb_injuries", return_value=True
+        ), patch.object(
+            live_refresh_loop, "_mlb_sim_input_fingerprint_by_game", return_value={"100": "aaa", "200": "bbb"}
+        ), patch.object(
+            live_refresh_loop, "_mlb_join_mismatch_game_pks", return_value=[]
+        ), patch.object(
+            live_refresh_loop, "_mlb_board_missing_game_pks", return_value=["200"]
+        ), patch.object(
+            live_refresh_loop, "_record_mlb_sim_check"
+        ) as mocked_record:
+            mocked_summary_path.return_value.exists.return_value = True
+            decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=2000.0, date_str="2026-07-19")
+
+        self.assertTrue(decision["force"])
+        self.assertEqual(decision["reason"], "board_missing_games")
+        self.assertEqual(decision["game_pks"], ["200"])
+        self.assertEqual(decision["board_missing_game_pks"], ["200"])
+        mocked_record.assert_called_once_with(2000.0, "2026-07-19", {"100": "aaa", "200": "bbb"}, launched=True)
+
+    def test_mlb_daily_sim_decision_skips_props_check_when_board_missing_games_already_triggers(self) -> None:
+        events = [live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None)]
+        with patch.dict(os.environ, {"SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER": "true"}, clear=False), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(live_refresh_loop, "is_refresh_run_active", return_value=False), patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=events
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path, patch.object(
+            live_refresh_loop, "events_starting_within", return_value=[]
+        ), patch.object(
+            live_refresh_loop, "_read_last_mlb_sim_check", return_value={"epoch": 1000.0, "date": "2026-08-01", "fingerprints": {"100": "aaa"}}
+        ), patch.object(
+            live_refresh_loop, "_fetch_mlb_injuries", return_value=True
+        ), patch.object(
+            live_refresh_loop, "_mlb_sim_input_fingerprint_by_game", return_value={"100": "aaa"}
+        ), patch.object(
+            live_refresh_loop, "_mlb_join_mismatch_game_pks", return_value=[]
+        ), patch.object(
+            live_refresh_loop, "_mlb_board_missing_game_pks", return_value=["100"]
+        ), patch.object(
+            live_refresh_loop, "_mlb_props_now_available_needs_regen"
+        ) as mocked_props_check, patch.object(live_refresh_loop, "_record_mlb_sim_check"):
+            mocked_summary_path.return_value.exists.return_value = True
+            decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=2000.0, date_str="2026-08-01")
+
+        self.assertEqual(decision["reason"], "board_missing_games")
+        mocked_props_check.assert_not_called()
+
     def test_mlb_daily_sim_decision_merges_fingerprint_and_join_mismatch_game_pks(self) -> None:
         events = [
             live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None),
@@ -1192,6 +1259,60 @@ class LiveRefreshLoopTests(unittest.TestCase):
         # break the existing mechanism.
         with patch("syndicate.features.mlb.cards.mlb_needs_resim_game_pks", side_effect=RuntimeError("boom")):
             result = live_refresh_loop._mlb_join_mismatch_game_pks("2026-07-19")
+        self.assertEqual(result, [])
+
+    def test_mlb_board_missing_game_pks_returns_scheduled_games_absent_from_board(self) -> None:
+        # 2026-08-02 production symptom: a 15-game slate had fingerprints
+        # recorded for every game, but the daily summary's outputs only
+        # covered 7 of them -- an early coldstart run whose own market read
+        # only saw a subset of the slate as ready. This is the direct
+        # complement to fingerprint_change/join_mismatch: it doesn't need
+        # anything about the game's market to CHANGE, just for the game to be
+        # absent from what the board will actually render.
+        summary = {
+            "date": "2026-08-02",
+            "outputs": [
+                {
+                    "game_pk": 100,
+                    "away": "A",
+                    "home": "B",
+                    "starter_names": {"away": "A SP", "home": "B SP"},
+                    "full": {"home_win_prob": 0.55, "away_win_prob": 0.45},
+                }
+            ],
+        }
+        with patch.object(live_refresh_loop, "read_json_file", return_value=summary):
+            result = live_refresh_loop._mlb_board_missing_game_pks("2026-08-02", {"100", "200", "300"})
+        self.assertEqual(result, ["200", "300"])
+
+    def test_mlb_board_missing_game_pks_empty_when_board_covers_full_slate(self) -> None:
+        summary = {
+            "date": "2026-08-02",
+            "outputs": [
+                {
+                    "game_pk": pk,
+                    "away": "A",
+                    "home": "B",
+                    "starter_names": {"away": "A SP", "home": "B SP"},
+                    "full": {"home_win_prob": 0.55, "away_win_prob": 0.45},
+                }
+                for pk in (100, 200)
+            ],
+        }
+        with patch.object(live_refresh_loop, "read_json_file", return_value=summary):
+            result = live_refresh_loop._mlb_board_missing_game_pks("2026-08-02", {"100", "200"})
+        self.assertEqual(result, [])
+
+    def test_mlb_board_missing_game_pks_empty_when_no_known_pks(self) -> None:
+        result = live_refresh_loop._mlb_board_missing_game_pks("2026-08-02", set())
+        self.assertEqual(result, [])
+
+    def test_mlb_board_missing_game_pks_swallows_exceptions(self) -> None:
+        # Defensive, same contract as the other additive triggers: a missing
+        # artifact or bad data shape must never propagate and break the
+        # existing fingerprint-based mechanism.
+        with patch.object(live_refresh_loop, "read_json_file", side_effect=RuntimeError("boom")):
+            result = live_refresh_loop._mlb_board_missing_game_pks("2026-08-02", {"100"})
         self.assertEqual(result, [])
 
     def test_mlb_daily_sim_decision_props_now_available_forces_full_slate_when_no_other_trigger(self) -> None:
