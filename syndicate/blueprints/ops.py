@@ -373,6 +373,40 @@ def api_ops_bootstrap_run() -> Any:
         return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
 
 
+@ops_bp.get("/api/ops/ncaaf/season-weeks")
+def api_ops_ncaaf_season_weeks() -> Any:
+    # Live diagnostic for exactly the class of bug hit 2026-08-02: real
+    # smartsim2_projections_*.csv files confirmed present on disk (via the
+    # bootstrap-run endpoint's own file counters) yet /ncaaf/api/cards kept
+    # resolving to the old historical fallback. Surfaces every real value
+    # the resolution chain depends on directly, so "which specific link is
+    # wrong" is answerable from one request instead of another guess-and-
+    # redeploy cycle.
+    from syndicate.features.ncaaf.cards import _engine_seasons_and_weeks
+    from syndicate.features.ncaaf.cards import _resolve_ncaaf_active_season_and_weeks
+    from syndicate.features.ncaaf.cards import _smartsim2_standalone_seasons_and_weeks
+    from syndicate.features.ncaaf.sources import default_ncaaf_source_root
+
+    root = default_ncaaf_source_root()
+    data_dir = root / "data"
+    glob_matches = sorted(str(path) for path in data_dir.glob("smartsim2_projections_*_wk*.csv")) if data_dir.exists() else []
+    active_season, active_weeks = _resolve_ncaaf_active_season_and_weeks()
+    return jsonify(
+        {
+            "ok": True,
+            "default_ncaaf_source_root": str(root),
+            "data_dir": str(data_dir),
+            "data_dir_exists": data_dir.exists(),
+            "smartsim2_glob_match_count": len(glob_matches),
+            "smartsim2_glob_matches_sample": glob_matches[:5],
+            "smartsim2_standalone_seasons_and_weeks": _smartsim2_standalone_seasons_and_weeks(),
+            "engine_seasons_and_weeks": _engine_seasons_and_weeks(),
+            "resolved_active_season": active_season,
+            "resolved_active_weeks": active_weeks,
+        }
+    )
+
+
 @ops_bp.post("/api/ops/artifacts/publish")
 def api_ops_artifacts_publish() -> Any:
     payload = _request_data()
