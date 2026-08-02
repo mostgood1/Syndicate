@@ -3823,6 +3823,72 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(filled, 0)
         self.assertEqual(candidate.get("projected"), "-")
 
+    def test_mlb_backfill_also_fills_blank_team_for_the_same_mystery_candidate_class(self) -> None:
+        # 2026-08-01 board audit follow-up: the same mystery-origin
+        # candidate class the "projected" backfill above already handles
+        # (confirmed live: "Rhys Hoskins"/pick "UNDER Rhys Hoskins") ALSO
+        # had a blank "team" despite a real one ("CLE") sitting right there
+        # in its daily_top_props row. Must backfill both fields in one pass
+        # -- a candidate with real "projected" already but blank "team"
+        # must still get team filled (the old code bailed out as soon as
+        # "projected" alone was non-blank).
+        from syndicate.features.intelligence import _mlb_backfill_missing_projected_from_top_props
+
+        candidate = {
+            "candidate_type": "prop",
+            "sport_slug": "mlb",
+            "player_name": "Rhys Hoskins",
+            "pick": "UNDER Rhys Hoskins",
+            "market": "Hitter Total Bases",
+            "market_key": "total_bases",
+            "market_focuses": ["total_bases"],
+            "game_pk": 824405,
+            "projected": "1.2",
+            "team": "-",
+        }
+        pregame_rows = [
+            {"ownerName": "Rhys Hoskins", "stat": "total_bases", "team": "CLE", "mean": 1.205, "gamePk": 824405}
+        ]
+        with patch(
+            "syndicate.features.intelligence._mlb_top_props_rows_from_artifact",
+            return_value=pregame_rows,
+        ):
+            filled = _mlb_backfill_missing_projected_from_top_props(
+                {"slug": "mlb", "context_label": "2026-08-01"}, [candidate]
+            )
+
+        self.assertEqual(filled, 1)
+        self.assertEqual(candidate.get("team"), "CLE")
+        self.assertEqual(candidate.get("projected"), "1.2")
+
+    def test_mlb_backfill_team_never_overwrites_a_real_value(self) -> None:
+        from syndicate.features.intelligence import _mlb_backfill_missing_projected_from_top_props
+
+        candidate = {
+            "candidate_type": "prop",
+            "sport_slug": "mlb",
+            "player_name": "Rhys Hoskins",
+            "market": "Hitter Total Bases",
+            "market_key": "total_bases",
+            "market_focuses": ["total_bases"],
+            "game_pk": 824405,
+            "projected": "1.2",
+            "team": "PHI",
+        }
+        pregame_rows = [
+            {"ownerName": "Rhys Hoskins", "stat": "total_bases", "team": "CLE", "mean": 1.205, "gamePk": 824405}
+        ]
+        with patch(
+            "syndicate.features.intelligence._mlb_top_props_rows_from_artifact",
+            return_value=pregame_rows,
+        ):
+            filled = _mlb_backfill_missing_projected_from_top_props(
+                {"slug": "mlb", "context_label": "2026-08-01"}, [candidate]
+            )
+
+        self.assertEqual(filled, 0)
+        self.assertEqual(candidate.get("team"), "PHI")
+
     def test_mlb_live_lens_prop_candidates_projected_stays_dash_without_a_pregame_match(self) -> None:
         # No matching daily_top_props row -- must NOT fabricate a pregame
         # value from the live one; "-" is the honest answer.

@@ -5101,10 +5101,33 @@ def _mlb_pregame_mean_by_player_market(selected_date: str) -> dict[tuple[str, st
     return lookup
 
 
+def _mlb_team_by_player_market(selected_date: str) -> dict[tuple[str, str, int | None], str]:
+    """Same shape/source as _mlb_pregame_mean_by_player_market, for "team"
+    instead of "mean" -- backs _mlb_backfill_missing_projected_from_top_
+    props' team backfill for the same mystery-origin candidate class
+    (confirmed live: "Rhys Hoskins"/pick "UNDER Rhys Hoskins", real team
+    "CLE" sitting right there in its daily_top_props row, structured "team"
+    field on the candidate still blank)."""
+    lookup: dict[tuple[str, str, int | None], str] = {}
+    for row in _mlb_top_props_rows_from_artifact(selected_date):
+        player_name = _safe_text(row.get("ownerName") or row.get("playerName"), "")
+        if not player_name:
+            continue
+        market_key = _market_key_from_text(row.get("stat") or row.get("statLabel"), allow_fallback=True)
+        if not market_key:
+            continue
+        team_value = _safe_text(row.get("team"), "")
+        if not team_value:
+            continue
+        game_pk = _safe_int(row.get("gamePk") or row.get("game_pk"))
+        lookup[(_normalized_market_text(player_name), market_key, game_pk)] = team_value
+    return lookup
+
+
 def _mlb_backfill_missing_projected_from_top_props(sport: dict[str, Any], candidates: list[dict[str, Any]]) -> int:
-    """Blank-only "projected" backfill for any MLB prop candidate, applied
-    in place to the sport's slice of the pool -- regardless of which
-    builder produced the candidate.
+    """Blank-only "projected"/"team" backfill for any MLB prop candidate,
+    applied in place to the sport's slice of the pool -- regardless of
+    which builder produced the candidate.
 
     2026-08-02 board audit follow-up: found a class of MLB prop candidate
     (confirmed live: "Miguel Rojas"/pick "OVER Miguel Rojas", narrative
@@ -5120,6 +5143,12 @@ def _mlb_backfill_missing_projected_from_top_props(sport: dict[str, Any], candid
     already relies on rather than risk changing whichever function builds
     these rows -- returns how many candidates were filled, purely for the
     caller's own stage logging.
+
+    2026-08-01 board audit follow-up (same mystery-origin class): "team"
+    was ALSO blank on these ("Rhys Hoskins"/pick "UNDER Rhys Hoskins", real
+    team "CLE" sitting right there in its daily_top_props row), so this now
+    backfills both fields independently per candidate in one pass rather
+    than bailing out as soon as "projected" alone is already filled.
     """
     if _safe_text(sport.get("slug"), "").lower() != "mlb":
         return 0
@@ -5127,7 +5156,8 @@ def _mlb_backfill_missing_projected_from_top_props(sport: dict[str, Any], candid
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", selected_date):
         return 0
     pregame_means = _mlb_pregame_mean_by_player_market(selected_date)
-    if not pregame_means:
+    teams_by_market = _mlb_team_by_player_market(selected_date)
+    if not pregame_means and not teams_by_market:
         return 0
     # Steam candidates confirmed live with game_pk=None (a real lifecycle
     # event whose game_id never resolved -- _steam_candidates_for_sport's
@@ -5145,6 +5175,13 @@ def _mlb_backfill_missing_projected_from_top_props(sport: dict[str, Any], candid
             means_by_subject_market[pair] = mean_val
         elif means_by_subject_market[pair] != mean_val:
             means_by_subject_market[pair] = None
+    teams_by_subject_market: dict[tuple[str, str], str | None] = {}
+    for (subject_key, market_key_val, _game_pk), team_val in teams_by_market.items():
+        pair = (subject_key, market_key_val)
+        if pair not in teams_by_subject_market:
+            teams_by_subject_market[pair] = team_val
+        elif teams_by_subject_market[pair] != team_val:
+            teams_by_subject_market[pair] = None
     filled = 0
     for candidate in candidates:
         # 2026-08-01 board audit: this backfill only ever ran for
@@ -5162,7 +5199,9 @@ def _mlb_backfill_missing_projected_from_top_props(sport: dict[str, Any], candid
         # do, so the same pregame_means lookup resolves for them too.
         if _safe_text(candidate.get("candidate_type"), "").lower() not in ("prop", "steam"):
             continue
-        if _numeric_hint(candidate.get("projected")) is not None:
+        needs_projected = _numeric_hint(candidate.get("projected")) is None
+        needs_team = _safe_text(candidate.get("team"), "").strip() in ("", "-", "—")
+        if not needs_projected and not needs_team:
             continue
         # Prefer player_name directly, same corruption guard
         # _prop_merge_dedup_key uses: a real player name is never itself
@@ -5175,17 +5214,57 @@ def _mlb_backfill_missing_projected_from_top_props(sport: dict[str, Any], candid
         if player_name_text and any(f" {marker} " in f" {player_name_text} " for marker in ("over", "under")):
             player_name_text = ""
         subject = player_name_text or _normalized_market_text(_safe_text(_candidate_subject_key(candidate), ""))
-        market_key = _candidate_market_key(candidate)
-        if not subject or not market_key:
+        if not subject:
+            continue
+        # _candidate_market_key alone picks ONE focus (sorted first) out of
+        # potentially several -- confirmed live: a real "Hitter Total Bases"
+        # candidate's market_focuses held both "total" and "total_bases",
+        # and alphabetical sort picked the too-generic "total" (never a key
+        # in this artifact-sourced lookup, which always uses the specific
+        # stat name), silently failing this whole backfill for the market
+        # that most needs it. Try every focus, primary key first, so a
+        # generic collision no longer blocks the specific match sitting
+        # right behind it.
+        market_key_candidates = [key for key in ([_candidate_market_key(candidate)] + sorted(_candidate_market_focuses(candidate))) if key]
+        seen_keys: set[str] = set()
+        ordered_market_keys = []
+        for key in market_key_candidates:
+            if key not in seen_keys:
+                seen_keys.add(key)
+                ordered_market_keys.append(key)
+        if not ordered_market_keys:
             continue
         game_pk = _safe_int(candidate.get("game_pk") or candidate.get("gamePk"))
-        mean_value = pregame_means.get((subject, market_key, game_pk))
-        if mean_value is None:
-            mean_value = means_by_subject_market.get((subject, market_key))
-        if mean_value is None:
-            continue
-        candidate["projected"] = f"{mean_value:.1f}"
-        filled += 1
+        resolved_any = False
+        if needs_projected:
+            mean_value = None
+            for market_key in ordered_market_keys:
+                mean_value = pregame_means.get((subject, market_key, game_pk))
+                if mean_value is None:
+                    mean_value = means_by_subject_market.get((subject, market_key))
+                if mean_value is not None:
+                    break
+            if mean_value is not None:
+                candidate["projected"] = f"{mean_value:.1f}"
+                resolved_any = True
+        if needs_team:
+            # 2026-08-01 board audit follow-up: same mystery-origin
+            # candidate class as the projected fix above (confirmed live:
+            # "Rhys Hoskins"/pick "UNDER Rhys Hoskins", real team "CLE"
+            # sitting right there in its daily_top_props row, structured
+            # "team" field on the candidate still blank).
+            team_value = None
+            for market_key in ordered_market_keys:
+                team_value = teams_by_market.get((subject, market_key, game_pk))
+                if team_value is None:
+                    team_value = teams_by_subject_market.get((subject, market_key))
+                if team_value is not None:
+                    break
+            if team_value is not None:
+                candidate["team"] = team_value
+                resolved_any = True
+        if resolved_any:
+            filled += 1
     return filled
 
 
