@@ -83,7 +83,20 @@ def _card_from_pick(game: dict[str, Any], pick: dict[str, Any]) -> dict[str, Any
     }
 
 
-def _cards_from_summary(summary: dict[str, Any], *, limit: int = 12) -> list[dict[str, Any]]:
+def _cards_from_summary(summary: dict[str, Any], *, limit: int = 60) -> list[dict[str, Any]]:
+    # limit was 12 -- a global cap across ALL of today's games, applied
+    # before the caller (home.py's _pregame_prop_rows_from_betting_card)
+    # filters out game-level ATS/Total/Moneyline picks via
+    # _is_game_level_rank_card_market. per_game picks mix game-level and
+    # player-prop markets in whatever order the recommendations_slate
+    # artifact wrote them, so on a multi-game slate the cap could be
+    # exhausted by early games before later games' real player props were
+    # ever appended -- confirmed live 2026-08-02: a 4-game/20-pick WNBA
+    # slate produced zero player-prop candidates on the cross-sport board
+    # (only 3 game-level candidates from an unrelated path), despite real
+    # prop data existing in the artifact for every game. 60 comfortably
+    # covers a full WNBA slate (never more than a handful of games/day at
+    # ~5 picks/game) with no realistic risk of hitting the cap again.
     per_game = summary.get("per_game") if isinstance(summary.get("per_game"), list) else []
     cards: list[dict[str, Any]] = []
     for game in per_game:

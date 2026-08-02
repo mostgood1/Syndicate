@@ -4503,16 +4503,42 @@ def _prop_rows_from_nba_live_lens(
     return rows
 
 
+def _opponent_abbr_by_team(home_games: list[dict[str, Any]] | None) -> dict[str, str]:
+    # The props_recommendations CSV has no opponent column at all (confirmed
+    # live 2026-08-02: its header is player/team/plays/ladders/.../top_play*,
+    # no "opponent"/"opp" field on any row or inside the parsed top_play
+    # dict) -- so _prop_rows_from_props_recommendations_csv's rows could
+    # never populate "home_label", which _backfill_prop_row_game_id requires
+    # alongside "away_label" to stamp a real game_id/event_id onto a CSV
+    # row. Derive it the same way home_games itself is already keyed
+    # (away_tri/home_tri or away.abbr/home.abbr) rather than trusting a
+    # column that doesn't exist in this artifact.
+    mapping: dict[str, str] = {}
+    for game in home_games or []:
+        if not isinstance(game, dict):
+            continue
+        away = game.get("away") if isinstance(game.get("away"), dict) else {}
+        home = game.get("home") if isinstance(game.get("home"), dict) else {}
+        away_abbr = _safe_text(game.get("away_tri") or away.get("abbr"), "").upper()
+        home_abbr = _safe_text(game.get("home_tri") or home.get("abbr"), "").upper()
+        if away_abbr and home_abbr:
+            mapping[away_abbr] = home_abbr
+            mapping[home_abbr] = away_abbr
+    return mapping
+
+
 def _prop_rows_from_props_recommendations_csv(
     slug: str,
     *,
     context_label: str,
     fallback_href: str | None = None,
     limit: int = 18,
+    home_games: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     sport_slug = str(slug or "").strip().lower()
     if sport_slug not in {"nba", "wnba"}:
         return []
+    opponent_by_team = _opponent_abbr_by_team(home_games)
 
     try:
         if sport_slug == "nba":
@@ -4553,11 +4579,13 @@ def _prop_rows_from_props_recommendations_csv(
                 summary = _safe_text(raw.get("top_play_explain") or raw.get("top_play_baseline"), "Top prop recommendation")
                 ev_pct = _numeric_value(top_play.get("ev_pct"))
                 edge_text = _pct_text(top_play.get("ev") if top_play.get("ev") is not None else top_play.get("edge"))
+                opponent_abbr = opponent_by_team.get(team.upper(), "")
                 rows.append(
                     {
                         "team": team,
-                        "opponent": _safe_text(raw.get("opponent") or raw.get("opp"), ""),
+                        "opponent": _safe_text(raw.get("opponent") or raw.get("opp"), "") or opponent_abbr,
                         "away_label": team,
+                        "home_label": opponent_abbr,
                         "matchup": _safe_text(raw.get("matchup") or team, team),
                         "heading": "Props",
                         "name": f"{player} ({team})",
@@ -4814,9 +4842,11 @@ class _NBADataProvider(_HomeSportDataProviderBase):
         nba_rows = _pregame_prop_rows_from_betting_card("nba", context_label=context.context_label, season=context.season, week=context.week)
         if nba_rows:
             return nba_rows
-        csv_rows = _prop_rows_from_props_recommendations_csv("nba", context_label=context.context_label, fallback_href=f"/nba/cards?date={context.context_label}")
+        csv_rows = _prop_rows_from_props_recommendations_csv(
+            "nba", context_label=context.context_label, fallback_href=f"/nba/cards?date={context.context_label}", home_games=home_games
+        )
         if csv_rows:
-            return csv_rows
+            return _backfill_prop_row_game_id(csv_rows, home_games)
         return _compact_prop_rows(home_games)
 
     def live_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
@@ -4878,7 +4908,9 @@ class _WNBADataProvider(_HomeSportDataProviderBase):
         wnba_rows = _pregame_prop_rows_from_betting_card("wnba", context_label=context.context_label, season=context.season, week=context.week)
         if wnba_rows:
             return _backfill_prop_row_game_id(wnba_rows, home_games)
-        csv_rows = _prop_rows_from_props_recommendations_csv("wnba", context_label=context.context_label, fallback_href=f"/wnba/cards?date={context.context_label}")
+        csv_rows = _prop_rows_from_props_recommendations_csv(
+            "wnba", context_label=context.context_label, fallback_href=f"/wnba/cards?date={context.context_label}", home_games=home_games
+        )
         if csv_rows:
             return _backfill_prop_row_game_id(csv_rows, home_games)
         return _compact_prop_rows(home_games)

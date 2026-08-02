@@ -575,6 +575,14 @@ class HomePageCommandCenterTests(unittest.TestCase):
         self.assertEqual(rows[0]["team"], "LAS")
         self.assertEqual(rows[0]["market"], "AST")
         self.assertFalse(rows[0]["is_live"])
+        # The props_recommendations CSV has no opponent column at all, so this
+        # row's game_id backfill depends entirely on _opponent_abbr_by_team
+        # deriving "home_label" from home_games -- previously never asserted
+        # (game_id/gamePk/event_id were never checked here), and previously
+        # never worked at all (home_label was never set, so
+        # _backfill_prop_row_game_id's away|home lookup key always missed).
+        self.assertEqual(rows[0]["gamePk"], "42")
+        self.assertEqual(rows[0]["event_id"], "42")
 
     def test_live_rows_require_live_odds_backing(self) -> None:
         game = {
