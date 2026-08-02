@@ -2813,6 +2813,64 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
 
         _dt.datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
 
+    def test_build_source_live_lines_payload_forwards_real_status_fields(self) -> None:
+        # Root-caused live 2026-08-02 (POR@LA): the served /wnba/api/
+        # live_lines row showed status="Scheduled", detail="Scheduled",
+        # period=null, clock="" for a game confirmed in_progress=true with
+        # correct, real period_totals -- because this function's constructed
+        # game dict never carried status/detail/period/clock at all, only
+        # in_progress. cards.py's _status_fields_from_value falls back to a
+        # hardcoded "Scheduled" default whenever status/detail text is
+        # empty, regardless of the in_progress flag it's given. state_payload
+        # (this function's own parameter) already has the correct,
+        # live_state-derived values for the exact same game -- they just
+        # weren't being forwarded.
+        module = self._load_module()
+
+        class _FakeSourceApp:
+            @staticmethod
+            def _live_oddsapi_period_totals_for_game(date_str, home_tri, away_tri):
+                return {"period_totals": {"q3": 47.5}, "period_spreads": {"q3": -0.5}}
+
+        state_payload = {
+            "ok": True,
+            "games": [
+                {
+                    "event_id": "401857108",
+                    "home": "LAS",
+                    "away": "POR",
+                    "in_progress": True,
+                    "final": False,
+                    "status": "8:32 - 3rd",
+                    "detail": "8:32 - 3rd",
+                    "period": 3,
+                    "clock": "8:32",
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            (source_root / "data" / "processed").mkdir(parents=True, exist_ok=True)
+            processed_root.mkdir(parents=True, exist_ok=True)
+
+            with patch.object(module, "_load_source_app", return_value=_FakeSourceApp()):
+                payload = module._build_source_live_lines_payload(
+                    source_root=source_root,
+                    processed_root=processed_root,
+                    date_str="2026-08-02",
+                    state_payload=state_payload,
+                )
+
+        game = (payload.get("games") or [{}])[0]
+        self.assertEqual(game.get("status"), "8:32 - 3rd")
+        self.assertEqual(game.get("detail"), "8:32 - 3rd")
+        self.assertEqual(game.get("period"), 3)
+        self.assertEqual(game.get("clock"), "8:32")
+        self.assertIs(game.get("final"), False)
+
     def test_export_live_snapshot_artifacts_skips_empty_shells_without_replacement(self) -> None:
         module = self._load_module()
 

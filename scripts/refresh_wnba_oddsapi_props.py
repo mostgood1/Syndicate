@@ -498,6 +498,21 @@ def _build_source_live_lines_payload(
                 "home": home_tri,
                 "away": away_tri,
                 "in_progress": bool(game.get("in_progress")),
+                # Root-caused live 2026-08-02 (POR@LA): this dict never
+                # carried status/detail/period/clock at all, so cards.py's
+                # _status_fields_from_value (fed None/None for status/
+                # detail) fell back to its hardcoded "Scheduled" default --
+                # completely ignoring the correct in_progress=True already
+                # set above. state_payload's own game record (this `game`
+                # variable) already has the real, live_state-derived values
+                # confirmed matching ESPN exactly; forward them instead of
+                # leaving the served live_lines row stuck showing
+                # "Scheduled" for a genuinely in-progress game.
+                "status": game.get("status"),
+                "detail": game.get("detail"),
+                "period": game.get("period"),
+                "clock": game.get("clock"),
+                "final": bool(game.get("final")),
                 "source": {
                     "scoreboard": "live_state_snapshot",
                     "game_lines": "processed_game_odds" if any(_float_or_none(merged_lines.get(key)) is not None for key in ("total", "home_spread", "away_spread", "home_ml", "away_ml")) else None,
