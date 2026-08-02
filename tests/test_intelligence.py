@@ -1184,6 +1184,23 @@ class IntelligenceBlueprintTests(unittest.TestCase):
 
         self.assertEqual(preferences.get("requested_markets"), ["threes"])
 
+    def test_market_key_from_text_agrees_across_hits_runs_rbis_label_variants(self) -> None:
+        # Every real-world spelling of this composite stat across MLB's
+        # candidate builders must resolve to the SAME key -- daily_top_props'
+        # stat key ("hits_runs_rbis"), its own statLabel ("Hits + Runs +
+        # RBIs"), and live-lens's abbreviated vendor-sim label ("Hitter
+        # H+R+R"). Before this stat had its own _MARKET_FOCUS_ALIASES entry,
+        # the first two false-matched the plain "hits" alias while the third
+        # fell through to a different fallback key entirely.
+        from syndicate.features.intelligence import _market_key_from_text
+
+        variants = ("hits_runs_rbis", "Hits + Runs + RBIs", "Hitter H+R+R", "Hitter H+r+r", "H+R+R")
+        keys = {_market_key_from_text(text, allow_fallback=True) for text in variants}
+        self.assertEqual(keys, {"hits_runs_rbis"})
+        # And the plain single-stat "Hits" market must be unaffected.
+        self.assertEqual(_market_key_from_text("Hits", allow_fallback=True), "hits")
+        self.assertEqual(_market_key_from_text("hits", allow_fallback=True), "hits")
+
     def test_query_preferences_infers_baseball_market_focus(self) -> None:
         preferences = _query_preferences("Who are the top 3 strikeout targets for today?")
 
@@ -3578,6 +3595,65 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(candidate.get("projected"), "4.6")
         self.assertEqual(candidate.get("live_projection"), "3.9")
         self.assertNotEqual(candidate.get("projected"), candidate.get("live_projection"))
+
+    def test_mlb_live_lens_hits_runs_rbis_join_survives_label_variant_mismatch(self) -> None:
+        # 2026-08-01 board audit follow-up: daily_top_props stamps this
+        # composite stat's key as "hits_runs_rbis" (row.get("stat")), while
+        # live-lens's own trackedProps rows carry the vendor sim's display
+        # label "Hitter H+R+R" as marketLabel -- before this stat had its
+        # own _MARKET_FOCUS_ALIASES entry, "hits_runs_rbis" false-matched
+        # the plain "hits" alias (both texts contain the word "hits") while
+        # "Hitter H+R+R" fell through to a different fallback key
+        # ("h_r_r") -- two different builders, two different keys, so
+        # _mlb_pregame_mean_by_player_market's cross-builder lookup always
+        # missed and this market's live candidates stayed permanently blank
+        # in "projected" even with a real daily_top_props mean available.
+        from syndicate.features.intelligence import _mlb_live_lens_prop_candidates_from_artifact
+
+        live_lens_payload = {
+            "games": [
+                {
+                    "gamePk": 824162,
+                    "status": {"abstract": "Live", "detailed": "In Progress"},
+                    "matchup": {"away": {"abbr": "TEX"}, "home": {"abbr": "HOU"}},
+                    "trackedProps": [
+                        {
+                            "playerName": "Isaac Paredes",
+                            "market": "hitter_hits_runs_rbis",
+                            "marketLabel": "Hitter H+R+R",
+                            "selection": "Over",
+                            "line": 1.5,
+                            "odds": "+100",
+                            "estimatedWinProb": 0.52,
+                            "liveProjection": 2.0,
+                            "actual": 1.0,
+                        }
+                    ],
+                }
+            ]
+        }
+        pregame_rows = [
+            {
+                "ownerName": "Isaac Paredes",
+                "stat": "hits_runs_rbis",
+                "statLabel": "Hits + Runs + RBIs",
+                "mean": 1.912,
+                "gamePk": 824162,
+            }
+        ]
+        with patch(
+            "syndicate.features.intelligence._mlb_live_lens_report_cached",
+            return_value=live_lens_payload,
+        ), patch(
+            "syndicate.features.intelligence._mlb_top_props_rows_from_artifact",
+            return_value=pregame_rows,
+        ):
+            candidates = _mlb_live_lens_prop_candidates_from_artifact({"slug": "mlb", "name": "MLB", "context_label": "2026-07-28"})
+
+        self.assertEqual(len(candidates), 1, candidates)
+        candidate = candidates[0]
+        self.assertEqual(candidate.get("projected"), "1.9")
+        self.assertEqual(candidate.get("live_projection"), "2.0")
 
     def test_mlb_live_lens_prop_candidates_projected_stays_dash_without_a_pregame_match(self) -> None:
         # No matching daily_top_props row -- must NOT fabricate a pregame

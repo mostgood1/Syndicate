@@ -381,6 +381,20 @@ _MARKET_FOCUS_ALIASES: dict[str, tuple[str, ...]] = {
     "shots": ("shots", "shots on goal", "sog"),
     "saves": ("saves", "save"),
     "goals": ("goals", "goal"),
+    # Must precede "hits" below -- checked in insertion order, first match
+    # wins, and every label variant of this stat ("Hitter H+R+R" from the
+    # vendor sim spec's label, "Hits + Runs + RBIs" from daily_top_props'
+    # statLabel, "hits_runs_rbis" from its stat key) contains the word
+    # "hits", so without its own entry ahead of "hits" this composite stat
+    # always misclassified as the plain single-stat Hits market. Confirmed
+    # live 2026-08-01: daily_top_props candidates for this market resolved
+    # market_key "hits" while live-lens's "Hitter H+R+R" rows independently
+    # fell back to a THIRD, different key ("h_r_r") -- the two builders
+    # never agreed on one key, so _mlb_pregame_mean_by_player_market's
+    # cross-builder lookup always missed, leaving Layer 2's live-lens H+R+R
+    # candidates permanently blank in "projected" even when daily_top_props
+    # had a real mean for the same player+stat+game.
+    "hits_runs_rbis": ("hits runs rbis", "hits+runs+rbis", "h+r+r", "hrr"),
     "hits": ("hits", "hit"),
     "rbi": ("rbi", "runs batted in"),
     "touchdowns": ("touchdowns", "touchdown", "td"),
@@ -406,6 +420,7 @@ _MARKET_FOCUS_LABELS = {
     "shots": "Shots",
     "saves": "Saves",
     "goals": "Goals",
+    "hits_runs_rbis": "Hits+Runs+RBIs",
     "hits": "Hits",
     "rbi": "RBI",
     "touchdowns": "Touchdowns",
