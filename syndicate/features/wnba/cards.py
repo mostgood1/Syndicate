@@ -230,6 +230,21 @@ def _maybe_persist_current_day_live_snapshot_artifact(kind: str, selected_date: 
         return payload
     if str(selected_date or "").strip() != central_today_iso():
         return payload
+    if _render_web_dyno():
+        # Root-caused live 2026-08-02 (MIN@IND): this had no web/worker gate,
+        # so EVERY web request for today's live_lines/live_state/etc. wrote
+        # its own read-time "merged_payload" back into the same cross-service
+        # keyvalue key the worker (refresh_wnba_oddsapi_props.py) writes real
+        # period_totals/period_spreads into. Whenever a web request's own
+        # read fell through to a weaker fallback (no period data, no real
+        # source generated_at), that fallback still got its own fresh "now"
+        # timestamp -- which then LOOKS freshest to the read-side's
+        # freshness-across-roots comparison, silently outranking and masking
+        # the worker's genuinely richer write on every subsequent read. Web
+        # must only ever read this artifact, never write it back -- matches
+        # this repo's standing web/worker split (see CLAUDE.md): all writes
+        # belong to the worker/offline side.
+        return payload
     path = _live_snapshot_artifact_path(kind, selected_date)
     try:
         if path.exists() and path.is_file() and path.stat().st_size > 0:

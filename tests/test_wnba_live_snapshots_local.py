@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from syndicate.features.wnba.cards import _local_live_snapshot_payload
 from syndicate.features.wnba.cards import _local_live_state_payload
+from syndicate.features.wnba.cards import _maybe_persist_current_day_live_snapshot_artifact
 from syndicate.features.wnba.cards import _merge_live_lines_game
 from syndicate.features.wnba.cards import _props_index_from_recommendations_rows
 from syndicate.features.wnba.cards import build_live_lines_payload
@@ -726,6 +727,38 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual((first or {}).get("generated_at"), "2026-05-21T19:10:51+00:00")
         self.assertEqual((second or {}).get("generated_at"), "2026-05-21T19:24:03+00:00")
         self.assertEqual(((second.get("games") or [{}])[0].get("lines") or {}).get("period_totals", {}).get("q1"), 69.0)
+
+    def test_maybe_persist_current_day_live_snapshot_artifact_never_writes_from_the_web_dyno(self) -> None:
+        # Root-caused live 2026-08-02 (MIN@IND): this had no web/worker gate,
+        # so every web request for today's live_lines/etc. wrote its own
+        # read-time payload back into the same cross-service keyvalue key
+        # the worker writes real period data into. A weak fallback read (no
+        # period data) still gets its own fresh "now" timestamp, which then
+        # outranks the worker's genuinely richer-but-older write in the
+        # freshness-across-roots comparison on every later read -- silently
+        # masking good data with a self-inflicted write-back. Web must only
+        # ever read this artifact.
+        payload = {"ok": True, "date": central_today_iso(), "games": [{"event_id": "evt-1"}]}
+        with patch("syndicate.features.wnba.cards._render_web_dyno", return_value=True), patch(
+            "syndicate.features.wnba.cards._write_jsonl_snapshot_payload"
+        ) as mock_write:
+            result = _maybe_persist_current_day_live_snapshot_artifact("live_lines", central_today_iso(), payload)
+
+        mock_write.assert_not_called()
+        self.assertIs(result, payload)
+
+    def test_maybe_persist_current_day_live_snapshot_artifact_still_writes_off_the_web_dyno(self) -> None:
+        payload = {"ok": True, "date": central_today_iso(), "games": [{"event_id": "evt-1"}]}
+        with patch("syndicate.features.wnba.cards._render_web_dyno", return_value=False), patch(
+            "syndicate.features.wnba.cards._live_snapshot_artifact_path",
+            return_value=Path("does") / "not" / "exist.jsonl",
+        ), patch("syndicate.features.wnba.cards._write_jsonl_snapshot_payload", return_value=True) as mock_write, patch(
+            "syndicate.features.wnba.cards._local_live_snapshot_payload"
+        ), patch("syndicate.features.wnba.cards._local_live_state_payload"):
+            result = _maybe_persist_current_day_live_snapshot_artifact("live_lines", central_today_iso(), payload)
+
+        mock_write.assert_called_once()
+        self.assertIs(result, payload)
 
     def test_live_state_payload_falls_back_to_cards_context(self) -> None:
         with patch(
