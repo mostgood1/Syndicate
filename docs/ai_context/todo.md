@@ -7579,12 +7579,27 @@ were resolved and nine already-closed rows removed from the open tables.
      (`dep-d9nqk1p42hec73868dqg` / `dep-d9nqk1rm8hqs73etosn0`,
      `generated_at`-stamp fix) — all confirmed `status=live`.
 
-     **Not chased this session, deliberately deferred**: the served
-     payload's own `status`/`detail`/`period` fields showed "Scheduled"/
-     `null` for POR@LA even while `in_progress: true` and `lines` were
-     correct — a secondary, cosmetic display-field staleness distinct
-     from the period-markets question this investigation was actually
-     about; flag for a future pass if it recurs. Also flagged (not
+     **Follow-up same session: the "Scheduled" display bug was fixed too**
+     (user asked directly: "fix the display bug"). Root cause:
+     `_build_source_live_lines_payload`'s constructed game entries carried
+     `in_progress` but never `status`/`detail`/`period`/`clock`/`final` at
+     all — so `_status_fields_from_value` (`wnba/cards.py:630`, given
+     `status_value=None, detail_value=None`) fell back to its hardcoded
+     `"Scheduled"` default, completely ignoring the correct `in_progress`
+     flag it was also given. `state_payload` (this function's own
+     parameter) already carries the real, `live_state`-derived values for
+     the same game — they just weren't being forwarded. **Fix**: copy
+     `status`/`detail`/`period`/`clock`/`final` from `state_payload`'s
+     game record into the constructed entry. Regression test added
+     (`test_build_source_live_lines_payload_forwards_real_status_fields`).
+     482 tests passing. Deployed to live-odds-worker + refresh-worker
+     (`dep-d9nrreu7bikc73chdst0` / `dep-d9nrrf7lk1mc738mt9bg`), confirmed
+     `status=live`. **Confirmed live**: both MIN@IND and POR@LA (now
+     final) correctly show `status: "Final"`, `detail: "Final"`,
+     `in_progress: false`, `final: true` in the served payload — the old
+     bug would have shown `"Scheduled"` regardless of actual game state.
+
+     **Not chased this session, deliberately deferred**: Also flagged (not
      investigated) via a spawned background task: NBA's sibling
      `_local_live_snapshot_payload_cached` in `syndicate/features/nba/
      cards.py` uses a plain `path.read_text()` (no keyvalue-aware read at
