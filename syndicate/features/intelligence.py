@@ -6074,7 +6074,20 @@ def _apply_live_state_context_to_candidates(
         sport_slug = _safe_text(candidate.get("sport_slug"), "").lower()
         if sport_slug != "mlb":
             continue
-        context_label = _safe_text(candidate.get("context_label"), "")
+        # 2026-08-01 board audit: a candidate with no context_label got
+        # silently skipped here entirely -- confirmed live, a genuinely
+        # stale MLB game-level moneyline candidate (real game ended hours
+        # earlier, but the row still claimed is_live=True with the
+        # game's last-known live score frozen in "actual") never got its
+        # live state re-checked against the real current game status
+        # because this exact field was null, even though game_date/
+        # source_board_date (which resolve this same game's real date
+        # just as well for this lookup) were both present on the same
+        # row. Falls back to either before giving up.
+        context_label = _safe_text(
+            candidate.get("context_label"),
+            _safe_text(candidate.get("game_date"), _safe_text(candidate.get("source_board_date"), "")),
+        )
         game_pk = _safe_int(candidate.get("game_pk"))
         if not context_label or game_pk is None:
             continue

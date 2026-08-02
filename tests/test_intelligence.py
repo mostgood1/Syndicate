@@ -7549,6 +7549,39 @@ class MlbLivePropProjectionHydrationTests(unittest.TestCase):
         self.assertEqual(candidate.get("live_projection"), "-")
         mocked_load.assert_not_called()
 
+    def test_apply_live_state_falls_back_to_game_date_when_context_label_is_missing(self) -> None:
+        # 2026-08-01 board audit: confirmed live -- a genuinely stale MLB
+        # game-level moneyline candidate (real game had ended hours
+        # earlier, but the row still claimed is_live=True with a frozen
+        # "3-3" score) never got re-checked against the real current game
+        # status, because context_label was null on this candidate class
+        # (game-level, not prop) and the loop skipped it entirely before
+        # even attempting a lookup -- despite game_date carrying the exact
+        # same real date this lookup needs. Must fall back rather than
+        # silently give up.
+        from syndicate.features.intelligence import _apply_live_state_context_to_candidates
+
+        candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "game",
+            "context_label": None,
+            "game_date": "2026-08-01",
+            "game_pk": 824893,
+            "is_live": True,
+            "game_state": "live",
+            "actual": "3-3",
+        }
+        final_payload = {"gameData": {"status": {"abstractGameState": "Final", "detailedState": "Final"}}}
+        with patch(
+            "syndicate.features.intelligence._mlb_actual_payload_for_candidate",
+            return_value=final_payload,
+        ) as mocked_lookup:
+            _apply_live_state_context_to_candidates([candidate])
+
+        mocked_lookup.assert_called_once_with("2026-08-01", 824893, {})
+        self.assertTrue(candidate.get("is_final"))
+        self.assertFalse(candidate.get("is_live"))
+
     def test_apply_live_state_leaves_placeholder_when_no_matching_row(self) -> None:
         from syndicate.features.intelligence import _apply_live_state_context_to_candidates
 
