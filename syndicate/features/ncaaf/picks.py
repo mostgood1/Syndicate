@@ -19,6 +19,7 @@ from syndicate.features.ncaaf.smartsim2_projection import SMARTSIM2_PUBLIC_LABEL
 from syndicate.features.ncaaf.smartsim2_trial_monitoring import record_trial_page_view
 
 from syndicate.features.ncaaf.cards import _engine_rows_for_season_week
+from syndicate.features.ncaaf.cards import _ncaaf_default_active_week
 from syndicate.features.ncaaf.cards import _prediction_source_path
 from syndicate.features.ncaaf.cards import _normalize_probability
 from syndicate.features.ncaaf.cards import _resolve_ncaaf_active_season_and_weeks
@@ -334,8 +335,9 @@ def build_smartsim_picks_page_context(selected_week: int) -> dict[str, Any]:
     season, active_weeks = _resolve_ncaaf_active_season_and_weeks()
     if not active_weeks:
         return build_picks_page_context(selected_week)
-    requested_week = int(selected_week or active_weeks[-1])
-    resolved_week = resolve_selected_value(requested_week, active_weeks, active_weeks[-1])
+    default_active_week = _ncaaf_default_active_week(season, active_weeks)
+    requested_week = int(selected_week or default_active_week)
+    resolved_week = resolve_selected_value(requested_week, active_weeks, default_active_week)
 
     # _prediction_weeks()/_runtime_prediction_rows() (used by the engine
     # path below) filter ONLY by week, never by season -- confirmed a real

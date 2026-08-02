@@ -19,6 +19,7 @@ from syndicate.features.ncaaf.sources import format_moneyline
 from syndicate.features.ncaaf.sources import format_num
 from syndicate.features.ncaaf.sources import format_pct
 from syndicate.features.ncaaf.sources import load_json
+from syndicate.features.ncaaf.sources import ncaaf_target_week
 from syndicate.features.ncaaf.sources import summary_path
 from syndicate.features.football.sim_engine.smartsim2.historical_truth.ncaaf_historical_loader import load_games_season
 from syndicate.features.ncaaf.smartsim2_blend import compute_blend
@@ -130,7 +131,6 @@ def _prediction_source_path() -> Path | None:
 _SMARTSIM2_PROJECTION_FILENAME_RE = re.compile(r"^smartsim2_projections_(\d{4})_wk(\d+)\.csv$")
 
 
-@lru_cache(maxsize=1)
 def _smartsim2_standalone_seasons_and_weeks() -> dict[int, list[int]]:
     """Every (season, week) with a real, already-generated SmartSim 2.0
     projection artifact on disk -- independent of whether the legacy engine
@@ -138,7 +138,17 @@ def _smartsim2_standalone_seasons_and_weeks() -> dict[int, list[int]]:
     is only ever refreshed for its own season (see the 2026 season bootstrap:
     NCAAFCompare, the engine's real source, was unavailable), so this is the
     only reliable signal for "is there real projection data for a season the
-    engine hasn't touched"."""
+    engine hasn't touched".
+
+    Deliberately NOT lru_cache'd (confirmed live 2026-08-02: a
+    maxsize=1-cached version returned an empty dict for the lifetime of a
+    worker process once it had computed that result before this session's
+    real 2026 files landed on Render's persistent disk via bootstrap --
+    the cache never re-observed the new files without a full worker
+    restart). New weeks get generated periodically by this session's own
+    autorun trigger, so this needs to see the real directory contents on
+    every call, same as syndicate.features.nfl.sources.week_summaries's
+    equivalent, uncached, glob."""
     data_root = default_ncaaf_source_root() / "data"
     if not data_root.exists():
         return {}
@@ -194,6 +204,22 @@ def _resolve_ncaaf_active_season_and_weeks() -> tuple[int, list[int]]:
     active_season = max(all_seasons)
     weeks = sorted(set(engine_seasons.get(active_season, [])) | set(smartsim2_seasons.get(active_season, [])))
     return active_season, weeks
+
+
+def _ncaaf_default_active_week(season: int, weeks: list[int]) -> int:
+    """Prefer the real calendar-driven target week (mirrors
+    syndicate.features.nfl.sources.default_week's own fix) over "last
+    available week" -- once a season's whole real schedule has generated
+    SmartSim 2.0 projections, "last available" degenerates to the season
+    finale even during the offseason/preseason. Falls back to "last
+    available" once every real game has a final score or the real season
+    isn't loaded yet."""
+    if not weeks:
+        return 1
+    target = ncaaf_target_week(season)
+    if target is not None and target in weeks:
+        return target
+    return weeks[-1]
 
 
 def _smartsim2_standalone_market_lines(season: int, week: int) -> dict[tuple[str, str], dict[str, float | None]]:
@@ -379,7 +405,7 @@ def build_ncaaf_market_board(week: int) -> dict[str, Any]:
     market_total on its own scoreboard.
     """
     season, weeks = _resolve_ncaaf_active_season_and_weeks()
-    resolved_week = resolve_selected_value(int(week or 0), weeks, weeks[-1] if weeks else default_week())
+    resolved_week = resolve_selected_value(int(week or 0), weeks, _ncaaf_default_active_week(season, weeks) if weeks else default_week())
     context = build_smartsim_cards_page_context(resolved_week)
     games = context.get("games") if isinstance(context.get("games"), list) else []
     lines_index = _smartsim2_standalone_market_lines(season, resolved_week)
@@ -1975,8 +2001,9 @@ def build_smartsim_cards_page_context(selected_week: int) -> dict[str, Any]:
     season, runtime_weeks = _resolve_ncaaf_active_season_and_weeks()
     if not runtime_weeks:
         return build_cards_page_context(selected_week)
-    requested_week = int(selected_week or runtime_weeks[-1])
-    resolved_week = resolve_selected_value(requested_week, runtime_weeks, runtime_weeks[-1])
+    default_active_week = _ncaaf_default_active_week(season, runtime_weeks)
+    requested_week = int(selected_week or default_active_week)
+    resolved_week = resolve_selected_value(requested_week, runtime_weeks, default_active_week)
 
     engine_rows = _engine_rows_for_season_week(season, resolved_week)
     if engine_rows:
