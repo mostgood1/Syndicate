@@ -7503,6 +7503,96 @@ were resolved and nine already-closed rows removed from the open tables.
      specifically (the unit test covers the mechanism; only a live game
      covers the real end-to-end path).
 
+     **2026-08-02 follow-up session: monitored MIN@IND (tip-off 17:00 UTC)
+     start to finish, found and fixed TWO more stacked bugs, then confirmed
+     the whole chain working end-to-end against a second live game
+     (POR@LA).** Every check made during MIN@IND's entire live window
+     showed `period_totals`/`period_spreads` empty in the served
+     `/wnba/api/live_lines` response, despite `/api/ops/wnba/live-lines-
+     export-diag`'s `source_payload_games` consistently showing real,
+     correctly-computed period data (q1-q4/h1/h2) every single cycle —
+     never once matching. Two separate root causes, both real, both fixed:
+
+     1. **`_local_live_snapshot_payload_cached`'s lru_cache was keyed off
+     `path.stat()`** (mtime_ns/size) — but this file is written
+     cross-service through the keyvalue store, so on the web dyno
+     `path.stat()` either raises (no local file) or sees one that never
+     changes, collapsing every call after the first successful fetch onto
+     the same cache key forever. Exactly the class of bug
+     `_game_cards_or_live_state_signature` already fixed once for
+     `game_cards.csv`/`live_state.jsonl` in this same file — never applied
+     here. **Fix**: reuse that same signature function (hash the keyvalue
+     content) instead of `path.stat()`. Regression test added.
+
+     2. **`_maybe_persist_current_day_live_snapshot_artifact` had no
+     web/worker gate**, so every web request for today's `live_lines`
+     wrote its own read-time payload back into the same cross-service
+     keyvalue key the worker writes real period data into. A weak
+     fallback read (no period data) still stamps its own fresh "now"
+     timestamp via `_attach_odds_refresh_timestamp`, which then outranks
+     the worker's genuinely richer-but-older write in the
+     freshness-across-roots comparison on every later read — silently
+     masking good data with a self-inflicted write-back, every time
+     *any* user or script hit the endpoint. **Fix**: gate the write on
+     `not _render_web_dyno()` — web must only ever read this artifact,
+     matching this repo's standing web/worker split (confirmed
+     `SYNDICATE_WEB_DYNO` is correctly set `true`/`false` per service in
+     `render.yaml`). Regression tests added (write skipped on web,
+     still happens off web).
+
+     **After deploying both fixes, a real live game (POR@LA, tips off
+     2026-08-02T19:30Z) STILL showed empty period markets throughout its
+     first ~40 minutes.** Added a new diagnostic endpoint
+     (`/api/ops/wnba/live-lines-raw`) that reads the raw stored
+     `live_lines_<date>.jsonl` content directly across every candidate
+     root, bypassing all of `build_live_lines_payload`'s merge logic —
+     revealed the real, final root cause: **the alt (non-default)
+     candidate root's stored payload — the one carrying genuinely correct,
+     rich period data — had `generated_at: None`.**
+     `_build_source_live_lines_payload` (`scripts/refresh_wnba_
+     oddsapi_props.py`, the function that calls the vendored OddsAPI
+     period-totals fetch directly) never stamped a `generated_at`/
+     `odds_refreshed_at` field on its own returned payload at all. Since
+     `_live_snapshot_payload_timestamp` requires a parseable timestamp to
+     ever prefer one candidate over another, this objectively richer
+     payload could **never** outrank a present-but-empty payload sitting
+     on the other root, no matter which was actually written more
+     recently — bug #2's self-write-back kept re-supplying that
+     always-timestamped-but-empty competitor on every request. **Fix**:
+     stamp `generated_at` with a real `datetime.now(timezone.utc)
+     .isoformat()` before returning. Regression test added
+     (`test_build_source_live_lines_payload_stamps_a_real_generated_at`).
+
+     **Confirmed working end-to-end for the first time this investigation
+     (2026-08-02, POR@LA, 3rd quarter):** both candidate roots' raw stored
+     payloads now agree exactly (`generated_at: "2026-08-02T15:49:06-05:00"`
+     on both), and the SERVED `/wnba/api/live_lines` response shows real,
+     populated period markets:
+     `period_totals: {"h1": 92.5, "h2": 95.5, "q2": 42.5, "q3": 47.5,
+     "q4": 47.5}`, `period_spreads: {"h1": -7.5, "h2": 1.0, "q2": 0.5,
+     "q3": -0.5, "q4": 1.0}`, `source.period_totals: "oddsapi_fast"`. This
+     is the first time in this multi-day investigation that qtr/half odds
+     have been confirmed reaching the served board for a genuinely live
+     game. 475 targeted WNBA/ops tests passing throughout. Deployed: web
+     (`dep-d9noqu2jnfac73bhfqa0`, write-gate fix; `dep-d9nps9laeets73cfil60`,
+     raw-diag endpoint), live-odds-worker + refresh-worker
+     (`dep-d9nqk1p42hec73868dqg` / `dep-d9nqk1rm8hqs73etosn0`,
+     `generated_at`-stamp fix) — all confirmed `status=live`.
+
+     **Not chased this session, deliberately deferred**: the served
+     payload's own `status`/`detail`/`period` fields showed "Scheduled"/
+     `null` for POR@LA even while `in_progress: true` and `lines` were
+     correct — a secondary, cosmetic display-field staleness distinct
+     from the period-markets question this investigation was actually
+     about; flag for a future pass if it recurs. Also flagged (not
+     investigated) via a spawned background task: NBA's sibling
+     `_local_live_snapshot_payload_cached` in `syndicate/features/nba/
+     cards.py` uses a plain `path.read_text()` (no keyvalue-aware read at
+     all, unlike WNBA's `_keyvalue_read_text_file`), which may mean NBA's
+     cross-service live data has never actually worked in production —
+     needs its own dedicated investigation of both read and write sides
+     before fixing.
+
 - **#23 — Make the MLB daily sim memory-safe, then re-enable its trigger.**
   - ✅ *Validated 2026-07-25*: `daily_summary_2026_07_25.json` lands (15 sim artifacts
     published; `/mlb/api/cards` returns 15 cards via `_games_from_daily_summary`,
