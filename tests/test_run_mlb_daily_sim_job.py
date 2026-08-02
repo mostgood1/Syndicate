@@ -8,7 +8,10 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from scripts.run_mlb_daily_sim_job import _hydrate_vendor_oddsapi_mirror
+from scripts.run_mlb_daily_sim_job import _parse_game_progress
+from scripts.run_mlb_daily_sim_job import _progress_poll_interval_seconds
 from scripts.run_mlb_daily_sim_job import _vendor_mlb_data_dir
+from scripts.run_mlb_daily_sim_job import _write_progress_snapshot
 
 
 def _write_snapshot(data_root: Path, date_str: str, filename: str, payload: dict) -> Path:
@@ -155,6 +158,91 @@ class HydrateVendorOddsapiMirrorTests(unittest.TestCase):
 
                 _hydrate_vendor_oddsapi_mirror("2026-07-30", vendor_cwd)
                 self.assertEqual(json.loads(dest.read_text(encoding="utf-8")), {"pitcher_props": {"a": 2}})
+
+
+class ParseGameProgressTests(unittest.TestCase):
+    # Confirmed live 2026-08-02: a scoped sim run sat at "state": "running"
+    # for 49+ minutes with no signal at all whether it was progressing or
+    # hung -- these lock in the parser that turns the vendored sim's own
+    # existing "[N/M] ..." per-game log lines into a readable progress
+    # snapshot, without needing to change any vendored code.
+
+    def test_no_progress_markers_returns_none(self) -> None:
+        self.assertIsNone(_parse_game_progress("no markers here\njust noise"))
+
+    def test_empty_text_returns_none(self) -> None:
+        self.assertIsNone(_parse_game_progress(""))
+
+    def test_single_marker_is_parsed(self) -> None:
+        result = _parse_game_progress("[core] Loaded 15 scheduled game(s).\n[3/15] Preparing rosters: LAS @ SEA")
+        self.assertEqual(result, {"game_index": 3, "game_total": 15, "last_line": "Preparing rosters: LAS @ SEA"})
+
+    def test_multiple_markers_keeps_the_last_one(self) -> None:
+        text = "\n".join(
+            [
+                "[1/15] Preparing rosters: A @ B",
+                "[1/15] Simulating: A @ B",
+                "[2/15] Preparing rosters: C @ D",
+                "[2/15] Simulating: C @ D",
+            ]
+        )
+        result = _parse_game_progress(text)
+        self.assertEqual(result["game_index"], 2)
+        self.assertEqual(result["game_total"], 15)
+        self.assertEqual(result["last_line"], "Simulating: C @ D")
+
+    def test_last_line_is_truncated(self) -> None:
+        long_suffix = "x" * 500
+        result = _parse_game_progress(f"[1/1] {long_suffix}")
+        self.assertLessEqual(len(result["last_line"]), 200)
+
+
+class ProgressPollIntervalTests(unittest.TestCase):
+    def test_default_is_twenty_seconds(self) -> None:
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("SYNDICATE_MLB_SIM_PROGRESS_POLL_SECONDS", None)
+            self.assertEqual(_progress_poll_interval_seconds(), 20)
+
+    def test_env_override_is_honored(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_MLB_SIM_PROGRESS_POLL_SECONDS": "5"}):
+            self.assertEqual(_progress_poll_interval_seconds(), 5)
+
+    def test_floor_is_five_seconds(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_MLB_SIM_PROGRESS_POLL_SECONDS": "1"}):
+            self.assertEqual(_progress_poll_interval_seconds(), 5)
+
+
+class WriteProgressSnapshotTests(unittest.TestCase):
+    def test_writes_parsed_progress_and_elapsed_time(self) -> None:
+        with TemporaryDirectory() as tmp:
+            capture_path = Path(tmp) / "sim.log"
+            capture_path.write_text("[4/15] Simulating: E @ F", encoding="utf-8")
+            progress_path = Path(tmp) / "progress.json"
+            _write_progress_snapshot(progress_path, capture_path=capture_path, started_epoch=0.0, done=False)
+            payload = json.loads(progress_path.read_text(encoding="utf-8"))
+        self.assertEqual(payload["game_index"], 4)
+        self.assertEqual(payload["game_total"], 15)
+        self.assertFalse(payload["done"])
+        self.assertIn("updated_at", payload)
+        self.assertGreater(payload["elapsed_seconds"], 0)
+
+    def test_marks_done_true_on_final_write(self) -> None:
+        with TemporaryDirectory() as tmp:
+            capture_path = Path(tmp) / "sim.log"
+            capture_path.write_text("[15/15] Simulating: Y @ Z", encoding="utf-8")
+            progress_path = Path(tmp) / "progress.json"
+            _write_progress_snapshot(progress_path, capture_path=capture_path, started_epoch=0.0, done=True)
+            payload = json.loads(progress_path.read_text(encoding="utf-8"))
+        self.assertTrue(payload["done"])
+
+    def test_missing_log_still_writes_a_snapshot(self) -> None:
+        with TemporaryDirectory() as tmp:
+            capture_path = Path(tmp) / "does_not_exist.log"
+            progress_path = Path(tmp) / "progress.json"
+            _write_progress_snapshot(progress_path, capture_path=capture_path, started_epoch=0.0, done=False)
+            payload = json.loads(progress_path.read_text(encoding="utf-8"))
+        self.assertNotIn("game_index", payload)
+        self.assertIn("updated_at", payload)
 
 
 if __name__ == "__main__":

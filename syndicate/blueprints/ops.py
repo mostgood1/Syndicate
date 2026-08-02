@@ -627,6 +627,13 @@ def api_ops_live_refresh_state() -> Any:
     state["sim_run_resolution"] = resolution
     if run_stamp and sim_date:
         state["sim_run_status"] = _state_read_json(sim_base / f"{sim_date}_{run_stamp}_status.json")
+        # Written every _progress_poll_interval_seconds() while the run is
+        # still in flight (run_mlb_daily_sim_job.py) -- absent for a run
+        # older than this feature, present-but-stale ("updated_at" far in
+        # the past relative to now) is the signal a "running" state is
+        # actually hung, not the earlier all-or-nothing "no news for 90
+        # minutes" state this replaces.
+        state["sim_run_progress"] = _state_read_json(sim_base / f"{sim_date}_{run_stamp}_progress.json")
         log_text = _state_read_text(sim_base / f"{sim_date}_{run_stamp}.log")
         if log_text:
             # Combined stdout+stderr of the sim subprocess; tail is where the

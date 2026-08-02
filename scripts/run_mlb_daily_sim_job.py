@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -161,6 +162,64 @@ def _status_path(date_str: str, run_stamp: str) -> Path:
     return reports_root() / "live_refresh_loop" / "mlb_sim_runs" / f"{date_str}_{run_stamp}_status.json"
 
 
+def _progress_path(date_str: str, run_stamp: str) -> Path:
+    return reports_root() / "live_refresh_loop" / "mlb_sim_runs" / f"{date_str}_{run_stamp}_progress.json"
+
+
+# 2026-08-02: a run could sit at "state": "running" with no other signal for
+# 90+ minutes -- confirmed live, a 5-game scoped run ran 49+ minutes with
+# nothing to tell whether it was progressing or hung, forcing a judgment call
+# on whether to kill it. The vendored sim (vendor/mlb_bettingv2/tools/
+# daily_update.py) already prints a "[N/M] <what it's doing>" line per game as
+# it works through the slate (roster prep, simming, etc.) -- this just reads
+# that existing signal back out of the child's own log rather than inventing
+# a new one inside vendored code.
+_GAME_PROGRESS_PATTERN = re.compile(r"^\[(\d+)/(\d+)\]\s*(.*)$", re.MULTILINE)
+
+
+def _parse_game_progress(log_text: str) -> dict[str, object] | None:
+    matches = list(_GAME_PROGRESS_PATTERN.finditer(log_text or ""))
+    if not matches:
+        return None
+    last = matches[-1]
+    try:
+        game_index = int(last.group(1))
+        game_total = int(last.group(2))
+    except (TypeError, ValueError):
+        return None
+    return {
+        "game_index": game_index,
+        "game_total": game_total,
+        "last_line": last.group(3).strip()[:200],
+    }
+
+
+def _progress_poll_interval_seconds() -> int:
+    raw = str(os.environ.get("SYNDICATE_MLB_SIM_PROGRESS_POLL_SECONDS") or "").strip()
+    try:
+        value = int(raw) if raw else 20
+    except ValueError:
+        value = 20
+    return max(5, value)
+
+
+def _write_progress_snapshot(
+    progress_path: Path, *, capture_path: Path, started_epoch: float, done: bool
+) -> None:
+    tail = _read_log_tail(capture_path, max_bytes=64 * 1024)
+    progress = _parse_game_progress(tail) or {}
+    payload = {
+        **progress,
+        "updated_at": _utc_now(),
+        "elapsed_seconds": round(time.time() - started_epoch, 1),
+        "done": bool(done),
+    }
+    try:
+        write_json_file(progress_path, payload)
+    except Exception:
+        pass
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run MLB's vendored daily sim for one date and publish results.")
     parser.add_argument("--date", required=True)
@@ -219,6 +278,8 @@ def main() -> int:
     print(f"MLB_DAILY_SIM_START date={args.date} season={args.season} sims={args.sims} workers={args.workers} reason={args.reason}", flush=True)
 
     timeout_seconds = _timeout_seconds()
+    poll_interval_seconds = _progress_poll_interval_seconds()
+    progress_path = _progress_path(str(args.date), run_stamp)
     timed_out = False
     try:
         # Stream the child's output straight to a temp file instead of
@@ -228,36 +289,58 @@ def main() -> int:
         # transiently doubled it building the combined string. On a 2GB
         # container already running the sim itself that is pure overhead --
         # and this wrapper only ever needs a tail of it for the ops log below.
+        #
+        # Popen + a wait-with-timeout poll loop, not subprocess.run(timeout=):
+        # confirmed live 2026-08-02, a scoped run sat at "state": "running"
+        # for 49+ minutes with absolutely no signal whether it was making
+        # progress or hung -- forcing a judgment call on whether to kill it.
+        # Each poll interval writes a progress snapshot (see
+        # _write_progress_snapshot) parsed from the vendored sim's own
+        # existing "[N/M] ..." per-game log lines, readable via
+        # /api/ops/live-refresh/state without waiting for the run to finish.
         with tempfile.NamedTemporaryFile(prefix="mlb_daily_sim_", suffix=".log", delete=False) as out_fh:
             capture_path = Path(out_fh.name)
-            result = subprocess.run(
-                command,
-                cwd=str(vendor_cwd),
-                stdout=out_fh,
-                stderr=subprocess.STDOUT,
-                timeout=timeout_seconds,
-            )
-        return_code = int(result.returncode)
-        combined_output = _read_log_tail(capture_path)
-    except subprocess.TimeoutExpired:
-        # subprocess.run has already killed the child by the time this
-        # surfaces. Previously nothing enforced this at all: the comment here
-        # claimed the launch side applied SYNDICATE_MLB_SIM_TIMEOUT_SECONDS,
-        # but live_refresh_loop.py's reader for that var was never called by
-        # anything (since removed) -- the only real ceiling was that module's
-        # hardcoded 90-minute _MLB_SIM_MAX_RUNTIME_SECONDS, which is
-        # stale-POINTER detection (when to stop trusting a "running" record),
-        # not a kill. A genuinely hung sim therefore held the container for
-        # 90 minutes before anything noticed.
-        timed_out = True
-        return_code = 124
-        tail = _read_log_tail(capture_path) if capture_path is not None else ""
-        combined_output = f"TimeoutExpired: killed after {timeout_seconds}s (SYNDICATE_MLB_SIM_TIMEOUT_SECONDS)\n{tail}"
-        print(f"MLB_DAILY_SIM_TIMEOUT date={args.date} timeout_seconds={timeout_seconds}", flush=True)
+            process = subprocess.Popen(command, cwd=str(vendor_cwd), stdout=out_fh, stderr=subprocess.STDOUT)
+            return_code: int | None = None
+            while True:
+                try:
+                    return_code = process.wait(timeout=poll_interval_seconds)
+                    break
+                except subprocess.TimeoutExpired:
+                    pass
+                _write_progress_snapshot(progress_path, capture_path=capture_path, started_epoch=started_epoch, done=False)
+                if time.time() - started_epoch > timeout_seconds:
+                    # Previously nothing enforced this at all: the comment
+                    # here used to claim the launch side applied
+                    # SYNDICATE_MLB_SIM_TIMEOUT_SECONDS, but
+                    # live_refresh_loop.py's reader for that var was never
+                    # called by anything (since removed) -- the only real
+                    # ceiling was that module's hardcoded 90-minute
+                    # _MLB_SIM_MAX_RUNTIME_SECONDS, which is stale-POINTER
+                    # detection (when to stop trusting a "running" record),
+                    # not a kill. A genuinely hung sim therefore held the
+                    # container for 90 minutes before anything noticed.
+                    process.kill()
+                    try:
+                        process.wait(timeout=10)
+                    except Exception:
+                        pass
+                    timed_out = True
+                    return_code = 124
+                    break
+        if timed_out:
+            tail = _read_log_tail(capture_path) if capture_path is not None else ""
+            combined_output = f"TimeoutExpired: killed after {timeout_seconds}s (SYNDICATE_MLB_SIM_TIMEOUT_SECONDS)\n{tail}"
+            print(f"MLB_DAILY_SIM_TIMEOUT date={args.date} timeout_seconds={timeout_seconds}", flush=True)
+        else:
+            combined_output = _read_log_tail(capture_path)
+        return_code = int(return_code if return_code is not None else 1)
     except Exception as exc:
         return_code = 1
         combined_output = f"{type(exc).__name__}: {exc}"
     finally:
+        if capture_path is not None:
+            _write_progress_snapshot(progress_path, capture_path=capture_path, started_epoch=started_epoch, done=True)
         try:
             if capture_path is not None:
                 capture_path.unlink(missing_ok=True)
