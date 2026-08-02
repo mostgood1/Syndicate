@@ -525,11 +525,17 @@ def nfl_projection_available_weeks(season: int) -> list[int]:
 
 @lru_cache(maxsize=8)
 def _nfl_real_lines_index(season: int) -> dict[str, dict[str, Any]]:
-    """Every real quoted line for a season, keyed by "{away} @ {home}" full
+    """Latest real quoted line per matchup, keyed by "{away} @ {home}" full
     team names -- merges every daily real_betting_lines_{season}_*.json
-    file's "lines" dict. A team pair meeting twice in a season (rare, e.g.
-    a divisional rematch) would have the later file's entry win; accepted
-    simplification for a first pass."""
+    file's "lines" dict in filename (date) order, so the freshest quote for
+    each matchup wins. That is the correct semantic for the current-week
+    board. Caveat (verified 2026-08-02): a single file's 272 keys are
+    unique -- regular-season divisional rematches swap venues so "{away} @
+    {home}" never collides during the regular season -- but a PLAYOFF game
+    repeating a regular-season venue pairing shares its key, so once
+    January files land, a past regular-season week's entry is retroactively
+    the playoff quote. Historical/backtest consumers must read the dated
+    file for the day in question instead of this merged index."""
     index: dict[str, dict[str, Any]] = {}
     pattern = os.path.join(str(default_nfl_source_root()), f"real_betting_lines_{season}_*.json")
     for path in sorted(glob.glob(pattern)):
@@ -562,9 +568,62 @@ def _nfl_cover_probability(*, line: float, mean: float | None, stdev: float | No
 _NFL_MARKET_BOARD_DISPLAY_LABELS = {
     "moneyline_home": "Moneyline",
     "moneyline_away": "Moneyline",
-    "spread": "Spread",
+    "spread_home": "Spread",
+    "spread_away": "Spread",
     "total": "Total",
 }
+
+
+def _nfl_prices_from_lines_entry(lines_entry: dict[str, Any] | None, *, home_full_name: str, away_full_name: str) -> dict[str, Any]:
+    """Per-side spread/total prices (and the away spread line) for one
+    real_betting_lines entry. The flat run_line/total_runs fields only carry
+    the home line and the over/under prices; the per-side spread prices live
+    in the raw ``markets`` passthrough (keys ``spreads``/``totals``, outcomes
+    keyed by full team name / Over / Under)."""
+    entry = lines_entry if isinstance(lines_entry, dict) else {}
+    total_runs = entry.get("total_runs") if isinstance(entry.get("total_runs"), dict) else {}
+    result: dict[str, Any] = {
+        "spread_home_line": (entry.get("run_line") or {}).get("home") if isinstance(entry.get("run_line"), dict) else None,
+        "spread_away_line": None,
+        "spread_home_price": None,
+        "spread_away_price": None,
+        "total_over_price": total_runs.get("over"),
+        "total_under_price": total_runs.get("under"),
+    }
+    markets = entry.get("markets") if isinstance(entry.get("markets"), list) else []
+    for market in markets:
+        if not isinstance(market, dict):
+            continue
+        outcomes = market.get("outcomes") if isinstance(market.get("outcomes"), list) else []
+        market_key = market.get("key")
+        if market_key == "spreads":
+            for outcome in outcomes:
+                if not isinstance(outcome, dict):
+                    continue
+                name = str(outcome.get("name") or "")
+                if name == home_full_name:
+                    result["spread_home_price"] = outcome.get("price")
+                    if outcome.get("point") is not None:
+                        result["spread_home_line"] = outcome.get("point")
+                elif name == away_full_name:
+                    result["spread_away_price"] = outcome.get("price")
+                    if outcome.get("point") is not None:
+                        result["spread_away_line"] = outcome.get("point")
+        elif market_key == "totals":
+            for outcome in outcomes:
+                if not isinstance(outcome, dict):
+                    continue
+                name = str(outcome.get("name") or "").strip().lower()
+                if name == "over" and outcome.get("price") is not None:
+                    result["total_over_price"] = outcome.get("price")
+                elif name == "under" and outcome.get("price") is not None:
+                    result["total_under_price"] = outcome.get("price")
+    if result["spread_away_line"] is None and result["spread_home_line"] is not None:
+        try:
+            result["spread_away_line"] = -float(result["spread_home_line"])
+        except (TypeError, ValueError):
+            result["spread_away_line"] = None
+    return result
 
 
 def _nfl_market_board_rows_for_game(
@@ -579,10 +638,22 @@ def _nfl_market_board_rows_for_game(
     model_margin_stdev: Any,
     model_total_stdev: Any,
     home_win_probability: Any,
+    spread_away_line: Any = None,
+    spread_home_price: Any = None,
+    spread_away_price: Any = None,
+    total_over_price: Any = None,
+    total_under_price: Any = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Raw odds + sim rows for one NFL game's moneyline/spread/total
     markets -- mirrors syndicate.features.ncaaf.cards._ncaaf_market_board_rows_for_game.
-    No player-prop rows: no props pipeline exists for NFL yet."""
+    No player-prop rows: no props pipeline exists for NFL yet.
+
+    ``spread_line`` is bet notation (home -10.5 = home must win by more than
+    10.5), so the margin threshold for the cover probability is its NEGATION
+    -- the first pass used it directly, which turned a big favorite's cover
+    probability into near-certainty (P(margin > -10.5) instead of
+    P(margin > +10.5)). NCAAF's builder negates its CFBD spread the same way
+    (market_margin = -mean(spreads))."""
     odds_rows: list[dict[str, Any]] = []
     sim_rows: list[dict[str, Any]] = []
 
@@ -600,24 +671,35 @@ def _nfl_market_board_rows_for_game(
             sim_rows.append({"game_id": game_id, "market": "moneyline_away", "period": "full_game", "entity": None, "sim_projection": 1.0 - home_prob, "model_side": model_side, "sim_source": "nfl_model"})
 
     try:
-        margin_line = float(spread_line) if spread_line is not None else None
+        home_spread = float(spread_line) if spread_line is not None else None
     except (TypeError, ValueError):
-        margin_line = None
-    if margin_line is not None:
-        odds_rows.append({"game_id": game_id, "market": "spread", "period": "full_game", "entity": None, "side": "home", "line": margin_line, "market_type": "game"})
+        home_spread = None
+    if home_spread is not None:
+        try:
+            away_spread = float(spread_away_line) if spread_away_line is not None else -home_spread
+        except (TypeError, ValueError):
+            away_spread = -home_spread
+        odds_rows.append({"game_id": game_id, "market": "spread_home", "period": "full_game", "entity": None, "side": "home", "line": home_spread, "odds": spread_home_price, "market_type": "game"})
+        odds_rows.append({"game_id": game_id, "market": "spread_away", "period": "full_game", "entity": None, "side": "away", "line": away_spread, "odds": spread_away_price, "market_type": "game"})
         if model_margin is not None:
-            cover_prob = _nfl_cover_probability(line=margin_line, mean=model_margin, stdev=model_margin_stdev)
-            sim_rows.append({"game_id": game_id, "market": "spread", "period": "full_game", "entity": None, "sim_projection": cover_prob, "projected_value": model_margin, "sim_source": "nfl_model"})
+            cover_prob = _nfl_cover_probability(line=-home_spread, mean=model_margin, stdev=model_margin_stdev)
+            model_side = None if cover_prob is None else ("home" if cover_prob >= 0.5 else "away")
+            sim_rows.append({"game_id": game_id, "market": "spread_home", "period": "full_game", "entity": None, "sim_projection": cover_prob, "model_side": model_side, "projected_value": model_margin, "sim_source": "nfl_model"})
+            sim_rows.append({"game_id": game_id, "market": "spread_away", "period": "full_game", "entity": None, "sim_projection": None if cover_prob is None else 1.0 - cover_prob, "model_side": model_side, "projected_value": model_margin, "sim_source": "nfl_model"})
 
     try:
         total_line_value = float(total_line) if total_line is not None else None
     except (TypeError, ValueError):
         total_line_value = None
     if total_line_value is not None:
-        odds_rows.append({"game_id": game_id, "market": "total", "period": "full_game", "entity": None, "side": "over", "line": total_line_value, "market_type": "game"})
+        odds_rows.append({"game_id": game_id, "market": "total", "period": "full_game", "entity": None, "side": "over", "line": total_line_value, "odds": total_over_price, "market_type": "game"})
+        odds_rows.append({"game_id": game_id, "market": "total", "period": "full_game", "entity": None, "side": "under", "line": total_line_value, "odds": total_under_price, "market_type": "game"})
         if model_total is not None:
             over_prob = _nfl_cover_probability(line=total_line_value, mean=model_total, stdev=model_total_stdev)
-            sim_rows.append({"game_id": game_id, "market": "total", "period": "full_game", "entity": None, "sim_projection": over_prob, "projected_value": model_total, "sim_source": "nfl_model"})
+            # One sim row serves both Over and Under odds rows (same join
+            # key); join_odds_to_sim derives each side's probability from
+            # model_prob_over -- the same two-sided contract MLB uses.
+            sim_rows.append({"game_id": game_id, "market": "total", "period": "full_game", "entity": None, "model_prob_over": over_prob, "projected_value": model_total, "sim_source": "nfl_model"})
 
     return odds_rows, sim_rows
 
@@ -648,20 +730,25 @@ def build_nfl_market_board(season: int, week: int) -> dict[str, Any]:
 
         lines_entry = _nfl_real_lines_for_matchup(season, away_full_name=away_full_name, home_full_name=home_full_name)
         moneyline = (lines_entry or {}).get("moneyline") or {}
-        run_line = (lines_entry or {}).get("run_line") or {}
         total_runs = (lines_entry or {}).get("total_runs") or {}
+        prices = _nfl_prices_from_lines_entry(lines_entry, home_full_name=home_full_name, away_full_name=away_full_name)
 
         odds_rows, sim_rows = _nfl_market_board_rows_for_game(
             game_id=projection.game_id,
             home_moneyline=moneyline.get("home"),
             away_moneyline=moneyline.get("away"),
-            spread_line=run_line.get("home"),
+            spread_line=prices.get("spread_home_line"),
             total_line=total_runs.get("line"),
             model_margin=projection.margin_mean,
             model_total=projection.total_mean,
             model_margin_stdev=projection.margin_stdev,
             model_total_stdev=projection.total_stdev,
             home_win_probability=projection.home_win_rate,
+            spread_away_line=prices.get("spread_away_line"),
+            spread_home_price=prices.get("spread_home_price"),
+            spread_away_price=prices.get("spread_away_price"),
+            total_over_price=prices.get("total_over_price"),
+            total_under_price=prices.get("total_under_price"),
         )
 
         # Attach this game's player-prop rows -- matched by real team full
