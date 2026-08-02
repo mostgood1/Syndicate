@@ -2411,7 +2411,18 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
     def test_optional_tool_exports_use_local_vendored_builders(self) -> None:
         module = self._load_module()
 
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        # Regression: the vendored build_live_player_lens_tuning.py tool
+        # tries `from wnba_betting.boxscores import _nba_gid_to_tricodes`
+        # first and only falls back to scanning this test's local smart_sim
+        # fixture if that import fails. In an isolated run it always fails
+        # (vendor/wnba_betting_repo/src is never on sys.path), but earlier
+        # tests in the full suite (e.g. test_archives.py's WNBA live-lens
+        # tests) exercise a real fallback path that permanently adds that
+        # src dir to sys.path -- so under full-suite load order the import
+        # succeeds and pulls real ESPN game ids for this date instead of the
+        # synthetic "0401" game, leaving game_id empty below. Block the
+        # import explicitly so this test is hermetic to that load order.
+        with patch.dict(sys.modules, {"wnba_betting": None, "wnba_betting.boxscores": None}), tempfile.TemporaryDirectory() as tmp_dir:
             tmp_root = Path(tmp_dir)
             source_root = tmp_root / "source"
             processed_root = tmp_root / "bundle" / "data" / "processed"
