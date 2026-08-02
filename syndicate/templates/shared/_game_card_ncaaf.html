@@ -29,16 +29,26 @@
   {% else %}
     <div class="cards-strip-head">
       <div class="cards-head-left cards-head-matchup">
-        <div class="cards-head-team">
-          <div class="cards-strip-logo">{{ game.away.abbr }}</div>
+        {% set away_logo_url = game.away.logo_url or away_team.get('logo_url') %}
+        {% set home_logo_url = game.home.logo_url or home_team.get('logo_url') %}
+        <div class="cards-head-team"{% if game.away.primary_color or away_team.get('primary_color') %} style="--cards-team-accent: {{ game.away.primary_color or away_team.get('primary_color') }};"{% endif %}>
+          {% if away_logo_url %}
+            <img class="cards-strip-logo cards-strip-crest" src="{{ away_logo_url }}" alt="{{ (away_team.school_name if away_team and away_team.school_name else game.away.name) }} crest" loading="lazy" />
+          {% else %}
+            <div class="cards-strip-logo">{{ game.away.abbr }}</div>
+          {% endif %}
           <div>
             <div class="cards-head-team-name">{{ away_team.school_name if away_team and away_team.school_name else game.away.name }}</div>
             <div class="cards-mini-copy">{{ game.away.abbr }}</div>
           </div>
         </div>
         <span class="cards-score-divider">@</span>
-        <div class="cards-head-team">
-          <div class="cards-strip-logo">{{ game.home.abbr }}</div>
+        <div class="cards-head-team"{% if game.home.primary_color or home_team.get('primary_color') %} style="--cards-team-accent: {{ game.home.primary_color or home_team.get('primary_color') }};"{% endif %}>
+          {% if home_logo_url %}
+            <img class="cards-strip-logo cards-strip-crest" src="{{ home_logo_url }}" alt="{{ (home_team.school_name if home_team and home_team.school_name else game.home.name) }} crest" loading="lazy" />
+          {% else %}
+            <div class="cards-strip-logo">{{ game.home.abbr }}</div>
+          {% endif %}
           <div>
             <div class="cards-head-team-name">{{ home_team.school_name if home_team and home_team.school_name else game.home.name }}</div>
             <div class="cards-mini-copy">{{ game.home.abbr }}</div>
