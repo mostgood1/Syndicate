@@ -5101,6 +5101,63 @@ def _mlb_pregame_mean_by_player_market(selected_date: str) -> dict[tuple[str, st
     return lookup
 
 
+def _mlb_backfill_missing_projected_from_top_props(sport: dict[str, Any], candidates: list[dict[str, Any]]) -> int:
+    """Blank-only "projected" backfill for any MLB prop candidate, applied
+    in place to the sport's slice of the pool -- regardless of which
+    builder produced the candidate.
+
+    2026-08-02 board audit follow-up: found a class of MLB prop candidate
+    (confirmed live: "Miguel Rojas"/pick "OVER Miguel Rojas", narrative
+    "detail" with the real mean baked into prose -- "...baseline comes in
+    around 1.8 batter hits runs rbis...") whose exact originating builder
+    could not be pinned down despite tracing every known MLB candidate
+    source (home_rails pregame/live rails, daily_top_props direct reads,
+    live-lens, steam). Its underlying daily_top_props row DOES exist with a
+    real mean (confirmed: Miguel Rojas hits_runs_rbis mean 1.807, matching
+    the "1.8" already visible in its own narrative text) -- it just never
+    reaches this candidate's structured "projected" field. Reuses the exact
+    same pregame-mean lookup _mlb_live_lens_prop_candidates_from_artifact
+    already relies on rather than risk changing whichever function builds
+    these rows -- returns how many candidates were filled, purely for the
+    caller's own stage logging.
+    """
+    if _safe_text(sport.get("slug"), "").lower() != "mlb":
+        return 0
+    selected_date = _safe_text(sport.get("context_label"), "")
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", selected_date):
+        return 0
+    pregame_means = _mlb_pregame_mean_by_player_market(selected_date)
+    if not pregame_means:
+        return 0
+    filled = 0
+    for candidate in candidates:
+        if _safe_text(candidate.get("candidate_type"), "").lower() != "prop":
+            continue
+        if _numeric_hint(candidate.get("projected")) is not None:
+            continue
+        # Prefer player_name directly, same corruption guard
+        # _prop_merge_dedup_key uses: a real player name is never itself
+        # "... over ..."/"... under ..." text. _candidate_subject_key alone
+        # isn't enough here -- it only parses a subject out of "name" when
+        # that field embeds the selection ("Miguel Rojas Over 0.5 Hits");
+        # this exact candidate class has a clean "name" with no selection
+        # embedded at all, which _candidate_subject_key has no pattern for.
+        player_name_text = _normalized_market_text(_safe_text(candidate.get("player_name"), ""))
+        if player_name_text and any(f" {marker} " in f" {player_name_text} " for marker in ("over", "under")):
+            player_name_text = ""
+        subject = player_name_text or _normalized_market_text(_safe_text(_candidate_subject_key(candidate), ""))
+        market_key = _candidate_market_key(candidate)
+        if not subject or not market_key:
+            continue
+        game_pk = _safe_int(candidate.get("game_pk") or candidate.get("gamePk"))
+        mean_value = pregame_means.get((subject, market_key, game_pk))
+        if mean_value is None:
+            continue
+        candidate["projected"] = f"{mean_value:.1f}"
+        filled += 1
+    return filled
+
+
 def _mlb_live_lens_prop_candidates_from_artifact(sport: dict[str, Any]) -> list[dict[str, Any]]:
     """Board candidates generated directly from MLB's live-lens artifact for
     LIVE games, not merely an enhancement layer on pre-existing daily_top_props
@@ -6673,6 +6730,32 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
                 backfill_candidates.append(artifact_candidate)
             if backfill_candidates:
                 _log_candidate_stage(pipeline_name="collect_candidates", stage="mlb_market_backfill", before=[], after=backfill_candidates)
+        if sport_slug == "mlb":
+            # 2026-08-02 board audit follow-up: found a class of MLB prop
+            # candidate (confirmed live: "Miguel Rojas"/pick "OVER Miguel
+            # Rojas", narrative "detail" with the real mean baked into
+            # prose -- "...baseline comes in around 1.8 batter hits runs
+            # rbis...") whose exact originating builder could not be
+            # pinned down despite tracing through every known MLB
+            # candidate source (home_rails pregame/live rails, daily_top_
+            # props direct reads, live-lens, steam) -- it isn't gated
+            # behind wants_ranked_mlb_market_backfill above (that only
+            # fires when the question names a specific market; "top edges
+            # today" doesn't), so it never gets a correctly-labeled
+            # artifact-style duplicate in the pool for
+            # _merge_duplicate_prop_candidates to backfill from, even
+            # though the row it's built from (confirmed: rank 39, well
+            # outside the home rail's own top-18 cap) has a real mean
+            # sitting right there. Rather than risk a change to whichever
+            # function builds it, backfill "projected" directly on any
+            # MLB prop candidate that's missing it, reusing the exact same
+            # pregame-mean lookup _mlb_live_lens_prop_candidates_from_
+            # artifact already relies on -- blank-only, so it can never
+            # overwrite a real value, and it does nothing for a candidate
+            # with no resolvable subject+market+game match.
+            filled_count = _mlb_backfill_missing_projected_from_top_props(sport, candidates[sport_start_count:])
+            if filled_count:
+                _log_candidate_stage(pipeline_name="collect_candidates", stage="mlb_missing_projected_backfill", before=[], after=candidates[sport_start_count:])
         sport_candidates = candidates[sport_start_count:]
         sport_market_counts: dict[str, int] = {}
         for candidate in sport_candidates:

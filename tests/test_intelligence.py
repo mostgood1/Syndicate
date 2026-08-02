@@ -3655,6 +3655,74 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(candidate.get("projected"), "1.9")
         self.assertEqual(candidate.get("live_projection"), "2.0")
 
+    def test_mlb_backfill_missing_projected_fills_from_top_props_by_subject_and_market(self) -> None:
+        # 2026-08-02 board audit follow-up: reproduces the real "Miguel
+        # Rojas" bug confirmed live -- a prop candidate whose exact
+        # originating builder was never pinned down (malformed "OVER
+        # Miguel Rojas" pick text, narrative detail with the real mean
+        # baked into prose, blank structured "projected") but whose clean
+        # player_name/market_focuses/game_pk are all intact, so the
+        # backfill can still resolve it against daily_top_props' real row
+        # (mean 1.807) even without knowing which function built it.
+        from syndicate.features.intelligence import _mlb_backfill_missing_projected_from_top_props
+
+        candidate = {
+            "candidate_type": "prop",
+            "sport_slug": "mlb",
+            "player_name": "Miguel Rojas",
+            "name": "Miguel Rojas",
+            "pick": "OVER Miguel Rojas",
+            "selection": "OVER Miguel Rojas",
+            "market": "Hitter H+r+r",
+            "market_key": "hitter h+r+r",
+            "market_focuses": ["hits_runs_rbis"],
+            "game_pk": 823920,
+            "projected": "-",
+            "detail": "The model baseline comes in around 1.8 batter hits runs rbis against a line of 0.5.",
+        }
+        pregame_rows = [
+            {
+                "ownerName": "Miguel Rojas",
+                "stat": "hits_runs_rbis",
+                "statLabel": "Hits + Runs + RBIs",
+                "mean": 1.807,
+                "gamePk": 823920,
+            }
+        ]
+        with patch(
+            "syndicate.features.intelligence._mlb_top_props_rows_from_artifact",
+            return_value=pregame_rows,
+        ):
+            filled = _mlb_backfill_missing_projected_from_top_props(
+                {"slug": "mlb", "context_label": "2026-08-01"}, [candidate]
+            )
+
+        self.assertEqual(filled, 1)
+        self.assertEqual(candidate.get("projected"), "1.8")
+
+    def test_mlb_backfill_missing_projected_never_overwrites_a_real_value(self) -> None:
+        from syndicate.features.intelligence import _mlb_backfill_missing_projected_from_top_props
+
+        candidate = {
+            "candidate_type": "prop",
+            "sport_slug": "mlb",
+            "player_name": "Miguel Rojas",
+            "market_focuses": ["hits_runs_rbis"],
+            "game_pk": 823920,
+            "projected": "3.3",
+        }
+        pregame_rows = [{"ownerName": "Miguel Rojas", "stat": "hits_runs_rbis", "mean": 1.807, "gamePk": 823920}]
+        with patch(
+            "syndicate.features.intelligence._mlb_top_props_rows_from_artifact",
+            return_value=pregame_rows,
+        ):
+            filled = _mlb_backfill_missing_projected_from_top_props(
+                {"slug": "mlb", "context_label": "2026-08-01"}, [candidate]
+            )
+
+        self.assertEqual(filled, 0)
+        self.assertEqual(candidate.get("projected"), "3.3")
+
     def test_mlb_live_lens_prop_candidates_projected_stays_dash_without_a_pregame_match(self) -> None:
         # No matching daily_top_props row -- must NOT fabricate a pregame
         # value from the live one; "-" is the honest answer.
