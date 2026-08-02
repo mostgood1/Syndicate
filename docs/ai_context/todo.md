@@ -4,12 +4,48 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 part 2 (NFL:
-injury adjustment root-caused and defaulted OFF)" below).
+Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 part 3 (NFL:
+season-projection autorun enabled in production)" below).
+Before that: "Reconciliation 2026-08-01 part 2 (NFL:
+injury adjustment root-caused and defaulted OFF)".
 Before that: "Reconciliation 2026-08-01 (Layer 2 board:
 full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
+
+### Reconciliation 2026-08-01 part 3 (NFL: season-projection autorun enabled in production)
+
+Closes item #6/#52 from the standing options list. User confirmed enabling
+`_launch_autorun_season_projections` (built earlier this session in
+`scripts/run_refresh_worker.py`) on the live refresh-worker service.
+
+Checked for an in-flight sim first per standing process
+([[project-syndicate-deploy-kills-inflight-sim]]): a `tip_off_window` resim
+scoped to one game (pk 824326) was running, ~6 minutes in, no ETA
+available. User explicitly chose to deploy anyway (matches this project's
+own established precedent for a small, non-irreplaceable scoped resim, not
+a full-slate coldstart run).
+
+Set `SEASON_PROJECTION_ENABLE_REFRESH_WORKER_AUTORUN=1` on refresh-worker
+(`srv-d91dpertqb8s73co8ls0`) via the single-key env-var endpoint (verified
+round-tripped before deploying, per [[project-render-env-needs-deploy]]),
+then deployed (`dep-d9n8nnjncjis739mjnjg`, commit `7908193b`, confirmed
+`live` via the deploys API, not just an inferred assumption). Verified
+healthy post-restart via observable state
+(`/api/ops/live-refresh/state`): the killed sim's `pid`/`run_stamp`
+changed and a fresh `tip_off_window` resim for the same game had already
+re-triggered on its own by the time of the check -- confirms the worker
+process survived the restart and the standing sim-recovery behavior works
+as expected, not just "no errors seen."
+
+Autorun uses the CLI's new default (`--injury-adjustment` opt-in, OFF
+unless passed -- see part 2 above), so scheduled regenerations will not
+apply the injury adjustment unless a future session explicitly changes
+that. Default refresh interval is 24h
+(`SEASON_PROJECTION_REFRESH_INTERVAL_SECONDS`); since both sports' full
+2026 schedules were just backfilled this session, don't expect to observe
+an actual autorun-triggered regeneration for a while -- there's currently
+nothing stale for it to regenerate.
 Before that: "Reconciliation 2026-08-01 (NFL: full 2026
 backfill both sports + real injury-rating adjustment, backtested)".
 Before that: "Reconciliation 2026-08-01 part 2 (Layer 2
