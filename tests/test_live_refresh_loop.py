@@ -1326,6 +1326,40 @@ class LiveRefreshLoopTests(unittest.TestCase):
         self.assertFalse(result)
         mocked_write.assert_not_called()
 
+    def test_mlb_props_now_available_needs_regen_false_when_artifact_missing_and_no_daily_summary(self) -> None:
+        # Genuine coldstart: neither top_props nor daily_summary exist yet.
+        # first_appearance owns this case -- this trigger must stay quiet.
+        def _fake_read(path: Any) -> Any:
+            return None
+
+        with patch.object(live_refresh_loop, "read_json_file", side_effect=_fake_read), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path:
+            mocked_summary_path.return_value.exists.return_value = False
+            result = live_refresh_loop._mlb_props_now_available_needs_regen(now_epoch=2000.0, date_str="2026-08-01")
+        self.assertFalse(result)
+
+    def test_mlb_props_now_available_needs_regen_true_when_artifact_missing_after_daily_summary_written(self) -> None:
+        # A prior run reached daily_summary but was killed (e.g. sim timeout)
+        # before ever writing top_props -- the file is missing entirely, not
+        # merely empty. Confirmed live 2026-08-02 (SYNDICATE_MLB_SIM_TIMEOUT_SECONDS
+        # killed a scoped fingerprint_change resim mid-pipeline). Real odds
+        # already posted, so this must still trigger a regen.
+        def _fake_read(path: Any) -> Any:
+            if "top_props" in str(path):
+                return None
+            if "pitcher_props" in str(path):
+                return {"pitcher_props": {"kevin gausman": {"strikeouts": {"line": 5.5}}}}
+            return {"hitter_props": {}}
+
+        with patch.object(live_refresh_loop, "read_json_file", side_effect=_fake_read), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path, patch.object(live_refresh_loop, "write_json_file") as mocked_write:
+            mocked_summary_path.return_value.exists.return_value = True
+            result = live_refresh_loop._mlb_props_now_available_needs_regen(now_epoch=2000.0, date_str="2026-08-01")
+        self.assertTrue(result)
+        mocked_write.assert_called_once()
+
     def test_mlb_daily_sim_decision_tip_off_window_returns_only_starting_soon_game_pks(self) -> None:
         all_events = [
             live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None),

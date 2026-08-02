@@ -1265,6 +1265,24 @@ def _mlb_props_now_available_needs_regen(*, now_epoch: float, date_str: str) -> 
 	pitcher/hitter section, while real pitcher-prop odds sat on disk from
 	08:37 CT that morning, untouched, for hours, because nothing else was
 	watching for "odds landed after the empty write" as a trigger.
+
+	The artifact being entirely ABSENT (not merely empty) needs the same
+	trigger, not an exemption from it. The original "no artifact at all yet"
+	early-return assumed that shape only happens pre-first-run, already
+	covered by first_appearance/coldstart above. That assumption breaks the
+	moment a run is killed mid-pipeline -- e.g. SYNDICATE_MLB_SIM_TIMEOUT_SECONDS
+	firing on a scoped fingerprint_change resim -- because daily_update.py
+	writes daily_summary_<date>.json early and the top-props artifact late;
+	a run that dies in between leaves daily_summary present (so first_appearance
+	never fires again) and top_props simply missing, forever, since nothing
+	else reacts to "the file was never written" the way it reacts to "the file
+	says zero rows." Confirmed live 2026-08-02: a 9-game fingerprint_change
+	resim launched 08:00:57Z, timed out at 2700s (return_code=124) before
+	reaching the top-props stage, and every following tick kept recording
+	"no_change" because this function bailed out on the missing file instead
+	of checking odds availability. Only skip the regen check when daily_summary
+	is ALSO missing -- that is the genuine coldstart case first_appearance
+	already owns.
 	"""
 	try:
 		from syndicate.features.mlb.sources import daily_top_props_path
@@ -1274,13 +1292,17 @@ def _mlb_props_now_available_needs_regen(*, now_epoch: float, date_str: str) -> 
 		return False
 
 	top_props = read_json_file(daily_top_props_path(date_str))
-	if not isinstance(top_props, dict):
-		# No artifact at all yet -- first_appearance/coldstart above already
-		# covers a slate with no daily_summary; this trigger only exists for
-		# the "ran, but props came back completely empty" case.
+	if isinstance(top_props, dict):
+		if _mlb_top_props_candidate_total(top_props) > 0:
+			return False
+	elif not _mlb_daily_summary_path(date_str).exists():
+		# Genuine coldstart -- first_appearance above already covers a slate
+		# with no daily_summary yet, so there's nothing for this trigger to do.
 		return False
-	if _mlb_top_props_candidate_total(top_props) > 0:
-		return False
+	# else: daily_summary exists but top_props doesn't -- a prior run got far
+	# enough to write daily_summary but was killed (or otherwise failed)
+	# before reaching the top-props stage. Fall through and treat it the same
+	# as "ran, but came back empty."
 
 	has_pitcher_odds = _mlb_oddsapi_props_snapshot_has_entries(
 		daily_snapshot_oddsapi_pitcher_props_path(date_str), "pitcher_props"

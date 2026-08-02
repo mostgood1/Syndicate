@@ -506,17 +506,35 @@ services:
         value: "30"
       - key: SYNDICATE_MLB_SIM_CHECK_INTERVAL_SECONDS
         value: "600"
+      # Raised from 2700s (45min) 2026-08-02: confirmed live that a 9-game
+      # fingerprint_change scoped resim (--workers 1) hit this ceiling and was
+      # killed (return_code=124) ~48min in, before ever reaching the
+      # top-props-generation stage of daily_update.py's pipeline -- daily_top_props
+      # for that date was then left completely unwritten for the rest of the
+      # day, with no other trigger able to notice (see
+      # _mlb_props_now_available_needs_regen's now-fixed "artifact missing"
+      # blind spot in live_refresh_loop.py). Matches
+      # run_mlb_daily_sim_job.py's own _DEFAULT_SIM_TIMEOUT_SECONDS so this
+      # var being unset would behave the same as it now does set.
       - key: SYNDICATE_MLB_SIM_TIMEOUT_SECONDS
-        value: "2700"
+        value: "5400"
       - key: SYNDICATE_MLB_SIM_COUNT
         value: "1000"
+      # Raised from 1 to 2 workers 2026-08-02: this was left at 1 "for the
+      # first cycle on the new service until a clean run confirms real
+      # headroom" (comment below dates from 2026-07-20) -- 13 days of runs
+      # later, nobody had revisited it. Confirmed live 2026-08-02 via
+      # /api/ops/intelligence/memory-diagnostics: refresh-worker headroom was
+      # 2278MB free of 4096MB even with an odds refresh and four NFL
+      # projection subprocesses resident at once, comfortably clean. Doubling
+      # sim workers halves per-game wall-clock, which is the real fix for the
+      # timeout above -- a higher ceiling alone doesn't stop a genuinely slow
+      # single-worker run from repeating this failure.
       # No longer sharing a container with odds refresh / SmartSim / live-lens,
       # so the memory pressure that forced this down to 1 worker on
-      # live-odds-worker shouldn't apply here -- but keeping it at 1 for the
-      # first cycle on the new service until a clean run confirms real
-      # headroom before raising it.
+      # live-odds-worker shouldn't apply here.
       - key: SYNDICATE_MLB_SIM_WORKERS
-        value: "1"
+        value: "2"
       - key: SYNDICATE_SCHEDULE_ADAPTER_TTL_SECONDS
         value: "900"
       - key: SYNDICATE_LOOK_AHEAD_ENABLED
