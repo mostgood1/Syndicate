@@ -3761,6 +3761,68 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(filled, 1)
         self.assertEqual(candidate.get("projected"), "0.0")
 
+    def test_mlb_backfill_missing_projected_falls_back_when_steam_candidate_has_no_game_pk(self) -> None:
+        # Confirmed live 2026-08-01 (same session, follow-up): the steam fix
+        # above still left ~195/200 steam candidates blank in production --
+        # _steam_candidates_for_sport's own game_id/game_pk end up ""/None
+        # for a real lifecycle event whose game never resolved, so the
+        # exact (subject, market_key, game_pk) lookup missed every one of
+        # them even though a real per-player mean exists. Must fall back to
+        # a (subject, market_key)-only match when game_pk can't be matched.
+        from syndicate.features.intelligence import _mlb_backfill_missing_projected_from_top_props
+
+        candidate = {
+            "candidate_type": "steam",
+            "sport_slug": "mlb",
+            "player_name": "Jung Hoo Lee",
+            "market": "Home runs · Steam",
+            "market_key": "home_runs",
+            "game_pk": None,
+            "projected": "-",
+        }
+        pregame_rows = [{"ownerName": "Jung Hoo Lee", "stat": "home_runs", "mean": 0.032, "gamePk": 824010}]
+        with patch(
+            "syndicate.features.intelligence._mlb_top_props_rows_from_artifact",
+            return_value=pregame_rows,
+        ):
+            filled = _mlb_backfill_missing_projected_from_top_props(
+                {"slug": "mlb", "context_label": "2026-08-01"}, [candidate]
+            )
+
+        self.assertEqual(filled, 1)
+        self.assertEqual(candidate.get("projected"), "0.0")
+
+    def test_mlb_backfill_missing_projected_stays_blank_on_ambiguous_doubleheader(self) -> None:
+        # A genuine doubleheader: the same player+stat has two DIFFERENT
+        # means across two games. Without a resolvable game_pk on the
+        # candidate, guessing either one risks showing the wrong game's
+        # number -- must stay "-" rather than pick one arbitrarily.
+        from syndicate.features.intelligence import _mlb_backfill_missing_projected_from_top_props
+
+        candidate = {
+            "candidate_type": "steam",
+            "sport_slug": "mlb",
+            "player_name": "Jung Hoo Lee",
+            "market": "Home runs · Steam",
+            "market_key": "home_runs",
+            "game_pk": None,
+            "projected": "-",
+        }
+        pregame_rows = [
+            {"ownerName": "Jung Hoo Lee", "stat": "home_runs", "mean": 0.032, "gamePk": 824010},
+            {"ownerName": "Jung Hoo Lee", "stat": "home_runs", "mean": 0.058, "gamePk": 824099},
+        ]
+        with patch(
+            "syndicate.features.intelligence._mlb_top_props_rows_from_artifact",
+            return_value=pregame_rows,
+        ):
+            filled = _mlb_backfill_missing_projected_from_top_props(
+                {"slug": "mlb", "context_label": "2026-08-01"}, [candidate]
+            )
+
+        self.assertEqual(filled, 0)
+        self.assertEqual(candidate.get("projected"), "-")
+
     def test_mlb_live_lens_prop_candidates_projected_stays_dash_without_a_pregame_match(self) -> None:
         # No matching daily_top_props row -- must NOT fabricate a pregame
         # value from the live one; "-" is the honest answer.

@@ -5129,6 +5129,22 @@ def _mlb_backfill_missing_projected_from_top_props(sport: dict[str, Any], candid
     pregame_means = _mlb_pregame_mean_by_player_market(selected_date)
     if not pregame_means:
         return 0
+    # Steam candidates confirmed live with game_pk=None (a real lifecycle
+    # event whose game_id never resolved -- _steam_candidates_for_sport's
+    # own game_id/game_pk fields end up "" / null for exactly these), so the
+    # exact-match (subject, market_key, game_pk) lookup below always misses
+    # for them even when a real per-player mean exists. A (subject,
+    # market_key)-only fallback, ambiguous ONLY on a genuine doubleheader
+    # with two DIFFERENT means for the same player+stat (rare) -- resolved
+    # per pair, not blindly first-wins, so an ambiguous pair is correctly
+    # left unresolved rather than risking the wrong game's number.
+    means_by_subject_market: dict[tuple[str, str], float | None] = {}
+    for (subject_key, market_key_val, _game_pk), mean_val in pregame_means.items():
+        pair = (subject_key, market_key_val)
+        if pair not in means_by_subject_market:
+            means_by_subject_market[pair] = mean_val
+        elif means_by_subject_market[pair] != mean_val:
+            means_by_subject_market[pair] = None
     filled = 0
     for candidate in candidates:
         # 2026-08-01 board audit: this backfill only ever ran for
@@ -5164,6 +5180,8 @@ def _mlb_backfill_missing_projected_from_top_props(sport: dict[str, Any], candid
             continue
         game_pk = _safe_int(candidate.get("game_pk") or candidate.get("gamePk"))
         mean_value = pregame_means.get((subject, market_key, game_pk))
+        if mean_value is None:
+            mean_value = means_by_subject_market.get((subject, market_key))
         if mean_value is None:
             continue
         candidate["projected"] = f"{mean_value:.1f}"
