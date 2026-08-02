@@ -5131,7 +5131,20 @@ def _mlb_backfill_missing_projected_from_top_props(sport: dict[str, Any], candid
         return 0
     filled = 0
     for candidate in candidates:
-        if _safe_text(candidate.get("candidate_type"), "").lower() != "prop":
+        # 2026-08-01 board audit: this backfill only ever ran for
+        # candidate_type == "prop" -- confirmed live, ~195 of MLB's ~360
+        # Layer 2 candidates (over half the board) were standalone steam
+        # candidates ("X · Steam" market label, _steam_candidates_for_sport)
+        # that never merged with a matching analytical candidate (a real
+        # steam/line move detected on a player+market the recommendation
+        # engine simply never flagged, not a merge-key bug -- confirmed:
+        # daily_top_props still has a real per-player row for these, just
+        # never surfaced as a "recommended" pick). _steam_candidates_for_
+        # sport hardcodes "projected": "-" unconditionally for exactly this
+        # reason -- it has no sim access of its own. Steam candidates carry
+        # player_name/market_key/game_pk in the same shape prop candidates
+        # do, so the same pregame_means lookup resolves for them too.
+        if _safe_text(candidate.get("candidate_type"), "").lower() not in ("prop", "steam"):
             continue
         if _numeric_hint(candidate.get("projected")) is not None:
             continue

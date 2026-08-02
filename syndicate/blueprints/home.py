@@ -5206,6 +5206,16 @@ def _mlb_top_prop_rows_from_group(
                         "pick": pick,
                         "detail": f"{pick} {market} | {heading}".strip(),
                         "value": f"{probability * 100:.1f}% win" if probability is not None else heading,
+                        # 2026-08-01 board audit: team_label/opponent_label
+                        # were computed above (used for away_logo/home_logo
+                        # matching) but never actually put on the row --
+                        # confirmed live, every home-rails prop candidate
+                        # downstream (_prop_candidate_from_item reads
+                        # item.get("team")/item.get("opponent")) showed a
+                        # blank team on the Layer 2 board regardless of a
+                        # real team being known right here.
+                        "team": team_label or None,
+                        "opponent": opponent_label or None,
                         "projected": _prop_metric_text(value.get("mean")),
                         "sim_projection": _prop_metric_text(value.get("mean")),
                         "line": _prop_metric_text(value.get("line")) or _safe_text(value.get("line"), "-"),

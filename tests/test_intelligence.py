@@ -3723,6 +3723,44 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(filled, 0)
         self.assertEqual(candidate.get("projected"), "3.3")
 
+    def test_mlb_backfill_missing_projected_also_fills_standalone_steam_candidates(self) -> None:
+        # 2026-08-01 board audit: this backfill was gated to candidate_type
+        # == "prop" only -- confirmed live, ~195 of MLB's ~360 Layer 2
+        # candidates (over half the board) were standalone steam candidates
+        # (_steam_candidates_for_sport hardcodes "projected": "-"
+        # unconditionally, since that function has no sim access of its
+        # own) that never merged with a matching prop candidate -- a real
+        # steam/line move on a player+market the recommendation engine
+        # simply never flagged as a top pick, confirmed against a real
+        # example (Jung Hoo Lee home runs) whose daily_top_props row exists
+        # (mean 0.032) despite no matching prop candidate anywhere in the
+        # pool. Steam candidates carry player_name/market_key/game_pk in
+        # the same shape prop candidates do, so the same lookup applies.
+        from syndicate.features.intelligence import _mlb_backfill_missing_projected_from_top_props
+
+        candidate = {
+            "candidate_type": "steam",
+            "sport_slug": "mlb",
+            "player_name": "Jung Hoo Lee",
+            "name": "Jung Hoo Lee Home runs steam move",
+            "pick": "Jung Hoo Lee over 0.5",
+            "market": "Home runs · Steam",
+            "market_key": "home_runs",
+            "game_pk": 824010,
+            "projected": "-",
+        }
+        pregame_rows = [{"ownerName": "Jung Hoo Lee", "stat": "home_runs", "mean": 0.032, "gamePk": 824010}]
+        with patch(
+            "syndicate.features.intelligence._mlb_top_props_rows_from_artifact",
+            return_value=pregame_rows,
+        ):
+            filled = _mlb_backfill_missing_projected_from_top_props(
+                {"slug": "mlb", "context_label": "2026-08-01"}, [candidate]
+            )
+
+        self.assertEqual(filled, 1)
+        self.assertEqual(candidate.get("projected"), "0.0")
+
     def test_mlb_live_lens_prop_candidates_projected_stays_dash_without_a_pregame_match(self) -> None:
         # No matching daily_top_props row -- must NOT fabricate a pregame
         # value from the live one; "-" is the honest answer.
