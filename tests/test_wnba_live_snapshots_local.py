@@ -664,6 +664,69 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual(game.get("event_id"), "evt-1")
         self.assertEqual(((game.get("lines") or {}).get("period_totals") or {}).get("q3"), 44.5)
 
+    def test_local_live_snapshot_payload_does_not_pin_a_stale_cache_entry_when_path_stat_never_changes(self) -> None:
+        # Root-caused live 2026-08-02 (MIN@IND): even after the alternate-root
+        # freshness fix above (already deployed), /wnba/api/live_lines stayed
+        # pinned on ONE generated_at for 15+ minutes while the export
+        # diagnostic showed real, newer period data (q1-q4/h1) landing every
+        # cycle. Root cause: the lru_cache on _local_live_snapshot_payload_
+        # cached was keyed off path.stat() (mtime_ns/size) -- but this file is
+        # written cross-service through the keyvalue store, so on the web
+        # dyno path.stat() either raises (no local file) or sees a local file
+        # that never changes, collapsing every call after the first
+        # successful fetch onto the SAME cache key forever. Exactly the class
+        # of bug _game_cards_or_live_state_signature already fixed once for
+        # game_cards.csv/live_state.jsonl -- never applied here until now.
+        # Simulates the real Render shape: no real file on local disk
+        # (path.stat() always raises the same way), but the keyvalue content
+        # genuinely changes between calls.
+        from syndicate.features.wnba import cards as cards_module
+
+        with TemporaryDirectory() as temp_dir:
+            nonexistent_path = Path(temp_dir) / "does_not_exist" / "live_snapshots" / "live_lines_2026-05-21.jsonl"
+            state = {
+                "text": json.dumps(
+                    {
+                        "payload": {
+                            "ok": True,
+                            "date": "2026-05-21",
+                            "generated_at": "2026-05-21T19:10:51+00:00",
+                            "games": [{"event_id": "evt-1", "found": True, "lines": {"total": 193.5, "period_totals": {}}}],
+                        }
+                    }
+                )
+                + "\n"
+            }
+            fresher_text = (
+                json.dumps(
+                    {
+                        "payload": {
+                            "ok": True,
+                            "date": "2026-05-21",
+                            "generated_at": "2026-05-21T19:24:03+00:00",
+                            "games": [{"event_id": "evt-1", "found": True, "lines": {"total": 209.5, "period_totals": {"q1": 69.0}}}],
+                        }
+                    }
+                )
+                + "\n"
+            )
+
+            def fake_keyvalue_read(_path: object) -> str:
+                return state["text"]
+
+            with patch.object(cards_module, "_live_snapshot_artifact_path", return_value=nonexistent_path), patch.object(
+                cards_module, "_keyvalue_read_text_file", side_effect=fake_keyvalue_read
+            ):
+                cards_module._local_live_snapshot_payload.cache_clear()
+                first = cards_module._local_live_snapshot_payload("live_lines", "2026-05-21")
+                state["text"] = fresher_text
+                second = cards_module._local_live_snapshot_payload("live_lines", "2026-05-21")
+                cards_module._local_live_snapshot_payload.cache_clear()
+
+        self.assertEqual((first or {}).get("generated_at"), "2026-05-21T19:10:51+00:00")
+        self.assertEqual((second or {}).get("generated_at"), "2026-05-21T19:24:03+00:00")
+        self.assertEqual(((second.get("games") or [{}])[0].get("lines") or {}).get("period_totals", {}).get("q1"), 69.0)
+
     def test_live_state_payload_falls_back_to_cards_context(self) -> None:
         with patch(
             "syndicate.features.wnba.cards.build_cards_page_context",

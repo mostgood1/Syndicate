@@ -3463,7 +3463,7 @@ def _public_scoreboard_live_state_payload(selected_date: str) -> dict[str, Any] 
 
 
 @lru_cache(maxsize=256)
-def _local_live_snapshot_payload_cached(kind: str, resolved_date: str, snapshot_mtime_ns: int | None, snapshot_size: int | None) -> dict[str, Any] | None:
+def _local_live_snapshot_payload_cached(kind: str, resolved_date: str, signature: int) -> dict[str, Any] | None:
     if not resolved_date:
         return None
     path = _live_snapshot_artifact_path(kind, resolved_date)
@@ -3495,11 +3495,21 @@ def _local_live_snapshot_payload(kind: str, selected_date: str) -> dict[str, Any
     if not resolved_date:
         return None
     path = _live_snapshot_artifact_path(kind, resolved_date)
-    try:
-        stat = path.stat()
-        payload = _local_live_snapshot_payload_cached(kind, resolved_date, int(stat.st_mtime_ns), int(stat.st_size))
-    except Exception:
-        payload = _local_live_snapshot_payload_cached(kind, resolved_date, None, None)
+    # Found live 2026-08-02: this used to key the lru_cache off path.stat()
+    # (mtime_ns/size). live_lines/live_player_lens/live_player_boxscore/
+    # live_pbp_stats are written cross-service through the keyvalue store --
+    # exactly the class of bug _game_cards_or_live_state_signature (above)
+    # already fixed once for game_cards.csv/live_state.jsonl -- so on the web
+    # dyno path.stat() either raises (no local file) or sees a local file
+    # that never changes, collapsing every call after the first successful
+    # fetch onto the SAME cache key forever. Confirmed live: MIN@IND's
+    # /wnba/api/live_lines stayed pinned on one generated_at for 15+ minutes
+    # while the diagnostic endpoint showed newer writes with real period
+    # data landing every cycle -- the alternate-root freshness fix above
+    # never got a chance to run because the cache never re-fetched at all.
+    # Hash the actual keyvalue content instead, same as that earlier fix.
+    signature = _game_cards_or_live_state_signature(path)
+    payload = _local_live_snapshot_payload_cached(kind, resolved_date, signature)
     # Found live 2026-08-01: processed_root() (current_odds_root_for_sport)
     # always prefers the "source_artifacts" candidate root whether or not
     # that location actually has anything written to it -- the same
