@@ -30,8 +30,10 @@ from syndicate.features.shared.basketball_props_recommendations import export_pr
 from syndicate.features.shared.basketball_props_smart_sim import _to_tricode_local
 from syndicate.features.shared.refresh_state_store import build_input_hash
 from syndicate.features.shared.refresh_state_store import path_fingerprint
+from syndicate.features.shared.refresh_state_store import read_json_file as _keyvalue_read_json_file
 from syndicate.features.shared.refresh_state_store import record_refresh_state
 from syndicate.features.shared.refresh_state_store import should_recompute
+from syndicate.features.shared.refresh_state_store import write_json_file as _keyvalue_write_json_file
 from syndicate.features.shared.timezone import central_date_from_iso
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -170,6 +172,24 @@ def _copy_existing_live_snapshot_artifact(*, source_root: Path, file_name: str, 
 
 
 def _read_live_snapshot_payload(path: Path) -> dict[str, object] | None:
+    # The production writer below always overwrites with a single record, so
+    # try the keyvalue-aware reader first (cross-service consistent) before
+    # falling back to the old multi-line-JSONL local read, which only
+    # matters for files an external source app's own exporter appended to.
+    # Mirrors the identical fix already applied to WNBA's copy of this
+    # function (scripts/refresh_wnba_oddsapi_props.py) -- same bug, same
+    # root cause: live-odds-worker computes this snapshot and the syndicate
+    # web service (a separate disk on Render) is what actually serves the
+    # request that reads it back, so a plain local-disk read/write here was
+    # invisible cross-service no matter how fresh the write was.
+    keyvalue_record = _keyvalue_read_json_file(path)
+    if isinstance(keyvalue_record, dict):
+        payload = keyvalue_record.get("payload") if isinstance(keyvalue_record.get("payload"), dict) else None
+        if isinstance(payload, dict):
+            return payload
+        if isinstance(keyvalue_record.get("games"), list):
+            return keyvalue_record
+
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except Exception:
@@ -193,9 +213,12 @@ def _read_live_snapshot_payload(path: Path) -> dict[str, object] | None:
 def _write_live_snapshot_payload(path: Path, payload: dict[str, object]) -> bool:
     if not isinstance(payload, dict):
         return False
-    path.parent.mkdir(parents=True, exist_ok=True)
+    # Written cross-service through the keyvalue store: the live-odds-worker
+    # refresh loop and the on-demand web request path run on different
+    # Render services with separate local disks, so a plain local write here
+    # would be invisible to whichever service didn't just write it.
     record = {"payload": payload}
-    path.write_text(json.dumps(record, ensure_ascii=False) + "\n", encoding="utf-8")
+    _keyvalue_write_json_file(path, record)
     return True
 
 

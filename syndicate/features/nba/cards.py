@@ -38,6 +38,7 @@ from syndicate.features.shared.team_branding import read_team_branding_snapshot
 from syndicate.features.shared.team_branding import team_branding_index_by_abbreviation
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
 from syndicate.features.shared.game_board_contract import _sim_payload
+from syndicate.features.shared.refresh_state_store import read_text_file as _keyvalue_read_text_file
 from syndicate.features.shared.timezone import central_now
 from syndicate.features.shared.timezone import central_today_iso
 
@@ -88,6 +89,25 @@ def _path_cache_signature(path: Path | None) -> int:
         return int((stat.st_mtime_ns << 16) ^ int(stat.st_size))
     except OSError:
         return 0
+
+
+def _live_snapshot_or_state_signature(path: Path | None) -> int:
+    # live_state.jsonl / live_lines / live_player_lens / live_player_boxscore
+    # / live_pbp_stats are written cross-service through the keyvalue store
+    # (live-odds-worker computes them, the web service has a separate disk),
+    # so under the keyvalue backend they no longer exist as real local files
+    # -- _path_cache_signature would always see "file not found" and return
+    # the same value forever, making the lru_cache below permanently stale.
+    # Mirrors the identical fix already applied to WNBA's copy of this same
+    # bug (_game_cards_or_live_state_signature / _local_live_snapshot_payload
+    # in syndicate/features/wnba/cards.py) -- hash the actual keyvalue
+    # content instead so the cache key changes whenever the underlying data
+    # does.
+    if path is not None:
+        keyvalue_text = _keyvalue_read_text_file(path)
+        if keyvalue_text is not None:
+            return hash(keyvalue_text)
+    return _path_cache_signature(path)
 
 
 def _load_csv_rows(path: Path) -> list[dict[str, str]]:
@@ -546,16 +566,19 @@ def _artifact_bundle(selected_date: str) -> dict[str, Any]:
     }
 
 
-@lru_cache(maxsize=64)
-def _local_live_state_payload_cached(selected_date: str, snapshot_mtime_ns: int | None, snapshot_size: int | None) -> dict[str, Any] | None:
-    try:
-        path = live_snapshot_path(f"live_state_{selected_date}.jsonl")
-    except FileNotFoundError:
+def _read_live_snapshot_jsonl_payload(path: Path) -> dict[str, Any] | None:
+    # Keyvalue-aware (not path.read_text()) -- live_state.jsonl and the
+    # live_lines/live_player_lens/live_player_boxscore/live_pbp_stats
+    # snapshots below are computed by live-odds-worker and read by whichever
+    # process handles the request (often a different Render service, a
+    # separate disk), so a plain local-disk read here only ever saw whatever
+    # THIS process itself had already written. Same root cause already fixed
+    # for WNBA's copy of this function (confirmed live 2026-07-22: WNBA live
+    # player props stayed empty for exactly this reason).
+    text = _keyvalue_read_text_file(path)
+    if text is None:
         return None
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except Exception:
-        return None
+    lines = text.splitlines()
     for line in reversed(lines):
         raw = str(line or "").strip()
         if not raw:
@@ -572,16 +595,21 @@ def _local_live_state_payload_cached(selected_date: str, snapshot_mtime_ns: int 
     return None
 
 
+@lru_cache(maxsize=64)
+def _local_live_state_payload_cached(selected_date: str, signature: int) -> dict[str, Any] | None:
+    try:
+        path = live_snapshot_path(f"live_state_{selected_date}.jsonl")
+    except FileNotFoundError:
+        return None
+    return _read_live_snapshot_jsonl_payload(path)
+
+
 def _local_live_state_payload(selected_date: str) -> dict[str, Any] | None:
     try:
         path = live_snapshot_path(f"live_state_{selected_date}.jsonl")
     except FileNotFoundError:
-        return _local_live_state_payload_cached(selected_date, None, None)
-    try:
-        stat = path.stat()
-    except Exception:
-        return _local_live_state_payload_cached(selected_date, None, None)
-    return _local_live_state_payload_cached(selected_date, int(stat.st_mtime_ns), int(stat.st_size))
+        return _local_live_state_payload_cached(selected_date, 0)
+    return _local_live_state_payload_cached(selected_date, _live_snapshot_or_state_signature(path))
 
 
 _local_live_state_payload.cache_clear = _local_live_state_payload_cached.cache_clear  # type: ignore[attr-defined]
@@ -908,31 +936,14 @@ def _merge_games_with_live_state(games: list[dict[str, Any]], selected_date: str
 
 
 @lru_cache(maxsize=256)
-def _local_live_snapshot_payload_cached(kind: str, resolved_date: str, snapshot_mtime_ns: int | None, snapshot_size: int | None) -> dict[str, Any] | None:
+def _local_live_snapshot_payload_cached(kind: str, resolved_date: str, signature: int) -> dict[str, Any] | None:
     if not resolved_date:
         return None
     try:
         path = live_snapshot_path(f"{kind}_{resolved_date}.jsonl")
     except FileNotFoundError:
         return None
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except Exception:
-        return None
-    for line in reversed(lines):
-        raw = str(line or "").strip()
-        if not raw:
-            continue
-        try:
-            record = json.loads(raw)
-        except Exception:
-            continue
-        payload = record.get("payload") if isinstance(record, dict) and isinstance(record.get("payload"), dict) else None
-        if isinstance(payload, dict):
-            return payload
-        if isinstance(record, dict) and isinstance(record.get("games"), list):
-            return record
-    return None
+    return _read_live_snapshot_jsonl_payload(path)
 
 
 def _local_live_snapshot_payload(kind: str, selected_date: str) -> dict[str, Any] | None:
@@ -942,12 +953,8 @@ def _local_live_snapshot_payload(kind: str, selected_date: str) -> dict[str, Any
     try:
         path = live_snapshot_path(f"{kind}_{resolved_date}.jsonl")
     except FileNotFoundError:
-        return _local_live_snapshot_payload_cached(kind, resolved_date, None, None)
-    try:
-        stat = path.stat()
-    except Exception:
-        return _local_live_snapshot_payload_cached(kind, resolved_date, None, None)
-    return _local_live_snapshot_payload_cached(kind, resolved_date, int(stat.st_mtime_ns), int(stat.st_size))
+        return _local_live_snapshot_payload_cached(kind, resolved_date, 0)
+    return _local_live_snapshot_payload_cached(kind, resolved_date, _live_snapshot_or_state_signature(path))
 
 
 _local_live_snapshot_payload.cache_clear = _local_live_snapshot_payload_cached.cache_clear  # type: ignore[attr-defined]
@@ -2259,7 +2266,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
         _path_cache_signature(_artifact_paths(requested_date)["recommendations"]),
         _path_cache_signature(_artifact_paths(requested_date)["sim"]),
         _path_cache_signature(_artifact_paths(requested_date)["props"]),
-        _path_cache_signature(live_snapshot_path(f"live_state_{requested_date}.jsonl")),
+        _live_snapshot_or_state_signature(live_snapshot_path(f"live_state_{requested_date}.jsonl")),
     )
     cached_context = _cache_get_context(cache_key)
     if cached_context is not None:

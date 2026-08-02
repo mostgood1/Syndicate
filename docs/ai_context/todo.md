@@ -4,9 +4,9 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-02 (see "Reconciliation 2026-08-02 (MLB props
-self-heal blind spot on a MISSING artifact + WNBA pregame props zeroing out,
-both shipped and deployed)" below).
+Last reconciled: 2026-08-02 (see "Reconciliation 2026-08-02 (NBA live
+snapshot cross-service read/write never made keyvalue-aware -- fixed
+locally, NOT yet committed/deployed)" below).
 Before that: "Reconciliation 2026-08-01 part 3 (NFL:
 season-projection autorun enabled in production)".
 Before that: "Reconciliation 2026-08-01 part 2 (NFL:
@@ -15,6 +15,64 @@ Before that: "Reconciliation 2026-08-01 (Layer 2 board:
 full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
+
+### Reconciliation 2026-08-02 (NBA live snapshot cross-service read/write never made keyvalue-aware -- fixed locally, NOT yet committed/deployed)
+
+Prompted by a code-review-style task comparing `syndicate/features/nba/cards.py`'s
+`_local_live_snapshot_payload_cached` (plain `path.read_text()`) against
+`syndicate/features/wnba/cards.py`'s already-fixed `_read_jsonl_snapshot_payload`
+(keyvalue-aware). Investigated and confirmed this is a real, still-open production
+bug, not a stale comparison: `render.yaml` sets
+`SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` on all three services (web,
+refresh-worker, live-odds-worker), NBA's live-game refresh runs on
+`live-odds-worker` (same loop that also drives WNBA/MLB, per
+`scripts/run_live_odds_refresh_worker.py`) -- a separate disk from the web
+service that renders NBA live pages -- and unlike WNBA, **NBA had zero
+keyvalue-aware code anywhere in this path**: not the writer
+(`scripts/refresh_nba_oddsapi_props.py`'s `_read_live_snapshot_payload`/
+`_write_live_snapshot_payload`, plain `path.read_text()`/`path.write_text()`),
+not the reader (`_local_live_snapshot_payload_cached` for
+live_lines/live_player_lens/live_player_boxscore/live_pbp_stats, plus the
+sibling `_local_live_state_payload_cached` for live_state.jsonl -- same bug,
+same file, not explicitly named in the original ask but fixed alongside since
+it's the identical pattern one function away and shares the same writer).
+Additionally, all three cache functions keyed their `lru_cache` off
+`path.stat()` mtime/size, which under a keyvalue backend either raises (no
+local file exists) or never changes -- collapsing every call after the first
+onto the same stale cache entry forever, independent of the read-path bug.
+
+Could not verify against a live production NBA game (NBA is off-season as of
+2026-08-02) -- this is a code-level fix based on decisive static evidence
+(render.yaml backend config + service topology + total absence of any
+keyvalue helper in the NBA path), not a live-confirmed regression the way the
+WNBA original was. Treat as high-confidence but flag if NBA's live pages still
+look wrong once the season resumes and this hasn't shipped yet.
+
+Fixed by mirroring WNBA's exact, already-proven pattern: added
+`_keyvalue_read_json_file`/`_keyvalue_write_json_file`-backed
+`_read_live_snapshot_payload`/`_write_live_snapshot_payload` in the writer
+script, and a keyvalue-aware `_read_live_snapshot_jsonl_payload` +
+content-hash `_live_snapshot_or_state_signature` (replacing the mtime/size
+`_path_cache_signature` for these specific files only -- game_cards.csv/
+recommendations/sim/props artifacts were left untouched, out of scope) in
+`nba/cards.py`. New regression tests in
+`tests/test_nba_cards_keyvalue_backend.py` (mirroring
+`tests/test_wnba_cards_keyvalue_backend.py`) cover cross-service round-trip
+and cache invalidation on a fresh keyvalue write. All targeted NBA tests pass
+(56/56 outside a pre-existing, unrelated test-order pollution issue -- see
+below). **Not committed and not deployed this session** -- next session
+should confirm with the user whether to commit/push, since this touches the
+production write path for a currently off-season sport.
+
+Also found (not fixed, flagged as a separate spawn_task): 
+`tests/test_nba_cards_merge_aliases.py::NbaCardsMergeAliasTests::test_cards_page_context_stays_artifact_first_on_render_web_dyno`
+passes alone but fails when run after `test_nba_live_snapshots_local.py`/
+`test_nba_refresh_runner.py` in the same session -- confirmed via `git stash`
+this predates this session's changes entirely (pre-existing on `main`).
+Likely a module-level `_NBA_CARDS_CONTEXT_CACHE` (or an lru_cache) leaking
+state between test files with no reset fixture, same class of thing
+`tests/conftest.py`'s existing autouse fixture already handles for WNBA's
+wall-clock-TTL caches.
 
 ### Reconciliation 2026-08-02 (MLB props self-heal blind spot on a MISSING artifact + WNBA pregame props zeroing out, both shipped and deployed)
 
@@ -7891,6 +7949,21 @@ were resolved and nine already-closed rows removed from the open tables.
 > (284,976cr total): props still dominates at 186,390cr (65.4%), segment
 > 57,986cr (20.3%), alternate 29,007cr (10.2%), full_game 11,118cr (3.9%) —
 > same shape as before, props remains the lever if headroom ever tightens.
+>
+> **Firmer read, 2026-08-02T04:33Z (28.5h post-rollover — supersedes the 3.54h
+> provisional table above, same baseline):**
+>
+> | Window | Burned | /hour | Projected 30d | vs 5M target |
+> |---|---|---|---|---|
+> | 102,707s (70,871 obs) | 52,440 | 1,838.1 | **1.32M** | **26.5%** |
+>
+> /hour roughly halved versus the first 3.5h post-rollover (3,472.1 → 1,838.1)
+> as the initial burst diluted out — this is the more trustworthy number.
+> **Best reading yet, well under target.** NFL cumulative (since 07-28) up to
+> 290 calls / 87cr — still trivial. `by_market_family` cumulative since 07-28
+> (318,968cr total, spans the rollover): props 203,356cr (63.8%), segment
+> 68,330cr (21.4%), alternate 34,182cr (10.7%), full_game 12,594cr (3.9%) —
+> same shape, props still the lever if it's ever needed.
 
 **16** 🟢 **CLOSED 2026-07-25** (`1986caf6`, "Drop F7 markets; standard line
 wins, alternates kept as a ladder") — **do not treat this as an open decision**,

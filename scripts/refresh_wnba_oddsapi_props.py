@@ -507,7 +507,23 @@ def _build_source_live_lines_payload(
             }
         )
 
-    payload = {"ok": True, "ttl": 20, "date": date_str, "games": out_games}
+    # Root-caused live 2026-08-02 (POR@LA): this payload never carried a
+    # generated_at/odds_refreshed_at field. cards.py's read-side freshness
+    # comparison across candidate roots (_local_live_snapshot_payload)
+    # requires a parseable timestamp to ever prefer one candidate's payload
+    # over another's -- with no timestamp here at all, this genuinely richer
+    # (real period_totals/period_spreads) payload could never outrank a
+    # present-but-weaker payload sitting on the other candidate root,
+    # regardless of which was actually written more recently. Confirmed
+    # live: the raw stored file on this exact path had real period data for
+    # every in-progress game, but its own generated_at read back as None.
+    payload = {
+        "ok": True,
+        "ttl": 20,
+        "date": date_str,
+        "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "games": out_games,
+    }
     return payload if _payload_has_snapshot_content("live_lines", payload) else None
 
 

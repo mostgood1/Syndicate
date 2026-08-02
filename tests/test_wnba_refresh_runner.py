@@ -2763,6 +2763,56 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             self.assertEqual(candidates["final_payload_interval_count"], 1)
             self.assertEqual(candidates["source_payload_games"], fake_source_payload["games"])
 
+    def test_build_source_live_lines_payload_stamps_a_real_generated_at(self) -> None:
+        # Root-caused live 2026-08-02 (POR@LA): this payload never carried a
+        # generated_at/odds_refreshed_at field at all. cards.py's read-side
+        # freshness comparison across candidate roots requires a parseable
+        # timestamp to ever prefer one candidate's payload over another's --
+        # confirmed live: the raw stored file had real period_totals for an
+        # in-progress game, but reading its own generated_at back gave None,
+        # so it could never outrank a present-but-empty payload sitting on
+        # the other candidate root regardless of which was written more
+        # recently.
+        module = self._load_module()
+
+        class _FakeSourceApp:
+            @staticmethod
+            def _live_oddsapi_period_totals_for_game(date_str, home_tri, away_tri):
+                return {
+                    "game_lines": {"total": 209.5, "home_spread": -6.5, "away_spread": 6.5, "home_ml": -300.0, "away_ml": 240.0},
+                    "period_totals": {"q1": 47.5, "q2": 44.5, "h1": 92.0},
+                    "period_spreads": {"q1": -1.5, "q2": -2.0, "h1": -3.5},
+                }
+
+        state_payload = {
+            "ok": True,
+            "games": [{"event_id": "401857108", "home": "LAS", "away": "POR", "in_progress": True}],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            (source_root / "data" / "processed").mkdir(parents=True, exist_ok=True)
+            processed_root.mkdir(parents=True, exist_ok=True)
+
+            with patch.object(module, "_load_source_app", return_value=_FakeSourceApp()):
+                payload = module._build_source_live_lines_payload(
+                    source_root=source_root,
+                    processed_root=processed_root,
+                    date_str="2026-08-02",
+                    state_payload=state_payload,
+                )
+
+        self.assertIsInstance(payload, dict)
+        game = (payload.get("games") or [{}])[0]
+        self.assertEqual((game.get("lines") or {}).get("period_totals", {}).get("q1"), 47.5)
+        generated_at = str(payload.get("generated_at") or "").strip()
+        self.assertTrue(generated_at, "generated_at must be a real, non-empty timestamp")
+        import datetime as _dt
+
+        _dt.datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+
     def test_export_live_snapshot_artifacts_skips_empty_shells_without_replacement(self) -> None:
         module = self._load_module()
 
