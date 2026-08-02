@@ -1098,6 +1098,92 @@ class IntelligenceStateTests(unittest.TestCase):
                 self.assertEqual(board_snapshot["board_contract"]["schema"], "intelligence_board_v1")
                 self.assertEqual(board_snapshot["response"]["board_contract"]["schema"], "intelligence_board_v1")
 
+    def test_compute_response_caps_unbounded_default_candidate_count(self) -> None:
+        # Confirmed live 2026-08-02: an unbounded default (no explicit
+        # `limit` in the request) response on a real 380-candidate Sunday
+        # slate serialized to ~30MB, blowing past both the keyvalue write
+        # ceiling (8MB) and the artifact-publish fallback's own effective
+        # limit (~19.6MB) -- every persistence attempt failed, freezing the
+        # shared board for 3+ hours despite refresh-worker computing a
+        # correct, fresh board every cycle the whole time. Locks in that the
+        # unbounded case is capped (both the flat list and each by_sport
+        # bucket) while candidate_count still reports the true total -- an
+        # explicit limit (see the sibling test with limit=1 above) is
+        # untouched by this.
+        service = IntelligenceStateService()
+        mlb_candidates = [{"name": f"MLB Play {i}", "sport_slug": "mlb", "market": "Hits"} for i in range(220)]
+        wnba_candidates = [{"name": f"WNBA Play {i}", "sport_slug": "wnba", "market": "Points"} for i in range(80)]
+        all_candidates = mlb_candidates + wnba_candidates
+
+        candidate_pool = {
+            "selected_date": "2026-06-15",
+            "source_fingerprint": "fingerprint-1",
+            "candidate_count": len(all_candidates),
+            "candidate_pools": {},
+            "global_pool": all_candidates,
+            "candidates": all_candidates,
+        }
+        analysis_result = {"ok": True, "headline": "The Syndicate brief", "recommendations": [], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []}
+
+        with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-1"):
+            with patch.object(service, "_build_candidate_pool", return_value=dict(candidate_pool)):
+                with patch("pipeline.intelligence_state._balanced_recommendation_order", return_value=list(all_candidates)):
+                    with patch("pipeline.intelligence_state.run_routed_intelligence_pipeline", return_value=dict(analysis_result)):
+                        response = service._compute_response({"question": "top edges today", "date": "2026-06-15"}, force_refresh=True)
+
+        self.assertEqual(response["candidate_count"], 300)
+        self.assertEqual(len(response["top_opportunities"]), 150)
+        self.assertEqual(len(response["recommendations"]), 150)
+        self.assertEqual(len(response["by_sport"]["mlb"]), 60)
+        self.assertEqual(len(response["by_sport"]["wnba"]), 60)
+
+    def test_compute_board_publication_response_caps_unbounded_default_candidate_count(self) -> None:
+        # Same defect, other copy of the duplicated construction logic (the
+        # background loop's own publish path, not the on-demand query path
+        # covered above).
+        service = IntelligenceStateService()
+        mlb_candidates = [{"name": f"MLB Play {i}", "sport_slug": "mlb", "market": "Hits"} for i in range(220)]
+        wnba_candidates = [{"name": f"WNBA Play {i}", "sport_slug": "wnba", "market": "Points"} for i in range(80)]
+        all_candidates = mlb_candidates + wnba_candidates
+
+        candidate_pool = {
+            "selected_date": "2026-06-15",
+            "source_fingerprint": "fingerprint-1",
+            "candidate_count": len(all_candidates),
+            "candidate_pools": {},
+            "global_pool": all_candidates,
+            "candidates": all_candidates,
+        }
+
+        with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-1"):
+            with patch.object(service, "_build_candidate_pool", return_value=dict(candidate_pool)):
+                with patch("pipeline.intelligence_state._balanced_recommendation_order", return_value=list(all_candidates)):
+                    response = service._compute_board_publication_response({"question": "top edges today", "date": "2026-06-15"})
+
+        self.assertEqual(response["candidate_count"], 300)
+        self.assertEqual(len(response["top_opportunities"]), 150)
+        self.assertEqual(len(response["recommendations"]), 150)
+        self.assertEqual(len(response["by_sport"]["mlb"]), 60)
+        self.assertEqual(len(response["by_sport"]["wnba"]), 60)
+
+    def test_default_candidate_cap_is_env_tunable(self) -> None:
+        service = IntelligenceStateService()
+        all_candidates = [{"name": f"Play {i}", "sport_slug": "mlb", "market": "Hits"} for i in range(50)]
+        candidate_pool = {
+            "selected_date": "2026-06-15",
+            "source_fingerprint": "fingerprint-1",
+            "candidate_count": len(all_candidates),
+            "candidate_pools": {},
+            "global_pool": all_candidates,
+            "candidates": all_candidates,
+        }
+        with patch.dict(os.environ, {"SYNDICATE_INTELLIGENCE_DEFAULT_CANDIDATE_CAP": "10"}):
+            with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-1"):
+                with patch.object(service, "_build_candidate_pool", return_value=dict(candidate_pool)):
+                    with patch("pipeline.intelligence_state._balanced_recommendation_order", return_value=list(all_candidates)):
+                        response = service._compute_board_publication_response({"question": "top edges today", "date": "2026-06-15"})
+        self.assertEqual(len(response["top_opportunities"]), 10)
+
     def test_write_latest_intelligence_state_falls_back_to_artifact_when_board_snapshot_too_large(self) -> None:
         # #105 follow-up, confirmed live 2026-07-27: unlike the compact state
         # payload two writes above (which already goes through

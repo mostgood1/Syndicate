@@ -188,6 +188,48 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return raw in {"1", "true", "t", "yes", "y", "on"}
 
 
+def _default_unbounded_candidate_cap() -> int:
+    # 2026-08-02: a live 9-game Sunday slate combined with MLB's props
+    # pipeline finally producing real data (a separate fix earlier the same
+    # session) pushed a single day's candidate pool past 380. An "unlimited"
+    # (no explicit `limit` in the request payload) top_opportunities/
+    # recommendations response serialized to ~30MB -- blowing past both the
+    # 8MB keyvalue write ceiling (refresh_state_store._keyvalue_max_bytes)
+    # AND the artifact-publish fallback's own effective limit (measured
+    # ~19.6MB before the connection drops -- see write_intelligence_state's
+    # _write_state_payload docstring). Every persistence fallback failed on
+    # every cycle, confirmed live via KEYVALUE_WRITE_REJECTED (30-33MB
+    # against an 8MB ceiling) and STATE_PUBLISHED_AS_ARTIFACT published=False
+    # in refresh-worker's own logs -- so the shared board froze at
+    # snapshot_generated_at=17:15:43Z (the last snapshot small enough to
+    # persist) for 3+ hours, even though refresh-worker kept computing a
+    # correct, fresh, real board every ~6 minutes the whole time. The web
+    # service can only ever see what's actually persisted (it never computes
+    # its own board), so a board that cannot be written might as well not
+    # exist for every reader.
+    #
+    # Capping the "give me everything" default -- not any caller's explicit
+    # `limit` -- keeps the persisted/served board small enough to actually
+    # reach readers. `candidate_count` in the response still reports the
+    # TRUE total pool size (len(candidates), never capped), so this never
+    # hides how much real data exists -- it only bounds what gets
+    # serialized. No UI this repo serves renders anywhere close to this many
+    # cards at once.
+    return max(1, _env_int("SYNDICATE_INTELLIGENCE_DEFAULT_CANDIDATE_CAP", 150))
+
+
+def _default_unbounded_by_sport_cap() -> int:
+    # by_sport is deliberately NOT limited by `limit_value` (see the "full
+    # ranked pool, not the sport-scoped/limited slice" comment at each call
+    # site) so a global top-N request never makes a sport look thinner than
+    # it really is. On a slate this large that means by_sport alone measured
+    # ~6MB, comparable to top_opportunities/recommendations combined -- so
+    # capping only those two is not sufficient on its own. Larger than
+    # _default_unbounded_candidate_cap's default since it applies PER SPORT,
+    # not to the flat combined list.
+    return max(1, _env_int("SYNDICATE_INTELLIGENCE_DEFAULT_BY_SPORT_CAP", 60))
+
+
 def _stable_payload(payload: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(payload)
     normalized.pop("user_profile", None)
@@ -3423,10 +3465,17 @@ class IntelligenceStateService:
         # Group by sport from the full ranked pool (not the sport-scoped/
         # limited slice below) so by_sport always reflects true per-sport
         # availability, even when the request asks for one specific sport.
+        # Each sport's list is capped (see _default_unbounded_by_sport_cap)
+        # so a dominant sport on a busy day cannot alone blow the persisted
+        # payload past the keyvalue/artifact-publish ceilings -- true counts
+        # stay available via response_candidate_count/candidate_count below.
+        by_sport_cap = _default_unbounded_by_sport_cap()
         by_sport: dict[str, list[dict[str, object]]] = {}
         for recommendation in top_candidates:
             sport_key = str(recommendation.get("sport") or recommendation.get("sport_slug") or "unknown").strip().lower() or "unknown"
-            by_sport.setdefault(sport_key, []).append(dict(recommendation))
+            bucket = by_sport.setdefault(sport_key, [])
+            if len(bucket) < by_sport_cap:
+                bucket.append(dict(recommendation))
 
         # _build_candidate_pool always builds a sport="all" pool (it's cached
         # by date only, not by sport), so without this the requested "sport"
@@ -3437,7 +3486,11 @@ class IntelligenceStateService:
         sport_scoped_candidates = top_candidates if requested_sport == "all" else by_sport.get(requested_sport, [])
 
         if limit_value is None:
-            top_opportunities = list(sport_scoped_candidates)
+            # See _default_unbounded_candidate_cap: an unbounded default on a
+            # busy day serializes to tens of MB and fails every persistence
+            # fallback, freezing the board readers actually see. Explicit
+            # limits from a caller are never touched here.
+            top_opportunities = list(sport_scoped_candidates)[: _default_unbounded_candidate_cap()]
         else:
             opportunity_limit = max(int(limit_value), 1) if sport_scoped_candidates else max(int(limit_value), 0)
             top_opportunities = sport_scoped_candidates[:opportunity_limit]
@@ -3673,10 +3726,17 @@ class IntelligenceStateService:
             else:
                 top_candidates = []
 
+            # Each sport's list is capped (see _default_unbounded_by_sport_cap
+            # and the matching comment in _compute_board_publication_response)
+            # so a dominant sport on a busy day cannot alone blow the
+            # persisted payload past the keyvalue/artifact-publish ceilings.
+            by_sport_cap = _default_unbounded_by_sport_cap()
             by_sport: dict[str, list[dict[str, object]]] = {}
             for recommendation in top_candidates:
                 sport_key = str(recommendation.get("sport") or recommendation.get("sport_slug") or "unknown").strip().lower() or "unknown"
-                by_sport.setdefault(sport_key, []).append(dict(recommendation))
+                bucket = by_sport.setdefault(sport_key, [])
+                if len(bucket) < by_sport_cap:
+                    bucket.append(dict(recommendation))
 
             # See the matching comment in _compute_board_publication_response:
             # _build_candidate_pool always builds a sport="all" pool, so
@@ -3685,7 +3745,8 @@ class IntelligenceStateService:
             sport_scoped_candidates = top_candidates if requested_sport == "all" else by_sport.get(requested_sport, [])
 
             if limit_value is None:
-                top_opportunities = list(sport_scoped_candidates)
+                # See _default_unbounded_candidate_cap.
+                top_opportunities = list(sport_scoped_candidates)[: _default_unbounded_candidate_cap()]
             else:
                 opportunity_limit = max(int(limit_value), 1) if sport_scoped_candidates else max(int(limit_value), 0)
                 top_opportunities = sport_scoped_candidates[:opportunity_limit]
