@@ -4,14 +4,100 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-01 (see "Reconciliation 2026-08-01 part 3 (NFL:
-season-projection autorun enabled in production)" below).
+Last reconciled: 2026-08-02 (see "Reconciliation 2026-08-02 (MLB props
+self-heal blind spot on a MISSING artifact + WNBA pregame props zeroing out,
+both shipped and deployed)" below).
+Before that: "Reconciliation 2026-08-01 part 3 (NFL:
+season-projection autorun enabled in production)".
 Before that: "Reconciliation 2026-08-01 part 2 (NFL:
 injury adjustment root-caused and defaulted OFF)".
 Before that: "Reconciliation 2026-08-01 (Layer 2 board:
 full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
+
+### Reconciliation 2026-08-02 (MLB props self-heal blind spot on a MISSING artifact + WNBA pregame props zeroing out, both shipped and deployed)
+
+User reported MLB props not hitting the board for a third straight morning
+and asked to fix the underlying timing gap, not just re-force a resim
+again. Confirmed live: `daily_top_props_2026-08-02.json` didn't exist at
+all (`/mlb/api/top-props?date=2026-08-02` -> Rows 0, empty_state), even
+though real pitcher/hitter odds had already been posted and published that
+morning. Root cause, found via `/api/ops/live-refresh/state`'s
+`sim_run_status`: a 9-game `fingerprint_change` scoped resim (launched
+08:00:57 CT) hit `SYNDICATE_MLB_SIM_TIMEOUT_SECONDS` (45min) and was killed
+(`exit_code":124`) before it ever reached the top-props stage of the
+pipeline. `_mlb_props_now_available_needs_regen`
+(`syndicate/features/shared/live_refresh_loop.py`) -- the #`da69cb57`
+self-heal trigger added 2026-08-01 for exactly this "props artifact never
+got written" symptom -- only fired for an artifact that exists but is
+empty; a MISSING file (the exact shape this timeout produces) fell through
+its `first_appearance`/coldstart exemption and never retried. Fixed the
+trigger to fall through to the regen check whenever `daily_summary` exists
+(reserving the coldstart exemption for when it doesn't), and raised
+`SYNDICATE_MLB_SIM_TIMEOUT_SECONDS` 45min -> 90min (matching the job
+runner's own default) and `SYNDICATE_MLB_SIM_WORKERS` 1 -> 2 on
+refresh-worker (confirmed live headroom comfortable) so a scoped resim is
+less likely to need the ceiling at all. Commit `1a56f914`, both env vars
+set via the single-key endpoint and confirmed round-tripped before
+deploying, deploy `dep-d9nmnmfqj5pc73f7nk50` confirmed `live`. Manually
+forced a resim for all 15 of today's games via
+`/api/ops/live-refresh/force-mlb-resim` to unblock today's board
+immediately rather than wait on the self-heal's natural cadence; a real
+`tip_off_window` sim (unrelated trigger, games actually starting) landed
+first and is expected to populate today's top-props as a side effect.
+**Not yet confirmed rows > 0 live** -- a monitor was left watching
+`/mlb/api/top-props`; if this session ended before it reported back,
+check `/mlb/api/top-props?date=2026-08-02`'s `Rows` stat first, next
+session.
+
+User asked about WNBA in the same breath ("wnba also has issues with props
+getting to the opps board"). Confirmed live: `/api/intelligence/status`
+showed `by_sport.wnba` with only 3 game-level candidates (Moneyline/ATS)
+and zero player props, despite `recommendations_slate_2026-08-02.json`
+having real prop data for all 4 games that day (confirmed via
+`/api/ops/intelligence/candidate-trace?sport=wnba`, which showed 23 raw
+per-sport candidates including rich `prop_recommendations` -- the data
+exists, it just never reaches `home_rails.pregame.items`, the only feed
+`_collect_candidates` has for WNBA prop candidates; unlike MLB/soccer, WNBA
+has no artifact-direct prop-candidate builder as a second path). Two real
+bugs found in `_WNBADataProvider.pregame_props`'s only path
+(`syndicate/blueprints/home.py`, `syndicate/features/wnba/picks.py`):
+1. `_cards_from_summary` (wnba/picks.py) applied a global `limit=12` cap
+   across ALL of today's games' `per_game[].picks` -- BEFORE
+   `_pregame_prop_rows_from_betting_card` (home.py) filters out game-level
+   ATS/Total/Moneyline picks via `_is_game_level_rank_card_market`. On a
+   multi-game slate the cap can be exhausted (or left dominated by
+   game-level picks) before enough real player props survive the later
+   filter. Raised to 60 -- comfortably above any real WNBA slate size.
+2. `_prop_rows_from_props_recommendations_csv` (home.py, the CSV fallback
+   path) set `away_label` but never `home_label`, so
+   `_backfill_prop_row_game_id`'s `away|home` lookup key could never match
+   -- CSV-sourced rows could never get a real `game_id`/`gamePk`/`event_id`
+   stamped on them. The CSV has no opponent column at all (confirmed by
+   direct inspection of its header), so added `_opponent_abbr_by_team`
+   (home.py) to derive it from `home_games` instead. New regression test
+   asserts the actual `gamePk`/`event_id` backfill now works -- this was
+   previously asserted nowhere (`test_home.py`'s existing CSV-path test
+   never checked ids at all). Commit `d12c3c3b`. Both fixes live in the
+   same `syndicate/blueprints/home.py`/`syndicate/features/wnba/picks.py`
+   module the refresh-worker's `pipeline/intelligence_state.py` background
+   loop calls directly (not request-path code, despite living in a
+   `blueprints/` file) -- deployed together with a concurrent session's
+   unrelated WNBA live-snapshots cache fix (`4bce5deb`) via
+   `dep-d9nnvn3m8hqs73eouk70`, confirmed `live`. **Not yet confirmed real
+   prop candidates appear live on `by_sport.wnba`** -- check
+   `/api/intelligence/status` next session if this one ended first.
+
+**Operational notes**: deployed refresh-worker twice this session, both
+times after checking `/api/ops/live-refresh/state`'s `sim_run_status` for
+an in-flight sim first per [[project-syndicate-deploy-kills-inflight-sim]];
+the second deploy killed a small in-flight `tip_off_window` sim (3 games,
+no ETA) with the user's explicit go-ahead rather than waiting. The
+`force-mlb-resim` and Render deploy-trigger calls both got blocked once by
+the permission-classifier as distinct risky actions even after a general
+"proceed with the fixes" -- each needed its own explicit ask, consistent
+with this repo's standing deploy/resim confirmation practice.
 
 ### Reconciliation 2026-08-01 part 3 (NFL: season-projection autorun enabled in production)
 
