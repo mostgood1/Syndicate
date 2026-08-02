@@ -325,6 +325,17 @@ def main() -> int:
         help="Weight for pitcher recency blend (passed through).",
     )
     ap.add_argument(
+        "--pitcher-so-model-weight",
+        type=float,
+        default=1.0,
+        help="Promoted 2026-08-01: default 1.0 (passed through). Pass 0.0 to disable the trained strikeout Poisson model.",
+    )
+    ap.add_argument(
+        "--pitcher-so-model-path",
+        default="",
+        help="Override path to the strikeout model JSON artifact (passed through).",
+    )
+    ap.add_argument(
         "--starter-stamina-shrink-n0",
         type=float,
         default=10.0,
@@ -564,6 +575,8 @@ def main() -> int:
         "batter_recency_weight": float(args.batter_recency_weight),
         "pitcher_recency_games": int(args.pitcher_recency_games),
         "pitcher_recency_weight": float(args.pitcher_recency_weight),
+        "pitcher_so_model_weight": float(args.pitcher_so_model_weight),
+        "pitcher_so_model_path": str(args.pitcher_so_model_path),
         "starter_stamina_shrink_n0": float(args.starter_stamina_shrink_n0),
         "weather_hr_weight": float(args.weather_hr_weight),
         "weather_inplay_hit_weight": float(args.weather_inplay_hit_weight),
@@ -683,6 +696,10 @@ def main() -> int:
                 str(int(args.pitcher_recency_games)),
                 "--pitcher-recency-weight",
                 str(float(args.pitcher_recency_weight)),
+                "--pitcher-so-model-weight",
+                str(float(args.pitcher_so_model_weight)),
+                "--pitcher-so-model-path",
+                str(args.pitcher_so_model_path or ""),
                 "--starter-stamina-shrink-n0",
                 str(float(args.starter_stamina_shrink_n0)),
                 "--weather-hr-weight",

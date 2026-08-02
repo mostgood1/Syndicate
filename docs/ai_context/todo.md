@@ -1745,6 +1745,108 @@ Prototype scripts (scratchpad, not part of the repo):
 `build_hitter_dataset.py`, `train_hitter_hr_model.py`, plus the earlier
 `pitcher_profiles.pkl`/`pitcher_dataset.pkl` from the initial pilot.
 
+### Reconciliation 2026-08-01 (MLB pitcher-prop statistical model: strikeout Poisson model integrated + promoted in the eval/backtest tool)
+
+Direct continuation of the pitcher/hitter statistical-model pilot entry
+above. User: "integrate strikeouts dig into the rest" -- this covers the
+integration half; the hits/outs/HR investigation is separate,
+not-yet-started work (see that entry's open items).
+
+**Integration design**: the trained model predicts total game strikeouts
+using both rate signals AND workload signals (batters_faced,
+stamina_pitches) combined, while the sim's per-PA `_combined_k`
+(pitch_model.py) only ever sees the rate piece -- workload/PA-count is a
+completely separate subsystem (the manager-hook pull-decision logic in
+simulate.py). Injecting the model into the per-PA rate would require
+backing out an implied rate by dividing the model's total prediction by
+the sim's own separately-estimated PA count, introducing a circular
+estimation error the sim doesn't have today. Chose instead: a **post-hoc
+recalibration of the final so_mean/so_dist output**, applied after the
+full Monte Carlo simulation completes, leaving the sim's own pitch-by-
+pitch mechanics (which also drive the correlated full-game simulation
+used for moneyline/totals/spread markets) completely untouched. Verified
+this architecturally: a smoke-test comparison confirmed `outs_mean` is
+bit-identical per-pitcher between weight=0.0 and weight=1.0 runs, only
+`so_mean`/`so_dist` move.
+
+**What was built**:
+1. `vendor/mlb_bettingv2/data/models/pitcher_so_poisson_v1.json` -- the
+   final model (13 features, trained on the full 46-date/1210-start
+   dataset, not CV folds -- CV was for validation only), serialized as
+   plain JSON (feature list, StandardScaler mean/scale, Poisson GLM
+   coefficients + intercept). New `data/models/` directory (distinct from
+   `data/tuning/`'s hand-fit config overrides) -- tracked in git despite
+   the broad `vendor/*/data/` gitignore rule, same as `data/tuning/`
+   (git doesn't re-apply ignore rules to already-tracked files; force-
+   added this one deliberately, matching that established precedent).
+2. `sim_engine/pitcher_so_model.py` -- `load_so_model()`,
+   `predict_so_mean()` (pure-python dot-product + exp, no sklearn runtime
+   dependency -- verified byte-for-byte matches sklearn's own `.predict()`
+   at training time, max diff 4.4e-16), and `recalibrate_so_output()`
+   (bin-by-bin integer translation of the count distribution by
+   `round(weight * (model_mean - sim_mean))`, preserving the sim's own
+   distribution shape/variance while moving its center). `weight=0.0` is
+   verified a true no-op via unit test, not just an approximation of one.
+3. Wired into `tools/eval/eval_sim_day_vs_actual.py`'s `_sim_many`/
+   `_simulate_one_game_task` (the same eval/backtest tool this entire
+   session's validation has run through) via new
+   `--pitcher-so-model-weight`/`--pitcher-so-model-path` CLI flags, and
+   passed through `tools/eval/run_batch_eval_days.py`. NOT wired into
+   `daily_update_multi_profile.py` (the real production artifact-
+   generation path) -- that's separate, unstarted work, deliberately not
+   rushed at the end of an already long session without adequate review
+   time on an unfamiliar, much larger file. This promotion only reaches
+   the backtesting tool.
+4. 14 unit tests (`tests/test_mlb_pitcher_so_model.py`): artifact
+   loading/shape, prediction correctness and missing-feature handling,
+   and `recalibrate_so_output`'s weight-clamping/no-op/direction/bin-
+   floor behavior.
+
+**Validation**: full 46-date/100-sims backtest through the actual wired-in
+code path (not the standalone prototype script), graded with
+`betting_accuracy.py`. Strikeouts betting hit rate 54.65% -> 59.18%
+(n=882) -- close to, and slightly above, the standalone model's
+cross-validated 58.84%; the wired-in number is evaluated in-sample (this
+final model was trained on all 46 dates, then evaluated on those same 46
+dates) so **58.84% (the CV number) is the more trustworthy estimate of
+real-world performance** -- this run's purpose was confirming the wiring
+itself reproduces the standalone model correctly, not that the true
+improvement is bigger than already validated. hits_allowed unaffected
+(56.43% -> 56.56%, noise). outs showed a small -1.02pp difference
+(59.15% -> 58.13%) despite `outs_mean` being verified bit-identical
+per-pitcher in the smoke test -- most likely Monte Carlo run-to-run
+variance from a different `--jobs` worker count between the two batch
+runs (8 vs the other batches' 10), not a real effect of this change,
+since the code never touches outs. Full mlb/sim regression sweep clean:
+1082 passed, 0 failures.
+
+**Promoted**: CLI default for `--pitcher-so-model-weight` changed from
+0.0 to 1.0 in both `eval_sim_day_vs_actual.py` and
+`run_batch_eval_days.py` -- this parameter isn't a `PitchModelConfig`
+field routed through the existing `forward_start_2026_04_14_v1.json`
+auto-load mechanism (it's consumed by a post-hoc aggregation step, not
+the per-pitch simulation, so cramming it into that config object would
+be an architectural mismatch), so "promoted" here means the tool applies
+the validated model by default going forward, not a JSON config value.
+Pass `--pitcher-so-model-weight 0.0` to opt out and reproduce
+pre-promotion behavior exactly.
+
+**Not yet done / open**: (1) production wiring
+(`daily_update_multi_profile.py`) -- the real next step if this is worth
+shipping to actual users, needs its own careful review of an unfamiliar
+file before touching it; (2) the outs -1.02pp discrepancy should be
+re-checked with matched `--jobs` counts to confirm it's really just MC
+noise and not a subtle real interaction; (3) walks/hits/outs models from
+the pilot were not integrated (only strikeouts cleared the bar); (4) as
+noted in the pilot entry, this whole session's validation has reused the
+same 46-date range for every fix and now this model too -- a genuinely
+fresh holdout set is still the right next check before fully trusting
+the cumulative effect of everything shipped tonight.
+
+Temp validation artifacts (scratchpad/eval, not committed):
+`full46_somodel_wired_w10/`, `_so_model_smoke.json`,
+`_so_model_smoke_off.json`; `train_final_so_model.py` (scratchpad).
+
 ### Reconciliation 2026-07-31 part 4 (NFL: real SmartSim 2.0 projection engine + market board + Ask the Syndicate)
 
 Continuation of the same "wire up NFL fully based on MLB" session (parts 1-2

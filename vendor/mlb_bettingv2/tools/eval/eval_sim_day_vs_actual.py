@@ -42,6 +42,7 @@ from sim_engine.data.statsapi import (
 from sim_engine.data.statcast_bvp import apply_starter_bvp_hr_multipliers, default_bvp_cache
 from sim_engine.data.build_roster import build_team, build_team_roster
 from sim_engine.data.roster_artifact import read_game_roster_artifact, write_game_roster_artifact
+from sim_engine.pitcher_so_model import load_so_model, predict_so_mean, recalibrate_so_output
 from sim_engine.forward_tuning import (
     FORWARD_BVP_MATCHUP_MODE,
     FORWARD_BVP_MIN_PA,
@@ -472,6 +473,8 @@ def _sim_many(
     pitcher_prop_ids: Optional[List[int]] = None,
     hitter_hr_top_n: int = 0,
     hitter_props_top_n: int = -1,
+    pitcher_so_model_weight: float = 0.0,
+    pitcher_so_model_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     def init_seg():
         return {"home_wins": 0, "away_wins": 0, "ties": 0, "totals": {}, "margins": {}}
@@ -495,6 +498,55 @@ def _sim_many(
             "bb_sum": 0.0,
             "hits_sum": 0.0,
         }
+
+    # Optional post-hoc recalibration of so_mean/so_dist toward a trained
+    # Poisson model (sim_engine/pitcher_so_model.py). Defaults to weight=0.0
+    # (a true no-op -- see recalibrate_so_output's docstring) so this is
+    # inert unless explicitly enabled. See todo.md's pitcher/hitter
+    # statistical-model pilot entry for why this recalibrates the final
+    # output rather than the sim's internal per-PA k_rate.
+    _so_model = load_so_model(pitcher_so_model_path) if pitcher_so_model_weight > 0.0 else None
+
+    _SO_MODEL_PITCHER_FIELDS = ["k_rate", "bb_rate", "hr_rate", "inplay_hit_rate", "hbp_rate"]
+    _SO_MODEL_OPP_FIELDS = ["k_rate", "bb_rate", "hr_rate", "inplay_hit_rate"]
+
+    def _so_model_features_for_pid(pid: int) -> Optional[Dict[str, float]]:
+        for roster, opp_roster, is_home in ((away_roster, home_roster, 0.0), (home_roster, away_roster, 1.0)):
+            try:
+                starter = roster.lineup.pitcher
+                if int(starter.player.mlbam_id) != int(pid):
+                    continue
+            except Exception:
+                continue
+            feats: Dict[str, float] = {}
+            for f in _SO_MODEL_PITCHER_FIELDS:
+                v = getattr(starter, f, None)
+                if not isinstance(v, (int, float)):
+                    return None
+                feats[f] = float(v)
+            bf = getattr(starter, "batters_faced", None)
+            stamina = getattr(starter, "stamina_pitches", None)
+            if not (isinstance(bf, (int, float)) and isinstance(stamina, (int, float))):
+                return None
+            feats["batters_faced"] = float(bf)
+            feats["stamina_pitches"] = float(stamina)
+            venue_key = "venue_mult_home" if is_home else "venue_mult_away"
+            venue_mult = getattr(starter, venue_key, None)
+            feats["venue_mult"] = float(venue_mult) if isinstance(venue_mult, (int, float)) else 1.0
+            feats["is_home"] = is_home
+
+            try:
+                opp_batters = list(opp_roster.lineup.batters or [])
+            except Exception:
+                opp_batters = []
+            for f in _SO_MODEL_OPP_FIELDS:
+                vals = [getattr(b, f, None) for b in opp_batters]
+                vals = [float(v) for v in vals if isinstance(v, (int, float))]
+                if not vals:
+                    return None
+                feats[f"opp_avg_{f}"] = sum(vals) / len(vals)
+            return feats
+        return None
 
     # Hitter/team stats (team-level aggregates; avoids per-player explosion)
     def _team_batter_ids(roster) -> set[int]:
@@ -881,6 +933,27 @@ def _sim_many(
             "run_margin_dist": seg["margins"],
         }
 
+    def _finalize_pitcher_prop(pid: int, acc: Dict[str, Any]) -> Dict[str, Any]:
+        so_dist = {int(k): int(v) for k, v in (acc.get("so") or {}).items()}
+        so_mean = float(acc.get("so_sum", 0.0)) / float(max(1, sims))
+        if _so_model is not None:
+            feats = _so_model_features_for_pid(int(pid))
+            model_so_mean = predict_so_mean(feats, _so_model) if feats is not None else None
+            if model_so_mean is not None:
+                so_dist, so_mean = recalibrate_so_output(so_dist, so_mean, model_so_mean, pitcher_so_model_weight)
+        return {
+            "so_dist": {str(k): v for k, v in so_dist.items()},
+            "outs_dist": {str(int(k)): int(v) for k, v in (acc.get("outs") or {}).items()},
+            "pitches_dist": {str(int(k)): int(v) for k, v in (acc.get("pitches") or {}).items()},
+            "bb_dist": {str(int(k)): int(v) for k, v in (acc.get("bb") or {}).items()},
+            "hits_dist": {str(int(k)): int(v) for k, v in (acc.get("hits") or {}).items()},
+            "so_mean": so_mean,
+            "outs_mean": float(acc.get("outs_sum", 0.0)) / float(max(1, sims)),
+            "pitches_mean": float(acc.get("pitches_sum", 0.0)) / float(max(1, sims)),
+            "bb_mean": float(acc.get("bb_sum", 0.0)) / float(max(1, sims)),
+            "hits_mean": float(acc.get("hits_sum", 0.0)) / float(max(1, sims)),
+        }
+
     out: Dict[str, Any] = {
         "sims": int(sims),
         "segments": {
@@ -902,18 +975,7 @@ def _sim_many(
             for side, acc in team_bat.items()
         },
         "pitcher_props": {
-            str(int(pid)): {
-                "so_dist": {str(int(k)): int(v) for k, v in (acc.get("so") or {}).items()},
-                "outs_dist": {str(int(k)): int(v) for k, v in (acc.get("outs") or {}).items()},
-                "pitches_dist": {str(int(k)): int(v) for k, v in (acc.get("pitches") or {}).items()},
-                "bb_dist": {str(int(k)): int(v) for k, v in (acc.get("bb") or {}).items()},
-                "hits_dist": {str(int(k)): int(v) for k, v in (acc.get("hits") or {}).items()},
-                "so_mean": float(acc.get("so_sum", 0.0)) / float(max(1, sims)),
-                "outs_mean": float(acc.get("outs_sum", 0.0)) / float(max(1, sims)),
-                "pitches_mean": float(acc.get("pitches_sum", 0.0)) / float(max(1, sims)),
-                "bb_mean": float(acc.get("bb_sum", 0.0)) / float(max(1, sims)),
-                "hits_mean": float(acc.get("hits_sum", 0.0)) / float(max(1, sims)),
-            }
+            str(int(pid)): _finalize_pitcher_prop(pid, acc)
             for pid, acc in prop_acc.items()
         },
     }
@@ -1221,6 +1283,8 @@ def _simulate_one_game_task(task: Dict[str, Any]) -> Dict[str, Any]:
     manager_pitching_overrides = task.get("manager_pitching_overrides")
     hitter_hr_top_n = int(task.get("hitter_hr_top_n") or 0)
     hitter_props_top_n = int(task.get("hitter_props_top_n") if task.get("hitter_props_top_n") is not None else -1)
+    pitcher_so_model_weight = float(task.get("pitcher_so_model_weight") or 0.0)
+    pitcher_so_model_path = task.get("pitcher_so_model_path") or None
     sims = _sim_many(
         away_roster,
         home_roster,
@@ -1256,6 +1320,8 @@ def _simulate_one_game_task(task: Dict[str, Any]) -> Dict[str, Any]:
         pitcher_prop_ids=(task.get("pitcher_prop_ids") or []),
         hitter_hr_top_n=int(hitter_hr_top_n),
         hitter_props_top_n=int(hitter_props_top_n),
+        pitcher_so_model_weight=pitcher_so_model_weight,
+        pitcher_so_model_path=pitcher_so_model_path,
     )
     return {"task": task, "sims": sims}
 
@@ -1808,6 +1874,25 @@ def main() -> int:
             "Top-N size for broader hitter props (hits/runs/RBI/SB/etc). "
             "Default 24. -1=use --hitter-hr-topn (back-compat), 0=disable."
         ),
+    )
+    ap.add_argument(
+        "--pitcher-so-model-weight",
+        type=float,
+        default=1.0,
+        help=(
+            "Promoted 2026-08-01: default 1.0 (full strength). Blend weight [0,1] for recalibrating "
+            "so_mean/so_dist toward sim_engine/pitcher_so_model.py's trained Poisson model "
+            "(data/models/pitcher_so_poisson_v1.json) -- 5-fold GroupKFold-CV betting-accuracy hit rate "
+            "54.65%->58.84% (n=882), no measurable effect on hits_allowed/outs. Pass 0.0 to disable "
+            "(reproduces pre-promotion sim-only behavior exactly). See recalibrate_so_output's docstring "
+            "for why this is a post-hoc output shift, not a per-PA rate change, and todo.md's pitcher/hitter "
+            "statistical-model pilot entry for full validation."
+        ),
+    )
+    ap.add_argument(
+        "--pitcher-so-model-path",
+        default="",
+        help="Override path to the strikeout model JSON artifact (default: data/models/pitcher_so_poisson_v1.json).",
     )
     ap.add_argument("--seed", type=int, default=1337)
     ap.add_argument("--jobs", type=int, default=1, help="Parallel workers (games in parallel). 1=off")
@@ -2699,6 +2784,8 @@ def main() -> int:
                 "sims_per_game": int(args.sims_per_game),
                 "hitter_hr_top_n": int(args.hitter_hr_topn),
                 "hitter_props_top_n": int(args.hitter_props_topn),
+                "pitcher_so_model_weight": float(getattr(args, "pitcher_so_model_weight", 0.0) or 0.0),
+                "pitcher_so_model_path": (getattr(args, "pitcher_so_model_path", "") or None),
                 "seed": int(args.seed) + int(game_pk_i) % 100000,
                 "pitcher_prop_ids": [int(x) for x in (away_starter, home_starter) if x],
             }
@@ -3104,6 +3191,8 @@ def main() -> int:
             "sims_per_game": int(args.sims_per_game),
             "hitter_hr_top_n": int(args.hitter_hr_topn),
             "hitter_props_top_n": int(args.hitter_props_topn),
+            "pitcher_so_model_weight": float(getattr(args, "pitcher_so_model_weight", 0.0) or 0.0),
+            "pitcher_so_model_path": (getattr(args, "pitcher_so_model_path", "") or None),
             "seed": int(args.seed),
             "generated_at": datetime.now().isoformat(),
             "use_raw": str(args.use_raw),
