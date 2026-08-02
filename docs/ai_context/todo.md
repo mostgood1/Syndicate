@@ -4,10 +4,14 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-02 (see "Reconciliation 2026-08-02 (Layer 2 board
+Last reconciled: 2026-08-02 (see "Reconciliation 2026-08-02 (MLB board
+stuck at 7-of-15 games all afternoon -- games whose fingerprint was
+recorded once and then never re-diffed, fixed with a board-completeness
+self-heal trigger, shipped and deployed, confirmed 15/15 live)" below).
+Before that: "Reconciliation 2026-08-02 (Layer 2 board
 frozen for 3+ hours on a busy Sunday: unbounded default candidate volume
 blew past every persistence ceiling, both shipped and deployed; MLB sim
-progress reporting added as a follow-up)" below).
+progress reporting added as a follow-up)".
 Before that: "Reconciliation 2026-08-02 (NBA live
 snapshot cross-service read/write never made keyvalue-aware -- fixed
 locally, NOT yet committed/deployed)".
@@ -19,6 +23,66 @@ Before that: "Reconciliation 2026-08-01 (Layer 2 board:
 full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
+
+### Reconciliation 2026-08-02 (MLB board stuck at 7-of-15 games all afternoon -- games whose fingerprint was recorded once and then never re-diffed, fixed with a board-completeness self-heal trigger, shipped and deployed, confirmed 15/15 live)
+
+User reported `/mlb` only showing 7 games when 15 were on today's slate.
+Confirmed live against production (not local -- local mirrors are stale):
+`/mlb/api/cards` and `/mlb/api/schedule` both genuinely returned 7 games
+from a real (non-sample) `daily_summary_2026_08_02.json`, six already
+`Final` and one still `Preview`, while `/api/ops/live-refresh/state`'s
+`last_mlb_sim_check.fingerprints` had entries for all 15 -- the odds/
+schedule stage knew about the full slate, but 8 games (823107, 823270,
+823996, 824163 TEX@HOU, 824323 KC@COL, 824483 PIT@CIN, 824648 NYY@CHC,
+824971) never got an initial completed sim.
+
+**Root cause**: `_mlb_daily_sim_decision`'s `fingerprint_change` trigger
+only fires on a hash DIFF against the last *recorded* value, but
+`_record_mlb_sim_check` stores a fingerprint for every scheduled game on
+every tick regardless of whether that game's sim actually ran or landed
+on the board (it's called synchronously as part of returning
+`force=True`, before the subprocess itself launches or finishes). So a
+game whose fingerprint got recorded once -- e.g. because it was part of
+an early scoped `--only-game-pks` run that got killed by
+`SYNDICATE_MLB_SIM_TIMEOUT_SECONDS` before finishing, or simply wasn't
+covered by whatever run first created `daily_summary` -- has an
+unchanged market from that point forward and never diffs again. Neither
+`join_mismatch` (only looks at rows the market board already built,
+which requires sim coverage to exist) nor anything else was watching for
+"board is missing games that were never simmed at all," only for
+"games whose input changed." This is the likely mechanism behind the
+long-standing "board count swings" flakiness beyond the scoped-resim
+merge-truncation bug (`dcda6243`/#41) already fixed 2026-07-24.
+
+**Fix**: new `_mlb_board_missing_game_pks` in
+`syndicate/features/shared/live_refresh_loop.py` -- compares the known
+schedule's game pks against what `_games_from_daily_summary` (the same
+function `syndicate/features/mlb/cards.py` uses to build the live board)
+will actually render, and forces a scoped resim for anything genuinely
+absent, independent of fingerprint state. Wired into
+`_mlb_daily_sim_decision` as a new `board_missing_games` reason,
+unconditional every tick (cheap -- one JSON read, no market-board
+rebuild, unlike `join_mismatch`'s guarded full board build). Commit
+`974bef3d`, 7 new tests (unit + decision-level merge/skip behavior),
+full `test_live_refresh_loop.py` (193/193) and
+`test_mlb_scoped_resim_summary.py`/`test_mlb_refresh_runner.py` (49/49)
+green.
+
+Manually unblocked today's board rather than wait on the self-heal's
+natural cadence: fired `force-mlb-resim` for all 8 missing game_pks via
+the ops endpoint (safe to call while another sim is active -- it only
+invalidates stored fingerprints for the next tick's decision, doesn't
+launch anything itself). Confirmed live ~30min later: `/mlb/api/cards`
+returned all 15 games with real predictions (`hasArtifactData: true`,
+`usingSampleData: false`), including all 8 previously-missing ones.
+
+Deployed together with a concurrent session's `90cf6386`/`ec6fdb3c`
+(Layer 2 board-freeze fix + sim progress reporting, see next entry) in
+one refresh-worker restart -- no file overlap between the two sessions'
+changes, coordinated directly via `mcp__ccd_session_mgmt__send_message`
+(including a heads-up before firing `force-mlb-resim` so neither session
+double-fired a resim) rather than each independently killing the other's
+in-flight sim. Per [[project-coordinate-with-parallel-sessions]].
 
 ### Reconciliation 2026-08-02 (Layer 2 board frozen for 3+ hours on a busy Sunday: unbounded default candidate volume blew past every persistence ceiling, both shipped and deployed; MLB sim progress reporting added as a follow-up)
 
