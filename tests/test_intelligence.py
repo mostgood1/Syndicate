@@ -3889,6 +3889,64 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(filled, 0)
         self.assertEqual(candidate.get("team"), "PHI")
 
+    def test_mlb_backfill_resolves_rbis_vs_rbi_naming_mismatch(self) -> None:
+        # 2026-08-01 board audit, final round: confirmed live this was
+        # ~77% (60/78) of all remaining blank steam candidates after every
+        # other fix in this pass -- _steam_candidates_for_sport's own
+        # market_key ("rbis") doesn't match daily_top_props' raw "stat"
+        # field naming ("rbi"), a naming-convention mismatch, not a real
+        # coverage gap (a real row exists, just under the other spelling).
+        from syndicate.features.intelligence import _mlb_backfill_missing_projected_from_top_props
+
+        candidate = {
+            "candidate_type": "steam",
+            "sport_slug": "mlb",
+            "player_name": "Alika Williams",
+            "name": "Alika Williams Rbis steam move",
+            "market": "Rbis · Steam",
+            "market_key": "rbis",
+            "pick": "Alika Williams over 0.5",
+            "game_pk": None,
+            "projected": "-",
+        }
+        pregame_rows = [{"ownerName": "Alika Williams", "stat": "rbi", "mean": 0.453, "gamePk": 824972}]
+        with patch(
+            "syndicate.features.intelligence._mlb_top_props_rows_from_artifact",
+            return_value=pregame_rows,
+        ):
+            filled = _mlb_backfill_missing_projected_from_top_props(
+                {"slug": "mlb", "context_label": "2026-08-01"}, [candidate]
+            )
+
+        self.assertEqual(filled, 1)
+        self.assertEqual(candidate.get("projected"), "0.5")
+
+    def test_mlb_backfill_resolves_runs_scored_vs_runs_naming_mismatch(self) -> None:
+        from syndicate.features.intelligence import _mlb_backfill_missing_projected_from_top_props
+
+        candidate = {
+            "candidate_type": "steam",
+            "sport_slug": "mlb",
+            "player_name": "Masataka Yoshida",
+            "name": "Masataka Yoshida Runs Scored steam move",
+            "market": "Runs Scored · Steam",
+            "market_key": "runs_scored",
+            "pick": "Masataka Yoshida over 0.5",
+            "game_pk": None,
+            "projected": "-",
+        }
+        pregame_rows = [{"ownerName": "Masataka Yoshida", "stat": "runs", "mean": 0.379, "gamePk": 824600}]
+        with patch(
+            "syndicate.features.intelligence._mlb_top_props_rows_from_artifact",
+            return_value=pregame_rows,
+        ):
+            filled = _mlb_backfill_missing_projected_from_top_props(
+                {"slug": "mlb", "context_label": "2026-08-01"}, [candidate]
+            )
+
+        self.assertEqual(filled, 1)
+        self.assertEqual(candidate.get("projected"), "0.4")
+
     def test_mlb_live_lens_prop_candidates_projected_stays_dash_without_a_pregame_match(self) -> None:
         # No matching daily_top_props row -- must NOT fabricate a pregame
         # value from the live one; "-" is the honest answer.

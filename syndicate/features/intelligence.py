@@ -5124,6 +5124,19 @@ def _mlb_team_by_player_market(selected_date: str) -> dict[tuple[str, str, int |
     return lookup
 
 
+# _steam_candidates_for_sport's own market_key vs daily_top_props' raw
+# "stat" field naming -- see the usage site in
+# _mlb_backfill_missing_projected_from_top_props for the full story.
+# Bidirectional so either spelling reaching this backfill (candidate side
+# OR, in principle, a future artifact-side rename) still resolves.
+_MLB_BACKFILL_MARKET_KEY_SYNONYMS: dict[str, tuple[str, ...]] = {
+    "rbis": ("rbi",),
+    "rbi": ("rbis",),
+    "runs_scored": ("runs",),
+    "runs": ("runs_scored",),
+}
+
+
 def _mlb_backfill_missing_projected_from_top_props(sport: dict[str, Any], candidates: list[dict[str, Any]]) -> int:
     """Blank-only "projected"/"team" backfill for any MLB prop candidate,
     applied in place to the sport's slice of the pool -- regardless of
@@ -5226,6 +5239,17 @@ def _mlb_backfill_missing_projected_from_top_props(sport: dict[str, Any], candid
         # generic collision no longer blocks the specific match sitting
         # right behind it.
         market_key_candidates = [key for key in ([_candidate_market_key(candidate)] + sorted(_candidate_market_focuses(candidate))) if key]
+        # Confirmed live: _steam_candidates_for_sport's own market_key
+        # ("rbis", "runs_scored") doesn't match daily_top_props' raw "stat"
+        # field naming ("rbi", "runs") -- a different naming convention, not
+        # a coverage gap -- confirmed via cross-check: real rows exist for
+        # both, just under the other spelling. This was ~77% (60/78) of all
+        # remaining blank steam candidates in production after every other
+        # fix in this same pass. _MLB_BACKFILL_MARKET_KEY_SYNONYMS is scoped
+        # to this backfill only (not the shared _market_key_from_text/
+        # _MARKET_FOCUS_ALIASES machinery) to keep blast radius contained.
+        for key in list(market_key_candidates):
+            market_key_candidates.extend(_MLB_BACKFILL_MARKET_KEY_SYNONYMS.get(key, ()))
         seen_keys: set[str] = set()
         ordered_market_keys = []
         for key in market_key_candidates:
