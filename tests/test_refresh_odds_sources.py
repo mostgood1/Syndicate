@@ -447,7 +447,7 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         ncaab_steps = module._build_ncaab_steps(args)
 
         interval_markets = "h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,totals_h2"
-        game_markets = "h2h,spreads,totals"
+        game_markets = interval_markets
         player_prop_markets = "player_points,player_rebounds,player_assists,player_points_rebounds_assists,player_threes,player_steals,player_blocks,player_turnovers,player_points_rebounds,player_points_assists,player_rebounds_assists,player_double_double,player_triple_double"
         wnba_markets = f"{game_markets},{player_prop_markets}"
 
@@ -456,13 +456,12 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         self.assertIn("--markets", ncaab_steps[0].command)
         self.assertIn(interval_markets, ncaab_steps[0].command)
 
-        # WNBA needs both: game_odds_/game_cards_ parsing (h2h/spreads/totals)
-        # and the player-prop markets -- without the game markets in this
-        # request, moneyline/spread/total stay empty even though the
-        # downstream parsing already knows how to build them.
+        # WNBA combines the same game markets NBA/NCAAB use (h2h/spreads/
+        # totals plus the half markets) with the player-prop markets, so a
+        # single request captures moneyline/spread/total parsing alongside
+        # player props.
         self.assertIn("--markets", wnba_steps[0].command)
         self.assertIn(wnba_markets, wnba_steps[0].command)
-        self.assertNotIn(interval_markets, wnba_steps[0].command)
 
     def test_source_root_helpers_prefer_render_disk(self) -> None:
         module = self._load_module()
