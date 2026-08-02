@@ -350,16 +350,25 @@ def api_ops_intelligence_memory_diagnostics() -> Any:
 
 @ops_bp.post("/api/ops/bootstrap/run")
 def api_ops_bootstrap_run() -> Any:
+    # Calls _sync_bootstrap_roots directly (not main(), which only ever
+    # returns an exit code) so a real per-root file-copy count comes back in
+    # the response -- confirmed 2026-08-02: main()'s "ok: true" doesn't rule
+    # out one root silently failing (each root is try/excepted
+    # independently, on purpose, so one root's failure can't hide the rest),
+    # which made "did ncaaf_source's real files actually land on disk"
+    # unanswerable from this endpoint's response alone. Verify by real
+    # returned state, not by re-inferring from an unrelated page render.
     try:
-        # Import and run the bootstrap script to copy repo data into the mounted data root
         try:
-            from scripts.bootstrap_data_root import main as _bootstrap_main  # type: ignore
+            from pathlib import Path as _Path
+
+            from scripts.bootstrap_data_root import _sync_bootstrap_roots  # type: ignore
         except Exception as exc:
             return jsonify({"ok": False, "error": f"ImportError: {type(exc).__name__}: {exc}"}), 500
-        exit_code = _bootstrap_main()
-        if exit_code == 0:
-            return jsonify({"ok": True, "message": "bootstrap completed"}), 200
-        return jsonify({"ok": False, "error": f"bootstrap returned exit code {exit_code}"}), 500
+        repo_root = _Path(__file__).resolve().parents[2]
+        root = data_root()
+        counters = _sync_bootstrap_roots(repo_root, root)
+        return jsonify({"ok": True, "message": "bootstrap completed", "repo_root": str(repo_root), "data_root": str(root), "counters": counters}), 200
     except Exception as exc:
         return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
 
