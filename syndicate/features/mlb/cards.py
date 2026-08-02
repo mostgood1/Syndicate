@@ -3190,6 +3190,53 @@ def _starter_removed_from_actual_payload(
     return False
 
 
+def _hitter_removed_from_actual_payload(
+    actual_payload: dict[str, Any] | None,
+    *,
+    batter_id: int | None,
+    batter_name: str,
+) -> bool:
+    """True once a hitter a prop candidate was built for is confirmed no
+    longer in the active lineup for the rest of this game (pinch hit for,
+    double-switched out, etc.) -- 2026-08-01 board audit follow-up to the
+    existing pitcher-starter-removed check, which has no hitter equivalent.
+
+    Unlike pitchers (one starter, replaced at most once, with a clean
+    "who's on the mound right now" signal), a normal game has 9+ hitters
+    all legitimately batting throughout -- "does someone else on this team
+    have batting stats" (the pitcher check's approach) is meaningless here.
+    The real signal: MLB's boxscore player object carries its own
+    "battingOrder" (the specific lineup slot they currently occupy, unset
+    once someone else takes their spot) and "gameStatus.isOnBench" --
+    confirmed against a real live game's raw feed, a substituted-out player
+    shows battingOrder=None and isOnBench=True, while any of the 9 players
+    currently in the lineup carry a real battingOrder value. Only fires on
+    that positive combination -- a player simply not found in the boxscore
+    at all (data lag, name-matching miss) never falsely excludes.
+    """
+    if not isinstance(actual_payload, dict):
+        return False
+    normalized_batter = _normalize_live_name(batter_name)
+    if batter_id is None and not normalized_batter:
+        return False
+    for side in ("home", "away"):
+        for player_obj in _iter_team_players(actual_payload, side):
+            person = player_obj.get("person") if isinstance(player_obj, dict) else {}
+            row_id = _safe_int((person or {}).get("id")) if isinstance(person, dict) else None
+            row_name = _normalize_live_name((person or {}).get("fullName")) if isinstance(person, dict) else ""
+            is_target_row = False
+            if batter_id is not None and row_id is not None:
+                is_target_row = int(row_id) == int(batter_id)
+            elif normalized_batter and row_name:
+                is_target_row = row_name == normalized_batter
+            if not is_target_row:
+                continue
+            game_status = player_obj.get("gameStatus") if isinstance(player_obj.get("gameStatus"), dict) else {}
+            has_batting_order = bool(player_obj.get("battingOrder"))
+            return bool(game_status.get("isOnBench")) and not has_batting_order
+    return False
+
+
 def _live_pitcher_prop_row_actionable(row: dict[str, Any], actual_payload: dict[str, Any] | None) -> bool:
     if str(row.get("market") or "").strip().lower() != "pitcher_props":
         return True

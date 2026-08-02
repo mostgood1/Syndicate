@@ -1296,5 +1296,80 @@ class EnrichGamesWithTrackedMarketLinesTests(unittest.TestCase):
         self.assertEqual(enriched, [None, "not a game"])
 
 
+def _boxscore_player(player_id: int, name: str, *, batting_order: str | None, is_on_bench: bool) -> dict:
+    return {
+        "person": {"id": player_id, "fullName": name},
+        "battingOrder": batting_order,
+        "gameStatus": {"isCurrentBatter": False, "isCurrentPitcher": False, "isOnBench": is_on_bench, "isSubstitute": False},
+    }
+
+
+class HitterRemovedFromActualPayloadTests(unittest.TestCase):
+    # 2026-08-01 board audit follow-up: no hitter equivalent existed for
+    # the pitcher-starter-removed check -- a hitter pinch hit for or
+    # double-switched out stayed on the board indefinitely. Real signal
+    # confirmed against a live game's raw feed: a substituted-out player's
+    # own boxscore entry shows battingOrder=None and gameStatus.isOnBench
+    # =True, while any of the 9 currently-batting players carry a real
+    # battingOrder value.
+    def _payload(self, home_players: list[dict], away_players: list[dict]) -> dict:
+        return {
+            "liveData": {
+                "boxscore": {
+                    "teams": {
+                        "home": {"players": {f"ID{p['person']['id']}": p for p in home_players}},
+                        "away": {"players": {f"ID{p['person']['id']}": p for p in away_players}},
+                    }
+                }
+            }
+        }
+
+    def test_returns_true_once_pinch_hit_for(self) -> None:
+        from syndicate.features.mlb.cards import _hitter_removed_from_actual_payload
+
+        payload = self._payload(
+            home_players=[_boxscore_player(624585, "Jorge Soler", batting_order=None, is_on_bench=True)],
+            away_players=[],
+        )
+        self.assertTrue(_hitter_removed_from_actual_payload(payload, batter_id=624585, batter_name="Jorge Soler"))
+
+    def test_returns_false_while_still_in_active_lineup(self) -> None:
+        from syndicate.features.mlb.cards import _hitter_removed_from_actual_payload
+
+        payload = self._payload(
+            home_players=[_boxscore_player(624585, "Jorge Soler", batting_order="400", is_on_bench=False)],
+            away_players=[],
+        )
+        self.assertFalse(_hitter_removed_from_actual_payload(payload, batter_id=624585, batter_name="Jorge Soler"))
+
+    def test_returns_false_when_player_not_found_rather_than_false_excluding(self) -> None:
+        from syndicate.features.mlb.cards import _hitter_removed_from_actual_payload
+
+        payload = self._payload(home_players=[], away_players=[])
+        self.assertFalse(_hitter_removed_from_actual_payload(payload, batter_id=624585, batter_name="Jorge Soler"))
+
+    def test_falls_back_to_normalized_name_match_without_an_id(self) -> None:
+        from syndicate.features.mlb.cards import _hitter_removed_from_actual_payload
+
+        payload = self._payload(
+            home_players=[],
+            away_players=[_boxscore_player(669016, "Vladimir Guerrero Jr.", batting_order=None, is_on_bench=True)],
+        )
+        self.assertTrue(_hitter_removed_from_actual_payload(payload, batter_id=None, batter_name="Vladimir Guerrero Jr."))
+
+    def test_a_bench_player_who_never_started_but_isnt_a_prop_subject_is_a_non_issue(self) -> None:
+        # Not a special case in the function itself -- included to document
+        # the reasoning: this check only ever runs for a player a candidate
+        # already exists for, which only happens via a pregame-lineup-
+        # sourced builder, so "never started" isn't a real code path here.
+        from syndicate.features.mlb.cards import _hitter_removed_from_actual_payload
+
+        payload = self._payload(
+            home_players=[_boxscore_player(1, "Bench Guy", batting_order=None, is_on_bench=True)],
+            away_players=[],
+        )
+        self.assertFalse(_hitter_removed_from_actual_payload(payload, batter_id=None, batter_name=""))
+
+
 if __name__ == "__main__":
     unittest.main()

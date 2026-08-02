@@ -1722,6 +1722,65 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertFalse(scored.get("state_invalid"))
         self.assertNotIn("prop_outcome", scored)
 
+    def test_score_candidate_excludes_steam_candidate_with_already_hit_prop(self) -> None:
+        # 2026-08-01 board audit follow-up: the settled-prop guard above was
+        # gated to candidate_type == "prop" only -- confirmed live, steam
+        # is roughly half of MLB's daily candidate pool, so a steam
+        # candidate on the exact same already-decided player+market stayed
+        # on the board indefinitely. Must apply to a player-level steam
+        # candidate exactly like a real prop.
+        candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "steam",
+            "player_name": "Steven Kwan",
+            "pick": "Over 1.5",
+            "name": "Steven Kwan Hits steam move",
+            "market": "Hits · Steam",
+            "line": "1.5",
+            "actual": "3",
+            "is_live": True,
+            "status_display": "In Progress",
+            "projection": 1.7,
+            "odds": "+110",
+            "edge": 0.1,
+            "source_strength": 0.5,
+        }
+
+        scored = score_candidate(candidate)
+
+        self.assertTrue(scored.get("state_invalid"))
+        self.assertEqual(scored.get("prop_outcome"), "hit")
+
+    def test_score_candidate_keeps_game_level_steam_candidate_untouched_by_settled_prop_logic(self) -> None:
+        # A team-level steam move (moneyline/spread/total) has no
+        # per-player monotonic-stat semantics -- _candidate_is_player_
+        # level_market must gate on player_name being present, not just
+        # candidate_type, or a real live game-level steam candidate could
+        # get wrongly excluded the moment its "line"/"actual"-shaped fields
+        # (which mean something entirely different for a game market)
+        # happened to satisfy the same numeric comparison.
+        candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "steam",
+            "player_name": None,
+            "pick": "Cincinnati Reds -1.5",
+            "name": "Cincinnati Reds H2H steam move",
+            "market": "H2H · Steam",
+            "line": "-1.5",
+            "actual": "3",
+            "is_live": True,
+            "status_display": "In Progress",
+            "projection": None,
+            "odds": "-120",
+            "edge": 0.1,
+            "source_strength": 0.5,
+        }
+
+        scored = score_candidate(candidate)
+
+        self.assertFalse(scored.get("state_invalid"))
+        self.assertNotIn("prop_outcome", scored)
+
     def test_score_candidate_keeps_prop_with_no_actual_yet(self) -> None:
         candidate = {
             "sport_slug": "mlb",
@@ -5707,6 +5766,55 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(recommendations)
         self.assertNotIn("Chris Sale Over 5.5 Strikeouts", [item.get("name") for item in recommendations])
         self.assertIn("Pete Alonso Over 1.5 Total Bases", [item.get("name") for item in recommendations])
+
+    def test_mlb_candidate_live_state_excludes_hitter_removed_from_lineup(self) -> None:
+        # 2026-08-01 board audit follow-up: no hitter equivalent existed for
+        # the pitcher-starter-removed check above -- direct unit test of
+        # the wiring (_hitter_removed_from_actual_payload's own boxscore-
+        # parsing logic is covered separately in test_mlb_market_board.py).
+        from syndicate.features.intelligence import _mlb_candidate_live_state
+
+        candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "prop",
+            "market": "Hitter Hits",
+            "player_name": "Jorge Soler",
+            "batter_id": 624585,
+        }
+        actual_payload = {
+            "gameData": {"status": {"abstractGameState": "Live", "detailedState": "In Progress"}},
+            "liveData": {"boxscore": {"teams": {"home": {"players": {}}, "away": {"players": {}}}}},
+        }
+        with patch(
+            "syndicate.features.mlb.cards._hitter_removed_from_actual_payload",
+            return_value=True,
+        ):
+            state = _mlb_candidate_live_state(candidate, actual_payload)
+
+        self.assertTrue(state.get("state_invalid"))
+        self.assertIn("no longer in the active lineup", state.get("state_note", ""))
+
+    def test_mlb_candidate_live_state_keeps_hitter_still_active(self) -> None:
+        from syndicate.features.intelligence import _mlb_candidate_live_state
+
+        candidate = {
+            "sport_slug": "mlb",
+            "candidate_type": "prop",
+            "market": "Hitter Hits",
+            "player_name": "Jorge Soler",
+            "batter_id": 624585,
+        }
+        actual_payload = {
+            "gameData": {"status": {"abstractGameState": "Live", "detailedState": "In Progress"}},
+            "liveData": {"boxscore": {"teams": {"home": {"players": {}}, "away": {"players": {}}}}},
+        }
+        with patch(
+            "syndicate.features.mlb.cards._hitter_removed_from_actual_payload",
+            return_value=False,
+        ):
+            state = _mlb_candidate_live_state(candidate, actual_payload)
+
+        self.assertNotIn("state_invalid", state)
 
     def test_intelligence_query_resolves_typo_subject_and_three_point_market(self) -> None:
         with _patch_build_intelligence_overview(_sample_nba_subject_specific_overview()):

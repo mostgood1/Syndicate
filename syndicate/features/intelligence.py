@@ -5765,6 +5765,37 @@ def _bind_candidate_state(candidate: dict[str, Any]) -> None:
         candidate["status_context"] = _safe_text(candidate.get("status_display"), "")
 
 
+def _candidate_is_player_level_market(candidate: dict[str, Any]) -> bool:
+    """True for any candidate that represents a specific player's stat line
+    -- a real prop candidate, OR a steam candidate built on a player-level
+    market (_steam_candidates_for_sport only ever sets player_name for a
+    genuine player prop, never a team/game-level market -- see its own
+    comment on that field). 2026-08-01 board audit follow-up: the settled-
+    prop and inactive-player guards below were gated to candidate_type ==
+    "prop" only, so a steam candidate on the exact same removed player or
+    already-decided line stayed on the board indefinitely -- confirmed
+    live, steam is roughly HALF of MLB's daily candidate pool, so this was
+    a large share of exactly the staleness the user asked to fix. Excludes
+    game-level steam moves (moneyline/spread/total), which have no
+    per-player monotonic-stat semantics to apply this logic to.
+    """
+    candidate_type = _safe_text(candidate.get("candidate_type"), "").lower()
+    if candidate_type == "prop":
+        # A "prop" candidate is player-level by definition/construction --
+        # unconditional, matching this guard's original behavior before the
+        # steam extension (some real prop candidates, and several existing
+        # tests' minimal fixtures, don't happen to set player_name even
+        # though every real builder does in practice; don't require it).
+        return True
+    if candidate_type == "steam":
+        # Steam is the one type that genuinely mixes player-level and
+        # team/game-level candidates -- player_name is the only reliable
+        # discriminator here (_steam_candidates_for_sport only ever sets it
+        # for a genuine player prop).
+        return bool(_safe_text(candidate.get("player_name"), ""))
+    return False
+
+
 def _candidate_prop_outcome_decided(candidate: dict[str, Any]) -> str | None:
     """"hit" or "missed" once a live prop's outcome is already
     mathematically locked in, else None (still undecided, or not enough
@@ -5779,7 +5810,7 @@ def _candidate_prop_outcome_decided(candidate: dict[str, Any]) -> str | None:
     than left showing as if it were still a live opportunity -- there was
     previously no code anywhere comparing actual against line at all.
     """
-    if _safe_text(candidate.get("candidate_type"), "").lower() != "prop":
+    if not _candidate_is_player_level_market(candidate):
         return None
     line_value = _numeric_hint(candidate.get("line"))
     actual_value = _numeric_hint(candidate.get("actual"))
@@ -5803,7 +5834,7 @@ def _apply_candidate_state_guard(candidate: dict[str, Any]) -> None:
         candidate["state_invalid"] = True
         candidate.setdefault("state_note", "Stale live-state data excluded (no update in over 8 hours).")
         return
-    if _safe_text(candidate.get("candidate_type"), "").lower() != "prop":
+    if not _candidate_is_player_level_market(candidate):
         return
     prop_outcome = _candidate_prop_outcome_decided(candidate)
     if prop_outcome is not None:
@@ -5908,6 +5939,26 @@ def _mlb_candidate_live_state(candidate: dict[str, Any], actual_payload: dict[st
                 current_label = current_pitcher_name or "another pitcher"
                 state["state_invalid"] = True
                 state["state_note"] = f"{pitcher_name or 'The listed pitcher'} is no longer the current pitcher; {current_label} is on the mound now."
+    elif not market_text.startswith("pitcher"):
+        # 2026-08-01 board audit follow-up: the pitcher-removed check above
+        # has no hitter equivalent -- a hitter pinch hit for or
+        # double-switched out of the lineup mid-game stayed on the board as
+        # a live opportunity indefinitely (until the whole game went
+        # Final). Applies to any hitter-market candidate, not just
+        # candidate_type=="prop" -- a steam candidate on the same removed
+        # player is exactly as stale.
+        batter_id = _safe_int(candidate.get("batter_id") or candidate.get("player_id"))
+        batter_name = _safe_text(candidate.get("player_name"), "")
+        if batter_id is not None or batter_name:
+            try:
+                from syndicate.features.mlb.cards import _hitter_removed_from_actual_payload
+
+                removed = _hitter_removed_from_actual_payload(actual_payload, batter_id=batter_id, batter_name=batter_name)
+            except Exception:
+                removed = False
+            if removed:
+                state["state_invalid"] = True
+                state["state_note"] = f"{batter_name or 'This player'} is no longer in the active lineup for this game."
     if _safe_int(candidate.get("gamePk")) == 823931:
         logger.info(
             "MLB live-state diagnostic gamePk=%s snapshot_timestamp=%s abstractGameState=%s detailedState=%s statusCode=%s decision=%s",
