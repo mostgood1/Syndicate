@@ -4,9 +4,13 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-02 (see "Reconciliation 2026-08-02 (NBA live
+Last reconciled: 2026-08-02 (see "Reconciliation 2026-08-02 (Layer 2 board
+frozen for 3+ hours on a busy Sunday: unbounded default candidate volume
+blew past every persistence ceiling, both shipped and deployed; MLB sim
+progress reporting added as a follow-up)" below).
+Before that: "Reconciliation 2026-08-02 (NBA live
 snapshot cross-service read/write never made keyvalue-aware -- fixed
-locally, NOT yet committed/deployed)" below).
+locally, NOT yet committed/deployed)".
 Before that: "Reconciliation 2026-08-01 part 3 (NFL:
 season-projection autorun enabled in production)".
 Before that: "Reconciliation 2026-08-01 part 2 (NFL:
@@ -15,6 +19,98 @@ Before that: "Reconciliation 2026-08-01 (Layer 2 board:
 full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
+
+### Reconciliation 2026-08-02 (Layer 2 board frozen for 3+ hours on a busy Sunday: unbounded default candidate volume blew past every persistence ceiling, both shipped and deployed; MLB sim progress reporting added as a follow-up)
+
+Direct continuation of the same day's earlier MLB props/WNBA props/NFL
+autorun-leak session (see the "MLB props self-heal blind spot ...
++ WNBA pregame props zeroing out" entry below). User reported it was
+1:30pm CT with 9 MLB games live and neither props nor K-targets had
+appeared all afternoon despite the morning's fixes being deployed --
+"we are not operating efficiently."
+
+**Root cause #1, confirmed via refresh-worker's own logs**: a
+`generate_smartsim2_nfl_projections.py` autorun (enabled 2026-08-01) had
+no "already running" guard, unlike every sibling autorun in
+`scripts/run_refresh_worker.py`. Its only gate was an artifact-staleness
+check, but the artifact's mtime doesn't move until the subprocess
+finishes -- so every tick while a run was in progress saw the same
+"stale" artifact and launched another one on top. Confirmed live:
+process count climbed 18 -> 56+ over ~2 hours, refresh-worker container
+memory 31.6% -> 61% of its 4GB limit, actively starving the concurrently
+running MLB Sunday-slate sim of CPU on the same container. Fixed with
+`_season_projection_process_still_running`/`_record_season_projection_launch`
+(PID-liveness guard mirroring `live_refresh_loop`'s `_process_exists`,
+45min stale-process ceiling), commit `7e737129`, 6 new tests. Confirmed
+live post-deploy: process count dropped to a clean ~13-19%, stayed
+stable (no re-pile).
+
+**Root cause #2, the deeper one**: even with #1 fixed and MLB's daily
+sim genuinely computing a correct, fresh 250-400+ candidate board every
+~6 minutes (confirmed via `CANDIDATE_POOL_READY` logs),
+`/api/intelligence/status` kept serving a snapshot frozen at
+`17:15:43Z` (12:15pm CT) -- surviving two full web-service restarts and
+an explicit `?refresh=1`, which ruled out a simple in-memory caching
+bug. Traced via Render logs to `KEYVALUE_WRITE_REJECTED`
+(`query_state_cache.json` 30MB, `board_snapshot.json` 33.5MB, both
+against an 8MB ceiling) and `STATE_PUBLISHED_AS_ARTIFACT published=False`
+(the artifact-publish fallback's own ~19.6MB effective ceiling, also
+exceeded) -- an *unbounded default* (no explicit `limit` in the request
+payload, the case every board-serving read actually uses) was
+serializing today's real ~380-candidate pool to ~30MB. Every persistence
+path failed on every cycle, so the web service (which never computes
+its own board) could only ever see whatever last happened to fit, from
+before MLB's props existed that day. Fixed by capping the
+unbounded-default case (both duplicated copies of the construction
+logic: `_compute_board_publication_response` and `_compute_response` in
+`pipeline/intelligence_state.py`) to 150 total
+(`SYNDICATE_INTELLIGENCE_DEFAULT_CANDIDATE_CAP`) and each `by_sport`
+bucket to 60 (`SYNDICATE_INTELLIGENCE_DEFAULT_BY_SPORT_CAP`) --
+`by_sport` needed its own separate cap since it's deliberately NOT
+limited by an explicit `limit`. `board_contract` shrinks automatically
+since it derives from the now-capped `recommendations` list. An
+explicit caller-provided `limit` and `candidate_count` (the true total)
+are untouched. Commit `90cf6386`, 3 new tests. Confirmed live post-deploy:
+`snapshot_generated_at` jumped from `17:15:43Z` to a fresh timestamp,
+MLB went from 0 to 12 real props (+39 steam) on the served board.
+
+Both fixes deployed together in one refresh-worker restart alongside a
+concurrent session's `974bef3d` ("MLB: self-heal trigger for games
+missing from the board entirely" -- `_mlb_board_missing_game_pks`, a
+complementary but independent fix for a different symptom: games whose
+fingerprint gets recorded once and never re-triggers even though they
+never landed on the board). No file overlap between the two sessions'
+changes; coordinated directly via `mcp__ccd_session_mgmt__send_message`
+to bundle into a single deploy/restart rather than each killing the
+other's in-flight sim separately.
+
+**Follow-up, user-requested**: "consider how we add progress indicators
+in the sims so it's easy to know if a run is stalled" -- prompted by a
+scoped 5-game sim sitting at `"state": "running"` for 49+ minutes with
+zero other signal, forcing a guess on whether to kill it. Added to
+`scripts/run_mlb_daily_sim_job.py`: switched from a single blocking
+`subprocess.run(timeout=...)` to `Popen` + a wait-with-timeout poll loop
+(default every 20s, `SYNDICATE_MLB_SIM_PROGRESS_POLL_SECONDS`), parsing
+the vendored sim's own existing `"[N/M] ..."` per-game log lines (no
+vendored code changed) into a small progress snapshot
+(`game_index`/`game_total`/`last_line`/`elapsed_seconds`/`done`) written
+to `<date>_<run_stamp>_progress.json` alongside the existing
+`_status.json`/`.log`. Exposed as `sim_run_progress` next to
+`sim_run_status` in `/api/ops/live-refresh/state`
+(`syndicate/blueprints/ops.py`). The existing 90-minute kill ceiling is
+unchanged -- this only adds visibility into what happens before that
+ceiling fires. Commit `ec6fdb3c`, 11 new tests, deployed.
+**Operational note**: two commits in this reconciliation
+(`90cf6386`/board-size fix, `ec6fdb3c`/sim-progress) initially failed to
+land silently -- a long multi-paragraph `git commit -m "$(cat <<'EOF' ...`
+heredoc returned exit 1 with no commit created, and the failure wasn't
+caught immediately (the next `git log` showed a concurrent session's
+commit at HEAD and it took a deliberate `git show HEAD:<file> | grep`
+check to notice the fix content was never actually in history). Recovered
+by writing the message to a scratch file and using `git commit -F
+<path>` instead. If a commit ever produces a suspiciously terse or
+truncated success message, verify with `git show HEAD:<file>` before
+trusting it landed, especially for long messages.
 
 ### Reconciliation 2026-08-02 (NBA live snapshot cross-service read/write never made keyvalue-aware -- fixed locally, NOT yet committed/deployed)
 
