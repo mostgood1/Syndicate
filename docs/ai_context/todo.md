@@ -1847,6 +1847,105 @@ Temp validation artifacts (scratchpad/eval, not committed):
 `full46_somodel_wired_w10/`, `_so_model_smoke.json`,
 `_so_model_smoke_off.json`; `train_final_so_model.py` (scratchpad).
 
+### Reconciliation 2026-08-01 (MLB pitcher-prop statistical model: real production wiring in daily_update.py, left OFF; found and fixed an argparse `%` help-text crash; hits/outs investigation)
+
+Direct continuation of the previous two entries. User: "do both" -- wire
+strikeouts into real production, and dig into why hits/outs/HR resist
+the same improvement. Both done this pass.
+
+**Production wiring**: dispatched an Explore agent first to map
+`tools/daily_update.py` (~7969 lines, the real production entrypoint --
+confirmed via `scripts/unified_daily_update.ps1` invoking it with
+`--workflow ui-daily`, which shells out through
+`tools/daily_update_multi_profile.py` to three `--workflow core`
+subprocess runs) before touching anything, given the much higher stakes
+than the backtesting tool. Key finding that simplified the work: unlike
+`eval_sim_day_vs_actual.py` (where the per-game sim runs inside a
+`ProcessPoolExecutor` task, forcing the new setting to thread through a
+task dict and reload per worker), `daily_update.py`'s `_sim_many` only
+parallelizes the *N repeated sims of one game* across workers (via
+`_simw_chunk`) and finalizes `so_mean`/`so_dist` **once, in the parent
+process**, after merging worker results -- so `away_roster`/`home_roster`
+are already in scope at the exact insertion point with no multiprocessing
+plumbing needed at all.
+
+Ported the identical pattern from the eval tool: `_so_model_features_for_pid`
+(verbatim match) and a new `_finalize_pitcher_prop` helper replacing the
+generic `_PITCHER_PROP_DIST_SPECS` dict comprehension, calling
+`recalibrate_so_output` only for the `so` market. New
+`--pitcher-so-model-weight`/`--pitcher-so-model-path` CLI flags mirror
+the `--hitter-hr-prob-calibration` pattern already in this file. **Left
+the default at 0.0 (OFF)**, unlike the eval tool's promoted 1.0 default --
+this is the live production board, not a backtest; turning it on for
+real users is a deliberate, separate decision the user should make
+explicitly, not something a "promotion" should do silently to
+production. Confirmed via `_strip_cli_args`/`parse_known_args` passthrough
+chains that a default-only change reaches every `--workflow core`
+invocation without touching `daily_update_multi_profile.py` or the `.ps1`
+wrapper.
+
+**Bug found and fixed along the way**: the help text I wrote for both
+CLI flags (`54.65%->58.84%`) crashed `--help` entirely on both files --
+argparse's `HelpFormatter` does `%`-style substitution on help strings,
+and a bare `%` followed by non-format-spec characters raises
+`ValueError: unsupported format character`. This was **already
+committed** in the previous entry's `eval_sim_day_vs_actual.py` change.
+Fixed by escaping to `%%` in both files; verified `--help` exits 0 on
+both after the fix. Worth remembering broadly: never put a literal `%`
+in an argparse `help=` string without escaping it, even in a percentage
+figure that looks harmless.
+
+**Verification**: given a full live `daily_update.py --workflow core`
+CLI run isn't safely reproducible without real network/API setup this
+session doesn't have configured, verified by directly calling the real
+`_sim_many` function with a real cached roster artifact (`read_game_roster_artifact`
+on a 2026-07-10 game) -- confirmed no crash, `so_mean` differs between
+weight=0.0 and weight=1.0 for the same seed, `outs_mean` is bit-identical
+between them, all through the actual production code path (not a
+reimplementation). Full mlb/sim regression sweep also re-run clean after
+these changes.
+
+**Hits/outs/HR investigation** (todo.md's earlier entries left this as
+"digging into it" -- one test run this pass): tested the leading
+hypothesis -- that real market lines for hits/outs already price in
+same-day information (bullpen plans, weather, injury status) the model's
+season-rate features don't have -- by adding the real market line itself
+as an extra feature, same GroupKFold-by-date CV methodology, controlled
+(both "with" and "without" runs use the identical row-filtered training
+set so the A/B pair itself is clean).
+
+- **Hits allowed**: partial support. Betting hit rate improved
+  55.58% -> 56.09% with the market line added, though still short of the
+  sim's 56.47% baseline on this row subset. Real, small, consistent with
+  the hypothesis but not a full explanation.
+- **Outs**: no support, and inconsistent. Within this controlled test,
+  adding the market line made things *worse* (59.37% -> 58.49%), the
+  opposite of the hypothesis. Separately, this test's own "without market
+  line" baseline (59.37%) doesn't match the earlier pitcher/hitter
+  pilot's outs result (55.72%) for what should be the same base model --
+  the difference traces to training-set composition (this test restricts
+  training rows to only those with a real outs market line present,
+  n=806, vs the earlier pilot's full n=1210). That sensitivity to exactly
+  which rows feed the fit is itself the more informative finding: the
+  outs model is unstable/data-hungry in a way the strikeout model never
+  was, consistent with outs allowed being driven more by team defense,
+  bullpen state, and ball-in-play luck than by pitcher-level signal alone.
+
+**Not yet done / open**: (1) turning `pitcher_so_model_weight` on for
+real production boards -- a separate, explicit decision for the user,
+not something this session should default into; (2) the outs
+training-composition instability deserves a proper controlled resolution
+(same row-filter for both the "with pilot" and "with market line" tests)
+before drawing any further conclusion either way; (3) HR was not
+re-investigated this pass -- the pilot's finding (roughly a wash against
+an already-calibrated sim) still stands untouched; (4) as before, the
+whole session has now reused the same 46-date range for every fix,
+including this model -- a genuinely fresh holdout is still the
+outstanding validation gap.
+
+Temp validation artifacts (scratchpad, not committed):
+`test_market_line_feature.py`.
+
 ### Reconciliation 2026-07-31 part 4 (NFL: real SmartSim 2.0 projection engine + market board + Ask the Syndicate)
 
 Continuation of the same "wire up NFL fully based on MLB" session (parts 1-2

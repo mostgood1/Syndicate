@@ -1883,7 +1883,7 @@ def main() -> int:
             "Promoted 2026-08-01: default 1.0 (full strength). Blend weight [0,1] for recalibrating "
             "so_mean/so_dist toward sim_engine/pitcher_so_model.py's trained Poisson model "
             "(data/models/pitcher_so_poisson_v1.json) -- 5-fold GroupKFold-CV betting-accuracy hit rate "
-            "54.65%->58.84% (n=882), no measurable effect on hits_allowed/outs. Pass 0.0 to disable "
+            "54.65%%->58.84%% (n=882), no measurable effect on hits_allowed/outs. Pass 0.0 to disable "
             "(reproduces pre-promotion sim-only behavior exactly). See recalibrate_so_output's docstring "
             "for why this is a post-hoc output shift, not a per-PA rate change, and todo.md's pitcher/hitter "
             "statistical-model pilot entry for full validation."

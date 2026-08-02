@@ -74,6 +74,7 @@ from sim_engine.models import GameConfig
 from sim_engine.simulate import simulate_game
 from sim_engine.pitch_model import PitchModelConfig
 from sim_engine.prob_calibration import apply_prop_prob_calibration
+from sim_engine.pitcher_so_model import load_so_model, predict_so_mean, recalibrate_so_output
 from sim_engine.data.roster_artifact import read_game_roster_artifact, write_game_roster_artifact
 from sim_engine.data.roster_registry import (
     build_latest_registry_team_by_player,
@@ -4090,6 +4091,8 @@ def _sim_many(
     hitter_props_prob_calibration: Optional[Dict[str, Any]] = None,
     pitcher_prop_ids: Optional[List[int]] = None,
     cfg_kwargs: Optional[Dict[str, Any]] = None,
+    pitcher_so_model_weight: float = 0.0,
+    pitcher_so_model_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     rng_seed = seed
 
@@ -4116,6 +4119,58 @@ def _sim_many(
     prop_acc: Dict[int, Dict[str, Any]] = {}
     hitter_prop_acc: Dict[int, Dict[str, Any]] = {}
     pitcher_box_acc: Dict[int, Dict[str, Any]] = {}
+
+    # Optional post-hoc recalibration of so_mean/so_dist toward a trained
+    # Poisson model (sim_engine/pitcher_so_model.py). Defaults to weight=0.0
+    # (a true no-op -- see recalibrate_so_output's docstring). This is real
+    # production code (unlike tools/eval/eval_sim_day_vs_actual.py's
+    # already-promoted default of 1.0) -- deliberately left off by default
+    # here; turning it on for live boards is a separate decision. Runs
+    # entirely in this (parent) process after the workers below have
+    # finished and merged, so away_roster/home_roster (never passed across
+    # a worker-process boundary for this purpose) are directly usable.
+    _so_model = load_so_model(pitcher_so_model_path) if pitcher_so_model_weight > 0.0 else None
+
+    _SO_MODEL_PITCHER_FIELDS = ["k_rate", "bb_rate", "hr_rate", "inplay_hit_rate", "hbp_rate"]
+    _SO_MODEL_OPP_FIELDS = ["k_rate", "bb_rate", "hr_rate", "inplay_hit_rate"]
+
+    def _so_model_features_for_pid(pid: int) -> Optional[Dict[str, float]]:
+        for roster, opp_roster, is_home in ((away_roster, home_roster, 0.0), (home_roster, away_roster, 1.0)):
+            try:
+                starter = roster.lineup.pitcher
+                if int(starter.player.mlbam_id) != int(pid):
+                    continue
+            except Exception:
+                continue
+            feats: Dict[str, float] = {}
+            for f in _SO_MODEL_PITCHER_FIELDS:
+                v = getattr(starter, f, None)
+                if not isinstance(v, (int, float)):
+                    return None
+                feats[f] = float(v)
+            bf = getattr(starter, "batters_faced", None)
+            stamina = getattr(starter, "stamina_pitches", None)
+            if not (isinstance(bf, (int, float)) and isinstance(stamina, (int, float))):
+                return None
+            feats["batters_faced"] = float(bf)
+            feats["stamina_pitches"] = float(stamina)
+            venue_key = "venue_mult_home" if is_home else "venue_mult_away"
+            venue_mult = getattr(starter, venue_key, None)
+            feats["venue_mult"] = float(venue_mult) if isinstance(venue_mult, (int, float)) else 1.0
+            feats["is_home"] = is_home
+
+            try:
+                opp_batters = list(opp_roster.lineup.batters or [])
+            except Exception:
+                opp_batters = []
+            for f in _SO_MODEL_OPP_FIELDS:
+                vals = [getattr(b, f, None) for b in opp_batters]
+                vals = [float(v) for v in vals if isinstance(v, (int, float))]
+                if not vals:
+                    return None
+                feats[f"opp_avg_{f}"] = sum(vals) / len(vals)
+            return feats
+        return None
     for pid in prop_ids:
         acc: Dict[str, Any] = {}
         for dist_key, _row_key, mean_key in _PITCHER_PROP_DIST_SPECS:
@@ -4432,20 +4487,29 @@ def _sim_many(
         pitcher_box_acc=pitcher_box_acc,
     )
 
-    if prop_acc:
-        out["pitcher_props"] = {
-            str(int(pid)): {
-                **{
-                    f"{dist_key}_dist": {str(int(k)): int(v) for k, v in (acc.get(str(dist_key)) or {}).items()}
-                    for dist_key, _row_key, _mean_key in _PITCHER_PROP_DIST_SPECS
-                },
-                **{
-                    str(mean_key): float(acc.get(str(mean_key), 0.0)) / float(max(1, sims))
-                    for _dist_key, _row_key, mean_key in _PITCHER_PROP_DIST_SPECS
-                },
-            }
-            for pid, acc in prop_acc.items()
+    def _finalize_pitcher_prop(pid: int, acc: Dict[str, Any]) -> Dict[str, Any]:
+        row: Dict[str, Any] = {
+            **{
+                f"{dist_key}_dist": {str(int(k)): int(v) for k, v in (acc.get(str(dist_key)) or {}).items()}
+                for dist_key, _row_key, _mean_key in _PITCHER_PROP_DIST_SPECS
+            },
+            **{
+                str(mean_key): float(acc.get(str(mean_key), 0.0)) / float(max(1, sims))
+                for _dist_key, _row_key, mean_key in _PITCHER_PROP_DIST_SPECS
+            },
         }
+        if _so_model is not None:
+            so_dist = {int(k): v for k, v in (row.get("so_dist") or {}).items()}
+            feats = _so_model_features_for_pid(int(pid))
+            model_so_mean = predict_so_mean(feats, _so_model) if feats is not None else None
+            if model_so_mean is not None:
+                so_dist, so_mean = recalibrate_so_output(so_dist, row["so_mean"], model_so_mean, pitcher_so_model_weight)
+                row["so_dist"] = {str(k): v for k, v in so_dist.items()}
+                row["so_mean"] = so_mean
+        return row
+
+    if prop_acc:
+        out["pitcher_props"] = {str(int(pid)): _finalize_pitcher_prop(pid, acc) for pid, acc in prop_acc.items()}
 
     if want_hitter and batter_meta and sims > 0:
         denom_sims = float(max(1, int(sims)))
@@ -5199,6 +5263,25 @@ def main() -> int:
         "--hitter-props-prob-calibration",
         default="data/tuning/hitter_props_calibration/default.json",
         help="Calibration JSON for hitter props likelihood probabilities (use 'off' to disable)",
+    )
+    ap.add_argument(
+        "--pitcher-so-model-weight",
+        type=float,
+        default=0.0,
+        help=(
+            "0.0 (default, OFF) -- a true no-op. Blend weight [0,1] for recalibrating so_mean/so_dist "
+            "toward sim_engine/pitcher_so_model.py's trained Poisson model "
+            "(data/models/pitcher_so_poisson_v1.json). Validated in tools/eval/eval_sim_day_vs_actual.py "
+            "(which promotes this to 1.0 by default -- see todo.md) with betting-accuracy hit rate "
+            "54.65%%->58.84%% (n=882), no measurable effect on hits_allowed/outs. Left OFF by default here "
+            "since this is the live production board, not a backtest -- turning it on is a deliberate, "
+            "separate decision, not something this default should make silently."
+        ),
+    )
+    ap.add_argument(
+        "--pitcher-so-model-path",
+        default="",
+        help="Override path to the strikeout model JSON artifact (default: data/models/pitcher_so_poisson_v1.json).",
     )
     ap.add_argument(
         "--hitter-hr-calib-set",
@@ -7717,6 +7800,8 @@ def main() -> int:
                     int(home_roster.lineup.pitcher.player.mlbam_id),
                 ],
                 cfg_kwargs=cfg_kwargs,
+                pitcher_so_model_weight=float(getattr(args, "pitcher_so_model_weight", 0.0) or 0.0),
+                pitcher_so_model_path=(getattr(args, "pitcher_so_model_path", "") or None),
             )
         except KeyboardInterrupt:
             raise
