@@ -36,6 +36,27 @@ data/*_source/source_artifacts/data/cache/
 data/*_source/source_artifacts/
 data/tmp_*/
 
+# Team-branding snapshots (logo URL + hex colors, ~few KB/sport, changes only
+# on a rebrand) are real Render deploy inputs -- unlike the rest of
+# source_artifacts/, which is bulky and regenerable, cards.py has no other
+# source for these and Render's persistent disk never runs the ESPN fetch
+# itself. Un-ignore just this one path per sport rather than the whole
+# source_artifacts/ tree.
+!data/nfl_source/source_artifacts/
+data/nfl_source/source_artifacts/*
+!data/nfl_source/source_artifacts/data/
+data/nfl_source/source_artifacts/data/*
+!data/nfl_source/source_artifacts/data/processed/
+data/nfl_source/source_artifacts/data/processed/*
+!data/nfl_source/source_artifacts/data/processed/team_branding/
+!data/ncaaf_source/source_artifacts/
+data/ncaaf_source/source_artifacts/*
+!data/ncaaf_source/source_artifacts/data/
+data/ncaaf_source/source_artifacts/data/*
+!data/ncaaf_source/source_artifacts/data/processed/
+data/ncaaf_source/source_artifacts/data/processed/*
+!data/ncaaf_source/source_artifacts/data/processed/team_branding/
+
 # SmartSim 2.0 historical-truth caches: regenerable via ncaaf_historical_loader.py /
 # nfl_historical_loader.py (CFBD API / nflverse release download); mirror caches, not source.
 data/nfl_source/historical_truth/
@@ -60,6 +81,16 @@ reports/live_refresh_loop/weather_fetch.log
 # Generated source trees are operational artifacts, not Render deploy inputs.
 data/*_source/data/
 vendor/*/data/
+
+# NCAAF's real SmartSim 2.0 projection artifacts nest under data/ncaaf_source/data/
+# (NFL's own equivalent avoids this by living directly under nfl_source/, no
+# nested data/ dir) -- these ARE a real Render deploy input (cards.py/picks.py's
+# standalone fallback reads them directly), unlike the ~300 other scratch/cache
+# files this directory otherwise holds (cfbd_lines caches, timestamped historical
+# predicted-totals snapshots), which should stay ignored.
+!data/ncaaf_source/data/
+data/ncaaf_source/data/*
+!data/ncaaf_source/data/smartsim2_projections_*.csv
 
 # Temporary helper scripts should stay local.
 scripts/tmp_*.py

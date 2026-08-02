@@ -25,10 +25,16 @@ BOOTSTRAP_ROOTS = (
     Path("data/nba_source/manifests"),
     Path("data/nhl_source/source_artifacts"),
     Path("data/nhl_source/manifests"),
-    Path("data/nfl_source/source_artifacts"),
-    Path("data/nfl_source/manifests"),
-    Path("data/ncaaf_source/source_artifacts"),
-    Path("data/ncaaf_source/manifests"),
+    # NFL/NCAAF: the whole top-level source root, not just source_artifacts/
+    # manifests -- both sports' real SmartSim 2.0 projection artifacts
+    # (smartsim2_projections_{season}_wk{week}.csv) and NFL's real
+    # schedule_{season}.csv live directly under the top level (confirmed
+    # 2026-08-01: neither was ever reaching the web service's persistent
+    # disk, since only the two narrower subdirectories were synced -- the
+    # committed git checkout only ever contains files git itself tracks, so
+    # syncing the whole tree here is safe, not a bulk-copy-everything risk).
+    Path("data/nfl_source"),
+    Path("data/ncaaf_source"),
     Path("data/ncaab_source/source_artifacts"),
     Path("data/ncaab_source/manifests"),
     Path("data/wnba_source/source_artifacts"),

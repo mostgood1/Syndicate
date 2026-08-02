@@ -1,0 +1,33 @@
+team_id,abbreviation,location,display_name,primary_color,secondary_color,logo_url,source_snapshot_date
+22,ARI,Arizona,Arizona Cardinals,#a40227,#ffffff,https://a.espncdn.com/i/teamlogos/nfl/500/ari.png,2026-08-02
+1,ATL,Atlanta,Atlanta Falcons,#a71930,#000000,https://a.espncdn.com/i/teamlogos/nfl/500/atl.png,2026-08-02
+33,BAL,Baltimore,Baltimore Ravens,#29126f,#000000,https://a.espncdn.com/i/teamlogos/nfl/500/bal.png,2026-08-02
+2,BUF,Buffalo,Buffalo Bills,#00338d,#d50a0a,https://a.espncdn.com/i/teamlogos/nfl/500/buf.png,2026-08-02
+29,CAR,Carolina,Carolina Panthers,#0085ca,#000000,https://a.espncdn.com/i/teamlogos/nfl/500/car.png,2026-08-02
+3,CHI,Chicago,Chicago Bears,#0b1c3a,#e64100,https://a.espncdn.com/i/teamlogos/nfl/500/chi.png,2026-08-02
+4,CIN,Cincinnati,Cincinnati Bengals,#fb4f14,#000000,https://a.espncdn.com/i/teamlogos/nfl/500/cin.png,2026-08-02
+5,CLE,Cleveland,Cleveland Browns,#472a08,#ff3c00,https://a.espncdn.com/i/teamlogos/nfl/500/cle.png,2026-08-02
+6,DAL,Dallas,Dallas Cowboys,#002a5c,#b0b7bc,https://a.espncdn.com/i/teamlogos/nfl/500/dal.png,2026-08-02
+7,DEN,Denver,Denver Broncos,#0a2343,#fc4c02,https://a.espncdn.com/i/teamlogos/nfl/500/den.png,2026-08-02
+8,DET,Detroit,Detroit Lions,#0076b6,#bbbbbb,https://a.espncdn.com/i/teamlogos/nfl/500/det.png,2026-08-02
+9,GB,Green Bay,Green Bay Packers,#204e32,#ffb612,https://a.espncdn.com/i/teamlogos/nfl/500/gb.png,2026-08-02
+34,HOU,Houston,Houston Texans,#00143f,#c41230,https://a.espncdn.com/i/teamlogos/nfl/500/hou.png,2026-08-02
+11,IND,Indianapolis,Indianapolis Colts,#003b75,#ffffff,https://a.espncdn.com/i/teamlogos/nfl/500/ind.png,2026-08-02
+30,JAX,Jacksonville,Jacksonville Jaguars,#007487,#d7a22a,https://a.espncdn.com/i/teamlogos/nfl/500/jax.png,2026-08-02
+12,KC,Kansas City,Kansas City Chiefs,#e31837,#ffb612,https://a.espncdn.com/i/teamlogos/nfl/500/kc.png,2026-08-02
+13,LV,Las Vegas,Las Vegas Raiders,#000000,#a5acaf,https://a.espncdn.com/i/teamlogos/nfl/500/lv.png,2026-08-02
+24,LAC,Los Angeles,Los Angeles Chargers,#0080c6,#ffc20e,https://a.espncdn.com/i/teamlogos/nfl/500/lac.png,2026-08-02
+14,LAR,Los Angeles,Los Angeles Rams,#003594,#ffd100,https://a.espncdn.com/i/teamlogos/nfl/500/lar.png,2026-08-02
+15,MIA,Miami,Miami Dolphins,#008e97,#fc4c02,https://a.espncdn.com/i/teamlogos/nfl/500/mia.png,2026-08-02
+16,MIN,Minnesota,Minnesota Vikings,#4f2683,#ffc62f,https://a.espncdn.com/i/teamlogos/nfl/500/min.png,2026-08-02
+17,NE,New England,New England Patriots,#002a5c,#c60c30,https://a.espncdn.com/i/teamlogos/nfl/500/ne.png,2026-08-02
+18,NO,New Orleans,New Orleans Saints,#d3bc8d,#000000,https://a.espncdn.com/i/teamlogos/nfl/500/no.png,2026-08-02
+19,NYG,New York,New York Giants,#003c7f,#c9243f,https://a.espncdn.com/i/teamlogos/nfl/500/nyg.png,2026-08-02
+20,NYJ,New York,New York Jets,#115740,#ffffff,https://a.espncdn.com/i/teamlogos/nfl/500/nyj.png,2026-08-02
+21,PHI,Philadelphia,Philadelphia Eagles,#06424d,#000000,https://a.espncdn.com/i/teamlogos/nfl/500/phi.png,2026-08-02
+23,PIT,Pittsburgh,Pittsburgh Steelers,#000000,#ffb612,https://a.espncdn.com/i/teamlogos/nfl/500/pit.png,2026-08-02
+25,SF,San Francisco,San Francisco 49ers,#aa0000,#b3995d,https://a.espncdn.com/i/teamlogos/nfl/500/sf.png,2026-08-02
+26,SEA,Seattle,Seattle Seahawks,#002a5c,#69be28,https://a.espncdn.com/i/teamlogos/nfl/500/sea.png,2026-08-02
+27,TB,Tampa Bay,Tampa Bay Buccaneers,#bd1c36,#3e3a35,https://a.espncdn.com/i/teamlogos/nfl/500/tb.png,2026-08-02
+10,TEN,Tennessee,Tennessee Titans,#4495d2,#001532,https://a.espncdn.com/i/teamlogos/nfl/500/ten.png,2026-08-02
+28,WSH,Washington,Washington Commanders,#5a1414,#ffb612,https://a.espncdn.com/i/teamlogos/nfl/500/wsh.png,2026-08-02

@@ -1,0 +1,2 @@
+game_id,season,week,home_team,away_team,home_score_mean,away_score_mean,margin_mean,total_mean,margin_stdev,total_stdev,home_win_rate,seeds_used,profile_name,rating_source,generated_at
+401862844,2026,15,Army,Navy,30.653,29.677,0.977,60.33,13.996,13.073,0.5467,300,ncaaf_v2,cfbd_ppa_season_2025_fallback_for_2026,2026-08-01T21:03:53.889878+00:00
