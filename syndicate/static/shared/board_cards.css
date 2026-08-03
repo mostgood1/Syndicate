@@ -749,6 +749,23 @@ table.board-blotter tbody tr:last-child td {
   }
 }
 
+/* Line/odds movement sparkline. Colour carries direction, matching the
+   arrow that precedes it, so the shape and the text agree at a glance. */
+.board-sparkline {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 8px;
+  overflow: visible;
+}
+
+.board-sparkline--up {
+  color: #4ade80;
+}
+
+.board-sparkline--down {
+  color: #f87171;
+}
+
 .board-action-button--slip {
   border: 1px solid rgba(46, 204, 113, 0.38);
   background: rgba(46, 204, 113, 0.14);

@@ -571,7 +571,80 @@
   // number. Falls back to the older fuzzy-matched `movement` object (from
   // _enrich_candidates_with_odds_history) for candidates not yet routed
   // through that pipeline, e.g. game-type candidates.
+  // Line movement is the most decision-relevant thing on a card and was
+  // the least visual: renderMovement already computes opening/latest, real
+  // direction and a real move count, then flattens all of it into one
+  // string. This draws the series it already has.
+  //
+  // Prefers the PRICE series over the line series -- price is what closing
+  // line value is measured against, and a market can hold its number while
+  // the juice walks (the same blind spot price CLV exists to cover). Falls
+  // back to the line series, then to a two-point opening->latest series.
+  // American odds are NOT safe to plot directly: they are discontinuous
+  // across the +/-100 boundary. -100 and +100 are the same price, yet sit
+  // 200 apart numerically, so a trivial -105 -> +105 move would draw as a
+  // 210-unit spike while a real -200 -> -150 move looks small. Decimal
+  // odds are continuous and monotonic in payout across that boundary
+  // (-100 and +100 both map to 2.0), so the shape reflects the actual
+  // move. Higher stays better for the bettor, which keeps "up" meaningful.
+  function _americanToDecimal(price) {
+    if (price === null || price === 0) return null;
+    return price > 0 ? 1 + price / 100 : 1 + 100 / Math.abs(price);
+  }
+
+  function _movementSeries(item) {
+    const movement = item.movement && typeof item.movement === "object" ? item.movement : {};
+    const history = Array.isArray(movement.history) ? movement.history : [];
+    if (history.length > 1) {
+      const prices = history.map((entry) => numericValue(entry.odds ?? entry.last_odds)).filter((value) => value !== null);
+      if (prices.length > 1 && new Set(prices).size > 1) {
+        const decimals = prices.map(_americanToDecimal).filter((value) => value !== null);
+        if (decimals.length > 1 && new Set(decimals).size > 1) return decimals;
+      }
+      const lines = history.map((entry) => numericValue(entry.current_line)).filter((value) => value !== null);
+      if (lines.length > 1 && new Set(lines).size > 1) return lines;
+    }
+    const structured = item.line_odds_movement && typeof item.line_odds_movement === "object" ? item.line_odds_movement : null;
+    if (structured) {
+      const openPrice = _americanToDecimal(numericValue(structured.opening_price));
+      const latestPrice = _americanToDecimal(numericValue(structured.latest_price));
+      if (openPrice !== null && latestPrice !== null && openPrice !== latestPrice) return [openPrice, latestPrice];
+      const openLine = numericValue(structured.opening_line);
+      const latestLine = numericValue(structured.latest_line);
+      if (openLine !== null && latestLine !== null && openLine !== latestLine) return [openLine, latestLine];
+    }
+    return [];
+  }
+
+  function _movementSparkline(item) {
+    const series = _movementSeries(item);
+    // A flat or single-point series has nothing to show; drawing a
+    // straight line would imply movement that did not happen, which is the
+    // exact mistake the "20 unchanged snapshots = 20 moves" bug made.
+    // _movementSeries already rejects flat series, but this is the function
+    // that decides to DRAW, so it re-checks rather than trusting its input.
+    if (series.length < 2 || new Set(series).size < 2) return "";
+    const width = 58;
+    const height = 16;
+    const pad = 2;
+    const min = Math.min(...series);
+    const max = Math.max(...series);
+    const span = max - min || 1;
+    const stepX = (width - pad * 2) / (series.length - 1);
+    const points = series.map((value, index) => {
+      const x = pad + index * stepX;
+      // Invert: SVG y grows downward, and a rising number should rise.
+      const y = pad + (height - pad * 2) * (1 - (value - min) / span);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    });
+    const rising = series[series.length - 1] > series[0];
+    const klass = rising ? "up" : "down";
+    const last = points[points.length - 1].split(",");
+    return `<svg class="board-sparkline board-sparkline--${klass}" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" aria-hidden="true" focusable="false"><polyline points="${points.join(" ")}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" /><circle cx="${last[0]}" cy="${last[1]}" r="1.9" fill="currentColor" /></svg>`;
+  }
+
   function renderMovement(item) {
+    const sparkline = _movementSparkline(item);
     const structured = item.line_odds_movement && typeof item.line_odds_movement === "object" ? item.line_odds_movement : null;
     if (structured) {
       const lineDelta = numericValue(structured.line_delta);
@@ -581,7 +654,7 @@
       const segments = [lineText, priceText].filter(Boolean);
       if (segments.length) {
         const primaryDirection = lineText ? structured.line_direction : structured.price_direction;
-        return `<span class="board-card__movement-arrow--${_movementArrowClass(primaryDirection)}">${_movementArrow(primaryDirection)}</span> ${escapeHtml(segments.join(" · "))}`;
+        return `<span class="board-card__movement-arrow--${_movementArrowClass(primaryDirection)}">${_movementArrow(primaryDirection)}</span> ${escapeHtml(segments.join(" · "))}${sparkline}`;
       }
     }
     const movement = item.movement && typeof item.movement === "object" ? item.movement : {};
@@ -634,7 +707,7 @@
     if (!parts.length) {
       return null;
     }
-    return `<span class="board-card__movement-arrow--${trend === "up" ? "up" : trend === "down" ? "down" : "flat"}">${arrow}</span> ${escapeHtml(parts.join(" · "))}`;
+    return `<span class="board-card__movement-arrow--${trend === "up" ? "up" : trend === "down" ? "down" : "flat"}">${arrow}</span> ${escapeHtml(parts.join(" · "))}${sparkline}`;
   }
 
   function edgeValue(item) {
