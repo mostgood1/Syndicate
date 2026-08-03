@@ -5796,6 +5796,23 @@ def _candidate_is_player_level_market(candidate: dict[str, Any]) -> bool:
     return False
 
 
+# A live prop this close to certain is not a placeable bet -- books pull or
+# reprice the market long before this, so a large "edge" against a price
+# still sitting on the board is a stale quote, not an opportunity.
+# Deliberately conservative so a genuinely strong live read (~80%) survives.
+_LIVE_PROP_DECIDED_PROBABILITY = 0.97
+
+
+def _candidate_is_live(candidate: dict[str, Any]) -> bool:
+    if bool(candidate.get("is_live")):
+        return True
+    live_text = " ".join(
+        _safe_text(candidate.get(field), "")
+        for field in ("status_badge", "status_line", "status_display", "status_context")
+    ).lower()
+    return "live" in live_text or "in progress" in live_text
+
+
 def _candidate_prop_outcome_decided(candidate: dict[str, Any]) -> str | None:
     """"hit" or "missed" once a live prop's outcome is already
     mathematically locked in, else None (still undecided, or not enough
@@ -5814,12 +5831,35 @@ def _candidate_prop_outcome_decided(candidate: dict[str, Any]) -> str | None:
         return None
     line_value = _numeric_hint(candidate.get("line"))
     actual_value = _numeric_hint(candidate.get("actual"))
-    if line_value is None or actual_value is None or actual_value <= line_value:
+    if line_value is not None and actual_value is not None and actual_value > line_value:
+        pick_text = _safe_text(candidate.get("pick"), "").strip().lower()
+        if pick_text.startswith("over"):
+            return "hit"
+        if pick_text.startswith("under"):
+            return "missed"
         return None
-    pick_text = _safe_text(candidate.get("pick"), "").strip().lower()
-    if pick_text.startswith("over"):
+    # The actual-crossed-line test above can only ever catch a decided
+    # OVER: an UNDER locks in the opposite way -- the actual stays below
+    # the line and simply runs out of game to climb, so `actual > line` is
+    # never true and the guard never fired for it. Confirmed live on the
+    # 2026-08-02 board: an UNDER 14.5 with 6:18 left in the 4th quarter and
+    # a live projection of 3 was the single highest-ranked opportunity on
+    # the whole board at +100 -- a price no book still offers, because the
+    # outcome is settled in all but name.
+    #
+    # Once the live probability carries real variance (WNBA live props now
+    # scale sigma by remaining game time), a near-certain live probability
+    # IS the decided signal, in either direction and for any sport. The
+    # threshold is deliberately conservative: a genuinely strong live edge
+    # (say 80%) is still a real opportunity and must survive.
+    if not _candidate_is_live(candidate):
+        return None
+    live_probability = _numeric_hint(candidate.get("model_probability"))
+    if live_probability is None:
+        return None
+    if live_probability >= _LIVE_PROP_DECIDED_PROBABILITY:
         return "hit"
-    if pick_text.startswith("under"):
+    if live_probability <= (1.0 - _LIVE_PROP_DECIDED_PROBABILITY):
         return "missed"
     return None
 

@@ -4683,6 +4683,91 @@ def _dedupe_live_player_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]
     return [best_by_key[key] for key in order if key in best_by_key]
 
 
+# Per-stat full-game standard deviations, mirroring
+# syndicate/features/shared/basketball_props_edges.py's _SigmaConfig -- the
+# same sigma model these props are priced with pregame. Held as a local copy
+# rather than imported because basketball_props_edges pulls pandas+numpy in
+# at module load and this runs on the live tick; the two are a contract and
+# must be updated together.
+_WNBA_LIVE_PROP_SIGMA_BASE: dict[str, float] = {
+    "pts": 7.5,
+    "reb": 3.0,
+    "ast": 2.5,
+    "threes": 1.3,
+    "pra": 9.0,
+    "stl": 1.2,
+    "blk": 1.3,
+    "tov": 1.5,
+}
+
+_WNBA_LIVE_PROP_SIGMA_COMBOS: dict[str, tuple[str, ...]] = {
+    "pr": ("pts", "reb"),
+    "pa": ("pts", "ast"),
+    "ra": ("reb", "ast"),
+}
+
+
+def _wnba_live_prop_sigma_for_stat(stat_key: Any) -> float | None:
+    key = str(stat_key or "").strip().lower()
+    if not key:
+        return None
+    direct = _WNBA_LIVE_PROP_SIGMA_BASE.get(key)
+    if direct is not None:
+        return direct
+    parts = _WNBA_LIVE_PROP_SIGMA_COMBOS.get(key)
+    if not parts:
+        return None
+    # Independent-sum approximation, exactly how basketball_props_edges
+    # derives its own pr/pa/ra sigmas.
+    return math.sqrt(sum(_WNBA_LIVE_PROP_SIGMA_BASE[part] ** 2 for part in parts))
+
+
+def _normal_cdf(value: float) -> float:
+    return 0.5 * (1.0 + math.erf(value / math.sqrt(2.0)))
+
+
+def _wnba_live_prop_over_probability(
+    live_projection: Any,
+    line_value: Any,
+    stat_key: Any,
+    minutes_remaining: float | None,
+) -> tuple[float | None, float | None]:
+    """Real P(final > line) for a live player prop, plus the live sigma it
+    was derived from.
+
+    The live path carried no variance at all: `live_edge` is a raw
+    projection-minus-line difference and `win_prob` stayed at its stale
+    pregame value, so anything deriving a probability from the live
+    projection saturated to 0/1 the moment the projection sat either side
+    of the line. Confirmed live on the 2026-08-02 board: a prop with 4:24
+    left in the FIRST quarter (projection 5.5 against a 12.5 line)
+    published model probability 1.0 and a fabricated edge -- with ~34
+    minutes still to play, which is not a certainty by any reading.
+
+    A counting stat's variance accumulates with playing time, so the
+    remaining-game standard deviation scales with sqrt(minutes remaining /
+    regulation): full sigma at tip-off, shrinking toward zero at the final
+    buzzer. Late-game near-certainties stay legitimately near-certain while
+    early-game projections stop pretending to be settled.
+    """
+    projection = _safe_float(live_projection)
+    line = _safe_float(line_value)
+    if projection is None or line is None:
+        return None, None
+    base_sigma = _wnba_live_prop_sigma_for_stat(stat_key)
+    if base_sigma is None or base_sigma <= 0:
+        return None, None
+    remaining = _safe_float(minutes_remaining)
+    if remaining is None:
+        remaining = float(_WNBA_REGULATION_MINUTES)
+    remaining = max(0.0, min(float(_WNBA_REGULATION_MINUTES), remaining))
+    live_sigma = base_sigma * math.sqrt(remaining / float(_WNBA_REGULATION_MINUTES))
+    if live_sigma <= 1e-6:
+        # No time left -- the projection is the outcome.
+        return (1.0 if projection > line else 0.0), 0.0
+    return _normal_cdf((projection - line) / live_sigma), round(live_sigma, 3)
+
+
 def _hydrate_live_player_lens_payload(
     payload: dict[str, Any],
     selected_date: str,
@@ -4746,6 +4831,11 @@ def _hydrate_live_player_lens_payload(
         game_explicitly_not_live = bool(source_game_status) and not bool(source_game_status.get("in_progress"))
         game_period = _period_from_status(game_status)
         game_score_differential = _score_differential_from_status(game_status)
+        game_is_in_progress = bool(game_status.get("in_progress")) if game_status else False
+        game_elapsed_minutes = _wnba_elapsed_minutes(game_status.get("period"), game_status.get("clock")) if game_status else None
+        live_minutes_remaining = (
+            max(0.0, float(_WNBA_REGULATION_MINUTES) - game_elapsed_minutes) if game_elapsed_minutes is not None else None
+        )
         rows: list[dict[str, Any]] = []
         for row in game.get("rows") if isinstance(game.get("rows"), list) else []:
             if not isinstance(row, dict):
@@ -4792,6 +4882,28 @@ def _hydrate_live_player_lens_payload(
                         live_edge = round(live_projection - line_value, 3)
                         hydrated_row["live_edge"] = live_edge
                         hydrated_row["liveEdge"] = live_edge
+                        if game_is_in_progress:
+                            over_probability, live_sigma = _wnba_live_prop_over_probability(
+                                live_projection,
+                                line_value,
+                                hydrated_row.get("stat") or hydrated_row.get("market"),
+                                live_minutes_remaining,
+                            )
+                            if over_probability is not None:
+                                side_text = str(hydrated_row.get("ev_side") or hydrated_row.get("lean") or "").strip().upper()
+                                side_probability = (1.0 - over_probability) if side_text == "UNDER" else over_probability
+                                hydrated_row["live_over_probability"] = round(over_probability, 4)
+                                hydrated_row["live_win_prob"] = round(side_probability, 4)
+                                hydrated_row["live_sigma"] = live_sigma
+                                # Override the stale pregame win_prob: every
+                                # downstream live-prop consumer (home.py's
+                                # _prop_rows_from_nba_live_lens, and through it
+                                # the Layer 2 candidate builder) reads win_prob,
+                                # and a pregame probability pinned to a live
+                                # projection is exactly what produced the
+                                # saturated board values.
+                                hydrated_row["win_prob"] = round(side_probability, 4)
+                                hydrated_row["live_probability_source"] = "live_sigma_normal"
                     if existing_live_projection is None:
                         hydrated_row["line_source"] = "boxscore_sim_fallback"
             status_period_value = _safe_float(game_status.get("period"))
