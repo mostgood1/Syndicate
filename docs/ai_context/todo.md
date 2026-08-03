@@ -4,9 +4,11 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-02 (see "Reconciliation 2026-08-02 (Live props:
+Last reconciled: 2026-08-03 (see "Reconciliation 2026-08-03 (Decided-prop
+guard root-caused properly + keyvalue ceiling made measurable)" below).
+Before that: "Reconciliation 2026-08-02 (Live props:
 real variance + decided-bet suppression, found by inspecting the post-
-deploy board)" below).
+deploy board)".
 Before that: "Reconciliation 2026-08-02 (End-to-end
 assessment + Phase 0: feedback loop closed, real ranker wired, season P0s
 -- committed AND deployed, verified live)".
@@ -31,6 +33,90 @@ Before that: "Reconciliation 2026-08-01 (Layer 2 board:
 full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
+
+### Reconciliation 2026-08-03 (Decided-prop guard root-caused properly + keyvalue ceiling made measurable)
+
+Two commits, both pushed, deployed together on `6debd2df`.
+
+**1. The decided-prop guard was never firing (`869e0645`).** The
+2026-08-02 suppression work (`c6a8b62c`) was verified against the live
+board rather than assumed, and it had NOT worked: a live MLB prop
+(`Gage Jump`, "Over 6+") published `model_probability: 0.98` with
+`state_invalid` never set. The first hypothesis -- a stale snapshot
+computed mid-deploy -- was **wrong**, and was disproven by polling for a
+genuinely post-restart snapshot (`02:49:09Z`, after all three services
+went live at `02:48:45Z`) where the candidate was still present.
+
+Real root cause: `model_probability` is stamped during
+normalization/scoring, but `_apply_candidate_state_guard` runs at
+`_collect_candidates` time (line ~7035, *before* normalize) and again
+inside `score_candidate` (line ~8953). Both saw `None`, so the new
+probability branch never evaluated. The older `actual > line` branch was
+unaffected only because `actual`/`line` are set at candidate construction.
+Note `score_candidate`'s guard call sets the flag but *returns* the
+candidate rather than pruning it -- `_score_candidates` (line ~9073) is
+what actually filters on it.
+
+Fixed twice over, deliberately: `_candidate_live_probability` reads
+`model_probability` -> `live_win_prob` -> `win_prob` ->
+`live_over_probability`, normalising percent-scaled values; and
+`_build_candidate_pool`'s final merged pool gets one last decided pass,
+the only point where every field is stamped (which also keeps
+`candidate_count` honest, since it is derived immediately below).
+`confidence` and the display `value` text are deliberately NOT consulted --
+neither is reliably a probability across builders, and over-suppressing
+real opportunities is the worse failure. 18 tests pass.
+
+**Correctly-behaving cases confirmed, not bugs**: two `type=steam`
+candidates at `model_probability: 1.0` remain on the board by design --
+`_candidate_is_player_level_market` scopes the guard to player-level
+props, and a game-level steam move is not a monotonic counting stat. One
+of them carries a *team* name (`Los Angeles Dodgers`) in `player_name`,
+which is worth knowing if that field is ever used as a player-level
+signal elsewhere.
+
+**2. Keyvalue ceiling instrumented (`6debd2df`).** The shared instance is
+at **230MB of a 256MB ceiling**, `maxmemory-policy=allkeys-lru`, with
+**37,573 keys already evicted** -- and `allkeys-lru` does not spare
+TTL-less keys, so shared coordination state is being silently dropped.
+This is a plausible hidden cause of cross-sport staleness bugs.
+**Upgrading the instance is not an option** (user constraint), so the fix
+must be usage reduction.
+
+`sweep-preview` could not explain it -- it accounts only for stale,
+TTL-less, date-scoped keys: 14 keys / 183KB of the 230MB. The remaining
+memory is in *fresh* keys, ~76KB average across ~3,000, so a small number
+of large payloads dominate. Added read-only
+`GET /api/ops/keyvalue/usage` (`keyvalue_usage_by_prefix`): estimated
+memory by bucket plus the largest individual keys, via `MEMORY USAGE`.
+Buckets collapse date and run-stamp path segments, else every run reports
+its own row. 48 tests pass.
+
+**Open, next session:**
+- **Measure and reduce keyvalue usage** using the new endpoint. Suspicion
+  (untested) is the intelligence board snapshots, but that is exactly the
+  guess this endpoint exists to replace. Candidate reductions once
+  measured: stop persisting `migration_runs/*` stderr/log text to KV at
+  all, and shorten TTLs on ephemeral run artifacts.
+- **Guard fix is NOT yet confirmed live** -- deployed but unverified on a
+  live board. Check a live slate for a `type=prop`, `is_live=true`
+  candidate with `model_probability >= 0.97`; there should be none.
+  `DECIDED_LIVE_PROPS_REMOVED` is printed (via `print(..., flush=True)`)
+  when the publication-stage pass drops any.
+- **The WNBA live sigma model has still never executed in production.**
+  No WNBA games were live at any of this session's three deploys, so
+  `live_probability_source: "live_sigma_normal"` has not appeared once.
+  Needs a live WNBA slate.
+- **NBA live-lens has the identical saturation bug** and is off-season --
+  the cheap window to port the sigma fix is now.
+
+**Operational note**: the Render deploy trigger was blocked by the
+permission classifier even mid-session after an earlier "deploy, verify,
+then proceed" -- consistent with
+[[project-syndicate-deploy-kills-inflight-sim]]'s standing practice that
+each deploy needs its own explicit ask. Checked
+`/api/ops/live-refresh/state` first: the prior scoped resim had finished
+cleanly (`exit_code: 0`) and `anyLive` was false, so nothing was killed.
 
 ### Reconciliation 2026-08-02 (Live props: real variance + decided-bet suppression, found by inspecting the post-deploy board)
 
