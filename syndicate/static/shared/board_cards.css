@@ -641,6 +641,95 @@ table.board-blotter tbody tr:last-child td {
   .board-layout {
     grid-template-columns: 1fr;
   }
+
+  /* The rail (bet slip / portfolio / parlays) sits AFTER .board-main in
+     source order, so collapsing to one column drops the slip below the
+     entire board -- hundreds of rows down, with no indication it holds
+     anything. Pin it to the bottom of the viewport instead, collapsed to
+     its header until tapped. */
+  .board-rail {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    max-height: 62vh;
+    overflow-y: auto;
+    margin: 0;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+    background: rgba(6, 14, 24, 0.97);
+    border-top: 1px solid var(--cards-line-strong);
+    box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.45);
+  }
+
+  /* Keep the last rows reachable above the docked rail. */
+  .board-main {
+    padding-bottom: 96px;
+  }
+}
+
+@media (max-width: 900px) {
+  /* An 11-column, 880px-min table inside overflow-x:auto is a 2.3x
+     horizontal scroll on a 390px phone, with Edge and the action buttons
+     off-screen. Stack each row into a labelled block instead -- the
+     data-label values come from the blotter's own column headers. */
+  .board-blotter-wrap {
+    overflow-x: visible;
+    border: 0;
+    background: transparent;
+  }
+
+  table.board-blotter,
+  table.board-blotter tbody,
+  table.board-blotter tr,
+  table.board-blotter td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  table.board-blotter thead {
+    display: none;
+  }
+
+  table.board-blotter tr {
+    margin-bottom: 10px;
+    border: 1px solid var(--cards-line);
+    border-radius: 14px;
+    background: rgba(8, 18, 30, 0.72);
+    padding: 6px 2px;
+  }
+
+  table.board-blotter td {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 6px 12px;
+    border: 0;
+    text-align: right;
+  }
+
+  table.board-blotter td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    text-align: left;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--cards-text-dim);
+  }
+
+  /* The identity cell reads as a heading, not a labelled field. */
+  table.board-blotter td.board-blotter__cell--primary {
+    display: block;
+    text-align: left;
+    padding-top: 10px;
+  }
+
+  table.board-blotter td.board-blotter__cell--primary::before {
+    content: none;
+  }
 }
 
 @media (max-width: 720px) {
@@ -651,6 +740,12 @@ table.board-blotter tbody tr:last-child td {
 
   .board-grid {
     grid-template-columns: 1fr;
+  }
+
+  /* Comfortable one-handed targets; the board is read standing up. */
+  .board-action-button,
+  .cards-tab {
+    min-height: 40px;
   }
 }
 
