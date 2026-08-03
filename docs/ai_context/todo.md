@@ -5,10 +5,9 @@ read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-08-03 (see "Reconciliation 2026-08-03 (Phase 3
-start + keyvalue eviction reported success but reclaimed NOTHING --
-OPEN)" below).
+start + keyvalue ceiling actually cleared: 212MB -> 62MB)" below).
 Before that: "Reconciliation 2026-08-03 (Phase 2:
-price CLV, fractional-Kelly stakes, correlated-exposure budgets)" below).
+price CLV, fractional-Kelly stakes, correlated-exposure budgets)".
 Before that: "Reconciliation 2026-08-03 (Keyvalue
 ceiling root-caused by measurement + NBA live-prop sigma ported)".
 Before that: "Reconciliation 2026-08-03 (Decided-prop
@@ -41,46 +40,44 @@ full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
 
-### Reconciliation 2026-08-03 (Phase 3 start + keyvalue eviction reported success but reclaimed NOTHING -- OPEN)
+### Reconciliation 2026-08-03 (Phase 3 start + keyvalue ceiling actually cleared: 212MB -> 62MB)
 
-**OPEN BUG, pick this up first.** `POST /api/ops/keyvalue/expire-run-artifacts`
-(added `dac3793e`) reported `ok=true, expired=1758,
-estimated_reclaimed_mb=150.17` against the `migration_runs` backlog, with a
-300s grace. Well past that grace, **nothing changed**: still 2,546 keys /
-185.43MB in that bucket, total 212.11MB, Redis `used_memory` 213.07M of
-256M, `evicted_keys` still climbing (37,633).
+**The keyvalue pressure is resolved.** `POST /api/ops/keyvalue/expire-run-artifacts`
+(added `dac3793e`) was run against the `migration_runs` backlog with
+`older_than_hours=6`, after a dry run confirmed the blast radius.
 
-What is RULED OUT by evidence, so don't re-tread it:
-- Not a scoping/threshold miss: the dry run and apply both matched 2,546
-  keys, expired 1,758, skipped 788 as recent, 0 without a run stamp.
-- Not phantom keys: `client.memory_usage(key)` returned real sizes summing
-  to 150.17MB **in the same loop**, so the key names are valid and the keys
-  exist. A non-existent key returns None there.
-- Not a silent exception: the counter only increments when `client.expire`
-  returns without raising, and it reached 1,758.
-- Not a dry-run mixup: the response echoed `dry_run=False`.
-- Not new keys refilling the count: a refresh writes a handful of keys per
-  run, not 2,546, and the count was byte-identical across measurements.
-- Mechanism matches the PROVEN `keyvalue_sweep_apply`, which calls
-  `client.expire(key, grace)` the same way. The one behavioural difference
-  is that sweep only ever targets keys with NO TTL (`ttl >= 0 -> continue`),
-  whereas this targets keys that ALREADY carry a ~37h TTL. **That is the
-  most promising thread**: whether something in this deployment refuses to
-  shorten an existing TTL (e.g. an EXPIRE with GT semantics, or a
-  Valkey/managed-Redis policy), which plain redis-py EXPIRE should not do.
-  Verify by reading back `client.ttl(key)` on a sample immediately after
-  the call -- the endpoint currently never checks that its own write took.
+Measured before and after with `/api/ops/keyvalue/usage`:
 
-Next step regardless of cause: make the endpoint report a post-write
-`ttl()` readback for a sample of keys, so it can never again claim success
-without evidence. That omission is the real defect here -- the tool
-asserted an outcome it never verified.
+| | before | after |
+|---|---|---|
+| total | 212.11 MB | **61.91 MB** |
+| keys | 3,394 | **1,636** |
+| `migration_runs` | 185.43 MB / 2,546 | **35.26 MB / 788** |
 
-Interim risk: still ~212MB of a 256MB ceiling under `allkeys-lru`, so
-coordination state keeps getting evicted. Truncation (`44b0f247`) does stop
-NEW growth -- no post-deploy run appears among the 40 largest keys -- so
-the backlog should still age out on its own ~37h TTLs even if the forced
-expiry stays broken.
+The 788 surviving `migration_runs` keys are exactly the recent runs the
+sweep deliberately skipped, so the outcome matches the plan precisely.
+Redis `used_memory` was 213.07M of a 256M ceiling; the instance now has
+real headroom and should stop evicting coordination state under
+`allkeys-lru`.
+
+**Methodological warning for the next session -- I got this wrong first.**
+Two measurements taken ~3 and ~8 minutes after applying showed *zero*
+change (still 2,546 keys / 185.43MB), and I wrote it up as "reported
+success but reclaimed nothing," complete with a list of ruled-out causes.
+That conclusion was **wrong**. Redis expires keys lazily -- it does not
+walk the keyspace at the moment a TTL elapses -- so a short-interval
+re-measure after an EXPIRE sweep tells you nothing, and reads as a total
+failure. Wait for the reclaim rather than concluding from an early sample.
+The background watcher polling until the bucket dropped below 60MB is what
+actually settled it.
+
+Standing lesson: this is the same failure mode as the earlier
+"stale mid-deploy snapshot" call -- reaching a confident conclusion from a
+measurement taken before the system could possibly have reflected the
+change. Prefer a watcher over a spot check for anything asynchronous.
+
+Truncation (`44b0f247`) independently stops NEW growth: no post-deploy run
+appears among the 40 largest keys.
 
 **Also this session (all shipped, deployed on `dac3793e`):**
 - **Mobile board (`fd69dce8`)**: cards default under 900px, blotter stacks
