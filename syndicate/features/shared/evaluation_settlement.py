@@ -345,6 +345,11 @@ def settle_ledger_for_date(
             result=result,
             pnl=_pnl_for_settlement(row, result),
             closing_line=row.get("line"),
+            # The graded row's own price at settlement is the closest
+            # available stand-in for the market close; without it price CLV
+            # can never be computed for any settled bet, since nothing else
+            # in this path carries a closing price.
+            closing_price=row.get("closing_price") or row.get("price") or row.get("odds"),
             implied_probability=recommendation.get("model_probability") or record.get("implied_probability"),
             persist=True,
             ledger_path=target_ledger_path,

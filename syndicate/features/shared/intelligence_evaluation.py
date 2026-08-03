@@ -1005,13 +1005,18 @@ def record_portfolio_event(*, prediction_record: Mapping[str, Any], portfolio_ev
     return payload
 
 
-def settle_result(*, record: Mapping[str, Any], result: Any, pnl: Any, closing_line: Any, implied_probability: Any | None = None, settled_at: str | None = None, persist: bool = True, ledger_path: Path | str | None = None) -> dict[str, Any]:
+def settle_result(*, record: Mapping[str, Any], result: Any, pnl: Any, closing_line: Any, closing_price: Any | None = None, implied_probability: Any | None = None, settled_at: str | None = None, persist: bool = True, ledger_path: Path | str | None = None) -> dict[str, Any]:
     payload = _copy_mapping(record)
     settled_record = {
         **payload,
         "result": _result_label(result),
         "pnl": _coerce_float(pnl),
         "closing_line": closing_line,
+        # Price CLV needs the closing PRICE, not just the closing line --
+        # moneylines have no line to move, and a prop can hold its number
+        # while the price walks. Optional so existing callers keep working;
+        # _price_clv simply skips records that never captured one.
+        "closing_price": _first_present(closing_price, payload.get("closing_price")),
         "implied_probability": _coerce_probability(implied_probability if implied_probability is not None else payload.get("implied_probability")),
         "settled_at": settled_at or _utc_now(),
     }
@@ -1133,6 +1138,51 @@ def _clv(records: list[dict[str, Any]]) -> float | None:
     return mean(values)
 
 
+def _implied_probability_from_american(price: Any) -> float | None:
+    """Vig-inclusive implied probability from an American price."""
+    value = _coerce_float(price)
+    if value is None or value == 0:
+        return None
+    if value > 0:
+        return 100.0 / (value + 100.0)
+    return abs(value) / (abs(value) + 100.0)
+
+
+def _price_clv(records: list[dict[str, Any]]) -> float | None:
+    """Realized price CLV: how much better than the closing price the bet
+    was taken at, in implied-probability terms.
+
+    The existing `_clv` measures LINE movement only, which misses every
+    market where the number never moves but the price does -- a prop held
+    at 5.5 while the price walks -110 -> -130 is a real, and commonly the
+    only, CLV signal. Moneylines have no line to move at all, so line CLV
+    is structurally blind to them.
+
+    Positive means the bet's price implied a lower probability than the
+    close, i.e. it was taken at better odds than the market settled on --
+    the standard definition of beating the closing line. Direction is not
+    applied here: the price is already side-specific (it is the price of
+    the side actually taken), unlike a spread/total line.
+    """
+    values: list[float] = []
+    for record in records:
+        recommendation = _copy_mapping(record.get("recommendation"))
+        bet_price = _first_present(
+            recommendation.get("odds"),
+            recommendation.get("price"),
+            record.get("odds"),
+            record.get("price"),
+        )
+        entry_probability = _implied_probability_from_american(bet_price)
+        closing_probability = _implied_probability_from_american(record.get("closing_price"))
+        if entry_probability is None or closing_probability is None:
+            continue
+        values.append(round(closing_probability - entry_probability, 4))
+    if not values:
+        return None
+    return mean(values)
+
+
 def _calibration(records: list[dict[str, Any]]) -> dict[str, Any]:
     errors: list[float] = []
     brier_scores: list[float] = []
@@ -1160,6 +1210,7 @@ def compute_metrics(*, records: Iterable[Mapping[str, Any]] | None = None, ledge
     win_rate = _win_rate(settled_rows)
     roi = _roi(settled_rows)
     clv = _clv(settled_rows)
+    clv_price = _price_clv(settled_rows)
     calibration = _calibration(settled_rows)
     return {
         "sample_size": len(record_rows),
@@ -1167,6 +1218,9 @@ def compute_metrics(*, records: Iterable[Mapping[str, Any]] | None = None, ledge
         "decisive_count": len(decisive_rows),
         "win_rate": win_rate,
         "roi": roi,
+        # Reported alongside line CLV rather than replacing it: they measure
+        # different things and line CLV is structurally blind to moneylines.
+        "clv_price": clv_price,
         "clv": clv,
         "calibration": calibration,
         "pnl": sum(_coerce_float(record.get("pnl")) or 0.0 for record in settled_rows),
