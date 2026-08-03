@@ -126,11 +126,62 @@ def _update_job_status(
     print(f"SAFE_WRITE_SUCCESS path={status_path}", flush=True)
 
 
+def _max_run_artifact_text_bytes() -> int:
+    """Cap for any single log-ish string this job runner persists.
+
+    Measured 2026-08-03: `migration_runs/**` held 185.71MB of a 212.67MB
+    keyvalue total (2,549 keys) -- 87% of a 256MB shared instance that was
+    already evicting 37k keys under allkeys-lru, which does not spare
+    TTL-less coordination state. The worst single keys were captured
+    subprocess console output: odds_refresh.stderr.txt and odds_refresh.json
+    at 8MB each (8MB being the backend's own write ceiling, so they were
+    already being clipped). Nothing cross-service reads the full text --
+    /api/ops/odds-refresh/status only surfaces it for debugging -- and for
+    that the tail is what matters.
+    """
+    raw = str(os.environ.get("SYNDICATE_MAX_RUN_ARTIFACT_TEXT_BYTES") or "").strip()
+    try:
+        value = int(raw) if raw else 65536
+    except ValueError:
+        value = 65536
+    return max(4096, value)
+
+
+def _truncate_log_text(text: str, limit: int | None = None) -> str:
+    """Keep the TAIL of a log, not the head -- the end is where the failure
+    is. Prefixed with an explicit notice so a truncated artifact is never
+    mistaken for a complete one."""
+    resolved_limit = _max_run_artifact_text_bytes() if limit is None else limit
+    raw = str(text or "")
+    encoded = raw.encode("utf-8", errors="replace")
+    if len(encoded) <= resolved_limit:
+        return raw
+    tail = encoded[-resolved_limit:].decode("utf-8", errors="replace")
+    dropped = len(encoded) - resolved_limit
+    return f"[truncated {dropped} bytes; showing last {resolved_limit}]\n{tail}"
+
+
+def _truncate_payload_strings(payload: dict[str, Any]) -> dict[str, Any]:
+    """Truncate oversized string fields *inside* a JSON payload rather than
+    truncating the serialized text, which would produce invalid JSON and
+    break /api/ops/odds-refresh/status's parsing."""
+    limit = _max_run_artifact_text_bytes()
+    trimmed: dict[str, Any] = {}
+    for key, value in payload.items():
+        if isinstance(value, str) and len(value.encode("utf-8", errors="replace")) > limit:
+            trimmed[key] = _truncate_log_text(value, limit)
+        elif isinstance(value, dict):
+            trimmed[key] = _truncate_payload_strings(value)
+        else:
+            trimmed[key] = value
+    return trimmed
+
+
 def _safe_write_text(path: Path, payload: str) -> None:
     try:
-        payload_text = str(payload or "")
+        payload_text = _truncate_log_text(payload)
         print(f"SAFE_WRITE_BEGIN path={path} payload_size={len(payload_text.encode('utf-8'))}", flush=True)
-        _refresh_state_store()["write_text_file"](path, payload)
+        _refresh_state_store()["write_text_file"](path, payload_text)
         print(f"SAFE_WRITE_SUCCESS path={path}", flush=True)
         print(f"[refresh_job_write_text_ok] path={path}", flush=True)
     except Exception as exc:
@@ -146,7 +197,7 @@ def _safe_write_text(path: Path, payload: str) -> None:
 
 def _safe_write_json(path: Path, payload: dict[str, Any]) -> None:
     try:
-        payload_text = json.dumps(payload, indent=2)
+        payload_text = json.dumps(_truncate_payload_strings(payload), indent=2)
         print(f"SAFE_WRITE_BEGIN path={path} payload_size={len(payload_text.encode('utf-8'))}", flush=True)
         _refresh_state_store()["write_text_file"](path, payload_text)
         print(f"SAFE_WRITE_SUCCESS path={path}", flush=True)
