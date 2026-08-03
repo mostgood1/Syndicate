@@ -2818,7 +2818,7 @@ below). **Not committed and not deployed this session** -- next session
 should confirm with the user whether to commit/push, since this touches the
 production write path for a currently off-season sport.
 
-Also found (not fixed, flagged as a separate spawn_task): 
+~~Also found (not fixed, flagged as a separate spawn_task):~~
 `tests/test_nba_cards_merge_aliases.py::NbaCardsMergeAliasTests::test_cards_page_context_stays_artifact_first_on_render_web_dyno`
 passes alone but fails when run after `test_nba_live_snapshots_local.py`/
 `test_nba_refresh_runner.py` in the same session -- confirmed via `git stash`
@@ -2827,6 +2827,20 @@ Likely a module-level `_NBA_CARDS_CONTEXT_CACHE` (or an lru_cache) leaking
 state between test files with no reset fixture, same class of thing
 `tests/conftest.py`'s existing autouse fixture already handles for WNBA's
 wall-clock-TTL caches.
+
+**Closed 2026-08-03**: fixed independently by a parallel session, commit
+`254df63d` ("Hygiene: NBA test-cache isolation, season-opener checklist") --
+new `_clear_nba_cards_caches` autouse fixture in `tests/conftest.py`, clearing
+`_NBA_CARDS_CONTEXT_CACHE` plus four `lru_cache`-decorated functions
+(`_nba_team_branding_index`, `_local_live_state_payload_cached`,
+`_local_live_snapshot_payload_cached`, `_live_projection_calibration_index`).
+The spawned session for this item independently arrived at the same root
+cause and wrote an equivalent (but narrower -- only the one context cache,
+not the other four) fix; discarded as redundant once `254df63d` was found
+already on `main`, so nothing further to commit. Verified: the originally
+failing run order (`test_nba_live_snapshots_local.py`
+`test_nba_refresh_runner.py` `test_nba_cards_merge_aliases.py`) and the full
+`nba`-filtered suite (632 passed) both pass clean on current `main`.
 
 ### Reconciliation 2026-08-02 (MLB props self-heal blind spot on a MISSING artifact + WNBA pregame props zeroing out, both shipped and deployed)
 
