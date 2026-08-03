@@ -1927,20 +1927,43 @@ def _game_from_row(
     away_spread_price = _safe_float(row.get("away_spread_price"))
     total_over_price = _safe_float(row.get("total_over_price"))
     total_under_price = _safe_float(row.get("total_under_price"))
-    p_home_win, p_away_win = _normalize_two_way(
-        _implied_prob_from_american(home_ml),
-        _implied_prob_from_american(away_ml),
-    )
+    sim_payload = _sim_payload(sim_game)
+    score_payload = sim_payload.get("score") if isinstance(sim_payload.get("score"), dict) else {}
+    # Model margin/total means: the sim detail's score payload first, then the
+    # pred_margin/pred_total game_cards columns (written by
+    # refresh_nba_oddsapi_props.py since 2026-08-02). Never the market line --
+    # a probability derived from the book's own line is the book's own price.
+    margin_hint = _safe_float(score_payload.get("margin_mean"))
+    if margin_hint is None:
+        margin_hint = _safe_float(row.get("pred_margin"))
+    total_hint = _safe_float(score_payload.get("total_mean"))
+    if total_hint is None:
+        total_hint = _safe_float(row.get("pred_total"))
+    # Sim-margin probability must outrank the market-implied one (same bug
+    # class fixed in wnba/cards.py's _source_betting, 2026-08-02): the old
+    # derivation used _implied_prob_from_american(home_ml) unconditionally, so
+    # whenever a book moneyline existed the "model" probability WAS the book's
+    # own vig-inclusive price and every edge computed from it was structurally
+    # zero. Market-implied stays as the last resort only, for rows with no sim
+    # projection at all.
+    sim_home_win_prob = _margin_win_prob(margin_hint, scale=6.5) if margin_hint is not None else None
+    if sim_home_win_prob is not None:
+        p_home_win, p_away_win = sim_home_win_prob, 1.0 - sim_home_win_prob
+    else:
+        p_home_win, p_away_win = _normalize_two_way(
+            _implied_prob_from_american(home_ml),
+            _implied_prob_from_american(away_ml),
+        )
+    p_home_cover = _margin_win_prob(margin_hint + home_spread, scale=7.5) if margin_hint is not None and home_spread is not None else None
+    p_total_over = _margin_win_prob(total_hint - total, scale=10.5) if total_hint is not None and total is not None else None
     market_home_margin = -home_spread if home_spread is not None else None
     home_score_mean = ((total + market_home_margin) / 2.0) if total is not None and market_home_margin is not None else None
     away_score_mean = ((total - market_home_margin) / 2.0) if total is not None and market_home_margin is not None else None
     segment_total = (total / 4.0) if total is not None else None
     segment_margin = (market_home_margin / 4.0) if market_home_margin is not None else None
-    sim_payload = _sim_payload(sim_game)
     props_payload = props_game.get("prop_recommendations") if isinstance(props_game, dict) and isinstance(props_game.get("prop_recommendations"), dict) else (
         props_game if isinstance(props_game, dict) else {}
     )
-    score_payload = sim_payload.get("score") if isinstance(sim_payload.get("score"), dict) else {}
     market_payload = sim_payload.get("market") if isinstance(sim_payload.get("market"), dict) else {}
     context_payload = sim_payload.get("context") if isinstance(sim_payload.get("context"), dict) else {}
     periods_payload = sim_payload.get("periods") if isinstance(sim_payload.get("periods"), dict) else {}
@@ -2005,10 +2028,14 @@ def _game_from_row(
             "total_under_price": total_under_price,
             "p_home_win": p_home_win,
             "p_away_win": p_away_win,
-            "p_home_cover": 0.5,
-            "p_away_cover": 0.5,
-            "p_total_over": 0.5,
-            "p_total_under": 0.5,
+            # Sim-derived when a model margin/total exists; None (not a
+            # fabricated coin-flip 0.5) otherwise, matching wnba/cards.py's
+            # _source_betting so basketball_market_board drops the row instead
+            # of scoring a structurally zero edge.
+            "p_home_cover": p_home_cover,
+            "p_away_cover": (1.0 - p_home_cover) if p_home_cover is not None else None,
+            "p_total_over": p_total_over,
+            "p_total_under": (1.0 - p_total_over) if p_total_over is not None else None,
             "home_ml_ev": 0.0,
             "away_ml_ev": 0.0,
             "home_spread_ev": 0.0,
