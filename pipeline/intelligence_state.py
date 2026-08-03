@@ -2511,6 +2511,50 @@ class IntelligenceStateService:
         }
 
     @staticmethod
+    def _attach_board_stakes(global_pool: list[dict[str, Any]]) -> None:
+        """Attach a fractional-Kelly suggested stake to each candidate.
+
+        `compute_bet_size` (real Kelly, correlation-aware sizing beside it in
+        bankroll_manager) existed but was reachable only from
+        run_intelligence_query's response builder -- the published board
+        hardcoded `"portfolio": {}`, so the served board showed edges with
+        no notion of how much they were worth.
+
+        Deliberately conservative: quarter Kelly by default, shrunk again by
+        how much settled evidence the candidate's sport actually has. Most
+        markets currently have zero settled bets (settlement was only just
+        enabled) and several probability models are explicitly not
+        backtested, so anything near full Kelly would be indefensible. The
+        shrinkage factors ride along on the payload so the number can be
+        inspected rather than taken on faith.
+        """
+        from syndicate.features.bankroll_manager import compute_board_stake
+
+        sample_size_by_sport: dict[str, int] = {}
+        for candidate in global_pool:
+            if not isinstance(candidate, dict):
+                continue
+            sport_slug = str(candidate.get("sport_slug") or candidate.get("sport") or "").strip().lower()
+            if sport_slug not in sample_size_by_sport:
+                sample_size = 0
+                try:
+                    profile = candidate.get("historical_profile")
+                    if isinstance(profile, Mapping):
+                        sample_size = int(_numeric_hint(profile.get("sample_size")) or 0)
+                except Exception:
+                    sample_size = 0
+                sample_size_by_sport[sport_slug] = sample_size
+            try:
+                candidate["stake"] = compute_board_stake(
+                    candidate,
+                    settled_sample_size=sample_size_by_sport.get(sport_slug, 0),
+                )
+            except Exception:
+                # A sizing failure must never drop a real opportunity off
+                # the board -- the candidate simply ships without a stake.
+                continue
+
+    @staticmethod
     def _attach_adjusted_scores(global_pool: list[dict[str, Any]]) -> None:
         """Annotate the pool with the shared recommendation engine's
         adjusted_score (reliability multipliers, ROI/calibration weighting,
@@ -2778,6 +2822,7 @@ class IntelligenceStateService:
             from syndicate.features.correlation_engine import attach_board_correlation_flags
 
             attach_board_correlation_flags(global_pool)
+            self._attach_board_stakes(global_pool)
             # Runs inside this fingerprint-cached build (once per data
             # change), NOT per publication -- rank_recommendations walks
             # odds-history/market-feature state per candidate and was

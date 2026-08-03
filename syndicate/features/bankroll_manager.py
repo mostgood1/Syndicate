@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any, Mapping
 
 from syndicate.features.correlation_engine import compute_correlation as _compute_correlation
@@ -149,6 +150,74 @@ def compute_bet_size(candidate: Mapping[str, Any]) -> dict[str, Any]:
         "confidence": round(confidence, 4),
         "cap_fraction": round(cap_fraction, 4),
         "recommended_bet_size": round(recommended_bet_size, 4),
+    }
+
+
+_DEFAULT_KELLY_MULTIPLIER = 0.25
+_SAMPLE_SIZE_FOR_FULL_CREDIBILITY = 50
+_MIN_SAMPLE_CREDIBILITY = 0.25
+
+
+def _kelly_multiplier() -> float:
+    raw = str(os.environ.get("SYNDICATE_KELLY_FRACTION_MULTIPLIER") or "").strip()
+    try:
+        value = float(raw) if raw else _DEFAULT_KELLY_MULTIPLIER
+    except ValueError:
+        value = _DEFAULT_KELLY_MULTIPLIER
+    return _clamp(value, 0.01, 1.0)
+
+
+def _sample_credibility(settled_sample_size: Any) -> float:
+    """How much to trust this market's own probability estimates yet.
+
+    Kelly assumes the probability is CORRECT; it is famously punishing when
+    it is not. Most of this repo's probability models are explicitly not
+    backtested (the WNBA/NBA live sigma constants and the live win-prob
+    logistic all say so in their own docstrings), and settlement was only
+    just enabled, so most markets currently have zero settled bets. Sizing
+    those at anything near full Kelly would be indefensible.
+
+    Credibility ramps from a floor to 1.0 as real settled results
+    accumulate. The floor is deliberately non-zero so an unproven market
+    still produces a small, honest suggestion rather than a silent 0 that
+    reads as a broken feature.
+    """
+    sample = _safe_float(settled_sample_size) or 0.0
+    if sample <= 0:
+        return _MIN_SAMPLE_CREDIBILITY
+    ratio = sample / float(_SAMPLE_SIZE_FOR_FULL_CREDIBILITY)
+    return _clamp(max(_MIN_SAMPLE_CREDIBILITY, ratio), _MIN_SAMPLE_CREDIBILITY, 1.0)
+
+
+def compute_board_stake(candidate: Mapping[str, Any], *, settled_sample_size: Any = 0) -> dict[str, Any]:
+    """Fractional-Kelly stake for a board candidate, as a fraction of bankroll.
+
+    Wraps compute_bet_size (full Kelly x confidence, capped) and shrinks it
+    twice: by a fixed fractional-Kelly multiplier (default quarter Kelly,
+    SYNDICATE_KELLY_FRACTION_MULTIPLIER) and by how much settled evidence
+    the market actually has. Both shrinkages are reported so the number is
+    inspectable rather than a bare figure the reader has to trust.
+
+    This is a sizing calculator over the user's own model output, not
+    advice: it states what the stated edge and price imply under a
+    deliberately conservative Kelly variant, and says so.
+    """
+    sizing = compute_bet_size(candidate)
+    multiplier = _kelly_multiplier()
+    credibility = _sample_credibility(settled_sample_size)
+    full_kelly_fraction = _safe_float(sizing.get("kelly_fraction")) or 0.0
+    cap_fraction = _safe_float(sizing.get("cap_fraction")) or 0.0
+    staked_fraction = full_kelly_fraction * multiplier * credibility
+    # The cap is an absolute ceiling and still applies after shrinkage.
+    staked_fraction = _clamp(min(staked_fraction, cap_fraction), 0.0, 1.0)
+    return {
+        **sizing,
+        "kelly_multiplier": round(multiplier, 4),
+        "sample_credibility": round(credibility, 4),
+        "settled_sample_size": int(_safe_float(settled_sample_size) or 0),
+        "stake_fraction": round(staked_fraction, 5),
+        "stake_units": round(staked_fraction * 100.0, 2),
+        "stake_basis": "fractional_kelly_shrunk_by_settled_sample",
     }
 
 
