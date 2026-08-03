@@ -186,13 +186,13 @@ live-lens, market/accuracy, picks/props, archive, and season betting-card lanes.
 | `ask_the_syndicate.py` | — | NL Q&A; `POST /api/syndicate/query` | reads latest snapshot, optional LLM narration |
 | `ops.py` | — | **All `/api/ops/*` + `/ops/*`** — admin-gated | see §2.4 |
 | `mlb.py` | `/mlb` | Reference module; richest surface (HR/K/RFI/ladders, market board, season) | fully local |
-| `nba.py` | `/nba` | Deepest live lane (`/api/live_state`, `live_player_lens`, …) | source-app fallback present |
+| `nba.py` | `/nba` | Deepest live lane (`/api/live_state`, `live_player_lens`, …) | fully local (fallback removed `35e0b4d5`) |
 | `nhl.py` | `/nhl` | Cards/picks/props-reconciliation/props-lines; no game_detail | |
 | `wnba.py` | `/wnba` | Mirrors NBA live lanes; serves own CSS/JS/logos | source-app fallback present |
 | `nfl.py` | `/nfl` | **Weekly** cadence; `/api/weeks` | leans on `features/football/` engine |
 | `ncaaf.py` | `/ncaaf` | Weekly; own `smartsim2` engine + CFBD | |
 | `ncaab.py` | `/ncaab` | Partial (no picks/props); `/results` season archive | |
-| `soccer.py` | `/soccer` | Only league-parameterized (`/soccer/<league>/…`); SoccerSim | no settlement/accuracy/picks lanes |
+| `soccer.py` | `/soccer` | Only league-parameterized (`/soccer/<league>/…`); SoccerSim | picks ship (no /picks route); no settlement/accuracy lanes |
 | `sports.py` | — | Catch-all generic hub | 20 lines |
 
 Some assets are served through **blueprint routes** (not `/static`) so they can be versioned or
@@ -252,9 +252,11 @@ tier normally runs neither.
   files). Interval is **adaptive** (`SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS` default 60, idle
   interval when nothing is live).
 - **Live-lens loop** (`syndicate/features/shared/live_lens_loop.py`) — also on live-odds-worker,
-  gated by `SYNDICATE_ENABLE_LIVE_LENS_LOOP`. Covers **MLB, NBA, WNBA** only. Per tick: builder →
+  gated by `SYNDICATE_ENABLE_LIVE_LENS_LOOP`. Covers **MLB, NBA, WNBA, soccer**
+  (`_LIVE_LENS_SPORTS`; soccer added 2026-07-31). Per tick: builder →
   validator → `write_json_file(snapshot_path)`. MLB's `estimate_live` runs a real 120-sim Monte
-  Carlo per live game (memory-gated).
+  Carlo per live game (memory-gated); soccer resimulates each in-progress match from live state
+  (`poll_soccer_live_state.py`).
 
 ---
 
@@ -384,21 +386,23 @@ Every sport's card/board funnels through here so one frontend contract serves al
 | Sport | Board | game_detail | picks | props | live_lens | archive | source-app fallback | Status |
 |---|---|---|---|---|---|---|---|---|
 | **MLB** | ✅ (`cards.py` 5.5k) | ✅ | in cards | `top_props` | ✅ | ✅ | **None (fully local)** | **Reference / complete** |
-| **NBA** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **Yes** (`SYNDICATE_NBA_SOURCE_APP_*`) | complete but source-app dependent |
-| **WNBA** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **Yes** (+`source_proxy.py`) | complete but source-app dependent |
+| **NBA** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **None** (HTTP fallback removed `35e0b4d5`; producer script still shells into `vendor/nba_betting_repo`) | complete; serving path fully local |
+| **WNBA** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **In-repo vendor only** (`_load_source_app` loads `vendor/wnba_betting_repo/app.py` in-process; no network) | complete; ~90% local |
 | **NHL** | ✅ | ❌ | ✅ | `props_lines`+reconciliation | ✅ | ✅ | No | mostly complete; no game_detail |
 | **NFL** | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | No | lean; uses `features/football/` engine (weekly) |
 | **NCAAF** | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | No | own `smartsim2_*` engine + `cfbd.py` (weekly) |
 | **NCAAB** | ✅ | ✅ | ❌ | ❌ | ✅ | `results_archive` | No | most partial |
-| **Soccer** | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | No | self-contained (`soccersim`); league-parameterized |
+| **Soccer** | ✅ | ✅ | ✅ (`picks_{date}.csv`, no `/picks` route) | ✅ | ✅ | ✅ | No | self-contained (`soccersim`); league-parameterized |
 
 - **MLB is the only fully-local sport** (canonical `card_variant="mlb_main"`, short-circuited in both
   `_normalize_game` and `normalize_publication_game`; `mlb/sources.py` resolves purely from
   `data/mlb_source/`).
-- **Only two files carry a true external source-app fallback:** `nba/cards.py` and `wnba/cards.py`
-  (env-gated `SYNDICATE_<SPORT>_SOURCE_APP_BASE_URL/_TOKEN/_FALLBACK` HTTP fetch when local artifacts
-  are missing). The broad `fallback` grep (600+ hits) is otherwise defensive `_safe_*(…, fallback=…)`
-  and local artifact-date fallbacks — **not** external dependencies.
+- **No external source-app HTTP fallback remains** (verified 2026-08-02: zero `SOURCE_APP` hits in
+  `syndicate/`). NBA's HTTP fallback was deleted in `35e0b4d5`; WNBA's only residual coupling is
+  `SYNDICATE_WNBA_SOURCE_APP_FALLBACK` gating an **in-process** load of the vendored
+  `vendor/wnba_betting_repo/app.py` (no network), used for live-lines/live-state exports after
+  local builders are tried first. The broad `fallback` grep (600+ hits) is otherwise defensive
+  `_safe_*(…, fallback=…)` and local artifact-date fallbacks — **not** external dependencies.
 - `features/football/` is a shared NFL/NCAAF **engine** package (ingestion + `sim_engine/smartsim2` +
   evaluation), not a board sport.
 
@@ -620,9 +624,11 @@ or `refresh_odds_sources.py --dry-run --json` (resolve the command plan without 
   offender and is deferred under headroom pressure (`SYNDICATE_LIVE_LENS_MIN_HEADROOM_MB` default
   1800MB); MLB sim ownership was moved to refresh-worker to isolate it; live-odds-worker self-recycles
   every ~6h. `pandas==2.2.2`, `onnxruntime==1.22.0` are pinned for a reason — don't bump casually.
-- **NBA/WNBA are not fully local** — they still HTTP-fetch from an upstream source app when local
-  artifacts are missing (`SYNDICATE_<SPORT>_SOURCE_APP_*`, `wnba/source_proxy.py`). The migration
-  direction is to eliminate these; don't add new ones.
+- **NBA serving is fully local; WNBA is ~90% local** — the NBA HTTP source-app fallback was removed
+  (`35e0b4d5`; `render.yaml`'s `SYNDICATE_NBA_SOURCE_APP_FALLBACK` blocks are dead config). WNBA's
+  residual coupling is the in-repo vendored app loaded in-process for a few live exports, plus the
+  vendored `cards-parity.js` frontend (`wnba/source_proxy.py` is a static-asset rewriter, not a
+  network proxy). The migration direction is still to eliminate these; don't add new ones.
 - **Repo-root clutter** — the `tmp_*` scratch, `ops_state_check*.json`, `ops_status.json`, and
   `prod_final_check.html` debug dumps were removed (see cleanup below); `.gitignore` covers
   `tmp_*.{log,json,py,txt,xml}` to stop recurrence. **`deploy_ids.json`** is intentionally kept —

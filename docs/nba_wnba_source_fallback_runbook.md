@@ -1,5 +1,16 @@
 # NBA/WNBA Source-App Fallback Runbook
 
+> **⚠ Largely superseded (2026-08-02).** The NBA HTTP source-app fallback this
+> runbook describes was **removed from the codebase** in `35e0b4d5` —
+> `nba/cards.py` no longer has any `SYNDICATE_NBA_SOURCE_APP_*` path and NBA
+> serving is fully local (the producer script `refresh_nba_oddsapi_props.py`
+> still gates some exports on `SYNDICATE_NBA_SOURCE_APP_FALLBACK`, but that
+> loads the in-repo vendored CLI, not a remote app). WNBA's
+> `SYNDICATE_WNBA_SOURCE_APP_FALLBACK` likewise gates an **in-process** load
+> of `vendor/wnba_betting_repo/app.py`, not a network fetch, and
+> `wnba/source_proxy.py` is a static-asset rewriter. Keep this file only as
+> history of the recovery it once described; do not follow it for new work.
+
 This runbook completes NBA/WNBA recovery on Syndicate Render by wiring Syndicate to the working standalone source apps.
 
 This is a compatibility path, not the normal Render data path. The authoritative Render disk layout is documented in [docs/render_data_authority.md](render_data_authority.md).

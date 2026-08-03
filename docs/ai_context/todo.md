@@ -4,17 +4,22 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-02 (see "Reconciliation 2026-08-02 (MLB board
+Last reconciled: 2026-08-02 (see "Reconciliation 2026-08-02 (End-to-end
+assessment + Phase 0: feedback loop closed, real ranker wired, season P0s
+-- committed, NOT yet deployed)" below).
+Before that: "Reconciliation 2026-08-02 (MLB board
 stuck at 7-of-15 games all afternoon -- games whose fingerprint was
 recorded once and then never re-diffed, fixed with a board-completeness
-self-heal trigger, shipped and deployed, confirmed 15/15 live)" below).
+self-heal trigger, shipped and deployed, confirmed 15/15 live)".
 Before that: "Reconciliation 2026-08-02 (Layer 2 board
 frozen for 3+ hours on a busy Sunday: unbounded default candidate volume
 blew past every persistence ceiling, both shipped and deployed; MLB sim
 progress reporting added as a follow-up)".
 Before that: "Reconciliation 2026-08-02 (NBA live
 snapshot cross-service read/write never made keyvalue-aware -- fixed
-locally, NOT yet committed/deployed)".
+locally, NOT yet committed/deployed)" -- NOTE: that fix has since shipped
+as `19e59beb` (pushed to origin); the section's "not committed" caveat is
+stale.
 Before that: "Reconciliation 2026-08-01 part 3 (NFL:
 season-projection autorun enabled in production)".
 Before that: "Reconciliation 2026-08-01 part 2 (NFL:
@@ -23,6 +28,81 @@ Before that: "Reconciliation 2026-08-01 (Layer 2 board:
 full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
+
+### Reconciliation 2026-08-02 (End-to-end assessment + Phase 0: feedback loop closed, real ranker wired, season P0s -- committed, NOT yet deployed)
+
+Ran a full seven-audit end-to-end assessment across every sport (report:
+`docs/reports/syndicate_end_to_end_assessment_2026_08_02.md` -- read it,
+it supersedes several stale claims in this file and end_to_end_context.md),
+then shipped Phase 0 of its roadmap as separate commits. **None of this is
+deployed yet** -- push ships nothing on its own; next session should deploy
+web + refresh-worker (check for an in-flight sim first) and then verify the
+items below live.
+
+Shipped (committed to main, in order):
+1. `0a8c8e58` NFL/NCAAF week-1 fixed point broken: odds-refresh resolvers
+   read current_week.json and wrote the same week back forever;
+   nfl_target_week()/ncaaf_target_week() (real schedule, first unplayed
+   week) now outrank the tracked file everywhere incl. home.py's Layer 2
+   context. Without this the NFL board stays on Week 1 all season.
+2. `04dfb179` NFL market board: real spread/total prices from
+   real_betting_lines markets[] (both sides, over+under), plus a REAL SIGN
+   BUG fix -- spread cover prob fed bet-notation line straight into
+   P(margin > line), making a -10.5 favorite ~94% to "cover"; now negated
+   like NCAAF. EV on spread/total was impossible before this.
+3. `44fb44af` Football pick cards stamp a game-level "market" key -- they
+   were flowing into pregame_props() mislabeled as player props (the WNBA
+   2026-07-27 bug class; the "12 unpriced NFL prop cards" on the live
+   board).
+4. `10345c35` Layer 2 board: rank_recommendations had ZERO production
+   callers (board ranked on edge x confidence). The pool build now
+   attaches adjusted_score (annotation-only, fingerprint-cached,
+   evaluation records via bounded windowed loader) and both ranking
+   surfaces prefer it. Unpriced candidates are flagged and excluded from
+   top_opportunities (stay in by_sport). Response gains
+   unpriced_candidate_count. Verify live: ADJUSTED_SCORES_ATTACHED prints
+   in refresh-worker logs; NFL cards with blank odds no longer occupy
+   board slots.
+5. `770d382f` Soccer provider fans out across ALL active leagues (was
+   MLS-or-first-only) -- required before the European leagues restart
+   2026-08-14/22.
+6. Evaluation ledger + settlement (this commit): records embedded the full
+   query response AND full sport manifests (nested again under
+   prediction/raw/recommendations) -- single-day chunks of 2.0GB/2.7GB.
+   Persist path now slims to provenance
+   (slim_evaluation_record_payload), full-history reads skip oversized
+   chunks, and scripts/compact_evaluation_ledger.py rewrote the local
+   history 5.19GB -> 14.7MB with record counts preserved (837/364 etc.
+   verified). render.yaml enables
+   EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN=true +
+   6h interval on refresh-worker -- **the single highest-leverage flip in
+   the assessment** (settled_count has been 0 forever; reliability
+   profiles/dynamic thresholds/policy promotion all inert). IMPORTANT for
+   next session: (a) run scripts/compact_evaluation_ledger.py ON THE
+   REFRESH-WORKER (its disk has its own giant chunks; the guard makes them
+   unreadable-not-fatal until compacted); (b) local dry-run match-rate
+   check was inconclusive (0 graded rows locally -- local mirror has no
+   recon artifacts for recent dates), so after deploy watch
+   reports/refresh_status/latest/evaluation_settlement_autorun_status.json
+   and spot-check a few settled records for match correctness; the matcher
+   requires key-overlap + market-family + line agreement, and writes
+   nothing when nothing matches.
+
+Also in flight this session (separate agent, may not be committed yet):
+WNBA game-market fix (sim probabilities + real spread/total prices through
+game_cards, replacing the p_home_win := market-implied fallback that made
+every WNBA game edge structurally zero, and the price=-110 / ev=|edge|/100
+fabrications in _build_local_game_recommendations_artifact).
+
+Corrections to audit claims (verified while implementing): NFL divisional
+rematches do NOT collide in the real-lines index (272 unique keys; venues
+swap) -- the real caveat is playoff venue repeats, docstring updated.
+SYNDICATE_NBA_SOURCE_APP_FALLBACK / _WNBA_ are NOT dead config -- the
+producer refresh scripts still read both (scripts/refresh_nba_oddsapi_props.py:67,
+refresh_wnba_oddsapi_props.py:106); do not delete them from render.yaml.
+The 9 test_intelligence_state.py failures seen during this session are
+pre-existing environmental leakage (live repo artifact state bleeding into
+unisolated tests) -- verified identical with all changes stashed.
 
 ### Reconciliation 2026-08-02 (MLB board stuck at 7-of-15 games all afternoon -- games whose fingerprint was recorded once and then never re-diffed, fixed with a board-completeness self-heal trigger, shipped and deployed, confirmed 15/15 live)
 

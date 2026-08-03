@@ -257,11 +257,11 @@ def create_app() -> Flask:
                 "name": "Soccer",
                 "status": "Active migration",
                 "phase": "SoccerSim-backed cards + game + props + live lens + daily archive across leagues",
-                "summary": "Soccer runs its own possession-based Monte Carlo engine (SoccerSim) across multiple leagues, with artifact-backed cards, a game drill-in, player-prop boards (anytime scorer / shots / shots on target), a resumed-match live lens covering live corners, live shots/SOT, live goals/BTTS/team totals, and scoring-in-a-window probabilities, and a stored-date daily archive. No settlement/accuracy pipeline is wired up yet, so market-accuracy, reconciliation, and picks lanes are not published for soccer.",
+                "summary": "Soccer runs its own possession-based Monte Carlo engine (SoccerSim) across multiple leagues, with artifact-backed cards, a game drill-in, player-prop boards (anytime scorer / shots / shots on target), graded picks (build_soccer_picks.py, consumed by cards/props and the Layer 2 board), a resumed-match live lens covering live corners, live shots/SOT, live goals/BTTS/team totals, and scoring-in-a-window probabilities, and a stored-date daily archive. The scheduled refresh autoruns are live (SYNDICATE_ENABLE_SOCCER_PREGAME_REFRESH_AUTORUN / _WEEKLY_REFRESH_AUTORUN). No settlement/accuracy pipeline exists yet, so market-accuracy and reconciliation lanes are not published for soccer.",
                 "primary_href": "/soccer/epl/cards",
                 "primary_label": "Open Soccer cards",
                 "surfaces": ["cards", "game", "props", "live-lens", "daily archive", "hub"],
-                "next_step": "Wire a daily artifact-generation job (scripts/build_soccer_artifacts.py + poll_soccer_live_state.py) into the scheduled refresh loop, then add settlement so market-accuracy/reconciliation/picks can follow the same pattern as the other sports.",
+                "next_step": "Build a soccer actuals writer (game results + prop reconciliation in prediction_reconciliation.py's expected format) so soccer picks can settle and market-accuracy can follow the same pattern as the other sports.",
                 "runtime_contract": {
                     "dependency_tier": "owned_local",
                     "ownership_goal": "full_local",
