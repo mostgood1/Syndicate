@@ -307,6 +307,28 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual(payload["supported_sports"], ["mlb", "wnba"])
         self.assertEqual(payload["autorun_status"]["summary"], {"pending": 12, "matched": 9, "settled": 9, "unmatched": 3})
 
+    def test_evaluation_settlement_status_includes_board_state_ledger_fingerprints(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            intelligence_dir = reports_root / "intelligence"
+            intelligence_dir.mkdir(parents=True, exist_ok=True)
+            (intelligence_dir / "canonical_board_state_ledger_fingerprints.json").write_text(
+                json.dumps({"2026-08-03": "fp-abc123"}),
+                encoding="utf-8",
+            )
+            with patch.dict(
+                os.environ,
+                {"ADMIN_TOKEN": "secret-token", "SYNDICATE_REPORTS_ROOT": str(reports_root)},
+                clear=False,
+            ):
+                response = self.client.get(
+                    "/api/ops/evaluation-settlement/status",
+                    headers={"X-Admin-Token": "secret-token"},
+                )
+
+        payload = response.get_json()
+        self.assertEqual(payload["board_state_ledger_recorded_fingerprints"], {"2026-08-03": "fp-abc123"})
+
     def test_force_mlb_resim_requires_game_pks(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
             response = self.client.post(

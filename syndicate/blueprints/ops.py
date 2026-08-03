@@ -412,6 +412,7 @@ def api_ops_evaluation_settlement_status() -> Any:
     # "is settlement actually finding matches in production" instead of just
     # inferring it from a possibly-never-regenerated performance_summary.json.
     from syndicate.features.shared.evaluation_settlement import _SUPPORTED_SPORTS
+    from pipeline.intelligence_state import _canonical_board_state_ledger_fingerprint_path
 
     status_path = reports_root() / "refresh_status" / "latest" / "evaluation_settlement_autorun_status.json"
     return jsonify(
@@ -419,6 +420,19 @@ def api_ops_evaluation_settlement_status() -> Any:
             "ok": True,
             "supported_sports": list(_SUPPORTED_SPORTS),
             "autorun_status": normalize_timestamped_payload(read_json_file(status_path)),
+            # Direct evidence the write side (pipeline/intelligence_state.py's
+            # maybe_record_board_state_to_evaluation_ledger, added 2026-08-03
+            # to fix the root cause behind the totals above) actually ran and
+            # persisted a ledger record for a given date -- a stored
+            # fingerprint only gets written AFTER build_intelligence_evaluation_bundle
+            # succeeds, so its presence is proof of a real write, not just that
+            # a rebuild cycle happened. Keyvalue-backed like the status file
+            # above, so readable here even though this endpoint runs on the
+            # web service and recording itself only ever runs on refresh-worker
+            # (not shown: whether the FLAG is on, since that's an env var local
+            # to whichever service reads it -- checking it here would report
+            # this web service's own value, not refresh-worker's).
+            "board_state_ledger_recorded_fingerprints": read_json_file(_canonical_board_state_ledger_fingerprint_path()) or {},
         }
     )
 
