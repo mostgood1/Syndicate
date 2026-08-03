@@ -1160,3 +1160,140 @@ table.board-blotter tbody tr:last-child td {
   background: rgba(255, 255, 255, 0.04);
   color: var(--cards-text-soft);
 }
+
+/* Watchlist + alerts, added 2026-08-03 -- same visual language as the bet
+   slip block above, kept as its own block since a watched item has no
+   stake/payout fields. */
+.board-action-button--watch {
+  border: 1px solid rgba(241, 196, 15, 0.38);
+  background: rgba(241, 196, 15, 0.14);
+  color: #fff2c2;
+}
+
+.board-action-button--watch[data-watched="true"] {
+  background: rgba(241, 196, 15, 0.32);
+}
+
+#watchlist-panel {
+  display: flex;
+  flex-direction: column;
+  background: rgba(8, 18, 30, 0.72);
+  border: 1px solid var(--cards-line);
+  border-radius: 16px;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.watchlist__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--cards-line);
+}
+
+#watchlist-panel[data-empty="true"] .watchlist__header {
+  border-bottom: none;
+}
+
+.watchlist__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--cards-text);
+}
+
+.watchlist__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(241, 196, 15, 0.28);
+  color: #fff2c2;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.watchlist__alerts-toggle {
+  appearance: none;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--cards-line-strong);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--cards-text-soft);
+  white-space: nowrap;
+}
+
+.watchlist__alerts-toggle[data-alerts-enabled="true"] {
+  border-color: rgba(46, 204, 113, 0.38);
+  background: rgba(46, 204, 113, 0.16);
+  color: #d6ffe4;
+}
+
+.watchlist__items {
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+}
+
+.watchlist__item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--cards-line);
+}
+
+.watchlist__item-main {
+  min-width: 0;
+}
+
+.watchlist__item-name {
+  font-weight: 700;
+  color: var(--cards-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watchlist__item-meta {
+  font-size: 11px;
+  color: var(--cards-text-dim);
+}
+
+.watchlist__item-remove {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--cards-text-dim);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.watchlist__item-remove:hover {
+  color: var(--cards-text);
+}
+
+.watchlist__empty {
+  padding: 12px;
+  color: var(--cards-text-soft);
+  font-size: 12px;
+}

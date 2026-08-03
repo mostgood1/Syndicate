@@ -71,6 +71,10 @@
     </div>
     <aside class="board-rail">
       <section>
+        <h2 class="board-section-title">Watchlist</h2>
+        <div id="watchlist-panel"></div>
+      </section>
+      <section>
         <h2 class="board-section-title">Bet slip</h2>
         <div id="bet-slip-panel"></div>
       </section>
@@ -89,6 +93,7 @@
 
 {% block extra_scripts %}
 <script src="{{ url_for('static', filename='shared/bet_slip.js') }}"></script>
+<script src="{{ url_for('static', filename='shared/watchlist.js') }}"></script>
 <script>
 (function () {
   "use strict";
@@ -1009,6 +1014,7 @@
             <button type="button" class="board-action-button board-action-button--add" data-portfolio-action="add">Add</button>
             <button type="button" class="board-action-button board-action-button--remove" data-portfolio-action="remove">Remove</button>
             <button type="button" class="board-action-button board-action-button--slip" data-slip-action="toggle" data-slip-label-full="true">🎫 Slip</button>
+            <button type="button" class="board-action-button board-action-button--watch" data-watch-action="toggle">☆ Watch</button>
           </div>
           ${lastResponseTimestamp ? `<div class="board-card__updated">Updated ${escapeHtml(formatTimestamp(lastResponseTimestamp))}</div>` : ""}
         </div>
@@ -1402,6 +1408,7 @@
       });
     });
     wireSlipButtons(container);
+    wireWatchButtons(container);
   }
 
   function movementSortValue(item) {
@@ -1542,6 +1549,7 @@
                     <div style="display:flex;gap:6px;">
                       <button type="button" class="board-action-button board-action-button--add" data-portfolio-action="add">Add</button>
                       <button type="button" class="board-action-button board-action-button--slip" data-slip-action="toggle">🎫</button>
+                      <button type="button" class="board-action-button board-action-button--watch" data-watch-action="toggle">☆</button>
                     </div>
                   </td>
                 </tr>
@@ -1583,6 +1591,7 @@
       });
     });
     wireSlipButtons(container);
+    wireWatchButtons(container);
   }
 
   // Every renderer below replaces its container's innerHTML wholesale, so
@@ -1631,9 +1640,14 @@
     // must run before matchesFilters (which reads it) is used below. Both
     // calls see the same date-filtered item list, so this warm-up and
     // renderGameCards' own internal derivation stay consistent.
-    deriveGameCards(lastRenderItems.filter(matchesDateFilter));
+    const dateFiltered = lastRenderItems.filter(matchesDateFilter);
+    deriveGameCards(dateFiltered);
     const clientFiltered = lastRenderItems.filter(matchesFilters).filter(matchesClientFilters);
-    renderGameCards(lastRenderItems.filter(matchesDateFilter));
+    renderGameCards(dateFiltered);
+    // Checked against the full date-filtered set, not clientFiltered -- a
+    // watched pick should still alert while a different sport/edge/steam
+    // filter has it hidden from view.
+    window.SyndicateWatchlist.checkForAlerts(dateFiltered);
     renderTopStrip(clientFiltered);
     if (state.view === "blotter") {
       renderBlotter(clientFiltered);
@@ -1723,6 +1737,10 @@
   // exposed for the collapse/mode-toggle handlers that used to live here.
   const wireSlipButtons = window.SyndicateBetSlip.wireSlipButtons;
   const renderBetSlip = window.SyndicateBetSlip.renderBetSlip;
+
+  // Watchlist + alerts, same extraction pattern as the bet slip above --
+  // syndicate/static/shared/watchlist.js (window.SyndicateWatchlist).
+  const wireWatchButtons = window.SyndicateWatchlist.wireWatchButtons;
 
   function renderPortfolio(data) {
     const container = document.getElementById("board-portfolio");
@@ -1888,6 +1906,7 @@
 
   renderFilterTabs();
   renderBetSlip();
+  window.SyndicateWatchlist.init();
   setRefreshStatus("Loading board…", "loading");
 
   if (initialIntelligenceResponse && Object.keys(initialIntelligenceResponse).length > 0) {
