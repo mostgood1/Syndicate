@@ -228,16 +228,46 @@
   .portfolio-delete-btn:hover {
     background: rgba(231, 76, 60, 0.12);
   }
+
+  .portfolio-pulse {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--cards-text-dim);
+    margin-bottom: 12px;
+  }
+
+  .portfolio-pulse__dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: #2ecc71;
+    animation: portfolio-pulse-blink 2s ease-in-out infinite;
+  }
+
+  .portfolio-pulse[data-state="error"] .portfolio-pulse__dot {
+    background: #e74c3c;
+    animation: none;
+  }
+
+  @keyframes portfolio-pulse-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
 </style>
 
 {% set summary = portfolio_summary or {} %}
 
 <main class="portfolio-page">
-  {% if (summary.settled_count or 0) == 0 %}
-    <div class="portfolio-note">Awaiting grading -- {{ summary.total_tracked or 0 }} tracked play{{ '' if (summary.total_tracked or 0) == 1 else 's' }}, 0 settled yet. Win rate, ROI, and CLV populate once reconciliation grades results.</div>
-  {% endif %}
+  <div class="portfolio-pulse" id="portfolio-pulse" role="status" aria-live="polite">
+    <span class="portfolio-pulse__dot"></span>
+    <span id="portfolio-pulse-text">Live</span>
+  </div>
 
-  <div class="portfolio-tiles">
+  <div class="portfolio-note" id="portfolio-note" {% if (summary.settled_count or 0) > 0 %}hidden{% endif %}>Awaiting grading -- {{ summary.total_tracked or 0 }} tracked play{{ '' if (summary.total_tracked or 0) == 1 else 's' }}, 0 settled yet. Win rate, ROI, and CLV populate once reconciliation grades results.</div>
+
+  <div class="portfolio-tiles" id="portfolio-tiles">
     <div class="portfolio-tile">
       <div class="portfolio-tile__label">Tracked plays</div>
       <div class="portfolio-tile__value">{{ summary.total_tracked or 0 }}</div>
@@ -275,9 +305,9 @@
     </div>
   </div>
 
-  {% if summary.by_sport %}
+  <div id="portfolio-sport-section" {% if not summary.by_sport %}hidden{% endif %}>
     <h2 class="portfolio-section-title">By sport</h2>
-    <div class="portfolio-sport-grid">
+    <div class="portfolio-sport-grid" id="portfolio-sport-grid">
       {% for row in summary.by_sport %}
         <div class="portfolio-sport-card">
           <div class="portfolio-sport-card__name">{{ row.sport }}</div>
@@ -287,11 +317,11 @@
         </div>
       {% endfor %}
     </div>
-  {% endif %}
+  </div>
 
-  {% if summary.exposure_by_sport %}
+  <div id="portfolio-exposure-section" {% if not summary.exposure_by_sport %}hidden{% endif %}>
     <h2 class="portfolio-section-title">Open exposure by sport</h2>
-    <div class="portfolio-exposure">
+    <div class="portfolio-exposure" id="portfolio-exposure">
       {% for row in summary.exposure_by_sport %}
         <div class="portfolio-exposure-row">
           <div class="portfolio-exposure-row__sport">{{ row.sport }}</div>
@@ -302,10 +332,10 @@
         </div>
       {% endfor %}
     </div>
-  {% endif %}
+  </div>
 
   <h2 class="portfolio-section-title">Recent positions</h2>
-  <div class="portfolio-table-wrap">
+  <div class="portfolio-table-wrap" id="portfolio-positions">
     {% if summary.positions %}
       <table class="portfolio-table">
         <thead>
@@ -360,4 +390,9 @@
     {% endif %}
   </div>
 </main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='shared/portfolio_pulse.js') }}"></script>
+<script>window.SyndicatePortfolioPulse.init();</script>
 {% endblock %}
