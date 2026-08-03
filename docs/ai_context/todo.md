@@ -4,8 +4,10 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-03 (see "Reconciliation 2026-08-03 (Decided-prop
-guard root-caused properly + keyvalue ceiling made measurable)" below).
+Last reconciled: 2026-08-03 (see "Reconciliation 2026-08-03 (Keyvalue
+ceiling root-caused by measurement + NBA live-prop sigma ported)" below).
+Before that: "Reconciliation 2026-08-03 (Decided-prop
+guard root-caused properly + keyvalue ceiling made measurable)".
 Before that: "Reconciliation 2026-08-02 (Live props:
 real variance + decided-bet suppression, found by inspecting the post-
 deploy board)".
@@ -33,6 +35,77 @@ Before that: "Reconciliation 2026-08-01 (Layer 2 board:
 full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
+
+### Reconciliation 2026-08-03 (Keyvalue ceiling root-caused by measurement + NBA live-prop sigma ported)
+
+Two commits, deployed together on `bd8851a8`.
+
+**1. The keyvalue ceiling is 87% subprocess logs (`44b0f247`).** Measured
+with the new `/api/ops/keyvalue/usage` endpoint rather than guessed --
+and the guess would have been wrong. Actual breakdown of 212.67MB:
+
+| bucket | size | keys |
+|---|---|---|
+| `reports/migration_runs/<date>` | **185.71 MB** | 2,549 |
+| `reports/intelligence` | 13.01 MB | 9 |
+| `reports/odds_control_plane` | 8.84 MB | 6 |
+| everything else | ~5 MB | ~800 |
+
+The prior suspicion (intelligence board snapshots) accounted for 6%. The
+real offenders are captured subprocess console logs written by
+`scripts/run_refresh_odds_job.py`: the largest single keys are
+`odds_refresh.stderr.txt` and `odds_refresh.json` at **8.0MB each** --
+8MB being the backend's own write ceiling, so they were already being
+clipped on the way in. A refresh runs every few minutes, so these
+accumulate continuously, and under `allkeys-lru` that log spam is what was
+evicting genuine coordination state (37,573 evictions).
+
+Fixed at the source: `_safe_write_text` tail-truncates to 64KB
+(`SYNDICATE_MAX_RUN_ARTIFACT_TEXT_BYTES`, floor 4KB) keeping the TAIL,
+since the end of a log is where the failure is, with an explicit
+truncation notice. `_safe_write_json` truncates oversized *fields* instead
+-- truncating the serialized text would produce invalid JSON and break
+`/api/ops/odds-refresh/status`'s parsing. Per-run worst case ~8MB -> ~64KB.
+
+**Does NOT retroactively shrink the existing 2,549 keys.** They carry TTLs
+(avg ~37h) and will age out; `keyvalue_sweep_apply` can force the
+TTL-less remainder. **Re-measure with `/api/ops/keyvalue/usage` in ~48h**
+to confirm the total actually falls -- that is the real proof, not the
+unit tests.
+
+**2. NBA live-prop sigma ported (`bd8851a8`).** NBA had the identical
+saturation defect fixed for WNBA in `c6a8b62c`. Ported off-season
+deliberately -- it cannot be validated mid-season without shipping into a
+live board, and NBA resumes in October.
+
+Two pieces could NOT be reused from WNBA and are the reason this is a port
+rather than a shared helper:
+- `_nba_elapsed_minutes`: 12-minute quarters, 48 regulation, 5-minute OT.
+  Reusing WNBA's 10-minute helper would mis-state elapsed time by 20% on
+  every single reading.
+- `_NBA_LIVE_PROP_SIGMA_BASE`: scaled above the WNBA constants for the
+  longer, higher-scoring game. A straight copy would understate NBA
+  variance. **Explicitly not backtested** (same status as the WNBA
+  constants) -- a test asserts NBA sigma > WNBA sigma so a future
+  copy-paste regression is caught.
+
+**Open, carried forward:**
+- **Re-measure keyvalue in ~48h** (above). If `migration_runs` has not
+  fallen sharply, the TTLs are longer than assumed and need shortening
+  too.
+- **Decided-prop guard still unconfirmed on a live board.** Deployed
+  twice now; no live slate has exercised it. Check a live slate for a
+  `type=prop`, `is_live=true` candidate with `model_probability >= 0.97` --
+  there should be none. `DECIDED_LIVE_PROPS_REMOVED` prints when the
+  publication-stage pass drops any.
+- **Neither sigma model (WNBA nor NBA) has ever executed in production.**
+  `live_probability_source: "live_sigma_normal"` has not appeared once.
+  WNBA needs a live slate; NBA needs October.
+- **Known-correct exception, do not "fix" it**: game-level steam
+  candidates legitimately sit at `model_probability` 1.0 and are out of
+  the guard's scope by design. One carries a *team* name in
+  `player_name` (`Los Angeles Dodgers`), worth knowing if that field is
+  ever treated as a player-level signal.
 
 ### Reconciliation 2026-08-03 (Decided-prop guard root-caused properly + keyvalue ceiling made measurable)
 
