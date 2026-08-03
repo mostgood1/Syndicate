@@ -4,9 +4,12 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-02 (see "Reconciliation 2026-08-02 (End-to-end
+Last reconciled: 2026-08-02 (see "Reconciliation 2026-08-02 (Live props:
+real variance + decided-bet suppression, found by inspecting the post-
+deploy board)" below).
+Before that: "Reconciliation 2026-08-02 (End-to-end
 assessment + Phase 0: feedback loop closed, real ranker wired, season P0s
--- committed, NOT yet deployed)" below).
+-- committed AND deployed, verified live)".
 Before that: "Reconciliation 2026-08-02 (MLB board
 stuck at 7-of-15 games all afternoon -- games whose fingerprint was
 recorded once and then never re-diffed, fixed with a board-completeness
@@ -29,7 +32,59 @@ full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
 
-### Reconciliation 2026-08-02 (End-to-end assessment + Phase 0: feedback loop closed, real ranker wired, season P0s -- committed, NOT yet deployed)
+### Reconciliation 2026-08-02 (Live props: real variance + decided-bet suppression, found by inspecting the post-deploy board)
+
+Follow-on from the Phase 0 deploy below. While verifying that deploy against
+the live board, the **top-ranked opportunity on the entire board** turned out
+to be unactionable, and the investigation found two distinct defects.
+
+**1. Live props carried no variance at all.** `basketball_props_edges.py`
+prices the pregame side with a real per-stat sigma model, but the live
+hydration path (`_hydrate_live_player_lens_payload`,
+`syndicate/features/wnba/cards.py`) drops sigma entirely: it computes
+`live_edge` as a raw projection-minus-line difference and leaves `win_prob`
+at its stale pregame value. Anything deriving a probability from the live
+projection therefore saturated to 0/1 the instant the projection sat either
+side of the line. Confirmed live: Julie Allemand UNDER 12.5 (pts+ast) with
+**4:24 left in the FIRST quarter**, live projection 5.5, published
+`model_probability = 1.0` and a fabricated 0.18 edge -- with ~34 minutes
+still to play. Fixed with `_wnba_live_prop_over_probability`, which scales a
+per-stat sigma (mirroring `_SigmaConfig`, held as a local copy to avoid
+pulling pandas/numpy onto the live tick -- the two are a contract and must
+be updated together) by `sqrt(minutes remaining / regulation)`, since a
+counting stat's variance accumulates with playing time, then takes a Normal
+CDF. Full sigma at tip-off, collapsing to the outcome at the buzzer. That
+same Q1 prop now reads ~0.88.
+
+**2. The decided-prop guard could only ever catch a decided OVER.**
+`_candidate_prop_outcome_decided` (`syndicate/features/intelligence.py`)
+tested `actual > line`, which an UNDER can never satisfy -- an UNDER locks in
+the opposite way, by running out of game to climb. Confirmed live: Brittney
+Griner UNDER 14.5 with **6:18 left in the 4th** and a live projection of 3
+was the single highest-ranked opportunity on the board at +100, a price no
+book still offers. Now that live probabilities carry real variance, a
+near-certain live probability *is* the decided signal, in either direction
+and for any sport, so the guard falls through to it.
+`_LIVE_PROP_DECIDED_PROBABILITY = 0.97` is deliberately conservative so a
+genuinely strong live read (~80%) still surfaces. Pregame candidates are
+explicitly excluded from the probability branch -- a confident pregame
+projection is exactly what the board exists to surface.
+
+Commit `c6a8b62c`, 13 new regression tests in
+`tests/test_live_prop_probability_and_decided_guard.py` (including one
+asserting the pre-existing `actual > line` behavior still holds, and one
+asserting pregame confidence is never filtered). Targeted suites green:
+65 WNBA/board tests, 45 candidate-state tests.
+
+**Open follow-up:** NBA shares the identical live-lens shape and needs the
+same sigma treatment. It is off-season, so it was left rather than shipped
+blind -- do it before the October opener. **Not yet verified against a live
+game**: the fix shipped when `anyLive=False`, so the live probability path
+has not executed in production. Check a live WNBA slate's
+`live_probability_source: "live_sigma_normal"` and confirm no
+`model_probability = 1.0` rows remain on the board.
+
+### Reconciliation 2026-08-02 (End-to-end assessment + Phase 0: feedback loop closed, real ranker wired, season P0s -- committed AND deployed, verified live)
 
 Ran a full seven-audit end-to-end assessment across every sport (report:
 `docs/reports/syndicate_end_to_end_assessment_2026_08_02.md` -- read it,
