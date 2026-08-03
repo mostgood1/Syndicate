@@ -4,9 +4,13 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-03 (see "Reconciliation 2026-08-03 (World-class
+Last reconciled: 2026-08-03 (see "HANDOFF 2026-08-03 #2 -- START HERE"
+below: session ended on context, four Phase 3 items + Phase 1 football
+readiness + a hygiene pass all shipped and deployed this round; a real,
+prioritized open-items list follows for whoever picks this up next).
+Before that: "Reconciliation 2026-08-03 (World-class
 plan audit: Phase 0 mostly done, Phase 1 football-readiness started,
-NFL props fix shipped)" below -- picks up from
+NFL props fix shipped)" -- picks up from
 docs/reports/syndicate_end_to_end_assessment_2026_08_02.md's own
 roadmap, which turned out to be the actual source of the todo.md
 "Phase 3" items already being tracked here).
@@ -51,6 +55,148 @@ Before that: "Reconciliation 2026-08-01 (Layer 2 board:
 full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
+
+### HANDOFF 2026-08-03 #2 -- START HERE (session ended on context, work is genuinely at a clean stopping point)
+
+Picked up the prior "HANDOFF 2026-08-03" entry below (now superseded),
+deployed its 4 pending commits, then worked through
+`docs/reports/syndicate_end_to_end_assessment_2026_08_02.md`'s full
+roadmap for a long continuation. Everything in this handoff's own scope
+is **shipped, tested, and deployed** -- this is not a mid-flight
+handoff like the last one, it's "here's what's genuinely still open
+across the whole roadmap, prioritized."
+
+**1. Deploy state: clean.** Latest commit `254df63d` (test/docs only,
+nothing to deploy). Everything with a code/template change before it is
+already live in production, confirmed via direct fetches, not assumed:
+`93460fe0` (NFL eval tracking), `73818816` (Ask-the-Syndicate embed),
+`54a6b7ef` (shell consolidation partial), `6cd12b4c` (NFL props fix),
+and the full Phase 3 batch before those. Always run
+`python scripts/check_deploy_safety.py` before the next deploy regardless
+-- exit 0 clear / 1 in flight / 2 could-not-determine, never eyeball
+`sim_run_status` alone.
+
+**2. Verification status unchanged, still worth clearing when the
+season data exists.** `python scripts/verify_recent_shipped_work.py`:
+4 PASS / 2 PENDING / 0 FAIL, same as the last several sessions -- no
+live WNBA/MLB slate occurred to exercise the remaining PENDING items
+(live sigma models, price CLV). Still don't mark these done without
+evidence: movement sparklines, scroll restoration (needs a real device,
+the preview pane doesn't composite), both sigma models, `clv_price`.
+
+**3. Open items, prioritized by what's actually time-sensitive or
+high-leverage first:**
+
+a. **Football season-opener manual steps** -- see the new
+   `docs/ai_context/season_opener_checklist_2026.md` for the full,
+   precise list (don't re-derive it, it's already researched): set
+   `SYNDICATE_ACTIVE_SPORTS` to include `nfl,ncaaf` before their
+   seasons (currently unset in render.yaml, defaults to `mlb,wnba`
+   only); decide on + flip `WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN`
+   (currently `false`, a real OddsAPI-budget decision, not a silent
+   flip); re-run `build_ncaaf_roster_snapshot.py --season 2026` once
+   CFBD actually publishes 2026 rosters (confirmed 0 rows as of
+   2026-08-03, check again close to Aug 29); run the new
+   `scripts/backfill_nfl_performance.py` weekly once real games exist.
+   NCAAF starts ~Aug 29, NFL ~Sep 10 -- this is the forcing function.
+
+b. **Settlement `_SUPPORTED_SPORTS` still only `("mlb","wnba")`.**
+   `EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN` is on in
+   render.yaml, but `syndicate/features/shared/evaluation_settlement.py:33`
+   never got extended to the other sports, and
+   `reports/performance_summary.json`/`reports/intelligence/performance_summary.json`
+   are both still stale from 2026-06-10 (predates the autorun flip) --
+   real settlement throughput since the flag flipped is genuinely
+   unconfirmed. This was flagged as "highest leverage in the repo" by
+   the original assessment and still is: everything downstream
+   (reliability multipliers, dynamic thresholds, policy promotion, CLV)
+   depends on it. First step for whoever picks this up: check production
+   directly for a fresher `performance_summary.json` before assuming
+   it's still broken -- it may just be that nobody's looked since the
+   flag flipped.
+
+c. **Shell consolidation's real remaining piece: 35+2 template
+   migration to `shared/base.html`.** Fully researched and categorized in
+   the "World-class plan audit" reconciliation entry below (search for
+   "shared/_standalone_app_header.html" in this file) -- don't
+   re-research, just execute: 35 templates share one consistent
+   "standalone shell" pattern and are a plausible batched migration
+   (budget individual before/after verification per template, don't
+   batch-commit unverified); `mlb/cards_embed.html` must stay excluded
+   (deliberate headerless iframe embed); `nhl/cards_source.html`
+   (7,434 lines, ~5,000 inline JS) needs its own dedicated pass, real
+   restructuring not a wrapper swap.
+
+d. **Four WNBA tests fail only in full-suite order, pass in isolation.**
+   `test_wnba_live_player_lens_non_live_game_uses_actual_projection`,
+   `test_wnba_live_player_lens_overlays_status_from_live_state`,
+   `test_wnba_live_player_lens_preserves_existing_live_projection`,
+   `test_wnba_live_state_fallback_parses_period_and_clock_from_card_detail`
+   (all in `tests/test_archives.py::DateArchiveHelperTests`). Confirmed
+   pre-existing (unrelated to any change made across this whole session
+   run), confirmed order-dependent (run via `python -m unittest
+   tests.test_archives` -> 4 failures; run the same tests via `pytest -k`
+   in isolation -> all pass). Very likely a stale `lru_cache` or module-
+   level cache not reset between tests -- the same class of bug the new
+   NBA conftest fixture (`tests/conftest.py::_clear_nba_cards_caches`)
+   just fixed for NBA, but for WNBA specifically despite
+   `_clear_wall_clock_ttl_caches` already existing and covering WNBA's
+   *known* caches -- meaning the actual polluting state here is
+   something else not yet identified. Needs real bisection (comment out
+   fixtures / binary-search which earlier test in file order leaves the
+   state), not a guess-fix.
+
+e. **Deeper Phase 2 engine work, none of it started:** MLB market
+   expansion (let F1/F3/F5 + runline become real board candidates, sim
+   coverage already exists per the assessment); soccer's remaining gaps
+   (full totals ladder/BTTS derivation from `scoreline_probabilities`,
+   grade more prop markets, wire market anchoring, build
+   `build_soccer_actuals.py`, add a live-odds phase -- multi-league
+   fan-out is already done, don't re-do it); football player props v1
+   (per-player attribution in smartsim2 contracts -> usage allocator ->
+   per-player distributions, described as "mostly built" by the
+   assessment); per-sport candidate SLOs (an artifact-direct builder as
+   a second path for every sport, plus a non-zero-candidate regression +
+   alerting); freshness (TTL on the candidate-pool cache for live dates);
+   live distributions for basketball (carry pregame sigma into live
+   hydration for a real P(over)/live EV instead of a point estimate).
+
+**4. Process notes from this continuation, worth not relearning:**
+
+- **A research agent's "confirmed zero readers" claim is still a
+  claim.** One research agent this session reported zero code readers
+  of two env var names before recommending their render.yaml blocks be
+  deleted as dead. A direct follow-up grep of `scripts/` (which the
+  agent said it had already checked) found four real hits -- two active
+  readers gating a still-live fallback path, two active writers setting
+  the value in real bootstrap/daily-update flows. Nothing was deleted,
+  but it was close. Rerun the check yourself before acting on a
+  "confirmed dead" claim, from an agent or from the original assessment
+  doc equally -- this session found several of the assessment doc's own
+  claims didn't hold up either (a "96/272 games affected" line-collision
+  bug had zero real collisions; a "near-identical forks" claim was
+  133/134 real differences; "football/evaluation.py is dead code" turned
+  out to be real, working code with only one downstream file stubbing
+  values).
+- **Zero diff-hunk overlap on a function's own body is necessary but
+  not sufficient for "safe to extract"** inside an IIFE-scoped JS file --
+  check the full call chain (a function can be internally identical yet
+  call one that's divergent), not just each candidate's own line range.
+- **A UI/template change verified only in the browser can still break a
+  server-side string-matching test.** Run the actual test suite for
+  every change, not just the browser check -- this session's own
+  card-client extraction broke a `test_archives.py` assertion checking
+  for a literal function name that had moved into a shared module, and
+  it went unnoticed until the full suite was run for the first time in
+  several sessions' worth of accumulated changes.
+- **A shared helper that computes a value from a module-level path
+  constant is hard to test safely without an explicit override
+  parameter.** Calling a would-be-tested function without one
+  (discovered building the NFL backfill script) silently wrote real test
+  data into the actual production data path. Design new scripts/helpers
+  with an explicit `source_root`/`log_path`-style parameter from the
+  start, not as an afterthought once the footgun's already been stepped
+  in.
 
 ### Reconciliation 2026-08-03 (World-class plan audit: Phase 0 mostly done, Phase 1 football-readiness started, NFL props fix shipped)
 
