@@ -91,6 +91,13 @@ class SettleLedgerForDateTests(unittest.TestCase):
                 self.assertEqual(summary["matched"], 1)
                 self.assertEqual(summary["settled"], 1)
                 self.assertEqual(summary["unmatched"], 1)
+                # total_recommendation_records/already_resolved_records exist so an
+                # autorun cycle that settles nothing (e.g. everything already
+                # resolved) is distinguishable from one where the ledger has no
+                # records at all for that date -- both otherwise read as
+                # pending=0/matched=0 from the status file alone.
+                self.assertEqual(summary["total_recommendation_records"], 2)
+                self.assertEqual(summary["already_resolved_records"], 0)
 
                 records = _iter_record_payloads(ledger_path=ledger_path)
                 settled_lookup = {r.get("recommendation_id"): r for r in records if r.get("record_type") == "recommendation"}
@@ -99,6 +106,44 @@ class SettleLedgerForDateTests(unittest.TestCase):
 
                 metrics = compute_metrics(ledger_path=ledger_path, sport="wnba")
                 self.assertEqual(metrics["settled_count"], 1)
+
+                # A second call against the same already-settled date reports
+                # already_resolved_records=1 (the previously-settled record) and
+                # pending=1 (the still-unmatched one) -- not pending=0 for
+                # everything, which is what a broken/never-populated ledger
+                # would also report.
+                with patch.object(evaluation_settlement, "_graded_rows_for_date", return_value=fixture_rows):
+                    second_summary = settle_ledger_for_date("2026-06-08", sport="wnba", ledger_path=ledger_path)
+                self.assertEqual(second_summary["pending"], 1)
+                self.assertEqual(second_summary["matched"], 0)
+                self.assertEqual(second_summary["total_recommendation_records"], 2)
+                self.assertEqual(second_summary["already_resolved_records"], 1)
+
+    def test_settle_ledger_for_dates_totals_do_not_double_count_ledger_records_across_sports(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            ledger_path = Path(tmp_dir) / "evaluation_ledger.jsonl"
+            with patch.object(intelligence_evaluation, "DEFAULT_LEDGER_PATH", ledger_path):
+                self._make_pending_recommendation(
+                    ledger_path,
+                    sport="mlb",
+                    recommendation={"market": "hitter_home_runs", "selection": "Over 0.5", "player": "Aaron Judge", "team": "NYY", "line": 0.5},
+                )
+                self._make_pending_recommendation(
+                    ledger_path,
+                    sport="wnba",
+                    recommendation={"market": "total", "selection": "Over", "home": "Aces", "away": "Sky", "line": 165.5},
+                )
+                with patch.object(evaluation_settlement, "_graded_rows_for_date", return_value=[]):
+                    result = evaluation_settlement.settle_ledger_for_dates(
+                        ["2026-06-08"], sports=["mlb", "wnba"], ledger_path=ledger_path
+                    )
+
+                # Both settle_ledger_for_date calls read the SAME date-scoped
+                # chunk file (one record per sport in it here), so summing a
+                # sport-scoped counter across both calls must equal 2, not the
+                # unfiltered per-call total_ledger_records (which would double
+                # to 4 if summed the same way).
+                self.assertEqual(result["totals"]["total_recommendation_records"], 2)
 
     def test_dry_run_reports_matches_without_writing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

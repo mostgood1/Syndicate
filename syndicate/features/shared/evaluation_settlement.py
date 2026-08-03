@@ -302,6 +302,21 @@ def settle_ledger_for_date(
     chunk_path = _ledger_chunk_path(target_ledger_path, date_token)
     records = _read_chunk_records(chunk_path)
 
+    # Visibility-only counters (2026-08-03): "pending" below is necessarily
+    # zero on a day this function has already fully settled, which reads
+    # identically to "nothing was ever recorded here" from the autorun
+    # status file alone -- these disambiguate the two from the web service,
+    # which has no other way to see this worker-local ledger chunk.
+    recommendation_records = [
+        record
+        for record in records
+        if str(record.get("record_type") or "").strip().lower() == "recommendation"
+        and (sport_slug is None or _record_sport(record) == sport_slug)
+    ]
+    already_resolved_records = [
+        record for record in recommendation_records if str(record.get("result") or "pending").strip().lower() != "pending"
+    ]
+
     pending_records = [
         record
         for record in records
@@ -366,6 +381,9 @@ def settle_ledger_for_date(
         "would_settle": settled if dry_run else None,
         "unmatched": unmatched,
         "dry_run": dry_run,
+        "total_ledger_records": len(records),
+        "total_recommendation_records": len(recommendation_records),
+        "already_resolved_records": len(already_resolved_records),
     }
 
 
@@ -391,6 +409,14 @@ def settle_ledger_for_dates(
             "matched": sum(int(r.get("matched") or 0) for r in results),
             "settled": sum(int(r.get("settled") or 0) for r in results),
             "unmatched": sum(int(r.get("unmatched") or 0) for r in results),
+            # total_ledger_records is deliberately NOT summed here: it counts
+            # every record in a date's whole ledger chunk file regardless of
+            # sport, so calling this once per sport for the same date (as the
+            # refresh-worker autorun does for mlb+wnba) would double-count it.
+            # The other two counters are sport-scoped per call, so summing
+            # them across sports/dates is correct.
+            "total_recommendation_records": sum(int(r.get("total_recommendation_records") or 0) for r in results),
+            "already_resolved_records": sum(int(r.get("already_resolved_records") or 0) for r in results),
         },
     }
 
