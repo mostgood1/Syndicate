@@ -221,6 +221,98 @@ def compute_board_stake(candidate: Mapping[str, Any], *, settled_sample_size: An
     }
 
 
+_DEFAULT_GAME_EXPOSURE_CAP = 0.05
+_CORRELATED_LEG_DECAY = 0.5
+
+
+def _game_exposure_cap() -> float:
+    raw = str(os.environ.get("SYNDICATE_MAX_GAME_EXPOSURE_FRACTION") or "").strip()
+    try:
+        value = float(raw) if raw else _DEFAULT_GAME_EXPOSURE_CAP
+    except ValueError:
+        value = _DEFAULT_GAME_EXPOSURE_CAP
+    return _clamp(value, 0.001, 1.0)
+
+
+def _exposure_group_key(candidate: Mapping[str, Any]) -> str:
+    """Legs that rise and fall together. Prefer a real event/game id; fall
+    back to the matchup text so a board whose builders never stamped an id
+    still gets budgeted rather than silently treated as all-independent."""
+    for field in ("event_id", "game_id", "gamePk", "game_pk"):
+        value = _safe_text(candidate.get(field), "")
+        if value:
+            return f"{_safe_text(candidate.get('sport_slug') or candidate.get('sport'), '')}:{value}"
+    matchup = _safe_text(candidate.get("matchup") or candidate.get("game") or "", "")
+    return f"{_safe_text(candidate.get('sport_slug') or candidate.get('sport'), '')}:{matchup.lower()}"
+
+
+def apply_exposure_budgets(candidates: list[dict[str, Any]]) -> dict[str, Any]:
+    """Cap total staked exposure per game and shrink correlated legs.
+
+    The greedy low-correlation selection this replaces was removed for good
+    reason -- a 0.65 threshold collapsed 100+ candidates to ~5 -- but
+    nothing took its place, so the board could serve five legs off one game
+    with no exposure penalty at all, each sized as if it were independent.
+    Five correlated legs at 2% each is a 10% swing on one game's outcome,
+    not five diversified 2% bets.
+
+    Shrinks rather than drops, matching the standing call that board
+    visibility stays complete and the judgment is carried on the card
+    instead of hidden by removing it. Within a game the best-ranked leg
+    keeps its full stake and each subsequent leg decays; if the group still
+    exceeds the cap, every leg is scaled down proportionally so the
+    ordering is preserved.
+    """
+    warn_if_compute_in_request_path("apply_exposure_budgets")
+    cap = _game_exposure_cap()
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        stake = candidate.get("stake")
+        if not isinstance(stake, Mapping):
+            continue
+        groups.setdefault(_exposure_group_key(candidate), []).append(candidate)
+
+    adjusted_groups = 0
+    for group in groups.values():
+        if not group:
+            continue
+        ranked = sorted(
+            group,
+            key=lambda item: _safe_float(item.get("adjusted_score")) or _safe_float((item.get("stake") or {}).get("stake_fraction")) or 0.0,
+            reverse=True,
+        )
+        decayed: list[float] = []
+        for index, candidate in enumerate(ranked):
+            base = _safe_float((candidate.get("stake") or {}).get("stake_fraction")) or 0.0
+            decayed.append(base * (_CORRELATED_LEG_DECAY**index))
+        total = sum(decayed)
+        scale = 1.0 if total <= cap or total <= 0 else cap / total
+        group_changed = False
+        for candidate, decayed_stake in zip(ranked, decayed):
+            stake = dict(candidate.get("stake") or {})
+            original = _safe_float(stake.get("stake_fraction")) or 0.0
+            final_stake = _clamp(decayed_stake * scale, 0.0, 1.0)
+            if abs(final_stake - original) > 1e-9:
+                group_changed = True
+            stake["stake_fraction_pre_exposure"] = round(original, 5)
+            stake["stake_fraction"] = round(final_stake, 5)
+            stake["stake_units"] = round(final_stake * 100.0, 2)
+            stake["exposure_group_size"] = len(ranked)
+            stake["exposure_capped"] = bool(scale < 1.0)
+            candidate["stake"] = stake
+        if group_changed:
+            adjusted_groups += 1
+
+    return {
+        "groups": len(groups),
+        "adjusted_groups": adjusted_groups,
+        "game_exposure_cap": round(cap, 4),
+        "correlated_leg_decay": _CORRELATED_LEG_DECAY,
+    }
+
+
 def build_portfolio(
     recommendations: list[Mapping[str, Any]] | tuple[Mapping[str, Any], ...],
     *,

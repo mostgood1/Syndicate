@@ -2829,6 +2829,21 @@ class IntelligenceStateService:
             # previously never called on the board path at all, leaving the
             # served ranking at raw edge x confidence.
             self._attach_adjusted_scores(global_pool)
+            # Strictly after _attach_adjusted_scores: the exposure pass ranks
+            # legs within a game by adjusted_score to decide which one keeps
+            # its full stake, so it must not run before that score exists.
+            try:
+                from syndicate.features.bankroll_manager import apply_exposure_budgets
+
+                exposure_summary = apply_exposure_budgets(global_pool)
+                if exposure_summary.get("adjusted_groups"):
+                    print(
+                        f"[intelligence_state] EXPOSURE_BUDGETS_APPLIED groups={exposure_summary.get('groups')} "
+                        f"adjusted={exposure_summary.get('adjusted_groups')} cap={exposure_summary.get('game_exposure_cap')}",
+                        flush=True,
+                    )
+            except Exception as exc:
+                print(f"[intelligence_state] EXPOSURE_BUDGETS_FAILED error={exc}", flush=True)
 
         pool = {
             "selected_date": selected_date,
