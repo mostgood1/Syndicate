@@ -5,7 +5,9 @@ read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
 Last reconciled: 2026-08-03 (see "Reconciliation 2026-08-03 (Phase 3
-start + keyvalue ceiling actually cleared: 212MB -> 62MB)" below).
+continued: sparklines, filter disclosure, deploy-safety check)" below).
+Before that: "Reconciliation 2026-08-03 (Phase 3
+start + keyvalue ceiling actually cleared: 212MB -> 62MB)".
 Before that: "Reconciliation 2026-08-03 (Phase 2:
 price CLV, fractional-Kelly stakes, correlated-exposure budgets)".
 Before that: "Reconciliation 2026-08-03 (Keyvalue
@@ -39,6 +41,58 @@ Before that: "Reconciliation 2026-08-01 (Layer 2 board:
 full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
+
+### Reconciliation 2026-08-03 (Phase 3 continued: sparklines, filter disclosure, deploy-safety check)
+
+Three commits on top of the keyvalue work, deployed on `c35243dd`
+(`0b439cb0` is pushed but NOT yet deployed).
+
+**1. Pre-deploy safety check (`9e107f3d`)** -- `scripts/check_deploy_safety.py`.
+Closes the gap found earlier: the standing check read `sim_run_status`,
+which covers the MLB sim ONLY, and a deploy made under it killed an
+in-flight odds-refresh run. Now checks the MLB sim, the odds-refresh job
+(`latest_tick.result.state` -- a separate process, invisible to
+`sim_run_status`), and live games (a WARNING, never a blocker, since in
+season they run for hours). Exit 0 clear / 1 in flight / **2
+could-not-determine** -- an unreachable control plane returns 2, not 0,
+because "unknown" must never read as "clear". Both paths verified.
+
+**2. Movement sparklines (`c35243dd`)** -- `renderMovement` already
+computed opening/latest, direction and a real move count, then flattened
+it all into one string. Now draws the series, preferring the PRICE series
+(what CLV is measured against; a market can hold its number while the juice
+walks).
+
+**Plots DECIMAL odds, not raw American** -- browser validation caught this
+before it shipped. American odds are discontinuous across +/-100: -100 and
++100 are the same price yet 200 apart numerically, so a trivial
+-105 -> +105 move would draw as a 210-unit spike while a real -200 -> -150
+move looked small. Exactly backwards, on the most decision-relevant visual
+on the card. Verified after the fix: -100 and +100 both map to 2.0;
+trivial-crossing span 0.098 < real-juice-move span 0.167; worsening ->
+"down", improving -> "up"; flat/single-point draw nothing.
+
+**3. Filter disclosure (`0b439cb0`)** -- four secondary rails (market,
+edge, view, steam) folded behind "More filters"; sport/day/state stay
+visible. Force-opens whenever a refinement is active and **never
+force-closes**: a narrowed board must not hide why it looks empty, but
+closing is the reader's choice. `view` is excluded from the count -- a
+display preference, not a filter. Verified from the COLLAPSED state:
+applying 5%+ opened it, badge "1", Clear appeared, URL synced; Clear reset
+everything. **Partial win**: collapsed mobile toolbar is 464px (55% of
+viewport) vs 832px expanded -- a 44% cut, but the three remaining rails
+still take over half a phone screen. Worth another pass.
+
+**Verification status on the deployed build** (`verify_recent_shipped_work.py`):
+4 PASS (kelly stakes, exposure budgets, decided-prop guard, keyvalue
+reduction), 2 PENDING (live sigma needs a live WNBA/NBA slate; price CLV
+needs settled bets). No FAILs.
+
+**Still never observed against real data** -- do not mark these done
+without evidence: sparklines (the local board carries no movement history,
+so every candidate correctly renders nothing), scroll restoration
+(`window.scrollTo` is a no-op in the preview browser -- needs a real
+device), both sigma models, and `clv_price`.
 
 ### Reconciliation 2026-08-03 (Phase 3 start + keyvalue ceiling actually cleared: 212MB -> 62MB)
 
