@@ -4,10 +4,14 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-03 (see "Reconciliation 2026-08-03 (Phase 3
-complete: hub reframe + card-client safe extraction, both deployed)"
-below -- all four Phase 3 items from the prior handoff are now shipped
-and deployed; verification is still 4 PASS / 2 PENDING, unchanged).
+Last reconciled: 2026-08-03 (see "Reconciliation 2026-08-03 (World-class
+plan audit: Phase 0 mostly done, Phase 1 football-readiness started,
+NFL props fix shipped)" below -- picks up from
+docs/reports/syndicate_end_to_end_assessment_2026_08_02.md's own
+roadmap, which turned out to be the actual source of the todo.md
+"Phase 3" items already being tracked here).
+Before that: "Reconciliation 2026-08-03 (Phase 3
+complete: hub reframe + card-client safe extraction, both deployed)".
 Before that: "HANDOFF 2026-08-03 -- START HERE" (superseded by the
 entry above -- kept as historical record of that session's findings).
 Before that: "Reconciliation 2026-08-03 (Phase 3
@@ -48,7 +52,146 @@ full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
 
-### Reconciliation 2026-08-03 (Phase 3 complete: hub reframe + card-client safe extraction, both deployed)
+### Reconciliation 2026-08-03 (World-class plan audit: Phase 0 mostly done, Phase 1 football-readiness started, NFL props fix shipped)
+
+Continuation of the same 2026-08-03 session. User asked to "keep pushing
+through all open items from the plan" -- after clarifying which plan (there
+are 17 files under ~/.claude/plans/ plus this doc plus
+docs/syndicate_world_class_implementation_plan.md), landed on
+**docs/reports/syndicate_end_to_end_assessment_2026_08_02.md**. Its own
+"Phase 3 -- World-class companion UX" roadmap turned out to be the exact
+source of the "Phase 3" items this todo.md has been tracking all session
+(watchlist+alerts, portfolio pulse, hub reframe, card unification are
+items 5/7/6/8 of that roadmap's 10) -- worth knowing next time "Phase 3"
+comes up, since it's this specific document's numbering, not
+`syndicate_world_class_implementation_plan.md`'s unrelated Phase 3
+("central odds management," marked completed there).
+
+**Audited the whole roadmap against current code first** (an Explore
+agent, not assumptions) -- most of Phase 0 and all of Phase 2 turned out
+already done by prior sessions:
+- Phase 0: settlement autorun flag is ON (`render.yaml:296-297`) but
+  `_SUPPORTED_SPORTS` in `evaluation_settlement.py:33` is still only
+  `("mlb","wnba")`, and `reports/performance_summary.json` is stale
+  (2026-06-10, predates the flag flip) -- real settlement throughput is
+  UNCONFIRMED, not proven broken. `rank_candidates` wiring, price-required
+  filtering, WNBA game-market sim-margin fix, and soccer multi-league
+  fan-out are all DONE and verified in code.
+- Phase 2 (Kelly staking, exposure budgets, CLV capture): all DONE,
+  verified wired into the actual board path (`pipeline/intelligence_state.py`
+  lines 2513-2531, 2825, 2838), not just present as unused functions.
+- Phase 3 items 9-10 (Ask-the-Syndicate board embed, shell consolidation):
+  confirmed NOT started -- no ask-bar markup in `intelligence/opportunity_board.html`,
+  only 24/83 templates extend `shared/base.html`, no PWA manifest anywhere,
+  `asset_version` still computed independently per sport blueprint.
+
+**The claimed NFL divisional-rematch line-collision bug does NOT hold up.**
+The roadmap said "96/272 games affected by keying without week" --
+directly checked by rebuilding `_nfl_real_lines_index` from the real
+`real_betting_lines_2025_*.json`/`2026_*.json` files and diffing each
+matchup key's sources by `commence_time`/`event_id`/`week`: **zero**
+distinct-identity collisions across 272 (2025) and 280 (2026-so-far)
+unique keys. The existing docstring in `nfl/cards.py:527-538` already
+correctly narrows this to the one real edge case (a playoff game reusing
+a regular-season venue pairing) and defers historical/backtest reads to
+the dated files -- a prior session had already investigated and fixed
+the framing; no code change was needed. **Lesson repeated from the
+card-client unification earlier this session: verify a claimed bug
+against real data before touching code, even when the claim comes from
+a structured audit doc, not just an offhand summary.**
+
+**Phase 1 (football season readiness, before NCAAF ~Aug 29 / NFL ~Sep 10)
+-- audited item by item:**
+1. **NFL evaluation tracking vs NCAAF's -- genuinely still a gap.**
+   `syndicate/features/football/evaluation.py` is real (not dead/placeholder
+   as the roadmap doc claims -- wired into `adapters.py`/`season_validation.py`,
+   produced 8 real output files for one date), but it's a manually-invoked
+   CLI backtest, never scheduled. NCAAF's `smartsim2_performance_tracking.py`
+   +`smartsim2_betting_performance.py` has a real ongoing log --
+   752 real graded games through 2025 week 16. NFL has no equivalent
+   ongoing pipeline. Not built this session -- a substantial new module,
+   deserves its own pass.
+2. **NFL props: Receiving Yards + Interceptions were silently dropped --
+   FIXED, `6cd12b4c`.** Both are real markets, fetched into the CSVs by
+   `scripts/fetch_nfl_oddsapi_props_local.py`, but `_NFL_PROP_MARKET_TO_STAT`
+   in `props.py` had no entry for either -- every row for both markets was
+   discarded exactly like an unknown market, never reaching the board.
+   Added both stat extractors to `player_stats.py` (receiving_yards mirrors
+   the existing rushing_yards pattern; interceptions reads the real
+   `interception` pbp column, newly loaded into `_PLAY_COLUMNS`) and both
+   entries to `_NFL_PROP_MARKET_TO_STAT`. Three new regression tests.
+   **Separately confirmed, NOT fixed:** most weekly prop CSVs are still
+   6-byte header-only stubs (`oddsapi_player_props_2025_wk10..21.csv`, even
+   `2026_wk1.csv`) because OddsAPI had no bookmaker offers when those
+   fetches ran -- an operational/scheduling gap (fetch closer to kickoff),
+   not a code bug; `props.py`'s own docstring already documents this as
+   expected, not broken.
+3. **NCAAF 2026 rosters -- externally blocked, confirmed via a real API
+   call.** `build_ncaaf_roster_snapshot.py --season 2026` can't produce
+   anything yet: hit CFBD's real roster endpoint directly (`year=2026`,
+   both all-teams and a specific team) and got 0 rows both times, vs.
+   30,072 real rows for `year=2025`. CFBD genuinely hasn't published 2026
+   rosters. Re-check closer to Aug 29, not sooner.
+4. **Weekly-refresh tick-owner race -- mostly fixed, one residual gap,
+   low urgency.** The big incident (18->56+ concurrent
+   `generate_smartsim2_nfl_projections.py` processes, 31.6%->53.8% of 4GB)
+   was already fixed the day before this session
+   (`run_refresh_worker.py:1001-1036`, PID-liveness + 45-min SIGTERM). The
+   remaining gap: `_launch_autorun_weekly_sports_refresh`
+   (`run_refresh_worker.py:279-335`) reads the last-run timestamp,
+   check-then-acts with no atomic claim of its own, and relies entirely on
+   `_assert_no_active_refresh_run` (`ops_refresh.py:631`) to catch a
+   concurrent launch -- confirmed that inner function is also
+   check-then-raise, not a true compare-and-swap lock. **Not fixed this
+   session** because `WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN` is
+   currently `false` in production (`render.yaml`) -- this code path isn't
+   even running right now, so a real distributed-lock fix would be
+   speculative work against an inactive flag. Revisit when the flag is
+   flipped on before the season, not before.
+5. **Odds cadence for football -- a production decision, not a code bug.**
+   Flat 6h cadence (`WEEKLY_SPORTS_REFRESH_INTERVAL_SECONDS=21600`), no
+   Sunday-specific tightening (soccer has its own separate 4h cadence;
+   football never got one). Combined with #4: enabling the football
+   autorun before the season is a real decision with OddsAPI call-budget
+   implications (5M cap, [[project_oddsapi_call_budget]]) that needs a
+   human call, not something to silently flip.
+
+**Running the full test suite for the first time all session surfaced
+three pre-existing stale tests and one caused by today's own work --
+fixed all four, `6cd12b4c`:**
+- `test_nfl_hub_prefers_latest_mirrored_week_for_launch_links` asserted
+  copy `e4b6a7de` deliberately removed (stale "Source app currently points
+  at..." language). Pre-existing, from a commit already in this session's
+  first deploy batch, not caused by the hub reframe.
+- `test_home_page_poll_preserves_date_query` asserted two behaviors two
+  separate older commits (`c86d9d86`, `4b238313`) deliberately changed.
+  Pre-existing, unrelated to anything this session touched.
+- `test_wnba_source_asset_routes_use_vendored_static_files_without_sibling_lookup`
+  asserted the literal string `"function viewportMode()"` as proof of real
+  vendored content -- broken by THIS session's own `616633cd`
+  (`viewportMode` moved into the shared module). This one really was
+  caused by today's work; fixed to check `applyViewportMode` instead.
+- **Lesson: a UI/template change verified only in the browser can still
+  break a server-side string-matching test.** Browser verification proved
+  the pages render correctly; it caught nothing about `test_archives.py`
+  because that suite was never run for the watchlist/portfolio-pulse/hub-
+  reframe/card-unification changes until this round. Run the test suite
+  for every change going forward, not just the browser check.
+
+**Found but NOT fixed -- flagged for its own investigation:** four WNBA
+live-state tests (`test_wnba_live_player_lens_*`,
+`test_wnba_live_state_fallback_*` in `test_archives.py`) fail only when
+the full suite runs in its normal order via
+`python -m unittest tests.test_archives`, but all pass in isolation via
+`pytest -k`. Order-dependent test pollution -- very likely a stale
+`lru_cache` not reset between tests, the same class of issue CLAUDE.md's
+"NBA conftest cache-reset fixture" note already describes, just on the
+WNBA side. Confirmed pre-existing (`wnba/cards.py` last touched by
+`c6a8b62c`, unrelated to anything in this session) and NOT a regression
+from today. Needs someone to actually bisect which earlier test leaves
+the stale cache state, not a guess-fix.
+
+
 
 Continuation of the same 2026-08-03 session logged in the HANDOFF entry
 below. Picked up the handoff, deployed its 4 pending commits, then
