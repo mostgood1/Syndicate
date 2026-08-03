@@ -738,6 +738,38 @@ table.board-blotter tbody tr:last-child td {
     align-items: stretch;
   }
 
+  /* The toolbar was still 55% of a phone viewport even with the secondary
+     filters folded away, because each pill rail WRAPS -- 9 sport pills
+     become three stacked lines before any content. Scroll them sideways
+     instead, the standard mobile pattern: one line each, everything still
+     reachable, and the rail edge-fades so it reads as scrollable rather
+     than truncated. */
+  .board-toolbar .board-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    /* Bleed to the card edge so the fade sits at the true boundary. */
+    margin-inline: -12px;
+    padding-inline: 12px;
+    mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 18px), transparent 100%);
+  }
+
+  .board-toolbar .board-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .board-toolbar .board-tabs > * {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+
+  /* Secondary chrome, not worth a line of its own on a phone. */
+  .board-toolbar-row .cards-nav-pill[href="/intelligence/status"] {
+    display: none;
+  }
+
   .board-grid {
     grid-template-columns: 1fr;
   }
