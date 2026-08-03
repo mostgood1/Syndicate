@@ -1462,7 +1462,48 @@
     wireSlipButtons(container);
   }
 
+  // Every renderer below replaces its container's innerHTML wholesale, so
+  // a poll tick (60s) silently discarded two pieces of UI state the reader
+  // owns: the scroll position, and any "Why this pick" <details> they had
+  // opened. In practice that meant the board yanked itself out from under
+  // you roughly while you were reading a pick. A full keyed-diff render is
+  // the proper fix and a much larger change; capturing and restoring the
+  // state the user actually notices is the contained one.
+  function captureBoardUiState() {
+    const openKeys = [];
+    document.querySelectorAll("#board-cards details[open], #board-top-strip details[open]").forEach((node) => {
+      const row = node.closest("[data-syndicate-recommendation-id], [data-syndicate-prediction-id]");
+      const key = row
+        ? (row.getAttribute("data-syndicate-recommendation-id") || row.getAttribute("data-syndicate-prediction-id") || "")
+        : "";
+      if (key) openKeys.push(key);
+    });
+    return { scrollY: window.scrollY || window.pageYOffset || 0, openKeys: openKeys };
+  }
+
+  function restoreBoardUiState(snapshot) {
+    if (!snapshot) return;
+    if (snapshot.openKeys && snapshot.openKeys.length) {
+      const wanted = new Set(snapshot.openKeys);
+      document.querySelectorAll("#board-cards details, #board-top-strip details").forEach((node) => {
+        const row = node.closest("[data-syndicate-recommendation-id], [data-syndicate-prediction-id]");
+        const key = row
+          ? (row.getAttribute("data-syndicate-recommendation-id") || row.getAttribute("data-syndicate-prediction-id") || "")
+          : "";
+        // Only re-open what the reader had open; a candidate that dropped
+        // off the board simply doesn't match anything.
+        if (key && wanted.has(key)) node.setAttribute("open", "");
+      });
+    }
+    // Restore scroll last, after the DOM has its final height -- doing it
+    // before would clamp against a shorter document and land short.
+    if (typeof snapshot.scrollY === "number" && snapshot.scrollY > 0) {
+      window.scrollTo({ top: snapshot.scrollY, behavior: "auto" });
+    }
+  }
+
   function renderBoardBody() {
+    const uiState = captureBoardUiState();
     // #165: deriveGameCards populates gameKeyMergeMap as a side effect --
     // must run before matchesFilters (which reads it) is used below. Both
     // calls see the same date-filtered item list, so this warm-up and
@@ -1476,6 +1517,7 @@
     } else {
       renderCards(clientFiltered);
     }
+    restoreBoardUiState(uiState);
   }
 
   function renderFreshnessChip(response) {

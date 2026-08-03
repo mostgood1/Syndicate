@@ -325,6 +325,36 @@ def api_ops_keyvalue_usage() -> Any:
     return jsonify(usage)
 
 
+@ops_bp.post("/api/ops/keyvalue/expire-run-artifacts")
+def api_ops_keyvalue_expire_run_artifacts() -> Any:
+    # Mutating. Force-expires OLD per-run diagnostic artifacts
+    # (migration_runs/** by default) that already carry long TTLs, which
+    # keyvalue_sweep can't touch since it only targets TTL-less keys.
+    # Added 2026-08-03: those keys held 185.71MB of a 212.67MB total on a
+    # 256MB instance already evicting coordination state under allkeys-lru,
+    # and truncating new writes cannot reclaim the existing backlog.
+    # Defaults to dry_run=1 so the blast radius is inspectable first; pass
+    # ?dry_run=0 to actually apply.
+    from syndicate.features.shared.refresh_state_store import keyvalue_expire_run_artifacts
+
+    def _int_param(name: str, default: int) -> int:
+        raw = str(request.args.get(name) or "").strip()
+        try:
+            return int(raw) if raw else default
+        except ValueError:
+            return default
+
+    result = keyvalue_expire_run_artifacts(
+        older_than_hours=max(1, _int_param("older_than_hours", 6)),
+        grace_period_seconds=max(60, _int_param("grace_period_seconds", 300)),
+        path_contains=str(request.args.get("path_contains") or "migration_runs").strip(),
+        dry_run=_coerce_bool(request.args.get("dry_run"), default=True),
+    )
+    if result is None:
+        return jsonify({"ok": False, "error": "SYNDICATE_REFRESH_STATE_BACKEND is not keyvalue on this service."})
+    return jsonify(result)
+
+
 @ops_bp.post("/api/ops/keyvalue/sweep")
 def api_ops_keyvalue_sweep() -> Any:
     # Board audit follow-up, 2026-07-31: mutating -- sets a short

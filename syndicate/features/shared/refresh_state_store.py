@@ -876,6 +876,113 @@ def keyvalue_usage_by_prefix(*, top_keys: int = 15, max_keys: int = 20000) -> di
         return {"ok": False, "error": str(exc)}
 
 
+_RUN_STAMP_PATTERN = re.compile(r"(\d{8})_(\d{6})")
+
+
+def _run_stamp_age_hours(key: str, *, now: datetime) -> float | None:
+    """Age in hours parsed from a `_YYYYMMDD_HHMMSS` run stamp in the key.
+    None when the key carries no parseable stamp -- those are left alone
+    rather than guessed at."""
+    match = _RUN_STAMP_PATTERN.search(str(key or ""))
+    if not match:
+        return None
+    try:
+        stamped = datetime.strptime(f"{match.group(1)}{match.group(2)}", "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    return (now - stamped).total_seconds() / 3600.0
+
+
+def keyvalue_expire_run_artifacts(
+    *,
+    older_than_hours: int = 6,
+    grace_period_seconds: int = 300,
+    path_contains: str = "migration_runs",
+    dry_run: bool = True,
+) -> dict[str, Any] | None:
+    """Force a short EXPIRE on old per-run diagnostic artifacts.
+
+    The 2026-08-03 measurement found `migration_runs/**` holding 185.71MB
+    of a 212.67MB keyvalue total (2,549 keys) on a 256MB instance already
+    evicting under `allkeys-lru`. Truncating new writes (44b0f247) stops
+    the growth but cannot reclaim the existing backlog, which carries ~37h
+    TTLs -- leaving ~2 days of continued pressure during which LRU keeps
+    dropping genuine coordination state. Upgrading the instance is not an
+    option.
+
+    These keys are per-run diagnostics (captured stdout/stderr, job status,
+    gate reports); only the most recent run is read by
+    /api/ops/odds-refresh/status, and a fresh one is written every few
+    minutes. So expiring old ones is safe in a way expiring board or
+    coordination state would not be -- which is exactly why this is scoped
+    by `path_contains` and refuses an empty scope.
+
+    EXPIRE rather than DELETE, matching keyvalue_sweep_apply: a reader
+    mid-flight still gets its answer, and the memory comes back on the same
+    timescale LRU would have taken anyway. Defaults to dry_run so the
+    blast radius is always inspectable before anything is mutated.
+    """
+    if _state_backend_kind() != "keyvalue":
+        return None
+    scope = str(path_contains or "").strip()
+    if not scope:
+        # An unscoped sweep here would happily expire board state and
+        # coordination keys; refuse rather than accept a dangerous default.
+        return {"ok": False, "error": "path_contains is required -- refusing an unscoped run-artifact expiry."}
+
+    def _scan(client):
+        keys = _keyvalue_scan_namespace_keys(client)
+        now = datetime.now(timezone.utc)
+        matched = 0
+        expired = 0
+        skipped_recent = 0
+        skipped_no_stamp = 0
+        reclaimed_bytes = 0
+        samples: list[str] = []
+        for key in keys:
+            if scope not in str(key):
+                continue
+            matched += 1
+            age_hours = _run_stamp_age_hours(key, now=now)
+            if age_hours is None:
+                skipped_no_stamp += 1
+                continue
+            if age_hours < float(older_than_hours):
+                skipped_recent += 1
+                continue
+            try:
+                size = client.memory_usage(key) or 0
+            except Exception:
+                size = 0
+            reclaimed_bytes += size
+            if len(samples) < 10:
+                samples.append(key)
+            if not dry_run:
+                try:
+                    client.expire(key, int(max(60, grace_period_seconds)))
+                except Exception:
+                    continue
+            expired += 1
+        return {
+            "dry_run": bool(dry_run),
+            "path_contains": scope,
+            "older_than_hours": int(older_than_hours),
+            "grace_period_seconds": int(max(60, grace_period_seconds)),
+            "matched_keys": matched,
+            "expired_keys": expired,
+            "skipped_recent": skipped_recent,
+            "skipped_no_run_stamp": skipped_no_stamp,
+            "estimated_reclaimed_bytes": reclaimed_bytes,
+            "estimated_reclaimed_mb": round(reclaimed_bytes / (1024 * 1024), 2),
+            "sample_keys": samples,
+        }
+
+    try:
+        return {"ok": True, **_execute_keyvalue_operation(_scan)}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
 def keyvalue_sweep_apply(*, stale_after_days: int = 2, grace_period_seconds: int = 3600) -> dict[str, Any] | None:
     # Sets a short grace-period EXPIRE (default 1 hour) rather than
     # deleting outright -- any reader mid-flight against a stale key still
