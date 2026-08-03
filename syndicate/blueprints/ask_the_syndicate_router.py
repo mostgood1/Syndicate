@@ -37,7 +37,17 @@ class SyndicateQueryRouter:
 
     def route(self, question: str) -> RouteDecision:
         normalized_question = self._normalize_question(question)
-        best_decision = RouteDecision(intent="bet_analysis", handler_name="handle_bet_analysis", score=0)
+        # Unmatched questions fall back to a BOARD SUMMARY, not single-bet
+        # analysis. bet_analysis matches one specific recommendation to the
+        # question and, failing that, returns an empty shell whose only
+        # content is "No board recommendation matches ... specifically" --
+        # which the UI surfaces as "No structured answer came back."
+        # Confirmed live 2026-08-03: "Summarize today's best opportunities
+        # across the board and what to watch for" matched NO rule at all, so
+        # every general question hit that dead end even with a healthy
+        # 10-card board behind it. A summary of the board is always
+        # answerable and is the sane default for a vague question.
+        best_decision = RouteDecision(intent="market_summary", handler_name="handle_market_summary", score=0)
 
         for rule in self._rules:
             score, matched_terms = rule.score_question(normalized_question)
@@ -92,6 +102,21 @@ DEFAULT_RULES: tuple[RouteRule, ...] = (
         patterns=(
             ("best_bets", re.compile(r"\bbest bets\b", re.IGNORECASE)),
             ("top_edges", re.compile(r"\btop edges\b", re.IGNORECASE)),
+            # Only the two literal phrases above existed, so ordinary
+            # board-summary phrasing scored zero and fell through to the
+            # single-bet path. These cover how the question is actually
+            # asked -- including the home-page prompt itself.
+            ("summarize", re.compile(r"\bsummar(?:ise|ize|y)\b", re.IGNORECASE)),
+            ("best_opportunities", re.compile(r"\b(?:best|top)\s+(?:opportunit(?:y|ies)|plays?|bets?|edges?|picks?)\b", re.IGNORECASE)),
+            ("across_the_board", re.compile(r"\bacross the board\b", re.IGNORECASE)),
+            ("what_to_watch", re.compile(r"\bwhat to watch\b", re.IGNORECASE)),
+            ("the_board", re.compile(r"\b(?:the|today'?s)\s+board\b", re.IGNORECASE)),
+            # "any good props" is a plural, open-ended ask -- it names a
+            # market family but no specific bet, so single-bet analysis
+            # dead-ends on it the same way. Summary always has an answer.
+            ("whats_good", re.compile(r"\b(?:what'?s|anything|any)\s+(?:good|worth|interesting)\b", re.IGNORECASE)),
+            ("what_should_i_bet", re.compile(r"\bwhat should i (?:bet|play|back)\b", re.IGNORECASE)),
+            ("overview", re.compile(r"\b(?:overview|rundown|slate)\b", re.IGNORECASE)),
         ),
     ),
     RouteRule(
