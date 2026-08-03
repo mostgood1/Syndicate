@@ -268,6 +268,45 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["memory"], fake_snapshot)
 
+    def test_evaluation_settlement_status_requires_admin_token(self) -> None:
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
+            response = self.client.get("/api/ops/evaluation-settlement/status")
+
+        self.assertEqual(response.status_code, 401)
+        self.assertFalse(response.get_json()["ok"])
+
+    def test_evaluation_settlement_status_reads_autorun_status_and_supported_sports(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            status_dir = reports_root / "refresh_status" / "latest"
+            status_dir.mkdir(parents=True, exist_ok=True)
+            (status_dir / "evaluation_settlement_autorun_status.json").write_text(
+                json.dumps(
+                    {
+                        "epoch": 1785000000.0,
+                        "dates": ["2026-08-02", "2026-08-03"],
+                        "summary": {"pending": 12, "matched": 9, "settled": 9, "unmatched": 3},
+                        "error": None,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch.dict(
+                os.environ,
+                {"ADMIN_TOKEN": "secret-token", "SYNDICATE_REPORTS_ROOT": str(reports_root)},
+                clear=False,
+            ):
+                response = self.client.get(
+                    "/api/ops/evaluation-settlement/status",
+                    headers={"X-Admin-Token": "secret-token"},
+                )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["supported_sports"], ["mlb", "wnba"])
+        self.assertEqual(payload["autorun_status"]["summary"], {"pending": 12, "matched": 9, "settled": 9, "unmatched": 3})
+
     def test_force_mlb_resim_requires_game_pks(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
             response = self.client.post(

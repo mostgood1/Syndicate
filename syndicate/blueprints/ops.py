@@ -399,6 +399,30 @@ def api_ops_intelligence_memory_diagnostics() -> Any:
     return jsonify({"ok": True, "record_count": len(records), "records": records})
 
 
+@ops_bp.get("/api/ops/evaluation-settlement/status")
+def api_ops_evaluation_settlement_status() -> Any:
+    # Read-only. The evaluation-settlement autorun (run_refresh_worker.py)
+    # only ever runs inside refresh-worker's own process and settles against
+    # its own local evaluation ledger -- both invisible to this web service,
+    # which has no disk access to refresh-worker's filesystem. Its per-cycle
+    # totals (pending/matched/settled/unmatched) are written through the
+    # shared keyvalue-backed refresh_state_store though (same path
+    # run_refresh_worker.py's _evaluation_settlement_autorun_status_path()
+    # writes to), so this is the only way from the web service to answer
+    # "is settlement actually finding matches in production" instead of just
+    # inferring it from a possibly-never-regenerated performance_summary.json.
+    from syndicate.features.shared.evaluation_settlement import _SUPPORTED_SPORTS
+
+    status_path = reports_root() / "refresh_status" / "latest" / "evaluation_settlement_autorun_status.json"
+    return jsonify(
+        {
+            "ok": True,
+            "supported_sports": list(_SUPPORTED_SPORTS),
+            "autorun_status": normalize_timestamped_payload(read_json_file(status_path)),
+        }
+    )
+
+
 @ops_bp.post("/api/ops/bootstrap/run")
 def api_ops_bootstrap_run() -> Any:
     # Calls _sync_bootstrap_roots directly (not main(), which only ever
