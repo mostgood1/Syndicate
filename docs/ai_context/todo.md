@@ -306,6 +306,43 @@ evidence.
   between NBA and WNBA) -- check the full call chain, not just each
   candidate's own line range, before extracting.
 
+**Addendum -- NFL evaluation tracking built, `93460fe0`, deployed.** User
+asked to keep pushing through every remaining item (NFL eval tracking,
+Ask-the-Syndicate embed, shell consolidation, hygiene sweep, all four
+selected). Built first since it was flagged as highest-leverage given
+the season clock:
+- New `syndicate/features/nfl/smartsim2_performance_tracking.py` +
+  `smartsim2_betting_performance.py` mirror NCAAF's real design
+  (record/log/stats shape, measurement-only contract), simplified for
+  NFL's single-model reality -- NCAAF reconciles two real engines into a
+  Consensus blend and tracks all three; NFL has only one SmartSim 2.0
+  model, so there's no second source to blend against or disagree with.
+  `model_picked_winner`/`large_mismatch` are the single-source analogs of
+  NCAAF's cross-source categories. Deliberately NOT ported: NCAAF's
+  Phase-2 additions (rolling windows, season-to-date checkpoints, drift
+  detection) -- premature before NFL's own log has real games to
+  calibrate against; a natural follow-up once it does.
+- New `scripts/backfill_nfl_performance.py` is simpler than NCAAF's own
+  CLI: `schedule_{season}.csv` carries real final scores AND the real
+  closing line in one file, and it already shares an exact `game_id`
+  with the projections CSV -- no fuzzy team-name join needed.
+- **Caught a real footgun while building this, from direct experience,
+  not inference:** calling the backfill function without explicit
+  overrides silently wrote a real record into the actual production
+  `data/nfl_source/data/smartsim2_performance_log.jsonl` path, because
+  the log path is a module-level constant computed at import time (the
+  same characteristic NCAAF's own script has -- confirmed NCAAF's test
+  suite only covers a pure helper for this exact reason, never
+  `backfill_week` itself). Cleaned up the accidental write immediately,
+  then refactored to take explicit `source_root`/`log_path` parameters
+  and wrote the test suite NCAAF's own script has never had. 43 new
+  tests, all passing, including a full join-and-write integration test.
+- No real 2025 schedule data exists in this local checkout (2026 only,
+  pre-season, no completed games) -- verified the join logic against the
+  real 2026 schema read directly off disk instead. A genuine full
+  backfill run needs production's real 2025 data, not something to fake
+  locally. Deployed (`dep-d9obl5ijnfac73dfeo2g`).
+
 ### HANDOFF 2026-08-03 (superseded -- all items below are now shipped and deployed, see the reconciliation above; kept as historical record)
 
 **1. RESOLVED -- deployed, twice.** First batch: `0b439cb0` filter
