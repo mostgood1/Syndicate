@@ -1524,9 +1524,17 @@ def _source_betting(row: dict[str, str]) -> dict[str, Any]:
     home_ml = _safe_float(row.get("home_ml"))
     away_ml = _safe_float(row.get("away_ml"))
     home_spread = _safe_float(row.get("home_spread"))
+    away_spread = _safe_float(row.get("away_spread"))
     total = _safe_float(row.get("total"))
     if total is not None and total <= 1.0:
         total = None
+    # Real per-side book prices, written by refresh_wnba_oddsapi_props.py's
+    # game_cards builder since 2026-08-02; older CSVs simply lack the columns
+    # and these stay None (no fabricated -110 juice).
+    home_spread_price = _safe_float(row.get("home_spread_price"))
+    away_spread_price = _safe_float(row.get("away_spread_price"))
+    total_over_price = _safe_float(row.get("total_over_price"))
+    total_under_price = _safe_float(row.get("total_under_price"))
 
     home_win_prob = _safe_float(row.get("p_home_win") or row.get("prob_home_win"))
     away_win_prob = _safe_float(row.get("p_away_win") or row.get("prob_away_win"))
@@ -1534,6 +1542,21 @@ def _source_betting(row: dict[str, str]) -> dict[str, Any]:
         home_win_prob = 1.0 - away_win_prob
     if away_win_prob is None and home_win_prob is not None:
         away_win_prob = 1.0 - home_win_prob
+
+    # Sim-margin probability must outrank the market-implied one: the old
+    # order tried _implied_prob_from_american(home_ml) first, so whenever a
+    # book moneyline existed (i.e. nearly always) the "model" probability WAS
+    # the book's own vig-inclusive price and every edge computed against the
+    # market from it was structurally zero -- the sim-margin branch below was
+    # dead code in practice. Confirmed in the 2026-08-02 end-to-end
+    # assessment (docs/reports/syndicate_end_to_end_assessment_2026_08_02.md).
+    # Market-implied stays as the last resort only, for rows with no sim
+    # projection at all.
+    if home_win_prob is None:
+        margin_hint = _safe_float(row.get("pred_margin") or row.get("margin_mean"))
+        home_win_prob = _margin_win_prob(margin_hint, scale=6.5)
+        if home_win_prob is not None:
+            away_win_prob = 1.0 - home_win_prob
 
     if home_win_prob is None:
         home_win_prob = _implied_prob_from_american(home_ml)
@@ -1544,12 +1567,6 @@ def _source_betting(row: dict[str, str]) -> dict[str, Any]:
         home_win_prob = 1.0 - away_win_prob
     if away_win_prob is None and home_win_prob is not None:
         away_win_prob = 1.0 - home_win_prob
-
-    if home_win_prob is None:
-        margin_hint = _safe_float(row.get("pred_margin") or row.get("margin_mean"))
-        home_win_prob = _margin_win_prob(margin_hint, scale=6.5)
-        if home_win_prob is not None:
-            away_win_prob = 1.0 - home_win_prob
 
     if home_ml is None and home_win_prob is not None:
         home_ml = _american_from_prob(home_win_prob)
@@ -1572,6 +1589,8 @@ def _source_betting(row: dict[str, str]) -> dict[str, Any]:
 
     if home_spread is None and projected_margin is not None:
         home_spread = _round_half(-projected_margin)
+    if away_spread is None and home_spread is not None:
+        away_spread = -home_spread
 
     if total is None and projected_total is not None:
         total = _round_half(projected_total)
@@ -1608,6 +1627,14 @@ def _source_betting(row: dict[str, str]) -> dict[str, Any]:
         "home_ml": home_ml,
         "away_ml": away_ml,
         "home_spread": home_spread,
+        "away_spread": away_spread,
+        # Per-side book prices feed basketball_market_board's spread/total
+        # odds rows, which drop the row entirely when the price is None --
+        # for WNBA these are real quotes now, never fabricated juice.
+        "home_spread_price": home_spread_price,
+        "away_spread_price": away_spread_price,
+        "total_over_price": total_over_price,
+        "total_under_price": total_under_price,
         "total": total,
         "home_ml_ev": None,
         "away_ml_ev": None,
@@ -1990,6 +2017,24 @@ def _hydrate_source_game_with_live_lines(
         merged_odds["odds_refreshed_at"] = odds_refreshed_at
         merged["odds_refreshed_at"] = odds_refreshed_at
     merged["odds"] = merged_odds
+    # _source_betting below reads column-shaped keys off `merged`, but the
+    # game dict's top level never carried the CSV's per-side price columns or
+    # the sim margin/total means (those were passed explicitly at
+    # _source_game_from_row time) -- without reseeding them here, live-lines
+    # hydration silently rebuilt the betting dict WITHOUT the sim-derived win
+    # probability and the real spread/total prices, reverting every live game
+    # to the market-implied-probability bug fixed 2026-08-02.
+    prior_betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
+    for merged_key, prior_key in (
+        ("home_spread_price", "home_spread_price"),
+        ("away_spread_price", "away_spread_price"),
+        ("total_over_price", "total_over_price"),
+        ("total_under_price", "total_under_price"),
+        ("margin_mean", "projected_margin"),
+        ("total_mean", "projected_total"),
+    ):
+        if merged.get(merged_key) is None and prior_betting.get(prior_key) is not None:
+            merged[merged_key] = prior_betting.get(prior_key)
     merged["betting"] = _source_betting(merged)
     return merged
 

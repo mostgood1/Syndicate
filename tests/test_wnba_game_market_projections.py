@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import unittest
 
 from syndicate.features.wnba.cards import _line_from_recommendation_pick
@@ -140,6 +141,64 @@ class SourceBettingProjectedFieldsTests(unittest.TestCase):
     def test_projected_total_ignored_when_degenerate(self) -> None:
         betting = _source_betting({"total_mean": 0.5})
         self.assertIsNone(betting["projected_total"])
+
+
+class SourceBettingProbabilityPriorityTests(unittest.TestCase):
+    # 2026-08-02 end-to-end assessment: the fallback chain used to try the
+    # book's own vig-inclusive moneyline (implied probability) BEFORE the
+    # sim-margin transform, so whenever a moneyline existed the "model"
+    # probability WAS the market price and edge was structurally zero.
+    def test_sim_margin_probability_outranks_market_implied(self) -> None:
+        betting = _source_betting({"home_ml": "-200", "away_ml": "170", "pred_margin": "1.0"})
+        expected = 1.0 / (1.0 + math.exp(-1.0 / 6.5))
+        self.assertAlmostEqual(betting["p_home_win"], expected, places=9)
+        self.assertAlmostEqual(betting["p_away_win"], 1.0 - expected, places=9)
+        # The old (buggy) value this must never regress to.
+        self.assertNotAlmostEqual(betting["p_home_win"], 200.0 / 300.0, places=3)
+
+    def test_explicit_probability_columns_still_outrank_everything(self) -> None:
+        betting = _source_betting({"p_home_win": "0.61", "home_ml": "-200", "pred_margin": "8.0"})
+        self.assertAlmostEqual(betting["p_home_win"], 0.61, places=9)
+        self.assertAlmostEqual(betting["p_away_win"], 0.39, places=9)
+
+    def test_market_implied_is_the_last_resort_without_any_sim_signal(self) -> None:
+        betting = _source_betting({"home_ml": "-200", "away_ml": "170"})
+        self.assertAlmostEqual(betting["p_home_win"], 200.0 / 300.0, places=9)
+        self.assertAlmostEqual(betting["p_away_win"], 100.0 / 270.0, places=9)
+
+    def test_margin_mean_alias_feeds_the_sim_branch_too(self) -> None:
+        betting = _source_betting({"home_ml": "-200", "margin_mean": "-2.0"})
+        expected = 1.0 / (1.0 + math.exp(2.0 / 6.5))
+        self.assertAlmostEqual(betting["p_home_win"], expected, places=9)
+
+
+class SourceBettingSidePriceTests(unittest.TestCase):
+    def test_per_side_prices_flow_through_from_csv_columns(self) -> None:
+        betting = _source_betting(
+            {
+                "home_spread": "-4.5",
+                "away_spread": "4.5",
+                "total": "164.5",
+                "home_spread_price": "-108",
+                "away_spread_price": "-112",
+                "total_over_price": "-105",
+                "total_under_price": "-115",
+            }
+        )
+        self.assertEqual(betting["home_spread_price"], -108.0)
+        self.assertEqual(betting["away_spread_price"], -112.0)
+        self.assertEqual(betting["total_over_price"], -105.0)
+        self.assertEqual(betting["total_under_price"], -115.0)
+        self.assertEqual(betting["away_spread"], 4.5)
+
+    def test_old_csv_without_price_columns_leaves_prices_none(self) -> None:
+        betting = _source_betting({"home_spread": "-4.5", "total": "164.5"})
+        self.assertIsNone(betting["home_spread_price"])
+        self.assertIsNone(betting["away_spread_price"])
+        self.assertIsNone(betting["total_over_price"])
+        self.assertIsNone(betting["total_under_price"])
+        # away_spread still derived from the home line for display parity.
+        self.assertEqual(betting["away_spread"], 4.5)
 
 
 if __name__ == "__main__":

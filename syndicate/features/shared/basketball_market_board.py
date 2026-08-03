@@ -3,9 +3,9 @@
 NBA's and WNBA's `cards.py` assemble a genuinely identical per-game shape
 for this purpose -- a `betting` dict (home_ml/away_ml/home_spread/
 away_spread/total/p_home_win/p_away_win/p_home_cover/p_away_cover/
-p_total_over/p_total_under, plus book-price fields that exist on both but
-are always None in the current artifact pipeline for WNBA's spread/total
-and always None for NBA's spread/total too) and a `prop_recommendations`
+p_total_over/p_total_under, plus book-price fields: real per-side
+spread/total quotes for WNBA since 2026-08-02, still always None for NBA
+until its game_cards CSV grows the same columns) and a `prop_recommendations`
 dict (`{"away": [...], "home": [...]}` of player/market/side/line/price/
 edge/p_win entries). Only the VALUES differ per sport (confirmed via
 direct research 2026-07-23), never the keys a reader needs to check, so
@@ -263,10 +263,14 @@ def basketball_market_board_rows_for_game(
     if p_home_win is not None:
         sim_rows.append({"game_id": game_pk, "market": "moneyline_home", "period": "full_game", "entity": None, "sim_projection": p_home_win, "sim_source": "basketball_sim"})
 
-    # Spread/total book prices are always None in the current artifact
-    # pipeline for both sports (confirmed via direct research 2026-07-23:
-    # game_cards_{date}.csv never carries them) -- only add a row when a
-    # real price shows up, rather than fabricating standard juice.
+    # Only add a spread/total row when a real book price shows up, rather
+    # than fabricating standard juice. WNBA's game_cards_{date}.csv carries
+    # real per-side prices since 2026-08-02 (end-to-end assessment fix:
+    # refresh_wnba_oddsapi_props.py now writes home_spread_price/
+    # away_spread_price/total_over_price/total_under_price and wnba/cards.py
+    # threads them into this betting dict); NBA's CSV does not yet, so its
+    # rows keep degrading exactly as before -- absent columns leave the
+    # prices None and the rows are dropped, never invented.
     home_spread = betting.get("home_spread")
     away_spread = betting.get("away_spread")
     home_spread_price = betting.get("home_spread_price")

@@ -529,6 +529,68 @@ class BasketballMarketBoardRawPropsFeedTests(unittest.TestCase):
         self.assertTrue(all(status == JOIN_STATUS_MATCHED for status in statuses))
 
 
+class WnbaPricedSpreadTotalRowTests(unittest.TestCase):
+    """2026-08-02 end-to-end assessment fix: WNBA's game_cards CSV now
+    carries real per-side spread/total quotes plus the smart-sim means, so
+    a betting dict built by wnba/cards.py's _source_betting must yield
+    priced spread/total odds rows here, while a column-less (NBA-style) row
+    keeps degrading to moneyline-only without crashing."""
+
+    def test_wnba_csv_row_with_prices_produces_priced_spread_and_total_rows(self) -> None:
+        from syndicate.features.wnba.cards import _source_betting
+
+        betting = _source_betting(
+            {
+                "home_ml": "-140",
+                "away_ml": "120",
+                "home_spread": "-4.5",
+                "away_spread": "4.5",
+                "total": "164.5",
+                "home_spread_price": "-108",
+                "away_spread_price": "-112",
+                "total_over_price": "-105",
+                "total_under_price": "-115",
+                "pred_margin": "6.0",
+                "pred_total": "166.0",
+            }
+        )
+        odds_rows, sim_rows = basketball_market_board_rows_for_game(game_pk=1, betting=betting, prop_recommendations={})
+
+        by_key = {(row["market"], row.get("side")): row for row in odds_rows}
+        self.assertEqual(by_key[("spread_home", "home")]["odds"], -108.0)
+        self.assertEqual(by_key[("spread_home", "home")]["line"], -4.5)
+        self.assertEqual(by_key[("spread_away", "away")]["odds"], -112.0)
+        self.assertEqual(by_key[("spread_away", "away")]["line"], 4.5)
+        self.assertEqual(by_key[("total", "over")]["odds"], -105.0)
+        self.assertEqual(by_key[("total", "under")]["odds"], -115.0)
+        self.assertEqual(by_key[("total", "over")]["line"], 164.5)
+
+        sim_markets = {row["market"] for row in sim_rows}
+        self.assertIn("spread_home", sim_markets)
+        self.assertIn("spread_away", sim_markets)
+        self.assertIn("total", sim_markets)
+
+        # The moneyline model probability is sim-derived (pred_margin
+        # through the logistic), NOT the book's own implied probability --
+        # the structural-zero-edge bug this fix closes.
+        self.assertGreater(abs(betting["p_home_win"] - (140.0 / 240.0)), 0.05)
+
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+        priced = [row for row in inventory if row["market"] in ("spread_home", "spread_away", "total")]
+        self.assertTrue(priced)
+        for row in priced:
+            self.assertEqual(row["join_status"], JOIN_STATUS_MATCHED)
+
+    def test_nba_style_row_without_price_columns_degrades_to_moneyline_only(self) -> None:
+        from syndicate.features.wnba.cards import _source_betting
+
+        betting = _source_betting(
+            {"home_ml": "-140", "away_ml": "120", "home_spread": "-4.5", "away_spread": "4.5", "total": "164.5"}
+        )
+        odds_rows, _ = basketball_market_board_rows_for_game(game_pk=1, betting=betting, prop_recommendations={})
+        self.assertEqual({row["market"] for row in odds_rows}, {"moneyline_home", "moneyline_away"})
+
+
 class PlayerStatDistributionsFromSimTests(unittest.TestCase):
     def test_parses_mean_sd_pairs_for_known_stat_codes(self) -> None:
         # Real shape confirmed 2026-07-27 against production

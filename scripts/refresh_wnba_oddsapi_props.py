@@ -1370,7 +1370,11 @@ def _aggregate_game_odds_from_market_rows(
     away_ml_values: list[float] = []
     home_spread_values: list[float] = []
     away_spread_values: list[float] = []
+    home_spread_price_values: list[float] = []
+    away_spread_price_values: list[float] = []
     total_values: list[float] = []
+    total_over_price_values: list[float] = []
+    total_under_price_values: list[float] = []
 
     for current in group_rows:
         market = str(current.get("market") or "").strip().lower()
@@ -1385,10 +1389,24 @@ def _aggregate_game_odds_from_market_rows(
         elif market == "spreads" and point_value is not None:
             if outcome_name == home_name:
                 home_spread_values.append(point_value)
+                if price_value is not None:
+                    home_spread_price_values.append(price_value)
             elif outcome_name == away_name:
                 away_spread_values.append(point_value)
+                if price_value is not None:
+                    away_spread_price_values.append(price_value)
         elif market == "totals" and point_value is not None:
             total_values.append(point_value)
+            # The raw feed always carried per-side prices on the same rows
+            # this loop was already reading for the point value -- they were
+            # simply thrown away, which is why every downstream spread/total
+            # row surfaced with fabricated -110 juice or got dropped
+            # (confirmed in the 2026-08-02 end-to-end assessment).
+            if price_value is not None:
+                if outcome_name.lower() == "over":
+                    total_over_price_values.append(price_value)
+                elif outcome_name.lower() == "under":
+                    total_under_price_values.append(price_value)
 
     home_spread = _mean_or_none(home_spread_values)
     away_spread = _mean_or_none(away_spread_values)
@@ -1402,7 +1420,11 @@ def _aggregate_game_odds_from_market_rows(
         "away_ml": _mean_or_none(away_ml_values),
         "home_spread": home_spread,
         "away_spread": away_spread,
+        "home_spread_price": _mean_or_none(home_spread_price_values),
+        "away_spread_price": _mean_or_none(away_spread_price_values),
         "total": _mean_or_none(total_values),
+        "total_over_price": _mean_or_none(total_over_price_values),
+        "total_under_price": _mean_or_none(total_under_price_values),
     }
 
 
@@ -1987,6 +2009,18 @@ _GAME_CARDS_HEADER_ORDER = [
     "bookmaker",
     "home_tri",
     "away_tri",
+    # Added 2026-08-02 (end-to-end assessment: WNBA game markets had
+    # structurally zero edge). pred_margin/pred_total are the smart-sim means
+    # -- probability derivation stays in wnba/cards.py's _source_betting so
+    # there is exactly one margin->probability transform site. The four price
+    # columns are real per-side book quotes; readers use DictReader + .get()
+    # so older CSVs without these columns keep working.
+    "pred_margin",
+    "pred_total",
+    "home_spread_price",
+    "away_spread_price",
+    "total_over_price",
+    "total_under_price",
 ]
 
 
@@ -2087,6 +2121,21 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
     snapshot_matchups: set[tuple[str, str]] = set()
     odds_by_matchup = _load_game_odds_rows_by_matchup(source_root=source_root, processed_root=processed_root, date_str=date_str)
 
+    # Smart-sim means ride along on every game_cards row (2026-08-02) so
+    # wnba/cards.py's _source_betting can derive a real model win/cover/total
+    # probability instead of echoing the book's own implied probability --
+    # already-computed values only, no new sim work on this refresh path.
+    sim_projections = _smart_sim_projection_index(processed_root=processed_root, date_str=date_str)
+
+    def _sim_projection_fields(home_tri: object, away_tri: object) -> dict[str, object]:
+        projection = sim_projections.get((str(home_tri or "").strip().upper(), str(away_tri or "").strip().upper())) or {}
+        pred_margin = _float_or_none(projection.get("pred_margin"))
+        pred_total = _float_or_none(projection.get("pred_total"))
+        return {
+            "pred_margin": round(pred_margin, 3) if pred_margin is not None else None,
+            "pred_total": round(pred_total, 3) if pred_total is not None else None,
+        }
+
     raw_candidates = [
         source_root / "data" / "raw" / f"odds_wnba_current_{date_str}.csv",
         source_root / "data" / "raw" / f"odds_wnba_current_{date_str}.parquet",
@@ -2135,6 +2184,10 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                         home_spread = _float_or_none((odds_row or {}).get("home_spread"))
                         away_spread = _float_or_none((odds_row or {}).get("away_spread"))
                         total = _float_or_none((odds_row or {}).get("total"))
+                        home_spread_price = _float_or_none((odds_row or {}).get("home_spread_price"))
+                        away_spread_price = _float_or_none((odds_row or {}).get("away_spread_price"))
+                        total_over_price = _float_or_none((odds_row or {}).get("total_over_price"))
+                        total_under_price = _float_or_none((odds_row or {}).get("total_under_price"))
                         rows_out.append(
                             {
                                 "date": date_str,
@@ -2150,6 +2203,11 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                                 "bookmaker": str((odds_row or {}).get("bookmaker") or "oddsapi_consensus").strip() or "oddsapi_consensus",
                                 "home_tri": home_tri,
                                 "away_tri": away_tri,
+                                **_sim_projection_fields(home_tri, away_tri),
+                                "home_spread_price": home_spread_price if home_spread_price is not None else aggregated["home_spread_price"],
+                                "away_spread_price": away_spread_price if away_spread_price is not None else aggregated["away_spread_price"],
+                                "total_over_price": total_over_price if total_over_price is not None else aggregated["total_over_price"],
+                                "total_under_price": total_under_price if total_under_price is not None else aggregated["total_under_price"],
                             }
                         )
 
@@ -2247,7 +2305,11 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
             home_spread = _first_group_value("home_spread")
             away_spread = _first_group_value("away_spread")
             total = _first_group_value("total")
-            if None in (home_ml, away_ml, home_spread, away_spread, total):
+            home_spread_price = _first_group_value("home_spread_price")
+            away_spread_price = _first_group_value("away_spread_price")
+            total_over_price = _first_group_value("total_over_price")
+            total_under_price = _first_group_value("total_under_price")
+            if None in (home_ml, away_ml, home_spread, away_spread, total, home_spread_price, away_spread_price, total_over_price, total_under_price):
                 market_rows = props_market_rows_by_matchup.get(key) or []
                 if market_rows:
                     aggregated = _aggregate_game_odds_from_market_rows(
@@ -2258,6 +2320,12 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                     home_spread = home_spread if home_spread is not None else aggregated["home_spread"]
                     away_spread = away_spread if away_spread is not None else aggregated["away_spread"]
                     total = total if total is not None else aggregated["total"]
+                    home_spread_price = home_spread_price if home_spread_price is not None else aggregated["home_spread_price"]
+                    away_spread_price = away_spread_price if away_spread_price is not None else aggregated["away_spread_price"]
+                    total_over_price = total_over_price if total_over_price is not None else aggregated["total_over_price"]
+                    total_under_price = total_under_price if total_under_price is not None else aggregated["total_under_price"]
+            home_tri = _to_tricode_local(home_name)
+            away_tri = _to_tricode_local(away_name)
             rows_out.append(
                 {
                     "date": date_str,
@@ -2271,8 +2339,13 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                     "away_spread": away_spread,
                     "total": total,
                     "bookmaker": str(first_row.get("bookmaker") or "oddsapi_consensus").strip() or "oddsapi_consensus",
-                    "home_tri": _to_tricode_local(home_name),
-                    "away_tri": _to_tricode_local(away_name),
+                    "home_tri": home_tri,
+                    "away_tri": away_tri,
+                    **_sim_projection_fields(home_tri, away_tri),
+                    "home_spread_price": home_spread_price,
+                    "away_spread_price": away_spread_price,
+                    "total_over_price": total_over_price,
+                    "total_under_price": total_under_price,
                 }
             )
 
@@ -2320,6 +2393,8 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
         group_rows = group.to_dict("records")
         aggregated = _aggregate_game_odds_from_market_rows(group_rows, home_name=home_name, away_name=away_name)
 
+        home_tri = _to_tricode_local(home_name)
+        away_tri = _to_tricode_local(away_name)
         rows_out.append(
             {
                 "date": date_str,
@@ -2333,8 +2408,13 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                 "away_spread": aggregated["away_spread"],
                 "total": aggregated["total"],
                 "bookmaker": "oddsapi_consensus",
-                "home_tri": _to_tricode_local(home_name),
-                "away_tri": _to_tricode_local(away_name),
+                "home_tri": home_tri,
+                "away_tri": away_tri,
+                **_sim_projection_fields(home_tri, away_tri),
+                "home_spread_price": aggregated["home_spread_price"],
+                "away_spread_price": aggregated["away_spread_price"],
+                "total_over_price": aggregated["total_over_price"],
+                "total_under_price": aggregated["total_under_price"],
             }
         )
 
@@ -2571,6 +2651,13 @@ def _build_local_live_lens_projections_artifact(*, processed_root: Path, date_st
 
 
 def _build_local_game_recommendations_artifact(*, processed_root: Path, date_str: str) -> tuple[int, Path | None]:
+    # One transform site for margin->probability (same logistic + scales
+    # wnba/cards.py's _source_betting uses for p_home_cover/p_total_over), and
+    # the repo's existing American-odds profit helper -- imported lazily like
+    # the other syndicate.features imports in this script's artifact builders.
+    from syndicate.features.shared.evaluation_settlement import _american_profit
+    from syndicate.features.wnba.cards import _margin_win_prob
+
     game_cards_path = processed_root / f"game_cards_{date_str}.csv"
     if not game_cards_path.exists() or not game_cards_path.is_file() or _count_csv_rows_quick(game_cards_path) <= 0:
         return 0, None
@@ -2578,8 +2665,22 @@ def _build_local_game_recommendations_artifact(*, processed_root: Path, date_str
     if not sim_index:
         return 0, None
 
+    def _side_price(row: dict[str, object], column: str) -> float:
+        price = _float_or_none(row.get(column))
+        if price is not None and price != 0:
+            return price
+        # Placeholder ONLY for a missing per-side quote (older game_cards
+        # CSVs without the 2026-08-02 price columns, or a book that never
+        # quoted this side) -- never preferred over a real price.
+        return -110.0
+
+    def _probability_ev(model_prob: float, price: float) -> float:
+        profit_multiplier = _american_profit(price)
+        if profit_multiplier is None:
+            profit_multiplier = 100.0 / 110.0
+        return model_prob * profit_multiplier - (1.0 - model_prob)
+
     rows: list[dict[str, object]] = []
-    implied_prob = 110.0 / 210.0
     with game_cards_path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         for row in reader:
@@ -2602,10 +2703,24 @@ def _build_local_game_recommendations_artifact(*, processed_root: Path, date_str
             total_line = _float_or_none(row.get("total"))
 
             if market_home_margin is not None:
-                cover_edge = pred_margin - market_home_margin
+                # market_home_margin is the quoted home HANDICAP (home_spread,
+                # negative when home is favored) -- the name and CSV column are
+                # kept for reader compat (_build_local_recommendations_slate_
+                # artifact displays it as the home side's signed line). Home
+                # covers iff actual margin + handicap > 0. The old cover_edge
+                # (pred_margin - handicap) subtracted the handicap instead,
+                # double-counting the spread toward the favorite, and the row's
+                # price/implied_prob/ev were fabricated constants (-110 juice,
+                # ev = points/100) rather than computed -- confirmed in the
+                # 2026-08-02 end-to-end assessment
+                # (docs/reports/syndicate_end_to_end_assessment_2026_08_02.md).
+                cover_edge = pred_margin + market_home_margin
                 pick_home = cover_edge >= 0
+                home_cover_prob = _margin_win_prob(cover_edge, scale=7.5) or 0.5
+                model_prob = home_cover_prob if pick_home else (1.0 - home_cover_prob)
+                price = _side_price(row, "home_spread_price" if pick_home else "away_spread_price")
                 edge_value = abs(cover_edge)
-                ev_value = edge_value / 100.0
+                ev_value = _probability_ev(model_prob, price)
                 rows.append(
                     {
                         "market": "ATS",
@@ -2614,8 +2729,8 @@ def _build_local_game_recommendations_artifact(*, processed_root: Path, date_str
                         "away": away_name,
                         "date": date_str,
                         "ev": round(ev_value, 6),
-                        "price": -110.0,
-                        "implied_prob": round(implied_prob, 6),
+                        "price": price,
+                        "implied_prob": round(_american_price_to_prob(price) or 0.5, 6),
                         "edge": round(edge_value, 6),
                         "line": round(abs(market_home_margin), 6),
                         "pred_margin": round(pred_margin if pick_home else (-pred_margin), 6),
@@ -2627,17 +2742,21 @@ def _build_local_game_recommendations_artifact(*, processed_root: Path, date_str
 
             if total_line is not None:
                 total_edge = pred_total - total_line
-                ev_value = abs(total_edge) / 100.0
+                pick_over = total_edge >= 0
+                total_over_prob = _margin_win_prob(total_edge, scale=10.5) or 0.5
+                model_prob = total_over_prob if pick_over else (1.0 - total_over_prob)
+                price = _side_price(row, "total_over_price" if pick_over else "total_under_price")
+                ev_value = _probability_ev(model_prob, price)
                 rows.append(
                     {
                         "market": "TOTAL",
-                        "side": "Over" if total_edge >= 0 else "Under",
+                        "side": "Over" if pick_over else "Under",
                         "home": home_name,
                         "away": away_name,
                         "date": date_str,
                         "ev": round(ev_value, 6),
-                        "price": -110.0,
-                        "implied_prob": round(implied_prob, 6),
+                        "price": price,
+                        "implied_prob": round(_american_price_to_prob(price) or 0.5, 6),
                         "edge": round(total_edge, 6),
                         "line": round(total_line, 6),
                         "pred_margin": "",
@@ -2770,7 +2889,11 @@ def _build_game_odds_rows_from_snapshot_frame(frame, *, date_str: str):
             "away_ml": None,
             "home_spread": None,
             "away_spread": None,
+            "home_spread_price": None,
+            "away_spread_price": None,
             "total": None,
+            "total_over_price": None,
+            "total_under_price": None,
             "bookmaker": "oddsapi_consensus",
         }
         for column, key in (("event_id", "game_id"), ("commence_time", "commence_time")):
@@ -2782,7 +2905,17 @@ def _build_game_odds_rows_from_snapshot_frame(frame, *, date_str: str):
             aggregated = _aggregate_game_odds_from_market_rows(
                 group.to_dict("records"), home_name=home_text, away_name=away_text
             )
-            for key in ("home_ml", "away_ml", "home_spread", "away_spread", "total"):
+            for key in (
+                "home_ml",
+                "away_ml",
+                "home_spread",
+                "away_spread",
+                "home_spread_price",
+                "away_spread_price",
+                "total",
+                "total_over_price",
+                "total_under_price",
+            ):
                 row_payload[key] = aggregated.get(key)
         rows_out.append(row_payload)
     return pd.DataFrame(rows_out)

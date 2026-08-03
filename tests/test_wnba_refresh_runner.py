@@ -247,6 +247,195 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual([row.get("market") for row in written], ["ATS", "TOTAL"])
         self.assertEqual(written[0].get("side"), "Home Team")
         self.assertEqual(written[1].get("side"), "Under")
+        # No price columns in this (old-format) game_cards CSV: -110 is the
+        # documented placeholder, and ev must still be probability-based
+        # (model cover prob vs the placeholder's payout), never the old
+        # fabricated abs(point_edge)/100.
+        import math
+
+        self.assertEqual(float(written[0].get("price")), -110.0)
+        self.assertAlmostEqual(float(written[0].get("implied_prob")), 110.0 / 210.0, places=5)
+        cover_prob = 1.0 / (1.0 + math.exp(-(10.0 + (-4.5)) / 7.5))
+        expected_ev = cover_prob * round(100.0 / 110.0, 4) - (1.0 - cover_prob)
+        self.assertAlmostEqual(float(written[0].get("ev")), expected_ev, places=5)
+
+    def test_build_local_game_recommendations_artifact_uses_real_prices_and_probability_ev(self) -> None:
+        # 2026-08-02 end-to-end assessment: price/implied_prob were hardcoded
+        # -110 juice and ev was abs(point_edge)/100 -- fabricated, not
+        # computed. With the game_cards price columns present, the row must
+        # carry the picked side's real quote and a standard per-unit
+        # American-odds EV from the sim cover/over probability.
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            processed_root = Path(tmp_dir)
+            date_str = "2026-05-22"
+            (processed_root / f"game_cards_{date_str}.csv").write_text(
+                "date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri,pred_margin,pred_total,home_spread_price,away_spread_price,total_over_price,total_under_price\n"
+                "2026-05-22,1,Chicago Sky,Minnesota Lynx,2026-05-22T23:00:00Z,-140,120,-4.5,4.5,164.5,oddsapi_consensus,CHI,MIN,6.0,166.0,-108,-112,-105,-115\n",
+                encoding="utf-8",
+            )
+            (processed_root / f"smart_sim_{date_str}_CHI_MIN.json").write_text(
+                json.dumps(
+                    {
+                        "date": date_str,
+                        "home": "CHI",
+                        "away": "MIN",
+                        "quarters": [
+                            {"home_pts_mu": 22.0, "away_pts_mu": 20.0},
+                            {"home_pts_mu": 21.0, "away_pts_mu": 19.0},
+                            {"home_pts_mu": 22.0, "away_pts_mu": 20.0},
+                            {"home_pts_mu": 21.0, "away_pts_mu": 21.0},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            rows, out_path = module._build_local_game_recommendations_artifact(processed_root=processed_root, date_str=date_str)
+
+            self.assertEqual(rows, 2)
+            self.assertIsNotNone(out_path)
+            assert out_path is not None
+            with out_path.open("r", encoding="utf-8", newline="") as handle:
+                written = list(csv.DictReader(handle))
+
+        import math
+
+        ats = next(row for row in written if row.get("market") == "ATS")
+        # pred_margin 6.0 vs home handicap -4.5: home covers by 1.5 -> pick
+        # home, at the HOME side's real quote.
+        self.assertEqual(ats.get("side"), "Chicago Sky")
+        self.assertEqual(float(ats.get("price")), -108.0)
+        self.assertAlmostEqual(float(ats.get("implied_prob")), 108.0 / 208.0, places=5)
+        self.assertAlmostEqual(float(ats.get("edge")), 1.5, places=6)
+        cover_prob = 1.0 / (1.0 + math.exp(-1.5 / 7.5))
+        expected_ats_ev = cover_prob * round(100.0 / 108.0, 4) - (1.0 - cover_prob)
+        self.assertAlmostEqual(float(ats.get("ev")), expected_ats_ev, places=5)
+
+        total = next(row for row in written if row.get("market") == "TOTAL")
+        # pred_total 166.0 vs line 164.5 -> Over, at the OVER side's quote.
+        self.assertEqual(total.get("side"), "Over")
+        self.assertEqual(float(total.get("price")), -105.0)
+        self.assertAlmostEqual(float(total.get("implied_prob")), 105.0 / 205.0, places=5)
+        over_prob = 1.0 / (1.0 + math.exp(-1.5 / 10.5))
+        expected_total_ev = over_prob * round(100.0 / 105.0, 4) - (1.0 - over_prob)
+        self.assertAlmostEqual(float(total.get("ev")), expected_total_ev, places=5)
+
+    def test_build_local_game_recommendations_artifact_picks_dog_when_model_margin_misses_handicap(self) -> None:
+        # Sign-convention regression: home_spread is a HANDICAP (-10.5 =
+        # home favored by 10.5). A model margin of +6.0 does NOT cover -10.5
+        # (6.0 + (-10.5) < 0), so the pick must be the away side at the away
+        # quote. The pre-2026-08-02 cover_edge (pred_margin - home_spread)
+        # subtracted the handicap instead and picked the favorite here.
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            processed_root = Path(tmp_dir)
+            date_str = "2026-05-22"
+            (processed_root / f"game_cards_{date_str}.csv").write_text(
+                "date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri,pred_margin,pred_total,home_spread_price,away_spread_price,total_over_price,total_under_price\n"
+                "2026-05-22,1,Chicago Sky,Minnesota Lynx,2026-05-22T23:00:00Z,-450,340,-10.5,10.5,,oddsapi_consensus,CHI,MIN,6.0,166.0,-108,-112,,\n",
+                encoding="utf-8",
+            )
+            (processed_root / f"smart_sim_{date_str}_CHI_MIN.json").write_text(
+                json.dumps(
+                    {
+                        "date": date_str,
+                        "home": "CHI",
+                        "away": "MIN",
+                        "quarters": [
+                            {"home_pts_mu": 22.0, "away_pts_mu": 20.0},
+                            {"home_pts_mu": 21.0, "away_pts_mu": 19.0},
+                            {"home_pts_mu": 22.0, "away_pts_mu": 20.0},
+                            {"home_pts_mu": 21.0, "away_pts_mu": 21.0},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            rows, out_path = module._build_local_game_recommendations_artifact(processed_root=processed_root, date_str=date_str)
+
+            self.assertEqual(rows, 1)
+            self.assertIsNotNone(out_path)
+            assert out_path is not None
+            with out_path.open("r", encoding="utf-8", newline="") as handle:
+                written = list(csv.DictReader(handle))
+
+        import math
+
+        ats = written[0]
+        self.assertEqual(ats.get("market"), "ATS")
+        self.assertEqual(ats.get("side"), "Minnesota Lynx")
+        self.assertEqual(float(ats.get("price")), -112.0)
+        home_cover_prob = 1.0 / (1.0 + math.exp(-(6.0 - 10.5) / 7.5))
+        away_prob = 1.0 - home_cover_prob
+        expected_ev = away_prob * round(100.0 / 112.0, 4) - (1.0 - away_prob)
+        self.assertAlmostEqual(float(ats.get("ev")), expected_ev, places=5)
+
+    def test_build_local_game_cards_artifact_writes_sim_projections_and_side_prices(self) -> None:
+        # 2026-08-02: game_cards must carry the smart-sim means
+        # (pred_margin/pred_total -- probability derivation stays in
+        # wnba/cards.py) and the real per-side spread/total quotes that were
+        # previously read for their point value and thrown away.
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir) / "source"
+            processed_root = source_root / "data" / "processed"
+            raw_root = source_root / "data" / "raw"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            raw_root.mkdir(parents=True, exist_ok=True)
+            date_str = "2026-05-22"
+            (raw_root / f"odds_wnba_current_{date_str}.csv").write_text(
+                "snapshot_ts,event_id,commence_time,bookmaker,bookmaker_title,market,outcome_name,player_name,point,price,last_update,home_team,away_team\n"
+                "2026-05-22T12:00:00Z,401,2026-05-22T23:00:00Z,fanduel,FanDuel,h2h,Chicago Sky,,,-140,2026-05-22T12:00:00Z,Chicago Sky,Minnesota Lynx\n"
+                "2026-05-22T12:00:00Z,401,2026-05-22T23:00:00Z,fanduel,FanDuel,h2h,Minnesota Lynx,,,120,2026-05-22T12:00:00Z,Chicago Sky,Minnesota Lynx\n"
+                "2026-05-22T12:00:00Z,401,2026-05-22T23:00:00Z,fanduel,FanDuel,spreads,Chicago Sky,,-4.5,-108,2026-05-22T12:00:00Z,Chicago Sky,Minnesota Lynx\n"
+                "2026-05-22T12:00:00Z,401,2026-05-22T23:00:00Z,fanduel,FanDuel,spreads,Minnesota Lynx,,4.5,-112,2026-05-22T12:00:00Z,Chicago Sky,Minnesota Lynx\n"
+                "2026-05-22T12:00:00Z,401,2026-05-22T23:00:00Z,fanduel,FanDuel,totals,Over,,164.5,-105,2026-05-22T12:00:00Z,Chicago Sky,Minnesota Lynx\n"
+                "2026-05-22T12:00:00Z,401,2026-05-22T23:00:00Z,fanduel,FanDuel,totals,Under,,164.5,-115,2026-05-22T12:00:00Z,Chicago Sky,Minnesota Lynx\n",
+                encoding="utf-8",
+            )
+            (processed_root / f"smart_sim_{date_str}_CHI_MIN.json").write_text(
+                json.dumps(
+                    {
+                        "date": date_str,
+                        "home": "CHI",
+                        "away": "MIN",
+                        "quarters": [
+                            {"home_pts_mu": 22.0, "away_pts_mu": 20.0},
+                            {"home_pts_mu": 21.0, "away_pts_mu": 19.0},
+                            {"home_pts_mu": 22.0, "away_pts_mu": 20.0},
+                            {"home_pts_mu": 21.0, "away_pts_mu": 21.0},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            rows, out_path = module._build_local_game_cards_artifact(
+                source_root=source_root,
+                processed_root=processed_root,
+                date_str=date_str,
+                log_file=Path(tmp_dir) / "refresh.log",
+            )
+
+            self.assertEqual(rows, 1)
+            self.assertIsNotNone(out_path)
+            assert out_path is not None
+            with out_path.open("r", encoding="utf-8", newline="") as handle:
+                written = list(csv.DictReader(handle))
+
+        self.assertEqual(len(written), 1)
+        row = written[0]
+        self.assertAlmostEqual(float(row.get("pred_margin")), 6.0)
+        self.assertAlmostEqual(float(row.get("pred_total")), 166.0)
+        self.assertAlmostEqual(float(row.get("home_spread_price")), -108.0)
+        self.assertAlmostEqual(float(row.get("away_spread_price")), -112.0)
+        self.assertAlmostEqual(float(row.get("total_over_price")), -105.0)
+        self.assertAlmostEqual(float(row.get("total_under_price")), -115.0)
 
     def test_seed_game_odds_writes_consensus_prices_from_snapshot(self) -> None:
         # Regression: the seeder wrote a bare matchup skeleton (no prices)
