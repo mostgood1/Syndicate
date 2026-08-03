@@ -777,6 +777,105 @@ def keyvalue_sweep_preview(*, stale_after_days: int = 2) -> dict[str, Any] | Non
         return {"ok": False, "error": str(exc)}
 
 
+_KEYVALUE_USAGE_DATE_TOKEN = re.compile(r"^\d{4}[-_]?\d{2}[-_]?\d{2}")
+
+
+def _keyvalue_usage_bucket(key: str) -> str:
+    """Group a namespaced key into a reportable bucket.
+
+    Keys are mostly filesystem-shaped
+    (`syndicate:refresh-state:/opt/.../data/reports/<area>/<date>/<file>`),
+    so the useful grouping is the first couple of path segments with date
+    and run-stamp segments collapsed -- otherwise every run stamps its own
+    bucket and the report is as unreadable as the raw key list.
+    """
+    text = str(key or "")
+    marker = "/data/"
+    if marker in text:
+        text = text.split(marker, 1)[1]
+    elif ":" in text:
+        text = text.rsplit(":", 1)[1]
+    segments = [segment for segment in text.split("/") if segment]
+    bucket: list[str] = []
+    for segment in segments:
+        if _KEYVALUE_USAGE_DATE_TOKEN.match(segment):
+            bucket.append("<date>")
+        elif len(bucket) >= 2:
+            break
+        else:
+            bucket.append(segment)
+        if len(bucket) >= 3:
+            break
+    return "/".join(bucket) if bucket else "(unbucketed)"
+
+
+def keyvalue_usage_by_prefix(*, top_keys: int = 15, max_keys: int = 20000) -> dict[str, Any] | None:
+    """Read-only estimated memory usage grouped by key bucket, plus the
+    single largest keys.
+
+    Added 2026-08-03: the keyvalue instance was sitting at 230MB of a 256MB
+    ceiling with `allkeys-lru` and 37k keys already evicted, and the
+    existing sweep-preview only ever accounted for *stale, TTL-less* keys
+    (183KB of that 230MB). There was no way to see which live payloads
+    actually held the memory, and upgrading the instance is not an option --
+    so the reduction work needed a measurement first.
+    """
+    if _state_backend_kind() != "keyvalue":
+        return None
+
+    def _scan(client):
+        keys = _keyvalue_scan_namespace_keys(client)
+        truncated = len(keys) > max_keys
+        scanned = keys[:max_keys]
+        buckets: dict[str, dict[str, int]] = {}
+        largest: list[tuple[int, str]] = []
+        total_bytes = 0
+        unsized = 0
+        for key in scanned:
+            try:
+                size = client.memory_usage(key) or 0
+            except Exception:
+                size = 0
+                unsized += 1
+            total_bytes += size
+            bucket_key = _keyvalue_usage_bucket(key)
+            bucket = buckets.setdefault(bucket_key, {"key_count": 0, "bytes": 0})
+            bucket["key_count"] += 1
+            bucket["bytes"] += size
+            largest.append((size, key))
+        largest.sort(key=lambda item: item[0], reverse=True)
+        ranked = sorted(
+            (
+                {
+                    "bucket": name,
+                    "key_count": stats["key_count"],
+                    "bytes": stats["bytes"],
+                    "mb": round(stats["bytes"] / (1024 * 1024), 2),
+                }
+                for name, stats in buckets.items()
+            ),
+            key=lambda item: item["bytes"],
+            reverse=True,
+        )
+        return {
+            "keys_scanned": len(scanned),
+            "keys_truncated": truncated,
+            "keys_without_size": unsized,
+            "total_estimated_bytes": total_bytes,
+            "total_estimated_mb": round(total_bytes / (1024 * 1024), 2),
+            "buckets": ranked,
+            "largest_keys": [
+                {"key": key, "bytes": size, "mb": round(size / (1024 * 1024), 3)}
+                for size, key in largest[: max(0, top_keys)]
+            ],
+        }
+
+    try:
+        return {"ok": True, **_execute_keyvalue_operation(_scan)}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
 def keyvalue_sweep_apply(*, stale_after_days: int = 2, grace_period_seconds: int = 3600) -> dict[str, Any] | None:
     # Sets a short grace-period EXPIRE (default 1 hour) rather than
     # deleting outright -- any reader mid-flight against a stale key still

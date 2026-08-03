@@ -304,6 +304,27 @@ def api_ops_keyvalue_sweep_preview() -> Any:
     return jsonify(preview)
 
 
+@ops_bp.get("/api/ops/keyvalue/usage")
+def api_ops_keyvalue_usage() -> Any:
+    # Read-only. Estimated memory grouped by key bucket, plus the largest
+    # individual keys. Added 2026-08-03 because the instance was at 230MB of
+    # a 256MB ceiling with allkeys-lru already evicting, and sweep-preview
+    # only accounts for stale TTL-less keys (183KB of that 230MB) -- it
+    # could not say what actually held the memory. Upgrading the instance
+    # is not an option, so reduction work needs this measurement first.
+    from syndicate.features.shared.refresh_state_store import keyvalue_usage_by_prefix
+
+    raw_top = str(request.args.get("top_keys") or "").strip()
+    try:
+        top_keys = int(raw_top) if raw_top else 15
+    except ValueError:
+        top_keys = 15
+    usage = keyvalue_usage_by_prefix(top_keys=max(0, min(100, top_keys)))
+    if usage is None:
+        return jsonify({"ok": False, "error": "SYNDICATE_REFRESH_STATE_BACKEND is not keyvalue on this service."})
+    return jsonify(usage)
+
+
 @ops_bp.post("/api/ops/keyvalue/sweep")
 def api_ops_keyvalue_sweep() -> Any:
     # Board audit follow-up, 2026-07-31: mutating -- sets a short
