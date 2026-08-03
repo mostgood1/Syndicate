@@ -4,7 +4,7 @@
 {% block page_title %}NFL Hub{% endblock %}
 
 {% block content %}
-  {% with route_label='/nfl', title='NFL now has cards, game drill-ins, picks, a live-lens monitor, an archive lane, and a betting-card lane in Syndicate', status='Active migration', body='Syndicate now exposes an NFL cards board lifted from the source app\'s `/api/cards` payload, plus per-game drill-ins on the same shared board contract, a read-only weekly live-lens monitor, a weekly daily-archive lane, the earlier weekly picks board, and a season betting-card companion backed by the same stored weekly snapshots.', action_href='/nfl/cards?season=' ~ season ~ '&week=' ~ launch_week, action_label='Open NFL cards' %}
+  {% with route_label='/nfl', title='NFL now has cards, game drill-ins, picks, a live-lens monitor, an archive lane, and a betting-card lane in Syndicate', status='Active migration', body='Syndicate now exposes an NFL cards board built from Syndicate-owned NFL artifacts, plus per-game drill-ins on the same shared board contract, a read-only weekly live-lens monitor, a weekly daily-archive lane, the earlier weekly picks board, and a season betting-card companion backed by the same stored weekly snapshots.', action_href='/nfl/cards?season=' ~ season ~ '&week=' ~ launch_week, action_label='Open NFL cards' %}
     {% include 'shared/_module_intro.html' %}
   {% endwith %}
 
@@ -13,7 +13,7 @@
   {% endwith %}
 
   {% if current_week %}
-    {% with eyebrow='Tracked current week', title='Source app currently points at ' ~ current_week.season ~ ' Week ' ~ current_week.week, body='The latest tracked source week can be ahead of the stored snapshots; the first Syndicate module navigates the weeks that actually have persisted recommendation files.' %}
+    {% with eyebrow='Tracked current week', title='Tracked week is ' ~ current_week.season ~ ' Week ' ~ current_week.week, body='The latest tracked source week can be ahead of the stored snapshots; the first Syndicate module navigates the weeks that actually have persisted recommendation files.' %}
       {% include 'shared/_content_panel.html' %}
     {% endwith %}
   {% endif %}
@@ -31,7 +31,7 @@
       <article class="sport-card">
         <div class="section-label">{{ week.season }} Week {{ week.week }}</div>
         <h3>Cards board</h3>
-        <p>Open the first shared NFL cards board for this week using the source app\'s `/api/cards` output.</p>
+        <p>Open the shared NFL cards board for this week's slate.</p>
         <div class="action-row">
           <a class="cards-nav-pill" href="/nfl/cards?season={{ week.season }}&week={{ week.week }}">Launch week {{ week.week }} cards</a>
         </div>
