@@ -5086,27 +5086,44 @@ class _NCAAFDataProvider(_HomeSportDataProviderBase):
 
 class _SoccerDataProvider(_HomeSportDataProviderBase):
     """Soccer is week-keyed per league (like NFL/NCAAF), not date-keyed like
-    mlb/nba/nhl/wnba/ncaab, and tracks several leagues at once. This
-    provider resolves ONE active league per call (preferring MLS -- the
-    league with real current data as of this migration -- then whichever
-    calendar-active league comes first, see _resolve_league) rather than
-    fanning games/props out across every league. That's a deliberate,
-    smaller fix: it's what makes soccer reachable through the same
-    dispatch every other sport uses at all (closing the "soccer missing
-    from three separate dispatch points" bug), not a genuine multi-league
-    board -- surfacing more than one league at once is a separate, larger
-    change than this migration's scope."""
+    mlb/nba/nhl/wnba/ncaab, and tracks several leagues at once. games() and
+    pregame_props() fan out across EVERY calendar-active league (each with
+    its own season/week resolution) -- the earlier single-league resolution
+    ("resolve ONE active league per call, preferring MLS") was a deliberate
+    migration shortcut, but from 2026-08-14 the European leagues come back
+    and five leagues can be live on the same Saturday; a one-league
+    provider would silently drop the other four from the Layer 2 board
+    (flagged as the highest-severity international-launch gap in the
+    2026-08-02 end-to-end assessment). The steam and live-lens paths
+    already fan out across active_leagues_for_date; this brings the
+    pregame games/props path in line. SportContext still carries a single
+    primary league (MLS first, else first active) for labels/links only."""
 
     slug = "soccer"
 
-    def _resolve_league(self, requested_date: str) -> str:
+    def _active_leagues(self, requested_date: str) -> list[str]:
         from syndicate.features.soccer.sources import DEFAULT_LEAGUE
         from syndicate.features.soccer.sources import active_leagues_for_date
 
-        active = active_leagues_for_date(requested_date or central_today_iso())
+        active = [str(league).strip() for league in active_leagues_for_date(requested_date or central_today_iso()) if str(league).strip()]
+        if not active:
+            return [DEFAULT_LEAGUE]
         if "mls" in active:
-            return "mls"
-        return active[0] if active else DEFAULT_LEAGUE
+            active.remove("mls")
+            active.insert(0, "mls")
+        return active
+
+    def _resolve_league(self, requested_date: str) -> str:
+        return self._active_leagues(requested_date)[0]
+
+    def _league_season_week(self, league: str, context: SportContext, today: str) -> tuple[int, int]:
+        from syndicate.features.soccer.sources import default_season
+        from syndicate.features.soccer.sources import default_week
+
+        if league == context.league:
+            return int(context.season), int(context.week)
+        season = default_season(league)
+        return int(season), int(default_week(league, season, reference_date=today))
 
     def resolve_context(self, *, requested_date: str | None = None, season: int | None = None, week: int | None = None) -> SportContext:
         from syndicate.features.soccer.sources import default_season
@@ -5133,32 +5150,58 @@ class _SoccerDataProvider(_HomeSportDataProviderBase):
     def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
         from syndicate.features.soccer.cards import build_cards_page_context
 
-        payload = build_cards_page_context(context.league, context.week, context.season)
-        return list(payload.get("games") or [])
+        today = central_today_iso()
+        games: list[dict[str, Any]] = []
+        for league in self._active_leagues(today):
+            # One broken league (missing schedule artifact, bad season roll)
+            # must not empty the whole sport -- each league is best-effort.
+            try:
+                season, week = self._league_season_week(league, context, today)
+                payload = build_cards_page_context(league, week, season)
+            except Exception as exc:
+                print(f"[home] SOCCER_LEAGUE_GAMES_FAILED league={league} error={exc}", flush=True)
+                continue
+            for game in payload.get("games") or []:
+                if isinstance(game, dict):
+                    game.setdefault("league", league)
+                    games.append(game)
+        return games
 
     def pregame_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
         from syndicate.features.soccer.props import build_props_page_context
 
-        payload = build_props_page_context(context.league, context.week, context.season)
-        cards = list(payload.get("rank_cards") or [])
-        if not cards:
+        today = central_today_iso()
+        rows: list[dict[str, Any]] = []
+        for league in self._active_leagues(today):
+            try:
+                season, week = self._league_season_week(league, context, today)
+                payload = build_props_page_context(league, week, season)
+            except Exception as exc:
+                print(f"[home] SOCCER_LEAGUE_PROPS_FAILED league={league} error={exc}", flush=True)
+                continue
+            cards = list(payload.get("rank_cards") or [])
+            if not cards:
+                continue
+            league_rows = _prop_rows_from_rank_cards(
+                cards,
+                sport_slug="soccer",
+                fallback_href=f"/soccer/{league}/props?week={week}&season={season}",
+            )
+            # _prop_rows_from_rank_cards never skips a valid dict card (see
+            # _prop_item_from_rank_card), so this zip is a true 1:1, order-
+            # preserved pairing even when the [:limit] truncation below it
+            # kicks in -- see props.py's _prop_rank_card for why match_id is
+            # needed at all (soccer's rank-card "meta" carries no away/home
+            # matchup text for the usual team-label match to key off of).
+            for card, row in zip(cards, league_rows):
+                match_id = str(card.get("match_id") or "").strip()
+                if match_id:
+                    row.setdefault("game_id", match_id)
+                    row.setdefault("gamePk", match_id)
+                row.setdefault("league", league)
+            rows.extend(league_rows)
+        if not rows:
             return _compact_prop_rows(home_games)
-        rows = _prop_rows_from_rank_cards(
-            cards,
-            sport_slug="soccer",
-            fallback_href=f"/soccer/{context.league}/props?week={context.week}&season={context.season}",
-        )
-        # _prop_rows_from_rank_cards never skips a valid dict card (see
-        # _prop_item_from_rank_card), so this zip is a true 1:1, order-
-        # preserved pairing even when the [:limit] truncation below it
-        # kicks in -- see props.py's _prop_rank_card for why match_id is
-        # needed at all (soccer's rank-card "meta" carries no away/home
-        # matchup text for the usual team-label match to key off of).
-        for card, row in zip(cards, rows):
-            match_id = str(card.get("match_id") or "").strip()
-            if match_id:
-                row.setdefault("game_id", match_id)
-                row.setdefault("gamePk", match_id)
         return rows
 
     def live_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
