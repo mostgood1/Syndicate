@@ -7,8 +7,12 @@ list in session-local task tools without reconciling it back here.
 Last reconciled: 2026-08-03 (see "Reconciliation 2026-08-03 (Settlement
 item 3b root-caused: canonical board-state path never writes the
 evaluation ledger)" immediately below -- picked up HANDOFF 2026-08-03 #2's
-top-priority open item and found the real cause, not just confirmed the
-symptom).
+top-priority open item, found the real cause (corrected once already
+mid-session -- read that entry's own "Root cause" section before trusting
+its first paragraph), and shipped+deployed a fix. **Not yet confirmed
+working end to end** -- an MLB sim's deferral window blocked verification
+before the session ended; see that entry's last section for the exact
+recheck to run first).
 Before that: "HANDOFF 2026-08-03 #2 -- START HERE"
 (session ended on context, four Phase 3 items + Phase 1 football
 readiness + a hygiene pass all shipped and deployed this round; a real,
@@ -144,52 +148,83 @@ after). Result for **both** mlb and wnba, for both 2026-08-02 and
 either date. This is not a settlement-matching problem -- there is
 nothing to settle.
 
-**Root cause, confirmed by reading the actual code paths (not guessed):**
-Production has `SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE=1` set on
-refresh-worker. The canonical path
-(`pipeline/intelligence_state.py:3719`'s `_build_intelligence_board_state`,
-queued via the `_watched_board_dates` registry) is what actually serves
-the live board today (confirmed live recommendations via
-`/api/intelligence/status` while this was checked) -- and it **never
-calls `record_prediction`/`record_recommendation`/
-`build_intelligence_evaluation_bundle`** anywhere in that file. Those
-three only get called from the OLDER per-query-payload path
-(`syndicate/features/intelligence.py:9865`'s `run_intelligence_query`,
-reached via `pipeline/intelligence_pipeline.py` and the separate
-`_watched_payloads`/`_pending_keys` queue in the same background service)
--- which appears to be unused/empty in production now that routes read
-canonical snapshots (`read_latest_intelligence_board_snapshot_response`
-etc.) instead of calling `run_intelligence_query` directly. So the
-write side of the whole evaluation feedback loop has been silently
-disconnected since canonical-board-state shipped, not since the
-settlement autorun flag flipped -- extending `_SUPPORTED_SPORTS` to more
-sports right now would still settle nothing, because there is nothing
-being recorded for ANY sport, mlb/wnba included.
+**Root cause, confirmed by reading the actual code paths -- CORRECTED
+once already, record the correction so the next reader doesn't repeat
+it:** The first pass through this investigation checked that
+`SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE` was a *configured key* on
+refresh-worker and wrongly assumed that meant it was `true`. Its actual
+value is **`false`** -- canonical board state is OFF in production.
+`_build_intelligence_board_state`/`_drain_one_watched_board_date` (the
+canonical path) genuinely never called `record_prediction`/
+`record_recommendation` either, but that path doesn't run at all right
+now, so that alone couldn't be the live cause. The path **actually**
+serving production is `_background_loop`'s legacy `_pending_keys` drain,
+which calls `_compute_board_publication_response` -- and that function
+*also* never touched the evaluation ledger. Deeper still:
+`_compute_response` is the ONLY method in `pipeline/intelligence_state.py`
+that reaches `run_routed_intelligence_pipeline` -> `run_intelligence_pipeline`
+-> `syndicate/features/intelligence.py`'s `run_intelligence_query` ->
+`build_intelligence_evaluation_bundle` (the actual ledger-writing chain),
+and its module-level wrapper `compute_intelligence_state_response` has
+**zero callers anywhere in the codebase** -- confirmed via a plain grep,
+not inference. So the original conclusion ("nothing is recording
+in production") was right, but the mechanism was wrong: it isn't that
+canonical bypasses recording while legacy doesn't -- neither of the two
+paths that actually run ever called it; only a third, completely
+uncalled method does.
 
-**Downstream consequence, not yet quantified:** `build_reliability_profile`
-(read directly from the ledger by `adjust_confidence`/
-`recommendation_engine.filter_candidates`/`.rank_candidates` -- NOT via
-`performance_summary.json`, which is a separate, likely-dead manual/CLI
-artifact nothing auto-regenerates either) has had an empty ledger to
-work with in production this whole time. Reliability multipliers,
-dynamic thresholds, and policy promotion have been silently operating on
-zero history and presumably falling back to whatever their no-data
-defaults are -- worth confirming what those defaults actually do before
-assuming this is merely "a metric that's always 0."
+**Fixed (both commits deployed to refresh-worker, in this order):**
+- `51729219` -- exposes `source_fingerprint` on
+  `_compute_board_publication_response`'s returned dict (mirroring what
+  `_build_intelligence_board_state` already did), and calls
+  `maybe_record_board_state_to_evaluation_ledger` from **both**
+  `_background_loop` call sites: the legacy `_pending_keys` drain (the
+  one actually live) and the canonical `_drain_one_watched_board_date`
+  drain (dormant until the flag flips, fixed anyway since it was already
+  broken the same way and costs nothing extra). The shared function
+  reads `state["ranked_all"]` (canonical) or
+  `state["recommendations"]`/`["top_opportunities"]` (legacy) so one
+  implementation covers both response shapes.
+- `0f14ba74` -- the original (canonical-only) version of the same fix,
+  superseded in scope but not reverted; `51729219` builds on it.
+- Gated behind `SYNDICATE_INTELLIGENCE_LEDGER_RECORDING_ENABLED`
+  (dark-launched like `SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE`
+  itself was), flipped to `true` on refresh-worker and deployed. Gated on
+  `source_fingerprint` rather than called unconditionally, since
+  `record_prediction`/`record_recommendation` mint their ledger identity
+  from a content hash of the full recommendation payload (incl. live
+  odds/edge/probability) -- recording every rebuild cycle would mint a
+  "new" pending row almost every time from ordinary price drift alone,
+  not a real change in what was recommended.
+- Read-only verification surfaced through `/api/ops/evaluation-settlement/status`
+  (`d9922674`): `board_state_ledger_recorded_fingerprints`, a per-date map
+  that only gets a date's fingerprint written AFTER
+  `build_intelligence_evaluation_bundle` returns without raising --
+  direct proof of a real write, not just that a rebuild cycle ran, and
+  readable from the web service (keyvalue-backed) without needing
+  refresh-worker disk access or another interval-override deploy dance.
 
-**Next step for whoever picks this up:** decide where inside
-`_build_intelligence_board_state`/its callers to record a
-prediction+recommendation per real board-state rebuild, with a real
-answer to the obvious follow-up question -- the canonical path rebuilds
-on every refresh cycle (tens of times a day), so recording unconditionally
-would flood the ledger with near-duplicate rows for the same
-still-standing recommendation. Needs a "record only when the
-recommendation set actually changed" guard, in the same spirit as the
-fingerprint-diffing already used elsewhere in this file
-(`_source_fingerprints`) -- don't build this from scratch without
-checking whether that existing machinery can be reused directly.
-Re-verify with `/api/ops/evaluation-settlement/status` afterward; no new
-diagnostic tooling should be needed, it's already deployed and live.
+**Verification status: NOT YET CONFIRMED WORKING END TO END.** As of
+this session ending, `board_state_ledger_recorded_fingerprints` was
+still `{}` after the fix reached production (checked directly, several
+minutes apart) -- refresh-worker had an MLB tip-off-window sim running
+essentially continuously through the check window, and
+`_board_build_deferral_reason` defers the ENTIRE pending-keys drain
+(both legacy and canonical) while a sim subprocess is resident (see
+`_background_loop`'s `deferral_reason == "sim_subprocess_resident"`
+branch) -- so an empty fingerprint map at that moment doesn't
+necessarily mean the fix is broken, it may just mean the loop hadn't
+gotten an undeferred iteration yet. **First step for whoever picks this
+up:** re-check `/api/ops/evaluation-settlement/status`'s
+`board_state_ledger_recorded_fingerprints` for today's date during a
+quieter window (no resident sim). If still empty with no
+`BOARD_STATE_LEDGER_RECORD_FAILED` prints in refresh-worker's logs
+(`GET api.render.com/v1/logs?ownerId=<owner>&resource=<refresh-worker
+service id>&text=BOARD_STATE_LEDGER`, `ownerId` from
+`GET /v1/services/<id>`), the deferral explanation holds and it just
+needs more real time. If `BOARD_STATE_LEDGER_RECORD_FAILED` appears,
+that's the next bug to chase, and the printed error message is the
+starting point, not a guess.
 
 ---
 
