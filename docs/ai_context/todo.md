@@ -65,6 +65,48 @@ full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
 
+### OPEN 2026-08-03 -- Soccer/MLS is excluded from the Layer 2 board (SYNDICATE_ACTIVE_SPORTS unset)
+
+User reported the board "feels low" on candidates. Chased it against prod.
+
+**Board is not as low as it looked, but soccer is missing entirely.**
+At 2026-08-03T22:41Z: `candidate_count: 60` (mlb 58, wnba 2, unpriced 0).
+The count swings hard through the day as sims land -- observed 4, 12, 29,
+then 60 within one day -- so a single low reading is usually a mid-build
+snapshot, not a fault. Worth saying in the UI, since it reads as breakage.
+
+**Root cause of the missing sport, confirmed:** `SYNDICATE_ACTIVE_SPORTS`
+is **unset on all three Render services** (checked via the env-vars API on
+`srv-d88ahvrbc2fs73eodu30`, `srv-d91dpertqb8s73co8ls0`,
+`srv-d91dpertqb8s73co8lt0`). So the code default applies:
+
+    syndicate/app.py:274          ["mlb", "wnba"]
+    syndicate/blueprints/home.py:521-523   same default, env-overridable
+
+`_active_sport_slugs()` filters on this BEFORE candidate collection, so
+soccer never reaches the board no matter how healthy its artifacts are.
+MLS is in-season right now. This also means the soccer multi-league
+fan-out shipped in `770d382f` is currently unreachable in production --
+it fixed one-league-at-a-time collection for a sport the board never asks
+about.
+
+**Fix:** set `SYNDICATE_ACTIVE_SPORTS=mlb,wnba,soccer` on all three
+services, then deploy (env changes need a deploy to take effect --
+[[project-render-env-needs-deploy]]). Verify after with
+`/api/intelligence/status` showing a `by_sport.soccer` bucket.
+
+**This is also the season-opener footgun.** NCAAF starts ~Aug 29 and NFL
+~Sep 10. Neither will appear on the board on opening day unless this var
+is updated first, regardless of how ready their pipelines are. The NFL/
+NCAAF readiness work already shipped this week does NOT cover it. Add
+soccer now and football before their openers.
+
+**Secondary, not yet chased:** WNBA contributed only 2 candidates against
+MLB's 58 on a night both had slates. Given WNBA has no artifact-direct
+prop-candidate builder (single `home_rails` path, the known
+single-point-of-failure that has now broken three separate times), 2 is
+worth a candidate-trace before assuming it is just slate size.
+
 ### OPEN 2026-08-03 -- Ask "top opportunities" is showing mostly NEGATIVE edges
 
 Found while verifying the Ask routing fix (`addec418`) against production.
