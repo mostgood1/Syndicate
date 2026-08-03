@@ -47,16 +47,26 @@ files throughout.
 
 ### HANDOFF 2026-08-03 -- START HERE (session ended on context, work is mid-flight)
 
-**1. Three commits are pushed but NOT deployed.** Live is `c35243dd`.
+**1. Four commits are pushed but NOT deployed.** Live is `c35243dd`.
 Undeployed: `0b439cb0` (filter disclosure), `ce9233c3` (mobile rails),
-`e4b6a7de` (hub fixes). All three are UI-only and pair naturally --
-deploy them together.
+`e4b6a7de` (hub fixes), `9a4ab02d` (watchlist + alerts, added
+2026-08-03 continuation session). All four are UI-only and pair
+naturally -- deploy them together.
 
 Before ANY deploy run `python scripts/check_deploy_safety.py` (new,
 `9e107f3d`). Exit 0 clear / 1 in flight / 2 could-not-determine. Do NOT
 fall back to eyeballing `sim_run_status` -- that only covers the MLB sim
 and a deploy made under it killed an in-flight odds-refresh run this
 session.
+
+Deploy was blocked for 35+ minutes straight in the 2026-08-03
+continuation session by an odds-refresh run (`run_stamp=20260803_042750`,
+lane=live-odds-worker, WNBA pregame full mode). A second, later refresh
+attempt (`20260803_043110`, mlb/wnba/nfl/soccer) started at 04:31 and
+failed in ~2 minutes (`returnCode: 1`) while the first was still
+reported running -- read as a scheduler retry bouncing off the
+still-in-flight job, not as evidence the safety check was reading stale
+state. Did not deploy through it; kept polling instead.
 
 **2. Highest-value next action is verification, not features.**
 `python scripts/verify_recent_shipped_work.py` currently reports 4 PASS /
@@ -83,9 +93,21 @@ several at once -- see the process note below):
   is untouched. All 8 hubs are still developer-facing migration-status
   pages ("Active migration", "In progress", route lists) where a bettor
   wants today's slate count, top 3 edges, and a live-now strip.
-- **Watchlist + alerts.** Nothing exists -- no Notification API, no
-  service worker, no watchlist anywhere. Steam data already flows as
-  `candidate_type === "steam"`, so the trigger side is ready.
+- ~~**Watchlist + alerts.**~~ **Done, `9a4ab02d`** (2026-08-03
+  continuation session). `syndicate/static/shared/watchlist.js` (new),
+  same `bet_slip.js` extraction pattern -- localStorage
+  `syndicate_watchlist_v1`, keyed off the existing `data-syndicate-*`
+  attrs (no new markup fields needed). Foreground Notification API only,
+  no service worker/push infra; opt-in via a click-gated permission
+  request. Fires once per distinct steam-movement signature (timestamp +
+  line/price delta), checked against the full date-filtered board on
+  every render so a watched pick alerts even while a different filter
+  hides it. Verified live: toggle persists across reload and a
+  Cards<->Blotter view switch, panel renders correctly, removal clears
+  storage; alert firing/dedupe/non-steam-suppression verified with a
+  mocked `Notification` constructor (real steam data wasn't available
+  locally to exercise it end-to-end -- same caveat as the sigma models
+  in section 3).
 - **Portfolio live pulse.** `templates/portfolio.html` has zero JS.
   `/api/portfolio/summary` already exists.
 - **Card client unification.** `nba/cards_source.js` (6,562) and
