@@ -343,6 +343,101 @@ the season clock:
   backfill run needs production's real 2025 data, not something to fake
   locally. Deployed (`dep-d9obl5ijnfac73dfeo2g`).
 
+**Addendum -- Ask-the-Syndicate board embed built, `73818816`, deployed
+(`dep-d9obrubm8hqs73fvqba0`).** Phase 3 item 9. Research found this was
+more tractable than it sounded: `/api/syndicate/query` already returns
+JSON (CORS/OPTIONS handled), already reads the exact same board state
+`/intelligence` reads (the roadmap's claimed parity already held), and
+every board card already carries the `data-syndicate-*` context
+attributes the standalone `/syndicate` page's own `getPageContext()`
+pulls from URL params instead. New `syndicate/static/shared/ask_bar.js`
+(same `bet_slip.js`/`watchlist.js` extraction pattern): persistent panel
+in the board's aside rail, question input, a "Today's briefing" preset,
+a "☰ Ask" button per card/row pre-filling a default question from the
+card's context, and a localStorage-backed scrollback transcript.
+**Deliberately not built:** server-side conversational memory (passing
+prior turns into the Claude call) -- would multiply this feature's
+per-question token cost, a real ongoing-cost decision needing a
+deliberate call, same category as the football odds-cadence/autorun
+question flagged earlier. The transcript is a real UI scrollback; each
+question is still answered independently. Verified end to end against
+the real endpoint: "Ask about this pick" fires the right question +
+context, panel renders and gracefully shows "No structured answer came
+back" (no local LLM key -- proves the degrade path, not a bug); preset
+briefing and a typed question both round-tripped (3 real 200s);
+newest-first order, localStorage, and collapse state all survived a
+full reload; no console errors.
+
+**Addendum -- Shell consolidation, partial, `54a6b7ef`, deployed
+(`dep-d9oc41jncjis73bo8bs0`).** Phase 3 item 10. Researched the full
+scope before touching anything, since "migrate standalone templates to
+base" is a real behavior-affecting change per this repo's own rules (no
+refactor removes a compatibility path until proven equivalent). Of 83
+templates, 24 already extend `shared/base.html`; of the other 59, 21 are
+`shared/_*.html` partials (not routed pages, out of scope) and 1 is
+`base.html` itself, leaving **37 real routed-page candidates**:
+- **35 share one consistent "standalone shell" pattern** (own
+  `<html>/<head>`, `standalone_shell.css` + a per-sport CSS file,
+  `{% include 'shared/_standalone_app_header.html' %}` for nav, same
+  `cards-shell`/`cards-header`/`cards-nav-pill` CSS vocabulary base.html
+  already uses) -- every `betting_card.html` (mlb/nba/nhl/wnba),
+  `picks.html`, `archive.html`, `market_accuracy.html`,
+  `live_lens_daily_accuracy.html`, `live_game_accuracy.html`,
+  `live_prop_accuracy.html`, `live_prop_audit.html`,
+  `reconciliation.html`/`player_props_reconciliation.html`,
+  `mlb/cards.html`, `mlb/daily_top_props.html`, `nba/features.html`,
+  `nhl/props_lines.html`, `intelligence/opportunity_board.html`, and the
+  thin `nba/cards_source.html`/`wnba/cards_source.html` bootstrap shells.
+  A prior research pass read `mlb/betting_card.html` in full and called
+  migrating it "a wrapper swap... no unusual restructuring" -- genuinely
+  the safest, most mechanical batch, but still 35 individual
+  before/after verifications, not something to rush through blindly.
+- **2 need individual, non-mechanical handling**: `mlb/cards_embed.html`
+  is a deliberate headerless iframe-embed variant (postMessage height
+  sync) that must NOT gain base.html's chrome -- exclude it entirely.
+  `nhl/cards_source.html` is 7,434 lines (~5,000 inline `<script>`,
+  ~2,260 inline `<style>`) doing the same job its NBA/WNBA siblings do
+  in a fraction of the size -- migrating the shell is easy, but doing it
+  *safely* means understanding/extracting that inline code first, real
+  restructuring work, not a wrapper swap. Its own dedicated pass.
+
+**What shipped instead, all four complete and verified on their own:**
+1. PWA manifest + theme-color (both confirmed fully unbuilt) --
+   `syndicate/static/shared/manifest.json` + `<link
+   rel="manifest">`/`<meta name="theme-color">` in `base.html`. Icon
+   uses the real logo at its real 815x193 size (`sizes="any"`) -- it's a
+   wide lockup, not square, so won't look polished as a home-screen
+   icon, but that's honest about the asset that exists rather than
+   fabricating square dimensions.
+2. Nav active-state highlighting in `base.html` -- ported (not rebuilt)
+   the exact logic `_standalone_app_header.html` already has, purely
+   `request.path`-based so no route anywhere needed a context change;
+   reuses the already-styled-but-previously-orphaned
+   `.cards-nav-pill--active` CSS class.
+3. Uniform `asset_version` -- new
+   `syndicate/features/shared/asset_version.py`
+   (`cards_source_asset_version(*relative_paths)`) replaces the
+   byte-identical mtime-hashing mechanics duplicated across
+   mlb.py/nba.py/nhl.py; each keeps a thin local wrapper with its own
+   file list (genuinely sport-specific, not merged), so no call site
+   elsewhere in those files changed. 4 new tests.
+4. Retired `syndicate/templates/home.html` -- confirmed dead (`/`
+   explicitly delegates to `intelligence_home()` per an inline comment
+   in `home.py`; zero `render_template("home.html")` callers anywhere).
+   Did not touch the still-load-bearing builders behind `/api/home`.
+
+Verified in the browser (manifest 200/valid JSON, theme-color present,
+"MLB"/"Portfolio"/"Home" each correctly highlighted on their own page,
+no console errors) and against the full archive suite (same 383 tests,
+same 4 pre-existing order-dependent WNBA failures, zero new failures).
+
+**Remaining, NOT attempted: the 35+2 template migration above.** The
+categorization and per-template notes here should let a future session
+execute the 35-template batch mechanically without re-researching --
+budget individual verification per template, don't batch-commit them
+unverified. Handle `cards_embed.html` and `nhl/cards_source.html`
+separately from that batch, each on its own terms.
+
 ### HANDOFF 2026-08-03 (superseded -- all items below are now shipped and deployed, see the reconciliation above; kept as historical record)
 
 **1. RESOLVED -- deployed, twice.** First batch: `0b439cb0` filter
