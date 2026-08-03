@@ -1550,6 +1550,29 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertTrue(response["state_last_updated"])
         self.assertEqual(response["state_last_updated"], response["snapshot_generated_at"])
 
+    def test_board_publication_response_includes_source_fingerprint(self) -> None:
+        # maybe_record_board_state_to_evaluation_ledger's legacy call site
+        # (_background_loop's pending_keys drain) reads source_fingerprint
+        # straight off this response instead of recomputing it -- must be
+        # present, and must reflect a rollover's substituted date/fingerprint
+        # if one fires (covered by the rollover-specific tests elsewhere in
+        # this file), not the originally-requested one.
+        service = IntelligenceStateService()
+        candidate_pool = {
+            "selected_date": "2026-06-15",
+            "source_fingerprint": "fingerprint-1",
+            "candidate_count": 1,
+            "candidate_pools": {},
+            "global_pool": [{"name": "Play A", "sport_slug": "mlb", "market": "Hits", "score": 6.2}],
+            "candidates": [{"name": "Play A", "sport_slug": "mlb", "market": "Hits", "score": 6.2}],
+        }
+
+        with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-1"):
+            with patch.object(service, "_build_candidate_pool", return_value=dict(candidate_pool)):
+                response = service._compute_board_publication_response({"question": "top edges today", "date": "2026-06-15"})
+
+        self.assertEqual(response["source_fingerprint"], "fingerprint-1")
+
     def test_board_publication_never_rolls_over_for_a_dateless_payload_either(self) -> None:
         # #94 follow-up. Superseded scenario: this file used to have two
         # tests asserting rollover DID fire, both driven by a payload that
@@ -5215,3 +5238,72 @@ class BoardWindowWatchFailureDoesNotKillTheLoopTests(unittest.TestCase):
         mocked_compute.assert_called_once_with(normalized)
         self.assertIn(queued_key, service._snapshots)
         self.assertEqual(service._latest_key, queued_key)
+
+    def test_background_loop_records_evaluation_ledger_for_legacy_pending_keys_path(self) -> None:
+        # This is the path actually live in production (canonical board
+        # state is currently flag-gated off) -- confirmed 2026-08-03 that
+        # _compute_board_publication_response (called here, not
+        # _compute_response) never itself touched the evaluation ledger,
+        # so maybe_record_board_state_to_evaluation_ledger must be called
+        # from THIS call site, not only from the canonical
+        # _drain_one_watched_board_date path.
+        service = IntelligenceStateService()
+        service._interval_seconds = 0
+
+        payload = {"question": "top edges today", "date": "2026-07-27", "sport": "mlb"}
+        normalized = service._normalize_payload(payload)
+        queued_key = _payload_key(normalized)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            state_path = temp_root / "query_state_cache.json"
+            board_snapshot_path = temp_root / "board_snapshot.json"
+            refresh_state_store.write_json_file(
+                state_path,
+                {
+                    "latest_key": None,
+                    "updated_at": "2026-07-27T20:00:00Z",
+                    "watched_payloads": {queued_key: normalized},
+                    "pending_keys": {queued_key: normalized},
+                    "snapshots": {},
+                },
+            )
+
+            board_state = {
+                "ok": True,
+                "top_opportunities": [{"name": "Play 1"}],
+                "recommendations": [{"name": "Play 1"}],
+                "by_sport": {"mlb": [{"name": "Play 1"}]},
+                "board_contract": {"schema": "intelligence_board_v1", "cards": [{"name": "Play 1"}]},
+                "analysis": None,
+                "portfolio": {},
+                "parlays": [],
+                "selected_date": "2026-07-27",
+                "source_fingerprint": "fp-legacy-1",
+                "state_last_updated": "2026-07-27T20:00:00Z",
+                "last_updated": "2026-07-27T20:00:00Z",
+                "snapshot_generated_at": "2026-07-27T20:00:00Z",
+                "candidate_count": 1,
+            }
+
+            def fake_write_latest_intelligence_state(state: dict[str, object]) -> dict[str, object]:
+                service._stop.set()
+                return dict(state)
+
+            with patch.object(intelligence_state_module, "STATE_PATH", state_path), patch.object(
+                intelligence_state_module, "BOARD_SNAPSHOT_PATH", board_snapshot_path
+            ), patch.object(
+                intelligence_state_module, "central_today_iso", return_value="2026-07-27"
+            ), patch.object(
+                service, "_ensure_default_board_window_watched"
+            ), patch(
+                "pipeline.intelligence_state._mlb_sim_subprocess_running", return_value=False
+            ), patch(
+                "pipeline.intelligence_state._odds_refresh_in_flight", return_value=False
+            ):
+                with patch.object(service, "_compute_board_publication_response", return_value=dict(board_state)):
+                    with patch("pipeline.intelligence_state.write_latest_intelligence_state", side_effect=fake_write_latest_intelligence_state):
+                        with patch.object(intelligence_state_module, "maybe_record_board_state_to_evaluation_ledger") as mocked_record:
+                            service._background_loop()
+
+        mocked_record.assert_called_once_with(board_state)

@@ -1270,9 +1270,21 @@ def _record_canonical_board_state_ledger_fingerprint(selected_date: str, fingerp
 
 
 def maybe_record_board_state_to_evaluation_ledger(state: dict[str, Any]) -> dict[str, Any] | None:
-    """Persist the canonical board state's current recommendations to the
+    """Persist a board-state response's current recommendations to the
     evaluation ledger, gated on source_fingerprint rather than called
     unconditionally on every rebuild.
+
+    Shared by BOTH call sites that actually run in production: the
+    canonical per-date board state (_build_intelligence_board_state,
+    behind SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE, which uses the
+    "ranked_all" key) and the legacy per-payload queue processed by
+    _background_loop's main pending_keys drain (_compute_board_publication_response,
+    which uses "recommendations"/"top_opportunities" instead) -- confirmed
+    2026-08-03 that the legacy path is what actually runs in production
+    right now (the canonical flag is off), and that NEITHER path called
+    any evaluation-ledger function before this, despite the standalone
+    run_intelligence_query in syndicate/features/intelligence.py (which
+    does) never being called from anywhere reachable in production either.
 
     Both record_prediction and record_recommendation mint their ledger
     identity from a content hash of the full recommendation payload (incl.
@@ -1280,12 +1292,11 @@ def maybe_record_board_state_to_evaluation_ledger(state: dict[str, Any]) -> dict
     board-state rebuild -- which happens far more often than the underlying
     source data actually changes -- would mint a fresh "new" pending row
     almost every cycle purely from ordinary price drift, not a real change
-    in what was recommended. source_fingerprint (already computed by
-    _build_intelligence_board_state) only changes when the underlying
-    manifest/odds-history signature actually changes, so gating on it here
-    matches the old run_intelligence_query path's implicit behavior: that
-    path only recorded on a genuine cache-miss recompute, never on a cached
-    re-read of an unchanged response.
+    in what was recommended. source_fingerprint only changes when the
+    underlying manifest/odds-history signature actually changes, so gating
+    on it here matches the old run_intelligence_query path's implicit
+    behavior: that path only recorded on a genuine cache-miss recompute,
+    never on a cached re-read of an unchanged response.
     """
     if not intelligence_ledger_recording_enabled():
         return None
@@ -1296,7 +1307,8 @@ def maybe_record_board_state_to_evaluation_ledger(state: dict[str, Any]) -> dict
     if _canonical_board_state_last_recorded_fingerprint(selected_date) == fingerprint:
         return None
 
-    recommendations = [item for item in (state.get("ranked_all") or []) if isinstance(item, Mapping)]
+    recommendations_source = state.get("ranked_all") or state.get("recommendations") or state.get("top_opportunities") or []
+    recommendations = [item for item in recommendations_source if isinstance(item, Mapping)]
     try:
         from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
 
@@ -3421,6 +3433,12 @@ class IntelligenceStateService:
                     print("[intelligence_state] CALLING_COMPUTE_BOARD_PUBLICATION_RESPONSE", flush=True)
                     state = self._compute_board_publication_response(payload_to_process)
                     print("[intelligence_state] RETURNED_FROM_COMPUTE_BOARD_PUBLICATION_RESPONSE", flush=True)
+                    # This is the path actually live in production (see
+                    # maybe_record_board_state_to_evaluation_ledger's own
+                    # docstring) -- the canonical board-state drain above
+                    # calls the same function for its own path, but that one
+                    # is currently flag-gated off.
+                    maybe_record_board_state_to_evaluation_ledger(state)
                     logger.info("BACKGROUND_LOOP_POST_BOARD_PUBLISH", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
                     logger.info("BACKGROUND_LOOP_PRE_PERSIST", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
                     written_state = write_latest_intelligence_state(state)
@@ -3782,6 +3800,14 @@ class IntelligenceStateService:
             "snapshot_generated_at": response_last_updated,
             "candidate_count": response_candidate_count,
             "unpriced_candidate_count": unpriced_candidate_count,
+            # Exposed so _background_loop's legacy _pending_keys processing
+            # (the path actually live in production -- see
+            # maybe_record_board_state_to_evaluation_ledger's own docstring)
+            # can gate evaluation-ledger recording on it without recomputing
+            # it a second time; already reflects any rollover-date
+            # substitution above since that branch reassigns this same
+            # local variable.
+            "source_fingerprint": source_fingerprint,
         }
         print("[intelligence_state] BUILDING_BOARD_CONTRACT", flush=True)
         response["board_contract"] = build_intelligence_board_contract(response)
