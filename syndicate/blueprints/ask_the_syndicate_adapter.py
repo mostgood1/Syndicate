@@ -360,6 +360,61 @@ def _matchup_analysis_schema(question: str, result: Any, *, relevance_matched: b
     }
 
 
+# A board-summary question with no specific subject to match. "Summarize
+# today's board" is asking for exactly the opportunities the summary shows,
+# so the not-matched note would contradict a correct answer. Deliberately
+# narrow: anything naming a player, team or single market still counts as
+# subject-bearing and keeps the note.
+_GENERAL_BOARD_QUESTION_PATTERNS = (
+    re.compile(r"\bsummar(?:ise|ize|y)\b", re.IGNORECASE),
+    re.compile(r"\b(?:best|top)\s+(?:opportunit(?:y|ies)|plays?|bets?|edges?|picks?)\b", re.IGNORECASE),
+    re.compile(r"\bacross the board\b", re.IGNORECASE),
+    re.compile(r"\bwhat to watch\b", re.IGNORECASE),
+    re.compile(r"\b(?:the|today'?s)\s+board\b", re.IGNORECASE),
+    re.compile(r"\bwhat should i (?:bet|play|back)\b", re.IGNORECASE),
+    re.compile(r"\b(?:overview|rundown|slate)\b", re.IGNORECASE),
+    re.compile(r"\b(?:what'?s|anything|any)\s+(?:good|worth|interesting)\b", re.IGNORECASE),
+)
+
+
+def _board_summary_sentence(rows: Any) -> str:
+    """A factual one-liner describing the opportunities actually returned.
+
+    Everything here is read off the rows -- count, sports covered, and the
+    best edge present. Nothing is inferred or narrated, so this stays true
+    whether or not the optional LLM briefing is enabled.
+    """
+    items = [row for row in (rows or []) if isinstance(row, dict)]
+    if not items:
+        return "No opportunities are on the board right now."
+    sports = []
+    for row in items:
+        label = str(row.get("sport") or row.get("sport_slug") or "").strip().upper()
+        if label and label not in sports:
+            sports.append(label)
+    best_edge = None
+    for row in items:
+        edge = _to_float(row.get("edge"))
+        if edge is not None and (best_edge is None or edge > best_edge):
+            best_edge = edge
+    parts = [f"Showing the top {len(items)} opportunit{'y' if len(items) == 1 else 'ies'} on today's board"]
+    if sports:
+        shown = ", ".join(sports[:4])
+        parts.append(f"across {shown}" if len(sports) > 1 else f"in {shown}")
+    sentence = " ".join(parts) + "."
+    if best_edge is not None:
+        sentence += f" Best edge {best_edge * 100:.1f}%."
+    return sentence
+
+
+def _is_general_board_question(question: str) -> bool:
+    text = str(question or "").strip()
+    if not text:
+        # No question at all -> nothing to claim a mismatch against.
+        return True
+    return any(pattern.search(text) for pattern in _GENERAL_BOARD_QUESTION_PATTERNS)
+
+
 def _market_summary_schema(result: Any, *, question: str = "", relevance_matched: bool | None = None) -> dict[str, Any]:
     recommendations = _items_to_dicts(_result_value(result, "recommendations", ()))
     top_opportunities: list[dict[str, Any]] = []
@@ -379,15 +434,29 @@ def _market_summary_schema(result: Any, *, question: str = "", relevance_matched
 
     explanation = _explanation_payload(result)
     summary_text = _result_value(result, "summary", None)
-    if relevance_matched is False:
+    if relevance_matched is False and not _is_general_board_question(question):
         # Unlike bet_analysis/matchup_analysis (a single framed "answer"),
         # a market summary is inherently a plural "here's today's board" --
         # less likely to be misread as being about the question's subject,
         # so the opportunities list stays. Still say plainly that none of
         # them are specifically about what was asked, rather than silently
         # implying they are.
+        #
+        # Suppressed for questions with no subject to match ("summarize
+        # today's board"): there, the opportunities ARE what was asked for,
+        # and leading with "No board opportunity matches ..." makes a
+        # working answer read as a failure -- reported live 2026-08-03. The
+        # guard still fires for subject-bearing questions ("how does Jokic
+        # look tonight"), which is the case it was written for.
         note = f"No board opportunity matches “{question.strip()}” specifically — showing today's top opportunities instead."
         summary_text = f"{note} {summary_text}".strip() if summary_text else note
+    if not summary_text:
+        # The not-matched note used to be the only thing populating this
+        # field, so suppressing it for general board questions left the
+        # summary empty. Describe what is actually being shown instead,
+        # entirely from the rows themselves -- no narration, no LLM, and
+        # nothing asserted that the data does not support.
+        summary_text = _board_summary_sentence(top_opportunities)
     return {
         "schema_type": "market_summary",
         "top_opportunities": top_opportunities,

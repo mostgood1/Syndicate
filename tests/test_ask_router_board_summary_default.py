@@ -70,5 +70,53 @@ class BoardSummaryRoutingTests(unittest.TestCase):
         self.assertEqual(self.router.route("Yankees vs Red Sox").intent, "matchup_analysis")
 
 
+
+class BoardSummaryAnswerContentTests(unittest.TestCase):
+    """The snapshot path is the product now -- the LLM narration layer is
+    deliberately not in use, so a board-summary answer has to stand on its
+    own without it."""
+
+    def test_general_question_gets_an_affirmative_data_derived_summary(self) -> None:
+        from syndicate.blueprints.ask_the_syndicate_adapter import _board_summary_sentence
+
+        rows = [
+            {"sport": "MLB", "edge": 0.0812},
+            {"sport": "WNBA", "edge": 0.0451},
+        ]
+        sentence = _board_summary_sentence(rows)
+        self.assertIn("top 2 opportunities", sentence)
+        self.assertIn("MLB", sentence)
+        self.assertIn("WNBA", sentence)
+        self.assertIn("8.1%", sentence)
+        # Must not lead with a negative -- that is the reported bug.
+        self.assertFalse(sentence.startswith("No board opportunity"))
+
+    def test_singular_is_not_pluralised(self) -> None:
+        from syndicate.blueprints.ask_the_syndicate_adapter import _board_summary_sentence
+
+        self.assertIn("top 1 opportunity", _board_summary_sentence([{"sport": "MLB"}]))
+
+    def test_empty_board_says_so_plainly(self) -> None:
+        from syndicate.blueprints.ask_the_syndicate_adapter import _board_summary_sentence
+
+        self.assertEqual(_board_summary_sentence([]), "No opportunities are on the board right now.")
+
+    def test_rows_without_edges_still_produce_a_sentence(self) -> None:
+        from syndicate.blueprints.ask_the_syndicate_adapter import _board_summary_sentence
+
+        sentence = _board_summary_sentence([{"sport": "MLB"}, {"sport": "MLB"}])
+        self.assertIn("top 2 opportunities", sentence)
+        self.assertNotIn("Best edge", sentence)
+
+    def test_subject_questions_keep_the_not_matched_guard(self) -> None:
+        from syndicate.blueprints.ask_the_syndicate_adapter import _is_general_board_question
+
+        # The guard exists so a board list is never silently implied to be
+        # about the asked-for subject. That must survive this change.
+        self.assertFalse(_is_general_board_question("how does nikola jokic look tonight"))
+        self.assertFalse(_is_general_board_question("what do you think of the Dodgers spread"))
+        self.assertTrue(_is_general_board_question("summarize today's board"))
+
+
 if __name__ == "__main__":
     unittest.main()
