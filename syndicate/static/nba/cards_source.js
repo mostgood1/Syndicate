@@ -1,10 +1,25 @@
 (function () {
-  function viewportMode() {
-    const width = Math.max(window.innerWidth || 0, document.documentElement?.clientWidth || 0);
-    if (width <= 767) return 'phone';
-    if (width <= 1180) return 'tablet';
-    return 'desktop';
-  }
+  // escapeHtml/extractApiErrorText/waitFor/viewportMode/clampNumber/
+  // titleCase/normalizeLogoTri/marketLabel/safeArray/safeObjectFromEntries/
+  // fmtTime/cardId extracted 2026-08-03 into shared/sport_cards_utils.js --
+  // confirmed byte-identical with wnba/cards-parity.js's own copies and
+  // fully self-contained (no reference to this file's closure state), so
+  // this is a real duplication removal, not a behavior change. See that
+  // file's header comment for why the rest of this file wasn't touched.
+  const {
+    escapeHtml,
+    extractApiErrorText,
+    waitFor,
+    viewportMode,
+    clampNumber,
+    titleCase,
+    normalizeLogoTri,
+    marketLabel,
+    safeArray,
+    safeObjectFromEntries,
+    fmtTime,
+    cardId,
+  } = window.SyndicateCardsUtils;
 
   function applyViewportMode() {
     const mode = viewportMode();
@@ -111,29 +126,6 @@
     return new Date(now.getTime() - offsetMs).toISOString().slice(0, 10);
   }
 
-  function escapeHtml(value) {
-    return String(value ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-  function extractApiErrorText(text, fallbackMessage) {
-    const raw = String(text || '').trim();
-    if (!raw) {
-      return fallbackMessage;
-    }
-    if (raw.startsWith('<')) {
-      return `${fallbackMessage} Server returned HTML instead of JSON.`;
-    }
-    if (raw.startsWith('{') || raw.startsWith('[')) {
-      return fallbackMessage;
-    }
-    return raw.slice(0, 240);
-  }
-
   async function readApiJson(response, fallbackMessage) {
     const rawText = await response.text();
     let payload = null;
@@ -159,9 +151,6 @@
     throw new Error(extractApiErrorText(rawText, fallbackMessage));
   }
 
-  function waitFor(ms) {
-    return new Promise((resolve) => window.setTimeout(resolve, ms));
-  }
 
   function isRetryableApiError(error) {
     const message = String(error?.message || '').toLowerCase();
@@ -351,22 +340,6 @@
     return number > 0 ? `+${Math.round(number)}` : `${Math.round(number)}`;
   }
 
-  function fmtTime(value) {
-    if (!value) {
-      return 'Time TBD';
-    }
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return 'Time TBD';
-    }
-    return new Intl.DateTimeFormat(undefined, {
-      hour: 'numeric',
-      minute: '2-digit',
-      month: 'short',
-      day: 'numeric',
-    }).format(date);
-  }
-
   function formatTimestampShort(value) {
     const text = String(value || '').trim();
     if (!text) return '-';
@@ -429,54 +402,8 @@
     return new Date(date.getTime() - offsetMs).toISOString().slice(0, 10);
   }
 
-  function titleCase(value) {
-    const raw = String(value || '').trim();
-    if (!raw) {
-      return '';
-    }
-    return raw
-      .split(/[_\s]+/)
-      .map((part) => part ? part.charAt(0).toUpperCase() + part.slice(1).toLowerCase() : '')
-      .join(' ');
-  }
-
   function currentBoardDate() {
     return String(state.payload?.date || state.date || getLocalDateISO());
-  }
-
-  function marketLabel(value) {
-    const key = String(value || '').trim().toLowerCase();
-    return {
-      pts: 'Points',
-      reb: 'Rebounds',
-      ast: 'Assists',
-      threes: '3PM',
-      stl: 'Steals',
-      blk: 'Blocks',
-      tov: 'Turnovers',
-      pra: 'PRA',
-      pr: 'PR',
-      pa: 'PA',
-      ra: 'RA',
-    }[key] || titleCase(key);
-  }
-
-  function normalizeLogoTri(tri) {
-    const raw = String(tri || '').trim().toUpperCase();
-    if (!raw) {
-      return '';
-    }
-    return {
-      BRO: 'BKN',
-      CHO: 'CHA',
-      GOL: 'GSW',
-      NJN: 'BKN',
-      NOH: 'NOP',
-      NOK: 'NOP',
-      PHO: 'PHX',
-      SAN: 'SAS',
-      UTH: 'UTA',
-    }[raw] || raw;
   }
 
   function canonicalTeamTri(tri) {
@@ -515,10 +442,6 @@
     const fallback = logoBadgeDataUrl(teamTri);
     const alt = String(altText || `${normalizeLogoTri(teamTri) || 'Team'} logo`);
     return `<img class="${escapeHtml(className)}" src="${escapeHtml(logo)}" alt="${escapeHtml(alt)}" loading="lazy" onerror="if(this.dataset.fallbackApplied==='1'){this.onerror=null;this.style.display='none';return;}this.dataset.fallbackApplied='1';this.src='${fallback}';" />`;
-  }
-
-  function cardId(game) {
-    return String(game?.sim?.game_id || `${game?.away_tri || 'AWAY'}@${game?.home_tri || 'HOME'}`);
   }
 
   function matchupKey(awayTri, homeTri) {
@@ -673,9 +596,6 @@
     return matchedGame ? cardId(matchedGame) : matchup;
   }
 
-  function clampNumber(value, min, max) {
-    return Math.min(max, Math.max(min, value));
-  }
 
   function parseClockToMinutes(clockText) {
     const value = String(clockText || '').trim();
@@ -943,14 +863,6 @@
       { sliceLabel: 'Full game', marketLabel: 'ATS', signal: signalMap.ats || null },
       { sliceLabel: 'Full game', marketLabel: 'Total', signal: signalMap.total || null },
     ];
-  }
-
-  function safeObjectFromEntries(entries) {
-    try {
-      return Object.fromEntries(entries || []);
-    } catch (_error) {
-      return {};
-    }
   }
 
   function completedMarginBeforePeriod(liveState, beforePeriod) {
@@ -2308,10 +2220,6 @@
     scoreboardRoot.innerHTML = '<div class="cards-loading-strip">Loading scoreboard...</div>';
     gridRoot.innerHTML = '<div class="cards-loading-state">Loading cards...</div>';
     state.boardInitialized = false;
-  }
-
-  function safeArray(value) {
-    return Array.isArray(value) ? value : [];
   }
 
   function recCount(game) {

@@ -80,6 +80,7 @@
   </div>
 
   <script src="{{ url_for('static', filename='shared/polling.js', v=asset_version) }}"></script>
+  <script src="{{ url_for('static', filename='shared/sport_cards_utils.js', v=asset_version) }}"></script>
   <script>
     window.WNBACardsBootstrap = {
       refreshPolicy: {{ refresh_policy|default({})|tojson }},
