@@ -3744,6 +3744,111 @@ class IntelligenceStateTests(unittest.TestCase):
 
         self.assertEqual(list(service._watched_board_dates), [])
 
+    def test_intelligence_ledger_recording_enabled_defaults_to_false(self) -> None:
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("SYNDICATE_INTELLIGENCE_LEDGER_RECORDING_ENABLED", None)
+            self.assertFalse(intelligence_state_module.intelligence_ledger_recording_enabled())
+
+    def test_intelligence_ledger_recording_enabled_reads_env_flag(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_INTELLIGENCE_LEDGER_RECORDING_ENABLED": "true"}, clear=False):
+            self.assertTrue(intelligence_state_module.intelligence_ledger_recording_enabled())
+
+    def test_maybe_record_board_state_returns_none_when_disabled(self) -> None:
+        state = {"selected_date": "2026-06-10", "source_fingerprint": "abc", "ranked_all": [{"market": "total"}]}
+        with patch.dict(os.environ, {"SYNDICATE_INTELLIGENCE_LEDGER_RECORDING_ENABLED": "false"}, clear=False):
+            with patch("syndicate.features.shared.intelligence_evaluation.build_intelligence_evaluation_bundle") as mocked_bundle:
+                result = intelligence_state_module.maybe_record_board_state_to_evaluation_ledger(state)
+
+        self.assertIsNone(result)
+        mocked_bundle.assert_not_called()
+
+    def test_maybe_record_board_state_records_on_new_fingerprint_and_persists_fingerprint(self) -> None:
+        state = {"selected_date": "2026-06-10", "source_fingerprint": "fp-1", "ranked_all": [{"market": "total", "selection": "Over"}]}
+        with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ,
+            {"SYNDICATE_INTELLIGENCE_LEDGER_RECORDING_ENABLED": "true", "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports")},
+            clear=False,
+        ):
+            with patch("syndicate.features.shared.intelligence_evaluation.build_intelligence_evaluation_bundle", return_value={"ok": True}) as mocked_bundle:
+                result = intelligence_state_module.maybe_record_board_state_to_evaluation_ledger(state)
+
+        self.assertEqual(result, {"ok": True})
+        mocked_bundle.assert_called_once()
+        _, kwargs = mocked_bundle.call_args
+        self.assertEqual(kwargs["response"]["recommendations"], [{"market": "total", "selection": "Over"}])
+        self.assertTrue(kwargs["persist"])
+
+        # A second call with the SAME fingerprint must not re-record --
+        # that's the whole point of the gate (odds/edges drift constantly
+        # between rebuilds even when nothing structural changed).
+        with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ,
+            {"SYNDICATE_INTELLIGENCE_LEDGER_RECORDING_ENABLED": "true", "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports")},
+            clear=False,
+        ):
+            with patch("syndicate.features.shared.intelligence_evaluation.build_intelligence_evaluation_bundle", return_value={"ok": True}) as mocked_bundle:
+                intelligence_state_module.maybe_record_board_state_to_evaluation_ledger(state)
+                second_result = intelligence_state_module.maybe_record_board_state_to_evaluation_ledger(state)
+
+            self.assertIsNone(second_result)
+            self.assertEqual(mocked_bundle.call_count, 1)
+
+    def test_maybe_record_board_state_records_again_when_fingerprint_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ,
+            {"SYNDICATE_INTELLIGENCE_LEDGER_RECORDING_ENABLED": "true", "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports")},
+            clear=False,
+        ):
+            with patch("syndicate.features.shared.intelligence_evaluation.build_intelligence_evaluation_bundle", return_value={"ok": True}) as mocked_bundle:
+                intelligence_state_module.maybe_record_board_state_to_evaluation_ledger(
+                    {"selected_date": "2026-06-10", "source_fingerprint": "fp-1", "ranked_all": []}
+                )
+                intelligence_state_module.maybe_record_board_state_to_evaluation_ledger(
+                    {"selected_date": "2026-06-10", "source_fingerprint": "fp-2", "ranked_all": []}
+                )
+
+            self.assertEqual(mocked_bundle.call_count, 2)
+
+    def test_maybe_record_board_state_swallows_persist_failures_and_does_not_advance_fingerprint(self) -> None:
+        state = {"selected_date": "2026-06-10", "source_fingerprint": "fp-1", "ranked_all": []}
+        with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ,
+            {"SYNDICATE_INTELLIGENCE_LEDGER_RECORDING_ENABLED": "true", "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports")},
+            clear=False,
+        ):
+            with patch(
+                "syndicate.features.shared.intelligence_evaluation.build_intelligence_evaluation_bundle",
+                side_effect=RuntimeError("boom"),
+            ) as mocked_bundle:
+                # Must not raise -- called from the background drain loop,
+                # where a bad cycle should be retried later, not crash the
+                # worker thread.
+                result = intelligence_state_module.maybe_record_board_state_to_evaluation_ledger(state)
+
+            self.assertIsNone(result)
+            self.assertIsNone(intelligence_state_module._canonical_board_state_last_recorded_fingerprint("2026-06-10"))
+            mocked_bundle.assert_called_once()
+
+    def test_maybe_record_board_state_returns_none_without_date_or_fingerprint(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_INTELLIGENCE_LEDGER_RECORDING_ENABLED": "true"}, clear=False):
+            with patch("syndicate.features.shared.intelligence_evaluation.build_intelligence_evaluation_bundle") as mocked_bundle:
+                self.assertIsNone(intelligence_state_module.maybe_record_board_state_to_evaluation_ledger({"selected_date": "2026-06-10"}))
+                self.assertIsNone(intelligence_state_module.maybe_record_board_state_to_evaluation_ledger({"source_fingerprint": "fp-1"}))
+
+        mocked_bundle.assert_not_called()
+
+    def test_drain_one_watched_board_date_calls_maybe_record_board_state(self) -> None:
+        service = IntelligenceStateService()
+        service.queue_board_state_refresh("2026-06-10")
+        built_state = {"selected_date": "2026-06-10", "candidate_count": 0, "covered_sports": [], "by_sport": {}, "ranked_all": [], "source_fingerprint": "fp-1"}
+
+        with patch.object(service, "_build_intelligence_board_state", return_value=built_state):
+            with patch("pipeline.intelligence_state.write_intelligence_board_state"):
+                with patch.object(intelligence_state_module, "maybe_record_board_state_to_evaluation_ledger") as mocked_record:
+                    service._drain_one_watched_board_date()
+
+        mocked_record.assert_called_once_with(built_state)
+
     def test_background_loop_drains_board_dates_when_canonical_flag_enabled(self) -> None:
         service = IntelligenceStateService()
         service._interval_seconds = 0

@@ -1199,6 +1199,22 @@ def canonical_board_state_shadow_compare_enabled() -> bool:
     return _env_bool(SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE_SHADOW_COMPARE_FLAG, default=False)
 
 
+SYNDICATE_INTELLIGENCE_LEDGER_RECORDING_FLAG = "SYNDICATE_INTELLIGENCE_LEDGER_RECORDING_ENABLED"
+
+
+def intelligence_ledger_recording_enabled() -> bool:
+    # Dark-launched the same way SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE
+    # was: off by default so a first deploy can be verified (via
+    # /api/ops/evaluation-settlement/status) before being trusted to write on
+    # every board-state rebuild. Root-caused 2026-08-03 (todo.md, "Settlement
+    # item 3b"): _build_intelligence_board_state below never called
+    # record_prediction/record_recommendation at all, so the evaluation
+    # ledger has been empty in production since the canonical path took over
+    # -- reliability multipliers, dynamic thresholds, and policy promotion
+    # have had zero history to work with the whole time.
+    return _env_bool(SYNDICATE_INTELLIGENCE_LEDGER_RECORDING_FLAG, default=False)
+
+
 def _intelligence_board_state_path(selected_date: str) -> Path:
     # One file per date -- an O(1) lookup by construction, unlike
     # _intelligence_state_daily_candidates() above, which has to glob every
@@ -1232,6 +1248,79 @@ def read_intelligence_board_state(selected_date: str | None) -> dict[str, Any] |
         return None
     payload = read_json_file(_intelligence_board_state_path(normalized_date))
     return payload if isinstance(payload, dict) else None
+
+
+def _canonical_board_state_ledger_fingerprint_path() -> Path:
+    return reports_root() / "intelligence" / "canonical_board_state_ledger_fingerprints.json"
+
+
+def _canonical_board_state_last_recorded_fingerprint(selected_date: str) -> str | None:
+    payload = read_json_file(_canonical_board_state_ledger_fingerprint_path())
+    if not isinstance(payload, dict):
+        return None
+    value = str(payload.get(selected_date) or "").strip()
+    return value or None
+
+
+def _record_canonical_board_state_ledger_fingerprint(selected_date: str, fingerprint: str) -> None:
+    payload = read_json_file(_canonical_board_state_ledger_fingerprint_path())
+    stored = dict(payload) if isinstance(payload, dict) else {}
+    stored[selected_date] = fingerprint
+    write_json_file(_canonical_board_state_ledger_fingerprint_path(), stored)
+
+
+def maybe_record_board_state_to_evaluation_ledger(state: dict[str, Any]) -> dict[str, Any] | None:
+    """Persist the canonical board state's current recommendations to the
+    evaluation ledger, gated on source_fingerprint rather than called
+    unconditionally on every rebuild.
+
+    Both record_prediction and record_recommendation mint their ledger
+    identity from a content hash of the full recommendation payload (incl.
+    live odds/edge/probability), so calling them unconditionally on every
+    board-state rebuild -- which happens far more often than the underlying
+    source data actually changes -- would mint a fresh "new" pending row
+    almost every cycle purely from ordinary price drift, not a real change
+    in what was recommended. source_fingerprint (already computed by
+    _build_intelligence_board_state) only changes when the underlying
+    manifest/odds-history signature actually changes, so gating on it here
+    matches the old run_intelligence_query path's implicit behavior: that
+    path only recorded on a genuine cache-miss recompute, never on a cached
+    re-read of an unchanged response.
+    """
+    if not intelligence_ledger_recording_enabled():
+        return None
+    selected_date = str(state.get("selected_date") or "").strip()
+    fingerprint = str(state.get("source_fingerprint") or "").strip()
+    if not selected_date or not fingerprint:
+        return None
+    if _canonical_board_state_last_recorded_fingerprint(selected_date) == fingerprint:
+        return None
+
+    recommendations = [item for item in (state.get("ranked_all") or []) if isinstance(item, Mapping)]
+    try:
+        from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
+
+        bundle = build_intelligence_evaluation_bundle(
+            query={
+                "question": "canonical board state",
+                "selected_date": selected_date,
+                "sport": "all",
+                "query_type": "board_state",
+            },
+            response={"recommendations": recommendations, "selected_date": selected_date},
+            persist=True,
+        )
+    except Exception as exc:
+        print(f"[intelligence_state] BOARD_STATE_LEDGER_RECORD_FAILED selected_date={selected_date} error={type(exc).__name__}: {exc}", flush=True)
+        return None
+
+    _record_canonical_board_state_ledger_fingerprint(selected_date, fingerprint)
+    print(
+        f"[intelligence_state] BOARD_STATE_LEDGER_RECORDED selected_date={selected_date} "
+        f"recommendation_count={len(recommendations)}",
+        flush=True,
+    )
+    return bundle
 
 
 def read_latest_intelligence_board_state() -> dict[str, Any] | None:
@@ -3810,6 +3899,7 @@ class IntelligenceStateService:
             state = self._build_intelligence_board_state(selected_date)
             write_intelligence_board_state(state)
             logger.info("BOARD_STATE_WRITTEN", extra={"selected_date": selected_date, "candidate_count": state.get("candidate_count")})
+            maybe_record_board_state_to_evaluation_ledger(state)
         except Exception as exc:
             logger.info("BOARD_STATE_DRAIN_FAILED", extra={"selected_date": selected_date, "error": f"{type(exc).__name__}: {exc}"})
             print(f"[intelligence_state] BOARD_STATE_DRAIN_FAILED selected_date={selected_date} error={exc}", flush=True)
