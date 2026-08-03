@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
-from pathlib import Path
 from urllib.parse import parse_qsl
 from urllib.parse import urlencode
 
@@ -39,6 +38,7 @@ from syndicate.features.nba.props import build_props_page_context
 from syndicate.features.nba.sources import available_dates
 from syndicate.features.nba.sources import default_date
 from syndicate.features.nba.sources import default_date_for_season
+from syndicate.features.shared.asset_version import cards_source_asset_version
 from syndicate.features.shared.hub_summary import build_hub_bettor_summary
 from syndicate.features.shared.rank_board import build_rank_api_payload
 from syndicate.features.shared.timezone import central_now
@@ -51,21 +51,11 @@ nba_bp = Blueprint("syndicate_nba", __name__, url_prefix="/nba")
 
 
 def _cards_source_asset_version() -> str:
-    static_root = Path(__file__).resolve().parents[1] / "static"
-    paths = [
-        static_root / "shared" / "standalone_shell.css",
-        static_root / "nba" / "cards_source.css",
-        static_root / "nba" / "cards_source.js",
-    ]
-    mtimes: list[int] = []
-    for path in paths:
-        try:
-            mtimes.append(int(path.stat().st_mtime_ns))
-        except OSError:
-            continue
-    if mtimes:
-        return str(max(mtimes))
-    return "1"
+    return cards_source_asset_version(
+        "shared/standalone_shell.css",
+        "nba/cards_source.css",
+        "nba/cards_source.js",
+    )
 
 
 def _selected_date(season: int | None = None) -> str:

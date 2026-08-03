@@ -3,6 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#040c14" />
+    <link rel="manifest" href="{{ url_for('static', filename='shared/manifest.json') }}" />
     <title>{% block title %}Syndicate{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='shared/app.css') }}" />
     {% block extra_head %}{% endblock %}
@@ -12,17 +14,18 @@
       {% if show_app_header is not defined or show_app_header %}
         <header class="cards-header syndicate-header">
           {% set nav_date = request.args.get('date') %}
+          {% set nav_path = request.path %}
           <div class="cards-title-row">
             <div class="syndicate-title-lockup">
               <img class="syndicate-title-lockup__logo" src="{{ url_for('static', filename='shared/syndicate-logo.png') }}" alt="Syndicate logo" />
             </div>
             <nav class="syndicate-nav" aria-label="Sports">
-              <a class="cards-nav-pill" href="/">Home</a>
-              <a class="cards-nav-pill" href="/syndicate{% if nav_date %}?date={{ nav_date }}{% endif %}">The Syndicate</a>
-              <a class="cards-nav-pill" href="/market-board{% if nav_date %}?date={{ nav_date }}{% endif %}">Betting Board</a>
-              <a class="cards-nav-pill" href="/portfolio">Portfolio</a>
+              <a class="cards-nav-pill{% if nav_path == '/' %} cards-nav-pill--active{% endif %}" href="/">Home</a>
+              <a class="cards-nav-pill{% if nav_path.startswith('/syndicate') %} cards-nav-pill--active{% endif %}" href="/syndicate{% if nav_date %}?date={{ nav_date }}{% endif %}">The Syndicate</a>
+              <a class="cards-nav-pill{% if nav_path.startswith('/market-board') %} cards-nav-pill--active{% endif %}" href="/market-board{% if nav_date %}?date={{ nav_date }}{% endif %}">Betting Board</a>
+              <a class="cards-nav-pill{% if nav_path.startswith('/portfolio') %} cards-nav-pill--active{% endif %}" href="/portfolio">Portfolio</a>
               {% for sport in syndicate_sports %}
-                <a class="cards-nav-pill" href="/{{ sport.slug }}{% if nav_date %}?date={{ nav_date }}{% endif %}">{{ sport.name }}</a>
+                <a class="cards-nav-pill{% if nav_path.startswith('/' ~ sport.slug) %} cards-nav-pill--active{% endif %}" href="/{{ sport.slug }}{% if nav_date %}?date={{ nav_date }}{% endif %}">{{ sport.name }}</a>
               {% endfor %}
               {% if request.args.get('admin_token') %}
                 <a class="cards-nav-pill" href="/ops/odds-refresh?admin_token={{ request.args.get('admin_token') }}">Ops</a>

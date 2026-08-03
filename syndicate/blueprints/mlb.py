@@ -6,6 +6,7 @@ from pathlib import Path
 
 from flask import Blueprint, Response, jsonify, render_template, request
 
+from syndicate.features.shared.asset_version import cards_source_asset_version
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
 from syndicate.features.shared.rank_board import build_rank_api_payload
 from syndicate.features.mlb.betting_card import build_betting_card_page_context
@@ -49,23 +50,13 @@ mlb_bp = Blueprint("syndicate_mlb", __name__, url_prefix="/mlb")
 
 
 def _cards_source_asset_version() -> str:
-    static_root = Path(__file__).resolve().parents[1] / "static"
-    paths = [
-        static_root / "shared" / "standalone_shell.css",
-        static_root / "shared" / "polling.js",
-        static_root / "mlb" / "cards_exact.css",
-        static_root / "mlb" / "cards_source.js",
-        static_root / "mlb" / "back_to_top.js",
-    ]
-    mtimes: list[int] = []
-    for path in paths:
-        try:
-            mtimes.append(int(path.stat().st_mtime_ns))
-        except OSError:
-            continue
-    if mtimes:
-        return str(max(mtimes))
-    return "1"
+    return cards_source_asset_version(
+        "shared/standalone_shell.css",
+        "shared/polling.js",
+        "mlb/cards_exact.css",
+        "mlb/cards_source.js",
+        "mlb/back_to_top.js",
+    )
 
 
 def _iso_or_today(value: str | None) -> str:

@@ -1,0 +1,16 @@
+{
+  "name": "Syndicate",
+  "short_name": "Syndicate",
+  "description": "Multi-sport betting intelligence: sim-backed edges, live boards, and portfolio tracking.",
+  "start_url": "/intelligence",
+  "display": "standalone",
+  "background_color": "#040c14",
+  "theme_color": "#040c14",
+  "icons": [
+    {
+      "src": "/static/shared/syndicate-logo.png",
+      "sizes": "any",
+      "type": "image/png"
+    }
+  ]
+}

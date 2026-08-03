@@ -3,10 +3,10 @@ from __future__ import annotations
 import csv
 from datetime import date
 from datetime import timedelta
-from pathlib import Path
 
 from flask import Blueprint, jsonify, redirect, render_template, request
 
+from syndicate.features.shared.asset_version import cards_source_asset_version
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
 from syndicate.features.shared.hub_summary import build_hub_bettor_summary
 from syndicate.features.nhl.archive import build_archive_api_payload
@@ -41,21 +41,11 @@ nhl_bp = Blueprint("syndicate_nhl", __name__, url_prefix="/nhl")
 
 
 def _cards_source_asset_version() -> str:
-    static_root = Path(__file__).resolve().parents[1] / "static"
-    paths = [
-        static_root / "shared" / "standalone_shell.css",
-        static_root / "shared" / "polling.js",
-        static_root / "nhl" / "cards_source_base.css",
-    ]
-    mtimes: list[int] = []
-    for path in paths:
-        try:
-            mtimes.append(int(path.stat().st_mtime_ns))
-        except OSError:
-            continue
-    if mtimes:
-        return str(max(mtimes))
-    return "1"
+    return cards_source_asset_version(
+        "shared/standalone_shell.css",
+        "shared/polling.js",
+        "nhl/cards_source_base.css",
+    )
 
 
 def _selected_date() -> str:
