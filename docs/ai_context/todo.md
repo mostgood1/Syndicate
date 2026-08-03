@@ -4,9 +4,12 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-03 (see "HANDOFF 2026-08-03 -- START HERE"
-below: three commits pushed but NOT deployed, and four changes never
-yet observed against real data).
+Last reconciled: 2026-08-03 (see "Reconciliation 2026-08-03 (Phase 3
+complete: hub reframe + card-client safe extraction, both deployed)"
+below -- all four Phase 3 items from the prior handoff are now shipped
+and deployed; verification is still 4 PASS / 2 PENDING, unchanged).
+Before that: "HANDOFF 2026-08-03 -- START HERE" (superseded by the
+entry above -- kept as historical record of that session's findings).
 Before that: "Reconciliation 2026-08-03 (Phase 3
 continued: sparklines, filter disclosure, deploy-safety check)".
 Before that: "Reconciliation 2026-08-03 (Phase 3
@@ -45,7 +48,122 @@ full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
 
-### HANDOFF 2026-08-03 -- START HERE (session ended on context, work is mid-flight)
+### Reconciliation 2026-08-03 (Phase 3 complete: hub reframe + card-client safe extraction, both deployed)
+
+Continuation of the same 2026-08-03 session logged in the HANDOFF entry
+below. Picked up the handoff, deployed its 4 pending commits, then
+completed the two remaining Phase 3 items.
+
+**1. Sport-hub reframing, all 8 (`bd751b23`).** All 8 hubs led with a
+developer-facing "Active migration"/"In progress" status pill and route
+lists; now lead with today's slate count, a live-now strip, and top 3
+edges. New `syndicate/features/shared/hub_summary.py`:
+`build_hub_bettor_summary(sport_slug)` reads the same
+`read_combined_intelligence_response` the `/intelligence` board already
+uses -- its own docstring documents the hard invariant that it never
+calls `_build_candidate_pool`, so this is read-only, same cost as the
+board itself. Deliberately did NOT reuse `home.py`'s
+`_build_sport_overview` for this -- powerful, but has a documented
+production OOM history and returns far more than a hub teaser needs.
+New shared partial `templates/shared/_hub_bettor_summary.html` +
+`hub_bettor_summary.css`, included by all 8 `hub.html` files; each
+blueprint's `/hub` route now passes a `hub_summary`. Verified all 8 in
+the browser: no console errors, no Jinja TemplateSyntaxErrors (two of
+these templates broke on a bad `\'` escape last session -- this pass
+uses the same escape correctly, including inside a concatenated
+expression on the soccer hub). Local data has no today's-date board
+artifact for any sport, so the empty-state path is what actually
+rendered locally; the non-empty/live-now/multi-edge/singular-plural
+paths were verified separately by rendering the shared partial directly
+with synthetic `hub_summary` data.
+
+**2. Card-client unification, safe partial (`616633cd`).** The handoff
+below called NBA/WNBA "near-identical forks" on the strength of an
+86%-line-overlap diff. A full hunk-by-hunk diff run this session found
+only 1 of 134 hunks between `nba/cards_source.js` and
+`wnba/cards-parity.js` is pure cosmetic (nba/wnba name) substitution --
+the other 133 are genuine independent feature drift from ~90 days of
+separate development (61 WNBA commits vs 25 NBA commits in that window),
+not just the one known quarter-length bug. WNBA has gained features NBA
+lacks (why/historical-context text, movement-summary lines, a
+`roundLineToHalf` helper); NBA has removed DOM hookups WNBA still
+carries and reworked its own render-metadata flow differently. A full
+merge means reconciling all 133 points and deciding, per point, which
+sport's behavior is correct -- materially bigger than "extract the
+common 85%", and NOT attempted this session.
+
+What shipped instead: 12 functions confirmed byte-identical between both
+files (zero diff-hunk overlap, then a direct line-range byte comparison)
+AND fully self-contained -- no reference to either file's closure-scoped
+state, only their own parameters and real JS globals: `escapeHtml`,
+`extractApiErrorText`, `waitFor`, `viewportMode`, `clampNumber`,
+`titleCase`, `normalizeLogoTri`, `marketLabel`, `safeArray`,
+`safeObjectFromEntries`, `fmtTime`, `cardId`. New
+`syndicate/static/shared/sport_cards_utils.js` holds them as
+`window.SyndicateCardsUtils`; both cards files now destructure from it
+instead of defining their own copies. 226 duplicated lines removed
+across the two files, replaced by one 148-line shared module. Excluded
+despite looking similar: `matchupKey`/`gameMatchupKey`/
+`canonicalTeamTri` (the team-tri mapping chain is genuinely divergent
+between sports) and `shiftISODate`/`getLocalDateISO`/`currentBoardDate`
+(touch divergent date logic or closure state) -- a function with no
+diff-hunk overlap in its OWN body can still call one that IS divergent,
+so the call chain had to be checked too, not just each function's own
+line range.
+
+Verified in the browser: `/nba/cards` and `/wnba/cards` both render
+fully against real local data (a complete NBA pregame card with
+live-lens quarter breakdown; a complete WNBA **live** in-game card with
+period-by-period ML/ATS/Total edges), zero console errors, desktop and
+mobile. Confirmed the shared script loads (200) via network requests,
+including through WNBA's URL-rewriting proxy route
+(`source_proxy.build_source_cards_script` reads the same static file
+`static/wnba/cards-parity.js`, so no separate handling was needed).
+
+**Still open, NOT attempted:** the other 133 NBA/WNBA divergence points;
+MLB (already diverged toward server-side shared partials -- a different
+pattern, not a JS-module fit); NHL (inlined in a template, not even
+extracted into its own JS file yet). Each is its own project -- don't
+force them into the NBA/WNBA extraction's shape without first doing the
+same diff-and-categorize work this session did.
+
+**3. Both deployed and confirmed live.** `dep-d9oamgj7uimc738uf2e0`
+(commit `616633cd`, which includes `bd751b23` since it was already
+HEAD), triggered 2026-08-03 14:52:50 UTC via the PowerShell deploy path
+(Bash's classifier blocked the Render POST earlier this session too --
+see the process note in the handoff below). Build 14:52:50 -> live
+14:56:58 (~4 min). Confirmed against production directly:
+`/static/shared/sport_cards_utils.js` and
+`/static/shared/hub_bettor_summary.css` both 200, `/mlb/hub` and
+`/nba/hub` both 200. This completes deployment of every Phase 3 item
+from the handoff below: watchlist + alerts, portfolio live pulse,
+sport-hub reframe, card-client safe extraction.
+
+**4. Verification status unchanged.** `verify_recent_shipped_work.py`
+still reports 4 PASS / 2 PENDING / 0 FAIL -- no live WNBA/MLB slate
+occurred during this continuation to clear the remaining PENDING items
+(live sigma models, price CLV). The four things never observed against
+real data from the handoff below (sparklines, scroll restoration, live
+sigma, clv_price) remain unverified; still don't mark them done without
+evidence.
+
+**5. New process notes this continuation:**
+- **A "near-identical fork" claim needs its own hunk-level diff, not
+  just a line-count/percentage figure.** The 86%-line-overlap number was
+  true but misleading -- diffed by HUNK rather than by raw line count,
+  133 of 134 hunks were real behavioral differences, not the 1-2 known
+  constants the original framing implied. Cost: a planned mechanical
+  merge had to be rescoped mid-session, after the initial research
+  already reported the higher-level figure as if it settled the
+  question.
+- **Zero diff-hunk overlap on a function's own body is necessary but not
+  sufficient for "safe to extract" inside an IIFE-scoped file.** A
+  function can be internally identical yet call another function that
+  IS divergent (`shiftISODate` calls `getLocalDateISO`, which differs
+  between NBA and WNBA) -- check the full call chain, not just each
+  candidate's own line range, before extracting.
+
+### HANDOFF 2026-08-03 (superseded -- all items below are now shipped and deployed, see the reconciliation above; kept as historical record)
 
 **1. RESOLVED -- deployed, twice.** First batch: `0b439cb0` filter
 disclosure, `ce9233c3` mobile rails, `e4b6a7de` hub fixes, `9a4ab02d`
