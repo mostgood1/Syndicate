@@ -187,8 +187,128 @@ def _write_chunk_manifest(path: Path | str | None, *, chunk_name: str, record_co
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
 
 
+_RESPONSE_PROVENANCE_KEYS = (
+    "selected_date",
+    "date",
+    "sport",
+    "requested_sport",
+    "market",
+    "query_type",
+    "intent",
+    "ok",
+    "local_only",
+    "candidate_count",
+    "state_last_updated",
+    "snapshot_generated_at",
+)
+
+
+_HEAVY_MANIFEST_ROW_KEYS = ("predictions", "edges", "recommendations", "live_data", "raw")
+# Nested containers that re-embed a full record payload (with its own
+# response/artifact_metadata) inside a record: RecommendationRecord and
+# PortfolioEventRecord both stash `raw={"prediction": prediction_payload,
+# ...}`, and bundle-shaped rows carry a top-level "prediction" plus a
+# "recommendations" list of sub-records. Confirmed 2026-08-02: after the
+# top-level slim alone, a 2026-06-04 record still carried a 1.5MB
+# `prediction` subtree (1.2MB of it a nested manifest_summary).
+_SLIM_NESTED_CONTAINER_KEYS = ("prediction", "raw", "portfolio_event", "record")
+
+
+def _slim_sport_manifest_rows(rows: Any) -> list[dict[str, Any]]:
+    slim_rows: list[dict[str, Any]] = []
+    if not isinstance(rows, list):
+        return slim_rows
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        counts = row.get("counts")
+        slim_rows.append(
+            {
+                "sport_slug": row.get("sport_slug"),
+                "selected_date": row.get("selected_date"),
+                "status": row.get("status"),
+                "last_updated": row.get("last_updated"),
+                "counts": dict(counts) if isinstance(counts, Mapping) else None,
+            }
+        )
+    return slim_rows
+
+
+def slim_evaluation_record_payload(payload: Mapping[str, Any], *, _depth: int = 0) -> tuple[dict[str, Any], bool]:
+    """Reduce a ledger record to provenance-not-payload form; returns
+    (record, changed). Shared by the persist path and
+    scripts/compact_evaluation_ledger.py so history and new writes converge
+    on one shape. Slims, at any nesting level reachable through
+    _SLIM_NESTED_CONTAINER_KEYS / "recommendations" lists:
+    - "response" dicts down to _RESPONSE_PROVENANCE_KEYS (no consumer reads
+      more -- _record_sport, _record_market_family,
+      _recommendation_publish_date, _ledger_record_chunk_name);
+    - "manifest_summary.sport_manifests" rows down to slim provenance rows
+      (full manifests live at reports/manifests/<sport>.json).
+    The per-candidate data settlement/metrics DO need lives in
+    record["recommendation"], untouched. Record identity is unaffected
+    (explicit id fields, see _ledger_record_identity)."""
+    record = dict(payload)
+    changed = False
+
+    response = record.get("response")
+    if isinstance(response, Mapping) and any(key not in _RESPONSE_PROVENANCE_KEYS for key in response):
+        record["response"] = {key: response.get(key) for key in _RESPONSE_PROVENANCE_KEYS if response.get(key) is not None}
+        changed = True
+
+    artifact_metadata = record.get("artifact_metadata")
+    if isinstance(artifact_metadata, Mapping):
+        manifest_summary = artifact_metadata.get("manifest_summary")
+        if isinstance(manifest_summary, Mapping):
+            sport_manifests = manifest_summary.get("sport_manifests")
+            if isinstance(sport_manifests, list) and any(
+                isinstance(row, Mapping) and any(key in row for key in _HEAVY_MANIFEST_ROW_KEYS) for row in sport_manifests
+            ):
+                new_metadata = dict(artifact_metadata)
+                new_summary = dict(manifest_summary)
+                new_summary["sport_manifests"] = _slim_sport_manifest_rows(sport_manifests)
+                new_metadata["manifest_summary"] = new_summary
+                record["artifact_metadata"] = new_metadata
+                changed = True
+
+    if _depth < 4:
+        for key in _SLIM_NESTED_CONTAINER_KEYS:
+            nested = record.get(key)
+            if isinstance(nested, Mapping):
+                slimmed, nested_changed = slim_evaluation_record_payload(nested, _depth=_depth + 1)
+                if nested_changed:
+                    record[key] = slimmed
+                    changed = True
+        nested_rows = record.get("recommendations")
+        if isinstance(nested_rows, list) and any(isinstance(row, Mapping) for row in nested_rows):
+            new_rows: list[Any] = []
+            rows_changed = False
+            for row in nested_rows:
+                if isinstance(row, Mapping):
+                    slimmed, row_changed = slim_evaluation_record_payload(row, _depth=_depth + 1)
+                    new_rows.append(slimmed)
+                    rows_changed = rows_changed or row_changed
+                else:
+                    new_rows.append(row)
+            if rows_changed:
+                record["recommendations"] = new_rows
+                changed = True
+
+    return record, changed
+
+
+def _slim_record_response_for_persist(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Persisted ledger records carry provenance, never payload copies --
+    confirmed 2026-08-02 as the dominant ledger bloat: single records over
+    2.5MB and day chunks of 2.0-2.7GB. In-process bundle consumers keep the
+    full response; only persisted bytes shrink."""
+    record, _changed = slim_evaluation_record_payload(payload)
+    return record
+
+
 def _append_evaluation_ledger_record(path: Path, payload: Mapping[str, Any]) -> None:
     target = Path(path)
+    payload = _slim_record_response_for_persist(payload)
     if not _is_chunked_ledger_path(target):
         _append_jsonl(target, payload)
         return
@@ -245,7 +365,7 @@ def _update_evaluation_ledger_record(path: Path, payload: Mapping[str, Any]) -> 
     needs this separate update path instead of routing back through append.
     """
     target = Path(path)
-    record = dict(payload)
+    record = _slim_record_response_for_persist(payload)
     identity = _ledger_record_identity(record)
     if not identity:
         _append_evaluation_ledger_record(target, record)
@@ -279,6 +399,20 @@ def _update_evaluation_ledger_record(path: Path, payload: Mapping[str, Any]) -> 
     _write_chunk_manifest(target, chunk_name=chunk_name, record_count=record_count)
 
 
+def _ledger_max_chunk_bytes() -> int:
+    """Per-chunk read ceiling for full-history loads. 256MB default keeps
+    every legitimately-sized historical chunk readable (largest real day
+    outside the two embedded-manifest giants is ~79MB) while making the
+    2.0-2.7GB giants unreadable-by-design until compacted."""
+    import os
+
+    raw_value = str(os.environ.get("SYNDICATE_EVALUATION_LEDGER_MAX_CHUNK_BYTES") or "").strip()
+    try:
+        return max(1_000_000, int(raw_value)) if raw_value else 256_000_000
+    except ValueError:
+        return 256_000_000
+
+
 def _load_chunked_ledger_records(path: Path) -> list[dict[str, Any]]:
     chunk_root = _ledger_chunk_root(path)
     if not chunk_root.exists():
@@ -299,8 +433,23 @@ def _load_chunked_ledger_records(path: Path) -> list[dict[str, Any]]:
                     chunk_paths.append(chunk_path)
     if not chunk_paths:
         chunk_paths = sorted(item for item in chunk_root.glob("*.jsonl") if item.is_file())
+    max_chunk_bytes = _ledger_max_chunk_bytes()
     rows: list[dict[str, Any]] = []
     for chunk_path in chunk_paths:
+        # Historical chunks reached 2.0-2.7GB per day (records used to embed
+        # full sport manifests -- see _artifact_manifest_summary); reading one
+        # of those into memory is an instant OOM on the workers. Skip
+        # oversized chunks outright until scripts/compact_evaluation_ledger.py
+        # has rewritten them.
+        try:
+            if chunk_path.stat().st_size > max_chunk_bytes:
+                print(
+                    f"[intelligence_evaluation] SKIP_OVERSIZED_LEDGER_CHUNK path={chunk_path.name} bytes={chunk_path.stat().st_size} ceiling={max_chunk_bytes}",
+                    flush=True,
+                )
+                continue
+        except OSError:
+            continue
         try:
             content = chunk_path.read_text(encoding="utf-8")
         except Exception:
@@ -440,7 +589,29 @@ def _artifact_manifest_summary(*, selected_date: str | None = None, sport: str |
     sport_slug = str(sport or "").strip().lower()
     sport_slugs = None if not sport_slug or sport_slug == "all" else [sport_slug]
     manifests = load_artifact_manifests(selected_date=selected_date, sport_slugs=sport_slugs)
-    manifest_rows = [manifest.to_dict() for manifest in manifests]
+    # Pointer, not payload (same contract manifest.py's publish_sport_manifest
+    # states): this used to embed every sport's FULL manifest.to_dict() --
+    # including the per-artifact predictions/edges/recommendations/live_data
+    # lists, which for MLB span the ~32k-file statcast cache -- into every
+    # single ledger record. Confirmed 2026-08-02: single-day chunk files of
+    # 2.0GB and 2.7GB (835 records = 2.1GB on 2026-06-04), which made every
+    # full-history ledger read an OOM and starved the whole evaluation loop.
+    # The full manifests are already durably persisted at
+    # reports/manifests/<sport>.json -- a record needs provenance (which
+    # manifests, how fresh, how many artifacts), never a copy.
+    manifest_rows = []
+    for manifest in manifests:
+        row = manifest.to_dict()
+        counts = row.get("counts")
+        manifest_rows.append(
+            {
+                "sport_slug": row.get("sport_slug"),
+                "selected_date": row.get("selected_date"),
+                "status": row.get("status"),
+                "last_updated": row.get("last_updated"),
+                "counts": dict(counts) if isinstance(counts, dict) else None,
+            }
+        )
     return {
         "selected_date": selected_date,
         "sport": sport,

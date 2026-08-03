@@ -281,6 +281,22 @@ services:
         value: "true"
       - key: RECONCILIATION_MLB_ACTUALS_WRITER_INTERVAL_SECONDS
         value: "3600"
+      # Evaluation-ledger settlement autorun (evaluation_settlement.py,
+      # gated in scripts/run_refresh_worker.py). This was the single
+      # largest open gap in the 2026-08-02 end-to-end assessment: with no
+      # caller for settle_result(), every ledger record stayed "pending"
+      # forever, so reliability profiles / dynamic edge thresholds / policy
+      # promotion were all permanently inert (settled_count: 0 since
+      # 2026-06-10). Enabled after (a) a local dry-run match-rate check
+      # against real graded artifacts and (b) the ledger-bloat fix that
+      # made chunk reads safe (slim manifest_summary + oversized-chunk skip
+      # + scripts/compact_evaluation_ledger.py for the historical giants).
+      # Settlement reads only the target date's own chunk file, never full
+      # history.
+      - key: EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN
+        value: "true"
+      - key: EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS
+        value: "21600"
       - key: SYNDICATE_REQUIRE_HOSTED_STORAGE
         value: "true"
       - key: SYNDICATE_REFRESH_STATE_BACKEND
