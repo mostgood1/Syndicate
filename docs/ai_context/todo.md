@@ -4,8 +4,13 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-03 (see "HANDOFF 2026-08-03 #2 -- START HERE"
-below: session ended on context, four Phase 3 items + Phase 1 football
+Last reconciled: 2026-08-03 (see "Reconciliation 2026-08-03 (Settlement
+item 3b root-caused: canonical board-state path never writes the
+evaluation ledger)" immediately below -- picked up HANDOFF 2026-08-03 #2's
+top-priority open item and found the real cause, not just confirmed the
+symptom).
+Before that: "HANDOFF 2026-08-03 #2 -- START HERE"
+(session ended on context, four Phase 3 items + Phase 1 football
 readiness + a hygiene pass all shipped and deployed this round; a real,
 prioritized open-items list follows for whoever picks this up next).
 Before that: "Reconciliation 2026-08-03 (World-class
@@ -56,6 +61,89 @@ full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
 
+### Reconciliation 2026-08-03 (Settlement item 3b root-caused: canonical board-state path never writes the evaluation ledger)
+
+Picked up "HANDOFF 2026-08-03 #2" item 3b ("Settlement `_SUPPORTED_SPORTS`
+still only mlb/wnba... real settlement throughput unconfirmed since the
+flag flipped"). It's now confirmed, root-caused, and it's a bigger gap
+than the `_SUPPORTED_SPORTS` framing suggested -- **this is not a
+settlement bug, it's a starvation bug upstream of settlement.**
+
+**What was built and shipped (both deployed, both tested):**
+- `/api/ops/evaluation-settlement/status` (`syndicate/blueprints/ops.py`,
+  commit `527dcd30`) -- read-only, admin-token-gated. Surfaces the
+  settlement autorun's last-cycle summary (it's written through the
+  shared keyvalue store, so the web service CAN read it even though the
+  ledger itself lives only on refresh-worker's local disk).
+- `total_recommendation_records`/`already_resolved_records` added to
+  `settle_ledger_for_date`'s return (`evaluation_settlement.py`, commit
+  `e402802a`) -- `pending=0` alone is ambiguous (means either "nothing to
+  do, already settled" or "ledger has nothing for this date at all");
+  these two disambiguate it. `total_ledger_records` is deliberately NOT
+  summed across a multi-sport `settle_ledger_for_dates` call -- it counts
+  a whole date's chunk file regardless of sport, so summing it once per
+  sport for the same date would double-count.
+
+**What was found, checked directly against production, not inferred:**
+Forced an off-cycle settlement run (the autorun only fires once per 24h
+by default; temporarily set `EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS=1`
+on refresh-worker, deployed, read the status endpoint, then reverted the
+env var and redeployed to restore normal cadence -- confirmed removed
+after). Result for **both** mlb and wnba, for both 2026-08-02 and
+2026-08-03: `total_recommendation_records: 0`. The evaluation ledger has
+**zero** recommendation records for either currently-live sport across
+either date. This is not a settlement-matching problem -- there is
+nothing to settle.
+
+**Root cause, confirmed by reading the actual code paths (not guessed):**
+Production has `SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE=1` set on
+refresh-worker. The canonical path
+(`pipeline/intelligence_state.py:3719`'s `_build_intelligence_board_state`,
+queued via the `_watched_board_dates` registry) is what actually serves
+the live board today (confirmed live recommendations via
+`/api/intelligence/status` while this was checked) -- and it **never
+calls `record_prediction`/`record_recommendation`/
+`build_intelligence_evaluation_bundle`** anywhere in that file. Those
+three only get called from the OLDER per-query-payload path
+(`syndicate/features/intelligence.py:9865`'s `run_intelligence_query`,
+reached via `pipeline/intelligence_pipeline.py` and the separate
+`_watched_payloads`/`_pending_keys` queue in the same background service)
+-- which appears to be unused/empty in production now that routes read
+canonical snapshots (`read_latest_intelligence_board_snapshot_response`
+etc.) instead of calling `run_intelligence_query` directly. So the
+write side of the whole evaluation feedback loop has been silently
+disconnected since canonical-board-state shipped, not since the
+settlement autorun flag flipped -- extending `_SUPPORTED_SPORTS` to more
+sports right now would still settle nothing, because there is nothing
+being recorded for ANY sport, mlb/wnba included.
+
+**Downstream consequence, not yet quantified:** `build_reliability_profile`
+(read directly from the ledger by `adjust_confidence`/
+`recommendation_engine.filter_candidates`/`.rank_candidates` -- NOT via
+`performance_summary.json`, which is a separate, likely-dead manual/CLI
+artifact nothing auto-regenerates either) has had an empty ledger to
+work with in production this whole time. Reliability multipliers,
+dynamic thresholds, and policy promotion have been silently operating on
+zero history and presumably falling back to whatever their no-data
+defaults are -- worth confirming what those defaults actually do before
+assuming this is merely "a metric that's always 0."
+
+**Next step for whoever picks this up:** decide where inside
+`_build_intelligence_board_state`/its callers to record a
+prediction+recommendation per real board-state rebuild, with a real
+answer to the obvious follow-up question -- the canonical path rebuilds
+on every refresh cycle (tens of times a day), so recording unconditionally
+would flood the ledger with near-duplicate rows for the same
+still-standing recommendation. Needs a "record only when the
+recommendation set actually changed" guard, in the same spirit as the
+fingerprint-diffing already used elsewhere in this file
+(`_source_fingerprints`) -- don't build this from scratch without
+checking whether that existing machinery can be reused directly.
+Re-verify with `/api/ops/evaluation-settlement/status` afterward; no new
+diagnostic tooling should be needed, it's already deployed and live.
+
+---
+
 ### HANDOFF 2026-08-03 #2 -- START HERE (session ended on context, work is genuinely at a clean stopping point)
 
 Picked up the prior "HANDOFF 2026-08-03" entry below (now superseded),
@@ -100,20 +188,12 @@ a. **Football season-opener manual steps** -- see the new
    `scripts/backfill_nfl_performance.py` weekly once real games exist.
    NCAAF starts ~Aug 29, NFL ~Sep 10 -- this is the forcing function.
 
-b. **Settlement `_SUPPORTED_SPORTS` still only `("mlb","wnba")`.**
-   `EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN` is on in
-   render.yaml, but `syndicate/features/shared/evaluation_settlement.py:33`
-   never got extended to the other sports, and
-   `reports/performance_summary.json`/`reports/intelligence/performance_summary.json`
-   are both still stale from 2026-06-10 (predates the autorun flip) --
-   real settlement throughput since the flag flipped is genuinely
-   unconfirmed. This was flagged as "highest leverage in the repo" by
-   the original assessment and still is: everything downstream
-   (reliability multipliers, dynamic thresholds, policy promotion, CLV)
-   depends on it. First step for whoever picks this up: check production
-   directly for a fresher `performance_summary.json` before assuming
-   it's still broken -- it may just be that nobody's looked since the
-   flag flipped.
+b. **SUPERSEDED -- see "Reconciliation 2026-08-03 (Settlement item 3b
+   root-caused...)" above this entry.** Root-caused, not just checked:
+   it's not a `_SUPPORTED_SPORTS` gap, the evaluation ledger has zero
+   recommendation records for any sport in production because the
+   canonical board-state path never writes to it. Extending
+   `_SUPPORTED_SPORTS` before that's fixed would still settle nothing.
 
 c. **Shell consolidation's real remaining piece: 35+2 template
    migration to `shared/base.html`.** Fully researched and categorized in
