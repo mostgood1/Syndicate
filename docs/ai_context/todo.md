@@ -4,7 +4,10 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-03 (see "Reconciliation 2026-08-03 (Phase 2:
+Last reconciled: 2026-08-03 (see "Reconciliation 2026-08-03 (Phase 3
+start + keyvalue eviction reported success but reclaimed NOTHING --
+OPEN)" below).
+Before that: "Reconciliation 2026-08-03 (Phase 2:
 price CLV, fractional-Kelly stakes, correlated-exposure budgets)" below).
 Before that: "Reconciliation 2026-08-03 (Keyvalue
 ceiling root-caused by measurement + NBA live-prop sigma ported)".
@@ -37,6 +40,72 @@ Before that: "Reconciliation 2026-08-01 (Layer 2 board:
 full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
+
+### Reconciliation 2026-08-03 (Phase 3 start + keyvalue eviction reported success but reclaimed NOTHING -- OPEN)
+
+**OPEN BUG, pick this up first.** `POST /api/ops/keyvalue/expire-run-artifacts`
+(added `dac3793e`) reported `ok=true, expired=1758,
+estimated_reclaimed_mb=150.17` against the `migration_runs` backlog, with a
+300s grace. Well past that grace, **nothing changed**: still 2,546 keys /
+185.43MB in that bucket, total 212.11MB, Redis `used_memory` 213.07M of
+256M, `evicted_keys` still climbing (37,633).
+
+What is RULED OUT by evidence, so don't re-tread it:
+- Not a scoping/threshold miss: the dry run and apply both matched 2,546
+  keys, expired 1,758, skipped 788 as recent, 0 without a run stamp.
+- Not phantom keys: `client.memory_usage(key)` returned real sizes summing
+  to 150.17MB **in the same loop**, so the key names are valid and the keys
+  exist. A non-existent key returns None there.
+- Not a silent exception: the counter only increments when `client.expire`
+  returns without raising, and it reached 1,758.
+- Not a dry-run mixup: the response echoed `dry_run=False`.
+- Not new keys refilling the count: a refresh writes a handful of keys per
+  run, not 2,546, and the count was byte-identical across measurements.
+- Mechanism matches the PROVEN `keyvalue_sweep_apply`, which calls
+  `client.expire(key, grace)` the same way. The one behavioural difference
+  is that sweep only ever targets keys with NO TTL (`ttl >= 0 -> continue`),
+  whereas this targets keys that ALREADY carry a ~37h TTL. **That is the
+  most promising thread**: whether something in this deployment refuses to
+  shorten an existing TTL (e.g. an EXPIRE with GT semantics, or a
+  Valkey/managed-Redis policy), which plain redis-py EXPIRE should not do.
+  Verify by reading back `client.ttl(key)` on a sample immediately after
+  the call -- the endpoint currently never checks that its own write took.
+
+Next step regardless of cause: make the endpoint report a post-write
+`ttl()` readback for a sample of keys, so it can never again claim success
+without evidence. That omission is the real defect here -- the tool
+asserted an outcome it never verified.
+
+Interim risk: still ~212MB of a 256MB ceiling under `allkeys-lru`, so
+coordination state keeps getting evicted. Truncation (`44b0f247`) does stop
+NEW growth -- no post-deploy run appears among the 40 largest keys -- so
+the backlog should still age out on its own ~37h TTLs even if the forced
+expiry stays broken.
+
+**Also this session (all shipped, deployed on `dac3793e`):**
+- **Mobile board (`fd69dce8`)**: cards default under 900px, blotter stacks
+  into labelled blocks, bet-slip rail docks to the bottom. Verified in a
+  real browser at 375px (no horizontal scroll; the slip button, previously
+  off-screen, now lands at x=380 of 392) and 1280px (desktop untouched).
+- **Tick no longer discards reader state (`dac3793e`)**: `renderBoardBody`
+  captures/restores open `<details>` + scroll around the wholesale
+  innerHTML re-render. **Browser verification caught the first version
+  querying `#board-body`, which does not exist** (the container is
+  `#board-cards`) -- it would have shipped as a silent no-op that reviewed
+  fine. Confirmed working on the real page. **Scroll restoration is NOT
+  verified** -- `window.scrollTo` is a no-op in the preview browser because
+  the pane is not compositing; needs a real device.
+
+**Process gap found, worth fixing:** the standing pre-deploy check reads
+`/api/ops/live-refresh/state`'s `sim_run_status`, which covers the MLB sim
+but **NOT an in-flight odds-refresh run**. This session's deploy killed the
+run stamped `20260803_033243` mid-flight -- its early artifacts
+(`refresh_and_gate_run`, `refresh_job_status`) exist while
+`odds_refresh.json`/`.stderr.txt` never got written, which is what
+`/api/ops/odds-refresh/status` reporting `exists=False` actually meant.
+No data loss (the next cycle rewrites them) and NOT eviction damage (that
+run was 18 minutes old and explicitly skipped as recent), but the
+"clean window" check is narrower than it has been treated as.
 
 ### Reconciliation 2026-08-03 (Phase 2: price CLV, fractional-Kelly stakes, correlated-exposure budgets)
 
