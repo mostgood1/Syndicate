@@ -31,13 +31,25 @@
         <a class="cards-nav-pill" href="/intelligence/status">Data coverage</a>
       </div>
     </div>
+    <!-- Sport, day and game-state stay visible; the rest fold away. Six
+         stacked rails put ~25 buttons above the content on a phone, which
+         is most of a viewport before a single opportunity is visible. The
+         disclosure opens itself whenever a filter is actually active, so a
+         narrowed board never hides why it is narrow. -->
     <div class="board-toolbar-row">
-      <div class="board-tabs cards-tabs" id="board-market-tabs" role="tablist" aria-label="Market family filter"></div>
-      <div class="board-tabs cards-tabs" id="board-edge-tabs" role="tablist" aria-label="Minimum edge filter"></div>
-      <div class="board-tabs cards-tabs" id="board-view-tabs" role="tablist" aria-label="Board view"></div>
-    </div>
-    <div class="board-toolbar-row">
-      <div class="board-tabs cards-tabs" id="board-steam-tabs" role="tablist" aria-label="Steam move filter"></div>
+      <details id="board-more-filters" class="board-more-filters">
+        <summary class="board-more-filters__summary">
+          <span>More filters</span>
+          <span id="board-filter-count" class="board-filter-count" hidden></span>
+        </summary>
+        <div class="board-more-filters__body">
+          <div class="board-tabs cards-tabs" id="board-market-tabs" role="tablist" aria-label="Market family filter"></div>
+          <div class="board-tabs cards-tabs" id="board-edge-tabs" role="tablist" aria-label="Minimum edge filter"></div>
+          <div class="board-tabs cards-tabs" id="board-view-tabs" role="tablist" aria-label="Board view"></div>
+          <div class="board-tabs cards-tabs" id="board-steam-tabs" role="tablist" aria-label="Steam move filter"></div>
+          <button type="button" id="board-clear-filters" class="cards-nav-pill board-clear-filters" hidden>Clear filters</button>
+        </div>
+      </details>
     </div>
   </form>
 
@@ -359,6 +371,44 @@
       renderFilterTabs();
       renderBoardBody();
     });
+    updateFilterDisclosure();
+  }
+
+  // Which of the folded-away controls are actually narrowing the board.
+  // `view` is deliberately excluded -- it is a display preference, not a
+  // filter, and counting it would claim the board is narrowed when it is
+  // not.
+  function activeRefinements() {
+    const active = [];
+    if (state.marketFamily && state.marketFamily !== "all") active.push("market");
+    if (state.minEdge > 0) active.push("edge");
+    if (state.steamOnly) active.push("steam");
+    return active;
+  }
+
+  function updateFilterDisclosure() {
+    const count = activeRefinements().length;
+    const badge = document.getElementById("board-filter-count");
+    if (badge) {
+      badge.textContent = String(count);
+      badge.hidden = count === 0;
+    }
+    const clearButton = document.getElementById("board-clear-filters");
+    if (clearButton) clearButton.hidden = count === 0;
+    const disclosure = document.getElementById("board-more-filters");
+    // Only ever force it OPEN, never closed: a board narrowed by a filter
+    // must not hide the reason it looks empty. Closing is left to the user
+    // so their choice is not undone on the next re-render.
+    if (disclosure && count > 0 && !disclosure.open) disclosure.open = true;
+  }
+
+  function clearRefinements() {
+    state.marketFamily = "all";
+    state.minEdge = 0;
+    state.steamOnly = false;
+    syncUrlState();
+    renderFilterTabs();
+    renderBoardBody();
   }
 
   function setRefreshStatus(message, tone) {
@@ -1827,6 +1877,14 @@
     void loadGameChips();
     void loadIntelligence({ forceRefresh: true });
   });
+
+  const clearFiltersButton = document.getElementById("board-clear-filters");
+  if (clearFiltersButton) {
+    clearFiltersButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      clearRefinements();
+    });
+  }
 
   renderFilterTabs();
   renderBetSlip();

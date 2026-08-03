@@ -749,6 +749,85 @@ table.board-blotter tbody tr:last-child td {
   }
 }
 
+/* Collapsible secondary filters. Market family, min-edge, view and steam
+   were four always-on rails; folded away they stop pushing content below
+   the fold, and the count badge means a narrowed board still announces
+   itself. */
+.board-more-filters {
+  width: 100%;
+}
+
+.board-more-filters__summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  padding: 7px 12px;
+  min-height: 36px;
+  border: 1px solid var(--cards-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 12px;
+  color: var(--cards-text-soft);
+}
+
+.board-more-filters__summary:hover {
+  color: var(--cards-text);
+  border-color: var(--cards-line-strong);
+}
+
+.board-more-filters__summary::-webkit-details-marker {
+  display: none;
+}
+
+.board-more-filters__summary::before {
+  content: "▸";
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+.board-more-filters[open] > .board-more-filters__summary::before {
+  content: "▾";
+}
+
+.board-filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(96, 165, 250, 0.28);
+  color: #dbeafe;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.board-more-filters__body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding-top: 10px;
+}
+
+.board-clear-filters {
+  margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  .board-more-filters__body {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .board-clear-filters {
+    margin-left: 0;
+  }
+}
+
 /* Line/odds movement sparkline. Colour carries direction, matching the
    arrow that precedes it, so the shape and the text agree at a glance. */
 .board-sparkline {
