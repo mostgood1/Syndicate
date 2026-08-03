@@ -83,6 +83,40 @@ def _clear_wall_clock_ttl_caches() -> None:
 
 
 @pytest.fixture(autouse=True)
+def _clear_nba_cards_caches() -> None:
+    # NBA's equivalent of the WNBA cache hazard above -- syndicate/features/nba/cards.py
+    # has its own _NBA_CARDS_CONTEXT_CACHE (an OrderedDict keyed on a cache
+    # tuple, not date-only) plus four lru_cache-decorated functions
+    # (_nba_team_branding_index, _local_live_state_payload_cached,
+    # _local_live_snapshot_payload_cached, _live_projection_calibration_index).
+    # None of these were reset by any autouse fixture -- a documented gap
+    # ("test order-pollution... no conftest reset") from an earlier session's
+    # end-to-end assessment. Individual test files worked around it by
+    # calling cache_clear() themselves, which only protects that one file's
+    # own run order, not the full suite. Clearing here follows the exact
+    # same pattern this file already uses for WNBA/soccer above.
+    from syndicate.features.nba.cards import _NBA_CARDS_CONTEXT_CACHE
+    from syndicate.features.nba.cards import _live_projection_calibration_index
+    from syndicate.features.nba.cards import _local_live_snapshot_payload_cached
+    from syndicate.features.nba.cards import _local_live_state_payload_cached
+    from syndicate.features.nba.cards import _nba_team_branding_index
+
+    caches = [
+        _nba_team_branding_index,
+        _local_live_state_payload_cached,
+        _local_live_snapshot_payload_cached,
+        _live_projection_calibration_index,
+    ]
+    for cache_owner in caches:
+        cache_owner.cache_clear()
+    _NBA_CARDS_CONTEXT_CACHE.clear()
+    yield
+    for cache_owner in caches:
+        cache_owner.cache_clear()
+    _NBA_CARDS_CONTEXT_CACHE.clear()
+
+
+@pytest.fixture(autouse=True)
 def _no_background_loops_in_tests():
     # create_app wires _start_background_loops onto the app's first request
     # for non-Render runs, so ANY test that touches a test client spawns the

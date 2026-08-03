@@ -438,6 +438,81 @@ budget individual verification per template, don't batch-commit them
 unverified. Handle `cards_embed.html` and `nhl/cards_source.html`
 separately from that batch, each on its own terms.
 
+**Addendum -- Hygiene sweep, `<pending commit>`.** The assessment's own
+"hygiene (cheap, do alongside)" list, checked item by item against
+current code (not assumed) -- most of it turned out already fixed by
+prior sessions, and **two items this session's own research agent
+first called "still true" turned out wrong on direct verification**,
+worth flagging as its own lesson:
+
+- Stale docs (NBA/WNBA source-app rows, live-lens sport list, `todo.md`'s
+  `19e59beb` header) -- **all already fixed**, no action needed.
+- **Dead `render.yaml` env blocks -- NOT dead, do not delete.** The
+  research agent reported zero readers of
+  `SYNDICATE_NBA_SOURCE_APP_FALLBACK`/`SYNDICATE_WNBA_SOURCE_APP_FALLBACK`
+  anywhere in `syndicate/`, `scripts/`, or `vendor/`. A direct follow-up
+  grep of `scripts/` found four real hits:
+  `scripts/refresh_nba_oddsapi_props.py:67` and
+  `scripts/refresh_wnba_oddsapi_props.py:106` both read these exact
+  names via `_source_app_fallback_enabled()` to gate a still-live props-
+  refresh fallback path (distinct from the web-serving fallback that
+  really was deleted); `scripts/bootstrap_data_root.py:222` and
+  `scripts/unified_daily_update.ps1:4172` actively **set**
+  `SYNDICATE_WNBA_SOURCE_APP_FALLBACK=1` as part of real bootstrap/daily-
+  update flows. Left `render.yaml` untouched. **Lesson: a research
+  agent's "confirmed zero readers" claim is still a claim -- rerun the
+  grep yourself before acting on it, same discipline as not trusting the
+  original assessment doc at face value.**
+- **`SYNDICATE_ACTIVE_SPORTS` rollout checklist -- written**, new
+  `docs/ai_context/season_opener_checklist_2026.md`. Traced the actual
+  mechanism first: `SYNDICATE_ACTIVE_SPORTS` (home.py) only gates the
+  home command-center *display* and isn't set anywhere in render.yaml
+  (defaults to `mlb,wnba` in code) -- a real manual step needed before
+  NFL/NCAAF's seasons. Separately, confirmed
+  `_active_sports_for_date()` (`ops_refresh.py:1073-1107`, the weekly-
+  autorun's own eligibility gate) is a hardcoded **calendar**, not an env
+  var -- NFL auto-activates at `month >= 8` (already true today),
+  NCAAF at Aug 15 -- so that one needs no manual step, and the doc says
+  so explicitly to head off confusing the two.
+- **NBA conftest cache-reset fixture -- built.** New
+  `_clear_nba_cards_caches` autouse fixture in `tests/conftest.py`,
+  mirroring the existing WNBA/soccer fixture exactly: NBA's
+  `_NBA_CARDS_CONTEXT_CACHE` plus its four `lru_cache`-decorated
+  functions (`_nba_team_branding_index`,
+  `_local_live_state_payload_cached`, `_local_live_snapshot_payload_cached`,
+  `_live_projection_calibration_index`) were never reset between tests --
+  the exact "test order-pollution... no conftest reset" gap a prior
+  session's audit already named. Verified: all 674 NBA-related tests
+  pass, and the full archive suite still shows only the same 4 pre-
+  existing WNBA order-dependent failures already flagged earlier this
+  session -- zero new failures from adding this fixture.
+- **`football/evaluation.py` -- NOT dead, do not delete.** Confirmed
+  precisely (matches this session's own earlier finding when it first
+  investigated NFL evaluation tracking): the file itself is real, wired
+  code (`adapters.py`/`season_validation.py` both import it, and
+  `persist_football_evaluation` does real conditional file I/O). The
+  actual stub is one level up -- `adapters.py:300-302` hardcodes
+  `mae: 0.0`, and `adapters.py:413-416` hardcodes `roi=0.0`/`clv=0.0`
+  when *persisting* a computed evaluation. Deleting `evaluation.py` per
+  the roadmap's literal wording would delete real working code to fix a
+  bug that lives elsewhere. Not fixed here (making those metrics real
+  needs real settled-bet data flowing through `adapters.py`, a bigger
+  piece tied to the still-open "extend settlement to more sports" Phase
+  0 item) -- just corrected the record so nobody deletes the wrong file
+  later.
+- **NHL `game_detail` -- still a redirect stub**
+  (`syndicate/blueprints/nhl.py:431-434`,
+  `return redirect(f"/nhl/cards?date={date}&gamePk={game_pk}")`). This
+  is a real feature (a dedicated game-detail template/route) not a quick
+  cleanup -- left as documented remaining scope, not attempted here.
+- **`estimate_live` bare except -- still true, deliberately not
+  touched.** The swallow is in *vendored* code
+  (`vendor/mlb_bettingv2/tools/web/flask_frontend.py:16523-16556`,
+  `except Exception: return None`, no logging). A prior session already
+  found this and chose to track the resulting fallback as a proxy signal
+  in `live_lens_loop.py:298` rather than edit vendor code directly --
+  respected that existing decision rather than override it silently.
+
 ### HANDOFF 2026-08-03 (superseded -- all items below are now shipped and deployed, see the reconciliation above; kept as historical record)
 
 **1. RESOLVED -- deployed, twice.** First batch: `0b439cb0` filter
