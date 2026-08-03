@@ -4,8 +4,10 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-03 (see "Reconciliation 2026-08-03 (Keyvalue
-ceiling root-caused by measurement + NBA live-prop sigma ported)" below).
+Last reconciled: 2026-08-03 (see "Reconciliation 2026-08-03 (Phase 2:
+price CLV, fractional-Kelly stakes, correlated-exposure budgets)" below).
+Before that: "Reconciliation 2026-08-03 (Keyvalue
+ceiling root-caused by measurement + NBA live-prop sigma ported)".
 Before that: "Reconciliation 2026-08-03 (Decided-prop
 guard root-caused properly + keyvalue ceiling made measurable)".
 Before that: "Reconciliation 2026-08-02 (Live props:
@@ -35,6 +37,89 @@ Before that: "Reconciliation 2026-08-01 (Layer 2 board:
 full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
+
+### Reconciliation 2026-08-03 (Phase 2: price CLV, fractional-Kelly stakes, correlated-exposure budgets)
+
+Three commits, deployed together on `4d9d0ac4`. These are the "world-class
+engine" items from the 2026-08-02 assessment's Phase 2, taken in the order
+that compounds: measure the right thing, then size on it, then bound the
+correlated risk of the sizing.
+
+**1. Price CLV (`c3220c4a`).** CLV is worth optimising first because it
+converges on far fewer settled bets than win rate -- and with settlement
+only just enabled, sample size is the binding constraint on reliability
+multipliers, dynamic thresholds and policy promotion alike.
+
+The existing `_clv` measures LINE movement only, so it is structurally
+blind to moneylines (no line to move) and to any market where the number
+holds while the price walks -- a prop at 5.5 going -110 -> -130 scored
+exactly zero. Added `_price_clv` (implied-probability gap between entry
+and closing price), reported as `clv_price` ALONGSIDE `clv`, not
+replacing it. Direction is deliberately NOT applied, unlike line CLV: a
+price is already side-specific, so applying direction would invert every
+under/against-the-favourite bet.
+
+Plumbing required to make it computable at all: `settle_result` now
+accepts and persists `closing_price` (optional; preserves an
+already-captured value when not passed), and `evaluation_settlement`
+passes the graded row's price through. Records with no closing price are
+SKIPPED, not scored 0.0 -- zeroing would drag the mean toward zero and
+make a real edge look like noise.
+
+**2. Fractional-Kelly stakes on every card (`25dc6a01`).**
+`compute_bet_size` implemented real Kelly but was reachable only from
+`run_intelligence_query`'s response builder; the published board hardcoded
+`"portfolio": {}`, so the board showed edges with no sense of what any was
+worth.
+
+Deliberately timid, because Kelly assumes the probability is CORRECT and
+punishes hard when it is not -- and several models here state in their own
+docstrings that they are unbacktested: quarter Kelly by default
+(`SYNDICATE_KELLY_FRACTION_MULTIPLIER`), shrunk again by settled-evidence
+credibility, with the pre-existing confidence cap still applying on top.
+**With zero settled bets a candidate sizes at ~1/16th of full Kelly.**
+Credibility floors at 0.25 rather than 0 so an unproven market yields a
+small honest number instead of a silent zero that reads as broken. All
+shrinkage factors ride on the payload for inspection.
+
+**3. Correlated-exposure budgets (`4d9d0ac4`).** `correlated_with` badges
+already existed but nothing acted on them for SIZING, so five legs on one
+game were each sized as independent -- a 10% swing dressed up as five
+diversified 2% bets. The old greedy low-correlation filter was removed for
+good reason (0.65 collapsed 100+ candidates to ~5) and nothing replaced
+it. Now: group by event id (falling back to matchup text so an id-less
+board is still budgeted rather than silently treated as independent), best
+leg keeps full stake, each subsequent leg decays by half, and the whole
+group scales proportionally if it still exceeds the per-game cap (5%
+default, `SYNDICATE_MAX_GAME_EXPOSURE_FRACTION`). **Shrinks, never
+drops** -- matching the standing call that board visibility stays
+complete. `stake_fraction_pre_exposure` is preserved so a shrunken stake
+is explicable.
+
+Ordering is load-bearing and commented at the call site: exposure budgets
+run strictly AFTER `_attach_adjusted_scores`, since they rank legs within
+a game by `adjusted_score` to decide which keeps its full stake.
+
+**Process note worth keeping**: `_attach_board_stakes` wraps each
+candidate in a broad `except` so a sizing failure can never drop a real
+opportunity. That swallowed a `NameError` during development
+(`_coerce_float` does not exist in `pipeline/intelligence_state.py`; the
+helper is `_numeric_hint`) and would have shipped a board with zero stakes
+and no error anywhere. Three tests now assert stakes are actually
+ATTACHED, not merely that nothing raised. Any future broad-except hook
+deserves the same treatment.
+
+**Open / unproven:**
+- **`clv_price` will read null until settled bets accumulate WITH closing
+  prices.** Wired end to end, zero data today. Not a defect -- but it
+  cannot be validated yet, and the first real check is whether it goes
+  non-null once settlement has run a few cycles.
+- **Stakes and exposure budgets are unverified on a real board.** Check
+  that candidates carry `stake.stake_fraction`, and that a multi-leg game
+  shows `exposure_capped`/`stake_fraction_pre_exposure`.
+- Everything still open from the previous entry: re-measure keyvalue in
+  ~48h, decided-prop guard unconfirmed live, neither sigma model has ever
+  executed in production.
 
 ### Reconciliation 2026-08-03 (Keyvalue ceiling root-caused by measurement + NBA live-prop sigma ported)
 
