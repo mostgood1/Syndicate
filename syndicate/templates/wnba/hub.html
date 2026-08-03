@@ -3,10 +3,16 @@
 {% block title %}Syndicate | WNBA{% endblock %}
 {% block page_title %}WNBA Hub{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/hub_bettor_summary.css') }}" />
+{% endblock %}
+
 {% block content %}
-  {% with route_label='/wnba', title='WNBA is now the first non-MLB module', status='In progress', body='WNBA now has cards, picks, props, a real hub, a betting-card lane, live lens, and a stored-date daily archive running on shared Syndicate surfaces, so the second sport has a real historical lane instead of only day-of boards.', action_href='/wnba/cards?date=' ~ today_date, action_label='Open WNBA cards' %}
+  {% with route_label='/wnba', title='WNBA', body='Today\'s slate, top edges, and live games at a glance.', action_href='/wnba/cards?date=' ~ today_date, action_label='Open WNBA cards' %}
     {% include 'shared/_module_intro.html' %}
   {% endwith %}
+
+  {% include 'shared/_hub_bettor_summary.html' %}
 
   {% with eyebrow='Stored daily slates', title='Recent WNBA processed dates', body='The hub now surfaces the stored WNBA slate dates already present in the source repo, so you can launch the shared board family from real processed artifacts instead of a static landing page.', summary_stats=summary_stats %}
     {% include 'shared/_content_panel.html' %}

@@ -26,6 +26,7 @@ from syndicate.features.soccer.team import build_roster_page_context
 from syndicate.features.soccer.team import build_team_schedule_api_payload
 from syndicate.features.soccer.team import build_team_schedule_page_context
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
+from syndicate.features.shared.hub_summary import build_hub_bettor_summary
 from syndicate.features.shared.rank_board import build_rank_api_payload
 from syndicate.features.shared.timezone import central_today_iso
 
@@ -77,6 +78,7 @@ def hub():
             {"label": "Leagues with a stored schedule", "value": str(len(leagues_with_data))},
             {"label": "Launch league", "value": league_display_name(DEFAULT_LEAGUE)},
         ],
+        hub_summary=build_hub_bettor_summary("soccer", today_value=today_date),
     )
 
 

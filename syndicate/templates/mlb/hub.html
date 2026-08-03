@@ -3,10 +3,16 @@
 {% block title %}Syndicate | MLB{% endblock %}
 {% block page_title %}MLB Hub{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/hub_bettor_summary.css') }}" />
+{% endblock %}
+
 {% block content %}
-  {% with route_label='/mlb', title='MLB is the reference migration module', status='Active', body='The target is full MLB usability inside Syndicate. The hub should launch real current workflows, not just expose a route list.' , action_href='/mlb/cards?date=' ~ launch_date, action_label='Open MLB cards' %}
+  {% with route_label='/mlb', title='MLB', body='Today\'s slate, top edges, and live games at a glance.', action_href='/mlb/cards?date=' ~ launch_date, action_label='Open MLB cards' %}
     {% include 'shared/_module_intro.html' %}
   {% endwith %}
+
+  {% include 'shared/_hub_bettor_summary.html' %}
 
   {% with eyebrow='Current launch points', title='MLB hub now follows the latest stored slate', body='The primary launch links now point at the latest stored MLB date so the hub matches the data that is actually available, while the surrounding route groups still expose the stored artifact lanes that back historical review and archive navigation.', summary_stats=summary_stats %}
     {% include 'shared/_content_panel.html' %}

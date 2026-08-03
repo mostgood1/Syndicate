@@ -19,7 +19,9 @@ from syndicate.features.ncaaf.sources import default_week
 from syndicate.features.ncaaf.sources import week_summaries
 from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
+from syndicate.features.shared.hub_summary import build_hub_bettor_summary
 from syndicate.features.shared.rank_board import build_rank_api_payload
+from syndicate.features.shared.timezone import central_today_iso
 
 
 ncaaf_bp = Blueprint("syndicate_ncaaf", __name__, url_prefix="/ncaaf")
@@ -68,6 +70,7 @@ def hub():
             {"label": "Weeks with data", "value": str(len(available))},
             {"label": "Tracked weeks", "value": str(len(legacy_weeks) or len(available))},
         ],
+        hub_summary=build_hub_bettor_summary("ncaaf", today_value=central_today_iso()),
     )
 
 

@@ -20,7 +20,9 @@ from syndicate.features.nfl.sources import tracked_week
 from syndicate.features.nfl.sources import week_summaries
 from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
+from syndicate.features.shared.hub_summary import build_hub_bettor_summary
 from syndicate.features.shared.rank_board import build_rank_api_payload
+from syndicate.features.shared.timezone import central_today_iso
 
 
 nfl_bp = Blueprint("syndicate_nfl", __name__, url_prefix="/nfl")
@@ -65,6 +67,7 @@ def hub():
             {"label": "Weeks with snapshots", "value": str(len(weeks))},
             {"label": "Latest season", "value": str(season)},
         ],
+        hub_summary=build_hub_bettor_summary("nfl", today_value=central_today_iso()),
     )
 
 

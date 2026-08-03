@@ -3,10 +3,16 @@
 {% block title %}Syndicate | NFL{% endblock %}
 {% block page_title %}NFL Hub{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/hub_bettor_summary.css') }}" />
+{% endblock %}
+
 {% block content %}
-  {% with route_label='/nfl', title='NFL now has cards, game drill-ins, picks, a live-lens monitor, an archive lane, and a betting-card lane in Syndicate', status='Active migration', body='Syndicate now exposes an NFL cards board built from Syndicate-owned NFL artifacts, plus per-game drill-ins on the same shared board contract, a read-only weekly live-lens monitor, a weekly daily-archive lane, the earlier weekly picks board, and a season betting-card companion backed by the same stored weekly snapshots.', action_href='/nfl/cards?season=' ~ season ~ '&week=' ~ launch_week, action_label='Open NFL cards' %}
+  {% with route_label='/nfl', title='NFL', body='Today\'s slate, top edges, and live games at a glance.', action_href='/nfl/cards?season=' ~ season ~ '&week=' ~ launch_week, action_label='Open NFL cards' %}
     {% include 'shared/_module_intro.html' %}
   {% endwith %}
+
+  {% include 'shared/_hub_bettor_summary.html' %}
 
   {% with eyebrow='Stored weekly snapshots', title='Available NFL recommendation weeks', body='The hub surfaces the weekly recommendation snapshot files already present in the source repo, so the first Syndicate NFL module is driven by real stored outputs.', summary_stats=summary_stats %}
     {% include 'shared/_content_panel.html' %}

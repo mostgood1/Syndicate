@@ -8,6 +8,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, redirect, render_template, request
 
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
+from syndicate.features.shared.hub_summary import build_hub_bettor_summary
 from syndicate.features.nhl.archive import build_archive_api_payload
 from syndicate.features.nhl.archive import build_archive_page_context
 from syndicate.features.nhl.betting_recap import build_betting_recap_payload
@@ -230,6 +231,7 @@ def hub():
             {"label": "Latest", "value": latest_date},
             {"label": "Launch date", "value": central_today_iso()},
         ],
+        hub_summary=build_hub_bettor_summary("nhl", today_value=central_today_iso()),
     )
 
 

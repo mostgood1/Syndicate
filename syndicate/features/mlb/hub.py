@@ -10,6 +10,7 @@ from syndicate.features.mlb.sources import daily_top_props_path
 from syndicate.features.mlb.sources import default_mlb_source_root
 from syndicate.features.mlb.sources import load_json_file
 from syndicate.features.mlb.sources import live_lens_report_path
+from syndicate.features.shared.hub_summary import build_hub_bettor_summary
 from syndicate.features.shared.timezone import central_today_iso
 
 
@@ -176,6 +177,7 @@ def build_hub_context() -> dict[str, Any]:
         "default_profile": default_profile,
         "profiles": profiles,
         "availability_note": availability_note,
+        "hub_summary": build_hub_bettor_summary("mlb", today_value=today_date),
         "summary_stats": [
             {"label": "Launch date", "value": cards_date},
             {"label": "Latest stored date", "value": latest_archive_date},

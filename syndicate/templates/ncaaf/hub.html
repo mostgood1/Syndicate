@@ -3,10 +3,16 @@
 {% block title %}Syndicate | NCAAF{% endblock %}
 {% block page_title %}NCAAF Hub{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/hub_bettor_summary.css') }}" />
+{% endblock %}
+
 {% block content %}
-  {% with route_label='/ncaaf', title='NCAAF now has cards, picks, a live-lens monitor, a daily archive, and a betting card in Syndicate', status='Active migration', body='The live NCAAF recommendation feed is offseason-empty, so Syndicate starts with historical weekly cards, picks, a read-only live-lens monitor, a daily archive lane, and a season betting-card companion backed by stored recommendation summaries from the source app.', action_href='/ncaaf/cards?week=' ~ launch_week, action_label='Open NCAAF cards' %}
+  {% with route_label='/ncaaf', title='NCAAF', body='Today\'s slate, top edges, and live games at a glance.', action_href='/ncaaf/cards?week=' ~ launch_week, action_label='Open NCAAF cards' %}
     {% include 'shared/_module_intro.html' %}
   {% endwith %}
+
+  {% include 'shared/_hub_bettor_summary.html' %}
 
   {% with eyebrow='Historical coverage', title='Available weekly recommendation summaries', body='The hub now surfaces the actual weekly artifacts found in the source repo, so you can jump straight into populated weeks and still see the empty tracked weeks.', summary_stats=summary_stats %}
     {% include 'shared/_content_panel.html' %}

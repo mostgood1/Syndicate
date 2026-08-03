@@ -3,10 +3,16 @@
 {% block title %}Syndicate | NBA{% endblock %}
 {% block page_title %}NBA Hub{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/hub_bettor_summary.css') }}" />
+{% endblock %}
+
 {% block content %}
-  {% with route_label='/nba', title='NBA is now running a real stored-date lane', status='In progress', body='NBA now has cards, picks, props-adjacent ranked boards, live lens, season betting-card routes, recap surfaces, a real hub, and a stored-date daily archive backed by processed slate artifacts rather than a static placeholder.', action_href='/nba/cards?date=' ~ today_date, action_label='Open NBA cards' %}
+  {% with route_label='/nba', title='NBA', body='Today\'s slate, top edges, and live games at a glance.', action_href='/nba/cards?date=' ~ today_date, action_label='Open NBA cards' %}
     {% include 'shared/_module_intro.html' %}
   {% endwith %}
+
+  {% include 'shared/_hub_bettor_summary.html' %}
 
   {% with eyebrow='Stored daily slates', title='Recent NBA processed dates', body='The hub now surfaces stored NBA slate dates already present in the source repo, so historical dates can launch the daily archive, cards, picks, props, and live-lens family from real processed artifacts.', summary_stats=summary_stats %}
     {% include 'shared/_content_panel.html' %}

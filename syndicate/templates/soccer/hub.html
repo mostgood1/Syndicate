@@ -3,10 +3,16 @@
 {% block title %}Syndicate | Soccer{% endblock %}
 {% block page_title %}Soccer Hub{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/hub_bettor_summary.css') }}" />
+{% endblock %}
+
 {% block content %}
-  {% with route_label='/soccer', title='Soccer now runs a full SoccerSim engine across multiple leagues', status='Active migration', body='Soccer now exposes SoccerSim-backed cards, a game drill-in, player-prop boards, a resumed-match live lens covering live corners/shots/goals/BTTS, a weekly archive, and full team rosters + season schedules, across ' ~ leagues|length ~ ' leagues.', action_href='/soccer/' ~ default_league ~ '/cards', action_label='Open ' ~ default_league|upper ~ ' cards' %}
+  {% with route_label='/soccer', title='Soccer', body='Today\'s slate, top edges, and live games at a glance, across ' ~ leagues|length ~ ' leagues.', action_href='/soccer/' ~ default_league ~ '/cards', action_label='Open ' ~ default_league|upper ~ ' cards' %}
     {% include 'shared/_module_intro.html' %}
   {% endwith %}
+
+  {% include 'shared/_hub_bettor_summary.html' %}
 
   {% with eyebrow='Coverage', title='Leagues with a stored SoccerSim schedule', body='Leagues run through the same engine and UI surfaces; a league only appears here with real weeks once scripts/build_soccer_schedule.py has been run for it.', summary_stats=summary_stats %}
     {% include 'shared/_content_panel.html' %}

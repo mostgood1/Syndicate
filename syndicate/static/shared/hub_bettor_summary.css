@@ -1,0 +1,120 @@
+/* Bettor-facing hub summary block, added 2026-08-03 (Phase 3). Shared across
+   all 8 sport hubs (shared/_hub_bettor_summary.html) so the reframe from
+   developer-facing migration status to "today's slate, top edges, live now"
+   only needed one stylesheet, not eight copies. */
+.hub-bettor-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hub-bettor-summary__tiles {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.hub-bettor-summary__tile {
+  border: 1px solid var(--cards-line);
+  border-radius: 14px;
+  background: rgba(8, 18, 30, 0.6);
+  padding: 10px 16px;
+  min-width: 140px;
+}
+
+.hub-bettor-summary__tile-label {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cards-text-dim);
+}
+
+.hub-bettor-summary__tile-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--cards-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.hub-bettor-summary__tile-meta {
+  font-size: 11px;
+  color: var(--cards-text-dim);
+}
+
+.hub-bettor-summary__live-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffd4d4;
+  border: 1px solid rgba(231, 76, 60, 0.4);
+  background: rgba(231, 76, 60, 0.14);
+  border-radius: 999px;
+  padding: 6px 12px;
+}
+
+.hub-bettor-summary__live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #e74c3c;
+  animation: hub-bettor-summary-blink 1.6s ease-in-out infinite;
+}
+
+@keyframes hub-bettor-summary-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.hub-bettor-summary__edges {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hub-bettor-summary__edge-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--cards-line);
+  font-size: 12.5px;
+  flex-wrap: wrap;
+}
+
+.hub-bettor-summary__edge-title {
+  font-weight: 600;
+  color: var(--cards-text);
+}
+
+.hub-bettor-summary__edge-market {
+  color: var(--cards-text-dim);
+  font-size: 11.5px;
+}
+
+.hub-bettor-summary__edge-value {
+  margin-left: auto;
+  font-weight: 700;
+  color: #2ecc71;
+  font-variant-numeric: tabular-nums;
+}
+
+.hub-bettor-summary__edge-live {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #ffd4d4;
+  border: 1px solid rgba(231, 76, 60, 0.4);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.hub-bettor-summary__empty {
+  color: var(--cards-text-soft);
+  font-size: 12.5px;
+  margin: 0;
+}

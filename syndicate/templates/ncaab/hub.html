@@ -3,10 +3,16 @@
 {% block title %}Syndicate | NCAAB{% endblock %}
 {% block page_title %}NCAAB Hub{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/hub_bettor_summary.css') }}" />
+{% endblock %}
+
 {% block content %}
-  {% with route_label='/ncaab', title='NCAAB now has source-backed cards, game, live-lens, season review, betting-card, and daily archive surfaces', status='Active migration', body='Syndicate now exposes NCAAB cards, a first game drill-in, a read-only live-lens board, a real-data season review, a compact historical betting-card lane, and a settled-date daily archive backed by Syndicate-owned recommendations, results, and live scoreboard artifacts.', action_href='/ncaab/cards?date=' ~ launch_date, action_label='Open NCAAB cards' %}
+  {% with route_label='/ncaab', title='NCAAB', body='Today\'s slate, top edges, and live games at a glance.', action_href='/ncaab/cards?date=' ~ launch_date, action_label='Open NCAAB cards' %}
     {% include 'shared/_module_intro.html' %}
   {% endwith %}
+
+  {% include 'shared/_hub_bettor_summary.html' %}
 
   <section class="cards-grid cards-grid--sports" aria-label="NCAAB module launches">
     <article class="sport-card">

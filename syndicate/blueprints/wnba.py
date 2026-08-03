@@ -15,6 +15,7 @@ from urllib.request import urlopen
 from flask import Blueprint, Response, jsonify, redirect, render_template, request, url_for
 
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
+from syndicate.features.shared.hub_summary import build_hub_bettor_summary
 from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
 from syndicate.features.wnba.archive import build_archive_api_payload
 from syndicate.features.wnba.archive import build_archive_page_context
@@ -318,6 +319,7 @@ def hub():
             {"label": "Latest", "value": latest_date},
             {"label": "Launch date", "value": today_date},
         ],
+        hub_summary=build_hub_bettor_summary("wnba", today_value=today_date),
     )
 
 

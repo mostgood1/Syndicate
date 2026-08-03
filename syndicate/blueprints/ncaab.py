@@ -20,6 +20,7 @@ from syndicate.features.ncaab.season import build_season_page_context
 from syndicate.features.ncaab.season import build_season_betting_card_api_payload
 from syndicate.features.ncaab.season import build_season_betting_card_page_context
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
+from syndicate.features.shared.hub_summary import build_hub_bettor_summary
 from syndicate.features.shared.timezone import central_today_iso
 
 
@@ -61,6 +62,7 @@ def hub():
             {"label": "Latest date", "value": latest_date()},
             {"label": "Launch date", "value": launch_date},
         ],
+        hub_summary=build_hub_bettor_summary("ncaab", today_value=launch_date),
     )
 
 

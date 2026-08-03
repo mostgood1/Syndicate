@@ -1,0 +1,28 @@
+{% set summary = hub_summary or {} %}
+<section class="cards-control-card hub-bettor-summary" aria-label="Today's slate summary">
+  <div class="hub-bettor-summary__tiles">
+    <div class="hub-bettor-summary__tile">
+      <div class="hub-bettor-summary__tile-label">Today's slate</div>
+      <div class="hub-bettor-summary__tile-value">{{ summary.slate_count or 0 }}</div>
+      <div class="hub-bettor-summary__tile-meta">tracked opportunit{{ 'y' if (summary.slate_count or 0) == 1 else 'ies' }}</div>
+    </div>
+    {% if summary.live_now %}
+      <div class="hub-bettor-summary__live-strip"><span class="hub-bettor-summary__live-dot"></span> Live now</div>
+    {% endif %}
+  </div>
+  {% if summary.top_edges %}
+    <div class="hub-bettor-summary__edges">
+      <div class="section-label">Top edges today</div>
+      {% for edge in summary.top_edges %}
+        <div class="hub-bettor-summary__edge-row">
+          <span class="hub-bettor-summary__edge-title">{{ edge.title }}</span>
+          {% if edge.market %}<span class="hub-bettor-summary__edge-market">{{ edge.market }}</span>{% endif %}
+          {% if edge.is_live %}<span class="hub-bettor-summary__edge-live">Live</span>{% endif %}
+          <span class="hub-bettor-summary__edge-value">{{ "%.1f%%"|format(edge.edge * 100) }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  {% elif (summary.slate_count or 0) == 0 %}
+    <p class="hub-bettor-summary__empty">No tracked opportunities for today's slate yet -- check back closer to first pitch/tip/kickoff.</p>
+  {% endif %}
+</section>

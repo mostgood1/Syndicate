@@ -39,6 +39,7 @@ from syndicate.features.nba.props import build_props_page_context
 from syndicate.features.nba.sources import available_dates
 from syndicate.features.nba.sources import default_date
 from syndicate.features.nba.sources import default_date_for_season
+from syndicate.features.shared.hub_summary import build_hub_bettor_summary
 from syndicate.features.shared.rank_board import build_rank_api_payload
 from syndicate.features.shared.timezone import central_now
 from syndicate.features.shared.timezone import central_today
@@ -126,6 +127,7 @@ def hub():
         today_date=today_date,
         recent_slates=recent_slates,
         summary_stats=summary_stats,
+        hub_summary=build_hub_bettor_summary("nba", today_value=today_date),
     )
 
 
