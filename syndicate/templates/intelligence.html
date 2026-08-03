@@ -71,6 +71,10 @@
     </div>
     <aside class="board-rail">
       <section>
+        <h2 class="board-section-title">Ask the Syndicate</h2>
+        <div id="ask-bar-panel"></div>
+      </section>
+      <section>
         <h2 class="board-section-title">Watchlist</h2>
         <div id="watchlist-panel"></div>
       </section>
@@ -94,6 +98,7 @@
 {% block extra_scripts %}
 <script src="{{ url_for('static', filename='shared/bet_slip.js') }}"></script>
 <script src="{{ url_for('static', filename='shared/watchlist.js') }}"></script>
+<script src="{{ url_for('static', filename='shared/ask_bar.js') }}"></script>
 <script>
 (function () {
   "use strict";
@@ -1015,6 +1020,7 @@
             <button type="button" class="board-action-button board-action-button--remove" data-portfolio-action="remove">Remove</button>
             <button type="button" class="board-action-button board-action-button--slip" data-slip-action="toggle" data-slip-label-full="true">🎫 Slip</button>
             <button type="button" class="board-action-button board-action-button--watch" data-watch-action="toggle">☆ Watch</button>
+            <button type="button" class="board-action-button board-action-button--ask" data-ask-action="ask-pick">☰ Ask</button>
           </div>
           ${lastResponseTimestamp ? `<div class="board-card__updated">Updated ${escapeHtml(formatTimestamp(lastResponseTimestamp))}</div>` : ""}
         </div>
@@ -1409,6 +1415,7 @@
     });
     wireSlipButtons(container);
     wireWatchButtons(container);
+    wireAskButtons(container);
   }
 
   function movementSortValue(item) {
@@ -1550,6 +1557,7 @@
                       <button type="button" class="board-action-button board-action-button--add" data-portfolio-action="add">Add</button>
                       <button type="button" class="board-action-button board-action-button--slip" data-slip-action="toggle">🎫</button>
                       <button type="button" class="board-action-button board-action-button--watch" data-watch-action="toggle">☆</button>
+                      <button type="button" class="board-action-button board-action-button--ask" data-ask-action="ask-pick">☰</button>
                     </div>
                   </td>
                 </tr>
@@ -1592,6 +1600,7 @@
     });
     wireSlipButtons(container);
     wireWatchButtons(container);
+    wireAskButtons(container);
   }
 
   // Every renderer below replaces its container's innerHTML wholesale, so
@@ -1741,6 +1750,10 @@
   // Watchlist + alerts, same extraction pattern as the bet slip above --
   // syndicate/static/shared/watchlist.js (window.SyndicateWatchlist).
   const wireWatchButtons = window.SyndicateWatchlist.wireWatchButtons;
+
+  // Ask-the-Syndicate board embed, same extraction pattern --
+  // syndicate/static/shared/ask_bar.js (window.SyndicateAskBar).
+  const wireAskButtons = window.SyndicateAskBar.wireAskButtons;
 
   function renderPortfolio(data) {
     const container = document.getElementById("board-portfolio");
@@ -1907,6 +1920,7 @@
   renderFilterTabs();
   renderBetSlip();
   window.SyndicateWatchlist.init();
+  window.SyndicateAskBar.init();
   setRefreshStatus("Loading board…", "loading");
 
   if (initialIntelligenceResponse && Object.keys(initialIntelligenceResponse).length > 0) {

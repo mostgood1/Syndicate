@@ -1297,3 +1297,216 @@ table.board-blotter tbody tr:last-child td {
   color: var(--cards-text-soft);
   font-size: 12px;
 }
+
+/* Ask-the-Syndicate board embed, added 2026-08-03. */
+.board-action-button--ask {
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  background: rgba(139, 92, 246, 0.14);
+  color: #e4d9ff;
+}
+
+#ask-bar-panel {
+  display: flex;
+  flex-direction: column;
+  background: rgba(8, 18, 30, 0.72);
+  border: 1px solid var(--cards-line);
+  border-radius: 16px;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.ask-bar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--cards-line);
+}
+
+#ask-bar-panel[data-collapsed="true"] .ask-bar__header {
+  border-bottom: none;
+}
+
+.ask-bar__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--cards-text);
+}
+
+.ask-bar__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(139, 92, 246, 0.28);
+  color: #e4d9ff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ask-bar__toggle {
+  color: var(--cards-text-soft);
+  font-size: 12px;
+  transition: transform 0.15s ease;
+}
+
+#ask-bar-panel[data-collapsed="true"] .ask-bar__toggle {
+  transform: rotate(180deg);
+}
+
+.ask-bar__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+#ask-bar-panel[data-collapsed="true"] .ask-bar__body {
+  display: none;
+}
+
+.ask-bar__form {
+  display: flex;
+  gap: 6px;
+}
+
+.ask-bar__input {
+  flex: 1;
+  min-width: 0;
+  border-radius: 10px;
+  border: 1px solid var(--cards-line-strong);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--cards-text);
+  padding: 8px 10px;
+  font-size: 12.5px;
+}
+
+.ask-bar__send {
+  appearance: none;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-weight: 700;
+  font-size: 12.5px;
+  background: rgba(139, 92, 246, 0.3);
+  color: #e4d9ff;
+  cursor: pointer;
+}
+
+.ask-bar__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ask-bar__briefing-btn {
+  appearance: none;
+  border: 1px solid var(--cards-line-strong);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--cards-text-soft);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.ask-bar__status {
+  font-size: 11px;
+  color: var(--cards-text-dim);
+}
+
+.ask-bar__transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.ask-bar__entry {
+  border: 1px solid var(--cards-line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.ask-bar__question {
+  font-weight: 700;
+  color: var(--cards-text);
+  font-size: 12.5px;
+  margin-bottom: 6px;
+}
+
+.ask-bar__question-context {
+  font-weight: 400;
+  color: var(--cards-text-dim);
+  font-size: 11px;
+}
+
+.ask-bar__answer-headline {
+  font-weight: 700;
+  color: var(--cards-text);
+  margin-bottom: 2px;
+}
+
+.ask-bar__answer-verdict {
+  color: #d6c8ff;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.ask-bar__answer-narrative {
+  color: var(--cards-text-soft);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.ask-bar__answer-narrative--empty {
+  font-style: italic;
+  color: var(--cards-text-dim);
+}
+
+.ask-bar__answer-error {
+  color: #ffd4d4;
+  font-size: 12.5px;
+}
+
+.ask-bar__answer-picks {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ask-bar__answer-pick {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+}
+
+.ask-bar__answer-pick-name {
+  font-weight: 700;
+  color: var(--cards-text);
+}
+
+.ask-bar__answer-pick-why {
+  color: var(--cards-text-dim);
+  font-size: 11px;
+}
+
+.ask-bar__empty {
+  color: var(--cards-text-soft);
+  font-size: 12px;
+  padding: 8px 0;
+}
