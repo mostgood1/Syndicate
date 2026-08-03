@@ -2734,6 +2734,39 @@ class IntelligenceStateService:
         if not candidate_pools:
             global_pool = []
 
+        # Effectively-decided live props get one last pass here, on the final
+        # merged pool, because this is the only point where every field is
+        # stamped. _apply_candidate_state_guard also runs at collect time and
+        # inside score_candidate, but `model_probability` is populated later
+        # than both -- confirmed live 2026-08-03: a live MLB prop published
+        # model_probability 0.98 to the board with state_invalid never set,
+        # because both earlier guard passes saw None. Filtering here also
+        # keeps candidate_count honest, since it is derived just below.
+        if global_pool:
+            from syndicate.features.intelligence import _candidate_prop_outcome_decided
+
+            undecided_pool: list[dict[str, Any]] = []
+            decided_removed = 0
+            for candidate in global_pool:
+                if not isinstance(candidate, Mapping):
+                    undecided_pool.append(candidate)
+                    continue
+                outcome = None
+                try:
+                    outcome = _candidate_prop_outcome_decided(dict(candidate))
+                except Exception:
+                    outcome = None
+                if outcome is None:
+                    undecided_pool.append(candidate)
+                    continue
+                decided_removed += 1
+            if decided_removed:
+                print(
+                    f"[intelligence_state] DECIDED_LIVE_PROPS_REMOVED count={decided_removed} date={selected_date}",
+                    flush=True,
+                )
+            global_pool = undecided_pool
+
         # Layer 2 Phase 4. Annotate (never suppress -- explicit user call)
         # candidates that are effectively the same bet stacked across
         # multiple markets, e.g. the CLE@CIN doubleheader screenshot that

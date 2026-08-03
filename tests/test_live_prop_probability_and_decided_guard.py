@@ -118,3 +118,39 @@ class DecidedLivePropGuardTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LiveProbabilityFieldFallbackTests(unittest.TestCase):
+    """`model_probability` is stamped later than the guard's earlier call
+    sites, so the probability has to be read from whichever field carries
+    it at the time. Confirmed live 2026-08-03: a live MLB prop published
+    model_probability 0.98 with state_invalid never set."""
+
+    @staticmethod
+    def _live_prop(**overrides: object) -> dict[str, object]:
+        base: dict[str, object] = {
+            "candidate_type": "prop",
+            "market": "pts",
+            "player_name": "Test Player",
+            "pick": "OVER 5.5",
+            "line": "5.5",
+            "is_live": True,
+        }
+        base.update(overrides)
+        return base
+
+    def test_win_prob_is_used_when_model_probability_absent(self) -> None:
+        self.assertEqual(_candidate_prop_outcome_decided(self._live_prop(win_prob=0.99)), "hit")
+
+    def test_live_win_prob_is_used_when_model_probability_absent(self) -> None:
+        self.assertEqual(_candidate_prop_outcome_decided(self._live_prop(live_win_prob=0.005)), "missed")
+
+    def test_percent_scaled_probability_is_normalised(self) -> None:
+        self.assertEqual(_candidate_prop_outcome_decided(self._live_prop(win_prob=98.0)), "hit")
+
+    def test_model_probability_still_wins_when_present(self) -> None:
+        candidate = self._live_prop(model_probability=0.5, win_prob=0.99)
+        self.assertIsNone(_candidate_prop_outcome_decided(candidate))
+
+    def test_out_of_range_values_are_ignored(self) -> None:
+        self.assertIsNone(_candidate_prop_outcome_decided(self._live_prop(win_prob=4200.0)))

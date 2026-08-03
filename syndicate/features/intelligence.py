@@ -5803,6 +5803,32 @@ def _candidate_is_player_level_market(candidate: dict[str, Any]) -> bool:
 _LIVE_PROP_DECIDED_PROBABILITY = 0.97
 
 
+def _candidate_live_probability(candidate: dict[str, Any]) -> float | None:
+    """The candidate's model probability, read from whichever field actually
+    carries it at this point in the pipeline.
+
+    `model_probability` is not stamped until late (normalization/scoring),
+    but `_apply_candidate_state_guard` runs at collect time too -- confirmed
+    live 2026-08-03: a live MLB prop published `model_probability: 0.98` on
+    the board while the guard saw None at both call sites and never marked
+    it, so a 0.98 live prop stayed on the board. Only fields that are
+    unambiguously probabilities are consulted; `confidence` and the display
+    `value` text are deliberately excluded, since neither is reliably a
+    probability across builders and over-suppressing real opportunities is
+    the worse failure.
+    """
+    for field in ("model_probability", "live_win_prob", "win_prob", "live_over_probability"):
+        value = _numeric_hint(candidate.get(field))
+        if value is None:
+            continue
+        # Some builders emit percent-scaled probabilities.
+        if value > 1.0:
+            value = value / 100.0
+        if 0.0 <= value <= 1.0:
+            return value
+    return None
+
+
 def _candidate_is_live(candidate: dict[str, Any]) -> bool:
     if bool(candidate.get("is_live")):
         return True
@@ -5854,7 +5880,7 @@ def _candidate_prop_outcome_decided(candidate: dict[str, Any]) -> str | None:
     # (say 80%) is still a real opportunity and must survive.
     if not _candidate_is_live(candidate):
         return None
-    live_probability = _numeric_hint(candidate.get("model_probability"))
+    live_probability = _candidate_live_probability(candidate)
     if live_probability is None:
         return None
     if live_probability >= _LIVE_PROP_DECIDED_PROBABILITY:
