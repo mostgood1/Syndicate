@@ -181,10 +181,45 @@ window.SyndicateAskBar = (function () {
         ` : ""}
       `;
     }
+    // `briefing` only exists when the optional LLM narration layer is on.
+    // It is deliberately NOT in use, so the snapshot-shaped
+    // structured_response below is the normal path, not a fallback.
     const structured = response && typeof response.structured_response === "object" ? response.structured_response : null;
-    const fallbackText = structured ? safeText(structured.narrative || structured.summary, "") : "";
-    if (fallbackText) {
-      return `<div class="ask-bar__answer-narrative">${escapeHtml(fallbackText).replace(/\n+/g, "<br><br>")}</div>`;
+    // Each schema_type nests its text differently: bet_analysis/matchup put
+    // it under `explanation`, market_summary under `rationale_summary`.
+    // Reading only the top-level `narrative`/`summary` found nothing for a
+    // market_summary answer and printed "No structured answer came back"
+    // over a perfectly good payload -- reported live 2026-08-03, with 5 real
+    // opportunities attached to the response it was discarding.
+    const nested = structured
+      ? (structured.rationale_summary || structured.explanation || structured.market_insight || null)
+      : null;
+    const fallbackText = safeText(
+      (structured && (structured.narrative || structured.summary))
+        || (nested && typeof nested === "object" ? (nested.narrative || nested.summary) : ""),
+      "",
+    );
+    // A market summary's substance is the opportunity list; render it the
+    // same way briefing top_picks are rendered above rather than dropping
+    // it because the prose slot was empty.
+    const opportunities = structured && Array.isArray(structured.top_opportunities) ? structured.top_opportunities : [];
+    if (fallbackText || opportunities.length) {
+      return `
+        ${fallbackText ? `<div class="ask-bar__answer-narrative">${escapeHtml(fallbackText).replace(/\n+/g, "<br><br>")}</div>` : ""}
+        ${opportunities.length ? `
+          <div class="ask-bar__answer-picks">
+            ${opportunities.slice(0, 3).map((row) => {
+              const name = safeText(row && (row.selection || row.name), "Opportunity");
+              const market = safeText(row && row.market, "");
+              return `
+              <div class="ask-bar__answer-pick">
+                <span class="ask-bar__answer-pick-name">${escapeHtml(name)}</span>
+                ${market ? `<span class="ask-bar__answer-pick-why">${escapeHtml(market)}</span>` : ""}
+              </div>`;
+            }).join("")}
+          </div>
+        ` : ""}
+      `;
     }
     return `<div class="ask-bar__answer-narrative ask-bar__answer-narrative--empty">No structured answer came back for this question -- try rephrasing it.</div>`;
   }
