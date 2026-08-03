@@ -4,8 +4,11 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-Last reconciled: 2026-08-03 (see "Reconciliation 2026-08-03 (Phase 3
-continued: sparklines, filter disclosure, deploy-safety check)" below).
+Last reconciled: 2026-08-03 (see "HANDOFF 2026-08-03 -- START HERE"
+below: three commits pushed but NOT deployed, and four changes never
+yet observed against real data).
+Before that: "Reconciliation 2026-08-03 (Phase 3
+continued: sparklines, filter disclosure, deploy-safety check)".
 Before that: "Reconciliation 2026-08-03 (Phase 3
 start + keyvalue ceiling actually cleared: 212MB -> 62MB)".
 Before that: "Reconciliation 2026-08-03 (Phase 2:
@@ -41,6 +44,76 @@ Before that: "Reconciliation 2026-08-01 (Layer 2 board:
 full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
+
+### HANDOFF 2026-08-03 -- START HERE (session ended on context, work is mid-flight)
+
+**1. Three commits are pushed but NOT deployed.** Live is `c35243dd`.
+Undeployed: `0b439cb0` (filter disclosure), `ce9233c3` (mobile rails),
+`e4b6a7de` (hub fixes). All three are UI-only and pair naturally --
+deploy them together.
+
+Before ANY deploy run `python scripts/check_deploy_safety.py` (new,
+`9e107f3d`). Exit 0 clear / 1 in flight / 2 could-not-determine. Do NOT
+fall back to eyeballing `sim_run_status` -- that only covers the MLB sim
+and a deploy made under it killed an in-flight odds-refresh run this
+session.
+
+**2. Highest-value next action is verification, not features.**
+`python scripts/verify_recent_shipped_work.py` currently reports 4 PASS /
+2 PENDING / 0 FAIL. Run it against a LIVE WNBA or MLB slate and it should
+clear most of the unproven list in one pass. PENDING explicitly means
+"precondition not met", never "pass".
+
+**3. Four things have NEVER been observed against real data.** Do not mark
+them done without evidence:
+- **movement sparklines** (`c35243dd`) -- the local board carries no
+  movement history, so every candidate correctly renders nothing.
+- **scroll restoration** (`dac3793e`) -- `window.scrollTo` is a no-op in
+  the preview browser (the pane does not composite, which is also why
+  screenshots time out). Needs a real device.
+- **WNBA + NBA live sigma models** -- `live_probability_source:
+  "live_sigma_normal"` has not appeared once; needs a live basketball
+  slate (NBA is off-season until October).
+- **`clv_price`** -- wired end to end, but null until settled bets
+  accumulate WITH closing prices.
+
+**4. Phase 3 remaining** (each wants a full context budget; do not attempt
+several at once -- see the process note below):
+- **Sport-hub reframing.** `e4b6a7de` fixed the *defects*; the *framing*
+  is untouched. All 8 hubs are still developer-facing migration-status
+  pages ("Active migration", "In progress", route lists) where a bettor
+  wants today's slate count, top 3 edges, and a live-now strip.
+- **Watchlist + alerts.** Nothing exists -- no Notification API, no
+  service worker, no watchlist anywhere. Steam data already flows as
+  `candidate_type === "steam"`, so the trigger side is ready.
+- **Portfolio live pulse.** `templates/portfolio.html` has zero JS.
+  `/api/portfolio/summary` already exists.
+- **Card client unification.** `nba/cards_source.js` (6,562) and
+  `wnba/cards-parity.js` (6,581) are near-identical forks; `mlb` is a
+  third dialect; `nhl/cards_source.html` inlines a fourth. ~28k
+  duplicated lines -- until this lands every UI fix costs 4x.
+
+**5. Process notes from this session, worth not relearning:**
+- **Prefer a watcher over a spot check for anything asynchronous.** This
+  produced two confidently-wrong conclusions in one session: a working
+  keyvalue eviction declared broken (Redis expires lazily; it had worked,
+  212MB -> 62MB), and a "stale mid-deploy snapshot" theory that was
+  disproven by polling for a genuinely post-restart snapshot.
+- **`\'` inside a Jinja `{% with body='...' %}` expression is a CORRECT
+  escape, not a rendering bug.** Only occurrences in raw HTML body text
+  reach the page. Mis-generalising this broke `nfl/hub.html` and
+  `ncaab/hub.html` with a TemplateSyntaxError this session; caught by
+  loading the page, not by review.
+- **Verify UI changes by loading them.** Browser checks caught two
+  would-be silent no-ops that reviewed perfectly: a `#board-body`
+  selector that does not exist (the container is `#board-cards`), and a
+  sparkline plotting raw American odds, which are discontinuous across
+  +/-100 and would have drawn a trivial -105->+105 move larger than a real
+  -200->-150 one.
+- **A broad `except` around a per-candidate hook can ship a silently empty
+  feature.** `_attach_board_stakes` swallowed a `NameError` (`_coerce_float`
+  does not exist in `pipeline/intelligence_state.py`; it is `_numeric_hint`).
+  Tests must assert output is ATTACHED, not merely that nothing raised.
 
 ### Reconciliation 2026-08-03 (Phase 3 continued: sparklines, filter disclosure, deploy-safety check)
 
