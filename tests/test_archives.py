@@ -2944,7 +2944,12 @@ class DateArchiveHelperTests(unittest.TestCase):
 
         self.assertEqual(script_response.status_code, 200)
         self.assertEqual(script_response.mimetype, "application/javascript")
-        self.assertIn("function viewportMode()", script_response.get_data(as_text=True))
+        # viewportMode itself moved into shared/sport_cards_utils.js on
+        # 2026-08-03 (confirmed byte-identical with NBA's own copy,
+        # destructured from window.SyndicateCardsUtils instead of defined
+        # locally) -- applyViewportMode (which calls it) is still real,
+        # WNBA-local content proving this is the actual vendored file.
+        self.assertIn("function applyViewportMode()", script_response.get_data(as_text=True))
 
         self.assertEqual(cards_css_response.status_code, 200)
         self.assertEqual(cards_css_response.mimetype, "text/css")
@@ -3445,8 +3450,21 @@ class HomeBoardTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn('class="board-date-input" value="2026-05-20"', body)
-        self.assertIn('date: urlParams.get("date") || document.getElementById("board-date").value || ""', body)
-        self.assertIn("if (state.date) payload.date = state.date;", body)
+        # c86d9d86 (#111 follow-up) deliberately dropped the
+        # document.getElementById("board-date").value fallback here -- a
+        # tab left open since a prior day restores that stale input value
+        # on reload independent of caching, silently resending yesterday's
+        # date. Only an explicit ?date= URL param should seed state.date
+        # now; the input is synced FROM state.date just after, not the
+        # reverse.
+        self.assertIn('date: urlParams.get("date") || "",', body)
+        self.assertIn('if (dateInput) dateInput.value = state.date;', body)
+        # 4b238313 (#114) added the explicitDateOverride gate: state.date is
+        # also used for client-side date-tab filtering, and forwarding it to
+        # every background poll regardless would leak that filter into the
+        # server-side query -- only a deliberate override (an explicit URL
+        # param or the date picker) should be forwarded.
+        self.assertIn("if (state.date && state.explicitDateOverride) payload.date = state.date;", body)
         self.assertIn('url.searchParams.set("date", state.date);', body)
 
     def test_home_page_background_poll_uses_shared_polling_policy(self) -> None:
@@ -6313,7 +6331,11 @@ class ArchiveRouteTests(unittest.TestCase):
             html = self.client.get("/nfl/hub").get_data(as_text=True)
 
         self.assertIn("/nfl/cards?season=2025&amp;week=21", html)
-        self.assertIn("Source app currently points at 2025 Week 22", html)
+        # e4b6a7de removed the stale "Source app currently points at..."
+        # copy (source-app fallback no longer exists at all); the tracked-
+        # week-vs-launch-week distinction this test actually cares about is
+        # now carried by the "Tracked week is ..." panel instead.
+        self.assertIn("Tracked week is 2025 Week 22", html)
 
     def test_generic_sport_hub_uses_shared_visual_shell(self) -> None:
         app = self.client.application

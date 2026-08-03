@@ -10,7 +10,7 @@ separate player-stats feed to pull from.
 
 Stat keys match the real markets seen in oddsapi_player_props_*.csv:
 passing_yards, passing_attempts, passing_tds, rushing_yards,
-rushing_attempts, receptions, anytime_td.
+rushing_attempts, receptions, anytime_td, receiving_yards, interceptions.
 """
 
 from __future__ import annotations
@@ -40,6 +40,7 @@ _PLAY_COLUMNS = (
     "receiving_yards",
     "complete_pass",
     "touchdown",
+    "interception",
     # Added for syndicate.features.nfl.injury_adjustment -- real per-play
     # team/value attribution, not used by any stat extractor above.
     "posteam",
@@ -129,6 +130,8 @@ _STAT_EXTRACTORS = {
     "rushing_yards": lambda play, pid: float(play["rushing_yards"] or 0) if play.get("rusher_player_id") == pid and play.get("rushing_yards") else 0.0,
     "rushing_attempts": lambda play, pid: 1.0 if play.get("rusher_player_id") == pid and play.get("rush_attempt") == "1" else 0.0,
     "receptions": lambda play, pid: 1.0 if play.get("receiver_player_id") == pid and play.get("complete_pass") == "1" else 0.0,
+    "receiving_yards": lambda play, pid: float(play["receiving_yards"] or 0) if play.get("receiver_player_id") == pid and play.get("receiving_yards") else 0.0,
+    "interceptions": lambda play, pid: 1.0 if play.get("passer_player_id") == pid and play.get("interception") == "1" else 0.0,
     # Anytime TD attributed only to the ball-carrier/receiver of the
     # scoring play -- deliberately checked against rusher/receiver id
     # only, so a passer's OWN touchdown pass never counts as their own

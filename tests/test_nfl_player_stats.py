@@ -18,7 +18,7 @@ def _play(**overrides) -> dict:
         "rusher_player_id": "", "rusher_player_name": "", "rushing_yards": "",
         "rush_attempt": "0", "rush_touchdown": "0",
         "receiver_player_id": "", "receiver_player_name": "", "receiving_yards": "",
-        "complete_pass": "0", "touchdown": "0",
+        "complete_pass": "0", "touchdown": "0", "interception": "0",
     }
     row.update(overrides)
     return row
@@ -71,6 +71,28 @@ class NflPlayerStatsTests(unittest.TestCase):
         # The passer's own passing TD must not count as their anytime_td --
         # only rusher/receiver attribution does.
         self.assertEqual(week1["anytime_td"], 0.0)
+
+    def test_receiving_yards_attributed_to_receiver_only(self) -> None:
+        # Regression: receiving_yards had no extractor at all (silently
+        # dropped before ever reaching the board) until 2026-08-03.
+        self._write_pbp(2025, [
+            _play(game_id="2025_01_KC_DEN", week="1", receiver_player_id="WR1", receiver_player_name="W.One", receiving_yards="15", complete_pass="1"),
+            _play(game_id="2025_01_KC_DEN", week="1", receiver_player_id="WR1", receiver_player_name="W.One", receiving_yards="30", complete_pass="1"),
+            # Passer's own passing yards must never count toward a receiver's total.
+            _play(game_id="2025_01_KC_DEN", week="1", passer_player_id="QB1", passer_player_name="P.One", passing_yards="200", pass_attempt="1"),
+        ])
+        log = player_stats.player_game_log(2025, "WR1")
+        self.assertEqual(log[0]["receiving_yards"], 45.0)
+
+    def test_interceptions_attributed_to_passer_only(self) -> None:
+        # Regression: interceptions had no extractor at all (silently
+        # dropped before ever reaching the board) until 2026-08-03.
+        self._write_pbp(2025, [
+            _play(game_id="2025_01_KC_DEN", week="1", passer_player_id="QB1", passer_player_name="P.One", passing_yards="10", pass_attempt="1", interception="1"),
+            _play(game_id="2025_01_KC_DEN", week="1", passer_player_id="QB1", passer_player_name="P.One", passing_yards="20", pass_attempt="1"),
+        ])
+        log = player_stats.player_game_log(2025, "QB1")
+        self.assertEqual(log[0]["interceptions"], 1.0)
 
     def test_anytime_td_attributed_to_scorer_only(self) -> None:
         self._write_pbp(2025, [

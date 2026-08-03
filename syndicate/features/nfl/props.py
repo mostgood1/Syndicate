@@ -35,6 +35,12 @@ _NFL_PROP_MARKET_TO_STAT: dict[str, str] = {
     "Rushing Attempts": "rushing_attempts",
     "Receptions": "receptions",
     "Anytime TD": "anytime_td",
+    # Both fetched by scripts/fetch_nfl_oddsapi_props_local.py
+    # (player_rec_yds/player_interceptions) but silently dropped here until
+    # 2026-08-03 -- real odds rows for these two markets reached the CSV and
+    # were discarded before ever reaching the board.
+    "Receiving Yards": "receiving_yards",
+    "Interceptions": "interceptions",
 }
 
 
