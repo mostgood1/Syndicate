@@ -1546,6 +1546,60 @@ def _load_chunk_records_for_window(since: str, until: str, ledger_path: Path | s
     return records
 
 
+def load_recent_evaluation_records(
+    *,
+    days: int = 14,
+    ledger_path: Path | str | None = None,
+    max_chunk_bytes: int = 64_000_000,
+) -> list[dict[str, Any]]:
+    """Bounded, safe evaluation-record load for hot paths (the board's
+    scoring/ranking pass): only the last ``days`` of date chunks, and any
+    single chunk file over ``max_chunk_bytes`` is skipped outright instead
+    of read. The skip guard exists because the historical ledger contains
+    multi-GB chunk files (records used to embed the full
+    artifact_metadata/manifest_summary payload) -- reading one of those
+    inside the refresh-worker's board loop is an instant OOM. Callers that
+    need full history should use the explicit window/report functions, not
+    this."""
+    from datetime import date as _date, timedelta as _timedelta
+
+    target_path = Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH
+    until_dt = _date.fromisoformat(datetime.now(timezone.utc).date().isoformat())
+    since_dt = until_dt - _timedelta(days=max(0, int(days)))
+    if not _is_chunked_ledger_path(target_path):
+        return _iter_record_payloads(ledger_path=target_path)
+    records: list[dict[str, Any]] = []
+    for date_token in _dates_in_window(since_dt.isoformat(), until_dt.isoformat()):
+        chunk_path = _ledger_chunk_path(target_path, date_token)
+        if not chunk_path.exists():
+            continue
+        try:
+            chunk_bytes = chunk_path.stat().st_size
+        except OSError:
+            continue
+        if chunk_bytes > max_chunk_bytes:
+            print(
+                f"[intelligence_evaluation] SKIP_OVERSIZED_LEDGER_CHUNK path={chunk_path.name} bytes={chunk_bytes} ceiling={max_chunk_bytes}",
+                flush=True,
+            )
+            continue
+        try:
+            content = chunk_path.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        for line in content.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except Exception:
+                continue
+            if isinstance(payload, dict):
+                records.append(payload)
+    return records
+
+
 def build_recommendation_performance_analytics_for_window(
     *,
     since: str,

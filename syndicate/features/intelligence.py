@@ -7258,7 +7258,15 @@ def _candidate_betting_rank_key(candidate: dict[str, Any]) -> tuple[bool, float,
     # (12.8% vs 2.5%) was compared before the correctly risk-adjusted score.
     # Same principle build_intelligence_board_contract's card sort (#73)
     # already applies; this function just hadn't caught up.
-    score_value = _numeric_hint(candidate.get("score"))
+    # adjusted_score (recommendation_engine.rank_recommendations: reliability
+    # multipliers, ROI/calibration weighting, movement/CLV signals, policy
+    # weights) outranks the bare `score` (edge x confidence - tier penalty)
+    # whenever the pool build attached it -- see
+    # IntelligenceStateService._attach_adjusted_scores. Candidates without it
+    # (attach failed, or an older cached pool) fall back to `score`
+    # unchanged.
+    adjusted_score_value = _numeric_hint(candidate.get("adjusted_score"))
+    score_value = adjusted_score_value if adjusted_score_value is not None else _numeric_hint(candidate.get("score"))
     score = score_value if score_value is not None else float("-inf")
     profile = _candidate_betting_edge_profile(candidate)
     edge = profile["adjusted_edge"] if profile is not None else float("-inf")

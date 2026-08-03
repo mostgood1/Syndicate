@@ -188,6 +188,24 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return raw in {"1", "true", "t", "yes", "y", "on"}
 
 
+def _candidate_has_price(candidate: Mapping[str, Any]) -> bool:
+    """A candidate with no bettable price is not an actionable opportunity.
+    classify_candidate deliberately accepts projection-only candidates
+    (has_projection OR has_odds), which is right for the pool -- a sim-only
+    signal is still real information on a sport lane -- but the board's
+    top_opportunities/recommendations surfaces are specifically "best
+    betting opportunities", and an unpriced card there is unactionable
+    (confirmed live 2026-08-02: 12 NFL cards published with odds/edge/EV
+    all blank). Unpriced candidates stay in by_sport, flagged, so sport
+    views keep the signal."""
+    odds = candidate.get("odds")
+    if isinstance(odds, bool):
+        return False
+    if isinstance(odds, (int, float)):
+        return True
+    return str(odds or "").strip() not in {"", "-", "None"}
+
+
 def _default_unbounded_candidate_cap() -> int:
     # 2026-08-02: a live 9-game Sunday slate combined with MLB's props
     # pipeline finally producing real data (a separate fix earlier the same
@@ -2492,6 +2510,57 @@ class IntelligenceStateService:
             "candidates": [],
         }
 
+    @staticmethod
+    def _attach_adjusted_scores(global_pool: list[dict[str, Any]]) -> None:
+        """Annotate the pool with the shared recommendation engine's
+        adjusted_score (reliability multipliers, ROI/calibration weighting,
+        movement/CLV signals, policy weights -- see
+        recommendation_engine.rank_recommendations). Before this, that
+        ranker had NO production caller: the served board ranked on the
+        bare `score` (edge x confidence - tier penalty) and several hundred
+        lines of tested scoring logic were computed nowhere.
+
+        Annotation only -- the candidates' own odds/edge/confidence fields
+        are left exactly as the pool built them; only the ranking inputs
+        (adjusted_score + provenance) are merged back, keyed by
+        candidate_id. evaluation_records is passed explicitly (bounded
+        window, oversized chunks skipped) so no code path here can trigger
+        _load_records_from_ledger's full-history read -- the historical
+        ledger still contains multi-GB chunk files. Best-effort by design:
+        any failure leaves the pool un-annotated and the ranking falls back
+        to `score`."""
+        try:
+            from syndicate.features.intelligence import rank_candidates
+            from syndicate.features.shared.intelligence_evaluation import load_recent_evaluation_records
+
+            evaluation_records = load_recent_evaluation_records(days=14)
+            ranked_rows = rank_candidates(global_pool, evaluation_records=evaluation_records)
+            rows_by_candidate_id: dict[str, Mapping[str, Any]] = {}
+            for row in ranked_rows:
+                if not isinstance(row, Mapping):
+                    continue
+                candidate_id = str(row.get("candidate_id") or "").strip()
+                if candidate_id:
+                    rows_by_candidate_id[candidate_id] = row
+            attached = 0
+            for candidate in global_pool:
+                if not isinstance(candidate, dict):
+                    continue
+                row = rows_by_candidate_id.get(str(candidate.get("candidate_id") or "").strip())
+                if row is None or row.get("adjusted_score") is None:
+                    continue
+                candidate["adjusted_score"] = row.get("adjusted_score")
+                for key in ("decision_strategy", "performance_multiplier", "movement_signal", "clv_signal"):
+                    if row.get(key) is not None:
+                        candidate[key] = row.get(key)
+                attached += 1
+            print(
+                f"[intelligence_state] ADJUSTED_SCORES_ATTACHED count={attached} pool={len(global_pool)} evaluation_records={len(evaluation_records)}",
+                flush=True,
+            )
+        except Exception as exc:
+            print(f"[intelligence_state] ADJUSTED_SCORE_ATTACH_FAILED error={exc}", flush=True)
+
     def _build_candidate_pool(self, selected_date: str | None, source_fingerprint: str) -> dict[str, Any]:
         cache_key = self._candidate_pool_key(selected_date, source_fingerprint)
         with self._condition:
@@ -2676,6 +2745,12 @@ class IntelligenceStateService:
             from syndicate.features.correlation_engine import attach_board_correlation_flags
 
             attach_board_correlation_flags(global_pool)
+            # Runs inside this fingerprint-cached build (once per data
+            # change), NOT per publication -- rank_recommendations walks
+            # odds-history/market-feature state per candidate and was
+            # previously never called on the board path at all, leaving the
+            # served ranking at raw edge x confidence.
+            self._attach_adjusted_scores(global_pool)
 
         pool = {
             "selected_date": selected_date,
@@ -3451,7 +3526,15 @@ class IntelligenceStateService:
 
         logger.info("BETTING_BOARD_PUBLISH_DATE", extra={"requested_date": str(payload.get("date") or payload.get("selected_date") or "").strip() or None, "selected_date": selected_date, "candidate_count": candidate_pool_count})
         candidates = [self._serialize_candidate(candidate) for candidate in candidate_pool.get("candidates") if isinstance(candidate, Mapping)]
-        print(f"[intelligence_state] CANDIDATES_SERIALIZED count={len(candidates)}", flush=True)
+        unpriced_candidate_count = 0
+        for candidate in candidates:
+            if not _candidate_has_price(candidate):
+                candidate["unpriced"] = True
+                unpriced_candidate_count += 1
+        print(
+            f"[intelligence_state] CANDIDATES_SERIALIZED count={len(candidates)} unpriced={unpriced_candidate_count}",
+            flush=True,
+        )
 
         ranked_candidates = _profile_stage("candidate_scoring", _balanced_recommendation_order, candidates)
         print(f"[intelligence_state] CANDIDATES_RANKED count={len(ranked_candidates)}", flush=True)
@@ -3485,15 +3568,20 @@ class IntelligenceStateService:
         # sport=wnba queries returned identical MLB-tagged candidates.
         sport_scoped_candidates = top_candidates if requested_sport == "all" else by_sport.get(requested_sport, [])
 
+        # See _candidate_has_price: unpriced candidates stay in by_sport
+        # (flagged) but never occupy a top_opportunities/recommendations
+        # slot -- those surfaces are actionable betting opportunities only.
+        actionable_candidates = [candidate for candidate in sport_scoped_candidates if not candidate.get("unpriced")]
+
         if limit_value is None:
             # See _default_unbounded_candidate_cap: an unbounded default on a
             # busy day serializes to tens of MB and fails every persistence
             # fallback, freezing the board readers actually see. Explicit
             # limits from a caller are never touched here.
-            top_opportunities = list(sport_scoped_candidates)[: _default_unbounded_candidate_cap()]
+            top_opportunities = list(actionable_candidates)[: _default_unbounded_candidate_cap()]
         else:
-            opportunity_limit = max(int(limit_value), 1) if sport_scoped_candidates else max(int(limit_value), 0)
-            top_opportunities = sport_scoped_candidates[:opportunity_limit]
+            opportunity_limit = max(int(limit_value), 1) if actionable_candidates else max(int(limit_value), 0)
+            top_opportunities = actionable_candidates[:opportunity_limit]
 
         response_last_updated = _utc_now()
         response_candidate_count = len(candidates)
@@ -3511,6 +3599,7 @@ class IntelligenceStateService:
             "last_updated": response_last_updated,
             "snapshot_generated_at": response_last_updated,
             "candidate_count": response_candidate_count,
+            "unpriced_candidate_count": unpriced_candidate_count,
         }
         print("[intelligence_state] BUILDING_BOARD_CONTRACT", flush=True)
         response["board_contract"] = build_intelligence_board_contract(response)

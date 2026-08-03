@@ -447,7 +447,19 @@ def build_intelligence_board_contract(response: Mapping[str, Any] | None) -> dic
             # It sits above simulated_edge and confidence deliberately: both are
             # components already folded into score, so consulting them first let
             # a single raw component outvote the composite.
-            _number(card.get("score")) or 0.0,
+            #
+            # adjusted_score (recommendation_engine.rank_recommendations,
+            # attached by the pool build's _attach_adjusted_scores) outranks
+            # the bare score whenever present -- the same preference
+            # _candidate_betting_rank_key applies, so the cards sort and the
+            # flat recommendations list stop disagreeing about the same
+            # candidates.
+            (
+                _number(card.get("adjusted_score"))
+                if _number(card.get("adjusted_score")) is not None
+                else _number(card.get("score"))
+            )
+            or 0.0,
             _number(card.get("simulated_edge")) or 0.0,
             # confidence can be a display-formatted percent string (e.g.
             # "63.0%", from MLB HR Targets fallback candidates --
