@@ -61,6 +61,55 @@ full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
 
+### OPEN 2026-08-03 -- Ask "top opportunities" is showing mostly NEGATIVE edges
+
+Found while verifying the Ask routing fix (`addec418`) against production.
+Reproduce in one call:
+
+    curl -s -X POST "$BASE/api/syndicate/query"       -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json"       -d '{"question":"summarize the board"}'
+
+Live result, `top_opportunities` in the order returned:
+
+    1. edge = -0.3016   Home ML
+    2. edge = -0.0572   OVER Endy Rodriguez
+    3. edge = -0.1536   Home ML
+    4. edge = -0.0954   Away ML
+    5. edge = +0.1694   OVER Jeremy Pena     <- only positive, ranked LAST
+
+4 of 5 negative, and the single genuinely good bet is last. A -30% edge is
+not an opportunity. This contradicts the product goal of surfacing the BEST
+opportunities, and it makes the new summary line ("Best edge 14.3%") read
+as an endorsement of a list led by -30%.
+
+**Not root-caused -- do not guess.** Known facts that narrow it:
+- `adjusted_score` is **None** on every row of this path, so whatever
+  ordered this list was NOT the ranker wired in `10345c35`.
+- The MAIN board looked correct earlier the same day (edges 0.45 / 0.1951 /
+  0.0886, descending), so this may be specific to the Ask summary path
+  rather than to the board. Check that distinction first.
+- Candidates: the Ask adapter slices the pool unsorted; or reads a payload
+  shape where `adjusted_score` was never attached; or sorts on a field that
+  is absent here and silently no-ops.
+
+**Strongly related:** the item-3b finding directly below (canonical
+board-state never calls `record_recommendation`, so the evaluation ledger
+is empty in prod).
+
+**This corrects an earlier claim in this file.** Phase 0 recorded the
+feedback loop as "closed" because the settlement autorun was enabled
+(`a309820c`). That was only the *settle* half -- with nothing being
+*recorded*, there was never anything to settle. The loop is still open, one
+stage earlier than diagnosed. Two symptoms already in this file were
+mis-read at the time and are now explained:
+- `verify_recent_shipped_work.py` reporting price CLV `PENDING -- no
+  settled bets yet`, read as "needs time", actually "nothing is recorded".
+- Every Kelly stake carrying `sample_credibility: 0.25`, the zero-evidence
+  floor, for the same reason.
+
+Consequence worth acting on before trusting any evaluation-derived number:
+reliability multipliers, dynamic thresholds, policy promotion, CLV and
+stake credibility are all currently computed against an empty ledger.
+
 ### Reconciliation 2026-08-03 (Settlement item 3b root-caused: canonical board-state path never writes the evaluation ledger)
 
 Picked up "HANDOFF 2026-08-03 #2" item 3b ("Settlement `_SUPPORTED_SPORTS`
