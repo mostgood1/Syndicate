@@ -675,6 +675,18 @@ table.board-blotter tbody tr:last-child td {
     border-radius: 10px;
     background: rgba(255, 255, 255, 0.04);
   }
+
+  /* Requested live 2026-08-04: collapsing the rail hid its content but
+     the two-column grid stayed put, so .board-main never gained any
+     width back -- the board stayed squeezed into the same column next
+     to an empty one. Dropping to a single column when collapsed
+     (board_rail_toggle.js mirrors data-rail-state onto .board-layout
+     for this) reclaims the full width for the board; DOM order
+     (.board-main before .board-rail) puts the now-slim rail handle
+     below it, not beside it. */
+  .board-layout[data-rail-state="collapsed"] {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 1080px) {
