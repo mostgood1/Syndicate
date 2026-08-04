@@ -164,6 +164,34 @@ until `total_recommendation_records` is non-zero.
 Non-zero `total_recommendation_records` is the pass condition. Do not
 treat a stamped fingerprint as evidence of anything.
 
+### OPEN 2026-08-04 -- /api/ops/intelligence/candidate-trace IGNORES its `sport` param
+
+Small, but it actively misleads diagnosis and cost real time here.
+
+`GET /api/ops/intelligence/candidate-trace?sport=wnba&date=...` and the
+same call with `sport=mlb` return **byte-identical** `fallback_merge_trace`
+numbers (24 / 24 / 22). Those are whole-board pool figures, not per-sport:
+`3_filter_candidates_count: 22` matched the board's own
+`candidate_count: 22` exactly at the same moment.
+
+`manifest_check` also carries
+`ComputeInRequestPathError: Refusing to run '_build_candidate_pool' inside
+a web request on a hosted deployment`, so the endpoint is reporting cached
+whole-board state rather than tracing the requested sport at all.
+
+**Why it matters:** it invites exactly the wrong conclusion. Reading a
+per-sport trace of "22 survived filtering" against a board showing
+`by_sport.wnba: 4` looks like a 22->4 sport-specific drop, i.e. a serious
+collection bug. It is not -- 4 is simply WNBA's share of a 22-candidate
+board on a 4-game slate (MLB had 19 off ~15 games). **WNBA is not
+anomalous**; the earlier "WNBA at 2 vs MLB 58, worth a trace" note is
+resolved as proportional, not a defect.
+
+Fix options: make the endpoint honour `sport` (scope the trace to that
+sport's collection), or -- if it structurally cannot inside a web request
+-- have it say so plainly and stop accepting a `sport` param that does
+nothing.
+
 ### PARTLY DONE 2026-08-04 -- Soccer: config fixed, but candidates need a refresh cycle (was: excluded via SYNDICATE_ACTIVE_SPORTS)
 
 User reported the board "feels low" on candidates. Chased it against prod.
