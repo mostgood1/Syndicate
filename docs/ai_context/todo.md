@@ -65,6 +65,59 @@ full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
 
+### OPEN 2026-08-04 -- Ledger recording stamps a "done" fingerprint while writing ZERO records
+
+Tier 2 verification of the record-side fix (`0f14ba74`, `51729219`,
+`1545a694`). The fix is deployed. It is firing. It is producing nothing.
+
+`GET /api/ops/evaluation-settlement/status` on prod (commit fa401ef6):
+
+    board_state_ledger_recorded_fingerprints:
+      "2026-08-03": d0b9bc7e...
+      "2026-08-04": dc2bd929...
+
+    autorun_status.summary:
+      total_recommendation_records: 0
+      pending: 0   matched: 0   settled: 0   unmatched: 0
+      already_resolved_records: 0
+
+So the recording path ran, decided it was done, and stamped a fingerprint
+for two dates -- while the ledger still holds zero recommendation records.
+
+**Why this is worse than the original bug.** A stamped fingerprint is a
+"this date is handled" marker. A no-op that marks itself complete can
+cause those dates to be SKIPPED on subsequent passes, so the failure is
+now self-concealing. Check whether the fingerprint gates re-runs before
+assuming a later cycle will fix it on its own.
+
+**Do not guess the cause.** Same discipline as the two mis-diagnoses this
+session (keyvalue eviction "failure" that was lazy expiry; the Ask fix
+declared done from an API check while the UI was still broken). Candidate
+directions, in the order they are cheap to falsify:
+- Is the fingerprint stamped BEFORE the write loop rather than after a
+  confirmed write? That alone explains everything observed.
+- Does the write target a ledger path/chunk the settlement reader does not
+  read? `_read_chunk_records` (evaluation_settlement.py) reads one date's
+  chunk directly; `_load_chunked_ledger_records` is the windowed
+  full-history read with the oversized-chunk skip guard. They are
+  different functions -- confirm which one the count comes from.
+- `1545a694` records that canonical board state is OFF in prod, so the
+  LEGACY path is what actually runs. Verify the recording call is on the
+  legacy path, not only the canonical one.
+
+**Blast radius, unchanged from before:** reliability multipliers, dynamic
+thresholds, policy promotion, price CLV and Kelly stake credibility are
+all still computing against an empty ledger. Kelly stakes remain pinned at
+the 0.25 zero-evidence floor. Nothing evaluation-derived can be trusted
+until `total_recommendation_records` is non-zero.
+
+**Verify with** (one call, no setup):
+
+    curl -s "$BASE/api/ops/evaluation-settlement/status"       -H "Authorization: Bearer $ADMIN_TOKEN" | python -m json.tool
+
+Non-zero `total_recommendation_records` is the pass condition. Do not
+treat a stamped fingerprint as evidence of anything.
+
 ### OPEN 2026-08-03 -- Soccer/MLS is excluded from the Layer 2 board (SYNDICATE_ACTIVE_SPORTS unset)
 
 User reported the board "feels low" on candidates. Chased it against prod.
