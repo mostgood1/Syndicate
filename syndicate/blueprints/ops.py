@@ -488,6 +488,23 @@ def api_ops_mlb_betting_card_day() -> Any:
                                     batch["sim_vs_actual"][scalar_key] = scalar
                                 elif isinstance(scalar, (list, dict)):
                                     batch["sim_vs_actual"][f"{scalar_key}_count"] = len(scalar)
+                            # meta.skipped_games is the last link: the report
+                            # covers 2 games with failures_n = 0, so the other
+                            # ~13 were SKIPPED, not failed. Its contents say
+                            # why, which is the actual answer to "why is
+                            # grading empty".
+                            meta_block = report.get("meta")
+                            if isinstance(meta_block, dict):
+                                for meta_key in ("skipped_games", "jobs", "sims_per_game", "prop_lines_source", "date", "season"):
+                                    meta_value = meta_block.get(meta_key)
+                                    if isinstance(meta_value, (list, dict)):
+                                        batch["sim_vs_actual"][f"meta_{meta_key}_count"] = len(meta_value)
+                                        batch["sim_vs_actual"][f"meta_{meta_key}_sample"] = json.dumps(
+                                            meta_value[:6] if isinstance(meta_value, list) else {k: meta_value[k] for k in list(meta_value.keys())[:6]},
+                                            default=str,
+                                        )[:600]
+                                    elif meta_value is not None:
+                                        batch["sim_vs_actual"][f"meta_{meta_key}"] = meta_value
                             for block_key in ("meta", "assessment", "summary"):
                                 block = report.get(block_key)
                                 if isinstance(block, dict):
