@@ -1836,6 +1836,13 @@ def _shared_mlb_sim_still_running() -> bool:
 		if age_seconds > _MLB_SIM_MAX_RUNTIME_SECONDS:
 			_clear_active_pointer(expected_pid=pid)
 			return False
+		# Same reasoning as the runtime ceiling above, but reacting to the run
+		# having stopped ADVANCING rather than merely having lived a long
+		# time -- the cross-container path is the one that wedged production
+		# on 2026-08-04.
+		if _mlb_sim_progress_is_stalled(meta):
+			_clear_active_pointer(expected_pid=pid)
+			return False
 		# A pointer recorded before this very process started can only belong
 		# to a previous, now-dead container (single-instance service -- see
 		# _PROCESS_STARTED_AT above) -- a definitive signal, unlike PID
@@ -1914,6 +1921,83 @@ def _persist_finished_mlb_sim_run(*, state: str = "finished") -> None:
 		_MLB_SIM_RUN_META = None
 
 
+def _mlb_sim_max_progress_stall_seconds() -> int:
+	"""How long a sim may go without advancing before it is treated as hung.
+
+	_MLB_SIM_MAX_RUNTIME_SECONDS (90 min) is a TOTAL-runtime ceiling, so a
+	sim that dies early still holds the slot for the rest of the 90 minutes.
+	Observed live 2026-08-04: pid 2517 wrote progress once at game 1 of 15,
+	twenty seconds in, then never again -- and was still reported "running"
+	93 minutes later. During that window no further sim could launch (the
+	decision function skips while one is resident, which silently disables
+	the props self-heal) and check_deploy_safety.py refused every deploy; a
+	40-minute watcher waiting for a clear window never got one.
+
+	A real run advances a game every ~3 minutes (15 games in 45-55 min), so
+	the 15-minute default is ~5x the expected gap -- wide enough not to trip
+	on a slow game or a coldstart batch, and 6x faster to notice than the
+	runtime ceiling.
+	"""
+	raw_value = str(os.environ.get("SYNDICATE_MLB_SIM_MAX_PROGRESS_STALL_SECONDS") or "").strip()
+	try:
+		value = int(raw_value or 900)
+	except ValueError:
+		value = 900
+	# Floor well above a single game's duration so this can never be tuned
+	# into killing healthy runs.
+	return max(300, value)
+
+
+def _mlb_sim_progress_path(date_str: str, run_stamp: str) -> Path:
+	# Mirrors scripts/run_mlb_daily_sim_job.py::_progress_path.
+	return _mlb_sim_runs_state_dir() / f"{date_str}_{run_stamp}_progress.json"
+
+
+def _mlb_sim_progress_is_stalled(meta: Any) -> bool:
+	"""True when a run's progress file exists but has stopped advancing.
+
+	Deliberately returns False when the progress file is absent or unparsable:
+	a run that has not written its first snapshot yet (or a job version that
+	does not emit one) must fall through to the runtime ceiling rather than
+	be killed on missing evidence. Only a progress file that EXISTS and is
+	old is treated as proof of a hang.
+	"""
+	if not isinstance(meta, dict):
+		return False
+	date_str = str(meta.get("date") or "").strip()
+	run_stamp = str(meta.get("run_stamp") or "").strip()
+	if not date_str or not run_stamp:
+		return False
+	try:
+		progress = read_json_file(_mlb_sim_progress_path(date_str, run_stamp))
+	except Exception:
+		return False
+	if not isinstance(progress, dict) or not progress:
+		return False
+	if bool(progress.get("done")):
+		return False
+	updated_at = str(progress.get("updated_at") or "").strip()
+	if not updated_at:
+		return False
+	try:
+		updated_dt = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
+	except Exception:
+		return False
+	if updated_dt.tzinfo is None:
+		# The job writes a local-time stamp; assume the worker's own zone.
+		updated_dt = updated_dt.astimezone()
+	stall_seconds = (datetime.now(timezone.utc) - updated_dt).total_seconds()
+	if stall_seconds <= float(_mlb_sim_max_progress_stall_seconds()):
+		return False
+	print(
+		f"[live_refresh_loop] MLB_SIM_PROGRESS_STALLED run_stamp={run_stamp} date={date_str} "
+		f"stall_seconds={int(stall_seconds)} game_index={progress.get('game_index')} "
+		f"game_total={progress.get('game_total')} threshold={_mlb_sim_max_progress_stall_seconds()}",
+		flush=True,
+	)
+	return True
+
+
 def _mlb_local_sim_run_is_stale() -> bool:
 	# Mirrors the age check _shared_mlb_sim_still_running already applies to
 	# the cross-container pointer -- confirmed missing here in production
@@ -1932,7 +2016,10 @@ def _mlb_local_sim_run_is_stale() -> bool:
 	if started_dt is None:
 		return False
 	age_seconds = (datetime.now(timezone.utc) - started_dt).total_seconds()
-	return age_seconds > _MLB_SIM_MAX_RUNTIME_SECONDS
+	if age_seconds > _MLB_SIM_MAX_RUNTIME_SECONDS:
+		return True
+	# Progress stall catches a hang far sooner than the total-runtime ceiling.
+	return _mlb_sim_progress_is_stalled(meta)
 
 
 def _kill_stale_mlb_sim_process() -> None:
