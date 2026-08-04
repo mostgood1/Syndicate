@@ -970,6 +970,82 @@ def api_ops_artifacts_export() -> Any:
     })
 
 
+@ops_bp.get("/api/ops/artifacts/stream")
+def api_ops_artifacts_stream() -> Any:
+    # Protected endpoint: requires admin token (enforced by before_request).
+    #
+    # Single-artifact companion to /api/ops/artifacts/export, for the one file
+    # class that endpoint structurally cannot deliver: odds_history shards.
+    # They are ~51MB on a real MLB slate (measured 2026-07-28: 51.1MB / 3,713
+    # markets) against export's 24MB whole-response budget, so the shard is
+    # either skipped as truncation (and the puller never advances its
+    # watermark past it, so it truncates at the same place forever) or, when
+    # it happens to be the first match, read whole into a dict and
+    # JSON-encoded on a 2GB web instance -- the exact shape of #50's OOM.
+    # Confirmed live 2026-08-04: web held 3,436 MLB markets while every one of
+    # 354 MLB board candidates rendered history_points=0, because the board is
+    # built on refresh-worker (render.yaml: it alone sets
+    # SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=true) and
+    # refresh-worker can only receive artifacts by pulling them. WNBA was
+    # unaffected the whole time -- 34 markets, kilobytes, well inside budget.
+    #
+    # Differs from export in exactly the ways that matter for a large file:
+    # the body is streamed from disk by send_file rather than accumulated in
+    # memory, and ?since= answers 304 (headers only, no body) instead of
+    # re-sending an unchanged 51MB every ~30s. Same allowlist, same admin
+    # gate -- this widens the transport, not what may cross it.
+    relative_path = str(request.args.get("path") or "").strip().replace("\\", "/")
+    if not relative_path:
+        return jsonify({"ok": False, "error": "path parameter required."}), 400
+    if relative_path.startswith("/") or ".." in relative_path.split("/"):
+        return jsonify({"ok": False, "error": "invalid path."}), 400
+    if not is_hot_artifact_relative_path(relative_path):
+        return jsonify({"ok": False, "error": "path is not an allowed hot artifact."}), 403
+
+    target = data_root() / Path(relative_path)
+    if not target.is_file():
+        return jsonify({"ok": False, "error": "not found."}), 404
+    # Defence in depth against a symlink or a pattern that escapes the root:
+    # the allowlist check above is on the requested string, this is on what
+    # that string actually resolved to on disk.
+    try:
+        resolved = target.resolve()
+        if not str(resolved).startswith(str(data_root().resolve())):
+            return jsonify({"ok": False, "error": "invalid path."}), 400
+    except Exception:
+        return jsonify({"ok": False, "error": "invalid path."}), 400
+
+    try:
+        stat = target.stat()
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+
+    since_raw = str(request.args.get("since") or "").strip()
+    if since_raw:
+        try:
+            if stat.st_mtime <= float(since_raw):
+                # Not modified. The caller keeps its local copy and pays one
+                # round trip instead of one transfer -- the whole reason this
+                # is worth calling every cycle.
+                response = Response(status=304)
+                response.headers["X-Artifact-Mtime"] = str(stat.st_mtime)
+                response.headers["X-Artifact-Size"] = str(stat.st_size)
+                return response
+        except ValueError:
+            pass
+
+    from flask import send_file
+
+    response = send_file(target, mimetype="application/json", conditional=True)
+    # The puller stamps its local copy with this so its next since= is
+    # web's own clock, not the moment the file finished downloading --
+    # otherwise a slow transfer looks newer than the source and the copy
+    # never refreshes again.
+    response.headers["X-Artifact-Mtime"] = str(stat.st_mtime)
+    response.headers["X-Artifact-Size"] = str(stat.st_size)
+    return response
+
+
 def _artifact_export_budget_bytes() -> int:
     # 24MB default: comfortably above a normal incremental pull (the
     # watermark keeps those small) and far below what put a 2GB instance

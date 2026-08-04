@@ -8,13 +8,16 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock
 from unittest.mock import patch
+from urllib.error import HTTPError
 from urllib.error import URLError
 
 from syndicate.app import create_app
 from syndicate.features.shared.artifact_publisher import is_hot_artifact_relative_path
 from syndicate.features.shared.artifact_publisher import publish_hot_artifact
 from syndicate.features.shared.artifact_publisher import publish_changed_hot_artifacts
+from syndicate.features.shared.artifact_publisher import odds_history_relative_paths_for_date
 from syndicate.features.shared.artifact_publisher import pull_hot_artifacts
+from syndicate.features.shared.artifact_publisher import pull_streamed_artifact
 
 
 HOT_RELATIVE_PATH = "wnba_source/source_artifacts/data/processed/recommendations_slate_2026-07-13.json"
@@ -1097,3 +1100,236 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
         self.assertNotIn("path=", urls[1])
         for later_url in urls[2:]:
             self.assertIn("path=", later_url)
+
+
+class OddsHistoryStreamedPullTests(unittest.TestCase):
+    """The board's movement data could not cross services at all.
+
+    Measured in production 2026-08-04: web held 3,436 MLB odds-history
+    markets while every one of 354 MLB board candidates rendered
+    history_points=0. The board is built on refresh-worker (render.yaml gives
+    only that service SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=true),
+    which can only receive artifacts by pulling them, and a real MLB shard is
+    ~51MB against /api/ops/artifacts/export's 24MB whole-response budget. So
+    the bulk pull either truncated before reaching it -- forever, since its
+    watermark only advances on a complete response -- or would have returned
+    it whole and OOMed a 2GB web instance (#50). WNBA was unaffected
+    throughout: 34 markets, kilobytes, well inside the budget. The join
+    itself was never broken; replaying production's own candidates against
+    production's own history matched 330/354.
+    """
+
+    def _stream_env(self, tmp_dir: str) -> dict[str, str]:
+        return {
+            "SYNDICATE_DATA_ROOT": tmp_dir,
+            "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports_root"),
+            "ADMIN_TOKEN": "secret-token",
+            "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+        }
+
+    def test_shard_paths_are_allowlisted_and_skip_week_scoped_sports(self) -> None:
+        paths = odds_history_relative_paths_for_date("2026-08-04")
+        for relative_path in paths:
+            self.assertTrue(is_hot_artifact_relative_path(relative_path), relative_path)
+        self.assertIn("mlb_source/artifacts/mlb/odds_history/2026-08-04.json", paths)
+        # nfl/ncaaf shard by season/week (_shard_key_for_row), so a
+        # date-named shard never exists for them -- asking would 404 every
+        # cycle for nothing.
+        self.assertFalse([p for p in paths if p.startswith(("nfl_", "ncaaf_"))], paths)
+        # One transport per sport, not two: the "tracking" copy holds the same
+        # payload, so pulling it as well would move ~51MB twice for one file.
+        self.assertFalse([p for p in paths if "/tracking/" in p], paths)
+
+    def test_streams_to_disk_in_chunks_and_stamps_web_mtime(self) -> None:
+        body = json.dumps({"markets": {"k": {"v": 1}}}).encode("utf-8")
+        chunks = [body[:4], body[4:], b""]
+        mocked_response = MagicMock()
+        mocked_response.__enter__.return_value = mocked_response
+        mocked_response.read.side_effect = chunks
+        mocked_response.headers = {"X-Artifact-Mtime": "1785800000.0"}
+
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(os.environ, self._stream_env(tmp_dir), clear=False):
+                with patch("urllib.request.urlopen", return_value=mocked_response):
+                    ok, written = pull_streamed_artifact(
+                        "mlb_source/artifacts/mlb/odds_history/2026-08-04.json"
+                    )
+            self.assertTrue(ok)
+            self.assertEqual(written, 1)
+            target = Path(tmp_dir) / "mlb_source/artifacts/mlb/odds_history/2026-08-04.json"
+            self.assertEqual(json.loads(target.read_text(encoding="utf-8")), {"markets": {"k": {"v": 1}}})
+            # Stamped with web's mtime, not download time -- the next cycle
+            # sends this back as since=, and a local mtime later than the
+            # source would make an updated shard look current forever.
+            self.assertAlmostEqual(target.stat().st_mtime, 1785800000.0, places=0)
+            # Streamed, not read whole: that is the entire point.
+            self.assertGreater(mocked_response.read.call_count, 1)
+            self.assertFalse(list(target.parent.glob("*.tmp")), "temp file left behind")
+
+    def test_existing_copy_sends_its_mtime_as_since(self) -> None:
+        mocked_response = MagicMock()
+        mocked_response.__enter__.return_value = mocked_response
+        mocked_response.read.side_effect = [b"{}", b""]
+        mocked_response.headers = {}
+
+        with TemporaryDirectory() as tmp_dir:
+            target = Path(tmp_dir) / "mlb_source/artifacts/mlb/odds_history/2026-08-04.json"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("{}", encoding="utf-8")
+            os.utime(target, (1785700000.0, 1785700000.0))
+            with patch.dict(os.environ, self._stream_env(tmp_dir), clear=False):
+                with patch("urllib.request.urlopen", return_value=mocked_response) as mocked_urlopen:
+                    pull_streamed_artifact("mlb_source/artifacts/mlb/odds_history/2026-08-04.json")
+            url = mocked_urlopen.call_args.args[0].full_url
+        self.assertIn("/api/ops/artifacts/stream?path=", url)
+        self.assertIn("since=1785700000.0", url)
+
+    def test_not_modified_is_a_success_that_writes_nothing(self) -> None:
+        # The steady state -- and the reason this is cheap enough to call on
+        # every board-build cycle instead of re-sending 51MB every ~30s.
+        error = HTTPError("https://x/api/ops/artifacts/stream", 304, "Not Modified", {}, None)
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(os.environ, self._stream_env(tmp_dir), clear=False):
+                with patch("urllib.request.urlopen", side_effect=error):
+                    ok, written = pull_streamed_artifact(
+                        "mlb_source/artifacts/mlb/odds_history/2026-08-04.json"
+                    )
+        self.assertTrue(ok)
+        self.assertEqual(written, 0)
+
+    def test_absent_on_web_is_reported_not_raised(self) -> None:
+        error = HTTPError("https://x/api/ops/artifacts/stream", 404, "Not Found", {}, None)
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(os.environ, self._stream_env(tmp_dir), clear=False):
+                with patch("urllib.request.urlopen", side_effect=error):
+                    ok, written = pull_streamed_artifact(
+                        "mlb_source/artifacts/mlb/odds_history/2026-08-04.json"
+                    )
+        self.assertFalse(ok)
+        self.assertEqual(written, 0)
+
+    def test_network_failure_never_raises(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(os.environ, self._stream_env(tmp_dir), clear=False):
+                with patch("urllib.request.urlopen", side_effect=URLError("boom")):
+                    ok, written = pull_streamed_artifact(
+                        "mlb_source/artifacts/mlb/odds_history/2026-08-04.json"
+                    )
+        self.assertFalse(ok)
+        self.assertEqual(written, 0)
+
+    def test_non_allowlisted_path_is_refused_before_any_request(self) -> None:
+        # The shared copy (reports/odds_control_plane/...) is the reader's
+        # FIRST precedence and is deliberately not allowlisted, so it can
+        # never cross services -- on a worker it simply doesn't exist and the
+        # reader falls through to the artifacts path this pull provides.
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(os.environ, self._stream_env(tmp_dir), clear=False):
+                with patch("urllib.request.urlopen") as mocked_urlopen:
+                    ok, written = pull_streamed_artifact(
+                        "reports/odds_control_plane/odds_history/mlb/2026-08-04.json"
+                    )
+        self.assertFalse(ok)
+        self.assertEqual(written, 0)
+        mocked_urlopen.assert_not_called()
+
+
+class ArtifactStreamEndpointTests(unittest.TestCase):
+    """The web-side half of the odds-history transport fix.
+
+    Same allowlist and same admin gate as /api/ops/artifacts/export -- this
+    widens the transport, not what is allowed to cross it.
+    """
+
+    ODDS_HISTORY_RELATIVE_PATH = "mlb_source/artifacts/mlb/odds_history/2026-08-04.json"
+
+    def setUp(self) -> None:
+        app = create_app()
+        app.testing = True
+        self.client = app.test_client()
+
+    def test_stream_requires_admin_token(self) -> None:
+        response = self.client.get("/api/ops/artifacts/stream?path=x")
+        self.assertEqual(response.status_code, 503)
+
+    def test_stream_refuses_a_path_outside_the_allowlist(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(
+                os.environ,
+                {"ADMIN_TOKEN": "secret-token", "SYNDICATE_DATA_ROOT": tmp_dir},
+                clear=False,
+            ):
+                response = self.client.get(
+                    "/api/ops/artifacts/stream?path=mlb_source/source_artifacts/data/statcast/2026.csv",
+                    headers={"Authorization": "Bearer secret-token"},
+                )
+        self.assertEqual(response.status_code, 403)
+
+    def test_stream_rejects_traversal(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(
+                os.environ,
+                {"ADMIN_TOKEN": "secret-token", "SYNDICATE_DATA_ROOT": tmp_dir},
+                clear=False,
+            ):
+                response = self.client.get(
+                    "/api/ops/artifacts/stream?path=../../etc/passwd",
+                    headers={"Authorization": "Bearer secret-token"},
+                )
+        self.assertEqual(response.status_code, 400)
+
+    def test_stream_returns_the_file_body_and_mtime_header(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            target = Path(tmp_dir) / self.ODDS_HISTORY_RELATIVE_PATH
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(json.dumps({"markets": {"k": {}}}), encoding="utf-8")
+            os.utime(target, (1785800000.0, 1785800000.0))
+            with patch.dict(
+                os.environ,
+                {"ADMIN_TOKEN": "secret-token", "SYNDICATE_DATA_ROOT": tmp_dir},
+                clear=False,
+            ):
+                response = self.client.get(
+                    f"/api/ops/artifacts/stream?path={self.ODDS_HISTORY_RELATIVE_PATH}",
+                    headers={"Authorization": "Bearer secret-token"},
+                )
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(json.loads(response.get_data(as_text=True)), {"markets": {"k": {}}})
+            self.assertAlmostEqual(float(response.headers["X-Artifact-Mtime"]), 1785800000.0, places=0)
+            # send_file streams from an open handle; on Windows the
+            # TemporaryDirectory cleanup below fails with WinError 32 unless
+            # the response is closed first.
+            response.close()
+
+    def test_stream_answers_304_without_a_body_when_not_modified(self) -> None:
+        # What keeps this affordable every cycle: an unchanged 51MB shard
+        # costs a round trip, not a transfer.
+        with TemporaryDirectory() as tmp_dir:
+            target = Path(tmp_dir) / self.ODDS_HISTORY_RELATIVE_PATH
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(json.dumps({"markets": {}}), encoding="utf-8")
+            os.utime(target, (1785700000.0, 1785700000.0))
+            with patch.dict(
+                os.environ,
+                {"ADMIN_TOKEN": "secret-token", "SYNDICATE_DATA_ROOT": tmp_dir},
+                clear=False,
+            ):
+                response = self.client.get(
+                    f"/api/ops/artifacts/stream?path={self.ODDS_HISTORY_RELATIVE_PATH}&since=1785700000.0",
+                    headers={"Authorization": "Bearer secret-token"},
+                )
+            self.assertEqual(response.status_code, 304)
+            self.assertEqual(response.get_data(), b"")
+
+    def test_stream_404s_when_the_artifact_is_absent(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(
+                os.environ,
+                {"ADMIN_TOKEN": "secret-token", "SYNDICATE_DATA_ROOT": tmp_dir},
+                clear=False,
+            ):
+                response = self.client.get(
+                    f"/api/ops/artifacts/stream?path={self.ODDS_HISTORY_RELATIVE_PATH}",
+                    headers={"Authorization": "Bearer secret-token"},
+                )
+        self.assertEqual(response.status_code, 404)

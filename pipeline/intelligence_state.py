@@ -2796,6 +2796,26 @@ class IntelligenceStateService:
             pull_hot_artifacts(date_str=selected_date)
         except Exception as exc:
             print(f"[intelligence_state] PULL_HOT_ARTIFACTS_FAILED error={exc}", flush=True)
+
+        # odds_history rides a separate, streamed transport: a real MLB shard
+        # is ~51MB against pull_hot_artifacts' 24MB whole-response budget, so
+        # the bulk pull above can never deliver it -- it either truncates
+        # before reaching it (and, because the watermark only advances on a
+        # complete response, truncates at the same place every cycle) or
+        # returns it whole and OOMs a 2GB web instance. Confirmed live
+        # 2026-08-04: web held 3,436 MLB markets while all 354 MLB board
+        # candidates rendered history_points=0 here, with WNBA (34 markets,
+        # comfortably inside the budget) showing movement normally the whole
+        # time. Without this the join below is correct and starved: replaying
+        # production's own candidates against production's own history matched
+        # 330/354.
+        try:
+            from syndicate.features.shared.artifact_publisher import pull_odds_history_artifacts
+
+            pulled = pull_odds_history_artifacts(date_str=selected_date)
+            print(f"[intelligence_state] PULL_ODDS_HISTORY date={selected_date} written={pulled}", flush=True)
+        except Exception as exc:
+            print(f"[intelligence_state] PULL_ODDS_HISTORY_FAILED error={exc}", flush=True)
         _diag_log_all_process_memory("post_pull_hot_artifacts")
         if _abort_build_candidate_pool_if_memory_critical("post_pull_hot_artifacts"):
             return self._empty_candidate_pool(selected_date, source_fingerprint)

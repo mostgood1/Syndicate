@@ -1,5 +1,78 @@
 # Syndicate TODO — canonical cross-session list
 
+### DONE (code) / NOT DEPLOYED 2026-08-04 -- MLB board movement: the join was never broken, the 51MB odds-history shard cannot cross services
+
+User reported (again) no odds movement on the front board. Investigated
+against production directly. **The join is correct and the fix from
+`8d24da2d` is live; the data simply never reaches the service that builds
+the board.**
+
+**Measured on production, 2026-08-04 ~21:20Z:**
+- Served board payload: **mlb 0/354** candidates with history, soccer 0/18,
+  **wnba 102/138** (16 points each). Not a uniform outage -- a split.
+- MLB odds-history on web: **3,436 markets** captured. Data is there.
+- Replaying production's OWN candidates against production's OWN history
+  through current `main` (`_build_odds_history_player_index` +
+  `_candidate_odds_history_state`) matched **330/354** -- every prop market.
+  The only misses were the 24 Moneylines, all of them on the 6 games with no
+  captured history at all (coverage, not join).
+- All three services live on `98e34103` (Render API), which contains
+  `8d24da2d`. Not a stale build.
+
+**Root cause: push and pull are different transports.**
+`render.yaml` gives ONLY refresh-worker
+`SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=true`, so refresh-worker
+builds the board; web just reads it (`read_combined_intelligence_response`
+never computes, by documented invariant). refresh-worker runs no HTTP server,
+so it can only PULL, and the pull is `/api/ops/artifacts/export` with a
+**24MB whole-response budget** (`_artifact_export_budget_bytes`). A real MLB
+odds-history shard is **~51MB** (measured in-repo 2026-07-28: 51.1MB /
+3,713 markets). So it is either skipped as truncation -- forever, since the
+watermark only advances on a complete response -- or returned whole and OOMs
+a 2GB web instance (#50). The push side (worker -> web) is per-file with no
+budget, which is exactly why web has the full shard and the board does not.
+WNBA was never affected: 34 markets, kilobytes, well inside the budget.
+
+**Shipped (option 2 of 3: dedicated streamed transport, not a bigger budget):**
+- New `GET /api/ops/artifacts/stream?path=&since=` on web. Same allowlist,
+  same admin gate -- widens the transport, not what may cross it. Streams via
+  `send_file` instead of accumulating in memory, answers **304** on an
+  unchanged file so a 51MB shard costs a round trip per cycle, not a transfer.
+- `pull_streamed_artifact` / `pull_odds_history_artifacts` in
+  `artifact_publisher.py`: 1MB chunks to a uuid-suffixed temp file, atomic
+  replace, then `os.utime` to web's mtime so the next `since=` is web's clock
+  (a slow transfer must not make the copy look newer than its source).
+- Wired into `_build_candidate_pool` right after `pull_hot_artifacts`.
+- Only the `artifacts/` copy is pulled, not `tracking/` (same payload; pulling
+  both moves ~51MB twice). The reader's FIRST-precedence copy
+  (`reports/odds_control_plane/...`) is deliberately not allowlisted and can
+  never cross -- on a worker it doesn't exist and the reader falls through.
+- 13 new tests (allowlist scoping, chunked write, mtime stamping, since=
+  round trip, 304/404/URLError handling, traversal + non-allowlisted refusal),
+  `tests/test_artifact_publisher.py` 60 passing.
+
+**Deploy order matters:** web FIRST (it serves the new endpoint), then
+refresh-worker. Reversed, the worker just logs `STREAM_PULL_ABSENT` and the
+board stays as it is now -- degraded, not broken. **A deploy kills the
+in-flight MLB sim; one was mid-run (`game_index 1/15`) at the time of
+writing.**
+
+**Two separate findings, both still open:**
+1. **Coverage gap is real and NOT closed.** 15 games on today's slate
+   (`last_mlb_sim_check` fingerprints), **9** in odds-history, fanduel +
+   draftkings only. The earlier entry claiming "15/15 games captured cleanly"
+   does not hold. This fix does nothing for those 6 games; their moneylines
+   will still show no movement.
+2. **`/api/ops/odds-history/inspect` lies about `path_status`.** It reports
+   `active_path: null, has_payload: false` in the same response that returns
+   3,436 markets, because `odds_history_path_status_for_sport` reads through
+   keyvalue-aware `read_json_file` while the real loader reads the file
+   directly. It says "no payload" precisely when the payload exists -- read
+   first during triage, it points the wrong way. (Also: the comment at
+   `ops.py:1243` claiming odds_history isn't allowlisted is stale; the
+   `*_source/artifacts/*/odds_history/*.json` and `*_source/tracking/...`
+   patterns were added later.)
+
 ### RESOLVED 2026-08-04 -- MLB betting-day backfill trigger built, run for 2026-08-02/03, confirmed real graded data now flows
 
 `_run_mlb_betting_day_backfill_tick` (`scripts/run_refresh_worker.py`, `03434e68`) -- a

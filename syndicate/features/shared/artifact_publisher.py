@@ -890,6 +890,153 @@ def _missing_required_artifact_relative_paths(date_str: str) -> list[str]:
     return relative_paths
 
 
+# Sports whose odds_history shard key is the plain ISO date. Deliberately
+# excludes nfl/ncaaf: _shard_key_for_row scopes those by season/week, so a
+# date-named shard never exists for them and asking would just 404 every
+# cycle. Kept as an explicit tuple for the same reason
+# _required_daily_artifact_paths is an explicit list -- this runs on the pull
+# path every cycle and must not import syndicate.features.intelligence.
+_ODDS_HISTORY_DATE_SHARDED_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba", "nhl", "ncaab", "soccer")
+
+# 1MB. Large enough that a 51MB shard is ~51 reads, small enough that peak
+# resident cost of a transfer is a rounding error on a 4GB worker -- the
+# entire point of streaming this rather than taking it through export's
+# read-whole-file-into-a-dict path.
+_STREAM_CHUNK_BYTES = 1024 * 1024
+
+
+def odds_history_relative_paths_for_date(date_str: str, *, sports: tuple[str, ...] | None = None) -> list[str]:
+    """Allowlisted odds_history shard paths the board build needs for a date.
+
+    Only the "artifacts" path, not "tracking": both are allowlisted and both
+    hold the same payload (odds_refresh_tracking._sync_odds_history_for_refresh
+    writes all three copies), so pulling both would move ~51MB twice for one
+    usable file. The reader's own precedence
+    (odds_control_plane.odds_history_paths_for_sport) is shared -> artifacts
+    -> tracking, and the shared copy lives under reports/odds_control_plane/,
+    which is NOT allowlisted and so can never cross services -- on a worker
+    that copy simply doesn't exist and the reader falls through to this one.
+    """
+    shard_key = str(date_str or "").strip()
+    if not shard_key:
+        return []
+    return [
+        f"{sport}_source/artifacts/{sport}/odds_history/{shard_key}.json"
+        for sport in (sports or _ODDS_HISTORY_DATE_SHARDED_SPORTS)
+    ]
+
+
+def _stream_url(relative_path: str, *, since_epoch: float | None = None) -> str:
+    base = _env("SYNDICATE_WEB_PUBLISH_URL")
+    if not base:
+        return ""
+    from urllib.parse import quote
+
+    url = base.rstrip("/") + "/api/ops/artifacts/stream?path=" + quote(relative_path, safe="")
+    if since_epoch is not None:
+        url += f"&since={since_epoch}"
+    return url
+
+
+def pull_streamed_artifact(relative_path: str, *, timeout_seconds: int = 120) -> tuple[bool, int]:
+    """Stream ONE allowlisted artifact to local disk. Returns (ok, written).
+
+    Never raises, same contract as the rest of this module. `ok` is False only
+    on a genuine failure -- a 304 (this worker's copy is already current) is a
+    success that writes nothing, which is the normal steady state.
+    """
+    normalized = str(relative_path or "").strip().replace("\\", "/")
+    if not normalized or not is_hot_artifact_relative_path(normalized):
+        return False, 0
+    token = _admin_token()
+    if not token or not _env("SYNDICATE_WEB_PUBLISH_URL"):
+        return False, 0
+
+    target_path = _data_root() / Path(normalized)
+    local_mtime: float | None = None
+    try:
+        if target_path.is_file():
+            local_mtime = target_path.stat().st_mtime
+    except Exception:
+        local_mtime = None
+
+    url = _stream_url(normalized, since_epoch=local_mtime)
+    if not url:
+        return False, 0
+    request_obj = urllib_request.Request(url, method="GET", headers={"Authorization": f"Bearer {token}"})
+
+    temp_path: Path | None = None
+    try:
+        with urllib_request.urlopen(request_obj, timeout=timeout_seconds) as response:
+            remote_mtime_raw = response.headers.get("X-Artifact-Mtime")
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            # uuid4-suffixed for the same concurrency reason the bulk pull's
+            # temp names are (see _pull_hot_artifacts_request).
+            temp_path = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.stream.tmp"
+            total = 0
+            with open(temp_path, "wb") as handle:
+                while True:
+                    chunk = response.read(_STREAM_CHUNK_BYTES)
+                    if not chunk:
+                        break
+                    handle.write(chunk)
+                    total += len(chunk)
+        os.replace(temp_path, target_path)
+        temp_path = None
+        # Stamp the copy with web's mtime, not now(): the next cycle sends
+        # this back as since=, and a local mtime later than the source would
+        # make an updated shard look already-current forever.
+        if remote_mtime_raw:
+            try:
+                remote_mtime = float(remote_mtime_raw)
+                os.utime(target_path, (remote_mtime, remote_mtime))
+            except Exception:
+                pass
+        print(f"[artifact_publisher] STREAM_PULL_OK path={normalized} bytes={total}", flush=True)
+        return True, 1
+    except urllib_error.HTTPError as exc:
+        if exc.code == 304:
+            # Already current. The steady state, and the reason this is cheap
+            # enough to call every cycle.
+            return True, 0
+        if exc.code == 404:
+            # Web doesn't have it either (no refresh has written this date's
+            # shard yet). Not an error worth failing the caller over, but say
+            # so rather than letting the board look merely quiet.
+            print(f"[artifact_publisher] STREAM_PULL_ABSENT path={normalized}", flush=True)
+            return False, 0
+        print(f"[artifact_publisher] STREAM_PULL_FAILED path={normalized} status={exc.code}", flush=True)
+        return False, 0
+    except (urllib_error.URLError, TimeoutError, OSError) as exc:
+        print(f"[artifact_publisher] STREAM_PULL_FAILED path={normalized} error={exc}", flush=True)
+        return False, 0
+    except Exception as exc:  # pragma: no cover - defensive, must never raise
+        print(f"[artifact_publisher] STREAM_PULL_UNEXPECTED_ERROR path={normalized} error={exc}", flush=True)
+        return False, 0
+    finally:
+        try:
+            if temp_path is not None and temp_path.exists():
+                temp_path.unlink()
+        except Exception:
+            pass
+
+
+def pull_odds_history_artifacts(
+    *, date_str: str, sports: tuple[str, ...] | None = None, timeout_seconds: int = 120
+) -> int:
+    """Pull every date-sharded odds_history artifact for a date. Returns files written.
+
+    Separate from pull_hot_artifacts on purpose: these are the files that do
+    not fit its bulk transport (see api_ops_artifacts_stream's comment), and
+    keeping them out of that call leaves its watermark semantics untouched.
+    """
+    written = 0
+    for relative_path in odds_history_relative_paths_for_date(date_str, sports=sports):
+        _, files = pull_streamed_artifact(relative_path, timeout_seconds=timeout_seconds)
+        written += files
+    return written
+
+
 def _date_glob_patterns(date_str: str) -> list[str]:
     parts = str(date_str or "").strip().split("-")
     if len(parts) == 3 and all(parts):
