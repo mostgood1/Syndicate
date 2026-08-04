@@ -1416,18 +1416,27 @@ class SteamDetectorTests(unittest.TestCase):
         self.assertEqual(steam["window_seconds"], 600.0)
 
     def test_record_is_bounded_and_never_raises(self) -> None:
+        # Intent unchanged (bounded, never raises); only the seam moved.
+        # _record_steam_events now writes per sport
+        # (steam_events_path_for_sport) rather than to one shared
+        # _steam_events_path, because a single global newest-200 window let
+        # MLB's volume evict every other sport -- see
+        # SteamEventsPerSportRetentionTests. These events carry no "sport",
+        # so they land under the "unknown" slug, which is exactly the
+        # fallback that keeps a malformed event recordable instead of lost.
         import json as _json
         from tempfile import TemporaryDirectory
         from unittest.mock import patch as _patch
 
         from syndicate.features.shared import odds_refresh_tracking as tracking
 
-        with TemporaryDirectory() as tmp_dir:
-            path = Path(tmp_dir) / "steam_events_2026-07-27.json"
-            with _patch.object(tracking, "_steam_events_path", return_value=path):
-                events = [{"market_id": f"m{i}", "steam": {"line_delta": 1.0}} for i in range(250)]
-                tracking._record_steam_events("2026-07-27", events)
-                payload = _json.loads(path.read_text(encoding="utf-8"))
+        with TemporaryDirectory() as tmp_dir, _patch.dict(
+            "os.environ", {"SYNDICATE_REPORTS_ROOT": tmp_dir}, clear=False
+        ):
+            events = [{"market_id": f"m{i}", "steam": {"line_delta": 1.0}} for i in range(250)]
+            tracking._record_steam_events("2026-07-27", events)
+            path = tracking.steam_events_path_for_sport("unknown", "2026-07-27")
+            payload = _json.loads(path.read_text(encoding="utf-8"))
         self.assertEqual(len(payload["events"]), tracking._STEAM_EVENTS_KEEP)
         self.assertEqual(payload["events"][-1]["market_id"], "m249")
 
@@ -1493,3 +1502,67 @@ class GameDateShardKeyTimezoneTests(unittest.TestCase):
         self.assertEqual(
             {_parse_game_date_token(token) for token in slate}, {date(2026, 8, 4)}
         )
+
+
+class SteamEventsPerSportRetentionTests(unittest.TestCase):
+    """One shared newest-200 file let the busiest sport evict every other.
+
+    _record_steam_events appended every sport's events to one
+    reports/steam/steam_events_<date>.json and truncated to the newest
+    _STEAM_EVENTS_KEEP. MLB detects far more steam than anything else
+    (3,400+ tracked markets on a 15-game night), so one MLB refresh evicted
+    the rest. Confirmed live 2026-08-04: 164 steam candidates on the board,
+    all MLB, with WNBA and soccer at zero despite both carrying candidates.
+    Writing per sport makes the cap per-sport by construction, and removes
+    the lost-update race where two concurrent refreshes read-modify-wrote
+    the same key.
+    """
+
+    def _event(self, sport: str, index: int) -> dict:
+        return {"sport": sport, "market_id": f"{sport}-{index}", "steam": {"line_delta": 0.5}}
+
+    def test_a_high_volume_sport_cannot_evict_another_sports_events(self) -> None:
+        from syndicate.features.shared import odds_refresh_tracking as tracking
+
+        with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(
+            "os.environ", {"SYNDICATE_REPORTS_ROOT": tmp_dir}, clear=False
+        ):
+            tracking._record_steam_events("2026-08-04", [self._event("wnba", 0)])
+            # Far more MLB events than the cap -- previously this alone
+            # flushed WNBA out of the shared file entirely.
+            tracking._record_steam_events(
+                "2026-08-04", [self._event("mlb", i) for i in range(tracking._STEAM_EVENTS_KEEP * 2)]
+            )
+
+            wnba = json.loads(
+                tracking.steam_events_path_for_sport("wnba", "2026-08-04").read_text(encoding="utf-8")
+            )
+            mlb = json.loads(
+                tracking.steam_events_path_for_sport("mlb", "2026-08-04").read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(len(wnba["events"]), 1)
+        self.assertEqual(wnba["events"][0]["market_id"], "wnba-0")
+        # MLB is still capped -- per sport, not globally.
+        self.assertEqual(len(mlb["events"]), tracking._STEAM_EVENTS_KEEP)
+
+    def test_each_sport_writes_only_its_own_key(self) -> None:
+        from syndicate.features.shared import odds_refresh_tracking as tracking
+
+        with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(
+            "os.environ", {"SYNDICATE_REPORTS_ROOT": tmp_dir}, clear=False
+        ):
+            tracking._record_steam_events(
+                "2026-08-04", [self._event("mlb", 0), self._event("soccer", 0)]
+            )
+            steam_dir = Path(tmp_dir) / "steam"
+            names = sorted(path.name for path in steam_dir.glob("*.json"))
+
+        self.assertEqual(names, ["steam_events_mlb_2026-08-04.json", "steam_events_soccer_2026-08-04.json"])
+
+    def test_the_per_sport_path_still_matches_the_hot_artifact_allowlist(self) -> None:
+        # Cross-service reach depends on reports/steam/steam_events_*.json.
+        from syndicate.features.shared.artifact_publisher import is_hot_artifact_relative_path
+
+        self.assertTrue(is_hot_artifact_relative_path("reports/steam/steam_events_mlb_2026-08-04.json"))
+        self.assertTrue(is_hot_artifact_relative_path("reports/steam/steam_events_soccer_2026-08-04.json"))

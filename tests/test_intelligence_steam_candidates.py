@@ -574,3 +574,79 @@ class MlbPlayerGameLookupForDateTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SteamOneMarketOneCardTests(unittest.TestCase):
+    """One real market move produced one card per re-detection.
+
+    The dedupe key included `timestamp`, so every refresh cycle that re-saw
+    the same move appended another identical candidate. Confirmed live
+    2026-08-04: fourteen "Baltimore Orioles Total steam move" rows, all at
+    line 8.5, on one board. A board is a list of things to bet, not an event
+    log -- one market carries one steam state, the latest.
+    """
+
+    def _observation(self, timestamp: str, line: float, previous_line: float) -> dict:
+        event = json.loads(json.dumps(PREGAME_TEAM_STEAM_EVENT))
+        event["timestamp"] = timestamp
+        event["line"] = line
+        event["steam"]["previous_line"] = previous_line
+        return event
+
+    def test_repeated_observations_of_one_move_collapse_to_a_single_card(self) -> None:
+        events = [
+            self._observation("2026-07-29T22:00:00+00:00", 8.5, 7.5),
+            self._observation("2026-07-29T22:05:00+00:00", 8.5, 7.5),
+            self._observation("2026-07-29T22:10:00+00:00", 8.5, 7.5),
+        ]
+        with patch("syndicate.features.intelligence._load_steam_events_for_date", return_value=events):
+            candidates = _steam_candidates_for_sport(_sport())
+
+        self.assertEqual(len(candidates), 1, candidates)
+        self.assertEqual(candidates[0]["steam_observations"], 3)
+        # Newest observation wins.
+        self.assertEqual(candidates[0]["steam_last_seen"], "2026-07-29T22:10:00+00:00")
+
+    def test_a_market_that_keeps_moving_reports_the_latest_line(self) -> None:
+        events = [
+            self._observation("2026-07-29T22:00:00+00:00", 8.5, 7.5),
+            self._observation("2026-07-29T22:30:00+00:00", 9.5, 8.5),
+        ]
+        with patch("syndicate.features.intelligence._load_steam_events_for_date", return_value=events):
+            candidates = _steam_candidates_for_sport(_sport())
+
+        self.assertEqual(len(candidates), 1, candidates)
+        self.assertEqual(candidates[0]["line"], "9.5")
+        self.assertEqual(candidates[0]["steam_observations"], 2)
+
+    def test_out_of_order_events_do_not_overwrite_a_newer_card(self) -> None:
+        events = [
+            self._observation("2026-07-29T22:30:00+00:00", 9.5, 8.5),
+            self._observation("2026-07-29T22:00:00+00:00", 8.5, 7.5),
+        ]
+        with patch("syndicate.features.intelligence._load_steam_events_for_date", return_value=events):
+            candidates = _steam_candidates_for_sport(_sport())
+
+        self.assertEqual(len(candidates), 1, candidates)
+        self.assertEqual(candidates[0]["line"], "9.5")
+
+    def test_two_genuinely_different_markets_stay_separate(self) -> None:
+        other = json.loads(json.dumps(PREGAME_TEAM_STEAM_EVENT))
+        other["market_type"] = "h2h"
+        other["player_name"] = "Los Angeles Dodgers"
+        with patch(
+            "syndicate.features.intelligence._load_steam_events_for_date",
+            return_value=[PREGAME_TEAM_STEAM_EVENT, other],
+        ):
+            candidates = _steam_candidates_for_sport(_sport())
+        self.assertEqual(len(candidates), 2, candidates)
+
+    def test_two_players_in_the_same_market_stay_separate(self) -> None:
+        other = json.loads(json.dumps(LIVE_PROP_STEAM_EVENT))
+        other["player_name"] = "rafael devers"
+        with patch(
+            "syndicate.features.intelligence._load_steam_events_for_date",
+            return_value=[LIVE_PROP_STEAM_EVENT, other],
+        ):
+            candidates = _steam_candidates_for_sport(_sport())
+        self.assertEqual(len(candidates), 2, candidates)

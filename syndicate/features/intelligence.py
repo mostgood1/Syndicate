@@ -75,6 +75,7 @@ from syndicate.features.shared.intelligence_evaluation import adjust_confidence
 from syndicate.features.shared.intelligence_evaluation import build_feature_coverage_profile
 from syndicate.features.shared.intelligence_evaluation import build_reliability_profile
 from syndicate.features.shared.intelligence_contracts import UniversalCandidate
+from syndicate.features.shared.intelligence_contracts import resolve_candidate_game_date
 from syndicate.features.shared.recommendation_engine import filter_candidates as _shared_filter_candidates
 from syndicate.features.shared.recommendation_engine import rank_recommendations as _shared_rank_recommendations
 from syndicate.features.shared.ops_refresh import load_latest_refresh_status
@@ -2797,6 +2798,63 @@ def _load_odds_history_payload_for_sport(slug: str, shard_key: str) -> dict[str,
     return payload
 
 
+# How many EXTRA fixture-date shards one sport may pull in beyond its primary
+# one. Bounds the cost for a sport whose board legitimately spans weeks:
+# soccer's shards are per-fixture-date and its board carries upcoming
+# matchdays, so one shard is never enough -- but an MLB shard is ~30MB, so
+# this must never become "load everything".
+_MAX_EXTRA_ODDS_HISTORY_SHARDS = 6
+
+
+def _odds_history_shard_keys_for_sport(sport: dict[str, Any], slug: str, primary_shard_key: str) -> list[str]:
+    """Every shard this sport's own board rows could need, primary first.
+
+    Confirmed live 2026-08-04: soccer had 399 markets under shard 2026-08-02
+    and 206 under 2026-08-16, and ZERO under 2026-08-04 -- so all 18 MLS
+    candidates on that day's board showed no movement. Nothing was broken in
+    soccer's capture; the reader simply asked for the board's date while
+    soccer shards by FIXTURE date, and MLS wasn't playing that day. Daily
+    sports never noticed because their fixture date and the board date are
+    the same thing.
+
+    Week-scoped sports (nfl/ncaaf) are left alone: their shard key is a
+    season/week token, not a date, so per-fixture dates don't map onto it.
+    """
+    keys = [primary_shard_key]
+    if slug in {"nfl", "ncaaf"}:
+        return keys
+    games = sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []
+    seen: set[str] = {primary_shard_key}
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        game_date = resolve_candidate_game_date(game)
+        if not game_date or game_date in seen:
+            continue
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(game_date)):
+            continue
+        seen.add(str(game_date))
+        keys.append(str(game_date))
+        if len(keys) > _MAX_EXTRA_ODDS_HISTORY_SHARDS:
+            break
+    return keys
+
+
+def _merge_odds_history_payloads(payloads: list[dict[str, Any]]) -> dict[str, Any]:
+    """Union several shards' `markets` into one payload.
+
+    Market keys already carry event_id/player_name, so they are unique across
+    fixture dates -- a union cannot collide two different games onto one key.
+    Earlier shards lose to later ones on an exact key match, which only
+    happens for the same market in the same game.
+    """
+    merged: dict[str, Any] = {"markets": {}}
+    for payload in payloads:
+        markets = payload.get("markets") if isinstance(payload.get("markets"), dict) else {}
+        merged["markets"].update(markets)
+    return merged
+
+
 def _odds_history_payloads_by_sport(overview: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     payloads: dict[str, dict[str, Any]] = {}
     for sport in overview:
@@ -2806,7 +2864,22 @@ def _odds_history_payloads_by_sport(overview: list[dict[str, Any]]) -> dict[str,
         if not slug or slug in payloads:
             continue
         shard_key = _shard_key_from_context_label(slug, _safe_text(sport.get("context_label"), ""))
-        payload = _load_odds_history_payload_for_sport(slug, shard_key)
+        shard_keys = _odds_history_shard_keys_for_sport(sport, slug, shard_key)
+        loaded = [
+            loaded_payload
+            for loaded_payload in (_load_odds_history_payload_for_sport(slug, key) for key in shard_keys)
+            if isinstance(loaded_payload, dict)
+        ]
+        payload = loaded[0] if len(loaded) == 1 else (_merge_odds_history_payloads(loaded) if loaded else None)
+        if len(shard_keys) > 1:
+            _intel_trace(
+                "odds_history_shard_window",
+                sport=slug,
+                primary_shard_key=shard_key,
+                shard_keys=shard_keys,
+                shards_found=len(loaded),
+                entry_count=len(payload.get("markets", {})) if isinstance(payload, dict) else 0,
+            )
         if isinstance(payload, dict):
             payloads[slug] = payload
     _intel_trace(
@@ -4342,10 +4415,39 @@ def _steam_events_path(date_str: str) -> Path:
     return reports_root() / "steam" / f"steam_events_{date_str}.json"
 
 
-def _load_steam_events_for_date(date_str: str) -> list[dict[str, Any]]:
-    payload = read_json_file(_steam_events_path(date_str))
-    events = payload.get("events") if isinstance(payload, dict) else None
-    return [event for event in events if isinstance(event, dict)] if isinstance(events, list) else []
+def _steam_events_path_for_sport(sport_slug: str, date_str: str) -> Path:
+    slug = _safe_text(sport_slug, "").strip().lower() or "unknown"
+    return reports_root() / "steam" / f"steam_events_{slug}_{date_str}.json"
+
+
+def _load_steam_events_for_date(date_str: str, sport_slug: str | None = None) -> list[dict[str, Any]]:
+    """Steam events for a date, preferring this sport's own record.
+
+    The writer now shards per sport (odds_refresh_tracking._record_steam_events)
+    because one shared newest-200 file let MLB's volume evict every other
+    sport -- the board carried 164 steam candidates, all MLB, with WNBA and
+    soccer at zero. The legacy combined file is still read and filtered so a
+    date written before that change, or by a service that has not been
+    deployed yet, keeps working rather than silently losing its steam.
+    """
+    events: list[dict[str, Any]] = []
+    if sport_slug:
+        payload = read_json_file(_steam_events_path_for_sport(sport_slug, date_str))
+        sport_events = payload.get("events") if isinstance(payload, dict) else None
+        if isinstance(sport_events, list):
+            events.extend(event for event in sport_events if isinstance(event, dict))
+
+    legacy_payload = read_json_file(_steam_events_path(date_str))
+    legacy_events = legacy_payload.get("events") if isinstance(legacy_payload, dict) else None
+    if isinstance(legacy_events, list):
+        wanted = _safe_text(sport_slug, "").strip().lower()
+        for event in legacy_events:
+            if not isinstance(event, dict):
+                continue
+            if wanted and _safe_text(event.get("sport"), "").strip().lower() != wanted:
+                continue
+            events.append(event)
+    return events
 
 
 def _steam_event_current_odds_text(value: Any) -> str:
@@ -4534,7 +4636,7 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
     selected_date = _safe_text(sport.get("context_label"), "")
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", selected_date):
         return []
-    events = _load_steam_events_for_date(selected_date)
+    events = _load_steam_events_for_date(selected_date, sport_slug)
     if not events:
         return []
 
@@ -4659,7 +4761,7 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
         mlb_game_pk_by_player = mlb_player_game_lookup_for_date(selected_date)
 
     candidates: list[dict[str, Any]] = []
-    seen_keys: set[tuple[str, str, str, str, str, str]] = set()
+    steam_candidate_index_by_key: dict[tuple[str, str, str, str, str], int] = {}
     for event in events:
         if _safe_text(event.get("sport"), "").lower() != sport_slug:
             continue
@@ -4749,10 +4851,25 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
         # -- two different players sharing the same selection ("Over")
         # collapsed into one, silently dropping one player's real steam
         # event before it ever became a candidate.
-        dedupe_key = (sport_slug, game_id, market_type, player_name, selection, timestamp)
-        if dedupe_key in seen_keys:
-            continue
-        seen_keys.add(dedupe_key)
+        # timestamp was part of this key, so every re-detection of the SAME
+        # market move became another card: confirmed live 2026-08-04, 14
+        # identical "Baltimore Orioles Total steam move" rows at line 8.5,
+        # one per refresh cycle that re-saw the move. A board is a list of
+        # things to bet, not an event log -- one market carries one steam
+        # state, the latest. Identity is therefore (sport, game, market,
+        # subject, selection) with the newest observation winning, and
+        # steam_observations records how many collapsed so a market that
+        # keeps moving is still distinguishable from one that moved once.
+        dedupe_key = (sport_slug, game_id, market_type, player_name, selection)
+        superseded_index = steam_candidate_index_by_key.get(dedupe_key)
+        if superseded_index is not None:
+            previous_timestamp = _safe_text(candidates[superseded_index].get("steam_last_seen"), "")
+            if timestamp and previous_timestamp and timestamp < previous_timestamp:
+                # Out-of-order event: keep the newer card already built.
+                continue
+        steam_observation_count = 1 + (
+            int(candidates[superseded_index].get("steam_observations") or 1) if superseded_index is not None else 0
+        )
 
         # #137 follow-up, confirmed live: candidates were generating and
         # surviving scoring (INTEL_TRACE showed steam counts intact through
@@ -4782,9 +4899,15 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
             move_bits.append(f"price moved {odds_delta:+.0f}")
         move_text = " and ".join(move_bits) if move_bits else "odds moved sharply"
 
-        candidates.append(
+        steam_candidate_payload = (
             {
                 "candidate_type": "steam",
+                # How many observations of this same market move collapsed
+                # into this one card, and when it was last seen. Both exist
+                # so one-move-one-card doesn't hide a market that is moving
+                # repeatedly -- that is a stronger signal, not a duplicate.
+                "steam_observations": steam_observation_count,
+                "steam_last_seen": timestamp,
                 # #162: prefer the resolved league ("MLS", "La Liga") over
                 # the generic sport family name for soccer -- see
                 # league_display_by_game_id above.
@@ -4880,6 +5003,11 @@ def _steam_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
                 ],
             }
         )
+        if superseded_index is not None:
+            candidates[superseded_index] = steam_candidate_payload
+        else:
+            steam_candidate_index_by_key[dedupe_key] = len(candidates)
+            candidates.append(steam_candidate_payload)
     return candidates
 
 

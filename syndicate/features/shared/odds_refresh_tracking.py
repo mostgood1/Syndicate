@@ -322,11 +322,38 @@ def _steam_events_path(date_str: str) -> Path:
     return reports_root() / "steam" / f"steam_events_{date_str}.json"
 
 
+def steam_events_path_for_sport(sport: str, date_str: str) -> Path:
+    """Per-sport steam record. Still matches HOT_ARTIFACT_PATTERNS'
+    reports/steam/steam_events_*.json, so cross-service reach is unchanged.
+    """
+    from syndicate.features.shared.refresh_state_store import reports_root
+
+    slug = str(sport or "").strip().lower() or "unknown"
+    return reports_root() / "steam" / f"steam_events_{slug}_{date_str}.json"
+
+
 def _record_steam_events(date_str: str, events: list[dict[str, Any]]) -> None:
-    """Bounded per-date steam record. Never raises; capped at
-    _STEAM_EVENTS_KEEP newest -- the consumers (board display, Ask the
-    Syndicate annotation, an eventual #62 re-price trigger) only ever care
-    about recent steam.
+    """Bounded per-date, PER-SPORT steam record. Never raises.
+
+    Was one shared file per date holding `merged[-_STEAM_EVENTS_KEEP:]` --
+    a single newest-200 window across every sport, appended to by each
+    sport's refresh in turn. Two consequences, both confirmed live
+    2026-08-04:
+
+    1. Starvation. MLB detects far more steam than anything else (3,400+
+       tracked markets on a 15-game night, props included), so one MLB
+       refresh evicted every other sport's events. The board showed 164
+       steam candidates, ALL MLB -- WNBA and soccer had zero despite both
+       carrying candidates. "Steam for all active sports" was structurally
+       impossible, not merely unlucky.
+    2. A lost-update race. Every sport's refresh read-modify-wrote the same
+       key, so two concurrent refreshes silently dropped one's events.
+
+    Writing per sport fixes both: the cap becomes per-sport by construction,
+    and a sport only ever touches its own key. The consumer reads the sport
+    it is building (see intelligence._load_steam_events_for_date), so no
+    globbing is needed -- which matters because with the keyvalue backend
+    these are store keys, not files, and cannot be globbed.
     """
     if not events:
         return
@@ -334,12 +361,24 @@ def _record_steam_events(date_str: str, events: list[dict[str, Any]]) -> None:
         from syndicate.features.shared.refresh_state_store import read_json_file as _read
         from syndicate.features.shared.refresh_state_store import write_json_file as _write
 
-        path = _steam_events_path(date_str)
-        payload = _read(path)
-        existing = payload.get("events") if isinstance(payload, dict) else None
-        merged = (existing if isinstance(existing, list) else []) + events
-        _write(path, {"date": date_str, "events": merged[-_STEAM_EVENTS_KEEP:]})
-        print(f"STEAM_DETECTED date={date_str} new={len(events)} total_kept={min(len(merged), _STEAM_EVENTS_KEEP)}", flush=True)
+        by_sport: dict[str, list[dict[str, Any]]] = {}
+        for event in events:
+            if not isinstance(event, dict):
+                continue
+            slug = str(event.get("sport") or "").strip().lower() or "unknown"
+            by_sport.setdefault(slug, []).append(event)
+
+        for slug, sport_events in by_sport.items():
+            path = steam_events_path_for_sport(slug, date_str)
+            payload = _read(path)
+            existing = payload.get("events") if isinstance(payload, dict) else None
+            merged = (existing if isinstance(existing, list) else []) + sport_events
+            _write(path, {"date": date_str, "sport": slug, "events": merged[-_STEAM_EVENTS_KEEP:]})
+            print(
+                f"STEAM_DETECTED sport={slug} date={date_str} new={len(sport_events)} "
+                f"total_kept={min(len(merged), _STEAM_EVENTS_KEEP)}",
+                flush=True,
+            )
     except Exception as exc:
         print(f"STEAM_RECORD_FAILED error={type(exc).__name__}: {exc}", flush=True)
 
