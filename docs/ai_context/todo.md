@@ -1,5 +1,52 @@
 # Syndicate TODO — canonical cross-session list
 
+### RESOLVED 2026-08-04 -- MLB betting-day backfill trigger built, run for 2026-08-02/03, confirmed real graded data now flows
+
+`_run_mlb_betting_day_backfill_tick` (`scripts/run_refresh_worker.py`, `03434e68`) -- a
+one-off, self-disabling refresh-worker autorun that re-runs
+`build_season_betting_cards_manifest.py` for a single named date
+(`MLB_BETTING_DAY_BACKFILL_DATE`), narrowly scoped via `--date` so the
+vendored script's `full_publish` path (season-wide manifest/recap) never
+engages, with `--out`/`--recap-md` pointed at a scratch path so the real
+season-wide manifest is never overwritten. Built because there is no
+automated Render-side trigger for this step at all -- df9df584 fixed the
+odds-path bug that made every date's graded rows zero, but nothing
+re-runs the generator against already-past dates; the daily GHA workflow
+only reaches the GHA runner's own local checkout, never Render's mounted
+disk (confirmed by reading .github/workflows/daily-update.yml -- its
+only Render interaction is a GET against `/api/ops/artifacts/export`,
+pull not push).
+
+**Run for 2026-08-03: succeeded, but produced ZERO selections
+(`combined: {n: 0}`)** -- the lock-policy genuinely selected nothing that
+day. Not a bug, just an empty confirmation.
+
+**Run for 2026-08-02: succeeded with REAL data** -- `combined: {n: 1,
+wins: 1, losses: 0, stake_u: 1.0, profit_u: 0.4651, roi: 0.4651}`. This
+confirms the odds-path fix + regeneration genuinely produces gradeable
+rows end-to-end, not just a clean exit code.
+
+**Forced a fast settlement cycle to check the join
+(`EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS=1`, temporary, reverted
+after one cycle) and found a THIRD, structural fact, not a bug:**
+`maybe_record_board_state_to_evaluation_ledger` only ever records the
+CURRENTLY SELECTED board date -- confirmed via refresh-worker logs, every
+`BOARD_STATE_LEDGER_RECORDED` line in a ~40-minute window was
+`selected_date=2026-08-04` or `2026-08-05`, none for 2026-08-02. So
+2026-08-02 has real graded rows now but ZERO pending ledger records to
+match them against -- settlement can never show a match for that date no
+matter how correct the graded-rows side is. **2026-08-04 (today) is the
+real test**: it has 98+ pending ledger records and growing every cycle;
+`graded_rows_available` for it was still 0 at check time because today's
+games likely hadn't finished yet. Check settlement status again once
+today's slate is final -- that is the date that will actually prove
+`matched > 0` for the first time.
+
+Also confirmed live: `check_deploy_safety.py`'s stale-sim-pointer issue
+(see the entry immediately below) was fixed by a concurrent session
+during this same window -- it now reports `MLB sim: STALE pointer,
+ignoring (age=181m > 90m ceiling)` instead of blocking forever.
+
 ### OPEN 2026-08-04 -- MLB sim can hang past its timeout, leaving a stale "running" pointer that blocks everything
 
 Observed live, not theorised. Sim `pid=2517` (`run_stamp 20260804_175808`):
