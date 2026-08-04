@@ -164,7 +164,7 @@ until `total_recommendation_records` is non-zero.
 Non-zero `total_recommendation_records` is the pass condition. Do not
 treat a stamped fingerprint as evidence of anything.
 
-### OPEN 2026-08-03 -- Soccer/MLS is excluded from the Layer 2 board (SYNDICATE_ACTIVE_SPORTS unset)
+### PARTLY DONE 2026-08-04 -- Soccer: config fixed, but candidates need a refresh cycle (was: excluded via SYNDICATE_ACTIVE_SPORTS)
 
 User reported the board "feels low" on candidates. Chased it against prod.
 
@@ -193,6 +193,45 @@ about.
 services, then deploy (env changes need a deploy to take effect --
 [[project-render-env-needs-deploy]]). Verify after with
 `/api/intelligence/status` showing a `by_sport.soccer` bucket.
+
+**UPDATE 2026-08-04 -- the env var is FIXED, and it was necessary but not
+sufficient.**
+
+Set `SYNDICATE_ACTIVE_SPORTS=mlb,wnba,soccer` on all three services
+(round-trip verified via the env-vars API) and deployed `99f784c3`.
+
+Confirmed the config change took effect, via the refresh tick rather than
+by assumption: `pregameCadenceSkipped: ['soccer']` -- soccer is now being
+EVALUATED and skipped on cadence, where before it was absent from
+consideration entirely. `SYNDICATE_ENABLE_SOCCER_PREGAME_REFRESH_AUTORUN`
+is `true` on live-odds-worker.
+
+But soccer still contributes **zero** candidates, and the reason is one
+layer deeper: MLS has a real 8-game slate on both 2026-08-03 and
+2026-08-04, yet every game returns `betting: False` from
+`/soccer/mls/api/cards`. No odds/picks artifact means
+`_game_bet_candidates_from_game` has nothing to emit, so the sport is
+allowed onto the board and still lands empty. Soccer's pregame refresh
+runs on a ~4h cadence, so nothing had regenerated since the config change.
+
+Triggered a scoped refresh to close it out:
+`POST /api/ops/odds-refresh/run {"sports":"soccer","date":"2026-08-04",
+"phase":"pregame","mode":"full"}` -> `ok: true`. A watcher was left polling
+`/soccer/mls/api/cards` for `betting` to become non-empty.
+
+**Not yet confirmed** that soccer candidates reach the board. The pass
+condition is a `by_sport.soccer` bucket in `/api/intelligence/status`.
+If `betting` stays False after a successful refresh, the problem is in
+soccer's picks generation (`build_soccer_picks.py` -> `picks_{date}.csv`,
+which `_market_data_for_match` reads), NOT in board config -- that part is
+now demonstrably correct.
+
+**Football takeaway is unchanged and now better evidenced:** setting the
+env var alone will NOT make NCAAF/NFL appear on opening day. They also need
+their refresh actually producing odds/picks artifacts for the date. Budget
+for both steps, and verify with a real slate rather than the config value.
+
+
 
 **This is also the season-opener footgun.** NCAAF starts ~Aug 29 and NFL
 ~Sep 10. Neither will appear on the board on opening day unless this var
