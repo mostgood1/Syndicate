@@ -17,6 +17,7 @@ import threading
 from typing import Callable
 
 from flask import Flask
+from flask.json.provider import DefaultJSONProvider
 from syndicate.blueprints.ask_the_syndicate import ask_the_syndicate_bp
 from syndicate.blueprints.home import home_bp
 from syndicate.blueprints.intelligence import intelligence_bp
@@ -31,8 +32,27 @@ from syndicate.blueprints.opportunity_board import opportunity_board_bp
 from syndicate.blueprints.soccer import soccer_bp
 from syndicate.blueprints.sports import sports_bp
 from syndicate.blueprints.wnba import wnba_bp
+from syndicate.features.shared.json_safety import json_safe_value
 from syndicate.features.shared.live_refresh_loop import start_live_refresh_background_loop
 from pipeline.intelligence_state import start_intelligence_state_background_loop
+
+
+class _NaNSafeJSONProvider(DefaultJSONProvider):
+    """Sanitizes NaN/Infinity/-Infinity out of every jsonify() response.
+
+    Root cause: syndicate/features/shared/json_safety.py's docstring.
+    A per-call-site sanitizer (syndicate/blueprints/intelligence.py's
+    _json_safe_value, added 2026-07-31) closed this for one blueprint's
+    response paths, then the same bug recurred 2026-08-04 in a second,
+    unrelated blueprint that had never been wired through it. Applying it
+    here instead -- at the app's own JSON provider -- covers every
+    jsonify() call across every current and future blueprint by
+    construction, not by remembering to wire each new response path
+    through a shared helper.
+    """
+
+    def dumps(self, obj: object, **kwargs: object) -> str:
+        return super().dumps(json_safe_value(obj), **kwargs)
 
 
 def _env_bool(name: str, *, default: bool = False) -> bool:
@@ -130,6 +150,7 @@ def create_app() -> Flask:
         template_folder="templates",
         static_folder="static",
     )
+    app.json = _NaNSafeJSONProvider(app)
 
     if not app.config.get("SYNDICATE_SPORTS"):
         app.config["SYNDICATE_SPORTS"] = [

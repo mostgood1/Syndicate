@@ -65,6 +65,62 @@ class AskTheSyndicateApiTests(unittest.TestCase):
         self.assertEqual(result.get("top_opportunities"), [{"name": "Board Snapshot Play"}])
         mocked_state_response.assert_not_called()
 
+    def test_query_route_response_is_strict_json_safe_even_with_nan_upstream(self) -> None:
+        # Reported live 2026-08-04: the Ask-the-Syndicate panel on the main
+        # board page never returned an answer -- "Unexpected token 'N', ...
+        # is not valid JSON" in the browser console. Root cause: a
+        # pandas-derived NaN reached this route's response (a board
+        # candidate's "line" sub-object, e.g. away_line/home_odds), and
+        # Flask's default JSON provider serializes float('nan') as the
+        # bareword `NaN` -- valid to Python's own json.loads but not to a
+        # browser's strict JSON.parse. syndicate/blueprints/intelligence.py
+        # had a call-site-scoped fix for this exact failure mode from
+        # 2026-07-31, but this blueprint's own response never routed
+        # through it. Must use syndicate.app.create_app() here, not a bare
+        # Flask(__name__) like this file's other route tests -- the real
+        # fix is the app-level JSON provider (syndicate/app.py's
+        # _NaNSafeJSONProvider), which only exists on the real app factory.
+        from syndicate.app import create_app
+
+        app = create_app()
+        app.testing = True
+
+        fake_result = {
+            "query_type": "market_summary",
+            "recommendations": [],
+            "board_contract": {
+                "cards": [
+                    {
+                        "line": {
+                            "away_line": float("nan"),
+                            "away_odds": float("nan"),
+                            "home_line": float("nan"),
+                            "home_odds": float("nan"),
+                            "line": 183.5,
+                        },
+                        "adjusted_edge": float("inf"),
+                    }
+                ],
+            },
+            "readiness_gate": {"ok": True},
+        }
+
+        with patch("syndicate.blueprints.ask_the_syndicate.read_latest_intelligence_state", return_value=dict(fake_result)):
+            response = app.test_client().post(
+                "/api/syndicate/query",
+                json={"question": "summarize the board", "context": {}},
+            )
+
+        raw = response.get_data(as_text=True)
+        self.assertEqual(response.status_code, 200)
+        # The actual bug: a literal NaN/Infinity token anywhere in the raw
+        # body is invalid JSON per spec, even though Python's own (lenient)
+        # json.loads and response.get_json() above would both accept it.
+        self.assertNotIn("NaN", raw)
+        self.assertNotIn("Infinity", raw)
+        payload = json.loads(raw)
+        self.assertTrue(payload["ok"])
+
     def test_query_route_returns_bet_analysis_schema(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(ask_the_syndicate_bp)

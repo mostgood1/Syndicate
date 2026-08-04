@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import hashlib
 import json
-import math
 import os
 import time
 from datetime import datetime, timezone
@@ -28,6 +27,7 @@ from syndicate.features.intelligence import _parlay_request_summary
 from syndicate.features.intelligence import _query_preferences
 from syndicate.features.intelligence import _attach_intelligence_response_aliases
 from syndicate.features.intelligence_board import build_intelligence_board_contract
+from syndicate.features.shared.json_safety import json_safe_value
 from syndicate.features.intelligence_board import _recommendation_lane
 from syndicate.features.shared.artifact_manifests import load_artifact_manifests
 from syndicate.features.shared.game_chip_scoreboard import build_game_chips
@@ -217,31 +217,14 @@ def _query_bool(value: object) -> bool:
 
 
 def _json_safe_value(value: object) -> object:
-    # Found live 2026-07-31: the Layer 2 board was stuck on "Loading board..."
-    # forever with zero console errors and zero failed network requests --
-    # every fetch returned 200. Root cause: some upstream numeric field
-    # (a pandas-derived line/odds value read without the NaN guard
-    # _line_number already has to apply defensively elsewhere in this
-    # pipeline) reached the response as a real Python float('nan'). Python's
-    # json.dumps happily serializes that as the bareword `NaN` -- valid to
-    # Python's own (lenient) json.loads, but not valid JSON per spec, so
-    # Chrome's strict JSON.parse threw a SyntaxError on the entire payload
-    # the instant it hit that one token, anywhere in the tree. The fetch
-    # itself succeeded; only .json() failed, silently, inside a catch block
-    # that never got a chance to run before hasRenderedIntelligence was
-    # already (wrongly) considered set. Rather than chase every possible
-    # NaN producer across every sport's candidate-building code, sanitize
-    # once here -- every response path funnels through
-    # _versioned_query_response before being jsonified.
-    if isinstance(value, float):
-        return value if math.isfinite(value) else None
-    if isinstance(value, dict):
-        return {key: _json_safe_value(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_json_safe_value(item) for item in value]
-    if isinstance(value, tuple):
-        return [_json_safe_value(item) for item in value]
-    return value
+    # Moved to syndicate/features/shared/json_safety.py 2026-08-04 and wired
+    # into the Flask app's own JSON provider (syndicate/app.py) after the
+    # same NaN-in-JSON failure this was built for (2026-07-31, see that
+    # module's docstring) recurred in a second, unrelated blueprint
+    # (ask_the_syndicate.py) that this call-site-scoped version never
+    # covered. Kept as a thin alias -- this module's own call sites and
+    # tests still import the name from here.
+    return json_safe_value(value)
 
 
 def _response_hash(payload: dict[str, object]) -> str:
