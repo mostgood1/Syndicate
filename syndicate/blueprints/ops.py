@@ -1691,7 +1691,19 @@ def api_ops_intelligence_candidate_trace() -> Any:
                 read_only_trace["state_read_updated_at"] = state_raw.get("updated_at")
         except Exception as exc:
             read_only_trace["error"] = f"{type(exc).__name__}: {exc}"
-        return jsonify({"ok": True, "date": date, "read_only_trace": read_only_trace})
+        # This fast path is genuinely sport-agnostic -- it reads the whole
+        # board's persisted state and snapshot paths, which have no per-sport
+        # dimension. Say that outright rather than accepting ?sport= and
+        # returning a response that mentions it nowhere, which is how the
+        # main path's partial scoping went unnoticed in the first place.
+        return jsonify({
+            "ok": True,
+            "date": date,
+            "requested_sport": sport_filter,
+            "sport_filter_applies": False,
+            "scope": "all_sports",
+            "read_only_trace": read_only_trace,
+        })
 
     try:
         from syndicate.features.intelligence import build_intelligence_overview

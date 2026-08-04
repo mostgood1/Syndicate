@@ -1507,3 +1507,30 @@ class CandidateTraceSportScopingTests(unittest.TestCase):
             payload["pool_wide_sections"],
             ["manifest_check", "full_pool_check", "app_context_pool_check"],
         )
+
+
+class CandidateTraceReadOnlyScopeTests(unittest.TestCase):
+    """?read_only=1 returns before the main path, so it needs its own answer.
+
+    It reads whole-board persisted state (no per-sport dimension), so ?sport=
+    genuinely cannot apply -- but silently accepting the param and never
+    mentioning it is how the main path's partial scoping stayed invisible.
+    """
+
+    def setUp(self) -> None:
+        app = create_app()
+        app.testing = True
+        self.client = app.test_client()
+
+    def test_read_only_states_that_the_sport_filter_does_not_apply(self) -> None:
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
+            response = self.client.get(
+                "/api/ops/intelligence/candidate-trace?sport=mlb&date=2026-08-04&read_only=1",
+                headers={"Authorization": "Bearer secret-token"},
+            )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertEqual(payload["requested_sport"], "mlb")
+        self.assertFalse(payload["sport_filter_applies"])
+        self.assertEqual(payload["scope"], "all_sports")
+        self.assertIn("read_only_trace", payload)

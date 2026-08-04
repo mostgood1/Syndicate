@@ -1,5 +1,45 @@
 # Syndicate TODO — canonical cross-session list
 
+### RESOLVED 2026-08-04 -- Both ops diagnostics that answered a different question than they were asked
+
+Closes the last two items from the board-movement chain below. Deployed to web.
+
+**`/api/ops/intelligence/candidate-trace` (`df6c71d8`).** `?sport=` reached
+ONLY the per-sport loop at the bottom of the response. Everything above it
+described the whole board: `preferences` was built with a hardcoded
+`sport="all"`, and `fallback_merge_trace` -- the collect -> score -> filter
+drop-off, the first thing anyone reads -- ran over every sport in the
+overview. Fetched with `?sport=mlb`, "collect=412, filtered=0" read as MLB's
+drop-off when it was the whole board's. Now: preferences carry the requested
+sport (it lands in `requested_sports`, not a `sport` key -- worth knowing),
+the merge trace runs over the filtered overview AND passes the sport to
+`filter_candidates` (stage 3 must vary the same argument the real pipeline
+varies, or it answers a different question than stages 1-2), and the
+per-sport loop iterates the already-filtered list. `manifest_check` /
+`full_pool_check` / `app_context_pool_check` stay pool-wide -- 
+`_build_candidate_pool` takes no sport argument, by design, because building
+the whole board's pool is exactly what the background loop does -- and the
+response now names them in `pool_wide_sections` instead of letting a scoped
+request imply otherwise. `?read_only=1` returns before all of this, so it
+carries its own `sport_filter_applies: false` rather than accepting the param
+and never mentioning it. Added `requested_sport` / `sports_in_overview` /
+`requested_sport_present` so an out-of-season or misspelled sport is stated
+outright instead of returning a bare empty list that reads like "no
+candidates". 6 tests.
+
+**`/api/ops/odds-history/matchup-coverage` (`32dd57c4`).** Verified live after
+deploy: `?date=2026-01-15` now returns `reported_dates: ["2026-08-04"]`,
+`matches_requested_date: false`, and `?sport=mlb` filters. Previously it
+answered 2026-08-04 for any date asked, just as confidently.
+
+**Testing note worth keeping:** candidate-trace tests must patch
+`_INTELLIGENCE_STATE_SERVICE._build_candidate_pool` (plus
+`_available_sport_manifests` / `_source_state_fingerprint` /
+`_candidate_pool_key`). Without it the test runs the REAL board build and
+blows past any sane timeout -- and that same endpoint calling that same
+function on web is what caused #98's OOM, so do not exercise the non-
+read_only path against production either.
+
 ### RESOLVED 2026-08-04 -- Board movement: all four bugs fixed, deployed, and verified live (MLB 0/354 -> 360/360)
 
 Closes the chain below. Deployed `32dd57c4` to all three services. **Verified
