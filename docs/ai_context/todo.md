@@ -273,7 +273,35 @@ here only as the record of what was wrong, not as open items):
    deliberately deferred until real settlement volume exists to fit/gate
    against (downstream of #1).
 
-### OPEN 2026-08-04 -- Ask the Syndicate can't reach game-market picks (moneyline/spread/ATS), only props/steam
+### FIXED 2026-08-04 -- Ask the Syndicate can't reach game-market picks (moneyline/spread/ATS), only props/steam
+
+Root cause confirmed and fixed, `06deb95c` (deployed, verified live). The
+board's own default read (`combined_board_default_enabled` branch) calls
+`read_combined_intelligence_response`, unioning each date's own per-date
+cached response across the board window. Ask's `read_latest_intelligence_state`
+instead fell through to `board_snapshot.json` -- a single global
+"whatever the legacy queue finished computing last" file, confirmed via
+`/api/ops/board-snapshot/inspect` to sometimes hold 100% steam
+candidates with zero props/game-markets at the same moment the live
+board was showing dozens across every market. `read_latest_intelligence_state`
+now tries the board's own combined-window source first, same flag-gate,
+before falling through unchanged. Verified live: all 6 of 6 sampled
+game-market picks (moneyline/ATS/totals across MLB/WNBA) that previously
+returned "No board recommendation matches" now return real answers.
+
+**New, smaller follow-up, not yet fixed:** some game-market picks'
+surfaced "prose" (via `_candidate_prose`'s `detail`/`writeup` field
+lookup, added in `b4cbb6b3`) is an internal label, not human-readable
+analysis -- e.g. "oddsapi_consensus market snapshot Sim: oddsapi_consensus
+market snapshot" for a couple of ATS/totals picks. Player-prop picks'
+prose (the same code path) is consistently good ("The model lands on
+the over side in X% of sims..."), so this is specific to whatever writes
+`detail`/`writeup` for certain game-market candidate types -- worth a
+source-side look (probably wherever oddsapi_consensus candidates get
+built) rather than another Ask-side fix, since the field itself is
+wrong/low-quality at the source, not misrouted.
+
+### CLOSED 2026-08-04 -- Ask the Syndicate can't reach game-market picks (moneyline/spread/ATS), only props/steam (superseded by FIXED entry above)
 
 Same session as the routing/prose fixes below (83a7c166 through
 d4532f22, all shipped and verified live). Found while "continue
