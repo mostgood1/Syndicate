@@ -4,17 +4,28 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-### IN PROGRESS 2026-08-04 -- Learning loop (accuracy over time), all sports: Stage 0 + Stage 1 shipped, working through Stages 2-5
+### IN PROGRESS 2026-08-04 -- Learning loop (accuracy over time), all sports: Stages 0-5 all have real shipped work, none of it deployed yet
 
 `docs/reports/syndicate_learning_loop_plan_2026_08_03.md` -- audit of every
 mechanism by which a sport gets more accurate over time (sim/model AND
-betting), plus a six-stage plan to make it best in class.
+betting), plus a six-stage plan to make it best in class. This entry
+covers a single long session that worked the plan stage by stage.
 
-**Shipped and pushed to main (7e91b0f2, 4927dd06, 08ef37e1) -- NOT YET
-DEPLOYED.** Deploy has been blocked the whole session by an in-flight MLB
-sim (pid=1567, started 04:21:19Z) + an odds refresh (pid=2063) -- check
-`python scripts/check_deploy_safety.py` before deploying, this is real
-production work sitting undeployed.
+**Shipped and pushed to main (7e91b0f2 through d27800b9, 8 commits) --
+NOT YET DEPLOYED.** Deploy was blocked for the ENTIRE session by an
+in-flight MLB sim + (at times) a concurrent odds refresh -- the sim pid
+changed twice (1567 -> 3944) over the session, meaning it's a busy
+in-season slate re-triggering resims continuously, not one stuck run.
+Check `python scripts/check_deploy_safety.py` before deploying -- there
+is a large, real batch of production work sitting undeployed. Run the
+full suite first: `python -m pytest tests/test_evaluation_settlement.py
+tests/test_graded_outcomes.py tests/test_soccer_actuals.py
+tests/test_model_scoring.py tests/test_segmented_reliability_profile.py
+tests/test_policy_exploration.py tests/test_drift_detection.py
+tests/test_build_accuracy_summary.py tests/test_model_version.py
+tests/test_calibration_profile_store.py tests/test_intelligence_evaluation.py
+tests/test_recommendation_engine.py tests/test_ops.py` (249 tests, all
+green as of d27800b9).
 
 Stage 0 (`evaluation_settlement.py`):
 - Fixed `settle_ledger_for_date` always reading via the chunked path even
@@ -71,10 +82,91 @@ Stage 1 (`syndicate/features/shared/graded_outcomes.py`, new module):
   sign conventions and real production payload shapes, not just synthetic
   fixtures.
 
-Stages 2-5 (scoring layer, calibration surface, versioned/refit
-profiles, policy exploration budget, model versioning/drift/accuracy
-gate) not yet started as of this checkpoint -- see the plan doc for the
-full breakdown. Resume there.
+Stage 2 (`model_scoring.py` new, `intelligence_evaluation.py`):
+- New pure-math module: `crps_normal`/`mean_crps` (closed-form CRPS,
+  verified against an independent Monte Carlo sample-based estimator, not
+  just self-consistency), `pinball_loss`, `brier_score`/`log_loss`/
+  `binary_calibration_metrics`, `reliability_curve` (real binned
+  predicted-vs-actual calibration -- nothing in the repo produced this
+  before), `bias_dispersion_decomposition` (separates "sim centered
+  wrong" from "sim spread wrong", two different profile-tuning fixes a
+  single MAE conflates).
+- `build_segmented_reliability_profile` (additive -- `build_reliability_profile`
+  is UNCHANGED and still what `filter_candidates`/`rank_recommendations`
+  consume): a real (sport, market_family, confidence_tier) surface with
+  hierarchical empirical-Bayes shrinkage. NOT wired into the live ranker
+  -- no real settlement volume exists yet to validate segment boundaries
+  or the shrinkage prior (`shrinkage_k=20` is a documented starting
+  point). Ready for a future re-fit job / accuracy view to read from.
+
+Stage 4 (`recommendation_engine.py`) -- done first out of order since it
+was small, self-contained, and high-value:
+- Fixed the policy deadlock: `select_policy` gave ties to the incumbent
+  by construction (empty history -> every policy scores 0.0 -> incumbent
+  wins the tie -> a challenger NEVER receives traffic NEVER accrues
+  samples NEVER gets promoted). Added a deterministic 10% exploration
+  budget (bucketed by `experiment_key`) independent of current standings.
+- `promotion_score` dropped `average_edge`/`average_confidence`/
+  `average_alignment` (inputs describing what a policy WOULD pick, not
+  evidence it performed well -- a policy could get promoted for being
+  confident rather than profitable). Added `average_clv_price` at 200x
+  weight (CLV is the fast-converging signal) using Stage 0's real
+  closing-price join, and a variance-aware required margin (2x combined
+  win-rate standard error) so a promotion at n=12 needs a much bigger
+  edge than the same score gap at n=500.
+- All existing policy regression tests pass unchanged (including the
+  n=12-noise-does-not-promote / obvious-50-vs-50-signal-does-promote
+  tests this touches most directly).
+
+Stage 5 (partial -- `model_version.py`, `drift_detection.py` new,
+`intelligence_evaluation.build_accuracy_summary`,
+`scripts/build_accuracy_summary.py`):
+- Every recorded prediction/recommendation now carries `model_version`
+  (git SHA, Render-env-first, cached per process) -- deliberately NOT
+  part of `prediction_id`/`recommendation_id`'s content hash, so the same
+  prediction across a deploy still dedupes. Without this nothing was ever
+  attributable to a specific commit.
+- `drift_detection.detect_metric_drift`: generic two-sample z-style drift
+  check for any metric over two windows (generalizes NCAAF's own
+  first-half/second-half `detect_drift`, which is log-shaped and
+  fixed-threshold, into something any sport/metric can use). False-positive
+  rate verified via a 200-trial Monte Carlo check.
+- `build_accuracy_summary`: combined metrics + segmented reliability +
+  day-bucketed win-rate/CLV drift, per sport. Deliberately NOT a web
+  route -- the ledger lives on refresh-worker's disk, not the web
+  service's (same constraint `/api/ops/evaluation-settlement/status`
+  already works around via keyvalue) -- shipped as a CLI script instead,
+  ready to become a refresh-worker autorun later.
+- **Explicitly NOT done**: a CI/`migration_gate.py` accuracy-regression
+  gate. Needs a frozen fixture slate + real settled history to gate
+  against, neither of which exist yet. Building one against fabricated
+  numbers would be worse than no gate.
+
+Stage 3 (partial -- `calibration_profile_store.py` new):
+- Generic load/save so a sim engine's `CalibrationProfile` (football's,
+  soccer's, hockeysim's `SimConfig`) can be a versioned JSON artifact
+  instead of a hardcoded source constant -- `load_versioned_profile`
+  applies only real dataclass fields via `dataclasses.replace` and
+  degrades to the exact frozen default (same object identity) on ANY
+  failure. Verified against the REAL football `CalibrationProfile`, round-
+  tripped through save/load.
+- **Explicitly NOT done**: the actual nightly re-fit job (read graded rows
+  -> minimize CRPS over tunable seams -> shadow-test -> promote). Needs
+  real settled-outcome volume per sport/market, which doesn't meaningfully
+  exist yet (same blocker as the Stage 5 CI gate). This ships the safe
+  loading mechanism a future fit job writes into, not the fit itself.
+
+Stage 2's other half -- **explicitly NOT done**: shadow-recording every
+priced candidate (not just published ones) so the filter itself becomes
+measurable. Deliberately skipped: this touches the LIVE production hot
+path (`pipeline/intelligence_state.py`'s `maybe_record_board_state_to_evaluation_ledger`,
+which currently only records `ranked_all`/published candidates), and the
+ledger already has a documented OOM/4.9GB-chunk incident history from
+exactly this kind of volume growth. Doing this safely needs real size
+controls (sampling, or a separate bounded shadow ledger) and was judged
+too risky to rush without a chance to verify against real production
+load. CLV-first promotion (the OTHER half of this Stage 2 item) IS done,
+via Stage 4's `promotion_score` rewrite above.
 
 Headline: exactly ONE closed automatic learning loop exists repo-wide
 (basketball props 7-day rolling bias, `basketball_props_calibration.py`).
@@ -85,22 +177,23 @@ Every other sport's sim runs on hand-authored frozen constants that nothing
 ever refits (NFL's profile is all 1.0 multipliers by construction; hockeysim's
 Phase 3b calibrated deltas were computed and never applied).
 
-New findings not previously recorded here, worth acting on independently:
-- **Settlement never uses the real close.** `odds_refresh_tracking.py:1385`
-  correctly stamps `closing_line`/`closing_price` at the pregame->live
-  transition, but `evaluation_settlement.py:362,367` settles with the graded
-  row's own price instead -- so `_price_clv` is ~0 by construction.
-- **The policy layer is deadlocked by design.** `select_policy` gives ties to
-  the incumbent, so a challenger never receives traffic, never accrues
-  samples, and can never be promoted. Needs an explicit exploration budget.
-  Also `promotion_score` includes average edge/confidence (inputs, not
-  results) and has no variance term.
-- **Soccer has no actuals builder at all** -- a calibrated 10-league engine
-  whose predictions can never be scored.
+Findings from the initial audit, ALL fixed in this session's commits (kept
+here only as the record of what was wrong, not as open items):
+- ~~Settlement never uses the real close~~ -- fixed, see Stage 0 above.
+- ~~The policy layer is deadlocked by design~~ -- fixed, see Stage 4 above.
+- ~~Soccer has no actuals builder at all~~ -- fixed, see Stage 1 above.
 
-Highest-leverage order: Stage 0 (get records into the ledger + join the real
-close) before the football openers, then the grading contract for the other
-six sports.
+**What's actually left, in order:**
+1. Deploy (blocked all session -- see top of this entry) and read the new
+   `unmatched_no_graded_rows`/`unmatched_no_key_match` diagnostics to
+   root-cause the current 35-pending/0-matched production state.
+2. NCAAF's grading gap (needs a game_id-joinable schedule source, likely
+   via `cfbd_lines_wk*.json`).
+3. Shadow-recording rejected candidates (deliberately deferred, see Stage
+   2's other half above -- needs real volume controls first).
+4. The Stage 3 re-fit job and the Stage 5 CI accuracy gate -- both
+   deliberately deferred until real settlement volume exists to fit/gate
+   against (downstream of #1).
 
 ### OPEN 2026-08-04 -- Ask the Syndicate can't reach game-market picks (moneyline/spread/ATS), only props/steam
 
