@@ -551,6 +551,48 @@ full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
 
+### ROOT CAUSE 2026-08-04 (controlled) -- card reconstruction selects 0 from a HEALTHY 15-game report
+
+Strongest evidence in this whole investigation, because it controls for
+input size. Two adjacent dates through the identical pipeline:
+
+    2026-08-02   batch report 15 games, failures 0  ->  day artifact games 0, selected 0
+    2026-08-03   batch report  2 games, failures 0  ->  day artifact games 0, selected 0
+
+**A healthy 15-game report yields the same empty day artifact as a 2-game
+one.** So the break is between the batch report and the day artifact --
+in the locked-card reconstruction -- and it is independent of how much
+input arrives.
+
+**This retracts entry (6)'s exoneration of
+`build_season_betting_cards_manifest.py`.** That was reasoned from 08-03
+alone ("it received input it could select nothing from"). 08-02 disproves
+it: 15 games in, 0 selected out. The generator/reconstruction IS in scope
+again.
+
+**Also retracts, as red herrings for THIS question:**
+- reconcile is healthy -- 15 games on 08-02 with 0 failures. The 08-03
+  2-game report is a real but SEPARATE anomaly and does not explain
+  16 days of empty grading, since 08-02 was fine and graded nothing.
+- the schedule, the settlement join, ledger recording, the flat/chunked
+  path split, mid-slate timing, silent dropping.
+
+**Where to look, now tightly bounded:** whatever turns a batch report into
+a locked card inside
+`vendor/mlb_bettingv2/tools/eval/build_season_betting_cards_manifest.py`
+-- `_build_card_from_report` and the per-market selection that feeds
+`combined.selected_n`. 15 real games with real assessment blocks produced
+`selected_n = 0` across every market. Read the selection thresholds and the
+market-row construction there; something is filtering everything out or
+never populating `markets` in the first place.
+
+**The instrument added in `b0636b8b`** (`RECONCILE_SIM_PATHS`) has NOT
+fired yet -- reconcile only runs inside a full daily_update, not on scoped
+resims or ticks, and none has run since the deploy. Verified the log query
+itself works via a `BOARD_STATE_LEDGER` control that returned live lines.
+Keep it: it still answers the separate 2-vs-15 question when a full run
+happens. It just is not on the critical path any more.
+
 ### ROOT CAUSE 2026-08-04 (final) -- reconcile only ever SAW 2 sims; nothing is being dropped
 
 **Corrected again, and this one is proven from code rather than measured
