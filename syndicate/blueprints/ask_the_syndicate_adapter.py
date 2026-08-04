@@ -415,10 +415,32 @@ def _is_general_board_question(question: str) -> bool:
     return any(pattern.search(text) for pattern in _GENERAL_BOARD_QUESTION_PATTERNS)
 
 
+def _market_summary_rank_key(item: dict[str, Any]) -> tuple[float, float]:
+    """Rank by the board's own ranker output, falling back to raw edge.
+
+    `adjusted_score` is what rank_recommendations produces (reliability,
+    ROI, calibration, CLV and policy weights folded in) and is the same key
+    the main board orders by, so using it keeps Ask and the board telling
+    the same story. Edge is the tiebreak and the fallback for any payload
+    that predates the ranker being wired onto this path.
+    """
+    score = _to_float(item.get("adjusted_score"))
+    edge = _to_float(item.get("adjusted_edge") or item.get("edge") or item.get("price_edge_pct"))
+    # -inf, not 0.0: an unscored row must sort BELOW a genuinely negative
+    # one rather than landing mid-pack as if it were neutral.
+    return (score if score is not None else float("-inf"), edge if edge is not None else float("-inf"))
+
+
 def _market_summary_schema(result: Any, *, question: str = "", relevance_matched: bool | None = None) -> dict[str, Any]:
     recommendations = _items_to_dicts(_result_value(result, "recommendations", ()))
+    # Was `recommendations[:5]` with no sort -- an arbitrary slice of
+    # whatever order the payload happened to arrive in. Confirmed live
+    # 2026-08-03: the summary returned 4 negative-edge rows with the only
+    # positive one (+16.9%) ranked LAST, under a header claiming "best
+    # edge". "Top opportunities" has to actually be the top ones.
+    ranked = sorted(recommendations, key=_market_summary_rank_key, reverse=True)
     top_opportunities: list[dict[str, Any]] = []
-    for item in recommendations[:5]:
+    for item in ranked[:5]:
         top_opportunities.append(
             {
                 "selection": item.get("selection") or item.get("pick") or item.get("name") or item.get("label"),
@@ -428,6 +450,9 @@ def _market_summary_schema(result: Any, *, question: str = "", relevance_matched
                 "edge": _to_float(item.get("adjusted_edge") or item.get("edge") or item.get("price_edge_pct")),
                 "EV": _to_float(item.get("expected_value") or item.get("ev_current") or item.get("ev")),
                 "confidence": _to_pct(item.get("confidence") or item.get("model_probability")),
+                # Surfaced so the ordering is inspectable rather than
+                # something a reader has to take on trust.
+                "adjusted_score": _to_float(item.get("adjusted_score")),
                 "recommendation": item.get("summary") or item.get("rationale") or item.get("writeup") or item.get("why"),
             }
         )
