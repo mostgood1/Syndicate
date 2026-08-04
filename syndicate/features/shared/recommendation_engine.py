@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import hashlib
 import json
+import math
 import time
 import uuid
 from dataclasses import dataclass
@@ -99,6 +100,13 @@ DEFAULT_POLICY = "balanced"
 
 def _copy_mapping(value: Any) -> dict[str, Any]:
     return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _first_present(*values: Any) -> Any:
+    for value in values:
+        if value is not None:
+            return value
+    return None
 
 
 def _coerce_float(value: Any) -> float | None:
@@ -795,6 +803,20 @@ def _settled_outcome(record: Mapping[str, Any]) -> str | None:
     return None
 
 
+def _policy_record_clv(record: Mapping[str, Any], source: Mapping[str, Any]) -> float | None:
+    # Same math as intelligence_evaluation._price_clv, computed per-record
+    # here so compare_policies can weight it the same way it already
+    # weights edge/confidence/roi -- CLV is the fast-converging signal the
+    # plan doc (P5/P6) says should lead promotion instead of trailing it.
+    entry_price = _first_present(source.get("odds"), source.get("price"), record.get("odds"), record.get("price"))
+    closing_price = _first_present(record.get("closing_price"), source.get("closing_price"))
+    entry_implied = _parse_american_odds(entry_price)
+    closing_implied = _parse_american_odds(closing_price)
+    if entry_implied is None or closing_implied is None:
+        return None
+    return closing_implied - entry_implied
+
+
 def _policy_record_features(record: Mapping[str, Any]) -> dict[str, float]:
     recommendation = _copy_mapping(record.get("recommendation"))
     response = _copy_mapping(record.get("response"))
@@ -820,12 +842,15 @@ def _policy_record_features(record: Mapping[str, Any]) -> dict[str, float]:
     stake = _coerce_float(record.get("stake")) or 1.0
     if stake:
         roi /= float(stake)
+    clv_price = _policy_record_clv(record, source)
     return {
         "edge": edge,
         "confidence": max(0.0, min(1.0, confidence)),
         "calibration_error": max(0.0, min(1.0, calibration_error)),
         "market_fit": max(0.0, market_fit),
         "roi": roi,
+        "clv_price": clv_price if clv_price is not None else 0.0,
+        "has_clv": 1.0 if clv_price is not None else 0.0,
     }
 
 
@@ -881,7 +906,10 @@ def compare_policies(
                     "average_edge": 0.0,
                     "average_confidence": 0.0,
                     "average_calibration_error": 0.0,
+                    "average_clv_price": 0.0,
+                    "clv_sample_size": 0,
                     "promotion_score": 0.0,
+                    "win_rate_standard_error": None,
                     "promotion_margin": policy.promotion_margin,
                     "min_sample_size": policy.min_sample_size,
                 }
@@ -893,7 +921,10 @@ def compare_policies(
         weighted_edge_total = 0.0
         weighted_confidence_total = 0.0
         weighted_calibration_total = 0.0
+        weighted_clv_total = 0.0
+        weighted_clv_weight_total = 0.0
         weight_total = 0.0
+        clv_sample_size = 0
         for record in settled_rows:
             features = _policy_record_features(record)
             alignment = _policy_alignment(policy, features)
@@ -908,6 +939,15 @@ def compare_policies(
             weighted_edge_total += float(features.get("edge") or 0.0) * weight
             weighted_confidence_total += float(features.get("confidence") or 0.0) * weight
             weighted_calibration_total += float(features.get("calibration_error") or 0.0) * weight
+            # CLV is only meaningful over records that actually captured a
+            # closing price -- averaging in a 0.0 for every record missing
+            # one (like the other features above do) would dilute the
+            # signal toward zero as coverage grows, exactly backwards from
+            # what "CLV should lead promotion" is supposed to buy.
+            if features.get("has_clv"):
+                weighted_clv_total += float(features.get("clv_price") or 0.0) * weight
+                weighted_clv_weight_total += weight
+                clv_sample_size += 1
             weight_total += weight
         weighted_roi = weighted_return_total / weight_total if weight_total else 0.0
         weighted_win_rate = weighted_win_total / weight_total if weight_total else 0.0
@@ -915,26 +955,46 @@ def compare_policies(
         average_edge = weighted_edge_total / weight_total if weight_total else 0.0
         average_confidence = weighted_confidence_total / weight_total if weight_total else 0.0
         average_calibration_error = weighted_calibration_total / weight_total if weight_total else 0.0
+        average_clv_price = (weighted_clv_total / weighted_clv_weight_total) if weighted_clv_weight_total else 0.0
+        # promotion_score is deliberately built ONLY from realized outcomes
+        # (roi, win rate, CLV, calibration error) -- average_edge/
+        # average_confidence/average_alignment describe what the policy
+        # WOULD pick, not evidence it performed well, and mixing them in
+        # let a policy get promoted for being confident rather than
+        # profitable (plan doc finding, 2026-08-03). They stay on the row
+        # below for visibility only. CLV is weighted at 200x (vs. ROI's
+        # 100x) because it is the fast-converging signal (plan doc P5) --
+        # it should be able to move promotion_score meaningfully even
+        # while win/loss sample sizes are still too thin to trust alone.
         promotion_score = (
             weighted_roi * 100.0
             + weighted_win_rate * 40.0
-            + average_edge * 18.0
-            + average_confidence * 10.0
+            + average_clv_price * 200.0
             - average_calibration_error * 20.0
-            + average_alignment * 12.0
         )
+        # Binomial standard error of weighted_win_rate, treating settled_count
+        # as the effective sample size -- an approximation (the alignment
+        # weighting above means observations aren't literally iid-equal-
+        # weight), but good enough to stop a promotion_score gap that's
+        # really just noise at a handful of settled bets (DecisionPolicy's
+        # own comment documents getting burned by exactly this at n=12).
+        sample_size = len(settled_rows)
+        win_rate_standard_error = math.sqrt(max(0.0, weighted_win_rate * (1.0 - weighted_win_rate)) / sample_size) if sample_size else None
         comparisons.append(
             {
                 "policy": policy.name,
-                "sample_size": len(settled_rows),
-                "settled_count": len(settled_rows),
+                "sample_size": sample_size,
+                "settled_count": sample_size,
                 "weighted_roi": round(weighted_roi, 4),
                 "weighted_win_rate": round(weighted_win_rate, 4),
                 "average_alignment": round(average_alignment, 4),
                 "average_edge": round(average_edge, 4),
                 "average_confidence": round(average_confidence, 4),
                 "average_calibration_error": round(average_calibration_error, 4),
+                "average_clv_price": round(average_clv_price, 4),
+                "clv_sample_size": clv_sample_size,
                 "promotion_score": round(promotion_score, 4),
+                "win_rate_standard_error": round(win_rate_standard_error, 4) if win_rate_standard_error is not None else None,
                 "promotion_margin": policy.promotion_margin,
                 "min_sample_size": policy.min_sample_size,
             }
@@ -949,32 +1009,68 @@ def build_policy_optimization_summary(
     sport: str | None = None,
     experiment_key: str | None = None,
     policies: Iterable[str] | None = None,
+    exploration_rate: float = 0.10,
 ) -> dict[str, Any]:
+    """Picks the policy for this experiment_key: promote a challenger with
+    a real, variance-aware edge; otherwise, on a deterministic fraction of
+    experiment_keys (``exploration_rate``), explore a challenger anyway so
+    it can accrue the settled samples needed to ever prove itself; else
+    fall back to the incumbent (``DEFAULT_POLICY``).
+
+    Before this, a challenger tied with (or losing to) the incumbent NEVER
+    received traffic: `leader_policy == DEFAULT_POLICY` short-circuited to
+    the incumbent immediately, and with no settled history at all every
+    policy scores promotion_score=0.0 -- a permanent tie the incumbent won
+    by construction (plan doc finding, 2026-08-03). The exploration slice
+    below is unconditional on current standings specifically to break that
+    deadlock.
+    """
     comparison = compare_policies(records, sport=sport, policies=policies)
-    incumbent = next((item for item in comparison if item.get("policy") == DEFAULT_POLICY), comparison[0] if comparison else {"policy": DEFAULT_POLICY})
-    leader = comparison[0] if comparison else incumbent
+    incumbent = next((item for item in comparison if item.get("policy") == DEFAULT_POLICY), {"policy": DEFAULT_POLICY})
+    ranked_challengers = [item for item in comparison if item.get("policy") != DEFAULT_POLICY]
+    leader = ranked_challengers[0] if ranked_challengers else None
     selected_policy = DEFAULT_POLICY
     promoted = False
-    if leader and incumbent:
+    explored = False
+
+    if leader is not None:
         lead_score = float(leader.get("promotion_score") or 0.0)
         incumbent_score = float(incumbent.get("promotion_score") or 0.0)
         lead_delta = lead_score - incumbent_score
         leader_policy = str(leader.get("policy") or DEFAULT_POLICY)
-        if leader_policy == DEFAULT_POLICY:
-            selected_policy = DEFAULT_POLICY
-        elif int(leader.get("sample_size") or 0) >= int(leader.get("min_sample_size") or POLICY_REGISTRY[DEFAULT_POLICY].min_sample_size) and lead_delta >= float(leader.get("promotion_margin") or POLICY_REGISTRY[leader_policy].promotion_margin):
+        # Variance-aware margin: the fixed promotion_margin alone treats a
+        # 1-bet swing at n=12 the same as a real edge at n=500 (the exact
+        # failure DecisionPolicy's own comment documents). Scale a required
+        # margin off the combined standard error of the two win rates, on
+        # the same *40 scale the win-rate term itself uses inside
+        # promotion_score, and take whichever requirement is stricter.
+        incumbent_se = float(incumbent.get("win_rate_standard_error") or 0.0)
+        leader_se = float(leader.get("win_rate_standard_error") or 0.0)
+        variance_margin = math.sqrt(incumbent_se ** 2 + leader_se ** 2) * 40.0 * 2.0
+        required_margin = max(float(leader.get("promotion_margin") or POLICY_REGISTRY[leader_policy].promotion_margin), variance_margin)
+        min_sample_size = int(leader.get("min_sample_size") or POLICY_REGISTRY[DEFAULT_POLICY].min_sample_size)
+        if int(leader.get("sample_size") or 0) >= min_sample_size and lead_delta >= required_margin:
             selected_policy = leader_policy
             promoted = True
-        elif experiment_key and abs(lead_delta) <= max(float(leader.get("promotion_margin") or 0.015), float(incumbent.get("promotion_margin") or 0.015)):
-            bucket = _policy_bucket(experiment_key)
-            selected_policy = leader_policy if bucket >= 50 else DEFAULT_POLICY
-        else:
-            selected_policy = DEFAULT_POLICY
+
+    if not promoted and experiment_key and ranked_challengers:
+        exploration_bucket = _policy_bucket(experiment_key)
+        if exploration_bucket < int(round(max(0.0, min(1.0, exploration_rate)) * 100)):
+            # Deterministic per-experiment_key pick among challengers (not
+            # always the current "leader") so a losing/untested challenger
+            # still gets a turn -- otherwise this exploration slice would
+            # just keep re-confirming whichever policy already looks best.
+            challenger_index = int(hashlib.sha1(f"{experiment_key}|policy_explore".encode("utf-8")).hexdigest(), 16) % len(ranked_challengers)
+            selected_policy = str(ranked_challengers[challenger_index].get("policy") or DEFAULT_POLICY)
+            explored = True
+
     return {
         "selected_policy": selected_policy,
         "incumbent_policy": DEFAULT_POLICY,
         "leader_policy": leader.get("policy") if leader else DEFAULT_POLICY,
         "promoted": promoted,
+        "explored": explored,
+        "exploration_rate": exploration_rate,
         "policy_comparison": comparison,
     }
 
