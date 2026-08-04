@@ -637,17 +637,44 @@ table.board-blotter tbody tr:last-child td {
   line-height: 1.4;
 }
 
-/* Default/desktop/tablet (>1080px): .board-rail is a normal static grid
-   column, never fixed/collapsed -- the handle only exists for the
-   docked-sheet mobile layout below and must never render here. Placed
-   BEFORE that media query block (not after) on purpose: an unscoped rule
-   always applies regardless of viewport, so if it came after the
-   mobile-scoped override it would win the cascade unconditionally
-   (equal specificity, later source order) and the handle would never
-   show on any phone either -- confirmed live in this session's own
-   browser check before reordering. */
-.board-rail-handle {
+/* Rail collapse (bet slip / watchlist / portfolio / parlays), any width.
+   board_rail_toggle.js sets data-rail-state on .board-rail at page load
+   (defaults to "collapsed" under 1080px, "expanded" at/above it) and
+   toggles it on click -- one shared mechanism, breakpoint-specific
+   presentation below. Universal so a mid-session resize across the
+   breakpoint doesn't leave a stale collapse rule from the other one
+   applied. */
+.board-rail[data-rail-state="collapsed"] > section {
   display: none;
+}
+
+.board-rail-handle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--cards-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Desktop/tablet (>1080px): .board-rail stays a normal static grid
+   column (never fixed) -- shrinking it just means hiding its sections,
+   no viewport-docked sheet needed. Added 2026-08-04: reported live that
+   the rail (all 5 sections stacked) had no way to shrink here either,
+   pushing it well down the page on a short window. */
+@media (min-width: 1081px) {
+  .board-rail-handle {
+    padding: 10px 12px;
+    margin: 0 0 12px;
+    border: 1px solid var(--cards-line-strong);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+  }
 }
 
 @media (max-width: 1080px) {
@@ -655,17 +682,17 @@ table.board-blotter tbody tr:last-child td {
     grid-template-columns: 1fr;
   }
 
-  /* The rail (bet slip / portfolio / parlays) sits AFTER .board-main in
-     source order, so collapsing to one column drops the slip below the
-     entire board -- hundreds of rows down, with no indication it holds
-     anything. Pin it to the bottom of the viewport instead, collapsed to
-     its header until tapped.
+  /* The rail sits AFTER .board-main in source order, so collapsing to
+     one column drops the slip below the entire board -- hundreds of
+     rows down, with no indication it holds anything. Pin it to the
+     bottom of the viewport instead, collapsed to its header until
+     tapped.
 
-     Root-caused 2026-08-03: this comment described the intended behavior,
-     but the actual collapse (max-height clamp + handle + JS toggle) was
-     never implemented -- .board-rail rendered permanently at max-height:
-     62vh, fixed to the bottom, with no way to collapse it, on every phone
-     since this shipped. .board-rail-handle/.is-expanded below and
+     Root-caused 2026-08-03: this comment described the intended
+     behavior, but the actual collapse (max-height clamp + handle + JS
+     toggle) was never implemented -- .board-rail rendered permanently
+     at max-height: 62vh, fixed to the bottom, with no way to collapse
+     it, on every phone since this shipped. .board-rail-handle above and
      shared/board_rail_toggle.js actually implement it. */
   .board-rail {
     position: fixed;
@@ -683,33 +710,14 @@ table.board-blotter tbody tr:last-child td {
     transition: max-height 0.2s ease;
   }
 
-  .board-rail.is-expanded {
+  .board-rail[data-rail-state="expanded"] {
     max-height: 62vh;
     overflow-y: auto;
     padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
   }
 
-  /* Only a direct child of .board-rail, not a <section> -- hiding every
-     <section> below while always showing this keeps the rail reachable
-     (and visibly non-empty, per the comment above) while collapsed. */
   .board-rail-handle {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
     height: 48px;
-    padding: 0;
-    margin: 0;
-    border: 0;
-    background: transparent;
-    color: var(--cards-text);
-    font-size: 13px;
-    font-weight: 600;
-    text-align: left;
-  }
-
-  .board-rail:not(.is-expanded) > section {
-    display: none;
   }
 
   /* Keep the last rows reachable above the docked, collapsed rail. */
