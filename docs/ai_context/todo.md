@@ -497,6 +497,55 @@ full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
 
+### OPEN 2026-08-04 (6) -- The generator is NOT the bug; the batch report is thin (2 games) and reconstruction selects 0
+
+Supersedes entry (5)'s framing. `build_season_betting_cards_manifest.py`
+is behaving correctly on the input it is given. **Do not "fix" it.**
+
+Full chain, every link now measured in production via
+`/api/ops/mlb/betting-card-day?date=2026-08-03` (`071ecf7d`):
+
+    sims on disk        8 files            (/api/ops/mlb/sims-list)
+    batch report        633,759 bytes  BUT games_count = 2
+    locked card         exists = FALSE     (reconstructed, never written)
+    day artifact        games = {}
+      results.combined  {"n": 0, "wins": 0, "losses": 0, "roi": null}
+      selected_counts   all zero
+    market accuracy     0 graded rows, 16 straight dates
+    settlement          35 pending, matched 0
+
+**Why the generator is exonerated:** `--cards-dir` is documented as
+"Directory to write **reconstructed** daily locked-policy cards" -- the
+card is not read from disk, it is rebuilt from the batch report
+(`_build_card_from_report` -> `_card_output_paths`). `combined.selected_n`
+sums `selected_n` across markets and came out 0, and `games` is seeded from
+`_recommendations_by_game(card)` before any settlement join. So the
+generator received an input from which it could select nothing, and
+faithfully wrote an empty day. Empty in, empty out.
+
+**The real thread: the batch report only has 2 games.** The 08-03 slate had
+~15 games and 8 sim files exist. A 633KB report holding 2 games is the
+anomaly to chase -- either `sim_vs_actual_*.json` is being written from a
+tiny subset of the slate, or its `games` is not the per-game map the name
+implies (633KB for 2 entries is a lot, so check the shape before assuming
+it is truncated).
+
+**Where to look next**, in order:
+1. Dump `sim_vs_actual_2026-08-03.json`'s `games` shape and its `meta` /
+   `assessment` / `failures_n` blocks -- `failures_n` in particular, since a
+   high failure count would explain a thin report directly. Extending
+   `/api/ops/mlb/betting-card-day` again is the cheap way (it has answered
+   four successive questions this way already).
+2. Whatever writes `sim_vs_actual_*` in the daily-update run -- if it only
+   emits games that passed some assessment gate, a broad failure would
+   silently shrink it to 2.
+3. Only then the reconstruction's selection thresholds.
+
+**Explicitly NOT the bug** (each checked, do not re-tread):
+`market_accuracy._normalized_rows`, the settlement join, ledger recording,
+the settlement autorun, the batch dir's existence, and
+`build_season_betting_cards_manifest.py` itself.
+
 ### OPEN 2026-08-04 (5) -- NARROWED TO ONE SCRIPT: input exists, the generator drops it
 
 Extended `/api/ops/mlb/betting-card-day` to report the generator's INPUT
