@@ -202,7 +202,9 @@ window.SyndicateAskBar = (function () {
     // A market summary's substance is the opportunity list; render it the
     // same way briefing top_picks are rendered above rather than dropping
     // it because the prose slot was empty.
-    const opportunities = structured && Array.isArray(structured.top_opportunities) ? structured.top_opportunities : [];
+    const opportunities = structured && Array.isArray(structured.top_opportunities) ? structured.top_opportunities
+      // matchup_analysis's own list, same shape/purpose as top_opportunities.
+      : (structured && Array.isArray(structured.key_edges) ? structured.key_edges : []);
     if (fallbackText || opportunities.length) {
       return `
         ${fallbackText ? `<div class="ask-bar__answer-narrative">${escapeHtml(fallbackText).replace(/\n+/g, "<br><br>")}</div>` : ""}
@@ -219,6 +221,31 @@ window.SyndicateAskBar = (function () {
             }).join("")}
           </div>
         ` : ""}
+      `;
+    }
+    // bet_analysis for a real, specific pick with no generated prose (the
+    // optional LLM narration layer is off by design -- see the comment
+    // above). Reported live 2026-08-04: routing a per-pick question to
+    // bet_analysis correctly matched the clicked pick's real numbers
+    // (selection/edge/EV/probabilities), but this function only ever knew
+    // how to render narrative text or a market_summary/matchup_analysis
+    // opportunity list, so a real answer with real numbers and no prose
+    // still fell through to "No structured answer came back" below.
+    if (structured && structured.schema_type === "bet_analysis" && structured.selection) {
+      const facts = [
+        typeof structured.model_probability === "number" ? `Model ${structured.model_probability.toFixed(1)}%` : null,
+        typeof structured.market_probability === "number" ? `Market ${structured.market_probability.toFixed(1)}%` : null,
+        typeof structured.edge === "number" ? `Edge ${(structured.edge * 100).toFixed(1)}%` : null,
+        typeof structured.EV === "number" ? `EV ${structured.EV.toFixed(2)}` : null,
+      ].filter(Boolean);
+      return `
+        <div class="ask-bar__answer-picks">
+          <div class="ask-bar__answer-pick">
+            <span class="ask-bar__answer-pick-name">${escapeHtml(safeText(structured.selection, "This pick"))}</span>
+            ${facts.length ? `<span class="ask-bar__answer-pick-why">${escapeHtml(facts.join(" · "))}</span>` : ""}
+          </div>
+        </div>
+        ${!facts.length ? `<div class="ask-bar__answer-narrative ask-bar__answer-narrative--empty">No detailed numbers available for this pick yet.</div>` : ""}
       `;
     }
     return `<div class="ask-bar__answer-narrative ask-bar__answer-narrative--empty">No structured answer came back for this question -- try rephrasing it.</div>`;
