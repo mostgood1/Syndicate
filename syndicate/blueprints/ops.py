@@ -408,6 +408,32 @@ def api_ops_mlb_betting_card_day() -> Any:
     payload["sample_game"] = sample_game
     payload["sample_row"] = sample_row
 
+    # The locked card is what the generator selects FROM. games is seeded by
+    # _recommendations_by_game(card) before any settlement is joined, so an
+    # empty games with zero selected_counts points here, not at the
+    # generator. Proving it rather than inferring it: report the card's own
+    # recommendation count.
+    summary_block = parsed.get("summary") if isinstance(parsed.get("summary"), dict) else {}
+    card_path_text = str(summary_block.get("card_path") or parsed.get("card_source") or "").strip()
+    card_info: dict[str, Any] = {"path": card_path_text or None}
+    if card_path_text:
+        try:
+            card_path = Path(card_path_text)
+            card_info["exists"] = card_path.exists()
+            if card_path.exists():
+                card_info["size_bytes"] = card_path.stat().st_size
+                card_doc = json.loads(card_path.read_text(encoding="utf-8"))
+                if isinstance(card_doc, dict):
+                    card_info["top_level_keys"] = sorted(card_doc.keys())[:20]
+                    for key in ("recommendations", "playable_recommendations", "all_recommendations", "shadow_recommendations"):
+                        value = card_doc.get(key)
+                        if isinstance(value, (list, dict)):
+                            card_info[f"{key}_count"] = len(value)
+                    card_info["cap_profile"] = card_doc.get("cap_profile")
+        except Exception as exc:
+            card_info["error"] = f"{type(exc).__name__}: {exc}"
+    payload["locked_card"] = card_info
+
     # The batch dir is the day payload's INPUT: daily_update.py resolves it
     # to <data>/eval/batches/season_{season}_ui_daily_live and hands it to
     # build_season_betting_cards_manifest.py as --batch-dir, which is what
