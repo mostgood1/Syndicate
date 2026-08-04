@@ -644,6 +644,133 @@ class RefreshWorkerTests(unittest.TestCase):
             called_dates = sorted(call.args[0] for call in mocked_writer.call_args_list)
             self.assertEqual(called_dates, ["2026-06-23", "2026-07-14", "2026-07-15"])
 
+    def test_betting_day_backfill_tick_is_a_no_op_without_a_target_date(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+        with TemporaryDirectory() as tmp_dir, patch.dict(
+            module.os.environ,
+            {"SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports")},
+            clear=True,
+        ):
+            self.assertIsNone(module._run_mlb_betting_day_backfill_tick())
+
+    def test_betting_day_backfill_tick_invokes_the_manifest_builder_with_scoped_args(self) -> None:
+        # 2026-08-04. Narrow by design: --date must be passed (so the
+        # vendored script's full_publish path, which touches the
+        # season-wide manifest/recap, never engages) and --out/--recap-md
+        # must point at a scratch path (so the real season-wide manifest
+        # is never overwritten with a single-day version).
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            data_root = Path(tmp_dir) / "data"
+            with patch.dict(
+                module.os.environ,
+                {
+                    "SYNDICATE_REPORTS_ROOT": str(reports_root),
+                    "SYNDICATE_DATA_ROOT": str(data_root),
+                    "MLB_BETTING_DAY_BACKFILL_DATE": "2026-08-03",
+                },
+                clear=True,
+            ), patch.object(module.subprocess, "run") as mocked_run:
+                mocked_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="ok", stderr="")
+                status = module._run_mlb_betting_day_backfill_tick()
+
+            self.assertIsNotNone(status)
+            self.assertTrue(status["ok"])
+            self.assertEqual(status["date"], "2026-08-03")
+            mocked_run.assert_called_once()
+            call_args = mocked_run.call_args
+            command = call_args.args[0]
+            self.assertIn("--season", command)
+            self.assertEqual(command[command.index("--season") + 1], "2026")
+            self.assertIn("--date", command)
+            self.assertEqual(command[command.index("--date") + 1], "2026-08-03")
+            self.assertIn("--profile-name", command)
+            self.assertEqual(command[command.index("--profile-name") + 1], "retuned")
+            # --out/--recap-md are the scratch-path guard -- must exist and
+            # must NOT point at the real season-wide manifest/recap files.
+            out_value = command[command.index("--out") + 1]
+            recap_value = command[command.index("--recap-md") + 1]
+            self.assertIn("2026-08-03", out_value)
+            self.assertIn("2026-08-03", recap_value)
+            self.assertNotIn("season_betting_cards_manifest.json", out_value)
+            # --day-payload-dir/--cards-dir are the REAL production paths --
+            # this is what's actually meant to be fixed.
+            day_payload_dir = command[command.index("--day-payload-dir") + 1]
+            cards_dir = command[command.index("--cards-dir") + 1]
+            self.assertIn("betting_day_payloads_retuned", day_payload_dir)
+            self.assertIn("locked_cards_retuned", cards_dir)
+
+    def test_betting_day_backfill_tick_self_disables_after_success_for_the_same_date(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            data_root = Path(tmp_dir) / "data"
+            with patch.dict(
+                module.os.environ,
+                {
+                    "SYNDICATE_REPORTS_ROOT": str(reports_root),
+                    "SYNDICATE_DATA_ROOT": str(data_root),
+                    "MLB_BETTING_DAY_BACKFILL_DATE": "2026-08-03",
+                },
+                clear=True,
+            ), patch.object(module.subprocess, "run") as mocked_run:
+                mocked_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="ok", stderr="")
+                first = module._run_mlb_betting_day_backfill_tick()
+                second = module._run_mlb_betting_day_backfill_tick()
+
+            self.assertIsNotNone(first)
+            self.assertIsNone(second)
+            mocked_run.assert_called_once()
+
+    def test_betting_day_backfill_tick_retries_after_a_failed_attempt(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            data_root = Path(tmp_dir) / "data"
+            with patch.dict(
+                module.os.environ,
+                {
+                    "SYNDICATE_REPORTS_ROOT": str(reports_root),
+                    "SYNDICATE_DATA_ROOT": str(data_root),
+                    "MLB_BETTING_DAY_BACKFILL_DATE": "2026-08-03",
+                },
+                clear=True,
+            ), patch.object(module.subprocess, "run") as mocked_run:
+                mocked_run.return_value = subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="boom")
+                first = module._run_mlb_betting_day_backfill_tick()
+                second = module._run_mlb_betting_day_backfill_tick()
+
+            self.assertFalse(first["ok"])
+            # A failed attempt must NOT self-disable -- the next tick should
+            # try again, not silently stay broken forever.
+            self.assertIsNotNone(second)
+            self.assertEqual(mocked_run.call_count, 2)
+
+    def test_betting_day_backfill_tick_reports_an_unparseable_date_without_running_the_subprocess(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            with patch.dict(
+                module.os.environ,
+                {"SYNDICATE_REPORTS_ROOT": str(reports_root), "MLB_BETTING_DAY_BACKFILL_DATE": "not-a-date"},
+                clear=True,
+            ), patch.object(module.subprocess, "run") as mocked_run:
+                status = module._run_mlb_betting_day_backfill_tick()
+
+            self.assertFalse(status["ok"])
+            self.assertIn("error", status)
+            mocked_run.assert_not_called()
+
     def test_main_run_once_marks_worker_status_claimed_when_pending(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module = self._load_module(repo_root)

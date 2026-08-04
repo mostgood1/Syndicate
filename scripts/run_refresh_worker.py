@@ -541,6 +541,105 @@ def _run_mlb_actuals_writer_tick() -> dict[str, Any] | None:
     return status
 
 
+def _mlb_betting_day_backfill_target_date() -> str | None:
+    raw = str(os.environ.get("MLB_BETTING_DAY_BACKFILL_DATE") or "").strip()
+    return raw or None
+
+
+def _mlb_betting_day_backfill_status_path() -> Path:
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "mlb_betting_day_backfill_status.json"
+
+
+def _run_mlb_betting_day_backfill_tick() -> dict[str, Any] | None:
+    """One-off backfill (2026-08-04): re-runs
+    vendor/mlb_bettingv2/tools/eval/build_season_betting_cards_manifest.py
+    for a SINGLE named date, so a stale season_betting_day_{date}.json --
+    written before df9df584's odds-path fix, when _odds_paths resolved
+    against the code checkout instead of the mounted data disk and every
+    day silently produced zero graded rows -- gets regenerated with the
+    fix now in place. There is no automated daily trigger for this specific
+    step on Render (see todo.md); this exists to backfill specific dates on
+    demand without inventing a general-purpose remote-script-execution
+    endpoint.
+
+    Deliberately one-off, not interval-gated: fires once for the exact
+    date named in MLB_BETTING_DAY_BACKFILL_DATE, writes a completion
+    marker keyed to that date, and self-disables (returns None) on every
+    later tick once that marker shows ok=True for the same date -- so the
+    operator can leave the env var set without it silently repeating.
+    Narrowly scoped by design: passes --date so the vendored script's own
+    full_publish path (which touches the season-wide manifest/recap
+    shared across every date) never engages; only this date's own card
+    and day-payload files are written. --out/--recap-md are pointed at a
+    scratch path for exactly that reason -- the script's own default
+    would otherwise overwrite the real season-wide manifest with a
+    single-day version.
+    """
+    target_date = _mlb_betting_day_backfill_target_date()
+    if not target_date:
+        return None
+    status_path = _mlb_betting_day_backfill_status_path()
+    last_status = _refresh_state_store()["read_json_file"](status_path) or {}
+    if str(last_status.get("date") or "") == target_date and bool(last_status.get("ok")):
+        return None
+
+    try:
+        season = int(target_date[:4])
+    except ValueError:
+        status = {"epoch": time.time(), "date": target_date, "ok": False, "error": f"could not parse a season from {target_date!r}"}
+        _refresh_state_store()["write_json_file"](status_path, status)
+        return status
+
+    data_root = _refresh_state_store()["data_root"]()
+    mlb_root = data_root / "mlb_source" / "source_artifacts" / "data"
+    batch_dir = mlb_root / "eval" / "batches" / f"season_{season}_ui_daily_live"
+    season_dir = mlb_root / "eval" / "seasons" / str(season)
+    day_payload_dir = season_dir / "betting_day_payloads_retuned"
+    cards_dir = season_dir / "locked_cards_retuned"
+    scratch_dir = _refresh_state_store()["reports_root"]() / "refresh_status" / "latest"
+    scratch_out = scratch_dir / f"mlb_betting_day_backfill_manifest_{target_date}.json"
+    scratch_recap = scratch_dir / f"mlb_betting_day_backfill_recap_{target_date}.md"
+
+    script_path = REPO_ROOT / "vendor" / "mlb_bettingv2" / "tools" / "eval" / "build_season_betting_cards_manifest.py"
+    command = [
+        sys.executable,
+        str(script_path),
+        "--season", str(season),
+        "--batch-dir", str(batch_dir),
+        "--date", target_date,
+        "--day-payload-dir", str(day_payload_dir),
+        "--cards-dir", str(cards_dir),
+        "--profile-name", "retuned",
+        "--out", str(scratch_out),
+        "--recap-md", str(scratch_recap),
+    ]
+    started = time.time()
+    try:
+        scratch_dir.mkdir(parents=True, exist_ok=True)
+        result = subprocess.run(command, cwd=str(REPO_ROOT), capture_output=True, text=True, timeout=600)
+        status = {
+            "epoch": time.time(),
+            "date": target_date,
+            "ok": result.returncode == 0,
+            "return_code": result.returncode,
+            "elapsed_seconds": round(time.time() - started, 1),
+            "stdout_tail": (result.stdout or "")[-4000:],
+            "stderr_tail": (result.stderr or "")[-4000:],
+            "command": [str(part) for part in command],
+        }
+    except Exception as exc:
+        status = {
+            "epoch": time.time(),
+            "date": target_date,
+            "ok": False,
+            "error": f"{type(exc).__name__}: {exc}",
+            "command": [str(part) for part in command],
+        }
+    _refresh_state_store()["write_json_file"](status_path, status)
+    print(f"[refresh_worker] MLB_BETTING_DAY_BACKFILL_TICK date={target_date} ok={status.get('ok')}", flush=True)
+    return status
+
+
 def _launch_autorun_reconciliation(
     *,
     latest_manifest_path: Path,
@@ -1201,6 +1300,17 @@ def main() -> int:
                 print(f"[refresh_worker] MLB_ACTUALS_TICK {json.dumps(mlb_actuals_meta, sort_keys=True, default=str)}", flush=True)
         except Exception as exc:
             print(f"[refresh_worker] MLB_ACTUALS_TICK_ERROR {type(exc).__name__}: {exc}", flush=True)
+
+        # Unconditional, same reasoning as the actuals-writer tick above --
+        # a one-off, self-disabling backfill (see
+        # _run_mlb_betting_day_backfill_tick's own docstring) has no reason
+        # to wait on the claimed_count/elif chain below.
+        try:
+            mlb_betting_day_backfill_meta = _run_mlb_betting_day_backfill_tick()
+            if mlb_betting_day_backfill_meta:
+                print(f"[refresh_worker] MLB_BETTING_DAY_BACKFILL {json.dumps(mlb_betting_day_backfill_meta, sort_keys=True, default=str)}", flush=True)
+        except Exception as exc:
+            print(f"[refresh_worker] MLB_BETTING_DAY_BACKFILL_ERROR {type(exc).__name__}: {exc}", flush=True)
 
         refresh_cycle = {"claimed_count": 0, "reclaimed_count": 0, "skipped_due_to_cap": 0}
         if _recover_stuck_claim(latest_manifest_path, timeout_minutes=stuck_claim_timeout_minutes):
