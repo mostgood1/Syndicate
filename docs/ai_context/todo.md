@@ -65,6 +65,74 @@ full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
 
+### OPEN 2026-08-04 (2) -- Zero ledger records CONFIRMED in prod; cause still NOT found
+
+Supersedes the "UNVERIFIED / stale read" entry below on the evidence
+question. The stale-read retraction was correct at the time; it no longer
+applies.
+
+**Now established, not inferred.** Forced a fresh settlement cycle by
+setting `EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS=3600` on
+refresh-worker (was unset/24h) and deploying. Confirmed the autorun
+re-ran at **2026-08-04T03:37:29Z** -- hours AFTER the board-state
+fingerprints for 2026-08-03/04 were stamped -- and it still reports:
+
+    total_recommendation_records: 0   pending: 0   settled: 0   matched: 0
+
+So the ledger genuinely holds zero recommendation records. This is no
+longer a timing artifact.
+
+**Ruled out by direct check (do not re-tread):**
+- *Fingerprint stamped before the write* -- no.
+  `maybe_record_board_state_to_evaluation_ledger` stamps at :1329 only
+  after `build_intelligence_evaluation_bundle(persist=True)` returns
+  without raising.
+- *Flag off* -- no. `SYNDICATE_INTELLIGENCE_LEDGER_RECORDING_ENABLED=true`
+  on refresh-worker (correctly; unset on web + live-odds-worker, which do
+  not build the board).
+- *Empty recommendations* -- unlikely. `ranked_all` is fed from
+  `top_opportunities`, observed non-empty (60 candidates at 22:41Z).
+- *The bundle not producing records* -- no. Locally it emits proper rows
+  with `record_type: "recommendation"` and a real `recommendation_id`.
+- *Stale settlement snapshot* -- no, see the fresh 03:37Z run above.
+
+**Why local reproduction CANNOT settle this** (worth knowing before trying
+again): `_is_chunked_ledger_path` returns True only when the path
+`.resolve()`s equal to `DEFAULT_LEDGER_PATH` exactly. Production is that
+path, so it writes chunked. Any temp/test path is False and writes FLAT.
+Three separate local attempts all silently exercised the flat branch. A
+local repro would need to monkeypatch `DEFAULT_LEDGER_PATH` itself, not
+pass `ledger_path=`.
+
+**Sharpest next step -- instrument, do not theorise.** The code already
+prints `BOARD_STATE_LEDGER_RECORDED selected_date=... recommendation_count=N`
+(and, since 02c6b2bb, `BOARD_STATE_LEDGER_SKIPPED_EMPTY`) via
+`print(flush=True)`, which does reach Render's collector where
+`logger.info` does not. Read refresh-worker logs for those two lines. `N`
+answers it immediately: a large N means records are written and the
+settlement COUNT/filter is wrong; N=0 or the SKIPPED line means the board
+state handed over an empty list. Everything else is guesswork until that
+is read.
+
+### OPEN 2026-08-04 (3) -- Ledger writes go FLAT while settlement reads CHUNKED, for any non-default path
+
+Separate, narrower, and confirmed locally. `_append_evaluation_ledger_record`
+honours `_is_chunked_ledger_path` (True only for the exact default path),
+so a custom `ledger_path=` writes to ONE flat file. But
+`settle_ledger_for_date` always reads
+`_ledger_chunk_path(target_ledger_path, date)` -> `<stem>_chunks/<date>.jsonl`.
+
+Demonstrated: writing 2 recommendations to a temp
+`evaluation_ledger.jsonl` produced an 11KB flat file, and settlement's own
+reader against the same path returned `rows=0`.
+
+Consequence: settlement can never see records for any non-default ledger
+path. That silently makes every settlement test against a temp ledger
+vacuously pass, and would break any deployment pointing at a custom path.
+Does NOT explain the production symptom (prod uses the default path, so
+both sides agree there) -- but it is a real trap and it is exactly why the
+local repro attempts above kept looking like a mismatch.
+
 ### OPEN 2026-08-04 -- Ledger recording: UNVERIFIED, earlier "writes zero records" claim was WRONG
 
 Tier 2 verification of the record-side fix (`0f14ba74`, `51729219`,
