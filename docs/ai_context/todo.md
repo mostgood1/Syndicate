@@ -133,7 +133,7 @@ Does NOT explain the production symptom (prod uses the default path, so
 both sides agree there) -- but it is a real trap and it is exactly why the
 local repro attempts above kept looking like a mismatch.
 
-### OPEN 2026-08-04 -- Ledger recording: UNVERIFIED, earlier "writes zero records" claim was WRONG
+### SUPERSEDED 2026-08-04 -- Ledger recording: UNVERIFIED (see "OPEN 2026-08-04 (2)" above -- zero records is now CONFIRMED)
 
 Tier 2 verification of the record-side fix (`0f14ba74`, `51729219`,
 `1545a694`). The fix is deployed. It is firing. It is producing nothing.
@@ -365,7 +365,28 @@ prop-candidate builder (single `home_rails` path, the known
 single-point-of-failure that has now broken three separate times), 2 is
 worth a candidate-trace before assuming it is just slate size.
 
-### OPEN 2026-08-03 -- Ask "top opportunities" is showing mostly NEGATIVE edges
+### FIXED 2026-08-04 -- Ask "top opportunities" negative-edge ordering (root cause: unsorted slice; verified live)
+
+**RESOLVED 2026-08-04, verified on live production.** Root cause was
+`_market_summary_schema` doing `recommendations[:5]` with **no sort** --
+an arbitrary slice of arrival order, which is also why `adjusted_score`
+read as None (it was never copied onto the output rows). Fixed in
+`5c7e4d67`: sorts by `adjusted_score` (the board's own ranker key) with
+edge as tiebreak, unscored rows to -inf so they fall below genuinely
+negative ones, and surfaces `adjusted_score` per row so ordering is
+inspectable. Deployed in `83a7c166`.
+
+Before / after on the same live endpoint:
+
+    before:  top row -30.2% edge, 4 of 5 negative, best bet ranked LAST
+    after :  top row +75.8% edge, 0 of 5 negative, best bet ranked FIRST
+             adjusted_score descending 68.5 / 47.4 / 47.3 / 45.5 / 44.1
+
+Note the after-state is NOT sorted by raw edge (rows 4-5 invert) -- that
+is correct and intended: adjusted_score is the ranking key, edge is only
+the tiebreak.
+
+
 
 Found while verifying the Ask routing fix (`addec418`) against production.
 Reproduce in one call:
