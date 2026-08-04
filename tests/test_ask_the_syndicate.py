@@ -210,6 +210,53 @@ class AskTheSyndicateApiTests(unittest.TestCase):
         self.assertEqual(payload["schema_type"], "bet_analysis")
         self.assertEqual(payload["schema"]["selection"], "Colorado Rockies steam move")
 
+    def test_ask_about_this_pick_surfaces_the_same_prose_the_board_renders(self) -> None:
+        # Reported live 2026-08-04, same session as the routing fix above:
+        # even with the correct pick matched, the real board-quality
+        # writeup the candidate already carries (intelligence.html's
+        # pickReasoning reads it under "detail" first) never made it into
+        # Ask's answer -- this schema's text lookup checked
+        # summary/rationale/writeup/why but never "detail", where the
+        # prose actually lives.
+        app = Flask(__name__)
+        app.register_blueprint(ask_the_syndicate_bp)
+
+        fake_result = {
+            "query_type": "player_analysis",
+            "recommendations": [
+                {
+                    "selection": "OVER Corbin Carroll",
+                    "model_probability": 0.545,
+                    "market_probability": 0.105,
+                    "edge": 0.153,
+                    "expected_value": 4.17,
+                    "detail": "The model lands on the over side in 54.5% of sims, while the market is pricing it closer to 10.5%.",
+                }
+            ],
+            "readiness_gate": {"ok": True},
+            "local_only": True,
+        }
+
+        with patch("syndicate.blueprints.ask_the_syndicate.read_latest_intelligence_state", return_value=dict(fake_result)):
+            response = app.test_client().post(
+                "/api/syndicate/query",
+                json={
+                    "question": "What's the case for and against OVER Corbin Carroll?",
+                    "context": {"sport": "mlb", "selection": "OVER Corbin Carroll", "candidate_type": "prop"},
+                },
+            )
+
+        payload = response.get_json()
+        self.assertEqual(payload["schema_type"], "bet_analysis")
+        self.assertEqual(
+            payload["schema"]["recommendation"],
+            "The model lands on the over side in 54.5% of sims, while the market is pricing it closer to 10.5%.",
+        )
+        self.assertEqual(
+            payload["schema"]["explanation"]["summary"],
+            "The model lands on the over side in 54.5% of sims, while the market is pricing it closer to 10.5%.",
+        )
+
     def test_query_route_returns_matchup_schema(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(ask_the_syndicate_bp)

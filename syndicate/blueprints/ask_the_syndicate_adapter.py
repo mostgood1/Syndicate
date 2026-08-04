@@ -74,6 +74,27 @@ def _to_pct(value: Any) -> float | None:
     return round(numeric, 2)
 
 
+def _candidate_prose(item: dict[str, Any]) -> str | None:
+    """The same per-pick prose the main board already renders under each
+    card (intelligence.html's client-side pickReasoning, same field
+    priority) -- e.g. "The model lands on the over side in 54.5% of
+    sims... Against SD, he has recorded a hit in 10 of 17 games."
+
+    Reported live 2026-08-04: Ask the Syndicate never showed this prose
+    for a real, correctly-matched pick, even though the exact same
+    candidate object carries it and the board renders it right next to
+    the same pick. Root cause: this schema's own text lookup only ever
+    checked summary/rationale/writeup/why -- never "detail", which is
+    where the real prose actually lives on a candidate. Not a missing
+    generator, a missing field name.
+    """
+    for field in ("detail", "writeup", "reasoning", "summary", "rationale", "why", "basketball_summary"):
+        value = str(item.get(field) or "").strip()
+        if value:
+            return value
+    return None
+
+
 def _first_recommendation(result: Any) -> dict[str, Any]:
     recommendations = _items_to_dicts(_result_value(result, "recommendations", ()))
     if recommendations:
@@ -256,10 +277,10 @@ def _bet_analysis_schema(result: Any, *, question: str = "", relevance_matched: 
         "edge": _to_float(top.get("adjusted_edge") or top.get("edge") or top.get("price_edge_pct")),
         "EV": _to_float(top.get("expected_value") or top.get("ev_current") or top.get("ev")),
         "confidence": _to_pct(top.get("confidence") or top.get("model_probability")),
-        "recommendation": top.get("summary") or top.get("rationale") or top.get("writeup") or top.get("why") or explanation.get("summary"),
+        "recommendation": _candidate_prose(top) or explanation.get("summary"),
         "relevance_matched": relevance_matched,
         "explanation": {
-            "summary": explanation.get("summary"),
+            "summary": _candidate_prose(top) or explanation.get("summary"),
             "analysis_brief": explanation.get("analysis_brief", {}),
             "supporting_evidence": explanation.get("supporting_evidence", {}),
             "reasoning_steps": explanation.get("reasoning_steps", []),
@@ -326,7 +347,7 @@ def _matchup_analysis_schema(question: str, result: Any, *, relevance_matched: b
                 "edge": _to_float(row.get("adjusted_edge") or row.get("edge") or row.get("price_edge_pct")),
                 "EV": _to_float(row.get("expected_value") or row.get("ev_current") or row.get("ev")),
                 "confidence": _to_pct(row.get("confidence") or row.get("model_probability")),
-                "recommendation": row.get("summary") or row.get("rationale") or row.get("why"),
+                "recommendation": _candidate_prose(row),
             }
         )
 
@@ -344,14 +365,14 @@ def _matchup_analysis_schema(question: str, result: Any, *, relevance_matched: b
         "win_probability": _to_pct(top.get("model_probability") or top.get("confidence")),
         "key_edges": key_edges,
         "simulation_summary": {
-            "summary": explanation.get("summary"),
+            "summary": _candidate_prose(top) or explanation.get("summary"),
             "top_candidate": top,
             "analysis_focus": analysis_views.get("focus"),
             "rows_considered": len(rows),
         },
         "hidden_factors": hidden_factors,
         "market_insight": {
-            "summary": top.get("market_fit_note") or top.get("summary") or top.get("rationale") or explanation.get("summary"),
+            "summary": top.get("market_fit_note") or _candidate_prose(top) or explanation.get("summary"),
             "analysis_views": analysis_views,
             "supporting_evidence": explanation.get("supporting_evidence", {}),
         },
@@ -453,7 +474,7 @@ def _market_summary_schema(result: Any, *, question: str = "", relevance_matched
                 # Surfaced so the ordering is inspectable rather than
                 # something a reader has to take on trust.
                 "adjusted_score": _to_float(item.get("adjusted_score")),
-                "recommendation": item.get("summary") or item.get("rationale") or item.get("writeup") or item.get("why"),
+                "recommendation": _candidate_prose(item),
             }
         )
 

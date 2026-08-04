@@ -1467,7 +1467,8 @@ table.board-blotter tbody tr:last-child td {
   gap: 8px;
 }
 
-.ask-bar__briefing-btn {
+.ask-bar__briefing-btn,
+.ask-bar__clear-btn {
   appearance: none;
   border: 1px solid var(--cards-line-strong);
   border-radius: 999px;
@@ -1561,6 +1562,13 @@ table.board-blotter tbody tr:last-child td {
 .ask-bar__answer-pick-why {
   color: var(--cards-text-dim);
   font-size: 11px;
+}
+
+.ask-bar__answer-pick-detail {
+  color: var(--cards-text-soft);
+  font-size: 11px;
+  line-height: 1.4;
+  margin-top: 2px;
 }
 
 .ask-bar__empty {

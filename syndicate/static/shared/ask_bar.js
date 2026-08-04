@@ -194,8 +194,15 @@ window.SyndicateAskBar = (function () {
     const nested = structured
       ? (structured.rationale_summary || structured.explanation || structured.market_insight || null)
       : null;
+    // structured.recommendation (bet_analysis's own top-level field) is the
+    // same per-pick prose the main board already renders under each card
+    // (server-side: ask_the_syndicate_adapter.py's _candidate_prose, same
+    // "detail" field the board's own pickReasoning checks first). Reported
+    // live 2026-08-04: a correctly-matched, real pick's real board-quality
+    // writeup existed on the candidate the whole time -- this just never
+    // read it.
     const fallbackText = safeText(
-      (structured && (structured.narrative || structured.summary))
+      (structured && (structured.narrative || structured.summary || structured.recommendation))
         || (nested && typeof nested === "object" ? (nested.narrative || nested.summary) : ""),
       "",
     );
@@ -213,24 +220,22 @@ window.SyndicateAskBar = (function () {
             ${opportunities.slice(0, 3).map((row) => {
               const name = safeText(row && (row.selection || row.name), "Opportunity");
               const market = safeText(row && row.market, "");
+              const why = safeText(row && row.recommendation, "");
               return `
               <div class="ask-bar__answer-pick">
                 <span class="ask-bar__answer-pick-name">${escapeHtml(name)}</span>
                 ${market ? `<span class="ask-bar__answer-pick-why">${escapeHtml(market)}</span>` : ""}
+                ${why ? `<div class="ask-bar__answer-pick-detail">${escapeHtml(why)}</div>` : ""}
               </div>`;
             }).join("")}
           </div>
         ` : ""}
       `;
     }
-    // bet_analysis for a real, specific pick with no generated prose (the
-    // optional LLM narration layer is off by design -- see the comment
-    // above). Reported live 2026-08-04: routing a per-pick question to
-    // bet_analysis correctly matched the clicked pick's real numbers
-    // (selection/edge/EV/probabilities), but this function only ever knew
-    // how to render narrative text or a market_summary/matchup_analysis
-    // opportunity list, so a real answer with real numbers and no prose
-    // still fell through to "No structured answer came back" below.
+    // bet_analysis for a real, specific pick with no prose at all on the
+    // underlying candidate (e.g. a steam-move alert, which is a market
+    // signal rather than a modeled pick and genuinely has no writeup) --
+    // still show the real numbers rather than a dead end.
     if (structured && structured.schema_type === "bet_analysis" && structured.selection) {
       const facts = [
         typeof structured.model_probability === "number" ? `Model ${structured.model_probability.toFixed(1)}%` : null,
@@ -291,8 +296,26 @@ window.SyndicateAskBar = (function () {
           askTodaysBriefing();
         }
       });
+      panel.addEventListener("click", (event) => {
+        const clearButton = event.target.closest("[data-ask-clear]");
+        if (clearButton) {
+          event.stopPropagation();
+          clearTranscript();
+        }
+      });
     }
     return panel;
+  }
+
+  function clearTranscript() {
+    // Requested live 2026-08-04: the panel's history is persisted in
+    // localStorage (loadTranscript/saveTranscript) and never re-fetched on
+    // its own, so old questions/answers -- including ones asked before a
+    // fix landed -- sit there indefinitely, indistinguishable from a
+    // current, live answer. This is the only way to clear it.
+    transcript = [];
+    saveTranscript();
+    renderPanel();
   }
 
   function renderPanel() {
@@ -312,6 +335,7 @@ window.SyndicateAskBar = (function () {
         </form>
         <div class="ask-bar__actions">
           <button type="button" class="ask-bar__briefing-btn" data-ask-briefing="1">📋 Today's briefing</button>
+          ${transcript.length ? `<button type="button" class="ask-bar__clear-btn" data-ask-clear="1" title="Clear conversation history">🗑️ Clear</button>` : ""}
           <span id="ask-bar-status" class="ask-bar__status" role="status" aria-live="polite">${escapeHtml(statusText)}</span>
         </div>
         <div class="ask-bar__transcript">
