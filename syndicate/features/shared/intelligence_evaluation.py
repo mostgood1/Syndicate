@@ -24,6 +24,7 @@ from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared.artifact_manifests import load_artifact_manifests
 from syndicate.features.shared.model_scoring import binary_calibration_metrics
+from syndicate.features.shared.model_version import code_version
 from syndicate.features.shared.odds_lifecycle import market_feature_summary
 from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
 from syndicate.features.shared.source_roots import repo_root_from
@@ -893,6 +894,11 @@ def _prediction_payload(*, query: Any, response: Any, artifact_metadata: Any = N
         "recommendation_count": len([item for item in response_payload.get("recommendations") or [] if isinstance(item, Mapping)]),
         "created_at": _utc_now(),
         "record_type": "prediction",
+        # Attribution only -- deliberately NOT part of the prediction_id
+        # hash above (which must stay content-derived from query/
+        # recommendations so the SAME prediction across a deploy still
+        # dedupes instead of minting a fresh "new" row on every restart).
+        "model_version": code_version(),
     }
 
 
@@ -961,6 +967,10 @@ def record_recommendation(*, prediction_record: Mapping[str, Any], recommendatio
         raw={
             "prediction": prediction_payload,
             "recommendation": recommendation_payload,
+            # Attribution only -- not part of recommendation_id's hash
+            # above, so a deploy never mints a duplicate row for the same
+            # recommendation.
+            "model_version": prediction_payload.get("model_version") or code_version(),
         },
     ).to_dict()
     if persist:
@@ -2067,6 +2077,75 @@ def build_segmented_reliability_profile(
     return {"global": global_stats, "shrinkage_k": shrinkage_k, "segments": segments}
 
 
+def build_accuracy_summary(
+    *,
+    records: Iterable[Mapping[str, Any]] | None = None,
+    ledger_path: Path | str | None = None,
+    sport: str | None = None,
+    recent_days: int = 7,
+    baseline_days: int = 21,
+) -> dict[str, Any]:
+    """One combined accuracy view for a sport: overall metrics
+    (compute_metrics), the segmented reliability surface
+    (build_segmented_reliability_profile), and day-bucketed drift on win
+    rate and price CLV (drift_detection.detect_metric_drift) comparing the
+    last ``recent_days`` against the ``baseline_days`` immediately before
+    that.
+
+    Deliberately NOT exposed as a web route: the evaluation ledger lives on
+    refresh-worker's disk, not the web service's (same constraint
+    /api/ops/evaluation-settlement/status works around via the keyvalue
+    store) -- calling this from a web request would silently read nothing
+    in production. Intended to run where the ledger actually lives: a CLI
+    invocation (scripts/build_accuracy_summary.py) today, and the natural
+    body of a future refresh-worker autorun that publishes its result
+    through refresh_state_store the same way evaluation-settlement's
+    autorun status already does.
+    """
+    from syndicate.features.shared.drift_detection import detect_metric_drift
+
+    sport_slug = str(sport or "").strip().lower() or None
+    record_rows = _latest_by_recommendation_id(_iter_record_payloads(records, ledger_path=ledger_path))
+    if sport_slug:
+        record_rows = [record for record in record_rows if _record_sport(record) in {sport_slug, None}]
+
+    settled_rows = _settled_records(record_rows)
+    by_date: dict[str, list[dict[str, Any]]] = {}
+    for record in settled_rows:
+        date_key = _recommendation_publish_date(record)
+        if date_key:
+            by_date.setdefault(date_key, []).append(record)
+    ordered_dates = sorted(by_date.keys())
+    recent_dates = ordered_dates[-recent_days:] if recent_days > 0 else []
+    remaining_dates = ordered_dates[: len(ordered_dates) - len(recent_dates)]
+    baseline_dates = remaining_dates[-baseline_days:] if baseline_days > 0 else []
+
+    def _daily_metric(dates: list[str], metric_key: str) -> list[float]:
+        values: list[float] = []
+        for date_key in dates:
+            day_stats = _segment_stats(by_date.get(date_key, []))
+            value = day_stats.get(metric_key)
+            if value is not None:
+                values.append(float(value))
+        return values
+
+    drift = {
+        "window": {"recent_days": recent_days, "baseline_days": baseline_days, "recent_dates": recent_dates, "baseline_dates": baseline_dates},
+        "win_rate": detect_metric_drift(_daily_metric(recent_dates, "win_rate"), _daily_metric(baseline_dates, "win_rate"), min_sample_size=min(5, recent_days)),
+        "clv_price": detect_metric_drift(_daily_metric(recent_dates, "clv_price"), _daily_metric(baseline_dates, "clv_price"), min_sample_size=min(5, recent_days)),
+    }
+
+    return {
+        "sport": sport_slug,
+        "generated_at": _utc_now(),
+        "sample_size": len(record_rows),
+        "settled_count": len(settled_rows),
+        "metrics": compute_metrics(records=record_rows, sport=sport_slug),
+        "segmented_reliability": build_segmented_reliability_profile(records=record_rows, sport=sport_slug),
+        "drift": drift,
+    }
+
+
 __all__ = [
     "SCHEMA_VERSION",
     "DEFAULT_LEDGER_PATH",
@@ -2074,6 +2153,7 @@ __all__ = [
     "build_artifact_metadata",
     "build_reliability_profile",
     "build_segmented_reliability_profile",
+    "build_accuracy_summary",
     "build_intelligence_evaluation_bundle",
     "build_evaluation_history_summary",
     "build_recommendation_performance_analytics",
