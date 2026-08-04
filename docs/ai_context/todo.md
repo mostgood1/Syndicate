@@ -474,6 +474,46 @@ full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
 
+### OPEN 2026-08-04 (5) -- NARROWED TO ONE SCRIPT: input exists, the generator drops it
+
+Extended `/api/ops/mlb/betting-card-day` to report the generator's INPUT
+(`5d93b919`, live). Production, 2026-08-03:
+
+    VERDICT: games_empty BUT sim_vs_actual exists -- input is present, the generator is dropping it
+    batch dir : /opt/render/project/data/mlb_source/source_artifacts/data/
+                eval/batches/season_2026_ui_daily_live
+                exists=True, file_count=22, sim_vs_actual files=22
+    input     : sim_vs_actual_2026-08-03.json -- 633,759 bytes, games_count=2
+                top_level_keys: [aggregate, assessment, failures, failures_n, games, meta]
+
+**So the chain is fully localised.** The batch dir exists, holds 22 real
+per-date reports, and this date's is 633KB of real content with a
+populated `games` key. The generator reads that and writes a day artifact
+with `games: {}`. Nothing upstream of the generator is missing.
+
+**The single remaining suspect:**
+`vendor/mlb_bettingv2/tools/eval/build_season_betting_cards_manifest.py`,
+invoked by `daily_update.py` (~:2344) as:
+
+    --season 2026 --batch-dir <above> --day-payload-dir betting_day_payloads_retuned
+    --profile-name retuned --prefer-canonical-daily on
+
+**Worth noting as a lead, not a conclusion:** the input reports
+`games_count=2` for a slate that had ~15 games (8 sim files exist for
+08-03 per `/api/ops/mlb/sims-list`). Either `games` there is keyed
+differently than a per-game map, or the input is itself thin. Check that
+before assuming the generator is purely at fault -- 633KB for 2 games is a
+lot of bytes, which hints the shape is not what the count suggests.
+
+**Next step:** run that script against the real batch dir (worker, or copy
+one `sim_vs_actual_*.json` down) and find where its game rows are lost --
+most likely a filter on the canonical-daily preference, or a join key that
+does not match this input's shape. This is now a single-script bug, not a
+pipeline mystery.
+
+**Confirmation for a fix, one call each:** `/mlb/market-accuracy` returns
+rows; settlement `matched` goes non-zero.
+
 ### OPEN 2026-08-04 (4) -- THE REAL BLOCKER: MLB day artifact is written EMPTY (games: {}) -- ANSWERED, see below
 
 **ANSWERED 2026-08-04 -- it is `games` EMPTY, not present-but-ungraded.**
