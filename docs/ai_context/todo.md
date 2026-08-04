@@ -551,7 +551,55 @@ full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
 
-### ROOT CAUSE 2026-08-04 -- The eval batch report is generated MID-SLATE and never regenerated
+### ROOT CAUSE 2026-08-04 (corrected) -- reconcile reads 8 sims, emits 2 games, reports 0 skipped and 0 failed
+
+`tools/eval/reconcile_daily_sim_artifacts.py` is silently dropping games,
+and its own counters do not admit it.
+
+Measured in production for 2026-08-03 (`/api/ops/mlb/betting-card-day`,
+endpoint at `6aeaedae`):
+
+    meta.tool             tools/eval/reconcile_daily_sim_artifacts.py
+    meta.generated_at     2026-08-04T00:55:57  (= 00:55 CDT 08-04, POST-slate)
+    meta.source_sim_dir   .../data/daily/sims/2026-08-03
+      exists              true
+      file_count          8      <-- eight real sim files on disk
+    games_count           2      <-- only two reached the report
+    skipped_games         0      <-- and it claims it skipped none
+    failures_n            0      <-- and failed none
+
+8 in, 2 out, 0 accounted for. Six games vanish between reading the sim dir
+and writing `games`, without incrementing either counter. That is the
+defect: not the timing, not the manifest builder, not the settlement join.
+
+**Fix has two parts, and the second matters as much as the first:**
+1. Find the drop point in `reconcile_daily_sim_artifacts.py` and stop it
+   discarding valid sims.
+2. Make every drop increment a counter. A stage that silently loses 75% of
+   its input while self-reporting a clean run is how this stayed invisible
+   for 16+ days -- and it is what made three separate diagnoses (mine
+   included) look plausible and be wrong.
+
+**Separately worth checking, do not conflate:** 8 sim files for a ~15-game
+slate is itself low. That is a different question upstream of this one;
+settle the 8->2 drop first, since it is unambiguous.
+
+### WRONG 2026-08-04 -- "generated mid-slate" (retracted, see the entry above it)
+
+**RETRACTED, same session, before anything was built on it.** Two errors:
+
+1. `meta.generated_at` is a NAIVE timestamp and the container runs
+   `TZ=America/Chicago`, so `2026-08-04T00:55:57` is 00:55 **CDT on 08-04**
+   -- after the slate, not during it.
+2. I read the live-refresh tick's `finishedAt` (08:08 CDT) as "when the
+   games ended". It is when that refresh TICK finished. It says nothing
+   about the slate.
+
+The scheduling fix this entry proposed would have changed *when* a job runs
+that is already running at a reasonable time, and fixed nothing. See the
+entry above for what is actually wrong.
+
+
 
 Chain complete. Every stage below (6), (5), (4) is downstream of this one.
 
