@@ -1163,7 +1163,9 @@ class LiveRefreshLoopTests(unittest.TestCase):
         self.assertEqual(decision["board_missing_game_pks"], ["200"])
         mocked_record.assert_called_once_with(2000.0, "2026-07-19", {"100": "aaa", "200": "bbb"}, launched=True)
 
-    def test_mlb_daily_sim_decision_skips_props_check_when_board_missing_games_already_triggers(self) -> None:
+    def test_mlb_daily_sim_decision_still_runs_props_check_when_board_missing_games_already_triggers(self) -> None:
+        # Same inversion as the fingerprint case above: a scoped launch for
+        # board-missing games does not regenerate top-props either.
         events = [live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None)]
         with patch.dict(os.environ, {"SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER": "true"}, clear=False), patch.object(
             live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
@@ -1190,7 +1192,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=2000.0, date_str="2026-08-01")
 
         self.assertEqual(decision["reason"], "board_missing_games")
-        mocked_props_check.assert_not_called()
+        mocked_props_check.assert_called_once()
 
     def test_mlb_daily_sim_decision_merges_fingerprint_and_join_mismatch_game_pks(self) -> None:
         events = [
@@ -1356,10 +1358,19 @@ class LiveRefreshLoopTests(unittest.TestCase):
         self.assertEqual(decision["props_regen_game_pks"], ["100", "200"])
         mocked_record.assert_called_once_with(2000.0, "2026-08-01", {"100": "aaa", "200": "bbb"}, launched=True)
 
-    def test_mlb_daily_sim_decision_skips_props_check_when_fingerprint_already_triggers(self) -> None:
-        # The props-regen check is cheap but still shouldn't run (and
-        # shouldn't spend its own cooldown marker) when another trigger
-        # already forces a resim this tick.
+    def test_mlb_daily_sim_decision_still_runs_props_check_when_fingerprint_already_triggers(self) -> None:
+        # Inverted 2026-08-04 after this exact skip caused a live outage.
+        # The old contract was "don't bother, we're launching anyway" -- but a
+        # fingerprint_change launch is SCOPED to the changed games and never
+        # reaches the top-props stage, so it does not regenerate props. Any
+        # slate with ongoing lineup/odds churn therefore kept this check
+        # suppressed on every tick, and daily_top_props stayed empty
+        # indefinitely (confirmed live: 15 sims, exit_code 0, zero prop rows
+        # for 11+ hours, board serving MLB moneylines only).
+        #
+        # Spending the cooldown marker is now correct rather than wasteful:
+        # it is only written when the check returns True, and its game_pks are
+        # merged into the launch below, so a props regen genuinely happens.
         events = [live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None)]
         with patch.dict(os.environ, {"SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER": "true"}, clear=False), patch.object(
             live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
@@ -1383,8 +1394,58 @@ class LiveRefreshLoopTests(unittest.TestCase):
             mocked_summary_path.return_value.exists.return_value = True
             decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=2000.0, date_str="2026-08-01")
 
+        # Reason still reflects the highest-priority trigger...
         self.assertEqual(decision["reason"], "fingerprint_change")
-        mocked_props_check.assert_not_called()
+        # ...but the props check must still get its say.
+        mocked_props_check.assert_called_once()
+
+    def test_mlb_daily_sim_decision_props_regen_widens_a_scoped_fingerprint_launch(self) -> None:
+        """The actual production fix: when props need regenerating, the launch
+        must cover the FULL slate, not just the fingerprint-changed game.
+
+        A scoped launch never reaches the top-props stage, so if props regen
+        only ever rode along with a scoped launch it would never repair
+        anything -- which is precisely the loop that left daily_top_props
+        empty for 11+ hours on 2026-08-04.
+        """
+        events = [
+            live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None),
+            live_refresh_loop.ScheduleEvent(sport="mlb", event_id="200", home="C", away="D", start_time_utc=None),
+            live_refresh_loop.ScheduleEvent(sport="mlb", event_id="300", home="E", away="F", start_time_utc=None),
+        ]
+        with patch.dict(os.environ, {"SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER": "true"}, clear=False), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(live_refresh_loop, "is_refresh_run_active", return_value=False), patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=events
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path, patch.object(
+            live_refresh_loop, "events_starting_within", return_value=[]
+        ), patch.object(
+            live_refresh_loop,
+            "_read_last_mlb_sim_check",
+            return_value={"epoch": 1000.0, "date": "2026-08-01", "fingerprints": {"100": "aaa", "200": "bbb", "300": "ccc"}},
+        ), patch.object(
+            live_refresh_loop, "_fetch_mlb_injuries", return_value=True
+        ), patch.object(
+            live_refresh_loop,
+            "_mlb_sim_input_fingerprint_by_game",
+            return_value={"100": "CHANGED", "200": "bbb", "300": "ccc"},
+        ), patch.object(
+            live_refresh_loop, "_mlb_join_mismatch_game_pks", return_value=[]
+        ), patch.object(
+            live_refresh_loop, "_mlb_board_missing_game_pks", return_value=[]
+        ), patch.object(
+            live_refresh_loop, "_mlb_props_now_available_needs_regen", return_value=True
+        ), patch.object(live_refresh_loop, "_record_mlb_sim_check"):
+            mocked_summary_path.return_value.exists.return_value = True
+            decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=2000.0, date_str="2026-08-01")
+
+        self.assertEqual(decision["reason"], "fingerprint_change")
+        # Only game 100's fingerprint changed, but props regen must pull in
+        # the whole slate -- otherwise top-props is never rebuilt.
+        self.assertEqual(decision["game_pks"], ["100", "200", "300"])
+        self.assertEqual(decision["props_regen_game_pks"], ["100", "200", "300"])
 
     def test_mlb_props_now_available_needs_regen_false_when_top_props_already_has_candidates(self) -> None:
         with patch.object(

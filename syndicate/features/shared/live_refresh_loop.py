@@ -1634,13 +1634,28 @@ def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any
 	# rescued.
 	board_missing_game_pks = _mlb_board_missing_game_pks(date_str, set(current_fingerprints.keys()))
 
-	# Cheapest trigger last, and only checked when nothing above already
-	# found a reason to resim -- a few small JSON reads, no market-board
-	# build, but no point paying even that when we're launching anyway.
+	# Cheapest trigger last -- a few small JSON reads, no market-board build.
+	# Deliberately NOT short-circuited by the triggers above, for the same
+	# reason board_missing_game_pks isn't (see its comment): the old
+	# `if not changed_game_pks and ...` guard reasoned "no point paying even
+	# that when we're launching anyway", but a scoped fingerprint_change
+	# launch resims only the changed games and never reaches the top-props
+	# stage -- so launching "anyway" does not regenerate props. That made the
+	# guard self-sustaining: any slate with ongoing lineup/odds churn kept
+	# changed_game_pks non-empty, which suppressed this check, which left
+	# top_props empty, on every tick.
+	#
+	# Confirmed live 2026-08-04: 15 sims on disk and a clean exit_code 0, but
+	# daily_top_props_2026-08-04.json held zero rows for 11+ hours while the
+	# board served MLB moneylines only (4 candidates, no props at all). The
+	# fix for the MISSING-artifact case shipped 2026-08-02 was correct and
+	# still never ran, because this guard skipped it all day.
+	#
+	# When it does fire, its game_pks are merged below, which widens a scoped
+	# launch to the full slate -- exactly what regenerating top-props needs.
 	props_regen_game_pks: list[str] = []
-	if not changed_game_pks and not join_mismatch_game_pks and not board_missing_game_pks:
-		if _mlb_props_now_available_needs_regen(now_epoch=now_epoch, date_str=date_str):
-			props_regen_game_pks = sorted(current_fingerprints.keys())
+	if _mlb_props_now_available_needs_regen(now_epoch=now_epoch, date_str=date_str):
+		props_regen_game_pks = sorted(current_fingerprints.keys())
 
 	if changed_game_pks or join_mismatch_game_pks or board_missing_game_pks or props_regen_game_pks:
 		_record_mlb_sim_check(now_epoch, date_str, current_fingerprints, launched=True)
