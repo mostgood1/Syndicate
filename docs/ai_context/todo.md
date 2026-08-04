@@ -1,5 +1,47 @@
 # Syndicate TODO — canonical cross-session list
 
+### OPEN 2026-08-04 -- MLB sim can hang past its timeout, leaving a stale "running" pointer that blocks everything
+
+Observed live, not theorised. Sim `pid=2517` (`run_stamp 20260804_175808`):
+
+    started_at   2026-08-04T17:58:08Z
+    progress     {"game_index": 1, "game_total": 15, "elapsed_seconds": 20.0,
+                  "last_line": "Simulating (1000, workers=2): LAA @ BAL",
+                  "updated_at": 2026-08-04T17:58:28Z}
+    state        "running", exit_code None, finished_at None
+    checked at   19:31Z -- 93.8 minutes later
+
+It wrote progress once, 20 seconds in at game 1 of 15, then never updated
+again. `SYNDICATE_MLB_SIM_TIMEOUT_SECONDS=5400` (90 min) should have killed
+it at ~19:28Z and did not.
+
+**Why this matters more than one lost sim:**
+1. The stale `sim_run_status.state == "running"` makes every downstream
+   gate believe a sim is active. `_mlb_daily_sim_decision` skips launching
+   while one is resident, so NO further sim can start -- including the
+   props self-heal fixed in `96b43120`.
+2. `scripts/check_deploy_safety.py` reads that same pointer, so deploys are
+   blocked indefinitely. Demonstrated: a 40-minute watcher waiting for a
+   clear window returned STILL_BUSY_AFTER_40MIN and never cleared. The
+   deploy only happened because it was forced deliberately after confirming
+   the process was hung.
+3. The live-refresh tick itself stayed healthy throughout (last tick 19:27Z,
+   4 minutes before the check), so nothing else surfaces this -- the worker
+   looks fine while being wedged.
+
+**What to look at:** the timeout enforcement in
+`scripts/run_mlb_daily_sim_job.py` (it aligns its kill timeout with
+live_refresh_loop's stale-pointer window). Either the timeout is not being
+applied to a subprocess that stops producing output, or the kill fires but
+the status file is never updated to reflect it -- those are different fixes.
+A watchdog on `sim_run_progress.updated_at` going stale (e.g. no progress
+for N minutes -> treat as dead, clear the pointer) would cover both without
+depending on the timeout working.
+
+**Do not confuse with** the earlier deliberate deploy-kills-in-flight-sim
+behaviour, which is expected and documented. This is a sim that died on its
+own and left the system believing it was alive.
+
 ### DONE 2026-08-04 -- "Fix all" pass on the three open loop items: 2 resolved, 1 root-caused-but-blocked, 1 shipped as new capability
 
 Follow-up to the odds->edge->movement->CLV loop map. All three open items
