@@ -1333,3 +1333,78 @@ class ArtifactStreamEndpointTests(unittest.TestCase):
                     headers={"Authorization": "Bearer secret-token"},
                 )
         self.assertEqual(response.status_code, 404)
+
+
+class MatchupCoverageDiagnosticHonestyTests(unittest.TestCase):
+    """The coverage diagnostic answered a different question than it was asked.
+
+    It accepted ?sport= and ?date= and honoured neither, always returning the
+    last refresh's write. During triage on 2026-08-04 it answered for
+    2026-08-05 when asked for 2026-08-04 (a look-ahead run had written last),
+    which read as "the endpoint ignores its date param" and cost real
+    investigation time; asked for 2026-01-15 it answered 2026-08-04 just as
+    confidently. The record really is last-write-only, so the fix is to say
+    which date is being described rather than to fake per-date history.
+    """
+
+    STATUS_RELATIVE = ("refresh_status", "latest", "odds_history_h2h_matchup_coverage_status.json")
+
+    def setUp(self) -> None:
+        app = create_app()
+        app.testing = True
+        self.client = app.test_client()
+
+    def _write_status(self, reports_root: Path, payload: dict) -> None:
+        target = reports_root.joinpath(*self.STATUS_RELATIVE)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(payload), encoding="utf-8")
+
+    def _get(self, tmp_dir: str, query: str) -> dict:
+        reports_root = Path(tmp_dir) / "reports"
+        self._write_status(
+            reports_root,
+            {
+                "mlb": {"date": "2026-08-04", "in_source": ["A@B"], "written": ["A@B"]},
+                "wnba": {"date": "2026-08-04", "in_source": [], "written": []},
+            },
+        )
+        with patch.dict(
+            os.environ,
+            {"ADMIN_TOKEN": "secret-token", "SYNDICATE_REPORTS_ROOT": str(reports_root), "SYNDICATE_DATA_ROOT": tmp_dir},
+            clear=False,
+        ):
+            response = self.client.get(
+                f"/api/ops/odds-history/matchup-coverage{query}",
+                headers={"Authorization": "Bearer secret-token"},
+            )
+        self.assertEqual(response.status_code, 200)
+        return response.get_json()
+
+    def test_matching_date_is_reported_as_matching(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            payload = self._get(tmp_dir, "?sport=mlb&date=2026-08-04")
+        self.assertTrue(payload["matches_requested_date"])
+        self.assertEqual(payload["reported_dates"], ["2026-08-04"])
+        self.assertEqual(sorted(payload["by_sport"]), ["mlb"])
+
+    def test_a_different_date_is_flagged_not_silently_answered(self) -> None:
+        # The whole point: the numbers are real, they are just not about the
+        # day that was asked for, and the response now says so.
+        with TemporaryDirectory() as tmp_dir:
+            payload = self._get(tmp_dir, "?sport=mlb&date=2026-01-15")
+        self.assertFalse(payload["matches_requested_date"])
+        self.assertEqual(payload["requested_date"], "2026-01-15")
+        self.assertEqual(payload["reported_dates"], ["2026-08-04"])
+        self.assertEqual(payload["source"], "last_refresh_write_only")
+
+    def test_sport_filter_is_honoured(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            payload = self._get(tmp_dir, "?sport=wnba")
+        self.assertEqual(sorted(payload["by_sport"]), ["wnba"])
+        self.assertIsNone(payload["matches_requested_date"])
+
+    def test_no_filters_returns_every_sport(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            payload = self._get(tmp_dir, "")
+        self.assertEqual(sorted(payload["by_sport"]), ["mlb", "wnba"])
+        self.assertIsNone(payload["requested_date"])

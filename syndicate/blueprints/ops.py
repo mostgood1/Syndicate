@@ -787,8 +787,47 @@ def api_ops_odds_history_matchup_coverage() -> Any:
     # status endpoint above, so this is readable from the web service
     # regardless of which service actually wrote it or how large that
     # service's own captured log got.
+    #
+    # 2026-08-04: this accepted ?sport= and ?date= and honoured NEITHER -- it
+    # always returned whatever the last refresh happened to write. Asked for
+    # 2026-08-04 during triage it answered for 2026-08-05 (a look-ahead run
+    # had written last), which read as "the diagnostic ignores its date" and
+    # sent the investigation sideways; asked for 2026-07-01 or 2026-01-15 it
+    # answered 2026-08-04 just as confidently. A diagnostic that silently
+    # answers a different question than the one asked is worse than one that
+    # refuses: it is trusted. The stored record is genuinely last-write-only
+    # (one file, keyed by sport), so rather than invent per-date history the
+    # response now says exactly which date it is describing and whether that
+    # is the date you asked for.
     status_path = reports_root() / "refresh_status" / "latest" / "odds_history_h2h_matchup_coverage_status.json"
-    return jsonify({"ok": True, "by_sport": read_json_file(status_path) or {}})
+    by_sport = read_json_file(status_path) or {}
+    if not isinstance(by_sport, dict):
+        by_sport = {}
+
+    requested_sport = str(request.args.get("sport") or "").strip().lower()
+    if requested_sport:
+        by_sport = {key: value for key, value in by_sport.items() if str(key).strip().lower() == requested_sport}
+
+    requested_date = str(request.args.get("date") or "").strip()
+    matches_requested_date = None
+    reported_dates = sorted(
+        {str(value.get("date") or "") for value in by_sport.values() if isinstance(value, dict) and value.get("date")}
+    )
+    if requested_date:
+        matches_requested_date = bool(reported_dates) and all(date == requested_date for date in reported_dates)
+
+    return jsonify({
+        "ok": True,
+        "by_sport": by_sport,
+        "requested_sport": requested_sport or None,
+        "requested_date": requested_date or None,
+        "reported_dates": reported_dates,
+        # True/False when a date was asked for, null when it wasn't. False
+        # means every number below describes a DIFFERENT day than the one
+        # requested -- the record is last-write-only, not per-date.
+        "matches_requested_date": matches_requested_date,
+        "source": "last_refresh_write_only",
+    })
 
 
 @ops_bp.post("/api/ops/bootstrap/run")
