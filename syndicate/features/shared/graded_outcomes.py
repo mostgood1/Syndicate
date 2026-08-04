@@ -280,26 +280,113 @@ def _nfl_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
+# Soccer -- moneyline (3-way)/total-at-2.5/BTTS, computed directly from
+# schedule_{season}.json's real ESPN-sourced scores (soccer had no actuals
+# builder at all before this; see syndicate/features/soccer/actuals.py for
+# the full reasoning, including why spread/Asian-handicap is not graded
+# yet). Across all 10 leagues per date.
+# ---------------------------------------------------------------------------
+
+
+def _soccer_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
+    from syndicate.features.soccer.actuals import graded_rows_for_date as _soccer_actuals_graded_rows_for_date
+
+    try:
+        return _soccer_actuals_graded_rows_for_date(date_str)
+    except Exception:
+        return []
+
+
+# ---------------------------------------------------------------------------
+# NCAAB -- unlike every other sport here, the source artifact
+# (results_by_date_payload) already carries actual_margin/actual_total AND
+# the market's own ats_result/ou_result_full ("Home Cover"/"Away Cover"/
+# "Push", "Over"/"Under"/"Push") pre-graded against spread_home/market_total
+# -- there is no evaluation module for NCAAB (no props, no picks, no
+# market_accuracy equivalent) but the raw results archive turns out to
+# already BE a graded ladder, so this adapter only needs to reshape it, not
+# compute it.
+# ---------------------------------------------------------------------------
+
+
+def _ncaab_ats_side_result(ats_result: str, *, side: str) -> str | None:
+    text = str(ats_result or "").strip().lower()
+    if not text:
+        return None
+    if "push" in text:
+        return "push"
+    if "home" in text:
+        return "win" if side == "home" else "loss"
+    if "away" in text:
+        return "win" if side == "away" else "loss"
+    return None
+
+
+def _ncaab_ou_side_result(ou_result: str, *, side: str) -> str | None:
+    text = str(ou_result or "").strip().lower()
+    if not text:
+        return None
+    if "push" in text:
+        return "push"
+    if "over" in text:
+        return "win" if side == "over" else "loss"
+    if "under" in text:
+        return "win" if side == "under" else "loss"
+    return None
+
+
+def _ncaab_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
+    from syndicate.features.ncaab.sources import results_by_date_payload
+
+    try:
+        payload = results_by_date_payload(date_str)
+    except Exception:
+        return []
+    if not isinstance(payload, dict):
+        return []
+    raw_rows = payload.get("rows") if isinstance(payload.get("rows"), list) else []
+
+    rows: list[dict[str, Any]] = []
+    for game in raw_rows:
+        if not isinstance(game, dict):
+            continue
+        home_team = str(game.get("home_team") or "").strip()
+        away_team = str(game.get("away_team") or "").strip()
+        home_score = _to_float(game.get("home_score"))
+        away_score = _to_float(game.get("away_score"))
+        title = f"{away_team} @ {home_team}"
+
+        if home_score is not None and away_score is not None and home_score != away_score:
+            home_ml_result = "win" if home_score > away_score else "loss"
+            away_ml_result = "loss" if home_score > away_score else "win"
+            rows.append({"sport": "ncaab", "market": "moneyline", "selection": home_team, "home": home_team, "away": away_team, "title": title, "actual": home_score, "result": home_ml_result})
+            rows.append({"sport": "ncaab", "market": "moneyline", "selection": away_team, "home": home_team, "away": away_team, "title": title, "actual": away_score, "result": away_ml_result})
+
+        spread_home = _to_float(game.get("spread_home"))
+        home_spread_result = _ncaab_ats_side_result(game.get("ats_result"), side="home")
+        away_spread_result = _ncaab_ats_side_result(game.get("ats_result"), side="away")
+        if home_spread_result is not None:
+            rows.append({"sport": "ncaab", "market": "spread", "selection": home_team, "home": home_team, "away": away_team, "title": title, "line": spread_home, "actual": game.get("actual_margin"), "result": home_spread_result})
+        if away_spread_result is not None:
+            rows.append({"sport": "ncaab", "market": "spread", "selection": away_team, "home": home_team, "away": away_team, "title": title, "line": (-spread_home if spread_home is not None else None), "actual": game.get("actual_margin"), "result": away_spread_result})
+
+        market_total = _to_float(game.get("market_total"))
+        over_result = _ncaab_ou_side_result(game.get("ou_result_full") or game.get("actual_ou"), side="over")
+        under_result = _ncaab_ou_side_result(game.get("ou_result_full") or game.get("actual_ou"), side="under")
+        if over_result is not None:
+            rows.append({"sport": "ncaab", "market": "total", "selection": "over", "home": home_team, "away": away_team, "title": title, "line": market_total, "actual": game.get("actual_total"), "result": over_result})
+        if under_result is not None:
+            rows.append({"sport": "ncaab", "market": "total", "selection": "under", "home": home_team, "away": away_team, "title": title, "line": market_total, "actual": game.get("actual_total"), "result": under_result})
+    return rows
+
+
+# ---------------------------------------------------------------------------
 # Not yet available. Registered (rather than omitted) so evaluation_settlement
 # treats these sports as "supported, currently zero graded rows" -- the
 # correct diagnostic bucket -- instead of "unsupported sport", and so
 # building the real grader later (Stage 1 follow-up) needs no change
 # anywhere else once it lands.
 # ---------------------------------------------------------------------------
-
-
-def _soccer_graded_rows_for_date(_date_str: str) -> list[dict[str, Any]]:
-    # No actuals builder exists yet (plan doc P-finding: "soccer has no
-    # actuals builder at all" -- a calibrated 10-league engine whose
-    # predictions can never be scored). Tracked separately as its own
-    # build_soccer_actuals.py effort.
-    return []
-
-
-def _ncaab_graded_rows_for_date(_date_str: str) -> list[dict[str, Any]]:
-    # No evaluation modules exist for NCAAB at all yet (no props module, no
-    # picks module, no market_accuracy equivalent).
-    return []
 
 
 def _ncaaf_graded_rows_for_date(_date_str: str) -> list[dict[str, Any]]:

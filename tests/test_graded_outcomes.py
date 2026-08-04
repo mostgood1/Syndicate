@@ -22,8 +22,7 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(go.graded_rows_for_date("esports", "2026-08-02"), [])
 
     def test_not_yet_available_sports_return_empty(self) -> None:
-        for sport in ("soccer", "ncaab", "ncaaf"):
-            self.assertEqual(go.graded_rows_for_date(sport, "2026-08-02"), [])
+        self.assertEqual(go.graded_rows_for_date("ncaaf", "2026-08-02"), [])
 
 
 class LocalMarketAccuracyDelegationTests(unittest.TestCase):
@@ -175,6 +174,63 @@ class NflGraderTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             with patch("syndicate.features.nfl.sources.default_nfl_source_root", return_value=Path(tmp_dir)):
                 self.assertEqual(go.graded_rows_for_date("nfl", "2026-09-09"), [])
+
+
+class NcaabGraderTests(unittest.TestCase):
+    def test_reshapes_already_graded_results_payload(self) -> None:
+        # Real shape from data/ncaab_source/api/results_by_date/results_2026-04-06.json
+        fake_payload = {
+            "count": 1,
+            "date": "2026-04-06",
+            "rows": [
+                {
+                    "actual_ats": "Away Cover", "actual_margin": 6.0, "actual_ou": "Under", "actual_total": 132.0,
+                    "ats_correct": True, "ats_result": "Away Cover", "away_score": 63.0, "away_team": "UConn Huskies",
+                    "date": "2026-04-06", "game_id": 401856600, "home_score": 69.0, "home_team": "Michigan Wolverines",
+                    "market_total": 144.5, "ou_correct": False, "ou_result_full": "Under", "pred_ats": "Away Cover",
+                    "pred_margin": -13.0720005, "pred_ou": "Over", "pred_total": 156.76637, "spread_home": -7.0,
+                }
+            ],
+        }
+        with patch("syndicate.features.ncaab.sources.results_by_date_payload", return_value=fake_payload):
+            rows = go.graded_rows_for_date("ncaab", "2026-04-06")
+        by_market_selection = {(r["market"], r["selection"]): r for r in rows}
+        # Michigan (home) won 69-63 straight up.
+        self.assertEqual(by_market_selection[("moneyline", "Michigan Wolverines")]["result"], "win")
+        self.assertEqual(by_market_selection[("moneyline", "UConn Huskies")]["result"], "loss")
+        # ats_result = "Away Cover" -> away (UConn) covered, home (Michigan) did not.
+        self.assertEqual(by_market_selection[("spread", "UConn Huskies")]["result"], "win")
+        self.assertEqual(by_market_selection[("spread", "Michigan Wolverines")]["result"], "loss")
+        self.assertEqual(by_market_selection[("spread", "Michigan Wolverines")]["line"], -7.0)
+        self.assertEqual(by_market_selection[("spread", "UConn Huskies")]["line"], 7.0)
+        # ou_result_full = "Under" -> under wins, over loses.
+        self.assertEqual(by_market_selection[("total", "under")]["result"], "win")
+        self.assertEqual(by_market_selection[("total", "over")]["result"], "loss")
+
+    def test_push_results_are_pushes_not_wins_or_losses(self) -> None:
+        fake_payload = {
+            "rows": [
+                {
+                    "ats_result": "Push", "ou_result_full": "Push", "home_score": 70.0, "away_score": 63.0,
+                    "home_team": "A", "away_team": "B", "spread_home": -7.0, "market_total": 133.0,
+                }
+            ]
+        }
+        with patch("syndicate.features.ncaab.sources.results_by_date_payload", return_value=fake_payload):
+            rows = go.graded_rows_for_date("ncaab", "2026-04-06")
+        by_market_selection = {(r["market"], r["selection"]): r for r in rows}
+        self.assertEqual(by_market_selection[("spread", "A")]["result"], "push")
+        self.assertEqual(by_market_selection[("spread", "B")]["result"], "push")
+        self.assertEqual(by_market_selection[("total", "over")]["result"], "push")
+        self.assertEqual(by_market_selection[("total", "under")]["result"], "push")
+
+    def test_missing_results_file_is_a_safe_no_op(self) -> None:
+        with patch("syndicate.features.ncaab.sources.results_by_date_payload", return_value={"date": "2026-05-22", "error": "results file not found"}):
+            self.assertEqual(go.graded_rows_for_date("ncaab", "2026-05-22"), [])
+
+    def test_exception_returns_empty(self) -> None:
+        with patch("syndicate.features.ncaab.sources.results_by_date_payload", side_effect=RuntimeError("boom")):
+            self.assertEqual(go.graded_rows_for_date("ncaab", "2026-04-06"), [])
 
 
 if __name__ == "__main__":
