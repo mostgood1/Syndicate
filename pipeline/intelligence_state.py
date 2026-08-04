@@ -1326,6 +1326,22 @@ def maybe_record_board_state_to_evaluation_ledger(state: dict[str, Any]) -> dict
         print(f"[intelligence_state] BOARD_STATE_LEDGER_RECORD_FAILED selected_date={selected_date} error={type(exc).__name__}: {exc}", flush=True)
         return None
 
+    # Only stamp the fingerprint when something was actually recorded. The
+    # stamp is a "this (date, fingerprint) is handled" marker that the guard
+    # at the top of this function uses to skip re-recording -- so stamping
+    # after a zero-recommendation cycle would permanently suppress retry for
+    # that fingerprint, turning a transient empty board into a silent, self-
+    # concealing gap in the ledger. Leaving it unstamped costs one repeated
+    # bundle build on the next cycle and lets the next non-empty board
+    # recover on its own.
+    if not recommendations:
+        print(
+            f"[intelligence_state] BOARD_STATE_LEDGER_SKIPPED_EMPTY selected_date={selected_date} "
+            f"fingerprint={fingerprint[:12]} (not stamping -- will retry next cycle)",
+            flush=True,
+        )
+        return bundle
+
     _record_canonical_board_state_ledger_fingerprint(selected_date, fingerprint)
     print(
         f"[intelligence_state] BOARD_STATE_LEDGER_RECORDED selected_date={selected_date} "
