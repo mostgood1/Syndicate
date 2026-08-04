@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import sys
 from collections import defaultdict
 from datetime import datetime
@@ -699,14 +700,66 @@ def _day_token(date_str: str) -> str:
     return str(date_str).strip().replace("-", "_")
 
 
+def _odds_data_roots() -> List[Path]:
+    """Every plausible location for the odds tree, best first.
+
+    `_ROOT` is the vendored package root -- i.e. the CODE CHECKOUT. On a
+    hosted deploy the real odds live on the mounted data disk, and the
+    checkout carries only whatever happens to be committed (as of
+    2026-08-04: exactly four files, all for 2026_07_10). So resolving odds
+    against `_ROOT` alone silently finds nothing for every other date.
+
+    Mirrors daily_update.py's own `_DATA_DIR` convention
+    (MLB_BETTING_DATA_ROOT / MLB_BETTING_DATA_ROOT_DIR) and reconcile's
+    `_resolve_sim_dir` source_artifacts handling, rather than inventing a
+    third scheme.
+    """
+    roots: List[Path] = []
+    env_root = str(
+        os.environ.get("MLB_BETTING_DATA_ROOT")
+        or os.environ.get("MLB_BETTING_DATA_ROOT_DIR")
+        or ""
+    ).strip()
+    if env_root:
+        try:
+            resolved = Path(env_root).resolve()
+            roots.append(resolved)
+            # The mounted bundle nests the same tree under source_artifacts;
+            # accept either shape so this works on both layouts.
+            roots.append(resolved / "source_artifacts" / "data")
+        except Exception:
+            pass
+    roots.append((_ROOT / "data").resolve())
+    deduped: List[Path] = []
+    seen: set = set()
+    for root in roots:
+        if root in seen:
+            continue
+        seen.add(root)
+        deduped.append(root)
+    return deduped
+
+
 def _odds_paths(date_str: str) -> Dict[str, Path]:
     token = _day_token(date_str)
-    odds_root = _ROOT / "data" / "market" / "oddsapi"
-    return {
-        "game_lines": odds_root / f"oddsapi_game_lines_{token}.json",
-        "hitter_lines": odds_root / f"oddsapi_hitter_props_{token}.json",
-        "pitcher_lines": odds_root / f"oddsapi_pitcher_props_{token}.json",
+    names = {
+        "game_lines": f"oddsapi_game_lines_{token}.json",
+        "hitter_lines": f"oddsapi_hitter_props_{token}.json",
+        "pitcher_lines": f"oddsapi_pitcher_props_{token}.json",
     }
+    roots = _odds_data_roots()
+    out: Dict[str, Path] = {}
+    for key, filename in names.items():
+        chosen: Optional[Path] = None
+        for root in roots:
+            candidate = root / "market" / "oddsapi" / filename
+            if candidate.exists():
+                chosen = candidate
+                break
+        # Fall back to the first root so the caller's own "missing" warning
+        # still names a sensible path rather than an empty one.
+        out[key] = chosen if chosen is not None else (roots[0] / "market" / "oddsapi" / filename)
+    return out
 
 
 def _base_game_row_from_report(date_str: str, game: Dict[str, Any], market_game: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
