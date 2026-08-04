@@ -1880,13 +1880,13 @@ def _game_row_updated_epoch(game: dict[str, Any], fallback_epoch: float) -> floa
     return fallback_epoch
 
 
-def _game_sim_vs_line_reasoning(game: dict[str, Any]) -> str | None:
-    """Surface the sim-vs-market-line comparison game_board_contract.py
-    already computes (shared_period_rows' "main"/"market"/"best_edge") --
-    it sits right there on the same game dict _game_bet_candidates_from_game
-    already has in scope, but never got read, so ATS/Total/Moneyline
-    candidates never carried the same sim-vs-line context the sport pages
-    show for the same game."""
+def _game_full_period_row(game: dict[str, Any]) -> dict[str, Any] | None:
+    """The same "full game" (or last available period) row from
+    shared_period_rows that _game_sim_vs_line_reasoning reads -- split out
+    so _game_bet_narrative below can reuse the row lookup (main/market/
+    best_edge) without duplicating it or changing
+    _game_sim_vs_line_reasoning's own return shape, which existing tests
+    pin exactly."""
     period_rows = game.get("shared_period_rows") if isinstance(game.get("shared_period_rows"), list) else []
     row = next(
         (item for item in period_rows if isinstance(item, dict) and _safe_text(item.get("label"), "").strip().lower() == "full game"),
@@ -1894,7 +1894,18 @@ def _game_sim_vs_line_reasoning(game: dict[str, Any]) -> str | None:
     )
     if row is None and period_rows and isinstance(period_rows[-1], dict):
         row = period_rows[-1]
-    if not isinstance(row, dict):
+    return row if isinstance(row, dict) else None
+
+
+def _game_sim_vs_line_reasoning(game: dict[str, Any]) -> str | None:
+    """Surface the sim-vs-market-line comparison game_board_contract.py
+    already computes (shared_period_rows' "main"/"market"/"best_edge") --
+    it sits right there on the same game dict _game_bet_candidates_from_game
+    already has in scope, but never got read, so ATS/Total/Moneyline
+    candidates never carried the same sim-vs-line context the sport pages
+    show for the same game."""
+    row = _game_full_period_row(game)
+    if row is None:
         return None
     parts: list[str] = []
     main = _safe_text(row.get("main"), "")
@@ -1907,6 +1918,48 @@ def _game_sim_vs_line_reasoning(game: dict[str, Any]) -> str | None:
     if best_edge and best_edge != "-":
         parts.append(f"Model edge vs. line: {best_edge}")
     return " | ".join(parts) if parts else None
+
+
+def _game_bet_narrative(*, market: str, subject: str, model_probability_pct: float | None, odds: Any, edge_pct: float | None, game: dict[str, Any]) -> str | None:
+    """Real analysis prose for a moneyline/spread/total candidate, mirroring
+    the player-prop generator's shape (model probability vs. a real
+    market-implied probability, edge, sim projection) instead of the raw
+    "Sim: X | Market: Y" pipe-joined label _game_sim_vs_line_reasoning
+    produces, or the internal "oddsapi_consensus market snapshot"
+    placeholder game.get("summary") sometimes carries (found live
+    2026-08-04, filtered at Ask's own read layer by dc4b9553 -- this is
+    the actual upstream fix: generate real prose instead of relying on a
+    downstream filter to hide the absence of any).
+
+    Every number here is real (already computed by this same candidate
+    builder, or the actual posted odds) -- returns None rather than a
+    templated sentence with nothing behind it when there isn't enough
+    real data to say something specific.
+    """
+    if model_probability_pct is None:
+        return None
+    try:
+        from syndicate.features.shared.odds_lifecycle import _implied_probability_from_american_odds
+    except Exception:
+        _implied_probability_from_american_odds = None  # type: ignore[assignment]
+
+    market_probability_pct = None
+    if _implied_probability_from_american_odds is not None and odds is not None:
+        implied = _implied_probability_from_american_odds(odds)
+        if implied is not None:
+            market_probability_pct = implied * 100.0
+
+    sentence = f"The model favors {subject} for the {market.lower()}, projecting a {model_probability_pct:.1f}% chance"
+    if market_probability_pct is not None:
+        sentence += f" against a market price near {market_probability_pct:.1f}%"
+    sentence += "."
+    if edge_pct is not None:
+        sentence += f" Model edge vs. the market: {edge_pct:.1f}%."
+    row = _game_full_period_row(game)
+    main = _safe_text(row.get("main"), "") if row else ""
+    if main:
+        sentence += f" Model projects {main}."
+    return sentence
 
 
 def _looks_like_badge_text(value: Any) -> bool:
@@ -2270,9 +2323,35 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
     updated_epoch = _game_row_updated_epoch(game, fallback_epoch)
     href = str(game.get("href") or sport.get("hub_href") or sport.get("primary_href") or "").strip() or None
     base_detail = _safe_text(detail or game.get("summary") or game.get("detail"), "No game-bet summary available.")
-    detail_text = base_detail
-    if sim_context and sim_context not in base_detail:
-        detail_text = f"{base_detail} {sim_context}".strip() if base_detail and base_detail != "No game-bet summary available." else sim_context
+    # Found live 2026-08-04 (dc4b9553): "detail" here was frequently the
+    # internal "oddsapi_consensus market snapshot" sentinel (meaning "no
+    # real sim summary yet") rather than real analysis -- previously only
+    # filtered downstream, at Ask's own read layer. Generate real prose
+    # from the same real inputs this candidate already carries (model
+    # probability, actual posted odds, edge, sim projection) whenever the
+    # upstream detail is that placeholder or genuinely absent, rather than
+    # relying on a downstream filter to hide the absence of real analysis.
+    # Scoped to game-level markets only -- player props already carry real
+    # generated prose from the vendored sim pipeline in "detail".
+    is_low_information_detail = base_detail.strip().lower() in {"oddsapi_consensus market snapshot", "no game-bet summary available."}
+    narrative = (
+        _game_bet_narrative(
+            market=_safe_text(market, "market"),
+            subject=team_text if team_text and team_text != "-" else pick_text,
+            model_probability_pct=confidence_value,
+            odds=odds,
+            edge_pct=edge_value,
+            game=game,
+        )
+        if is_game_level_market and is_low_information_detail
+        else None
+    )
+    if narrative:
+        detail_text = narrative
+    else:
+        detail_text = base_detail
+        if sim_context and sim_context not in base_detail:
+            detail_text = f"{base_detail} {sim_context}".strip() if base_detail and base_detail != "No game-bet summary available." else sim_context
     candidates.append(
         {
             "game_id": _game_identifier(game),

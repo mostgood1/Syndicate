@@ -27,6 +27,7 @@ from syndicate.blueprints.home import _backfill_prop_row_game_id
 from syndicate.blueprints.home import _team_for_side_hint
 from syndicate.blueprints.home import _compact_prop_rows
 from syndicate.blueprints.home import _game_sim_vs_line_reasoning
+from syndicate.blueprints.home import _game_bet_narrative
 from syndicate.blueprints.home import _game_identifier
 from syndicate.blueprints.home import _board_candidate_rows
 
@@ -925,6 +926,66 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         moneyline_by_pick = {c["pick"]: c["team"] for c in candidates if c["market"] == "Moneyline"}
         self.assertEqual(moneyline_by_pick.get("Away ML"), "Boston Celtics")
         self.assertEqual(moneyline_by_pick.get("Home ML"), "New York Knicks")
+
+    def test_placeholder_detail_is_replaced_with_real_narrative_prose(self) -> None:
+        # Found live 2026-08-04 verifying game-market picks (moneyline/ATS/
+        # totals) through Ask the Syndicate: "detail" was frequently the
+        # internal "oddsapi_consensus market snapshot" sentinel, not real
+        # analysis -- dc4b9553 filtered it downstream at Ask's own read
+        # layer, but the upstream candidate never carried real prose to
+        # begin with. This is the actual fix: generate it here, from the
+        # same real inputs (model win probability, actual posted odds,
+        # edge) every consumer of these candidates already has.
+        game = self._sample_game(
+            summary="oddsapi_consensus market snapshot",
+            betting={"away_ml": -120, "home_ml": 105, "p_away_win": 0.55, "p_home_win": 0.45},
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "nba"}, game, fallback_epoch=0.0)
+        moneyline_by_pick = {c["pick"]: c for c in candidates if c["market"] == "Moneyline"}
+        home_detail = moneyline_by_pick["Home ML"]["detail"]
+        self.assertNotIn("oddsapi_consensus", home_detail.lower())
+        self.assertIn("New York Knicks", home_detail)
+        self.assertIn("45.0%", home_detail)  # model win probability (p_home_win=0.45)
+        self.assertIn("%", home_detail)  # a real market-implied probability from the -120/105 odds is present too
+
+    def test_real_detail_text_is_left_untouched(self) -> None:
+        # A genuinely real, hand-authored summary must never be replaced --
+        # the fix targets the specific known placeholder, not "any detail
+        # text we could theoretically improve on."
+        game = self._sample_game(
+            summary="Knicks are 8-2 in their last 10 home games against a spread this size.",
+            betting={"away_ml": -120, "home_ml": 105, "p_away_win": 0.55, "p_home_win": 0.45},
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "nba"}, game, fallback_epoch=0.0)
+        moneyline = next(c for c in candidates if c["market"] == "Moneyline" and c["pick"] == "Home ML")
+        self.assertEqual(moneyline["detail"], "Knicks are 8-2 in their last 10 home games against a spread this size.")
+
+    def test_placeholder_detail_without_confidence_falls_back_unchanged(self) -> None:
+        # Real odds but no model win probability at all -- _game_bet_narrative
+        # must return None rather than fabricate a sentence with no real
+        # numbers behind it, leaving the old placeholder-handling path intact.
+        game = self._sample_game(
+            summary="oddsapi_consensus market snapshot",
+            betting={"away_ml": -120, "home_ml": 105},
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "nba"}, game, fallback_epoch=0.0)
+        moneyline = next(c for c in candidates if c["market"] == "Moneyline" and c["pick"] == "Home ML")
+        # Unchanged pre-existing fallback (not this fix's concern): the raw
+        # placeholder string passes through as-is when there's no real data
+        # to replace it with.
+        self.assertEqual(moneyline["detail"], "oddsapi_consensus market snapshot")
+
+    def test_game_bet_narrative_returns_none_without_model_probability(self) -> None:
+        self.assertIsNone(
+            _game_bet_narrative(market="Moneyline", subject="New York Knicks", model_probability_pct=None, odds=-120, edge_pct=5.0, game={})
+        )
+
+    def test_game_bet_narrative_includes_market_implied_probability_from_real_odds(self) -> None:
+        narrative = _game_bet_narrative(market="Moneyline", subject="New York Knicks", model_probability_pct=62.0, odds=-150, edge_pct=8.5, game={})
+        self.assertIn("New York Knicks", narrative)
+        self.assertIn("62.0%", narrative)
+        self.assertIn("60.0%", narrative)  # implied probability of -150 american odds
+        self.assertIn("8.5%", narrative)
 
     def test_soccer_candidates_show_league_display_instead_of_generic_sport_name(self) -> None:
         # #162: soccer covers several leagues at once (MLS, La Liga, ...);
