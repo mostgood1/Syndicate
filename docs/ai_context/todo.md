@@ -419,7 +419,50 @@ full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
 
-### OPEN 2026-08-04 (4) -- THE REAL BLOCKER: MLB grading yields ZERO rows for 16+ straight days
+### OPEN 2026-08-04 (4) -- THE REAL BLOCKER: MLB day artifact is written EMPTY (games: {}) -- ANSWERED, see below
+
+**ANSWERED 2026-08-04 -- it is `games` EMPTY, not present-but-ungraded.**
+(This closes the open question in the Learning-loop entry's item 3 at the
+top of this file, which was blocked on exactly this.)
+
+Added `GET /api/ops/mlb/betting-card-day?date=YYYY-MM-DD` (`eb194fba`,
+read-only, admin-gated, returns a STRUCTURAL summary never the raw file)
+and dumped 2026-08-03 from production:
+
+    verdict:      games_empty -- day artifact exists but was never populated with games
+    exists:       true          size_bytes: 5166
+    games_count:  0             games_with_any_rows: 0
+    row_totals:   {settled_rows: 0, playable_settled_rows: 0, all_settled_rows: 0}
+    has_results_block: true
+    path: .../data/eval/seasons/2026/betting_day_payloads_retuned/
+          season_betting_day_2026_08_03.json
+
+The envelope is written in FULL -- `results`, `all_results`,
+`playable_results`, `shadow_results`, `summary`, `selected_counts`,
+`available_profiles` -- while `games` is flatly empty. So
+`market_accuracy._normalized_rows` is not at fault: it walks
+`payload["games"]` and there is nothing there to walk. **The bug is
+upstream, in whatever writes this artifact.**
+
+**Generator traced:** `vendor/mlb_bettingv2/tools/daily_update.py` (~:2344)
+builds `betting_day_payloads_retuned/` by shelling out to
+`tools/eval/build_season_betting_cards_manifest.py` with
+`--batch-dir <batch_dir> --day-payload-dir <dir> --profile-name retuned
+--prefer-canonical-daily on`. The day payload derives from that batch dir,
+so empty `games` means the generator found nothing to emit -- either the
+batch dir holds no per-game rows for these dates, or
+`--prefer-canonical-daily on` selects an empty source. `daily_update.py`
+also has a `season_betting_day_missing` branch (~:3753) worth ruling out.
+
+**Cheapest next probe:** extend `/api/ops/mlb/betting-card-day` to also
+report the batch-dir contents for the date, mirroring how this endpoint
+answered the previous question in one call.
+
+**Confirmation signals for any fix, one HTTP call each:**
+`/mlb/market-accuracy` starts returning rows, and settlement's `matched`
+goes non-zero (equivalently `unmatched_no_graded_rows` drops).
+
+
 
 The feedback loop is blocked at the **GRADE** stage. Recording works (35
 records). Settlement works. There is simply nothing graded to match
