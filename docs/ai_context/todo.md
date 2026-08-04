@@ -88,6 +88,61 @@ depending on the timeout working.
 **Do not confuse with** the earlier deliberate deploy-kills-in-flight-sim
 behaviour, which is expected and documented. This is a sim that died on its
 own and left the system believing it was alive.
+### DONE 2026-08-04 -- 6 pre-existing `test_live_refresh_loop.py` failures: test-isolation leak, NOT a live_refresh_loop bug (no production impact)
+
+Six `test_run_tick_*` failures found while fixing an unrelated MLB props bug
+(`96b43120`); confirmed pre-existing against a stashed baseline. **Verdict:
+the six assertions were RIGHT and `live_refresh_loop.py` is RIGHT -- the
+fault was a different test leaking real cross-process state.** Not one of
+the six assertions was changed.
+
+**Root cause.** All six failed the same way: they expect
+`launch_refresh_run(..., sports=None, ...)` and got `sports='mlb,nba,nhl,soccer'`
+(the active-season set minus WNBA). That string is produced by exactly one
+branch -- the sim/odds memory mutex at `live_refresh_loop.py:3559-3587`,
+which defers only WNBA and launches every other sport when an MLB daily sim
+is resident. So the tick believed a sim was running. It was:
+`test_launch_mlb_daily_sim_*` (3 tests) call the REAL `_launch_mlb_daily_sim`
+with `subprocess.Popen` mocked and `pid = 4242`, which correctly writes the
+shared active-sim pointer to `reports/live_refresh_loop/mlb_sim_runs/_active.json`
+-- into the repo's real reports tree. Nothing cleared it. On this dev machine
+pid 4242 genuinely exists, `started_at` is "now" (so neither the 90-min
+ceiling nor the `started_dt < _PROCESS_STARTED_AT` container-restart guard
+fires), and `_process_matches_lock` deliberately fail-opens on Windows
+(`_process_cmdline` returns None -- no `/proc`). All three guards therefore
+pass and `_shared_mlb_sim_still_running()` returns True for every test that
+runs after those three, alphabetically -- which is all six.
+
+Confirms cleanly: each of the six passes in isolation; `-k "launch_mlb_daily_sim
+or run_tick_launches_live_refresh_with_expected_defaults"` reproduces the
+failure with 4 tests.
+
+**Why this is not a production bug.** On Render (Linux) `_process_matches_lock`
+reads a real `/proc/<pid>/cmdline` and rejects a reused PID, so the fail-open
+that made the stale pointer look live is dev-machine-only. The other two
+guards (90-min ceiling, pre-process-start pointer) are intact and unrelated
+to platform. The pointer-on-launch write is the whole point of the
+cross-worker design, not a leak.
+
+**Fix (tests only).** (a) The three `_launch_mlb_daily_sim` tests now patch
+`_mlb_sim_runs_state_dir` to a `TemporaryDirectory`, so a launch's real
+bookkeeping never touches `reports/` -- fixes the leak at source and stops
+those tests dirtying the working tree. (b) `setUp`/`tearDown` snapshot and
+restore `_active.json` as a safety net for any future test that reaches a
+real launch; restore-not-delete specifically so running the suite while a
+REAL local sim is in flight cannot destroy that sim's live pointer. Both
+carry inline comments recording why. 203/203 pass, stable across three
+consecutive full-file runs.
+
+**Operational note (cheap to rediscover the hard way):** this test file
+writes to the repo's REAL `reports/live_refresh_loop/` tree, and several of
+those files are ambient state that later tests read as fact (`_active.json`,
+`_last_attempt.json`, `last_pregame_sweep_by_sport.json`, the statcast status
+file). `setUp` already neutralises the pregame-cadence markers via env; the
+sim pointer was the gap. A `test_run_tick_*` failure whose diff is only in
+`sports=` is almost certainly this class of leak, not a tick-logic change --
+check `reports/live_refresh_loop/mlb_sim_runs/_active.json` before reading
+any of `_run_live_refresh_tick`.
 
 ### DONE 2026-08-04 -- "Fix all" pass on the three open loop items: 2 resolved, 1 root-caused-but-blocked, 1 shipped as new capability
 

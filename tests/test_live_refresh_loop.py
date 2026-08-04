@@ -26,6 +26,14 @@ class LiveRefreshLoopTests(unittest.TestCase):
         )
         self._cadence_env.start()
         self.addCleanup(self._cadence_env.stop)
+        # Snapshot for the tearDown safety net below: only state this test
+        # itself created gets cleaned up, so running the suite while a REAL
+        # local sim is in flight doesn't delete that sim's live pointer.
+        try:
+            pointer_path = live_refresh_loop._mlb_sim_active_pointer_path()
+            self._sim_pointer_before = pointer_path.read_bytes() if pointer_path.exists() else None
+        except Exception:
+            self._sim_pointer_before = None
 
     def tearDown(self) -> None:
         live_refresh_loop._LIVE_REFRESH_LOOP_STOP.set()
@@ -40,6 +48,21 @@ class LiveRefreshLoopTests(unittest.TestCase):
         live_refresh_loop._MLB_STATCAST_REFRESH_PROCESS = None
         try:
             live_refresh_loop._mlb_statcast_refresh_status_path().unlink(missing_ok=True)
+        except Exception:
+            pass
+        # Safety net for the same hazard the _launch_mlb_daily_sim tests below
+        # document: an active-sim pointer left on disk is ambient "a sim is
+        # running" state for every subsequent tick test, and unlike
+        # _MLB_SIM_PROCESS above it survives the process. Restore whatever was
+        # there when this test started (usually nothing) so a test that reaches
+        # a real sim launch can't poison the ones after it -- and so a real
+        # in-flight local sim's pointer survives the suite untouched.
+        try:
+            pointer_path = live_refresh_loop._mlb_sim_active_pointer_path()
+            if self._sim_pointer_before is None:
+                pointer_path.unlink(missing_ok=True)
+            elif pointer_path.read_bytes() != self._sim_pointer_before:
+                pointer_path.write_bytes(self._sim_pointer_before)
         except Exception:
             pass
 
@@ -1580,8 +1603,23 @@ class LiveRefreshLoopTests(unittest.TestCase):
         self.assertEqual(decision["reason"], "first_appearance")
         self.assertNotIn("game_pks", decision)
 
+    # These three call the REAL _launch_mlb_daily_sim, which (correctly, in
+    # production) writes the shared active-sim pointer -- reports/live_refresh_loop/
+    # mlb_sim_runs/_active.json -- so another worker/container can see the sim it
+    # just started. With Popen mocked and pid=4242, that pointer named a pid that
+    # really does exist on the dev machine, started_at was "now", and
+    # _process_matches_lock fail-opens on Windows (no /proc to read a cmdline
+    # from). Nothing ever cleared it, so every later test in this class saw
+    # _mlb_daily_sim_process_still_running() == True and _run_live_refresh_tick
+    # took the sim-mutex branch, rewriting sports=None into the effective sport
+    # list minus WNBA. That failed six test_run_tick_* assertions that have
+    # nothing to do with the sim mutex -- and the assertions were right; the
+    # leaked pointer was wrong. Point the sim-runs state dir at a temp dir so the
+    # launch's real bookkeeping stays out of the repo's reports/ tree entirely.
     def test_launch_mlb_daily_sim_includes_only_game_pks_flag_when_scoped(self) -> None:
-        with patch.object(live_refresh_loop.subprocess, "Popen") as mocked_popen:
+        with TemporaryDirectory() as tmp_dir, patch.object(
+            live_refresh_loop, "_mlb_sim_runs_state_dir", return_value=Path(tmp_dir)
+        ), patch.object(live_refresh_loop.subprocess, "Popen") as mocked_popen:
             mocked_popen.return_value.pid = 4242
             live_refresh_loop._launch_mlb_daily_sim("2026-07-19", {"reason": "fingerprint_change", "game_pks": ["200", "100"]})
 
@@ -1590,7 +1628,9 @@ class LiveRefreshLoopTests(unittest.TestCase):
         self.assertEqual(command[command.index("--only-game-pks") + 1], "100,200")
 
     def test_launch_mlb_daily_sim_omits_only_game_pks_flag_for_first_appearance(self) -> None:
-        with patch.object(live_refresh_loop.subprocess, "Popen") as mocked_popen:
+        with TemporaryDirectory() as tmp_dir, patch.object(
+            live_refresh_loop, "_mlb_sim_runs_state_dir", return_value=Path(tmp_dir)
+        ), patch.object(live_refresh_loop.subprocess, "Popen") as mocked_popen:
             mocked_popen.return_value.pid = 4242
             live_refresh_loop._launch_mlb_daily_sim("2026-07-19", {"reason": "first_appearance"})
 
@@ -1598,7 +1638,9 @@ class LiveRefreshLoopTests(unittest.TestCase):
         self.assertNotIn("--only-game-pks", command)
 
     def test_launch_mlb_daily_sim_omits_only_game_pks_flag_for_evening_next_day(self) -> None:
-        with patch.object(live_refresh_loop.subprocess, "Popen") as mocked_popen:
+        with TemporaryDirectory() as tmp_dir, patch.object(
+            live_refresh_loop, "_mlb_sim_runs_state_dir", return_value=Path(tmp_dir)
+        ), patch.object(live_refresh_loop.subprocess, "Popen") as mocked_popen:
             mocked_popen.return_value.pid = 4242
             live_refresh_loop._launch_mlb_daily_sim("2026-07-20", {"reason": "evening_next_day_sim", "date": "2026-07-20"})
 
