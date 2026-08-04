@@ -313,6 +313,55 @@ full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
 
+### OPEN 2026-08-04 (4) -- THE REAL BLOCKER: MLB grading yields ZERO rows for 16+ straight days
+
+The feedback loop is blocked at the **GRADE** stage. Recording works (35
+records). Settlement works. There is simply nothing graded to match
+against, and there has not been for over two weeks.
+
+**Evidence, taken after the 08-03 slate was fully final** (games finished
+08:08 CDT; checked 13:21 CDT, so timing is NOT a factor this time):
+
+    /mlb/api/market-accuracy  ->  16 dates returned, 2026-07-19 .. 2026-08-03
+    EVERY date:  {'all': 0, 'official': 0, 'playable': 0}
+
+Zero graded rows on every single day for 16 days.
+
+**Why this blocks everything downstream:**
+`evaluation_settlement._mlb_graded_rows_for_date` calls
+`build_market_accuracy_payload` and matches ledger records against its
+rows. No rows -> `matched: 0` -> nothing ever settles -> the ledger stays
+100% pending -> reliability multipliers, per-market dynamic thresholds,
+policy promotion, price CLV and Kelly stake credibility all keep running
+on empty. Every one of those is gated behind THIS.
+
+**Also user-visible:** `/mlb/market-accuracy` has been showing nothing for
+16 days. Same root cause, and a good independent way to confirm a fix.
+
+**Where it breaks, traced:**
+- `market_accuracy.build_market_accuracy_payload` (:290) reads
+  `season_betting_card_day_path(season, date, profile="retuned")`.
+- Those files DO load -- 16 days came back, so `_day_payload` returned
+  non-None for each, i.e. the artifacts exist and parse.
+- `_normalized_rows` (:185) walks `payload["games"]` -> per-game row lists
+  named by `_ROW_SETS`, normalising `result` / `profit_u` / `actual`.
+- All buckets are 0, so either `payload["games"]` is empty, or the games
+  carry none of the `_ROW_SETS` row fields.
+- Sims are NOT the problem: `/api/ops/mlb/sims-list?date=2026-08-03`
+  returns 8 real sim files. The inputs exist; the graded artifact does not
+  get populated from them.
+
+**Next step (needs worker-disk access, which the web service does not
+have):** dump one real
+`season_betting_card_day_2026_retuned_2026-08-03.json` and answer one
+question -- is `games` empty, or are the games present but missing the
+`_ROW_SETS` row fields / their `result` values? That single look decides
+between "the day artifact is never populated" and "it is populated but
+never graded", which are different fixes in different places.
+
+**Do NOT re-diagnose this as timing.** It was checked 5 hours after the
+slate went final, across 16 days of history.
+
 ### RESOLVED 2026-08-04 (2) -- Ledger recording WORKS (35 records); the open half is now MATCHING, not recording
 
 **RESOLVED 2026-08-04T04:37Z. The record half of the loop is closed.**
