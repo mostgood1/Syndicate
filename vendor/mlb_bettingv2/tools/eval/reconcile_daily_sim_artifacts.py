@@ -826,6 +826,25 @@ def main() -> int:
     skipped_games = 0
     sims_per_game = 0
 
+    # This count is the whole question. The loop below has no silent branch --
+    # every iteration appends to `results` or to `failures` -- so
+    # len(results) + len(failures) == len(sim_paths) always holds. A report
+    # showing games_count 2 with failures_n 0 therefore proves the glob saw 2
+    # files, not that anything was dropped. What could NOT be established from
+    # outside is how many files were actually on the worker's disk at that
+    # moment, because this runs on refresh-worker while the ops endpoints run
+    # on the web service, and the two have separate disks.
+    #
+    # print(flush=True) rather than logger.info: only the former reaches
+    # Render's log collector.
+    print(
+        f"RECONCILE_SIM_PATHS date={args.date} n={len(sim_paths)} dir={sim_dir}",
+        flush=True,
+    )
+    if sim_paths:
+        _sample = ", ".join(path.name for path in sim_paths[:12])
+        print(f"RECONCILE_SIM_PATHS_SAMPLE date={args.date} files=[{_sample}]", flush=True)
+
     for sim_path in sim_paths:
         try:
             sim_obj = _read_json(sim_path)
