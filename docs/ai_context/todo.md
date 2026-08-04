@@ -65,10 +65,56 @@ full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
 
-### OPEN 2026-08-04 -- Ledger recording stamps a "done" fingerprint while writing ZERO records
+### OPEN 2026-08-04 -- Ledger recording: UNVERIFIED, earlier "writes zero records" claim was WRONG
 
 Tier 2 verification of the record-side fix (`0f14ba74`, `51729219`,
 `1545a694`). The fix is deployed. It is firing. It is producing nothing.
+
+**CORRECTION (same session, before anyone acts on this).** The claim above
+that recording "produces nothing" was drawn from a STALE read and is not
+supported. The settlement autorun's `epoch` decodes to
+**2026-08-03T18:07:16Z**; the observation was made at 2026-08-04T02:44Z --
+8.6 hours later -- because
+`EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS` was reverted to its 24h
+default. The 08-04 fingerprint could not have existed at 18:07 (that date
+had not started). So `total_recommendation_records: 0` describes the
+ledger BEFORE recording ran for these dates. It is not evidence of a
+no-op.
+
+Also incorrect in the original entry: "fingerprint stamped before the
+write". Verified in code -- `maybe_record_board_state_to_evaluation_ledger`
+(pipeline/intelligence_state.py:1301-1335) stamps at 1329, only AFTER
+`build_intelligence_evaluation_bundle(..., persist=True)` returns without
+raising. The ordering is correct as written.
+
+**What is actually established:**
+- Recording is flag-gated on `SYNDICATE_INTELLIGENCE_LEDGER_RECORDING_ENABLED`,
+  set `true` on refresh-worker ONLY (unset on web + live-odds-worker).
+  That placement is correct -- the worker builds the board.
+- Fingerprints exist for 2026-08-03 and 2026-08-04, so the function ran
+  and the bundle build did not raise.
+- `ranked_all` (the source at :1310) is populated from
+  `top_opportunities`, which was non-empty (60 candidates observed at
+  22:41Z), so the empty-recommendations theory is unlikely too.
+
+**Still genuinely unknown:** whether recommendation records are now in the
+ledger. Nothing observed so far answers it either way.
+
+**The one real residual risk worth keeping** from the original entry: if a
+cycle ever DOES record zero recommendations, :1329 still stamps the
+fingerprint and :1307 then skips that (date, fingerprint) permanently. That
+is a latent self-concealing failure -- worth guarding regardless of whether
+it is what happened here.
+
+**How to actually settle this** (the status endpoint is read-only, there is
+no POST to force a run): temporarily set
+`EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS=1` on refresh-worker
+(srv-d91dpertqb8s73co8ls0) + deploy, wait one cycle, re-read the status
+endpoint, then revert to unset + deploy. A concurrent session did exactly
+this successfully earlier today. Coordinate first -- it makes the autorun
+fire every poll.
+
+
 
 `GET /api/ops/evaluation-settlement/status` on prod (commit fa401ef6):
 
