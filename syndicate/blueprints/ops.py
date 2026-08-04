@@ -392,9 +392,55 @@ def api_ops_mlb_betting_card_day() -> Any:
     payload["sample_game"] = sample_game
     payload["sample_row"] = sample_row
 
+    # The batch dir is the day payload's INPUT: daily_update.py resolves it
+    # to <data>/eval/batches/season_{season}_ui_daily_live and hands it to
+    # build_season_betting_cards_manifest.py as --batch-dir, which is what
+    # populates `games`. Derived from the day-payload path rather than from
+    # env vars so it follows whatever root this service actually resolved:
+    # .../data/eval/seasons/<season>/betting_day_payloads_retuned/<file>
+    #        ^parents[4] ^[3]  ^[2]    ^[1]   ^parents[0]
+    try:
+        eval_root = path.parents[3]
+        batch_dir = eval_root / "batches" / f"season_{season}_ui_daily_live"
+        batch: dict[str, Any] = {"path": str(batch_dir), "exists": batch_dir.is_dir()}
+        if batch_dir.is_dir():
+            # Both spellings appear across this pipeline (the day payload
+            # file uses underscores, the batch report uses hyphens), so
+            # check each rather than guess.
+            for token in (date_str, date_str.replace("-", "_")):
+                candidate = batch_dir / f"sim_vs_actual_{token}.json"
+                if candidate.exists():
+                    batch["sim_vs_actual"] = {"path": str(candidate), "exists": True, "size_bytes": candidate.stat().st_size}
+                    try:
+                        report = json.loads(candidate.read_text(encoding="utf-8"))
+                        if isinstance(report, dict):
+                            batch["sim_vs_actual"]["top_level_keys"] = sorted(report.keys())[:25]
+                            for games_key in ("games", "rows", "results"):
+                                value = report.get(games_key)
+                                if isinstance(value, (list, dict)):
+                                    batch["sim_vs_actual"][f"{games_key}_count"] = len(value)
+                    except Exception as exc:
+                        batch["sim_vs_actual"]["parse_error"] = f"{type(exc).__name__}: {exc}"
+                    break
+            batch.setdefault("sim_vs_actual", {"exists": False, "looked_for": f"sim_vs_actual_{date_str}.json"})
+            entries = sorted(p.name for p in batch_dir.iterdir() if p.is_file())
+            batch["file_count"] = len(entries)
+            batch["sample_files"] = entries[:12]
+            batch["sim_vs_actual_file_count"] = sum(1 for name in entries if name.startswith("sim_vs_actual_"))
+        payload["batch_dir"] = batch
+    except Exception as exc:
+        payload["batch_dir"] = {"error": f"{type(exc).__name__}: {exc}"}
+
     # The whole point of the endpoint: name which of the two failures it is.
     if not games:
-        payload["verdict"] = "games_empty -- day artifact exists but was never populated with games"
+        batch_info = payload.get("batch_dir") if isinstance(payload.get("batch_dir"), dict) else {}
+        sim_vs_actual = batch_info.get("sim_vs_actual") if isinstance(batch_info.get("sim_vs_actual"), dict) else {}
+        if not batch_info.get("exists"):
+            payload["verdict"] = "games_empty + BATCH DIR MISSING -- the generator had no input directory at all"
+        elif not sim_vs_actual.get("exists"):
+            payload["verdict"] = "games_empty + no sim_vs_actual for this date -- the generator's per-date input was never written"
+        else:
+            payload["verdict"] = "games_empty BUT sim_vs_actual exists -- input is present, the generator is dropping it"
     elif sum(totals.values()) == 0:
         payload["verdict"] = "games_present_but_ungraded -- games exist, no settled-row fields populated"
     else:
