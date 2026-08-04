@@ -304,6 +304,104 @@ def api_ops_keyvalue_sweep_preview() -> Any:
     return jsonify(preview)
 
 
+@ops_bp.get("/api/ops/mlb/betting-card-day")
+def api_ops_mlb_betting_card_day() -> Any:
+    # Read-only STRUCTURAL dump of the season betting-card day artifact --
+    # the file syndicate/features/mlb/market_accuracy.py reads to produce
+    # graded rows, and therefore the file evaluation_settlement joins ledger
+    # records against.
+    #
+    # Added 2026-08-04 for one specific question: /mlb/api/market-accuracy
+    # has returned zero graded rows on EVERY date for 16+ days (checked 5
+    # hours after a slate went final, so not a timing artifact), which
+    # leaves the whole evaluation loop unable to settle anything. The
+    # artifact loads and parses fine, so the failure is inside it -- either
+    # `games` is empty (never populated) or the games are present but carry
+    # none of _ROW_SETS' settled-row fields (populated but never graded).
+    # Those are different bugs in different places, and the web service
+    # cannot read the worker's disk to tell them apart.
+    #
+    # Deliberately a SUMMARY, not the raw file: these artifacts are large,
+    # and dumping one through an HTTP response is how you turn a diagnostic
+    # into an outage.
+    from syndicate.features.mlb.sources import season_betting_card_day_path
+
+    date_str = str(request.args.get("date") or "").strip()
+    if not date_str:
+        return jsonify({"ok": False, "error": "date=YYYY-MM-DD is required."})
+    profile = str(request.args.get("profile") or "retuned").strip() or "retuned"
+    try:
+        season = int(date_str[:4])
+    except ValueError:
+        return jsonify({"ok": False, "error": f"could not parse a season from date={date_str!r}"})
+
+    path = season_betting_card_day_path(season, date_str, profile=profile)
+    payload: dict[str, Any] = {
+        "ok": True,
+        "date": date_str,
+        "season": season,
+        "profile": profile,
+        "path": str(path),
+        "exists": path.exists(),
+    }
+    if not path.exists():
+        payload["verdict"] = "artifact_missing"
+        return jsonify(payload)
+
+    try:
+        payload["size_bytes"] = path.stat().st_size
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        payload["ok"] = False
+        payload["error"] = f"{type(exc).__name__}: {exc}"
+        return jsonify(payload)
+
+    if not isinstance(parsed, dict):
+        payload["verdict"] = "artifact_not_an_object"
+        return jsonify(payload)
+
+    row_fields = ("settled_rows", "playable_settled_rows", "all_settled_rows")
+    payload["top_level_keys"] = sorted(parsed.keys())
+    payload["has_results_block"] = isinstance(parsed.get("results"), dict)
+    games = parsed.get("games") if isinstance(parsed.get("games"), dict) else {}
+    payload["games_count"] = len(games)
+
+    totals = {field: 0 for field in row_fields}
+    games_with_any_rows = 0
+    sample_game: dict[str, Any] | None = None
+    sample_row: dict[str, Any] | None = None
+    for game_pk, game_payload in list(games.items()):
+        if not isinstance(game_payload, dict):
+            continue
+        per_game = {field: len(game_payload.get(field) or []) if isinstance(game_payload.get(field), list) else 0 for field in row_fields}
+        for field, count in per_game.items():
+            totals[field] += count
+        if any(per_game.values()):
+            games_with_any_rows += 1
+            if sample_row is None:
+                for field in row_fields:
+                    rows = game_payload.get(field)
+                    if isinstance(rows, list) and rows and isinstance(rows[0], dict):
+                        sample_row = {k: rows[0].get(k) for k in ("market", "selection", "result", "actual", "market_line", "odds", "profit_u", "stake_u")}
+                        break
+        if sample_game is None:
+            sample_game = {"game_pk": str(game_pk), "keys": sorted(game_payload.keys())[:25], "row_counts": per_game}
+
+    payload["row_totals"] = totals
+    payload["games_with_any_rows"] = games_with_any_rows
+    payload["sample_game"] = sample_game
+    payload["sample_row"] = sample_row
+
+    # The whole point of the endpoint: name which of the two failures it is.
+    if not games:
+        payload["verdict"] = "games_empty -- day artifact exists but was never populated with games"
+    elif sum(totals.values()) == 0:
+        payload["verdict"] = "games_present_but_ungraded -- games exist, no settled-row fields populated"
+    else:
+        payload["verdict"] = "graded_rows_present -- grading works for this date; look downstream"
+    return jsonify(payload)
+
+
 @ops_bp.get("/api/ops/keyvalue/usage")
 def api_ops_keyvalue_usage() -> Any:
     # Read-only. Estimated memory grouped by key bucket, plus the largest
