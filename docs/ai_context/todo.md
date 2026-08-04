@@ -4,6 +4,39 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
+### PLAN 2026-08-03 -- Learning loop (accuracy over time), all sports: staged plan written
+
+`docs/reports/syndicate_learning_loop_plan_2026_08_03.md` -- audit of every
+mechanism by which a sport gets more accurate over time (sim/model AND
+betting), plus a six-stage plan to make it best in class. No code changed;
+this is the plan doc only.
+
+Headline: exactly ONE closed automatic learning loop exists repo-wide
+(basketball props 7-day rolling bias, `basketball_props_calibration.py`).
+Layer 2's outcome loop is fully wired but carries zero records in prod (see
+"OPEN 2026-08-04 (2)" below), so `reliability_multiplier` is 1.0 everywhere,
+dynamic thresholds are inert and Kelly is pinned at the zero-evidence floor.
+Every other sport's sim runs on hand-authored frozen constants that nothing
+ever refits (NFL's profile is all 1.0 multipliers by construction; hockeysim's
+Phase 3b calibrated deltas were computed and never applied).
+
+New findings not previously recorded here, worth acting on independently:
+- **Settlement never uses the real close.** `odds_refresh_tracking.py:1385`
+  correctly stamps `closing_line`/`closing_price` at the pregame->live
+  transition, but `evaluation_settlement.py:362,367` settles with the graded
+  row's own price instead -- so `_price_clv` is ~0 by construction.
+- **The policy layer is deadlocked by design.** `select_policy` gives ties to
+  the incumbent, so a challenger never receives traffic, never accrues
+  samples, and can never be promoted. Needs an explicit exploration budget.
+  Also `promotion_score` includes average edge/confidence (inputs, not
+  results) and has no variance term.
+- **Soccer has no actuals builder at all** -- a calibrated 10-league engine
+  whose predictions can never be scored.
+
+Highest-leverage order: Stage 0 (get records into the ledger + join the real
+close) before the football openers, then the grading contract for the other
+six sports.
+
 ### OPEN 2026-08-04 -- Ask the Syndicate can't reach game-market picks (moneyline/spread/ATS), only props/steam
 
 Same session as the routing/prose fixes below (83a7c166 through

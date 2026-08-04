@@ -25,7 +25,9 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 from syndicate.features.shared.intelligence_evaluation import DEFAULT_LEDGER_PATH
+from syndicate.features.shared.intelligence_evaluation import _is_chunked_ledger_path
 from syndicate.features.shared.intelligence_evaluation import _ledger_chunk_path
+from syndicate.features.shared.intelligence_evaluation import _ledger_record_chunk_name
 from syndicate.features.shared.intelligence_evaluation import _record_sport
 from syndicate.features.shared.intelligence_evaluation import settle_result
 
@@ -77,6 +79,27 @@ def _read_chunk_records(chunk_path: Path) -> list[dict[str, Any]]:
         if isinstance(payload, dict):
             records.append(payload)
     return records
+
+
+def _read_ledger_records_for_date(target_ledger_path: Path, date_token: str) -> list[dict[str, Any]]:
+    """Read a date's ledger records, honouring the SAME chunked-vs-flat
+    decision the write side (`_append_evaluation_ledger_record` /
+    `_update_evaluation_ledger_record`) makes via `_is_chunked_ledger_path`.
+
+    Before this, this function always read via `_ledger_chunk_path`
+    regardless of path shape -- correct for the production default path
+    (which is always chunked), but silently wrong for any other path: a
+    custom `ledger_path=` writes FLAT (one file, no date split), so a
+    per-date chunk read against it always returns zero rows even when the
+    flat file holds real records for that date. That made every settlement
+    test/repro against a temp ledger vacuously pass (`todo.md` "OPEN
+    2026-08-04 (3)") and would silently break any deployment pointing at a
+    non-default ledger path.
+    """
+    if _is_chunked_ledger_path(target_ledger_path):
+        return _read_chunk_records(_ledger_chunk_path(target_ledger_path, date_token))
+    records = _read_chunk_records(target_ledger_path)
+    return [record for record in records if _ledger_record_chunk_name(record) == date_token]
 
 
 def _mlb_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
@@ -299,8 +322,7 @@ def settle_ledger_for_date(
         }
 
     target_ledger_path = Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH
-    chunk_path = _ledger_chunk_path(target_ledger_path, date_token)
-    records = _read_chunk_records(chunk_path)
+    records = _read_ledger_records_for_date(target_ledger_path, date_token)
 
     # Visibility-only counters (2026-08-03): "pending" below is necessarily
     # zero on a day this function has already fully settled, which reads
@@ -329,42 +351,101 @@ def settle_ledger_for_date(
     matched = 0
     settled = 0
     unmatched = 0
+    # Diagnostic breakdown (2026-08-04): "unmatched" alone conflates three
+    # structurally different failures -- an unsupported/missing sport label,
+    # a sport with zero graded rows for the date (games not yet finalized
+    # upstream), and a real key-mismatch inside match_graded_row. Production
+    # showed pending=35/matched=0/unmatched=35 with no way to tell which of
+    # the three that was, so this disambiguates it without needing a second
+    # deploy-and-wait cycle to find out. Bounded sample only -- never a full
+    # record dump.
+    unmatched_unsupported_sport = 0
+    unmatched_no_graded_rows = 0
+    unmatched_no_key_match = 0
+    unmatched_bad_result = 0
+    unmatched_samples: list[dict[str, Any]] = []
+    _MAX_SAMPLES = 5
+    # Shared across every settled record in this call so repeated closes for
+    # the same sport/shard don't each re-read the odds-history shard payload
+    # from disk -- same pattern (and same documented cost motivation) as the
+    # odds_payload_cache in recommendation_engine.filter_candidates/rank_recommendations.
+    odds_payload_cache: dict[tuple[str, str], dict[str, Any] | None] = {}
 
     for record in pending_records:
         record_sport = _record_sport(record) or sport_slug
         if not record_sport or record_sport not in _SUPPORTED_SPORTS:
             unmatched += 1
+            unmatched_unsupported_sport += 1
             continue
         if record_sport not in graded_rows_by_sport:
             graded_rows_by_sport[record_sport] = _graded_rows_for_date(record_sport, date_token)
         candidate_rows = graded_rows_by_sport[record_sport]
         if not candidate_rows:
             unmatched += 1
+            unmatched_no_graded_rows += 1
             continue
         row = match_graded_row(record, candidate_rows)
         if row is None:
             unmatched += 1
+            unmatched_no_key_match += 1
+            if len(unmatched_samples) < _MAX_SAMPLES:
+                recommendation = record.get("recommendation") if isinstance(record.get("recommendation"), Mapping) else {}
+                unmatched_samples.append(
+                    {
+                        "sport": record_sport,
+                        "reason": "no_key_match",
+                        "record_keys": sorted(_evaluation_record_keys(record)),
+                        "record_market_family": _market_family(recommendation.get("market") or recommendation.get("market_family")),
+                        "record_line": _record_line(record),
+                        "graded_rows_available": len(candidate_rows),
+                        "graded_row_market_families_sample": sorted({_market_family(row.get("market")) for row in candidate_rows[:25] if _market_family(row.get("market"))}),
+                    }
+                )
             continue
         matched += 1
         result = str(row.get("result") or "").strip().lower()
         if result not in {"win", "loss", "push", "void"}:
             unmatched += 1
+            unmatched_bad_result += 1
             matched -= 1
             continue
         if dry_run:
             settled += 1
             continue
         recommendation = record.get("recommendation") if isinstance(record.get("recommendation"), Mapping) else {}
+        # The graded row's own price is a fallback, not the market close --
+        # it's whatever the sport's own accuracy module happened to record,
+        # which is frequently the SAME price the bet was taken at (since both
+        # are commonly sourced from the same pregame snapshot), making price
+        # CLV silently ~0 for nearly every settled row (plan doc "P6",
+        # 2026-08-03). odds_refresh_tracking.py stamps a real closing_line/
+        # closing_price on market_state at the actual pregame->live
+        # transition -- prefer that when it's available. Only trust it when
+        # build_market_history_view found real history (history_points > 0);
+        # its own no-history fallback returns the RECOMMENDATION's own
+        # opening line/price relabeled as "closing", which would make CLV
+        # compute as a fake zero instead of correctly staying unmeasured.
+        closing_line = row.get("line")
+        closing_price = row.get("closing_price") or row.get("price") or row.get("odds")
+        try:
+            from syndicate.features.shared.odds_lifecycle import build_market_history_view
+
+            market_history = build_market_history_view(recommendation, sport=record_sport, payload_cache=odds_payload_cache)
+            if int(market_history.get("history_points") or 0) > 0:
+                stamped_closing_price = market_history.get("closing_price")
+                stamped_closing_line = market_history.get("closing_line")
+                if stamped_closing_price is not None:
+                    closing_price = stamped_closing_price
+                if stamped_closing_line is not None:
+                    closing_line = stamped_closing_line
+        except Exception:
+            pass
         settle_result(
             record=record,
             result=result,
             pnl=_pnl_for_settlement(row, result),
-            closing_line=row.get("line"),
-            # The graded row's own price at settlement is the closest
-            # available stand-in for the market close; without it price CLV
-            # can never be computed for any settled bet, since nothing else
-            # in this path carries a closing price.
-            closing_price=row.get("closing_price") or row.get("price") or row.get("odds"),
+            closing_line=closing_line,
+            closing_price=closing_price,
             implied_probability=recommendation.get("model_probability") or record.get("implied_probability"),
             persist=True,
             ledger_path=target_ledger_path,
@@ -380,6 +461,12 @@ def settle_ledger_for_date(
         "settled": settled if not dry_run else 0,
         "would_settle": settled if dry_run else None,
         "unmatched": unmatched,
+        "unmatched_unsupported_sport": unmatched_unsupported_sport,
+        "unmatched_no_graded_rows": unmatched_no_graded_rows,
+        "unmatched_no_key_match": unmatched_no_key_match,
+        "unmatched_bad_result": unmatched_bad_result,
+        "unmatched_samples": unmatched_samples,
+        "graded_rows_available": {sport_key: len(rows) for sport_key, rows in graded_rows_by_sport.items()},
         "dry_run": dry_run,
         "total_ledger_records": len(records),
         "total_recommendation_records": len(recommendation_records),
@@ -417,6 +504,18 @@ def settle_ledger_for_dates(
             # them across sports/dates is correct.
             "total_recommendation_records": sum(int(r.get("total_recommendation_records") or 0) for r in results),
             "already_resolved_records": sum(int(r.get("already_resolved_records") or 0) for r in results),
+            "unmatched_unsupported_sport": sum(int(r.get("unmatched_unsupported_sport") or 0) for r in results),
+            "unmatched_no_graded_rows": sum(int(r.get("unmatched_no_graded_rows") or 0) for r in results),
+            "unmatched_no_key_match": sum(int(r.get("unmatched_no_key_match") or 0) for r in results),
+            "unmatched_bad_result": sum(int(r.get("unmatched_bad_result") or 0) for r in results),
+            # Bounded across the whole call, not per-date/sport, so this
+            # never grows with the number of (date, sport) pairs settled.
+            "unmatched_samples": [sample for r in results for sample in (r.get("unmatched_samples") or [])][:5],
+            "graded_rows_available": {
+                f"{r.get('sport')}:{r.get('date')}": r.get("graded_rows_available")
+                for r in results
+                if r.get("graded_rows_available")
+            },
         },
     }
 
