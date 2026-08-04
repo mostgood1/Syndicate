@@ -23,35 +23,43 @@ back, never contained a single moneyline/ATS/spread candidate --
 `steam`/`prop` only, 2-7 cards total, while the live board's real
 `#board-cards` grid (same moment) showed dozens across every market
 type (one screenshot this session showed "43 candidates" in the
-window label). `ask_the_syndicate.py`'s `read_latest_intelligence_state`
-reads `recommendations`, and `pipeline/intelligence_state.py:1422`
-(`slice_intelligence_board_state_for_request`) sets
-`response["recommendations"] = top_opportunities` -- traced this far
-before stopping: `_load_canonical_board_response` (which computes this
-with an explicit, per-request `limit`) is a no-op right now
-(`canonical_board_state_enabled()` is false, confirmed elsewhere in
-this file), so the LIVE path is
-`read_latest_intelligence_board_snapshot_response`, which reads a
-single persisted `board_snapshot.json` -- one shared "latest" slot, not
-scoped per caller/limit. Working theory, NOT yet confirmed: whichever
-request last got cached into that slot determines what candidate pool
-every OTHER caller (including Ask, on a totally unrelated request)
-inherits, and if that request carried a small `limit` (or a market-type
-filter), game-market picks fall out of the pool for everyone until a
-different request happens to repopulate it. Did not chase further --
-this touches the shared board-state cache other real consumers (the
-board itself, portfolio) depend on, and changing it deserves proper
-investigation, not a guess at this hour.
+window label).
 
-**Next step:** confirm the theory first (read `board_snapshot.json`'s
-actual persisted content directly -- either via a new `/api/ops/`
-diagnostic mirroring `evaluation-settlement/status`'s pattern, or by
-tracing exactly which request last wrote it) before touching the cache
-itself. If confirmed, the fix is probably widening what gets persisted
-to that slot (all candidate types, not whatever the last caller
-happened to request) rather than anything in `ask_the_syndicate*.py` --
-the routing/prose fixes below are already correct for whatever pool
-they're given.
+**The "shared narrow-limit slot" theory below is REFUTED -- confirmed
+directly, not re-guessed.** Built `/api/ops/board-snapshot/inspect`
+(`e1c64f24`) to read the real persisted `board_snapshot.json` instead of
+inferring from `/api/syndicate/query` responses. Result: `recorded_limit:
+"all"`, `recorded_sport: "all"` -- the request that populated the
+"latest" slot was NOT narrowed by limit or sport. Yet its
+`recommendations` (5 items) were 100% `steam` type -- zero `prop`, zero
+game-market -- at the exact moment player-prop candidates (Ty France,
+Fernando Tatis Jr., ...) were being successfully matched by
+`/api/syndicate/query` in the SAME few minutes. So the pool isn't
+narrowed by a caller's limit; it's that the persisted "latest" snapshot's
+own composition swings dramatically between refresh cycles (steam-only
+one moment, includes real props minutes later) and evidently never
+includes game-market candidates in any of the ~6 samples pulled this
+session, unlike the live page's own `#board-cards`, which shows them
+directly. Whether the live page reads this same cached snapshot or a
+different, fresher path was NOT determined -- that's the actual open
+question now, not the limit theory.
+
+**Next step:** don't touch the shared board-state cache without
+answering that specific question first: does `intelligence.html`'s
+`#board-cards` rendering call the same
+`read_latest_intelligence_board_snapshot_response`/`board_snapshot.json`
+path Ask reads, or a different one (e.g. a direct client-side fetch to
+`/api/intelligence/query` that recomputes fresh)? If different, the fix
+is making Ask read whatever the live page reads, not widening the
+snapshot cache. If the same, then either game-market candidates are
+being filtered out specifically during `_compute_board_publication_response`'s
+`_build_candidate_pool` step (worth an ops diagnostic on THAT, not
+another guess), or the persisted snapshot really is that volatile and
+the fix is elsewhere (freshness/cadence). `/api/ops/board-snapshot/inspect`
+is already deployed and live -- pull it a few more times across
+different moments (including once during a busier daytime slate) before
+forming a new theory; the 04:00 UTC sample this session pulled from is a
+very thin, late-night board and may not be representative.
 
 Last reconciled: 2026-08-03 (see "Reconciliation 2026-08-03 (Settlement
 item 3b root-caused: canonical board-state path never writes the
