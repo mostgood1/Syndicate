@@ -363,6 +363,22 @@ def api_ops_mlb_betting_card_day() -> Any:
     row_fields = ("settled_rows", "playable_settled_rows", "all_settled_rows")
     payload["top_level_keys"] = sorted(parsed.keys())
     payload["has_results_block"] = isinstance(parsed.get("results"), dict)
+    # `results`/`selected_counts` come straight off settled_card in
+    # _static_day_payload, while `games` ALSO requires each row to carry a
+    # positive game_pk (_season_betting_games_payload). So populated results
+    # + empty games means rows exist but have no game_pk (fix the game_pk
+    # join), whereas empty results + empty games means settled_card itself
+    # is empty (fix is upstream, in the card/settlement step). Those are
+    # different bugs, and "has_results_block" alone cannot tell them apart
+    # because an empty dict is still a dict.
+    for block in ("results", "playable_results", "all_results", "selected_counts", "summary"):
+        value = parsed.get(block)
+        if isinstance(value, dict):
+            payload[f"{block}_keys"] = sorted(value.keys())[:12]
+            payload[f"{block}_is_empty"] = not value
+            payload[f"{block}_sample"] = json.dumps({k: value[k] for k in sorted(value.keys())[:4]})[:220]
+        else:
+            payload[f"{block}_is_empty"] = True
     games = parsed.get("games") if isinstance(parsed.get("games"), dict) else {}
     payload["games_count"] = len(games)
 
