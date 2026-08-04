@@ -461,6 +461,38 @@ def api_ops_mlb_betting_card_day() -> Any:
                                 value = report.get(games_key)
                                 if isinstance(value, (list, dict)):
                                     batch["sim_vs_actual"][f"{games_key}_count"] = len(value)
+                            # 633KB holding 2 games is the last unexplained
+                            # number in the chain. Either the report covers
+                            # only a slice of the slate, or `games` is not the
+                            # per-game map its name implies -- the shape and a
+                            # sample entry's keys tell them apart immediately.
+                            # failures_n is checked in the same pass because a
+                            # broad sim-failure count would explain a thin
+                            # report outright.
+                            games_value = report.get("games")
+                            batch["sim_vs_actual"]["games_type"] = type(games_value).__name__
+                            if isinstance(games_value, dict):
+                                sample_keys = list(games_value.keys())[:6]
+                                batch["sim_vs_actual"]["games_keys_sample"] = [str(k) for k in sample_keys]
+                                if sample_keys:
+                                    first = games_value.get(sample_keys[0])
+                                    if isinstance(first, dict):
+                                        batch["sim_vs_actual"]["games_entry_keys"] = sorted(first.keys())[:20]
+                            elif isinstance(games_value, list) and games_value:
+                                first = games_value[0]
+                                if isinstance(first, dict):
+                                    batch["sim_vs_actual"]["games_entry_keys"] = sorted(first.keys())[:20]
+                            for scalar_key in ("failures_n", "failures", "n_games", "games_n", "requested_n", "completed_n", "skipped_n", "date", "season"):
+                                scalar = report.get(scalar_key)
+                                if isinstance(scalar, (int, float, str)):
+                                    batch["sim_vs_actual"][scalar_key] = scalar
+                                elif isinstance(scalar, (list, dict)):
+                                    batch["sim_vs_actual"][f"{scalar_key}_count"] = len(scalar)
+                            for block_key in ("meta", "assessment", "summary"):
+                                block = report.get(block_key)
+                                if isinstance(block, dict):
+                                    batch["sim_vs_actual"][f"{block_key}_keys"] = sorted(block.keys())[:15]
+                                    batch["sim_vs_actual"][f"{block_key}_sample"] = json.dumps({k: block[k] for k in sorted(block.keys())[:6]}, default=str)[:300]
                     except Exception as exc:
                         batch["sim_vs_actual"]["parse_error"] = f"{type(exc).__name__}: {exc}"
                     break
