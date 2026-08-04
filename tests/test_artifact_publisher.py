@@ -1408,3 +1408,102 @@ class MatchupCoverageDiagnosticHonestyTests(unittest.TestCase):
             payload = self._get(tmp_dir, "")
         self.assertEqual(sorted(payload["by_sport"]), ["mlb", "wnba"])
         self.assertIsNone(payload["requested_date"])
+
+
+class CandidateTraceSportScopingTests(unittest.TestCase):
+    """?sport= reached only the per-sport loop at the bottom of the response.
+
+    preferences was built with a hardcoded sport="all", and fallback_merge_trace
+    -- the stage-by-stage collect -> score -> filter drop-off, i.e. the numbers
+    a reader looks at FIRST -- was computed over every sport in the overview.
+    Fetched with ?sport=mlb it still described the whole board, so "collect=412,
+    filtered=0" read as MLB's drop-off when it was not. Same class of bug as
+    matchup-coverage's ignored date param, fixed the same day.
+    """
+
+    def setUp(self) -> None:
+        app = create_app()
+        app.testing = True
+        self.client = app.test_client()
+
+    def _overview(self):
+        return [
+            {"slug": "mlb", "dashboard_games": [{"game_id": 1}]},
+            {"slug": "wnba", "dashboard_games": [{"game_id": 2}]},
+        ]
+
+    def _trace(self, query: str) -> dict:
+        import syndicate.blueprints.ops as ops_module
+
+        seen: dict = {}
+
+        def fake_collect(overview_arg, preferences_arg, _extra=None):
+            seen["collect_slugs"] = [row.get("slug") for row in overview_arg]
+            seen["preferences_sports"] = preferences_arg.get("requested_sports") if isinstance(preferences_arg, dict) else None
+            return []
+
+        from pipeline.intelligence_state import _INTELLIGENCE_STATE_SERVICE as service
+
+        # _build_candidate_pool is the real, expensive board build -- it runs
+        # collect/score/filter over every sport and will blow past any sane
+        # test timeout. This endpoint's pool_wide sections are not what these
+        # tests are about.
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
+            "syndicate.features.intelligence.build_intelligence_overview", return_value=self._overview()
+        ), patch("syndicate.features.intelligence.collect_candidates", side_effect=fake_collect), patch(
+            "syndicate.features.intelligence._collect_candidates", return_value=[]
+        ), patch.object(
+            service, "_available_sport_manifests", return_value={}
+        ), patch.object(
+            service, "_source_state_fingerprint", return_value="fp"
+        ), patch.object(
+            service, "_build_candidate_pool", return_value={"candidate_count": 0}
+        ), patch.object(
+            service, "_candidate_pool_key", return_value="k"
+        ):
+            response = self.client.get(
+                f"/api/ops/intelligence/candidate-trace{query}",
+                headers={"Authorization": "Bearer secret-token"},
+            )
+        self.assertEqual(response.status_code, 200, response.get_data(as_text=True)[:400])
+        payload = response.get_json()
+        payload["_seen"] = seen
+        return payload
+
+    def test_scoped_request_reports_the_requested_sport(self) -> None:
+        payload = self._trace("?sport=mlb&date=2026-08-04")
+        self.assertEqual(payload["requested_sport"], "mlb")
+        self.assertTrue(payload["requested_sport_present"])
+        self.assertEqual([row["slug"] for row in payload["sports"]], ["mlb"])
+        self.assertEqual(payload["fallback_merge_trace"].get("0_scope"), "mlb")
+
+    def test_scoped_request_narrows_the_preferences_and_the_merge_trace_input(self) -> None:
+        # The actual defect: these two used every sport regardless.
+        payload = self._trace("?sport=mlb&date=2026-08-04")
+        # _query_preferences lands an explicit sport in requested_sports;
+        # unscoped leaves it empty, meaning "every sport".
+        self.assertEqual(payload["preferences"]["requested_sports"], ["mlb"])
+        self.assertEqual(payload["_seen"].get("collect_slugs"), ["mlb"])
+
+    def test_unscoped_request_still_covers_every_sport(self) -> None:
+        payload = self._trace("?date=2026-08-04")
+        self.assertIsNone(payload["requested_sport"])
+        self.assertIsNone(payload["requested_sport_present"])
+        self.assertEqual(payload["preferences"]["requested_sports"], [])
+        self.assertEqual(sorted(row["slug"] for row in payload["sports"]), ["mlb", "wnba"])
+        self.assertEqual(payload["fallback_merge_trace"].get("0_scope"), "all_sports")
+
+    def test_a_sport_not_in_the_overview_is_stated_not_implied_by_an_empty_list(self) -> None:
+        payload = self._trace("?sport=nfl&date=2026-08-04")
+        self.assertFalse(payload["requested_sport_present"])
+        self.assertEqual(payload["sports"], [])
+        self.assertEqual(sorted(payload["sports_in_overview"]), ["mlb", "wnba"])
+
+    def test_pool_wide_sections_are_labelled_as_pool_wide(self) -> None:
+        # _build_candidate_pool takes no sport argument by design, so these
+        # stay whole-board even on a scoped request and must say so.
+        payload = self._trace("?sport=mlb&date=2026-08-04")
+        self.assertEqual(
+            payload["pool_wide_sections"],
+            ["manifest_check", "full_pool_check", "app_context_pool_check"],
+        )

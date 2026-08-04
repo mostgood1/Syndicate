@@ -1749,10 +1749,24 @@ def api_ops_intelligence_candidate_trace() -> Any:
     except Exception as exc:
         manifest_check["error"] = f"{type(exc).__name__}: {exc}"
 
+    # 2026-08-04: ?sport= used to reach ONLY the per-sport loop at the bottom.
+    # Everything above it -- these preferences (hardcoded sport="all") and the
+    # fallback_merge_trace built from them -- silently described every sport
+    # while sitting at the top of a response fetched with ?sport=mlb. Those
+    # are the numbers a reader looks at first, so "collect=412, filtered=0"
+    # got read as MLB's drop-off when it was the whole board's. Same class of
+    # dishonesty as /api/ops/odds-history/matchup-coverage's date param, fixed
+    # the same day: scope what can be scoped, and label what genuinely cannot.
+    scoped_overview = [
+        sport_row
+        for sport_row in overview
+        if isinstance(sport_row, dict)
+        and (not sport_filter or str(sport_row.get("slug") or "").strip().lower() == sport_filter)
+    ]
     preferences = _query_preferences(
         "top edges today",
         mode="recommendation",
-        sport="all",
+        sport=sport_filter or "all",
         timing="all",
         include_props=True,
         include_games=True,
@@ -1773,18 +1787,23 @@ def api_ops_intelligence_candidate_trace() -> Any:
         from syndicate.features.shared.recommendation_engine import filter_candidates as _fc
         from syndicate.features.intelligence import _THIN_CANDIDATE_POOL_THRESHOLD as _thin_threshold
 
-        raw = _cc(overview, preferences, None)
+        fallback_merge_trace["0_scope"] = sport_filter or "all_sports"
+        raw = _cc(scoped_overview, preferences, None)
         fallback_merge_trace["1_collect_candidates_count"] = len(raw)
         if raw:
             tracked = _trf()
             advanced_by_sport = {
                 str(sport_row.get("slug") or "sport").strip().lower(): _airfs(sport_row, tracked)
-                for sport_row in overview
+                for sport_row in scoped_overview
                 if isinstance(sport_row, dict)
             }
             scored = _sc(raw, advanced_by_sport, preferences, pipeline="ops_trace")
             fallback_merge_trace["2_scored_count"] = len(scored)
-            filtered = _fc(scored, sport=None)
+            # sport=sport_filter, not sport=None: filter_candidates' own
+            # sport argument is what the real pipeline varies, so a scoped
+            # trace has to vary it too or stage 3 is answering a different
+            # question than stages 1 and 2.
+            filtered = _fc(scored, sport=sport_filter)
             fallback_merge_trace["3_filter_candidates_count"] = len(filtered)
             fallback_merge_trace["4_thin_pool_threshold"] = _thin_threshold
             fallback_merge_trace["5_would_trigger_thin_merge"] = 0 < len(filtered) < _thin_threshold
@@ -1829,9 +1848,23 @@ def api_ops_intelligence_candidate_trace() -> Any:
     except Exception as exc:
         read_path_trace["error"] = f"{type(exc).__name__}: {exc}"
 
+    overview_slugs = [
+        str(sport_row.get("slug") or "").strip().lower() for sport_row in overview if isinstance(sport_row, dict)
+    ]
     result: dict[str, Any] = {
         "ok": True,
         "date": date,
+        "requested_sport": sport_filter,
+        # _build_candidate_pool takes no sport argument -- it builds the whole
+        # board's pool by design, and that IS what the background loop does.
+        # These three therefore stay pool-wide even when ?sport= is set, so
+        # they say so rather than letting a scoped request imply otherwise.
+        "pool_wide_sections": ["manifest_check", "full_pool_check", "app_context_pool_check"],
+        "sports_in_overview": overview_slugs,
+        # Explicit, because an out-of-season or misspelled sport otherwise
+        # returns a bare empty list that reads like "this sport produced no
+        # candidates" rather than "this sport was never in the overview".
+        "requested_sport_present": (sport_filter in overview_slugs) if sport_filter else None,
         "preferences": preferences,
         "manifest_check": manifest_check,
         "full_pool_check": full_pool_check,
@@ -1840,12 +1873,10 @@ def api_ops_intelligence_candidate_trace() -> Any:
         "read_path_trace": read_path_trace,
         "sports": [],
     }
-    for sport in overview:
+    for sport in scoped_overview:
         if not isinstance(sport, dict):
             continue
         slug = str(sport.get("slug") or "").strip().lower()
-        if sport_filter and slug != sport_filter:
-            continue
         dashboard_games = sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []
         sample_game = dashboard_games[0] if dashboard_games else None
         sample_game_summary = None
