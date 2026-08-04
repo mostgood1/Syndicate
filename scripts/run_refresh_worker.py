@@ -741,6 +741,34 @@ def _evaluation_settlement_interval_seconds() -> int:
     return max(1, value)
 
 
+def _evaluation_settlement_lookback_days() -> int:
+    """How many days back the settlement autorun sweeps.
+
+    Was hardcoded to (yesterday, today). That is only correct when grading
+    has always worked: any date whose graded rows appear LATER than two days
+    after the fact can never be settled, because the window has already moved
+    past it. Confirmed live 2026-08-04 -- grading had produced zero rows for
+    16 days, and when it was fixed, 14 dates (2026-07-20..2026-08-02) came
+    back graded while the autorun was still only looking at 08-03/08-04. The
+    ledger stayed 100% pending with matched=0 against rows that existed.
+
+    Default 21 rather than 14: from 2026-08-04 a 14-day window still missed
+    the two oldest graded dates (07-20, 07-21). 21 covers the whole observed
+    backfill with margin.
+
+    Re-sweeping settled dates is close to free: settle_ledger_for_date skips
+    records that already have a non-pending result (already_resolved_records),
+    so an old date costs one chunk read and no writes.
+    """
+    raw_value = str(os.environ.get("EVALUATION_SETTLEMENT_LOOKBACK_DAYS") or "").strip()
+    try:
+        value = int(raw_value or 21)
+    except ValueError:
+        value = 14
+    # Bounded so a typo cannot turn every cycle into a full-season scan.
+    return max(1, min(60, value))
+
+
 def _evaluation_settlement_autorun_status_path() -> Path:
     return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "evaluation_settlement_autorun_status.json"
 
@@ -764,8 +792,13 @@ def _launch_autorun_evaluation_settlement(
     from syndicate.features.shared.graded_outcomes import GRADED_OUTCOME_GRADERS
 
     today_date = central_today_iso()
-    yesterday_date = (date.fromisoformat(today_date) - timedelta(days=1)).isoformat()
-    target_dates = (yesterday_date, today_date)
+    lookback_days = _evaluation_settlement_lookback_days()
+    # Oldest first, so a backfill settles in chronological order and the
+    # status summary reads naturally.
+    target_dates = tuple(
+        (date.fromisoformat(today_date) - timedelta(days=offset)).isoformat()
+        for offset in range(lookback_days - 1, -1, -1)
+    )
     summaries: dict[str, Any] = {}
     error_text: str | None = None
     try:
