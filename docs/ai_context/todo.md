@@ -4,12 +4,77 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-### PLAN 2026-08-03 -- Learning loop (accuracy over time), all sports: staged plan written
+### IN PROGRESS 2026-08-04 -- Learning loop (accuracy over time), all sports: Stage 0 + Stage 1 shipped, working through Stages 2-5
 
 `docs/reports/syndicate_learning_loop_plan_2026_08_03.md` -- audit of every
 mechanism by which a sport gets more accurate over time (sim/model AND
-betting), plus a six-stage plan to make it best in class. No code changed;
-this is the plan doc only.
+betting), plus a six-stage plan to make it best in class.
+
+**Shipped and pushed to main (7e91b0f2, 4927dd06, 08ef37e1) -- NOT YET
+DEPLOYED.** Deploy has been blocked the whole session by an in-flight MLB
+sim (pid=1567, started 04:21:19Z) + an odds refresh (pid=2063) -- check
+`python scripts/check_deploy_safety.py` before deploying, this is real
+production work sitting undeployed.
+
+Stage 0 (`evaluation_settlement.py`):
+- Fixed `settle_ledger_for_date` always reading via the chunked path even
+  for a non-default `ledger_path` (which writes flat) -- added
+  `_read_ledger_records_for_date`, symmetric with the write side's
+  `_is_chunked_ledger_path` check. Confirmed via repro: a flat-file write
+  that previously read back 0 pending records now reads correctly.
+- Settlement now joins the REAL closing price/line
+  (`odds_refresh_tracking.py`'s pregame->live stamp, via
+  `build_market_history_view`) instead of the graded row's own price,
+  falling back to the old behavior only when no real market history exists
+  -- never fabricates a close from the recommendation's own opening price.
+- Split the single `unmatched` counter into
+  `unmatched_unsupported_sport/no_graded_rows/no_key_match/bad_result` +
+  a bounded sample of key-mismatch records, surfaced through the existing
+  `/api/ops/evaluation-settlement/status` keyvalue path (no new endpoint).
+- **Production state at investigation time (fresher than this doc's own
+  earlier "zero records" snapshot): `total_recommendation_records: 35`,
+  `matched: 0`, `unmatched: 35`, dates 2026-08-02/03.** So records ARE
+  being written now -- the live bug is 100% match failure, not zero
+  writes. The new diagnostics (once deployed) will show whether that's
+  `unmatched_no_graded_rows` (games not graded yet upstream) or
+  `unmatched_no_key_match` (a real matching bug) on the next autorun
+  cycle. **This is the single most important next step** -- read it
+  before doing anything else here.
+
+Stage 1 (`syndicate/features/shared/graded_outcomes.py`, new module):
+- One registry (`GRADED_OUTCOME_GRADERS`) replacing
+  `evaluation_settlement.py`'s hardcoded `_SUPPORTED_SPORTS = ("mlb",
+  "wnba")` with "has a registered adapter". mlb/wnba unchanged; nba/nhl
+  added (same `build_local_market_accuracy_payload` shape wnba already
+  used); nfl added (built from `schedule_{season}.csv` directly -- has
+  the real closing spread/total/moneyline + game date + final score all
+  keyed by game_id, verified sign convention against `nfl/cards.py`'s
+  "home -10.5" bet notation).
+- `syndicate/features/soccer/actuals.py` (new): soccer's first-ever
+  settlement grader -- moneyline (3-way)/total@2.5/BTTS from
+  `schedule_{season}.json`'s real scores (NOT `recommendations_{date}.json`,
+  which has a documented staleness bug). Spread deliberately not graded
+  yet (no per-match line source available locally). Soccer's own
+  10-league engine can now actually be scored for the first time.
+- NCAAB: `results_by_date_payload` turned out to already carry a fully
+  graded ladder (`ats_result`/`ou_result_full` pre-graded against
+  `spread_home`/`market_total`) -- the adapter only reshapes it.
+- `run_refresh_worker.py`'s settlement autorun now settles every
+  registered sport instead of the old `["mlb", "wnba"]` literal.
+- Only NCAAF remains a documented `[]`-stub: its performance log
+  (752 real graded games) has no date field and no game_id join to any
+  clean schedule file in this mirror (scattered timestamped snapshot
+  CSVs, no CFBD-id column). Needs its own investigation, likely via the
+  `cfbd_lines_wk*.json` files.
+- Full test coverage: `tests/test_graded_outcomes.py`,
+  `tests/test_soccer_actuals.py` -- NFL/NCAAB math verified against real
+  sign conventions and real production payload shapes, not just synthetic
+  fixtures.
+
+Stages 2-5 (scoring layer, calibration surface, versioned/refit
+profiles, policy exploration budget, model versioning/drift/accuracy
+gate) not yet started as of this checkpoint -- see the plan doc for the
+full breakdown. Resume there.
 
 Headline: exactly ONE closed automatic learning loop exists repo-wide
 (basketball props 7-day rolling bias, `basketball_props_calibration.py`).
