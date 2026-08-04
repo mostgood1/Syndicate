@@ -1150,10 +1150,36 @@ def _load_shard_existing_markets(*, source_root: Path, tracking_root: Path, slug
     return _odds_history_market_states(existing)
 
 
+def _row_h2h_matchup_label(row: Mapping[str, Any]) -> str | None:
+    # Diagnostic-only (2026-08-04): "away@home" label for a moneyline/h2h
+    # row, used to compare which games survive each stage of the sync
+    # pipeline. Reads the exact context fields _market_rows_from_mapping
+    # already propagates onto every row (home_team/away_team), so this
+    # never changes what the real pipeline sees -- it only labels it.
+    market = str(row.get("market") or row.get("market_type") or "").strip().lower()
+    if market not in {"h2h", "moneyline", "ml"}:
+        return None
+    home = str(row.get("home_team") or "").strip()
+    away = str(row.get("away_team") or "").strip()
+    if not home or not away:
+        return None
+    return f"{away}@{home}"
+
+
 def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: str) -> dict[str, Any]:
     slug = str(sport or "").strip().lower()
     tracking_root = source_root / "tracking"
     candidates = _odds_history_snapshot_paths(sport=slug, source_root=source_root, date_str=date_str)
+    # #150 diagnostic (2026-08-04): only 18/30 MLB teams got h2h odds-history
+    # captured on a 15-game day, and the captured stdout of the run that
+    # would explain it is too large for the ops log-read endpoint's 64KB
+    # tail to reach (todo.md "MLB odds-history: 18/30-team coverage gap").
+    # These three sets pin exactly which stage of the pipeline a matchup
+    # falls out at -- source extraction, the market_key/line gate, or the
+    # shard write -- instead of guessing from a truncated log again.
+    h2h_matchups_in_source: set[str] = set()
+    h2h_matchups_passed_gate: set[str] = set()
+    h2h_matchups_written: set[str] = set()
     _trace_log("before_sync_odds_history", sport=slug, date=date_str, candidates=[str(path) for path in candidates], candidate_count=len(candidates))
     if not candidates:
         return {
@@ -1231,11 +1257,16 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
         for row in rows:
             if not isinstance(row, Mapping):
                 continue
+            matchup_label = _row_h2h_matchup_label(row)
+            if matchup_label:
+                h2h_matchups_in_source.add(matchup_label)
             market_key = _odds_history_market_key(row)
             line_snapshot = _odds_history_line_snapshot(row)
             current_line = _primary_line_value(row)
             if not market_key or not line_snapshot or current_line is None:
                 continue
+            if matchup_label:
+                h2h_matchups_passed_gate.add(matchup_label)
             current_odds = _primary_odds_value(row)
             row_snapshot_ts = str(row.get("snapshot_ts") or row.get("retrieved_at") or row.get("retrievedAt") or row.get("fetched_at") or candidate_snapshot_ts).strip() or candidate_snapshot_ts
             dedupe_key = (market_key, current_line, current_odds, row_snapshot_ts)
@@ -1249,6 +1280,8 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             seen_market_keys = shard_seen_market_keys[shard_key]
             seen_live_market_keys = shard_seen_live_market_keys[shard_key]
             seen_market_keys.add(market_key)
+            if matchup_label:
+                h2h_matchups_written.add(matchup_label)
 
             market_state = markets.get(market_key)
             if not isinstance(market_state, dict):
@@ -1639,6 +1672,49 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
 
     primary_shard_key = next(iter(shard_results), None)
     primary = shard_results.get(primary_shard_key, {}) if primary_shard_key else {}
+    h2h_matchup_coverage = {
+        "in_source": sorted(h2h_matchups_in_source),
+        "passed_gate": sorted(h2h_matchups_passed_gate),
+        "written": sorted(h2h_matchups_written),
+        # The two diffs are the whole point: non-empty dropped_at_gate means
+        # the market_key/line_snapshot/current_line gate rejected a real
+        # row (missing/malformed fields for that specific matchup);
+        # non-empty dropped_after_gate means the row passed that gate but
+        # never reached seen_market_keys.add (should be structurally
+        # impossible today -- nothing continues between the two -- so a
+        # non-empty result here would itself be the finding).
+        "dropped_at_gate": sorted(h2h_matchups_in_source - h2h_matchups_passed_gate),
+        "dropped_after_gate": sorted(h2h_matchups_passed_gate - h2h_matchups_written),
+    }
+    if h2h_matchups_in_source:
+        _trace_log(
+            "odds_history_h2h_matchup_coverage",
+            sport=slug,
+            date=date_str,
+            in_source=len(h2h_matchups_in_source),
+            passed_gate=len(h2h_matchups_passed_gate),
+            written=len(h2h_matchups_written),
+            dropped_at_gate=h2h_matchup_coverage["dropped_at_gate"],
+            dropped_after_gate=h2h_matchup_coverage["dropped_after_gate"],
+        )
+        try:
+            from syndicate.features.shared.refresh_state_store import reports_root as _reports_root
+            from syndicate.features.shared.refresh_state_store import write_json_file as _write_status
+
+            status_path = _reports_root() / "refresh_status" / "latest" / "odds_history_h2h_matchup_coverage_status.json"
+            existing = {}
+            try:
+                from syndicate.features.shared.refresh_state_store import read_json_file as _read_status
+
+                existing = _read_status(status_path) or {}
+            except Exception:
+                existing = {}
+            if not isinstance(existing, dict):
+                existing = {}
+            existing[slug] = {"date": date_str, "updated_at": now, **h2h_matchup_coverage}
+            _write_status(status_path, existing)
+        except Exception as exc:
+            _trace_log("odds_history_h2h_matchup_coverage_status_write_failed", sport=slug, error=f"{type(exc).__name__}: {exc}")
     return {
         "ok": True,
         "skipped": False,
@@ -1652,6 +1728,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
         "entries_appended": int(entries_appended),
         "markets_tracked": sum(result["markets_tracked"] for result in shard_results.values()),
         "shards": shard_results,
+        "h2h_matchup_coverage": h2h_matchup_coverage if h2h_matchups_in_source else None,
     }
 
 

@@ -802,6 +802,58 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertNotIn(tomorrow_key, today_payload["markets"])
             self.assertNotIn(today_key, tomorrow_payload["markets"])
 
+    def test_h2h_matchup_coverage_pins_the_stage_a_matchup_drops_out_at(self) -> None:
+        # 2026-08-04 diagnostic added for todo.md's "MLB odds-history:
+        # 18/30-team coverage gap" -- a real matchup ("Away2 @ Home2") whose
+        # h2h row is emitted (home_team/away_team/market="h2h" all present)
+        # but whose only numeric-ish fields are non-numeric strings passes
+        # _odds_history_line_snapshot's presence-only check (used to decide
+        # whether to emit a row at all) but fails _primary_line_value's
+        # actual float conversion at the sync gate -- exactly the gap
+        # between "emitted" and "usable" this diagnostic exists to catch.
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False):
+            root = Path(tmpdir)
+            snapshot_root = root / "source_artifacts" / "data" / "daily" / "snapshots" / "2026-06-07"
+            snapshot_root.mkdir(parents=True)
+            (snapshot_root / "oddsapi_game_lines_2026_06_07.json").write_text(
+                json.dumps(
+                    {
+                        "retrieved_at": "2026-06-07T12:00:00Z",
+                        "games": [
+                            {
+                                "away_team": "Away",
+                                "home_team": "Home",
+                                "bookmaker": "draftkings",
+                                "markets": {"h2h": {"home_odds": "-140", "away_odds": "+120"}},
+                            },
+                            {
+                                "away_team": "Away2",
+                                "home_team": "Home2",
+                                "bookmaker": "draftkings",
+                                "markets": {"h2h": {"home_odds": "N/A", "away_odds": "N/A"}},
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = sync_post_refresh_tracking_for_source_root(sport="mlb", source_root=root, date_str="2026-06-07")
+
+            self.assertTrue(result["ok"])
+            coverage = result["artifacts"]["odds_history"]["h2h_matchup_coverage"]
+            self.assertIn("Away@Home", coverage["written"])
+            self.assertIn("Away2@Home2", coverage["in_source"])
+            self.assertNotIn("Away2@Home2", coverage["written"])
+            self.assertIn("Away2@Home2", coverage["dropped_at_gate"])
+            self.assertEqual(coverage["dropped_after_gate"], [])
+
+            status_path = root / "reports" / "refresh_status" / "latest" / "odds_history_h2h_matchup_coverage_status.json"
+            self.assertTrue(status_path.exists())
+            status_payload = json.loads(status_path.read_text(encoding="utf-8"))
+            self.assertIn("mlb", status_payload)
+            self.assertEqual(status_payload["mlb"]["dropped_at_gate"], ["Away2@Home2"])
+
     def test_sync_ncaab_tracking_writes_team_lines(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False):
             root = Path(tmpdir)

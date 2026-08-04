@@ -775,6 +775,22 @@ def api_ops_evaluation_settlement_status() -> Any:
     )
 
 
+@ops_bp.get("/api/ops/odds-history/matchup-coverage")
+def api_ops_odds_history_matchup_coverage() -> Any:
+    # Read-only. Diagnostic for todo.md's "MLB odds-history: 18/30-team
+    # coverage gap" -- _sync_odds_history_for_refresh (odds_refresh_tracking.py)
+    # only ever runs inside whichever service's odds-refresh subprocess is
+    # currently active (live-odds-worker's round-robin or refresh-worker's
+    # own run), and that subprocess's stdout is captured to a file the ops
+    # log-read endpoint truncates to its last 64KB -- too small to reach a
+    # busy run's MLB section. Keyvalue-backed like evaluation-settlement's
+    # status endpoint above, so this is readable from the web service
+    # regardless of which service actually wrote it or how large that
+    # service's own captured log got.
+    status_path = reports_root() / "refresh_status" / "latest" / "odds_history_h2h_matchup_coverage_status.json"
+    return jsonify({"ok": True, "by_sport": read_json_file(status_path) or {}})
+
+
 @ops_bp.post("/api/ops/bootstrap/run")
 def api_ops_bootstrap_run() -> Any:
     # Calls _sync_bootstrap_roots directly (not main(), which only ever

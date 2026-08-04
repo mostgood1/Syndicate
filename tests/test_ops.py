@@ -394,6 +394,66 @@ class OpsRefreshApiTests(unittest.TestCase):
         payload = response.get_json()
         self.assertEqual(payload["board_state_ledger_recorded_fingerprints"], {"2026-08-03": "fp-abc123"})
 
+    def test_odds_history_matchup_coverage_requires_admin_token(self) -> None:
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
+            response = self.client.get("/api/ops/odds-history/matchup-coverage")
+
+        self.assertEqual(response.status_code, 401)
+        self.assertFalse(response.get_json()["ok"])
+
+    def test_odds_history_matchup_coverage_reads_status_file(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            status_dir = reports_root / "refresh_status" / "latest"
+            status_dir.mkdir(parents=True, exist_ok=True)
+            (status_dir / "odds_history_h2h_matchup_coverage_status.json").write_text(
+                json.dumps(
+                    {
+                        "mlb": {
+                            "date": "2026-08-04",
+                            "updated_at": "2026-08-04T15:26:00Z",
+                            "in_source": ["Away@Home", "Away2@Home2"],
+                            "passed_gate": ["Away@Home"],
+                            "written": ["Away@Home"],
+                            "dropped_at_gate": ["Away2@Home2"],
+                            "dropped_after_gate": [],
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch.dict(
+                os.environ,
+                {"ADMIN_TOKEN": "secret-token", "SYNDICATE_REPORTS_ROOT": str(reports_root)},
+                clear=False,
+            ):
+                response = self.client.get(
+                    "/api/ops/odds-history/matchup-coverage",
+                    headers={"X-Admin-Token": "secret-token"},
+                )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["by_sport"]["mlb"]["dropped_at_gate"], ["Away2@Home2"])
+
+    def test_odds_history_matchup_coverage_empty_when_no_status_file(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            with patch.dict(
+                os.environ,
+                {"ADMIN_TOKEN": "secret-token", "SYNDICATE_REPORTS_ROOT": str(reports_root)},
+                clear=False,
+            ):
+                response = self.client.get(
+                    "/api/ops/odds-history/matchup-coverage",
+                    headers={"X-Admin-Token": "secret-token"},
+                )
+
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["by_sport"], {})
+
     def test_force_mlb_resim_requires_game_pks(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
             response = self.client.post(
