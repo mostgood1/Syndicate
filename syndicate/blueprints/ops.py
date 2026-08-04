@@ -495,7 +495,25 @@ def api_ops_mlb_betting_card_day() -> Any:
                             # grading empty".
                             meta_block = report.get("meta")
                             if isinstance(meta_block, dict):
-                                for meta_key in ("skipped_games", "jobs", "sims_per_game", "prop_lines_source", "date", "season"):
+                                # source_sim_dir is what reconcile actually
+                                # READ. sims-list reports a different root
+                                # (source_artifacts), so the two can disagree
+                                # -- comparing the dir's real file count
+                                # against games_count says whether the input
+                                # was thin or the tool dropped games.
+                                sim_dir_text = str(meta_block.get("source_sim_dir") or "").strip()
+                                if sim_dir_text:
+                                    batch["sim_vs_actual"]["meta_source_sim_dir"] = sim_dir_text
+                                    try:
+                                        sim_dir = Path(sim_dir_text)
+                                        batch["sim_vs_actual"]["source_sim_dir_exists"] = sim_dir.is_dir()
+                                        if sim_dir.is_dir():
+                                            sim_files = sorted(p.name for p in sim_dir.iterdir() if p.is_file())
+                                            batch["sim_vs_actual"]["source_sim_dir_file_count"] = len(sim_files)
+                                            batch["sim_vs_actual"]["source_sim_dir_sample"] = sim_files[:8]
+                                    except Exception as exc:
+                                        batch["sim_vs_actual"]["source_sim_dir_error"] = f"{type(exc).__name__}: {exc}"
+                                for meta_key in ("skipped_games", "jobs", "sims_per_game", "prop_lines_source", "date", "season", "generated_at", "tool", "use_raw"):
                                     meta_value = meta_block.get(meta_key)
                                     if isinstance(meta_value, (list, dict)):
                                         batch["sim_vs_actual"][f"meta_{meta_key}_count"] = len(meta_value)
