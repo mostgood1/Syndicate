@@ -301,6 +301,53 @@ class AskTheSyndicateApiTests(unittest.TestCase):
             "The model lands on the over side in 54.5% of sims, while the market is pricing it closer to 10.5%.",
         )
 
+    def test_ask_about_a_game_market_pick_does_not_surface_the_internal_placeholder(self) -> None:
+        # Found live 2026-08-04 verifying game-market picks (moneyline/ATS/
+        # totals): several of these returned real answers (routing/prose
+        # fixes above both worked) but the "prose" was an internal
+        # placeholder -- "oddsapi_consensus market snapshot Sim: oddsapi_consensus
+        # market snapshot" -- not real analysis. Traced to
+        # syndicate/blueprints/home.py's _append_game_bet_candidate: some
+        # game-market candidates' "detail" is built from game.get("summary"),
+        # which carries that literal placeholder (confirmed by
+        # test_home.py) when there's no real sim summary yet, doubled by
+        # _game_sim_vs_line_reasoning's own "Sim: {main}" echoing the same
+        # placeholder. This must not surface as if it were real analysis --
+        # the client's numeric-only fallback (model/market/edge/EV) is the
+        # honest answer when there's nothing better.
+        app = Flask(__name__)
+        app.register_blueprint(ask_the_syndicate_bp)
+
+        fake_result = {
+            "query_type": "player_analysis",
+            "recommendations": [
+                {
+                    "selection": "KC Home ML",
+                    "model_probability": 0.55,
+                    "market_probability": 0.50,
+                    "edge": 0.05,
+                    "expected_value": 0.1,
+                    "detail": "oddsapi_consensus market snapshot Sim: oddsapi_consensus market snapshot",
+                }
+            ],
+            "readiness_gate": {"ok": True},
+            "local_only": True,
+        }
+
+        with patch("syndicate.blueprints.ask_the_syndicate.read_latest_intelligence_state", return_value=dict(fake_result)):
+            response = app.test_client().post(
+                "/api/syndicate/query",
+                json={
+                    "question": "What's the case for and against KC Home ML?",
+                    "context": {"sport": "mlb", "selection": "KC Home ML", "candidate_type": "game"},
+                },
+            )
+
+        payload = response.get_json()
+        self.assertEqual(payload["schema_type"], "bet_analysis")
+        self.assertNotIn("oddsapi_consensus", str(payload["schema"]["recommendation"] or ""))
+        self.assertNotIn("oddsapi_consensus", str(payload["schema"]["explanation"]["summary"] or ""))
+
     def test_query_route_returns_matchup_schema(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(ask_the_syndicate_bp)

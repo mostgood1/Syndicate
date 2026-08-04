@@ -74,6 +74,29 @@ def _to_pct(value: Any) -> float | None:
     return round(numeric, 2)
 
 
+# Found live 2026-08-04 verifying game-market picks (moneyline/ATS/totals):
+# some of these candidates' "detail" is built from game.get("summary")
+# (syndicate/blueprints/home.py's _append_game_bet_candidate), which is an
+# internal placeholder value ("oddsapi_consensus market snapshot", confirmed
+# by test_home.py) meaning "no real sim summary yet, just a market
+# snapshot" -- not human-readable prose. _game_sim_vs_line_reasoning's own
+# "Sim: {main}" half echoes the same placeholder when there's no real sim
+# value either, producing the observed doubled string ("oddsapi_consensus
+# market snapshot Sim: oddsapi_consensus market snapshot"). Player-prop
+# candidates never hit this path (their detail is real generated prose),
+# so this is scoped narrowly rather than touching home.py's shared
+# candidate builder, which many other consumers (the board itself
+# included) depend on.
+_LOW_INFORMATION_PROSE_PHRASES = ("oddsapi_consensus market snapshot", "no game-bet summary available")
+
+
+def _is_low_information_prose(value: str) -> bool:
+    normalized = value.strip().lower()
+    if not normalized:
+        return True
+    return any(phrase in normalized for phrase in _LOW_INFORMATION_PROSE_PHRASES) and len(normalized) < 120
+
+
 def _candidate_prose(item: dict[str, Any]) -> str | None:
     """The same per-pick prose the main board already renders under each
     card (intelligence.html's client-side pickReasoning, same field
@@ -90,7 +113,7 @@ def _candidate_prose(item: dict[str, Any]) -> str | None:
     """
     for field in ("detail", "writeup", "reasoning", "summary", "rationale", "why", "basketball_summary"):
         value = str(item.get(field) or "").strip()
-        if value:
+        if value and not _is_low_information_prose(value):
             return value
     return None
 
