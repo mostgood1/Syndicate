@@ -1,5 +1,62 @@
 # Syndicate TODO — canonical cross-session list
 
+### RESOLVED 2026-08-04 -- Board movement: all four bugs fixed, deployed, and verified live (MLB 0/354 -> 360/360)
+
+Closes the chain below. Deployed `32dd57c4` to all three services. **Verified
+against production, not inferred.**
+
+**Board, before -> after:** MLB `0/354` candidates carrying odds-history
+movement -> **`360/360`**. WNBA `102/138` -> `120/150`. (The MLB candidate mix
+shifted to live steam candidates as games started, so it is not a like-for-like
+comparison of the same rows -- the trace below is the direct proof.)
+
+**Bug A verified by the new `candidate_files` trace on refresh-worker:**
+```
+22:24:14  shard=2026-08-04  entries=611     <- before
+22:28:13  shard=2026-08-04  entries=3520    <- after
+  reports/odds_control_plane/.../2026-08-04.json  mtime=04:16Z   1,179,157 bytes  <- stale, was winning on precedence
+  mlb_source/artifacts/.../2026-08-04.json        mtime=22:23Z  30,720,512 bytes  <- now selected (newest)
+  mlb_source/tracking/.../2026-08-04.json         mtime=22:15Z  19,798,176 bytes
+```
+An 18-hour-old 1.1MB copy with 611 markets was shadowing a fresh 30MB copy with
+3,520. Precedence alone did that; nothing was broken except the ordering rule.
+
+**Bug B verified:** the 2026-08-04 MLB shard went from **9 games to all 15**
+(3,517 markets), including SD@AZ and DET@SEA -- which had previously been in
+NEITHER shard and were listed as unexplained. They were simply the two latest
+starts (9:10pm and 9:40pm Central): the UTC shard key filed them under 08-05,
+and the 08-05 shard had been written by an earlier look-ahead cycle before
+their odds were posted, so they fell between the two. Same root cause, no
+separate bug. `matchup-coverage` now reports in_source=15, passed_gate=15,
+written=15, nothing dropped.
+
+**Note on the size figure:** the artifacts shard measured **30.7MB** by 22:23Z,
+having been 18.9MB an hour earlier. So it is now well past the export
+endpoint's 24MB whole-response budget on its own -- the streamed transport was
+not a theoretical need. (The ~51MB in `95c33287`'s message was the repo's
+2026-07-28 measurement, not that moment's file.)
+
+**Diagnostic honesty fix (`32dd57c4`):** `/api/ops/odds-history/matchup-coverage`
+accepted `?sport=` and `?date=` and honoured neither -- asked for 2026-01-15 it
+answered 2026-08-04 just as confidently, and asked for 08-04 mid-investigation
+it answered 08-05, which cost real time. The record is genuinely
+last-write-only, so the response now carries `requested_date`,
+`reported_dates` and `matches_requested_date` rather than pretending, and
+`?sport=` filters.
+
+**Deploy sequencing actually used:** web first (it serves the stream endpoint
+the worker calls), then the workers. refresh-worker was deliberately held ~15
+minutes while a `tip_off_window` MLB sim finished rather than killing it;
+`scripts/check_deploy_safety.py` was the gate each round. Worth repeating: its
+"NOT CLEAR" is service-agnostic, so read WHICH service the in-flight work is
+on -- twice here the blocker was on a service that was not being deployed.
+
+**Still open, unchanged by this work:** 6 pre-existing failures in
+`tests/test_intelligence_state.py` (confirmed against a stashed baseline,
+unrelated), and `/api/ops/intelligence/candidate-trace` still ignores its
+`sport` param -- the same class of bug as the coverage endpoint just fixed, and
+now the last known instance.
+
 ### OPEN 2026-08-04 (deployed, board still zero) -- odds-history: transport FIXED, then two more real bugs behind it
 
 Follow-on from the streamed-transport entry below. Deployed `49442bed` to web
