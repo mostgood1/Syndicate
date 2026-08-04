@@ -23,6 +23,7 @@ from statistics import mean
 from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared.artifact_manifests import load_artifact_manifests
+from syndicate.features.shared.model_scoring import binary_calibration_metrics
 from syndicate.features.shared.odds_lifecycle import market_feature_summary
 from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
 from syndicate.features.shared.source_roots import repo_root_from
@@ -1939,12 +1940,140 @@ def build_intelligence_evaluation_bundle(*, query: Any, response: Any, persist: 
     }
 
 
+# ---------------------------------------------------------------------------
+# Segmented reliability surface (learning-loop plan Stage 2). Not yet wired
+# into the live ranker -- build_reliability_profile above stays exactly as
+# it is and remains what filter_candidates/rank_recommendations consume, so
+# this is purely additive. build_reliability_profile collapses calibration,
+# win rate and ROI into ONE scalar per (sport[, market]) with a hard
+# +/-22% band -- correct as a coarse floor, but it can't tell "MLB props
+# are well-calibrated but MLB spreads are not" apart, and a single low- or
+# high-confidence outlier bucket gets averaged away with everything else.
+# This adds a real (sport, market_family, confidence_tier) segmentation
+# with hierarchical empirical-Bayes shrinkage -- a thin segment's stat is
+# pulled toward its parent (drop confidence_tier, then drop market_family,
+# then the sport-wide/global rate) in proportion to how few settled
+# observations it has, so a segment with 3 settled bets doesn't swing on
+# noise while a segment with 300 is trusted almost entirely on its own
+# data. Ready for Stage 3 (calibration re-fit) and a future accuracy view
+# to read from once real settlement volume exists.
+# ---------------------------------------------------------------------------
+
+
+def _segment_key(record: Mapping[str, Any]) -> tuple[str | None, str | None, str]:
+    sport = _record_sport(record)
+    market_family = _record_market_family(record)
+    recommendation = _recommendation_source(record)
+    confidence_value = _coerce_probability(recommendation.get("confidence")) if recommendation.get("confidence") is not None else None
+    if confidence_value is None:
+        confidence_value = _coerce_probability(recommendation.get("model_probability"))
+    confidence_tier = _confidence_tier(confidence_value if confidence_value is not None else recommendation.get("confidence"))
+    return (sport, market_family, confidence_tier)
+
+
+def _segment_stats(records: list[dict[str, Any]]) -> dict[str, Any]:
+    settled_rows = _settled_records(records)
+    decisive_rows = [record for record in settled_rows if _result_label(record.get("result")) in {"win", "loss"}]
+    calibration_pairs: list[tuple[float, float]] = []
+    for record in decisive_rows:
+        implied_probability = _coerce_probability(record.get("implied_probability"))
+        if implied_probability is None:
+            continue
+        outcome = 1.0 if _result_label(record.get("result")) == "win" else 0.0
+        calibration_pairs.append((implied_probability, outcome))
+    calibration = binary_calibration_metrics(calibration_pairs)
+    return {
+        "sample_size": len(settled_rows),
+        "decisive_count": len(decisive_rows),
+        "win_rate": _win_rate(settled_rows),
+        "roi": _roi(settled_rows),
+        "clv_price": _price_clv(settled_rows),
+        "brier_score": calibration.get("brier_score"),
+        "log_loss": calibration.get("log_loss"),
+        "calibration_sample_size": calibration.get("sample_size"),
+    }
+
+
+def _shrink_stat(own_value: float | None, own_weight: float, parent_value: float | None, k: float) -> float | None:
+    if own_value is None:
+        return parent_value
+    if parent_value is None:
+        return own_value
+    denominator = own_weight + k
+    if denominator <= 0:
+        return parent_value
+    return (own_weight * own_value + k * parent_value) / denominator
+
+
+def _shrink_toward_parent(own: Mapping[str, Any], parent: Mapping[str, Any] | None, *, k: float) -> dict[str, Any]:
+    own_weight = float(own.get("decisive_count") or 0)
+    parent_stats = parent or {}
+    shrunk = dict(own)
+    for field in ("win_rate", "roi", "clv_price", "brier_score"):
+        shrunk[f"shrunk_{field}"] = _shrink_stat(own.get(field), own_weight, parent_stats.get(f"shrunk_{field}", parent_stats.get(field)), k)
+    # log_loss is unbounded (not a rate in [0, 1]/[-1, 1] like the others),
+    # so it gets its own weight based on calibration_sample_size rather than
+    # decisive_count -- a segment can have decisive results without every
+    # one of them carrying an implied_probability to compute log-loss from.
+    calibration_weight = float(own.get("calibration_sample_size") or 0)
+    shrunk["shrunk_log_loss"] = _shrink_stat(own.get("log_loss"), calibration_weight, parent_stats.get("shrunk_log_loss", parent_stats.get("log_loss")), k)
+    return shrunk
+
+
+def build_segmented_reliability_profile(
+    *,
+    records: Iterable[Mapping[str, Any]] | None = None,
+    ledger_path: Path | str | None = None,
+    sport: str | None = None,
+    shrinkage_k: float = 20.0,
+) -> dict[str, Any]:
+    """Hierarchical (sport, market_family, confidence_tier) reliability
+    surface with empirical-Bayes shrinkage toward each segment's parent.
+    ``shrinkage_k`` is the prior strength in "equivalent settled bets" --
+    at k decisive observations a segment's own data and its parent's carry
+    equal weight; well below k it's dominated by the parent, well above it
+    it's dominated by its own data. 20 is a starting point (no real
+    settlement volume exists yet to calibrate it against, same caveat
+    DecisionPolicy's own promotion_margin/min_sample_size carry) -- revisit
+    once real segment-level sample sizes exist.
+    """
+    sport_slug = str(sport or "").strip().lower() or None
+    record_rows = _latest_by_recommendation_id(_iter_record_payloads(records, ledger_path=ledger_path))
+    if sport_slug:
+        record_rows = [record for record in record_rows if _record_sport(record) in {sport_slug, None}]
+
+    global_stats = _shrink_toward_parent(_segment_stats(record_rows), None, k=shrinkage_k)
+
+    by_sport: dict[str | None, list[dict[str, Any]]] = {}
+    by_sport_market: dict[tuple[str | None, str | None], list[dict[str, Any]]] = {}
+    by_full_segment: dict[tuple[str | None, str | None, str], list[dict[str, Any]]] = {}
+    for record in record_rows:
+        segment_sport, segment_market, segment_tier = _segment_key(record)
+        by_sport.setdefault(segment_sport, []).append(record)
+        by_sport_market.setdefault((segment_sport, segment_market), []).append(record)
+        by_full_segment.setdefault((segment_sport, segment_market, segment_tier), []).append(record)
+
+    sport_profiles = {key: _shrink_toward_parent(_segment_stats(rows), global_stats, k=shrinkage_k) for key, rows in by_sport.items()}
+    sport_market_profiles = {
+        key: _shrink_toward_parent(_segment_stats(rows), sport_profiles.get(key[0], global_stats), k=shrinkage_k)
+        for key, rows in by_sport_market.items()
+    }
+    segments = []
+    for (segment_sport, segment_market, segment_tier), rows in by_full_segment.items():
+        parent = sport_market_profiles.get((segment_sport, segment_market), global_stats)
+        shrunk = _shrink_toward_parent(_segment_stats(rows), parent, k=shrinkage_k)
+        segments.append({"sport": segment_sport, "market_family": segment_market, "confidence_tier": segment_tier, **shrunk})
+
+    return {"global": global_stats, "shrinkage_k": shrinkage_k, "segments": segments}
+
+
 __all__ = [
     "SCHEMA_VERSION",
     "DEFAULT_LEDGER_PATH",
     "DEFAULT_LEDGER_CHUNK_ROOT",
     "build_artifact_metadata",
     "build_reliability_profile",
+    "build_segmented_reliability_profile",
     "build_intelligence_evaluation_bundle",
     "build_evaluation_history_summary",
     "build_recommendation_performance_analytics",
