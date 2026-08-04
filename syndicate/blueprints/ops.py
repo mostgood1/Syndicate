@@ -511,6 +511,36 @@ def api_ops_mlb_betting_card_day() -> Any:
                                             sim_files = sorted(p.name for p in sim_dir.iterdir() if p.is_file())
                                             batch["sim_vs_actual"]["source_sim_dir_file_count"] = len(sim_files)
                                             batch["sim_vs_actual"]["source_sim_dir_sample"] = sim_files[:8]
+                                            # The loop in reconcile appends to
+                                            # `failures` on EVERY drop, so 8
+                                            # paths -> 2 results with
+                                            # failures_n 0 is impossible. The
+                                            # only consistent story is that
+                                            # glob saw 2 files. Comparing each
+                                            # sim's mtime against the report's
+                                            # generated_at proves whether the
+                                            # other 6 were written afterwards
+                                            # (a race) or were already there
+                                            # (a real filter bug).
+                                            import datetime as _dt
+
+                                            stamps = []
+                                            for name in sim_files:
+                                                try:
+                                                    mtime = (sim_dir / name).stat().st_mtime
+                                                    stamps.append({
+                                                        "file": name,
+                                                        "mtime_local": _dt.datetime.fromtimestamp(mtime).isoformat(timespec="seconds"),
+                                                    })
+                                                except Exception:
+                                                    continue
+                                            stamps.sort(key=lambda row: row["mtime_local"])
+                                            batch["sim_vs_actual"]["source_sim_mtimes"] = stamps
+                                            generated_at = str(meta_block.get("generated_at") or "").strip()
+                                            if generated_at and stamps:
+                                                after = [row["file"] for row in stamps if row["mtime_local"] > generated_at]
+                                                batch["sim_vs_actual"]["sims_written_after_report"] = len(after)
+                                                batch["sim_vs_actual"]["sims_written_before_report"] = len(stamps) - len(after)
                                     except Exception as exc:
                                         batch["sim_vs_actual"]["source_sim_dir_error"] = f"{type(exc).__name__}: {exc}"
                                 for meta_key in ("skipped_games", "jobs", "sims_per_game", "prop_lines_source", "date", "season", "generated_at", "tool", "use_raw"):
