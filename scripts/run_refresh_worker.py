@@ -662,6 +662,7 @@ def _launch_autorun_evaluation_settlement(
         return False
 
     from syndicate.features.shared.evaluation_settlement import settle_ledger_for_dates
+    from syndicate.features.shared.graded_outcomes import GRADED_OUTCOME_GRADERS
 
     today_date = central_today_iso()
     yesterday_date = (date.fromisoformat(today_date) - timedelta(days=1)).isoformat()
@@ -669,7 +670,13 @@ def _launch_autorun_evaluation_settlement(
     summaries: dict[str, Any] = {}
     error_text: str | None = None
     try:
-        result = settle_ledger_for_dates(list(target_dates), sports=["mlb", "wnba"])
+        # Every sport with a registered grader (graded_outcomes.py), not the
+        # old hardcoded ["mlb", "wnba"] -- that list predates Stage 1 of the
+        # learning-loop plan, which is precisely what gave nba/nhl/nfl their
+        # own graders. A sport whose grader is still a documented []-stub
+        # (soccer/ncaab/ncaaf) costs one cheap no-op pass here and settles
+        # for real the moment its grader lands, with no autorun change.
+        result = settle_ledger_for_dates(list(target_dates), sports=sorted(GRADED_OUTCOME_GRADERS.keys()))
         summaries = result.get("totals") or {}
     except Exception as exc:
         error_text = f"{type(exc).__name__}: {exc}"

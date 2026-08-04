@@ -24,6 +24,8 @@ import json
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
+from syndicate.features.shared.graded_outcomes import GRADED_OUTCOME_GRADERS
+from syndicate.features.shared.graded_outcomes import graded_rows_for_date
 from syndicate.features.shared.intelligence_evaluation import DEFAULT_LEDGER_PATH
 from syndicate.features.shared.intelligence_evaluation import _is_chunked_ledger_path
 from syndicate.features.shared.intelligence_evaluation import _ledger_chunk_path
@@ -32,7 +34,13 @@ from syndicate.features.shared.intelligence_evaluation import _record_sport
 from syndicate.features.shared.intelligence_evaluation import settle_result
 
 
-_SUPPORTED_SPORTS = ("mlb", "wnba")
+# "Supported" now means "has a registered grader in graded_outcomes.py",
+# not a hardcoded two-sport list. A sport whose grader is still a stub
+# (returns []) is correctly supported-but-empty -- settlement's own
+# unmatched_no_graded_rows diagnostic already reports that distinctly from
+# "sport not recognized at all". See graded_outcomes.py for which sports
+# currently have a real grader vs. a documented placeholder.
+_SUPPORTED_SPORTS = tuple(sorted(GRADED_OUTCOME_GRADERS.keys()))
 
 
 def _normalize_text(value: Any) -> str:
@@ -102,111 +110,8 @@ def _read_ledger_records_for_date(target_ledger_path: Path, date_token: str) -> 
     return [record for record in records if _ledger_record_chunk_name(record) == date_token]
 
 
-def _mlb_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
-    from syndicate.features.mlb.market_accuracy import build_market_accuracy_payload
-
-    try:
-        payload = build_market_accuracy_payload(f"date={date_str}")
-    except Exception:
-        return []
-    if not isinstance(payload, dict):
-        return []
-
-    rows: list[dict[str, Any]] = []
-    for day in payload.get("days") or []:
-        if not isinstance(day, dict) or str(day.get("date") or "") != date_str:
-            continue
-        by_kind = day.get("rows") if isinstance(day.get("rows"), dict) else {}
-        kind_rows = by_kind.get("official") or by_kind.get("playable") or by_kind.get("all") or []
-        for row in kind_rows:
-            if not isinstance(row, dict):
-                continue
-            result = str(row.get("result") or "").strip().lower()
-            if result not in {"win", "loss", "push", "void"}:
-                continue
-            rows.append(
-                {
-                    "sport": "mlb",
-                    "market": row.get("market"),
-                    "selection": row.get("selection"),
-                    "player": row.get("player_name"),
-                    "team": row.get("team"),
-                    "title": row.get("title"),
-                    "line": row.get("line"),
-                    "actual": row.get("actual"),
-                    "odds": row.get("odds"),
-                    "result": result,
-                    "pnl": row.get("profit_u"),
-                }
-            )
-    return rows
-
-
-def _wnba_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
-    from syndicate.features.shared.live_lens_local import build_local_market_accuracy_payload
-    from syndicate.features.wnba.sources import processed_root
-
-    try:
-        payload = build_local_market_accuracy_payload(f"date={date_str}", processed_root())
-    except Exception:
-        return []
-    if not isinstance(payload, dict):
-        return []
-
-    rows: list[dict[str, Any]] = []
-    for day in payload.get("days") or []:
-        if not isinstance(day, dict) or str(day.get("date") or "") != date_str:
-            continue
-        games = day.get("games") if isinstance(day.get("games"), dict) else {}
-        for row in games.get("rows") or []:
-            if not isinstance(row, dict):
-                continue
-            result = str(row.get("result") or "").strip().lower()
-            if result not in {"win", "loss", "push", "void"}:
-                continue
-            rows.append(
-                {
-                    "sport": "wnba",
-                    "market": row.get("market"),
-                    "selection": row.get("side"),
-                    "home": row.get("home"),
-                    "away": row.get("away"),
-                    "line": row.get("line"),
-                    "actual": row.get("actual"),
-                    "odds": row.get("price"),
-                    "result": result,
-                }
-            )
-        props = day.get("props") if isinstance(day.get("props"), dict) else {}
-        for row in props.get("rows") or []:
-            if not isinstance(row, dict):
-                continue
-            result = str(row.get("result") or "").strip().lower()
-            if result not in {"win", "loss", "push", "void"}:
-                continue
-            rows.append(
-                {
-                    "sport": "wnba",
-                    "market": row.get("market"),
-                    "selection": row.get("side"),
-                    "player": row.get("player"),
-                    "team": row.get("team"),
-                    "line": row.get("line"),
-                    "actual": row.get("actual"),
-                    "odds": row.get("price"),
-                    "result": result,
-                }
-            )
-    return rows
-
-
 def _graded_rows_for_date(sport: str, date_str: str) -> list[dict[str, Any]]:
-    sport_slug = str(sport or "").strip().lower()
-    if sport_slug == "mlb":
-        return _mlb_graded_rows_for_date(date_str)
-    if sport_slug == "wnba":
-        return _wnba_graded_rows_for_date(date_str)
-    return []
+    return graded_rows_for_date(sport, date_str)
 
 
 def _evaluation_record_keys(record: Mapping[str, Any]) -> set[str]:

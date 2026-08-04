@@ -364,7 +364,12 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["supported_sports"], ["mlb", "wnba"])
+        # "Supported" is driven by graded_outcomes.GRADED_OUTCOME_GRADERS
+        # (has a registered grader), not a hardcoded allowlist -- assert
+        # membership/superset rather than an exact list so this doesn't
+        # need updating every time another sport's grader lands.
+        self.assertIn("mlb", payload["supported_sports"])
+        self.assertIn("wnba", payload["supported_sports"])
         self.assertEqual(payload["autorun_status"]["summary"], {"pending": 12, "matched": 9, "settled": 9, "unmatched": 3})
 
     def test_evaluation_settlement_status_includes_board_state_ledger_fingerprints(self) -> None:

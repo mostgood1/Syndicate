@@ -169,9 +169,14 @@ class SettleLedgerForDateTests(unittest.TestCase):
                 self.assertEqual(recommendation_records[0]["result"], "pending")
 
     def test_unsupported_sport_is_a_safe_no_op(self) -> None:
+        # "Supported" is now driven by graded_outcomes.GRADED_OUTCOME_GRADERS
+        # (has a registered grader) rather than a hardcoded allowlist, so a
+        # sport with no grader at all (not one whose grader is a documented
+        # []-returning stub, like soccer/ncaab -- those ARE registered and
+        # take the empty-graded-rows path instead) is what exercises this.
         with tempfile.TemporaryDirectory() as tmp_dir:
             ledger_path = Path(tmp_dir) / "evaluation_ledger.jsonl"
-            summary = settle_ledger_for_date("2026-06-08", sport="nhl", ledger_path=ledger_path)
+            summary = settle_ledger_for_date("2026-06-08", sport="esports", ledger_path=ledger_path)
             self.assertEqual(summary["pending"], 0)
             self.assertIn("note", summary)
 
