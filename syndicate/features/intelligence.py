@@ -36,6 +36,7 @@ import time
 from pathlib import Path
 import re
 import subprocess
+import unicodedata
 from statistics import NormalDist
 from typing import Any, Mapping
 
@@ -823,7 +824,20 @@ def _decimal_to_american(value: float | None) -> str | None:
 
 
 def _normalized_market_text(value: Any) -> str:
-    lowered = str(value or "").lower()
+    # NFKD-fold diacritics before the char-class filter below strips
+    # anything outside [a-z0-9] -- without this, an accented character (the
+    # "i" in "Rodriguez" from MLB's own roster data) gets replaced by a
+    # SPACE rather than folded, splitting one word into two ("rodr guez")
+    # and silently breaking every downstream exact-string dict lookup
+    # against odds-history's plain-ASCII player_name keys (confirmed live
+    # 2026-08-04: "Endy Rodriguez"/"Nasim Nunez" prop candidates had real,
+    # actively-moving odds-history entries under "endy rodriguez"/"nasim
+    # nunez" that this function's own candidate-side normalization could
+    # never produce). Same pattern as basketball_props_edges.py/
+    # basketball_props_onnx.py's own name normalization.
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    lowered = text.lower()
     lowered = re.sub(r"([a-z0-9])['’]s\b", r"\1", lowered)
     lowered = re.sub(r"\b3\s*pt\s*m\b", " 3pm ", lowered)
     lowered = re.sub(r"\b3\s*point\s*makes?\b", " 3pm ", lowered)
@@ -2805,6 +2819,49 @@ def _candidate_selection_text(candidate: dict[str, Any]) -> str:
 
 _GAME_ONLY_ODDS_HISTORY_MARKET_TYPES = {"h2h", "spreads", "totals", "moneyline", "spread", "total"}
 
+_MLB_TEAM_FULL_NAME_BY_ABBR: dict[str, str] | None = None
+
+
+def _mlb_team_full_name_index() -> dict[str, str]:
+    global _MLB_TEAM_FULL_NAME_BY_ABBR
+    if _MLB_TEAM_FULL_NAME_BY_ABBR is None:
+        try:
+            from syndicate.features.mlb.cards import _MLB_TEAM_META_BY_ABBR
+
+            _MLB_TEAM_FULL_NAME_BY_ABBR = {
+                str(abbr).strip().upper(): str(meta.get("name") or "").strip()
+                for abbr, meta in _MLB_TEAM_META_BY_ABBR.items()
+                if isinstance(meta, Mapping) and meta.get("name")
+            }
+        except Exception:
+            _MLB_TEAM_FULL_NAME_BY_ABBR = {}
+    return _MLB_TEAM_FULL_NAME_BY_ABBR
+
+
+def _expand_mlb_team_abbreviations(text: str) -> list[str]:
+    """MLB board candidates carry team abbreviations (`team="CHC"`,
+    `matchup="LAD @ CHC"`) while odds-history's own OddsAPI-sourced market
+    keys carry full team names ("Chicago Cubs") -- neither ever textually
+    overlaps the other, so every MLB game-market (moneyline/spread/total)
+    candidate failed the overlap check below even when real, actively-
+    moving odds-history existed for the exact same game (confirmed live
+    2026-08-04: Red Sox/Yankees moneylines moved 6-10 cents same-day,
+    captured correctly in odds-history, never surfaced on any board card).
+
+    Returns each recognized team's full name as a SEPARATE string (not one
+    joined blob) -- entry_event below lists home_team before away_team, but
+    a matchup string like "LAD @ CHC" lists away before home, so a single
+    joined "away home" string would need to appear as one contiguous
+    substring of a "home away"-ordered entry_event and would never match.
+    Checking each team name independently against entry_event sidesteps
+    the ordering entirely.
+    """
+    index = _mlb_team_full_name_index()
+    if not index or not text:
+        return []
+    tokens = re.split(r"[^A-Za-z]+", text.upper())
+    return [index[token] for token in tokens if token and token in index]
+
 
 def _candidate_odds_history_match_score(candidate: dict[str, Any], market_key: Any, state: Mapping[str, Any]) -> float:
     parsed_key = _parse_odds_history_market_key(market_key)
@@ -2825,6 +2882,15 @@ def _candidate_odds_history_match_score(candidate: dict[str, Any], market_key: A
     subject_source = _candidate_subject_key(candidate) or candidate.get("subject_key") or candidate.get("player_name") or candidate.get("entity")
     candidate_subject = _normalized_market_text(_safe_text(subject_source, ""))
     candidate_team = _normalized_market_text(_safe_text(_candidate_team_key(candidate), ""))
+    expanded_team_names: list[str] = []
+    if _normalized_market_text(_safe_text(candidate.get("sport_slug"), candidate.get("sport"))) == "mlb":
+        expanded_team_names = [
+            _normalized_market_text(name)
+            for name in (
+                *_expand_mlb_team_abbreviations(_safe_text(candidate.get("matchup"), "")),
+                *_expand_mlb_team_abbreviations(_safe_text(_candidate_team_key(candidate), "")),
+            )
+        ]
     candidate_selection = _candidate_selection_text(candidate)
     candidate_selection_direction = _candidate_selection_direction(candidate)
     candidate_selection_hint = "over" if candidate_selection_direction > 0 else "under" if candidate_selection_direction < 0 else ""
@@ -2865,7 +2931,7 @@ def _candidate_odds_history_match_score(candidate: dict[str, Any], market_key: A
         if not candidate_subject or candidate_subject not in entry_event:
             return 0.0
 
-    for value in (candidate_matchup, candidate_subject, candidate_team, candidate_selection):
+    for value in (candidate_matchup, candidate_subject, candidate_team, candidate_selection, *expanded_team_names):
         if not value or not entry_event:
             continue
         if value == entry_event or value in entry_event or entry_event in value:

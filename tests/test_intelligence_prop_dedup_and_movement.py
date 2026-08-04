@@ -561,5 +561,103 @@ class OddsHistoryPlayerIndexTests(unittest.TestCase):
         self.assertEqual(unattributed, [])
 
 
+class NormalizedMarketTextDiacriticTests(unittest.TestCase):
+    """2026-08-04 fix: confirmed live that real, actively-moving MLB prop
+    odds-history existed for "Endy Rodriguez"/"Nasim Nunez" and never
+    surfaced on their board cards. Root cause: _normalized_market_text's
+    char-class filter (`[^a-z0-9]` -> space) replaced an accented letter
+    with a SPACE rather than folding it, splitting "Rodriguez" into
+    "rodr guez" and breaking the exact-string player-bucket lookup against
+    odds-history's plain-ASCII "endy rodriguez" key.
+    """
+
+    def test_accented_name_normalizes_to_same_text_as_plain_ascii(self) -> None:
+        self.assertEqual(intelligence._normalized_market_text("Endy Rodríguez"), intelligence._normalized_market_text("Endy Rodriguez"))
+        self.assertEqual(intelligence._normalized_market_text("Nasim Nuñez"), intelligence._normalized_market_text("Nasim Nunez"))
+        self.assertEqual(intelligence._normalized_market_text("Endy Rodríguez"), "endy rodriguez")
+
+    def test_accented_prop_candidate_now_matches_its_plain_ascii_odds_history_entry(self) -> None:
+        candidate = {
+            "candidate_type": "prop",
+            "player_name": "Endy Rodríguez",
+            "matchup": "PIT @ CHC",
+            "market": "Hitter Hits",
+            "pick": "OVER Endy Rodríguez",
+            "name": "OVER Endy Rodríguez",
+            "line": "1.5",
+        }
+        odds_history = {
+            "markets": {
+                "player_name=endy rodriguez|market=batter_hits|selection=over": {"last_line": 1.5, "last_odds": -120.0},
+            }
+        }
+        index = intelligence._build_odds_history_player_index(odds_history)
+        market_key, state = intelligence._candidate_odds_history_state(candidate, index)
+        self.assertIsNotNone(state)
+        self.assertIn("endy rodriguez", market_key)
+
+
+class MlbGameMarketTeamAbbreviationTests(unittest.TestCase):
+    """2026-08-04 fix: MLB board candidates carry team abbreviations
+    (matchup="LAD @ CHC", team="CHC") while odds-history's own OddsAPI-
+    sourced market keys carry full team names ("Chicago Cubs") -- neither
+    ever textually overlapped the other, so every MLB game-market
+    (moneyline/spread/total) candidate showed zero movement even when real
+    odds-history existed for the exact same game. Confirmed live: Red Sox/
+    Yankees moneylines moved 6-10 cents same-day, captured correctly in
+    odds-history, never surfaced on any board card. Deliberately uses
+    DIFFERENT candidate/state prices so the pre-existing line-proximity
+    scoring bonus can't accidentally paper over a real text-matching gap.
+    """
+
+    def _home_ml_candidate(self, **overrides) -> dict:
+        candidate = {
+            "sport_slug": "mlb",
+            "sport": "MLB",
+            "candidate_type": "game",
+            "matchup": "LAD @ CHC",
+            "team": "CHC",
+            "market": "Moneyline",
+            "pick": "Home ML",
+            "selection": "Home ML",
+            "name": "CHC",
+            "line": None,
+        }
+        candidate.update(overrides)
+        return candidate
+
+    def test_expand_mlb_team_abbreviations_returns_each_full_name_separately(self) -> None:
+        names = intelligence._expand_mlb_team_abbreviations("LAD @ CHC")
+        self.assertEqual(sorted(names), ["Chicago Cubs", "Los Angeles Dodgers"])
+
+    def test_home_side_candidate_matches_its_real_game(self) -> None:
+        market_key = "event_id=00828e81b6bef980ada2777528d99f93|home_team=Chicago Cubs|away_team=Los Angeles Dodgers|market=h2h|bookmaker=fanduel"
+        state = {"last_line": -126.0}
+        score = intelligence._candidate_odds_history_match_score(self._home_ml_candidate(), market_key, state)
+        self.assertGreater(score, 0.0)
+
+    def test_away_side_candidate_matches_the_same_game(self) -> None:
+        market_key = "event_id=00828e81b6bef980ada2777528d99f93|home_team=Chicago Cubs|away_team=Los Angeles Dodgers|market=h2h|bookmaker=fanduel"
+        state = {"last_line": -126.0}
+        away_candidate = self._home_ml_candidate(team="LAD", pick="Away ML", selection="Away ML", name="LAD")
+        score = intelligence._candidate_odds_history_match_score(away_candidate, market_key, state)
+        self.assertGreater(score, 0.0)
+
+    def test_does_not_match_an_unrelated_games_market(self) -> None:
+        unrelated_key = "event_id=abc|home_team=Boston Red Sox|away_team=Chicago White Sox|market=h2h|bookmaker=fanduel"
+        state = {"last_line": -126.0}
+        score = intelligence._candidate_odds_history_match_score(self._home_ml_candidate(), unrelated_key, state)
+        self.assertEqual(score, 0.0)
+
+    def test_non_mlb_sport_does_not_get_abbreviation_expansion(self) -> None:
+        # Guards against the expansion accidentally firing for a different
+        # sport whose short team codes might collide with an MLB abbreviation.
+        candidate = self._home_ml_candidate(sport_slug="nhl", sport="NHL")
+        market_key = "event_id=xyz|home_team=Chicago Cubs|away_team=Los Angeles Dodgers|market=h2h|bookmaker=fanduel"
+        state = {"last_line": -126.0}
+        score = intelligence._candidate_odds_history_match_score(candidate, market_key, state)
+        self.assertEqual(score, 0.0)
+
+
 if __name__ == "__main__":
     unittest.main()

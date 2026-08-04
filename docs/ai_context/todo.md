@@ -4,6 +4,61 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
+### IN PROGRESS 2026-08-04 -- Board showed zero movement on every card; two real, distinct bugs found and fixed (pushed, not yet deployed)
+
+User reported the home-page board showing no movement on any opportunity.
+Investigated against production directly rather than guessing.
+
+**Not a uniform "no movement" -- two different things wearing the same
+symptom.** Pulled the embedded board payload from the live page plus raw
+odds-history via `/api/ops/odds-history/inspect?sport=mlb&date=...`
+(3,300 tracked MLB markets):
+- WNBA cards (the ones that DID carry `movement.history`) were correctly
+  showing flat -- 8 real hourly snapshots per candidate, bit-identical
+  price the whole time (games ~24-30h out, thin pregame liquidity). Not a
+  bug.
+- MLB cards showed `history_points: 0` even though real odds-history
+  existed with real movement (Red Sox ML -134 -> -126, Yankees -174 ->
+  -164, both same-day). This WAS a bug -- the board's candidate-to-odds-
+  history join was silently failing for MLB.
+
+**Root-caused to two independent bugs in `syndicate/features/intelligence.py`,
+both fixed and tested (9 new tests,
+`tests/test_intelligence_prop_dedup_and_movement.py`):**
+1. `_normalized_market_text` replaced accented characters with a SPACE
+   (its `[^a-z0-9]` filter) instead of folding them, so "Endy Rodríguez"
+   normalized to "endy rodr guez" -- never matching odds-history's plain-
+   ASCII "endy rodriguez" bucket key. Added NFKD fold + combining-mark
+   strip before the filter (same pattern already used in
+   basketball_props_edges.py/basketball_props_onnx.py). Affects every
+   sport's prop matching, not just MLB.
+2. MLB board candidates carry team abbreviations (`matchup="LAD @ CHC"`,
+   `team="CHC"`) while odds-history's OddsAPI-sourced keys carry full team
+   names ("Chicago Cubs") -- neither ever textually overlapped in
+   `_candidate_odds_history_match_score`, so no MLB moneyline/spread/total
+   candidate could ever find its own real, actively-moving odds-history.
+   Added `_expand_mlb_team_abbreviations` (reuses the existing
+   `_MLB_TEAM_META_BY_ABBR` table from `mlb/cards.py`) and wired each
+   expanded team name in as its own separate scoring value -- NOT joined
+   into one string, since entry_event lists home_team before away_team
+   but a matchup string lists away-then-home, so a single joined blob
+   would need exact positional order to match and silently wouldn't
+   (caught this in testing before shipping it, not after).
+
+**Separately confirmed empirically: two different odds-polling cadences.**
+MLB's real per-bookmaker capture runs ~every 2h (matches
+`_pregame_sweep_interval_seconds`'s coded default). WNBA's cards are fed
+by a DIFFERENT, apparently-consensus/entity-keyed capture running a rock-
+solid ~60 minutes (confirmed across 8 consecutive real timestamps) that
+does not match any interval this session found in code or render.yaml --
+worth a dedicated look, not chased further here.
+
+**Status: committed, pushed, NOT yet deployed** -- check
+`python scripts/check_deploy_safety.py` before deploying. Once live,
+verify against a real MLB slate that moneyline/spread/total cards start
+showing real `movement.history` (the New York/Boston-style games are the
+easiest live check -- moneylines move most visibly).
+
 ### IN PROGRESS 2026-08-04 -- Learning loop: Stages 0-5 DEPLOYED, NCAAF grader shipped as a same-day follow-up, 2 items pushed but NOT yet deployed
 
 Picks up the entry directly below this one (the long single-session
