@@ -4,6 +4,55 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
+### OPEN 2026-08-04 -- Ask the Syndicate can't reach game-market picks (moneyline/spread/ATS), only props/steam
+
+Same session as the routing/prose fixes below (83a7c166 through
+d4532f22, all shipped and verified live). Found while "continue
+verifying the other picks work too": clicked "Ask about this pick" on
+6 real cards. All 4 player-prop cards (Ty France, Luis Rengifo, Fernando
+Tatis Jr., Jake Cronenworth, Nolan Arenado) got real prose. All 3
+game-market cards (KC Home ML, GSV Golden State Valkyries -13.5, TOR
+Away ML) got "No board recommendation matches ... specifically" --
+even "GSV Golden State Valkyries -13.5" (the full team name, spelled
+out, present verbatim in the question) failed to match anything.
+
+**Not a text-matching bug -- the candidates aren't in the pool Ask
+searches at all.** Confirmed live: `/api/syndicate/query`'s own
+`board_contract.cards` for "summarize the board", checked 3x back to
+back, never contained a single moneyline/ATS/spread candidate --
+`steam`/`prop` only, 2-7 cards total, while the live board's real
+`#board-cards` grid (same moment) showed dozens across every market
+type (one screenshot this session showed "43 candidates" in the
+window label). `ask_the_syndicate.py`'s `read_latest_intelligence_state`
+reads `recommendations`, and `pipeline/intelligence_state.py:1422`
+(`slice_intelligence_board_state_for_request`) sets
+`response["recommendations"] = top_opportunities` -- traced this far
+before stopping: `_load_canonical_board_response` (which computes this
+with an explicit, per-request `limit`) is a no-op right now
+(`canonical_board_state_enabled()` is false, confirmed elsewhere in
+this file), so the LIVE path is
+`read_latest_intelligence_board_snapshot_response`, which reads a
+single persisted `board_snapshot.json` -- one shared "latest" slot, not
+scoped per caller/limit. Working theory, NOT yet confirmed: whichever
+request last got cached into that slot determines what candidate pool
+every OTHER caller (including Ask, on a totally unrelated request)
+inherits, and if that request carried a small `limit` (or a market-type
+filter), game-market picks fall out of the pool for everyone until a
+different request happens to repopulate it. Did not chase further --
+this touches the shared board-state cache other real consumers (the
+board itself, portfolio) depend on, and changing it deserves proper
+investigation, not a guess at this hour.
+
+**Next step:** confirm the theory first (read `board_snapshot.json`'s
+actual persisted content directly -- either via a new `/api/ops/`
+diagnostic mirroring `evaluation-settlement/status`'s pattern, or by
+tracing exactly which request last wrote it) before touching the cache
+itself. If confirmed, the fix is probably widening what gets persisted
+to that slot (all candidate types, not whatever the last caller
+happened to request) rather than anything in `ask_the_syndicate*.py` --
+the routing/prose fixes below are already correct for whatever pool
+they're given.
+
 Last reconciled: 2026-08-03 (see "Reconciliation 2026-08-03 (Settlement
 item 3b root-caused: canonical board-state path never writes the
 evaluation ledger)" immediately below -- picked up HANDOFF 2026-08-03 #2's
@@ -9961,6 +10010,23 @@ were resolved and nine already-closed rows removed from the open tables.
 > (318,968cr total, spans the rollover): props 203,356cr (63.8%), segment
 > 68,330cr (21.4%), alternate 34,182cr (10.7%), full_game 12,594cr (3.9%) —
 > same shape, props still the lever if it's ever needed.
+>
+> **Latest, 2026-08-04T04:02Z (76h post-rollover, same baseline — trend is
+> stabilizing, not still settling):**
+>
+> | Window | Burned | /hour | Projected 30d | vs 5M target |
+> |---|---|---|---|---|
+> | 273,642s (91,659 obs) | 151,698 | 1,995.7 | **1.44M** | **28.7%** |
+>
+> Three consecutive same-baseline readings now read 2.50M → 1.32M → 1.44M —
+> converged around **~1.3-1.5M/mo (27-29% of the 5M target)**, comfortable and
+> stable, no action needed. NFL cumulative still trivial (640 calls / 192cr).
+> `by_market_family` cumulative (396,556cr total): props 243,419cr (61.4%),
+> segment 90,867cr (22.9%), alternate 45,456cr (11.5%), full_game 16,175cr
+> (4.1%) — unchanged shape. First `race_detected_count` hit this reading (5,
+> was 0 previously) — a one-observation concurrent-write race on the quota
+> store, read-only probe per its own design ([[oddsapi_quota.py]] comments),
+> does not affect the numbers above; noting in case the rate climbs.
 
 **16** 🟢 **CLOSED 2026-07-25** (`1986caf6`, "Drop F7 markets; standard line
 wins, alternates kept as a ladder") — **do not treat this as an open decision**,
