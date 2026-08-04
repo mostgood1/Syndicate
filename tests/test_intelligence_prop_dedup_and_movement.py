@@ -661,3 +661,119 @@ class MlbGameMarketTeamAbbreviationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GameLevelSteamOddsHistoryJoinTests(unittest.TestCase):
+    """Game-level steam candidates scored 0.0 against their own game's market.
+
+    The cross-market guard assumed a steam candidate's subject is "a player
+    name, or a team name for a game-level one". For GAME-level steam it is
+    neither: _steam_candidates_for_sport composes it as
+    f"{subject} {market_label} steam move", so "philadelphia phillies total
+    steam move" can never be a substring of entry_event and the guard
+    rejected every one of them.
+
+    Confirmed live 2026-08-04: 21 "Total · Steam" candidates across WSH@PHI,
+    LAA@BAL and ATH@CIN sat at history_points=0 while current totals history
+    for all three games was present. Note the pre-existing
+    test_game_level_steam_candidate_still_matches_its_own_game passed
+    throughout -- its fixture used a bare subject_key and no market_key, which
+    is not the shape production emits. These use the real one, captured from
+    the live board.
+    """
+
+    def _total_steam_candidate(self) -> dict:
+        # Exact field shape read off a production board candidate.
+        return {
+            "candidate_type": "steam",
+            "sport_slug": "mlb",
+            "matchup": "WSH @ PHI",
+            "market": "Total · Steam",
+            "market_key": "total",
+            "team": "—",
+            "name": "Philadelphia Phillies Total steam move",
+            "pick": "Philadelphia Phillies steam move",
+            "selection": "Philadelphia Phillies steam move",
+            "subject_key": "philadelphia phillies total steam move",
+            "entity": "Philadelphia Phillies Total steam move",
+            # None by construction for market_key in _GAME_SIDE_MARKETS.
+            "player_name": None,
+        }
+
+    _TOTALS_KEY = "event_id=9d696e41|home_team=Philadelphia Phillies|away_team=Washington Nationals|market=totals|bookmaker=draftkings"
+    _H2H_KEY = "event_id=9d696e41|home_team=Philadelphia Phillies|away_team=Washington Nationals|market=h2h|bookmaker=draftkings"
+    _OTHER_GAME_TOTALS_KEY = "event_id=fadc6a30|home_team=Baltimore Orioles|away_team=Los Angeles Angels|market=totals|bookmaker=draftkings"
+
+    def test_total_steam_matches_its_own_games_totals_history(self) -> None:
+        score = intelligence._candidate_odds_history_match_score(
+            self._total_steam_candidate(), self._TOTALS_KEY, {"last_line": 8.5}
+        )
+        self.assertGreater(score, 0.0)
+
+    def test_total_steam_does_not_adopt_the_same_games_moneyline(self) -> None:
+        # Team identity alone matches h2h, spreads and totals for one game,
+        # so without the market-correspondence check this fix would just move
+        # the "wrong market's movement" bug inside the game markets.
+        score = intelligence._candidate_odds_history_match_score(
+            self._total_steam_candidate(), self._H2H_KEY, {"last_line": -145.0}
+        )
+        self.assertEqual(score, 0.0)
+
+    def test_total_steam_does_not_adopt_another_games_totals(self) -> None:
+        score = intelligence._candidate_odds_history_match_score(
+            self._total_steam_candidate(), self._OTHER_GAME_TOTALS_KEY, {"last_line": 9.0}
+        )
+        self.assertEqual(score, 0.0)
+
+    def test_moneyline_steam_matches_h2h_and_not_totals(self) -> None:
+        candidate = self._total_steam_candidate()
+        candidate.update(
+            {
+                "market": "Moneyline · Steam",
+                "market_key": "moneyline",
+                "name": "Philadelphia Phillies Moneyline steam move",
+                "subject_key": "philadelphia phillies moneyline steam move",
+                "entity": "Philadelphia Phillies Moneyline steam move",
+            }
+        )
+        self.assertGreater(
+            intelligence._candidate_odds_history_match_score(candidate, self._H2H_KEY, {"last_line": -145.0}), 0.0
+        )
+        self.assertEqual(
+            intelligence._candidate_odds_history_match_score(candidate, self._TOTALS_KEY, {"last_line": 8.5}), 0.0
+        )
+
+    def test_player_level_steam_is_unchanged(self) -> None:
+        # player_name set and market_key outside _GAME_SIDE_MARKETS, so this
+        # still takes the original subject-containment path.
+        candidate = {
+            "candidate_type": "steam",
+            "matchup": "SSF @ PT",
+            "market": "Shots · Steam",
+            "market_key": "player_shots",
+            "subject_key": "gage guerra",
+            "player_name": "Gage Guerra",
+            "entity": "Gage Guerra",
+        }
+        unrelated_game = "event_id=52ee1a58|home_team=New York City FC|away_team=Toronto FC|market=spreads|bookmaker=draftkings"
+        self.assertEqual(
+            intelligence._candidate_odds_history_match_score(candidate, unrelated_game, {"last_line": -0.25}), 0.0
+        )
+        own_prop = "event_id=abc|player_name=Gage Guerra|market=player_shots_on_target|bookmaker=draftkings"
+        self.assertGreater(
+            intelligence._candidate_odds_history_match_score(candidate, own_prop, {"last_line": 2.5}), 0.0
+        )
+
+    def test_a_prop_still_cannot_adopt_a_game_market(self) -> None:
+        # The original 2026-07-24 bug this guard exists for.
+        prop = {
+            "candidate_type": "prop",
+            "matchup": "WSH @ PHI",
+            "market": "Strikeouts",
+            "pick": "OVER Tomoyuki Sugano",
+            "player_name": "Tomoyuki Sugano",
+            "subject_key": "tomoyuki sugano",
+        }
+        self.assertEqual(
+            intelligence._candidate_odds_history_match_score(prop, self._H2H_KEY, {"last_line": -145.0}), 0.0
+        )

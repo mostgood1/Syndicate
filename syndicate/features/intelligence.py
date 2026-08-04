@@ -2837,6 +2837,18 @@ def _candidate_selection_text(candidate: dict[str, Any]) -> str:
 
 _GAME_ONLY_ODDS_HISTORY_MARKET_TYPES = {"h2h", "spreads", "totals", "moneyline", "spread", "total"}
 
+# Which raw odds-history market types a game-level candidate's own market_key
+# (_GAME_SIDE_MARKETS' vocabulary) may legitimately join to. Needed because a
+# game's teams appear in its h2h, spreads AND totals entries alike, so team
+# identity alone cannot tell a Total steam move from the same game's
+# moneyline -- exactly the cross-market mismatch the guard below prevents for
+# props.
+_ODDS_HISTORY_MARKET_TYPES_BY_GAME_SIDE = {
+    "moneyline": {"h2h", "moneyline"},
+    "spread": {"spreads", "spread"},
+    "total": {"totals", "total"},
+}
+
 _MLB_TEAM_FULL_NAME_BY_ABBR: dict[str, str] | None = None
 
 
@@ -2945,8 +2957,40 @@ def _candidate_odds_history_match_score(candidate: dict[str, Any], market_key: A
     # identity as a prop's -- it's a player name for a player-level steam
     # move, or a team name for a game-level one -- so the same hard gate
     # applies equally well to both.
-    if _safe_text(candidate.get("candidate_type"), "") in ("prop", "steam") and entry_market.strip().lower() in _GAME_ONLY_ODDS_HISTORY_MARKET_TYPES:
-        if not candidate_subject or candidate_subject not in entry_event:
+    #
+    # 2026-08-04 follow-up: the paragraph above assumes a steam candidate's
+    # subject is "a player name, or a team name for a game-level one". For
+    # GAME-level steam it is neither -- _steam_candidates_for_sport composes
+    # it as f"{subject} {market_label} steam move", e.g. "philadelphia
+    # phillies total steam move", which can never be a substring of
+    # entry_event. So every game-level steam candidate scored 0.0 against its
+    # own game's own market. Confirmed live: 21 "Total · Steam" candidates on
+    # WSH@PHI / LAA@BAL / ATH@CIN sat at history_points=0 while the totals
+    # history for all three games was present and current.
+    #
+    # Checked the other way round instead: does the ENTRY's team appear in the
+    # candidate's subject? That works without needing the composed label to be
+    # parsed apart, and generalises past MLB (expanded_team_names is
+    # MLB-only). Market correspondence is then required explicitly, because
+    # team identity alone matches h2h, spreads AND totals for the same game --
+    # which would re-introduce the exact "wrong market's movement" bug this
+    # gate exists to prevent, just within game markets instead of across
+    # prop/game ones. player_name is already None for these by construction
+    # (market_key in _GAME_SIDE_MARKETS), so player-level steam is untouched.
+    candidate_type_text = _safe_text(candidate.get("candidate_type"), "")
+    if candidate_type_text in ("prop", "steam") and entry_market.strip().lower() in _GAME_ONLY_ODDS_HISTORY_MARKET_TYPES:
+        candidate_market_key = _normalized_market_text(_safe_text(candidate.get("market_key"), ""))
+        if candidate_type_text == "steam" and candidate_market_key in _GAME_SIDE_MARKETS:
+            entry_team_names = [
+                _normalized_market_text(_safe_text(parsed_key.get(field), ""))
+                for field in ("home_team", "away_team", "team", "team_key")
+            ]
+            entry_team_names = [name for name in entry_team_names if name]
+            if not candidate_subject or not any(name in candidate_subject for name in entry_team_names):
+                return 0.0
+            if entry_market.strip().lower() not in _ODDS_HISTORY_MARKET_TYPES_BY_GAME_SIDE.get(candidate_market_key, set()):
+                return 0.0
+        elif not candidate_subject or candidate_subject not in entry_event:
             return 0.0
 
     for value in (candidate_matchup, candidate_subject, candidate_team, candidate_selection, *expanded_team_names):

@@ -1,5 +1,54 @@
 # Syndicate TODO — canonical cross-session list
 
+### FIXED (code) 2026-08-04 -- Game-level steam candidates could never join their own game's odds history
+
+Found by re-checking the board after the movement fixes landed: MLB was
+**363/384** carrying movement, and every one of the 21 zeros was a
+`Total · Steam` candidate on WSH@PHI / LAA@BAL / ATH@CIN -- while current
+totals history for all three games was present in the shard.
+
+**Cause.** The cross-market guard in `_candidate_odds_history_match_score`
+(added 2026-07-24 for props, extended to steam 2026-07-31) assumes a steam
+candidate's subject is "a player name, or a team name for a game-level one".
+For GAME-level steam it is neither: `_steam_candidates_for_sport` composes it
+as `f"{subject} {market_label} steam move"`, so the real subject_key is
+`"philadelphia phillies total steam move"`, which can never be a substring of
+`entry_event`. The guard therefore returned 0.0 for every game-level steam
+candidate against its own game's own market.
+
+**Fix.** For steam candidates whose `market_key` is in `_GAME_SIDE_MARKETS`
+(where `player_name` is already None by construction), check identity the
+other way round -- does the ENTRY's team appear in the candidate's subject --
+which needs no parsing of the composed label and generalises past MLB
+(`expanded_team_names` is MLB-only). Market correspondence is then required
+explicitly via a new `_ODDS_HISTORY_MARKET_TYPES_BY_GAME_SIDE` map, because a
+game's teams appear in its h2h, spreads AND totals entries alike: without it
+this fix would just move the "wrong market's movement" bug inside the game
+markets. Prop and player-level steam paths are untouched.
+
+**Verified against production data before shipping:** replaying the live
+board's 21 Total-Steam candidates through the patched scorer joins **21/21**,
+each to its own game's `market=totals` entry (not h2h), with 0/120 prop
+candidates wrongly adopting a game market.
+
+**Worth noting:** the pre-existing
+`test_game_level_steam_candidate_still_matches_its_own_game` passed the whole
+time. Its fixture used a bare `subject_key` ("san francisco fc"), a set
+`player_name`, and no `market_key` -- not the shape production emits. A test
+built from assumption rather than a real payload, and it hid this for days.
+New tests use the exact field shape read off the live board.
+
+**Still open -- soccer has NO odds-history at all.** `?sport=soccer` inspect
+returns `market_count: 0` on web for all three candidate paths, and the pull
+logs `STREAM_PULL_ABSENT`, so all 18 Anytime-Goalscorer candidates sit at
+zero. `_odds_history_snapshot_paths` DOES handle soccer (globs
+`<league>/api/odds/game_odds_current.csv` and `<league>/props/<date>.csv`
+across league dirs), so this is not a missing branch -- either those files
+are absent on the service running soccer's refresh, or the rows produce no
+usable market keys. The `before_sync_odds_history` trace was not in the
+retained log window for either worker. Needs its own pass; deliberately not
+guessed at here.
+
 ### RESOLVED 2026-08-04 -- Both ops diagnostics that answered a different question than they were asked
 
 Closes the last two items from the board-movement chain below. Deployed to web.
