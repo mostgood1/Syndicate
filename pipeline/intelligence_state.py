@@ -1343,9 +1343,30 @@ def maybe_record_board_state_to_evaluation_ledger(state: dict[str, Any]) -> dict
         return bundle
 
     _record_canonical_board_state_ledger_fingerprint(selected_date, fingerprint)
+    # `recommendation_count` below is the INPUT list length, not what landed.
+    # That distinction cost real diagnosis time on 2026-08-04: the log showed
+    # healthy non-zero counts every couple of minutes while settlement kept
+    # reporting total_recommendation_records: 0, and the log was read as
+    # proof that records were being written. It is not --
+    # _append_evaluation_ledger_record early-returns on identity dedupe
+    # BEFORE writing, silently, so a non-zero input count is compatible with
+    # nothing being persisted at all. `landed` reads the chunk back off disk
+    # so the two can never be conflated again.
+    landed: int | str = "unknown"
+    try:
+        from syndicate.features.shared.intelligence_evaluation import DEFAULT_LEDGER_PATH
+        from syndicate.features.shared.intelligence_evaluation import _ledger_chunk_path
+
+        chunk_path = _ledger_chunk_path(DEFAULT_LEDGER_PATH, selected_date)
+        if chunk_path.exists():
+            landed = sum(1 for line in chunk_path.read_text(encoding="utf-8").splitlines() if line.strip())
+        else:
+            landed = 0
+    except Exception as exc:
+        landed = f"error:{type(exc).__name__}"
     print(
         f"[intelligence_state] BOARD_STATE_LEDGER_RECORDED selected_date={selected_date} "
-        f"recommendation_count={len(recommendations)}",
+        f"recommendation_count={len(recommendations)} chunk_lines_on_disk={landed}",
         flush=True,
     )
     return bundle
