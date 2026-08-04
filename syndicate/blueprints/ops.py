@@ -399,6 +399,61 @@ def api_ops_intelligence_memory_diagnostics() -> Any:
     return jsonify({"ok": True, "record_count": len(records), "records": records})
 
 
+@ops_bp.get("/api/ops/board-snapshot/inspect")
+def api_ops_board_snapshot_inspect() -> Any:
+    # Read-only. Confirms (or refutes) the theory in todo.md's "OPEN
+    # 2026-08-04 -- Ask the Syndicate can't reach game-market picks" entry:
+    # that read_latest_intelligence_board_snapshot_response reads a single
+    # shared "latest" board_snapshot.json slot, so whichever request last
+    # got persisted into it (potentially with its own limit/sport
+    # narrowing) determines the pool every OTHER caller inherits --
+    # including Ask, on a totally unrelated request. Reports the raw
+    # persisted payload's own recorded request_payload/limit/sport (if
+    # any) plus a candidate_type/market breakdown of its recommendations,
+    # so this can be answered directly instead of guessed at again.
+    from pipeline.intelligence_state import BOARD_SNAPSHOT_PATH
+
+    snapshot = read_json_file(BOARD_SNAPSHOT_PATH)
+    if not isinstance(snapshot, dict):
+        return jsonify({"ok": True, "path": str(BOARD_SNAPSHOT_PATH), "exists": False})
+
+    response = snapshot.get("response") if isinstance(snapshot.get("response"), dict) else snapshot
+    recommendations = response.get("recommendations") if isinstance(response.get("recommendations"), list) else []
+    top_opportunities = response.get("top_opportunities") if isinstance(response.get("top_opportunities"), list) else []
+
+    def _type_market_breakdown(items: list) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            key = f"{item.get('candidate_type') or item.get('type') or '?'} / {item.get('market') or item.get('market_type') or '?'}"
+            counts[key] = counts.get(key, 0) + 1
+        return counts
+
+    return jsonify(
+        {
+            "ok": True,
+            "path": str(BOARD_SNAPSHOT_PATH),
+            "exists": True,
+            "snapshot_top_level_keys": sorted(snapshot.keys()),
+            "response_top_level_keys": sorted(response.keys()) if response is not snapshot else None,
+            "recommendation_count": len(recommendations),
+            "top_opportunities_count": len(top_opportunities),
+            "recommendations_candidate_type_market_breakdown": _type_market_breakdown(recommendations),
+            "top_opportunities_candidate_type_market_breakdown": _type_market_breakdown(top_opportunities),
+            # If either of these is set on the persisted payload, that's
+            # direct evidence the last-cached request narrowed the pool
+            # before it was persisted (the theory) rather than the pool
+            # genuinely only containing prop/steam candidates board-wide.
+            "recorded_limit": response.get("limit") or response.get("requested_sport") if isinstance(response, dict) else None,
+            "recorded_sport": response.get("requested_sport") or response.get("sport") if isinstance(response, dict) else None,
+            "candidate_count_field": response.get("candidate_count") if isinstance(response, dict) else None,
+            "selected_date": response.get("selected_date") if isinstance(response, dict) else None,
+            "snapshot_generated_at": snapshot.get("updated_at") or response.get("snapshot_generated_at") if isinstance(response, dict) else snapshot.get("updated_at"),
+        }
+    )
+
+
 @ops_bp.get("/api/ops/evaluation-settlement/status")
 def api_ops_evaluation_settlement_status() -> Any:
     # Read-only. The evaluation-settlement autorun (run_refresh_worker.py)

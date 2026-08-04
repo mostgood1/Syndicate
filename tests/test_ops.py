@@ -11,6 +11,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+import pipeline.intelligence_state as intelligence_state_module
 from syndicate.app import create_app
 from syndicate.features.shared.live_refresh_loop import ScheduleEvent
 
@@ -242,6 +243,65 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual(payload["version"]["commit_source"], "env")
         self.assertEqual(payload["version"]["branch"], "main")
         self.assertEqual(payload["version"]["render_service_name"], "syndicate-web")
+
+    def test_board_snapshot_inspect_requires_admin_token(self) -> None:
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
+            response = self.client.get("/api/ops/board-snapshot/inspect")
+
+        self.assertEqual(response.status_code, 401)
+        self.assertFalse(response.get_json()["ok"])
+
+    def test_board_snapshot_inspect_reports_missing_snapshot(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            fake_path = Path(tmp_dir) / "reports" / "intelligence" / "board_snapshot.json"
+            with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch.object(
+                intelligence_state_module, "BOARD_SNAPSHOT_PATH", fake_path
+            ):
+                response = self.client.get(
+                    "/api/ops/board-snapshot/inspect",
+                    headers={"X-Admin-Token": "secret-token"},
+                )
+
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertFalse(payload["exists"])
+
+    def test_board_snapshot_inspect_breaks_down_candidate_types_and_markets(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            fake_path = Path(tmp_dir) / "reports" / "intelligence" / "board_snapshot.json"
+            fake_path.parent.mkdir(parents=True, exist_ok=True)
+            fake_path.write_text(
+                json.dumps(
+                    {
+                        "updated_at": "2026-08-04T04:00:00Z",
+                        "response": {
+                            "selected_date": "2026-08-04",
+                            "candidate_count": 3,
+                            "recommendations": [
+                                {"candidate_type": "prop", "market": "Hitter Hits"},
+                                {"candidate_type": "steam", "market": "Total · Steam"},
+                                {"candidate_type": "game", "market": "Moneyline"},
+                            ],
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch.object(
+                intelligence_state_module, "BOARD_SNAPSHOT_PATH", fake_path
+            ):
+                response = self.client.get(
+                    "/api/ops/board-snapshot/inspect",
+                    headers={"X-Admin-Token": "secret-token"},
+                )
+
+        payload = response.get_json()
+        self.assertTrue(payload["exists"])
+        self.assertEqual(payload["recommendation_count"], 3)
+        self.assertEqual(
+            payload["recommendations_candidate_type_market_breakdown"],
+            {"prop / Hitter Hits": 1, "steam / Total · Steam": 1, "game / Moneyline": 1},
+        )
 
     def test_memory_endpoint_requires_admin_token(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
