@@ -142,6 +142,23 @@ window.SyndicateAskBar = (function () {
     void askQuestion("Summarize today's best opportunities across the board and what to watch for.", {});
   }
 
+  // data-syndicate-selection is sometimes just the pick direction with no
+  // player/team in it at all (e.g. "Under", confirmed live 2026-08-04 on
+  // several real cards) -- selection alone was silently ambiguous there,
+  // producing "What's the case for and against Under?", which cannot
+  // possibly match one specific board recommendation. data-syndicate-name
+  // (the card's own title, e.g. "Manny Machado") is always the specific
+  // part; combine the two whenever selection doesn't already include it,
+  // rather than treating selection as unconditionally more specific.
+  function askSubjectFromContext(context) {
+    const name = safeText(context.name, "");
+    const selection = safeText(context.selection, "");
+    if (name && selection && !selection.toLowerCase().includes(name.toLowerCase())) {
+      return `${name} ${selection}`;
+    }
+    return selection || name || safeText(context.matchup, "") || "this pick";
+  }
+
   function wireAskButtons(container) {
     const scope = container || document;
     scope.querySelectorAll("[data-ask-action='ask-pick']").forEach((button) => {
@@ -150,7 +167,7 @@ window.SyndicateAskBar = (function () {
         const card = button.closest("[data-syndicate-name]");
         if (!card) return;
         const context = contextFromCard(card);
-        const subject = context.selection || context.name || context.matchup || "this pick";
+        const subject = askSubjectFromContext(context);
         void askQuestion(`What's the case for and against ${subject}?`, context);
       });
     });
