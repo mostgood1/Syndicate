@@ -3535,13 +3535,32 @@ def _game_side_merge_dedup_key(candidate: dict[str, Any]) -> tuple[str, str, str
     if not game_identity:
         return None
     market = _market_key_from_text(candidate.get("market"), allow_fallback=True)
-    if market not in ("moneyline", "spread"):
-        return None
-    team = _candidate_team_key(candidate)
-    if not team:
+    if market not in ("moneyline", "spread", "total"):
         return None
     line = _numeric_hint(candidate.get("line"))
     line_bucket = round(line * 2.0) / 2.0 if line is not None else None
+    if market == "total":
+        # Totals were excluded here originally, on the grounds that "merging
+        # by market+line alone with no team and no per-side identity would
+        # risk conflating two unrelated games that happen to share a total
+        # line". That risk does not survive this function's own guard above:
+        # game_identity is REQUIRED and returns None when absent, so two
+        # unrelated games can never reach the same key regardless of line.
+        # What totals genuinely lack is a TEAM side -- but they have an
+        # over/under side, which is the correct per-side identity for them.
+        #
+        # The cost of the exclusion was visible on the board 2026-08-04: a
+        # "Total · Steam" card sat alongside the real Total bet for the same
+        # game instead of enriching it, so the steam signal never reached the
+        # candidate a user would actually back.
+        direction = _candidate_selection_direction(candidate)
+        side = "over" if direction > 0 else "under" if direction < 0 else ""
+        if not side:
+            return None
+        return (sport_slug, game_identity, market, side, line_bucket)
+    team = _candidate_team_key(candidate)
+    if not team:
+        return None
     return (sport_slug, game_identity, market, team, line_bucket)
 
 

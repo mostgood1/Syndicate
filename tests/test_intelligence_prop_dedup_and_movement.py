@@ -777,3 +777,71 @@ class GameLevelSteamOddsHistoryJoinTests(unittest.TestCase):
         self.assertEqual(
             intelligence._candidate_odds_history_match_score(prop, self._H2H_KEY, {"last_line": -145.0}), 0.0
         )
+
+
+class TotalsSteamMergeTests(unittest.TestCase):
+    """A Total steam move sat beside the real Total bet instead of enriching it.
+
+    _game_side_merge_dedup_key covered moneyline and spread but excluded
+    totals, reasoning that "merging by market+line alone with no team and no
+    per-side identity would risk conflating two unrelated games that happen
+    to share a total line". That risk cannot occur: the function already
+    REQUIRES a game identity and returns None without one. Totals do lack a
+    team side, but they have an over/under side, which is the right per-side
+    identity for them.
+    """
+
+    def _game_total(self) -> dict:
+        return {
+            "candidate_type": "game",
+            "sport_slug": "mlb",
+            "game_id": "823598",
+            "market": "Total",
+            "pick": "Over 8.5",
+            "line": "8.5",
+        }
+
+    def _total_steam(self) -> dict:
+        return {
+            "candidate_type": "steam",
+            "sport_slug": "mlb",
+            "game_id": "823598",
+            "market": "Total · Steam",
+            "market_key": "total",
+            "pick": "Over 8.5",
+            "line": "8.5",
+        }
+
+    def test_a_total_steam_and_the_real_total_bet_share_a_merge_key(self) -> None:
+        game_key = intelligence._game_side_merge_dedup_key(self._game_total())
+        steam_key = intelligence._game_side_merge_dedup_key(self._total_steam())
+        self.assertIsNotNone(game_key)
+        self.assertEqual(game_key, steam_key)
+
+    def test_over_and_under_do_not_merge_into_each_other(self) -> None:
+        under = self._game_total()
+        under["pick"] = "Under 8.5"
+        self.assertNotEqual(
+            intelligence._game_side_merge_dedup_key(self._game_total()),
+            intelligence._game_side_merge_dedup_key(under),
+        )
+
+    def test_two_games_sharing_a_total_line_stay_separate(self) -> None:
+        # The exact risk the original exclusion named -- prevented by the
+        # required game identity, not by excluding totals.
+        other_game = self._game_total()
+        other_game["game_id"] = "999999"
+        self.assertNotEqual(
+            intelligence._game_side_merge_dedup_key(self._game_total()),
+            intelligence._game_side_merge_dedup_key(other_game),
+        )
+
+    def test_a_total_without_a_game_identity_is_still_refused(self) -> None:
+        no_game = self._game_total()
+        no_game["game_id"] = ""
+        self.assertIsNone(intelligence._game_side_merge_dedup_key(no_game))
+
+    def test_a_total_without_a_resolvable_side_is_refused(self) -> None:
+        sideless = self._game_total()
+        sideless["pick"] = "Total 8.5"
+        self.assertIsNone(intelligence._game_side_merge_dedup_key(sideless))

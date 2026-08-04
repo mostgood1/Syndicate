@@ -230,6 +230,19 @@ _STEAM_LATE_PHASE_ODDS_MOVE = 10.0
 _STEAM_EVENTS_KEEP = 200
 
 
+def _implied_probability_from_american(value: Any) -> float | None:
+    """American price -> implied probability (vig included, single side)."""
+    try:
+        odds = float(value)
+    except (TypeError, ValueError):
+        return None
+    if odds == 0:
+        return None
+    if odds > 0:
+        return 100.0 / (odds + 100.0)
+    return abs(odds) / (abs(odds) + 100.0)
+
+
 def _steam_thresholds(capture_phase: str | None) -> tuple[float, float, float]:
     def _env_float(name: str, fallback: float) -> float:
         raw = str(os.environ.get(name) or "").strip()
@@ -308,11 +321,39 @@ def _steam_signal(
     odds_hit = odds_delta is not None and abs(odds_delta) >= odds_move
     if not (line_hit or odds_hit):
         return None
+    # Recorded, NOT yet used as a threshold. Raw American-odds deltas are not
+    # comparable across sports or markets -- 30 points on a -110 NBA total and
+    # 30 on a +450 soccer goalscorer are wildly different amounts of
+    # information -- so a single fixed SYNDICATE_STEAM_ODDS_MOVE is
+    # simultaneously too loose for liquid markets and too tight for thin
+    # ones. Probability movement per minute is the comparable unit, and is
+    # what a threshold SHOULD key on.
+    #
+    # Deliberately not switched over in this change: re-basing the trigger
+    # blind would silently change what counts as steam across every sport at
+    # once, with no measurement to say whether the new cut is better. Record
+    # it first, grade it against closing lines (steam -> CLV hit rate per
+    # sport/market), then move the threshold onto the graded number. This
+    # field is the input that makes that possible.
+    #
+    # Single-sided, so it still carries the book's vig -- a true de-vig needs
+    # both sides of the market, which this per-row detector never sees. Named
+    # accordingly rather than claiming more than it is.
+    prob_delta = None
+    prob_delta_per_minute = None
+    previous_prob = _implied_probability_from_american(previous_odds)
+    current_prob = _implied_probability_from_american(current_odds)
+    if previous_prob is not None and current_prob is not None:
+        prob_delta = current_prob - previous_prob
+        if gap_seconds > 0:
+            prob_delta_per_minute = prob_delta * 60.0 / gap_seconds
     return {
         "line_delta": round(line_delta, 3) if line_delta is not None else None,
         "odds_delta": round(odds_delta, 1) if odds_delta is not None else None,
         "window_seconds": round(gap_seconds, 1),
         "capture_phase": capture_phase,
+        "implied_prob_delta": round(prob_delta, 5) if prob_delta is not None else None,
+        "implied_prob_delta_per_minute": round(prob_delta_per_minute, 5) if prob_delta_per_minute is not None else None,
     }
 
 
@@ -330,6 +371,65 @@ def steam_events_path_for_sport(sport: str, date_str: str) -> Path:
 
     slug = str(sport or "").strip().lower() or "unknown"
     return reports_root() / "steam" / f"steam_events_{slug}_{date_str}.json"
+
+
+def _annotate_steam_book_confirmation(events: list[dict[str, Any]]) -> None:
+    """Stamp each steam event with how many books moved the SAME way.
+
+    One book moving is that book's own position; a correlated move across
+    several books is the thing "steam" is actually supposed to name. The
+    detector is per-row (one market, one book, two consecutive
+    observations), so it structurally cannot see this -- but by the time a
+    refresh has finished, every book's row for that cycle is in hand, and
+    grouping them is cheap.
+
+    Recorded, not enforced: nothing filters on it yet, for the same reason
+    the probability delta above isn't a threshold yet -- requiring N books
+    without first measuring how single-book steam actually grades against
+    closing lines would be swapping one guess for another. Consumers can
+    rank on it immediately; a threshold should wait for the CLV numbers.
+    """
+    groups: dict[tuple[str, str, str, str], list[dict[str, Any]]] = {}
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        steam = event.get("steam") if isinstance(event.get("steam"), dict) else None
+        if not steam:
+            continue
+        key = (
+            str(event.get("sport") or "").strip().lower(),
+            str(event.get("game_id") or event.get("event_id") or "").strip(),
+            str(event.get("market_type") or "").strip().lower(),
+            str(event.get("selection") or event.get("player_name") or "").strip().lower(),
+        )
+        groups.setdefault(key, []).append(event)
+
+    for grouped in groups.values():
+        books_up: set[str] = set()
+        books_down: set[str] = set()
+        for event in grouped:
+            steam = event.get("steam") or {}
+            book = str(event.get("bookmaker") or event.get("book") or "").strip().lower()
+            if not book:
+                continue
+            direction = steam.get("implied_prob_delta")
+            if direction is None:
+                direction = steam.get("odds_delta")
+            if direction is None:
+                direction = steam.get("line_delta")
+            if direction is None:
+                continue
+            (books_up if direction > 0 else books_down).add(book)
+        for event in grouped:
+            steam = event.get("steam") or {}
+            direction = steam.get("implied_prob_delta")
+            if direction is None:
+                direction = steam.get("odds_delta")
+            if direction is None:
+                direction = steam.get("line_delta")
+            agreeing = books_up if (direction or 0) > 0 else books_down
+            steam["books_confirming"] = len(agreeing)
+            steam["books_opposing"] = len(books_down if (direction or 0) > 0 else books_up)
 
 
 def _record_steam_events(date_str: str, events: list[dict[str, Any]]) -> None:
@@ -1591,6 +1691,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
                 )
             )
 
+    _annotate_steam_book_confirmation(steam_events)
     _record_steam_events(date_str, steam_events)
     if lifecycle_events:
         _trace_log("before_append_odds_lifecycle_events", sport=slug, date=date_str, events=len(lifecycle_events), path=str(odds_lifecycle_path(date_str)))

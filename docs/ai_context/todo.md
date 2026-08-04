@@ -1,5 +1,68 @@
 # Syndicate TODO — canonical cross-session list
 
+### IN PROGRESS 2026-08-04 -- Steam reworked toward a real signal layer; soccer movement fixed (code done, deploy blocked)
+
+Four shipped in code (`6647a975` + follow-up), one staged item deliberately
+NOT started. Deploy has been blocked for ~30min by chained MLB sims
+(`evening_next_day_sim` then back-to-back `tip_off_window`) on refresh-worker;
+watcher is running, deploy goes the moment it clears.
+
+**1. Soccer movement -- FIXED.** Not a capture failure. Soccer had 399 markets
+under shard 2026-08-02 and 206 under 2026-08-16, ZERO under 2026-08-04.
+odds_history shards by the GAME's date; soccer's board carries upcoming
+fixtures, so the reader was asking for a day MLS doesn't play. Daily sports
+never noticed because their fixture date IS the board date. The reader now
+loads the primary shard plus the distinct fixture dates on that sport's own
+board (bounded by `_MAX_EXTRA_ODDS_HISTORY_SHARDS`, unioned). MLB still
+resolves to exactly one shard -- important, its shard is ~30MB.
+
+**2. Steam for all active sports -- FIXED.** It was structurally impossible
+before, not unlucky: `_record_steam_events` appended every sport to ONE
+`steam_events_<date>.json` and kept `merged[-200:]`. MLB (3,400+ tracked
+markets on a 15-game night) evicted everything else in a single refresh --
+board showed 164 steam candidates, all MLB, WNBA and soccer at zero. Now
+per-sport files, so the cap is per-sport by construction; also removes the
+lost-update race where concurrent refreshes read-modify-wrote one key.
+Reader still reads the legacy combined file (filtered) for back-compat.
+Per-sport paths still match HOT_ARTIFACT_PATTERNS.
+
+**3. One move, one card -- FIXED.** The dedupe key included `timestamp`, so
+each re-detection appended another identical row: 14 "Baltimore Orioles Total
+steam move" cards at line 8.5 on one board. Identity is now (sport, game,
+market, subject, selection), newest wins, with `steam_observations` /
+`steam_last_seen` so a market that keeps moving stays distinguishable from
+one that moved once.
+
+**4. Totals steam now merges into the real bet.** `_game_side_merge_dedup_key`
+covered moneyline/spread but excluded totals, reasoning that merging on
+market+line with no team could conflate two games sharing a line. That risk
+cannot occur -- the function already REQUIRES a game identity and returns
+None without one. Totals lack a TEAM side but have an over/under side, which
+is the correct per-side identity. Cost of the exclusion was visible: a
+"Total · Steam" card sat next to the real Total bet instead of enriching it.
+
+**5. Measurement groundwork, recorded but NOT enforced.** Two new fields on
+every steam event: `implied_prob_delta` / `implied_prob_delta_per_minute`
+(probability movement is the only unit comparable across sports and markets
+-- 30 American points on a -110 NBA total and on a +450 goalscorer are
+completely different amounts of information, yet one fixed
+`SYNDICATE_STEAM_ODDS_MOVE` governs both), and `books_confirming` /
+`books_opposing` (one book moving is that book's position; a correlated move
+across books is what "steam" is supposed to mean -- the per-row detector
+structurally cannot see this, but the full refresh can).
+
+**Deliberately not switched over.** Re-basing the trigger onto probability,
+or requiring N confirming books, would change what counts as steam across
+every sport at once with no measurement saying the new cut is better. That is
+swapping one guess for another. Correct order: record -> grade against
+closing lines (steam -> CLV hit rate per sport/market/threshold) -> move the
+threshold onto the graded number. Step 1 is now done; **the CLV grading
+joiner is the next real piece of work and has not been started.**
+
+**Still open:** the standalone steam lane is still a peer of EV-ranked bets
+rather than a demoted information lane -- deferred on purpose, it changes what
+users see and wants a product call, not a refactor.
+
 ### FIXED (code) 2026-08-04 -- Game-level steam candidates could never join their own game's odds history
 
 Found by re-checking the board after the movement fixes landed: MLB was
