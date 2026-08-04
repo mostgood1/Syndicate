@@ -65,6 +65,50 @@ class AskTheSyndicateApiTests(unittest.TestCase):
         self.assertEqual(result.get("top_opportunities"), [{"name": "Board Snapshot Play"}])
         mocked_state_response.assert_not_called()
 
+    def test_read_latest_intelligence_state_prefers_combined_board_window_when_enabled(self) -> None:
+        # Confirmed live 2026-08-04 (todo.md "Ask the Syndicate can't reach
+        # game-market picks"): the live board's own default read
+        # (intelligence_query_api's combined_board_default_enabled branch)
+        # unions each date's per-date cached response via
+        # read_combined_intelligence_response. This function's fallback
+        # (board_snapshot.json) is a DIFFERENT, single-global-slot source
+        # that was confirmed to sometimes carry a much narrower pool
+        # (100% steam candidates) than what the board showed at the same
+        # moment. This must try the board's own combined source first, same
+        # flag-gate, before falling to the older cascade.
+        combined_response = {"top_opportunities": [{"name": "Combined Window Play"}], "candidate_count": 1}
+        with patch("syndicate.blueprints.intelligence._load_canonical_board_response", return_value=(None, "canonical_disabled")):
+            with patch("syndicate.blueprints.intelligence.combined_board_default_enabled", return_value=True):
+                with patch(
+                    "pipeline.intelligence_state.read_combined_intelligence_response", return_value=combined_response
+                ) as mocked_combined:
+                    with patch("syndicate.blueprints.ask_the_syndicate.read_latest_intelligence_board_snapshot_response") as mocked_board_snapshot:
+                        with patch("syndicate.blueprints.ask_the_syndicate.read_latest_intelligence_state_response") as mocked_state_response:
+                            result = ask_module.read_latest_intelligence_state({"selected_date": "2026-06-10", "sport": "mlb"})
+
+        self.assertEqual(result.get("top_opportunities"), [{"name": "Combined Window Play"}])
+        mocked_combined.assert_called_once_with(dates=["2026-06-10"], sport="mlb", limit=None)
+        mocked_board_snapshot.assert_not_called()
+        mocked_state_response.assert_not_called()
+
+    def test_read_latest_intelligence_state_skips_empty_combined_window(self) -> None:
+        # An empty combined response (candidate_count falsy) must not
+        # shadow the older cascade -- an empty board window is not
+        # meaningfully "better" than whatever board_snapshot.json has.
+        with patch("syndicate.blueprints.intelligence._load_canonical_board_response", return_value=(None, "canonical_disabled")):
+            with patch("syndicate.blueprints.intelligence.combined_board_default_enabled", return_value=True):
+                with patch(
+                    "pipeline.intelligence_state.read_combined_intelligence_response",
+                    return_value={"top_opportunities": [], "candidate_count": 0},
+                ):
+                    with patch(
+                        "syndicate.blueprints.ask_the_syndicate.read_latest_intelligence_board_snapshot_response",
+                        return_value={"top_opportunities": [{"name": "Board Snapshot Play"}]},
+                    ):
+                        result = ask_module.read_latest_intelligence_state({})
+
+        self.assertEqual(result.get("top_opportunities"), [{"name": "Board Snapshot Play"}])
+
     def test_query_route_response_is_strict_json_safe_even_with_nan_upstream(self) -> None:
         # Reported live 2026-08-04: the Ask-the-Syndicate panel on the main
         # board page never returned an answer -- "Unexpected token 'N', ...

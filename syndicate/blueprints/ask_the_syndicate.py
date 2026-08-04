@@ -266,6 +266,36 @@ def read_latest_intelligence_state(payload: dict[str, Any] | None = None) -> dic
     if isinstance(canonical_response, dict) and canonical_response:
         return _hydrate_intelligence_snapshot_payload(canonical_response)
 
+    # Confirmed live 2026-08-04 ("Ask the Syndicate can't reach game-market
+    # picks" in todo.md): the live board's own default read
+    # (intelligence_query_api's combined_board_default_enabled branch)
+    # unions each date's own per-date cached response across the whole
+    # board window via read_combined_intelligence_response. This function's
+    # fallback below instead reads board_snapshot.json -- a SINGLE global
+    # "whatever the legacy background queue finished computing last" file,
+    # overwritten by every payload it processes regardless of date/sport/
+    # completeness -- not the same source, and confirmed to sometimes be a
+    # much narrower snapshot (100% steam candidates, zero props, zero
+    # game-markets) than what the board was showing at that same moment.
+    # Try the board's own combined source first, same flag-gate, before
+    # falling through to the older cascade unchanged.
+    try:
+        from syndicate.blueprints.intelligence import combined_board_default_enabled
+        from pipeline.intelligence_state import read_combined_intelligence_response
+
+        if combined_board_default_enabled():
+            explicit_date = str((payload or {}).get("date") or (payload or {}).get("selected_date") or "").strip()
+            requested_sport = str((payload or {}).get("sport") or "all").strip().lower() or "all"
+            combined_response = read_combined_intelligence_response(
+                dates=[explicit_date] if explicit_date else None,
+                sport=requested_sport,
+                limit=(payload or {}).get("limit"),
+            )
+            if isinstance(combined_response, dict) and combined_response.get("candidate_count"):
+                return _hydrate_intelligence_snapshot_payload(combined_response)
+    except Exception:
+        pass
+
     board_snapshot = read_latest_intelligence_board_snapshot_response(payload or {}, force_refresh=False)
     if isinstance(board_snapshot, dict):
         return _hydrate_intelligence_snapshot_payload(board_snapshot)
