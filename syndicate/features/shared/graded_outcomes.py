@@ -29,6 +29,7 @@ Constraints:
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -381,25 +382,126 @@ def _ncaab_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
-# Not yet available. Registered (rather than omitted) so evaluation_settlement
-# treats these sports as "supported, currently zero graded rows" -- the
-# correct diagnostic bucket -- instead of "unsupported sport", and so
-# building the real grader later (Stage 1 follow-up) needs no change
-# anywhere else once it lands.
+# NCAAF -- follow-up to the gap noted above: cfbd_lines_{wk}.json /
+# cfbd_lines_{season}_wk{N}.json (already fetched for the market board,
+# ncaaf/cards.py:_smartsim2_standalone_market_lines) turns out to carry
+# everything needed directly -- a real joinable id (CFBD's own numeric game
+# id; 705/752 = 93.8% overlap confirmed against
+# smartsim2_performance_log.jsonl's own game_id field), a real UTC
+# `startDate`, multi-provider `lines` (spread/overUnder/moneylines), and
+# (once played) real `homeScore`/`awayScore`. The performance log itself is
+# NOT used here -- same as the NFL adapter above, grading an arbitrary
+# selection+line needs only the real closing market number and the real
+# final score, not which internal model picked what.
+#
+# Sign convention verified against ncaaf/cards.py's own
+# `_smartsim2_standalone_market_lines` (`market_margin =
+# -statistics.mean(spreads)`, i.e. cfbd's raw `spread` field is already
+# "the home team's own signed number, negative favors home" -- e.g. "TCU
+# -6.5" with TCU at home is `spread: -6.5`), the exact same convention
+# `_nfl_graded_rows_for_date` above assumes for `spread_line` from
+# schedule_{season}.csv. No renegotiating the sign here -- average the raw
+# `spread`/`overUnder` fields directly.
 # ---------------------------------------------------------------------------
 
 
-def _ncaaf_graded_rows_for_date(_date_str: str) -> list[dict[str, Any]]:
-    # NCAAF's own performance log (smartsim2_performance_log.jsonl, 752 real
-    # graded games) has the same date gap the NFL adapter above works around
-    # via schedule_{season}.csv -- but NCAAF's on-disk schedule data is a
-    # scattered set of timestamped snapshot CSVs
-    # (college_football_schedule_2025_predicted_totals_enhanced*.csv) with
-    # no game_id column matching the performance log's CFBD numeric ids, and
-    # no closing spread/total/moneyline columns at all. Resolving that needs
-    # its own investigation (likely the cfbd_lines_wk*.json files carry the
-    # real market numbers + a joinable id) rather than a guess here.
-    return []
+def _ncaaf_lines_paths() -> list[Path]:
+    from syndicate.features.ncaaf.sources import default_ncaaf_source_root
+
+    root = default_ncaaf_source_root() / "data"
+    if not root.exists():
+        return []
+    return sorted(root.glob("cfbd_lines_*.json"))
+
+
+def _ncaaf_game_local_date(game: Mapping[str, Any]) -> str | None:
+    from syndicate.features.shared.timezone import central_date_from_iso
+
+    resolved = central_date_from_iso(game.get("startDate"))
+    return resolved.isoformat() if resolved else None
+
+
+def _ncaaf_market_numbers(game: Mapping[str, Any]) -> dict[str, float | None]:
+    import statistics as _statistics
+
+    lines = game.get("lines") if isinstance(game.get("lines"), list) else []
+    spreads = [line["spread"] for line in lines if isinstance(line, dict) and line.get("spread") is not None]
+    totals = [line["overUnder"] for line in lines if isinstance(line, dict) and line.get("overUnder") is not None]
+    spread_line = _statistics.mean(spreads) if spreads else None
+    total_line = _statistics.mean(totals) if totals else None
+    home_moneyline = None
+    away_moneyline = None
+    for line in lines:
+        if not isinstance(line, dict):
+            continue
+        if line.get("homeMoneyline") is not None and line.get("awayMoneyline") is not None:
+            home_moneyline = line.get("homeMoneyline")
+            away_moneyline = line.get("awayMoneyline")
+            break
+    return {"spread_line": spread_line, "total_line": total_line, "home_moneyline": home_moneyline, "away_moneyline": away_moneyline}
+
+
+def _ncaaf_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    seen_game_ids: set[str] = set()
+    for lines_path in _ncaaf_lines_paths():
+        try:
+            with lines_path.open("r", encoding="utf-8") as handle:
+                games = json.load(handle)
+        except Exception:
+            continue
+        if not isinstance(games, list):
+            continue
+        for game in games:
+            if not isinstance(game, dict):
+                continue
+            game_id = str(game.get("id") or "").strip()
+            # Several cfbd_lines_*.json snapshots can carry the same game
+            # (weekly re-fetches, or the "_wkN"/"_{season}_wkN" naming
+            # overlapping) -- grade each real game once per date.
+            if not game_id or game_id in seen_game_ids:
+                continue
+            game_date = _ncaaf_game_local_date(game)
+            if game_date != date_str:
+                continue
+            home_score = _to_float(game.get("homeScore"))
+            away_score = _to_float(game.get("awayScore"))
+            if home_score is None or away_score is None:
+                continue
+            seen_game_ids.add(game_id)
+
+            home_team = str(game.get("homeTeam") or "").strip()
+            away_team = str(game.get("awayTeam") or "").strip()
+            title = f"{away_team} @ {home_team}"
+            actual_margin = home_score - away_score
+            actual_total = home_score + away_score
+            market = _ncaaf_market_numbers(game)
+            spread_line = market["spread_line"]
+            total_line = market["total_line"]
+
+            def _ml_result(margin_for_side: float) -> str:
+                if margin_for_side == 0:
+                    return "push"
+                return "win" if margin_for_side > 0 else "loss"
+
+            rows.append({"sport": "ncaaf", "market": "moneyline", "selection": home_team, "home": home_team, "away": away_team, "title": title, "actual": home_score, "odds": market["home_moneyline"], "result": _ml_result(actual_margin)})
+            rows.append({"sport": "ncaaf", "market": "moneyline", "selection": away_team, "home": home_team, "away": away_team, "title": title, "actual": away_score, "odds": market["away_moneyline"], "result": _ml_result(-actual_margin)})
+
+            if spread_line is not None:
+                def _spread_result(covers_margin: float) -> str:
+                    if covers_margin == 0:
+                        return "push"
+                    return "win" if covers_margin > 0 else "loss"
+
+                rows.append({"sport": "ncaaf", "market": "spread", "selection": home_team, "home": home_team, "away": away_team, "title": title, "line": spread_line, "actual": actual_margin, "odds": -110, "result": _spread_result(actual_margin + spread_line)})
+                rows.append({"sport": "ncaaf", "market": "spread", "selection": away_team, "home": home_team, "away": away_team, "title": title, "line": -spread_line, "actual": -actual_margin, "odds": -110, "result": _spread_result(-actual_margin - spread_line)})
+
+            if total_line is not None:
+                over_result = "push" if actual_total == total_line else ("win" if actual_total > total_line else "loss")
+                under_result = "push" if actual_total == total_line else ("win" if actual_total < total_line else "loss")
+                rows.append({"sport": "ncaaf", "market": "total", "selection": "over", "home": home_team, "away": away_team, "title": title, "line": total_line, "actual": actual_total, "odds": -110, "result": over_result})
+                rows.append({"sport": "ncaaf", "market": "total", "selection": "under", "home": home_team, "away": away_team, "title": title, "line": total_line, "actual": actual_total, "odds": -110, "result": under_result})
+    return rows
 
 
 GRADED_OUTCOME_GRADERS: dict[str, GradedRowGrader] = {

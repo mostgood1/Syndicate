@@ -5,6 +5,7 @@ to instead of hardcoding a per-sport grader inline."""
 from __future__ import annotations
 
 import csv
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -20,9 +21,6 @@ class RegistryTests(unittest.TestCase):
 
     def test_unknown_sport_returns_empty_not_an_error(self) -> None:
         self.assertEqual(go.graded_rows_for_date("esports", "2026-08-02"), [])
-
-    def test_not_yet_available_sports_return_empty(self) -> None:
-        self.assertEqual(go.graded_rows_for_date("ncaaf", "2026-08-02"), [])
 
 
 class LocalMarketAccuracyDelegationTests(unittest.TestCase):
@@ -174,6 +172,94 @@ class NflGraderTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             with patch("syndicate.features.nfl.sources.default_nfl_source_root", return_value=Path(tmp_dir)):
                 self.assertEqual(go.graded_rows_for_date("nfl", "2026-09-09"), [])
+
+
+class NcaafGraderTests(unittest.TestCase):
+    def _write_lines_file(self, root: Path, filename: str, games: list[dict]) -> None:
+        data_dir = root / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        (data_dir / filename).write_text(json.dumps(games), encoding="utf-8")
+
+    def _game(self, **overrides) -> dict:
+        game = {
+            "id": 401752822,
+            "season": 2025,
+            "week": 2,
+            "startDate": "2025-09-06T19:00:00.000Z",
+            "homeTeam": "Iowa State",
+            "awayTeam": "Iowa",
+            "homeScore": 16,
+            "awayScore": 13,
+            "lines": [
+                {"provider": "Bovada", "spread": -3.0, "overUnder": 44.0, "homeMoneyline": -150, "awayMoneyline": 130},
+                {"provider": "DraftKings", "spread": -2.5, "overUnder": 43.0, "homeMoneyline": -155, "awayMoneyline": 135},
+            ],
+        }
+        game.update(overrides)
+        return game
+
+    def test_home_favorite_covers_and_totals_grade_correctly(self) -> None:
+        # spread averages to -2.75 (home favored by 2.75), home wins by 3 -> covers.
+        # total averages to 43.5, actual total 29 -> under wins.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self._write_lines_file(root, "cfbd_lines_wk2.json", [self._game()])
+            with patch("syndicate.features.ncaaf.sources.default_ncaaf_source_root", return_value=root):
+                rows = go.graded_rows_for_date("ncaaf", "2025-09-06")
+
+        by_market_selection = {(r["market"], r["selection"]): r for r in rows}
+        self.assertEqual(by_market_selection[("moneyline", "Iowa State")]["result"], "win")
+        self.assertEqual(by_market_selection[("moneyline", "Iowa")]["result"], "loss")
+        self.assertEqual(by_market_selection[("spread", "Iowa State")]["result"], "win")
+        self.assertEqual(by_market_selection[("spread", "Iowa")]["result"], "loss")
+        self.assertEqual(by_market_selection[("total", "under")]["result"], "win")
+        self.assertEqual(by_market_selection[("total", "over")]["result"], "loss")
+        self.assertAlmostEqual(by_market_selection[("spread", "Iowa State")]["line"], -2.75)
+        self.assertAlmostEqual(by_market_selection[("total", "over")]["line"], 43.5)
+
+    def test_favorite_fails_to_cover_is_a_loss_not_a_win(self) -> None:
+        game = self._game(homeScore=17, awayScore=15)  # wins by 2, favored by 2.75 -> fails to cover
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self._write_lines_file(root, "cfbd_lines_wk2.json", [game])
+            with patch("syndicate.features.ncaaf.sources.default_ncaaf_source_root", return_value=root):
+                rows = go.graded_rows_for_date("ncaaf", "2025-09-06")
+        by_market_selection = {(r["market"], r["selection"]): r for r in rows}
+        self.assertEqual(by_market_selection[("moneyline", "Iowa State")]["result"], "win")
+        self.assertEqual(by_market_selection[("spread", "Iowa State")]["result"], "loss")
+        self.assertEqual(by_market_selection[("spread", "Iowa")]["result"], "win")
+
+    def test_unplayed_games_are_skipped(self) -> None:
+        game = self._game(homeScore=None, awayScore=None)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self._write_lines_file(root, "cfbd_lines_wk2.json", [game])
+            with patch("syndicate.features.ncaaf.sources.default_ncaaf_source_root", return_value=root):
+                rows = go.graded_rows_for_date("ncaaf", "2025-09-06")
+        self.assertEqual(rows, [])
+
+    def test_wrong_date_is_not_graded(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self._write_lines_file(root, "cfbd_lines_wk2.json", [self._game()])
+            with patch("syndicate.features.ncaaf.sources.default_ncaaf_source_root", return_value=root):
+                rows = go.graded_rows_for_date("ncaaf", "2025-09-07")
+        self.assertEqual(rows, [])
+
+    def test_duplicate_game_id_across_files_graded_once(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self._write_lines_file(root, "cfbd_lines_wk2.json", [self._game()])
+            self._write_lines_file(root, "cfbd_lines_2026_wk2.json", [self._game()])
+            with patch("syndicate.features.ncaaf.sources.default_ncaaf_source_root", return_value=root):
+                rows = go.graded_rows_for_date("ncaaf", "2025-09-06")
+        # 2 moneyline + 2 spread + 2 total = 6 rows for ONE game, not 12.
+        self.assertEqual(len(rows), 6)
+
+    def test_no_lines_files_returns_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with patch("syndicate.features.ncaaf.sources.default_ncaaf_source_root", return_value=Path(tmp_dir)):
+                self.assertEqual(go.graded_rows_for_date("ncaaf", "2025-09-06"), [])
 
 
 class NcaabGraderTests(unittest.TestCase):
