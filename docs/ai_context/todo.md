@@ -1,5 +1,36 @@
 # Syndicate TODO — canonical cross-session list
 
+### OPEN 2026-08-04 (2) -- Matchup-coverage diagnostic deployed and proven working; still waiting on an MLB cycle
+
+`eb46b219` (`_sync_odds_history_for_refresh` h2h-coverage tracking +
+`GET /api/ops/odds-history/matchup-coverage`) is deployed and confirmed
+live on all three services (`git merge-base --is-ancestor eb46b219
+<live commit>` on each). **The mechanism itself is proven correct, not
+just unit-tested**: WNBA's first post-deploy cycle
+(`updated_at: 2026-08-04T11:03:21-05:00`) shows clean 4/4 coverage --
+all four of that day's real matchups (Dallas@Washington, LA@Chicago,
+Phoenix@Atlanta, Seattle@New York) flowed `in_source` -> `passed_gate`
+-> `written` with zero drops at either stage.
+
+**MLB itself had not cycled yet** after ~8 minutes of observation post-
+deploy (`by_sport` had no `mlb` key). Consistent with the earlier finding
+that MLB's odds-history sync is owned by `refresh-worker`'s own lane, a
+separately-cadenced, larger multi-sport run -- not `live-odds-worker`'s
+faster round robin that produced the WNBA read above.
+
+**Next step, one call, no new code:** `GET
+/api/ops/odds-history/matchup-coverage` (Authorization: Bearer
+$ADMIN_TOKEN) and read `by_sport.mlb`. Once present:
+`dropped_at_gate` non-empty -> a real gate rejection (missing/malformed
+line or odds field) for those specific matchups, matched against real
+field values by re-reading the row shape in
+`_sync_odds_history_for_refresh`'s per-row loop. `dropped_at_gate` empty
+but `in_source` still short of ~15 games -> the gap is upstream of this
+function entirely (in what `_odds_history_snapshot_paths`/
+`_odds_history_rows_from_json` extract from
+`oddsapi_game_lines_{date}.json`), not in the market_key/line gate this
+diagnostic instruments -- would need a second diagnostic one level up.
+
 ### OPEN 2026-08-04 -- MLB odds-history capture: 18/30 teams (9/~15 games), cause narrowed but not found
 
 Follow-up to the board-movement fix above. Confirmed this is a REAL, separate
