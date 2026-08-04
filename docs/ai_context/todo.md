@@ -551,7 +551,64 @@ full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
 
-### ROOT CAUSE 2026-08-04 (corrected) -- reconcile reads 8 sims, emits 2 games, reports 0 skipped and 0 failed
+### ROOT CAUSE 2026-08-04 (final) -- reconcile only ever SAW 2 sims; nothing is being dropped
+
+**Corrected again, and this one is proven from code rather than measured
+across the wrong disk.**
+
+`reconcile_daily_sim_artifacts.py`'s main loop (lines ~829-868) has NO
+silent branch. Every iteration either appends to `results` or to
+`failures`:
+
+    read fails            -> failures.append(); continue
+    non-dict root         -> failures.append(); continue
+    missing game_pk       -> failures.append(); continue
+    feed load raises      -> failures.append(); continue
+    feed empty            -> skipped_games += 1; failures.append(); continue
+    _build_game_row None  -> skipped_games += 1; failures.append(); continue
+    otherwise             -> results.append(row)
+
+and the report writes `"games": results` verbatim with
+`"failures_n": len(failures)`. So the invariant is absolute:
+
+    len(results) + len(failures) == len(sim_paths)
+
+Observed in production: `games_count 2`, `failures_n 0`. Therefore
+**`sim_paths` had exactly 2 entries.** Reconcile never saw 8 sims. Nothing
+is being dropped, and the counters are NOT lying -- the previous entry's
+"silently drops 6 of 8" claim is withdrawn.
+
+**Why the earlier measurement misled: it read the wrong disk.**
+`/api/ops/mlb/betting-card-day` runs on the **web** service and inspects
+the web disk. `reconcile` runs on **refresh-worker**, which has its own
+separate disk (the repo's standing three-disk constraint). The 8 sim files
+and their 23:11:09 mtimes are the WEB copy, arriving via artifact publish
+-- not what reconcile globbed on the worker.
+
+**The real question, restated:** why did
+`data/daily/sims/2026-08-03` on **refresh-worker** contain only 2 sim
+files at 00:55 CDT on 08-04, when 8 later reached the web disk (and the
+slate had ~15 games)?
+
+**Next step must run on the worker, not the web service.** Options:
+1. An ops endpoint will NOT work -- refresh-worker runs no HTTP server.
+   Note `/api/ops/intelligence/memory-diagnostics` exists precisely because
+   of this limitation.
+2. Have the worker itself log the glob result: one
+   `print(f"RECONCILE_SIM_PATHS n={len(sim_paths)} dir={sim_dir}", flush=True)`
+   before the loop in `reconcile_daily_sim_artifacts.py`, then read
+   refresh-worker logs. `print(flush=True)` reaches Render's collector where
+   `logger.info` does not.
+3. Or have the MLB sim job log how many sims it wrote for the date, and
+   compare the two counts directly.
+
+(2) is the smallest change and answers it in one cycle.
+
+**Do NOT** "fix" the loop, the manifest builder, the settlement join, or
+the schedule. Eight suspects have now been ruled out; the open question is
+purely how many sim files exist on the worker when reconcile runs.
+
+
 
 `tools/eval/reconcile_daily_sim_artifacts.py` is silently dropping games,
 and its own counters do not admit it.
