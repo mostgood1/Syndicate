@@ -69,6 +69,38 @@ class BoardSummaryRoutingTests(unittest.TestCase):
         self.assertEqual(self.router.route("compare Judge and Ohtani").intent, "comparison")
         self.assertEqual(self.router.route("Yankees vs Red Sox").intent, "matchup_analysis")
 
+    def test_per_pick_ask_button_context_routes_to_bet_analysis(self) -> None:
+        # Reported live 2026-08-04: the board's "Ask about this pick" button
+        # (ask_bar.js's wireAskButtons) always asks "What's the case for and
+        # against <selection>?" -- a phrasing that matches no rule above --
+        # while attaching real context (selection/candidate_id/market)
+        # identifying exactly one pick. Every per-card click therefore fell
+        # through to the market_summary default and never returned real
+        # single-bet analysis, no matter which card was clicked.
+        decision = self.router.route(
+            "What's the case for and against Colorado Rockies steam move?",
+            context={"sport": "mlb", "selection": "Colorado Rockies steam move", "candidate_type": "game"},
+        )
+        self.assertEqual(decision.intent, "bet_analysis")
+        self.assertEqual(decision.handler_name, "handle_bet_analysis")
+
+    def test_context_subject_fallback_yields_to_an_explicit_textual_match(self) -> None:
+        # A stale/incidental context object (carried over from a prior
+        # per-card click) must never override an EXPLICIT question the user
+        # actually typed -- the textual match still wins on its own merits.
+        general = self.router.route(
+            "Summarize today's best opportunities across the board and what to watch for.",
+            context={"selection": "Colorado Rockies steam move"},
+        )
+        self.assertEqual(general.intent, "market_summary")
+
+        comparison = self.router.route("Compare the Lakers and Celtics", context={"selection": "Colorado Rockies steam move"})
+        self.assertEqual(comparison.intent, "comparison")
+
+    def test_context_without_a_subject_does_not_change_the_default(self) -> None:
+        decision = self.router.route("qwertyuiop nothing matches this at all", context={"sport": "mlb"})
+        self.assertEqual(decision.intent, "market_summary")
+
 
 
 class BoardSummaryAnswerContentTests(unittest.TestCase):

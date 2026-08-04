@@ -35,7 +35,7 @@ class SyndicateQueryRouter:
     def _normalize_question(question: str) -> str:
         return re.sub(r"\s+", " ", str(question or "").strip()).lower()
 
-    def route(self, question: str) -> RouteDecision:
+    def route(self, question: str, context: dict[str, object] | None = None) -> RouteDecision:
         normalized_question = self._normalize_question(question)
         # Unmatched questions fall back to a BOARD SUMMARY, not single-bet
         # analysis. bet_analysis matches one specific recommendation to the
@@ -60,6 +60,23 @@ class SyndicateQueryRouter:
                     matched_terms=matched_terms,
                     score=score,
                 )
+
+        # The board's own "Ask about this pick" button (ask_bar.js's
+        # wireAskButtons) asks a fixed, generic phrasing -- "What's the case
+        # for and against <selection>?" -- that never matches any pattern
+        # above, so every per-card click fell through to the market_summary
+        # default and discarded the real context (selection/candidate_id/
+        # market) it attached, even though that context unambiguously
+        # names ONE specific pick. Reported live 2026-08-04: clicking the
+        # per-card ask action never returned real single-bet analysis, no
+        # matter which card. Only engages when nothing textual matched at
+        # all (best_decision.score == 0) -- an explicit textual match (e.g.
+        # "compare X and Y" typed while old context happens to be attached)
+        # still wins on its own merits.
+        if best_decision.score == 0 and isinstance(context, dict):
+            subject = str(context.get("selection") or context.get("candidate_id") or context.get("name") or "").strip()
+            if subject:
+                return RouteDecision(intent="bet_analysis", handler_name="handle_bet_analysis", matched_terms=("context_subject",), score=self._base_score("bet_analysis") + 1)
 
         return best_decision
 

@@ -425,7 +425,11 @@ def ask_the_syndicate_query_api():
         return _with_cors_headers(jsonify({"ok": False, "error": "question is required."})), 400
 
     shaped_payload = _smart_route_payload(payload)
-    decision = _QUERY_ROUTER.route(str(shaped_payload.get("question") or question))
+    # shaped_payload already has the request's context (selection/
+    # candidate_id/market/etc.) flattened into it by _smart_route_payload,
+    # so it doubles as the context source for the per-pick routing fallback
+    # in SyndicateQueryRouter.route -- see that function's own comment.
+    decision = _QUERY_ROUTER.route(str(shaped_payload.get("question") or question), context=shaped_payload)
 
     cache_key = _query_cache_key(question, payload, decision)
     cached_response = _read_cached_response(cache_key)

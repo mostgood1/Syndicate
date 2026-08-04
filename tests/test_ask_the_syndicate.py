@@ -166,6 +166,50 @@ class AskTheSyndicateApiTests(unittest.TestCase):
         self.assertEqual(payload["schema"]["explanation"]["analysis_brief"]["title"], "Brief")
         mocked_snapshot.assert_called_once()
 
+    def test_ask_about_this_pick_button_flow_returns_real_bet_analysis(self) -> None:
+        # Reproduces the exact request ask_bar.js's "Ask about this pick"
+        # button sends (wireAskButtons): a fixed "What's the case for and
+        # against <selection>?" question plus a context object naming the
+        # clicked card. Reported live 2026-08-04: this always came back as
+        # the generic market_summary board recap regardless of which pick
+        # was clicked, discarding the attached context entirely.
+        app = Flask(__name__)
+        app.register_blueprint(ask_the_syndicate_bp)
+
+        fake_result = {
+            "query_type": "player_analysis",
+            "recommendations": [
+                {
+                    "selection": "Colorado Rockies steam move",
+                    "model_probability": 0.81,
+                    "market_probability": 0.42,
+                    "edge": 0.39,
+                    "expected_value": 0.85,
+                    "confidence": 0.81,
+                    "summary": "Sharp money moved the total after the lineup card dropped.",
+                    "rationale": "Sharp money moved the total after the lineup card dropped.",
+                }
+            ],
+            "readiness_gate": {"ok": True},
+            "local_only": True,
+        }
+
+        with patch("syndicate.blueprints.ask_the_syndicate.read_latest_intelligence_state", return_value=dict(fake_result)):
+            response = app.test_client().post(
+                "/api/syndicate/query",
+                json={
+                    "question": "What's the case for and against Colorado Rockies steam move?",
+                    "context": {"sport": "mlb", "selection": "Colorado Rockies steam move", "candidate_type": "game"},
+                },
+            )
+
+        payload = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload["ok"])
+        # The actual bug: this used to be "market_summary" every time.
+        self.assertEqual(payload["schema_type"], "bet_analysis")
+        self.assertEqual(payload["schema"]["selection"], "Colorado Rockies steam move")
+
     def test_query_route_returns_matchup_schema(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(ask_the_syndicate_bp)
