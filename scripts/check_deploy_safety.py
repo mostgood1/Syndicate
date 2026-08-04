@@ -26,6 +26,7 @@ import json
 import os
 import sys
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -50,6 +51,23 @@ def _get_json(base_url: str, path: str, token: str, timeout: int = 90) -> Any:
     request = urllib.request.Request(f"{base_url.rstrip('/')}{path}", headers={"Authorization": f"Bearer {token}"})
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.loads(response.read().decode("utf-8"))
+
+
+_SIM_MAX_RUNTIME_MINUTES = 90
+
+
+def _run_age_minutes(started_at: Any) -> float | None:
+    """Age in minutes of an ISO-8601 start stamp, or None if unparsable."""
+    text = str(started_at or "").strip()
+    if not text:
+        return None
+    try:
+        started = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - started).total_seconds() / 60.0
 
 
 def _as_dict(value: Any) -> dict[str, Any]:
@@ -89,9 +107,27 @@ def main() -> int:
 
     sim_state = str(sim.get("state") or "").strip().lower()
     if sim_state == "running":
-        blockers.append(
-            f"MLB sim RUNNING (pid={sim.get('pid')}, reason={sim.get('reason')}, started={sim.get('started_at')})"
-        )
+        # sim_run_status is written by the sim job and is NOT corrected when
+        # the process dies without updating it -- e.g. killed by a deploy, or
+        # hung. Confirmed live 2026-08-04: pid 2517 still read "running" 167
+        # minutes after start, across a refresh-worker redeploy, blocking
+        # every subsequent deploy. Trusting it unconditionally made this
+        # script refuse to ever return CLEAR.
+        #
+        # Mirror the loop's own ceiling (_MLB_SIM_MAX_RUNTIME_SECONDS, 90
+        # min): past that, the run cannot legitimately still be alive, so
+        # report it as stale rather than treating it as a blocker.
+        age_minutes = _run_age_minutes(sim.get("started_at"))
+        if age_minutes is not None and age_minutes > _SIM_MAX_RUNTIME_MINUTES:
+            notes.append(
+                f"MLB sim: STALE pointer, ignoring (pid={sim.get('pid')}, started={sim.get('started_at')}, "
+                f"age={age_minutes:.0f}m > {_SIM_MAX_RUNTIME_MINUTES}m ceiling)"
+            )
+        else:
+            age_text = f", age={age_minutes:.0f}m" if age_minutes is not None else ""
+            blockers.append(
+                f"MLB sim RUNNING (pid={sim.get('pid')}, reason={sim.get('reason')}, started={sim.get('started_at')}{age_text})"
+            )
     else:
         notes.append(f"MLB sim: {sim_state or 'none'} (exit={sim.get('exit_code')})")
 
