@@ -497,6 +497,53 @@ full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
 
+### ROOT CAUSE 2026-08-04 -- The eval batch report is generated MID-SLATE and never regenerated
+
+Chain complete. Every stage below (6), (5), (4) is downstream of this one.
+
+**The evidence, all from one endpoint call:**
+
+    sim_vs_actual_2026-08-03.json
+      generated_at    2026-08-04T00:55:57Z  =  19:55 CDT on 08-03
+      games_count     2          (a ~15-game slate)
+      failures_n      0
+      skipped_games   0          <-- NOTHING was skipped or failed
+      sims_per_game   1000
+      assessment      full_game.totals.games = 2, moneyline.games = 2
+
+Zero skipped and zero failed with only 2 games means the run never
+CONSIDERED the rest. It ran at 19:55 CDT while the slate was still being
+played -- only the afternoon games had final results at that moment. The
+08-03 slate did not finish until **08:08 CDT on 08-04** (confirmed via the
+live-refresh tick's `finishedAt`). The report was never regenerated after
+the games completed.
+
+**This explains every zero downstream, with no other bug required:**
+- report has 2 games, both with nothing selectable
+  -> reconstructed locked card selects 0 (`combined.selected_n = 0`)
+  -> day artifact `games = {}`, `results.combined.n = 0`
+  -> market accuracy: 0 graded rows (16 straight dates -- the same thing
+     happens EVERY day, because the report is always written mid-slate)
+  -> settlement: 35 pending, `matched: 0`
+  -> reliability multipliers / dynamic thresholds / policy promotion /
+     price CLV / stake credibility all run on an empty ledger.
+
+**The fix is a scheduling/trigger problem, not a data-shape one.** Options,
+in rough order of directness:
+1. Regenerate `sim_vs_actual_<date>.json` after the slate goes final --
+   there is already a natural signal for it (`anyLive` flipping false on
+   the live-refresh tick, which is what the deploy-safety script reads).
+2. Or run the eval batch for date D-1 during D's morning cycle, when D-1 is
+   guaranteed complete. This is the more conventional shape for a
+   settlement pipeline and avoids racing the slate entirely.
+
+Prefer (2) unless same-day grading is actually wanted -- (1) re-runs a
+1000-sims-per-game job on a live worker and would need memory-gating.
+
+**Do NOT "fix" `build_season_betting_cards_manifest.py`** (see entry (6)) --
+it is correct, and the six other suspects listed there are all ruled out.
+The single defect is when the batch report is written.
+
 ### OPEN 2026-08-04 (6) -- The generator is NOT the bug; the batch report is thin (2 games) and reconstruction selects 0
 
 Supersedes entry (5)'s framing. `build_season_betting_cards_manifest.py`
