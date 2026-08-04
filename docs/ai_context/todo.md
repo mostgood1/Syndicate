@@ -219,6 +219,30 @@ Triggered a scoped refresh to close it out:
 "phase":"pregame","mode":"full"}` -> `ok: true`. A watcher was left polling
 `/soccer/mls/api/cards` for `betting` to become non-empty.
 
+**Mechanism now understood (2026-08-04, from the live tick, not inferred):**
+`/api/ops/live-refresh/state` shows `phase: live`, `sports: active`,
+`pregameCadenceSkipped: ['soccer']`, and the actual run command carrying
+`--sports mlb,wnba`. Every soccer refresh step is declared
+`phases=("pregame",)` (scripts/refresh_odds_sources.py `_build_soccer_steps`),
+so **live-phase ticks skip soccer by design** -- it only refreshes on the
+pregame cadence (~4h). That is why an 8-game MLS slate has `betting: False`
+hours after the config change: nothing has run a pregame soccer leg yet.
+
+A manual `POST /api/ops/odds-refresh/run` with `phase=pregame` returned
+`ok: true` but produced no artifacts, because the refresh lane already had
+an mlb/wnba run in `state: running` -- the per-service lane mutex. Re-issue
+it when the lane is idle, or simply wait for the next pregame cadence tick.
+
+**So the remaining soccer gap is cadence/phase, not correctness.** Nothing
+further to fix in board config or the provider. Expect `by_sport.soccer`
+to appear after the first pregame soccer leg completes; if it does NOT
+appear after one has demonstrably run, THEN look at picks generation.
+
+**Related standing gap, now concretely evidenced:** soccer has no
+live-phase refresh at all, so live soccer candidates would compare a live
+resim against a pregame price. Already noted in the end-to-end assessment;
+this is the direct confirmation.
+
 **Not yet confirmed** that soccer candidates reach the board. The pass
 condition is a `by_sport.soccer` bucket in `/api/intelligence/status`.
 If `betting` stays False after a successful refresh, the problem is in
