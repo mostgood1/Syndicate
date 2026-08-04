@@ -122,7 +122,50 @@ full blanks audit -- MLB live-lens slim-mode root cause fixed, prop-already-
 decided removal added, shipped and deployed)" -- ran concurrently, different
 files throughout.
 
-### OPEN 2026-08-04 (2) -- Zero ledger records CONFIRMED in prod; cause still NOT found
+### RESOLVED 2026-08-04 (2) -- Ledger recording WORKS (35 records); the open half is now MATCHING, not recording
+
+**RESOLVED 2026-08-04T04:37Z. The record half of the loop is closed.**
+
+Settlement autorun at `04:37:38Z`:
+
+    total_recommendation_records: 35   pending: 35
+    matched: 0   settled: 0   dates: ['2026-08-02', '2026-08-03']
+
+Up from 0. Combined with the new on-disk instrumentation (`9cbacde5`)
+showing `chunk_lines_on_disk=6` / `8` against `recommendation_count=5` /
+`7` at 04:03-04:05, the chain is now evidenced end to end: board hands
+over recommendations -> records are written to the date chunk -> settlement
+reads them back.
+
+**Every earlier zero was timing, not a defect.** The 18:07Z and 03:37Z
+runs genuinely predated records existing for those dates. No code fix was
+needed for recording. The things suspected along the way and cleared:
+fingerprint ordering, the recording flag, empty recommendations, record
+slimming (`a309820c` -- explicitly tested, `_record_sport` returns "mlb"
+before AND after slimming), and the flat-vs-chunked path split (real, but
+non-default paths only, so not this).
+
+**The open half is now MATCHING.** 35 pending records, `matched: 0`. Two
+candidates, in order of likelihood:
+1. **Benign timing again** -- settlement ran at 04:37Z = 23:37 CDT on
+   08-03, with that evening's games still in progress. `_graded_rows_for_date`
+   needs finals, so there may simply be nothing graded yet to match against.
+   Re-read after the slate completes before treating this as a bug. Given
+   how many times timing has been the answer today, check this FIRST.
+2. If it persists once games are final: the join in
+   `_evaluation_record_keys` / `_graded_rows_for_date`
+   (evaluation_settlement.py) between ledger records and each sport's own
+   market-accuracy rows.
+
+**Note on scope:** `dates` is Central-derived, so 08-04 records are not yet
+in scope. The signal to watch is the 08-03 count once that slate is final.
+
+**Config that made this observable:** `EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS=3600`
+on refresh-worker (was unset/24h). Worth keeping -- at 24h this question
+would have taken a day per iteration. Revert to unset if the cadence is
+ever a concern.
+
+
 
 Supersedes the "UNVERIFIED / stale read" entry below on the evidence
 question. The stale-read retraction was correct at the time; it no longer
