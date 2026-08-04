@@ -2768,6 +2768,23 @@ def _load_odds_history_payload_for_sport(slug: str, shard_key: str) -> dict[str,
         return None
     markets = payload.get("markets") if isinstance(payload.get("markets"), dict) else {}
     market_keys = list(markets.keys()) if isinstance(markets, dict) else []
+    # Which file this actually came from, and what the alternatives looked
+    # like. Without it, "entry_count=611 when web serves 3,436" is a mystery
+    # you can only solve by reading the loader's precedence rules and
+    # guessing -- which is exactly what happened on 2026-08-04, where a stale
+    # shared copy shadowed a freshly pulled one for every MLB candidate.
+    candidates: list[dict[str, Any]] = []
+    try:
+        from syndicate.features.shared.odds_control_plane import odds_history_paths_for_sport
+
+        for candidate_path in odds_history_paths_for_sport(sport_slug, shard_key):
+            try:
+                stat = candidate_path.stat()
+                candidates.append({"path": str(candidate_path), "mtime": round(stat.st_mtime, 3), "bytes": stat.st_size})
+            except Exception:
+                continue
+    except Exception:
+        candidates = []
     _intel_trace(
         "odds_history_input",
         sport=sport_slug,
@@ -2775,6 +2792,7 @@ def _load_odds_history_payload_for_sport(slug: str, shard_key: str) -> dict[str,
         present=True,
         entry_count=len(market_keys),
         sample_market_keys=market_keys[:5],
+        candidate_files=candidates,
     )
     return payload
 

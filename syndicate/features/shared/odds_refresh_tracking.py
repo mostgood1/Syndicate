@@ -16,6 +16,7 @@ from syndicate.features.shared.odds_framework import normalize_odds_entry
 from syndicate.features.shared.odds_lifecycle import append_odds_lifecycle_events
 from syndicate.features.shared.odds_lifecycle import odds_lifecycle_path
 from syndicate.features.shared.refresh_state_store import _atomic_write_text
+from syndicate.features.shared.timezone import central_date_from_iso
 from syndicate.features.shared.recommendation_engine import build_recommendation_output
 from syndicate.features.shared.week_calendar import shard_key_for_week
 from syndicate.features.shared.week_calendar import week_for_date
@@ -1007,14 +1008,31 @@ def _is_basketball_game_cards_path(path: Path) -> bool:
 
 
 def _parse_game_date_token(value: Any) -> date | None:
+    """Which BETTING day (Central) a game-time token falls on.
+
+    Was `.date()` on the parsed timestamp, i.e. the UTC calendar day. A 7:40pm
+    Central first pitch is 00:40 UTC the NEXT day, so every West Coast and
+    late-evening game sharded to date+1 while the board asks for
+    central_today_iso(). Confirmed live 2026-08-04: the 2026-08-04 MLB shard
+    held 9 of 15 games -- all of them East/Central afternoon or early-evening
+    starts -- while LAD@CHC, SF@TEX, TB@COL and TOR@HOU sat in the 2026-08-05
+    shard where nothing looks for them, and SD@AZ/DET@SEA (the latest starts)
+    had not been captured at all. That is the same "18 of 30 teams" coverage
+    gap logged earlier as an unexplained book-coverage mystery: it is not a
+    book gap, it is a timezone gap, and the covered 18 were exactly the teams
+    whose games start before 00:00 UTC.
+
+    central_date_from_iso is the existing helper for precisely this, and its
+    own docstring already documents the identical bug found 2026-07-21 in
+    WNBA game-card filtering. A date-only token ("2026-08-05") is naive, gets
+    read as Central midnight, and so still resolves to itself.
+    """
     text = str(value or "").strip()
     if not text:
         return None
-    normalized = text.replace("Z", "+00:00")
-    try:
-        return datetime.fromisoformat(normalized).date()
-    except Exception:
-        pass
+    parsed = central_date_from_iso(text)
+    if parsed is not None:
+        return parsed
     try:
         return date.fromisoformat(text[:10])
     except Exception:

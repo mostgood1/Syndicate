@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 import scripts.migrate_odds_history_to_shards as migrate_module
+from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
+from syndicate.features.shared.odds_control_plane import odds_history_paths_for_sport
 from syndicate.features.shared.odds_control_plane import shared_odds_history_root
 
 
@@ -107,3 +111,47 @@ class MigrateOddsHistoryToShardsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OddsHistoryFreshestCopyWinsTests(unittest.TestCase):
+    """A stale local copy used to shadow a freshly pulled one.
+
+    odds_history_paths_for_sport's precedence is shared -> artifacts ->
+    tracking, and load_odds_history_payload_for_sport took the first hit. But
+    those paths do not refresh through the same route: the shared copy is not
+    in HOT_ARTIFACT_PATTERNS and can never cross services, while the artifacts
+    copy is pulled from web every board-build cycle. Confirmed live
+    2026-08-04 on refresh-worker: STREAM_PULL_OK wrote the full 3,436-market
+    MLB shard and the next build still read entry_count=611 from the stale
+    shared copy, leaving every MLB board candidate at history_points=0.
+    """
+
+    def _write(self, path: Path, markets: dict, mtime: float) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"markets": markets}), encoding="utf-8")
+        os.utime(path, (mtime, mtime))
+
+    def test_newer_artifacts_copy_beats_an_older_shared_copy(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": tmp_dir, "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports")}, clear=False):
+                paths = odds_history_paths_for_sport("mlb", "2026-08-04")
+                self._write(paths[0], {"stale": {}}, 1785700000.0)          # shared, older
+                self._write(paths[1], {"a": {}, "b": {}}, 1785800000.0)     # artifacts, newer
+                payload = load_odds_history_payload_for_sport("mlb", "2026-08-04")
+            self.assertEqual(sorted(payload["markets"]), ["a", "b"])
+
+    def test_precedence_still_decides_when_copies_were_written_together(self) -> None:
+        # The writer emits all three at once, so equal mtimes must resolve the
+        # old way rather than arbitrarily.
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": tmp_dir, "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports")}, clear=False):
+                paths = odds_history_paths_for_sport("mlb", "2026-08-04")
+                self._write(paths[0], {"shared": {}}, 1785800000.0)
+                self._write(paths[1], {"artifacts": {}}, 1785800000.0)
+                payload = load_odds_history_payload_for_sport("mlb", "2026-08-04")
+            self.assertEqual(list(payload["markets"]), ["shared"])
+
+    def test_missing_shard_still_returns_none(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": tmp_dir, "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports")}, clear=False):
+                self.assertIsNone(load_odds_history_payload_for_sport("mlb", "2026-08-04"))

@@ -108,15 +108,49 @@ def _read_odds_history_candidate(path: Path) -> dict[str, Any] | None:
 
 
 def load_odds_history_payload_for_sport(sport_slug: str, shard_key: str, *, cache: dict[tuple[str, str], dict[str, Any] | None] | None = None) -> dict[str, Any] | None:
+    """Freshest available copy of a sport's odds_history shard.
+
+    Was first-hit over odds_history_paths_for_sport's fixed precedence
+    (shared -> artifacts -> tracking). That silently preferred a STALE copy
+    over a current one, because the paths do not all refresh through the same
+    route: the shared copy (reports/odds_control_plane/...) is deliberately
+    not in HOT_ARTIFACT_PATTERNS and so can never cross services, while the
+    artifacts copy does. On any service that both writes a partial shard
+    locally and pulls the full one from web, the local partial won on
+    precedence alone and the pulled file was never read.
+
+    Confirmed live 2026-08-04 on refresh-worker, minutes after the streamed
+    odds_history pull started working: STREAM_PULL_OK wrote 19,798,176 bytes
+    of the 3,436-market MLB shard, and the very next board build still logged
+    odds_history_input entry_count=611 -- the stale shared copy, shadowing it.
+    Every MLB board candidate stayed at history_points=0.
+
+    Newest mtime wins instead. On the writing service all three copies are
+    written together by _sync_odds_history_for_refresh, so they tie and the
+    choice is a no-op; on a pulling service the freshly pulled copy is newer,
+    which is exactly the intent. Ordering is only ever a tie-break by
+    precedence, never a reason to read older data.
+    """
     cache_key = (str(sport_slug or "").strip().lower(), str(shard_key or ""))
     if cache is not None and cache_key in cache:
         return cache[cache_key]
-    payload: dict[str, Any] | None = None
+
+    freshest_path: Path | None = None
+    freshest_mtime: float | None = None
     for path in odds_history_paths_for_sport(sport_slug, shard_key):
-        candidate_payload = _read_odds_history_candidate(path)
-        if isinstance(candidate_payload, dict):
-            payload = candidate_payload
-            break
+        try:
+            if not path.is_file():
+                continue
+            mtime = path.stat().st_mtime
+        except Exception:
+            continue
+        # Strictly-greater keeps the existing precedence order as the
+        # tie-break when copies were written together.
+        if freshest_mtime is None or mtime > freshest_mtime:
+            freshest_path = path
+            freshest_mtime = mtime
+
+    payload = _read_odds_history_candidate(freshest_path) if freshest_path is not None else None
     if cache is not None:
         cache[cache_key] = payload
     return payload

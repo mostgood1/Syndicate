@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from datetime import date
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
@@ -10,6 +11,7 @@ from unittest.mock import patch
 from syndicate.features.shared.odds_refresh_tracking import sync_post_refresh_tracking_for_source_root
 from syndicate.features.shared.odds_refresh_tracking import refresh_impacted_recommendations_for_tracking
 from syndicate.features.shared.odds_refresh_tracking import _odds_history_market_key
+from syndicate.features.shared.odds_refresh_tracking import _parse_game_date_token
 from syndicate.features.shared.odds_refresh_tracking import _flatten_basketball_game_cards
 from syndicate.features.shared.odds_refresh_tracking import _row_elapsed_game_time_indicates_live
 from syndicate.features.shared.odds_lifecycle import load_odds_lifecycle_events
@@ -751,6 +753,19 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertEqual(markets[prop_key]["last_line"], 5.5)
 
     def test_sync_mlb_tracking_shards_by_commence_time_not_invocation_date(self) -> None:
+        # Fixture retimed 2026-08-04. This test's intent -- shard by the
+        # game's own date rather than the refresh invocation date -- is
+        # unchanged and still asserted below. What was wrong was the second
+        # game's timestamp: "2026-06-08T00:30:00Z" is 7:30pm CENTRAL on
+        # 06-07, i.e. the same betting day as the first game, and the old
+        # expectation of a separate "2026-06-08" shard was the timezone bug
+        # itself written down as a requirement. Confirmed in production the
+        # day this was changed: the 2026-08-04 MLB shard held 9 of 15 games,
+        # with LAD@CHC/SF@TEX/TB@COL/TOR@HOU stranded in the 2026-08-05 shard
+        # while the board -- which asks by central_today_iso() and lists all
+        # 15 as 08-04 games -- found nothing for them. The second game now
+        # starts 6pm Central on 06-08, so it is genuinely the next betting
+        # day and the "not invocation date" property is still proven.
         with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False):
             root = Path(tmpdir)
             snapshot_root = root / "source_artifacts" / "data" / "daily" / "snapshots" / "2026-06-07"
@@ -773,7 +788,8 @@ class OddsRefreshTrackingTests(unittest.TestCase):
                                 "away_team": "Away2",
                                 "home_team": "Home2",
                                 "bookmaker": "draftkings",
-                                "commence_time": "2026-06-08T00:30:00Z",
+                                # 6:00pm Central on 06-08 -- a real next-day game.
+                                "commence_time": "2026-06-08T23:00:00Z",
                                 "markets": {
                                     "h2h": {"home_odds": "-130", "away_odds": "+110"},
                                 },
@@ -1414,3 +1430,66 @@ class SteamDetectorTests(unittest.TestCase):
                 payload = _json.loads(path.read_text(encoding="utf-8"))
         self.assertEqual(len(payload["events"]), tracking._STEAM_EVENTS_KEEP)
         self.assertEqual(payload["events"][-1]["market_id"], "m249")
+
+
+class GameDateShardKeyTimezoneTests(unittest.TestCase):
+    """odds_history sharded evening games onto the WRONG betting day.
+
+    _parse_game_date_token took the UTC calendar date of commence_time. A
+    7:40pm Central first pitch is 00:40 UTC the next day, so every West Coast
+    and late-evening game landed in shard date+1 while the board asks for
+    central_today_iso(). Confirmed live 2026-08-04: the 2026-08-04 MLB shard
+    held 9 of 15 games -- every one an East/Central afternoon or early-evening
+    start -- while LAD@CHC, SF@TEX, TB@COL and TOR@HOU sat in the 2026-08-05
+    shard, unreachable by anything. This is the real cause of the "18 of 30
+    teams captured" gap previously filed as an unexplained book-coverage
+    mystery: the covered 18 were exactly the teams starting before 00:00 UTC.
+    """
+
+    def test_evening_central_start_shards_to_that_betting_day_not_the_utc_next_day(self) -> None:
+        # LAD @ CHC, 7:40pm Central.
+        self.assertEqual(
+            _parse_game_date_token("2026-08-05T00:40:00Z"), date(2026, 8, 4)
+        )
+        # SD @ AZ, 9:10pm Central -- the latest start on the slate.
+        self.assertEqual(
+            _parse_game_date_token("2026-08-05T02:10:00Z"), date(2026, 8, 4)
+        )
+
+    def test_afternoon_start_is_unchanged(self) -> None:
+        # Already correct before the fix; must stay correct.
+        self.assertEqual(
+            _parse_game_date_token("2026-08-04T17:10:00Z"), date(2026, 8, 4)
+        )
+
+    def test_a_genuinely_next_day_game_still_shards_to_the_next_day(self) -> None:
+        # The fix must not simply shift everything back a day: a game that is
+        # really on the 5th in Central terms belongs in the 5th's shard.
+        self.assertEqual(
+            _parse_game_date_token("2026-08-05T17:10:00Z"), date(2026, 8, 5)
+        )
+
+    def test_date_only_token_resolves_to_itself(self) -> None:
+        # NCAAF's start_date and NHL's gameDate can be date-only. Naive tokens
+        # are read as Central midnight, so they must not shift.
+        self.assertEqual(_parse_game_date_token("2026-08-05"), date(2026, 8, 5))
+
+    def test_unparseable_and_empty_tokens_stay_none(self) -> None:
+        self.assertIsNone(_parse_game_date_token(""))
+        self.assertIsNone(_parse_game_date_token(None))
+        self.assertIsNone(_parse_game_date_token("not-a-date"))
+
+    def test_whole_slate_lands_on_one_shard_key(self) -> None:
+        # The end-to-end property that was broken: every game of one betting
+        # day resolves to the same shard, whatever time zone it starts in.
+        slate = [
+            "2026-08-04T17:10:00Z",  # CWS @ BOS  12:10pm CT
+            "2026-08-04T23:05:00Z",  # MIA @ ATL   6:05pm CT
+            "2026-08-05T00:40:00Z",  # LAD @ CHC   7:40pm CT
+            "2026-08-05T00:05:00Z",  # SF  @ TEX   7:05pm CT
+            "2026-08-05T02:10:00Z",  # SD  @ AZ    9:10pm CT
+            "2026-08-05T02:40:00Z",  # DET @ SEA   9:40pm CT
+        ]
+        self.assertEqual(
+            {_parse_game_date_token(token) for token in slate}, {date(2026, 8, 4)}
+        )

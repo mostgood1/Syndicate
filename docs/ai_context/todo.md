@@ -1,5 +1,71 @@
 # Syndicate TODO — canonical cross-session list
 
+### OPEN 2026-08-04 (deployed, board still zero) -- odds-history: transport FIXED, then two more real bugs behind it
+
+Follow-on from the streamed-transport entry below. Deployed `49442bed` to web
+then refresh-worker (in that order). **The transport works**: refresh-worker
+logged `STREAM_PULL_OK path=mlb_source/artifacts/mlb/odds_history/2026-08-04.json
+bytes=19798176` and `PULL_ODDS_HISTORY date=2026-08-04 written=1`. The board
+still showed mlb 0/348, which exposed two further bugs, both now fixed in code
+and NOT yet deployed.
+
+**Correction to the entry below:** today's MLB shard is **18.9MB**, not ~51MB.
+The 51.1MB figure was the repo's own 2026-07-28 measurement. 18.9MB is still
+unusable through the bulk export in practice (24MB budget for the WHOLE
+response, and it is one of many matched files), so the streamed transport is
+still the right fix -- but the size claim in `95c33287`'s message is the older
+measurement, not today's file.
+
+**Bug A -- a stale copy shadowed the freshly pulled one.**
+`load_odds_history_payload_for_sport` took the FIRST hit over
+`odds_history_paths_for_sport`'s fixed precedence (shared -> artifacts ->
+tracking). Those paths do not refresh through the same route: the shared copy
+(`reports/odds_control_plane/...`) is deliberately not allowlisted and can
+never cross services, while the artifacts copy is pulled every cycle. On
+refresh-worker the stale local shared copy won on precedence alone --
+`odds_history_input entry_count=611` logged immediately after a 3,436-market
+file was pulled. Now picks the **newest mtime**, with precedence kept only as
+the tie-break (the writer emits all three together, so they tie on the writing
+service and nothing changes there). Also added `candidate_files`
+(path/mtime/bytes per candidate) to the `odds_history_input` trace -- without
+it, "611 when web serves 3,436" is only solvable by reading precedence rules
+and guessing, which is exactly what happened here.
+
+**Bug B -- the real cause of the "18 of 30 teams" coverage gap. It was never a
+book-coverage gap; it is a timezone gap.** `_parse_game_date_token` took the
+**UTC** calendar date of `commence_time`. A 7:40pm Central first pitch is
+00:40 UTC the NEXT day, so every West Coast and late-evening game sharded to
+date+1 while the board asks by `central_today_iso()`. Measured live: the
+2026-08-04 MLB shard held **9 of 15** games -- every one an East/Central
+afternoon or early-evening start -- while LAD@CHC, SF@TEX, TB@COL and TOR@HOU
+sat in the 2026-08-05 shard (51 markets, game-level only) where nothing looks
+for them, and SD@AZ/DET@SEA (the two latest starts) were not captured at all.
+The previously-covered "18 teams" were exactly the teams whose games start
+before 00:00 UTC. Now uses `central_date_from_iso`, whose own docstring
+already documented this identical bug class found 2026-07-21 in WNBA
+game-card filtering. Props were never affected (no per-row game date, so they
+fall back to the refresh date), which is why the earlier replay still matched
+330/354.
+
+One existing test changed: `test_sync_mlb_tracking_shards_by_commence_time_not_invocation_date`
+used `2026-06-08T00:30:00Z` -- 7:30pm Central on 06-07 -- and asserted a
+separate 06-08 shard, i.e. the bug written down as a requirement. Retimed to a
+genuine next-day game (6pm Central on 06-08) so the test's actual intent
+(shard by game date, not invocation date) is still proven. Reason recorded
+inline.
+
+**Deploy needed for both fixes, all THREE services this time:** the reader
+change affects web and refresh-worker; the shard-key change affects whoever
+WRITES odds history, which is live-odds-worker. Note the shard-key fix only
+takes effect on the next write -- today's already-misfiled 08-05 rows do not
+move retroactively, so today's 4 late games stay unmatched until tomorrow's
+capture.
+
+**Still unexplained:** SD@AZ and DET@SEA had no odds-history rows in either
+shard. And `/api/ops/odds-history/matchup-coverage?date=2026-08-04` answers
+for 2026-08-05 regardless of the date asked for -- same class of ignored-param
+bug already filed for `candidate-trace`'s `sport`.
+
 ### DONE (code) / NOT DEPLOYED 2026-08-04 -- MLB board movement: the join was never broken, the 51MB odds-history shard cannot cross services
 
 User reported (again) no odds movement on the front board. Investigated
