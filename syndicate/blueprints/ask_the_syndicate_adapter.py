@@ -87,7 +87,15 @@ def _to_pct(value: Any) -> float | None:
 # so this is scoped narrowly rather than touching home.py's shared
 # candidate builder, which many other consumers (the board itself
 # included) depend on.
-_LOW_INFORMATION_PROSE_PHRASES = ("oddsapi_consensus market snapshot", "no game-bet summary available")
+#
+# home.py's _game_bet_narrative (added 2026-08-04) is now the real,
+# upstream fix for this -- it generates actual analysis prose for these
+# candidates instead of leaving the placeholder in place. This filter
+# stays as a safety net for any candidate that reaches Ask without going
+# through that builder. "official pick(" also catches MLB cards.py's
+# real-but-generic "{starter} vs {starter} | N official pick(s)" summary,
+# not just the two internal sentinels.
+_LOW_INFORMATION_PROSE_PHRASES = ("oddsapi_consensus market snapshot", "no game-bet summary available", "official pick(")
 
 
 def _is_low_information_prose(value: str) -> bool:

@@ -1920,6 +1920,41 @@ def _game_sim_vs_line_reasoning(game: dict[str, Any]) -> str | None:
     return " | ".join(parts) if parts else None
 
 
+_LOW_INFORMATION_GAME_DETAIL_PHRASES = ("oddsapi_consensus market snapshot", "no game-bet summary available.")
+
+
+def _is_low_information_game_detail(text: str) -> bool:
+    """True for a "detail" string that carries no real per-pick analysis --
+    either of the two known internal placeholder sentinels, or MLB
+    cards.py's own real-but-generic "{starter} vs {starter} | N official
+    pick(s)" summary (game.get("summary")'s literal shape there -- a real,
+    non-placeholder string, so the exact-placeholder check alone doesn't
+    catch it, but reported live 2026-08-04 as exactly the kind of "terse
+    pitcher-matchup metadata" that isn't the actual analysis being asked
+    for either). Checked via a specific, identifiable substring
+    ("official pick(") rather than a general "vs" scan, which would
+    false-positive on a genuine analytical sentence that happens to
+    compare two things."""
+    normalized = text.strip().lower()
+    if normalized in _LOW_INFORMATION_GAME_DETAIL_PHRASES:
+        return True
+    return "official pick(" in normalized
+
+
+def _game_bet_narrative_subject(*, team_text: str | None, pick_text: str | None) -> str:
+    # Found live 2026-08-04: _team_for_side_hint resolves correctly, but
+    # some sports' own team dicts (confirmed for WNBA) carry an abbreviated
+    # code ("NYL") rather than a full display name in the same field
+    # _game_team_label reads -- "The model favors NYL for the ats" instead
+    # of the full team name. Fixing that data gap per-sport is out of
+    # scope here; picking whichever candidate string is more descriptive
+    # sidesteps it without depending on any one sport's naming being
+    # correct -- an abbreviation is always short, a real team name or a
+    # full selection string ("New York Liberty -9.5") never is.
+    candidates = [text for text in (team_text, pick_text) if text and text != "-"]
+    return max(candidates, key=len) if candidates else "this pick"
+
+
 def _game_bet_narrative(*, market: str, subject: str, model_probability_pct: float | None, odds: Any, edge_pct: float | None, game: dict[str, Any]) -> str | None:
     """Real analysis prose for a moneyline/spread/total candidate, mirroring
     the player-prop generator's shape (model probability vs. a real
@@ -1957,7 +1992,12 @@ def _game_bet_narrative(*, market: str, subject: str, model_probability_pct: flo
         sentence += f" Model edge vs. the market: {edge_pct:.1f}%."
     row = _game_full_period_row(game)
     main = _safe_text(row.get("main"), "") if row else ""
-    if main:
+    # game_board_contract.py's own "main" falls back to game.get("summary")
+    # when there's no real projected score (see its docstring reference) --
+    # the same placeholder this whole function exists to replace can leak
+    # back in right here otherwise. Found live 2026-08-04: "Model projects
+    # oddsapi_consensus market snapshot." on several real candidates.
+    if main and not _is_low_information_game_detail(main):
         sentence += f" Model projects {main}."
     return sentence
 
@@ -2332,18 +2372,21 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
     # upstream detail is that placeholder or genuinely absent, rather than
     # relying on a downstream filter to hide the absence of real analysis.
     # Scoped to game-level markets only -- player props already carry real
-    # generated prose from the vendored sim pipeline in "detail".
-    is_low_information_detail = base_detail.strip().lower() in {"oddsapi_consensus market snapshot", "no game-bet summary available."}
+    # generated prose from the vendored sim pipeline in "detail". Also
+    # catches MLB cards.py's real-but-generic "{starter} vs {starter} | N
+    # official pick(s)" summary, not just the two internal sentinels --
+    # reported live 2026-08-04 as exactly the "terse pitcher-matchup
+    # metadata" that isn't real analysis either.
     narrative = (
         _game_bet_narrative(
             market=_safe_text(market, "market"),
-            subject=team_text if team_text and team_text != "-" else pick_text,
+            subject=_game_bet_narrative_subject(team_text=team_text, pick_text=pick_text),
             model_probability_pct=confidence_value,
             odds=odds,
             edge_pct=edge_value,
             game=game,
         )
-        if is_game_level_market and is_low_information_detail
+        if is_game_level_market and _is_low_information_game_detail(base_detail)
         else None
     )
     if narrative:

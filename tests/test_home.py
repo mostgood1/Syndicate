@@ -28,6 +28,7 @@ from syndicate.blueprints.home import _team_for_side_hint
 from syndicate.blueprints.home import _compact_prop_rows
 from syndicate.blueprints.home import _game_sim_vs_line_reasoning
 from syndicate.blueprints.home import _game_bet_narrative
+from syndicate.blueprints.home import _game_bet_narrative_subject
 from syndicate.blueprints.home import _game_identifier
 from syndicate.blueprints.home import _board_candidate_rows
 
@@ -926,6 +927,49 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         moneyline_by_pick = {c["pick"]: c["team"] for c in candidates if c["market"] == "Moneyline"}
         self.assertEqual(moneyline_by_pick.get("Away ML"), "Boston Celtics")
         self.assertEqual(moneyline_by_pick.get("Home ML"), "New York Knicks")
+
+    def test_pitcher_matchup_metadata_summary_is_also_replaced(self) -> None:
+        # Found live 2026-08-04, second round: MLB cards.py's own
+        # game["summary"] is real (not the internal sentinel) but still
+        # low-information -- "{starter} vs {starter} | N official
+        # pick(s)" -- reported as exactly the "terse pitcher-matchup
+        # metadata" that isn't real analysis either. Confirms this is also
+        # replaced, not just the two exact internal placeholders.
+        game = self._sample_game(
+            summary="Tarik Skubal vs Javier Assad | 3 official pick(s) | +1 playable",
+            betting={"away_ml": -120, "home_ml": 105, "p_away_win": 0.55, "p_home_win": 0.45},
+        )
+        candidates = _game_bet_candidates_from_game({"slug": "mlb"}, game, fallback_epoch=0.0)
+        home_detail = next(c for c in candidates if c["market"] == "Moneyline" and c["pick"] == "Home ML")["detail"]
+        self.assertNotIn("official pick", home_detail)
+        self.assertIn("New York Knicks", home_detail)
+
+    def test_narrative_subject_prefers_the_more_descriptive_string(self) -> None:
+        # Found live 2026-08-04: some sports' team dicts (confirmed for
+        # WNBA) carry an abbreviated code ("NYL") rather than a full name
+        # in the field _game_team_label reads, producing "The model favors
+        # NYL for the ats" -- picking whichever of team/pick text is
+        # longer sidesteps the per-sport data gap rather than depending on
+        # any one sport's naming being correct.
+        self.assertEqual(_game_bet_narrative_subject(team_text="NYL", pick_text="New York Liberty -9.5"), "New York Liberty -9.5")
+        self.assertEqual(_game_bet_narrative_subject(team_text="New York Knicks", pick_text="Home ML"), "New York Knicks")
+        self.assertEqual(_game_bet_narrative_subject(team_text="-", pick_text="Under 181.5"), "Under 181.5")
+        self.assertEqual(_game_bet_narrative_subject(team_text=None, pick_text=None), "this pick")
+
+    def test_narrative_does_not_echo_a_placeholder_projected_score(self) -> None:
+        # game_board_contract.py's shared_period_rows "main" falls back to
+        # game.get("summary") when there's no real projected score -- the
+        # same placeholder this whole function replaces can leak back in
+        # through that second path. Found live 2026-08-04: "Model projects
+        # oddsapi_consensus market snapshot."
+        game = {
+            "shared_period_rows": [
+                {"label": "Full game", "main": "oddsapi_consensus market snapshot", "market": "-", "best_edge": "-"}
+            ]
+        }
+        narrative = _game_bet_narrative(market="Moneyline", subject="New York Knicks", model_probability_pct=62.0, odds=-150, edge_pct=8.5, game=game)
+        self.assertNotIn("oddsapi_consensus", narrative)
+        self.assertNotIn("Model projects", narrative)
 
     def test_placeholder_detail_is_replaced_with_real_narrative_prose(self) -> None:
         # Found live 2026-08-04 verifying game-market picks (moneyline/ATS/
