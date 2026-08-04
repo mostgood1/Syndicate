@@ -385,6 +385,41 @@ def _any_tracked_sport_game_live() -> bool:
 	return False
 
 
+def _any_tracked_sport_has_upcoming_game(date_str: str, *, now_epoch: float) -> bool:
+	# #15 follow-up (2026-08-04): the off-hours gate below used ONE flat
+	# ceiling regardless of whether a tracked sport actually had a game
+	# still ahead of us today -- real pregame line movement (steam moves,
+	# CLV-relevant drift) happens in exactly that window, and a flat 3600s
+	# blackout meant a late-starting slate could see just one or two real
+	# captures across its entire pregame period. Reuses fetch_schedule_for_date
+	# (already TTL-cached, already covers all 7 tracked sports, already used
+	# for the same "is a kickoff coming up" question by
+	# _any_gated_sport_event_within_force_window above) rather than adding a
+	# second per-sport artifact reader alongside _LIVE_STATUS_CHECKERS'.
+	configured = _live_refresh_loop_sports()
+	sports = [item.strip().lower() for item in configured.split(",") if item.strip()] if configured else list(_LIVE_STATUS_CHECKERS.keys())
+	for sport in sports:
+		try:
+			events = fetch_schedule_for_date(sport, date_str)
+		except Exception:
+			continue
+		for event in events:
+			# Defensive, not just tidy: fetch_schedule_for_date's real
+			# contract is list[ScheduleEvent], but this must never be the
+			# reason a tick blows up if a caller's test double or a future
+			# refactor hands back something else shaped.
+			get_start_epoch = getattr(event, "start_time_epoch", None)
+			if not callable(get_start_epoch):
+				continue
+			try:
+				start_epoch = get_start_epoch()
+			except Exception:
+				continue
+			if start_epoch is not None and start_epoch > now_epoch:
+				return True
+	return False
+
+
 def _lineup_check_interval_seconds() -> int:
 	raw = str(os.environ.get("SYNDICATE_LINEUP_CHECK_INTERVAL_SECONDS") or "").strip()
 	try:
@@ -2802,10 +2837,12 @@ def _record_pregame_launch(epoch: float, date_str: str) -> None:
 
 
 def _off_hours_max_staleness_seconds() -> int:
-	# How stale the odds may get while NO tracked game is live. 3600 bounds
-	# worst-case pregame staleness at one hour -- the moment any game goes
-	# live, full cadence resumes on the next tick regardless of this. 0
-	# disables the gate entirely.
+	# How stale the odds may get while NO tracked game is live AND nothing
+	# tracked has a game left today (see _off_hours_game_day_max_staleness_seconds
+	# for the shorter ceiling used on an actual game day). 3600 bounds
+	# worst-case staleness at one hour for a truly dead period -- the moment
+	# any game goes live, full cadence resumes on the next tick regardless of
+	# this. 0 disables the gate entirely.
 	raw = str(os.environ.get("SYNDICATE_ODDS_OFF_HOURS_MAX_STALENESS_SECONDS") or "").strip()
 	try:
 		value = int(raw or 3600)
@@ -2814,7 +2851,29 @@ def _off_hours_max_staleness_seconds() -> int:
 	return max(0, value)
 
 
-def _off_hours_gate_blocks_launch(*, now_epoch: float, any_live: bool | None) -> bool:
+def _off_hours_game_day_max_staleness_seconds() -> int:
+	# #15 follow-up (2026-08-04): a flat 3600s ceiling applied even when a
+	# tracked sport had a game still ahead of us today, which could reduce
+	# an entire slate's pregame window to one or two real odds captures --
+	# not enough resolution to see a real steam move (movement_velocity/
+	# is_steam_move in odds_refresh_tracking.py need multiple captures to
+	# mean anything) or to give price-CLV a meaningful pregame trajectory,
+	# not just an open and a close. 900 restores roughly the cadence the
+	# idle interval + pregame cooldown already gave before the off-hours
+	# gate was added (see that gate's own comment at its call site) --
+	# tighter than the fully-dead-period ceiling above, but nowhere near
+	# live-phase's 60s. 0 disables this tier (falls back to the flat
+	# ceiling above for every off-hours tick, matching pre-#15-follow-up
+	# behavior).
+	raw = str(os.environ.get("SYNDICATE_ODDS_OFF_HOURS_GAME_DAY_MAX_STALENESS_SECONDS") or "").strip()
+	try:
+		value = int(raw or 900)
+	except Exception:
+		value = 900
+	return max(0, value)
+
+
+def _off_hours_gate_blocks_launch(*, now_epoch: float, any_live: bool | None, date_str: str | None = None) -> bool:
 	"""#15. True when nothing is live and a sweep ran recently enough.
 
 	Only a definite any_live=False can block: None means adaptive is off or
@@ -2822,10 +2881,17 @@ def _off_hours_gate_blocks_launch(*, now_epoch: float, any_live: bool | None) ->
 	liveness must run, not starve (same fail-open rule as the empty-board
 	guard). A missing/unreadable launch marker also fails open -- the sweep
 	that then runs writes the marker, so the gate self-heals.
+
+	Ceiling is tiered, not flat: shorter while a tracked sport still has a
+	game ahead of us today (_any_tracked_sport_has_upcoming_game), the
+	original flat ceiling otherwise (nothing tracked has anything left to
+	move a line on today).
 	"""
 	if any_live is not False:
 		return False
-	ceiling = _off_hours_max_staleness_seconds()
+	resolved_date = date_str or central_today_iso()
+	game_day = _any_tracked_sport_has_upcoming_game(resolved_date, now_epoch=now_epoch)
+	ceiling = _off_hours_game_day_max_staleness_seconds() if game_day else _off_hours_max_staleness_seconds()
 	if ceiling <= 0:
 		return False
 	try:
@@ -3526,7 +3592,7 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			flush=True,
 		)
 		skip_launch = True
-	if not skip_launch and _off_hours_gate_blocks_launch(now_epoch=tick_started_epoch, any_live=any_live):
+	if not skip_launch and _off_hours_gate_blocks_launch(now_epoch=tick_started_epoch, any_live=any_live, date_str=selected_date):
 		# #15 off-hours gate. When NOTHING is live, every sweep prices a
 		# board nobody's odds are moving for. The idle interval (900s) and
 		# pregame cooldown (1800s) already throttled off-hours to ~2
@@ -3536,12 +3602,24 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 		# unreadable liveness signal means any_live is None, not False, and
 		# the gate only ever fires on a definite False -- an odds refresh
 		# that cannot establish liveness must sweep, not starve.
+		#
+		# #15 follow-up (2026-08-04): the ceiling is tiered -- shorter while
+		# a tracked sport still has a game ahead of us today, since real
+		# pregame line movement only happens in that window and a flat
+		# 3600s blackout was capping an entire slate's pregame capture to
+		# one or two data points regardless of how many hours were left
+		# before the next game. Recomputed here (not read back from the
+		# gate call above) purely for this diagnostic message.
+		game_day = _any_tracked_sport_has_upcoming_game(selected_date, now_epoch=tick_started_epoch)
+		active_ceiling = _off_hours_game_day_max_staleness_seconds() if game_day else _off_hours_max_staleness_seconds()
 		meta["ok"] = False
 		meta["skipped"] = True
 		meta["offHoursSkipped"] = True
+		meta["offHoursGameDay"] = game_day
 		meta["error"] = "off-hours: no tracked game live; next sweep when the staleness ceiling expires or a game goes live"
 		print(
-			f"[live_refresh_loop] ODDS_REFRESH_OFF_HOURS_SKIPPED max_staleness_s={_off_hours_max_staleness_seconds()}",
+			f"[live_refresh_loop] ODDS_REFRESH_OFF_HOURS_SKIPPED game_day={game_day} active_ceiling_s={active_ceiling} "
+			f"dead_period_ceiling_s={_off_hours_max_staleness_seconds()} game_day_ceiling_s={_off_hours_game_day_max_staleness_seconds()}",
 			flush=True,
 		)
 		skip_launch = True

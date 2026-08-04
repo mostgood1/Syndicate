@@ -1,5 +1,51 @@
 # Syndicate TODO — canonical cross-session list
 
+### DONE 2026-08-04 -- Off-hours odds-refresh gate: tiered ceiling for game days (shipping, not yet deployed)
+
+Follow-up to the movement-cadence question this session's investigation
+raised: the #15 off-hours gate used ONE flat ceiling
+(`SYNDICATE_ODDS_OFF_HOURS_MAX_STALENESS_SECONDS`, default 3600s)
+regardless of whether a tracked sport had a game still ahead of us
+today. A late-starting slate could see just one or two real odds
+captures across its ENTIRE pregame window -- not enough resolution for
+`movement_velocity`/`is_steam_move` (odds_refresh_tracking.py) to mean
+anything, and directly related to why price CLV has no real pregame
+trajectory to work with.
+
+Added `_any_tracked_sport_has_upcoming_game(date_str, now_epoch=...)`
+(`syndicate/features/shared/live_refresh_loop.py`) -- reuses
+`fetch_schedule_for_date` (already TTL-cached, already covers all 7
+tracked sports, already used for the same "kickoff coming up" question
+elsewhere in this file) rather than adding a second per-sport artifact
+reader. `_off_hours_gate_blocks_launch` now picks between two ceilings:
+`SYNDICATE_ODDS_OFF_HOURS_GAME_DAY_MAX_STALENESS_SECONDS` (new, default
+900s) while a tracked sport has a game still ahead of us today, the
+original flat ceiling otherwise (truly dead periods keep the old,
+budget-conserving behavior unchanged). `meta["offHoursGameDay"]` and an
+enriched `ODDS_REFRESH_OFF_HOURS_SKIPPED` log line report which tier
+fired, for future diagnosis.
+
+9 new/updated tests, all passing. **Found and confirmed a real,
+pre-existing, unrelated test-isolation bug while verifying**: running
+`tests/test_live_refresh_loop.py` as a whole file fails 6
+`LiveRefreshLoopTests.test_run_tick_*` tests that pass individually --
+reproduced identically on the untouched pre-session code via `git
+stash`, so this is not something this session's change caused. Root
+cause not chased down, but the stash run's own git diff pointed straight
+at it: an unmocked schedule fetch during the full-file run wrote real
+changes to `vendor/wnba_betting_repo/data/processed/schedule_2026.csv`/
+`.json` (reverted before committing) -- some earlier test in the file
+calls a real, un-mocked `fetch_schedule_for_date`-family function that
+shells out and mutates checked-in vendor data, and that mutation likely
+explains the later tests' `sports=` mismatch. Worth a real investigation
+by whoever picks it up -- CI's `unittest tests.test_archives` run
+wouldn't catch this (different test file), but any full local
+`pytest tests/test_live_refresh_loop.py` run will keep showing 6 red
+tests until it's fixed.
+
+**Not deployed yet as of writing this entry** -- check
+`python scripts/check_deploy_safety.py` before deploying.
+
 ### OPEN 2026-08-04 (2) -- Matchup-coverage diagnostic deployed and proven working; still waiting on an MLB cycle
 
 `eb46b219` (`_sync_odds_history_for_refresh` h2h-coverage tracking +

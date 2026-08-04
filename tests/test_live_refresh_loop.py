@@ -2219,8 +2219,10 @@ class LiveRefreshLoopTests(unittest.TestCase):
                 "SYNDICATE_LOOK_AHEAD_ENABLED": "true",
                 # Gate disabled: this test asserts the idle-phase launch
                 # and reads the repo's real launch marker; the #15
-                # off-hours gate has its own tests.
+                # off-hours gate (both the flat and the game-day tier) has
+                # its own tests.
                 "SYNDICATE_ODDS_OFF_HOURS_MAX_STALENESS_SECONDS": "0",
+                "SYNDICATE_ODDS_OFF_HOURS_GAME_DAY_MAX_STALENESS_SECONDS": "0",
             },
             clear=False,
         ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-07-15"), patch.object(
@@ -3214,6 +3216,62 @@ class SimPipelineDeferralBoundTests(unittest.TestCase):
         self.assertIsNone(self._reason(2, busy=True, headroom={"sufficient": True}))
 
 
+class AnyTrackedSportHasUpcomingGameTests(unittest.TestCase):
+    """#15 follow-up (2026-08-04). Backs the off-hours gate's game-day
+    ceiling tier -- True only when a currently-tracked sport has a
+    scheduled event whose start time is still ahead of `now_epoch`.
+    """
+
+    def _has_upcoming(self, *, schedules, now_epoch=10_000.0, sports_env=None):
+        env = {}
+        if sports_env is not None:
+            env["SYNDICATE_LIVE_ODDS_REFRESH_SPORTS"] = sports_env
+
+        def fake_fetch(sport, date_str):
+            if sport in schedules:
+                return schedules[sport]
+            raise RuntimeError(f"unexpected sport {sport}")
+
+        with patch.dict(os.environ, env, clear=False), patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", side_effect=fake_fetch
+        ):
+            return live_refresh_loop._any_tracked_sport_has_upcoming_game("2026-08-04", now_epoch=now_epoch)
+
+    def test_true_when_a_tracked_sport_has_a_game_still_ahead(self) -> None:
+        schedules = {
+            "mlb": [live_refresh_loop.ScheduleEvent(sport="mlb", event_id="1", home="A", away="B", start_time_utc="2026-08-04T23:00:00Z")],
+        }
+        self.assertTrue(self._has_upcoming(schedules=schedules, now_epoch=10_000.0, sports_env="mlb"))
+
+    def test_false_when_the_only_event_already_started(self) -> None:
+        schedules = {
+            "mlb": [live_refresh_loop.ScheduleEvent(sport="mlb", event_id="1", home="A", away="B", start_time_utc="1970-01-01T00:00:00Z")],
+        }
+        self.assertFalse(self._has_upcoming(schedules=schedules, now_epoch=10_000.0, sports_env="mlb"))
+
+    def test_false_when_nothing_scheduled(self) -> None:
+        self.assertFalse(self._has_upcoming(schedules={"mlb": []}, sports_env="mlb"))
+
+    def test_false_when_start_time_is_unresolved(self) -> None:
+        schedules = {
+            "mlb": [live_refresh_loop.ScheduleEvent(sport="mlb", event_id="1", home="A", away="B", start_time_utc=None)],
+        }
+        self.assertFalse(self._has_upcoming(schedules=schedules, sports_env="mlb"))
+
+    def test_one_sports_fetch_error_does_not_block_checking_the_rest(self) -> None:
+        def fake_fetch(sport, date_str):
+            if sport == "mlb":
+                raise RuntimeError("boom")
+            if sport == "wnba":
+                return [live_refresh_loop.ScheduleEvent(sport="wnba", event_id="1", home="A", away="B", start_time_utc="2026-08-04T23:00:00Z")]
+            return []
+
+        with patch.dict(os.environ, {"SYNDICATE_LIVE_ODDS_REFRESH_SPORTS": "mlb,wnba"}, clear=False), patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", side_effect=fake_fetch
+        ):
+            self.assertTrue(live_refresh_loop._any_tracked_sport_has_upcoming_game("2026-08-04", now_epoch=10_000.0))
+
+
 class OffHoursOddsGateTests(unittest.TestCase):
     """#15. Measured 371,563 credits/day (11.1M/30d against a 5M target).
 
@@ -3223,19 +3281,31 @@ class OffHoursOddsGateTests(unittest.TestCase):
     live, resuming full cadence the moment one is.
     """
 
-    def _gate(self, *, any_live, last_epoch, now_epoch=10_000.0, ceiling=None):
+    def _gate(self, *, any_live, last_epoch, now_epoch=10_000.0, ceiling=None, game_day_ceiling=None, game_day=False):
         env = {}
         if ceiling is not None:
             env["SYNDICATE_ODDS_OFF_HOURS_MAX_STALENESS_SECONDS"] = str(ceiling)
+        if game_day_ceiling is not None:
+            env["SYNDICATE_ODDS_OFF_HOURS_GAME_DAY_MAX_STALENESS_SECONDS"] = str(game_day_ceiling)
         with patch.dict(os.environ, env, clear=False):
             with patch.object(
                 live_refresh_loop,
                 "_read_last_odds_refresh_launch",
                 return_value={"epoch": last_epoch} if last_epoch is not None else {},
             ):
-                return live_refresh_loop._off_hours_gate_blocks_launch(
-                    now_epoch=now_epoch, any_live=any_live
-                )
+                # Defaults to game_day=False so every pre-existing test below
+                # keeps exercising the original flat/dead-period ceiling
+                # unchanged -- the tiered game-day ceiling gets its own
+                # dedicated tests further down instead of being threaded
+                # through every case here.
+                with patch.object(
+                    live_refresh_loop,
+                    "_any_tracked_sport_has_upcoming_game",
+                    return_value=game_day,
+                ):
+                    return live_refresh_loop._off_hours_gate_blocks_launch(
+                        now_epoch=now_epoch, any_live=any_live, date_str="2026-08-04"
+                    )
 
     def test_blocks_when_nothing_live_and_a_sweep_ran_recently(self) -> None:
         self.assertTrue(self._gate(any_live=False, last_epoch=9_500.0))
@@ -3260,6 +3330,30 @@ class OffHoursOddsGateTests(unittest.TestCase):
 
     def test_zero_ceiling_disables_the_gate(self) -> None:
         self.assertFalse(self._gate(any_live=False, last_epoch=9_999.0, ceiling=0))
+
+    def test_game_day_uses_the_shorter_ceiling(self) -> None:
+        # #15 follow-up (2026-08-04): a tracked sport with a game still
+        # ahead of us today gets the tighter (default 900s) ceiling instead
+        # of the flat dead-period one (default 3600s) -- last real sweep
+        # 1000s ago blocks under the flat ceiling but must NOT block once
+        # game_day=True, since 1000s already exceeds the shorter one.
+        self.assertTrue(self._gate(any_live=False, last_epoch=10_000.0 - 1000.0, game_day=False))
+        self.assertFalse(self._gate(any_live=False, last_epoch=10_000.0 - 1000.0, game_day=True))
+
+    def test_game_day_ceiling_is_independently_tunable(self) -> None:
+        self.assertTrue(
+            self._gate(any_live=False, last_epoch=10_000.0 - 1000.0, game_day=True, game_day_ceiling=2000)
+        )
+
+    def test_game_day_zero_ceiling_disables_the_gate_on_a_game_day(self) -> None:
+        self.assertFalse(
+            self._gate(any_live=False, last_epoch=9_999.0, game_day=True, game_day_ceiling=0)
+        )
+
+    def test_dead_period_zero_ceiling_does_not_disable_a_game_day(self) -> None:
+        # The two ceilings are independent knobs -- zeroing the dead-period
+        # one must not silently also disable the game-day one.
+        self.assertTrue(self._gate(any_live=False, last_epoch=9_999.0, game_day=True, ceiling=0))
 
 
 class PregameSportCadenceTests(unittest.TestCase):
