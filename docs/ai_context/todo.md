@@ -4,10 +4,33 @@
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
 
-### IN PROGRESS 2026-08-04 -- Board showed zero movement on every card; two real, distinct bugs found and fixed (pushed, not yet deployed)
+### RESOLVED 2026-08-04 -- Board showed zero movement on every card; two real, distinct bugs found, fixed, deployed, and verified against live data
 
 User reported the home-page board showing no movement on any opportunity.
 Investigated against production directly rather than guessing.
+
+**Deployed and verified.** `8d24da2d` confirmed live on all three Render
+services (`/api/ops/version` on web; git ancestry check on
+refresh-worker/live-odds-worker, both landed `8d24da2d` directly before
+the concurrent session's next commits carried it further). Could not
+observe the fix on TODAY's actual top-4 MLB board cards (LAD@CHC, TB@COL,
+TOR@HOU, SD@AZ) -- separately confirmed via
+`/api/ops/odds-history/inspect` that odds-history capture only covers
+18 of 30 MLB teams today (Athletics, Braves, Orioles, Red Sox, White Sox,
+Reds, Guardians, Royals, Angels, Marlins, Brewers, Twins, Mets, Yankees,
+Phillies, Pirates, Cardinals, Nationals) -- none of the 8 teams in
+today's 4 board candidates are on that list, a genuine separate DATA-
+COVERAGE gap, not a join failure. **Verified the fix end-to-end anyway**
+by running the real, currently-live Milwaukee Brewers moneyline entry
+(-167 -> -168, moved today) through the actual deployed
+`_candidate_odds_history_match_score` locally: score 8.0 (was 0.0 before
+the fix) for a realistic MIL board candidate. The fix is confirmed
+correct against real production data; it will show up organically on the
+board the next time a candidate's game is one of the 18 covered teams.
+
+**New follow-up worth its own investigation** (not chased further here):
+why odds-history capture only covers 18/30 MLB teams on a 15-game day --
+book-coverage gap, a partial capture run, or something else.
 
 **Not a uniform "no movement" -- two different things wearing the same
 symptom.** Pulled the embedded board payload from the live page plus raw
