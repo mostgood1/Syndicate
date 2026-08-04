@@ -1,5 +1,59 @@
 # Syndicate TODO — canonical cross-session list
 
+### OPEN 2026-08-04 -- MLB odds-history capture: 18/30 teams (9/~15 games), cause narrowed but not found
+
+Follow-up to the board-movement fix above. Confirmed this is a REAL, separate
+gap, not an artifact of the movement-join fix, and not a timing/upstream-data
+issue.
+
+**Ruled out:**
+- Not "books haven't posted lines yet" -- the board's own live pricing
+  (reads the SAME `oddsapi_game_lines_{date}.json` file via
+  `daily_snapshot_oddsapi_game_lines_path`) has real, current prices for
+  games that never appear in odds-history (LAD@CHC +184, TB@COL +142,
+  SD@AZ -118, TOR@HOU +116 -- confirmed live off the actual board).
+- Not a stale-cache/one-off miss -- re-checked `/api/ops/odds-history/inspect`
+  twice ~10 minutes apart; the SAME 9 games (18 teams: Athletics, Braves,
+  Orioles, Red Sox, White Sox, Reds, Guardians, Royals, Angels, Marlins,
+  Brewers, Twins, Mets, Yankees, Phillies, Pirates, Cardinals, Nationals)
+  got fresh ticks both times: real, stable, persistent split, not noise.
+- Not an obvious write-side parsing bug -- `_market_rows_from_mapping` /
+  `_odds_history_market_key` (`odds_refresh_tracking.py`) are generic
+  recursive dict-walkers with no per-game exclusion logic on inspection.
+
+**Real structural finding, not yet fully chased down:** there are (at
+least) two independent odds-refresh owners, each writing its own
+lane-specific manifest (`SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES=true`,
+`refresh_status_latest__<lane>.json`, readable via
+`/api/ops/odds-refresh/logs?stream=stdout&lane=<lane>`):
+- `live-odds-worker` (lane `live-odds-worker`) runs `refresh_odds_sources.py`
+  through a SERIAL, one-sport-per-tick round robin
+  (`SYNDICATE_SERIAL_SPORT_REFRESH=true`) -- watched it live for ~5 minutes,
+  every tick in that window was `selected=['wnba']`, never `mlb`.
+- `refresh-worker` (lane `refresh-worker`) runs its own, much larger
+  multi-sport refresh (one observed run's captured stdout was 775KB) that
+  DOES reference MLB odds-history shard paths in its tail output -- but the
+  log-read endpoint truncates captured stdout to the last 64KB
+  (`"[truncated 775035 bytes; showing last 65536]"`), which cut off before
+  the actual MLB h2h per-game accounting, only showing an unrelated
+  end-of-run shard listing (dates 07-15 through 07-30).
+
+**Next step for whoever picks this up:** don't re-fetch the same truncated
+tail again. Either (a) add a narrow, purpose-built diagnostic --
+mirroring the `unmatched_no_graded_rows`-style counters added to
+`evaluation_settlement.py` earlier this session -- directly into
+`_sync_odds_history_for_refresh` reporting `distinct_matchups_in_source`
+vs `distinct_matchups_written` for MLB specifically, surfaced through a
+small keyvalue-backed field the way `/api/ops/evaluation-settlement/status`
+already does (the pattern this session used successfully for the
+settlement matcher), or (b) extend `load_latest_refresh_log`/the ops
+endpoint to support a `?head=true` or byte-range read so the START of a
+large captured stdout is readable, not just the tail.
+
+**This is a live production system with a concurrent session actively
+shipping to `main` throughout this investigation** -- re-verify current
+state before continuing rather than trusting this snapshot.
+
 **This is the single source of truth for outstanding work.** Every session should
 read this before starting and update it before finishing. Do not keep a parallel
 list in session-local task tools without reconciling it back here.
