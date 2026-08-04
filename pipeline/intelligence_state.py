@@ -2693,7 +2693,7 @@ class IntelligenceStateService:
                 continue
 
     @staticmethod
-    def _attach_adjusted_scores(global_pool: list[dict[str, Any]]) -> None:
+    def _attach_adjusted_scores(global_pool: list[dict[str, Any]], selected_date: str | None = None) -> None:
         """Annotate the pool with the shared recommendation engine's
         adjusted_score (reliability multipliers, ROI/calibration weighting,
         movement/CLV signals, policy weights -- see
@@ -2710,13 +2710,32 @@ class IntelligenceStateService:
         _load_records_from_ledger's full-history read -- the historical
         ledger still contains multi-GB chunk files. Best-effort by design:
         any failure leaves the pool un-annotated and the ranking falls back
-        to `score`."""
+        to `score`.
+
+        Also the one place in the live board-build path that sees BOTH the
+        published and rejected halves of a ranking pass in the same call --
+        rank_candidates' rejected_sink collects what filter_candidates
+        turned away (learning-loop Stage 2's deferred other half), and
+        shadow_candidate_ledger.record_shadow_candidates samples a bounded
+        slice of it. Off by default (SYNDICATE_SHADOW_CANDIDATE_LEDGER_ENABLED);
+        a no-op call when disabled, same as every other flag-gated autorun
+        in this codebase."""
         try:
             from syndicate.features.intelligence import rank_candidates
             from syndicate.features.shared.intelligence_evaluation import load_recent_evaluation_records
 
             evaluation_records = load_recent_evaluation_records(days=14)
-            ranked_rows = rank_candidates(global_pool, evaluation_records=evaluation_records)
+            rejected_sink: list[dict[str, Any]] = []
+            ranked_rows = rank_candidates(global_pool, evaluation_records=evaluation_records, rejected_sink=rejected_sink)
+            if rejected_sink:
+                try:
+                    from syndicate.features.shared.shadow_candidate_ledger import record_shadow_candidates
+
+                    shadow_result = record_shadow_candidates(rejected_sink, selected_date=str(selected_date or ""))
+                    if not shadow_result.get("skipped"):
+                        print(f"[intelligence_state] SHADOW_CANDIDATES_RECORDED {shadow_result}", flush=True)
+                except Exception as exc:
+                    print(f"[intelligence_state] SHADOW_CANDIDATE_RECORD_FAILED error={type(exc).__name__}: {exc}", flush=True)
             rows_by_candidate_id: dict[str, Mapping[str, Any]] = {}
             for row in ranked_rows:
                 if not isinstance(row, Mapping):
@@ -2966,7 +2985,7 @@ class IntelligenceStateService:
             # odds-history/market-feature state per candidate and was
             # previously never called on the board path at all, leaving the
             # served ranking at raw edge x confidence.
-            self._attach_adjusted_scores(global_pool)
+            self._attach_adjusted_scores(global_pool, selected_date)
             # Strictly after _attach_adjusted_scores: the exposure pass ranks
             # legs within a game by adjusted_score to decide which one keeps
             # its full stake, so it must not run before that score exists.

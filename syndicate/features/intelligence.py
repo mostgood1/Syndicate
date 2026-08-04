@@ -9219,6 +9219,7 @@ def rank_candidates(
     experiment_key: str | None = None,
     limit: int | None = None,
     ranking_key: Any | None = None,
+    rejected_sink: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     ranked_candidates = _shared_rank_recommendations(
         candidates,
@@ -9228,6 +9229,7 @@ def rank_candidates(
         policy=policy,
         experiment_key=experiment_key,
         limit=limit,
+        rejected_sink=rejected_sink,
     )
     if ranking_key is None:
         return ranked_candidates

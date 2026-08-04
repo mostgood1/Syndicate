@@ -1103,7 +1103,17 @@ def filter_candidates(
     evaluation_records: Iterable[Mapping[str, Any]] | None = None,
     policy: str | None = None,
     min_edge: float = 0.0,
+    rejected_sink: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
+    # rejected_sink (2026-08-04, learning-loop Stage 2's deferred other
+    # half): this function already builds a real `rejected` list with a
+    # reason per entry, every call -- it was just never returned. Backward
+    # compatible by construction: existing callers pass nothing, get
+    # nothing extra, identical behavior. A caller that wants the rejects
+    # (shadow_candidate_ledger.py) passes a list and this appends the FULL
+    # candidate (not the lean summary `rejected` below carries) tagged
+    # with `_shadow_rejection_reason`, so the sink has enough fields to
+    # identify and later grade what was turned away.
     candidate_rows = [_copy_mapping(candidate) for candidate in candidates if isinstance(candidate, Mapping)]
     history_rows = [dict(record) for record in (evaluation_records or _load_records_from_ledger(ledger_path)) if isinstance(record, Mapping)]
     sport_profile = build_reliability_profile(records=history_rows, sport=sport)
@@ -1182,6 +1192,8 @@ def filter_candidates(
                         "reason": "stale_beyond_sla",
                     }
                 )
+                if rejected_sink is not None:
+                    rejected_sink.append({**candidate, "_shadow_rejection_reason": "stale_beyond_sla"})
                 continue
         market = _market(candidate)
         market_profile = market_profile_cache.get(market)
@@ -1233,6 +1245,8 @@ def filter_candidates(
                     "reason": "edge_below_threshold",
                 }
             )
+            if rejected_sink is not None:
+                rejected_sink.append({**candidate, "edge": edge, "_shadow_rejection_reason": "edge_below_threshold"})
             continue
         enriched = dict(candidate)
         enriched.update(
@@ -1327,6 +1341,7 @@ def rank_recommendations(
     policy: str | None = None,
     experiment_key: str | None = None,
     limit: int | None = None,
+    rejected_sink: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     candidate_rows = [_copy_mapping(candidate) for candidate in candidates if isinstance(candidate, Mapping)]
     if experiment_key is None:
@@ -1340,6 +1355,7 @@ def rank_recommendations(
         ledger_path=ledger_path,
         evaluation_records=evaluation_records,
         policy=selected_policy,
+        rejected_sink=rejected_sink,
     )
     history_rows = [dict(record) for record in (evaluation_records or _load_records_from_ledger(ledger_path)) if isinstance(record, Mapping)]
     sport_profile = build_reliability_profile(records=history_rows, sport=sport)

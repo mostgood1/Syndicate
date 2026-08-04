@@ -121,6 +121,56 @@ class AttachAdjustedScoresTests(unittest.TestCase):
             IntelligenceStateService._attach_adjusted_scores(pool)
         self.assertNotIn("adjusted_score", pool[0])
 
+    def test_rejected_candidates_are_forwarded_to_the_shadow_ledger(self) -> None:
+        # 2026-08-04 (learning-loop Stage 2's deferred other half): this is
+        # the one place on the live board-build path that sees both halves
+        # of a ranking pass in the same call, so it's the natural hook for
+        # shadow-recording what filter_candidates turned away.
+        pool = [{"candidate_id": "a", "score": 4.0, "odds": "-110"}]
+
+        def fake_rank_candidates(candidates, *, evaluation_records=None, rejected_sink=None):
+            if rejected_sink is not None:
+                rejected_sink.append({"candidate_id": "rejected-1", "sport_slug": "mlb", "_shadow_rejection_reason": "edge_below_threshold"})
+            return []
+
+        with patch("syndicate.features.intelligence.rank_candidates", side_effect=fake_rank_candidates), patch(
+            "syndicate.features.shared.intelligence_evaluation.load_recent_evaluation_records", return_value=[]
+        ), patch("syndicate.features.shared.shadow_candidate_ledger.record_shadow_candidates") as mocked_record:
+            mocked_record.return_value = {"ok": True, "skipped": False, "sampled": 1}
+            IntelligenceStateService._attach_adjusted_scores(pool, "2026-08-04")
+
+        mocked_record.assert_called_once()
+        call_args, call_kwargs = mocked_record.call_args
+        self.assertEqual(call_args[0][0]["candidate_id"], "rejected-1")
+        self.assertEqual(call_kwargs["selected_date"], "2026-08-04")
+
+    def test_no_rejected_candidates_never_calls_the_shadow_ledger(self) -> None:
+        pool = [{"candidate_id": "a", "score": 4.0}]
+        with patch(
+            "syndicate.features.intelligence.rank_candidates", return_value=[]
+        ), patch(
+            "syndicate.features.shared.intelligence_evaluation.load_recent_evaluation_records", return_value=[]
+        ), patch("syndicate.features.shared.shadow_candidate_ledger.record_shadow_candidates") as mocked_record:
+            IntelligenceStateService._attach_adjusted_scores(pool, "2026-08-04")
+        mocked_record.assert_not_called()
+
+    def test_shadow_ledger_failure_does_not_break_score_attachment(self) -> None:
+        pool = [{"candidate_id": "a", "score": 4.0}]
+
+        def fake_rank_candidates(candidates, *, evaluation_records=None, rejected_sink=None):
+            if rejected_sink is not None:
+                rejected_sink.append({"candidate_id": "rejected-1", "sport_slug": "mlb"})
+            return [{"candidate_id": "a", "adjusted_score": 9.0}]
+
+        with patch("syndicate.features.intelligence.rank_candidates", side_effect=fake_rank_candidates), patch(
+            "syndicate.features.shared.intelligence_evaluation.load_recent_evaluation_records", return_value=[]
+        ), patch(
+            "syndicate.features.shared.shadow_candidate_ledger.record_shadow_candidates",
+            side_effect=RuntimeError("boom"),
+        ):
+            IntelligenceStateService._attach_adjusted_scores(pool, "2026-08-04")
+        self.assertEqual(pool[0]["adjusted_score"], 9.0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -174,6 +174,120 @@ class RecommendationEngineTests(unittest.TestCase):
         filtered = filter_candidates(candidates, sport="mlb", evaluation_records=_UNRELATED_HISTORY)
         self.assertEqual(filtered, [])
 
+    def test_filter_candidates_rejected_sink_is_none_by_default_and_backward_compatible(self) -> None:
+        # 2026-08-04 (learning-loop Stage 2's deferred other half): rejected_sink
+        # is opt-in -- every existing caller that doesn't pass it must see
+        # byte-identical behavior to before this parameter existed.
+        now = datetime.now(timezone.utc)
+        candidates = [
+            {
+                "name": "Home ML",
+                "event_id": "game-1",
+                "market": "moneyline",
+                "selection": "Home ML",
+                "odds": "+110",
+                "model_probability": 0.6,
+                "last_updated": (now - timedelta(hours=8)).isoformat(),
+                "sport_manifest_last_updated": now.isoformat(),
+                "sport_slug": "mlb",
+            }
+        ]
+        filtered = filter_candidates(candidates, sport="mlb", evaluation_records=_UNRELATED_HISTORY)
+        self.assertEqual(filtered, [])
+
+    def test_filter_candidates_rejected_sink_collects_the_full_candidate_for_stale_rejection(self) -> None:
+        now = datetime.now(timezone.utc)
+        candidates = [
+            {
+                "name": "Home ML",
+                "event_id": "game-1",
+                "market": "moneyline",
+                "selection": "Home ML",
+                "odds": "+110",
+                "model_probability": 0.6,
+                "last_updated": (now - timedelta(hours=8)).isoformat(),
+                "sport_manifest_last_updated": now.isoformat(),
+                "sport_slug": "mlb",
+            }
+        ]
+        sink: list[dict] = []
+        filtered = filter_candidates(candidates, sport="mlb", evaluation_records=_UNRELATED_HISTORY, rejected_sink=sink)
+        self.assertEqual(filtered, [])
+        self.assertEqual(len(sink), 1)
+        self.assertEqual(sink[0]["_shadow_rejection_reason"], "stale_beyond_sla")
+        # Full candidate, not just the lean summary the internal `rejected`
+        # list carries -- event_id/odds/model_probability are needed later
+        # to identify and grade a shadow-recorded candidate.
+        self.assertEqual(sink[0]["event_id"], "game-1")
+        self.assertEqual(sink[0]["odds"], "+110")
+
+    def test_filter_candidates_rejected_sink_collects_edge_below_threshold(self) -> None:
+        candidates = [
+            {
+                "name": "Jayson Tatum Over 28.5 Points",
+                "event_id": "game-1",
+                "market": "points",
+                "pick": "Over 28.5",
+                "odds": "+100",
+                "score": 86.0,
+                "confidence": "63%",
+                "model_probability": 0.53,
+            },
+        ]
+        historical_records = [
+            {
+                "result": "loss",
+                "pnl": -1.0,
+                "stake": 1.0,
+                "implied_probability": 0.53,
+                "recommendation": {"market": "points", "selection": "Over 28.5", "line": 28.5, "odds": "+100"},
+                "artifact_metadata": {"sport": "nba"},
+            },
+            {
+                "result": "loss",
+                "pnl": -1.0,
+                "stake": 1.0,
+                "implied_probability": 0.53,
+                "recommendation": {"market": "points", "selection": "Over 28.5", "line": 28.5, "odds": "+100"},
+                "artifact_metadata": {"sport": "nba"},
+            },
+            {
+                "result": "loss",
+                "pnl": -1.0,
+                "stake": 1.0,
+                "implied_probability": 0.53,
+                "recommendation": {"market": "points", "selection": "Over 28.5", "line": 28.5, "odds": "+100"},
+                "artifact_metadata": {"sport": "nba"},
+            },
+        ]
+        sink: list[dict] = []
+        filtered = filter_candidates(candidates, sport="nba", evaluation_records=historical_records, rejected_sink=sink)
+        self.assertEqual(filtered, [])
+        self.assertEqual(len(sink), 1)
+        self.assertEqual(sink[0]["_shadow_rejection_reason"], "edge_below_threshold")
+        self.assertIn("edge", sink[0])
+
+    def test_rank_recommendations_threads_rejected_sink_through_to_filter_candidates(self) -> None:
+        now = datetime.now(timezone.utc)
+        candidates = [
+            {
+                "name": "Home ML",
+                "event_id": "game-1",
+                "market": "moneyline",
+                "selection": "Home ML",
+                "odds": "+110",
+                "model_probability": 0.6,
+                "last_updated": (now - timedelta(hours=8)).isoformat(),
+                "sport_manifest_last_updated": now.isoformat(),
+                "sport_slug": "mlb",
+            }
+        ]
+        sink: list[dict] = []
+        ranked = rank_recommendations(candidates, sport="mlb", evaluation_records=_UNRELATED_HISTORY, rejected_sink=sink)
+        self.assertEqual(ranked, [])
+        self.assertEqual(len(sink), 1)
+        self.assertEqual(sink[0]["_shadow_rejection_reason"], "stale_beyond_sla")
+
     def test_filter_candidates_keeps_a_fresh_pregame_candidate(self) -> None:
         now = datetime.now(timezone.utc)
         fresh_last_updated = (now - timedelta(hours=1)).isoformat()
