@@ -3646,7 +3646,76 @@ def _merge_duplicate_game_side_candidates(candidates: list[dict[str, Any]]) -> l
     return result
 
 
+def _supplement_odds_history_from_candidate_dates(
+    candidates: list[dict[str, Any]],
+    odds_history_by_sport: dict[str, dict[str, Any]] | None,
+) -> dict[str, dict[str, Any]]:
+    """Load the shards this sport's CANDIDATES actually need.
+
+    _odds_history_shard_keys_for_sport derives extra fixture dates from the
+    overview's dashboard_games. Confirmed live 2026-08-04 that this is not
+    enough: soccer's overview row carries no per-game dates at all, so the
+    window never widened (odds_history_shard_window logged zero times
+    post-deploy) and all 18 MLS candidates stayed at zero movement while
+    their real history sat in the 2026-08-02 and 2026-08-16 shards.
+
+    The candidates themselves always carry a game date -- resolve_candidate_game_date
+    is what the combined board already filters on -- and by this point they
+    are in hand. Deriving the shard set from the thing actually being joined
+    is both more accurate and independent of how any one sport happens to
+    shape its overview row.
+    """
+    supplemented: dict[str, dict[str, Any]] = dict(odds_history_by_sport or {})
+    dates_by_sport: dict[str, set[str]] = {}
+    for candidate in candidates:
+        if not isinstance(candidate, Mapping):
+            continue
+        sport_slug = _safe_text(candidate.get("sport_slug"), "").lower()
+        if not sport_slug or sport_slug in {"nfl", "ncaaf"}:
+            # Week-scoped shard keys; a date does not map onto them.
+            continue
+        game_date = resolve_candidate_game_date(candidate)
+        if not game_date or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(game_date)):
+            continue
+        dates_by_sport.setdefault(sport_slug, set()).add(str(game_date))
+
+    for sport_slug, dates in dates_by_sport.items():
+        existing = supplemented.get(sport_slug)
+        existing_markets = existing.get("markets") if isinstance(existing, dict) else None
+        loaded_extra = 0
+        merged_markets: dict[str, Any] = dict(existing_markets) if isinstance(existing_markets, dict) else {}
+        today_iso = central_today_iso()
+        for shard_key in sorted(dates)[:_MAX_EXTRA_ODDS_HISTORY_SHARDS]:
+            if shard_key == today_iso and isinstance(existing_markets, dict) and existing_markets:
+                # Already loaded by _odds_history_payloads_by_sport -- an MLB
+                # shard is ~30MB and this runs on every board build, so
+                # re-reading the one we already hold is a real cost for
+                # exactly zero new markets.
+                continue
+            payload = _load_odds_history_payload_for_sport(sport_slug, shard_key)
+            if not isinstance(payload, dict):
+                continue
+            markets = payload.get("markets") if isinstance(payload.get("markets"), dict) else {}
+            if not markets:
+                continue
+            before = len(merged_markets)
+            merged_markets.update(markets)
+            if len(merged_markets) != before:
+                loaded_extra += 1
+        if merged_markets and (loaded_extra or not isinstance(existing_markets, dict)):
+            supplemented[sport_slug] = {"markets": merged_markets}
+            _intel_trace(
+                "odds_history_candidate_date_supplement",
+                sport=sport_slug,
+                candidate_dates=sorted(dates)[:_MAX_EXTRA_ODDS_HISTORY_SHARDS],
+                shards_merged=loaded_extra,
+                entry_count=len(merged_markets),
+            )
+    return supplemented
+
+
 def _enrich_candidates_with_odds_history(candidates: list[dict[str, Any]], odds_history_by_sport: dict[str, dict[str, Any]] | None) -> list[dict[str, Any]]:
+    odds_history_by_sport = _supplement_odds_history_from_candidate_dates(candidates, odds_history_by_sport)
     enriched: list[dict[str, Any]] = []
     # Indexed once per sport rather than re-scanning the full odds-history
     # payload for every candidate -- see _build_odds_history_player_index's

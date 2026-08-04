@@ -175,3 +175,72 @@ class OddsHistoryShardWindowTests(unittest.TestCase):
             [{"markets": {"a": {"last_line": 1}}}, {"markets": {"a": {"last_line": 2}}}]
         )
         self.assertEqual(merged["markets"]["a"]["last_line"], 2)
+
+
+class OddsHistoryCandidateDateSupplementTests(unittest.TestCase):
+    """The overview-derived shard window was not enough for soccer.
+
+    _odds_history_shard_keys_for_sport widens the window using the
+    overview's dashboard_games. Confirmed live 2026-08-04 that soccer's
+    overview row carries no per-game dates at all: post-deploy, the
+    odds_history_shard_window trace logged ZERO times and soccer still asked
+    only for shard 2026-08-04, so all 18 MLS candidates stayed at zero
+    movement while their history sat in the 2026-08-02 and 2026-08-16
+    shards. The candidates themselves always carry a game date, and are in
+    hand at enrichment time -- deriving the shard set from the thing being
+    joined works regardless of how a sport shapes its overview row.
+    """
+
+    def _loader(self, available: dict[str, dict]):
+        def _load(slug: str, shard_key: str):
+            return available.get(f"{slug}:{shard_key}")
+
+        return _load
+
+    def test_a_fixture_date_shard_is_loaded_for_soccer(self) -> None:
+        candidates = [{"sport_slug": "soccer", "commence_time": "2026-08-16T20:00:00Z"}]
+        available = {"soccer:2026-08-16": {"markets": {"soccer:m1": {"history": [{"line": 1}]}}}}
+        with patch.object(
+            intelligence, "_load_odds_history_payload_for_sport", side_effect=self._loader(available)
+        ):
+            result = intelligence._supplement_odds_history_from_candidate_dates(
+                candidates, {"soccer": {"markets": {}}}
+            )
+        self.assertIn("soccer:m1", result["soccer"]["markets"])
+
+    def test_existing_markets_are_preserved_not_replaced(self) -> None:
+        candidates = [{"sport_slug": "soccer", "commence_time": "2026-08-16T20:00:00Z"}]
+        available = {"soccer:2026-08-16": {"markets": {"new": {}}}}
+        with patch.object(
+            intelligence, "_load_odds_history_payload_for_sport", side_effect=self._loader(available)
+        ):
+            result = intelligence._supplement_odds_history_from_candidate_dates(
+                candidates, {"soccer": {"markets": {"already": {}}}}
+            )
+        self.assertEqual(sorted(result["soccer"]["markets"]), ["already", "new"])
+
+    def test_a_daily_sport_does_not_reload_the_shard_it_already_holds(self) -> None:
+        # An MLB shard is ~30MB and this runs on every board build.
+        from syndicate.features.intelligence import central_today_iso
+
+        today = central_today_iso()
+        candidates = [{"sport_slug": "mlb", "game_date": today}]
+        with patch.object(intelligence, "_load_odds_history_payload_for_sport") as mocked_load:
+            intelligence._supplement_odds_history_from_candidate_dates(
+                candidates, {"mlb": {"markets": {"already": {}}}}
+            )
+        mocked_load.assert_not_called()
+
+    def test_week_scoped_sports_are_skipped(self) -> None:
+        candidates = [{"sport_slug": "nfl", "commence_time": "2026-09-13T17:00:00Z"}]
+        with patch.object(intelligence, "_load_odds_history_payload_for_sport") as mocked_load:
+            intelligence._supplement_odds_history_from_candidate_dates(candidates, {})
+        mocked_load.assert_not_called()
+
+    def test_the_number_of_supplemental_shards_is_bounded(self) -> None:
+        candidates = [
+            {"sport_slug": "soccer", "commence_time": f"2026-09-{day:02d}T20:00:00Z"} for day in range(1, 20)
+        ]
+        with patch.object(intelligence, "_load_odds_history_payload_for_sport", return_value=None) as mocked_load:
+            intelligence._supplement_odds_history_from_candidate_dates(candidates, {})
+        self.assertLessEqual(mocked_load.call_count, intelligence._MAX_EXTRA_ODDS_HISTORY_SHARDS)
