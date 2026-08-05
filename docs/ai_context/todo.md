@@ -1,5 +1,49 @@
 # Syndicate TODO — canonical cross-session list
 
+### CORRECTION 2026-08-05 -- NFL preseason: shrinkage was over-flattening real team identity, fixed
+
+Follow-up to the "NFL: real preseason support" entry below (same session,
+same day). User spot-checked the published board and caught it live:
+projected scores all clustered around 21-23 regardless of matchup --
+"these smartsims look fake". Correct call: real diagnosis found the
+original design shrunk the MEAN rating by the FULL real non-starter
+participation share (0.55-0.92), collapsing genuine team-quality spread
+almost to nothing (real 2025 NE +0.158 EPA/play vs TEN -0.160 shrank to
++0.032 vs -0.032 at an 80% share) -- conflated "how much of the lineup is
+backups" (a real uncertainty driver) with "how far should the point
+estimate move toward league-average" (a much smaller effect, since a
+strong organization's backups still tend to outperform a weak one's).
+
+Fixed via `MEAN_SHRINKAGE_SCALE = 0.35` in
+`scripts/generate_smartsim2_nfl_preseason_projections.py` -- scales the
+mean-shift down from the raw participation share while
+`widened_stdev()` keeps using the full real share for variance, so
+uncertainty is still honestly disclosed via a wider band rather than a
+flattened point estimate. Also surfaced a second, related real bug while
+fixing this: `pbp_2022.csv`/`pbp_2023.csv` weren't on disk, silently
+forcing 2023's entire historic backfill (and part of 2024's) onto
+`team_rating()`'s `neutral_no_data` fallback -- same root symptom
+(identical scores across different real matchups), different cause.
+Downloaded both real files from nflverse's release, regenerated every
+real 2026 + historic (2023-2025) artifact.
+
+Rebacktested against the same 140 real games as the original entry:
+shrinkage now **beats** plain prior-season rating 74/140 (52.9%) vs
+68/140 (48.6%) -- a real +4.3pp gain. The original entry's "within noise"
+finding is retracted: that was a coincidental wash from both variants
+being equally flattened toward the same fake neutral baseline, not a
+genuine null result.
+
+Also wired real market odds while in there: OddsAPI's
+`americanfootball_nfl_preseason` is a real, distinct, active sport key
+(confirmed live) from the regular season's -- `scripts/fetch_nfl_preseason_odds.py`
+fetches and joins to the real schedule by team-pair;
+`preseason_cards.py` shows posted lines as a reference-only overlay,
+never blended into the model. One real posted line exists as of this
+session (Hall of Fame Game).
+
+Two commits (`431ae0ef` code+tests, `520389e4` data) -- not yet deployed.
+
 ### OPEN 2026-08-05 (#185) -- WNBA Layer 2 board: live-game projections/actuals alignment + possible prop dedup issue, investigation started but NOT root-caused (session ended on interrupt)
 
 User: "this still isn't working check layer 2 board for wnba active now with
