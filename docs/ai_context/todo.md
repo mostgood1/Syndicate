@@ -72,6 +72,30 @@ Local `reports/*.json` churn from this session's own pytest runs discarded
 via `git checkout -- reports/` per the existing "Local pytest pollutes
 `reports/`" operational note, not committed.
 
+**Addendum -- verified the original caching fix that motivated this
+session, no code change needed.** User's opening context named "a caching
+fix in `wnba/cards.py`" as the change in progress when the two test
+failures above interrupted it; asked afterward to confirm it, since it had
+already shipped. Identified it as `e8deadb7`
+(`_maybe_persist_current_day_live_snapshot_artifact`'s exists-based write
+skip, which silently froze all 5 shared live-snapshot artifact kinds at
+their first, usually-pregame write for the rest of the day -- see the
+"RESOLVED 2026-08-05 -- WNBA 'not showing live'" entry above for full
+detail) plus its required companion `ded23a0d` (ESPN 403 on Render's
+outbound IP for a bare `Mozilla/5.0` User-Agent, which is what made
+`e8deadb7` look inert for two deploy cycles until this landed too).
+Re-read both diffs against the current worktree (byte-identical, no
+drift), reran `tests/test_wnba_live_snapshots_local.py` (51 passed,
+including the regression test added with the fix), and confirmed the
+existing todo.md write-up already documents live, on-the-actual-board
+verification (not just an API response) after deploy. Verification only
+-- no commit.
+
+**Session final state:** `git status` clean, local `HEAD` fast-forwarded
+onto `origin/main`'s tip through several more rounds of concurrent-session
+commits after the push above, no divergence at any point. Nothing
+uncommitted, nothing left mid-edit. Safe to archive.
+
 ### NOTE 2026-08-05 -- picked up HANDOFF #1 concurrently with another session; theirs is the resolution, this entry is a minor separate addition
 
 Started HANDOFF #1 ("pitcher live lens") independently, in parallel with the
