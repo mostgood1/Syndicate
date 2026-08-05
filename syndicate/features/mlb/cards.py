@@ -3340,8 +3340,6 @@ def _current_live_pitcher_prop_rows(selected_date: str, sim_payload: dict[str, A
         return []
     actual_pitchers = _actual_pitching_context_by_name(actual_payload)
     progress_fraction = _live_progress_fraction(actual_payload)
-    current_batting_side = _current_batting_side(actual_payload)
-    current_pitcher_side = "away" if current_batting_side == "home" else "home" if current_batting_side == "away" else None
     config = _MLB_PITCHER_PROP_DIST_CONFIG
     out: list[dict[str, Any]] = []
     for side in ("away", "home"):
@@ -3419,8 +3417,19 @@ def _current_live_pitcher_prop_rows(selected_date: str, sim_payload: dict[str, A
             ),
             reverse=True,
         )
-        keep_count = 2 if current_pitcher_side == side else 1
-        out.extend(side_rows[:keep_count])
+        # Used to cap at top 1-2 rows per pitcher (best edge only), which
+        # silently dropped every other actionable market from this artifact.
+        # Confirmed live 2026-08-05: the board's OWN candidate pool (a
+        # separate, broader pipeline) still carries a pitcher's other prop
+        # markets as real candidates, but the read-time hydration
+        # (_mlb_hydrate_live_prop_projection) matches by player+market, so a
+        # candidate whose market got capped out of THIS artifact can never
+        # find a row to hydrate from and shows "-"/"-" even when the pitcher
+        # is genuinely live and tracked -- e.g. Gabriel Hughes and Randy
+        # Vásquez both had a real hits_allowed row here while their board
+        # candidates were Pitcher Strikeouts. min_edge=0.03 above already
+        # keeps this to genuinely actionable rows; no reason to cap further.
+        out.extend(side_rows)
     return out
 
 
