@@ -2934,6 +2934,19 @@ def _build_prop_dashboard_row(sport: dict[str, Any], item: dict[str, Any], *, de
         "game_id": _game_identifier(item),
         "gamePk": item.get("gamePk") or item.get("game_pk") or item.get("game_id"),
         "event_id": item.get("event_id"),
+        # Traced live 2026-08-05: this function reconstructs a brand new
+        # dict from `item` rather than passing it through, and used to drop
+        # commence_time entirely -- confirmed via a persisted diagnostic
+        # that _finalize_home_prop_rows's own commence_time fix (30a7067e)
+        # WAS setting item["commence_time"] correctly (matched_game found by
+        # game_pk, scheduled_start_utc populated), yet the served board
+        # still showed the board's context date. resolve_candidate_game_date
+        # (intelligence_contracts.py) checks commence_time/start_time_utc/
+        # game_time_utc/game_date in that order; none of those existed on
+        # the dict THIS function actually returns, so it always fell
+        # through to the fallback. The upstream fix was correct and
+        # necessary but not sufficient without this.
+        "commence_time": item.get("commence_time"),
         "sport": _safe_text(sport.get("name"), str(sport.get("slug") or "").upper()),
         "sport_slug": _safe_text(sport.get("slug"), "sport").lower(),
         "surface": heading,

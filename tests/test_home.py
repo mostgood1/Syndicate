@@ -2085,16 +2085,43 @@ class SoccerPropCommenceTimePropagationTests(unittest.TestCase):
             finalized = home_module._finalize_home_prop_rows([self._prop_row()], slug="soccer")
         self.assertNotIn("commence_time", finalized[0])
 
-    def test_resolve_candidate_game_date_now_finds_the_real_fixture_date(self) -> None:
-        # End-to-end: the propagated field is exactly what the shared
-        # resolver checks first, so the whole downstream chain (including
-        # this session's earlier odds_history shard-window fix) now sees
-        # the fixture's real date instead of falling back to today.
+    def test_resolve_candidate_game_date_finds_it_on_finalize_rows_own_output(self) -> None:
+        # NOT actually end-to-end, despite the name this test had before --
+        # it stops at _finalize_home_prop_rows's own return value. That gap
+        # is exactly how the real bug shipped invisibly: this assertion
+        # passed while the SERVED board still showed the wrong date, because
+        # _build_prop_dashboard_row (intelligence.py's actual consumer of
+        # this data) reconstructs a brand new dict from `item` and dropped
+        # commence_time entirely -- confirmed live 2026-08-05 via a
+        # persisted diagnostic showing the match succeeding and
+        # commence_time being set correctly right here, with the value gone
+        # by the time it reached the board. See
+        # test_commence_time_survives_all_the_way_through_the_dashboard_row
+        # below for the assertion that actually would have caught it.
         from syndicate.features.shared.intelligence_contracts import resolve_candidate_game_date
 
         with patch.object(home_module, "_home_prop_matched_game", return_value=self._matched_game()):
             finalized = home_module._finalize_home_prop_rows([self._prop_row()], slug="soccer")
         self.assertEqual(resolve_candidate_game_date(finalized[0], fallback="2026-08-05"), "2026-08-08")
+
+    def test_commence_time_survives_all_the_way_through_the_dashboard_row(self) -> None:
+        # The real end-to-end path: _finalize_home_prop_rows's output feeds
+        # _build_prop_dashboard_row (imported into intelligence.py and
+        # called from there to build the actual board candidate), which
+        # used to construct its returned dict from scratch and never copy
+        # commence_time across. Both hops must be exercised together, or a
+        # regression at either one goes undetected -- which is exactly what
+        # happened here.
+        from syndicate.blueprints.home import _build_prop_dashboard_row
+        from syndicate.features.shared.intelligence_contracts import resolve_candidate_game_date
+
+        with patch.object(home_module, "_home_prop_matched_game", return_value=self._matched_game()):
+            finalized = home_module._finalize_home_prop_rows([self._prop_row()], slug="soccer")
+        dashboard_row = _build_prop_dashboard_row(
+            {"slug": "soccer", "name": "Soccer"}, finalized[0], default_surface="Pregame props"
+        )
+        self.assertEqual(dashboard_row.get("commence_time"), "2026-08-08T23:30:00Z")
+        self.assertEqual(resolve_candidate_game_date(dashboard_row, fallback="2026-08-05"), "2026-08-08")
 
 
 class NflGameMarketRecommendationRowsTests(unittest.TestCase):
