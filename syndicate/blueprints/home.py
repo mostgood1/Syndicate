@@ -1370,6 +1370,26 @@ def _finalize_home_prop_rows(rows: list[dict[str, Any]], *, slug: str, context_l
                     item["game_id"] = matched_game_id
             if not item.get("event_id") and matched_game.get("event_id") is not None:
                 item["event_id"] = matched_game.get("event_id")
+            # Confirmed live 2026-08-05: soccer prop candidates (e.g. "Anytime
+            # Goalscorer") carried NO date field of their own at all, so
+            # resolve_candidate_game_date (intelligence_contracts.py --
+            # checks commence_time/start_time_utc/game_time_utc/game_date,
+            # in that order) always fell through to its fallback, which is
+            # the BOARD's context date, not the fixture's real date. Three
+            # real candidates for an Aug 8 MLS match all carried game_date
+            # Aug 5 (today) as a result -- silently pointing the odds_history
+            # join at the wrong shard, with no exception or empty-state to
+            # notice. Soccer's own dashboard game dicts (cards.py's
+            # _match_to_game/_unsimulated_game) DO carry the real kickoff,
+            # just under a different key ("scheduled_start_utc", read
+            # directly by game-chip rendering) that resolve_candidate_game_date
+            # doesn't check. This is the same "copy matched_game's real
+            # identity onto the prop item" pattern already used above for
+            # team labels/gamePk/game_id/event_id, filling the one field
+            # that pattern was missing. setdefault, not overwrite: an item
+            # that already carries its own accurate date is left alone.
+            if not item.get("commence_time") and matched_game.get("scheduled_start_utc"):
+                item["commence_time"] = matched_game.get("scheduled_start_utc")
         away_logo = str(item.get("away_logo") or item.get("team_logo_url") or "").strip() or None
         home_logo = str(item.get("home_logo") or item.get("opponent_logo_url") or "").strip() or None
         if isinstance(matched_game, dict):
