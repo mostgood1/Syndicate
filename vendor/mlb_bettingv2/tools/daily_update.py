@@ -5267,15 +5267,14 @@ def main() -> int:
     ap.add_argument(
         "--pitcher-so-model-weight",
         type=float,
-        default=0.0,
+        default=1.0,
         help=(
-            "0.0 (default, OFF) -- a true no-op. Blend weight [0,1] for recalibrating so_mean/so_dist "
-            "toward sim_engine/pitcher_so_model.py's trained Poisson model "
-            "(data/models/pitcher_so_poisson_v1.json). Validated in tools/eval/eval_sim_day_vs_actual.py "
-            "(which promotes this to 1.0 by default -- see todo.md) with betting-accuracy hit rate "
-            "54.65%%->58.84%% (n=882), no measurable effect on hits_allowed/outs. Left OFF by default here "
-            "since this is the live production board, not a backtest -- turning it on is a deliberate, "
-            "separate decision, not something this default should make silently."
+            "Promoted to production 2026-08-01 (default 1.0, full strength). Blend weight [0,1] for "
+            "recalibrating so_mean/so_dist toward sim_engine/pitcher_so_model.py's trained Poisson model "
+            "(data/models/pitcher_so_poisson_v1.json). Validated betting-accuracy hit rate "
+            "54.65%%->58.84%% (n=882, 5-fold GroupKFold cross-validated), no measurable effect on "
+            "hits_allowed/outs. Pass 0.0 to disable (reproduces pre-promotion sim-only behavior exactly). "
+            "See todo.md's pitcher/hitter statistical-model pilot entries for full validation."
         ),
     )
     ap.add_argument(

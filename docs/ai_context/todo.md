@@ -6856,6 +6856,33 @@ outstanding validation gap.
 Temp validation artifacts (scratchpad, not committed):
 `test_market_line_feature.py`.
 
+### Reconciliation 2026-08-01 (MLB pitcher-prop statistical model: SO-model weight flipped ON in production)
+
+Direct continuation of the previous entry. User: "flip the SO-model
+weight on in production." Changed `tools/daily_update.py`'s
+`--pitcher-so-model-weight` CLI default from `0.0` (deliberately left off
+when first wired) to `1.0` (full strength), matching the already-promoted
+default in the backtesting tools -- same mechanism, same wording pattern
+as the other CLI-default promotions this session. `--pitcher-so-model-path
+0.0` (or any value in `[0,1)`) still overrides it back down at invocation
+time if ever needed; the underlying `_sim_many` function parameter default
+stays at `0.0` as a conservative library-level fallback for any other
+caller, consistent with how the other promoted knobs work (dataclass/
+function defaults conservative, CLI/config-level default is the actual
+promotion). Verified `--help` still exits 0 (the `%%`-escaping fix from
+the previous entry), syntax-checked, SO-model unit tests (14) and the
+full mlb/sim regression sweep both re-run clean after the change.
+
+**This makes the setting live the next time `daily_update.py` runs with
+default arguments** -- i.e. the next real daily-update invocation via
+`scripts/unified_daily_update.ps1` (which does not pass this flag
+explicitly, so it inherits the new default) will apply the strikeout
+recalibration to real board output. Nothing was deployed to Render as
+part of this change -- it's a repo-level default; whether/when it takes
+effect on the live service depends on the normal deploy cadence (auto-
+deploy is OFF per this repo's operational notes) and the next actual
+daily-update run.
+
 ### Reconciliation 2026-07-31 part 4 (NFL: real SmartSim 2.0 projection engine + market board + Ask the Syndicate)
 
 Continuation of the same "wire up NFL fully based on MLB" session (parts 1-2
