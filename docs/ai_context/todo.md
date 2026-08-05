@@ -11,6 +11,43 @@
   same-day concurrent session's test-only WNBA fix). See `todo_closed.md`
   for the full writeup and verification detail.
 
+### FOUND 2026-08-05 -- Soccer movement is STILL zero, and it is not the shard-date bug -- odds_history has NO player-prop markets at all
+
+Board check: MLB movement 59/59, WNBA movement 25/28, WNBA steam now
+genuinely appearing (3 candidates) for the first time this session --
+confirms the per-sport steam retention + cross-service publish fixes
+(`6647a975`/`c2e3e648`) are real and working, not just deployed. Soccer
+remains 0/3.
+
+**Not the same bug as before.** The shard-date-selection fix
+(`_supplement_odds_history_from_candidate_dates`, `d072999c`) is doing its
+job correctly: today's 3 soccer candidates carry `game_date: 2026-08-05`,
+which is the primary shard key, so date resolution is not the issue this
+time.
+
+**The real gap: soccer's odds_history shards contain ZERO player-prop
+markets, ever, on any date checked.** Pulled the shards for 2026-08-04
+through 2026-08-08 directly and inspected every market key. All of them
+(205 markets on 08-08, 69 on 08-07) are `market=h2h`, `market=totals`, or
+`market=spreads` -- game-level only. None carry a player identity. Today's
+3 soccer board candidates are ALL "Anytime Goalscorer" (a player prop), so
+there is nothing in odds_history to join to regardless of which shard gets
+read -- the data was never captured, not merely mis-shelved.
+
+This is despite `_build_soccer_props_snapshot` (odds_refresh_tracking.py:2347,
+backed by `scripts/fetch_soccer_oddsapi_props_local.py`) being wired into the
+pipeline at the `slug == "soccer"` branch (odds_refresh_tracking.py:2796-2810)
+-- the plumbing to CAPTURE soccer player props exists in the code. Not yet
+traced further: whether the raw OddsAPI fetch itself returns empty for
+soccer player markets (plausible -- MLS goalscorer markets may have thin
+book coverage, same shape as the pitcher-props investigation above), or
+whether `_build_soccer_props_snapshot`'s output is produced but dropped
+before reaching `_write_odds_history_artifact`'s markets dict. That's the
+next concrete step for whoever picks this up: add a trace at the soccer
+props snapshot's row count immediately before the write, same pattern as
+the odds_history_h2h_matchup_coverage trace already in this file, to
+confirm which side of that boundary the data is lost on.
+
 ### RECONCILIATION 2026-08-05 (session close-out) -- two stale WNBA test failures fixed, unrelated to the cards.py caching change that surfaced them
 
 User was making a caching fix in `syndicate/features/wnba/cards.py` and hit
