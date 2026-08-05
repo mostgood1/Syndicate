@@ -44,13 +44,14 @@ to **"0 upcoming · 1 live"**, "Live slate active", "Live score TOR 66 -
 69 GSV", 10 live player props -- verified on the real page, not just an
 API response.
 
-**Worth a follow-up, not chased further this session:** `soccer/
-ingestion/espn_lineups.py` and `espn_teams.py` call the same ESPN site
-API with a different (non-bare) User-Agent
-(`"Mozilla/5.0 (SyndicateSoccerSim)"`) -- untested against this same
-403, left alone without evidence they're also affected. Worth a quick
-`espn_helper_raw`-style check next time soccer's live tracking looks
-suspect.
+**Follow-up closed same session.** Checked `soccer/ingestion/
+espn_lineups.py`/`espn_teams.py`'s different User-Agent
+(`"Mozilla/5.0 (SyndicateSoccerSim)"`) directly against the real ESPN
+endpoint from a live Render deploy (temporary probe, removed after):
+`status_code: 200`. Confirmed NOT affected -- ESPN's filter matches the
+exact low-effort bare "Mozilla/5.0" string specifically, not any
+Mozilla-prefixed value. No code fix needed for soccer's lineup/team
+ingestion.
 
 ### FIXED 2026-08-05 (02:07-02:15 CDT) -- Per-pitcher market cap removed, deployed to live-odds-worker, confirmed changing the artifact
 
