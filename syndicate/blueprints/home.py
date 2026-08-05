@@ -1532,14 +1532,29 @@ def _finalize_home_prop_rows(rows: list[dict[str, Any]], *, slug: str, context_l
             from syndicate.features.shared.refresh_state_store import reports_root as _diag_reports_root
             from syndicate.features.shared.refresh_state_store import write_json_file as _write_diag
 
+            # There are 4 call sites into this function per board build (WNBA's
+            # pregame+live, and the generic pregame+live branch soccer goes
+            # through). A single overwrite per slug lost every call but the
+            # last -- confirmed live 2026-08-05: the write showed
+            # game_index_summary.home_games_count=37 (including "hdf|ner",
+            # the exact Houston Dynamo @ New England Revolution game these
+            # rows are for) but rows=[], because the LIVE-lane call (which
+            # legitimately has zero soccer rows most of the time) ran after
+            # the PREGAME-lane call and overwrote it. Append instead --
+            # every call's outcome stays visible, capped so this can't grow
+            # unboundedly across many board builds.
             diag_path = _diag_reports_root() / "refresh_status" / "latest" / "home_prop_match_diagnostic_status.json"
             existing = _read_diag(diag_path)
             payload = existing if isinstance(existing, dict) else {}
-            payload[slug] = {
+            slug_entry = payload.get(slug) if isinstance(payload.get(slug), dict) else {}
+            calls = slug_entry.get("calls") if isinstance(slug_entry.get("calls"), list) else []
+            calls.append({
                 "context_label": context_label,
+                "row_count": len(rows),
                 "game_index_summary": game_idx_summary,
                 "rows": _prop_match_diag,
-            }
+            })
+            payload[slug] = {"calls": calls[-8:]}
             _write_diag(diag_path, payload)
         except Exception:
             pass
