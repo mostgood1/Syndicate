@@ -3320,6 +3320,23 @@ def _current_live_pitcher_prop_rows(selected_date: str, sim_payload: dict[str, A
     market_lines = _pitcher_snapshot_market_lines(selected_date)
     probable_pitchers = ((actual_payload.get("gameData") or {}).get("probablePitchers")) if isinstance((actual_payload.get("gameData") or {}).get("probablePitchers"), dict) else {}
     if not pitcher_models or not market_lines or not probable_pitchers:
+        # TEMPORARY diagnostic (todo.md handoff #1) -- the intelligence board's
+        # live_lens_report artifact has zero pitcher rows in production while
+        # this same function's output renders correctly via the game-detail
+        # endpoint (source_card_detail_payload -> _source_sim_detail), which
+        # calls this identical function with equivalent inputs. Since the two
+        # call sites are mechanically the same code, the divergence has to be
+        # a data-availability difference between whichever service runs each
+        # one -- this print pins down which of the three inputs is actually
+        # missing in the tick's own process before guessing a fix. Remove
+        # once resolved.
+        print(
+            f"[PITCHER_LIVE_ROWS_DIAG] date={selected_date} game_pk={sim_payload.get('game_pk')} "
+            f"pitcher_models_empty={not pitcher_models} market_lines_empty={not market_lines} "
+            f"probable_pitchers_empty={not probable_pitchers} "
+            f"market_lines_path={daily_snapshot_oddsapi_pitcher_props_path(selected_date)}",
+            flush=True,
+        )
         return []
     actual_pitchers = _actual_pitching_context_by_name(actual_payload)
     progress_fraction = _live_progress_fraction(actual_payload)
