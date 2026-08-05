@@ -2104,15 +2104,51 @@ def _daily_sim_updated_at_by_game(selected_date: str, game_pks: list[int]) -> di
     return out
 
 
+def _mojibake_probable_pitcher_names(payload: dict[str, Any] | None) -> list[str]:
+    probable = ((payload or {}).get("gameData") or {}).get("probablePitchers") if isinstance(payload, dict) else None
+    if not isinstance(probable, dict):
+        return []
+    names: list[str] = []
+    for side in ("away", "home"):
+        entry = probable.get(side)
+        name = str((entry or {}).get("fullName") or "") if isinstance(entry, dict) else ""
+        if "�" in name:
+            names.append(name)
+    return names
+
+
 def _daily_actual_by_game(selected_date: str, game_pks: list[int]) -> dict[int, dict[str, Any]]:
     out: dict[int, dict[str, Any]] = {}
     today_iso = central_today_iso()
     for game_pk in game_pks:
         feed_path = raw_feed_live_path(selected_date, int(game_pk))
         payload = load_json_or_gz_file(feed_path)
+        # TEMPORARY diagnostic (todo.md mojibake follow-up) -- the MLB Stats
+        # API itself returns correct UTF-8 names when fetched directly
+        # (confirmed live: statsapi.mlb.com/.../feed/live for this exact
+        # game_pk returned "Randy Vásquez" cleanly), and every read/write in
+        # this pipeline already uses explicit utf-8 -- so the corruption's
+        # exact origin is still unlocated. This bisects the pipeline: if the
+        # cached file ON DISK already carries "�", the writer (not yet
+        # found) is the bug; if this file is clean, corruption happens later
+        # (candidate build, normalization, or transport). Remove once found.
+        mojibake_names = _mojibake_probable_pitcher_names(payload)
+        if mojibake_names:
+            print(
+                f"[MOJIBAKE_DIAG] date={selected_date} game_pk={game_pk} feed_path={feed_path} "
+                f"already_corrupted_on_disk=True names={mojibake_names}",
+                flush=True,
+            )
         if selected_date == today_iso and isinstance(payload, dict) and not _actual_payload_is_live(payload):
             live_payload = _fetch_current_feed_live(int(game_pk))
             if isinstance(live_payload, dict):
+                fresh_mojibake_names = _mojibake_probable_pitcher_names(live_payload)
+                if fresh_mojibake_names and not mojibake_names:
+                    print(
+                        f"[MOJIBAKE_DIAG] date={selected_date} game_pk={game_pk} "
+                        f"corrupted_on_fresh_fetch=True names={fresh_mojibake_names}",
+                        flush=True,
+                    )
                 payload = live_payload
         if not isinstance(payload, dict) and selected_date == today_iso:
             payload = _fetch_current_feed_live(int(game_pk))
