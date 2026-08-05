@@ -1,5 +1,63 @@
 # Syndicate TODO — canonical cross-session list
 
+### RESOLVED 2026-08-05 -- Soccer odds_history root-cause chain CLOSED, verified live, diagnostics cleaned up
+
+Closes the chain opened by "ROOT CAUSED 2026-08-05" and continued through
+"TRACED 2026-08-05" below. Both real fixes are deployed and CONFIRMED
+against a live production refresh, not just shipped.
+
+**Fix #1 -- ESPN 403** (`18b74632`): soccer's ESPN ingestion
+(`espn_lineups.py`'s `fetch_espn_scoreboard`/`fetch_match_summary`,
+`espn_teams.py`'s `fetch_team_roster`) carried a custom
+`"Mozilla/5.0 (SyndicateSoccerSim)"` header that 403'd from Render's
+outbound IP on a date-ranged scoreboard query -- a request shape an
+earlier probe (`81f091b7`) had not tested. Dropped the header at all 3
+call sites, same already-proven remediation as 3 other ESPN-403 sites
+fixed earlier this session.
+
+**Fix #2 -- sport-wide gate** (`2176f73c`): `refresh_odds_sources.py`'s
+post-refresh `odds_history` sync was gated on `sport_result["ok"]` -- a
+single AND across every step of every league. One league's fixture-build
+failure (the ESPN 403 above) silently blocked the sync for every OTHER
+league too, MLS included, whose own odds/props steps had already
+succeeded. Gate changed to "did at least one step in this sport's refresh
+succeed" -- the sync itself only reads whatever is on disk, so requiring
+universal success was never a correctness requirement, just an accident of
+reusing one flag everywhere.
+
+**Verified live, decisively, after both fixes deployed together
+(`1a757ad1`):** a temporary always-on diagnostic at the exact gate
+decision (added when `_log_memory`'s own trace of that gate turned out to
+be silent in production -- gated behind
+`SYNDICATE_LIVE_ODDS_REFRESH_MEMORY_TRACE`, default off, so there had been
+zero real production visibility into the gate independent of the fixes
+themselves) confirmed `gate_entered: true` for a live soccer refresh, with
+`eredivisie`/`primeira_liga`'s `_artifacts` steps still failing (`ok:
+false`, a separate build step, unaffected by this fix) but their `_odds`
+and `_props` steps now succeeding (confirming fix #1 too) and the sync
+still running regardless (confirming fix #2). The props-row diagnostic
+next to it showed real numbers for essentially the whole league roster in
+one refresh: MLS 783 rows read / 220 written across 3 fixture dates,
+eredivisie 534/253, EPL 775/262, La Liga 414/169, Ligue 1 577/227, and
+more. Soccer's odds_history is genuinely populated now, for the first time
+across this entire investigation.
+
+**Diagnostics removed** (both were explicitly temporary): the
+`prop-row-coverage` write/endpoint (`cb76ef32`) and the
+`post-refresh-gate` write/endpoint (`1a757ad1`), plus their tests. The
+`SoccerPropRowOddsHistoryCoverageTests` local-reproduction test is KEPT as
+a permanent regression test (rewritten to drop its now-removed diagnostic
+assertions) -- it independently verifies the odds_history write path
+itself stays correct for real-shaped soccer prop rows. The h2h-matchup-
+coverage endpoint (older, not part of this chase) is unaffected and stays.
+The separate, still-open `_diagnose_live_events_coverage` diagnostic in
+`fetch_mlb_oddsapi_local.py` (a different, lower-priority, unresolved
+question about OddsAPI's raw live-event coverage) was NOT touched.
+
+**Still open, unrelated:** the CLV grading joiner for the steam-signal
+measurement fields hasn't been started; the standalone steam lane vs.
+EV-ranked bets product question is still deferred.
+
 ### ROOT CAUSED 2026-08-05 -- soccer odds_history: one broken league silently blocks movement for ALL soccer, every run
 
 Triggered two real manual soccer-only refreshes in production (per explicit

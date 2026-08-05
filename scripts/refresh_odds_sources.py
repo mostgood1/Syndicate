@@ -2139,42 +2139,6 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
     sport_had_a_successful_step = any(bool(step.get("ok")) for step in sport_result["refresh_steps"])
     _log_memory("sport_step_post_append_before_post_refresh_check", sport=sport, execution_mode=execution_mode, sport_ok=bool(sport_result.get("ok")), sport_had_a_successful_step=sport_had_a_successful_step)
     post_refresh_gate_entered = execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaab", "ncaaf", "soccer"} and sport_had_a_successful_step
-    # Temporary, always-on diagnostic (2026-08-05): _log_memory above is
-    # gated behind SYNDICATE_LIVE_ODDS_REFRESH_MEMORY_TRACE (default off),
-    # so it produced zero visibility in production while chasing why
-    # soccer's odds_history sync stayed empty even after both the ESPN-403
-    # fix and the sport_result["ok"] -> sport_had_a_successful_step gate
-    # change deployed together. Persisted (not print-only) for the same
-    # reason as the prop-row-coverage diagnostic next to it: Render's log
-    # API returned zero hits for print-only traces multiple times this
-    # session even when they definitely fired. Remove once this gate is
-    # confirmed correctly reached/entered for soccer against a real run.
-    try:
-        from syndicate.features.shared.refresh_state_store import reports_root as _diag_reports_root
-        from syndicate.features.shared.refresh_state_store import write_json_file as _diag_write
-
-        diag_status_path = _diag_reports_root() / "refresh_status" / "latest" / "odds_history_post_refresh_gate_status.json"
-        diag_existing = {}
-        try:
-            from syndicate.features.shared.refresh_state_store import read_json_file as _diag_read
-
-            diag_existing = _diag_read(diag_status_path) or {}
-        except Exception:
-            diag_existing = {}
-        if not isinstance(diag_existing, dict):
-            diag_existing = {}
-        diag_existing[sport] = {
-            "date": args.date,
-            "updated_at": _utc_now(),
-            "execution_mode": execution_mode,
-            "sport_ok": bool(sport_result.get("ok")),
-            "sport_had_a_successful_step": sport_had_a_successful_step,
-            "gate_entered": post_refresh_gate_entered,
-            "step_names_and_ok": [{"name": step.get("name"), "ok": bool(step.get("ok"))} for step in sport_result["refresh_steps"]],
-        }
-        _diag_write(diag_status_path, diag_existing)
-    except Exception:
-        pass
     if post_refresh_gate_entered:
         _log_memory("sport_step_post_append_enter_post_refresh_branch", sport=sport, execution_mode=execution_mode)
         _log_memory("sport_step_post_append_before_post_refresh_root", sport=sport, execution_mode=execution_mode)
