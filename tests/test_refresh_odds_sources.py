@@ -695,3 +695,90 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         args = argparse.Namespace(force_refresh=False, force_refresh_sports="nba")
 
         self.assertFalse(module._sport_force_refresh_scope(args, "nba"))
+    def test_one_leagues_failed_step_does_not_block_odds_history_sync_for_the_others(self) -> None:
+        # Was gated on sport_result["ok"] -- a single AND across EVERY step
+        # of the whole sport. For soccer specifically, refresh_steps is a
+        # flat list spanning every league's odds/props/picks/artifacts
+        # tasks, one entry per (league, task). Confirmed live 2026-08-05: a
+        # single unrelated league's fixture-artifact-build step failing (an
+        # ESPN 403 on primeira_liga/eredivisie, since fixed separately)
+        # silently skipped the odds_history sync for EVERY league including
+        # MLS, whose own odds/props steps had already succeeded and written
+        # genuinely fresh data. The sync itself only reads whatever files
+        # exist on disk, so there was never a correctness reason to require
+        # every OTHER step to have succeeded first.
+        module = self._load_module()
+        args = argparse.Namespace(
+            date="2026-08-05",
+            sports="soccer",
+            phase="pregame",
+            regions="us",
+            bookmakers="",
+            markets="",
+            season=None,
+            week=None,
+            skip_mirror=True,
+            execution_mode="source",
+            mirror_only=False,
+            continue_on_error=True,
+            dry_run=False,
+            json=False,
+            list=False,
+        )
+
+        call_count = {"n": 0}
+
+        def _mixed_step_results(step, dry_run=False):
+            call_count["n"] += 1
+            # First step (an arbitrary league's fixture build, in this
+            # reproduction) fails; every other league's step succeeds --
+            # exactly the shape observed live.
+            ok = call_count["n"] != 1
+            return {"ok": ok, "name": step.name, "dry_run": dry_run}
+
+        with patch.object(module, "_run_command", side_effect=_mixed_step_results), patch.object(
+            module,
+            "_sync_post_refresh_tracking_step",
+            return_value={"ok": True, "name": "soccer_post_refresh_tracking_sync", "dry_run": False, "meta": {"signals_rows": 3}},
+        ) as mocked_tracking:
+            summary = module._build_summary(args)
+
+        self.assertGreater(call_count["n"], 1, "soccer should have more than one refresh step to make this scenario meaningful")
+        sport_result = summary["results"][0]
+        self.assertFalse(sport_result["ok"], "sport_result[ok] should still correctly reflect the real failure")
+        mocked_tracking.assert_called_once()
+        self.assertIn("post_refresh", sport_result)
+        self.assertEqual(sport_result["post_refresh"]["name"], "soccer_post_refresh_tracking_sync")
+
+    def test_a_sport_with_zero_successful_steps_never_attempts_the_sync(self) -> None:
+        # The opposite edge: nothing on disk worth syncing should still
+        # correctly skip it, not attempt a no-op sync.
+        module = self._load_module()
+        args = argparse.Namespace(
+            date="2026-08-05",
+            sports="soccer",
+            phase="pregame",
+            regions="us",
+            bookmakers="",
+            markets="",
+            season=None,
+            week=None,
+            skip_mirror=True,
+            execution_mode="source",
+            mirror_only=False,
+            continue_on_error=True,
+            dry_run=False,
+            json=False,
+            list=False,
+        )
+
+        with patch.object(module, "_run_command", return_value={"ok": False, "name": "soccer_every_step_fails", "dry_run": False}), patch.object(
+            module,
+            "_sync_post_refresh_tracking_step",
+        ) as mocked_tracking:
+            summary = module._build_summary(args)
+
+        sport_result = summary["results"][0]
+        self.assertFalse(sport_result["ok"])
+        mocked_tracking.assert_not_called()
+        self.assertNotIn("post_refresh", sport_result)
