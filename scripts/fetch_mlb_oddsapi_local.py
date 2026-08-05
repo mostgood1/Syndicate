@@ -603,9 +603,52 @@ def _is_fatal_live_odds_error(status_code: int | None, error_code: str | None) -
     return status_code in {401, 403, 429}
 
 
+def _diagnose_live_events_coverage(date_str: str, raw_events: list[dict[str, Any]], matched_events: list[dict[str, Any]]) -> None:
+    """Diagnostic only -- never changes what is fetched or returned.
+
+    Investigating why live pitcher/hitter prop snapshots go near-empty
+    mid-slate (`events_matched` was seen at 1 while the board's own live-lens
+    report showed several games live). That single observation compared
+    timestamps roughly 3 hours apart -- by the time of the low count, most of
+    that day's early games had likely already finished -- so it does not by
+    itself distinguish "OddsAPI's /events response is thin right now" from
+    "most games really were done." This writes a real, same-moment
+    comparison: OddsAPI's own raw event count, the date-filtered count this
+    script actually uses, and the count of games MLB's own schedule (an
+    independent source, not OddsAPI) currently calls live -- so a future read
+    during an actual live window answers the question directly instead of by
+    inference. Best-effort: any failure here must not affect the real fetch.
+    """
+    try:
+        from syndicate.features.shared.refresh_state_store import reports_root
+        from syndicate.features.shared.refresh_state_store import write_json_file
+
+        status_by_matchup = _load_mlb_status_by_matchup(date_str)
+        live_per_schedule = sum(
+            1
+            for status in status_by_matchup.values()
+            if mlb_status_is_live(status.get("abstract"), status.get("detailed"))
+        )
+        payload = {
+            "date": str(date_str),
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "oddsapi_raw_event_count": len(raw_events),
+            "oddsapi_date_matched_count": len(matched_events),
+            "mlb_schedule_live_count": live_per_schedule,
+            "mlb_schedule_total_count": len(status_by_matchup),
+        }
+        print(f"[mlb_live_events_coverage_diag] {json.dumps(payload, sort_keys=True)}", flush=True)
+        write_json_file(reports_root() / "mlb_odds_diag" / f"live_events_coverage_{date_str}.json", payload)
+    except Exception as exc:
+        print(f"[mlb_live_events_coverage_diag] FAILED error={type(exc).__name__}: {exc}", flush=True)
+
+
 def _fetch_live_events_for_date(api_key: str, date_str: str) -> list[dict[str, Any]]:
     raw, _ = _http_get(f"{API_BASE}/sports/{SPORT}/events", {"apiKey": api_key})
-    return [event for event in _as_events_list(raw) if _event_matches_slate_date(event, date_str)]
+    raw_events = _as_events_list(raw)
+    matched_events = [event for event in raw_events if _event_matches_slate_date(event, date_str)]
+    _diagnose_live_events_coverage(date_str, raw_events, matched_events)
+    return matched_events
 
 
 def _fetch_live_event_odds(api_key: str, event_id: str, *, markets_csv: str, regions: str, bookmakers: str | None) -> dict[str, Any] | None:

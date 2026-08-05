@@ -115,6 +115,14 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # capture_phase directly, so it is the cheap, bounded way to verify both
     # without exporting bulk data.
     "reports/steam/steam_events_*.json",
+    # Same-moment odds-events-coverage diagnostic for the pitcher live-lens
+    # investigation (see fetch_mlb_oddsapi_local.py::_diagnose_live_events_coverage):
+    # OddsAPI's raw/date-filtered event counts vs. MLB's own schedule-derived
+    # live count, written on whichever service runs the odds-refresh
+    # subprocess. Tiny (a handful of ints per date), so allowlisting it is
+    # cheap; without this it is only readable on the writing service's own
+    # disk, and the writer isn't necessarily the one this is investigated from.
+    "reports/mlb_odds_diag/live_events_coverage_*.json",
     # MLB's vendored daily sim (vendor/mlb_bettingv2/tools/daily_update.py,
     # triggered from live_refresh_loop.py's MLB daily-sim gate) writes under
     # data/daily/, data/manager/, data/park/, data/umpire/ -- none of which
