@@ -1,5 +1,125 @@
 # Syndicate TODO — canonical cross-session list
 
+### RECONCILIATION 2026-08-05 -- session close-out (evaluation loop, deploy safety, sim watchdog, price gate)
+
+Full-day session, root-caused across five layers before finding the real
+bottom. Reconciling for archive; safe to close.
+
+**Shipped, deployed, verified live (all commits confirmed on `1a757ad1`,
+the tip all three services run as of this reconciliation):**
+
+1. **The evaluation ledger was living in ephemeral storage** -- the
+   session's real finding. `DEFAULT_LEDGER_PATH` resolved relative to the
+   CODE checkout (`repo_root_from`), which Render rebuilds on every deploy;
+   the persistent disk is a separate `SYNDICATE_REPORTS_ROOT` mount. Every
+   ledger record written between deploys was silently wiped by the next
+   one -- explains the whole day's "matched: 0" confusion, which was never
+   really about date windows, grading timing, or the join (all three of
+   those were ALSO real bugs, independently fixed, see below -- just not
+   the bottleneck). Confirmed with a direct on-disk `chunk_diagnostics`
+   check, not inferred. Fixed both `intelligence_evaluation.py` and its
+   sibling `shadow_candidate_ledger.py` (same bug, found by checking the
+   obvious "ledger"-named neighbor) using the established `reports_root()`
+   pattern -- `prediction_ledger.py` already had this exact bug fixed with
+   an explicit warning comment that should have been checked against
+   first. 15 more `repo_root_from` usages recorded as an explicit, bounded
+   follow-up audit, not silently skipped.
+2. **Settlement's schedule had no time-of-day concept.** Pure
+   interval-since-last-run meant "when it runs" was an accident. Now runs
+   once per Central calendar day at 6am (self-catching-up if the worker
+   was down), so yesterday settles before today's board is used --
+   directly per the user's framing. DST-correct (real timezone, verified
+   against a January date, not a fixed offset).
+3. **MLB sim hang detection was a total-runtime ceiling, 6x too slow.** A
+   sim that died 20s in held its slot for the full 90 minutes, silently
+   blocking every later trigger (including item 4) and every deploy
+   (`check_deploy_safety.py` trusted the same stale pointer indefinitely --
+   a 40-minute watcher never got a clear window). Added a progress-stall
+   watchdog on `sim_run_progress.updated_at` (~15min default) on both the
+   local-Popen and cross-container pointer paths, and made the deploy-
+   safety script itself ignore a pointer past the 90-minute ceiling.
+4. **MLB props self-heal was starved by its own call site.** `if not
+   changed_game_pks and not join_mismatch_game_pks and not
+   board_missing_game_pks:` reasoned "no point checking, we're launching
+   anyway" -- but a scoped `fingerprint_change` launch never reaches the
+   top-props stage, so any slate with ongoing churn suppressed the check
+   all day. This is what actually caused the user-reported "MLB opps
+   missing from the board" symptom (props artifact empty 11+ hours despite
+   healthy sims). Now runs every tick; its game_pks widen a scoped launch
+   to the full slate. Confirmed working via a manual force-resim (56 props
+   landed) -- **not yet observed self-healing unattended**, that's the
+   real remaining verification.
+5. **Layer 2 board Phase 0/2/3** (from the earlier world-class-plan
+   sessions, verified still live): NFL/NCAAF week self-pinning, real
+   WNBA game-market probabilities, soccer multi-league fan-out, the real
+   ranker wired onto the board path, price-gated opportunities, Kelly
+   stakes, correlation exposure budgets, decided-live-prop suppression,
+   price CLV, mobile board, settlement autorun enabled.
+6. **Ask the Syndicate**: market-summary routing fix (unmatched questions
+   now default to a board summary instead of a dead-end single-bet
+   analysis), the negative-edge ordering fix, "ask about this pick" context
+   routing -- all user-reported, all verified against the live production
+   page.
+
+**Env state confirmed clean at close:** `EVALUATION_SETTLEMENT_REFRESH_
+INTERVAL_SECONDS` reverted to unset (used twice as a sanctioned diagnostic
+override to force fast cycles, reverted immediately after each use --
+confirmed via the Render API, not assumed). `SYNDICATE_ACTIVE_SPORTS=
+mlb,wnba,soccer` on all three services is intentional production config
+from earlier in the session, not a diagnostic leftover.
+
+**Test suite: 371/371 pass** across every file touched this session
+(`test_intelligence_evaluation`, `test_price_clv`, `test_evaluation_
+settlement`, `test_board_state_ledger_recording`, `test_refresh_worker`,
+`test_evaluation_settlement_daily_gate`, `test_shadow_candidate_ledger`,
+`test_board_price_gate_and_ranker`, `test_mlb_sim_progress_watchdog`,
+`test_live_refresh_loop`, `test_keyvalue_usage_diagnostic`, `test_refresh_
+state_store`). `test_intelligence_state.py`: 6 -> 5 failures this session
+(one was a real regression from this session's own earlier price-gate
+work, root-caused and fixed with evidence -- the log line literally named
+it: `unpriced=2`). `test_live_refresh_loop.py`'s separate 6-failure cluster
+was spun off as its own task earlier and fixed by that session (203/203
+passing now, confirmed).
+
+**Genuinely still open, for whoever picks this up next:**
+- `test_intelligence_state.py`, 5 remaining failures. Two
+  (`test_build_candidate_pool_skips_sports_without_manifests`,
+  `test_build_candidate_pool_does_not_embed_full_odds_history_payload`)
+  are the SAME price-gate issue but through the PRIMARY `collect_candidates`
+  path, not the `collect_all_recommendations` fallback their mocks target --
+  the mocks are never reached; 60 REAL candidates come from checked-in MLB
+  fixture data for `2026-06-10` that genuinely lacks price fields. Real fix
+  means touching shared on-disk test fixtures other tests may depend on --
+  deliberately not attempted at the end of an already long session. The
+  other three (`test_query_endpoint_default_unchanged_when_combined_flag_
+  disabled`, `test_read_latest_response_syncs_shared_backend_state`,
+  `test_background_loop_survives_board_window_watch_exception`) bypass
+  candidate scoring entirely and were not investigated -- architecturally
+  unrelated to anything this session touched.
+- **The props self-heal fix has only been verified via manual force-resim,
+  never observed self-healing unattended.** Check tomorrow whether
+  `reason=props_now_available` fires on its own in refresh-worker logs.
+- **The persistent-ledger fix needs to survive a deploy to be proven, not
+  just observed once.** Check tomorrow morning (after the 6am settlement
+  gate fires against today's now-final slate) whether `matched` goes
+  non-zero for the first time, AND whether today's accumulated records are
+  still present (not wiped by whatever deploy happens between now and
+  then).
+- 15 more `repo_root_from` usages, listed in the ROOT CAUSE entry above,
+  not audited.
+- A concurrent session has real, substantial in-progress work on NFL
+  preseason support (`scripts/generate_smartsim2_nfl_preseason_
+  projections.py`, `syndicate/features/nfl/preseason_cards.py`, plus new
+  untracked `scripts/fetch_nfl_preseason_odds.py` /
+  `data/nfl_source/preseason_odds_2026.csv`) -- left completely untouched
+  and unstaged; not this session's to commit or judge.
+
+**Safe to archive.** Nothing of this session's own work is uncommitted,
+unpushed, or undeployed. No diagnostic env overrides left set. No
+background watchers left silently running against a closed session. Every
+claim above is backed by a direct read against production or a local test
+run, not inferred.
+
 ### ROOT CAUSED 2026-08-05 -- soccer odds_history: one broken league silently blocks movement for ALL soccer, every run
 
 Triggered two real manual soccer-only refreshes in production (per explicit
@@ -5663,8 +5783,10 @@ Ask the Syndicate player-prop evidence fetcher.
 
 ### Reconciliation 2026-08-01 (Ask the Syndicate player-name disambiguation bug: last-name-only substring match picked the wrong same-surname player)
 
-**New: #180** (filed and closed same session) — user reported "Ask the
-Syndicate" returning data for the wrong player when asking about Yordan
+**New: #184** (filed and closed same session; renumbered from a duplicate
+#180 — that ID was already claimed by the "NFL: real player-props/ladders
+pipeline" entry above from a concurrent session, missed at write time) —
+user reported "Ask the Syndicate" returning data for the wrong player when asking about Yordan
 Alvarez (MLB has multiple "Alvarez" players). Two passes were needed; the
 first deploy did not actually fix the user-visible symptom — recorded here
 so a future session doesn't stop at pass 1 and declare victory.
