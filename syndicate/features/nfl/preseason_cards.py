@@ -146,6 +146,29 @@ def _game_from_preseason_projection(projection: Any, season: int, week: int, *, 
     ]
     if market:
         metrics.append({"label": "Market total", "value": str(market.get("total_line") or "-")})
+    # Real data plumbing for the shared board contract's Box Score/Game tabs
+    # (mirrors the same fix in nfl/cards.py's _game_from_smartsim_projection).
+    # p_home_win is always the model's own win probability (never
+    # fabricated); home_spread/total are only set when this exact matchup's
+    # `market` argument (real preseason odds already loaded by the caller via
+    # _load_preseason_odds -- no new fetch here) actually has a real quoted
+    # value. No prop_recommendations here at all: preseason has no real prop
+    # odds source (see build_nfl_preseason_market_board's own docstring), so
+    # the generic template's "no props" empty state is correct, not a gap.
+    betting: dict[str, Any] = {"p_home_win": projection.home_win_rate}
+    if market:
+        try:
+            market_home_spread = float(market.get("spread_home")) if str(market.get("spread_home") or "").strip() else None
+        except (TypeError, ValueError):
+            market_home_spread = None
+        try:
+            market_total = float(market.get("total_line")) if str(market.get("total_line") or "").strip() else None
+        except (TypeError, ValueError):
+            market_total = None
+        if market_home_spread is not None:
+            betting["home_spread"] = market_home_spread
+        if market_total is not None:
+            betting["total"] = market_total
     panels = [
         {
             "eyebrow": "SmartSim 2.0 (preseason)",
@@ -201,6 +224,27 @@ def _game_from_preseason_projection(projection: Any, season: int, week: int, *, 
         "detail": "SmartSim 2.0 (preseason)",
         "summary": summary,
         "metrics": metrics,
+        "sim": {
+            "periods": {
+                "full": {
+                    "away_mean": projection.away_score_mean,
+                    "home_mean": projection.home_score_mean,
+                    "total_mean": projection.total_mean,
+                    "margin_mean": projection.margin_mean,
+                    "p_home_win": projection.home_win_rate,
+                }
+            },
+            "score": {"away_mean": projection.away_score_mean, "home_mean": projection.home_score_mean},
+        },
+        "betting": betting,
+        "probability_rows": [
+            {
+                "label": "Full Game",
+                "away_pct": (1.0 - projection.home_win_rate) * 100.0,
+                "home_pct": projection.home_win_rate * 100.0,
+                "summary": f"Home win probability {win_probability}",
+            }
+        ],
         "shared_top_play_rows": [],
         "panels": panels,
     }

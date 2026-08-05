@@ -2688,8 +2688,71 @@ class AskTheSyndicateNflEvidenceTests(unittest.TestCase):
     def test_fetchers_for_sport_registers_nfl(self) -> None:
         fetchers = ask_data._fetchers_for_sport("nfl", "any question")
         self.assertIn(ask_data._nfl_matchup_evidence, fetchers)
+        self.assertIn(ask_data._nfl_preseason_matchup_evidence, fetchers)
         self.assertIn(ask_data._nfl_team_profile_evidence, fetchers)
         self.assertIn(ask_data._nfl_ats_evidence, fetchers)
+
+    def test_fetchers_for_sport_agnostic_catch_all_registers_nfl_preseason(self) -> None:
+        fetchers = ask_data._fetchers_for_sport("", "any question")
+        self.assertIn(ask_data._nfl_preseason_matchup_evidence, fetchers)
+
+    def _write_preseason_projection(self, season: int, week: int, projection) -> None:
+        from syndicate.features.nfl.preseason_projection import write_preseason_projection_artifact
+
+        write_preseason_projection_artifact([projection], season=season, week=week, data_root=Path(self.nfl_root))
+
+    def test_preseason_matchup_evidence_reads_real_preseason_projection(self) -> None:
+        from syndicate.features.nfl.preseason_projection import SmartSimNflPreseasonProjection
+
+        projection = SmartSimNflPreseasonProjection(
+            game_id="2026_preseason_1_ARI_SEA", season=2026, week=1, home_team="SEA", away_team="ARI",
+            home_score_mean=20.5, away_score_mean=17.2, margin_mean=3.3, total_mean=37.7,
+            margin_stdev=17.0, total_stdev=15.0, home_win_rate=0.58, seeds_used=100,
+            profile_name="nfl_preseason_v1", rating_source="prior_season_fallback", generated_at="2026-08-01T00:00:00Z",
+            nonstarter_participation_share=0.92, shrinkage_applied=0.92,
+            uncertainty_note="Preseason projection -- shrunk toward league-neutral by 92%.",
+        )
+        # default_nfl_source_root() resolves via a real-data glob heuristic
+        # (see nfl/sources.py's _first_existing_root: it prefers whichever
+        # candidate root already has upcoming_recs_*.csv on disk) that
+        # would otherwise silently fall through to this repo's real data
+        # root instead of this fixture's tempdir -- pinned directly here so
+        # the test reads only the fixture's own file, same pattern
+        # tests/test_nfl_preseason_cards.py already uses.
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}), patch(
+            "syndicate.features.nfl.sources.latest_season", return_value=2026,
+        ), patch(
+            "syndicate.features.nfl.sources.default_nfl_source_root", return_value=Path(self.nfl_root),
+        ):
+            self._write_branding()
+            self._write_preseason_projection(2026, 1, projection)
+
+            result = ask_data._nfl_preseason_matchup_evidence("who wins Arizona Cardinals vs Seattle Seahawks", {})
+
+        self.assertIsNotNone(result)
+        evidence = result["evidence"]
+        self.assertEqual(evidence["season"], 2026)
+        self.assertEqual(evidence["week"], 1)
+        self.assertEqual(evidence["model_margin"], 3.3)
+        self.assertAlmostEqual(evidence["nonstarter_participation_share"], 0.92)
+        self.assertAlmostEqual(evidence["shrinkage_applied"], 0.92)
+        self.assertIn("shrunk toward league-neutral", evidence["uncertainty_note"])
+        self.assertIn("Preseason Week 1 projection", result["tables"][0]["title"])
+
+    def test_preseason_matchup_evidence_none_with_only_one_team(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}):
+            self._write_branding()
+            self.assertIsNone(ask_data._nfl_preseason_matchup_evidence("how good are the Seattle Seahawks", {}))
+
+    def test_preseason_matchup_evidence_none_when_no_matching_preseason_game_exists(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}), patch(
+            "syndicate.features.nfl.sources.latest_season", return_value=2026,
+        ), patch(
+            "syndicate.features.nfl.sources.default_nfl_source_root", return_value=Path(self.nfl_root),
+        ):
+            self._write_branding()
+            result = ask_data._nfl_preseason_matchup_evidence("who wins Arizona Cardinals vs Seattle Seahawks", {})
+        self.assertIsNone(result)
 
 
 if __name__ == "__main__":

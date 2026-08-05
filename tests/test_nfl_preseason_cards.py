@@ -169,6 +169,50 @@ class GameFromPreseasonProjectionTests(PreseasonCardsTestCase):
         game = pc._game_from_preseason_projection(projections[0], 2026, 3)
         self.assertEqual(game["status"], "Preseason Week 2 (dress rehearsal)")
 
+    def test_sim_periods_and_score_come_from_projection_fields(self) -> None:
+        self._write_projection(2026, 1, [self._projection_row()])
+        projections = pp.read_preseason_projection_artifact(season=2026, week=1, data_root=self.root)
+        game = pc._game_from_preseason_projection(projections[0], 2026, 1)
+        full = game["sim"]["periods"]["full"]
+        self.assertEqual(full["away_mean"], 20.9)
+        self.assertEqual(full["home_mean"], 24.3)
+        self.assertEqual(full["total_mean"], 45.2)
+        self.assertEqual(full["margin_mean"], 3.4)
+        self.assertAlmostEqual(full["p_home_win"], 0.59)
+        self.assertEqual(game["sim"]["score"]["away_mean"], 20.9)
+        self.assertEqual(game["sim"]["score"]["home_mean"], 24.3)
+
+    def test_betting_always_carries_the_models_own_win_probability(self) -> None:
+        self._write_projection(2026, 1, [self._projection_row()])
+        projections = pp.read_preseason_projection_artifact(season=2026, week=1, data_root=self.root)
+        game = pc._game_from_preseason_projection(projections[0], 2026, 1)
+        self.assertAlmostEqual(game["betting"]["p_home_win"], 0.59)
+        self.assertNotIn("home_spread", game["betting"])
+        self.assertNotIn("total", game["betting"])
+
+    def test_betting_carries_the_real_market_line_when_one_is_passed(self) -> None:
+        self._write_projection(2026, 1, [self._projection_row()])
+        projections = pp.read_preseason_projection_artifact(season=2026, week=1, data_root=self.root)
+        market = {"home_moneyline": "-140", "away_moneyline": "120", "spread_home": "-2.5", "total_line": "42.0", "book": "fanduel"}
+        game = pc._game_from_preseason_projection(projections[0], 2026, 1, market=market)
+        self.assertEqual(game["betting"]["home_spread"], -2.5)
+        self.assertEqual(game["betting"]["total"], 42.0)
+
+    def test_probability_rows_built_from_home_win_rate(self) -> None:
+        self._write_projection(2026, 1, [self._projection_row()])
+        projections = pp.read_preseason_projection_artifact(season=2026, week=1, data_root=self.root)
+        game = pc._game_from_preseason_projection(projections[0], 2026, 1)
+        row = game["probability_rows"][0]
+        self.assertEqual(row["label"], "Full Game")
+        self.assertAlmostEqual(row["home_pct"], 59.0)
+        self.assertAlmostEqual(row["away_pct"], 41.0)
+
+    def test_prop_recommendations_never_set(self) -> None:
+        self._write_projection(2026, 1, [self._projection_row()])
+        projections = pp.read_preseason_projection_artifact(season=2026, week=1, data_root=self.root)
+        game = pc._game_from_preseason_projection(projections[0], 2026, 1)
+        self.assertNotIn("prop_recommendations", game)
+
 
 class BuildPreseasonCardsPageContextTests(PreseasonCardsTestCase):
     def test_renders_real_games_for_week(self) -> None:

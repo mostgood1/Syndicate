@@ -193,6 +193,12 @@ def build_module_links(selected_week: int, active_label: str, *, season: int | N
         ("Picks", f"/nfl/picks?season={resolved_season}&week={selected_week}"),
         ("Live Lens", f"/nfl/live-lens?season={resolved_season}&week={selected_week}"),
         ("Daily Archive", f"/nfl/archive?season={resolved_season}&week={selected_week}"),
+        # These two real pages (build_nfl_props_page_context / build_nfl_market_board,
+        # both already live behind /nfl/props and /nfl/market-board) had no
+        # nav link into them from anywhere in this module's own link list --
+        # orphaned pages, reachable only by typing the URL directly.
+        ("Props", f"/nfl/props?season={resolved_season}&week={selected_week}"),
+        ("Market Board", f"/nfl/market-board?season={resolved_season}&week={selected_week}"),
         ("Hub", "/nfl/hub"),
     ]
     return [{"label": label, "href": href, "active": label == active_label} for label, href in links]

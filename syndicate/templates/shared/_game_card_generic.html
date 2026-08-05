@@ -120,6 +120,7 @@
       <button class="cards-tab is-active" type="button" data-tab-target="game">Game</button>
       <button class="cards-tab" type="button" data-tab-target="boxscore">Box Score</button>
       <button class="cards-tab" type="button" data-tab-target="props">Props</button>
+      {% if game.panels %}<button class="cards-tab" type="button" data-tab-target="panels">Details</button>{% endif %}
     </div>
     <div class="cards-mini-metrics cards-mini-metrics--rail">
       {% for metric in metrics[:3] %}
@@ -298,4 +299,30 @@
       </div>
     </div>
   </section>
+
+  {% if game.panels %}
+  <section class="cards-panel" data-panel-id="panels">
+    <div class="cards-box-grid{% if game.panels|length < 2 %} cards-box-grid--stack{% endif %}">
+      {% for panel in game.panels %}
+        <div class="cards-panel-card">
+          <div class="cards-box-head">
+            <div>
+              <div class="cards-table-kicker">{{ panel.eyebrow }}</div>
+              <div class="cards-table-title"><strong>{{ panel.title }}</strong></div>
+            </div>
+            <span class="cards-chip">Source</span>
+          </div>
+          <div class="cards-callout-copy">{{ panel.body }}</div>
+          {% if panel['items'] is defined and panel['items'] %}
+            <div class="cards-callout-list">
+              {% for item in panel['items'] %}
+                <div class="cards-callout"><strong>{{ item.split(':', 1)[0] if ':' in item else 'Detail' }}</strong><span class="cards-callout-copy">{{ item.split(':', 1)[1].strip() if ':' in item else item }}</span></div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
 </article>

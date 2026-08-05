@@ -261,6 +261,17 @@ def _game_from_snapshot_bundle(bundle: dict[str, Any], season: int, week: int) -
         f"Stored weekly recommendation rows for {away_team} at {home_team}. "
         f"Top signal: {top_type} at {_format_ev_pct(top_ev)} EV."
     )
+    # sim/betting/probability_rows are deliberately NOT set here (unlike
+    # _game_from_smartsim_projection/_game_from_preseason_projection below and
+    # in preseason_cards.py): the legacy upcoming_recs_*.csv snapshot this
+    # path reads carries only type/confidence/ev_pct/odds per recommendation
+    # row -- no home/away score projection, no numeric spread/total line
+    # value, and no which-side-of-the-game the odds/confidence apply to.
+    # There is no real, non-fabricated way to populate a projected score, a
+    # market home_spread/total, or a home win probability from this data
+    # shape, so the Box Score/Game tabs correctly fall back to their generic
+    # "unavailable" empty states for this (historical, 2025-only) path
+    # rather than inventing numbers.
     return {
         "gamePk": game_pk,
         "card_variant": "shared_default",
@@ -350,6 +361,33 @@ def _game_from_smartsim_projection(projection: Any, season: int, week: int) -> d
         f"with a projected total of {round(projection.total_mean, 1)} and a home win probability of {win_probability}. "
         f"No stored recommendation snapshot exists for this week yet."
     )
+    # Real data plumbing for the shared board contract's Box Score/Game/Props
+    # tabs (game_board_contract.py's _build_period_rows/_build_probability_rows/
+    # _build_box_sections all read these keys, unconditionally, for every
+    # sport -- NFL just never set them, so real projection data never reached
+    # those tabs even though it was computed right here). p_home_win is the
+    # model's own win probability (never fabricated), always included;
+    # home_spread/total are only ever set when a real quoted market line was
+    # found for this exact matchup -- never fabricated when absent.
+    lines_entry = _nfl_real_lines_for_matchup(season, away_full_name=away_name, home_full_name=home_name)
+    betting: dict[str, Any] = {"p_home_win": projection.home_win_rate}
+    if lines_entry:
+        run_line = lines_entry.get("run_line") if isinstance(lines_entry.get("run_line"), dict) else {}
+        total_runs = lines_entry.get("total_runs") if isinstance(lines_entry.get("total_runs"), dict) else {}
+        if run_line.get("home") is not None:
+            betting["home_spread"] = run_line.get("home")
+        if total_runs.get("line") is not None:
+            betting["total"] = total_runs.get("line")
+    # prop_recommendations is deliberately left unset here: nfl_props_rows_for_week's
+    # raw odds/sim rows carry the player's name but no home/away team-side
+    # attribution (unlike build_nfl_market_board, which only needs the two
+    # teams' full names to key the whole game, not each individual player's
+    # side) -- _build_prop_rows requires rows split into "away"/"home" lists,
+    # and there is no reliable real source here for that split without extra
+    # per-player team resolution against nflverse play-by-play. Forcing a
+    # guess would risk mis-attributing a real prop to the wrong team, so this
+    # is left for the generic template's honest "no props" empty state
+    # rather than forcing something fragile.
     return {
         "gamePk": game_pk,
         "card_variant": "shared_default",
@@ -377,6 +415,27 @@ def _game_from_smartsim_projection(projection: Any, season: int, week: int) -> d
             {"label": "Away mean", "value": round(projection.away_score_mean, 1)},
             {"label": "Projected spread", "value": spread_label},
             {"label": "Win probability", "value": win_probability},
+        ],
+        "sim": {
+            "periods": {
+                "full": {
+                    "away_mean": projection.away_score_mean,
+                    "home_mean": projection.home_score_mean,
+                    "total_mean": projection.total_mean,
+                    "margin_mean": projection.margin_mean,
+                    "p_home_win": projection.home_win_rate,
+                }
+            },
+            "score": {"away_mean": projection.away_score_mean, "home_mean": projection.home_score_mean},
+        },
+        "betting": betting,
+        "probability_rows": [
+            {
+                "label": "Full Game",
+                "away_pct": (1.0 - projection.home_win_rate) * 100.0,
+                "home_pct": projection.home_win_rate * 100.0,
+                "summary": f"Home win probability {win_probability}",
+            }
         ],
         "shared_top_play_rows": [],
         "panels": [

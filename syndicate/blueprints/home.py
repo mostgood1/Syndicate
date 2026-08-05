@@ -3518,6 +3518,75 @@ def _nfl_game_market_recommendation_rows(game_id: Any, board_rows: list[dict[str
     return rows
 
 
+def _ncaaf_game_market_recommendation_rows(game_id: Any, board_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    # Same class of gap NFL had (see _nfl_game_market_recommendation_rows
+    # just above, which this mirrors closely): NCAAF never set
+    # game_market_recommendations, so it never reached the cross-sport Layer
+    # 2 opportunity feed. ``board_rows`` is one game's Layer 1 inventory as
+    # build_ncaaf_market_board (ncaaf/cards.py) produces it via
+    # join_odds_to_sim, with "market" already remapped to the display labels
+    # "Moneyline"/"Spread"/"Total" (_NCAAF_MARKET_BOARD_DISPLAY_LABELS).
+    #
+    # Unlike NFL, NCAAF's real market-line data (CFBD) carries no per-side
+    # price for Spread/Total today -- _ncaaf_market_board_rows_for_game only
+    # ever attaches a real "line" for those two markets, never an "odds"
+    # price on either side. The "picked.get('odds') is None -> skip" check
+    # below (same discipline NFL uses: never recommend a side the book
+    # hasn't actually priced) means only Moneyline recommendations surface
+    # for NCAAF in practice right now -- expected given current real data,
+    # not a bug.
+    rows: list[dict[str, Any]] = []
+    game_id_text = str(game_id or "")
+    for market_label in ("Moneyline", "Spread", "Total"):
+        market_rows = [
+            row
+            for row in board_rows
+            if isinstance(row, dict)
+            and row.get("market_type") == "game"
+            and row.get("market") == market_label
+            and str(row.get("game_id") or "") == game_id_text
+        ]
+        if not market_rows:
+            continue
+        model_side = next((row.get("model_side") for row in market_rows if row.get("model_side")), None)
+        if not model_side:
+            continue
+        picked = next((row for row in market_rows if row.get("side") == model_side), None)
+        if picked is None or picked.get("odds") is None:
+            continue
+        side = str(picked.get("side") or "")
+        line = picked.get("line")
+        if market_label == "Moneyline":
+            display_pick = "Home ML" if side == "home" else "Away ML" if side == "away" else None
+        elif market_label == "Spread":
+            side_label = "Home" if side == "home" else "Away" if side == "away" else side.title()
+            display_pick = f"{side_label} {line}".strip() if line is not None else None
+        else:  # Total
+            display_pick = f"{side.title()} {line}".strip() if line is not None else None
+        if not display_pick:
+            continue
+        sim_projection = picked.get("sim_projection")
+        projected_value = picked.get("projected_value")
+        if projected_value is not None:
+            projected: Any = projected_value
+        elif isinstance(sim_projection, (int, float)):
+            projected = f"{sim_projection * 100.0:.1f}%"
+        else:
+            projected = None
+        rows.append(
+            {
+                "market_label": market_label,
+                "display_pick": display_pick,
+                "selection": picked.get("side"),
+                "odds": picked.get("odds"),
+                "confidence": sim_projection,
+                "projected": projected,
+                "summary": picked.get("join_note"),
+            }
+        )
+    return rows
+
+
 def _apply_nba_live_scores(games: list[dict[str, Any]], selected_date: str) -> list[dict[str, Any]]:
     try:
         from syndicate.features.nba.cards import _games_from_live_state_fallback
@@ -5347,11 +5416,40 @@ class _NCAAFDataProvider(_HomeSportDataProviderBase):
         return _football_in_season(today_value)
 
     def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+        # Layer 2 fix, mirrors _NFLDataProvider.games(): switched from
+        # build_cards_page_context (a stale/historical saved-summary
+        # snapshot path) to build_smartsim_cards_page_context, the real
+        # current-slate path /ncaaf/cards itself renders through --
+        # build_ncaaf_market_board internally uses the same
+        # build_smartsim_cards_page_context path, and the two pipelines
+        # (saved summary vs. real current slate) produce different gamePk
+        # values in practice, so a join against the old source would have
+        # silently produced zero recommendations. Also stamps
+        # game_market_recommendations from the real Layer 1 market board,
+        # the same read-time translation _NFLDataProvider.games() already
+        # does for NFL. Single always-regular-season path: NCAAF has no
+        # preseason concept, so no phase branch is needed here (unlike
+        # NFL's regular-season/preseason split above).
         if context.week is None:
             return []
-        from syndicate.features.ncaaf.cards import build_cards_page_context
+        from syndicate.features.ncaaf.cards import build_ncaaf_market_board
+        from syndicate.features.ncaaf.cards import build_smartsim_cards_page_context
 
-        return list(build_cards_page_context(context.week).get("games") or [])
+        games = list(build_smartsim_cards_page_context(context.week).get("games") or [])
+        try:
+            board_games = list(build_ncaaf_market_board(context.week).get("games") or [])
+        except Exception:
+            board_games = []
+        rows_by_game_id = {str(board_game.get("gamePk") or ""): board_game.get("rows") or [] for board_game in board_games if isinstance(board_game, dict)}
+        for game in games:
+            if isinstance(game, dict) and not game.get("game_market_recommendations"):
+                game_id = str(game.get("gamePk") or "")
+                board_rows = rows_by_game_id.get(game_id)
+                if board_rows:
+                    rows = _ncaaf_game_market_recommendation_rows(game_id, board_rows)
+                    if rows:
+                        game["game_market_recommendations"] = rows
+        return games
 
     def pregame_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
         if not is_active_today:
@@ -6658,6 +6756,11 @@ _MARKET_BOARD_HUB_SPORTS: tuple[dict[str, str], ...] = (
     {"slug": "nba", "name": "NBA", "description": "Full market inventory once the season resumes."},
     {"slug": "wnba", "name": "WNBA", "description": "Full market inventory once the season resumes."},
     {"slug": "nfl", "name": "NFL", "description": "Every quoted moneyline, spread, and total, joined against a real SmartSim 2.0 projection."},
+    # slug "nfl/preseason" (not a real sport slug) relies on the template's
+    # href pattern `/{{ sport.slug }}/market-board` resolving to the real
+    # /nfl/preseason/market-board route -- this tile was previously
+    # orphaned, reachable only by typing the URL directly.
+    {"slug": "nfl/preseason", "name": "NFL Preseason", "description": "Every quoted preseason moneyline, spread, and total, joined against a shrinkage-adjusted SmartSim 2.0 projection."},
     {"slug": "ncaaf", "name": "NCAAF", "description": "Every quoted spread, total, and moneyline -- current week's games."},
 )
 

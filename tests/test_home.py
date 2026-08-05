@@ -19,7 +19,9 @@ from syndicate.blueprints.home import _sport_availability_reason
 from syndicate.blueprints.home import _prefer_today_or_latest
 from syndicate.blueprints.home import _game_bet_candidates_from_game
 from syndicate.blueprints.home import _mlb_game_market_recommendation_rows
+from syndicate.blueprints.home import _ncaaf_game_market_recommendation_rows
 from syndicate.blueprints.home import _nfl_game_market_recommendation_rows
+from syndicate.blueprints.home import _NCAAFDataProvider
 from syndicate.blueprints.home import _NFLDataProvider
 from syndicate.features.shared.sport_data_provider import SportContext
 from syndicate.blueprints.home import _game_status_state
@@ -68,6 +70,14 @@ class HomePageCommandCenterTests(unittest.TestCase):
         response = self.client.get("/market-board?date=2026-07-23")
         html = response.get_data(as_text=True)
         self.assertIn("/mlb/market-board?date=2026-07-23", html)
+
+    def test_market_board_hub_includes_nfl_preseason_tile(self) -> None:
+        # Item 5: this tile was previously orphaned -- /nfl/preseason/market-board
+        # was a real, working route with no nav link into it anywhere.
+        response = self.client.get("/market-board")
+        html = response.get_data(as_text=True)
+        self.assertIn("/nfl/preseason/market-board", html)
+        self.assertIn("NFL Preseason", html)
 
     def test_home_payload_uses_light_shell_on_render_web_dyno(self) -> None:
         from syndicate.blueprints import home as home_module
@@ -2300,3 +2310,120 @@ class NflGameMarketRecommendationsEndToEndTests(unittest.TestCase):
         self.assertEqual(moneyline["pick"], "Home ML")
         self.assertTrue(moneyline["team"])
         self.assertEqual(total["pick"], "Over 45.5")
+
+
+class NcaafGameMarketRecommendationRowsTests(unittest.TestCase):
+    """Coverage for _ncaaf_game_market_recommendation_rows -- mirrors
+    NflGameMarketRecommendationRowsTests exactly, plus the NCAAF-specific
+    real-data caveat: CFBD spread/total carry no per-side price today, so
+    only Moneyline ever has real odds coverage to recommend."""
+
+    @staticmethod
+    def _row(*, market: str, side: str, market_type: str = "game", line=None, odds=None, sim_projection=None, model_side=None, projected_value=None, join_status="matched", join_note=None, game_id="g1"):
+        return {
+            "game_id": game_id,
+            "market": market,
+            "market_type": market_type,
+            "side": side,
+            "line": line,
+            "odds": odds,
+            "sim_projection": sim_projection,
+            "model_side": model_side,
+            "projected_value": projected_value,
+            "join_status": join_status,
+            "join_note": join_note,
+        }
+
+    def test_moneyline_recommendation_picks_the_models_favored_side(self) -> None:
+        board_rows = [
+            self._row(market="Moneyline", side="home", odds=-150, sim_projection=0.62, model_side="home"),
+            self._row(market="Moneyline", side="away", odds=130, sim_projection=0.38, model_side="home"),
+        ]
+        rows = _ncaaf_game_market_recommendation_rows("g1", board_rows)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["market_label"], "Moneyline")
+        self.assertEqual(rows[0]["display_pick"], "Home ML")
+        self.assertEqual(rows[0]["odds"], -150)
+        self.assertEqual(rows[0]["projected"], "62.0%")
+
+    def test_spread_and_total_with_no_real_odds_price_are_skipped(self) -> None:
+        # Real CFBD data shape: _ncaaf_market_board_rows_for_game only ever
+        # attaches a "line" for Spread/Total, never an "odds" price.
+        board_rows = [
+            self._row(market="Moneyline", side="home", odds=-150, sim_projection=0.62, model_side="home"),
+            self._row(market="Moneyline", side="away", odds=130, sim_projection=0.38, model_side="home"),
+            self._row(market="Spread", side="home", line=-3.5, odds=None, sim_projection=0.55, model_side="home", projected_value=2.1),
+            self._row(market="Total", side="over", line=51.5, odds=None, sim_projection=0.52, model_side="over", projected_value=53.0),
+        ]
+        rows = _ncaaf_game_market_recommendation_rows("g1", board_rows)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["market_label"], "Moneyline")
+
+    def test_market_with_no_sim_coverage_is_skipped(self) -> None:
+        board_rows = [
+            self._row(market="Moneyline", side="home", odds=-150, sim_projection=None, model_side=None, join_status="unmatched_no_sim_coverage"),
+            self._row(market="Moneyline", side="away", odds=130, sim_projection=None, model_side=None, join_status="unmatched_no_sim_coverage"),
+        ]
+        self.assertEqual(_ncaaf_game_market_recommendation_rows("g1", board_rows), [])
+
+    def test_rows_from_a_different_game_id_are_ignored(self) -> None:
+        board_rows = [
+            self._row(market="Moneyline", side="home", odds=-150, sim_projection=0.62, model_side="home", game_id="other-game"),
+            self._row(market="Moneyline", side="away", odds=130, sim_projection=0.38, model_side="home", game_id="other-game"),
+        ]
+        self.assertEqual(_ncaaf_game_market_recommendation_rows("g1", board_rows), [])
+
+
+class NcaafDataProviderGamesTests(unittest.TestCase):
+    """Coverage for _NCAAFDataProvider.games()'s Item 3 fix: switched from
+    the stale build_cards_page_context snapshot path to
+    build_smartsim_cards_page_context (the real current-slate path
+    /ncaaf/cards itself renders through), plus game_market_recommendations
+    stamping from build_ncaaf_market_board -- both keyed by the SAME
+    gamePk, unlike the old snapshot source."""
+
+    @staticmethod
+    def _board(*, game_id: str) -> dict:
+        rows = [
+            {"game_id": game_id, "market": "Moneyline", "market_type": "game", "side": "home", "line": None, "odds": -150, "sim_projection": 0.62, "model_side": "home", "projected_value": None, "join_status": "matched", "join_note": "Model favors the home side."},
+            {"game_id": game_id, "market": "Moneyline", "market_type": "game", "side": "away", "line": None, "odds": 130, "sim_projection": 0.38, "model_side": "home", "projected_value": None, "join_status": "matched", "join_note": None},
+        ]
+        return {"season": 2026, "week": 1, "games": [{"gamePk": game_id, "rows": rows}]}
+
+    def test_no_week_returns_empty(self) -> None:
+        context = SportContext(slug="ncaaf", context_label="2026 Week 1", season=2026, week=None)
+        games = _NCAAFDataProvider().games(context, is_active_today=True)
+        self.assertEqual(games, [])
+
+    def test_games_come_from_the_real_current_slate_path_not_the_stale_snapshot(self) -> None:
+        context = SportContext(slug="ncaaf", context_label="2026 Week 1", season=2026, week=1)
+        smartsim_payload = {"games": [{"gamePk": "g1", "away": {"name": "Away Team"}, "home": {"name": "Home Team"}}]}
+        with patch("syndicate.features.ncaaf.cards.build_smartsim_cards_page_context", return_value=smartsim_payload) as mocked_smartsim, patch(
+            "syndicate.features.ncaaf.cards.build_cards_page_context"
+        ) as mocked_stale, patch("syndicate.features.ncaaf.cards.build_ncaaf_market_board", return_value=self._board(game_id="g1")):
+            games = _NCAAFDataProvider().games(context, is_active_today=True)
+        mocked_smartsim.assert_called_once_with(1)
+        mocked_stale.assert_not_called()
+        self.assertEqual(len(games), 1)
+        self.assertTrue(games[0].get("game_market_recommendations"))
+        self.assertEqual(games[0]["game_market_recommendations"][0]["market_label"], "Moneyline")
+
+    def test_game_that_already_has_recommendations_is_not_overwritten(self) -> None:
+        context = SportContext(slug="ncaaf", context_label="2026 Week 1", season=2026, week=1)
+        existing = [{"market_label": "Existing", "display_pick": "Keep me"}]
+        smartsim_payload = {"games": [{"gamePk": "g1", "game_market_recommendations": existing}]}
+        with patch("syndicate.features.ncaaf.cards.build_smartsim_cards_page_context", return_value=smartsim_payload), patch(
+            "syndicate.features.ncaaf.cards.build_ncaaf_market_board", return_value=self._board(game_id="g1")
+        ):
+            games = _NCAAFDataProvider().games(context, is_active_today=True)
+        self.assertEqual(games[0]["game_market_recommendations"], existing)
+
+    def test_market_board_failure_does_not_break_games(self) -> None:
+        context = SportContext(slug="ncaaf", context_label="2026 Week 1", season=2026, week=1)
+        smartsim_payload = {"games": [{"gamePk": "g1", "away": {"name": "Away Team"}, "home": {"name": "Home Team"}}]}
+        with patch("syndicate.features.ncaaf.cards.build_smartsim_cards_page_context", return_value=smartsim_payload), patch(
+            "syndicate.features.ncaaf.cards.build_ncaaf_market_board", side_effect=Exception("boom")
+        ):
+            games = _NCAAFDataProvider().games(context, is_active_today=True)
+        self.assertEqual(len(games), 1)
+        self.assertNotIn("game_market_recommendations", games[0])

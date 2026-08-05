@@ -3151,6 +3151,84 @@ def _nfl_ats_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] 
     return {"evidence": evidence, "tables": [table], "charts": [], "as_of": f"{season} season to date", "sport": "nfl"}
 
 
+def _nfl_preseason_matchup_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
+    """Real SmartSim 2.0 preseason projection
+    (scripts/generate_smartsim2_nfl_preseason_projections.py) for a
+    scheduled preseason matchup between two teams named in the question --
+    a NEW, SEPARATE fetcher from _nfl_matchup_evidence (not an extension of
+    it), since the preseason week domain (1-4) numerically collides with
+    the regular season's own week numbers: this fetcher's own table label
+    ("Preseason Week N projection") disambiguates the two rather than
+    risking an ambiguous "Week N projection" that could be read as either.
+    Searches every (season, week) that actually has a generated preseason
+    projection artifact, mirroring _nfl_matchup_evidence's own
+    every-available-week search. Includes the real preseason-only fields
+    (nonstarter_participation_share, shrinkage_applied, uncertainty_note)
+    so the evidence honestly discloses how much real signal was shrunk
+    away, same disclosure preseason_cards.py already renders on the card
+    itself."""
+    from syndicate.features.nfl.preseason_projection import preseason_seasons_and_weeks
+    from syndicate.features.nfl.preseason_projection import read_preseason_projection_artifact
+    from syndicate.features.nfl.sources import default_nfl_source_root
+    from syndicate.features.nfl.sources import latest_season
+
+    teams = _nfl_teams_in_question(question)
+    if len(teams) < 2:
+        return None
+    team_a = _normalize_ncaaf_name(teams[0])
+    team_b = _normalize_ncaaf_name(teams[1])
+
+    season = latest_season()
+    data_root = default_nfl_source_root()
+    candidate_weeks = sorted(preseason_seasons_and_weeks(data_root).get(season, []))
+    projection = None
+    week = None
+    for candidate_week in candidate_weeks:
+        for row in read_preseason_projection_artifact(season=season, week=candidate_week, data_root=data_root):
+            home_full = _nfl_code_to_full_name(row.home_team)
+            away_full = _nfl_code_to_full_name(row.away_team)
+            if {_normalize_ncaaf_name(home_full), _normalize_ncaaf_name(away_full)} == {team_a, team_b}:
+                projection = row
+                week = candidate_week
+                break
+        if projection is not None:
+            break
+    if projection is None:
+        return None
+
+    home_full_name = _nfl_code_to_full_name(projection.home_team)
+    away_full_name = _nfl_code_to_full_name(projection.away_team)
+
+    evidence = {
+        "source": "nfl_smartsim2_preseason_projection",
+        "season": season,
+        "week": week,
+        "home_team": home_full_name,
+        "away_team": away_full_name,
+        "model_home_points": round(projection.home_score_mean, 1),
+        "model_away_points": round(projection.away_score_mean, 1),
+        "model_margin": round(projection.margin_mean, 1),
+        "model_total": round(projection.total_mean, 1),
+        "model_home_win_probability": round(projection.home_win_rate, 3),
+        "nonstarter_participation_share": round(projection.nonstarter_participation_share, 3),
+        "shrinkage_applied": round(projection.shrinkage_applied, 3),
+        "uncertainty_note": projection.uncertainty_note,
+    }
+    table = {
+        "title": f"{away_full_name} @ {home_full_name} — Preseason Week {week} projection",
+        "columns": ["Metric", "Value"],
+        "rows": [
+            ["Home margin", evidence["model_margin"]],
+            ["Total points", evidence["model_total"]],
+            ["Home win probability", evidence["model_home_win_probability"]],
+            ["Nonstarter participation share", evidence["nonstarter_participation_share"]],
+            ["Shrinkage applied", evidence["shrinkage_applied"]],
+            ["Uncertainty note", evidence["uncertainty_note"]],
+        ],
+    }
+    return {"evidence": evidence, "tables": [table], "charts": [], "as_of": f"{season} preseason week {week}", "sport": "nfl"}
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -3187,7 +3265,7 @@ def _fetchers_for_sport(sport: str, question: str) -> list:
     if sport == "ncaaf":
         return [_ncaaf_matchup_projection_evidence, _ncaaf_team_profile_evidence, _ncaaf_ats_evidence]
     if sport == "nfl":
-        return [_nfl_matchup_evidence, _nfl_team_profile_evidence, _nfl_ats_evidence]
+        return [_nfl_matchup_evidence, _nfl_preseason_matchup_evidence, _nfl_team_profile_evidence, _nfl_ats_evidence]
     if sport == "":
         if _is_ranking_intent_question(_question_words(question)):
             return [_mlb_top_candidates_evidence]
@@ -3219,6 +3297,7 @@ def _fetchers_for_sport(sport: str, question: str) -> list:
             _ncaaf_team_profile_evidence,
             _ncaaf_ats_evidence,
             _nfl_matchup_evidence,
+            _nfl_preseason_matchup_evidence,
             _nfl_team_profile_evidence,
             _nfl_ats_evidence,
         ]

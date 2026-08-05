@@ -4,6 +4,8 @@ import unittest
 from unittest.mock import patch
 
 from syndicate.features.nfl.cards import _NFL_MARKET_BOARD_DISPLAY_LABELS
+from syndicate.features.nfl.cards import _game_from_smartsim_projection
+from syndicate.features.nfl.cards import _game_from_snapshot_bundle
 from syndicate.features.nfl.cards import _nfl_cover_probability
 from syndicate.features.nfl.cards import _nfl_market_board_rows_for_game
 from syndicate.features.nfl.cards import _nfl_prices_from_lines_entry
@@ -285,6 +287,90 @@ class NflMarketBoardBuilderTests(unittest.TestCase):
         self.assertEqual(prop_rows[0]["market"], "passing_yards")
         self.assertEqual(prop_rows[0]["game_id"], "2025_22_SEA_NE")
         self.assertEqual(prop_rows[0]["sim_projection"], 0.55)
+
+
+class GameFromSmartsimProjectionBoardContractTests(unittest.TestCase):
+    """Coverage for the Tier 1 fix to _game_from_smartsim_projection: real
+    data must reach game_board_contract.py's shared sim/betting/
+    probability_rows inputs, the only thing that was missing -- not a new
+    computation, just plumbing the projection's own fields through."""
+
+    @staticmethod
+    def _projection() -> SmartSimNflProjection:
+        return SmartSimNflProjection(
+            game_id="2025_10_ARI_SEA", season=2025, week=10, home_team="SEA", away_team="ARI",
+            home_score_mean=23.2, away_score_mean=21.9, margin_mean=1.3, total_mean=45.1,
+            margin_stdev=14.0, total_stdev=11.4, home_win_rate=0.612, seeds_used=300,
+            profile_name="nfl_v1", rating_source="test", generated_at="2026-01-01T00:00:00Z",
+        )
+
+    def test_sim_periods_and_score_come_from_projection_fields(self) -> None:
+        with patch("syndicate.features.nfl.cards._nfl_real_lines_for_matchup", return_value=None):
+            game = _game_from_smartsim_projection(self._projection(), 2025, 10)
+        full = game["sim"]["periods"]["full"]
+        self.assertEqual(full["away_mean"], 21.9)
+        self.assertEqual(full["home_mean"], 23.2)
+        self.assertEqual(full["total_mean"], 45.1)
+        self.assertEqual(full["margin_mean"], 1.3)
+        self.assertAlmostEqual(full["p_home_win"], 0.612)
+        self.assertEqual(game["sim"]["score"]["away_mean"], 21.9)
+        self.assertEqual(game["sim"]["score"]["home_mean"], 23.2)
+
+    def test_betting_always_carries_the_models_own_win_probability(self) -> None:
+        with patch("syndicate.features.nfl.cards._nfl_real_lines_for_matchup", return_value=None):
+            game = _game_from_smartsim_projection(self._projection(), 2025, 10)
+        self.assertAlmostEqual(game["betting"]["p_home_win"], 0.612)
+        # No real market line was found -- never fabricate one.
+        self.assertNotIn("home_spread", game["betting"])
+        self.assertNotIn("total", game["betting"])
+
+    def test_betting_carries_the_real_market_line_when_one_was_found(self) -> None:
+        fake_lines = {"run_line": {"home": -1.5}, "total_runs": {"line": 45.5}}
+        with patch("syndicate.features.nfl.cards._nfl_real_lines_for_matchup", return_value=fake_lines):
+            game = _game_from_smartsim_projection(self._projection(), 2025, 10)
+        self.assertEqual(game["betting"]["home_spread"], -1.5)
+        self.assertEqual(game["betting"]["total"], 45.5)
+
+    def test_probability_rows_built_from_home_win_rate(self) -> None:
+        with patch("syndicate.features.nfl.cards._nfl_real_lines_for_matchup", return_value=None):
+            game = _game_from_smartsim_projection(self._projection(), 2025, 10)
+        row = game["probability_rows"][0]
+        self.assertEqual(row["label"], "Full Game")
+        self.assertAlmostEqual(row["home_pct"], 61.2)
+        self.assertAlmostEqual(row["away_pct"], 38.8)
+
+    def test_prop_recommendations_intentionally_left_unset(self) -> None:
+        # See the comment in _game_from_smartsim_projection: no real
+        # home/away team-side attribution exists for NFL player props here,
+        # so this must not be forced/fabricated.
+        with patch("syndicate.features.nfl.cards._nfl_real_lines_for_matchup", return_value=None):
+            game = _game_from_smartsim_projection(self._projection(), 2025, 10)
+        self.assertNotIn("prop_recommendations", game)
+
+
+class GameFromSnapshotBundleBoardContractTests(unittest.TestCase):
+    """_game_from_snapshot_bundle reads the legacy upcoming_recs_*.csv
+    snapshot shape (type/confidence/ev_pct/odds -- no score projection, no
+    numeric market line, no pick side), so unlike the two SmartSim-backed
+    card builders above it deliberately does NOT populate sim/betting/
+    probability_rows -- there is no real, non-fabricated source for any of
+    them in this data shape. This locks down that intentional omission."""
+
+    def test_sim_betting_probability_rows_are_not_fabricated(self) -> None:
+        bundle = {
+            "game_date": "2025-12-25",
+            "away_team": "Denver Broncos",
+            "home_team": "Kansas City Chiefs",
+            "rows": [{"type": "SPREAD", "confidence": "High", "ev_pct": 37.2, "odds": -110}],
+            "top_row": {"type": "SPREAD", "confidence": "High", "ev_pct": 37.2, "odds": -110},
+            "top_ev": 37.2,
+            "confidence": "High",
+        }
+        game = _game_from_snapshot_bundle(bundle, 2025, 17)
+        self.assertNotIn("sim", game)
+        self.assertNotIn("betting", game)
+        self.assertNotIn("probability_rows", game)
+        self.assertNotIn("prop_recommendations", game)
 
 
 if __name__ == "__main__":
