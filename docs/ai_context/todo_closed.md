@@ -16,6 +16,14 @@ work takes the next free number (see the counter at the top of `todo.md`).
 
 ---
 
+## Closed 2026-08-05 — WNBA CI test-order pollution + empty-slate message mismatch (`task_b4637457`)
+
+| # | What shipped |
+|---|---|
+| `task_b4637457` | `python -m unittest tests.test_archives` (what CI actually runs) was reporting 6 failures. Two distinct root causes, both fixed in one commit: (1) plain `unittest`'s alphabetical-by-method-name test order (not file order) plus a wall-clock-TTL cache in `wnba/cards.py` keyed only on `(date, event_ids, allow_stored_date_fallback)` let one test's mocked payload leak into a same-key later-running test — `tests/conftest.py` already resets this cache class for pytest, but its autouse fixtures never load under plain `unittest`; fixed with real `setUp`/`tearDown` on `DateArchiveHelperTests` (`tests/test_archives.py`), which run under both runners. (2) `has_games_for_date("1900-01-01")` fell through to a live ESPN call that fails offline and returns `None` rather than `False`, so the wrong empty-state message was chosen; fixed with a founding-year (1997) guard in `wnba/sources.py`. |
+
+Commit: `53cf342a` (2 files). Verified: `unittest tests.test_archives` 383/383 (was 6 failures); `pytest tests/test_archives.py` unaffected (381 passed/2 skipped); 145 tests across the other 6 files touching `has_games_for_date` still pass. Deployed to all three Render services (web, refresh-worker, live-odds-worker) after confirming no in-flight MLB sim — `has_games_for_date` runs in the live request path, so this one needed the deploy, unlike a test-only fix. Full writeup in `todo.md`'s git history (was the top "RESOLVED 2026-08-05 (`task_b4637457`)" entry before this archival pass).
+
 ## Closed 2026-07-30 — Games-strip/soccer-league session (#162, #164, #165, #166)
 
 | # | What shipped |

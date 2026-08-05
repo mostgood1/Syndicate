@@ -1,5 +1,16 @@
 # Syndicate TODO — canonical cross-session list
 
+- **Closed: `task_b4637457`** (filed and closed same day) — the "still
+  open" WNBA CI test-order-pollution + empty-slate-message item flagged in
+  the session-close-out entry below ("What's genuinely still open" #4).
+  Two distinct root causes (an alphabetical-not-file-order `unittest`
+  quirk compounding a wall-clock-TTL cache never reset outside pytest;
+  a `has_games_for_date` network-fallback returning `None` instead of
+  `False` for pre-league dates), one commit (`53cf342a`), deployed live
+  to all three services (this one runs in the request path, unlike a
+  same-day concurrent session's test-only WNBA fix). See `todo_closed.md`
+  for the full writeup and verification detail.
+
 ### RECONCILIATION 2026-08-05 (session close-out) -- two stale WNBA test failures fixed, unrelated to the cards.py caching change that surfaced them
 
 User was making a caching fix in `syndicate/features/wnba/cards.py` and hit
@@ -379,24 +390,13 @@ uncommitted work directly.
    session investigation thread (`314a169a`, MLB feed mojibake bisect,
    still open on their side). No action needed unless that mojibake
    thread turns out to need refresh-worker specifically.
-4. **Found at close-out, pre-existing, NOT caused by this session --
-   spawned as a separate task rather than fixed here.** `python -m
-   unittest tests.test_archives` (what CI actually runs) reports 6
-   failures: 3 are genuine test-order pollution in WNBA live-state tests
-   (pass in isolation via pytest -k, fail as part of the full unittest
-   run) -- confirmed via git-history bisection that this happens
-   identically on the pre-this-session version of `wnba/cards.py`, so
-   nothing shipped today caused it. Almost certainly the same class of
-   issue already documented for NBA's `_NBA_CARDS_CONTEXT_CACHE` (a
-   module-level cache with no conftest reset, and pytest's autouse
-   fixtures don't apply when the suite runs via plain `unittest`) --
-   likely `_BUILD_LIVE_STATE_PAYLOAD_CACHE` this time. A 4th failure
-   (`test_wnba_cards_empty_slate_does_not_inject_fake_sample_game`) is
-   separate and unrelated (two different empty-state code paths choosing
-   different message text). **Update: user started this as its own
-   session (`task_b4637457`) shortly after it was spawned -- it is
-   running independently as of this reconciliation. Do not duplicate;
-   check its outcome before starting fresh work on the same tests.**
+4. ~~Found at close-out, pre-existing, NOT caused by this session --
+   spawned as a separate task rather than fixed here.~~ **RESOLVED
+   2026-08-05, same day, by `task_b4637457`.** Commit `53cf342a`,
+   deployed live to web/refresh-worker/live-odds-worker. Already archived
+   to `todo_closed.md` (see the "Closed" pointer near the top of this
+   file for a one-line summary, and `todo_closed.md` itself for the full
+   writeup).
 
 ### RESOLVED 2026-08-05 -- WNBA "not showing live": two real, independent bugs, both fixed, deployed, and confirmed on the live board itself
 
@@ -12292,6 +12292,20 @@ were resolved and nine already-closed rows removed from the open tables.
 > was 0 previously) — a one-observation concurrent-write race on the quota
 > store, read-only probe per its own design ([[oddsapi_quota.py]] comments),
 > does not affect the numbers above; noting in case the rate climbs.
+>
+> **Latest, 2026-08-05T15:16Z (111.2h post-rollover, same baseline):**
+>
+> | Window | Burned | /hour | Projected 30d | vs 5M target |
+> |---|---|---|---|---|
+> | 400,481s (105,369 obs) | 197,894 | 1,778.9 | **1.28M** | **25.6%** |
+>
+> Four consecutive same-baseline readings: 2.50M → 1.32M → 1.44M → **1.28M** —
+> firmly converged, this is the burn rate now. NFL cumulative still trivial
+> (980 calls / 294cr — no real ramp yet despite preseason underway).
+> `by_market_family` cumulative (440,172cr total): props 268,632cr (61.0%),
+> segment 101,583cr (23.1%), alternate 50,817cr (11.5%), full_game 18,443cr
+> (4.2%) — unchanged shape for the 5th straight reading. `race_detected_count`
+> 5→6 over ~35h — flat, not climbing, no concern.
 
 **16** 🟢 **CLOSED 2026-07-25** (`1986caf6`, "Drop F7 markets; standard line
 wins, alternates kept as a ladder") — **do not treat this as an open decision**,
