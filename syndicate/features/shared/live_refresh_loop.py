@@ -2102,6 +2102,17 @@ def _launch_mlb_daily_sim(date_str: str, decision: dict[str, Any]) -> dict[str, 
 		popen_kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
 	else:
 		popen_kwargs["start_new_session"] = True
+	# The subprocess's merged stdout+stderr is captured to a binary-mode file
+	# handle below, so whatever encoding the CHILD process's own stdout
+	# defaults to (locale.getpreferredencoding, not UTF-8, when piped rather
+	# than a console) is what lands on disk byte-for-byte. Any accented
+	# player name printed there (progress line, traceback) then gets read
+	# back with an enforced UTF-8 decode, which silently mangles it to the
+	# replacement character -- confirmed as a real, reproducible bug, the
+	# same symptom class as the still-open mojibake gap in player names
+	# elsewhere on the board. Forcing the child's own stdout to UTF-8
+	# removes the platform-dependent guess.
+	popen_kwargs["env"] = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
 	log_path = _mlb_sim_log_dir() / f"{date_str}_{run_stamp}.log"
 	log_handle: Any = None
 	try:
@@ -2261,6 +2272,10 @@ def _launch_mlb_statcast_refresh() -> dict[str, Any]:
 		popen_kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
 	else:
 		popen_kwargs["start_new_session"] = True
+	# Same platform-dependent-stdout-encoding bug as the MLB sim launch above
+	# -- force the child's own stdout to UTF-8 so a binary-captured log can't
+	# silently mangle an accented name into the replacement character.
+	popen_kwargs["env"] = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
 	log_path = _meta_dir() / "mlb_statcast_refresh.log"
 	log_handle: Any = None
 	try:
