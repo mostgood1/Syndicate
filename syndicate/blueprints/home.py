@@ -3469,6 +3469,91 @@ def _mlb_game_market_recommendation_rows(game: dict[str, Any]) -> list[dict[str,
     return rows
 
 
+def _nfl_game_market_recommendation_rows(game_id: Any, board_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    # NFL never reached the cross-sport Layer 2 opportunity feed at all --
+    # neither regular season nor preseason -- because nfl/cards.py and
+    # nfl/preseason_cards.py never set game_market_recommendations, the
+    # only shape _game_bet_candidates_from_game reads. Mirrors
+    # _mlb_game_market_recommendation_rows just above: the same class of
+    # gap, the same fix pattern (translate an existing, already-computed
+    # data shape at read time, no new artifact, no new autorun).
+    #
+    # ``board_rows`` is one game's Layer 1 market-inventory rows --
+    # join_odds_to_sim's output as build_nfl_market_board /
+    # build_nfl_preseason_market_board produce it (nfl/cards.py), with
+    # each row's "market" already remapped from the internal
+    # "moneyline_home"/"spread_away"/"total" keys to the display labels
+    # "Moneyline"/"Spread"/"Total" (see _NFL_MARKET_BOARD_DISPLAY_LABELS).
+    # Every game-level odds row in that inventory carries market_type
+    # "game" (as opposed to "prop"), a "side" ("home"/"away" for
+    # moneyline/spread, "over"/"under" for total), and -- when a sim row
+    # joined -- a "model_side" naming whichever side the model itself
+    # favors, stamped identically on every sibling row of that market (see
+    # market_inventory.join_odds_to_sim's docstring).
+    rows: list[dict[str, Any]] = []
+    game_id_text = str(game_id or "")
+    for market_label in ("Moneyline", "Spread", "Total"):
+        market_rows = [
+            row
+            for row in board_rows
+            if isinstance(row, dict)
+            and row.get("market_type") == "game"
+            and row.get("market") == market_label
+            and str(row.get("game_id") or "") == game_id_text
+        ]
+        if not market_rows:
+            continue
+        model_side = next((row.get("model_side") for row in market_rows if row.get("model_side")), None)
+        if not model_side:
+            # No sim coverage for this market at all (join_status
+            # unmatched_no_sim_coverage on every sibling row) -- the model
+            # has no opinion, so there's nothing to recommend. Mirrors
+            # MLB's own "don't fabricate a pick" rule above.
+            continue
+        picked = next((row for row in market_rows if row.get("side") == model_side), None)
+        if picked is None or picked.get("odds") is None:
+            # The model favors a side the book hasn't actually priced --
+            # no real odds coverage to show a bettable pick against.
+            continue
+        side = str(picked.get("side") or "")
+        line = picked.get("line")
+        if market_label == "Moneyline":
+            display_pick = "Home ML" if side == "home" else "Away ML" if side == "away" else None
+        elif market_label == "Spread":
+            side_label = "Home" if side == "home" else "Away" if side == "away" else side.title()
+            display_pick = f"{side_label} {line}".strip() if line is not None else None
+        else:  # Total
+            display_pick = f"{side.title()} {line}".strip() if line is not None else None
+        if not display_pick:
+            continue
+        sim_projection = picked.get("sim_projection")
+        projected_value = picked.get("projected_value")
+        if projected_value is not None:
+            # Spread/Total carry a real projected magnitude (model margin /
+            # model total) distinct from the side's win/cover probability --
+            # kept as a raw number, matching MLB's own Total projected field.
+            projected: Any = projected_value
+        elif isinstance(sim_projection, (int, float)):
+            # Moneyline has no separate "projected line" concept -- the
+            # model's own win probability IS the projection, same reasoning
+            # as MLB's Moneyline projected field just above.
+            projected = f"{sim_projection * 100.0:.1f}%"
+        else:
+            projected = None
+        rows.append(
+            {
+                "market_label": market_label,
+                "display_pick": display_pick,
+                "selection": picked.get("side"),
+                "odds": picked.get("odds"),
+                "confidence": sim_projection,
+                "projected": projected,
+                "summary": picked.get("join_note"),
+            }
+        )
+    return rows
+
+
 def _apply_nba_live_scores(games: list[dict[str, Any]], selected_date: str) -> list[dict[str, Any]]:
     try:
         from syndicate.features.nba.cards import _games_from_live_state_fallback
@@ -5224,11 +5309,55 @@ class _NFLDataProvider(_HomeSportDataProviderBase):
         return _football_in_season(today_value)
 
     def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
-        if context.week is None:
-            return []
-        from syndicate.features.nfl.cards import build_cards_page_context
+        # Regular season and preseason never overlap on the calendar, so
+        # this gates on season phase and returns ONE or the other, never a
+        # merge of both -- merging two different schedules' games into one
+        # list risks game_id collisions / card-shape mismatches. Also
+        # stamps game_market_recommendations from the real Layer 1 market
+        # board (build_nfl_market_board / build_nfl_preseason_market_board)
+        # onto each game, the same read-time translation
+        # _MLBDataProvider.games() already does for MLB below -- without
+        # it, neither regular-season nor preseason NFL games ever reached
+        # the cross-sport Layer 2 opportunity feed.
+        def _stamp_market_recommendations(games_list: list[dict[str, Any]], board_games: list[dict[str, Any]]) -> list[dict[str, Any]]:
+            rows_by_game_id = {str(board_game.get("gamePk") or ""): board_game.get("rows") or [] for board_game in board_games if isinstance(board_game, dict)}
+            for game in games_list:
+                if isinstance(game, dict) and not game.get("game_market_recommendations"):
+                    game_id = str(game.get("gamePk") or "")
+                    board_rows = rows_by_game_id.get(game_id)
+                    if board_rows:
+                        rows = _nfl_game_market_recommendation_rows(game_id, board_rows)
+                        if rows:
+                            game["game_market_recommendations"] = rows
+            return games_list
 
-        return list(build_cards_page_context(context.week, season=context.season).get("games") or [])
+        if context.week is not None:
+            from syndicate.features.nfl.cards import build_cards_page_context
+            from syndicate.features.nfl.cards import build_nfl_market_board
+
+            week = int(context.week)
+            season = int(context.season) if context.season is not None else nfl_latest_season()
+            games = list(build_cards_page_context(week, season=context.season).get("games") or [])
+            try:
+                board_games = list(build_nfl_market_board(season, week).get("games") or [])
+            except Exception:
+                board_games = []
+            return _stamp_market_recommendations(games, board_games)
+
+        from syndicate.features.nfl.preseason_cards import build_nfl_preseason_market_board
+        from syndicate.features.nfl.preseason_cards import build_preseason_cards_page_context
+        from syndicate.features.nfl.sources import preseason_target_week
+
+        season = int(context.season) if context.season is not None else nfl_latest_season()
+        target_week = preseason_target_week(season)
+        if target_week is None:
+            return []
+        games = list(build_preseason_cards_page_context(target_week, season=season).get("games") or [])
+        try:
+            board_games = list(build_nfl_preseason_market_board(season, target_week).get("games") or [])
+        except Exception:
+            board_games = []
+        return _stamp_market_recommendations(games, board_games)
 
     def pregame_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
         if not is_active_today:

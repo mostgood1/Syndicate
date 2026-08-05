@@ -19,6 +19,9 @@ from syndicate.blueprints.home import _sport_availability_reason
 from syndicate.blueprints.home import _prefer_today_or_latest
 from syndicate.blueprints.home import _game_bet_candidates_from_game
 from syndicate.blueprints.home import _mlb_game_market_recommendation_rows
+from syndicate.blueprints.home import _nfl_game_market_recommendation_rows
+from syndicate.blueprints.home import _NFLDataProvider
+from syndicate.features.shared.sport_data_provider import SportContext
 from syndicate.blueprints.home import _game_status_state
 from syndicate.blueprints.home import _prop_item_from_rank_card
 from syndicate.blueprints.home import _is_game_level_rank_card_market
@@ -2092,3 +2095,181 @@ class SoccerPropCommenceTimePropagationTests(unittest.TestCase):
         with patch.object(home_module, "_home_prop_matched_game", return_value=self._matched_game()):
             finalized = home_module._finalize_home_prop_rows([self._prop_row()], slug="soccer")
         self.assertEqual(resolve_candidate_game_date(finalized[0], fallback="2026-08-05"), "2026-08-08")
+
+
+class NflGameMarketRecommendationRowsTests(unittest.TestCase):
+    """Coverage for _nfl_game_market_recommendation_rows -- the same class
+    of Layer 1 -> Layer 2 shape translation _mlb_game_market_recommendation_rows
+    provides for MLB, mirrored here for NFL's build_nfl_market_board /
+    build_nfl_preseason_market_board join_odds_to_sim output."""
+
+    @staticmethod
+    def _row(*, market: str, side: str, market_type: str = "game", line=None, odds=None, sim_projection=None, model_side=None, projected_value=None, join_status="matched", join_note=None, game_id="g1"):
+        return {
+            "game_id": game_id,
+            "market": market,
+            "market_type": market_type,
+            "side": side,
+            "line": line,
+            "odds": odds,
+            "sim_projection": sim_projection,
+            "model_side": model_side,
+            "projected_value": projected_value,
+            "join_status": join_status,
+            "join_note": join_note,
+        }
+
+    def test_picks_the_models_own_favored_side_per_market_not_always_home(self) -> None:
+        # Moneyline favors home, Spread favors away, Total favors over --
+        # proves the "pick model_side" logic, not a hardcoded home/over bias.
+        board_rows = [
+            self._row(market="Moneyline", side="home", odds=-150, sim_projection=0.62, model_side="home"),
+            self._row(market="Moneyline", side="away", odds=130, sim_projection=0.38, model_side="home"),
+            self._row(market="Spread", side="home", line=-3.5, odds=-110, sim_projection=0.45, model_side="away", projected_value=1.2),
+            self._row(market="Spread", side="away", line=3.5, odds=-108, sim_projection=0.55, model_side="away", projected_value=1.2),
+            self._row(market="Total", side="over", line=45.5, odds=-105, sim_projection=0.53, model_side="over", projected_value=47.0),
+            self._row(market="Total", side="under", line=45.5, odds=-115, sim_projection=0.47, model_side="over", projected_value=47.0),
+        ]
+        rows = _nfl_game_market_recommendation_rows("g1", board_rows)
+        self.assertEqual(len(rows), 3)
+        moneyline = next(r for r in rows if r["market_label"] == "Moneyline")
+        spread = next(r for r in rows if r["market_label"] == "Spread")
+        total = next(r for r in rows if r["market_label"] == "Total")
+
+        self.assertEqual(moneyline["display_pick"], "Home ML")
+        self.assertEqual(moneyline["selection"], "home")
+        self.assertEqual(moneyline["odds"], -150)
+        self.assertAlmostEqual(moneyline["confidence"], 0.62)
+        self.assertEqual(moneyline["projected"], "62.0%")
+
+        self.assertEqual(spread["display_pick"], "Away 3.5")
+        self.assertEqual(spread["selection"], "away")
+        self.assertEqual(spread["odds"], -108)
+        self.assertAlmostEqual(spread["confidence"], 0.55)
+        self.assertEqual(spread["projected"], 1.2)
+
+        self.assertEqual(total["display_pick"], "Over 45.5")
+        self.assertEqual(total["selection"], "over")
+        self.assertEqual(total["odds"], -105)
+        self.assertAlmostEqual(total["confidence"], 0.53)
+        self.assertEqual(total["projected"], 47.0)
+
+    def test_market_with_no_odds_coverage_is_skipped_not_fabricated(self) -> None:
+        # Total has a real sim projection and model_side, but neither side
+        # ever got a real quoted price (a line with no book price attached)
+        # -- there is nothing bettable to show, so it must be dropped
+        # entirely rather than emitted with odds=None.
+        board_rows = [
+            self._row(market="Moneyline", side="home", odds=-150, sim_projection=0.62, model_side="home"),
+            self._row(market="Moneyline", side="away", odds=130, sim_projection=0.38, model_side="home"),
+            self._row(market="Total", side="over", line=45.5, odds=None, sim_projection=0.53, model_side="over", projected_value=47.0),
+            self._row(market="Total", side="under", line=45.5, odds=None, sim_projection=0.47, model_side="over", projected_value=47.0),
+        ]
+        rows = _nfl_game_market_recommendation_rows("g1", board_rows)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["market_label"], "Moneyline")
+
+    def test_market_with_no_sim_coverage_is_skipped(self) -> None:
+        # unmatched_no_sim_coverage: real odds exist but the model never
+        # priced this market -- model_side stays None on every sibling row.
+        board_rows = [
+            self._row(market="Spread", side="home", line=-3.5, odds=-110, sim_projection=None, model_side=None, join_status="unmatched_no_sim_coverage"),
+            self._row(market="Spread", side="away", line=3.5, odds=-110, sim_projection=None, model_side=None, join_status="unmatched_no_sim_coverage"),
+        ]
+        self.assertEqual(_nfl_game_market_recommendation_rows("g1", board_rows), [])
+
+    def test_prop_rows_are_ignored(self) -> None:
+        board_rows = [
+            {"game_id": "g1", "market": "passing_yards", "market_type": "prop", "side": "over", "line": 230.5, "odds": -110, "sim_projection": 0.55, "model_side": "over", "projected_value": 240.0},
+        ]
+        self.assertEqual(_nfl_game_market_recommendation_rows("g1", board_rows), [])
+
+    def test_rows_from_a_different_game_id_are_ignored(self) -> None:
+        board_rows = [
+            self._row(market="Moneyline", side="home", odds=-150, sim_projection=0.62, model_side="home", game_id="other-game"),
+            self._row(market="Moneyline", side="away", odds=130, sim_projection=0.38, model_side="home", game_id="other-game"),
+        ]
+        self.assertEqual(_nfl_game_market_recommendation_rows("g1", board_rows), [])
+
+
+class NflDataProviderGamesTests(unittest.TestCase):
+    """Coverage for _NFLDataProvider.games() -- the regular-season/
+    preseason phase gate plus game_market_recommendations stamping."""
+
+    @staticmethod
+    def _board(*, game_id: str) -> dict:
+        rows = [
+            {"game_id": game_id, "market": "Moneyline", "market_type": "game", "side": "home", "line": None, "odds": -150, "sim_projection": 0.62, "model_side": "home", "projected_value": None, "join_status": "matched", "join_note": "Model favors the home side."},
+            {"game_id": game_id, "market": "Moneyline", "market_type": "game", "side": "away", "line": None, "odds": 130, "sim_projection": 0.38, "model_side": "home", "projected_value": None, "join_status": "matched", "join_note": None},
+        ]
+        return {"season": 2026, "week": 1, "games": [{"gamePk": game_id, "rows": rows}]}
+
+    def test_regular_season_games_carry_game_market_recommendations(self) -> None:
+        context = SportContext(slug="nfl", context_label="2026 Week 1", season=2026, week=1)
+        cards_payload = {"games": [{"gamePk": "g1", "away": {"name": "Away Team"}, "home": {"name": "Home Team"}}]}
+        with patch("syndicate.features.nfl.cards.build_cards_page_context", return_value=cards_payload), patch(
+            "syndicate.features.nfl.cards.build_nfl_market_board", return_value=self._board(game_id="g1")
+        ):
+            games = _NFLDataProvider().games(context, is_active_today=True)
+        self.assertEqual(len(games), 1)
+        self.assertTrue(games[0].get("game_market_recommendations"))
+        self.assertEqual(games[0]["game_market_recommendations"][0]["market_label"], "Moneyline")
+
+    def test_regular_season_game_that_already_has_recommendations_is_not_overwritten(self) -> None:
+        context = SportContext(slug="nfl", context_label="2026 Week 1", season=2026, week=1)
+        existing = [{"market_label": "Existing", "display_pick": "Keep me"}]
+        cards_payload = {"games": [{"gamePk": "g1", "game_market_recommendations": existing}]}
+        with patch("syndicate.features.nfl.cards.build_cards_page_context", return_value=cards_payload), patch(
+            "syndicate.features.nfl.cards.build_nfl_market_board", return_value=self._board(game_id="g1")
+        ):
+            games = _NFLDataProvider().games(context, is_active_today=True)
+        self.assertEqual(games[0]["game_market_recommendations"], existing)
+
+    def test_preseason_games_carry_game_market_recommendations_when_a_target_week_exists(self) -> None:
+        context = SportContext(slug="nfl", context_label="2026 Preseason", season=2026, week=None)
+        preseason_payload = {"games": [{"gamePk": "g1", "away": {"name": "Away Team"}, "home": {"name": "Home Team"}}]}
+        with patch("syndicate.features.nfl.sources.preseason_target_week", return_value=1), patch(
+            "syndicate.features.nfl.preseason_cards.build_preseason_cards_page_context", return_value=preseason_payload
+        ), patch("syndicate.features.nfl.preseason_cards.build_nfl_preseason_market_board", return_value=self._board(game_id="g1")):
+            games = _NFLDataProvider().games(context, is_active_today=True)
+        self.assertEqual(len(games), 1)
+        self.assertTrue(games[0].get("game_market_recommendations"))
+
+    def test_no_week_and_no_preseason_target_week_returns_empty(self) -> None:
+        context = SportContext(slug="nfl", context_label="2026 Off-season", season=2026, week=None)
+        with patch("syndicate.features.nfl.sources.preseason_target_week", return_value=None):
+            games = _NFLDataProvider().games(context, is_active_today=True)
+        self.assertEqual(games, [])
+
+
+class NflGameMarketRecommendationsEndToEndTests(unittest.TestCase):
+    """Regression guard: the translator's rows must actually flow through
+    _game_bet_candidates_from_game and produce real board candidates, not
+    just look right in isolation."""
+
+    def test_translated_rows_produce_real_candidates(self) -> None:
+        board_rows = [
+            {"game_id": "g1", "market": "Moneyline", "market_type": "game", "side": "home", "line": None, "odds": -150, "sim_projection": 0.62, "model_side": "home", "projected_value": None, "join_status": "matched", "join_note": None},
+            {"game_id": "g1", "market": "Moneyline", "market_type": "game", "side": "away", "line": None, "odds": 130, "sim_projection": 0.38, "model_side": "home", "projected_value": None, "join_status": "matched", "join_note": None},
+            {"game_id": "g1", "market": "Total", "market_type": "game", "side": "over", "line": 45.5, "odds": -105, "sim_projection": 0.53, "model_side": "over", "projected_value": 47.0, "join_status": "matched", "join_note": None},
+            {"game_id": "g1", "market": "Total", "market_type": "game", "side": "under", "line": 45.5, "odds": -115, "sim_projection": 0.47, "model_side": "over", "projected_value": 47.0, "join_status": "matched", "join_note": None},
+        ]
+        recommendations = _nfl_game_market_recommendation_rows("g1", board_rows)
+        self.assertTrue(recommendations)
+        game = {
+            "gamePk": "g1",
+            "away": {"name": "Arizona Cardinals", "abbr": "ARI"},
+            "home": {"name": "Seattle Seahawks", "abbr": "SEA"},
+            "summary": "Test game",
+            "status": "Scheduled",
+            "game_market_recommendations": recommendations,
+        }
+        candidates = _game_bet_candidates_from_game({"slug": "nfl", "name": "NFL"}, game, fallback_epoch=0.0)
+        self.assertTrue(candidates)
+        moneyline = next((c for c in candidates if c["market"] == "Moneyline"), None)
+        total = next((c for c in candidates if c["market"] == "Total"), None)
+        self.assertIsNotNone(moneyline)
+        self.assertIsNotNone(total)
+        self.assertEqual(moneyline["pick"], "Home ML")
+        self.assertTrue(moneyline["team"])
+        self.assertEqual(total["pick"], "Over 45.5")
