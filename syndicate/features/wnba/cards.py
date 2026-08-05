@@ -3382,13 +3382,18 @@ def _public_scoreboard_live_state_payload(selected_date: str) -> dict[str, Any] 
         "https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard"
         f"?dates={urllib_parse.quote(compact_date)}"
     )
-    request_obj = urllib_request.Request(
-        url,
-        headers={
-            "User-Agent": "Mozilla/5.0",
-            "Accept": "application/json,text/plain,*/*",
-        },
-    )
+    # Confirmed live 2026-08-05 (TOR@GSV, a real 2nd-quarter game): ESPN's
+    # scoreboard API returns HTTP 403 for this exact bare
+    # "User-Agent: Mozilla/5.0" header when called from Render's outbound
+    # IP -- this function was returning None for every genuinely live game
+    # all day because of it, which is why game_cards.csv's live status
+    # never flipped despite build_live_state_payload's own separate
+    # persist-gate bug (see _maybe_persist_current_day_live_snapshot_artifact)
+    # already being fixed. See scripts/fetch_espn_live_status_for_date.py's
+    # matching comment for the full probe results (3 header variants tried
+    # directly from Render; only sending NO custom User-Agent -- urllib's
+    # own honest default -- returned 200).
+    request_obj = urllib_request.Request(url)
     try:
         with urllib_request.urlopen(request_obj, timeout=6) as response:
             payload = json.loads(response.read().decode("utf-8"))

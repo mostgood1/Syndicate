@@ -360,10 +360,16 @@ def _fetch_espn_football_schedule(sport: str, date_str: str, *, timeout: int = 1
         f"https://site.api.espn.com/apis/site/v2/sports/football/{league_slug}/scoreboard"
         f"?dates={urllib.parse.quote(compact_date)}"
     )
-    request_obj = urllib.request.Request(
-        url,
-        headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json,text/plain,*/*"},
-    )
+    # Confirmed live 2026-08-05: ESPN's scoreboard API returns HTTP 403 for
+    # this exact bare "User-Agent: Mozilla/5.0" header when called from
+    # Render's outbound IP (found via the identical pattern in wnba/cards.py
+    # and fetch_espn_live_status_for_date.py -- see either's matching
+    # comment for the full probe results). Sending no custom User-Agent at
+    # all -- urllib's own honest default -- was the confirmed-working
+    # variant; this site shares the exact byte-identical header dict that
+    # was proven blocked, so fixing it proactively rather than waiting to
+    # rediscover the same bug for NFL/NCAAF schedules.
+    request_obj = urllib.request.Request(url)
     try:
         with urllib.request.urlopen(request_obj, timeout=timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))

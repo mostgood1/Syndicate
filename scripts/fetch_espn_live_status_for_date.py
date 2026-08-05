@@ -63,10 +63,21 @@ def main() -> int:
         f"https://site.api.espn.com/apis/site/v2/sports/{sport_slug}/{league_slug}/scoreboard"
         f"?dates={urllib.parse.quote(compact_date)}"
     )
-    request_obj = urllib.request.Request(
-        url,
-        headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json,text/plain,*/*"},
-    )
+    # Confirmed live 2026-08-05: ESPN's scoreboard API returns HTTP 403 for
+    # this exact bare "User-Agent: Mozilla/5.0" header when called from
+    # Render's outbound IP, for a game confirmed genuinely live at the time
+    # (independently verified against the same endpoint from a non-Render
+    # IP). A generic browser-spoof User-Agent is a common, easily
+    # fingerprinted scraper signature -- ESPN's filter appears to target
+    # exactly that pattern specifically. Empirically confirmed the fix by
+    # probing 3 variants directly from Render: this exact header (403), a
+    # fuller realistic Chrome header set (also 403), and NO custom headers
+    # at all -- letting urllib send its own honest default User-Agent
+    # (Python-urllib/x.y) -- which returned 200. Do not reintroduce a
+    # browser-spoofing User-Agent here without re-verifying against a real
+    # Render deploy first; local testing cannot reproduce this (only
+    # Render's IP is blocked).
+    request_obj = urllib.request.Request(url)
     try:
         with urllib.request.urlopen(request_obj, timeout=8) as response:
             payload = json.loads(response.read().decode("utf-8"))
