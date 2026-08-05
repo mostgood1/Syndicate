@@ -1,5 +1,47 @@
 # Syndicate TODO — canonical cross-session list
 
+### RETRACTED 2026-08-05 (04:35 CDT) -- "Mojibake" player-name corruption was never real; it was this session's own tool-display artifact
+
+Full retraction, not a fix. Earlier tonight's CORRECTION entry (below) reported
+accented MLB names ("Randy Vásquez") rendering as `Randy V�squez` "end to end,
+visible on both the raw artifact and the rendered board." That observation was
+made by piping JSON through this session's shell/tool output and reading the
+printed text. **The underlying data was correct the entire time.**
+
+Proven directly: pulled the same board/game-detail/live-lens responses again
+and checked the actual Python string's codepoint rather than its printed
+glyph. `json.loads(...)`, then `ord(char)` on the letter between "V" and
+"squez" -> **`0xE1`, `unicodedata.name()` = "LATIN SMALL LETTER A WITH ACUTE"**
+-- the genuinely correct "á", every single time, across three independent
+pulls (raw `/mlb/api/live-lens`, two separate `/api/intelligence/query` board
+snapshots). There is no `�` (U+FFFD, the actual replacement character)
+anywhere in the underlying string. What looked like `�` was this environment's
+terminal/tool-output rendering choking on a Latin-1-supplement character when
+displaying it back to the session -- a *display* artifact, not stored,
+transmitted, or served corruption.
+
+**What this means for the two things built on the wrong premise tonight:**
+- The `MOJIBAKE_DIAG` diagnostic added to `_daily_actual_by_game`
+  (`syndicate/features/mlb/cards.py`) checked for a literal `�` that
+  never occurs in real data -- it could never have fired. Removed; the
+  function is back to its original form.
+- The subprocess UTF-8-forcing fix in `live_refresh_loop.py` (MLB sim job +
+  statcast-refresh job stdout capture) is UNRELATED to this and **is being
+  kept** -- it addresses a real, independently-verified mechanism (binary-
+  captured subprocess log + a forced `errors="replace"` UTF-8 decode on
+  read-back) that could genuinely corrupt non-ASCII bytes in that one
+  specific ops-log-display path, on its own merits, regardless of the
+  retraction above. Just don't credit it with fixing a board-facing bug --
+  there wasn't one.
+
+**Lesson, in the same spirit as this session's earlier "where I was wrong"
+entries:** when a symptom is "characters look wrong," verify by codepoint
+(`ord()`/`unicodedata.name()`) before concluding the DATA is corrupted --
+printed/piped text through several encoding layers (shell, tool capture,
+markdown render) is not a reliable proxy for what a Python string actually
+contains. This one cost real investigation time (an Explore agent, a
+diagnostic, two service deploys) chasing a bug that was never in production.
+
 ### RECONCILIATION 2026-08-05 -- Session close-out: learning-loop plan (Stages 0-5) through the WNBA live-board fix, everything below deployed and verified
 
 Long session (spans roughly 00:08-23:31 this calendar day per commit
@@ -214,6 +256,12 @@ Gore has no artifact row at all (any market), cause not yet traced.
 accents are mojibake'd end to end (`Randy V�squez`, `Jesús Luzardo` shows
 as `Jes�s Luzardo`) -- visible on both the raw artifact and the rendered
 board. Worth its own fix, unrelated to the live-lens gap.
+
+**RETRACTED, see the top-of-file entry dated 04:35 CDT: this was never real.**
+The `�` above was this session's own terminal/tool-output rendering of a
+correct `á` (U+00E1), not stored/served corruption -- confirmed by checking
+`ord()` on the actual character, not its printed glyph, across three
+independent production pulls. Do not carry this forward as a real bug.
 
 **Not done, deliberately, given how much this correction already changed the
 picture:** did not widen the per-pitcher keep_count (that's a product
