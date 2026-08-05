@@ -44,6 +44,50 @@ session (Hall of Fame Game).
 
 Two commits (`431ae0ef` code+tests, `520389e4` data) -- not yet deployed.
 
+### OPEN 2026-08-05 -- soccer prop commence_time fix (30a7067e) is deployed and executing, but does NOT reach the 3 target candidates
+
+`30a7067e`/`e0082a82` (web + refresh-worker) shipped a fix in
+`_finalize_home_prop_rows` (home.py) to copy `matched_game["scheduled_start_utc"]`
+onto soccer prop candidates as `commence_time`, so `resolve_candidate_game_date`
+stops falling back to today. Deployed live on both services. Verified via
+refresh-worker's own logs that the board-build loop genuinely rebuilt and
+processed soccer's overview repeatedly since deploy (`OVERVIEW_SPORT_BEGIN
+sport=soccer` fired 9x after 18:34, newest 19:05:25; `build_candidate_pool_start`
+3x in the same window) -- so this is NOT the "board hasn't rebuilt" trap this
+session already learned to check for.
+
+**The 3 target candidates (Carles Gil / Peyton Miller / Will Sands, "Anytime
+Goalscorer") are still unfixed after 30+ minutes and multiple confirmed
+rebuilds** -- `game_date=2026-08-05`, `commence_time=None`, unchanged across
+every poll.
+
+**Working hypothesis, NOT confirmed:** `_home_prop_matched_game(item,
+game_index)` returns `None` for these specific rows in production, so the new
+branch (gated on `isinstance(matched_game, dict)`) never executes at all. The
+4 new tests added with the fix mocked `_home_prop_matched_game` directly to
+return a match -- they never exercised whether the REAL matcher (`_home_prop_
+game_index`'s by_pk/by_labels/by_team lookups) actually finds this game, which
+is exactly the gap that would explain zero effect despite correct, deployed,
+executing code.
+
+**A specific, plausible mechanism for that, also unconfirmed:** MLS is
+week-keyed. `_SoccerDataProvider.games()` resolves `home_games` via ONE
+`_league_season_week(league, context, today)` call; `.pregame_props()`
+resolves its OWN week independently. If a player's "Anytime Goalscorer" prop
+belongs to a match in a DIFFERENT week than `.games()` currently returns
+(plausible -- these are future fixtures per the earlier root-cause entry:
+08-08/08-15/08-16, not today), `game_index` never contains that game at all.
+Not a matching-logic bug in that case -- a week-scope mismatch between two
+independently-resolved calls feeding the same finalize step.
+
+**Next step, not yet done:** confirm or rule out the hypothesis directly --
+either add a small, always-on diagnostic at `_home_prop_matched_game`'s own
+call site recording match success/failure per candidate (same proven pattern
+used twice already this session), or reproduce `.games()` and
+`.pregame_props()`'s actual week resolution locally for MLS/today and check
+whether they genuinely diverge. Do not assume the week-scope hypothesis is
+correct without checking -- it is currently a guess, not a finding.
+
 ### OPEN 2026-08-05 (#185) -- WNBA Layer 2 board: live-game projections/actuals alignment + possible prop dedup issue, investigation started but NOT root-caused (session ended on interrupt)
 
 User: "this still isn't working check layer 2 board for wnba active now with
