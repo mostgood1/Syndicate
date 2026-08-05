@@ -12,6 +12,7 @@ production; do not repeat that omission here.
 
 from __future__ import annotations
 
+import csv
 from typing import Any
 
 from syndicate.features.nfl.cards import _resolve_branding
@@ -25,12 +26,37 @@ from syndicate.features.nfl.preseason_projection import preseason_projection_art
 from syndicate.features.nfl.preseason_projection import read_preseason_projection_artifact
 from syndicate.features.nfl.sources import build_preseason_module_links
 from syndicate.features.nfl.sources import default_nfl_source_root
+from syndicate.features.nfl.sources import format_odds
 from syndicate.features.nfl.sources import latest_season
 from syndicate.features.nfl.sources import preseason_target_week
 from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.discrete_nav import resolve_selected_value
 from syndicate.features.shared.formatters import format_pct
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
+
+
+def _load_preseason_odds(season: int) -> dict[tuple[str, str], dict[str, Any]]:
+    """Real market odds keyed by (away_team, home_team) abbreviation --
+    written by scripts/fetch_nfl_preseason_odds.py from OddsAPI's real,
+    active americanfootball_nfl_preseason sport key (confirmed live
+    2026-08-05, a distinct key from the regular season's
+    americanfootball_nfl). Empty dict, not an error, if the file hasn't
+    been fetched yet for this season -- odds are always an optional
+    overlay on the real model projection, never required for a card to
+    render."""
+    path = default_nfl_source_root() / f"preseason_odds_{season}.csv"
+    odds: dict[tuple[str, str], dict[str, Any]] = {}
+    try:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            for row in csv.DictReader(handle):
+                away = (row.get("away_team") or "").strip()
+                home = (row.get("home_team") or "").strip()
+                if not away or not home:
+                    continue
+                odds[(away, home)] = row
+    except (OSError, FileNotFoundError):
+        return {}
+    return odds
 
 
 def _depth_chart_panel(team_name: str, season: int, week: int) -> dict[str, Any]:
@@ -46,7 +72,42 @@ def _depth_chart_panel(team_name: str, season: int, week: int) -> dict[str, Any]
     }
 
 
-def _game_from_preseason_projection(projection: Any, season: int, week: int) -> dict[str, Any]:
+def _market_panel(market: dict[str, Any] | None, *, away_name: str, home_name: str) -> dict[str, Any] | None:
+    """Real, live sportsbook odds for this exact game (OddsAPI's real,
+    active americanfootball_nfl_preseason sport key -- a distinct key
+    from the regular season's americanfootball_nfl, confirmed live
+    2026-08-05). None if no real market row was fetched for this game
+    yet -- reference-only overlay, never required, never fabricated."""
+    if not market:
+        return None
+    book = str(market.get("book") or "").strip().replace("_", " ").title() or "Sportsbook"
+    home_ml = format_odds(market.get("home_moneyline"))
+    away_ml = format_odds(market.get("away_moneyline"))
+    total_raw = str(market.get("total_line") or "").strip()
+    try:
+        spread_val = float(market.get("spread_home"))
+    except (TypeError, ValueError):
+        spread_label = "-"
+    else:
+        if spread_val > 0:
+            spread_label = f"{away_name} favored by {spread_val:.1f}"
+        elif spread_val < 0:
+            spread_label = f"{home_name} favored by {abs(spread_val):.1f}"
+        else:
+            spread_label = "Pick'em"
+    return {
+        "eyebrow": f"Real market ({book})",
+        "title": "Posted preseason line",
+        "body": "Real, live sportsbook odds for this game. Shown for reference only -- not blended into the model projection above.",
+        "items": [
+            f"Moneyline: {away_name} {away_ml} / {home_name} {home_ml}",
+            f"Spread: {spread_label}",
+            f"Total: {total_raw or '-'}",
+        ],
+    }
+
+
+def _game_from_preseason_projection(projection: Any, season: int, week: int, *, market: dict[str, Any] | None = None) -> dict[str, Any]:
     away_team = str(projection.away_team or "Away").strip() or "Away"
     home_team = str(projection.home_team or "Home").strip() or "Home"
     away_branding = _resolve_branding(away_team)
@@ -66,11 +127,53 @@ def _game_from_preseason_projection(projection: Any, season: int, week: int) -> 
     game_pk = str(projection.game_id or f"{season}-preseason-{week}-{away_abbr}-{home_abbr}").replace(" ", "-")
     week_label = PRESEASON_WEEK_LABELS.get(week, f"Preseason Week {week}")
     share = projection.nonstarter_participation_share
+    market_panel = _market_panel(market, away_name=away_name, home_name=home_name)
     summary = (
         f"SmartSim 2.0 projects {home_name} {round(projection.home_score_mean, 1)} - {round(projection.away_score_mean, 1)} {away_name} "
         f"with a projected total of {round(projection.total_mean, 1)}. Preseason projection -- shrunk toward league-neutral by "
         f"{share:.0%} to reflect expected backup/bubble-player snaps this week; treat with much lower confidence than a "
         f"regular-season projection."
+    )
+    metrics = [
+        {"label": "Home mean", "value": round(projection.home_score_mean, 1)},
+        {"label": "Away mean", "value": round(projection.away_score_mean, 1)},
+        {"label": "Projected spread", "value": spread_label},
+        {"label": "Win probability", "value": win_probability},
+        {"label": "Shrinkage applied", "value": f"{share:.0%}"},
+    ]
+    if market:
+        metrics.append({"label": "Market total", "value": str(market.get("total_line") or "-")})
+    panels = [
+        {
+            "eyebrow": "SmartSim 2.0 (preseason)",
+            "title": "Projection contract",
+            "body": projection.uncertainty_note,
+            "items": [
+                f"Home mean: {round(projection.home_score_mean, 1)}",
+                f"Away mean: {round(projection.away_score_mean, 1)}",
+                f"Projected spread: {spread_label}",
+                f"Projected total: {round(projection.total_mean, 1)}",
+                f"Win probability: {win_probability}",
+            ],
+        },
+    ]
+    if market_panel:
+        panels.append(market_panel)
+    panels.extend(
+        [
+            {
+                "eyebrow": "Game context",
+                "title": f"{season} {week_label}",
+                "body": f"{away_name} at {home_name}.",
+                "items": [
+                    f"Teams: {away_name} at {home_name}",
+                    f"Projection source: SmartSim 2.0 ({projection.rating_source})",
+                    f"Real game id: {game_pk}",
+                ],
+            },
+            _depth_chart_panel(away_name, season, week),
+            _depth_chart_panel(home_name, season, week),
+        ]
     )
     return {
         "gamePk": game_pk,
@@ -94,40 +197,9 @@ def _game_from_preseason_projection(projection: Any, season: int, week: int) -> 
         "status": week_label,
         "detail": "SmartSim 2.0 (preseason)",
         "summary": summary,
-        "metrics": [
-            {"label": "Home mean", "value": round(projection.home_score_mean, 1)},
-            {"label": "Away mean", "value": round(projection.away_score_mean, 1)},
-            {"label": "Projected spread", "value": spread_label},
-            {"label": "Win probability", "value": win_probability},
-            {"label": "Shrinkage applied", "value": f"{share:.0%}"},
-        ],
+        "metrics": metrics,
         "shared_top_play_rows": [],
-        "panels": [
-            {
-                "eyebrow": "SmartSim 2.0 (preseason)",
-                "title": "Projection contract",
-                "body": projection.uncertainty_note,
-                "items": [
-                    f"Home mean: {round(projection.home_score_mean, 1)}",
-                    f"Away mean: {round(projection.away_score_mean, 1)}",
-                    f"Projected spread: {spread_label}",
-                    f"Projected total: {round(projection.total_mean, 1)}",
-                    f"Win probability: {win_probability}",
-                ],
-            },
-            {
-                "eyebrow": "Game context",
-                "title": f"{season} {week_label}",
-                "body": f"{away_name} at {home_name}.",
-                "items": [
-                    f"Teams: {away_name} at {home_name}",
-                    f"Projection source: SmartSim 2.0 ({projection.rating_source})",
-                    f"Real game id: {game_pk}",
-                ],
-            },
-            _depth_chart_panel(away_name, season, week),
-            _depth_chart_panel(home_name, season, week),
-        ],
+        "panels": panels,
     }
 
 
@@ -145,7 +217,11 @@ def build_preseason_cards_page_context(selected_week: int, *, season: int | None
     season = resolved_season
 
     projections = read_preseason_projection_artifact(season=season, week=resolved_week, data_root=default_nfl_source_root())
-    games = [_game_from_preseason_projection(projection, season, resolved_week) for projection in projections]
+    odds = _load_preseason_odds(season)
+    games = [
+        _game_from_preseason_projection(projection, season, resolved_week, market=odds.get((projection.away_team, projection.home_team)))
+        for projection in projections
+    ]
 
     prev_week, next_week = neighboring_values(weeks, resolved_week, fallback=resolved_week)
     scoreboard_items = [

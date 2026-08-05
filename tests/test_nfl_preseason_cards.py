@@ -67,6 +67,65 @@ class PreseasonCardsTestCase(unittest.TestCase):
         }
 
 
+    def _write_odds(self, season: int, rows: list[dict]) -> None:
+        self.root.mkdir(parents=True, exist_ok=True)
+        fieldnames = ["game_id", "season", "week", "home_team", "away_team", "home_moneyline", "away_moneyline", "spread_home", "total_line", "book", "fetched_at"]
+        path = self.root / f"preseason_odds_{season}.csv"
+        with path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in rows:
+                full = {key: "" for key in fieldnames}
+                full.update(row)
+                writer.writerow(full)
+
+
+class LoadPreseasonOddsTests(PreseasonCardsTestCase):
+    def test_missing_file_returns_empty(self) -> None:
+        self.assertEqual(pc._load_preseason_odds(2026), {})
+
+    def test_real_row_keyed_by_away_home_pair(self) -> None:
+        self._write_odds(2026, [{"game_id": "g1", "season": "2026", "week": "1", "home_team": "ARI", "away_team": "CAR", "home_moneyline": "105", "away_moneyline": "-125", "spread_home": "1.5", "total_line": "35.5", "book": "draftkings"}])
+        odds = pc._load_preseason_odds(2026)
+        self.assertIn(("CAR", "ARI"), odds)
+        self.assertEqual(odds[("CAR", "ARI")]["book"], "draftkings")
+
+
+class MarketPanelTests(unittest.TestCase):
+    def test_none_market_returns_none(self) -> None:
+        self.assertIsNone(pc._market_panel(None, away_name="Carolina Panthers", home_name="Arizona Cardinals"))
+
+    def test_real_moneylines_formatted_for_both_teams(self) -> None:
+        panel = pc._market_panel(
+            {"home_moneyline": "105", "away_moneyline": "-125", "spread_home": "1.5", "total_line": "35.5", "book": "draftkings"},
+            away_name="Carolina Panthers", home_name="Arizona Cardinals",
+        )
+        self.assertIn("Carolina Panthers", panel["items"][0])
+        self.assertIn("Arizona Cardinals", panel["items"][0])
+        self.assertIn("draftkings".title(), panel["eyebrow"])
+
+    def test_positive_spread_home_means_away_team_favored(self) -> None:
+        panel = pc._market_panel(
+            {"home_moneyline": "105", "away_moneyline": "-125", "spread_home": "1.5", "total_line": "35.5", "book": "draftkings"},
+            away_name="Carolina Panthers", home_name="Arizona Cardinals",
+        )
+        self.assertIn("Carolina Panthers favored", panel["items"][1])
+
+    def test_negative_spread_home_means_home_team_favored(self) -> None:
+        panel = pc._market_panel(
+            {"home_moneyline": "-140", "away_moneyline": "120", "spread_home": "-2.5", "total_line": "42.0", "book": "fanduel"},
+            away_name="Away Team", home_name="Home Team",
+        )
+        self.assertIn("Home Team favored", panel["items"][1])
+
+    def test_body_discloses_reference_only(self) -> None:
+        panel = pc._market_panel(
+            {"home_moneyline": "105", "away_moneyline": "-125", "spread_home": "1.5", "total_line": "35.5", "book": "draftkings"},
+            away_name="Away", home_name="Home",
+        )
+        self.assertIn("not blended into the model projection", panel["body"])
+
+
 class GameFromPreseasonProjectionTests(PreseasonCardsTestCase):
     def test_top_level_away_home_have_logo_and_color_fields(self) -> None:
         # Regression guard for the exact bug class hit once this session:

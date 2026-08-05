@@ -91,14 +91,38 @@ def preseason_schedule_rows(season: int, week: int) -> list[dict[str, str]]:
     return rows
 
 
+# Real, live sportsbook and user-facing spot-check both surfaced the same
+# real problem: shrinking the MEAN by the full real non-starter
+# participation share (0.55-0.92) collapsed genuine team-quality spread
+# almost to nothing -- e.g. real 2025 NE (off +0.158 EPA/play) vs TEN
+# (off -0.160) shrank to +0.032 vs -0.032 at an 80% share, so every game's
+# projected score converged on the same ~21-23 baseline regardless of who
+# was playing. That conflated two different real things: "what fraction
+# of snaps come from backups" (the participation share -- a legitimate,
+# real driver of UNCERTAINTY) does not mean "the team's expected quality
+# moves that same fraction toward league-average" -- a strong
+# organization's backups still tend to outperform a weak organization's
+# backups (correlated coaching/scheme/depth-building quality), so full
+# shrinkage-to-neutral overcorrects the POINT ESTIMATE. Fix: the full
+# participation share still drives the honest uncertainty WIDTH
+# (widened_stdev, unchanged below); only a scaled-down fraction of it
+# drives how far the MEAN moves, so real team identity survives in the
+# projected score even for the most backup-heavy weeks.
+MEAN_SHRINKAGE_SCALE = 0.35
+
+
 def shrunk_rating(base_rating: float, *, nonstarter_share: float) -> tuple[float, float]:
-    """Real, legitimate regression-to-mean: shrunk = base*(1-share) +
-    LEAGUE_NEUTRAL_RATING*share. Justification: most snaps in this real
-    preseason game belong to players whose real prior-season team-level
-    EPA rating says nothing about them -- they may not have been on the
-    team, or barely played. Returns (shrunk_rating, shrinkage_applied)."""
-    shrunk = base_rating * (1.0 - nonstarter_share) + LEAGUE_NEUTRAL_RATING * nonstarter_share
-    return shrunk, nonstarter_share
+    """Real, legitimate regression-to-mean, scaled down from the raw
+    participation share by MEAN_SHRINKAGE_SCALE (see the comment above
+    for why the raw share alone overcorrects the mean). shrunk =
+    base*(1-mean_share) + LEAGUE_NEUTRAL_RATING*mean_share. Returns
+    (shrunk_rating, mean_share_applied) -- the second value is the real
+    fraction actually applied to the mean, not the raw participation
+    share (that's recorded separately as
+    nonstarter_participation_share)."""
+    mean_share = nonstarter_share * MEAN_SHRINKAGE_SCALE
+    shrunk = base_rating * (1.0 - mean_share) + LEAGUE_NEUTRAL_RATING * mean_share
+    return shrunk, mean_share
 
 
 def widened_stdev(base_stdev: float, *, nonstarter_share: float) -> float:
@@ -153,9 +177,11 @@ def build_preseason_projection(
     home_win_rate = sum(1 for m in margins if m > 0) / seeds
 
     uncertainty_note = (
-        f"Preseason projection for {PRESEASON_WEEK_LABELS[week]} -- ratings shrunk toward "
-        f"league-neutral by {share:.0%} to reflect expected backup/bubble-player snaps this "
-        f"week; treat with much lower confidence than a regular-season projection."
+        f"Preseason projection for {PRESEASON_WEEK_LABELS[week]} -- ratings nudged toward "
+        f"league-neutral by {shrinkage_applied:.0%} (real 2025 team identity is mostly kept; "
+        f"a strong organization's backups still tend to outperform a weak one's) and the "
+        f"variance widened to reflect {share:.0%} expected backup/bubble-player participation "
+        f"this week; treat with much lower confidence than a regular-season projection."
     )
 
     return SmartSimNflPreseasonProjection(

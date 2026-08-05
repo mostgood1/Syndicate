@@ -17,23 +17,48 @@ def _play(week: int, posteam: str, defteam: str, play_type: str, epa: float) -> 
 
 
 class ShrunkRatingTests(unittest.TestCase):
+    """MEAN_SHRINKAGE_SCALE (0.35) means shrunk_rating()'s mean shift is a
+    fraction OF the participation share, not the raw share itself -- a
+    real, live spot-check (2025 NE off +0.158 vs TEN off -0.160 EPA/play)
+    found the earlier 1:1 design collapsed real team-quality spread
+    almost to nothing at high shares, making every game's projected score
+    converge on the same ~21-23 baseline regardless of who was playing."""
+
     def test_zero_share_leaves_rating_unchanged(self) -> None:
         shrunk, applied = gen.shrunk_rating(0.4, nonstarter_share=0.0)
         self.assertAlmostEqual(shrunk, 0.4)
         self.assertEqual(applied, 0.0)
 
-    def test_full_share_moves_rating_to_league_neutral(self) -> None:
+    def test_full_share_only_moves_rating_by_the_scaled_fraction(self) -> None:
         shrunk, applied = gen.shrunk_rating(0.4, nonstarter_share=1.0)
-        self.assertAlmostEqual(shrunk, gen.LEAGUE_NEUTRAL_RATING)
-        self.assertEqual(applied, 1.0)
+        expected_mean_share = gen.MEAN_SHRINKAGE_SCALE
+        self.assertAlmostEqual(applied, expected_mean_share)
+        self.assertAlmostEqual(shrunk, 0.4 * (1.0 - expected_mean_share) + gen.LEAGUE_NEUTRAL_RATING * expected_mean_share)
+        # Real team identity survives even at a full 100% participation share.
+        self.assertGreater(shrunk, gen.LEAGUE_NEUTRAL_RATING)
 
-    def test_partial_share_is_a_weighted_average(self) -> None:
-        shrunk, _applied = gen.shrunk_rating(0.4, nonstarter_share=0.5)
-        self.assertAlmostEqual(shrunk, 0.2)
+    def test_partial_share_is_a_weighted_average_of_the_scaled_fraction(self) -> None:
+        shrunk, applied = gen.shrunk_rating(0.4, nonstarter_share=0.5)
+        expected_mean_share = 0.5 * gen.MEAN_SHRINKAGE_SCALE
+        self.assertAlmostEqual(applied, expected_mean_share)
+        self.assertAlmostEqual(shrunk, 0.4 * (1.0 - expected_mean_share))
 
     def test_negative_rating_shrinks_toward_neutral_too(self) -> None:
-        shrunk, _applied = gen.shrunk_rating(-0.4, nonstarter_share=0.5)
-        self.assertAlmostEqual(shrunk, -0.2)
+        shrunk, applied = gen.shrunk_rating(-0.4, nonstarter_share=0.5)
+        expected_mean_share = 0.5 * gen.MEAN_SHRINKAGE_SCALE
+        self.assertAlmostEqual(shrunk, -0.4 * (1.0 - expected_mean_share))
+
+    def test_real_team_spread_mostly_survives_at_the_highest_real_share(self) -> None:
+        # Regression guard for the exact bug the live spot-check found:
+        # real 2025 NE (+0.1583) vs TEN (-0.1597) offense ratings, week 1's
+        # real share (0.92) -- confirm the gap between them stays large,
+        # not compressed to near-zero.
+        share = gen.NONSTARTER_PARTICIPATION_SHARE[1]
+        ne_shrunk, _ = gen.shrunk_rating(0.1583, nonstarter_share=share)
+        ten_shrunk, _ = gen.shrunk_rating(-0.1597, nonstarter_share=share)
+        real_spread = 0.1583 - (-0.1597)
+        shrunk_spread = ne_shrunk - ten_shrunk
+        self.assertGreater(shrunk_spread, real_spread * 0.5)
 
 
 class WidenedStdevTests(unittest.TestCase):
