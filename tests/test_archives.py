@@ -168,6 +168,56 @@ class NhlCardsPayloadTests(unittest.TestCase):
 
 
 class DateArchiveHelperTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._clear_cross_test_module_caches()
+
+    def tearDown(self) -> None:
+        self._clear_cross_test_module_caches()
+
+    @staticmethod
+    def _clear_cross_test_module_caches() -> None:
+        # tests/conftest.py's _clear_wall_clock_ttl_caches and
+        # _clear_nba_cards_caches autouse fixtures already reset these same
+        # process-local caches before/after every test -- but they're pytest
+        # fixtures, and CI runs this suite via `python -m unittest
+        # tests.test_archives`, which never loads conftest.py, so those
+        # fixtures never fire here. Two symptoms confirmed live from a full
+        # `python -m unittest` run (both pass in isolation, both fail in the
+        # full suite): unittest's default test order is alphabetical by
+        # method name, not file order, so
+        # test_wnba_live_player_lens_overlays_status_from_live_state runs
+        # BEFORE test_wnba_live_player_lens_preserves_existing_live_projection
+        # even though it's defined after it in this file -- both call
+        # build_live_player_lens_payload("2026-06-05", ["401856963"]), a
+        # wall-clock-TTL cache keyed only on (date, event_ids,
+        # allow_stored_date_fallback), so the second test to run gets back
+        # the first test's cached payload instead of computing its own from
+        # its own patches. setUp/tearDown are plain unittest.TestCase
+        # lifecycle hooks, so -- unlike a conftest.py fixture -- they run
+        # identically under pytest and under `python -m unittest`.
+        from syndicate.features.nba.cards import _NBA_CARDS_CONTEXT_CACHE
+        from syndicate.features.nba.cards import _live_projection_calibration_index
+        from syndicate.features.nba.cards import _local_live_snapshot_payload_cached
+        from syndicate.features.nba.cards import _local_live_state_payload_cached
+        from syndicate.features.nba.cards import _nba_team_branding_index
+        from syndicate.features.wnba.cards import build_cards_page_context as _wnba_build_cards_page_context
+        from syndicate.features.wnba.cards import build_live_player_lens_payload as _wnba_build_live_player_lens_payload
+        from syndicate.features.wnba.cards import build_live_state_payload as _wnba_build_live_state_payload
+        from syndicate.features.wnba.cards import build_source_cards_payload as _wnba_build_source_cards_payload
+
+        for cache_owner in (
+            _live_projection_calibration_index,
+            _local_live_snapshot_payload_cached,
+            _local_live_state_payload_cached,
+            _nba_team_branding_index,
+            _wnba_build_live_state_payload,
+            _wnba_build_source_cards_payload,
+            _wnba_build_cards_page_context,
+            _wnba_build_live_player_lens_payload,
+        ):
+            cache_owner.cache_clear()
+        _NBA_CARDS_CONTEXT_CACHE.clear()
+
     def test_rank_board_preserves_explicit_source_title_for_sample_backed_contexts(self) -> None:
         context = build_rank_page_context(
             selected_date="2026-05-17",

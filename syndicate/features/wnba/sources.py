@@ -56,11 +56,24 @@ def _strict_artifact_path(filename: str, subdir: tuple[str, ...]) -> Path:
 
 _HAS_GAMES_CONFIRMED_TRUE_CACHE: set[str] = set()
 
+# The WNBA's first season was 1997 -- any earlier date can never have games,
+# so there's no reason to burn a live ESPN scoreboard round trip (network
+# latency, and a hard failure there falls through to `None`/"unknown"
+# rather than a deterministic False) confirming what's already known from
+# the calendar alone.
+_WNBA_FOUNDING_YEAR = 1997
+
 
 def has_games_for_date(date_str: str) -> bool | None:
     selected_date = str(date_str or "").strip()
     if not selected_date:
         return None
+
+    try:
+        if datetime.strptime(selected_date, "%Y-%m-%d").year < _WNBA_FOUNDING_YEAR:
+            return False
+    except ValueError:
+        pass
 
     if selected_date in _HAS_GAMES_CONFIRMED_TRUE_CACHE:
         return True
