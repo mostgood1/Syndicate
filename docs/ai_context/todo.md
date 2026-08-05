@@ -334,7 +334,9 @@ require the advanced Statcast metrics to achieve, and it does not survive
 contact with a 21% overround. Ks (5.98% hold) are break-even; HR (21.1%) is
 not close. If the goal is profitability, neither of these two markets is it.
 
-**Two real bugs found while building this** (both filed as #190/#191):
+**Two real bugs found while building this, both OPEN and unfixed** (#190 and
+#191 respectively -- numbers reserved here, no separate entries; fix them
+under those IDs):
 1. `hr_targets.py:_statcast_features_path()` resolves to
    `data/mlb_source/data/statcast/features/player_features_latest.json`,
    which is **season 2025** (window 2025-03-01..2025-11-30, generated
