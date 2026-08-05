@@ -474,9 +474,33 @@ def _record_steam_events(date_str: str, events: list[dict[str, Any]]) -> None:
             existing = payload.get("events") if isinstance(payload, dict) else None
             merged = (existing if isinstance(existing, list) else []) + sport_events
             _write(path, {"date": date_str, "sport": slug, "events": merged[-_STEAM_EVENTS_KEEP:]})
+            # Steam is written by whichever service ran the refresh and read
+            # by whichever service builds the board -- different Render
+            # services, different disks. Confirmed live 2026-08-05: the board
+            # carried 164 MLB steam candidates and nothing else, because
+            # refresh-worker (which builds the board) runs MLB's refresh
+            # itself via _launch_autorun_mlb_refresh, while WNBA/soccer/NBA
+            # refresh on live-odds-worker -- so their steam was written to a
+            # disk the board build never reads. Per-sport retention was
+            # necessary but not sufficient: nothing was transporting these at
+            # all. Neither the legacy nor the per-sport file was even present
+            # on web, while the board still showed MLB steam.
+            #
+            # Cheap to publish, unlike the odds_history shards next to it:
+            # capped at _STEAM_EVENTS_KEEP events per sport per day, so this
+            # is kilobytes. The path is already in HOT_ARTIFACT_PATTERNS, and
+            # the filename carries the date, so refresh-worker's own
+            # date-scoped pull_hot_artifacts picks it back up.
+            try:
+                from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+
+                published = publish_hot_artifact(path)
+            except Exception as publish_exc:
+                published = False
+                print(f"STEAM_PUBLISH_FAILED sport={slug} error={type(publish_exc).__name__}: {publish_exc}", flush=True)
             print(
                 f"STEAM_DETECTED sport={slug} date={date_str} new={len(sport_events)} "
-                f"total_kept={min(len(merged), _STEAM_EVENTS_KEEP)}",
+                f"total_kept={min(len(merged), _STEAM_EVENTS_KEEP)} published={published}",
                 flush=True,
             )
     except Exception as exc:

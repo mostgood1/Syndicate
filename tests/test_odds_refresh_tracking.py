@@ -1566,3 +1566,61 @@ class SteamEventsPerSportRetentionTests(unittest.TestCase):
 
         self.assertTrue(is_hot_artifact_relative_path("reports/steam/steam_events_mlb_2026-08-04.json"))
         self.assertTrue(is_hot_artifact_relative_path("reports/steam/steam_events_soccer_2026-08-04.json"))
+
+
+class SteamEventsCrossServicePublishTests(unittest.TestCase):
+    """Steam never left the service that detected it.
+
+    Written by whichever service ran the refresh, read by whichever service
+    builds the board -- different Render services, different disks. Confirmed
+    live 2026-08-05: the board carried 164 MLB steam candidates and nothing
+    else, because refresh-worker builds the board AND runs MLB's own refresh,
+    while WNBA/soccer/NBA refresh on live-odds-worker and their steam landed
+    on a disk the board build never reads. Neither the legacy nor the
+    per-sport file was present on web at all. Per-sport retention was
+    necessary but not sufficient -- nothing was transporting these.
+    """
+
+    def test_each_sports_record_is_published_for_cross_service_reach(self) -> None:
+        from syndicate.features.shared import odds_refresh_tracking as tracking
+
+        with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(
+            "os.environ", {"SYNDICATE_REPORTS_ROOT": tmp_dir}, clear=False
+        ), patch("syndicate.features.shared.artifact_publisher.publish_hot_artifact", return_value=True) as published:
+            tracking._record_steam_events(
+                "2026-08-04",
+                [
+                    {"sport": "wnba", "market_id": "w1", "steam": {"line_delta": 1.0}},
+                    {"sport": "soccer", "market_id": "s1", "steam": {"line_delta": 1.0}},
+                ],
+            )
+
+        published_names = sorted(Path(str(call.args[0])).name for call in published.call_args_list)
+        self.assertEqual(
+            published_names,
+            ["steam_events_soccer_2026-08-04.json", "steam_events_wnba_2026-08-04.json"],
+        )
+
+    def test_a_publish_failure_never_breaks_recording(self) -> None:
+        # A network blip must cost cross-service reach, not the local record.
+        from syndicate.features.shared import odds_refresh_tracking as tracking
+
+        with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(
+            "os.environ", {"SYNDICATE_REPORTS_ROOT": tmp_dir}, clear=False
+        ), patch(
+            "syndicate.features.shared.artifact_publisher.publish_hot_artifact",
+            side_effect=RuntimeError("network down"),
+        ):
+            tracking._record_steam_events("2026-08-04", [{"sport": "wnba", "market_id": "w1", "steam": {}}])
+            payload = json.loads(
+                tracking.steam_events_path_for_sport("wnba", "2026-08-04").read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(len(payload["events"]), 1)
+
+    def test_the_published_filename_carries_the_date_so_the_scoped_pull_matches(self) -> None:
+        # refresh-worker's pull is date-scoped (*<date>*); a name without the
+        # date would publish fine and never be pulled back.
+        from syndicate.features.shared.odds_refresh_tracking import steam_events_path_for_sport
+
+        self.assertIn("2026-08-04", steam_events_path_for_sport("wnba", "2026-08-04").name)
