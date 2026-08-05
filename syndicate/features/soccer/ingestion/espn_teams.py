@@ -21,16 +21,19 @@ import requests
 from syndicate.features.soccer.ingestion.espn_lineups import LEAGUE_ESPN_SLUGS
 
 _ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer"
-_HEADERS = {"User-Agent": "Mozilla/5.0 (SyndicateSoccerSim)", "Accept": "application/json,text/plain,*/*"}
+# See espn_lineups.py's matching comment for the full history: this same
+# custom header was confirmed live 2026-08-05 to 403 from Render for
+# fetch_espn_scoreboard's date-ranged query, superseding an earlier,
+# narrower probe that had cleared it. Dropped here too for the same
+# already-proven-safe reason -- no custom header, same as the 3 other
+# already-fixed call sites in this repo.
 
 
 def fetch_team_roster(league: str, team_id: str, *, timeout: int = 20) -> list[dict[str, Any]]:
     """The full squad ESPN lists for a team -- every rostered player, not
     just those with accumulated per-90 stats."""
     slug = LEAGUE_ESPN_SLUGS[str(league).strip().lower()]
-    response = requests.get(
-        f"{_ESPN_BASE}/{slug}/teams/{team_id}/roster", headers=_HEADERS, timeout=timeout
-    )
+    response = requests.get(f"{_ESPN_BASE}/{slug}/teams/{team_id}/roster", timeout=timeout)
     response.raise_for_status()
     payload = response.json()
     athletes = payload.get("athletes") or []

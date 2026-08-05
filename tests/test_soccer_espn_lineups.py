@@ -112,3 +112,56 @@ class EspnLineupsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EspnRequestsUseNoCustomHeadersTests(unittest.TestCase):
+    """ESPN's public site API 403s Render's outbound IP for this repo's
+    generic browser-spoof User-Agent -- confirmed for 3 other call sites
+    (ded23a0d) and, live 2026-08-05, for THIS module's fetch_espn_scoreboard
+    too (a 403 for ned.1/por.1's date-ranged query silently blocked
+    odds_history for all of soccer, see todo.md's "ROOT CAUSED 2026-08-05"
+    entry). A prior probe (81f091b7) had cleared this exact header string
+    for a narrower request shape (usa.1, no date-range param) and that
+    conclusion did not generalize. No custom header is the only
+    confirmed-safe choice; lock it in so a future edit can't quietly
+    reintroduce one.
+    """
+
+    def test_fetch_espn_scoreboard_sends_no_custom_headers(self) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from syndicate.features.soccer.ingestion.espn_lineups import fetch_espn_scoreboard
+
+        fake_response = MagicMock()
+        fake_response.json.return_value = {"events": []}
+        with patch("syndicate.features.soccer.ingestion.espn_lineups.requests.get", return_value=fake_response) as mocked_get:
+            fetch_espn_scoreboard("mls", date_range="20260807-20260807")
+
+        mocked_get.assert_called_once()
+        self.assertNotIn("headers", mocked_get.call_args.kwargs)
+
+    def test_fetch_match_summary_sends_no_custom_headers(self) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from syndicate.features.soccer.ingestion.espn_lineups import fetch_match_summary
+
+        fake_response = MagicMock()
+        fake_response.json.return_value = {}
+        with patch("syndicate.features.soccer.ingestion.espn_lineups.requests.get", return_value=fake_response) as mocked_get:
+            fetch_match_summary("mls", "123")
+
+        mocked_get.assert_called_once()
+        self.assertNotIn("headers", mocked_get.call_args.kwargs)
+
+    def test_fetch_team_roster_sends_no_custom_headers(self) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from syndicate.features.soccer.ingestion.espn_teams import fetch_team_roster
+
+        fake_response = MagicMock()
+        fake_response.json.return_value = {"athletes": []}
+        with patch("syndicate.features.soccer.ingestion.espn_teams.requests.get", return_value=fake_response) as mocked_get:
+            fetch_team_roster("mls", "12345")
+
+        mocked_get.assert_called_once()
+        self.assertNotIn("headers", mocked_get.call_args.kwargs)
