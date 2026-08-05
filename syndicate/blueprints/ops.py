@@ -1286,6 +1286,70 @@ def api_ops_live_refresh_sport_liveness_check() -> Any:
             "elapsed_ms": round((time.perf_counter() - helper_started) * 1000, 1),
         }
 
+    # Temporary, narrowly-scoped header-variant probe (2026-08-05): the raw
+    # subprocess above confirmed ESPN returns HTTP 403 for the exact
+    # headers this repo's ESPN call sites use (bare "User-Agent: Mozilla/
+    # 5.0"). Whether that's a hard IP/ASN block (no header fixes it) or a
+    # basic bot-signature filter (a more complete browser-like header set
+    # clears it) is unknown without testing FROM Render -- a local test
+    # proves nothing here since only Render's outbound IP is blocked.
+    # Tries a few real variants directly and reports each one's outcome so
+    # the next commit can pick the one that actually works instead of
+    # guessing. Remove once the real fix lands.
+    if sport in {"wnba", "nba", "nhl"} or sport in {
+        "epl", "la_liga", "bundesliga", "serie_a", "ligue_1", "mls", "eredivisie", "primeira_liga", "championship", "belgian_pro_league",
+    }:
+        import urllib.error
+        import urllib.parse
+        import urllib.request
+
+        _sport_league = {
+            "wnba": ("basketball", "wnba"), "nba": ("basketball", "nba"), "nhl": ("hockey", "nhl"),
+            "epl": ("soccer", "eng.1"), "la_liga": ("soccer", "esp.1"), "bundesliga": ("soccer", "ger.1"),
+            "serie_a": ("soccer", "ita.1"), "ligue_1": ("soccer", "fra.1"), "mls": ("soccer", "usa.1"),
+            "eredivisie": ("soccer", "ned.1"), "primeira_liga": ("soccer", "por.1"), "championship": ("soccer", "eng.2"),
+            "belgian_pro_league": ("soccer", "bel.1"),
+        }
+        sport_slug, league_slug = _sport_league[sport]
+        compact_date = date_str.replace("-", "")
+        probe_url = f"https://site.api.espn.com/apis/site/v2/sports/{sport_slug}/{league_slug}/scoreboard?dates={urllib.parse.quote(compact_date)}"
+        header_variants = {
+            "bare_mozilla": {"User-Agent": "Mozilla/5.0", "Accept": "application/json,text/plain,*/*"},
+            "full_chrome": {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Referer": "https://www.espn.com/",
+                "Origin": "https://www.espn.com",
+                "Connection": "keep-alive",
+            },
+            "no_headers": {},
+        }
+        probe_results: dict[str, Any] = {}
+        for label, probe_headers in header_variants.items():
+            probe_started = time.perf_counter()
+            try:
+                probe_request = urllib.request.Request(probe_url, headers=probe_headers)
+                with urllib.request.urlopen(probe_request, timeout=8) as response:
+                    body = response.read().decode("utf-8", errors="replace")
+                probe_results[label] = {
+                    "status_code": 200,
+                    "elapsed_ms": round((time.perf_counter() - probe_started) * 1000, 1),
+                    "body_len": len(body),
+                }
+            except urllib.error.HTTPError as exc:
+                probe_results[label] = {
+                    "status_code": exc.code,
+                    "elapsed_ms": round((time.perf_counter() - probe_started) * 1000, 1),
+                    "error": str(exc.reason),
+                }
+            except Exception as exc:
+                probe_results[label] = {
+                    "error": f"{type(exc).__name__}: {exc}",
+                    "elapsed_ms": round((time.perf_counter() - probe_started) * 1000, 1),
+                }
+        result["espn_header_variant_probe"] = probe_results
+
     try:
         result["combined_checker_result"] = bool(checker(date_str))
     except Exception as exc:
