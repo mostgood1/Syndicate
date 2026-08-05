@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import tempfile
 import threading
 import time
@@ -2821,6 +2822,9 @@ class OpsSportLivenessCheckTests(unittest.TestCase):
         ), patch(
             "syndicate.features.shared.live_refresh_loop._any_tracked_sport_game_live",
             return_value=True,
+        ), patch(
+            "syndicate.blueprints.ops.subprocess.run",
+            return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout='{"live_event_ids": ["401857114"]}', stderr=""),
         ):
             status_code, payload = self._get("?sport=wnba&date=2026-08-04")
 
@@ -2850,9 +2854,47 @@ class OpsSportLivenessCheckTests(unittest.TestCase):
         ), patch(
             "syndicate.features.shared.live_refresh_loop._any_tracked_sport_game_live",
             return_value=False,
+        ), patch(
+            "syndicate.blueprints.ops.subprocess.run",
+            side_effect=RuntimeError("subprocess spawn failed"),
         ):
             status_code, payload = self._get("?sport=wnba&date=2026-08-04")
 
         self.assertEqual(status_code, 200)
         self.assertFalse(payload["espn_fallback_check"]["ok"])
         self.assertIn("subprocess spawn failed", payload["espn_fallback_check"]["error"])
+
+    def test_espn_helper_raw_surfaces_a_non_zero_exit_that_espn_has_live_game_would_otherwise_swallow(self) -> None:
+        # This is the actual production gap this endpoint was built to
+        # close: _espn_has_live_game internally treats a non-zero
+        # returncode from the helper subprocess exactly like "not live" (no
+        # exception, no distinguishing signal) -- so espn_fallback_check
+        # alone reads identically for "genuinely not live" and "the helper
+        # subprocess failed for some other reason". espn_helper_raw runs
+        # the SAME subprocess call independently and reports its actual
+        # returncode/stderr, so a real failure (network error, DNS, a bad
+        # response) is visible instead of silently indistinguishable.
+        with patch(
+            "syndicate.features.shared.live_refresh_loop._wnba_has_live_game_via_artifact",
+            return_value=False,
+        ), patch(
+            "syndicate.features.shared.live_refresh_loop._espn_has_live_game",
+            return_value=False,
+        ), patch(
+            "syndicate.features.shared.live_refresh_loop._any_tracked_sport_game_live",
+            return_value=True,
+        ), patch(
+            "syndicate.blueprints.ops.subprocess.run",
+            return_value=subprocess.CompletedProcess(
+                args=[], returncode=1, stdout="", stderr='{"error": "URLError: <urlopen error [Errno -2] Name or service not known>"}'
+            ),
+        ):
+            status_code, payload = self._get("?sport=wnba&date=2026-08-04")
+
+        self.assertEqual(status_code, 200)
+        # The misleading "looks like it worked" signal this bug hides behind.
+        self.assertTrue(payload["espn_fallback_check"]["ok"])
+        self.assertFalse(payload["espn_fallback_check"]["value"])
+        # The actual answer: it didn't work, and here is exactly why.
+        self.assertEqual(payload["espn_helper_raw"]["return_code"], 1)
+        self.assertIn("Name or service not known", payload["espn_helper_raw"]["stderr"])

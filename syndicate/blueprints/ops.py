@@ -1235,6 +1235,7 @@ def api_ops_live_refresh_sport_liveness_check() -> Any:
     artifact_checker = getattr(_loop, artifact_checker_name, None)
 
     result: dict[str, Any] = {"ok": True, "sport": sport, "date": date_str}
+    helper_path = _loop.REPO_ROOT / "scripts" / "fetch_espn_live_status_for_date.py"
 
     if callable(artifact_checker):
         try:
@@ -1259,6 +1260,32 @@ def api_ops_live_refresh_sport_liveness_check() -> Any:
             "elapsed_ms": round((time.perf_counter() - espn_started) * 1000, 1),
         }
 
+    # _espn_has_live_game swallows the subprocess's own returncode/stderr
+    # internally (any failure just becomes False, same as "genuinely not
+    # live") -- run the exact same subprocess call directly here so a
+    # network failure, a non-zero exit, or a malformed response is visible
+    # instead of indistinguishable from a real "not live" answer.
+    helper_started = time.perf_counter()
+    try:
+        raw = subprocess.run(
+            [sys.executable, str(helper_path), "--sport", sport, "--date", date_str],
+            cwd=str(_loop.REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=12.0,
+        )
+        result["espn_helper_raw"] = {
+            "return_code": raw.returncode,
+            "stdout": (raw.stdout or "").strip()[:2000],
+            "stderr": (raw.stderr or "").strip()[:2000],
+            "elapsed_ms": round((time.perf_counter() - helper_started) * 1000, 1),
+        }
+    except Exception as exc:
+        result["espn_helper_raw"] = {
+            "error": f"{type(exc).__name__}: {exc}",
+            "elapsed_ms": round((time.perf_counter() - helper_started) * 1000, 1),
+        }
+
     try:
         result["combined_checker_result"] = bool(checker(date_str))
     except Exception as exc:
@@ -1269,7 +1296,6 @@ def api_ops_live_refresh_sport_liveness_check() -> Any:
     except Exception as exc:
         result["any_tracked_sport_game_live_error"] = f"{type(exc).__name__}: {exc}"
 
-    helper_path = _loop.REPO_ROOT / "scripts" / "fetch_espn_live_status_for_date.py"
     result["espn_helper_script_exists"] = helper_path.exists()
     result["python_executable"] = sys.executable
 
