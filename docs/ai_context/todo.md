@@ -203,44 +203,82 @@ NOT committed and NOT deployed -- working tree also carries unrelated
 generated-state churn from concurrent sessions ([[concurrent parallel
 sessions]]); needs a scoped `git add` of exactly these four files.
 
-### OPEN 2026-08-05 (#187) -- MLB SO model projects 1.22 K BELOW the sim in production; served `batters_faced` sits 0.88 SD under its training mean
+### RESOLVED 2026-08-05 (#187) -- the SO model's -1.22 K gap vs the sim is REAL SIGNAL, not a defect. Model on beats model off at every edge threshold. But neither clears the vig, and the validated 58.84% does not reproduce.
 
-Found while validating #186 on real production artifacts. Over the same 298
-starts the model's prediction runs **mean -1.217 K / median -1.340 K**
-against the sim (sigma 0.854). At 16.3pp per K that is roughly **20pp of
-P(over) movement applied to every start** -- about five times the effect
-#186 just fixed, and it is currently live at weight 1.0.
+Found while validating #186: over 298 production starts the model runs
+**mean -1.217 K / median -1.340 K** below the sim (sigma 0.854) -- ~20pp of
+P(over) applied to every start, five times the effect #186 fixed, and live
+at weight 1.0. Resolved this pass by grading both against **real per-start
+strikeout outcomes**, which do exist after all: cached StatsAPI
+`feed/live` payloads under
+`data/mlb_source/source_artifacts/data/raw/statsapi/feed_live/2026/<date>/<game_pk>.json.gz`.
+(The earlier "no outcome source on disk" note was wrong -- it was based on
+the empty eval batch alone. Only 144 of these are git-tracked, covering
+2026-06-14..06-25, which overlaps the roster_objs dates on just ONE usable
+date, n=22 -- far too small, and it pointed the opposite way, pure noise.
+The numbers below are the full on-disk mirror: 381 starts / 15 dates.)
 
-**The lead**: `batters_faced` is the model's #2 feature by coefficient
-(0.12646, scale 124.8). Trained mean **391.7**; served mean across 634
-starter-rows in the git-tracked roster artifacts is **282.1** (median 319,
-range 0-459) -- ~0.88 SD low, worth roughly -10% on the prediction, so
-maybe half the gap. No season trend within 2026-06-15..07-12 that would
-explain it as normal accumulation.
+**Accuracy vs. real outcomes** (mean actual 4.87 K):
 
-**Two candidate explanations, not distinguished:**
-1. Genuine -- these are earlier-season dates and the model is correctly
-   pricing lower workload.
-2. Train/serve skew -- the training dataset came from scratchpad
-   `build_pitcher_dataset.py` (never committed, per the 2026-08-01 pilot
-   entry), so training may have computed `batters_faced` from a different
-   source than `_so_model_features_for_pid` reads at serve time.
+| | bias | MAE | RMSE |
+|---|---|---|---|
+| sim | **+0.551** | 2.147 | 2.605 |
+| model | **-0.702** | 1.981 | 2.510 |
 
-**Why it could not be resolved this session**: needs actual per-start
-strikeout outcomes to grade sim vs. model on these dates. The local eval
-batch (`data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-07-09.json`)
-is **empty** (`games: 0`), and no other outcome source is on disk or in git.
+The -1.22 gap is just the sum of two opposite biases: the sim
+over-projects strikeouts, the model under-projects them. The model is
+better on MAE and RMSE, and it is better on betting at every threshold:
 
-**Ruled out**: this is not a deserialization bug -- `batters_faced`
-round-trips correctly through the v4 roster artifact
-(`roster_artifact.py:304`). Also noted: `venue_mult` is an **inert
-feature** -- trained constant (mean 1.0, scale 1.0, coef exactly 0.0), and
-`_so_model_features_for_pid` always resolves it to 1.0 anyway because
-`PitcherProfile.venue_mult_home/away` are Dicts, not floats. Harmless, but
-dead weight in the feature list.
+**Betting accuracy, de-vigged market P(over), production-style edge filter (n=294):**
 
-**This outranks the fresh-holdout item** -- a 1.2 K systematic shift is a
-bigger open risk than the holdout it would be validated on.
+| min edge | sim only (w=0.0) | model on (w=1.0) |
+|---|---|---|
+| 0% | 47.96% (294 bets) | **50.00%** (294) |
+| 3% | 48.47% (262) | **50.00%** (274) |
+| 5% | 47.08% (240) | **50.78%** (256) |
+| 8% | 46.01% (213) | **51.75%** (228) |
+
+**Conclusions:**
+1. **Turning the model on was correct** -- it beats the sim by 2.0-5.7pp
+   everywhere. Do not roll it back. #187 is not a bug.
+2. **The sim alone is anti-predictive at the tails**: its hit rate FALLS as
+   the edge filter tightens (48.47% -> 46.01%). Its biggest disagreements
+   with the market are its most wrong.
+3. **But nothing here clears the vig.** Measured two-sided hold on these K
+   lines is 5.98%, so break-even is ~51.5%. The model tops out at 51.75%.
+   That is break-even, not an edge.
+4. **The validated 58.84% CV number does not reproduce** -- 50-52% across
+   294 bets on 15 dates. Caveat cutting the wrong way: the training window
+   ("full46") may OVERLAP 2026-06-15..07-12, in which case this is partly
+   in-sample and the true out-of-sample figure is worse, not better.
+
+**Bias correction tested and rejected**: sweeping a constant offset on the
+model mean, MAE bottoms at +0.70 (1.981) and bias reaches zero at +0.85 --
+where betting accuracy is at its **WORST (50.00%)**, versus 52.04% at no
+offset. This is the third market to hit the exact statistical-accuracy-vs-
+betting-accuracy wall (after hits-allowed and outs), and the first time it
+has shown up for strikeouts. Do not "fix" the model's bias.
+
+**`batters_faced` train/serve gap -- quantified, and NOT worth chasing**:
+served mean 283.1 vs trained 391.7 (0.87 SD low) implies a x1.116 lift,
+i.e. +0.49 K -- close to the MAE-optimal +0.70. But per the sweep above,
+applying it would degrade betting accuracy. Real, measured, and
+deliberately left alone.
+
+**Ruled out**: not a deserialization bug -- `batters_faced` round-trips
+correctly through the v4 roster artifact (`roster_artifact.py:304`).
+Separately, `venue_mult` is an **inert feature** (trained constant: mean
+1.0, scale 1.0, coef exactly 0.0) and `_so_model_features_for_pid` always
+resolves it to 1.0 regardless, because `PitcherProfile.venue_mult_home/away`
+are Dicts not floats. Contributes exactly zero; left in place because
+removing it from a trained artifact is risk without numerical benefit.
+
+**What is actually open on SO now** (#189): the K market may simply not be
+beatable at this hold with this model. The next honest step is a genuinely
+fresh holdout (dates outside both "full46" and 2026-06-15..07-12) graded on
+CLV rather than hit rate -- if the model can't clear 51.5% out-of-sample,
+the SO thread's conclusion is "correct model, unprofitable market," and
+effort should move to markets with better hold or weaker pricing.
 
 ### OPEN 2026-08-05 (#188) -- MLB HR props: Statcast features are computed and displayed but never reach the probability
 
