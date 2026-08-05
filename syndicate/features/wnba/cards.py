@@ -246,11 +246,23 @@ def _maybe_persist_current_day_live_snapshot_artifact(kind: str, selected_date: 
         # belong to the worker/offline side.
         return payload
     path = _live_snapshot_artifact_path(kind, selected_date)
-    try:
-        if path.exists() and path.is_file() and path.stat().st_size > 0:
-            return payload
-    except OSError:
-        pass
+    # Root-caused live 2026-08-04 (TOR@GSV, a genuinely live 2nd-quarter
+    # game that never showed as live anywhere -- game_cards, live_state,
+    # live_lines, live_player_boxscore, live_player_lens all frozen). This
+    # used to skip the write entirely whenever ANY non-empty file already
+    # existed at `path` -- correct for a write-once-per-day artifact, wrong
+    # for a LIVE snapshot that is expected to change every call. A game is
+    # pregame for most of the day before tip-off, so the file's first
+    # successful write nearly always captures the "Scheduled" state, and
+    # this gate then silently froze every one of these 5 artifact kinds at
+    # that pregame snapshot for the rest of the day -- no error, no log
+    # line, just permanently stale data once tip-off passed. The caller's
+    # own TTL cache (build_live_state_payload's 12s _BUILD_LIVE_STATE_
+    # PAYLOAD_CACHE and its per-kind siblings) already rate-limits how
+    # often this function is reached with a genuinely fresh payload, so
+    # gating the WRITE on "does a file already exist" was always redundant
+    # with that cache and actively harmful on top of it. Always persist a
+    # payload this function is actually reached with.
     if _write_jsonl_snapshot_payload(path, payload):
         try:
             _local_live_snapshot_payload.cache_clear()

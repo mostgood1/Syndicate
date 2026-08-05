@@ -760,6 +760,35 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         mock_write.assert_called_once()
         self.assertIs(result, payload)
 
+    def test_maybe_persist_current_day_live_snapshot_artifact_writes_again_when_a_stale_file_already_exists(self) -> None:
+        # Root-caused live 2026-08-04 (TOR@GSV): a real pregame write early
+        # in the day made `path.exists() and size > 0` true for the rest of
+        # the day, silently freezing live_state/live_lines/etc. at whatever
+        # they were BEFORE tip-off -- a genuinely live 2nd-quarter game
+        # never showed as live anywhere. The two tests above only ever
+        # exercise a path that does not exist yet; this is the actual
+        # failure mode -- a real, non-empty file already sitting there from
+        # an earlier call in the same day -- and it must still get a fresh
+        # write, not a silent skip.
+        with TemporaryDirectory() as tmp_dir:
+            existing_path = Path(tmp_dir) / "live_lines_today.jsonl"
+            existing_path.write_text(json.dumps({"payload": {"stale": True}}) + "\n", encoding="utf-8")
+            self.assertGreater(existing_path.stat().st_size, 0)
+
+            fresh_payload = {"ok": True, "date": central_today_iso(), "games": [{"event_id": "evt-1", "in_progress": True}]}
+            with patch("syndicate.features.wnba.cards._render_web_dyno", return_value=False), patch(
+                "syndicate.features.wnba.cards._live_snapshot_artifact_path",
+                return_value=existing_path,
+            ), patch(
+                "syndicate.features.wnba.cards._write_jsonl_snapshot_payload", return_value=True
+            ) as mock_write, patch(
+                "syndicate.features.wnba.cards._local_live_snapshot_payload"
+            ), patch("syndicate.features.wnba.cards._local_live_state_payload"):
+                result = _maybe_persist_current_day_live_snapshot_artifact("live_lines", central_today_iso(), fresh_payload)
+
+        mock_write.assert_called_once_with(existing_path, fresh_payload)
+        self.assertIs(result, fresh_payload)
+
     def test_live_state_payload_falls_back_to_cards_context(self) -> None:
         with patch(
             "syndicate.features.wnba.cards.build_cards_page_context",
