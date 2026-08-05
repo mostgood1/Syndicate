@@ -6437,7 +6437,27 @@ def _mlb_hydrate_live_prop_projection(candidate: dict[str, Any], live_rows: list
         return
     candidate_line = _numeric_hint(candidate.get("line"))
     candidate_market = _normalized_market_text(str(_safe_text(candidate.get("market"), "")).replace("Pitcher", "").replace("pitcher", ""))
+    # Line equality used to be a REJECTION here, which silently discarded the
+    # live numbers whenever the board's line differed from the live-lens
+    # registry's. Confirmed against production 2026-08-05: of 9 live MLB prop
+    # candidates, 8 matched on player+market but 2 were thrown away on line
+    # alone -- Luis Arraez (board 2.5, lens 1.5) carrying actual=2.0 /
+    # liveProjection=2.081, and Luis Torrens (board 4.5, lens 0.5) carrying
+    # actual=6.0. Both numbers were real and both were dropped.
+    #
+    # The gate was wrong in kind, not degree: `actual` and `liveProjection`
+    # are STAT-level quantities, not bet-level ones. Arraez has two hits
+    # whether you are looking at over 1.5 or under 2.5; the rest-of-game
+    # projection of his hit total does not change either. Only the
+    # over/under verdict depends on the line, and that is computed downstream
+    # from these values, not here.
+    #
+    # Line is now a PREFERENCE, not a filter: an exact-line row wins when one
+    # exists (it is the same market the registry priced, so its numbers are
+    # the most directly comparable), otherwise the best player+market row is
+    # used rather than showing a live game with no live numbers at all.
     matched_row: dict[str, Any] | None = None
+    fallback_row: dict[str, Any] | None = None
     for row in live_rows:
         row_name = _normalized_market_text(_safe_text(row.get("playerName"), ""))
         names_overlap = bool(row_name) and (row_name in candidate_name or candidate_name in row_name)
@@ -6448,9 +6468,13 @@ def _mlb_hydrate_live_prop_projection(candidate: dict[str, Any], live_rows: list
             continue
         row_line = _numeric_hint(row.get("line"))
         if candidate_line is not None and row_line is not None and abs(row_line - candidate_line) > 0.01:
+            if fallback_row is None:
+                fallback_row = row
             continue
         matched_row = row
         break
+    if matched_row is None:
+        matched_row = fallback_row
     if matched_row is None:
         return
     live_projection_value = _numeric_hint(matched_row.get("liveProjection"))
