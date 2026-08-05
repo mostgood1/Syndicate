@@ -1339,27 +1339,6 @@ def _finalize_home_prop_rows(rows: list[dict[str, Any]], *, slug: str, context_l
     finalized: list[dict[str, Any]] = []
     actual_cache: dict[int, dict[str, Any] | None] = {}
     game_index = _home_prop_game_index(home_games)
-    # Temporary, always-on diagnostic (2026-08-05): the commence_time fix
-    # just above (matched_game.get("scheduled_start_utc")) is confirmed
-    # deployed and confirmed EXECUTING (refresh-worker's own logs show
-    # OVERVIEW_SPORT_BEGIN sport=soccer firing repeatedly post-deploy), but
-    # three real soccer candidates (Carles Gil/Peyton Miller/Will Sands,
-    # "Anytime Goalscorer") still show no commence_time after multiple
-    # confirmed rebuilds. The one thing that fix cannot see is WHY
-    # _home_prop_matched_game returns None for a given row -- print-only
-    # traces already proved unreliable twice this session (Render's log API
-    # missed them), so this persists a small, per-slug record of every
-    # match attempt via the same keyvalue-backed pattern already proven for
-    # prop-row-coverage/post-refresh-gate. Remove once the soccer
-    # commence_time gap is resolved and confirmed.
-    _prop_match_diag: list[dict[str, Any]] = [] if slug == "soccer" else None  # type: ignore[assignment]
-    if _prop_match_diag is not None:
-        game_idx_summary = {
-            "by_pk_count": len(game_index.get("by_pk") or {}),
-            "by_labels_keys": sorted(str(key) for key in (game_index.get("by_labels") or {}).keys())[:40],
-            "by_team_keys": sorted(str(key) for key in (game_index.get("by_team") or {}).keys())[:40],
-            "home_games_count": len(home_games or []),
-        }
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -1374,19 +1353,6 @@ def _finalize_home_prop_rows(rows: list[dict[str, Any]], *, slug: str, context_l
         away_label = away_label or parsed_away
         home_label = home_label or parsed_home
         matched_game = _home_prop_matched_game(item, game_index)
-        if _prop_match_diag is not None and len(_prop_match_diag) < 40:
-            _prop_match_diag.append({
-                "name": item.get("name"),
-                "team": item.get("team"),
-                "opponent": item.get("opponent"),
-                "away_label": item.get("away_label"),
-                "home_label": item.get("home_label"),
-                "matchup": item.get("matchup"),
-                "game_pk": item.get("game_pk") or item.get("gamePk") or item.get("game_id"),
-                "commence_time_before": item.get("commence_time"),
-                "matched": isinstance(matched_game, dict),
-                "matched_game_scheduled_start_utc": (matched_game or {}).get("scheduled_start_utc") if isinstance(matched_game, dict) else None,
-            })
         if isinstance(matched_game, dict):
             matched_away = matched_game.get("away") if isinstance(matched_game.get("away"), dict) else {}
             matched_home = matched_game.get("home") if isinstance(matched_game.get("home"), dict) else {}
@@ -1528,38 +1494,6 @@ def _finalize_home_prop_rows(rows: list[dict[str, Any]], *, slug: str, context_l
         item["hero_live_box"] = hero_live_box
         item["hero_sim_box"] = hero_sim_box
         finalized.append(item)
-    if _prop_match_diag is not None:
-        try:
-            from syndicate.features.shared.refresh_state_store import read_json_file as _read_diag
-            from syndicate.features.shared.refresh_state_store import reports_root as _diag_reports_root
-            from syndicate.features.shared.refresh_state_store import write_json_file as _write_diag
-
-            # There are 4 call sites into this function per board build (WNBA's
-            # pregame+live, and the generic pregame+live branch soccer goes
-            # through). A single overwrite per slug lost every call but the
-            # last -- confirmed live 2026-08-05: the write showed
-            # game_index_summary.home_games_count=37 (including "hdf|ner",
-            # the exact Houston Dynamo @ New England Revolution game these
-            # rows are for) but rows=[], because the LIVE-lane call (which
-            # legitimately has zero soccer rows most of the time) ran after
-            # the PREGAME-lane call and overwrote it. Append instead --
-            # every call's outcome stays visible, capped so this can't grow
-            # unboundedly across many board builds.
-            diag_path = _diag_reports_root() / "refresh_status" / "latest" / "home_prop_match_diagnostic_status.json"
-            existing = _read_diag(diag_path)
-            payload = existing if isinstance(existing, dict) else {}
-            slug_entry = payload.get(slug) if isinstance(payload.get(slug), dict) else {}
-            calls = slug_entry.get("calls") if isinstance(slug_entry.get("calls"), list) else []
-            calls.append({
-                "context_label": context_label,
-                "row_count": len(rows),
-                "game_index_summary": game_idx_summary,
-                "rows": _prop_match_diag,
-            })
-            payload[slug] = {"calls": calls[-8:]}
-            _write_diag(diag_path, payload)
-        except Exception:
-            pass
     return finalized
 
 
