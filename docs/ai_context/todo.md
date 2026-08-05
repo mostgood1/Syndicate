@@ -1,5 +1,140 @@
 # Syndicate TODO — canonical cross-session list
 
+### RECONCILIATION 2026-08-05 -- session close-out, board-accuracy + soccer investigation thread (archive-ready)
+
+Full-suite run for this close-out: **4307 passed, 14 failed, 4 skipped,
+2054.91s (0:34:14).** Triaged the delta against this session's own earlier
+"12 failed" count (see the board-accuracy reconciliation further down):
+
+- 1 fixed since (`test_wnba_cards_empty_slate_does_not_inject_fake_sample_game`
+  -- a parallel session's WNBA test-isolation work, not this thread's).
+- 3 confirmed still order-dependent (`test_artifact_publisher.py`'s three
+  `requires_admin_token` tests -- pass alone, fail only in the full run; an
+  env leak from an earlier test in suite order).
+- 1 confirmed pre-existing (`test_no_new_timezone_ambiguous_date_calls`,
+  `shadow_candidate_ledger.py`'s `date.today()` usage).
+- 1 confirmed template-markup drift, unrelated to any of this session's code
+  (`test_intelligence_blotter_view_includes_odds_projected_and_live_columns`).
+- 1 confirmed order-dependent, NOT a real failure
+  (`test_odds_control_plane.py::test_odds_history_prefers_artifact_history_
+  over_tracking` -- passed cleanly when run in isolation alongside the
+  intelligence_state file; only fails as suite-order noise in the full run).
+- **8 in `tests/test_intelligence_state.py` (`IntelligenceStateTests` x7,
+  `BoardWindowWatchFailureDoesNotKillTheLoopTests` x1) -- confirmed REAL,
+  fail even in isolation (`8 failed, 214 passed` running that file alone).**
+  Grew from 6 to 8 since the earlier reconciliation. Read one directly
+  (`test_build_candidate_pool_skips_sports_without_manifests`): asserts
+  `pool["candidate_count"] == 1`, actual is 18. The trace shows why --
+  60 MLB candidates generated, 32 survive dedup, 18 survive exposure-budget
+  application (`EXPOSURE_BUDGETS_APPLIED groups=8 adjusted=6 cap=0.05`).
+  Dedup, exposure budgets, and adjusted-scoring are all real pipeline
+  stages added by concurrent same-day feature work (confirmed in git log:
+  `4d9d0ac4`, `25dc6a01`, and others, none of them this thread's commits) --
+  this test's fixture predates that evolution and was never updated to
+  expect it. **Verified NOT caused by this thread's own change to this same
+  file** (`49442bed` added `pull_hot_artifacts` wiring right after
+  `_build_candidate_pool` starts; the failing test's own captured stdout
+  shows `PULL_SKIP_NOT_CONFIGURED url_set=False token_set=False` -- a
+  confirmed no-op here). Also checked whether this is the same root cause a
+  parallel session already fixed today for a sibling test (`ec35dc67`,
+  "unpriced=2" price-gate regression) -- it is not; no "unpriced" anywhere
+  in this failure's trace, different mechanism entirely. Flagging for
+  whoever owns `test_intelligence_state.py`'s fixtures next rather than
+  fixing it here -- it is stale-test drift from several sessions'
+  legitimate feature work compounding, not a regression from this thread.
+
+**This thread's own changes are independently verified clean**, separate
+from the repo-wide full-suite health above: targeted run across every file
+this thread touched (`test_home.py`, `test_intelligence.py`, `test_ops.py`)
+-- **449 passed, 1 failed** (the same pre-existing template-markup test
+listed above, confirmed unrelated). Every commit in this thread that added
+new behavior shipped with its own new regression tests, all passing.
+
+**Deployed and confirmed live**, this thread's work:
+- `746f26cf` -- 6 pre-existing `live_refresh_loop` test failures fixed
+  (leaked sim pointer), 203/203 stable across 3 runs.
+- `49442bed`/`aee3bb8d`/`32dd57c4` -- odds_history transport: MLB board
+  movement **0/354 -> 373/373**, verified live.
+- `6647a975`/`c2e3e648`/`e9c3058a` -- steam per-sport retention,
+  cross-service publish, totals merge -- WNBA steam appeared on the served
+  board for the first time this session, verified live.
+- `68d05266`/`a9159f5f`/`dcd5659b` -- live board columns: MLB live-flag
+  coverage **4 matchups -> all 12**, verified live.
+- `18b74632`/`2176f73c` -- soccer odds_history root cause (ESPN 403 in a
+  second call site + a per-league result-aggregation bug silently blocking
+  the whole sport's sync) -- verified live via manual production triggers:
+  real props flowing for MLS/eredivisie/EPL/La Liga/Ligue 1 (783/220
+  read/written for MLS alone).
+- `30a7067e`/`25ad43df` + the web-cache-restart fix -- soccer commence_time,
+  full chain resolved, see the RESOLVED entry directly above this one.
+- All temporary diagnostics added during these investigations
+  (`prop-row-coverage`, `post-refresh-gate`, `home-props/match-diagnostic`,
+  `prop-candidate/commence-time-diagnostic`) removed in the same pass they
+  stopped being needed -- confirmed zero references left in `syndicate/` or
+  `tests/`.
+
+**Not this thread's work, landed on `main` concurrently throughout** (noted
+for accurate attribution, not claimed here): NFL preseason schedule/model/
+deploy work, WNBA test-order-pollution fixes, MLB pitcher SO-model flip,
+evaluation-ledger ephemeral-storage fix, settlement scheduling change. All
+already reconciled in their own entries elsewhere in this file by whichever
+session did them.
+
+**State at close: branch and `main` in sync, nothing uncommitted.** Three
+services live on `3be6d096` (all real fixes deployed and confirmed); the
+diagnostic-removal cleanup commit (`b7522658`) is committed+pushed but
+NOT yet deployed -- pure cleanup, zero user-facing behavior change, holding
+for a natural deploy window rather than killing another sim for it.
+
+### RESOLVED 2026-08-05 -- Soccer commence_time: the real break was _build_prop_dashboard_row dropping it, not the match
+
+Closes both earlier OPEN entries below ("soccer commence_time: TWO real
+bugs..." and "soccer prop commence_time fix (30a7067e) is deployed and
+executing..."). Confirmed on the served board: Carles Gil / Peyton Miller /
+Will Sands all now show `game_date=2026-08-08`, `commence_time=
+2026-08-08T20:30Z` -- correct, matching the real HD@NER fixture.
+
+**Three real things were wrong, found in order:**
+1. `_finalize_home_prop_rows` (home.py) never copied `matched_game.get(
+   "scheduled_start_utc")` onto the item -- fixed (`30a7067e`).
+2. `_build_prop_dashboard_row` (home.py) reconstructs its return value as a
+   brand new dict from `item` and never copied `commence_time` across --
+   fixed (`25ad43df`). Confirmed with a genuine regression test that fails
+   without the fix and passes with it.
+3. **The actual final blocker, found via a targeted diagnostic rather than
+   another guess:** `read_combined_intelligence_response`'s in-process TTL
+   cache on the WEB service (`_COMBINED_INTELLIGENCE_RESPONSE_CACHE`) kept
+   serving a combined-board response computed BEFORE fixes 1+2 ever
+   deployed. refresh-worker's board-build loop was genuinely rebuilding
+   soccer's candidate pool correctly and repeatedly the whole time
+   (confirmed via its own logs) -- the underlying `intelligence_state.json`
+   on disk already had `commence_time` set correctly. Web just never served
+   it, because nothing invalidates that cache except a web process restart.
+   A diagnostic written from inside `_prop_candidate_from_item` (its own
+   return value) proved `commence_time`/`resolved_game_date` were already
+   correct in memory before this was found -- ruling out every hop between
+   the match and the candidate object, and pointing at the one thing left:
+   the read-side cache in front of it.
+
+Two prior "should work by reading the code" conclusions in this chase were
+wrong in ways only live evidence caught (recorded in the superseded OPEN
+entries below for the record). The third hop was checked with a real
+diagnostic instead of a third guess, which is what actually found it.
+
+**Cleanup done:** all four temporary diagnostics from this whole soccer
+investigation removed in the same pass -- `home_prop_match_diagnostic`,
+`prop_candidate_commence_time_diagnostic` (this chase), plus
+`prop-row-coverage` and `post-refresh-gate` (the earlier per-league
+aggregation chase, see "Soccer odds_history root-cause chain CLOSED"
+below). The real, permanent fixes underneath all of them stay.
+
+**Worth remembering:** a web-side response cache invalidated only by
+process restart is a real, general hazard for THIS class of bug --
+"the underlying data changed but the cache didn't know" reads identically
+to "the fix didn't work" from the outside, and the only way to tell them
+apart is checking the source data directly (which is what finally cracked
+this) rather than re-reading the served board.
+
 ### DONE (mostly) 2026-08-05 -- NFL preseason: deployed, wired into odds/resim autorun, Layer-1 market board, and Layer-2 opportunity feed -- one open verification item
 
 Continuation of the same day's earlier NFL preseason build (real ESPN
