@@ -881,6 +881,49 @@ def api_ops_odds_history_prop_row_coverage() -> Any:
     })
 
 
+@ops_bp.get("/api/ops/odds-history/post-refresh-gate")
+def api_ops_odds_history_post_refresh_gate() -> Any:
+    # Temporary, read-only diagnostic (2026-08-05). Both known causes of
+    # soccer's empty odds_history (the ESPN-403-triggered header,
+    # 18b74632, and the sport-wide sport_result["ok"] gate, 2176f73c) are
+    # deployed together, but a live verification refresh still shows no
+    # data in prop-row-coverage below. _log_memory's own trace of this
+    # exact gate is silent in production (gated behind
+    # SYNDICATE_LIVE_ODDS_REFRESH_MEMORY_TRACE, default off), so this reads
+    # the always-on companion write in refresh_odds_sources.py directly:
+    # whether the post-refresh sync gate was even REACHED and ENTERED for
+    # a given sport's most recent refresh, and which of that sport's own
+    # steps succeeded. Same date-honesty contract and same keyvalue-backed
+    # read as the other two odds-history diagnostics next to this one.
+    # Remove once the remaining gap is found.
+    status_path = reports_root() / "refresh_status" / "latest" / "odds_history_post_refresh_gate_status.json"
+    by_sport = read_json_file(status_path) or {}
+    if not isinstance(by_sport, dict):
+        by_sport = {}
+
+    requested_sport = str(request.args.get("sport") or "").strip().lower()
+    if requested_sport:
+        by_sport = {key: value for key, value in by_sport.items() if str(key).strip().lower() == requested_sport}
+
+    requested_date = str(request.args.get("date") or "").strip()
+    reported_dates = sorted(
+        {str(value.get("date") or "") for value in by_sport.values() if isinstance(value, dict) and value.get("date")}
+    )
+    matches_requested_date = None
+    if requested_date:
+        matches_requested_date = bool(reported_dates) and all(date == requested_date for date in reported_dates)
+
+    return jsonify({
+        "ok": True,
+        "by_sport": by_sport,
+        "requested_sport": requested_sport or None,
+        "requested_date": requested_date or None,
+        "reported_dates": reported_dates,
+        "matches_requested_date": matches_requested_date,
+        "source": "last_refresh_write_only",
+    })
+
+
 @ops_bp.post("/api/ops/bootstrap/run")
 def api_ops_bootstrap_run() -> Any:
     # Calls _sync_bootstrap_roots directly (not main(), which only ever
