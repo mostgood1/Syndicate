@@ -2764,3 +2764,95 @@ class OpsLiveRefreshStateSimRunResolutionTests(unittest.TestCase):
 
         self.assertEqual(state["sim_run_resolution"], {"run_stamp": None, "date": None, "source": None})
         self.assertNotIn("sim_run_status", state)
+
+
+class OpsSportLivenessCheckTests(unittest.TestCase):
+    """2026-08-05: WNBA's odds-history stayed frozen from before a real
+    game's tip-off for over an hour even after a confirmed, deployed fix
+    to a separate artifact-freezing bug -- meaning something gates the
+    live-odds-worker's sweep from ever including WNBA once it's live, even
+    though the code that decides that should, by reading it, detect the
+    game as live. This endpoint exercises each layer of that decision
+    (artifact check, ESPN subprocess fallback, combined checker) so a
+    production read can show which layer is lying, instead of only the
+    combined boolean.
+    """
+
+    def setUp(self) -> None:
+        app = create_app()
+        app.testing = True
+        self.client = app.test_client()
+        self._prior_admin_token = os.environ.get("ADMIN_TOKEN")
+        os.environ["ADMIN_TOKEN"] = "test-token"
+        self.addCleanup(self._restore_admin_token)
+
+    def _restore_admin_token(self) -> None:
+        if self._prior_admin_token is None:
+            os.environ.pop("ADMIN_TOKEN", None)
+        else:
+            os.environ["ADMIN_TOKEN"] = self._prior_admin_token
+
+    def _get(self, query: str) -> tuple:
+        response = self.client.get(
+            f"/api/ops/live-refresh/sport-liveness-check{query}", headers={"X-Admin-Token": "test-token"}
+        )
+        return response.status_code, response.get_json()
+
+    def test_requires_sport_param(self) -> None:
+        status_code, payload = self._get("")
+        self.assertEqual(status_code, 400)
+        self.assertFalse(payload["ok"])
+
+    def test_rejects_a_sport_with_no_registered_checker(self) -> None:
+        status_code, payload = self._get("?sport=not_a_real_sport")
+        self.assertEqual(status_code, 400)
+        self.assertFalse(payload["ok"])
+
+    def test_reports_each_layer_when_espn_fallback_is_the_one_that_is_true(self) -> None:
+        # The exact production scenario this was built to distinguish: the
+        # artifact says not-live (stale/never-written), but ESPN's own
+        # scoreboard confirms a real live game.
+        with patch(
+            "syndicate.features.shared.live_refresh_loop._wnba_has_live_game_via_artifact",
+            return_value=False,
+        ), patch(
+            "syndicate.features.shared.live_refresh_loop._espn_has_live_game",
+            return_value=True,
+        ), patch(
+            "syndicate.features.shared.live_refresh_loop._any_tracked_sport_game_live",
+            return_value=True,
+        ):
+            status_code, payload = self._get("?sport=wnba&date=2026-08-04")
+
+        self.assertEqual(status_code, 200)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["artifact_check"], {"ok": True, "value": False})
+        self.assertTrue(payload["espn_fallback_check"]["ok"])
+        self.assertTrue(payload["espn_fallback_check"]["value"])
+        self.assertTrue(payload["combined_checker_result"])
+        self.assertTrue(payload["any_tracked_sport_game_live"])
+
+    def test_reports_when_the_espn_subprocess_itself_fails(self) -> None:
+        # The theory this session couldn't yet confirm or refute in
+        # production: a subprocess spawn failure, PATH/env difference, or
+        # timeout would make _espn_has_live_game return False via its own
+        # bare except-return-False, indistinguishable from "genuinely not
+        # live" anywhere else. This endpoint's whole point is to surface
+        # that distinction -- if _espn_has_live_game itself raises (rather
+        # than swallowing and returning False), this ok=False branch is
+        # what a real subprocess failure looks like here.
+        with patch(
+            "syndicate.features.shared.live_refresh_loop._wnba_has_live_game_via_artifact",
+            return_value=False,
+        ), patch(
+            "syndicate.features.shared.live_refresh_loop._espn_has_live_game",
+            side_effect=RuntimeError("subprocess spawn failed"),
+        ), patch(
+            "syndicate.features.shared.live_refresh_loop._any_tracked_sport_game_live",
+            return_value=False,
+        ):
+            status_code, payload = self._get("?sport=wnba&date=2026-08-04")
+
+        self.assertEqual(status_code, 200)
+        self.assertFalse(payload["espn_fallback_check"]["ok"])
+        self.assertIn("subprocess spawn failed", payload["espn_fallback_check"]["error"])

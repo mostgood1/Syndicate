@@ -3,6 +3,7 @@ from __future__ import annotations
 import fnmatch
 import json
 import os
+import sys
 import threading
 import subprocess
 import time
@@ -1198,6 +1199,81 @@ def api_ops_live_refresh_state() -> Any:
             # traceback lives. Bounded to keep the response reasonable.
             state["sim_run_log_tail"] = log_text[-8000:]
     return jsonify({"ok": True, "state": normalize_timestamped_payload(state)})
+
+
+@ops_bp.get("/api/ops/live-refresh/sport-liveness-check")
+def api_ops_live_refresh_sport_liveness_check() -> Any:
+    # Read-only diagnostic (2026-08-05): WNBA's odds-history updated_at
+    # stayed frozen from BEFORE a real live game's tip-off for over an hour,
+    # even after a confirmed, deployed fix to the artifact-freezing write
+    # gate -- meaning refresh_wnba_oddsapi_props.py appears to not be
+    # running at all during a live game. _apply_pregame_sport_cadence's
+    # own liveness check (_LIVE_STATUS_CHECKERS[sport] -- artifact check OR
+    # an ESPN-scoreboard subprocess fallback) should, by reading the code,
+    # force the sport into every sweep once live. Whether that's true in
+    # PRODUCTION's own process/environment is unverified -- the ESPN
+    # subprocess call works when run locally, but a subprocess spawn
+    # failure, PATH/env difference, or timeout under load on Render would
+    # silently make it return False via its own bare except-return-False,
+    # indistinguishable anywhere in current logging from "genuinely not
+    # live". Exercises each layer of _wnba_has_live_game/_nba_has_live_game/
+    # etc. individually and reports which one is actually true right now,
+    # instead of only the combined boolean.
+    from syndicate.features.shared import live_refresh_loop as _loop
+    from syndicate.features.shared.timezone import central_today_iso
+
+    sport = str(request.args.get("sport") or "").strip().lower()
+    date_str = str(request.args.get("date") or "").strip() or central_today_iso()
+    if not sport:
+        return jsonify({"ok": False, "error": "sport parameter required (e.g. wnba)"}), 400
+
+    checker = _loop._LIVE_STATUS_CHECKERS.get(sport)
+    if checker is None:
+        return jsonify({"ok": False, "error": f"no liveness checker registered for sport={sport!r}"}), 400
+
+    artifact_checker_name = f"_{sport}_has_live_game_via_artifact"
+    artifact_checker = getattr(_loop, artifact_checker_name, None)
+
+    result: dict[str, Any] = {"ok": True, "sport": sport, "date": date_str}
+
+    if callable(artifact_checker):
+        try:
+            result["artifact_check"] = {"ok": True, "value": bool(artifact_checker(date_str))}
+        except Exception as exc:
+            result["artifact_check"] = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+    else:
+        result["artifact_check"] = {"ok": False, "error": f"no {artifact_checker_name} on live_refresh_loop"}
+
+    espn_started = time.perf_counter()
+    try:
+        espn_live = bool(_loop._espn_has_live_game(sport, date_str))
+        result["espn_fallback_check"] = {
+            "ok": True,
+            "value": espn_live,
+            "elapsed_ms": round((time.perf_counter() - espn_started) * 1000, 1),
+        }
+    except Exception as exc:
+        result["espn_fallback_check"] = {
+            "ok": False,
+            "error": f"{type(exc).__name__}: {exc}",
+            "elapsed_ms": round((time.perf_counter() - espn_started) * 1000, 1),
+        }
+
+    try:
+        result["combined_checker_result"] = bool(checker(date_str))
+    except Exception as exc:
+        result["combined_checker_result_error"] = f"{type(exc).__name__}: {exc}"
+
+    try:
+        result["any_tracked_sport_game_live"] = bool(_loop._any_tracked_sport_game_live())
+    except Exception as exc:
+        result["any_tracked_sport_game_live_error"] = f"{type(exc).__name__}: {exc}"
+
+    helper_path = _loop.REPO_ROOT / "scripts" / "fetch_espn_live_status_for_date.py"
+    result["espn_helper_script_exists"] = helper_path.exists()
+    result["python_executable"] = sys.executable
+
+    return jsonify(result)
 
 
 @ops_bp.post("/api/ops/live-refresh/force-mlb-resim")
