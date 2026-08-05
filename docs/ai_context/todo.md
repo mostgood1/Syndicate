@@ -1,5 +1,39 @@
 # Syndicate TODO — canonical cross-session list
 
+### FIXED 2026-08-05 (02:07-02:15 CDT) -- Per-pitcher market cap removed, deployed to live-odds-worker, confirmed changing the artifact
+
+Follow-up to the CORRECTION entry directly below. Removed
+`_current_live_pitcher_prop_rows`'s top-1/2-per-pitcher cap
+(`syndicate/features/mlb/cards.py`, commit `83004596`) so every market that
+clears `min_edge=0.03` is kept, not just the single best-edge one. Deployed
+to live-odds-worker only (`dep-d9p9m3e417fc73dec69g`, same in-flight-sim
+reasoning as the diagnostic deploy above -- refresh-worker's sim untouched).
+
+**Confirmed live, before vs after, same pitcher:** pre-deploy, Randy Vásquez
+had only a `hits_allowed` row in the artifact while his board candidate was
+`Pitcher Strikeouts` (no match, "-"/"-"). Post-deploy (next tick,
+`generatedAt` advanced from `21:11` to `21:14`), Vásquez's artifact row set
+now includes `strikeouts` at line 2.5 -- exactly his board candidate's
+market. The join itself now has something to find.
+
+**Not fully hydrated end-to-end yet, and NOT the same bug as before:** at
+the instant checked, that new `strikeouts` row's own `actual`/`liveProjection`
+were null (a transient live-game-state gap, not a match failure -- confirmed
+separately that Vásquez's game was still live, not final), so the board
+still showed "-" one tick later. This is expected noise given how fast live
+pitcher state changes tick-to-tick, not a residual defect in this fix.
+Tarik Skubal, who WAS fully hydrated (18.0/18.0) before this deploy, showed
+"-" afterward with no artifact row either before or after -- that candidate's
+live_projection was set by some mechanism this session never located (no
+matching artifact row existed for him at any point checked), almost
+certainly on refresh-worker's separate board-build cadence, not
+live-odds-worker's tick this fix touched. Not chased further; flagging so
+it isn't mistaken for a regression from this change.
+
+**Still open, lower priority than before this correction:** the mojibake
+encoding bug (accented names -> `�`) -- being investigated separately, not
+yet fixed as of this writing.
+
 ### CORRECTION 2026-08-05 (01:52-02:00 CDT) -- Handoff #1's premise ("board structurally cannot see any pitcher live rows") is FALSE right now; real gap is narrower
 
 Picked up handoff #1 below as instructed priority. Before writing code, added
