@@ -1,5 +1,115 @@
 # Syndicate TODO — canonical cross-session list
 
+### HANDOFF 2026-08-05 -- START HERE (board-accuracy session; all below is committed+deployed unless marked)
+
+All source committed and pushed to `main`; services live on `dcd5659b` or later.
+Working tree holds only generated `reports/`+`data/` churn. Session ended on
+context, not mid-edit.
+
+**#1 PRIORITY -- pitcher live lens: make it an ARTIFACT, not compute-on-read.**
+Board live cards are blank for every PITCHER prop (Grant Holmes Earned Runs,
+Javier Assad Outs Recorded, Ryan Weathers Outs Recorded, Davis Martin
+Strikeouts); hitter props hydrate fine. NOT a join bug:
+`live_lens_report_<date>.json` holds 329 rows and every one is a hitter market
+(Hits/Total Bases/RBIs/Runs/H+R+R) -- verified across `trackedProps`, `props`
+AND `liveProps` (all identical), `archivedLiveProps` empty.
+
+Pitcher live rows are COMPUTED on demand instead, by
+`syndicate/features/mlb/cards.py::_current_live_pitcher_prop_rows(selected_date,
+sim_payload, actual_payload)` -- blends sim `pitcher_props` model means, the
+live MLB feed's actual outs/Ks, and `_pitcher_snapshot_market_lines`, via
+`_bounded_live_pitcher_projection`. Confirmed working in production on /mlb
+("PITCHER LIVE LENS" sections render real numbers). The intelligence board
+structurally cannot see any of it.
+
+Decision taken (user asked artifact-vs-computed explicitly): **artifact**, and
+extend the EXISTING report rather than adding a second one -- move that
+computation into the live-lens tick that writes `live_lens_report_<date>.json`
+and emit pitcher rows beside hitter rows. Why: (a) CLAUDE.md's rule, web reads
+precomputed artifacts and does no heavy request-path compute; (b) the board is
+BUILT on refresh-worker and SERVED by web, so computing on web leaves the build
+blind -- the same cross-service gap behind three separate bugs this session;
+(c) sim payload + live feed per game per request on a 2GB box is the shape of
+the #50/#98 OOMs. Artifact cost is once per tick per game, not once per request
+per viewer. **The board side needs NO change**:
+`_refresh_live_columns_from_artifact` (shipped, `dcd5659b`) matches on
+player+market and does not care whether a row is hitter or pitcher -- pitcher
+rows hydrate the moment they appear in the file.
+
+**#2 -- 12 full-suite failures (4173 passed, 4 skipped, 20m53s).** NOT triaged
+against a stashed baseline; do that first per repo convention before
+attributing any to this session.
+- `test_slate_date_timezone_discipline` -- CONFIRMED pre-existing, flags
+  `syndicate/features/shared/shadow_candidate_ledger.py` using `date.today()`.
+  Not this session's file, but a real bug (that guard exists because
+  process-timezone `today` pinned live MLS games to next week).
+- 3x `requires_admin_token` in `tests/test_artifact_publisher.py` (Publish,
+  Export, Stream endpoint tests) -- PASS when that file runs alone (64 passed).
+  Order-dependent env leak, almost certainly an `ADMIN_TOKEN` left in
+  `os.environ`. Same class as the `_active.json` leak fixed at session start.
+- `test_archives.py::HomeBoardTests::test_wnba_cards_empty_slate_does_not_inject_fake_sample_game`
+- `test_intelligence.py::IntelligenceBlueprintTests::test_intelligence_blotter_view_includes_odds_projected_and_live_columns`
+- 6x `tests/test_intelligence_state.py` -- most likely genuinely this session's,
+  since `intelligence.py`'s enrichment path changed.
+
+**#3 -- soccer movement: fix shipped, NEVER VERIFIED.** Soccer sat at 0/18 all
+session. First attempt (`6647a975`) keyed the shard window off the overview's
+`dashboard_games` -- wrong input; soccer's overview row carries no per-game
+dates and the `odds_history_shard_window` trace logged ZERO times post-deploy.
+Second fix (`d072999c`) derives shard keys from the CANDIDATES' own game dates
+(`_supplement_odds_history_from_candidate_dates`). Deployed, unverified. To
+check: watch for the `odds_history_candidate_date_supplement` trace on
+refresh-worker, then soccer movement on the board. Underlying fact: soccer had
+399 markets under shard `2026-08-02` and 206 under `2026-08-16`, zero under
+`2026-08-04` -- odds_history shards by FIXTURE date, and soccer's board carries
+upcoming fixtures.
+
+**#4 -- non-MLB steam: fix deployed, NEVER OBSERVED.** Two real bugs fixed
+(per-sport retention `6647a975`, cross-service publish `c2e3e648`), but no
+WNBA/soccer steam has appeared. Verify in order: per-sport files
+(`reports/steam/steam_events_<sport>_<date>.json`) reach web via
+`/api/ops/artifacts/export?path=`; refresh-worker's date-scoped pull brings them
+back; board shows non-MLB steam.
+
+**#5 -- steam redesign, remaining stages.** `implied_prob_delta`,
+`implied_prob_delta_per_minute`, `books_confirming`, `books_opposing` are now
+RECORDED on every steam event and deliberately NOT enforced. Next real piece is
+the **CLV grading joiner** (steam -> closing line -> hit rate per
+sport/market/threshold); only after that should the trigger move off raw
+American-odds deltas onto probability, or start requiring N confirming books.
+Not started. Also deferred as a product call: the standalone steam lane is still
+a peer of EV-ranked bets rather than a demoted information lane.
+
+**#6 -- a web deploy silently degrades the board.** Observed 00:47:51: every
+refresh-worker pull 502'd while web redeployed (`PULL_FAILED ... 502` x11 plus
+`STREAM_PULL_FAILED` for every odds_history shard), and the board then built
+from stale local artifacts with no signal that it had. `pull_hot_artifacts` is
+best-effort by design ("a network blip just means this cycle reads stale local
+data") -- right failure mode, but it should be VISIBLE. Consider a
+stale-artifact/degraded flag in `state_meta` so such a build is identifiable
+from the served payload.
+
+**#7 -- board build cadence during a live slate.** refresh-worker went ~15
+minutes without a rebuild (`build_candidate_pool_start` last at 00:47:51) while
+the page kept showing a fresh `computed_at`. Partially mitigated by the
+read-path live-column refresh, but anything else that only updates at build time
+is equally stale mid-slate.
+
+**Operational notes (each cost real time this session):**
+- The served payload carries each candidate in SEVERAL collections
+  (`top_opportunities`, `recommendations`, `ranked_all`, `by_sport`, plus older
+  nested `response` copies). A walker that recurses everything and dedupes to
+  first-seen reads the UN-refreshed nested copy and reports a working fix as
+  broken -- this happened and produced a wrong "the fix isn't working" call.
+  Measure the collections the page actually renders.
+- `state_meta.computed_at` is web's read-time combined merge, NOT the worker's
+  board build. Never use it to decide whether new code has run; check
+  refresh-worker's own build traces.
+- Render's logs API 503s intermittently -- verify by state, not log lines.
+- `scripts/check_deploy_safety.py` is the gate. Killing an in-flight odds
+  refresh is cheap (self-heals next ~60s tick); killing a sim is not, and
+  `tip_off_window` sims chain back-to-back all evening so windows are short.
+
 ### IN PROGRESS 2026-08-04 -- Steam reworked toward a real signal layer; soccer movement fixed (code done, deploy blocked)
 
 Four shipped in code (`6647a975` + follow-up), one staged item deliberately
