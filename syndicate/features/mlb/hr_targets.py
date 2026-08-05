@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from syndicate.features.mlb.ladders_common import build_module_links
+from syndicate.features.mlb.sources import _source_roots
 from syndicate.features.mlb.sources import daily_artifact_path
 from syndicate.features.mlb.sources import daily_snapshot_oddsapi_hitter_props_path
 from syndicate.features.mlb.sources import default_mlb_source_root
@@ -17,8 +18,55 @@ from syndicate.features.mlb.sources import load_json_file
 from syndicate.features.shared.timezone import central_today
 
 
-def _statcast_features_path() -> Path:
-    return default_mlb_source_root() / "data" / "statcast" / "features" / "player_features_latest.json"
+def _statcast_features_candidates(season: int | None) -> list[Path]:
+    """Statcast feature files to try, season-matched first.
+
+    `player_features_latest.json` is NOT reliably the latest season: confirmed
+    2026-08-05 that both copies under data/mlb_source/ (the plain root and
+    source_artifacts/) are season **2025** (window 2025-03-01..2025-11-30,
+    generated 2026-05-12), while a real 2026 set exists alongside them. So the
+    HR Targets board was decorating 2026 matchups with 2025 barrel/xwOBA/
+    launch-angle numbers presented as current form.
+
+    Season-specific filenames are what build_statcast_player_feature_set.py
+    actually writes (`player_features_{season}.json`, plus the `_latest` alias),
+    so prefer those across every source root before falling back to the alias.
+    """
+    names: list[str] = []
+    if season:
+        names.append(f"player_features_{int(season)}.json")
+    names.append("player_features_latest.json")
+    candidates: list[Path] = []
+    for name in names:
+        for root in _source_roots():
+            candidates.append(root / "data" / "statcast" / "features" / name)
+    return candidates
+
+
+def _load_statcast_features(season: int | None) -> dict[str, Any]:
+    """First candidate whose payload actually matches `season`.
+
+    A season mismatch returns EMPTY rather than the wrong season's numbers.
+    These features drive the "batter xwOBA is strong at ..." matchup prose, and
+    a wrong-season stat presented as current form is worse than no stat at all
+    -- it reads as a real read on today's hitter. Callers already degrade
+    cleanly when this is empty (`_pitch_mix_context` returns {} and the row
+    simply carries no pitch-mix context).
+    """
+    for path in _statcast_features_candidates(season):
+        payload = _load_json_path(str(path))
+        if not payload:
+            continue
+        meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
+        payload_season = _safe_int(meta.get("season"))
+        if season is None or payload_season == int(season):
+            return payload
+    return {}
+
+
+def _season_for_date(value: str) -> int | None:
+    head = str(value or "").split("-", 1)[0].strip()
+    return int(head) if head.isdigit() and len(head) == 4 else None
 
 
 def _daily_snapshot_root() -> Path:
@@ -314,7 +362,7 @@ def _pitch_mix_context(selected_date: str, row: dict[str, Any]) -> dict[str, Any
     if not pitcher_profile:
         return {}
 
-    statcast_payload = _load_json_path(str(_statcast_features_path()))
+    statcast_payload = _load_statcast_features(_season_for_date(selected_date))
     batter_feature = {}
     pitcher_feature = {}
     if isinstance(statcast_payload.get("batters"), dict):

@@ -334,29 +334,50 @@ require the advanced Statcast metrics to achieve, and it does not survive
 contact with a 21% overround. Ks (5.98% hold) are break-even; HR (21.1%) is
 not close. If the goal is profitability, neither of these two markets is it.
 
-**Two real bugs found while building this, both OPEN and unfixed** (#190 and
-#191 respectively -- numbers reserved here, no separate entries; fix them
-under those IDs):
-1. `hr_targets.py:_statcast_features_path()` resolves to
-   `data/mlb_source/data/statcast/features/player_features_latest.json`,
-   which is **season 2025** (window 2025-03-01..2025-11-30, generated
-   2026-05-12) -- as is the source_artifacts copy. The 2026 set exists only
-   under `vendor/` (git-tracked, through 07-12) and as an untracked local
-   file (through 07-30). **The HR Targets board is showing 2025 Statcast for
-   2026 games.** Display-only today, but it would silently poison any model
-   wired to that path.
-2. `p_hr_1plus_cal` is a **pure passthrough** -- identical to raw
-   `p_hr_1plus` in all 3,726 served rows -- even though
-   `daily_update.py:5259` defaults `--hitter-hr-prob-calibration` to
-   `data/tuning/hitter_hr_calibration/default.json` (a real fitted
-   affine-logit, a=0.805/b=0.032, n=7470). Suspect the passthrough at
-   `daily_update.py:2149-2150`, which forwards
-   `getattr(args, "hitter_hr_prob_calibration", "") or ""` to the
-   `--workflow core` subprocesses and yields `""` when the attribute is
-   absent, so `_load_json_cfg("")` returns None. The 2026-08-01 pilot's
-   methodology note ("always check whether a raw model output has a
-   downstream calibration step") assumed this calibration was live in the
-   served artifact; on this evidence it is not.
+**#190 -- FIXED 2026-08-05: HR Targets was showing 2025 Statcast for 2026
+games.** `hr_targets.py:_statcast_features_path()` resolved to
+`player_features_latest.json`, and **both** copies under `data/mlb_source/`
+(plain root and `source_artifacts/`) are **season 2025** (window
+2025-03-01..2025-11-30, generated 2026-05-12), while real 2026 sets sit
+right next to them. The batter xwOBA / barrel / hard-hit / launch-angle
+numbers in the matchup prose were last season's, presented as current form.
+
+Replaced with `_statcast_features_candidates(season)` +
+`_load_statcast_features(season)`: prefers `player_features_{season}.json`
+across every source root before the `_latest` alias, and **a payload whose
+`meta.season` doesn't match the requested date returns EMPTY rather than the
+wrong season's numbers** -- a wrong-season stat shown as today's read is
+worse than no stat. Callers already degrade cleanly on empty. Season comes
+from the selected date via the new `_season_for_date`. Deleted the now-dead
+`_statcast_features_path`. Real effect on 2026-07-10: 23/24 targets now
+carry current-season xwOBA. 14 new tests in
+`tests/test_mlb_hr_targets_statcast.py`.
+
+**#191 -- WITHDRAWN, not a bug on the evidence.** The earlier claim here was
+that `p_hr_1plus_cal` is a silent passthrough in production. Investigated
+properly and the claim does not hold:
+- `_hr_row` (`daily_update.py:4548-4569`) does apply
+  `apply_prop_prob_calibration`, the config IS git-tracked (so it ships to
+  Render), `_load_json_cfg` resolves it relative to `_ROOT_DIR` (not CWD),
+  `daily_update_multi_profile.py` never overrides it, and the function
+  demonstrably shifts probabilities (+3 to +5pp: 0.134 -> 0.187).
+- The suspected culprit (`daily_update.py:2149-2150`) is the **prior-eval**
+  subprocess builder, not the artifact-generation path. Wrong code read.
+- The actual explanation for cal==raw in all 3,726 local rows: the
+  calibration config's own `_meta.generated_at` is **2026-07-17**, and every
+  artifact examined is 2026-06-21..07-12 -- **generated before the config
+  existed**. `_load_json_cfg` on a missing path returns None, so no
+  calibration was applied, correctly.
+- Could not confirm current behaviour from local/git (no daily_summary after
+  2026-07-12 exists in either). Production `/mlb/api/hr-targets?date=2026-08-04`
+  returns `p_hr_1plus=0.3326` with **no `p_hr_1plus_cal` field at all**,
+  because the HR-target row builder
+  (`daily_update_multi_profile.py:3358-3360`) reads `_cal` preferentially and
+  re-emits it under the plain `p_hr_1plus` key -- so the served field name
+  cannot distinguish calibrated from raw either way. Inconclusive, not broken.
+- **Still worth a real check when a post-2026-07-17 daily_summary is
+  available**: compare its `p_hr_1plus` vs `p_hr_1plus_cal` directly. Leaving
+  #191 retired rather than open, since there is no evidence of a defect.
 
 ### SUPERSEDED 2026-08-05 (#188, original framing) -- MLB HR props: Statcast features are computed and displayed but never reach the probability
 
