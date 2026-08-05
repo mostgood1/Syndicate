@@ -23,6 +23,7 @@ from syndicate.features.shared.ops_refresh import _REFRESH_WORKER_LANE_KEY
 from syndicate.features.shared.ops_refresh import _refresh_lane_key
 from syndicate.features.shared.ops_refresh import _refresh_manifest_filename
 from pipeline.intelligence_state import start_intelligence_state_background_loop
+from syndicate.features.shared.timezone import central_datetime_from_epoch
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.shared.live_refresh_loop import _run_mlb_sim_tick
 
@@ -769,6 +770,60 @@ def _evaluation_settlement_lookback_days() -> int:
     return max(1, min(60, value))
 
 
+def _evaluation_settlement_target_hour_central() -> int:
+    """Central-time hour after which the daily settlement autorun is
+    allowed to run.
+
+    Reported live 2026-08-05: settlement had last run at 21:01 CT (an
+    accident of when the interval-based gate last happened to fire), so the
+    24h-interval default meant the NEXT run wasn't due until ~21:01 the
+    following night -- hours after that morning's grading had already
+    produced fresh rows for yesterday's slate. Interval-since-last-run has
+    no concept of time of day, so "when it runs" was pure accident, not a
+    schedule.
+
+    Default 6 (6am Central): by then even a West-coast night game
+    (finishing ~11pm-1am CT) plus its resim/reconcile has had hours of
+    buffer, and settling before the board is used for the day means
+    reliability multipliers / dynamic thresholds / policy promotion from
+    yesterday's results can influence TODAY's recommendations, which is the
+    entire point of the feedback loop existing.
+    """
+    raw_value = str(os.environ.get("EVALUATION_SETTLEMENT_TARGET_HOUR_CENTRAL") or "").strip()
+    try:
+        value = int(raw_value or 6)
+    except ValueError:
+        value = 6
+    return max(0, min(23, value))
+
+
+def _evaluation_settlement_should_run_now(*, now_epoch: float, last_epoch: float) -> bool:
+    """Once per Central calendar day, at or after the target hour -- not a
+    fixed interval since the last run.
+
+    EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS, if explicitly set,
+    overrides this entirely and restores the old interval-only gate -- kept
+    for the diagnostic use this already had twice (forcing a fast cycle to
+    confirm a fix), which the once-a-day gate below cannot do quickly.
+
+    Self-catching-up by construction: if the worker was down at 6am and
+    comes up at 9am having never run today, "different Central date than
+    last run" is still true and it fires on the next tick, rather than
+    waiting for tomorrow's window.
+    """
+    if str(os.environ.get("EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS") or "").strip():
+        return last_epoch <= 0.0 or (now_epoch - last_epoch) >= float(_evaluation_settlement_interval_seconds())
+    if last_epoch <= 0.0:
+        return True
+    last_central_date = central_datetime_from_epoch(last_epoch).date()
+    now_central = central_datetime_from_epoch(now_epoch)
+    if now_central.date() == last_central_date:
+        # Already ran today (or the clock hasn't rolled to a new Central
+        # date yet since the last run) -- wait for tomorrow's window.
+        return False
+    return now_central.hour >= _evaluation_settlement_target_hour_central()
+
+
 def _evaluation_settlement_autorun_status_path() -> Path:
     return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "evaluation_settlement_autorun_status.json"
 
@@ -785,7 +840,7 @@ def _launch_autorun_evaluation_settlement(
     status_path = _evaluation_settlement_autorun_status_path()
     last_status = _refresh_state_store()["read_json_file"](status_path) or {}
     last_epoch = float((last_status or {}).get("epoch") or 0.0)
-    if last_epoch > 0.0 and (time.time() - last_epoch) < float(_evaluation_settlement_interval_seconds()):
+    if not _evaluation_settlement_should_run_now(now_epoch=time.time(), last_epoch=last_epoch):
         return False
 
     from syndicate.features.shared.evaluation_settlement import settle_ledger_for_dates

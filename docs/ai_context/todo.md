@@ -107,6 +107,94 @@ already-fixed cause. Read the diagnostic's output next time it's live and
 close this out one way or the other rather than leaving it as a dangling
 probe.
 
+### RESOLVED 2026-08-05 -- settlement's schedule itself was the bug (root cause of the PENDING CHECK below)
+
+Checked in with the user on the PENDING CHECK below at 9:52am CDT on 08-05.
+The direct answer surfaced a real scheduling defect: the autorun's last run
+was 21:01 CDT on 08-04, the interval had reverted to the 24h default (a
+concurrent session's revert of the 1h diagnostic override), and
+`time.time() - last_epoch < interval` has NO time-of-day concept -- so the
+next run wasn't due until ~21:01 CT that NIGHT, hours after that morning's
+grading had already produced a fresh row for 08-04. "When it runs" was an
+accident of when it last happened to fire, not a schedule.
+
+User's framing, verbatim and correct: *"why wouldn't we settle earlier in
+the day? We should be settling at like 6AM central so learnings can impact
+the next day."* That is the actual point of the feedback loop -- yesterday
+settled before today's board is used.
+
+Fixed: `_evaluation_settlement_should_run_now` replaces the pure interval
+check with once-per-Central-calendar-day, at or after
+`EVALUATION_SETTLEMENT_TARGET_HOUR_CENTRAL` (default 6am). Self-catches-up
+if the worker is down at 6am and comes up later -- "different Central date
+than last run" stays true until it actually runs. The old
+`EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS`, if explicitly set, still
+overrides to interval-only behaviour -- kept for the fast-diagnostic use it
+already had twice. Uses `central_datetime_from_epoch` (real timezone, not a
+fixed UTC offset) so the DST boundary is correct, verified directly against
+a January date. 10 new tests in
+`tests/test_evaluation_settlement_daily_gate.py`, including the exact
+reported scenario. `tests/test_refresh_worker.py` 33 passed, unaffected.
+
+**Separate, NOT fixed, flagged for a decision rather than silently
+changed:** grading (`reconcile_daily_sim_artifacts`) itself runs only as a
+side effect of whatever MLB sim triggers happen to fire for a date before
+`central_today_iso()` rolls to the next day -- there is no equivalent
+"finalize yesterday" step. This is very likely why 08-03's batch report
+only covered 2 of ~15 games (root-caused earlier the same day): whatever
+resim was in flight for the last game(s) when the date rolled over never
+completed grading, and nothing retries it afterward. Fixing THIS would mean
+spawning a fresh full-slate resim of the previous day every morning
+(45-55 min of real compute) purely for grading closure -- a heavier,
+costlier change than the settlement gate above, and a product decision
+(is stale-but-present grading acceptable, or is a guaranteed-complete
+morning resim worth the compute) rather than a pure bug fix. Left to the
+user/next session to decide, not bundled into this fix.
+
+### PENDING CHECK 2026-08-05 -- did settlement finally match? (one command, no code needed)
+
+Everything upstream is fixed and deployed (`98e34103`). The evaluation loop
+is waiting on ONE thing: a date that has BOTH ledger records and graded
+rows. As of 2026-08-04 21:00Z they have never overlapped:
+
+    graded rows exist for   2026-07-20 .. 2026-08-02   (historical backfill)
+    ledger records exist for 2026-08-03 .. 2026-08-04   (recording began 08-03)
+
+`unmatched_no_key_match: 0` proves the join logic works -- there is simply
+nothing to join. Once a daily cycle grades 08-03 or 08-04 (both of which
+have records), `matched` should go non-zero for the first time.
+
+**Run this:**
+
+    curl -s "$BASE/api/ops/evaluation-settlement/status" -H "Authorization: Bearer $ADMIN_TOKEN" | python -m json.tool
+
+Read `autorun_status.summary`:
+- `matched` > 0  ->  **the loop is closed end to end.** Reliability
+  multipliers, per-market dynamic thresholds, policy promotion, price CLV
+  and Kelly stake credibility begin receiving real settled data for the
+  first time. Expect a SMALL number (~14): those dates grade moneyline only
+  (1/day by the `nototals_p1_tbheavy11_r1_nohr` cap profile) and no props.
+  Enough to prove the mechanism, not enough sample for the multipliers to
+  mean anything yet.
+- `matched` still 0 AND `unmatched_no_graded_rows` still equals `pending`
+  -> grading still has not run for a date with records. Check
+  `graded_rows_available` in the same summary: it names the exact
+  sport:date keys it looked for and how many rows each had.
+- `matched` 0 but `unmatched_no_key_match` > 0 -> **different bug**, and a
+  real one: rows and records both exist but do not join. That would be the
+  first time the join itself is implicated; everything so far has been
+  coverage, not matching.
+
+**Do not re-diagnose as a date-window problem** -- the window is already 21
+days (`a9b2498a`) and confirmed covering 07-15..08-04.
+
+**Second thing to check on the same visit:** whether the props self-heal
+fired on its own overnight. `96b43120` made it run every tick, but it has
+only ever been observed working via a MANUAL force-resim. Grep
+refresh-worker logs for `BOARD_STATE_LEDGER_RECORDED` and for a sim with
+`reason=props_now_available` -- the latter appearing unattended is the
+proof that fix holds.
+
 ### RECONCILIATION 2026-08-05 (session close-out, ~01:45-04:45 CDT) -- pitcher live-lens handoff picked up, corrected, and fixed; mojibake investigated and retracted
 
 Picked up the prior session's HANDOFF #1 ("pitcher live lens: make it an

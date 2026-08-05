@@ -1,12 +1,12 @@
 {
   "sport": "mlb",
-  "last_updated": "2026-07-11T21:47:30-05:00",
+  "last_updated": "2026-08-04T22:17:56-05:00",
   "artifact_paths": [
     "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
   ],
   "status": "complete",
   "metadata": {
-    "date": "2026-07-11",
+    "date": "2026-05-22",
     "phase": "all",
     "execution_mode": "source",
     "refresh_mode": "full",
@@ -32,7 +32,7 @@
     "optional_artifact_failures": [],
     "ok": true,
     "post_refresh_ok": true,
-    "mirror_ok": null,
+    "mirror_ok": true,
     "odds_control_plane": {
       "source_precedence": [
         "shared_history",
