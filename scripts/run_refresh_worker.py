@@ -883,6 +883,22 @@ def _launch_autorun_evaluation_settlement(
         from syndicate.features.shared.intelligence_evaluation import DEFAULT_LEDGER_PATH
         from syndicate.features.shared.intelligence_evaluation import _ledger_chunk_path
 
+        # Reported live 2026-08-05: after fixing DEFAULT_LEDGER_PATH to use
+        # reports_root() (ac068787), the chunk file this SAME process wrote
+        # still resolved under /opt/render/project/src/... (the ephemeral
+        # checkout) rather than /opt/render/project/data/... (the mounted
+        # disk SYNDICATE_REPORTS_ROOT points at, confirmed set correctly via
+        # the Render env-vars API). reports_root() was verified correct in
+        # isolation with the same env var simulated locally. So something
+        # about THIS process disagrees with that isolated test -- report
+        # exactly what it sees, not what it should see.
+        chunk_diagnostics["_env_as_seen_by_process"] = {
+            "SYNDICATE_REPORTS_ROOT": os.environ.get("SYNDICATE_REPORTS_ROOT"),
+            "SYNDICATE_STATE_ROOT": os.environ.get("SYNDICATE_STATE_ROOT"),
+            "RENDER": os.environ.get("RENDER"),
+        }
+        chunk_diagnostics["_default_ledger_path_as_imported"] = str(DEFAULT_LEDGER_PATH)
+
         for chunk_date in target_dates:
             chunk_path = _ledger_chunk_path(DEFAULT_LEDGER_PATH, chunk_date)
             if not chunk_path.exists():
