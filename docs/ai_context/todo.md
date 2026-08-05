@@ -1,5 +1,51 @@
 # Syndicate TODO — canonical cross-session list
 
+### NOTE 2026-08-05 -- picked up HANDOFF #1 concurrently with another session; theirs is the resolution, this entry is a minor separate addition
+
+Started HANDOFF #1 ("pitcher live lens") independently, in parallel with the
+session recorded in the RECONCILIATION entry directly below this one. That
+session's fix is the real one -- read it first. This note exists only to
+(a) retract my own independent line of investigation cleanly, since it
+diagnosed something different and less complete, and (b) record one small,
+separate, still-open observation that survives their fix and is worth
+keeping visible.
+
+**My independent diagnosis, superseded.** Before discovering the parallel
+work, I traced the same pipeline (`_current_live_pitcher_prop_rows` ->
+`live_prop_rows_for_game` -> the live-lens tick) and, like the other session,
+confirmed the plumbing already existed -- HANDOFF #1's "structurally cannot
+see any pitcher live rows" premise was wrong. I then replayed one specific
+production snapshot (`oddsapi_pitcher_props_2026-08-04.json`, retrieved_at
+23:28 CT) and found `"pitcher_props": {}` with `events_matched: 1`, and
+initially read that as a live-odds-coverage bug blocking ALL pitcher rows.
+The other session's before/after production verification (Vásquez gaining a
+real artifact row after their fix) shows pitcher rows DO reach the artifact
+under normal operation, so a universally-empty market-lines snapshot is not
+the general case -- my one sample was likely just late-slate sparsity (most
+of that day's early games had already finished by 23:28 CT), the same
+mismatched-timestamp mistake this session's own operational notes warn
+about. Retracting the "coverage bug" framing; it was not confirmed and the
+other session's evidence argues against it being the dominant cause.
+
+**What I shipped anyway, and why it's still worth keeping.** A single
+diagnostic, no behavior change: `_diagnose_live_events_coverage`
+(`scripts/fetch_mlb_oddsapi_local.py`) writes OddsAPI's raw/date-filtered
+event counts alongside MLB's own schedule-derived live count (an independent
+source, already-cached local read, zero extra API calls) to
+`reports/mlb_odds_diag/live_events_coverage_<date>.json` on every
+`_fetch_live_events_for_date` call, now allowlisted for cross-service reach.
+This targets a DIFFERENT code path than the one the other session fixed --
+the pitcher/hitter MARKET-LINES odds snapshot's own event coverage, not
+`_current_live_pitcher_prop_rows`'s per-pitcher market cap -- so it does not
+duplicate or conflict with their work (confirmed: rebased onto their commits
+with zero conflicts). Whether the underlying question (is OddsAPI's live
+in-play event coverage ever genuinely thin mid-slate, in a way that starves
+that specific snapshot) is worth chasing further is now LOW priority given
+the actual board gap it was investigating turned out to have a different,
+already-fixed cause. Read the diagnostic's output next time it's live and
+close this out one way or the other rather than leaving it as a dangling
+probe.
+
 ### RECONCILIATION 2026-08-05 (session close-out, ~01:45-04:45 CDT) -- pitcher live-lens handoff picked up, corrected, and fixed; mojibake investigated and retracted
 
 Picked up the prior session's HANDOFF #1 ("pitcher live lens: make it an
