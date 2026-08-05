@@ -40,8 +40,10 @@ from syndicate.features.wnba.sources import available_dates as wnba_available_da
 from syndicate.features.wnba.sources import build_module_links as build_wnba_module_links
 from syndicate.features.wnba.cards import get_wnba_overview
 from syndicate.features.nfl.sources import build_module_links as build_nfl_module_links
+from syndicate.features.nfl.sources import build_preseason_module_links
 from syndicate.features.nfl.sources import default_week as nfl_default_week
 from syndicate.features.nfl.sources import latest_season as nfl_latest_season
+from syndicate.features.nfl.sources import preseason_target_week
 from syndicate.features.nfl.sources import tracked_week as nfl_tracked_week
 from syndicate.features.nfl.sources import week_summaries as nfl_week_summaries
 from syndicate.features.ncaaf.sources import build_module_links as build_ncaaf_module_links
@@ -6231,22 +6233,49 @@ def _build_sport_overview(
         ]
     elif slug == "nfl":
         season = nfl_latest_season()
-        tracked = nfl_tracked_week() or {}
-        # Schedule-driven default_week() outranks the tracked
-        # current_week.json: the tracked file is rewritten by the odds
-        # refresh itself, so preferring it pinned the Layer 2 NFL context
-        # to whatever week the file last held (a week-1 fixed point at
-        # season start). The tracked value is only a last resort when the
-        # schedule/projection artifacts are absent entirely.
-        selected_week = int(nfl_default_week(season) or tracked.get("week") or 1)
-        links = build_nfl_module_links(selected_week, "Cards", season=season)
-        context_label = f"{season} Week {selected_week}"
-        primary_href = f"/nfl?season={season}&week={selected_week}"
-        overview_stats = [
-            {"label": "Season", "value": str(season)},
-            {"label": "Week", "value": str(selected_week)},
-            {"label": "Snapshots", "value": str(len(nfl_week_summaries()))},
-        ]
+        # default_week()/nfl_target_week() both say "week 1" as soon as the
+        # regular season is next up -- true even while we're still
+        # genuinely in preseason (no regular-season game has been played
+        # yet either way), so week number alone can't distinguish the two.
+        # preseason_target_week() is the real signal: non-None means there
+        # is still a real, unplayed preseason game on the schedule, so
+        # preseason is the CURRENT phase, not "week 1 imminent." Confirmed
+        # live: without this, this branch always fell through to week 1
+        # regardless of season phase, which set context.week to a non-None
+        # regular-season value everywhere downstream (this dict's own
+        # nav/context_label AND, critically, _NFLDataProvider.games()'s own
+        # context.week is None gate for real preseason games) -- so
+        # preseason games never reached the Layer 2 board even once
+        # everything else (odds, resim autorun, the translator itself) was
+        # wired and confirmed working in isolation.
+        preseason_week = preseason_target_week(season)
+        if preseason_week is not None:
+            selected_week = None
+            links = build_preseason_module_links(preseason_week, "Preseason Cards", season=season)
+            context_label = f"{season} Preseason"
+            primary_href = f"/nfl/preseason/cards?season={season}&week={preseason_week}"
+            overview_stats = [
+                {"label": "Season", "value": str(season)},
+                {"label": "Phase", "value": "Preseason"},
+                {"label": "Snapshots", "value": str(len(nfl_week_summaries()))},
+            ]
+        else:
+            tracked = nfl_tracked_week() or {}
+            # Schedule-driven default_week() outranks the tracked
+            # current_week.json: the tracked file is rewritten by the odds
+            # refresh itself, so preferring it pinned the Layer 2 NFL context
+            # to whatever week the file last held (a week-1 fixed point at
+            # season start). The tracked value is only a last resort when the
+            # schedule/projection artifacts are absent entirely.
+            selected_week = int(nfl_default_week(season) or tracked.get("week") or 1)
+            links = build_nfl_module_links(selected_week, "Cards", season=season)
+            context_label = f"{season} Week {selected_week}"
+            primary_href = f"/nfl?season={season}&week={selected_week}"
+            overview_stats = [
+                {"label": "Season", "value": str(season)},
+                {"label": "Week", "value": str(selected_week)},
+                {"label": "Snapshots", "value": str(len(nfl_week_summaries()))},
+            ]
     elif slug == "ncaaf":
         season = ncaaf_default_season()
         selected_week = ncaaf_default_week()
