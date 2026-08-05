@@ -1624,3 +1624,91 @@ class SteamEventsCrossServicePublishTests(unittest.TestCase):
         from syndicate.features.shared.odds_refresh_tracking import steam_events_path_for_sport
 
         self.assertIn("2026-08-04", steam_events_path_for_sport("wnba", "2026-08-04").name)
+
+
+class SoccerPropRowOddsHistoryCoverageTests(unittest.TestCase):
+    """Traces exactly where a real soccer player-prop row goes missing.
+
+    Board investigation (2026-08-05) found soccer's odds_history shards hold
+    ZERO player-prop markets on every date checked -- only h2h/totals/spreads
+    -- despite fetch_soccer_oddsapi_props_local.py's real, present output
+    (confirmed via /api/ops/artifacts/export against production:
+    soccer_source/mls/props/2026-08-05.csv, 785 real rows). Reproduces the
+    EXACT real row shape (an "Anytime Goalscorer" market: no numeric "line"
+    at all, priced only on "over_price" -- a binary yes/no market) end to
+    end through the real sync entrypoint, to settle -- locally, before any
+    deploy -- whether the row is written, and if not, at which gate.
+    """
+
+    REAL_SHAPE_ROW = (
+        "league,player,market,market_key,line,over_price,under_price,book,event,event_id,game_time,home_team,away_team\n"
+        "mls,Carles Gil,Anytime Goalscorer,player_goal_scorer_anytime|carles_gil,,550,,draftkings,"
+        "Houston Dynamo @ New England Revolution,665b6a3861ae02435e47693dfecb6717,2026-08-08T20:30:00Z,"
+        "New England Revolution,Houston Dynamo\n"
+    )
+
+    def test_a_real_anytime_goalscorer_row_reaches_the_odds_history_shard(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict(
+            "os.environ", {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports")}, clear=False
+        ):
+            root = Path(tmpdir)
+            props_dir = root / "mls" / "props"
+            props_dir.mkdir(parents=True)
+            (props_dir / "2026-08-05.csv").write_text(self.REAL_SHAPE_ROW, encoding="utf-8")
+
+            result = sync_post_refresh_tracking_for_source_root(sport="soccer", source_root=root, date_str="2026-08-05")
+
+            self.assertTrue(result["ok"])
+            odds_history = result["artifacts"]["odds_history"]
+            self.assertTrue(odds_history["ok"], odds_history)
+            self.assertGreaterEqual(odds_history["entries_appended"], 1, odds_history)
+
+            status_path = root / "reports" / "refresh_status" / "latest" / "odds_history_prop_row_coverage_status.json"
+            self.assertTrue(status_path.exists(), "prop-row coverage diagnostic was not written")
+            status_payload = json.loads(status_path.read_text(encoding="utf-8"))
+            self.assertIn("soccer", status_payload)
+            candidates = status_payload["soccer"]["candidates"]
+            props_candidate = next(v for k, v in candidates.items() if k.replace("\\", "/").endswith("props/2026-08-05.csv"))
+            self.assertEqual(props_candidate["rows_read"], 1)
+            self.assertEqual(props_candidate["rows_gate_passed"], 1, props_candidate)
+            self.assertEqual(props_candidate["rows_written"], 1, props_candidate)
+            # game_time is 2026-08-08 -- the row's own fixture date, not the
+            # 2026-08-05 refresh date -- so it must land in that shard.
+            self.assertIn("2026-08-08", props_candidate["shard_keys_written"])
+
+            shard_path = Path(odds_history["shared_history_path"])
+            self.assertTrue(shard_path.exists(), f"shard for the row's own fixture date was not written: {shard_path}")
+            shard_payload = json.loads(shard_path.read_text(encoding="utf-8"))
+            markets = shard_payload.get("markets") or {}
+            self.assertTrue(
+                any("goal_scorer" in key.lower() or "carles" in key.lower() for key in markets),
+                f"no goalscorer/player market key in shard: {list(markets)}",
+            )
+
+    def test_the_endpoint_reports_it_back(self) -> None:
+        # Read-path sanity: the write above is only useful if the ops
+        # endpoint (api_ops_odds_history_prop_row_coverage) can read it back,
+        # same date-honesty contract as matchup-coverage.
+        from syndicate.app import create_app
+
+        with tempfile.TemporaryDirectory() as tmpdir, patch.dict(
+            "os.environ",
+            {"SYNDICATE_REPORTS_ROOT": str(Path(tmpdir) / "reports"), "ADMIN_TOKEN": "secret-token"},
+            clear=False,
+        ):
+            root = Path(tmpdir)
+            props_dir = root / "mls" / "props"
+            props_dir.mkdir(parents=True)
+            (props_dir / "2026-08-05.csv").write_text(self.REAL_SHAPE_ROW, encoding="utf-8")
+            sync_post_refresh_tracking_for_source_root(sport="soccer", source_root=root, date_str="2026-08-05")
+
+            app = create_app()
+            app.testing = True
+            client = app.test_client()
+            response = client.get(
+                "/api/ops/odds-history/prop-row-coverage?sport=soccer",
+                headers={"Authorization": "Bearer secret-token"},
+            )
+            self.assertEqual(response.status_code, 200)
+            payload = response.get_json()
+            self.assertIn("soccer", payload["by_sport"])

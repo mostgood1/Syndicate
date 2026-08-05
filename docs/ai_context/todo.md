@@ -1,5 +1,59 @@
 # Syndicate TODO — canonical cross-session list
 
+### TRACED 2026-08-05 -- soccer props before the odds_history write: the code is NOT the bug, reproduced locally
+
+Follow-up to "FOUND 2026-08-05" below: traced every gate between reading a
+soccer player-prop CSV row and writing it into an odds_history shard, per
+explicit user request to trace it before the write.
+
+**Reproduced the exact real-world row shape end to end, locally, before any
+deploy.** Built a fixture matching production's actual
+`soccer_source/mls/props/<date>.csv` shape precisely -- an "Anytime
+Goalscorer" row with market_key=`player_goal_scorer_anytime|...`, blank
+`line` (this market has none, it is binary yes/no), priced only on
+`over_price` -- and ran it through the real
+`sync_post_refresh_tracking_for_source_root(sport="soccer", ...)`
+entrypoint. Result: `rows_read=1, rows_gate_passed=1, rows_written=1,
+shard_keys_written={"2026-08-08": 1}` (2026-08-08 is the row's own
+`game_time`, correctly resolved, not the 2026-08-05 refresh date), and the
+shard file on disk genuinely contains the goalscorer market key afterward.
+**Every gate passes. The code writes the row correctly.** This settles the
+"is it a write-gate bug" question definitively rather than by further
+static reading -- confirmed by running the real code against the real row
+shape, not by inference.
+
+Added two things, both now committed:
+1. A persisted diagnostic in `_sync_odds_history_for_refresh` itself
+   (`odds_refresh_tracking.py`): for every candidate file under a `props/`
+   path segment, counts rows_read / rows_gate_passed (with a breakdown of
+   which field failed when it didn't) / rows_written / shard_keys_written,
+   written to `reports/refresh_status/latest/odds_history_prop_row_coverage_status.json`
+   via the same keyvalue-backed write the existing h2h-matchup-coverage
+   diagnostic already uses (chosen over another print: Render's log API
+   returned zero hits twice this session for print-only traces that
+   definitely fired).
+2. `GET /api/ops/odds-history/prop-row-coverage` (`?sport=`, `?date=`) to
+   read it back cross-service, same date-honesty contract fixed earlier
+   this session for matchup-coverage (a mismatched date is reported as a
+   mismatch, not silently answered as if it matched).
+2 new tests, including one that locks the local reproduction in as a
+regression test (a future change that reintroduces a write-gate bug for
+line-less markets will fail it).
+
+**Since the code is proven correct, the remaining gap is NOT "why does the
+write drop these rows" -- it does not. It is now: does
+`_sync_odds_history_for_refresh(sport="soccer", ...)` actually RUN against
+CURRENT props data in production, and how often. Read
+`GET /api/ops/odds-history/prop-row-coverage?sport=soccer` next time
+soccer's odds refresh has genuinely run today -- if `rows_written` there is
+also >0 (matching this local proof), the shard should show player-prop
+markets and the original "soccer movement is zero" symptom should already
+be resolved by nothing more than this diagnostic existing to confirm it;
+if the endpoint reports NOTHING for soccer at all, that points at a
+scheduling/cadence gap (soccer's odds-refresh trigger, or which service
+runs it and how often) rather than anything in this write path.** Not yet
+deployed or checked against a live production run this session.
+
 - **Closed: `task_b4637457`** (filed and closed same day) — the "still
   open" WNBA CI test-order-pollution + empty-slate-message item flagged in
   the session-close-out entry below ("What's genuinely still open" #4).

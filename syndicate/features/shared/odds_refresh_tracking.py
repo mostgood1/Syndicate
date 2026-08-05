@@ -1395,12 +1395,46 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             shard_entries_appended[shard_key] = 0
         return shards[shard_key]
 
+    # Prop-row diagnostic (2026-08-05): soccer's odds_history shards were
+    # found to hold zero player-prop markets on every date checked (only
+    # h2h/totals/spreads), despite the props CSV (fetch_soccer_oddsapi_props_local.py,
+    # confirmed present with real rows via /api/ops/artifacts/export) being
+    # among this function's own candidate paths for soccer
+    # (_odds_history_snapshot_paths' `add(league_dir.name, "props", ...)`
+    # branch). Static read of every gate between "row read" and "row
+    # written" (_odds_history_market_key/_odds_history_line_snapshot/
+    # _primary_line_value, the dedupe check, the shard write) found nothing
+    # that should drop these rows -- market_key comes straight from the
+    # CSV's own "market_key" column, and _primary_line_value's fallback
+    # chain reaches "over_price" when "line" is blank (true for every
+    # "Anytime Goalscorer" row, a binary yes/no market with no numeric
+    # line), so all three gates should pass. Rather than keep guessing,
+    # count every candidate ".../props/*.csv" file's rows through each real
+    # checkpoint and persist it -- Render's log API has twice this session
+    # returned zero hits for print-only traces that definitely fired
+    # (odds_history_h2h_matchup_coverage's own history), so this uses the
+    # same keyvalue-backed write already proven working for that endpoint,
+    # not another print.
+    prop_diag_candidates: dict[str, dict[str, Any]] = {}
+
     for candidate in candidates:
         files_scanned += 1
         suffix = candidate.suffix.lower()
         candidate_snapshot_ts = _odds_history_candidate_snapshot_ts(candidate)
         _trace_log("before_odds_history_candidate_read", sport=slug, path=str(candidate), suffix=suffix, size_bytes=_trace_file_size(candidate))
         candidate_read_started = time.perf_counter()
+        is_prop_candidate = "props" in candidate.parts
+        prop_diag_entry: dict[str, Any] | None = None
+        if is_prop_candidate:
+            prop_diag_entry = {
+                "path": str(candidate.relative_to(source_root)) if source_root in candidate.parents else str(candidate),
+                "rows_read": 0,
+                "rows_gate_passed": 0,
+                "rows_gate_failed_reason": {},
+                "rows_written": 0,
+                "shard_keys_written": {},
+            }
+            prop_diag_candidates[prop_diag_entry["path"]] = prop_diag_entry
         mlb_props_root_key = _mlb_props_root_key_for_path(candidate) if slug == "mlb" else None
         if mlb_props_root_key:
             # oddsapi_hitter_props/oddsapi_pitcher_props are nested TWO
@@ -1432,6 +1466,8 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
         else:
             rows = _odds_history_rows_from_json(candidate)
         _trace_log("after_odds_history_candidate_read", sport=slug, path=str(candidate), suffix=suffix, size_bytes=_trace_file_size(candidate), rows=int(len(rows)), elapsed_ms=round((time.perf_counter() - candidate_read_started) * 1000, 3))
+        if prop_diag_entry is not None:
+            prop_diag_entry["rows_read"] = int(len(rows))
         if not rows:
             continue
 
@@ -1445,7 +1481,12 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             line_snapshot = _odds_history_line_snapshot(row)
             current_line = _primary_line_value(row)
             if not market_key or not line_snapshot or current_line is None:
+                if prop_diag_entry is not None:
+                    reason = "market_key" if not market_key else ("line_snapshot" if not line_snapshot else "current_line")
+                    prop_diag_entry["rows_gate_failed_reason"][reason] = int(prop_diag_entry["rows_gate_failed_reason"].get(reason, 0)) + 1
                 continue
+            if prop_diag_entry is not None:
+                prop_diag_entry["rows_gate_passed"] += 1
             if matchup_label:
                 h2h_matchups_passed_gate.add(matchup_label)
             current_odds = _primary_odds_value(row)
@@ -1463,6 +1504,14 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             seen_market_keys.add(market_key)
             if matchup_label:
                 h2h_matchups_written.add(matchup_label)
+            if prop_diag_entry is not None:
+                # Counted here, unconditionally past the gate/dedupe checks --
+                # from this point the row lands in SOME shard's markets dict
+                # either way, whether or not the branch below appends a new
+                # history entry (an unchanged-since-last-tick row still
+                # writes markets[market_key], just with no new entry).
+                prop_diag_entry["rows_written"] += 1
+                prop_diag_entry["shard_keys_written"][shard_key] = int(prop_diag_entry["shard_keys_written"].get(shard_key, 0)) + 1
 
             market_state = markets.get(market_key)
             if not isinstance(market_state, dict):
@@ -1897,6 +1946,31 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
             _write_status(status_path, existing)
         except Exception as exc:
             _trace_log("odds_history_h2h_matchup_coverage_status_write_failed", sport=slug, error=f"{type(exc).__name__}: {exc}")
+    if prop_diag_candidates:
+        _trace_log(
+            "odds_history_prop_row_coverage",
+            sport=slug,
+            date=date_str,
+            candidates={path: {k: v for k, v in entry.items() if k != "path"} for path, entry in prop_diag_candidates.items()},
+        )
+        try:
+            from syndicate.features.shared.refresh_state_store import reports_root as _reports_root
+            from syndicate.features.shared.refresh_state_store import write_json_file as _write_status
+
+            status_path = _reports_root() / "refresh_status" / "latest" / "odds_history_prop_row_coverage_status.json"
+            existing = {}
+            try:
+                from syndicate.features.shared.refresh_state_store import read_json_file as _read_status
+
+                existing = _read_status(status_path) or {}
+            except Exception:
+                existing = {}
+            if not isinstance(existing, dict):
+                existing = {}
+            existing[slug] = {"date": date_str, "updated_at": now, "candidates": prop_diag_candidates}
+            _write_status(status_path, existing)
+        except Exception as exc:
+            _trace_log("odds_history_prop_row_coverage_status_write_failed", sport=slug, error=f"{type(exc).__name__}: {exc}")
     return {
         "ok": True,
         "skipped": False,

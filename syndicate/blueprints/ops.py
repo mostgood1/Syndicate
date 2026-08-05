@@ -831,6 +831,56 @@ def api_ops_odds_history_matchup_coverage() -> Any:
     })
 
 
+@ops_bp.get("/api/ops/odds-history/prop-row-coverage")
+def api_ops_odds_history_prop_row_coverage() -> Any:
+    # Read-only. Diagnostic for todo.md's "soccer movement is zero -- no
+    # player-prop markets in odds_history at all" finding. Every gate
+    # between reading a props CSV row and writing it into a shard
+    # (_sync_odds_history_for_refresh, odds_refresh_tracking.py) was traced
+    # by reading the code and found to pass for soccer's "Anytime
+    # Goalscorer" rows -- market_key comes straight from the CSV's own
+    # market_key column, and _primary_line_value's fallback chain reaches
+    # over_price when the market has no numeric line. Rather than keep
+    # guessing from source, this counts every ".../props/*.csv" candidate's
+    # rows through each real checkpoint (rows_read, rows_gate_passed with a
+    # breakdown of WHICH field failed when it didn't, rows_written, and
+    # which shard_key each write landed in) and persists it -- same
+    # keyvalue-backed status file as matchup-coverage above, for the same
+    # reason: this diagnostic needs to answer from whichever service ran
+    # the refresh, not just the one this request happens to hit.
+    #
+    # Same date-honesty contract as matchup-coverage: the stored record is
+    # last-write-only (one file, keyed by sport), so a requested ?date= that
+    # does not match what is actually stored is reported as a mismatch, not
+    # silently answered as if it matched.
+    status_path = reports_root() / "refresh_status" / "latest" / "odds_history_prop_row_coverage_status.json"
+    by_sport = read_json_file(status_path) or {}
+    if not isinstance(by_sport, dict):
+        by_sport = {}
+
+    requested_sport = str(request.args.get("sport") or "").strip().lower()
+    if requested_sport:
+        by_sport = {key: value for key, value in by_sport.items() if str(key).strip().lower() == requested_sport}
+
+    requested_date = str(request.args.get("date") or "").strip()
+    reported_dates = sorted(
+        {str(value.get("date") or "") for value in by_sport.values() if isinstance(value, dict) and value.get("date")}
+    )
+    matches_requested_date = None
+    if requested_date:
+        matches_requested_date = bool(reported_dates) and all(date == requested_date for date in reported_dates)
+
+    return jsonify({
+        "ok": True,
+        "by_sport": by_sport,
+        "requested_sport": requested_sport or None,
+        "requested_date": requested_date or None,
+        "reported_dates": reported_dates,
+        "matches_requested_date": matches_requested_date,
+        "source": "last_refresh_write_only",
+    })
+
+
 @ops_bp.post("/api/ops/bootstrap/run")
 def api_ops_bootstrap_run() -> Any:
     # Calls _sync_bootstrap_roots directly (not main(), which only ever
