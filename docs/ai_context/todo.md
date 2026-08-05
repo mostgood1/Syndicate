@@ -280,7 +280,83 @@ CLV rather than hit rate -- if the model can't clear 51.5% out-of-sample,
 the SO thread's conclusion is "correct model, unprofitable market," and
 effort should move to markets with better hold or weaker pricing.
 
-### OPEN 2026-08-05 (#188) -- MLB HR props: Statcast features are computed and displayed but never reach the probability
+### ANSWERED 2026-08-05 (#188) -- A dedicated HR model DOES beat the sim, the Statcast features DON'T help leak-free, and the market is unbeatable at +21% overround
+
+Built and graded the dedicated HR model the user asked for. Dataset:
+**3,215 batter-games, 15 dates (2026-06-21..07-12), 418 HR games (13.00%)**,
+built from git-tracked production artifacts only -- v4 roster_objs for
+point-in-time 2026 batter/pitcher profiles, flat snapshots for park/weather
+multipliers, the sim's own `hitter_hr_likelihood_all` rows for the baseline,
+and cached StatsAPI `feed/live` boxscores for the target. 5-fold GroupKFold
+**by date**; all figures are pooled out-of-fold.
+(scratchpad: `build_hr_dataset.py`, `train_hr_model.py`)
+
+**Probabilistic accuracy -- the model wins, but NOT because of Statcast:**
+
+| variant | Brier | logloss | AUC |
+|---|---|---|---|
+| sim served (`p_hr_1plus`) | 0.11523 | 0.40083 | 0.5645 |
+| model, sim-side features only | **0.11246** | **0.38346** | 0.5735 |
+| model + 2025 Statcast (leak-free) | 0.11311 | 0.38644 | 0.5579 |
+| model + 2026 Statcast (leaky UB) | 0.11089 | 0.37754 | 0.6208 |
+
+**The leakage split is the whole story.** The only current-season Statcast
+set in git (`vendor/.../player_features_2026.json`) has window
+**2026-03-11..2026-07-12**, which OVERLAPS every game date here -- a
+batter's barrel rate includes the game being predicted. With it, AUC jumps
+0.5645 -> 0.6208. With the strictly prior-season 2025 set (zero leakage),
+Statcast makes things **worse** than using no Statcast at all (0.5579 vs
+0.5735). So the advanced-metrics gain is not demonstrated.
+**Important**: 2025 is both leak-free AND stale, so this does not *disprove*
+that current-season Statcast helps -- it means the question is still
+untested, and testing it needs a point-in-time feature set computed as-of
+each game date (excluding that date), which does not exist on disk.
+
+**Profitability -- the market is the wall, exactly as feared.** HR props are
+single-sided (over only, no de-vig), so this is flat-stake ROI at the real
+offered price, betting only positive-EV rows. On the 2,228 priced rows:
+actual HR rate **13.55%** vs mean vigged implied **16.42%** = **+21.1%
+overround** (vs 5.98% two-sided hold on K lines).
+
+| variant | edge>0 | edge>2pt | edge>5pt |
+|---|---|---|---|
+| model + 2025 Statcast (leak-free) | -11.1% (n=474) | -9.5% (n=261) | -3.6% (n=76) |
+| model + 2026 Statcast (leaky UB) | +7.3% (n=541) | +1.9% (n=358) | -12.2% (n=180) |
+| sim served | +39.0% (n=50) | +78.6% (n=14) | -100% (n=2) |
+
+The sim's +39%/+78.6% is **noise, not an edge** -- n=14 at a 13% base rate
+is a handful of lucky hits. Every honest variant loses money, and even the
+leakage-assisted upper bound only reaches break-even.
+
+**Bottom line for the user's original question**: separating HR modelling
+out is a real but small accuracy win (Brier 0.11523 -> 0.11246), it does NOT
+require the advanced Statcast metrics to achieve, and it does not survive
+contact with a 21% overround. Ks (5.98% hold) are break-even; HR (21.1%) is
+not close. If the goal is profitability, neither of these two markets is it.
+
+**Two real bugs found while building this** (both filed as #190/#191):
+1. `hr_targets.py:_statcast_features_path()` resolves to
+   `data/mlb_source/data/statcast/features/player_features_latest.json`,
+   which is **season 2025** (window 2025-03-01..2025-11-30, generated
+   2026-05-12) -- as is the source_artifacts copy. The 2026 set exists only
+   under `vendor/` (git-tracked, through 07-12) and as an untracked local
+   file (through 07-30). **The HR Targets board is showing 2025 Statcast for
+   2026 games.** Display-only today, but it would silently poison any model
+   wired to that path.
+2. `p_hr_1plus_cal` is a **pure passthrough** -- identical to raw
+   `p_hr_1plus` in all 3,726 served rows -- even though
+   `daily_update.py:5259` defaults `--hitter-hr-prob-calibration` to
+   `data/tuning/hitter_hr_calibration/default.json` (a real fitted
+   affine-logit, a=0.805/b=0.032, n=7470). Suspect the passthrough at
+   `daily_update.py:2149-2150`, which forwards
+   `getattr(args, "hitter_hr_prob_calibration", "") or ""` to the
+   `--workflow core` subprocesses and yields `""` when the attribute is
+   absent, so `_load_json_cfg("")` returns None. The 2026-08-01 pilot's
+   methodology note ("always check whether a raw model output has a
+   downstream calibration step") assumed this calibration was live in the
+   served artifact; on this evidence it is not.
+
+### SUPERSEDED 2026-08-05 (#188, original framing) -- MLB HR props: Statcast features are computed and displayed but never reach the probability
 
 The other half of the user's original question. The 2026-08-01 pilot
 already tested a dedicated HR model and it **lost** (Brier 0.1000 sim vs
