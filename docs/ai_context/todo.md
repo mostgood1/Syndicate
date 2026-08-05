@@ -1,5 +1,79 @@
 # Syndicate TODO — canonical cross-session list
 
+### RECONCILIATION 2026-08-05 (NFL: real preseason support -- schedule, depth-chart context, shrinkage-based model)
+
+Real 2026 NFL preseason starts this week (Hall of Fame Game Aug 7); user
+wanted the UI functional on it now plus a genuinely preseason-aware
+model, as season prep. Two prior bugs surfaced and fixed first (see the
+"still 2025 data" / "no logos" entries earlier this session, not
+duplicated here): the answer was real, deployed, and confirmed working
+before this preseason work started.
+
+**Confirmed structural, not fixable by more ingestion effort**: nflverse
+-- this repo's entire NFL data backbone -- has zero preseason data of
+any kind (schedule, scores, pbp), verified live against the real
+nflverse `games.csv` release for both 2025 and 2026: only
+`REG`/`WC`/`DIV`/`CON`/`SB` game types ever appear, `PRE` never does.
+ESPN's public scoreboard API does have it (verified live: real 2026
+schedule, Hall of Fame Weekend through Preseason Week 3, ESPN's own
+`week.number` 1-4 already correctly bucketed) -- reused via this
+codebase's existing `_fetch_espn_football_schedule` pattern
+(`syndicate/features/shared/schedule_adapter.py`), same no-custom-
+User-Agent gotcha as everywhere else ESPN is hit from Render.
+
+**Shipped, fully separate from the regular season** (own file prefix,
+route family `/nfl/preseason`, closed week domain 1-4 -- interleaving
+into the regular-season week domain hits real landmines already
+documented in this file: falsy-0 bug, negative-week filtering,
+chronological misorder of a numeric-offset scheme):
+- `scripts/fetch_nfl_preseason_schedule.py` -- real ESPN schedule fetch.
+- `syndicate/features/nfl/preseason_depth.py` -- real depth-chart-informed
+  likely-snap-leaders/starters-sitting context. Deliberately does NOT
+  reuse `injury_adjustment.py`'s per-player EPA substitution (checked:
+  most preseason-relevant players, depth_rank 3+, have no real EPA
+  history to substitute in -- would silently no-op while looking like
+  modeling).
+- `syndicate/features/nfl/preseason_projection.py` +
+  `scripts/generate_smartsim2_nfl_preseason_projections.py` -- anchored
+  on real prior-season team ratings (reuses `team_rating()` unmodified),
+  real documented shrinkage-toward-league-neutral + widened stdev scaled
+  by each real preseason week's expected non-starter participation
+  share -- honest uncertainty disclosure instead of false precision.
+- `syndicate/features/nfl/preseason_cards.py` -- mirrors
+  `_game_from_smartsim_projection`, including top-level away/home
+  `logo_url`/`primary_color`/`secondary_color` (the exact field-omission
+  class that broke NCAAF's equivalent function in production earlier
+  this session -- checked explicitly, not repeated).
+- New `/nfl/preseason` routes + hub link.
+
+**Backtested honestly** (`scripts/backtest_nfl_preseason_projection.py`,
+140 real completed preseason games, 2023-2025, real ESPN final scores):
+plain prior-season rating 73/140 (52.1%) vs shrunk 71/140 (50.7%) -- a
+2-game difference, well within noise for this sample size (unlike the
+injury-adjustment backtest's clear, decisive gap recorded earlier this
+session). Shrinkage's real purpose (uncertainty communication via
+probability compression + widened stdev, not raw pick accuracy) is
+independent of this metric, so kept enabled rather than defaulted off --
+noted transparently rather than omitted, same discipline as the injury
+adjustment finding.
+
+Real data landed: 2026 schedule + all 4 real preseason weeks generated
+(week 1 has only the Hall of Fame Game as of this session, more will
+appear as ESPN's real schedule fills in); historic 2023-2025 schedules +
+projections backfilled for the backtest above. 302 tests pass (254
+NFL-scoped + 48 new). Two commits (`4b7bc046` code+tests, `1c7162e8`
+data) -- not yet deployed to Render (this session did not push or
+trigger a deploy; the earlier "still 2025 data"/"no logos" fixes
+earlier this session were already deployed and confirmed live
+separately).
+
+**Still open**: `/nfl/preseason` is reachable and correct locally but
+not yet verified live on Render (needs a push + deploy, and the usual
+in-flight-sim check first per the deploy-kills-inflight-sim rule).
+NCAAF has no equivalent preseason work -- not requested this session,
+and CFBD/college football's true preseason (spring games, etc.) is a
+different, not-yet-scoped problem if ever wanted.
+
 ### TRACED 2026-08-05 -- soccer props before the odds_history write: the code is NOT the bug, reproduced locally
 
 Follow-up to "FOUND 2026-08-05" below: traced every gate between reading a
