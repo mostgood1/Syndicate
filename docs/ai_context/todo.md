@@ -1,5 +1,68 @@
 # Syndicate TODO — canonical cross-session list
 
+### OPEN 2026-08-01 (#185) -- WNBA Layer 2 board: live-game projections/actuals alignment + possible prop dedup issue, investigation started but NOT root-caused (session ended on interrupt)
+
+User: "this still isn't working check layer 2 board for wnba active now with
+a live game", then "specifically the projections and live actuals alignment
+and dedup". This is a separate report from #184 below (Ask the Syndicate) --
+likely a recurrence/continuation of earlier Layer 2 WNBA work referenced
+elsewhere in this file ("Layer 2 board: MLB live-status dedup fix + WNBA
+game/prop wiring, Phase A-C", "Layer 2 live-candidate-stuck-at-pregame bug",
+"Layer 2 board blanks audit" -- search this file for "Layer 2" for that
+history; not cross-checked against this report yet).
+
+**No root cause found. No code read on this path yet** -- session was
+interrupted mid-investigation, right after pulling one live repro from
+production. Recorded here so the repro isn't lost.
+
+**Live repro** (captured 2026-08-01 ~13:35 CT, LVA @ CHI in progress, 3rd
+quarter): `GET /wnba/api/live_state` showed `away_pts=54, home_pts=46,
+clock="3:28", period=3` for `event_id=401857105`
+(`gamePk="0d113b66ed1649d47506a6434e06bd1b6"`). Seconds later,
+`POST /api/intelligence/query {"question":"best bets today","sport":"wnba"}`
+returned candidates for that same game whose `status_display` read
+`"58-48 | 2:04 - 3rd"` -- a different score AND a later clock reading than
+the live_state call moments before. Could just be normal same-game
+progression between two calls a few seconds apart (not yet ruled out) or
+could be a real staleness/alignment bug between whatever feeds
+`status_display` on Layer 2 cards and the live_state endpoint -- **not
+distinguished, needs a same-instant paired fetch** (see
+[[feedback_measure_same_instant]] discipline -- this repro violated it by
+using two sequential calls).
+
+**Possible dedup issue spotted, not confirmed real**: among the WNBA
+candidates for this game, two rows for what looks like the same market:
+- `candidate_id cand_44f3d0fe68938052`: player=`"Jackie Young"` (clean
+  name), team=LVA, market=`"pa"`, line=27.5, projected=20.3,
+  live_projection=28.1, actual=`"19"`, edge=0.1295.
+- `candidate_id cand_b88d5e3eb1e50395`: player=`"Jackie Young UNDER 27.5
+  PTS+AST"` (market baked into the name field, inconsistent with the
+  sibling row above), team=LVA, market=`"Pa"` (case differs from `"pa"`
+  above -- worth checking if these are being treated as the same market
+  key or two different ones downstream), line=27.5, projected=20.3,
+  live_projection=`"-"`, actual=`"-"`, edge=0.0005.
+
+Open questions for whoever picks this up: (1) is the second row a duplicate
+of the first, or intentionally the OVER/UNDER opposite side represented as
+a separate candidate -- if the latter, is baking the side into the `player`
+field on only ONE of the pair the actual bug (display inconsistency), not
+duplication itself? (2) why does one side have real `live_projection`/
+`actual` values and the other has `"-"` for both, for the same
+player/market/line? (3) is `actual="19"` even correct for a PTS+AST market
+mid-3rd-quarter, or is it reading a single-stat actual into a combo
+market? (4) the `market` casing difference (`"pa"` vs `"Pa"`) -- confirm
+whether the recommendation/dedup engine keys on this case-sensitively
+before assuming it's cosmetic.
+
+Raw response saved only to a session-scratch temp path that will not
+survive — re-fetch live with:
+```bash
+curl -s -X POST "https://syndicate-an21.onrender.com/api/intelligence/query" \
+  -H "Content-Type: application/json" \
+  -d '{"question":"best bets today","sport":"wnba"}'
+```
+and filter `response.recommendations` for the target `event_id`/team.
+
 ### RECONCILIATION 2026-08-05 -- session close-out (evaluation loop, deploy safety, sim watchdog, price gate)
 
 Full-day session, root-caused across five layers before finding the real
