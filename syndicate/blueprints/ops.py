@@ -1286,6 +1286,43 @@ def api_ops_live_refresh_sport_liveness_check() -> Any:
             "elapsed_ms": round((time.perf_counter() - helper_started) * 1000, 1),
         }
 
+    # Temporary probe (2026-08-05): soccer/ingestion/espn_lineups.py and
+    # espn_teams.py call this same ESPN endpoint with a DIFFERENT, still
+    # Mozilla-pattern User-Agent ("Mozilla/5.0 (SyndicateSoccerSim)") that
+    # was never tested against the confirmed 403 (ded23a0d only tested the
+    # exact bare "Mozilla/5.0" string). Unknown whether ESPN's filter
+    # matches the exact low-effort string specifically or any Mozilla-
+    # prefixed value. Remove once answered.
+    if sport == "soccer":
+        import urllib.error
+        import urllib.request
+
+        probe_url = "https://site.api.espn.com/apis/site/v2/sports/soccer/usa.1/scoreboard"
+        probe_started = time.perf_counter()
+        try:
+            probe_request = urllib.request.Request(
+                probe_url,
+                headers={"User-Agent": "Mozilla/5.0 (SyndicateSoccerSim)", "Accept": "application/json,text/plain,*/*"},
+            )
+            with urllib.request.urlopen(probe_request, timeout=8) as response:
+                body = response.read().decode("utf-8", errors="replace")
+            result["espn_lineups_useragent_probe"] = {
+                "status_code": 200,
+                "elapsed_ms": round((time.perf_counter() - probe_started) * 1000, 1),
+                "body_len": len(body),
+            }
+        except urllib.error.HTTPError as exc:
+            result["espn_lineups_useragent_probe"] = {
+                "status_code": exc.code,
+                "elapsed_ms": round((time.perf_counter() - probe_started) * 1000, 1),
+                "error": str(exc.reason),
+            }
+        except Exception as exc:
+            result["espn_lineups_useragent_probe"] = {
+                "error": f"{type(exc).__name__}: {exc}",
+                "elapsed_ms": round((time.perf_counter() - probe_started) * 1000, 1),
+            }
+
     try:
         result["combined_checker_result"] = bool(checker(date_str))
     except Exception as exc:
