@@ -1,5 +1,59 @@
 # Syndicate TODO — canonical cross-session list
 
+### FINDING 2026-08-05 (#192) -- Top-N propensity is the right lens, and HR and K behave in OPPOSITE directions
+
+User's reframing: stop grading accuracy across every row and ask "how do the
+top 10 plays per slate do?" That is the lens that matches how the board is
+actually bet, and it changes the conclusion for both markets.
+(scratchpad: `top_propensity.py`; same datasets as #187/#188, pooled
+out-of-fold, GroupKFold by date, ranked WITHIN each date.)
+
+**HR -- signal concentrates. This is where the edge is.** Base rate 13.00%:
+
+| ranker | top-3 | top-5 | top-10 | ROI@top-10 |
+|---|---|---|---|---|
+| sim served | 17.78% (1.37x) | 13.33% (1.03x) | 18.00% (1.38x) | -24.1% |
+| model, sim-side only | 22.22% (1.71x) | 21.33% (1.64x) | 21.33% (1.64x) | +1.1% |
+| model + 2025 statcast (leak-free) | 22.22% (1.71x) | 22.67% (1.74x) | **24.00% (1.85x)** | **+1.3%** |
+| model + 2026 statcast (leaky UB) | 40.00% (3.08x) | 40.00% (3.08x) | 31.33% (2.41x) | +23.5% |
+
+**The nuance that matters**: the leak-free Statcast features LOST on global
+metrics (#188: AUC 0.5579 vs 0.5735 without them) but WIN on top-10
+precision (24.00% vs 21.33%). Global discrimination and tail-ranking quality
+are not the same thing, and only the second one pays. The advanced metrics
+the user asked about do earn their place -- just not in a way Brier/AUC
+could see.
+
+**K -- signal ANTI-concentrates. Extreme disagreement is a warning sign.**
+Ranked by |model P(over) - market no-vig|:
+
+| config | top-3 | top-5 | top-10 |
+|---|---|---|---|
+| sim only (w=0.0) | 32.50% / -35.4% | 37.88% / -29.6% | 45.04% / -17.4% |
+| model on (w=1.0) | 45.00% / -14.3% | 51.52% / -2.6% | **53.44% / +1.1%** |
+
+Hit rate RISES monotonically as the selection LOOSENS, for both configs.
+The sim's three biggest disagreements with the market each day hit 32.50% --
+far below a coin flip. **When this system disagrees most with a K line, the
+market is usually right**, consistent with the hits/outs finding: the market
+prices same-day information (bullpen plans, weather, scratches) the model
+has no access to, and the largest disagreements are exactly where that
+missing information dominates.
+
+**Actionable split:**
+- **HR**: rank-and-take-top-N is the correct frame. Keep the Statcast
+  features, grade on precision@K, not Brier.
+- **K**: do NOT build a top-N K play list. Use the model to shade the whole
+  book (which is what #186 now does correctly) and treat a large
+  model-vs-market gap as a reason for LESS confidence, not more.
+
+**Sample-size honesty**: 45-150 HR picks (~36 HR events at top-10) and 40-131
+K bets. The ROI figures swing on a handful of results and none are
+distinguishable from break-even. The 1.85x HR lift is the more robust number
+(a rate, not payout-weighted); the monotone K ordering is robust because it
+holds across all three N values and both configs. Treat exact ROI as
+directional only.
+
 ### RECONCILIATION 2026-08-05 -- session close-out, board-accuracy + soccer investigation thread (archive-ready)
 
 Full-suite run for this close-out: **4307 passed, 14 failed, 4 skipped,
