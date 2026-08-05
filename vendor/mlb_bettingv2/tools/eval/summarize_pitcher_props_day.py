@@ -34,14 +34,18 @@ def _safe_int(x: Any) -> Optional[int]:
         return None
 
 
-def _dist_to_items(dist: Dict[str, Any]) -> List[Tuple[int, int]]:
-    out: List[Tuple[int, int]] = []
+def _dist_to_items(dist: Dict[str, Any]) -> List[Tuple[int, float]]:
+    # Bucket counts are float: recalibrate_so_output (sim_engine/
+    # pitcher_so_model.py) emits fractional counts when it shifts the
+    # distribution by a non-integer number of strikeouts, so int() would
+    # truncate them and skew every percentile/sd this tool reports.
+    out: List[Tuple[int, float]] = []
     if not isinstance(dist, dict):
         return out
     for k, v in dist.items():
         try:
             kk = int(k)
-            vv = int(v)
+            vv = float(v)
         except Exception:
             continue
         if vv <= 0:

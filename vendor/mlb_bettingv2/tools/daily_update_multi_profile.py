@@ -4016,12 +4016,16 @@ def _locked_policy_selected_counts(card: Optional[Dict[str, Any]]) -> Optional[D
 
 
 def _mean_from_dist(dist: Dict[str, Any]) -> Optional[float]:
-    total = 0
+    # Counts are float, not int: sim_engine/pitcher_so_model.py's
+    # recalibrate_so_output emits fractional bin counts when it moves the
+    # distribution by a non-integer number of strikeouts. int() here would
+    # truncate every bucket toward zero and silently undo that.
+    total = 0.0
     weighted = 0.0
     for raw_bucket, raw_count in (dist or {}).items():
         try:
             bucket = float(raw_bucket)
-            count = int(raw_count)
+            count = float(raw_count)
         except Exception:
             continue
         total += count
@@ -4032,12 +4036,16 @@ def _mean_from_dist(dist: Dict[str, Any]) -> Optional[float]:
 
 
 def _prob_over_line_from_dist(dist: Dict[str, Any], line: float) -> Optional[float]:
-    total = 0
-    over = 0
+    # Float counts, for the same reason as _mean_from_dist above -- and it
+    # matters more here: this is the number the K-prop edge is computed
+    # from, so truncating fractional bins would land the interpolated
+    # recalibration back on (roughly) the whole-K behaviour it replaced.
+    total = 0.0
+    over = 0.0
     for raw_bucket, raw_count in (dist or {}).items():
         try:
             bucket = float(raw_bucket)
-            count = int(raw_count)
+            count = float(raw_count)
         except Exception:
             continue
         total += count

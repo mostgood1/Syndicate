@@ -137,5 +137,145 @@ class RecalibrateSoOutputTests(unittest.TestCase):
         self.assertEqual(new_mean, self.so_mean_raw)
 
 
+def _p_over(dist, line):
+    total = sum(dist.values())
+    return sum(v for k, v in dist.items() if float(k) > line) / total
+
+
+class FractionalShiftTests(unittest.TestCase):
+    """The sub-half-strikeout corrections that int(round(...)) used to discard.
+
+    recalibrate_so_output originally translated bins by
+    `int(round(weight * (model_so_mean - so_mean_raw)))`, so any model
+    correction under 0.5 K produced no change at all. Measured over 312 real
+    starts (real Monte Carlo so_dist + real OddsAPI line), one K of shift is
+    worth 16.3pp of P(over) on average, so that rounding cost up to 8.2pp of
+    mispricing against a ~3pp break-even edge. These lock in the fractional
+    behaviour that replaced it.
+    """
+
+    def setUp(self):
+        self.so_dist = {0: 5.0, 1: 15.0, 2: 25.0, 3: 25.0, 4: 15.0, 5: 10.0, 6: 5.0}
+        self.dist_mean = 2.80  # sum(k*v)/sum(v) for the dist above
+        self.so_mean_raw = 2.85
+
+    def test_sub_half_delta_is_no_longer_discarded(self):
+        # delta = +0.30 K. The old int(round(0.30)) == 0 made this a no-op.
+        shifted, new_mean = recalibrate_so_output(
+            self.so_dist, self.so_mean_raw, model_so_mean=self.so_mean_raw + 0.30, weight=1.0
+        )
+        self.assertNotEqual(shifted, self.so_dist)
+        self.assertGreater(new_mean, self.dist_mean)
+
+    def test_new_mean_moves_by_exactly_delta(self):
+        for delta in (0.10, 0.30, 0.49, 0.75, 1.20):
+            with self.subTest(delta=delta):
+                _, new_mean = recalibrate_so_output(
+                    self.so_dist, self.so_mean_raw, model_so_mean=self.so_mean_raw + delta, weight=1.0
+                )
+                self.assertAlmostEqual(new_mean, self.dist_mean + delta, places=9)
+
+    def test_negative_delta_moves_by_exactly_delta_when_nothing_clips(self):
+        # Same exactness guarantee downward, on a distribution held clear of
+        # the zero floor so no mass is dropped.
+        dist = {4: 10.0, 5: 30.0, 6: 40.0, 7: 20.0}
+        dist_mean = sum(k * v for k, v in dist.items()) / sum(dist.values())
+        for delta in (-0.10, -0.35, -0.80, -1.50):
+            with self.subTest(delta=delta):
+                _, new_mean = recalibrate_so_output(dist, 5.7, model_so_mean=5.7 + delta, weight=1.0)
+                self.assertAlmostEqual(new_mean, dist_mean + delta, places=9)
+
+    def test_negative_shift_past_zero_drops_mass_and_lifts_the_mean(self):
+        # A strikeout count can't go below zero, so mass shifted past it is
+        # dropped rather than clamped onto bin 0 (see _translate_bins). That
+        # necessarily pulls the resulting mean slightly ABOVE mean + delta --
+        # documented here so the exactness tests above aren't read as a
+        # promise this case breaks.
+        shifted, new_mean = recalibrate_so_output(
+            self.so_dist, self.so_mean_raw, model_so_mean=self.so_mean_raw - 0.40, weight=1.0
+        )
+        self.assertTrue(all(k >= 0 for k in shifted))
+        self.assertLess(sum(shifted.values()), sum(self.so_dist.values()))
+        self.assertGreater(new_mean, self.dist_mean - 0.40)
+        self.assertLess(new_mean, self.dist_mean)
+
+    def test_p_over_scales_with_the_fractional_part(self):
+        # The betting-relevant property: P(over) at a half-integer line must
+        # respond proportionally, not in whole-K steps.
+        line = 2.5
+        base = _p_over(self.so_dist, line)
+        full, _ = recalibrate_so_output(self.so_dist, self.so_mean_raw, self.so_mean_raw + 1.0, 1.0)
+        p_full = _p_over(full, line)
+        for frac in (0.25, 0.5, 0.75):
+            with self.subTest(frac=frac):
+                shifted, _ = recalibrate_so_output(
+                    self.so_dist, self.so_mean_raw, self.so_mean_raw + frac, 1.0
+                )
+                self.assertAlmostEqual(_p_over(shifted, line), base + frac * (p_full - base), places=9)
+
+    def test_p_over_is_monotonic_in_delta(self):
+        line = 2.5
+        probs = []
+        for i in range(21):
+            delta = -1.0 + 0.1 * i
+            shifted, _ = recalibrate_so_output(
+                self.so_dist, self.so_mean_raw, self.so_mean_raw + delta, 1.0
+            )
+            probs.append(_p_over(shifted, line))
+        for earlier, later in zip(probs, probs[1:]):
+            self.assertLessEqual(earlier, later + 1e-12)
+
+    def test_whole_number_delta_stays_a_pure_translation(self):
+        # No mixture smoothing when none is needed -- an exact 2 K shift must
+        # reproduce the original bins moved by 2, counts untouched.
+        shifted, _ = recalibrate_so_output(
+            self.so_dist, self.so_mean_raw, model_so_mean=self.so_mean_raw + 2.0, weight=1.0
+        )
+        self.assertEqual(shifted, {k + 2: v for k, v in self.so_dist.items()})
+
+    def test_total_mass_is_preserved(self):
+        for delta in (0.30, 0.60, 1.40):
+            with self.subTest(delta=delta):
+                shifted, _ = recalibrate_so_output(
+                    self.so_dist, self.so_mean_raw, model_so_mean=self.so_mean_raw + delta, weight=1.0
+                )
+                self.assertAlmostEqual(sum(shifted.values()), sum(self.so_dist.values()), places=9)
+
+    def test_negligible_delta_is_still_a_true_noop(self):
+        shifted, new_mean = recalibrate_so_output(
+            self.so_dist, self.so_mean_raw, model_so_mean=self.so_mean_raw + 1e-12, weight=1.0
+        )
+        self.assertEqual(shifted, self.so_dist)
+        self.assertEqual(new_mean, self.so_mean_raw)
+
+    def test_emits_fractional_counts(self):
+        # Contract check for downstream readers: so_dist bin counts are no
+        # longer integers. _prob_over_line_from_dist / _mean_from_dist in
+        # tools/daily_update_multi_profile.py were made float-safe for this;
+        # any new consumer that does int(count) would silently truncate the
+        # correction back out.
+        shifted, _ = recalibrate_so_output(
+            self.so_dist, self.so_mean_raw, model_so_mean=self.so_mean_raw + 0.5, weight=1.0
+        )
+        self.assertTrue(any(abs(v - round(v)) > 1e-9 for v in shifted.values()))
+
+    def test_variance_penalty_of_the_mixture_is_bounded(self):
+        # A non-integer lattice translation adds frac*(1-frac) of variance,
+        # max 0.25 K^2 at frac=0.5. Documented and deliberate -- the sim's
+        # own so_dist is underdispersed (median var/mean 0.754 over the 312
+        # measured starts), so widening it slightly is far cheaper than the
+        # 16.3pp-per-K centering error the rounding used to introduce.
+        def variance(dist):
+            total = sum(dist.values())
+            mu = sum(k * v for k, v in dist.items()) / total
+            return sum(v * (k - mu) ** 2 for k, v in dist.items()) / total
+
+        base_var = variance(self.so_dist)
+        shifted, _ = recalibrate_so_output(
+            self.so_dist, self.so_mean_raw, model_so_mean=self.so_mean_raw + 0.5, weight=1.0
+        )
+        self.assertAlmostEqual(variance(shifted), base_var + 0.25, places=9)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -135,6 +135,137 @@ to "the fix didn't work" from the outside, and the only way to tell them
 apart is checking the source data directly (which is what finally cracked
 this) rather than re-reading the served board.
 
+### DONE 2026-08-05 (#186) -- MLB SO model: integer-rounding quantization fixed (measured, validated on production artifacts). NEW OPEN (#187): systematic -1.22 K model-vs-sim gap, unresolved
+
+User asked whether HR and K props should get dedicated models "fully based
+on advanced metrics, weather, lineup, history" rather than the current
+approach. Research first: **Ks already have a dedicated model** (the
+`pitcher_so_poisson_v1.json` Poisson GLM, live in production at weight 1.0
+since this same date) -- the gap was never "build a separate model," it was
+that the model's output was being rounded away. HR has no dedicated model;
+its Statcast features exist on disk but only produce prose (see #188 below).
+
+**The defect** (`sim_engine/pitcher_so_model.py`): `recalibrate_so_output`
+applied the model by translating so_dist bins by
+`int(round(weight * (model_mean - sim_mean)))`. K props are priced on
+P(over) at half-integer lines, so rounding the shift to a whole strikeout
+discarded the entire sub-0.5 K correction and snapped the rest.
+
+**Measured, not assumed** (scratchpad `measure_so_quantization.py`, 312
+starts / 15 dates, real Monte Carlo so_dist + real OddsAPI lines): one K of
+shift moves P(over) by **16.3pp** on average (median 17.2pp). Loss is
+exactly `frac(delta) x 16.3pp`, peaking at 8.16pp. Median two-sided hold on
+those same K lines is **5.98%** (~3pp break-even edge) -- the rounding was
+discarding more probability mass than the edge the model exists to find.
+
+**The fix**: translate by the fractional amount as a mixture of the two
+adjacent whole-K translations. Mean moves by exactly delta; distribution
+shape preserved; adds at most 0.25 K^2 of variance (frac*(1-frac)).
+Deliberately NOT a negative-binomial refit -- the sim's so_dist is
+**underdispersed** (median variance/mean **0.754** over those 312 starts),
+which an NB structurally cannot represent. That corrected an earlier
+in-session recommendation.
+
+**Hazard found and fixed in the same pass**: the fix emits FRACTIONAL bin
+counts, and `_prob_over_line_from_dist` / `_mean_from_dist` in
+`tools/daily_update_multi_profile.py` both did `int(raw_count)` -- which
+would have truncated every bucket and silently undone the fix on the exact
+number the K-prop edge is computed from. Both made float-safe, plus
+`_dist_to_items` in `tools/eval/summarize_pitcher_props_day.py`. Verified
+end-to-end by feeding a recalibrated dist through the real production
+helpers. `eval_sim_day_vs_actual.py`'s copy already used `float(v)`.
+
+**Validated on git-tracked production artifacts, not local mirrors** (user:
+"use git/render data NOT local"; scratchpad `validate_so_fix.py`). The
+v4 `snapshots/<date>/roster_objs/roster_obj_*.json` artifacts are the only
+place `batters_faced` lives -- 689 tracked, all present and byte-identical
+to HEAD (clean `git status`). Feature construction is a verbatim port of
+`daily_update.py`'s `_so_model_features_for_pid`, so these are the deltas
+production actually computes. 298 starts, 14 dates, 0 skipped:
+- P(over) correction restored: **mean 4.18pp, median 3.98pp, p90 7.80pp,
+  max 9.53pp**. 59.4% of starts move more than the ~3pp break-even edge.
+- Signed mean change **+0.12pp** -- the fix re-centers, it does not bias a
+  side. (The step-1 sensitivity sweep predicted 3.2-4.1pp; measured 4.18pp.)
+
+**Correction to an in-session claim**: the sweep's "~68% of corrections
+discarded at sigma=0.5" was wrong in the specific. Real sigma is 0.854 K
+but the delta carries a large systematic offset, so only **17.1%** fall
+under 0.5 K. The headline pp figure held; the "two-thirds" framing did not.
+
+Tests: 11 new cases in `tests/test_mlb_pitcher_so_model.py` (exact-delta
+mean movement, P(over) proportionality and monotonicity, whole-number
+deltas staying pure translations, mass preservation, the bounded variance
+penalty, fractional-count contract, and the zero-floor clipping case that
+correctly breaks mean-exactness). Existing 14 unchanged and passing.
+`pytest tests/ -k mlb`: **628 passed, 1 skipped, 0 failures**.
+
+NOT committed and NOT deployed -- working tree also carries unrelated
+generated-state churn from concurrent sessions ([[concurrent parallel
+sessions]]); needs a scoped `git add` of exactly these four files.
+
+### OPEN 2026-08-05 (#187) -- MLB SO model projects 1.22 K BELOW the sim in production; served `batters_faced` sits 0.88 SD under its training mean
+
+Found while validating #186 on real production artifacts. Over the same 298
+starts the model's prediction runs **mean -1.217 K / median -1.340 K**
+against the sim (sigma 0.854). At 16.3pp per K that is roughly **20pp of
+P(over) movement applied to every start** -- about five times the effect
+#186 just fixed, and it is currently live at weight 1.0.
+
+**The lead**: `batters_faced` is the model's #2 feature by coefficient
+(0.12646, scale 124.8). Trained mean **391.7**; served mean across 634
+starter-rows in the git-tracked roster artifacts is **282.1** (median 319,
+range 0-459) -- ~0.88 SD low, worth roughly -10% on the prediction, so
+maybe half the gap. No season trend within 2026-06-15..07-12 that would
+explain it as normal accumulation.
+
+**Two candidate explanations, not distinguished:**
+1. Genuine -- these are earlier-season dates and the model is correctly
+   pricing lower workload.
+2. Train/serve skew -- the training dataset came from scratchpad
+   `build_pitcher_dataset.py` (never committed, per the 2026-08-01 pilot
+   entry), so training may have computed `batters_faced` from a different
+   source than `_so_model_features_for_pid` reads at serve time.
+
+**Why it could not be resolved this session**: needs actual per-start
+strikeout outcomes to grade sim vs. model on these dates. The local eval
+batch (`data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-07-09.json`)
+is **empty** (`games: 0`), and no other outcome source is on disk or in git.
+
+**Ruled out**: this is not a deserialization bug -- `batters_faced`
+round-trips correctly through the v4 roster artifact
+(`roster_artifact.py:304`). Also noted: `venue_mult` is an **inert
+feature** -- trained constant (mean 1.0, scale 1.0, coef exactly 0.0), and
+`_so_model_features_for_pid` always resolves it to 1.0 anyway because
+`PitcherProfile.venue_mult_home/away` are Dicts, not floats. Harmless, but
+dead weight in the feature list.
+
+**This outranks the fresh-holdout item** -- a 1.2 K systematic shift is a
+bigger open risk than the holdout it would be validated on.
+
+### OPEN 2026-08-05 (#188) -- MLB HR props: Statcast features are computed and displayed but never reach the probability
+
+The other half of the user's original question. The 2026-08-01 pilot
+already tested a dedicated HR model and it **lost** (Brier 0.1000 sim vs
+0.1030 model, n=11016) -- but it used the same season-rate feature family
+as the pitcher model. Meanwhile `hr_targets.py:317-429` pulls barrel_rate,
+xwOBA, launch-angle mean, hard-hit rate, the pitcher's arsenal shares,
+`vs_pitch_type_hr` and `pitch_type_hr_mult` out of
+`player_features_latest.json` -- and routes all of it into
+`hr_target_metrics` and a prose sentence. The actual HR path
+(`pitch_model.py:446-460`) is still season `batter_hr_rate` x
+`pitcher_hr_rate` x park x weather, plus the affine-logit calibration.
+
+So the untested experiment is a HR model built on the advanced metrics that
+already exist, not "a separate HR model" in general.
+
+**Profitability caveat that must be checked first**: HR props are
+single-sided (over price only, no de-vig -- see the comment at
+`hr_targets.py:495`), carrying ~15-25% hold versus the 5.98% measured on K
+lines. The accuracy bar for HR profitability is far higher than for Ks.
+Grade on betting hit rate / CLV against `p_hr_1plus_cal` (NOT raw
+`p_hr_1plus`, and NOT Brier alone -- hits-allowed and outs both went
+statistically better and betting-worse, the repo's most expensive lesson).
+
 ### DONE (mostly) 2026-08-05 -- NFL preseason: deployed, wired into odds/resim autorun, Layer-1 market board, and Layer-2 opportunity feed -- one open verification item
 
 Continuation of the same day's earlier NFL preseason build (real ESPN
