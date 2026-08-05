@@ -1588,6 +1588,33 @@ class OpsRefreshApiTests(unittest.TestCase):
         mocked.assert_called_once()
         self.assertEqual(mocked.call_args.kwargs.get("mode"), "fast")
 
+    def test_odds_refresh_run_honours_an_explicit_full_mode(self) -> None:
+        # mode="fast" was hardcoded at the route regardless of what the
+        # caller sent, so a manual "run odds refresh now" trigger could
+        # never reach refresh_odds_sources.py's post-refresh odds_history
+        # sync step (gated on `if refresh_mode == "fast": return` before
+        # that call) -- confirmed live: a real manual soccer refresh ran
+        # every step ok but never populated odds_history movement data.
+        def _fake_launch_refresh_run(**_: object) -> dict[str, object]:
+            return {"ok": True, "pid": 4242, "run_stamp": "20260520_123100", "date": "2026-05-20", "state": "running"}
+
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
+            "syndicate.blueprints.ops.launch_refresh_run",
+            side_effect=_fake_launch_refresh_run,
+        ) as mocked, patch("syndicate.features.shared.ops_refresh._reports_root", return_value=Path(tempfile.gettempdir()) / "syndicate-test-reports"), patch(
+            "syndicate.blueprints.ops.reports_root",
+            return_value=Path(tempfile.gettempdir()) / "syndicate-test-reports",
+        ):
+            response = self.client.post(
+                "/api/ops/odds-refresh/run",
+                json={"sports": "soccer", "phase": "pregame", "mode": "full"},
+                headers={"X-Admin-Token": "secret-token"},
+            )
+
+        self.assertEqual(response.status_code, 202)
+        mocked.assert_called_once()
+        self.assertEqual(mocked.call_args.kwargs.get("mode"), "full")
+
     def test_run_page_route_starts_odds_refresh_job_and_redirects(self) -> None:
         def _fake_launch_refresh_run(**_: object) -> dict[str, object]:
             return {"ok": True, "pid": 5252, "run_stamp": "20260520_123100", "date": "2026-05-20", "state": "running"}
