@@ -7011,11 +7011,15 @@ the same improvement. Both done this pass.
 
 **Production wiring**: dispatched an Explore agent first to map
 `tools/daily_update.py` (~7969 lines, the real production entrypoint --
-confirmed via `scripts/unified_daily_update.ps1` invoking it with
-`--workflow ui-daily`, which shells out through
-`tools/daily_update_multi_profile.py` to three `--workflow core`
-subprocess runs) before touching anything, given the much higher stakes
-than the backtesting tool. Key finding that simplified the work: unlike
+[CORRECTED below, same date: the agent's claim that
+`scripts/unified_daily_update.ps1` invokes this with `--workflow
+ui-daily` is wrong, that script never runs in production at all; the
+real caller is `scripts/run_mlb_daily_sim_job.py`, spawned by
+`live_refresh_loop.py`'s background tick loop -- see the "SO-model
+weight flipped ON" entry a few sections down for the corrected trace],
+which shells out through `tools/daily_update_multi_profile.py` to three
+`--workflow core` subprocess runs) before touching anything, given the
+much higher stakes than the backtesting tool. Key finding that simplified the work: unlike
 `eval_sim_day_vs_actual.py` (where the per-game sim runs inside a
 `ProcessPoolExecutor` task, forcing the new setting to thread through a
 task dict and reload per worker), `daily_update.py`'s `_sim_many` only
@@ -7119,15 +7123,36 @@ promotion). Verified `--help` still exits 0 (the `%%`-escaping fix from
 the previous entry), syntax-checked, SO-model unit tests (14) and the
 full mlb/sim regression sweep both re-run clean after the change.
 
-**This makes the setting live the next time `daily_update.py` runs with
-default arguments** -- i.e. the next real daily-update invocation via
-`scripts/unified_daily_update.ps1` (which does not pass this flag
-explicitly, so it inherits the new default) will apply the strikeout
-recalibration to real board output. Nothing was deployed to Render as
-part of this change -- it's a repo-level default; whether/when it takes
-effect on the live service depends on the normal deploy cadence (auto-
-deploy is OFF per this repo's operational notes) and the next actual
-daily-update run.
+**CORRECTION 2026-08-01 (same session, right after this entry was
+written)**: the paragraph originally here claimed the real production
+trigger was `scripts/unified_daily_update.ps1`. That was wrong, and
+user-caught ("we dont use unified daily update anymore?") rather than
+self-caught -- should have verified instead of trusting the earlier
+Explore agent's finding at face value. `unified_daily_update.ps1` **does
+not run in production at all**; confirmed via an existing comment at
+`syndicate/features/shared/live_refresh_loop.py:2162`: "Originally wired
+into scripts/unified_daily_update.ps1, which turned out to never run in
+production at all (not referenced by render.yaml or any GHA workflow --
+confirmed live 2026-07-30)."
+
+**The real trigger**: `live_refresh_loop.py` runs continuously inside the
+live refresh-worker Render service. Each tick evaluates
+`_mlb_daily_sim_decision` (roster/lineup fingerprint changes, props-now-
+available, etc. -- see the 2026-08-01 MLB props root-cause reconciliation
+entry near the top of this file) and, when a resim is warranted, spawns
+`scripts/run_mlb_daily_sim_job.py` as a subprocess, which calls
+`tools/daily_update.py --workflow ui-daily` directly.
+`run_mlb_daily_sim_job.py`'s own fixed command-list construction never
+passes `--pitcher-so-model-weight` explicitly, and it's the same
+`daily_update.py` script/parser at every level of its own subprocess
+chain (`ui-daily` -> `daily_update_multi_profile.py` -> `--workflow
+core`), so **the conclusion still holds**: the new default (1.0) applies
+correctly through the real trigger path, just not the one originally
+described. Nothing was deployed to Render as part of this change -- it's
+a repo-level default; whether/when it takes effect on the live service
+still depends on the normal deploy cadence (auto-deploy is OFF) and the
+next time the live refresh-worker's own background loop decides a resim
+is warranted.
 
 ### Reconciliation 2026-07-31 part 4 (NFL: real SmartSim 2.0 projection engine + market board + Ask the Syndicate)
 
