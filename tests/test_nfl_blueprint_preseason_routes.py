@@ -116,5 +116,83 @@ class PreseasonRouteTests(unittest.TestCase):
         self.assertEqual(captured["week"], 2)
 
 
+_FAKE_MARKET_BOARD = {
+    "season": 2026,
+    "week": 1,
+    "available_weeks": [1, 2],
+    "games": [
+        {
+            "gamePk": "g1",
+            "matchup": "CAR @ ARI",
+            "away_abbr": "CAR",
+            "home_abbr": "ARI",
+            "away_logo": "https://a.espncdn.com/i/teamlogos/nfl/500/car.png",
+            "home_logo": "https://a.espncdn.com/i/teamlogos/nfl/500/ari.png",
+            "game_state": "pregame",
+            "rows": [
+                {"market": "Moneyline", "side": "home", "odds": -125.0, "market_type": "game", "sim_projection": 0.55},
+            ],
+        }
+    ],
+    "using_sample_data": False,
+    "source_path": "smartsim2_preseason_projections_2026_wk1.csv",
+    "route_path": "/nfl/preseason/market-board",
+    "uncertainty_note": "Preseason projections are shrunk toward league-neutral.",
+}
+
+
+class PreseasonMarketBoardRouteTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.app = create_app()
+        self.app.config.update(TESTING=True)
+        self.client = self.app.test_client()
+
+    def test_preseason_market_board_page_renders(self) -> None:
+        with patch("syndicate.blueprints.nfl.build_nfl_preseason_market_board", return_value=dict(_FAKE_MARKET_BOARD)):
+            response = self.client.get("/nfl/preseason/market-board?season=2026&week=1")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Preseason", response.data)
+
+    def test_preseason_market_board_page_surfaces_uncertainty_note(self) -> None:
+        with patch("syndicate.blueprints.nfl.build_nfl_preseason_market_board", return_value=dict(_FAKE_MARKET_BOARD)):
+            response = self.client.get("/nfl/preseason/market-board?season=2026&week=1")
+        self.assertIn(b"shrunk toward league-neutral", response.data)
+
+    def test_api_preseason_market_board_returns_json_with_real_shape(self) -> None:
+        with patch("syndicate.blueprints.nfl.build_nfl_preseason_market_board", return_value=dict(_FAKE_MARKET_BOARD)):
+            response = self.client.get("/nfl/api/preseason/market-board?season=2026&week=1")
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertEqual(len(payload["games"]), 1)
+        self.assertEqual(payload["games"][0]["matchup"], "CAR @ ARI")
+        self.assertEqual(payload["route_path"], "/nfl/preseason/market-board")
+
+    def test_week_query_param_is_forwarded_to_builder(self) -> None:
+        captured = {}
+
+        def fake_builder(season, week):
+            captured["season"] = season
+            captured["week"] = week
+            return dict(_FAKE_MARKET_BOARD)
+
+        with patch("syndicate.blueprints.nfl.build_nfl_preseason_market_board", side_effect=fake_builder):
+            self.client.get("/nfl/preseason/market-board?season=2026&week=3")
+        self.assertEqual(captured["season"], 2026)
+        self.assertEqual(captured["week"], 3)
+
+    def test_invalid_week_falls_back_to_target_week(self) -> None:
+        captured = {}
+
+        def fake_builder(season, week):
+            captured["week"] = week
+            return dict(_FAKE_MARKET_BOARD)
+
+        with patch("syndicate.blueprints.nfl.build_nfl_preseason_market_board", side_effect=fake_builder), patch(
+            "syndicate.blueprints.nfl.preseason_target_week", return_value=2
+        ):
+            self.client.get("/nfl/preseason/market-board?season=2026&week=99")
+        self.assertEqual(captured["week"], 2)
+
+
 if __name__ == "__main__":
     unittest.main()

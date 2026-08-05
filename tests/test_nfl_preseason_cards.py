@@ -200,5 +200,73 @@ class BuildPreseasonCardsPageContextTests(PreseasonCardsTestCase):
         self.assertIn("Hall of Fame Weekend", ctx["date"])
 
 
+class BuildNflPreseasonMarketBoardTests(PreseasonCardsTestCase):
+    """Coverage for pc.build_nfl_preseason_market_board -- mirrors the
+    regular-season builder's tests in tests/test_nfl_market_board.py, but
+    reads preseason's own artifacts (smartsim2_preseason_projections_*.csv /
+    preseason_odds_{season}.csv) via a tempdir-patched source root instead
+    of mocking read_projection_artifact/_nfl_real_lines_for_matchup."""
+
+    def test_builds_joined_game_market_rows(self) -> None:
+        self._write_projection(2026, 1, [self._projection_row()])
+        self._write_odds(
+            2026,
+            [
+                {
+                    "game_id": "g1",
+                    "season": "2026",
+                    "week": "1",
+                    "home_team": "ARI",
+                    "away_team": "CAR",
+                    "home_moneyline": "-125",
+                    "away_moneyline": "105",
+                    "spread_home": "-1.5",
+                    "total_line": "35.5",
+                    "book": "draftkings",
+                }
+            ],
+        )
+
+        board = pc.build_nfl_preseason_market_board(2026, 1)
+
+        self.assertEqual(board["season"], 2026)
+        self.assertEqual(board["week"], 1)
+        self.assertEqual(board["route_path"], "/nfl/preseason/market-board")
+        self.assertFalse(board["using_sample_data"])
+        self.assertEqual(len(board["games"]), 1)
+
+        game = board["games"][0]
+        self.assertEqual(game["matchup"], "CAR @ ARI")
+        self.assertEqual(game["away_abbr"], "CAR")
+        self.assertEqual(game["home_abbr"], "ARI")
+        self.assertEqual(game["game_state"], "pregame")
+        self.assertIn("away_logo", game)
+        self.assertIn("home_logo", game)
+
+        markets = sorted({row["market"] for row in game["rows"]})
+        self.assertEqual(markets, ["Moneyline", "Spread", "Total"])
+        self.assertFalse(any(row["market_type"] == "prop" for row in game["rows"]))
+
+        moneyline_home = next(row for row in game["rows"] if row["market"] == "Moneyline" and row["side"] == "home")
+        self.assertEqual(moneyline_home["odds"], -125.0)
+        self.assertIsNotNone(moneyline_home["sim_projection"])
+
+        self.assertIn("shrunk toward league-neutral", board["uncertainty_note"])
+
+    def test_no_odds_file_still_returns_game_with_no_market_rows(self) -> None:
+        self._write_projection(2026, 1, [self._projection_row()])
+
+        board = pc.build_nfl_preseason_market_board(2026, 1)
+
+        self.assertEqual(len(board["games"]), 1)
+        self.assertEqual(board["games"][0]["rows"], [])
+
+    def test_empty_week_returns_default_uncertainty_note(self) -> None:
+        board = pc.build_nfl_preseason_market_board(2026, 1)
+
+        self.assertEqual(board["games"], [])
+        self.assertIn("shrunk toward league-neutral", board["uncertainty_note"])
+
+
 if __name__ == "__main__":
     unittest.main()

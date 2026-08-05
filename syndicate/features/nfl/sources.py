@@ -270,6 +270,7 @@ def build_preseason_module_links(selected_week: int, active_label: str, *, seaso
     resolved_season = int(season or latest_season())
     links = [
         ("Preseason Cards", f"/nfl/preseason/cards?season={resolved_season}&week={selected_week}"),
+        ("Preseason Market Board", f"/nfl/preseason/market-board?season={resolved_season}&week={selected_week}"),
         ("Hub", "/nfl/hub"),
     ]
     return [{"label": label, "href": href, "active": label == active_label} for label, href in links]

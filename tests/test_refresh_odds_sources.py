@@ -782,3 +782,65 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         self.assertFalse(sport_result["ok"])
         mocked_tracking.assert_not_called()
         self.assertNotIn("post_refresh", sport_result)
+
+
+class NflStepsPreseasonGatingTests(unittest.TestCase):
+    """Coverage for _build_nfl_steps' preseason-odds RefreshStep gating --
+    the step should only be shelled out while preseason_target_week()
+    reports there's still an unplayed preseason game on the real schedule
+    for this season."""
+
+    def _load_module(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = repo_root / "scripts" / "refresh_odds_sources.py"
+        spec = importlib.util.spec_from_file_location("test_refresh_odds_sources_nfl_steps", script_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        return module
+
+    def _make_args(self, *, season=2026, week=1):
+        return argparse.Namespace(
+            date="2026-08-05",
+            sports="nfl",
+            phase="pregame",
+            regions="us",
+            bookmakers="",
+            markets="",
+            season=season,
+            week=week,
+            skip_mirror=True,
+            execution_mode="source",
+            mirror_only=False,
+            continue_on_error=True,
+            dry_run=False,
+            json=False,
+            list=False,
+        )
+
+    def test_preseason_step_included_when_target_week_present(self) -> None:
+        module = self._load_module()
+        with patch.object(module, "nfl_preseason_target_week", return_value=1):
+            steps = module._build_nfl_steps(self._make_args())
+
+        names = [step.name for step in steps]
+        self.assertIn("nfl_oddsapi_refresh", names)
+        self.assertIn("nfl_preseason_oddsapi_refresh", names)
+        preseason_step = next(step for step in steps if step.name == "nfl_preseason_oddsapi_refresh")
+        self.assertIn("scripts/fetch_nfl_preseason_odds.py", preseason_step.command)
+        self.assertIn("2026", preseason_step.command)
+        self.assertEqual(preseason_step.phases, ("pregame", "live"))
+        self.assertEqual(preseason_step.cwd, module.REPO_ROOT)
+
+    def test_preseason_step_excluded_when_no_target_week(self) -> None:
+        module = self._load_module()
+        with patch.object(module, "nfl_preseason_target_week", return_value=None):
+            steps = module._build_nfl_steps(self._make_args())
+
+        names = [step.name for step in steps]
+        self.assertEqual(names, ["nfl_oddsapi_refresh"])
+
+
+if __name__ == "__main__":
+    unittest.main()

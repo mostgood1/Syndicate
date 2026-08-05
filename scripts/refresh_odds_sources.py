@@ -59,6 +59,7 @@ from syndicate.features.ncaab.sources import available_dates as ncaab_available_
 from syndicate.features.ncaaf.sources import default_season as ncaaf_default_season
 from syndicate.features.ncaaf.sources import week_summaries as ncaaf_week_summaries
 from syndicate.features.nfl.sources import latest_season as nfl_latest_season
+from syndicate.features.nfl.sources import preseason_target_week as nfl_preseason_target_week
 from syndicate.features.nfl.sources import week_summaries as nfl_week_summaries
 from syndicate.features.nhl.sources import available_dates as nhl_available_dates
 from syndicate.features.soccer.sources import active_leagues_for_date as soccer_active_leagues_for_date
@@ -884,7 +885,7 @@ def _build_nfl_steps(args: argparse.Namespace) -> list[RefreshStep]:
     artifact_root = _local_source_artifact_root("nfl")
     source_root = _source_repo_root("nfl", "NFL-Betting")
     season, week = _infer_nfl_context(source_root, artifact_root, args.season, args.week)
-    return [
+    steps = [
         RefreshStep(
             name="nfl_oddsapi_refresh",
             phases=("pregame", "live"),
@@ -902,6 +903,27 @@ def _build_nfl_steps(args: argparse.Namespace) -> list[RefreshStep]:
             description="Refresh NFL team odds and player props into a Syndicate-owned artifact bundle.",
         ),
     ]
+    # Only shell fetch_nfl_preseason_odds.py while there's still an unplayed
+    # preseason game on the real schedule for this season -- once every
+    # preseason game has a final score, preseason_target_week() returns
+    # None and there is nothing left for OddsAPI's preseason sport key
+    # (americanfootball_nfl_preseason) to have a live line for.
+    if nfl_preseason_target_week(season) is not None:
+        steps.append(
+            RefreshStep(
+                name="nfl_preseason_oddsapi_refresh",
+                phases=("pregame", "live"),
+                cwd=REPO_ROOT,
+                command=(
+                    python_exe,
+                    "scripts/fetch_nfl_preseason_odds.py",
+                    "--season",
+                    str(season),
+                ),
+                description="Refresh NFL preseason market odds into a Syndicate-owned artifact bundle.",
+            )
+        )
+    return steps
 
 
 def _build_ncaab_steps(args: argparse.Namespace) -> list[RefreshStep]:

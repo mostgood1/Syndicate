@@ -1355,6 +1355,110 @@ def _launch_autorun_season_projections(
     return False
 
 
+# ---------------------------------------------------------------------------
+# NFL preseason autorun -- a separate, parallel job from
+# _launch_autorun_season_projections above. Deliberately its own function
+# rather than a third entry in _SEASON_PROJECTION_SPORTS: preseason has its
+# own week domain (1-4, real-schedule-driven via preseason_target_week()),
+# its own artifact filename prefix (smartsim2_preseason_projections_*), and
+# its own generation script (generate_smartsim2_nfl_preseason_projections.py)
+# -- interleaving it into the regular-season sport loop would risk the same
+# "unsafe to interleave preseason into the regular-season domain" mistake
+# that preseason_projection.py's own docstring already warns about.
+# Env-gated independently (SEASON_PROJECTION_ENABLE_REFRESH_WORKER_
+# PRESEASON_AUTORUN, default OFF) so turning on the regular-season autorun
+# does not silently also start firing preseason runs, and uses its own
+# "nfl_preseason" sport key throughout (a distinct PID-guard status file
+# from the regular-season "nfl" key) so the two autoruns never block each
+# other or race on the same launch-state file.
+# ---------------------------------------------------------------------------
+
+_PRESEASON_PROJECTION_SPORT_KEY = "nfl_preseason"
+
+
+def _season_projection_preseason_auto_refresh_enabled() -> bool:
+    raw_value = str(os.environ.get("SEASON_PROJECTION_ENABLE_REFRESH_WORKER_PRESEASON_AUTORUN") or "").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
+
+
+def _preseason_projection_target_week(season: int) -> int | None:
+    from syndicate.features.nfl.sources import preseason_target_week
+
+    return preseason_target_week(season)
+
+
+def _preseason_projection_artifact_path(season: int, week: int) -> Path:
+    data_root = _refresh_state_store()["data_root"]()
+    return data_root / "nfl_source" / f"smartsim2_preseason_projections_{season}_wk{week}.csv"
+
+
+def _preseason_projection_script_args(season: int, week: int) -> list[str]:
+    script_path = Path(__file__).resolve().parent / "generate_smartsim2_nfl_preseason_projections.py"
+    return [sys.executable, str(script_path), "--season", str(season), "--week", str(week)]
+
+
+def _launch_autorun_preseason_projections(
+    *,
+    latest_manifest_path: Path,
+    worker_status_path: Path,
+    refresh_cycle: dict[str, int],
+) -> bool:
+    """NFL preseason's own Monte Carlo projection autorun -- mirrors
+    _launch_autorun_season_projections's shape (env-gated off by default,
+    staleness via _file_age_seconds, an "already running" PID guard via the
+    same _season_projection_process_still_running/_record_season_projection_launch
+    helpers keyed on _PRESEASON_PROJECTION_SPORT_KEY, direct subprocess.Popen
+    dispatch) but scoped to the real preseason schedule/week domain and
+    artifact instead of the regular-season one."""
+    if not _season_projection_preseason_auto_refresh_enabled():
+        return False
+    selected_date = central_today_iso()
+    active = {item.strip().lower() for item in _active_sports_for_date(selected_date).split(",") if item.strip()}
+    if "nfl" not in active:
+        return False
+    if _season_projection_process_still_running(_PRESEASON_PROJECTION_SPORT_KEY):
+        return False
+
+    season = date.today().year  # calendar-year=season, same convention as the regular-season autorun
+    week = _preseason_projection_target_week(season)
+    if week is None:
+        return False
+
+    artifact_path = _preseason_projection_artifact_path(season, week)
+    age_seconds = _file_age_seconds(artifact_path)
+    if age_seconds is not None and age_seconds < float(_season_projection_refresh_interval_seconds()):
+        return False
+
+    try:
+        process = subprocess.Popen(_preseason_projection_script_args(season, week))
+    except Exception as exc:
+        _write_worker_status(
+            worker_status_path=worker_status_path,
+            latest_manifest_path=latest_manifest_path,
+            state="error",
+            detail=f"Failed to auto-launch nfl preseason season-projection refresh (season={season} week={week}): {type(exc).__name__}: {exc}",
+            ran_job=False,
+            latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+            refresh_cycle=refresh_cycle,
+        )
+        return False
+
+    _record_season_projection_launch(_PRESEASON_PROJECTION_SPORT_KEY, int(getattr(process, "pid", 0) or 0))
+    refresh_cycle["claimed_count"] = int(refresh_cycle.get("claimed_count") or 0) + 1
+    _write_worker_status(
+        worker_status_path=worker_status_path,
+        latest_manifest_path=latest_manifest_path,
+        state="launched",
+        detail=f"Auto-launched nfl preseason season-projection refresh (season={season} week={week}) because the artifact was stale/missing.",
+        ran_job=True,
+        run_exit_code=None,
+        latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+        launch_pid=int(getattr(process, "pid", 0) or 0) or None,
+        refresh_cycle=refresh_cycle,
+    )
+    return True
+
+
 def _diag_log_all_process_memory(stage: str) -> None:
     # Temporary boot-crash diagnostic: the worker has been OOM-killed (2GB
     # limit) within seconds-to-minutes of boot even with the MLB daily-sim
@@ -1544,6 +1648,13 @@ def main() -> int:
             if args.run_once:
                 return 0
         elif _launch_autorun_season_projections(
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_preseason_projections(
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,

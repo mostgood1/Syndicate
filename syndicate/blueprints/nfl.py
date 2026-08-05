@@ -11,6 +11,7 @@ from syndicate.features.nfl.game_detail import build_game_detail_page_context
 from syndicate.features.nfl.live_lens import build_live_lens_page_context
 from syndicate.features.nfl.picks import build_betting_card_page_context
 from syndicate.features.nfl.picks import build_picks_page_context
+from syndicate.features.nfl.preseason_cards import build_nfl_preseason_market_board
 from syndicate.features.nfl.preseason_cards import build_preseason_cards_page_context
 from syndicate.features.nfl.props import build_nfl_props_page_context
 from syndicate.features.nfl.props import nfl_props_available_weeks
@@ -301,3 +302,35 @@ def api_preseason_cards():
     season = _selected_season()
     context = build_preseason_cards_page_context(_selected_preseason_week(season), season=season)
     return jsonify(build_game_board_api_payload(context))
+
+
+@nfl_bp.get("/preseason/market-board")
+def preseason_market_board():
+    season = _selected_season()
+    selected_week = _selected_preseason_week(season)
+    prev_week, next_week = neighboring_values([1, 2, 3, 4], selected_week, fallback=selected_week)
+    # Built directly here (not JS/API-only like the regular-season market
+    # board) so the shrinkage/uncertainty disclosure can render server-side
+    # on first paint -- same "build the page context directly in the route"
+    # pattern preseason_cards() above already uses, and a cheap artifact
+    # read/join, not a simulation, so it stays within the web service's
+    # "light transformation for display" budget.
+    board = build_nfl_preseason_market_board(season, selected_week)
+    return render_template(
+        "nfl/preseason_market_board.html",
+        sport_label="NFL Preseason",
+        sport_slug="nfl",
+        api_endpoint=f"/nfl/api/preseason/market-board?season={season}&week={selected_week}",
+        season=season,
+        selected_week=selected_week,
+        prev_week=prev_week,
+        next_week=next_week,
+        cards_href=f"/nfl/preseason/cards?season={season}&week={selected_week}",
+        uncertainty_note=board.get("uncertainty_note"),
+    )
+
+
+@nfl_bp.get("/api/preseason/market-board")
+def api_preseason_market_board():
+    season = _selected_season()
+    return jsonify(build_nfl_preseason_market_board(season, _selected_preseason_week(season)))

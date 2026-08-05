@@ -15,6 +15,8 @@ from __future__ import annotations
 import csv
 from typing import Any
 
+from syndicate.features.nfl.cards import _NFL_MARKET_BOARD_DISPLAY_LABELS
+from syndicate.features.nfl.cards import _nfl_market_board_rows_for_game
 from syndicate.features.nfl.cards import _resolve_branding
 from syndicate.features.nfl.cards import _team_abbr
 from syndicate.features.nfl.preseason_depth import NONSTARTER_PARTICIPATION_SHARE
@@ -33,6 +35,7 @@ from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.discrete_nav import resolve_selected_value
 from syndicate.features.shared.formatters import format_pct
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
+from syndicate.features.shared.market_inventory import join_odds_to_sim
 
 
 def _load_preseason_odds(season: int) -> dict[tuple[str, str], dict[str, Any]]:
@@ -271,6 +274,7 @@ def build_preseason_cards_page_context(selected_week: int, *, season: int | None
                 "much higher real uncertainty than the regular-season board, disclosed on every card."
             ),
             "cards_control_links": [
+                {"label": "Market Board", "href": f"/nfl/preseason/market-board?season={season}&week={resolved_week}"},
                 {"label": "Regular Season Cards", "href": f"/nfl/cards?season={season}"},
                 {"label": "Hub", "href": "/nfl/hub"},
             ],
@@ -291,3 +295,95 @@ def build_preseason_cards_page_context(selected_week: int, *, season: int | None
         source_kind="local_artifact",
         live_lens_integrated=False,
     )
+
+
+# ---------------------------------------------------------------------------
+# Market board (Layer 1) -- real preseason market odds joined against real
+# SmartSim 2.0 preseason projections. Mirrors
+# syndicate.features.nfl.cards.build_nfl_market_board's shape and join
+# logic exactly (reuses that module's own _nfl_market_board_rows_for_game/
+# _NFL_MARKET_BOARD_DISPLAY_LABELS plus market_inventory.join_odds_to_sim
+# directly rather than duplicating them), scoped to preseason_odds_{season}.csv
+# / smartsim2_preseason_projections_{season}_wk{week}.csv instead of the
+# regular-season artifacts. No player-prop rows -- there's no preseason prop
+# odds source (see scripts/fetch_nfl_preseason_odds.py's docstring).
+# ---------------------------------------------------------------------------
+
+
+def _preseason_market_float(value: Any) -> float | None:
+    text = str(value if value is not None else "").strip()
+    if not text:
+        return None
+    try:
+        return float(text)
+    except (TypeError, ValueError):
+        return None
+
+
+_DEFAULT_PRESEASON_UNCERTAINTY_NOTE = (
+    "Preseason projections are shrunk toward league-neutral and their variance is widened to "
+    "reflect expected backup/bubble-player participation -- treat with much lower confidence "
+    "than a regular-season projection."
+)
+
+
+def build_nfl_preseason_market_board(season: int, week: int) -> dict[str, Any]:
+    """Layer 1 market/odds inventory for NFL preseason game markets
+    (moneyline, spread, total only)."""
+    projections = read_preseason_projection_artifact(season=season, week=week, data_root=default_nfl_source_root())
+    weeks = _available_preseason_weeks(season)
+    odds = _load_preseason_odds(season)
+
+    board_games: list[dict[str, Any]] = []
+    uncertainty_note: str | None = None
+    for projection in projections:
+        if uncertainty_note is None and str(projection.uncertainty_note or "").strip():
+            uncertainty_note = projection.uncertainty_note
+
+        home_branding = _resolve_branding(projection.home_team)
+        away_branding = _resolve_branding(projection.away_team)
+        home_abbr = home_branding.abbreviation if home_branding else _team_abbr(projection.home_team)
+        away_abbr = away_branding.abbreviation if away_branding else _team_abbr(projection.away_team)
+
+        market = odds.get((projection.away_team, projection.home_team))
+
+        odds_rows, sim_rows = _nfl_market_board_rows_for_game(
+            game_id=projection.game_id,
+            home_moneyline=_preseason_market_float((market or {}).get("home_moneyline")),
+            away_moneyline=_preseason_market_float((market or {}).get("away_moneyline")),
+            spread_line=_preseason_market_float((market or {}).get("spread_home")),
+            total_line=_preseason_market_float((market or {}).get("total_line")),
+            model_margin=projection.margin_mean,
+            model_total=projection.total_mean,
+            model_margin_stdev=projection.margin_stdev,
+            model_total_stdev=projection.total_stdev,
+            home_win_probability=projection.home_win_rate,
+        )
+
+        inventory = join_odds_to_sim(odds_rows, sim_rows)
+        for row in inventory:
+            row["market"] = _NFL_MARKET_BOARD_DISPLAY_LABELS.get(row.get("market"), row.get("market"))
+
+        board_games.append(
+            {
+                "gamePk": projection.game_id,
+                "matchup": f"{away_abbr} @ {home_abbr}",
+                "away_abbr": away_abbr,
+                "home_abbr": home_abbr,
+                "away_logo": away_branding.logo_url if away_branding else None,
+                "home_logo": home_branding.logo_url if home_branding else None,
+                "game_state": "pregame",
+                "rows": inventory,
+            }
+        )
+
+    return {
+        "season": season,
+        "week": week,
+        "available_weeks": weeks,
+        "games": board_games,
+        "using_sample_data": False,
+        "source_path": str(preseason_projection_artifact_path(season=season, week=week, data_root=default_nfl_source_root())),
+        "route_path": "/nfl/preseason/market-board",
+        "uncertainty_note": uncertainty_note or _DEFAULT_PRESEASON_UNCERTAINTY_NOTE,
+    }
