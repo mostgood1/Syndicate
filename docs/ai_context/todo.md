@@ -114,6 +114,21 @@ uncommitted work directly.
    session investigation thread (`314a169a`, MLB feed mojibake bisect,
    still open on their side). No action needed unless that mojibake
    thread turns out to need refresh-worker specifically.
+4. **Found at close-out, pre-existing, NOT caused by this session --
+   spawned as a separate task rather than fixed here.** `python -m
+   unittest tests.test_archives` (what CI actually runs) reports 6
+   failures: 3 are genuine test-order pollution in WNBA live-state tests
+   (pass in isolation via pytest -k, fail as part of the full unittest
+   run) -- confirmed via git-history bisection that this happens
+   identically on the pre-this-session version of `wnba/cards.py`, so
+   nothing shipped today caused it. Almost certainly the same class of
+   issue already documented for NBA's `_NBA_CARDS_CONTEXT_CACHE` (a
+   module-level cache with no conftest reset, and pytest's autouse
+   fixtures don't apply when the suite runs via plain `unittest`) --
+   likely `_BUILD_LIVE_STATE_PAYLOAD_CACHE` this time. A 4th failure
+   (`test_wnba_cards_empty_slate_does_not_inject_fake_sample_game`) is
+   separate and unrelated (two different empty-state code paths choosing
+   different message text).
 
 ### RESOLVED 2026-08-05 -- WNBA "not showing live": two real, independent bugs, both fixed, deployed, and confirmed on the live board itself
 
