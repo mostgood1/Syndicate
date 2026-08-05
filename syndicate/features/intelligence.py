@@ -4496,6 +4496,44 @@ def _prop_candidate_from_item(sport: dict[str, Any], item: dict[str, Any], *, su
         }
     )
     _bind_candidate_state(row)
+    # Temporary, always-on diagnostic (2026-08-05): two real bugs upstream
+    # of this function (_finalize_home_prop_rows never setting
+    # commence_time, then _build_prop_dashboard_row dropping it when
+    # reconstructing its return dict) are both fixed and deployed, yet the
+    # served board still shows the wrong game_date for the same soccer
+    # "Anytime Goalscorer" candidates. Reading the surrounding code says
+    # commence_time should survive row.update() below (it isn't in the
+    # overwrite list, and dict.update() never removes existing keys) all
+    # the way to resolve_candidate_game_date -- but two "should work by
+    # reading the code" conclusions already in this same chase were wrong
+    # in ways only live evidence caught. This settles it directly: is
+    # commence_time actually present on THIS function's own return value,
+    # right here, for these specific candidates, in production. Remove
+    # once the remaining gap is found (see todo.md "soccer commence_time").
+    if _safe_text(sport.get("slug"), "").lower() == "soccer" and str(row.get("market") or "").strip().lower() == "anytime goalscorer":
+        try:
+            from syndicate.features.shared.refresh_state_store import read_json_file as _diag_read
+            from syndicate.features.shared.refresh_state_store import reports_root as _diag_reports_root
+            from syndicate.features.shared.refresh_state_store import write_json_file as _diag_write
+
+            diag_path = _diag_reports_root() / "refresh_status" / "latest" / "prop_candidate_commence_time_diagnostic_status.json"
+            existing = _diag_read(diag_path)
+            payload = existing if isinstance(existing, dict) else {}
+            entries = payload.get("entries") if isinstance(payload.get("entries"), list) else []
+            entries.append(
+                {
+                    "name": row.get("name"),
+                    "matchup": row.get("matchup"),
+                    "game_pk": row.get("game_pk"),
+                    "commence_time_on_row": row.get("commence_time"),
+                    "commence_time_on_item": item.get("commence_time"),
+                    "resolved_game_date": resolve_candidate_game_date(row, fallback=None),
+                }
+            )
+            payload["entries"] = entries[-40:]
+            _diag_write(diag_path, payload)
+        except Exception:
+            pass
     return row
 
 

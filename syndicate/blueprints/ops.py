@@ -849,6 +849,28 @@ def api_ops_home_props_match_diagnostic() -> Any:
     return jsonify({"ok": True, "by_slug": by_slug if isinstance(by_slug, dict) else {}})
 
 
+@ops_bp.get("/api/ops/prop-candidate/commence-time-diagnostic")
+def api_ops_prop_candidate_commence_time_diagnostic() -> Any:
+    # Read-only, temporary (2026-08-05). Follow-up to
+    # /api/ops/home-props/match-diagnostic above: that endpoint proved
+    # commence_time is set correctly inside _finalize_home_prop_rows for
+    # these exact candidates, and _build_prop_dashboard_row was separately
+    # fixed to stop dropping it when reconstructing its return dict -- yet
+    # the served board is still unchanged after confirmed rebuilds. Reading
+    # the code between there and the board says commence_time should
+    # survive (_prop_candidate_from_item's row.update() doesn't touch it,
+    # resolve_candidate_game_date's parser handles the timestamp format
+    # correctly), but two "should work by reading the code" conclusions in
+    # this same chase were already wrong. This settles it directly: is
+    # commence_time actually present on _prop_candidate_from_item's OWN
+    # return value, right where it returns, for these candidates, in
+    # production. Remove once the gap is found and confirmed fixed.
+    status_path = reports_root() / "refresh_status" / "latest" / "prop_candidate_commence_time_diagnostic_status.json"
+    payload = read_json_file(status_path) or {}
+    entries = payload.get("entries") if isinstance(payload, dict) and isinstance(payload.get("entries"), list) else []
+    return jsonify({"ok": True, "entries": entries})
+
+
 @ops_bp.post("/api/ops/bootstrap/run")
 def api_ops_bootstrap_run() -> Any:
     # Calls _sync_bootstrap_roots directly (not main(), which only ever
