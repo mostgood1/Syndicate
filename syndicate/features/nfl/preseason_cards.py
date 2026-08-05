@@ -1,0 +1,217 @@
+"""Real NFL preseason game-cards board.
+
+Separate module from cards.py -- keeps the regular-season card-building
+path (_game_from_smartsim_projection, build_cards_page_context, the
+whole upcoming_recs_*.csv/SmartSim2-standalone split) completely
+untouched. Mirrors _game_from_smartsim_projection's exact output shape,
+including the top-level away/home logo_url/primary_color/secondary_color
+fields -- an equivalent NCAAF card-building function omitted those at the
+top level earlier this session and silently broke every team logo in
+production; do not repeat that omission here.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from syndicate.features.nfl.cards import _resolve_branding
+from syndicate.features.nfl.cards import _team_abbr
+from syndicate.features.nfl.preseason_depth import NONSTARTER_PARTICIPATION_SHARE
+from syndicate.features.nfl.preseason_depth import PRESEASON_WEEK_LABELS
+from syndicate.features.nfl.preseason_depth import likely_snap_leaders
+from syndicate.features.nfl.preseason_depth import likely_starters_sitting
+from syndicate.features.nfl.preseason_projection import preseason_seasons_and_weeks
+from syndicate.features.nfl.preseason_projection import preseason_projection_artifact_path
+from syndicate.features.nfl.preseason_projection import read_preseason_projection_artifact
+from syndicate.features.nfl.sources import build_preseason_module_links
+from syndicate.features.nfl.sources import default_nfl_source_root
+from syndicate.features.nfl.sources import latest_season
+from syndicate.features.nfl.sources import preseason_target_week
+from syndicate.features.shared.discrete_nav import neighboring_values
+from syndicate.features.shared.discrete_nav import resolve_selected_value
+from syndicate.features.shared.formatters import format_pct
+from syndicate.features.shared.game_board_contract import apply_game_board_contract
+
+
+def _depth_chart_panel(team_name: str, season: int, week: int) -> dict[str, Any]:
+    leaders = likely_snap_leaders(season, team_name, week=week, top_n=6)
+    sitting = likely_starters_sitting(season, team_name, week=week)
+    leader_items = [f"{row['player_name']} ({row['position']}, depth {row['depth_rank']})" for row in leaders if row.get("player_name")]
+    sitting_items = [f"{row['player_name']} ({row['position']}) -- {row['status_note']}" for row in sitting if row.get("player_name")]
+    return {
+        "eyebrow": "Real depth chart",
+        "title": f"{team_name} likely snap leaders",
+        "body": "Real depth-chart context, informational only -- not fed into the numeric projection above (see the module docstring for why real per-player quality data doesn't exist for most of this roster tier).",
+        "items": (leader_items or ["No real depth-chart rows on file for this team yet."]) + sitting_items,
+    }
+
+
+def _game_from_preseason_projection(projection: Any, season: int, week: int) -> dict[str, Any]:
+    away_team = str(projection.away_team or "Away").strip() or "Away"
+    home_team = str(projection.home_team or "Home").strip() or "Home"
+    away_branding = _resolve_branding(away_team)
+    home_branding = _resolve_branding(home_team)
+    away_abbr = away_branding.abbreviation if away_branding else _team_abbr(away_team)
+    home_abbr = home_branding.abbreviation if home_branding else _team_abbr(home_team)
+    away_name = away_branding.display_name if away_branding else away_team
+    home_name = home_branding.display_name if home_branding else home_team
+    margin = projection.margin_mean
+    if margin > 0:
+        spread_label = f"{home_name} by {abs(margin):.1f}"
+    elif margin < 0:
+        spread_label = f"{away_name} by {abs(margin):.1f}"
+    else:
+        spread_label = "Pick'em"
+    win_probability = format_pct(projection.home_win_rate)
+    game_pk = str(projection.game_id or f"{season}-preseason-{week}-{away_abbr}-{home_abbr}").replace(" ", "-")
+    week_label = PRESEASON_WEEK_LABELS.get(week, f"Preseason Week {week}")
+    share = projection.nonstarter_participation_share
+    summary = (
+        f"SmartSim 2.0 projects {home_name} {round(projection.home_score_mean, 1)} - {round(projection.away_score_mean, 1)} {away_name} "
+        f"with a projected total of {round(projection.total_mean, 1)}. Preseason projection -- shrunk toward league-neutral by "
+        f"{share:.0%} to reflect expected backup/bubble-player snaps this week; treat with much lower confidence than a "
+        f"regular-season projection."
+    )
+    return {
+        "gamePk": game_pk,
+        "card_variant": "shared_default",
+        "away": {
+            "abbr": away_abbr,
+            "name": away_name,
+            "logo_url": away_branding.logo_url if away_branding else None,
+            "primary_color": away_branding.primary_color if away_branding else None,
+            "secondary_color": away_branding.secondary_color if away_branding else None,
+        },
+        "home": {
+            "abbr": home_abbr,
+            "name": home_name,
+            "logo_url": home_branding.logo_url if home_branding else None,
+            "primary_color": home_branding.primary_color if home_branding else None,
+            "secondary_color": home_branding.secondary_color if home_branding else None,
+        },
+        "href": f"/nfl/game/{game_pk}?season={season}&week={week}",
+        "href_label": "Open NFL game detail",
+        "status": week_label,
+        "detail": "SmartSim 2.0 (preseason)",
+        "summary": summary,
+        "metrics": [
+            {"label": "Home mean", "value": round(projection.home_score_mean, 1)},
+            {"label": "Away mean", "value": round(projection.away_score_mean, 1)},
+            {"label": "Projected spread", "value": spread_label},
+            {"label": "Win probability", "value": win_probability},
+            {"label": "Shrinkage applied", "value": f"{share:.0%}"},
+        ],
+        "shared_top_play_rows": [],
+        "panels": [
+            {
+                "eyebrow": "SmartSim 2.0 (preseason)",
+                "title": "Projection contract",
+                "body": projection.uncertainty_note,
+                "items": [
+                    f"Home mean: {round(projection.home_score_mean, 1)}",
+                    f"Away mean: {round(projection.away_score_mean, 1)}",
+                    f"Projected spread: {spread_label}",
+                    f"Projected total: {round(projection.total_mean, 1)}",
+                    f"Win probability: {win_probability}",
+                ],
+            },
+            {
+                "eyebrow": "Game context",
+                "title": f"{season} {week_label}",
+                "body": f"{away_name} at {home_name}.",
+                "items": [
+                    f"Teams: {away_name} at {home_name}",
+                    f"Projection source: SmartSim 2.0 ({projection.rating_source})",
+                    f"Real game id: {game_pk}",
+                ],
+            },
+            _depth_chart_panel(away_name, season, week),
+            _depth_chart_panel(home_name, season, week),
+        ],
+    }
+
+
+def _available_preseason_weeks(season: int) -> list[int]:
+    return sorted(preseason_seasons_and_weeks(default_nfl_source_root()).get(season, []))
+
+
+def build_preseason_cards_page_context(selected_week: int, *, season: int | None = None) -> dict[str, Any]:
+    resolved_season = int(season or latest_season())
+    weeks = _available_preseason_weeks(resolved_season)
+    target_week = preseason_target_week(resolved_season)
+    default_week = target_week if target_week is not None else (weeks[-1] if weeks else 1)
+    requested_week = int(selected_week) if selected_week else default_week
+    resolved_week = resolve_selected_value(requested_week, weeks, default_week) if weeks else requested_week
+    season = resolved_season
+
+    projections = read_preseason_projection_artifact(season=season, week=resolved_week, data_root=default_nfl_source_root())
+    games = [_game_from_preseason_projection(projection, season, resolved_week) for projection in projections]
+
+    prev_week, next_week = neighboring_values(weeks, resolved_week, fallback=resolved_week)
+    scoreboard_items = [
+        {
+            "target_id": f"game-{game['gamePk']}",
+            "label": f"{game['away']['abbr']} @ {game['home']['abbr']}",
+            "status": game["status"],
+        }
+        for game in games
+    ]
+    week_label = PRESEASON_WEEK_LABELS.get(resolved_week, f"Preseason Week {resolved_week}")
+    source_path = str(preseason_projection_artifact_path(season=season, week=resolved_week, data_root=default_nfl_source_root()))
+    return apply_game_board_contract(
+        {
+            "date": f"{season} {week_label}",
+            "requested_date": f"{season} Preseason Week {selected_week}",
+            "prev_date": str(prev_week),
+            "next_date": str(next_week),
+            "control_action": "/nfl/preseason/cards",
+            "controls_prev_href": f"/nfl/preseason/cards?season={season}&week={prev_week}",
+            "controls_next_href": f"/nfl/preseason/cards?season={season}&week={next_week}",
+            "control_label": "Preseason week",
+            "control_type": "number",
+            "control_name": "week",
+            "control_value": str(resolved_week),
+            "hidden_fields": [{"name": "season", "value": str(season)}],
+            "module_links": build_preseason_module_links(resolved_week, "Preseason Cards", season=season),
+            "games": games,
+            "scoreboard_items": scoreboard_items,
+            "source_path": source_path,
+            "source_title": "NFL SmartSim 2.0 preseason projections" if games else "NFL preseason projections unavailable",
+            "empty_state": {
+                "eyebrow": "NFL preseason",
+                "title": "No preseason projections were available for this week",
+                "body": "Run scripts/fetch_nfl_preseason_schedule.py then scripts/generate_smartsim2_nfl_preseason_projections.py for this season/week to populate this board.",
+                "list_items": [
+                    f"Season: {season}",
+                    f"Week: {selected_week} ({week_label})",
+                ],
+            } if not games else None,
+            "using_sample_data": False,
+            "route_path": "/nfl/preseason/cards",
+            "intro_title": "NFL Preseason Cards",
+            "intro_body": (
+                "Real preseason schedule from ESPN (nflverse has no preseason data of any kind) joined against a "
+                "shrinkage-toward-league-neutral projection anchored on real prior-season team ratings -- carries "
+                "much higher real uncertainty than the regular-season board, disclosed on every card."
+            ),
+            "cards_control_links": [
+                {"label": "Regular Season Cards", "href": f"/nfl/cards?season={season}"},
+                {"label": "Hub", "href": "/nfl/hub"},
+            ],
+            "header_stats": [
+                {"label": "Games", "value": str(len(games))},
+                {"label": "Season", "value": str(season)},
+                {"label": "Week", "value": week_label},
+                {"label": "Shrinkage", "value": f"{NONSTARTER_PARTICIPATION_SHARE.get(resolved_week, 0):.0%}"},
+            ],
+            "cards_stylesheet": None,
+            "cards_grid_class": "cards-grid",
+            "show_source_summary": True,
+            "show_intro": True,
+            "active_sport_name": "NFL",
+        },
+        sport="nfl",
+        module="preseason_cards",
+        source_kind="local_artifact",
+        live_lens_integrated=False,
+    )

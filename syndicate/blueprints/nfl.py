@@ -11,11 +11,13 @@ from syndicate.features.nfl.game_detail import build_game_detail_page_context
 from syndicate.features.nfl.live_lens import build_live_lens_page_context
 from syndicate.features.nfl.picks import build_betting_card_page_context
 from syndicate.features.nfl.picks import build_picks_page_context
+from syndicate.features.nfl.preseason_cards import build_preseason_cards_page_context
 from syndicate.features.nfl.props import build_nfl_props_page_context
 from syndicate.features.nfl.props import nfl_props_available_weeks
 from syndicate.features.nfl.sources import available_weeks
 from syndicate.features.nfl.sources import default_week
 from syndicate.features.nfl.sources import latest_season
+from syndicate.features.nfl.sources import preseason_target_week
 from syndicate.features.nfl.sources import tracked_week
 from syndicate.features.nfl.sources import week_summaries
 from syndicate.features.shared.discrete_nav import neighboring_values
@@ -262,3 +264,40 @@ def api_props():
     payload = build_rank_api_payload(context)
     payload["season"] = season
     return jsonify(payload)
+
+
+def _selected_preseason_week(season: int) -> int:
+    # Deliberately its own resolver, not _selected_week() -- preseason's
+    # week domain (1-4) and default (preseason_target_week(), the
+    # real-schedule-driven "next unplayed preseason week") are completely
+    # separate from the regular season's, never falls back to
+    # default_week().
+    raw = (request.args.get("week") or "").strip()
+    if raw:
+        try:
+            requested = int(raw)
+            if requested in (1, 2, 3, 4):
+                return requested
+        except ValueError:
+            pass
+    target = preseason_target_week(season)
+    return target if target is not None else 1
+
+
+@nfl_bp.get("/preseason")
+def preseason_hub():
+    return preseason_cards()
+
+
+@nfl_bp.get("/preseason/cards")
+def preseason_cards():
+    season = _selected_season()
+    context = build_preseason_cards_page_context(_selected_preseason_week(season), season=season)
+    return render_template("shared/game_cards_board.html", **context)
+
+
+@nfl_bp.get("/api/preseason/cards")
+def api_preseason_cards():
+    season = _selected_season()
+    context = build_preseason_cards_page_context(_selected_preseason_week(season), season=season)
+    return jsonify(build_game_board_api_payload(context))

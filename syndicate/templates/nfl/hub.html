@@ -14,6 +14,10 @@
 
   {% include 'shared/_hub_bettor_summary.html' %}
 
+  {% with route_label='/nfl/preseason', title='NFL Preseason', body='Real ESPN preseason schedule joined against a shrinkage-toward-league-neutral projection anchored on real prior-season team ratings -- carries much higher uncertainty than the regular-season board, disclosed on every card.', action_href='/nfl/preseason/cards?season=' ~ season, action_label='Open NFL preseason cards' %}
+    {% include 'shared/_module_intro.html' %}
+  {% endwith %}
+
   {% with eyebrow='Stored weekly snapshots', title='Available NFL recommendation weeks', body='The hub surfaces the weekly recommendation snapshot files already present in the source repo, so the first Syndicate NFL module is driven by real stored outputs.', summary_stats=summary_stats %}
     {% include 'shared/_content_panel.html' %}
   {% endwith %}

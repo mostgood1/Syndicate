@@ -231,3 +231,45 @@ def nfl_target_week(season: int) -> int | None:
             if not home_score and not away_score:
                 weeks_with_unplayed_games.add(week)
     return min(weeks_with_unplayed_games) if weeks_with_unplayed_games else None
+
+
+def real_preseason_schedule_path(season: int) -> Path:
+    return data_path(f"schedule_preseason_{season}.csv")
+
+
+def preseason_target_week(season: int) -> int | None:
+    """Same real, score-driven logic as nfl_target_week(), scoped to the
+    real preseason schedule (data/nfl_source/schedule_preseason_{season}.csv,
+    see scripts/fetch_nfl_preseason_schedule.py) and its closed week domain
+    (1-4, ESPN's own preseason week numbering). None if the file doesn't
+    exist, or every loaded game already has a real final score."""
+    path = real_preseason_schedule_path(season)
+    if not path.exists():
+        return None
+    weeks_with_unplayed_games: set[int] = set()
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            try:
+                week = int(row.get("week") or 0)
+            except (TypeError, ValueError):
+                continue
+            if week not in (1, 2, 3, 4):
+                continue
+            home_score = (row.get("home_score") or "").strip()
+            away_score = (row.get("away_score") or "").strip()
+            if not home_score and not away_score:
+                weeks_with_unplayed_games.add(week)
+    return min(weeks_with_unplayed_games) if weeks_with_unplayed_games else None
+
+
+def build_preseason_module_links(selected_week: int, active_label: str, *, season: int | None = None) -> list[dict[str, Any]]:
+    """Preseason's own nav -- deliberately NOT a branch inside
+    build_module_links() above, since preseason's week domain (1-4) and
+    route family (/nfl/preseason/...) are completely separate from the
+    regular-season one that function already serves."""
+    resolved_season = int(season or latest_season())
+    links = [
+        ("Preseason Cards", f"/nfl/preseason/cards?season={resolved_season}&week={selected_week}"),
+        ("Hub", "/nfl/hub"),
+    ]
+    return [{"label": label, "href": href, "active": label == active_label} for label, href in links]
