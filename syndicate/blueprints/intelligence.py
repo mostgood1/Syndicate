@@ -984,6 +984,53 @@ def _hydrate_board_response_payload(response_payload: dict[str, object] | None) 
 _LIVE_ARTIFACT_COLUMNS = ("live_projection", "actual")
 
 
+def _matchup_key(value: object) -> str:
+    return " ".join(str(value or "").upper().replace("@", " ").split())
+
+
+def _live_lens_game_index(context_label: str, report_cache: dict, index_cache: dict) -> dict | None:
+    """Index the live-lens report once per request: pk -> game, matchup -> game.
+
+    Built here rather than per candidate because a busy slate has hundreds of
+    candidates over ~15 games, and the report is the same document for all of
+    them.
+    """
+    if context_label in index_cache:
+        return index_cache[context_label]
+    try:
+        from syndicate.features.intelligence import _mlb_live_lens_report_cached
+        from syndicate.features.intelligence import _safe_int
+
+        report = _mlb_live_lens_report_cached(context_label, report_cache)
+        games = report.get("games") if isinstance(report, dict) else None
+        if not isinstance(games, list):
+            index_cache[context_label] = None
+            return None
+        by_pk: dict[int, dict] = {}
+        by_matchup: dict[str, dict] = {}
+        for game in games:
+            if not isinstance(game, dict):
+                continue
+            status = game.get("status") if isinstance(game.get("status"), dict) else {}
+            is_live = str(status.get("abstract") or "").strip().lower() == "live"
+            rows = game.get("trackedProps")
+            if not (isinstance(rows, list) and rows):
+                rows = game.get("props") if isinstance(game.get("props"), list) else []
+            entry = {"is_live": is_live, "rows": [row for row in rows if isinstance(row, dict)]}
+            game_pk = _safe_int(game.get("gamePk"))
+            if game_pk:
+                by_pk[game_pk] = entry
+            matchup = game.get("matchup") if isinstance(game.get("matchup"), dict) else {}
+            away = (matchup.get("away") or {}).get("abbr") if isinstance(matchup.get("away"), dict) else None
+            home = (matchup.get("home") or {}).get("abbr") if isinstance(matchup.get("home"), dict) else None
+            if away and home:
+                by_matchup[_matchup_key(f"{away} {home}")] = entry
+        index_cache[context_label] = {"by_pk": by_pk, "by_matchup": by_matchup}
+    except Exception:
+        index_cache[context_label] = None
+    return index_cache[context_label]
+
+
 def _refresh_live_columns_from_artifact(payload: dict[str, object]) -> None:
     """Re-read LIVE PROJ. / LIVE ACTUAL from the live-lens artifact at read time.
 
@@ -1017,25 +1064,48 @@ def _refresh_live_columns_from_artifact(payload: dict[str, object]) -> None:
     by_sport = payload.get("by_sport") if isinstance(payload.get("by_sport"), dict) else {}
 
     report_cache: dict[str, dict | None] = {}
-    rows_cache: dict[tuple[str, int], list] = {}
+    index_cache: dict[str, dict | None] = {}
     refreshed = 0
+    promoted = 0
 
     def _visit(candidate: object) -> None:
-        nonlocal refreshed
-        if not isinstance(candidate, dict) or not candidate.get("is_live"):
+        nonlocal refreshed, promoted
+        if not isinstance(candidate, dict):
             return
         if str(candidate.get("sport_slug") or "").lower() != "mlb":
-            return
-        game_pk = _safe_int(candidate.get("game_pk") or candidate.get("gamePk") or candidate.get("game_id"))
-        if not game_pk:
             return
         context_label = str(candidate.get("game_date") or candidate.get("source_board_date") or "").strip()
         if not context_label:
             return
-        cache_key = (context_label, game_pk)
-        if cache_key not in rows_cache:
-            rows_cache[cache_key] = _mlb_live_lens_prop_rows_for_game(context_label, game_pk, report_cache)
-        rows = rows_cache[cache_key]
+        index = _live_lens_game_index(context_label, report_cache, index_cache)
+        if not index:
+            return
+
+        # Resolve the game by pk, falling back to the matchup abbreviations.
+        # Confirmed live 2026-08-05: game_pk is blank on a fifth of MLB
+        # candidates (4 of 12 present for CWS @ BOS), and a candidate with no
+        # game identity could be matched to nothing at all.
+        game_pk = _safe_int(candidate.get("game_pk") or candidate.get("gamePk") or candidate.get("game_id"))
+        entry = index["by_pk"].get(game_pk) if game_pk else None
+        if entry is None:
+            entry = index["by_matchup"].get(_matchup_key(candidate.get("matchup")))
+        if entry is None:
+            return
+
+        # is_live was set per candidate during the build and disagreed with
+        # reality both across and WITHIN games: 8 MLB games were live while
+        # only 4 matchups had any candidate flagged, and PIT @ MIL had live
+        # numbers on 4 candidates with zero flagged live. The artifact's own
+        # per-game status is the authoritative, minutes-fresh answer, so use
+        # it rather than whatever the build happened to stamp. Only promotes
+        # to live -- demoting a card the build considers live is a bigger
+        # behaviour change than this read-path refresh should make.
+        if entry["is_live"] and not candidate.get("is_live"):
+            candidate["is_live"] = True
+            candidate.setdefault("lane", "live")
+            promoted += 1
+
+        rows = entry["rows"]
         if not rows:
             return
         before = {column: candidate.get(column) for column in _LIVE_ARTIFACT_COLUMNS}

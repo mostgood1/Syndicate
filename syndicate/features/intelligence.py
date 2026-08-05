@@ -6480,7 +6480,16 @@ def _mlb_hydrate_live_prop_projection(candidate: dict[str, Any], live_rows: list
     live_projection_value = _numeric_hint(matched_row.get("liveProjection"))
     if live_projection_value is not None:
         candidate["live_projection"] = f"{live_projection_value:.1f}"
-    actual_value = _numeric_hint(matched_row.get("actual"))
+    # The live-lens row carries the same number under three keys and does not
+    # always populate the first. Confirmed live 2026-08-05: LIVE ACTUAL was
+    # blank on every live prop on the board while the rows behind them had
+    # actualSoFar/actualValue set -- reading only "actual" is why the column
+    # looked universally empty.
+    actual_value = None
+    for key in ("actual", "actualSoFar", "actualValue"):
+        actual_value = _numeric_hint(matched_row.get(key))
+        if actual_value is not None:
+            break
     if actual_value is not None:
         candidate["actual"] = f"{actual_value:.1f}"
 
