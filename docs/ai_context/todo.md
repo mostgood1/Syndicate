@@ -1,5 +1,77 @@
 # Syndicate TODO — canonical cross-session list
 
+### ROOT CAUSED 2026-08-05 -- soccer odds_history: one broken league silently blocks movement for ALL soccer, every run
+
+Triggered two real manual soccer-only refreshes in production (per explicit
+request) to observe the new prop-row-coverage endpoint end to end. Neither
+populated odds_history for soccer. Traced the second (genuinely `--mode
+full`, confirmed in the launched command) all the way through and found the
+real cause -- not a props/write-gate bug (that was proven correct via local
+reproduction the previous entry), not purely the 8-hour pregame cadence
+(real, but not the operative blocker here).
+
+**`refresh_odds_sources.py`'s per-sport result aggregation is too coarse.**
+Its per-league loop does:
+```
+if not step_result["ok"]:
+    sport_result["ok"] = False        # unconditional, regardless of continue_on_error
+    if not args.continue_on_error:
+        return _finalize_sport_result(sport_result)
+...
+if execution_mode == "source" and spec.slug in {...} and sport_result["ok"]:
+    tracking_result = _sync_post_refresh_tracking_step(...)   # the odds_history sync
+```
+Both manual runs show `soccer_mls_odds`/`soccer_mls_props`/`soccer_mls_picks`
+all succeeding cleanly (confirmed: a genuinely fresh
+`mls/props/2026-08-05.csv` was written each time), while
+`primeira_liga`/`eredivisie`'s FIXTURE BUILD step
+(`build_soccer_artifacts.py::_fetch_fixtures` -> `fetch_events`) fails with
+`403 Client Error: Forbidden` from `site.api.espn.com` -- a DIFFERENT ESPN
+code path than `espn_lineups.py`, the one already fixed today (`ded23a0d`,
+confirmed by this session's own reconciliation entry: "soccer ingestion is
+NOT affected by the ESPN 403" -- true for lineups, not true for this
+fixture-fetch path). That one league's failure sets `sport_result["ok"] =
+False` for the WHOLE sport, and the odds_history sync is gated on that
+single flag -- so MLS's genuinely-fresh, genuinely-correct props data never
+reaches odds_history, on EVERY run, manual or the recurring full-mode
+production loop, because they share this exact code path.
+
+**This is the actual, complete answer to "why is soccer movement always
+zero":** not missing data, not a parsing bug, not (primarily) cadence -- a
+result-aggregation flag that treats one broken league as disqualifying every
+other league sharing the same sport slug.
+
+**Two independent fixes, either sufficient on its own, both worth doing:**
+1. Fix the ESPN 403 in `build_soccer_artifacts.py`'s fixture fetch --
+   almost certainly the same root cause as the already-fixed
+   `espn_lineups.py` case (`ded23a0d`, "drop the bare Mozilla/5.0
+   User-Agent that triggers it"), just a second call site that fix didn't
+   cover.
+2. Make the post-refresh-tracking gate per-league-aware in
+   `refresh_odds_sources.py`, so one league's failure cannot block
+   odds_history for the sport's other, healthy leagues. The more durable
+   fix -- (1) alone leaves the same class of bug live for the next
+   unrelated per-league failure.
+
+**Also fixed and deployed this pass, unrelated but found along the way:**
+`/api/ops/odds-refresh/run` hardcoded `mode="fast"`, silently discarding any
+`mode` the caller sent -- no manual trigger through that endpoint could ever
+reach the odds_history sync at all, for any sport. Fixed to honour an
+explicit `mode` in the request body (default unchanged). This is what made
+tracing the REAL bug above possible -- without it, both manual attempts
+would have silently hit "fast mode never syncs" and looked identical to the
+league-aggregation bug, with no way to tell them apart.
+
+**Not fixed this session:** neither the ESPN 403 fix nor the per-league gate
+fix. Both are scoped and clear next steps; recorded here rather than rushed,
+since the aggregation fix touches every sport's shared refresh
+orchestration, not just soccer, and deserves care rather than a fix made on
+a tight context budget.
+
+**Cost incurred:** two real OddsAPI-backed soccer refreshes triggered
+manually in production this session (small, scoped to soccer, well within
+normal operational use -- see project_oddsapi_call_budget.md).
+
 ### Reconciliation 2026-08-01 (MLB/WNBA/soccer props root causes + Layer 2 board blanks audit, long multi-thread session)
 
 Closing out this session -- long-running, many threads, all shipped work

@@ -2163,8 +2163,22 @@ def api_ops_odds_refresh_plan() -> Any:
 @ops_bp.post("/api/ops/odds-refresh/run")
 def api_ops_odds_refresh_run() -> Any:
     payload = _request_data()
+    # Was hardcoded mode="fast" here regardless of what the caller sent --
+    # _start_refresh_job's own mode= kwarg unconditionally overwrites
+    # launch_payload["mode"] before _payload_value ever gets a chance to read
+    # the request body's own "mode" key, so no caller of this endpoint could
+    # ever trigger a "full" refresh through it. Confirmed live 2026-08-05: a
+    # manually-triggered soccer refresh through this exact route ran
+    # end-to-end (all steps ok) but never reached
+    # refresh_odds_sources.py's post-refresh odds_history sync, because that
+    # call sits behind an `if refresh_mode == "fast": return` a few lines
+    # earlier in that script -- a manual "run odds refresh now" trigger
+    # could never populate movement data for anyone using this endpoint.
+    # Defaults to fast (unchanged for a bare POST), but a caller that
+    # explicitly asks for "full" now gets it.
+    requested_mode = str((payload or {}).get("mode") or "").strip().lower()
     try:
-        job_id, job = _start_refresh_job(payload, mode="fast")
+        job_id, job = _start_refresh_job(payload, mode=requested_mode or "fast")
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:

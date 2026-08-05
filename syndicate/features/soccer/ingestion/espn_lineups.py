@@ -23,7 +23,39 @@ from typing import Any
 import requests
 
 _ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer"
-_HEADERS = {"User-Agent": "Mozilla/5.0 (SyndicateSoccerSim)", "Accept": "application/json,text/plain,*/*"}
+# Was {"User-Agent": "Mozilla/5.0 (SyndicateSoccerSim)", "Accept":
+# "application/json,text/plain,*/*"}. A prior session's temporary probe
+# (81f091b7, 2026-08-04) tested this exact string against usa.1's bare
+# scoreboard (no date-range param) from a live Render deploy and got 200,
+# concluding soccer ingestion was not affected by the ded23a0d ESPN-403
+# fix that dropped this same class of header elsewhere in the repo
+# (fetch_espn_live_status_for_date.py, wnba/cards.py, schedule_adapter.py --
+# all confirmed 403 on the bare "Mozilla/5.0" string, 200 with no custom
+# header at all).
+#
+# That conclusion held for the narrower case it tested, not the general
+# one. Confirmed live 2026-08-05, during a real manual soccer refresh
+# through /api/ops/odds-refresh/run: this exact header on THIS function
+# (fetch_espn_scoreboard, called via fetch_events from
+# build_soccer_artifacts.py's _fetch_fixtures) returned a genuine 403 for
+# ned.1 (eredivisie) and por.1 (primeira_liga) WITH a real dates=
+# YYYYMMDD-YYYYMMDD range param -- the one difference from the earlier
+# probe's request shape. That single failure then silently blocked
+# odds_history for the ENTIRE soccer sport (see todo.md's "ROOT CAUSED
+# 2026-08-05" entry) -- refresh_odds_sources.py's per-sport result
+# aggregation treats one league's failure as disqualifying every other
+# league sharing the same sport slug, MLS included, even though MLS's own
+# ingestion never touches this failing code path.
+#
+# No local repro is possible for either the 403 or the fix -- only
+# Render's outbound IP is affected (confirmed empirically for the other 3
+# sites; ESPN's public scoreboard/summary endpoints work from every other
+# tested origin regardless of headers). Dropping the custom header
+# entirely is the same proven remediation already applied at those 3
+# sites: sending no custom User-Agent/Accept -- the underlying library's
+# own honest default -- returned 200 in every case tested. Do not
+# reintroduce a custom header here without re-verifying against a real
+# Render deploy first.
 
 LEAGUE_ESPN_SLUGS: dict[str, str] = {
     "epl": "eng.1",
@@ -43,7 +75,7 @@ def fetch_espn_scoreboard(league: str, *, date_range: str | None = None, timeout
     slug = LEAGUE_ESPN_SLUGS[str(league).strip().lower()]
     url = f"{_ESPN_BASE}/{slug}/scoreboard"
     params = {"dates": date_range} if date_range else {}
-    response = requests.get(url, params=params, headers=_HEADERS, timeout=timeout)
+    response = requests.get(url, params=params, timeout=timeout)
     response.raise_for_status()
     return response.json()
 
@@ -94,9 +126,7 @@ def fetch_completed_events(league: str, *, date_windows: list[str], timeout: int
 
 def fetch_match_summary(league: str, event_id: str, *, timeout: int = 20) -> dict[str, Any]:
     slug = LEAGUE_ESPN_SLUGS[str(league).strip().lower()]
-    response = requests.get(
-        f"{_ESPN_BASE}/{slug}/summary", params={"event": event_id}, headers=_HEADERS, timeout=timeout
-    )
+    response = requests.get(f"{_ESPN_BASE}/{slug}/summary", params={"event": event_id}, timeout=timeout)
     response.raise_for_status()
     return response.json()
 

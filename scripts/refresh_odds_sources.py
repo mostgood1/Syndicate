@@ -2109,8 +2109,36 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
         _log_memory("sport_step_post_append_before_fast_finalize", sport=sport, refresh_mode=refresh_mode)
         return _finalize_sport_result(sport_result)
 
-    _log_memory("sport_step_post_append_before_post_refresh_check", sport=sport, execution_mode=execution_mode, sport_ok=bool(sport_result.get("ok")))
-    if execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaab", "ncaaf", "soccer"} and sport_result["ok"]:
+    # Was `and sport_result["ok"]` -- a single AND across EVERY step of the
+    # whole sport, including ones that have nothing to do with odds_history
+    # at all. For soccer specifically, refresh_steps is a flat list spanning
+    # every league's odds/props/picks/artifacts tasks, one entry per
+    # (league, task): a single unrelated league's fixture-artifact-build
+    # step failing (confirmed live 2026-08-05: an ESPN 403 on
+    # primeira_liga/eredivisie's fixture fetch, since fixed, see
+    # espn_lineups.py) set sport_result["ok"] = False for the ENTIRE sport,
+    # which silently skipped the odds_history sync for every league
+    # including MLS -- whose own odds/props steps had already succeeded and
+    # written genuinely fresh data to disk (see todo.md's "ROOT CAUSED
+    # 2026-08-05" entry for the full trace). The sync itself
+    # (_sync_post_refresh_tracking_step -> sync_sport_post_refresh_tracking)
+    # is already safe to call this way: it only reads whatever odds/props
+    # files actually exist on disk (per-league for soccer), wraps its own
+    # work in try/except, and reports its own ok/failure back into
+    # sport_result below regardless -- there was never a correctness reason
+    # to require every OTHER step to have succeeded first, only a
+    # historical accident of using the same blanket flag everywhere.
+    #
+    # any(...) instead: attempt the sync whenever at least one step in this
+    # sport's refresh actually ran and succeeded, so a genuinely healthy
+    # league's data still reaches odds_history even when a sibling league
+    # is broken. A wholesale failure (zero successful steps, or an early
+    # return before this point at all -- see _validate_source_root's
+    # source_error path above) still correctly skips it, since there is
+    # nothing on disk worth syncing in that case.
+    sport_had_a_successful_step = any(bool(step.get("ok")) for step in sport_result["refresh_steps"])
+    _log_memory("sport_step_post_append_before_post_refresh_check", sport=sport, execution_mode=execution_mode, sport_ok=bool(sport_result.get("ok")), sport_had_a_successful_step=sport_had_a_successful_step)
+    if execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaab", "ncaaf", "soccer"} and sport_had_a_successful_step:
         _log_memory("sport_step_post_append_enter_post_refresh_branch", sport=sport, execution_mode=execution_mode)
         _log_memory("sport_step_post_append_before_post_refresh_root", sport=sport, execution_mode=execution_mode)
         post_refresh_root = _post_refresh_root(spec)
