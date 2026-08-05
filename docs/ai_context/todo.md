@@ -1,5 +1,32 @@
 # Syndicate TODO — canonical cross-session list
 
+### RECONCILIATION 2026-08-05 (addendum) -- final sync confirmed, no new work this pass
+
+Re-checked archive-safety after the earlier same-day close-out (see
+"RECONCILIATION 2026-08-05 -- session close-out" below). Nothing new to
+report; confirming the state held.
+
+- Local was 0 ahead / 2 behind origin -- fast-forwarded cleanly, no
+  conflict. The 2 incoming commits are a concurrent session's own work
+  (soccer `commence_time` diagnostic + NFL preseason wiring), already
+  committed properly on their end -- the uncommitted preseason files flagged
+  as in-progress in the earlier close-out are now landed and clean.
+- All three services confirmed live on the exact tip commit (`65695ba3`) at
+  time of check -- nothing of this session's or the concurrent session's
+  work is undeployed.
+- `EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS` still unset (confirmed
+  via the Render API, not assumed) -- the diagnostic override from earlier
+  stayed reverted. `SYNDICATE_ACTIVE_SPORTS=mlb,wnba,soccer` unchanged,
+  still intentional.
+- 323/323 tests pass across every file touched this session, run fresh
+  against the final merged HEAD (not just the state at the earlier
+  close-out).
+
+Everything genuinely open is still exactly what the earlier close-out
+entry lists -- not re-verified in more depth this pass (no new evidence
+gathered on the props self-heal running unattended or the ledger surviving
+a further deploy; both need tomorrow's slate to actually test).
+
 ### CORRECTION 2026-08-05 -- NFL preseason: shrinkage was over-flattening real team identity, fixed
 
 Follow-up to the "NFL: real preseason support" entry below (same session,
