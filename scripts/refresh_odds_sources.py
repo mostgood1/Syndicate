@@ -908,7 +908,25 @@ def _build_nfl_steps(args: argparse.Namespace) -> list[RefreshStep]:
     # preseason game has a final score, preseason_target_week() returns
     # None and there is nothing left for OddsAPI's preseason sport key
     # (americanfootball_nfl_preseason) to have a live line for.
-    if nfl_preseason_target_week(season) is not None:
+    #
+    # The schedule-status check is real-data-driven, but it is also the
+    # ONLY gate -- if the preseason schedule mirror ever stopped being
+    # refreshed with real final scores (a stalled fetch_nfl_preseason_
+    # schedule.py run, say), it would read as "still unplayed" forever and
+    # this step would keep firing indefinitely, well past the real
+    # preseason window. Confirmed live: a stale/never-updated committed
+    # schedule snapshot did exactly this in a regression test run against
+    # date=2026-10-01 (October), long after preseason genuinely ends.
+    # A real calendar backstop -- the actual 2026 preseason window is
+    # Aug 7 - Sep 8 -- closes that gap without weakening the schedule
+    # check for the real active window.
+    requested_month = 0
+    try:
+        requested_month = int(str(args.date or "")[5:7])
+    except (TypeError, ValueError):
+        pass
+    preseason_calendar_window = requested_month in (7, 8, 9)
+    if preseason_calendar_window and nfl_preseason_target_week(season) is not None:
         steps.append(
             RefreshStep(
                 name="nfl_preseason_oddsapi_refresh",

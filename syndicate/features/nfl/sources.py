@@ -238,11 +238,27 @@ def real_preseason_schedule_path(season: int) -> Path:
 
 
 def preseason_target_week(season: int) -> int | None:
-    """Same real, score-driven logic as nfl_target_week(), scoped to the
-    real preseason schedule (data/nfl_source/schedule_preseason_{season}.csv,
-    see scripts/fetch_nfl_preseason_schedule.py) and its closed week domain
+    """Same real, score-driven intent as nfl_target_week() -- "which week
+    should we be preparing for right now" -- scoped to the real preseason
+    schedule (data/nfl_source/schedule_preseason_{season}.csv, see
+    scripts/fetch_nfl_preseason_schedule.py) and its closed week domain
     (1-4, ESPN's own preseason week numbering). None if the file doesn't
-    exist, or every loaded game already has a real final score."""
+    exist, or every loaded game is already final.
+
+    Deliberately keyed on ``status`` rather than blank home_score/away_score
+    (the convention nfl_target_week() uses against the nflverse-sourced
+    regular-season schedule): confirmed live that
+    fetch_nfl_preseason_schedule.py's ESPN source writes "0"/"0" for a
+    not-yet-played game, not blank -- a blank-score check against real
+    preseason data always found zero "unplayed" games and returned None
+    unconditionally, which silently defeated this function for every real
+    2026 preseason week (and, downstream, the odds-refresh gating in
+    refresh_odds_sources.py, the resim autorun in run_refresh_worker.py,
+    and Layer 2 candidate generation in blueprints/home.py -- all three
+    call this). ESPN's own status string is "Final" for a completed game
+    (confirmed against the real 2025 preseason schedule) and anything else
+    ("Scheduled", "In Progress", blank in a test fixture) for one that
+    is not, which is the actually-reliable signal here."""
     path = real_preseason_schedule_path(season)
     if not path.exists():
         return None
@@ -255,9 +271,8 @@ def preseason_target_week(season: int) -> int | None:
                 continue
             if week not in (1, 2, 3, 4):
                 continue
-            home_score = (row.get("home_score") or "").strip()
-            away_score = (row.get("away_score") or "").strip()
-            if not home_score and not away_score:
+            status = str(row.get("status") or "").strip().lower()
+            if status != "final":
                 weeks_with_unplayed_games.add(week)
     return min(weeks_with_unplayed_games) if weeks_with_unplayed_games else None
 
