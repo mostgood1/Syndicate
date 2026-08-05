@@ -1,5 +1,78 @@
 # Syndicate TODO — canonical cross-session list
 
+### Reconciliation 2026-08-05 (board-accuracy session CLOSED -- 16 commits, what is proven vs merely shipped)
+
+Read the HANDOFF entry below this one for the open work. This entry is the
+honest accounting of what actually got validated.
+
+**Shipped and PROVEN against production (measured, not inferred):**
+- Board movement, MLB: **0/354 -> 373/373**. Root cause was transport, not the
+  join: refresh-worker builds the board but can only PULL, and the pull is a
+  24MB-budgeted bulk export against a ~51MB odds_history shard, so MLB's shard
+  could never cross while WNBA's (34 markets, kilobytes) always did. Fixed with
+  a streamed per-file transport (`49442bed`).
+- Odds-history sharding by Central betting day (`aee3bb8d`): the 2026-08-04 MLB
+  shard went **9 games -> 15 games / 3,517 markets**, including SD@AZ and
+  DET@SEA which had previously landed in NEITHER shard.
+- Live-flag correctness (`dcd5659b`): **55 of 58** MLB candidates now flagged
+  live, covering all 12 live matchups. Before: 4 matchups, with PIT@MIL,
+  MIA@ATL, STL@NYY and MIN@KC at zero flagged while live.
+- Live hitter-prop hydration: watcher confirmed `LIVE HYDRATION RECOVERED`
+  (4/5 live_projection, 3/5 actual) after the read-path refresh landed.
+- The original 6 `test_live_refresh_loop.py` failures: fixed, stable across
+  three consecutive full-file runs (203/203).
+
+**Shipped but NOT verified in production (do not treat as done):**
+- Soccer movement (`d072999c`) -- soccer sat at 0/18 all session.
+- Non-MLB steam (`6647a975` retention, `c2e3e648` cross-service publish) -- no
+  WNBA/soccer steam ever appeared on the board.
+- Totals-steam merge into the real bet (`e9c3058a`).
+- **Live-actual line-mismatch fix (`68d05266`)** -- caught by the #71 check as
+  missing from this file, recorded here now. `_mlb_hydrate_live_prop_projection`
+  required the board's line to EQUAL the live-lens registry's line before
+  attaching anything, which discarded real values: replaying production's own
+  report against its own candidates, 8 of 9 live props matched on player+market
+  and 2 were rejected on line alone (Luis Arraez board 2.5 / lens 1.5, carrying
+  actual=2.0 liveProjection=2.081; Luis Torrens board 4.5 / lens 0.5, carrying
+  actual=6.0). The gate was wrong in kind: `actual` and `liveProjection` are
+  STAT-level, not bet-level -- Arraez has two hits whichever line you look at.
+  Line is now a preference, not a filter. Real fix, but secondary: it accounted
+  for ~2 of 9, not the bulk of the blanks.
+
+**Three bugs of the SAME class, found in three different subsystems.** Worth
+naming because a fourth is likely: something is written on one Render service
+and read on another, with no transport between them.
+1. odds_history -- 51MB shard vs a 24MB pull budget (starved).
+2. steam events -- written by whichever service ran the refresh, never
+   published at all, so a board built on refresh-worker could only ever see
+   MLB steam (the one sport refresh-worker refreshes itself).
+3. pitcher live rows -- computed on web for /mlb, never emitted as an artifact,
+   so the board cannot see them. STILL OPEN, see HANDOFF #1.
+
+**Where I was wrong, recorded so the next session discounts appropriately:**
+- Called the read-path live-column fix broken twice on bad measurements. My
+  probe recursed the whole payload and deduped to first-seen, which reads the
+  UN-refreshed nested copy; the collections the page renders showed 55/58 the
+  whole time. Measure what the page renders.
+- Asserted "no pitcher data exists anywhere" from a single artifact. User
+  pushed back ("mlb page has a pitcher lane") and was right -- the data is
+  computed on demand in `mlb/cards.py` and renders live on /mlb today.
+- Claimed odds_history was not in HOT_ARTIFACT_PATTERNS, repeating a stale
+  code comment instead of testing the patterns. It is allowlisted, on two of
+  three candidate paths.
+- Ran a "full suite" through `tail -30` and learned nothing: this repo's
+  process-memory diagnostics flushed the pytest summary out of the window.
+
+**Tests:** 4173 passed / 12 failed / 4 skipped (20m53s). Not clean. One failure
+confirmed pre-existing (`shadow_candidate_ledger.py` via the timezone guard),
+three are order-dependent and pass file-alone, eight untriaged -- see HANDOFF
+#2. ~60 tests added this session, all passing in their own files.
+
+**Deploys:** ~8 deploys across the three services, all via the Render API with
+`scripts/check_deploy_safety.py` checked first. One sim killed deliberately on
+explicit instruction; every other deploy either waited for a clear window or
+took only an in-flight odds refresh (cheap, self-heals next tick).
+
 ### HANDOFF 2026-08-05 -- START HERE (board-accuracy session; all below is committed+deployed unless marked)
 
 All source committed and pushed to `main`; services live on `dcd5659b` or later.
