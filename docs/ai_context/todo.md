@@ -198,7 +198,10 @@ uncommitted work directly.
    likely `_BUILD_LIVE_STATE_PAYLOAD_CACHE` this time. A 4th failure
    (`test_wnba_cards_empty_slate_does_not_inject_fake_sample_game`) is
    separate and unrelated (two different empty-state code paths choosing
-   different message text).
+   different message text). **Update: user started this as its own
+   session (`task_b4637457`) shortly after it was spawned -- it is
+   running independently as of this reconciliation. Do not duplicate;
+   check its outcome before starting fresh work on the same tests.**
 
 ### RESOLVED 2026-08-05 -- WNBA "not showing live": two real, independent bugs, both fixed, deployed, and confirmed on the live board itself
 
