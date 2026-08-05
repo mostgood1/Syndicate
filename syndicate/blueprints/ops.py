@@ -831,6 +831,24 @@ def api_ops_odds_history_matchup_coverage() -> Any:
     })
 
 
+@ops_bp.get("/api/ops/home-props/match-diagnostic")
+def api_ops_home_props_match_diagnostic() -> Any:
+    # Read-only, temporary (2026-08-05). The soccer commence_time fix
+    # (home.py::_finalize_home_prop_rows) is deployed and confirmed
+    # EXECUTING (refresh-worker's board-build loop rebuilds soccer's
+    # overview repeatedly), but 3 real candidates (Carles Gil/Peyton
+    # Miller/Will Sands, "Anytime Goalscorer") still show no commence_time
+    # after multiple confirmed rebuilds. The fix only fires when
+    # _home_prop_matched_game finds a match; this answers whether it does,
+    # and if not, what identity the row carried vs. what the game index
+    # actually contains -- without needing another print-only trace, which
+    # Render's log API has already missed twice this session. Remove once
+    # the soccer commence_time gap is resolved and confirmed.
+    status_path = reports_root() / "refresh_status" / "latest" / "home_prop_match_diagnostic_status.json"
+    by_slug = read_json_file(status_path) or {}
+    return jsonify({"ok": True, "by_slug": by_slug if isinstance(by_slug, dict) else {}})
+
+
 @ops_bp.post("/api/ops/bootstrap/run")
 def api_ops_bootstrap_run() -> Any:
     # Calls _sync_bootstrap_roots directly (not main(), which only ever
