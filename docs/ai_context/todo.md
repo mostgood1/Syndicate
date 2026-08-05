@@ -1,5 +1,115 @@
 # Syndicate TODO — canonical cross-session list
 
+### DONE (mostly) 2026-08-05 -- NFL preseason: deployed, wired into odds/resim autorun, Layer-1 market board, and Layer-2 opportunity feed -- one open verification item
+
+Continuation of the same day's earlier NFL preseason build (real ESPN
+schedule, depth-chart context, shrinkage-corrected projection model,
+cards UI, real odds overlay -- see prior entries same day). This entry
+covers deploying it and wiring it into every system the user asked for:
+odds worker, resim autorun, Layer-1 market board, and (after the user
+asked to go further) the Layer-2 cross-sport opportunity feed. Commits
+`e6288d3e` (deploy trigger + odds/resim/market-board wiring) ->
+`1c458271` (Layer 2 translator + provider wiring) -> `22b11622` (real bug
+fix, see below) -> `ccae6bbf` (second real bug fix, see below). All
+deployed to web + refresh-worker + live-odds-worker.
+
+**Odds orchestrator + resim autorun (both real, both correct):**
+`scripts/refresh_odds_sources.py::_build_nfl_steps` now appends a
+preseason `RefreshStep` (shells `fetch_nfl_preseason_odds.py`), gated on
+`preseason_target_week(season) is not None` AND a calendar backstop
+(requested month in {7,8,9} -- added after a regression test caught the
+schedule-status check alone having no protection against a stalled
+mirror reading "still unplayed" forever). `run_refresh_worker.py`'s new
+`_launch_autorun_preseason_projections` mirrors the regular-season
+season-projection autorun exactly (env-gated
+`SEASON_PROJECTION_ENABLE_REFRESH_WORKER_PRESEASON_AUTORUN`, now `true`
+in prod on refresh-worker, PID-guarded under its own `"nfl_preseason"`
+key).
+
+**Layer-1 market board (real, correct, verified live):**
+`build_nfl_preseason_market_board` (`nfl/preseason_cards.py`), reusing
+`cards.py`'s existing `_nfl_market_board_rows_for_game`/
+`_NFL_MARKET_BOARD_DISPLAY_LABELS` and `market_inventory.join_odds_to_sim`
+-- real odds joined to real sim. Routes `/nfl/preseason/market-board`
+(HTML) + `/nfl/api/preseason/market-board` (JSON). Confirmed live on
+`syndicate-an21.onrender.com`: real Hall of Fame Game (CAR @ ARI), real
+logos, `join_status: "matched"`.
+
+**Two real, previously-undiscovered bugs found and fixed while verifying
+Layer 2 -- both blocked things believed shipped earlier the same day:**
+
+1. **`preseason_target_week()` (`nfl/sources.py`) always returned `None`
+   against real 2026 data.** It copied `nfl_target_week()`'s "blank
+   home_score/away_score means unplayed" convention, but
+   `fetch_nfl_preseason_schedule.py`'s ESPN source writes `"0"`/`"0"` for
+   a not-yet-played game, not blank -- the regular-season nflverse source
+   writes true blanks, so `nfl_target_week()` was never affected by the
+   same mistake. This silently defeated the odds-refresh gating, the
+   resim autorun, AND Layer 2 candidate generation (all three call this)
+   for the ENTIRE 2026 preseason, despite each having been built,
+   tested, and deployed as if working. Fixed to key on the real `status`
+   column (`"Final"` vs anything else) instead. Commit `22b11622`.
+
+2. **`_build_sport_overview`'s NFL branch (`home.py` ~line 6204) never
+   considered preseason at all**, always resolving `selected_week` via
+   `nfl_default_week()`/`tracked_week()` with a hardcoded `1` fallback --
+   and `nfl_default_week()` itself already returns `1` as soon as the
+   regular season is next up, which is true throughout preseason too (no
+   regular-season game has been played either way). So `context.week`
+   passed to `_NFLDataProvider.games()` was NEVER actually `None` in
+   this real call path, even mid-preseason -- silently defeating the
+   `context.week is None` preseason branch built into `.games()` earlier
+   the same day, confirmed working in isolation but never actually
+   reached in production. Fixed by checking `preseason_target_week()`
+   first and leaving `selected_week = None` (using
+   `build_preseason_module_links` for nav) when it's non-`None`. Commit
+   `ccae6bbf`. Confirmed via `build_intelligence_overview()` directly:
+   NFL now reports `context_label="2026 Preseason"`, 1 dashboard game,
+   real Moneyline recommendation attached (`odds=105.0,
+   confidence=0.54`).
+
+**Site-wide config change, done with explicit user confirmation:**
+`SYNDICATE_ACTIVE_SPORTS` (gates which sports appear on the real home
+dashboard / Layer 2 feed for every visitor -- separate from all of the
+above) was `mlb,wnba,soccer` on both web and refresh-worker; NFL was
+never in it, independent of any of today's work. User confirmed adding
+it; now `mlb,wnba,soccer,nfl` on both services, deployed.
+
+**Operational note for future NFL/preseason work:** `preseason_target_week`
+and any `context.week is None`-style "is this preseason" check is now the
+correct, load-bearing signal across four call sites (odds-refresh gating,
+resim autorun, `_NFLDataProvider.games()`, `_build_sport_overview`'s NFL
+branch) -- if a fifth NFL preseason integration point is added, check
+whether it needs this same signal rather than assuming week-number-based
+logic already covers it.
+
+**Still open, not fully confirmed:** all four fixes were verified
+correct locally, end-to-end, via direct calls to
+`build_intelligence_overview()` (real Moneyline candidate produced,
+`context_label="2026 Preseason"`). On the deployed production service,
+`/api/intelligence/query` still showed `nfl=0` candidates as of the last
+check this session, immediately after the final deploy -- most likely
+just the intelligence-state background loop's own recompute cadence
+(unknown interval, owned by `pipeline/intelligence_state.py`'s loop in
+refresh-worker) not having completed a fresh cycle yet, not a code
+issue, since the exact same code path was directly proven correct
+locally. **Before assuming this is still broken in a future session,
+re-check `/api/intelligence/query` (`{"question": "best bets today"}`)
+for real `sport: "nfl"` cards -- it may already have resolved on its
+own.** If it's still `nfl=0` after a genuinely fresh check, the next
+diagnostic step is tracing the board-window watch set's own rebuild
+trigger/interval in `pipeline/intelligence_state.py`
+(`_ensure_default_board_window_watched` and friends), not re-checking
+anything in `home.py` -- that layer is now confirmed correct.
+
+**Explicitly out of scope, flagged not built:** NFL regular season
+itself still doesn't reach Layer 2 via a dedicated recommendation-CSV
+generator the way NHL/NBA do -- it reaches it only via the same
+`build_nfl_market_board`/`join_odds_to_sim`-backed translator built for
+preseason. This is real and correct, just worth knowing it's a lighter-
+weight mechanism (no persisted recommendation artifact, computed at
+overview-build time) than NHL/NBA's own pipelines.
+
 ### OPEN 2026-08-05 -- soccer commence_time: TWO real bugs found+fixed+deployed, still not reaching the served board
 
 Continuation of the earlier OPEN entry (now superseded by this one -- keep
