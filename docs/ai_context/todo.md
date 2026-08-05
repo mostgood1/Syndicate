@@ -102,6 +102,103 @@ props snapshot's row count immediately before the write, same pattern as
 the odds_history_h2h_matchup_coverage trace already in this file, to
 confirm which side of that boundary the data is lost on.
 
+### ROOT CAUSE 2026-08-05 -- the evaluation ledger was living in EPHEMERAL storage, wiped by every deploy
+
+Supersedes and explains every earlier "matched: 0" entry today. This was
+never really about date windows, grading timing, or the join -- those were
+all real, independently-confirmed bugs and correctly fixed, but none of
+them could ever have produced a stable non-zero `matched` because the
+ledger itself never survived long enough to accumulate overlap.
+
+**Root cause.** `intelligence_evaluation.py`'s `DEFAULT_LEDGER_PATH` was
+computed as `repo_root_from(__file__) / "reports" / "intelligence" /
+"evaluation_ledger.jsonl"` -- a path relative to the CODE checkout. Render
+rebuilds the code checkout fresh on every deploy; the PERSISTENT disk is a
+separate mount at `SYNDICATE_REPORTS_ROOT`
+(`/opt/render/project/data/reports`). So every ledger record written
+between deploys landed on ephemeral storage and vanished on the next
+deploy -- mine or a concurrent session's.
+
+**Confirmed with a direct on-disk check, not inferred.** Extended
+`_launch_autorun_evaluation_settlement`'s status write with
+`chunk_diagnostics` (`17403358`) -- per-date `.exists()`/`.stat()` on the
+actual chunk files, independent of `settle_ledger_for_dates`' own counting.
+Forced one cycle via the sanctioned interval override (reverted
+immediately after): **every single chunk file for all 21 dates in the
+lookback window reported `exists: false`.** Combined with the numbers
+observed across the day -- 1344 (2-day window) -> 194 (21-day window,
+right after that deploy) -> 98 (next morning, stale cache) -> 0 (fresh read
+after three more refresh-worker deploys) -- the pattern is exactly what
+"wiped on every deploy, partially repopulated between deploys" looks like.
+
+`reports/intelligence/evaluation_ledger_chunks/` is correctly gitignored
+(`.gitignore:137`), so nothing seeds it back on a fresh checkout either --
+confirmed via `git check-ignore`. One stray file, `2026-07-05.jsonl`, IS
+tracked in git (`git ls-files` shows it) -- almost certainly committed
+before the gitignore rule existed, and itself a small piece of evidence
+that this was never meant to live in the repo checkout.
+
+**Precedent already existed in this codebase and was missed.**
+`prediction_ledger.py`'s `_default_ledger_path()` has an explicit comment
+warning about this EXACT failure mode and correctly uses `data_root()`
+instead -- someone already found and fixed this bug class there. This
+should have been checked against that precedent before today's ledger work
+shipped.
+
+**Fixed, both using the established `reports_root()`/`data_root()`
+pattern** (honours `SYNDICATE_REPORTS_ROOT`/`_STATE_ROOT` when hosted,
+falls back to a repo-relative path identical to the old behaviour when
+not -- so this is a no-op change locally/in tests and only changes
+anything on Render, where it was actually broken):
+- `syndicate/features/shared/intelligence_evaluation.py::DEFAULT_LEDGER_PATH`
+  -- the real evaluation ledger the settlement/reliability pipeline reads.
+- `syndicate/features/shared/shadow_candidate_ledger.py::DEFAULT_SHADOW_LEDGER_ROOT`
+  -- found by the same audit (same `repo_root_from(__file__)` pattern,
+  same "ledger" naming, checked because it was the obvious sibling). A
+  recently-added, currently off-by-default feature
+  (`SYNDICATE_SHADOW_CANDIDATE_LEDGER_ENABLED`), so no production data was
+  lost by this one specifically -- but it would have hit the identical
+  wall the moment it was enabled.
+
+86 tests pass across both files' test suites (`test_intelligence_evaluation.py`,
+`test_price_clv.py`, `test_evaluation_settlement.py`,
+`test_board_state_ledger_recording.py`, `test_refresh_worker.py`,
+`test_evaluation_settlement_daily_gate.py`, `test_shadow_candidate_ledger.py`,
+`test_board_price_gate_and_ranker.py`).
+
+**NOT audited, deliberately bounded rather than silently skipped.** 15 more
+files use `repo_root_from` for SOME purpose:
+`syndicate/features/football/ingestion/source_fetchers.py`,
+`syndicate/features/nfl/sources.py`,
+`syndicate/features/shared/artifact_manifests.py`,
+`syndicate/features/shared/basketball_props_predictions.py`,
+`syndicate/features/shared/basketball_props_smart_sim.py`,
+`syndicate/features/shared/live_refresh_loop.py`,
+`syndicate/features/shared/model_version.py`,
+`syndicate/features/shared/ops_refresh.py`,
+`syndicate/features/shared/recommendation_engine.py`,
+`syndicate/features/shared/refresh_state_store.py` (defines `repo_root_from`
+itself, not a misuse), `syndicate/features/shared/schedule_adapter.py`,
+`syndicate/features/shared/source_roots.py` (same, the definition),
+`syndicate/features/wnba/cards.py`, `pipeline/intelligence_state.py`.
+NOT all of these are bugs -- `repo_root_from` is legitimately used for
+things that SHOULD be code-checkout-relative (vendored package roots, code
+paths). The bug is specifically "a path meant to PERSIST across deploys
+computed via `repo_root_from` instead of `reports_root()`/`data_root()`".
+Each needs its actual purpose read before judging it, the same way
+`prediction_ledger.py`'s existing correct usage was distinguished from the
+two bugs above by inspection, not by the function name alone. Worth a
+dedicated pass -- this bug class has now been found real, in production,
+twice in one day.
+
+**Impact on today's earlier claims.** The Phase 0/2/3 "feedback loop
+closed" and "35/98/194 records confirmed" claims from earlier today were
+riding on ledger data that could not have survived past the next deploy --
+not wrong in the sense of fabricated, the reads were real at the time, but
+none of them were ever measuring a STABLE state. Today's actual `matched`
+count is not yet re-measured post-fix; that is the real next check, not
+another repeat of "did settlement match yet".
+
 ### RECONCILIATION 2026-08-05 (session close-out) -- two stale WNBA test failures fixed, unrelated to the cards.py caching change that surfaced them
 
 User was making a caching fix in `syndicate/features/wnba/cards.py` and hit

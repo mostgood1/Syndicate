@@ -26,12 +26,32 @@ from syndicate.features.shared.artifact_manifests import load_artifact_manifests
 from syndicate.features.shared.model_scoring import binary_calibration_metrics
 from syndicate.features.shared.model_version import code_version
 from syndicate.features.shared.odds_lifecycle import market_feature_summary
+from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
-from syndicate.features.shared.source_roots import repo_root_from
 
 
 SCHEMA_VERSION = 1
-DEFAULT_LEDGER_PATH = repo_root_from(__file__) / "reports" / "intelligence" / "evaluation_ledger.jsonl"
+# Root-caused live 2026-08-05: this used to be repo_root_from(__file__),
+# i.e. a path relative to the CODE checkout, not the persistent data disk.
+# On Render, SYNDICATE_REPORTS_ROOT points at the mounted disk
+# (/opt/render/project/data/reports); the code checkout is rebuilt fresh on
+# every deploy. So every evaluation-ledger record written between deploys
+# was landing on ephemeral storage and vanishing on the next one -- not a
+# counting bug, not a scheduling bug, but the entire ledger being silently
+# wiped by any deploy (mine or a concurrent session's). Confirmed directly:
+# total_recommendation_records dropped from a real 194 to a real, disk-level
+# 0 (every chunk file "exists: false") within ~19.5h spanning three
+# refresh-worker deploys, and reports/intelligence/evaluation_ledger_chunks/
+# is correctly gitignored, so nothing seeds it back on a fresh checkout.
+# This explains why "matched" never went non-zero all day despite the
+# record/grade/settle mechanics each independently working: the ledger
+# never survived long enough to accumulate overlap.
+# reports_root() honours SYNDICATE_REPORTS_ROOT/SYNDICATE_STATE_ROOT and
+# only falls back to a repo-relative path when NOT hosted (RENDER unset),
+# which is exactly this file's old behaviour for local dev/tests -- so this
+# change is a no-op locally and only changes anything on Render, where it
+# was actually broken.
+DEFAULT_LEDGER_PATH = reports_root() / "intelligence" / "evaluation_ledger.jsonl"
 DEFAULT_LEDGER_CHUNK_ROOT = DEFAULT_LEDGER_PATH.parent / "evaluation_ledger_chunks"
 DEFAULT_LEDGER_INDEX_PATH = DEFAULT_LEDGER_CHUNK_ROOT / "index.json"
 DEFAULT_LEDGER_MANIFEST_PATH = DEFAULT_LEDGER_CHUNK_ROOT / "manifest.json"

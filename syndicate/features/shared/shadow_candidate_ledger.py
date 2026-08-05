@@ -36,9 +36,18 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Mapping
 
-from syndicate.features.shared.source_roots import repo_root_from
+from syndicate.features.shared.refresh_state_store import reports_root
 
-DEFAULT_SHADOW_LEDGER_ROOT = repo_root_from(__file__) / "reports" / "intelligence" / "shadow_candidate_ledger"
+# Same bug class root-caused in intelligence_evaluation.py's
+# DEFAULT_LEDGER_PATH on 2026-08-05, fixed here at the same time: this used
+# to be repo_root_from(__file__) -- a path relative to the CODE checkout,
+# which Render rebuilds fresh on every deploy, not the persistent disk
+# mounted at SYNDICATE_REPORTS_ROOT. Every shadow-ledger record would have
+# been silently wiped on the next deploy, same as the real evaluation
+# ledger was. reports_root() honours SYNDICATE_REPORTS_ROOT/_STATE_ROOT and
+# only falls back to a repo-relative path when not hosted, so this is a
+# no-op locally and only changes anything on Render, where it was broken.
+DEFAULT_SHADOW_LEDGER_ROOT = reports_root() / "intelligence" / "shadow_candidate_ledger"
 
 # The exact fields needed to identify a candidate and later grade it the
 # same way evaluation_settlement.py grades a real recommendation --
