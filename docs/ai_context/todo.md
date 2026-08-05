@@ -1,5 +1,75 @@
 # Syndicate TODO — canonical cross-session list
 
+### RECONCILIATION 2026-08-05 (session close-out, ~01:45-04:45 CDT) -- pitcher live-lens handoff picked up, corrected, and fixed; mojibake investigated and retracted
+
+Picked up the prior session's HANDOFF #1 ("pitcher live lens: make it an
+artifact") as the stated priority. Ran the full session with a concurrent
+session also actively pushing to `main` throughout (WNBA live-board fix,
+ESPN-probe cleanup, their own close-out) -- coordinated by fetching before
+each push, never touching their in-progress work, all pushes landed clean
+fast-forwards, no conflicts.
+
+**What's actually proven, checked against live production, not just shipped:**
+1. Handoff #1's premise ("board structurally cannot see any pitcher live
+   rows") was **false at the moment re-checked** -- pitcher prop candidates
+   were already reaching the board (4 live candidates that night). Recorded
+   as a correction rather than silently building on a stale claim.
+2. The REAL, narrower gap: `_current_live_pitcher_prop_rows`
+   (`syndicate/features/mlb/cards.py`) kept only the top 1-2 markets per
+   pitcher per tick, so a board candidate whose specific market got capped
+   out of the artifact could never hydrate. **Fixed** (`83004596`) --
+   verified live, before/after, same pitcher: Randy Vásquez's artifact row
+   set gained his exact board market (`strikeouts`) it didn't have pre-fix.
+   Deployed to `live-odds-worker` only throughout (the service that actually
+   runs this tick), leaving `refresh-worker`'s in-flight sims untouched
+   until a deliberate, user-confirmed deploy later cleared all three
+   services onto the same commit.
+3. **Mojibake retracted.** A prior-session finding ("player names render as
+   `V�squez` end to end") was re-investigated (Explore agent + a live
+   diagnostic), and turned out to be **entirely a tool/terminal display
+   artifact of this session's own shell output**, not real data corruption
+   -- confirmed by checking `ord()` on the actual character (`0xE1`, LATIN
+   SMALL LETTER A WITH ACUTE, the correct "á") across three independent
+   production pulls, never a real `U+FFFD`. The diagnostic built on that
+   false premise was reverted. One unrelated, independently real bug found
+   along the way (subprocess stdout encoding in `live_refresh_loop.py`'s
+   MLB sim + statcast jobs) was kept -- genuinely correct on its own merits,
+   just not the cause of anything that was actually broken.
+
+**Deploys:** 7 across the session (diagnostic → fix → verify → diagnostic →
+retraction, each to the minimum service needed), all via the Render API with
+`scripts/check_deploy_safety.py` checked first every time. One deploy
+(refresh-worker, the mojibake-fix redeploy) killed an in-flight MLB sim --
+done only after explicitly surfacing that exact tradeoff and getting the
+user's confirmation, not assumed from an earlier unrelated "proceed."
+
+**Tests:** targeted pytest sweeps after every code change (`test_mlb_live_prop_hydration`,
+`test_mlb_refresh_runner`, `test_live_refresh_loop`, `test_mlb_live_lens_snapshot_reader`,
+`test_live_lens_loop`, plus a broader `-k "mlb and (pitcher or live_lens or live_prop)"`
+pass, 148 tests) -- all green throughout. No full-suite run this session;
+changes were narrowly scoped MLB-only edits already covered by the targeted
+files, and the concurrent session's own close-out already covers the
+cross-cutting CI-pollution finding (see their entry below).
+
+**Final state:** all three services (web, live-odds-worker, refresh-worker)
+live on the same commit as of close-out; `git status` clean except the
+usual generated `reports/`/`data/` churn; nothing uncommitted or mid-edit;
+`main` and `origin/main` in sync, no local divergence.
+
+**Still open, unchanged by this session (see earlier entries for full
+detail):** soccer movement and non-MLB steam remain shipped-but-unverified;
+the CLV grading joiner hasn't been started; the settlement artifact
+regeneration trigger (season_betting_day manifest) is root-caused but not
+wired to an automated trigger; the web-deploy-degrades-board visibility gap
+and board build cadence during a live slate are both still just flagged, not
+built.
+
+**Lesson worth carrying forward, stated plainly:** this session cost real
+time chasing a bug (mojibake) that was never in the data, because a printed
+`�` glyph was trusted over checking the actual codepoint. Verify by
+`ord()`/`unicodedata.name()` before concluding text data is corrupted --
+shell/tool output is not a reliable proxy for what a Python string contains.
+
 ### RETRACTED 2026-08-05 (04:35 CDT) -- "Mojibake" player-name corruption was never real; it was this session's own tool-display artifact
 
 Full retraction, not a fix. Earlier tonight's CORRECTION entry (below) reported
