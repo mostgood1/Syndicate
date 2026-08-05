@@ -1,5 +1,73 @@
 # Syndicate TODO — canonical cross-session list
 
+### CORRECTION 2026-08-05 (01:52-02:00 CDT) -- Handoff #1's premise ("board structurally cannot see any pitcher live rows") is FALSE right now; real gap is narrower
+
+Picked up handoff #1 below as instructed priority. Before writing code, added
+one diagnostic print (`PITCHER_LIVE_ROWS_DIAG`, `syndicate/features/mlb/cards.py`
+`_current_live_pitcher_prop_rows`, commit `780c1cc3`) logging which of its three
+required inputs is empty when it returns nothing, and deployed it to
+**live-odds-worker only** (confirmed via `scripts/run_live_odds_refresh_worker.py`
+that this is the service that actually runs the live-lens tick; deploying only
+this service left the in-flight `refresh-worker` MLB sim untouched, per
+deploy-safety). Chose diagnostic-first because static reading showed the tick's
+own call path (`live_prop_rows_for_game`) and the game-detail endpoint's call
+path (`source_card_detail_payload` -> `_source_sim_detail`) invoke the exact
+same underlying function with equivalent inputs -- a real logic bug would have
+to explain why one "works" and the other doesn't despite identical code, which
+static analysis alone couldn't resolve.
+
+**What real production data showed, checked directly against three live
+endpoints within the same ~10-minute window (`central_now` ~19:52-20:00 CDT,
+8 MLB games live):**
+- `GET /mlb/api/live-lens?date=2026-08-04` (no auth needed): **NOT** 329
+  hitter-only rows as handoff #1 states. `pitcher_props` rows exist for 5
+  pitchers across 3 live games (Gabriel Hughes, Randy Vásquez, Eduardo
+  Rodriguez, Troy Melton, Emerson Hancock -- `hits_allowed`/`strikeouts`/
+  `earned_runs`), most carrying real `actual`/`liveProjection` values.
+- The diagnostic (`PITCHER_LIVE_ROWS_DIAG`) **never fired once** across the
+  whole observation window -- `_current_live_pitcher_prop_rows`'s three
+  preconditions (pitcher model, market line, probable-pitcher data) are
+  satisfied every time it's called right now.
+- `POST /api/intelligence/query` (the actual rendered board, `top_opportunities`)
+  currently carries **4 live MLB pitcher-prop candidates**, not zero --
+  refuting "the intelligence board structurally cannot see any of it" as
+  currently written.
+
+**The real, narrower gap, found by cross-referencing the board candidates
+against the artifact rows directly:** of those 4 board candidates, 1 (Tarik
+Skubal, Pitcher Outs) is fully hydrated (`live_projection=18.0`,
+`actual=18.0`) by a mechanism not yet traced (no matching artifact row for
+Skubal exists at all, so this isn't `_mlb_hydrate_live_prop_projection` --
+likely populated at candidate-build time by a different path). The other 3
+(Vásquez/Strikeouts, Gore/Outs, Hughes/Strikeouts) show `-`/`-`. For 2 of
+those 3, the CAUSE is now precise, not a guess: `_current_live_pitcher_prop_rows`
+keeps only the top 1-2 props per pitcher per tick (`keep_count = 2 if
+current_pitcher_side == side else 1`, sorted by edge) -- Hughes and Vásquez
+both have a real `hits_allowed` row in the artifact, but their board
+candidates are for `Pitcher Strikeouts`, a market this tick's per-pitcher cap
+dropped in favor of the higher-edge market. `_mlb_hydrate_live_prop_projection`
+correctly finds no market match and honestly shows `-` rather than a wrong
+number -- this is arguably correct behavior given the cap, not a join bug.
+Gore has no artifact row at all (any market), cause not yet traced.
+
+**Encoding bug found in passing, real and separate:** player names with
+accents are mojibake'd end to end (`Randy V�squez`, `Jesús Luzardo` shows
+as `Jes�s Luzardo`) -- visible on both the raw artifact and the rendered
+board. Worth its own fix, unrelated to the live-lens gap.
+
+**Not done, deliberately, given how much this correction already changed the
+picture:** did not widen the per-pitcher keep_count (that's a product
+decision -- more markets tracked live per pitcher -- not a clear defect fix)
+or chase Gore's/Skubal's specific mechanisms further. Diagnostic left in
+place (harmless, zero fires so far, costs nothing to keep watching).
+
+**Lesson for next time, matching this exact session's own prior "where I was
+wrong" entries:** re-verify a structural claim against live production before
+building on it, even when it's recorded as "confirmed." Handoff #1's own
+verification was real at the time it was checked, but MLB live-game state
+changes continuously -- a snapshot taken hours earlier during an in-progress
+slate does not hold as "structural" fact for the rest of the night.
+
 ### Reconciliation 2026-08-05 (board-accuracy session CLOSED -- 16 commits, what is proven vs merely shipped)
 
 Read the HANDOFF entry below this one for the open work. This entry is the
