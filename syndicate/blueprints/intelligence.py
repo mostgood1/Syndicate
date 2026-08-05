@@ -973,7 +973,90 @@ def _hydrate_board_response_payload(response_payload: dict[str, object] | None) 
     if not isinstance(current.get("boardContract"), dict) or not current.get("boardContract"):
         current["boardContract"] = dict(current.get("board_contract") or {})
 
+    _refresh_live_columns_from_artifact(current)
+
     return current
+
+
+# Only the two columns that go stale by the minute. Everything else on a
+# card is a property of the bet, not of the game clock, and stays owned by
+# the worker's build.
+_LIVE_ARTIFACT_COLUMNS = ("live_projection", "actual")
+
+
+def _refresh_live_columns_from_artifact(payload: dict[str, object]) -> None:
+    """Re-read LIVE PROJ. / LIVE ACTUAL from the live-lens artifact at read time.
+
+    These two columns were only ever written during refresh-worker's board
+    build, so they aged at the build cadence -- minutes -- while the values
+    they display change every pitch. Confirmed live 2026-08-05: the board
+    showed live_projection on 1 of 9 live MLB props for over 15 minutes,
+    while web's OWN live-lens artifact was 3 minutes old and carried 329
+    tracked props with real actual/liveProjection for every live game. The
+    numbers were already sitting on this box; nothing was reading them.
+
+    This is a read-path refresh of two display fields from an artifact the
+    web service already has, which is the "light transformation for display"
+    the runtime split allows -- not a recompute. It does NOT call
+    run_intelligence_query, rebuild a candidate pool, or touch the sim. If
+    the artifact is missing or unreadable the card keeps whatever the build
+    gave it, exactly as before.
+
+    Deliberately narrow: only candidates already flagged is_live, only the
+    two clock-sensitive columns, and one cached artifact read per request
+    regardless of how many candidates match.
+    """
+    try:
+        from syndicate.features.intelligence import _mlb_hydrate_live_prop_projection
+        from syndicate.features.intelligence import _mlb_live_lens_prop_rows_for_game
+        from syndicate.features.intelligence import _safe_int
+    except Exception:
+        return
+
+    collections = [key for key in ("top_opportunities", "top_live_opportunities", "recommendations", "ranked_all") if isinstance(payload.get(key), list)]
+    by_sport = payload.get("by_sport") if isinstance(payload.get("by_sport"), dict) else {}
+
+    report_cache: dict[str, dict | None] = {}
+    rows_cache: dict[tuple[str, int], list] = {}
+    refreshed = 0
+
+    def _visit(candidate: object) -> None:
+        nonlocal refreshed
+        if not isinstance(candidate, dict) or not candidate.get("is_live"):
+            return
+        if str(candidate.get("sport_slug") or "").lower() != "mlb":
+            return
+        game_pk = _safe_int(candidate.get("game_pk") or candidate.get("gamePk") or candidate.get("game_id"))
+        if not game_pk:
+            return
+        context_label = str(candidate.get("game_date") or candidate.get("source_board_date") or "").strip()
+        if not context_label:
+            return
+        cache_key = (context_label, game_pk)
+        if cache_key not in rows_cache:
+            rows_cache[cache_key] = _mlb_live_lens_prop_rows_for_game(context_label, game_pk, report_cache)
+        rows = rows_cache[cache_key]
+        if not rows:
+            return
+        before = {column: candidate.get(column) for column in _LIVE_ARTIFACT_COLUMNS}
+        _mlb_hydrate_live_prop_projection(candidate, rows)
+        if any(candidate.get(column) != before[column] for column in _LIVE_ARTIFACT_COLUMNS):
+            refreshed += 1
+
+    try:
+        for key in collections:
+            for candidate in payload.get(key) or []:
+                _visit(candidate)
+        for items in by_sport.values():
+            if isinstance(items, list):
+                for candidate in items:
+                    _visit(candidate)
+    except Exception as exc:  # never break the board over a display refresh
+        _LOGGER.warning("LIVE_COLUMN_REFRESH_FAILED %s: %s", type(exc).__name__, exc)
+        return
+
+    if refreshed:
+        print(f"[intelligence] LIVE_COLUMNS_REFRESHED_FROM_ARTIFACT candidates={refreshed}", flush=True)
 
 
 def _response_candidate_count(response_payload: dict[str, object] | None) -> int:
