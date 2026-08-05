@@ -1,5 +1,78 @@
 # Syndicate TODO — canonical cross-session list
 
+### RECONCILIATION 2026-08-05 -- Session close-out: learning-loop plan (Stages 0-5) through the WNBA live-board fix, everything below deployed and verified
+
+Long session (spans roughly 00:08-23:31 this calendar day per commit
+timestamps), multiple threads, each independently deployed and verified
+against production rather than left as "should work." In order:
+
+1. **Learning-loop plan** (`docs/reports/syndicate_learning_loop_plan_2026_08_03.md`)
+   -- audited every mechanism by which a sport gets more accurate over
+   time (sim/model AND betting) and worked it stage by stage. Stage 0
+   (settlement flat-path fix, real closing-price join, unmatched-reason
+   diagnostics), Stage 1 (unified grading contract across 8 sports,
+   soccer + NCAAB + NCAAF graders), Stage 2 (CRPS/Brier scoring layer,
+   shadow-recording), Stage 4 (policy exploration budget, CLV-first
+   promotion), Stage 5 partial (model_version, drift detection) all
+   shipped and deployed. Stage 3's actual re-fit job and Stage 5's CI
+   accuracy gate remain explicitly not done (both need real settled
+   volume to fit/gate against -- see below).
+2. **MLB grading pipeline**: root-caused (with a concurrent session) why
+   MLB graded rows were zero for 16+ days (`df9df584`, odds resolved
+   against the code checkout instead of the mounted data disk), then
+   built a one-off backfill trigger (`03434e68`) since nothing
+   automatically regenerates `season_betting_day_{date}.json` on Render.
+   Ran it for 2026-08-02 -- produced a real settled row (win, 46.5% ROI),
+   confirming the fix works end to end, not just a clean exit code.
+   Forced a fast settlement cycle and found a third, structural (not
+   buggy) fact: the ledger only ever records the currently-selected board
+   date, so historical dates can never retroactively match regardless of
+   graded-rows correctness.
+3. **Board movement**: fixed a diacritic-normalization gap and an MLB
+   team-abbreviation/full-name mismatch that made every MLB game
+   candidate unable to find its own real odds-history
+   (`8d24da2d`) -- verified live, 0/354 candidates showing movement before
+   to 360/360 after (`e79df2f8`). Built the odds-history matchup-coverage
+   diagnostic (`eb46b219`) and fixed the off-hours odds-refresh cadence
+   (`6e90b5ad`) from a binary "poll once, then blackout for an hour" gate
+   to a tiered one that keeps real pregame resolution once any tracked
+   game is live that day.
+4. **WNBA live bug** (full detail in the entry directly below): two
+   independent root causes, both fixed and confirmed live on the actual
+   `/wnba` board (not just an API response) -- an artifact-freezing write
+   gate (`e8deadb7`) and ESPN returning HTTP 403 to Render's outbound IP
+   for a generic "Mozilla/5.0" User-Agent (`ded23a0d`), found by adding a
+   diagnostic that ran the real subprocess call from a live deploy and
+   caught what `_espn_has_live_game`'s own bare except-return-False was
+   silently swallowing. Checked soccer's separate ESPN User-Agent
+   (`espn_lineups.py`) against the same 403 -- confirmed not affected.
+
+**Concurrent sessions were active throughout this same window** (visible
+in the interleaved commit history: MLB grading, live-board/steam fixes,
+Ask-the-Syndicate routing, pitcher live-lens work, NBA cards test-order
+flag, a sim-hang/stale-pointer fix to `check_deploy_safety.py` this
+session's own deploys relied on). Coordinated by reading their commits
+and `todo.md` entries before acting, never by touching their in-progress
+uncommitted work directly.
+
+**What's genuinely still open, in priority order:**
+1. Stage 3's real re-fit job and Stage 5's CI accuracy gate -- both need
+   real settled-outcome volume to fit/gate against. Should now be
+   possible to start now that MLB grading produces real rows again.
+2. Re-check `/api/ops/evaluation-settlement/status` once a full day's
+   slate finishes settling under the (now working) MLB grading pipeline
+   -- the actual proof this whole thread was chasing is `matched > 0`
+   for a same-day date, not yet observed.
+3. Deploy hygiene: checked at close-out. web/live-odds-worker are both
+   on `81f091b7` (the session's final commit); refresh-worker is 5
+   commits behind on `ded23a0d`. Not a gap that matters -- every actual
+   fix from this session (`e8deadb7`, `ded23a0d`) IS present on
+   refresh-worker; the 5 missing commits are diagnostic-only ops.py
+   additions/removals (web-only routes) plus one unrelated concurrent-
+   session investigation thread (`314a169a`, MLB feed mojibake bisect,
+   still open on their side). No action needed unless that mojibake
+   thread turns out to need refresh-worker specifically.
+
 ### RESOLVED 2026-08-05 -- WNBA "not showing live": two real, independent bugs, both fixed, deployed, and confirmed on the live board itself
 
 User reported WNBA not showing live. Investigated against a real live
