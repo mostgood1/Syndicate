@@ -1,5 +1,66 @@
 # Syndicate TODO — canonical cross-session list
 
+### RECONCILIATION 2026-08-05 (session close-out) -- two stale WNBA test failures fixed, unrelated to the cards.py caching change that surfaced them
+
+User was making a caching fix in `syndicate/features/wnba/cards.py` and hit
+two unrelated failures running `python -m pytest tests/ -q -k "wnba"`. Both
+root-caused and fixed; neither touches production code.
+
+**1. `test_refresh_odds_sources.py::test_wnba_uses_combined_game_and_player_prop_markets_while_other_basketball_sports_keep_interval_defaults`**
+-- pure stale-expectation bug, not a real regression. `_WNBA_GAME_MARKETS`
+was deliberately updated in #125 follow-up 6 to add the four half-market
+tokens (`spreads_h1,totals_h1,spreads_h2,totals_h2`) for parity with
+NBA/NCAAB, but this test's `game_markets`/`assertNotIn(interval_markets, ...)`
+expectations were never updated to match. Fixed the test only.
+
+**2. `test_wnba_refresh_runner.py::test_optional_tool_exports_use_local_vendored_builders`**
+-- a genuine, different test-isolation bug from the one the concurrent
+session fixed in the RECONCILIATION entry below (`53cf342a`, a wall-clock-TTL
+cache leak under `python -m unittest`). This one is pytest-full-suite-order
+specific: `test_archives.py::HomeBoardTests::test_wnba_live_lens_empty_date_does_not_inject_fake_rank_card`
+exercises a real WNBA live-lens fallback path that permanently inserts
+`vendor/wnba_betting_repo/src` onto `sys.path` as a side effect (via
+`syndicate/features/shared/basketball_props_*.py`'s `sys.path.insert`, which
+is correct, deliberate production behavior -- it's never undone). Once that
+path is present for the rest of the process, a later test's call into the
+vendored `build_live_player_lens_tuning.py` tool takes a code branch it
+normally can't reach: `from wnba_betting.boxscores import _nba_gid_to_tricodes`
+starts succeeding instead of raising `ModuleNotFoundError`, and pulls real
+ESPN game ids for the test's date instead of falling back to the test's
+synthetic `smart_sim` fixture -- leaving `game_id` empty in the output
+(`'' != '0401'`). Root-caused by bisecting with a temporary autouse conftest
+fixture that tracked exactly when `vendor/wnba_betting_repo/src` first
+appeared on `sys.path` across the full `-k wnba` run (fully reverted before
+committing, no trace left). **Fixed on the test side**, per the same
+load-order-hermeticity precedent already established in this file
+(`module._load_source_app` overridden to a no-op in `_load_module()`):
+wrapped the call in `patch.dict(sys.modules, {"wnba_betting": None,
+"wnba_betting.boxscores": None})` so the import deterministically fails
+regardless of ambient `sys.path`/`sys.modules` state left by any other test
+file, rather than trying to make every other WNBA-touching test file clean
+up after itself.
+
+**Verified:** full `python -m pytest tests/ -q -k "wnba"` was failing 2/436
+before, passing 436/436 immediately after (this session's fixes alone,
+before merging the concurrent session's other-file fixes); 440/440 after
+merging in `origin/main`'s concurrent work (which added 4 more WNBA-matched
+tests, none overlapping these two).
+
+**Git/deploy:** committed (`32aa51ec`), merged cleanly with two concurrent
+commits that landed on `origin/main` mid-session (`19e59beb`/`4b1c6d53`,
+unrelated NBA/WNBA live-lines `generated_at` fixes -- auto-merged, no
+conflicts, both diffs confirmed non-overlapping before merging), pushed
+(`df794dec`), later confirmed as an ancestor of `origin/main`'s tip after
+~180 more commits landed from other concurrent sessions. **Not deployed --
+deliberately.** This change is test-only (no `syndicate/`, `scripts/`, or
+other runtime code touched), so a deploy would ship zero behavior change;
+flagged that explicitly to the user given deploying carries a real,
+non-zero cost (kills an in-flight MLB sim on `refresh-worker`) for no
+benefit, and the user did not ask to proceed after seeing that tradeoff.
+Local `reports/*.json` churn from this session's own pytest runs discarded
+via `git checkout -- reports/` per the existing "Local pytest pollutes
+`reports/`" operational note, not committed.
+
 ### NOTE 2026-08-05 -- picked up HANDOFF #1 concurrently with another session; theirs is the resolution, this entry is a minor separate addition
 
 Started HANDOFF #1 ("pitcher live lens") independently, in parallel with the
