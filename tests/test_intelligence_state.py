@@ -1526,12 +1526,12 @@ class IntelligenceStateTests(unittest.TestCase):
             "candidate_count": 2,
             "candidate_pools": {},
             "global_pool": [
-                {"name": "Play B", "sport_slug": "mlb", "market": "Hits", "score": 4.5, "confidence": 0.2, "updated_at": "2026-06-15T20:00:00Z"},
-                {"name": "Play A", "sport_slug": "mlb", "market": "Hits", "score": 6.2, "confidence": 0.9, "updated_at": "2026-06-15T18:00:00Z"},
+                {"name": "Play B", "sport_slug": "mlb", "market": "Hits", "score": 4.5, "confidence": 0.2, "updated_at": "2026-06-15T20:00:00Z", "odds": -110},
+                {"name": "Play A", "sport_slug": "mlb", "market": "Hits", "score": 6.2, "confidence": 0.9, "updated_at": "2026-06-15T18:00:00Z", "odds": -110},
             ],
             "candidates": [
-                {"name": "Play B", "sport_slug": "mlb", "market": "Hits", "score": 4.5, "confidence": 0.2, "updated_at": "2026-06-15T20:00:00Z"},
-                {"name": "Play A", "sport_slug": "mlb", "market": "Hits", "score": 6.2, "confidence": 0.9, "updated_at": "2026-06-15T18:00:00Z"},
+                {"name": "Play B", "sport_slug": "mlb", "market": "Hits", "score": 4.5, "confidence": 0.2, "updated_at": "2026-06-15T20:00:00Z", "odds": -110},
+                {"name": "Play A", "sport_slug": "mlb", "market": "Hits", "score": 6.2, "confidence": 0.9, "updated_at": "2026-06-15T18:00:00Z", "odds": -110},
             ],
         }
 
@@ -3426,8 +3426,8 @@ class IntelligenceStateTests(unittest.TestCase):
                     with patch(
                         "syndicate.features.intelligence.collect_all_recommendations",
                         return_value=[
-                            {"name": "MLB Play", "sport": "MLB", "market": "Hits", "score": 91.0},
-                            {"name": "NBA Play", "sport": "NBA", "market": "Points", "score": 89.0},
+                            {"name": "MLB Play", "sport": "MLB", "market": "Hits", "score": 91.0, "odds": -110},
+                            {"name": "NBA Play", "sport": "NBA", "market": "Points", "score": 89.0, "odds": -110},
                         ],
                     ):
                         pool = service._build_candidate_pool("2026-06-10", "fingerprint-1")
@@ -3513,7 +3513,7 @@ class IntelligenceStateTests(unittest.TestCase):
                 with patch("pipeline.intelligence_state.build_intelligence_overview", return_value=status["sports"]):
                     with patch(
                         "syndicate.features.intelligence.collect_all_recommendations",
-                        return_value=[{"name": "MLB Play", "sport": "MLB", "market": "Hits", "score": 91.0}],
+                        return_value=[{"name": "MLB Play", "sport": "MLB", "market": "Hits", "score": 91.0, "odds": -110}],
                     ):
                         with patch(
                             "pipeline.intelligence_state.load_odds_history_payload_for_sport",
