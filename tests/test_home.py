@@ -2027,3 +2027,68 @@ class MLBLiveScoreFallbackTests(unittest.TestCase):
             enriched = home_module._apply_mlb_live_scores([self._game()], "2026-07-29")
         self.assertNotIn("score", enriched[0]["away"])
         self.assertNotIn("score", enriched[0]["home"])
+
+
+class SoccerPropCommenceTimePropagationTests(unittest.TestCase):
+    """A soccer prop candidate carried no date field of its own, so the
+    shared resolve_candidate_game_date fallback (checks commence_time/
+    start_time_utc/game_time_utc/game_date, in that order) always fell
+    through to the board's context date instead of the fixture's real date.
+    Confirmed live 2026-08-05: 3 "Anytime Goalscorer" candidates for an Aug 8
+    MLS match all carried game_date Aug 5 (today), which pointed the
+    odds_history join at the wrong shard -- the odds data existed, just
+    under a date these candidates never asked for.
+
+    Soccer's own dashboard game dicts (cards.py's _match_to_game/
+    _unsimulated_game) DO carry the real kickoff, under "scheduled_start_utc"
+    -- a key resolve_candidate_game_date does not check. _finalize_home_prop_rows
+    already copies several other matched_game fields (team labels, gamePk,
+    game_id, event_id) onto the prop item; this was the one field that
+    pattern was missing.
+    """
+
+    def _matched_game(self, *, scheduled_start_utc: str | None = "2026-08-08T23:30:00Z") -> dict:
+        return {
+            "gamePk": "evt-761469",
+            "event_id": "761469",
+            "away": {"abbr": "HOU", "name": "Houston Dynamo"},
+            "home": {"abbr": "NE", "name": "New England Revolution"},
+            "scheduled_start_utc": scheduled_start_utc,
+        }
+
+    def _prop_row(self) -> dict:
+        return {
+            "name": "Carles Gil Anytime Goalscorer",
+            "market": "Anytime Goalscorer",
+            "player_name": "Carles Gil",
+            "matchup": "HOU @ NE",
+        }
+
+    def test_the_matched_games_kickoff_becomes_the_props_commence_time(self) -> None:
+        game_index = home_module._home_prop_game_index([self._matched_game()])
+        with patch.object(home_module, "_home_prop_matched_game", return_value=self._matched_game()):
+            finalized = home_module._finalize_home_prop_rows([self._prop_row()], slug="soccer")
+        self.assertEqual(finalized[0].get("commence_time"), "2026-08-08T23:30:00Z")
+
+    def test_an_existing_commence_time_on_the_row_is_never_overwritten(self) -> None:
+        row = self._prop_row()
+        row["commence_time"] = "2026-08-09T00:00:00Z"
+        with patch.object(home_module, "_home_prop_matched_game", return_value=self._matched_game()):
+            finalized = home_module._finalize_home_prop_rows([row], slug="soccer")
+        self.assertEqual(finalized[0]["commence_time"], "2026-08-09T00:00:00Z")
+
+    def test_no_matched_game_leaves_commence_time_unset(self) -> None:
+        with patch.object(home_module, "_home_prop_matched_game", return_value=None):
+            finalized = home_module._finalize_home_prop_rows([self._prop_row()], slug="soccer")
+        self.assertNotIn("commence_time", finalized[0])
+
+    def test_resolve_candidate_game_date_now_finds_the_real_fixture_date(self) -> None:
+        # End-to-end: the propagated field is exactly what the shared
+        # resolver checks first, so the whole downstream chain (including
+        # this session's earlier odds_history shard-window fix) now sees
+        # the fixture's real date instead of falling back to today.
+        from syndicate.features.shared.intelligence_contracts import resolve_candidate_game_date
+
+        with patch.object(home_module, "_home_prop_matched_game", return_value=self._matched_game()):
+            finalized = home_module._finalize_home_prop_rows([self._prop_row()], slug="soccer")
+        self.assertEqual(resolve_candidate_game_date(finalized[0], fallback="2026-08-05"), "2026-08-08")
