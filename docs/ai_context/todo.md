@@ -1,5 +1,92 @@
 # Syndicate TODO — canonical cross-session list
 
+### OPEN 2026-08-05 -- soccer commence_time: TWO real bugs found+fixed+deployed, still not reaching the served board
+
+Continuation of the earlier OPEN entry (now superseded by this one -- keep
+both, this one has the full trace). Deployed `30a7067e` -> `e0082a82` ->
+`0fa7bc41` -> `25ad43df` across web+refresh-worker, each a genuine fix or a
+genuine diagnostic improvement, confirmed by evidence at every step. The
+served board STILL shows `game_date=2026-08-05`/`commence_time=None` for
+Carles Gil/Peyton Miller/Will Sands after a confirmed post-deploy rebuild
+(refresh-worker's own logs: OVERVIEW_SPORT_BEGIN sport=soccer at 21:57:46,
+well after the 25ad43df deploy finished; board read at 21:59:41 still
+unfixed).
+
+**Bug #1, fixed (`30a7067e`): `_finalize_home_prop_rows` never copied
+`commence_time` onto soccer prop items.** Confirmed via a persisted
+diagnostic (`syndicate/blueprints/home.py`'s temporary
+`_prop_match_diag`/`GET /api/ops/home-props/match-diagnostic`, itself fixed
+once in `0fa7bc41` after its first deploy proved a real overwrite bug in
+ITSELF -- 4 call sites per board build were overwriting each other, keeping
+only the last): `_home_prop_matched_game` genuinely matches Carles Gil/
+Peyton Miller by `game_pk="761469"`, `matched_game_scheduled_start_utc`
+genuinely resolves to `'2026-08-08T20:30Z'`. This bug is real and this fix
+is correct.
+
+**Bug #2, fixed (`25ad43df`): `_build_prop_dashboard_row` (home.py,
+line ~2933) reconstructs its return value as a brand new dict and never
+copied `commence_time` across from `item`.** This is the function
+`intelligence.py:4443`'s `_prop_candidate_from_item` calls to build the
+actual board candidate. Traced with a genuine regression test
+(`tests/test_home.py::SoccerPropCommenceTimePropagationTests::
+test_commence_time_survives_all_the_way_through_the_dashboard_row`),
+confirmed to FAIL without the fix (`None != '2026-08-08T23:30:00Z'`) and
+PASS with it. This bug is real and this fix is correct. The PRE-EXISTING
+"end-to-end" test in the same file
+(`test_resolve_candidate_game_date_now_finds_the_real_fixture_date`, renamed
+to `..._on_finalize_rows_own_output` in this pass) was not actually
+end-to-end -- it stopped at `_finalize_home_prop_rows`'s own output and
+never exercised `_build_prop_dashboard_row` at all, which is exactly why it
+passed while the real board stayed broken. Worth remembering as a pattern:
+a test suite can be fully green while the exact bug it should catch ships,
+if it stops one hop short of the real consumer.
+
+**Still open, NOT confirmed:** despite both fixes being individually
+correct and both deployed, the served board is unchanged. Traced one hop
+further -- `_prop_candidate_from_item`'s `row.update({...})` (intelligence.py
+:4467) only adds/overwrites the keys explicitly listed there, does not
+include `commence_time`, and `dict.update()` never removes pre-existing
+keys -- so `commence_time` should survive this hop too, on paper.
+`resolve_candidate_game_date`'s ISO parser (intelligence_contracts.py)
+correctly handles the `...T20:30Z` format (manually verified: replace
+Z->+00:00, fromisoformat, convert to Central -> 2026-08-08). Every hop
+individually checks out, yet the end state is still wrong.
+
+**One lead, explicitly NOT verified -- do not assume it's the answer without
+checking:** `build_intelligence_overview` (intelligence.py ~2510) takes
+`skip_game_hydration: bool`, with its own comment warning "never pass True
+for any overview that feeds candidate collection... See
+_build_sport_overview's own comment for the full story." That kind of
+comment usually exists because someone got it wrong once. Did NOT verify
+whether `_collect_candidates`'s actual call path into
+`build_intelligence_overview` honors this invariant, or whether there are
+in fact TWO separate overview builds in play (one that produces the
+diagnostic's captured data, a different one that actually feeds
+`top_opportunities`). Note this doesn't fully fit either -- a
+skip_game_hydration=True overview produces ZERO prop items for a sport
+(home.py's own skip_game_hydration branch sets `pregame_prop_items = []`
+before `_finalize_home_prop_rows` is ever called), and these 3 candidates
+ARE present on the board with a (wrong) date, not absent -- so this lead is
+incomplete as stated and needs real tracing, not just re-reading code.
+
+**Next step for whoever picks this up:** do NOT deploy another guess. Add
+one more diagnostic write -- this time immediately after
+`_prop_candidate_from_item` returns, keyed by candidate name, recording
+`row.get("commence_time")` at that exact point. That directly answers
+whether the value is present in the CANDIDATE OBJECT itself (meaning the
+loss is downstream, in serialization/caching/the combined-board merge) or
+already gone by then (meaning the loss is between `_build_prop_dashboard_row`
+returning and `_prop_candidate_from_item`'s `.update()` call, which the code
+reading above says shouldn't be possible -- worth confirming empirically
+rather than trusting the reading, since two prior "should work" readings in
+this same chase were both wrong in ways only live evidence caught).
+
+**Cost so far, explicit:** 2 killed sims (both `fingerprint_change`, ~5min
+and ~32min old respectively) across this thread's deploys, both explicitly
+authorized by the user in the moment ("deploy now, accept the cost"). Do not
+treat that as standing authorization for further deploys on this issue --
+ask again if it recurs.
+
 ### RECONCILIATION 2026-08-05 (addendum) -- final sync confirmed, no new work this pass
 
 Re-checked archive-safety after the earlier same-day close-out (see
