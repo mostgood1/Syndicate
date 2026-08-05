@@ -1,5 +1,207 @@
 # Syndicate TODO — canonical cross-session list
 
+### Reconciliation 2026-08-01 (MLB/WNBA/soccer props root causes + Layer 2 board blanks audit, long multi-thread session)
+
+Closing out this session -- long-running, many threads, all shipped work
+deployed and confirmed against production. Starting point: user reported
+MLB/WNBA/soccer props thin (~50 candidates total across all three) and
+asked for a full pregame/live, game/prop, source-to-board inspection.
+Ended on a Layer 2 "world-class board" accuracy/completeness push.
+
+**Shipped and deployed, confirmed live (commits `da69cb57`, `4e628c5f`,
+`c0a98faa`/`0907154f`, `952632db`, `9d90dbcc`/`8ad24148`/`2e9c4223`/
+`0b54ac90`, `f34b9314`):**
+
+1. **MLB props were completely empty for the day.** `daily_top_props_
+   <date>.json`'s regen trigger only reacted to roster/lineup fingerprint
+   changes -- "player-prop odds just landed" was never a trigger, so a run
+   that landed before OddsAPI posted lines stayed empty all day. Added
+   `_mlb_props_now_available_needs_regen`. Confirmed live: 28 -> 225
+   candidates same day.
+2. **WNBA board showed every player prop twice** -- `_source_game_market_
+   recommendations` (wnba/cards.py) had no market filter, so player-prop
+   picks in the mixed per-game `picks` list got promoted a second time,
+   mislabeled as a game market. Filtered out the known player-stat market
+   codes.
+3. **Soccer (MLS) player props were zero.** Root cause:
+   `bootstrap_data_root.py`'s `main()` had no exception isolation between
+   `BOOTSTRAP_ROOTS` entries and the caller swallows exceptions silently --
+   one root throwing (MLB's large tree, synced first) could abort every
+   root after it, including soccer's `players_<season>.csv` roster seed
+   (last in the list), which starves the player-props sim pass. Isolated
+   each root's sync in its own try/except. Confirmed live: soccer
+   `player_props` went `[]` -> 647 real entries, picks CSV 0 -> 248 PROP
+   rows.
+4. **Soccer never produced a single live prop candidate on the Layer 2
+   board** -- `_SoccerDataProvider.live_props()` is hardcoded `[]`. Added
+   `_soccer_live_lens_prop_candidates_from_artifact` mirroring MLB's
+   live-lens backfill, sourced from the already-ticking live-lens loop.
+   Live soccer tracking is shots-based, not the pregame anytime-goalscorer
+   market, so this surfaces "Shots" as its own market. **Not verified
+   against a real live match** -- none was in progress at build or verify
+   time; next session should confirm real live candidates appear once an
+   MLS match goes live (candidate-trace, `slug=soccer`).
+5. `_query_preferences`' bare default limit raised 5 -> 300 at user's
+   explicit request, after MLB's newly-unlocked prop volume dominated a
+   limit-bound "top edges" view. The main board grid itself
+   (`board_contract.cards`) was already unbounded by this -- confirmed the
+   real full board renders every real candidate in the pool with no
+   artificial cap; a dominant sport there is real ranked-edge behavior,
+   not a limit bug.
+6. **WNBA duplicate props (round 2, a genuinely different bug from #2):**
+   two "Alyssa Thomas AST" candidates never merged on a live board --
+   one had `player_name` holding the entire pick text ("Alyssa Thomas
+   UNDER 8.5 AST") instead of just the name. First fix
+   (`_prop_merge_dedup_key` trusting a truthy-but-wrong player_name,
+   `c0a98faa`) passed its unit test but did NOT resolve on the live board
+   when re-checked -- real root cause was one level up:
+   `collect_candidates_with_fallback_merge`'s union step discards one of
+   two cross-pipeline duplicates using a strict identity hash that never
+   matches differently-phrased selections for the same bet. Fixed by
+   re-running the merge on the union's output (`0907154f`). Confirmed live
+   this time: the two candidates collapsed into one with real
+   `live_projection`/`actual`/`is_live`. **Lesson for future sessions:**
+   a passing unit test for a plausible-looking fix is not proof it's the
+   real root cause on a live board -- always re-verify against production
+   after deploy, not just against the test.
+7. **MLB "Hitter Hits+Runs+RBIs" prop market badly broken on Layer 1**
+   (user follow-up: "props are still missing this behavior") --
+   `_MLB_HITTER_PROP_DIST_CONFIG` mirrors vendor/mlb_bettingv2's
+   `HITTER_MARKET_SPECS` for 5 of 6 hitter markets; this composite one was
+   never ported over. Without a config entry, `_mlb_prop_dist_projection`
+   always returned `(None, None)`: 77% of rows showed no sim coverage, the
+   rest fell back to `_row_stat_mean_value`'s generic "first `_mean`-suffix
+   key" heuristic, which could latch onto an unrelated field (confirmed
+   live: `projected_value` 85.79 for a stat that should be under 3). Added
+   the missing entry with the real field names from the vendor spec.
+   Confirmed live: 104/104 rows populated with sane values (was 84/109
+   null). **Layer 1 only** -- Layer 2 board candidates for this exact
+   market (a different, still-unidentified "mystery origin" builder --
+   see #8 below) were separately, only partially fixed.
+8. **Layer 2 board-wide blanks audit** (user: "layer 2 board still doesn't
+   show/match on sim project, live projection, live status across all
+   sports and all players"; later "tons of blanks... props are still
+   missing this behavior"). Found and fixed, in order:
+   - `team` field blank on 111/155 prop candidates -> **0/59 blank,
+     fully fixed** (confirmed on 2 separate post-deploy checks).
+   - Steam candidate `projected` blank on 195/200 -> 99/199 -> **78/194
+     blank**, a real ~60% reduction from game_pk-less-fallback and
+     multi-focus-key fixes. Of the residual 78: 13 are game-level
+     markets (H2H/spreads/totals, correctly never carry a player
+     projection) and some are genuinely uncovered players (confirmed:
+     Javier Baez home runs, zero matching rows anywhere in
+     `daily_top_props`) -- both expected/correct blanks, not bugs.
+   - **Open anomaly, not resolved:** the `rbis`/`runs_scored` synonym
+     fix (`0b54ac90`, accounts for 60 of the remaining 78) passes in
+     isolated unit tests and is confirmed deployed
+     (`/api/ops/version` matches), but two consecutive fresh post-deploy
+     production checks (different response_hash, different
+     state_last_updated, ~15 min apart) show **zero change** -- identical
+     78/194 count, identical market_key breakdown. Confirmed the
+     underlying `daily_top_props` artifact still has the exact matching
+     rows that should resolve (Alika Williams rbi=0.453, Masataka
+     Yoshida runs=0.379). Ruled out: stale cache (hash/timestamp both
+     advanced), artifact regenerated without these rows (rows still
+     present). **Root cause not found** -- needs a session with deeper
+     access (refresh-worker logs, or a temporary diagnostic print
+     actually inside `_mlb_backfill_missing_projected_from_top_props`)
+     rather than more blind iteration.
+   - Separately, mid-investigation into a specific Layer 2 "Isaac
+     Paredes Over 1.5 Hitter H+R+R" candidate showing blank `projected`
+     despite its `daily_top_props` row having a real mean (1.912): found
+     the board's actual pick ("Over 1.5") doesn't even match the raw
+     row's own selection ("under") for that player/market/game_pk,
+     meaning this candidate is NOT built from the row I was comparing
+     it against -- there is at least one more MLB prop candidate
+     builder in play beyond every one already traced this session
+     (daily_top_props direct read, live-lens, subject-prop backfill,
+     ranked-market backfill, home_rails pregame/live rails). This is
+     very likely the same "mystery origin" class noted in the
+     `_mlb_backfill_missing_projected_from_top_props` docstring
+     (confirmed pre-existing from an earlier session, not new). Not
+     pinned down this session -- worth a dedicated trace next time
+     (e.g. temporarily stamp a `_source_fn` marker on every MLB prop
+     candidate at creation to observe which builder produces this
+     exact one on a live pull).
+9. **Stale-live game candidates skipped live-state refresh entirely**
+   (user: "games that are final still show with OPPs... the whole game
+   rail is finals"). Confirmed live: "MIN @ SEA" showed `is_live=True`
+   with a frozen "3-3" score many hours after the real game ended. Root
+   cause: `_apply_live_state_context_to_candidates` requires a non-empty
+   `context_label` before even attempting a fresh live-state lookup, and
+   this candidate had `context_label=None` -- despite `game_date`/
+   `source_board_date` (which resolve the same lookup just as well)
+   being present on the same row. Added a fallback. Deployed
+   (`f34b9314`), unit-tested, but **not yet independently reconfirmed
+   against a fresh live production pull** (ran out of session time) --
+   worth a quick check next session that a previously-stale live game
+   now correctly flips to excluded.
+
+**Explicitly NOT done this session, real open items:**
+- **NFL "games show up as 8-1, which is not correct"** (user's own
+  wording) -- could not reproduce anywhere: game-chips API, cards API,
+  candidate objects, or the actual rendered board via browser all showed
+  NFL games correctly as PREGAME with no score. Asked the user for a
+  screenshot/clarification; never received one before session end. Did
+  find (separately, unconfirmed as related) that every NFL Layer 2
+  candidate shows an identical placeholder projected score
+  ("22.7-21.7") instead of real per-game numbers, and hit a tooling
+  wall trying to root-cause it (the ops artifact-export tool can't see
+  NFL data-root files at all on production, unlike every other sport).
+  **Needs a fresh look, ideally with the user confirming exactly what
+  they're seeing on the board this time.**
+- **Game-aware Layer 2 removal for "player is out" / "prop already
+  hit"** (user's explicit ask, twice: "make sure this works across
+  steam and real opps") -- investigated but not implemented. Findings
+  to build from: (a) MLB already has a pitcher-specific "starter
+  removed" detector (`_starter_removed_from_actual_payload`,
+  mlb/cards.py) wired into `_mlb_candidate_live_state`, but it's
+  pitcher-only and its existing "inactive player" text-token guard
+  (`_apply_candidate_state_guard`'s `_CANDIDATE_INACTIVE_PLAYER_TOKENS`
+  scan) is a dead letter -- confirmed live, nothing anywhere stamps
+  "inactive"/"out"/"DNP" text onto any real candidate's status fields,
+  so this check never fires for anyone, pitcher or hitter. (b) For
+  hitters, the real signal exists in MLB's live boxscore: each team's
+  top-level `liveData.boxscore.teams.<side>.battingOrder` array (9
+  player IDs) reflects the CURRENT active lineup and updates on
+  substitution -- confirmed against a real live game feed
+  (gamePk 824000) -- so "candidate's player id not in the team's
+  current battingOrder array" is a clean, general "no longer in the
+  game" signal, distinct from the existing pitcher-only check. (c) For
+  "prop already hit/decided": the clean, sport-agnostic rule is
+  "candidate's numeric `actual` already exceeds its numeric `line`" --
+  true regardless of Over/Under side, since every tracked prop stat
+  (MLB hits/HR/RBI/runs/total bases/strikeouts/outs/ER/walks, WNBA/NBA
+  box-score counting stats, soccer shots) is monotonically
+  non-decreasing during a game, so once `actual > line` the outcome
+  (hit or busted) is already locked in either way. **Both need
+  extending `_apply_candidate_state_guard`'s existing `candidate_type
+  != "prop": return` gate** (currently skips ALL steam candidates
+  entirely, per the user's specific "make sure this works across
+  steam" ask) to also cover steam candidates that carry a real
+  `player_name` (the natural proxy for "this is a player-level bet,
+  not a game-level one" -- game-level steam/game candidates never
+  carry `player_name`). Neither piece of code was written this
+  session -- this is a from-scratch build for next session, not a
+  small follow-up.
+
+**Operational notes:** two full deploys this session used the
+established `da69cb57`-precedent pattern (check `anyLive`/
+`last_mlb_sim_check` before triggering, deploy all three services
+together since fixes spanned shared `intelligence.py`/`cards.py` code,
+poll `/deploys/{id}` until `status=live` on all three, verify via
+`/api/ops/version`). An errant `git stash`/`stash pop` mid-session
+briefly reverted 6 of this session's own files and conflicted with a
+concurrent session's in-progress NFL work -- recovered cleanly via
+`git checkout stash@{N} -- <only-the-6-files>` rather than
+force-resolving the pop, leaving the concurrent session's WIP
+untouched. This checkout is shared with other actively-committing
+sessions throughout (confirmed: 200+ commits landed on `main` from
+other sessions between this session's last commit and this
+reconciliation entry being written) -- per [[project-concurrent-parallel-sessions]],
+never `git add -A`; every commit this session staged only its own
+known files explicitly.
+
 ### RECONCILIATION 2026-08-05 (NFL: real preseason support -- schedule, depth-chart context, shrinkage-based model)
 
 Real 2026 NFL preseason starts this week (Hall of Fame Game Aug 7); user
