@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### OPEN 2026-08-01 (#185) -- WNBA Layer 2 board: live-game projections/actuals alignment + possible prop dedup issue, investigation started but NOT root-caused (session ended on interrupt)
+### OPEN 2026-08-05 (#185) -- WNBA Layer 2 board: live-game projections/actuals alignment + possible prop dedup issue, investigation started but NOT root-caused (session ended on interrupt)
 
 User: "this still isn't working check layer 2 board for wnba active now with
 a live game", then "specifically the projections and live actuals alignment
@@ -15,8 +15,11 @@ history; not cross-checked against this report yet).
 interrupted mid-investigation, right after pulling one live repro from
 production. Recorded here so the repro isn't lost.
 
-**Live repro** (captured 2026-08-01 ~13:35 CT, LVA @ CHI in progress, 3rd
-quarter): `GET /wnba/api/live_state` showed `away_pts=54, home_pts=46,
+**Live repro** (fetched today, 2026-08-05; the WNBA slate/game artifacts
+themselves carry an internal `"date": "2026-08-01"` field -- that's the
+data's own slate-date value, not today's date, noted here only so it isn't
+misread as a stale fetch): `LVA @ CHI` in progress, 3rd
+quarter. `GET /wnba/api/live_state` showed `away_pts=54, home_pts=46,
 clock="3:28", period=3` for `event_id=401857105`
 (`gamePk="0d113b66ed1649d47506a6434e06bd1b6"`). Seconds later,
 `POST /api/intelligence/query {"question":"best bets today","sport":"wnba"}`
