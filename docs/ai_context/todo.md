@@ -7198,6 +7198,40 @@ still depends on the normal deploy cadence (auto-deploy is OFF) and the
 next time the live refresh-worker's own background loop decides a resim
 is warranted.
 
+**Deployed to Render 2026-08-05** (user: "deploy this to render"). Before
+triggering, checked `/api/ops/live-refresh/state` for an in-flight sim
+first (this repo's known risk -- deploying kills one mid-run): found a
+real scoped resim actively running (9/15 games, `tip_off_window` reason).
+User chose to wait; on the next poll a *different* scoped resim had
+already started (new pid, new 3-game scope) -- revealed this isn't a
+one-off, it's a rolling sequence of tip-off-triggered resims throughout
+MLB's active game window, so "wait for a clean gap" could mean hours, not
+minutes. User then chose to deploy anyway and accept the (cheap, 3-game)
+restart cost. Triggered refresh-worker's deploy
+(`srv-d91dpertqb8s73co8ls0`) via the Render API using `RENDER_API_KEY`
+from `.env` -- `dep-d9po1939ik0c73cb4b7g`, reached `status: live` in
+~3.5 minutes, deployed commit `30a7067e` confirmed to have this session's
+`f1ccae6c` (the SO-model default flip) as an ancestor.
+
+**Also caught along the way**: this session's own `d88ae23a` (the
+`unified_daily_update.ps1` correction, previous entry) had never actually
+been pushed to `origin/main` -- discovered because the deploy trigger
+response's commit hash didn't include it. Separately, three *unrelated*
+commits (NFL preseason shrinkage fix + real-odds wiring) had landed
+directly on this same local `main` from a concurrent session sharing this
+working tree -- the same collision pattern as this session's earlier
+stash/reset incident, a different manifestation. Reconciled safely (fetch
++ `git merge --no-edit`, no rebase, no force, clean auto-merge) and
+pushed (`e0082a82`) -- confirmed nothing was lost or overwritten on
+either side.
+
+**Final state**: strikeout model is live in production. Every commit from
+tonight is on `origin/main`, local and remote are in sync, all
+1200+-test mlb/sim/roster/stamina/pitcher regression subset passes clean
+as of the last check. This closes out the MLB pitcher-props thread for
+this session -- diagnosed, prototyped, cross-validated, promoted,
+deployed, and reconciled end to end.
+
 ### Reconciliation 2026-07-31 part 4 (NFL: real SmartSim 2.0 projection engine + market board + Ask the Syndicate)
 
 Continuation of the same "wire up NFL fully based on MLB" session (parts 1-2
