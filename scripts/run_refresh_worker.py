@@ -868,9 +868,39 @@ def _launch_autorun_evaluation_settlement(
     except Exception as exc:
         error_text = f"{type(exc).__name__}: {exc}"
 
+    # Reported live 2026-08-05: total_recommendation_records dropped from a
+    # real 194 (19:41Z) to 0 (15:17Z, ~19.5h later) across the SAME date
+    # window, with no code change to the counting/reading path in between.
+    # This status file is the ONLY cross-service visibility into
+    # refresh-worker's local ledger disk -- the web service that serves
+    # /api/ops/evaluation-settlement/status cannot see this filesystem at
+    # all (refresh-worker runs no HTTP server), so a bare summary of "0"
+    # cannot be told apart from "the chunk files are genuinely gone" without
+    # this. Read directly, independent of settle_ledger_for_dates' own
+    # counting, so a bug in ITS counting would not also hide from this.
+    chunk_diagnostics: dict[str, Any] = {}
+    try:
+        from syndicate.features.shared.intelligence_evaluation import DEFAULT_LEDGER_PATH
+        from syndicate.features.shared.intelligence_evaluation import _ledger_chunk_path
+
+        for chunk_date in target_dates:
+            chunk_path = _ledger_chunk_path(DEFAULT_LEDGER_PATH, chunk_date)
+            if not chunk_path.exists():
+                chunk_diagnostics[chunk_date] = {"exists": False}
+                continue
+            try:
+                stat = chunk_path.stat()
+                line_count = sum(1 for line in chunk_path.read_text(encoding="utf-8").splitlines() if line.strip())
+            except Exception as exc:
+                chunk_diagnostics[chunk_date] = {"exists": True, "error": f"{type(exc).__name__}: {exc}"}
+                continue
+            chunk_diagnostics[chunk_date] = {"exists": True, "size_bytes": stat.st_size, "line_count": line_count, "path": str(chunk_path)}
+    except Exception as exc:
+        chunk_diagnostics["_error"] = f"{type(exc).__name__}: {exc}"
+
     _refresh_state_store()["write_json_file"](
         status_path,
-        {"epoch": time.time(), "dates": list(target_dates), "summary": summaries, "error": error_text},
+        {"epoch": time.time(), "dates": list(target_dates), "summary": summaries, "error": error_text, "chunk_diagnostics": chunk_diagnostics},
     )
 
     if error_text:
