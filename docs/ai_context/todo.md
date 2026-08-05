@@ -1,5 +1,69 @@
 # Syndicate TODO — canonical cross-session list
 
+### PARTLY FIXED 2026-08-04/05 -- WNBA "not showing live" on a genuinely live game: one real bug fixed and deployed, a SECOND likely-bigger one found and still open
+
+User reported WNBA not showing live. Investigated against a real live game
+(TOR@GSV, confirmed directly against ESPN's own scoreboard: GS 25-30 TOR,
+7:47 left in Q2) rather than guessing.
+
+**Bug #1 -- FIXED, deployed (`e8deadb7`), confirmed correct in isolation.**
+`_maybe_persist_current_day_live_snapshot_artifact` (`wnba/cards.py`)
+skipped writing whenever ANY non-empty file already existed at the target
+path. A game is pregame for most of the day before tip-off, so the
+file's first successful write nearly always captures "Scheduled", and
+this permanently blocked every later write for the rest of the day --
+across all 5 shared kinds (live_state, live_lines, live_player_boxscore,
+live_player_lens, live_pbp_stats), silently, no error anywhere. Verified
+the underlying computation itself was always correct
+(`_public_scoreboard_live_state_payload` called directly against ESPN's
+real scoreboard for this exact date returns correct in_progress/score/
+clock, including the already-correct GS->GSV tricode alias for this
+brand-new expansion team). Fix: removed the exists-based skip -- the
+caller's own TTL cache already rate-limits how often this function is
+reached with a fresh payload, so the skip was redundant with that cache,
+not a needed safeguard. New regression test creates a real pre-existing
+non-empty file (the actual failure mode; the two existing tests only
+ever exercised a path that doesn't exist yet).
+
+**Bug #2 -- FOUND, NOT YET FIXED, larger blast radius than #1.**
+`/api/ops/odds-history/matchup-coverage`'s WNBA `updated_at` stayed
+frozen at `2026-08-04T20:13:12-05:00` (8:13pm CT, BEFORE the 9:00pm
+tip-off) for over an hour into the live game, even after Bug #1's fix
+deployed and even while `wnba_live_lens`'s own separate market-discovery
+pipeline and `game_cards_2026-08-04.csv` regeneration were both visibly
+still running. Searched refresh-worker/live-odds-worker logs for
+`refresh_wnba_oddsapi_props` and `EXPORT_LIVE_SNAPSHOT` -- essentially
+no recent hits, meaning the FULL WNBA refresh script (which does
+odds-history sync, live-snapshot export, AND game_cards regeneration)
+appears to not be running at all during this live game, even though
+`_apply_pregame_sport_cadence`'s own liveness check (`_LIVE_STATUS_
+CHECKERS["wnba"]` = artifact check OR ESPN fallback) should, by reading
+the code, correctly detect this game as live and force WNBA into every
+sweep. Contradiction between what the code says should happen and what
+production is actually doing -- not yet resolved. Bug #1's fix may
+still be functionally inert in production until this is found, since it
+can only help once `refresh_wnba_oddsapi_props.py` actually runs again
+for today.
+
+**Next step, in order of cheapest-to-falsify:**
+1. Confirm whether `_espn_has_live_game`'s subprocess call
+   (`scripts/fetch_espn_live_status_for_date.py`) actually succeeds when
+   invoked from live-odds-worker's own process/environment on Render --
+   it works locally (confirmed this session) but production behavior is
+   unverified. A subprocess spawn failure, timeout under load, or a
+   missing dependency in that specific environment would silently make
+   `_wnba_has_live_game` return False via its own `except Exception:
+   return False` fallback, which is indistinguishable from "genuinely not
+   live" anywhere in current logging.
+2. If that's fine, trace what actually gates `refresh_odds_sources.py`
+   from including `wnba` in a sweep right now -- the round-robin/serial
+   sport-refresh gate, the off-hours ceiling (should not apply, a game IS
+   live), or something else not yet found.
+3. Once found, re-verify Bug #1's fix actually reaches production data
+   (poll `/api/ops/wnba/status-trace?date=<today>` until
+   `build_cards_page_context_games[].status.in_progress` flips true for a
+   real live game).
+
 ### FIXED 2026-08-05 (02:07-02:15 CDT) -- Per-pitcher market cap removed, deployed to live-odds-worker, confirmed changing the artifact
 
 Follow-up to the CORRECTION entry directly below. Removed
