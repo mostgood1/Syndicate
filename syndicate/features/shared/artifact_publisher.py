@@ -23,6 +23,7 @@ import logging
 import os
 import time
 import uuid
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, NamedTuple
 from urllib import error as urllib_error
@@ -962,10 +963,34 @@ def _required_daily_artifact_paths(date_str: str) -> list[Path]:
                 paths.append(book_quotes_path(sport, selected))
             except Exception:
                 continue
+        # #239: soccer alone shards by each FIXTURE's date, not by the slate
+        # date. `_append_soccer_prop_book_quotes` buckets rows by
+        # `commence_time[:10]` before writing, so asking only for today gets a
+        # 404 forever while the quotes sit in tomorrow's file. Verified on
+        # production 2026-08-06: soccer/2026-08-06 was absent while 08-07
+        # (120,637 B), 08-08 (533,825), 08-09 (483,682) and 08-10 (23,318) all
+        # existed on web and had never been pulled -- which is the whole reason
+        # soccer rows on the board carried no price.
+        #
+        # Soccer only, because it is the only writer that does this; every other
+        # sport writes to the slate date and a forward window for them would be
+        # 404s every cycle for nothing.
+        for offset in range(1, _SOCCER_FIXTURE_LOOKAHEAD_DAYS + 1):
+            try:
+                future = (date.fromisoformat(selected) + timedelta(days=offset)).isoformat()
+                paths.append(book_quotes_path("soccer", future))
+            except Exception:
+                continue
     except Exception:
         pass
     return paths
 
+
+# How far ahead to fetch soccer's fixture-dated quote shards. Seven days covers
+# a normal fixture list without asking for months of 404s; a far-future fixture
+# (the Serie A opener 16 days out) stays unpriced until it comes inside the
+# window, which is fine -- prices that far ahead would be stale by kickoff.
+_SOCCER_FIXTURE_LOOKAHEAD_DAYS = 7
 
 # Families that are APPENDED TO all day rather than written once. The repair
 # pass above is presence-based, so for these it does the wrong thing precisely
