@@ -44,21 +44,45 @@ Layer 2**, extend the row contract it consumes.
 Also fixed a real #209 defect: `line` was missing from the quote key, so
 alternate lines from one book collapsed (6 considered, 5 appended).
 
-**STILL OPEN, in order:**
-1. **Board/UI** -- book chip, best-of-N badge, two ages on the row. `quote_ref`
-   exists; nothing renders it yet. This is the whole "surface it better" ask.
-2. **Ledger bridge** -- two ledgers still, and `/portfolio` reads only
-   `prediction_ledger.json` (stated in a code comment at
-   `intelligence.py:1919`).
-3. **Rank candidates on best price**, not one arbitrary book -- changes WHICH
-   candidates surface. #211: 140 bets cleared a 3% threshold under best price,
-   0 the other way.
-4. **CLV-first portfolio** -- lead with beat-the-close rate, not ROI (#211: ROI
-   CI95 was [-7.6%, +3.8%], no power; paired price comparison was [+2.48, +3.13]).
-5. **Props cannot settle** -- no actuals source for ANY sport. Closing prices are
-   captured and ready; the bet stays pending and gets no CLV, since CLV is
-   written at settlement. A test pins this so a future actuals source turns it
-   red rather than passing silently.
+**#215/#216 also DONE and pushed** (`d3bc0ae9`):
+
+- **Board price strip + best-price ranking.** `quote_enrichment` attaches
+  `quote_ref` in ONE place -- `_game_bet_candidates_from_game`, the single funnel
+  all five per-sport builders pass through -- so all eight sports get it from one
+  implementation. Card renders book chip, best-of-N, "better price at X (+N
+  pts)", consensus, and two clocks with a stale state on the BOOK clock.
+- **`ev_pct` recomputed against best price**, which changes which candidates
+  surface, not just how they look.
+- **Ledger bridge** with real bookmaker parlay rules (any leg loses → settles
+  immediately; a push drops out; all-push returns stake). Bridge, not merge.
+
+**Two bugs the tests caught that would have shipped silently** -- both the same
+root cause, worth remembering: board rows carry **no bookmaker**, so `quote_ref`
+returns the BEST book by default and `price_rank` is always 1.
+`price_improvement_pct` compared that price against itself (always 0.00 on every
+card) and the template gated the better-price chip on `rank > 1` (never true).
+The strip would have rendered "★ best of N" universally and never once surfaced a
+better price -- its entire purpose. **The reference price must be the row's own
+`odds`, the number actually on screen.**
+
+**CORRECTION to #214**: I claimed no actuals source was wired for any sport.
+Wrong. `graded_outcomes.GRADED_OUTCOME_GRADERS` registers **all eight** and
+yields `player`/`line`/`actual`/`result` -- it covers **props**. Now the primary
+outcome source, with StatsAPI finals kept alongside because the graders read
+worker-local accuracy artifacts and return zero on a cold checkout. Three
+(soccer/ncaab/ncaaf) are still documented `[]`-stubs.
+
+**STILL OPEN:**
+1. **CLV-first portfolio** -- lead with beat-the-close rate, not ROI (#211: ROI
+   CI95 was [-7.6%, +3.8%], no power; paired price comparison was
+   [+2.48, +3.13]). The data now exists; the page still leads with ROI.
+2. **Verify on Render.** Everything above is tested locally and none of it has
+   run in production. The board strip in particular has only been proven by
+   exercising the render functions directly under node -- `/intelligence` did
+   not load in the local driver within 90s (a known local-dev-server issue, see
+   the run-syndicate skill's gotchas), so it has never been seen in a browser.
+3. **soccer/ncaab/ncaaf graders are stubs** -- their bets cannot settle until
+   those land, regardless of everything above.
 
 **Not deployed.** #209-#214 are committed but Render auto-deploy is off, and
 deploying kills in-flight sims. Nothing in the settlement chain produces live
@@ -4504,6 +4528,16 @@ already does (the pattern this session used successfully for the
 settlement matcher), or (b) extend `load_latest_refresh_log`/the ops
 endpoint to support a `?head=true` or byte-range read so the START of a
 large captured stdout is readable, not just the tail.
+
+> ✅ **(b)-equivalent SHIPPED 2026-08-06, via #215** (a second, independent
+> investigation hit this same wall diagnosing a failed soccer refresh):
+> `_truncate_log_text` now keeps head+tail halves at capture time instead of
+> tail-only, same total budget. Not `?head=true` as literally proposed —
+> capture-time truncation permanently discards the dropped bytes, so a
+> read-time flag would have had nothing to serve; fixed at the point the
+> data is actually lost instead. (a) (the MLB-specific
+> `distinct_matchups_in_source` counter) is still open if this doesn't fully
+> resolve future MLB odds-history diagnosis.
 
 **This is a live production system with a concurrent session actively
 shipping to `main` throughout this investigation** -- re-verify current
@@ -15491,6 +15525,45 @@ were resolved and nine already-closed rows removed from the open tables.
 > check for a concurrent one-off script (backfills, manual replays) — not
 > every OddsAPI HTTP seam necessarily has record_oddsapi_quota wired in yet;
 > the fix here was making that seam comply, not the monitoring.
+
+**#215** — **Failed soccer pregame refresh (2026-08-06), dug into: isolated but
+not root-caused; the diagnosability gap that blocked it is fixed.**
+
+- **Reproducible, not a blip.** Two separate `refresh_odds_sources.py --sports
+  mlb,wnba,nfl,soccer --phase pregame` runs an hour apart (14:05Z and 15:05Z,
+  runStamps `20260806_140516`/`20260806_150530`) both finished `"ok": false,
+  "returnCode": 1`.
+- **Isolated to soccer specifically.** The `odds_control_plane` snapshot in
+  the run summary carries a per-sport `"ok"` flag; mlb/wnba/nfl all read
+  `true`, only `"sport": "soccer", "ok": false`. Every individual soccer step
+  visible in the captured output (eredivisie/primeira_liga/championship/
+  belgian_pro_league picks generation, `soccer_post_refresh_tracking_sync`)
+  showed `status=ok return_code=0` — the actual failing check/step is not
+  among those, so it's a specific league's fetch step, not a script-wide
+  crash or the picks/tracking-sync stages.
+- **Could not go further — hit the exact gap already flagged 2026-08-04 in
+  this file** (the "MLB h2h per-game accounting" entry, live-odds-worker vs
+  refresh-worker lanes): `run_refresh_odds_job.py` truncates captured
+  stdout/stderr to the
+  **tail 65536 bytes at WRITE time**, permanently discarding the rest — not
+  a read-time API limit, `read_text_file` just returns what's on disk. This
+  script's `--json` output is one structured document where per-league
+  results sit near the START and only a derived summary trails at the end,
+  so the tail-only capture kept exactly the summary (which just says
+  `ok: false`) and discarded the one part that says why, for BOTH runs
+  (1.6MB and 4.0MB total, respectively). The 2026-08-04 entry proposed two
+  fixes and neither had shipped; this is the second investigation it's
+  blocked.
+- **Fixed the diagnosability gap, not the underlying soccer failure**
+  (`scripts/run_refresh_odds_job.py`'s `_truncate_log_text`, same
+  `SYNDICATE_MAX_RUN_ARTIFACT_TEXT_BYTES` budget, no keyvalue-pressure
+  change): now keeps **head AND tail halves** instead of tail-only.
+  `tests/test_run_refresh_odds_job_log_truncation.py` updated to match (was
+  asserting the head is *dropped*; now asserts both halves survive) — 12/12
+  passing. **The actual soccer root cause is still open** — needs a fresh
+  run captured with this fix to read the real failure; not triggered here
+  since a re-run burns real OddsAPI credits and that's the user's call, not
+  a default action mid-budget-investigation.
 
 **16** 🟢 **CLOSED 2026-07-25** (`1986caf6`, "Drop F7 markets; standard line
 wins, alternates kept as a ladder") — **do not treat this as an open decision**,
