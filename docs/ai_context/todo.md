@@ -1,6 +1,52 @@
 # Syndicate TODO — canonical cross-session list
 
-### ROOT-CAUSED 2026-08-05 (#204) -- the first-inning bias is TWO defects: 34% over-dispersion + a missing top-of-order boost
+### CORRECTION 2026-08-05 to #204 -- the "34% over-dispersion" figure is WRONG. Real excess is ~2% at inning 1. The shape and top-of-order findings stand.
+
+Caught while starting the sim fix. **#204's headline "first-inning runs are
+over-dispersed by 34% (sim variance 2.411 vs actual 1.803)" is a bad
+calculation and must not be acted on.** The "actual 1.803" was computed over
+run values TRUNCATED at 5+ and against a mean taken from those same truncated
+values -- apples to oranges.
+
+Correct comparison, sim mean per-game variance vs actual variance across games:
+
+| segment | sim | actual | ratio |
+|---|---|---|---|
+| first1 | 2.411 | 2.374 | **1.016** |
+| first3 | 7.529 | 6.778 | 1.111 |
+| first5 | 13.251 | 11.206 | 1.183 |
+| full | 23.642 | 21.566 | 1.096 |
+
+Interpretation matters here: actual across-game variance INCLUDES real
+game-to-game matchup spread, which the sim's mean within-game variance does
+not. Reality's total = E[within] + Var[game means], so the sim's within-game
+figure alone exceeding reality's TOTAL does indicate genuine over-dispersion --
+but on the order of **a few percent at inning 1**, not 34%.
+
+Also note the ratio GROWS with segment length (1.016 -> 1.111 -> 1.183). That
+points at over-dispersion ACCUMULATING across innings -- a general inning-
+mechanics property -- rather than anything specific to the first inning.
+
+**What in #204 still stands** (measured directly, not derived from variance):
+- The pmf shape gap is real: sim 54.36% at zero vs actual 48.92%, with too
+  little mass at 1 run (19.40% vs 23.21%) and 2 runs (11.57% vs 14.22%).
+- The missing top-of-order boost is real: reality has inning 1 at 1.095x an
+  average inning, the sim at 0.997x.
+- The mean deficit is real but small: 0.987 vs 1.036.
+- The per-inning bias profile (deficit concentrated in inning 1 and innings
+  6-9, bullpen) is unaffected.
+
+**Consequence for the fix**: the framing changes from "inning 1 is broken" to
+"a small general over-dispersion that compounds, plus a genuinely missing
+first-inning top-of-order effect." Those are different repairs, and the first
+one should NOT be attacked as an inning-1 problem.
+
+This is the fifth self-correction in the #186-#204 thread. The pattern is
+consistent and worth stating plainly: every number in this thread computed
+once, without an independent cross-check, has had roughly even odds of being
+wrong.
+
+### SUPERSEDED 2026-08-05 (#204) -- the first-inning bias is TWO defects: 34% over-dispersion + a missing top-of-order boost
 
 Diagnosed #203's NRFI bias on **879 games**. It is not a mean problem, which is
 why it was invisible in every runs-based check: sim first-inning mean is 0.987
