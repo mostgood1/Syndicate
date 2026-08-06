@@ -113,3 +113,70 @@ def apply_prop_prob_calibration(p: float, cfg: Optional[Dict[str, Any]], prop_ke
     """Apply probability calibration for a specific prop key (supports per-prop wrapper configs)."""
     sub = resolve_prop_calibration_cfg(cfg, str(prop_key))
     return apply_prob_calibration(float(p), sub)
+
+
+# Measured 2026-08-05 over 873 completed games / 66 dates (Render sims vs real
+# StatsAPI finals): the sim states a mean per-game run-margin SD of 4.515 while
+# the realised residual SD (actual margin - sim mean margin) is 4.733. The sim
+# under-disperses full-game run margin by 4.8%, which pushes win probabilities
+# too far from 50%.
+#
+# Scope: FULL-GAME ONLY. The first1/first3/first5 segments were never measured,
+# and their dispersion has no reason to share this factor, so applying it there
+# would be unvalidated extrapolation.
+FULL_GAME_MARGIN_DISPERSION_FACTOR = 1.048
+
+
+def widen_margin_distribution(dist: Dict[Any, float], factor: float) -> Dict[int, float]:
+    """Scale a run-margin count distribution about its own mean by `factor`.
+
+    This is a variance correction, not a calibration fit: the factor comes from
+    measured realised-vs-stated dispersion, so it has a physical meaning and no
+    free parameters tuned against outcomes.
+
+    `factor > 1` widens (less confident), `1.0` is an exact no-op. Bin k moves
+    to `mu + factor * (k - mu)`, which lands between integers, so mass is split
+    across the two adjacent bins. Rounding to the nearest bin instead would
+    quantise away most of a small adjustment -- the same defect that made
+    `recalibrate_so_output` discard sub-half-strikeout corrections before it was
+    fixed (see pitcher_so_model.py). Total mass is preserved exactly.
+    """
+    items = []
+    for k, v in (dist or {}).items():
+        try:
+            kk, vv = float(k), float(v)
+        except (TypeError, ValueError):
+            continue
+        if vv > 0:
+            items.append((kk, vv))
+    total = sum(v for _, v in items)
+    if total <= 0 or not items:
+        return {int(k): float(v) for k, v in (dist or {}).items()}
+    try:
+        f = float(factor)
+    except (TypeError, ValueError):
+        return {int(k): float(v) for k, v in items}
+    if abs(f - 1.0) < 1e-12:
+        return {int(k): float(v) for k, v in items}
+
+    mean = sum(k * v for k, v in items) / total
+    out: Dict[int, float] = {}
+    for k, v in items:
+        pos = mean + f * (k - mean)
+        lo = math.floor(pos)
+        frac = pos - lo
+        out[lo] = out.get(lo, 0.0) + v * (1.0 - frac)
+        if frac > 0.0:
+            out[lo + 1] = out.get(lo + 1, 0.0) + v * frac
+    return out
+
+
+def win_probs_from_margin_distribution(dist: Dict[Any, float]) -> "tuple[float, float, float]":
+    """(home_win_prob, away_win_prob, tie_prob) from a home-minus-away margin dist."""
+    total = sum(float(v) for v in (dist or {}).values() if float(v) > 0)
+    if total <= 0:
+        return 0.0, 0.0, 0.0
+    home = sum(float(v) for k, v in dist.items() if float(k) > 0 and float(v) > 0)
+    away = sum(float(v) for k, v in dist.items() if float(k) < 0 and float(v) > 0)
+    tie = sum(float(v) for k, v in dist.items() if float(k) == 0 and float(v) > 0)
+    return home / total, away / total, tie / total

@@ -74,6 +74,9 @@ from sim_engine.models import GameConfig
 from sim_engine.simulate import simulate_game
 from sim_engine.pitch_model import PitchModelConfig
 from sim_engine.prob_calibration import apply_prop_prob_calibration
+from sim_engine.prob_calibration import FULL_GAME_MARGIN_DISPERSION_FACTOR
+from sim_engine.prob_calibration import widen_margin_distribution
+from sim_engine.prob_calibration import win_probs_from_margin_distribution
 from sim_engine.pitcher_so_model import load_so_model, predict_so_mean, recalibrate_so_output
 from sim_engine.data.roster_artifact import read_game_roster_artifact, write_game_roster_artifact
 from sim_engine.data.roster_registry import (
@@ -4093,6 +4096,7 @@ def _sim_many(
     cfg_kwargs: Optional[Dict[str, Any]] = None,
     pitcher_so_model_weight: float = 0.0,
     pitcher_so_model_path: Optional[str] = None,
+    margin_dispersion_factor: float = 1.0,
 ) -> Dict[str, Any]:
     rng_seed = seed
 
@@ -4456,22 +4460,42 @@ def _sim_many(
 
     denom = float(max(1, sims))
 
-    def finalize(seg: Dict[str, Any]) -> Dict[str, Any]:
+    def finalize(seg: Dict[str, Any], *, margin_dispersion: float = 1.0) -> Dict[str, Any]:
+        # `margin_dispersion` corrects a MEASURED under-dispersion of the sim's
+        # run-margin distribution (see prob_calibration.py's
+        # FULL_GAME_MARGIN_DISPERSION_FACTOR). It is a variance correction
+        # derived from realised-vs-stated spread over 873 completed games, not a
+        # calibration fitted against outcomes, so it has no free parameters.
+        #
+        # Only the FULL segment passes a factor: first1/first3/first5 dispersion
+        # was never measured and has no reason to share it.
+        #
+        # Win probabilities are recomputed FROM the widened distribution rather
+        # than left as the raw win counts, so the reported probability and the
+        # reported distribution stay consistent with each other -- otherwise a
+        # consumer reading run_margin_dist would disagree with home_win_prob.
+        margins = seg["margins"]
+        home_p = seg["home_wins"] / denom
+        away_p = seg["away_wins"] / denom
+        tie_p = seg["ties"] / denom
+        if abs(float(margin_dispersion) - 1.0) > 1e-12:
+            margins = widen_margin_distribution(margins, float(margin_dispersion))
+            home_p, away_p, tie_p = win_probs_from_margin_distribution(margins)
         return {
-            "home_win_prob": seg["home_wins"] / denom,
-            "away_win_prob": seg["away_wins"] / denom,
-            "tie_prob": seg["ties"] / denom,
+            "home_win_prob": home_p,
+            "away_win_prob": away_p,
+            "tie_prob": tie_p,
             "away_runs_mean": float(seg.get("away_runs_sum", 0.0)) / denom,
             "home_runs_mean": float(seg.get("home_runs_sum", 0.0)) / denom,
             "total_runs_dist": seg["totals"],
-            "run_margin_dist": seg["margins"],
+            "run_margin_dist": margins,
             "samples": seg["samples"],
         }
 
     out: Dict[str, Any] = {
         "sims": sims,
         "segments": {
-            "full": finalize(seg_full),
+            "full": finalize(seg_full, margin_dispersion=margin_dispersion_factor),
             "first1": finalize(seg_f1),
             "first5": finalize(seg_f5),
             "first3": finalize(seg_f3),
@@ -5263,6 +5287,20 @@ def main() -> int:
         "--hitter-props-prob-calibration",
         default="data/tuning/hitter_props_calibration/default.json",
         help="Calibration JSON for hitter props likelihood probabilities (use 'off' to disable)",
+    )
+    ap.add_argument(
+        "--margin-dispersion-factor",
+        type=float,
+        default=FULL_GAME_MARGIN_DISPERSION_FACTOR,
+        help=(
+            "Widen the FULL-game run-margin distribution about its mean by this factor before "
+            "deriving win probabilities. Default 1.048, measured 2026-08-05 over 873 completed "
+            "games / 66 dates: the sim states a mean per-game margin SD of 4.515 while the realised "
+            "residual SD is 4.733, i.e. it under-disperses by 4.8%%, pushing win probabilities too far "
+            "from 50%%. This is a variance correction from measured spread, not a calibration fitted "
+            "against outcomes. Applies to the full segment only -- first1/first3/first5 dispersion was "
+            "never measured. Pass 1.0 to disable (exact no-op)."
+        ),
     )
     ap.add_argument(
         "--pitcher-so-model-weight",
@@ -7800,6 +7838,10 @@ def main() -> int:
                 ],
                 cfg_kwargs=cfg_kwargs,
                 pitcher_so_model_weight=float(getattr(args, "pitcher_so_model_weight", 0.0) or 0.0),
+                margin_dispersion_factor=float(
+                    getattr(args, "margin_dispersion_factor", FULL_GAME_MARGIN_DISPERSION_FACTOR)
+                    or FULL_GAME_MARGIN_DISPERSION_FACTOR
+                ),
                 pitcher_so_model_path=(getattr(args, "pitcher_so_model_path", "") or None),
             )
         except KeyboardInterrupt:
