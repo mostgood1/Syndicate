@@ -199,6 +199,36 @@ def _row_closing_line(row: Mapping[str, Any]) -> Any:
     return None
 
 
+def _row_closing_price(row: Mapping[str, Any]) -> Any:
+    """The closing PRICE, distinct from the closing line.
+
+    Line CLV is undefined for moneyline -- there is no line -- so on a ledger of
+    moneylines and parlays it is null for almost everything (measured on
+    production 2026-08-06: avg_clv null across the board). Price CLV is defined
+    for every bet that has a price, which is all of them.
+    """
+    for key in ("closing_price", "closing_odds", "close_price", "price", "odds"):
+        value = row.get(key)
+        if value is not None and str(value).strip() != "":
+            return value
+    return None
+
+
+def _prediction_original_price(prediction: Mapping[str, Any]) -> Any:
+    """The price we actually struck at.
+
+    Prefers the #213 bet-time quote, which records the book and the price
+    together, and falls back to the bare `odds` column for predictions logged
+    before that existed. Returns None rather than guessing when neither is
+    present -- an unknown CLV must stay distinguishable from a zero one.
+    """
+    quote = prediction.get("quote") if isinstance(prediction.get("quote"), Mapping) else None
+    if quote is not None and quote.get("price") is not None:
+        return quote.get("price")
+    odds = prediction.get("odds")
+    return odds if odds is not None and str(odds).strip() != "" else None
+
+
 def _american_profit(odds: Any, stake: float = 1.0) -> float | None:
     try:
         value = float(str(odds).replace(",", ""))
@@ -369,6 +399,8 @@ def reconcile_prediction_results_for_date(
             original_line=original_line,
             closing_line=closing_line,
             pnl=pnl,
+            original_price=_prediction_original_price(prediction),
+            closing_price=_row_closing_price(matched_row),
             ledger_path=ledger_root,
         )
         resolved += 1

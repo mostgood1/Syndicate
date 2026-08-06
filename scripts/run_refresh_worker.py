@@ -683,6 +683,25 @@ def _launch_autorun_reconciliation(
     # The CLI entrypoint (scripts/daily_update.ps1's GHA pipeline) keeps
     # using the function's own repo-relative default, unaffected by this.
     result_roots = [_refresh_state_store()["data_root"]()]
+    # Emit the result files BEFORE reconciling. #214: reconciliation was never
+    # broken, it was starved -- it globs for closing_lines_{date}.csv and found
+    # nothing, so every prediction logged "no match found" and production sat at
+    # settled_count 0 with avg_clv null. Emitting inside the same autorun keeps
+    # the two in lockstep; a separate schedule would reintroduce the window
+    # where reconciliation runs against files that do not exist yet.
+    emit_summary: dict[str, Any] = {}
+    try:
+        from scripts.emit_settlement_inputs import emit_for_date
+
+        for target_date in target_dates:
+            emit_summary[target_date] = emit_for_date(target_date)
+    except Exception as exc:  # noqa: BLE001
+        # Never fatal: stale or missing result files degrade settlement, but a
+        # failure here must not stop the reconciliation pass from retrying
+        # whatever files already exist.
+        emit_summary["error"] = f"{type(exc).__name__}: {exc}"
+        print(f"[settlement_inputs] emit FAILED {emit_summary['error']}", flush=True)
+
     summaries: dict[str, Any] = {}
     error_text: str | None = None
     try:
@@ -694,7 +713,13 @@ def _launch_autorun_reconciliation(
 
     _refresh_state_store()["write_json_file"](
         status_path,
-        {"epoch": time.time(), "dates": list(target_dates), "summaries": summaries, "error": error_text},
+        {
+            "epoch": time.time(),
+            "dates": list(target_dates),
+            "summaries": summaries,
+            "settlement_inputs": emit_summary,
+            "error": error_text,
+        },
     )
 
     if error_text:
