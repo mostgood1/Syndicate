@@ -130,6 +130,26 @@ class Budget:
             )
 
 
+def _record_quota(headers: dict[str, str], *, endpoint: str) -> None:
+    """Attribute this call in the platform-wide quota ledger.
+
+    Added after the fact, and the omission had a real cost: the first 30-day run
+    spent 115,739 credits through this seam WITHOUT calling record_oddsapi_quota,
+    so a concurrent session monitoring burn saw ~73% of an interval's charges
+    unattributed and opened an investigation into phantom spend. Every OddsAPI
+    HTTP seam in this repo must record, including one-off backfills -- an
+    unattributed call is indistinguishable from a leak.
+    """
+    try:
+        from syndicate.features.shared.oddsapi_quota import record_oddsapi_quota
+
+        record_oddsapi_quota(headers, sport="mlb", endpoint=endpoint)
+    except Exception:
+        # Instrumentation that can break the thing it measures is worse than
+        # none -- same contract as record_oddsapi_quota's own docstring.
+        pass
+
+
 def _get(path: str, params: dict[str, Any], *, api_key: str, budget: Budget, retries: int = 3) -> Any:
     query = dict(params)
     query["apiKey"] = api_key
@@ -140,11 +160,13 @@ def _get(path: str, params: dict[str, Any], *, api_key: str, budget: Budget, ret
             with urllib.request.urlopen(urllib.request.Request(url), timeout=120) as response:
                 headers = {str(key).lower(): str(value) for key, value in response.headers.items()}
                 budget.charge(headers)
+                _record_quota(headers, endpoint=f"historical{path}")
                 return json.loads(response.read())
         except urllib.error.HTTPError as exc:
             headers = {str(key).lower(): str(value) for key, value in (exc.headers or {}).items()}
             # A 4xx still bills in some cases, and always carries the counters.
             budget.charge(headers)
+            _record_quota(headers, endpoint=f"historical{path}")
             if exc.code in (404, 422):
                 # No snapshot at that instant, or a market this event never
                 # offered. Both are ordinary and must not abort the run.
