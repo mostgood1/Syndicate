@@ -1,5 +1,72 @@
 # Syndicate TODO — canonical cross-session list
 
+### FINDING 2026-08-05 (#195) -- Market-hold map for ALL MLB markets: where an edge can exist at all, and the two biggest levers
+
+Hold needs only prices, not outcomes, so this is the one analysis in the
+#186-#194 thread NOT limited to 14-15 slates -- it runs on all 45-46
+git-tracked odds snapshot dates. Hold is the bar any model must clear, so this
+map says where to spend effort and where not to bother regardless of model
+quality. (scratchpad: `hold_sweep.py`)
+
+| market | sides | n | median hold | break-even |
+|---|---|---|---|---|
+| **full: moneyline** | 2 | 499 | **4.53%** | 52.27% |
+| **full: run line** | 2 | 498 | **4.57%** | 52.28% |
+| **full: total** | 2 | 499 | **4.71%** | 52.35% |
+| **batter_home_runs (TWO-SIDED)** | 2 | 1340 | **5.56%** | 52.78% |
+| first5: moneyline | 2 | 471 | 5.95% | 52.98% |
+| pitcher: strikeouts | 2 | 925 | 6.00% | 53.00% |
+| batter_hits | 2 | 8681 | 6.72% | 53.36% |
+| batter_total_bases | 2 | 6242 | 6.80% | 53.40% |
+| pitcher: outs | 2 | 843 | 7.34% | 53.67% |
+| pitcher: earned_runs / hits_allowed | 2 | ~840 | 8.33% | 54.17% |
+| first1: moneyline (3-way) | 3 | 468 | 8.91% | n/a |
+
+**LEVER 1 (#196) -- HR props ARE de-viggable, and we stopped capturing it.**
+The entire "HR is unprofitable at 21% overround" conclusion in #188/#192 was
+based on the one-sided over price, because that is all the artifacts carry for
+the dates analysed. **`batter_home_runs` is quoted two-sided at 5.56% hold** --
+cheaper than strikeouts, nearly as cheap as the full-game moneyline -- on 1,340
+samples, all at line 0.5. That reframes HR entirely, and it also makes the
+UNDER bettable, which was never considered.
+
+But two-sided HR capture **stops dead after 2026-06-18** (27.4% of quotes
+through 06-18 -> **0.0%** from 06-19 onward), while every other hitter market
+held or improved across the same boundary -- `batter_hits` 98.6% -> 99.6%,
+`batter_total_bases` 68.0% -> **93.4%**. So this is HR-specific and looks like a
+capture regression, not a book behaviour change. Not root-caused:
+`PLAYER_PROP_PRIMARY_LINE_PREFERENCES` in `scripts/fetch_mlb_oddsapi_local.py`
+has HR at `(0.5,)`, identical to hits/rbis/runs which are unaffected, so the
+line filter is NOT the cause. Next place to look is over/under outcome-name
+parsing (OddsAPI returns some HR books as Yes/No rather than Over/Under) and
+any bookmaker-selection change around 2026-06-18.
+
+**Why this is the top betting-side item**: it is the difference between a ~21%
+effective overround and 5.56%, on the market where the model already shows its
+strongest signal (#192: top-10 hits 24.00% vs a 13.00% base rate, 1.85x lift).
+Fixing capture is what makes the HR Top 10 board (#194) potentially bettable
+rather than purely informational.
+
+**LEVER 2 (#197) -- game markets are 25-35% cheaper than props, and the sim was
+built for them.** Full-game moneyline/run line/total sit at 4.53-4.71% hold vs
+6.00-8.33% for props. The Monte Carlo engine's actual strength is the
+correlated full-game simulation -- props are a post-hoc read off it -- yet this
+entire session (and #186-#192 before it) graded ONLY props. Game-level betting
+accuracy has never been measured here. Everything needed is already on disk:
+`daily_summary` carries `full`/`first1`/`first3`/`first5` sim segments, the
+game-line snapshots carry matching segments, and `feed_live` carries final
+scores.
+
+Also worth noting: **first5 moneyline at 5.95%** is a starters-only market, so
+it is structurally insulated from the bullpen/same-day-information problem that
+killed hits-allowed and outs (#187) -- and the sim produces a `first5` segment
+directly. That combination (cheap, matched segment, less same-day noise) makes
+it the most promising prop-adjacent market in the table.
+
+**Ordering recommendation**: #196 (HR capture fix) before any more HR modelling;
+#197 (grade game markets) before any more prop modelling. Both are blocked on
+#193 for a sample big enough to trust the result.
+
 ### OPEN 2026-08-05 (#193) -- HIGH PRIORITY: make Render the single source of data truth for all sports, all dates
 
 User: "we need ALL required data for ALL dates for ALL sports in one SINGLE
