@@ -3081,6 +3081,7 @@ def _build_home_dashboard(overview: list[dict[str, Any]], *, selected_date: str,
         # any overview built by a path that predates prop_opportunities -- they
         # are a compatibility shim, not the contract, and should be deleted once
         # every producer sets it.
+        sport_slug_for_metrics = _safe_text(sport.get("slug"), "").lower()
         opportunities = sport.get("prop_opportunities") if isinstance(sport.get("prop_opportunities"), dict) else {}
         prop_items = []
         for lane in ("pregame", "live"):
@@ -3088,10 +3089,31 @@ def _build_home_dashboard(overview: list[dict[str, Any]], *, selected_date: str,
             if isinstance(lane_items, list):
                 prop_items.extend(lane_items)
         if not prop_items:
-            if isinstance((home_rails.get("pregame") or {}).get("items"), list):
-                prop_items.extend((home_rails.get("pregame") or {}).get("items") or [])
-            if isinstance((home_rails.get("live") or {}).get("items"), list):
-                prop_items.extend((home_rails.get("live") or {}).get("items") or [])
+            # #232: the duplicate read path, now COUNTED rather than removed.
+            #
+            # Deleting it outright broke 42 tests: producers and fixtures exist
+            # that build a sport overview with rails and no prop_opportunities,
+            # so this is not yet a dead path -- it is a live one for some sports.
+            # Removing it blind would have emptied their lanes in production the
+            # same way it emptied them in the suite.
+            #
+            # So it gets the same treatment that took missing_market_key from
+            # 100% to 0%: make the reliance visible, per sport, and delete the
+            # path once the number is zero. `rail_fallback_used` on the counter
+            # names exactly which sports still need a producer.
+            for lane in ("pregame", "live"):
+                lane_items = (home_rails.get(lane) or {}).get("items")
+                if isinstance(lane_items, list):
+                    prop_items.extend(lane_items)
+            try:
+                from syndicate.features.shared import opportunity_contract_metrics
+
+                opportunity_contract_metrics.record_rows(
+                    prop_items, sport=sport_slug_for_metrics, lane="rail_fallback_used",
+                    date_str=selected_date,
+                )
+            except Exception:
+                pass
         if not prop_items:
             prop_items = props_bar.get("items") if isinstance(props_bar.get("items"), list) else []
         for item in game_items:

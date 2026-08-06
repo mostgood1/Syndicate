@@ -898,6 +898,33 @@ def _required_daily_artifact_paths(date_str: str) -> list[Path]:
                 continue
     except Exception:
         pass
+    try:
+        # #232: the per-book quote log, for every sport that keeps one.
+        #
+        # This is the file the Layer 2 board's price context is built from, and
+        # it had NEVER reached refresh-worker -- zero book_quotes log lines
+        # there, ever, while web's copy was fine. The board consequently served
+        # 138 candidates with a canonical market_key and not one price.
+        #
+        # It was assumed to self-heal because it IS allowlisted and DOES match
+        # the `*<date>*` incremental glob. Both are true and it still never
+        # arrived: the incremental pull filters on `since=`, and a 502 on that
+        # path holds the watermark back, so a file that is missing outright can
+        # stay missing indefinitely. That is exactly the gap this repair list
+        # exists for -- an exact `?path=` request with no `since=` filter -- and
+        # book_quotes simply was not on it. Costs nothing once the file exists,
+        # because _missing_required_artifact_relative_paths only asks for
+        # artifacts this service does not already have.
+        from syndicate.features.shared.odds_book_quotes import book_quotes_path
+
+        selected = str(date_str).strip()
+        for sport in ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"):
+            try:
+                paths.append(book_quotes_path(sport, selected))
+            except Exception:
+                continue
+    except Exception:
+        pass
     return paths
 
 
