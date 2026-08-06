@@ -1,5 +1,69 @@
 # Syndicate TODO — canonical cross-session list
 
+### DIAGNOSED, NOT SHIPPED 2026-08-05 (#201) -- the sim's "favourite overconfidence" is mostly NOISE. Real defect is a 4.8% margin under-dispersion, which explains ~1pp of a claimed 16pp gap.
+
+#199/#200 flagged the sim as badly overconfident on favourites (0.6-1.0
+home-win bucket predicting 64.4% vs 56.2% actual) and called game-level
+calibration the next target. Measured it properly on **873 games / 66 dates**
+before changing anything. The defect is far smaller than claimed.
+
+**Full calibration curve (raw sim):**
+
+| bucket | n | predicted | actual | gap |
+|---|---|---|---|---|
+| 0.00-0.35 | 35 | 30.8% | 28.6% | -2.2 |
+| 0.35-0.42 | 102 | 39.5% | 46.1% | +6.6 |
+| 0.42-0.46 | 111 | 44.1% | 43.2% | -0.9 |
+| 0.46-0.50 | 188 | 48.1% | 54.3% | +6.1 |
+| 0.50-0.54 | 159 | 51.9% | 57.9% | +5.9 |
+| 0.54-0.58 | 145 | 56.0% | 57.2% | +1.2 |
+| 0.58-0.65 | 99 | 60.9% | 55.6% | -5.4 |
+| **0.65-1.01** | **34** | **69.0%** | **52.9%** | **-16.0** |
+
+The headline -16.0pp rests on **n=34**. Standard error on that bucket is
+~7.9pp, so it is ~2 SE -- suggestive, not established.
+
+**Root cause test -- is the run-margin distribution too narrow?**
+- Sim's own mean per-game margin SD: **4.515**
+- Realised residual SD (actual margin - sim mean margin): **4.733**
+- **Ratio 1.048 -- the sim under-disperses margin by 4.8%.** Real, and in the
+  direction that causes overconfidence.
+
+**But it explains almost none of the gap.** For the sim to output 69% it needs
+mu/sigma = 0.496, i.e. mu = 2.24 runs. Re-evaluating at the true sigma:
+Phi(2.24/4.733) = **68.2%**. So correcting the entire under-dispersion moves
+69% -> 68.2% -- about **1pp of the claimed 16pp**. The rest is noise, or mean
+error (bad team ratings), not spread.
+
+Totals are fine: dispersion ratio **0.977** (slightly over-dispersed), with a
+small -0.32-run mean bias (sim 8.90 vs actual 9.22).
+
+**Why nothing was shipped.** An affine-logit calibration fit with GroupKFold by
+date gives a = **0.617** (a heavy shrink toward 50%, stable across folds
+0.53-0.69). It is a genuine out-of-fold improvement -- Brier 0.24806 ->
+**0.24750**, logloss 0.68943 -> 0.68816 -- but:
+1. That is a **0.2% Brier gain**, against a base-rate-only Brier of 0.24955.
+   The sim has very little game-level signal to calibrate.
+2. **It does not fix the target bucket**: after calibration 0.65-1.01 still
+   reads 63.9% predicted vs 52.9% actual (-10.9, was -16.0).
+3. **It makes the low end worse**: 0.00-0.35 goes from -2.2 to **-10.8**.
+   The miscalibration is asymmetric, so a single global shrink cannot fix it --
+   shrinking helps favourites and hurts underdogs.
+
+Shipping it would be cosmetic: it would flatten the reliability curve's middle
+while leaving the actual complaint intact and degrading the other tail.
+
+**What would actually be worth doing** (in order): (1) apply the small,
+principled **+4.8% widening of the run-margin distribution** -- it is
+root-caused and physically meaningful, though worth only ~1pp; (2) re-measure
+the top bucket once coverage exceeds ~150 games there, since the current n=34
+cannot support a conclusion; (3) if a real gap survives, the problem is the
+sim's **mean** margin (team ratings), not its spread, and that is a modelling
+problem rather than a calibration one.
+
+Fitted config preserved at scratchpad `game_winprob_calibration.json` if it is
+ever wanted; deliberately NOT wired into `prob_calibration.py`.
+
 ### CLOSED 2026-08-05 (#200) -- The moneyline +8.0% does NOT survive robustness. No MLB market in this thread is profitable.
 
 Ran the checks #199 said were required before believing the +8.0% moneyline
