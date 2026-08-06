@@ -987,7 +987,15 @@
     // gating on rank showed "★ best" on every card and never once surfaced a
     // better price, which is the whole point of the strip.
     const improvement = Number(item.price_improvement_pct);
-    if (Number.isFinite(improvement) && improvement > 0.01) {
+    // A NEGATIVE improvement means the price on this row beats every book we
+    // have a quote from, which cannot be true of the same wager -- best-across-
+    // books is by construction never worse than any single book. So it is
+    // evidence the join landed on a different line or a stale snapshot, and
+    // claiming "best of N" there would assert something we just disproved.
+    // Show the book and the field size, withhold the verdict.
+    if (Number.isFinite(improvement) && improvement < -0.01) {
+      chips.push(`<span class="price-chip price-chip--unverified" title="Our quoted books are stale or on a different line for this market -- price not verified">${count > 1 ? escapeHtml(String(count)) + " books seen" : "unverified"}</span>`);
+    } else if (Number.isFinite(improvement) && improvement > 0.01) {
       // Not an error state -- it is the actionable one. #211 measured 2.79 ROI
       // points on identical bets from taking the best price instead of an
       // arbitrary book, so "you are not on the best number" is the single most

@@ -3077,6 +3077,18 @@ def _build_home_dashboard(overview: list[dict[str, Any]], *, selected_date: str,
                 if isinstance(item, dict):
                     prop_rows.append(_build_prop_dashboard_row(sport, item, default_surface="HR Top 10"))
         sport_slug = _safe_text(sport.get("slug"), "").lower()
+        # #220: props are a SEPARATE lane from game bets -- _build_prop_dashboard_row
+        # over home_rails/props_bar items, which never passes through
+        # _game_bet_candidates_from_game where enrichment lives. Traced live:
+        # top_game_bets had 5 of 12 quotes, top_props 0 of 14. These rows carry
+        # no game dict, but they do carry player_name, which is a full identity
+        # signal on its own.
+        try:
+            from syndicate.features.shared.quote_enrichment import enrich_prop_rows
+
+            enrich_prop_rows(prop_rows, date_str=str(selected_date)[:10])
+        except Exception:
+            pass
         mlb_top_prop_counts = _mlb_top_prop_lane_counts(_safe_text(sport.get("context_label"), selected_date)) if sport_slug == "mlb" else None
         availability_reasons = _sport_availability_reason(
             sport,

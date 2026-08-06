@@ -1649,3 +1649,13 @@ table.board-blotter tbody tr:last-child td {
   font-size: 12px;
   padding: 8px 0;
 }
+
+
+/* A row whose own price beats every book we hold a quote for. Impossible for
+   the same wager, so the join is on a different line or a stale snapshot --
+   shown as unverified rather than silently badged "best". */
+.price-chip--unverified {
+  color: #94a3b8;
+  border-style: dashed;
+  opacity: 0.85;
+}

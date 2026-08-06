@@ -285,3 +285,68 @@ def enrich_candidate_rows(
     except Exception:
         return candidates
     return candidates
+
+
+def enrich_prop_rows(
+    rows: list[dict[str, Any]],
+    *,
+    date_str: str,
+    now: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """Attach price context to PROP DASHBOARD rows.
+
+    Props reach the board through an entirely separate lane from game bets --
+    `_build_prop_dashboard_row` over each sport's `home_rails`/`props_bar`
+    items -- which never passes through `_game_bet_candidates_from_game` and so
+    never saw enrichment. Traced from production 2026-08-06:
+    `command_center/top_game_bets` had 5 of 12 quotes while
+    `command_center/top_props` and every `home_rails` lane had 0 of 14/28/9.
+
+    These rows carry no game dict, so there are no teams and no game date --
+    but they DO carry `player_name`, which `quote_ref_for_bet` accepts as a
+    full identity signal in its own right. A player is unique to one game on a
+    given slate, so this is a sound join, not a loosening: a prop row still
+    cannot pick up an unrelated game's price.
+
+    `sport_slug` comes off each row rather than a parameter, because this lane
+    mixes sports in a single list.
+    """
+    if not rows:
+        return rows
+    try:
+        from syndicate.features.shared.odds_book_quotes import quote_ref_for_bet
+
+        now = now or datetime.now(timezone.utc)
+        for row in rows:
+            if not isinstance(row, dict) or row.get("quote"):
+                continue
+            player = row.get("player_name") or row.get("entity") or row.get("player")
+            if not str(player or "").strip():
+                # Without a player there is no identity signal at all here, and
+                # guessing from the market alone would attach some other
+                # player's price.
+                continue
+            sport_slug = str(row.get("sport_slug") or row.get("sport") or "").strip().lower()
+            if not sport_slug:
+                continue
+            quote = quote_ref_for_bet(
+                sport=sport_slug,
+                date_str=date_str,
+                market=row.get("market"),
+                selection=row.get("pick") or row.get("selection"),
+                line=row.get("line"),
+                player_name=player,
+                now=now,
+            )
+            if not quote:
+                continue
+            row["quote"] = quote
+            for flat_key, quote_key in _FLAT_QUOTE_FIELDS:
+                row[flat_key] = quote.get(quote_key)
+            best_implied = _implied_probability(quote.get("best_price"))
+            shown_implied = _implied_probability(row.get("odds"))
+            if best_implied is not None and shown_implied is not None:
+                row["price_improvement_pct"] = round((shown_implied - best_implied) * 100.0, 2)
+    except Exception:
+        return rows
+    return rows
