@@ -67,6 +67,75 @@ it the most promising prop-adjacent market in the table.
 #197 (grade game markets) before any more prop modelling. Both are blocked on
 #193 for a sample big enough to trust the result.
 
+### SURVEYED 2026-08-05 (#193a) -- MLB: Render's real coverage mapped. 66 dates pullable TODAY with zero code change; one family missing blocks the K model only.
+
+First concrete step on #193, scoped to MLB per user direction ("for MLB lets get
+render as the source of truth which SHOULD give us full season data").
+Surveyed production directly rather than designing first.
+(scratchpad: `survey_render.py`, `probe_web_coverage.py`)
+
+**Render HAS the full season.** `/api/ops/mlb/sims-list` across 139 dates
+(2026-03-20..08-05): **76 dates with sims, 1,078 sim files, 2026-04-10 ..
+2026-08-05**, zero errors. Empty dates are pre-season plus a small early-April
+gap. The sparse git mirror was never a data problem.
+
+**No allowlist change is needed.** Checked before assuming: `fnmatch`'s `*`
+crosses `/`, so `is_hot_artifact_relative_path` ALREADY permits
+`daily_summary_*`, `snapshots/*/*.json` (including `roster_objs/` one level
+deeper), and `sims/*/sim_*.json`. The only blocked family is
+`raw/statsapi/feed_live/` -- which does not matter, because outcomes come from
+MLB StatsAPI and were validated 30/30 against the cache (see #193's
+cross-check).
+
+**The real constraint is RETENTION on the WEB disk, not per-family drift.**
+`/api/ops/artifacts/stream` reads *web's* disk; the full season lives on
+refresh-worker, which has no HTTP surface. Probed all 127 dates 04-01..08-05:
+
+| family | dates on web | window |
+|---|---|---|
+| daily_summary | 66 | 2026-05-28 .. 2026-08-05 |
+| hitter odds | 68 | 2026-05-28 .. 2026-08-05 |
+| game lines | 68 | 2026-05-28 .. 2026-08-05 |
+| **all three together** | **66** | **2026-05-28 .. 2026-08-05** |
+
+Unlike git (4 families, 4 windows, intersection = 1 date), web's families are
+**coherent** -- they just stop at 05-28. Earlier dates 404. This corrects the
+in-session claim that Render suffered the same per-family patchwork as git;
+it does not.
+
+**66 dates is 4.4x the 15-date sample every conclusion in #186-#192 rests on,
+and it is pullable today with no code change.**
+
+**The one real gap (#193b): `roster_objs/` is NOT on Render at all.**
+Confirmed by server-side glob (count=0). Production writes the FLAT
+`snapshots/<date>/roster_<n>_<AWAY>_at_<HOME>_pk<pk>_g1.json` files instead --
+16 per date, already allowlisted and pullable -- and those **lack
+`batters_faced`**. Consistent with the existing note in `hr_targets.py`
+("roster_objs/ was empty, production writes flat"). Consequences:
+- **HR work: fully unblocked at 66 dates.** Its features come from
+  daily_summary (p_hr_1plus, pa_mean, lineup_order), the flat rosters (batter
+  hr_rate, platoon, vs_pitch_type_hr, park/weather multipliers) and the
+  Statcast feature files. `batters_faced` is not an HR feature.
+- **K model: blocked at 66 dates, still 15.** `batters_faced` is the SO model's
+  #2 feature by coefficient (0.126 on scale 124.8), so model predictions cannot
+  be recomputed without it. The SIM's own `so_mean`/`so_dist` ARE in
+  daily_summary, so sim-side grading still works across all 66.
+
+**Three ways to close #193b** (pick before the K re-run):
+1. Flip `--write-roster-artifacts on` in the production sim job so
+   `roster_objs/` starts being written -- forward-only, no history.
+2. Reconstruct `batters_faced` from StatsAPI season pitching stats, summed over
+   games strictly before each date (authoritative, point-in-time-correct,
+   retroactive). Most work, but it is the only option that recovers history.
+3. Drop `batters_faced` and retrain the SO model without it -- changes the
+   model, and it was the #2 feature, so expect real degradation.
+
+**Next actions, in order**: (a) pull the 66 dates (daily_summary + flat rosters
++ hitter/pitcher odds + game lines) via `/api/ops/artifacts/stream`; (b) fetch
+outcomes for those dates from StatsAPI; (c) re-run #187/#188/#192/#195 on 66
+dates; (d) decide #193b for the K side. Everything through (c) needs no code
+change and no new infrastructure.
+
 ### OPEN 2026-08-05 (#193) -- HIGH PRIORITY: make Render the single source of data truth for all sports, all dates
 
 User: "we need ALL required data for ALL dates for ALL sports in one SINGLE
