@@ -107,6 +107,19 @@ _KEY_FIELDS: tuple[str, ...] = (
     "market",
     "selection",
     "player_name",
+    # `line` belongs here and its absence was a real defect (found by
+    # test_line_selects_the_right_total, 2026-08-06). Alternate lines arrive as
+    # separate outcomes in one payload, so without it FanDuel's total over 8.5
+    # and over 9.0 shared a key and the within-call dedupe dropped the second as
+    # a duplicate -- 6 rows considered, 5 appended. Totals 8.5 and 9.0 are
+    # different bets, and collapsing them makes the best price across books a
+    # comparison of prices for different wagers.
+    #
+    # Consequence worth knowing: a book MOVING its line now mints a new key
+    # rather than updating one, so both observations persist. That is the right
+    # behaviour for an append-only log -- movement is read off the time series,
+    # not inferred from one mutating row.
+    "line",
 )
 
 
@@ -529,6 +542,98 @@ def quote_ref(
             for row in ranked
         ],
     }
+
+
+def _normalize_token(value: Any) -> str:
+    return " ".join(str(value or "").strip().lower().replace("_", " ").replace("-", " ").split())
+
+
+def quote_ref_for_bet(
+    *,
+    sport: Any,
+    date_str: Any,
+    event_id: Any = None,
+    market: Any = None,
+    selection: Any = None,
+    line: Any = None,
+    player_name: Any = None,
+    bookmaker: Any = None,
+    now: datetime | None = None,
+) -> dict[str, Any] | None:
+    """Resolve the quote a bet was struck against, for recording at bet time.
+
+    Matching is deliberately tolerant. The board's `market`/`selection` wording
+    is not OddsAPI's (`h2h` vs `moneyline`, a team name vs `home`), and a bet
+    logged from a card may carry only some of the fields. So this narrows
+    progressively -- event, then market, then selection, then line -- and returns
+    the best-supported match rather than requiring an exact key.
+
+    Returns None when nothing matches, and that is the honest answer: a bet
+    recorded with no resolvable quote should carry no quote rather than a
+    guessed one, because the whole point is to record the price actually
+    available at that instant.
+    """
+    rows = read_book_quotes(str(sport or ""), str(date_str or ""))
+    if not rows:
+        return None
+
+    wanted_event = _normalize_token(event_id)
+    wanted_market = _normalize_token(market)
+    wanted_selection = _normalize_token(selection)
+    wanted_player = _normalize_token(player_name)
+    line_value = _coerce_line(line)
+
+    candidates = list(rows)
+    if wanted_event:
+        narrowed = [row for row in candidates if _normalize_token(row.get("event_id")) == wanted_event]
+        candidates = narrowed or candidates
+    if wanted_player:
+        narrowed = [row for row in candidates if _normalize_token(row.get("player_name")) == wanted_player]
+        candidates = narrowed or candidates
+    if wanted_market:
+        narrowed = [
+            row for row in candidates
+            if _normalize_token(row.get("market")) == wanted_market
+            or _MARKET_ALIASES.get(wanted_market) == _normalize_token(row.get("market"))
+        ]
+        candidates = narrowed or candidates
+    if wanted_selection:
+        narrowed = [
+            row for row in candidates
+            if _normalize_token(row.get("selection")) == wanted_selection
+            or _normalize_token(row.get("home_team")) == wanted_selection and row.get("selection") == "home"
+            or _normalize_token(row.get("away_team")) == wanted_selection and row.get("selection") == "away"
+        ]
+        candidates = narrowed or candidates
+    if line_value is not None:
+        narrowed = [row for row in candidates if _coerce_line(row.get("line")) == line_value]
+        candidates = narrowed or candidates
+
+    if not candidates:
+        return None
+    grouped = quotes_by_market(candidates)
+    if not grouped:
+        return None
+    # Narrowing can still leave more than one market (e.g. no line given and the
+    # book offers several). Prefer the one the most books quote -- the main line.
+    best_key = max(grouped, key=lambda key: len(grouped[key]))
+    return quote_ref(grouped[best_key], chosen_bookmaker=bookmaker, now=now)
+
+
+# Board wording -> OddsAPI market key. Only the collisions that actually occur;
+# an unknown market simply fails to narrow rather than mismatching.
+_MARKET_ALIASES: dict[str, str] = {
+    "moneyline": "h2h",
+    "ml": "h2h",
+    "money line": "h2h",
+    "spread": "spreads",
+    "ats": "spreads",
+    "run line": "spreads",
+    "puck line": "spreads",
+    "total": "totals",
+    "over under": "totals",
+    "ou": "totals",
+}
 
 
 def quotes_by_market(rows: Iterable[Mapping[str, Any]]) -> dict[str, list[dict[str, Any]]]:

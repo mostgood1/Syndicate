@@ -164,6 +164,17 @@ class PredictionRecord:
     stake: float | None = None
     bet_type: str = "straight"
     legs: list[dict[str, Any]] | None = None
+    # The price we actually took, as odds_book_quotes.quote_ref describes it:
+    # which book, what number, when that book last moved it, and where it ranked
+    # against every other book quoting the same market at that instant.
+    #
+    # This is the OPENING half of CLV and nothing else in the system records it.
+    # Without it a bet can never have a closing-line value computed, no matter
+    # what settlement does later -- which is why every position in the live
+    # ledger reads avg_clv: null. Unrecorded here is unrecoverable, the same
+    # failure mode as #208: the books were not discarded by decision, they were
+    # lost because nothing wrote them down.
+    quote: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -182,6 +193,7 @@ class PredictionRecord:
             "stake": self.stake,
             "bet_type": self.bet_type,
             "legs": [dict(leg) for leg in self.legs] if self.legs else None,
+            "quote": dict(self.quote) if self.quote else None,
         }
 
 
@@ -193,6 +205,15 @@ class PredictionResult:
     closing_line: Any = None
     clv: float | None = None
     pnl: float | None = None
+    # PRICE CLV, distinct from `clv` above, which is a LINE difference
+    # (closing_line - original_line, in points). Line CLV is undefined for
+    # moneyline -- there is no line -- so on a ledger of moneylines and parlays
+    # it is null for almost everything, which is exactly what production shows.
+    # Price CLV is defined for every bet that has a price, which is all of them.
+    original_price: Any = None
+    closing_price: Any = None
+    clv_pct: float | None = None
+    beat_close: bool | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -202,6 +223,10 @@ class PredictionResult:
             "closing_line": self.closing_line,
             "clv": self.clv,
             "pnl": self.pnl,
+            "original_price": self.original_price,
+            "closing_price": self.closing_price,
+            "clv_pct": self.clv_pct,
+            "beat_close": self.beat_close,
         }
 
 
@@ -211,6 +236,37 @@ def _clv_from_lines(original_line: Any, closing_line: Any) -> float | None:
     if original_value is None or closing_value is None:
         return None
     return round(closing_value - original_value, 4)
+
+
+def _implied_from_american(price: Any) -> float | None:
+    value = _coerce_float(price)
+    if value is None or value == 0:
+        return None
+    return (100.0 / (value + 100.0)) if value > 0 else (abs(value) / (abs(value) + 100.0))
+
+
+def _clv_pct_from_prices(original_price: Any, closing_price: Any) -> float | None:
+    """CLV in probability points: how much better the price we took was than the
+    price the market closed at.
+
+    Sign convention: POSITIVE means we beat the close. Betting a side at -110
+    that closes at -130 means the market moved toward us -- implied probability
+    rose from 52.4% to 56.5%, so +4.1 points. That direction is worth stating
+    because the raw American numbers move the opposite way to the intuition
+    (-130 is a "bigger" number but a worse price to take).
+
+    This exists because `_clv_from_lines` measures a LINE difference and is
+    therefore undefined for moneyline, which is most of what actually gets bet.
+    #211 is the argument for caring: outcome ROI on ~1,100 bets had CI95
+    [-7.6%, +3.8%] -- no power at all -- while a paired price comparison on the
+    same data gave [+2.48, +3.13]. CLV is the same kind of paired, low-variance
+    instrument, and it is available before any game settles.
+    """
+    original_implied = _implied_from_american(original_price)
+    closing_implied = _implied_from_american(closing_price)
+    if original_implied is None or closing_implied is None:
+        return None
+    return round((closing_implied - original_implied) * 100.0, 4)
 
 
 def _normalize_legs(value: Any) -> list[dict[str, Any]] | None:
@@ -237,6 +293,7 @@ def _prediction_from_payload(payload: Mapping[str, Any]) -> PredictionRecord:
         stake=_coerce_float(payload.get("stake")),
         bet_type=_normalize_text(payload.get("bet_type")) or "straight",
         legs=_normalize_legs(payload.get("legs")),
+        quote=dict(payload["quote"]) if isinstance(payload.get("quote"), Mapping) else None,
     )
 
 
@@ -248,6 +305,10 @@ def _result_from_payload(payload: Mapping[str, Any]) -> PredictionResult:
         closing_line=payload.get("closing_line"),
         clv=_coerce_float(payload.get("clv")),
         pnl=_coerce_float(payload.get("pnl")),
+        original_price=payload.get("original_price"),
+        closing_price=payload.get("closing_price"),
+        clv_pct=_coerce_float(payload.get("clv_pct")),
+        beat_close=payload.get("beat_close"),
     )
 
 
@@ -279,6 +340,7 @@ def record_prediction(
     stake: Any = None,
     bet_type: Any = None,
     legs: Any = None,
+    quote: Any = None,
     ledger_path: Path | str | None = None,
 ) -> dict[str, Any]:
     payload = _prediction_from_payload(
@@ -298,6 +360,7 @@ def record_prediction(
             "stake": stake,
             "bet_type": bet_type,
             "legs": legs,
+            "quote": quote,
         }
     )
     path = Path(ledger_path) if ledger_path is not None else _default_ledger_path()
@@ -312,9 +375,12 @@ def record_result(
     closing_line: Any = None,
     clv: Any = None,
     pnl: Any = None,
+    original_price: Any = None,
+    closing_price: Any = None,
     ledger_path: Path | str | None = None,
 ) -> dict[str, Any]:
     computed_clv = _clv_from_lines(original_line, closing_line)
+    computed_clv_pct = _clv_pct_from_prices(original_price, closing_price)
     record = _result_from_payload(
         {
             "prediction_id": prediction_id,
@@ -323,6 +389,13 @@ def record_result(
             "closing_line": closing_line,
             "clv": computed_clv if computed_clv is not None else clv,
             "pnl": pnl,
+            "original_price": original_price,
+            "closing_price": closing_price,
+            "clv_pct": computed_clv_pct,
+            # Left None rather than False when CLV is uncomputable, so "we did
+            # not beat the close" and "we cannot tell" stay distinguishable in
+            # any rate built over this column.
+            "beat_close": None if computed_clv_pct is None else bool(computed_clv_pct > 0),
         }
     )
     path = Path(ledger_path) if ledger_path is not None else _default_ledger_path()

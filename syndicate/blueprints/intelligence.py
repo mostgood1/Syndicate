@@ -1915,6 +1915,37 @@ def intelligence_portfolio_event_api():
         raise
 
 
+def _quote_ref_for_payload(source: dict[str, Any], *, fallback: dict[str, Any]) -> dict[str, Any] | None:
+    """Look up the per-book quote behind one logged bet (or one parlay leg).
+
+    Never raises: failing to resolve a quote must not stop a bet being logged.
+    A bet with no quote is worse than one with a quote, but a bet that silently
+    404s because the odds log was mid-write is worse than both.
+    """
+    try:
+        from syndicate.features.shared.odds_book_quotes import quote_ref_for_bet
+
+        date_str = (
+            source.get("game_date")
+            or fallback.get("game_date")
+            or fallback.get("selected_date")
+            or central_today_iso()
+        )
+        return quote_ref_for_bet(
+            sport=source.get("sport") or fallback.get("sport"),
+            date_str=str(date_str)[:10],
+            event_id=source.get("event_id") or fallback.get("event_id"),
+            market=source.get("market") or fallback.get("market"),
+            selection=source.get("pick") or source.get("selection"),
+            line=source.get("line"),
+            player_name=source.get("player_name") or source.get("player"),
+            bookmaker=source.get("bookmaker") or source.get("book"),
+        )
+    except Exception:
+        _LOGGER.exception("PORTFOLIO BET QUOTE LOOKUP FAILURE")
+        return None
+
+
 @intelligence_bp.post("/api/portfolio/bets")
 def portfolio_bets_api():
     # Writes into data/prediction_ledger.json -- the same store /portfolio
@@ -1964,6 +1995,27 @@ def portfolio_bets_api():
                 response.status_code = 400
                 return _no_cache_response(response)
 
+        # Record the price we struck at, across every book quoting it. This is
+        # the OPENING half of CLV; nothing else in the system captures it, and a
+        # bet logged without it can never have a closing-line value no matter
+        # what settlement does later. Unrecorded here is unrecoverable -- the
+        # same failure as #208, where the books were lost not by decision but
+        # because nothing wrote them down. Per-leg for a parlay, since each leg
+        # has its own market and its own close.
+        if bet_type == "parlay":
+            for leg in legs or []:
+                if not isinstance(leg, dict) or leg.get("quote"):
+                    continue
+                resolved = _quote_ref_for_payload(leg, fallback=payload)
+                # Only stamp a leg when a quote actually resolved -- writing
+                # `quote: None` onto every leg would change the stored shape of
+                # legs that have nothing to say, for no gain.
+                if resolved:
+                    leg["quote"] = resolved
+            quote = None
+        else:
+            quote = _quote_ref_for_payload(payload, fallback=payload)
+
         record = record_prediction(
             sport=sport,
             market=market,
@@ -1978,6 +2030,7 @@ def portfolio_bets_api():
             legs=legs,
             prediction_id=payload.get("prediction_id"),
             features_snapshot=features_snapshot,
+            quote=quote,
         )
         return _no_cache_response(jsonify({"ok": True, "bet": record}))
     except Exception:
