@@ -22,6 +22,40 @@ quality. (scratchpad: `hold_sweep.py`)
 | pitcher: earned_runs / hits_allowed | 2 | ~840 | 8.33% | 54.17% |
 | first1: moneyline (3-way) | 3 | 468 | 8.91% | n/a |
 
+**CORRECTION 2026-08-05 to #196 (below): "we stopped capturing it" is NOT
+supported -- the evidence now points UPSTREAM, not at our code.** Investigated
+while waiting on the #193a pull:
+- The request config is **identical** across the 06-18/06-19 boundary. Every
+  hitter-props snapshot from 06-13 through 07-10 carries the same
+  `meta.markets` list (all 7 markets including `batter_home_runs`) and the same
+  `meta.bookmakers` (None). Syndicate did not change what it asked for.
+- No commit touched `scripts/fetch_mlb_oddsapi_local.py` or
+  `refresh_mlb_oddsapi.py` in that window. The nearest candidate,
+  `af11e859 Slow live odds refresh cadence`, is **2026-06-30** -- after the
+  boundary, and it touches cadence/render.yaml, not market parsing.
+- `PLAYER_PROP_PRIMARY_LINE_PREFERENCES` has HR at `(0.5,)`, identical to
+  `batter_hits`/`batter_rbis`/`batter_runs_scored`, which are unaffected.
+- The tell: `batter_total_bases` two-sided coverage **improved** (68.0% ->
+  93.4%) across the exact same boundary where HR went to zero. A code
+  regression would not improve one market while zeroing another; an upstream
+  book/feed coverage change would.
+
+So the most likely reading is that the books in this feed stopped quoting the
+HR under side around 2026-06-19, not that we stopped capturing it. **That
+means the 5.56% two-sided HR hold may be historical rather than currently
+available**, and today's HR market really is the ~21% one-sided over.
+
+**Do NOT spend effort "fixing" the fetcher until this is settled.** Two cheap
+ways to settle it, in order: (1) the #193a pull covers 05-28..08-05 -- if
+two-sided HR quotes never reappear after 06-18 across all 66 dates, that is
+strong confirmation; (2) a single live OddsAPI probe for `batter_home_runs`
+(mind the capped call budget). Only if unders ARE present upstream today is
+there a capture bug to chase.
+
+The lever itself still stands for the historical window -- the modelling
+conclusion in #188/#192 was drawn against a one-sided price, and there are
+~1,340 two-sided samples through 06-18 to re-grade against properly.
+
 **LEVER 1 (#196) -- HR props ARE de-viggable, and we stopped capturing it.**
 The entire "HR is unprofitable at 21% overround" conclusion in #188/#192 was
 based on the one-sided over price, because that is all the artifacts carry for
