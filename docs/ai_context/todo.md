@@ -14998,12 +14998,90 @@ were resolved and nine already-closed rows removed from the open tables.
   - The response carries `response.response.*` duplicating `response.*` in a
     **75 MB** payload. Related to #232's duplicate read path; not fixed here.
 
-  **Deploy was NOT clear when this was written** — `check_deploy_safety.py`
-  reported MLB sim RUNNING (pid 342, 14m in), odds refresh RUNNING, live games
-  in progress. Deploy on the next clear window, then re-run the baseline above
-  and compare. Do not mark this done off the code alone — that is precisely
-  the error being corrected. Verify against `/api/intelligence/query`, **not**
-  `/api/home`.
+  **DEPLOYED `f0eb546c` 21:49:30Z (all three services, user chose to kill the
+  in-flight sim). Re-measured after a post-deploy recompute: THE BOARD DID NOT
+  MOVE. Still 23/141, props 15/37. #235 is shipped and NOT working. Do not
+  close it.**
+
+  What is now established, each measured rather than assumed:
+
+  | question | answer | how |
+  |---|---|---|
+  | is the fix in the executed path? | **yes** | all three entry points funnel to `_collect_candidates`: `collect_candidates_with_fallback_merge` → `collect_candidates`, and `collect_all_recommendations` → `_primary_query_candidates` → `collect_candidates`. `_prop_candidate_from_item` has exactly 2 call sites, both inside my enriched block |
+  | did refresh-worker get the commit? | **yes** | Render deploy API: `commit=f0eb546c`, `status=live`, `finishedAt=21:49:30Z` |
+  | did it recompute after that? | **yes** | board payload `state_last_updated=2026-08-06T22:02:36Z`, 13 min later |
+  | is the date right? | **yes** | every unpriced row carries `game_date=2026-08-06`, `context_label=2026-08-06` — the same date as the priced rows |
+  | are the players in the shard? | **yes** | 243 players / 122,023 rows in prod's own `mlb_source/tracking/book_quotes/2026-08-06.jsonl` |
+  | does the function work on these rows? | **YES — 10 of 12** | ran the real `enrich_prop_rows` over the served board's own pregame/live MLB rows against prod's own shard: `Miles Mikolas → williamhill_us -121`, `Ranger Suarez → draftkings -106`, `Luis Castillo → draftkings -149`, … |
+
+  The smoking gun is that **the same player is priced on one lane and not the
+  other in the same payload**: `Ranger Suarez` reads `quoted=True` at
+  `surface_key=None` (game lane) and `quoted=False` at `surface_key=pregame`
+  (my lane). Same slate, same shard, same player.
+
+  Per-lane, from the served payload:
+
+  | lane | priced |
+  |---|---|
+  | props `surface=None` (game lane, `enrich_candidate_rows`) | 15 / 18 |
+  | props `surface=pregame` (my lane) | **0 / 12** |
+  | props `surface=live` (my lane) | **0 / 7** |
+  | steam `surface=pregame` | 0 / 83 |
+
+  **The single unresolved unknown is refresh-worker's own view**, which nothing
+  reachable from web can currently show:
+  - Its `reports/opportunity_contract/latest.json` is written to **its** disk;
+    `/api/ops/opportunity-contract/status` is served by **web** off a different
+    disk, so the `intelligence_prop` lane I added is structurally invisible
+    there. I watched for it for 11 minutes before realising that. The counter
+    is real but unreadable — fix the transport before trusting its silence.
+  - Leading hypothesis, untested: **refresh-worker no longer has the shard.**
+    #233's streamed pull put it there at ~21:0xZ; the 21:47Z deploy restarted
+    the service. If that path is not on the persistent disk, the deploy wiped
+    it and the repair pass has not re-pulled — see the "written between deploys
+    landed on ephemeral storage" precedent already recorded in this file. That
+    would explain the whole result without anything being wrong with #235's
+    code.
+
+  **Next session, in this order:** (1) establish whether
+  `mlb_source/tracking/book_quotes/<date>.jsonl` exists on refresh-worker after
+  a restart — this is one fact and it decides everything else; (2) make
+  refresh-worker's counter reachable from web (publish it under a
+  role-qualified name so it cannot collide with web's own file), so this lane
+  stops being unmeasurable; (3) only then re-measure the board. Do not add more
+  enrichment call sites until (1) is answered — the function is proven correct
+  on this exact data.
+
+- **#236 — WNBA put the whole display pick in every identity field. Shipped
+  `59af37bb`, DEPLOY PENDING.** Production 2026-08-06: WNBA served 0 of 27 prop
+  rows priced against a shard holding 2,615 prop quotes for 28 players — not a
+  capture gap, not a missing call, the same code prices MLB at 101/115. The
+  rows carried `"Chelsea Gray OVER 1.5 3PM"` in **all four** identity fields
+  (`player_name`/`entity`/`name`/`player`) while the shard said `"Chelsea
+  Gray"`; identity is an exact match, so every row missed. Root cause:
+  `wnba/cards.py` fell back to `display_pick` when a pick had no `player`. That
+  value also never matched `player_lookup` two lines below, so the sim
+  projection silently fell back to the line itself — a second, quieter bug from
+  the same line. Fixed at the producer plus a defensive `_player_identity()`
+  repair in `quote_enrichment` (repairs a malformed shape; does not loosen the
+  match — names with no OVER/UNDER suffix are returned untouched). Verified
+  against production rows with the real matcher: 4/4 now join, was 0/4.
+
+- **Soccer captures no book quotes at all — Serie A is 0/60 priced.**
+  `soccer_source/tracking/book_quotes/2026-08-06.jsonl` returns **404** from
+  `/api/ops/artifacts/stream` while mlb (55.2MB), wnba (1.49MB) and nfl
+  (2.04MB) all exist. So Serie A's 60 unpriced board candidates are a *capture*
+  gap, upstream of every join fix in #235/#236 — nothing downstream can price a
+  sport whose quotes were never written. nba/nhl/ncaab are also absent but are
+  out of season; soccer is not. Not yet investigated: which lane in the odds
+  refresh should be writing it.
+
+- **`/api/intelligence/query` returns 75MB, with `response.response.*` fully
+  duplicating `response.*`.** Both copies carry the same 141 candidates
+  (`recommendations`, `ranked_all`, `top_opportunities`, `boardContract.cards`
+  and `board_contract.cards` are five names for one list, then the whole thing
+  again one level deeper). Related to #232's duplicate read path. Measured, not
+  fixed.
 
 - **New — WNBA live score fabrication, root-caused and fixed, deployed and
   confirmed live 2026-08-01.** User reported three symptoms in one message:
@@ -15873,10 +15951,43 @@ ID-collision precedent, same class as the #131/#132 one.)
   change): now keeps **head AND tail halves** instead of tail-only.
   `tests/test_run_refresh_odds_job_log_truncation.py` updated to match (was
   asserting the head is *dropped*; now asserts both halves survive) — 12/12
-  passing. **The actual soccer root cause is still open** — needs a fresh
-  run captured with this fix to read the real failure; not triggered here
-  since a re-run burns real OddsAPI credits and that's the user's call, not
-  a default action mid-budget-investigation.
+  passing. Deployed to web (`dep-d9qcf4rm8hqs738756og`, commit
+  `7eca54b7`, confirmed `live`).
+
+⚠️ **Capture attempt (same session, post-deploy): still didn't get the real
+error — surfaced a second, different, also-real bug instead.**
+
+- Triggered `POST /api/ops/odds-refresh/run` with `sports=soccer` alone
+  (cheaper than the full 4-sport replica): **never finished**. Sat `state:
+  running` for 13+ minutes — an order of magnitude past either original
+  failure's ~3.5min clean `rc=1` — until canceled (`pid=242`, confirmed via
+  `/api/ops/odds-refresh/cancel`).
+- Retried with the exact original 4-sport command: **same symptom**, hung
+  past 13 minutes (`pid=609`), also canceled.
+- **So manually triggering via this endpoint behaves differently from
+  whatever triggered the two original failures** (a scheduled caller, not
+  this session) — those failed fast and cleanly; both manual triggers here
+  hung instead of either succeeding or failing. That's a real, separate
+  finding, not yet explained, and not the same bug as the original `ok:
+  false`.
+- **Structural difficulty worth recording**: `/api/ops/odds-refresh/status`
+  silently ignores its own `?lane=` query param (confirmed by code read —
+  the route calls `load_latest_refresh_status()` with no arguments) and its
+  `history` field is a shallow, *cross-lane* 6-entry rolling window — so
+  polling it while `live-odds-worker`'s automatic ~90s MLB-live tick is
+  active scrolls a slower manual trigger out of view before it can write
+  its own result. `/api/ops/odds-refresh/logs` (the log-content endpoint)
+  DOES honor `?lane=` correctly — that inconsistency between the two
+  endpoints cost real time here and is worth fixing if this class of manual
+  capture is attempted again.
+- **Not chased further this session** — two manual triggers hanging for
+  13+ minutes each, on top of the original diagnosis, is real OddsAPI spend
+  with nothing to show for the last two attempts specifically. **The actual
+  soccer root cause is still open.** Next attempt should either (a) just
+  wait for the next naturally-scheduled pregame run (proven to reproduce
+  cleanly, unlike manual triggers) and read it with the now-deployed fix,
+  or (b) fix the manual-trigger hang first, since it's now a second bug in
+  the way of the first.
 
 **16** 🟢 **CLOSED 2026-07-25** (`1986caf6`, "Drop F7 markets; standard line
 wins, alternates kept as a ladder") — **do not treat this as an open decision**,
