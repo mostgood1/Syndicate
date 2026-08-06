@@ -1,5 +1,53 @@
 # Syndicate TODO — canonical cross-session list
 
+### OPEN 2026-08-05 (#206) -- Scoping the #205 fixes against Render: best-price re-grade is possible for GAME markets only, and CLV is BLOCKED (closing lines captured on 2% of markets)
+
+User asked to fix book capture, re-grade everything against best price, and
+account for CLV. Scoped all three against production
+(`/api/ops/odds-history/inspect?sport=mlb&date=…`, 3,734 market entries for
+2026-08-05) before writing code. Two of the three are not currently possible,
+and it is better to know that first.
+
+**Finding 1 -- odds_history DOES carry multiple books, but only for GAME
+markets.** Keys are `event_id=…|market=…|bookmaker=…`. Book distribution:
+betmgm 45, betrivers 45, fanduel 45, draftkings 42, fanatics 36, mybookieag 15,
+williamhill_us 11, bovada 6.
+
+**But 3,489 of 3,734 entries have `bookmaker: None`** -- and those are the
+player props (batter_hits 588, batter_hits_runs_rbis 588, batter_rbis 582,
+batter_runs_scored 582, batter_total_bases 562, batter_home_runs 289). **Props
+are stored with no bookmaker dimension at all.**
+
+Consequence: a historical best-price re-grade is possible for **game markets
+only**. It is NOT possible for HR or K props -- which is where most of
+#186-#204's conclusions live. Those prop verdicts cannot be retroactively
+rescued; they can only be re-established forward, after capture is fixed.
+
+**Finding 2 -- CLV is blocked.** Only **75 of 3,734 entries (2.0%)** have a
+non-null `closing_line`/`closing_price`/`closing_captured_at`. Closing capture
+is essentially not happening. So the measurement identified in #205 as the gate
+on whether further modelling is justified **cannot be run on existing history at
+all**. It needs a closing-capture fix, then weeks of forward accumulation before
+it says anything.
+
+**Revised plan, in dependency order:**
+1. **Fix closing-line capture** -- highest value, because CLV is the only
+   instrument with the statistical power to detect the edge size we care about
+   (#205 reason 2), and every day without it is a day of unusable data.
+2. **Fix prop book capture** -- add the bookmaker dimension to prop history, and
+   stop collapsing `oddsapi_*_props_*` / `oddsapi_game_lines_*` to a single
+   arbitrary book at persistence.
+3. **Re-grade GAME markets against best price** -- doable now from existing
+   odds_history, 8 books available. This is the only retroactive win on offer.
+4. **Re-establish prop verdicts forward** once (2) has accumulated data.
+
+**Honest consequence for the thread**: the prop conclusions in #186-#204 (HR
+-5.3%, K -4.6%, NRFI -11.1%) were graded against a randomly-chosen single book
+and cannot be corrected retroactively. They should be treated as **withdrawn,
+not merely uncertain** -- the evidence for them no longer exists in a form that
+can be re-examined.
+
+
 ### OPEN 2026-08-05 (#205) -- HIGHEST-VALUE BETTING ITEM: we fetch 5 books and keep 1. Every ROI in #186-#204 was graded against an arbitrary book, not the best price.
 
 User, correctly: "we can log these but we still aren't any closer to betting
