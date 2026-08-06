@@ -1,5 +1,63 @@
 # Syndicate TODO — canonical cross-session list
 
+### RE-RUN 2026-08-05 (#198) -- #188 REVERSED on 3.6x the data: the leak-free Statcast features DO help. Model still beats sim. HR overs still unprofitable.
+
+First re-run on the Render+StatsAPI cache from #193a. Pull completed: 66 dates
+of summaries/odds, 48 with flat rosters, **1,547 StatsAPI boxscores**, and
+point-in-time `batters_faced` rebuilt for 116 dates (#193b option 2 -- top
+pitcher 563 BF entering 08-05 vs the model's 391.7 training mean, so the
+reconstruction behaves).
+
+**Dataset: 11,551 rows / 1,363 HR events / 48 dates** vs the old
+3,215 / 418 / 15. 3.6x rows, 3.3x events.
+
+**Two data-quality changes came with moving off the git mirror:**
+1. Render has no `roster_objs/`, so features now come from the FLAT roster
+   snapshots. Lost `bb_fb_rate` and `venue_mult`.
+2. **`vs_pitch_type_hr` is POPULATED in the flat rosters and was `{}` in every
+   v4 roster artifact.** So the pitch-mix x batter-HR-by-pitch-type interaction
+   -- the exact feature this whole thread was about -- was silently falling
+   back to 1.0 in ALL earlier work. It is now non-trivial on 30% of rows.
+   #188's conclusion was drawn with that feature effectively disabled.
+
+| variant | Brier | logloss | AUC |
+|---|---|---|---|
+| sim served | 0.10435 | 0.36736 | 0.5870 |
+| model: sim-side only | 0.10311 | 0.35756 | 0.5949 |
+| **model + 2025 statcast (leak-free)** | **0.10300** | **0.35702** | **0.6001** |
+| model + 2026 statcast (leaky UB) | 0.10256 | 0.35537 | 0.6097 |
+
+**#188 IS REVERSED.** On 15 dates the leak-free Statcast features made things
+*worse* (AUC 0.5579 vs 0.5735 without them) and I concluded the advanced
+metrics don't earn their place. On 48 dates with the pitch-mix interaction
+actually working, they **help**: AUC 0.5949 -> 0.6001, Brier and logloss both
+improve. The earlier conclusion was a small-sample artifact compounded by a
+silently-dead feature.
+
+**Top-N (per date), and the earlier lift was optimistic:**
+
+| variant | top-5 | top-10 | ROI@top-10 |
+|---|---|---|---|
+| sim served | 17.08% (1.45x) | 17.92% (1.52x) | -26.6% |
+| model: sim-side only | 20.00% (1.69x) | 18.12% (1.54x) | -4.5% |
+| model + 2025 statcast | 18.75% (1.59x) | 18.75% (1.59x) | -5.3% |
+| model + 2026 statcast (leaky) | 23.75% (2.01x) | 22.50% (1.91x) | +18.2% |
+
+#192's headline 1.85x top-10 lift does NOT hold -- the honest figure is
+**1.59x**, and the +1.1%/+1.3% ROI becomes **-4.5%/-5.3%**. Both were
+small-sample optimism, exactly the risk flagged at the time. The model still
+massively improves ROI over the sim (-26.6% -> -5.3%), but HR overs remain
+unprofitable at one-sided pricing, consistent with the ~21% overround.
+
+**Two-sided HR quotes: still 1,340, still none after 06-18**, across the full
+66-date window. That is strong confirmation for the #196 CORRECTION -- the
+under side genuinely disappeared upstream around 2026-06-19 rather than being
+dropped by our fetcher. Do not chase a capture fix.
+
+**Still to do on this cache**: K-side re-run (now unblocked -- `bf_table`
+covers all 66 dates), the #195 hold sweep on 66 dates, and #197 game-market
+grading (66 dates, needs no rosters).
+
 ### FINDING 2026-08-05 (#195) -- Market-hold map for ALL MLB markets: where an edge can exist at all, and the two biggest levers
 
 Hold needs only prices, not outcomes, so this is the one analysis in the
