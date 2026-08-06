@@ -323,6 +323,46 @@ is left rather than "props still don't join":
 4. **WNBA `game_candidate` still has no date bucket**, so its quote enrichment
    returns early -- the #219 camelCase-date defect in a second sport, still open.
 
+### Where the plan stands (2026-08-06 close)
+
+| step | state |
+|---|---|
+| 1. Extend `UniversalCandidate` + `validate()` | **DONE** (#223) |
+| 2. Counters at the lanes | **DONE** (#222), `/api/ops/opportunity-contract/status` |
+| 3. Canonical key from producer to board | **DONE** (#224/#225/#226/#227/#228) |
+| 4. Point `top_props`/`top_edges` at the store, not rail items | **NEXT** |
+| 5. Remaining sports (nhl, nfl, ncaaf, ncaab, soccer) | not started -- out of season, no live rows to measure |
+| 6. Game markets onto the same producer | not started |
+| 7. Delete the prose scraper + the 3 enrichment sites | not started |
+
+**Measured arc, one board, same endpoint:**
+
+```
+             missing_market_key    complete
+first read        100% of rows          0%
+after #224         47 of 242           81%
+after #226         53 of 343           85%
+after #227          2 of 105           98%   (single-worker in-process read)
+```
+
+MLB is at **zero** keyless rows in both lanes; game markets are 100% priced in
+both sports.
+
+**Two things to carry forward, both learned the hard way today:**
+
+1. **`/api/home` serves from cache, so the counters go stale.** Two readings were
+   26 minutes old and identical to the pre-fix numbers -- indistinguishable from
+   "the fix did nothing". `?refresh=1&cb=<rand>` forces the rebuild and flips the
+   endpoint to `source=in_process`. Always check `generated_at` before believing
+   a reading.
+2. **Do not force repeated rebuilds.** The web service is 2GB and was already at
+   its ceiling; four in a row returned 502. One cache-busted call, then read.
+
+**Step 4 is the one that actually retires the anti-pattern.** Everything so far
+has made the rail-sourced rows *correct*; step 4 stops rails being a source at
+all. V3 established it must cover `intelligence.py` (`:2585`, `:7201`) as well as
+`home.py`, or half the board keeps the old feed.
+
 ## 11. Residual risks
 
 
