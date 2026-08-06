@@ -4775,7 +4775,7 @@ settlement matcher), or (b) extend `load_latest_refresh_log`/the ops
 endpoint to support a `?head=true` or byte-range read so the START of a
 large captured stdout is readable, not just the tail.
 
-> ✅ **(b)-equivalent SHIPPED 2026-08-06, via #221** (a second, independent
+> ✅ **(b)-equivalent SHIPPED 2026-08-06, via #234** (a second, independent
 > investigation hit this same wall diagnosing a failed soccer refresh):
 > `_truncate_log_text` now keeps head+tail halves at capture time instead of
 > tail-only, same total budget. Not `?head=true` as literally proposed —
@@ -14944,6 +14944,67 @@ were resolved and nine already-closed rows removed from the open tables.
 
 ## In progress
 
+- **#235 — The Layer 2 prop lane was never enriched at all. Code shipped,
+  DEPLOY PENDING (not yet verified in production).**
+
+  Every price fix from #215 through #233 landed on `/api/home`'s lanes.
+  `syndicate/features/intelligence.py` — which is what `/api/intelligence/query`
+  and the Layer 2 board serve — contained **no call to any enrichment
+  function**. Its game candidates were priced by accident, because
+  `_game_candidates_for_sport` reuses home.py's `_game_bet_candidates_from_game`
+  and inherits its `enrich_candidate_rows`. Its props take neither path:
+  `_prop_candidate_from_item` calls `_build_prop_dashboard_row` **directly**,
+  and home.py's `enrich_prop_rows` sits in the dashboard builder *around* that
+  function, not inside it.
+
+  **This is the same mistake three times in one day: verified on a surface
+  nobody reads.** `/api/home` was measured, repeatedly, while the board the
+  user actually watches was never wired. [[feedback-user-watches-the-board]].
+
+  **Measured production baseline, 2026-08-06 ~21:5xZ, before the fix**
+  (`/api/intelligence/query`, `response.recommendations`, single fetch):
+
+  | lane | priced |
+  |---|---|
+  | board overall | **23 / 141** |
+  | board props | **15 / 37** |
+  | `by_sport.mlb` | 21 / 59 (props 15 / 30) |
+  | `by_sport.wnba` | 2 / 18 (props 0 / 4) |
+  | `by_sport.serie a` | 0 / 60 |
+
+  The 15 priced props are the ones arriving via the *game* lane (per-game
+  `market == "props"` rows, tagged `candidate_type="prop"` at `intelligence.py`
+  `:6018`) — enriched for free. The ~22 unpriced ones are the `home_rails` /
+  `prop_opportunities` lane this item fixes.
+
+  Note this **corrects the previous session's "0 of 138 priced"** — that
+  reading was taken before the #233 streamed pull landed. The board was
+  partially priced; the prop lane specifically was not.
+
+  For contrast, `/api/home`'s own lanes on the same fetch are healthy —
+  `mlb game_candidate 327/327`, `mlb prop_dashboard_row 101/115`,
+  `wnba game_candidate 12/12`. Which is exactly how this hid for so long.
+
+  **Shipped:** `_quote_date_for_sport()` (the quote log is date-sharded, so a
+  wrong date reads an empty shard and looks identical to "no quotes
+  captured"); `enrich_prop_rows` over the collected pregame+live prop
+  candidates per sport; `intelligence_prop`/`intelligence_game` counter lanes
+  plus a `flush()` — without the flush the counts accumulate on refresh-worker
+  and never reach `/api/ops`, which web serves off a different disk.
+
+  **Two things this exposed that are worth keeping:**
+  - `wnba prop_dashboard_row 0/27` and `serie a 0/60` are *separate* unpriced
+    lanes, not fixed by this. Own items needed.
+  - The response carries `response.response.*` duplicating `response.*` in a
+    **75 MB** payload. Related to #232's duplicate read path; not fixed here.
+
+  **Deploy was NOT clear when this was written** — `check_deploy_safety.py`
+  reported MLB sim RUNNING (pid 342, 14m in), odds refresh RUNNING, live games
+  in progress. Deploy on the next clear window, then re-run the baseline above
+  and compare. Do not mark this done off the code alone — that is precisely
+  the error being corrected. Verify against `/api/intelligence/query`, **not**
+  `/api/home`.
+
 - **New — WNBA live score fabrication, root-caused and fixed, deployed and
   confirmed live 2026-08-01.** User reported three symptoms in one message:
   Layer 2 board not matching live WNBA data, the WNBA page and main page
@@ -15772,12 +15833,14 @@ were resolved and nine already-closed rows removed from the open tables.
 > every OddsAPI HTTP seam necessarily has record_oddsapi_quota wired in yet;
 > the fix here was making that seam comply, not the monitoring.
 
-**#221** — **Failed soccer pregame refresh (2026-08-06), dug into: isolated but
-not root-caused; the diagnosability gap that blocked it is fixed.** (Originally
-filed as #215 — collided with a concurrent session's unrelated #215/#216
-board/ranking work, `ba5d1e58`; renumbered to the actual next-free ID, #221,
-after #220 landed. See top-of-file ID-collision precedent, same class as the
-#131/#132 one.)
+**#234** — **Failed soccer pregame refresh (2026-08-06), dug into: isolated but
+not root-caused; the diagnosability gap that blocked it is fixed.** (Filed as
+#215, collided with a concurrent session's unrelated #215/#216 board/ranking
+work `ba5d1e58`; renumbered to #221; #221 turned out to also be taken by that
+same session's shipped, deployed `42902ee6` — cited across #222-#233's commit
+messages, so theirs kept the number, not mine. Renumbered again to #234, the
+actual next-free ID per `ecf940e1`. Two collisions on one item; see top-of-file
+ID-collision precedent, same class as the #131/#132 one.)
 
 - **Reproducible, not a blip.** Two separate `refresh_odds_sources.py --sports
   mlb,wnba,nfl,soccer --phase pregame` runs an hour apart (14:05Z and 15:05Z,

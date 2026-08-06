@@ -7191,6 +7191,32 @@ def _primary_query_candidates(
     return collect_candidates(overview, preferences, odds_history_by_sport)
 
 
+def _quote_date_for_sport(sport: Mapping[str, Any], preferences: Mapping[str, Any]) -> str:
+    """The slate date to read book quotes for, on the Layer 2 lane.
+
+    The quote log is sharded by date (`book_quotes/2026-08-06.jsonl`), so this
+    is a hard input to the join, not a hint -- a wrong date reads an empty
+    shard and every row comes back unpriced, which is indistinguishable from
+    "no quotes captured" without looking at the file.
+
+    An explicitly requested date wins, because a question about a past slate
+    must not be priced against today's book. Otherwise the sport's own
+    `context_label` is preferred over today: sports run on their own calendars
+    here (MLB's label is a date, NFL's is "2026 Week 1"), so the label is used
+    only when it genuinely is an ISO date and today is the fallback.
+    """
+    for value in (
+        preferences.get("requested_date"),
+        preferences.get("selected_date"),
+        preferences.get("date"),
+        sport.get("context_label"),
+    ):
+        text = _safe_text(value, "").strip()
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
+            return text
+    return central_today_iso()
+
+
 def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, Any]) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
     question_text = _safe_text(preferences.get("question"), "").lower()
@@ -7253,11 +7279,72 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
                     live_candidates.append(candidate)
             if live_candidates:
                 _log_candidate_stage(pipeline_name="collect_candidates", stage="live_prop_candidate_creation", before=[], after=live_candidates)
+            # #235: THIS is the Layer 2 prop lane, and until now nothing priced
+            # it. Every price fix through #233 landed on `/api/home`'s lanes --
+            # `_game_bet_candidates_from_game` (which intelligence does reuse,
+            # so game candidates were enriched for free) and home.py's own
+            # `enrich_prop_rows` over `prop_rows`. Props here take neither
+            # path: `_prop_candidate_from_item` calls `_build_prop_dashboard_row`
+            # directly, and the enrichment in home.py sits in the dashboard
+            # builder AROUND that function, not inside it. So the board served
+            # 0 of 138 priced while `/api/home` served 12 of 14 -- the fix was
+            # verified on a surface nobody reads.
+            #
+            # The candidates already carry everything the join needs
+            # (`player_name`, `market_key`, `line`, `odds`, `sport_slug`), so
+            # this is the same call home.py makes, on the list that was missed.
+            sport_prop_candidates = pregame_candidates + live_candidates
+            if sport_prop_candidates:
+                try:
+                    from syndicate.features.shared.quote_enrichment import enrich_prop_rows
+
+                    enrich_prop_rows(sport_prop_candidates, date_str=_quote_date_for_sport(sport, preferences))
+                except Exception:
+                    # A board without price context is degraded; a board that
+                    # fails the whole query because an odds log was mid-write is
+                    # an outage.
+                    pass
+            # Recorded even when the list is EMPTY, and outside the guard above
+            # for exactly that reason. A first run of this measured 0 props for
+            # every sport and the lane simply did not appear in the snapshot --
+            # unreadable as "no props were built" versus "the counter was never
+            # wired", which is the same defect this module's own docstring
+            # calls out ("Zero has to be visible for a zero to mean anything").
+            # An empty `record_rows` still materialises the bucket with every
+            # counter at 0.
+            #
+            # Counted AFTER enrichment, for the reason home.py records: a
+            # `with_quote` read before the call reports 0 on a lane that is
+            # actually priced.
+            try:
+                from syndicate.features.shared import opportunity_contract_metrics
+
+                opportunity_contract_metrics.record_rows(
+                    sport_prop_candidates, sport=sport_slug, lane="intelligence_prop",
+                    date_str=_quote_date_for_sport(sport, preferences),
+                )
+            except Exception:
+                pass
         if preferences.get("include_games"):
             game_candidates = _game_candidates_for_sport(sport)
             candidates.extend(game_candidates)
             if game_candidates:
                 _log_candidate_stage(pipeline_name="collect_candidates", stage="game_candidate_creation", before=[], after=game_candidates)
+            # Enriched already -- `_game_candidates_for_sport` goes through
+            # `_game_bet_candidates_from_game`, which carries home.py's
+            # `enrich_candidate_rows`. Counted anyway so that claim is a
+            # measurement rather than an assumption: this lane reading 0
+            # `with_quote` while `game_candidate` reads non-zero would mean the
+            # shared path is not as shared as it looks.
+            try:
+                from syndicate.features.shared import opportunity_contract_metrics
+
+                opportunity_contract_metrics.record_rows(
+                    game_candidates, sport=sport_slug, lane="intelligence_game",
+                    date_str=_quote_date_for_sport(sport, preferences),
+                )
+            except Exception:
+                pass
         # Steam moves as real board candidates, per explicit user direction:
         # every sport, unconditionally (gated only on the same
         # props-or-games-requested check every other sport-agnostic block
@@ -9262,6 +9349,17 @@ def collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, An
         odds_history_by_sport = _odds_history_payloads_by_sport(overview)
     candidates = _collect_candidates(overview, preferences)
     _log_candidate_stage(pipeline_name="collect_candidates", stage="_collect_candidates", before=[], after=candidates)
+    # The `intelligence_prop`/`intelligence_game` counts above accumulate
+    # in-process, and this path runs on refresh-worker while `/api/ops` is
+    # served by web -- separate disks, separate processes, so an unflushed
+    # counter is invisible exactly where it is read. home.py flushes once per
+    # dashboard build; this is the same cadence for this lane.
+    try:
+        from syndicate.features.shared import opportunity_contract_metrics
+
+        opportunity_contract_metrics.flush()
+    except Exception:
+        pass
     enriched_candidates = _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
     _log_candidate_stage(pipeline_name="collect_candidates", stage="_enrich_candidates_with_odds_history", before=candidates, after=enriched_candidates)
     normalized_candidates = [normalize_candidate(candidate) for candidate in enriched_candidates]
