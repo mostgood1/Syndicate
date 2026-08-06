@@ -3123,15 +3123,6 @@ def _build_home_dashboard(overview: list[dict[str, Any]], *, selected_date: str,
                 if isinstance(item, dict):
                     prop_rows.append(_build_prop_dashboard_row(sport, item, default_surface="HR Top 10"))
         sport_slug = _safe_text(sport.get("slug"), "").lower()
-        try:
-            from syndicate.features.shared import opportunity_contract_metrics
-
-            opportunity_contract_metrics.record_rows(
-                [row for row in prop_rows if row.get("sport_slug") == sport_slug],
-                sport=sport_slug, lane="prop_dashboard_row", date_str=selected_date,
-            )
-        except Exception:
-            pass
         # #220: props are a SEPARATE lane from game bets -- _build_prop_dashboard_row
         # over home_rails/props_bar items, which never passes through
         # _game_bet_candidates_from_game where enrichment lives. Traced live:
@@ -3142,6 +3133,19 @@ def _build_home_dashboard(overview: list[dict[str, Any]], *, selected_date: str,
             from syndicate.features.shared.quote_enrichment import enrich_prop_rows
 
             enrich_prop_rows(prop_rows, date_str=str(selected_date)[:10])
+        except Exception:
+            pass
+        # Counted AFTER enrichment on purpose. Recording before it made the
+        # `quoted` column read 0 while the same build served top_props 12/14
+        # priced -- a metric that understates its own subject is as misleading
+        # as one that flatters it.
+        try:
+            from syndicate.features.shared import opportunity_contract_metrics
+
+            opportunity_contract_metrics.record_rows(
+                [row for row in prop_rows if row.get("sport_slug") == sport_slug],
+                sport=sport_slug, lane="prop_dashboard_row", date_str=selected_date,
+            )
         except Exception:
             pass
         mlb_top_prop_counts = _mlb_top_prop_lane_counts(_safe_text(sport.get("context_label"), selected_date)) if sport_slug == "mlb" else None
@@ -4704,6 +4708,7 @@ def _prop_rows_from_nhl_cards(cards: list[dict[str, Any]], *, fallback_href: str
         side = _safe_text(card.get("side"), "Play")
         line = _score_value(card.get("line")) or _safe_text(card.get("line"), "-")
         market = _safe_text(card.get("market"), "Market")
+        market_key = canonical_market_key("nhl", card.get("market_key"), card.get("prop"), card.get("stat"), market)
         team = _safe_text(card.get("team"), "Team")
         opp = _safe_text(card.get("opp"), "Opp")
         prob = _numeric_value(card.get("prob"))
@@ -4717,6 +4722,7 @@ def _prop_rows_from_nhl_cards(cards: list[dict[str, Any]], *, fallback_href: str
                 "headshot_url": str(card.get("headshot_url") or "").strip() or None,
                 "is_live": True,
                 "market": market,
+                "market_key": market_key,
                 "pick": side,
                 "detail": f"{side} {line} {market} | {_safe_text(card.get('reason_summary'), 'No stored prop summary available.')}",
                 "value": prob_text,
@@ -4754,6 +4760,7 @@ def _prop_rows_from_mlb_live_games(games: list[dict[str, Any]], *, limit: int = 
             selection = str(prop.get("selection") or "").strip().title()
             line = _score_value(prop.get("line")) or _safe_text(prop.get("line"), "-")
             market = _safe_text(prop.get("marketLabel") or prop.get("market"), "Market")
+            market_key = canonical_market_key("mlb", prop.get("market_key"), prop.get("prop"), prop.get("stat"), market)
             player = _safe_text(prop.get("playerName"), "MLB prop")
             player_id = _int_or_none(
                 prop.get("playerId")
@@ -4779,6 +4786,7 @@ def _prop_rows_from_mlb_live_games(games: list[dict[str, Any]], *, limit: int = 
                 "headshot_url": headshot_url,
                 "is_live": True,
                 "market": market,
+                "market_key": market_key,
                 "pick": selection,
                 "detail": f"{selection} {line} {market}",
                 "value": value,
@@ -4874,6 +4882,10 @@ def _prop_rows_from_nba_live_lens(
         side = _safe_text(row.get("lean") or row.get("ev_side"), "Watch")
         line = _score_value(row.get("line_live") if row.get("line_live") is not None else row.get("line")) or _safe_text(row.get("line"), "-")
         market = _safe_text(row.get("stat"), "Market")
+        # `stat` here IS the source's key ("pts"/"reb"/"threes") and was
+        # used only as a display label -- the WNBA half of the 100% keyless
+        # reading. canonical_market_key maps it to the feed's vocabulary.
+        market_key = canonical_market_key(sport_slug, row.get("market_key"), row.get("prop"), row.get("stat"), market)
         probability = _pct_text(row.get("win_prob") or row.get("live_rank_probability"))
         ev_pct = _pct_text(row.get("ev"))
         value = probability or (f"EV {ev_pct}" if ev_pct else _safe_text(row.get("klass"), "Watch"))
@@ -4891,6 +4903,7 @@ def _prop_rows_from_nba_live_lens(
                 "player_name": player,
                 "is_live": row_is_live,
                 "market": market,
+                "market_key": market_key,
                 "pick": side,
                 "detail": f"{side} {line} {market_label} | {_safe_text(row.get('basketball_summary') or row.get('shape_summary'), 'Live prop signal')}",
                 "value": value,
@@ -5009,6 +5022,7 @@ def _prop_rows_from_props_recommendations_csv(
                 if not isinstance(top_play, dict):
                     continue
                 market = _safe_text(top_play.get("market"), "Market").upper()
+                market_key = canonical_market_key("mlb", top_play.get("market_key"), top_play.get("prop"), top_play.get("stat"), market)
                 side = _safe_text(top_play.get("side"), "Watch")
                 line_text = _prop_metric_text(top_play.get("line"))
                 summary = _safe_text(raw.get("top_play_explain") or raw.get("top_play_baseline"), "Top prop recommendation")
@@ -5026,6 +5040,7 @@ def _prop_rows_from_props_recommendations_csv(
                         "name": f"{player} ({team})",
                         "is_live": False,
                         "market": market,
+                "market_key": market_key,
                         "pick": side,
                         "detail": f"{side} {line_text} {market} | {summary}",
                         "value": f"EV {ev_pct:.1f}%" if ev_pct is not None else edge_text,
