@@ -802,6 +802,41 @@ outcomes for those dates from StatsAPI; (c) re-run #187/#188/#192/#195 on 66
 dates; (d) decide #193b for the K side. Everything through (c) needs no code
 change and no new infrastructure.
 
+### EVIDENCE 2026-08-05 for #193 -- three separate failures in ONE session, all from having no single source of truth. Upgrading this from "good idea" to "the blocker".
+
+User, after the #205/#206 correction: "this is exactly why we needed source of
+truth defined." Correct, and it was raised earlier in the session and deferred
+partly because I argued against it with a **wrong** objection -- I read the
+2GB/2GB/4GB service figures as DISK and claimed the data would not fit. They are
+RAM. Capacity was never a constraint. That error is why this was tabled, and the
+cost is now measurable.
+
+**Three distinct failures today, same root cause:**
+
+1. **Git mirror fragmentation (#193a)** -- four artifact families synced on four
+   different schedules: odds 46 dates, daily_summary 33 (with interior gaps),
+   roster_objs 26, feed_live 11. Intersection: **1 date**. Every conclusion in
+   #186-#192 silently rested on 14-15 slates. Several later reversed on 48.
+2. **Web-disk retention (#193a)** -- nothing before 2026-05-28 is reachable, so
+   analysis runs on 48 dates while Render has sims back to 2026-04-10.
+3. **Three disks, one HTTP surface (#205/#206 correction)** -- the ops API runs
+   on web and reads web's disk, but live-odds-worker owns the odds. Multiple
+   rounds of analysis were performed against the wrong copy, producing wrong
+   conclusions about whether a defect lives in capture or in publish -- and a
+   wrongly-confident claim that prop verdicts were unrecoverable.
+
+**The under-weighted argument**: a single source of truth is not mainly about
+ACCESS, it is about EPISTEMICS. The recurring failure this session was never
+missing data -- it was being unable to tell whether a given read was the real
+thing or a stale partial copy, and assuming it was the real thing. Five findings
+reversed and two source-of-truth errors were caught by the user, not by me. A
+single SoT removes the question instead of requiring it to be asked correctly
+every time.
+
+**Practical minimum, even short of the full build**: every read path should be
+able to answer "which service's disk did this come from, and how current is it?"
+Today nothing could, and that is precisely what made the mistakes invisible.
+
 ### OPEN 2026-08-05 (#193) -- HIGH PRIORITY: make Render the single source of data truth for all sports, all dates
 
 User: "we need ALL required data for ALL dates for ALL sports in one SINGLE
