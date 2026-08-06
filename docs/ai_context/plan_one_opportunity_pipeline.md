@@ -363,6 +363,50 @@ has made the rail-sourced rows *correct*; step 4 stops rails being a source at
 all. V3 established it must cover `intelligence.py` (`:2585`, `:7201`) as well as
 `home.py`, or half the board keeps the old feed.
 
+### BLOCKER FOUND 2026-08-06 -- the Layer 2 board has the contract but NOT the prices
+
+User report: "none of the data we've discussed is showing on the board." Correct,
+and the counters did not catch it because **they measure `/api/home`, and the
+Layer 2 board is `/api/intelligence/query`** -- a different pipeline on a
+different service.
+
+Measured after deploying all three services to HEAD:
+
+```
+/api/home              rows=256  missing_market_key=0  complete=256  (100%)
+/api/intelligence/query recs=138  withQuote=0
+```
+
+The board's candidates DO carry `market_key`, so #221-#231 are live on the
+worker. They carry **no `quote` at all**.
+
+**Root cause: `book_quotes` never reaches refresh-worker.** The Layer 2 board's
+candidates are built there (`_game_candidates_for_sport` ->
+`_game_bet_candidates_from_game` -> `enrich_candidate_rows`), and that enrichment
+reads `book_quotes` off **its own** `data_root()`. Web has the file; the worker
+does not. Zero `book_quotes` log lines have ever appeared on refresh-worker.
+
+This was reasoned about and NOT verified earlier in the session -- the claim was
+"it is allowlisted and matches the `*<date>*` pull glob, so it self-heals". The
+allowlist and the glob are both true and the file still is not there, which is
+the #208 lesson exactly: *being allowlisted only PERMITS a transfer, something
+still has to make it.* Candidate causes, in order of likelihood:
+1. the `since=` watermark -- the incremental pull only returns files modified
+   since the last successful pull, and `STREAM_PULL_FAILED ... status=502` was
+   observed on that path, which holds the watermark back;
+2. size -- these shards are tens of MB and the export endpoint has 502'd on
+   large sets before;
+3. `book_quotes` is not in `_required_daily_artifact_paths`, so the repair pass
+   that exists precisely for "missing, not stale" never asks for it.
+
+**(3) is the cheapest test and the most likely fix**: add `book_quotes` to the
+repair list, which requests an exact path with no `since=` filter and costs
+nothing when the file is already present.
+
+**The wider lesson for the counters**: they instrument one surface. `/api/home`
+at 100% said nothing about the board the user actually looks at. Instrument the
+lane the USER reads, or the metric measures the wrong thing confidently.
+
 ## 11. Residual risks
 
 
