@@ -1,6 +1,55 @@
 # Syndicate TODO — canonical cross-session list
 
-### OPEN 2026-08-05 (#206) -- Scoping the #205 fixes against Render: best-price re-grade is possible for GAME markets only, and CLV is BLOCKED (closing lines captured on 2% of markets)
+### CORRECTION 2026-08-05 to #205/#206 -- I was reading WEB's disk, not live-odds-worker's. The defect may be in the PUBLISH path, not capture.
+
+User: "are you getting data from odds worker disk?" No. This invalidates the
+attribution in #205/#206, though not necessarily their observations.
+
+`render.yaml` confirms three services, three separate disks:
+`syndicate` (**type: web**, disk `syndicate-data-web`), `refresh-worker`
+(**type: worker**, disk `syndicate-data-refresh-worker`), `live-odds-worker`
+(**type: worker**, disk `syndicate-data-live-odds-worker`). Both workers are
+`type: worker` and therefore have **no HTTP surface at all**.
+
+Every endpoint used in #205/#206 -- `artifacts/stream`, `artifacts/export`,
+`odds-history/inspect` -- runs on the WEB service and reads WEB's disk. But
+[[project-three-service-architecture]] is explicit that **live-odds-worker is
+the source of truth for odds**. So everything measured was the synced COPY, not
+the capture.
+
+**What this changes:**
+- "5 books collapsed to 1" may be the **publish/sync path** collapsing, not
+  `fetch_mlb_oddsapi_local.py` discarding at capture.
+- "props have `bookmaker: None`" may be a sync-path shape, not a capture gap.
+- "closing lines on 2% of markets" may be web not RECEIVING them rather than the
+  worker not capturing them.
+
+**If live-odds-worker's disk holds full multi-book history and closing lines,
+then #206's central conclusion is wrong**: the prop verdicts would be
+recoverable after all, CLV would be measurable today, and the fix would be in
+the publish path rather than the fetcher. #206 stated those props were
+"withdrawn, not merely uncertain" -- that claim is itself now unsupported.
+
+**Blocker**: workers serve no HTTP, so their disks cannot be inspected the way
+web's can. Ways to find out, cheapest first:
+1. Check whether `HOT_ARTIFACT_PATTERNS` even covers odds_history shards and
+   whether the publish path preserves the `bookmaker` key -- a code read, no
+   deploy needed, and it would confirm or kill the publish-path hypothesis
+   directly.
+2. Have live-odds-worker publish a small diagnostic artifact (book counts,
+   closing-capture rate on ITS disk) that web can then serve.
+3. Render shell/exec against live-odds-worker if available.
+
+**Do not act on #205/#206's fix ordering until this is resolved** -- it decides
+whether the work is a capture fix (forward-only, props unrecoverable) or a
+publish fix (retroactive, props recoverable).
+
+This is the second time this session I drew a conclusion from a synced copy
+rather than source of truth, after the same mistake with the git mirror. The
+pattern is that "I queried Render" is not the same as "I queried the service
+that owns the data."
+
+### SUPERSEDED-IN-PART 2026-08-05 (#206) -- Scoping the #205 fixes against Render: best-price re-grade is possible for GAME markets only, and CLV is BLOCKED (closing lines captured on 2% of markets)
 
 User asked to fix book capture, re-grade everything against best price, and
 account for CLV. Scoped all three against production
