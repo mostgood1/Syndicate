@@ -332,7 +332,11 @@ def enrich_prop_rows(
             quote = quote_ref_for_bet(
                 sport=sport_slug,
                 date_str=date_str,
-                market=row.get("market"),
+                # Canonical key first: "batter_total_bases" joins, the display
+                # string "Total Bases" does not. Market stays a SOFT narrowing
+                # signal either way, so a sport with no canonical key still
+                # matches on player identity.
+                market=row.get("market_key") or row.get("market"),
                 selection=row.get("pick") or row.get("selection"),
                 line=row.get("line"),
                 player_name=player,

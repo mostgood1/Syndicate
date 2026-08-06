@@ -2936,6 +2936,20 @@ def _build_prop_dashboard_row(sport: dict[str, Any], item: dict[str, Any], *, de
         "sport_slug": _safe_text(sport.get("slug"), "sport").lower(),
         "surface": heading,
         "name": _safe_text(item.get("name"), "Prop"),
+        # IDENTITY, not display. This function reconstructs a new dict rather
+        # than passing `item` through, and dropped these -- exactly the failure
+        # the commence_time comment above records, one field-set later.
+        # Verified live 2026-08-06: MLB rail items carry a correct
+        # player_name ("Ryan Johnson") and player_id, and every row this
+        # function produced had player_name: null, which is why 0 of 14
+        # top_props rows could be joined to a price. `name` is the display
+        # label ("Ryan Johnson Walks Allowed") and is not a substitute.
+        "player_name": _safe_text(item.get("player_name") or item.get("player") or item.get("entity"), None),
+        "player_id": item.get("player_id"),
+        # The canonical, sport-agnostic market key where the source has one
+        # (MLB prop rows carry prop="batter_total_bases"). `market` below is a
+        # display string ("Walks Allowed") and must never be used as a key.
+        "market_key": _safe_text(item.get("market_key") or item.get("prop") or item.get("prop_market_key") or item.get("stat"), None),
         "headshot_url": _safe_text(item.get("headshot_url") or item.get("photo"), None),
         "market": _safe_text(item.get("market"), heading),
         "pick": _safe_text(item.get("pick"), detail.split("|")[0].strip() if detail else heading),
